@@ -95,6 +95,53 @@ namespace Nino {
 		}
 
 		/**
+		 *	The class a callable belongs to: [class|object, method],
+		 *	'Class::method', or the scope of a Closure - what says which module
+		 *	or feature registered it (see \Nino\Features::shortcodes())
+		 *
+		 *	@param		mixed			$callback
+		 *
+		 *	@return 	string|null							The class name without a leading backslash, null for a plain function
+		 */
+		public static function owner( mixed $callback ): ?string {
+
+			if( is_array( $callback ) === true && isset( $callback[0] ) === true ) {
+
+				if( is_object( $callback[0] ) === true )
+					return $callback[0]::class;
+
+				return is_string( $callback[0] ) === true ? ltrim( $callback[0], '\\' ) : null;
+			}
+
+			if( is_string( $callback ) === true && str_contains( $callback, '::' ) === true )
+				return ltrim( explode( '::', $callback, 2 )[0], '\\' );
+
+			if( $callback instanceof \Closure )
+				return ( new \ReflectionFunction( $callback ) )->getClosureScopeClass()?->getName();
+
+			return null;
+		}
+
+		/**
+		 *	Who registered what is registered under a name, for a sentence: the
+		 *	classes of the callables, in the order they are called
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The hook name
+		 *
+		 *	@return 	string									Eg. 'Nino\Modules\Meetups', 'an unknown registrant' where no class says
+		 */
+		public static function owners( array &$appData, string $name ): string {
+
+			$owners = [];
+
+			foreach( self::registered( $appData, $name ) as $callback )
+				$owners[] = self::owner( $callback ) ?? 'a function';
+
+			return $owners === [] ? 'an unknown registrant' : implode( ', ', array_unique( $owners ) );
+		}
+
+		/**
 		 *	Take every callable registered under a name away - what a
 		 *	registration that replaces its predecessor rather than joining it
 		 *	does first (see \Nino\Modules\Components::addComponent()), since a

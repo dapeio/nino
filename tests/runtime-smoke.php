@@ -198,6 +198,12 @@ check( 'registered() lists the callables in the order they are called, and fires
 \Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', [ KernelSmokeCallbackTarget::class, 'staticMethod' ], 2 );
 check( '...a lower priority number first, as doCallbacks() runs it, and a name nobody registered has none', \Nino\Callbacks::registered( $appData, 'test/callbackshapes' )[0] === [ KernelSmokeCallbackTarget::class, 'staticMethod' ]
 	&& count( \Nino\Callbacks::registered( $appData, 'test/callbackshapes' ) ) === 5 && \Nino\Callbacks::registered( $appData, 'test/nobody-registered-this' ) === [] );
+check( 'owners() names the class of each callable once, a callable of no class as a function, in the order they are called',
+	\Nino\Callbacks::owners( $appData, 'test/callbackshapes' ) === KernelSmokeCallbackTarget::class. ', a function' );
+check( '...and a name nobody registered has an unknown registrant', \Nino\Callbacks::owners( $appData, 'test/nobody-registered-this' ) === 'an unknown registrant' );
+check( 'owner() reads the class of an object method, a static one, a "Class::method" string and a closure\'s scope, and none for a plain function',
+	\Nino\Callbacks::owner( [ $callbackTarget, 'instanceMethod' ] ) === KernelSmokeCallbackTarget::class && \Nino\Callbacks::owner( [ '\\'. KernelSmokeCallbackTarget::class, 'staticMethod' ] ) === KernelSmokeCallbackTarget::class
+	&& \Nino\Callbacks::owner( KernelSmokeCallbackTarget::class. '::staticMethod' ) === KernelSmokeCallbackTarget::class && \Nino\Callbacks::owner( 'kernelSmokeCallbackFunction' ) === null );
 \Nino\Html::addShortcode( $appData, 'shortcodelist-a', 'kernelSmokeCallbackFunction' );
 \Nino\Html::addShortcode( $appData, 'shortcodelist-b', 'kernelSmokeCallbackFunction' );
 check( 'Html::shortcodes() lists the registered names, the kernel\'s own among them, in the order they were added', array_slice( \Nino\Html::shortcodes( $appData ), -2 ) === [ 'shortcodelist-a', 'shortcodelist-b' ]

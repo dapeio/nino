@@ -168,7 +168,7 @@ namespace Nino {
 		 *
 		 *	A directory without a readable manifest is skipped with a warning
 		 *	naming it, and so is a second directory claiming a key an earlier
-		 *	one holds. Read once per request.
+		 *	one holds; rejected() answers which, and why. Read once per request.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -180,6 +180,7 @@ namespace Nino {
 				return $appData['./nino/features/all'];
 
 			$features = [];
+			$rejected = [];
 			$dir = self::dir();
 
 			foreach( is_dir( $dir ) === true ? ( scandir( $dir ) ?: [] ) : [] as $entry ) {
@@ -189,12 +190,15 @@ namespace Nino {
 				if( $entry[0] === '.' || is_dir( $path ) === false || is_file( $path. '/'. self::MANIFEST ) === false )
 					continue;
 
-				$manifest = self::manifest( $path );
-				if( $manifest === null )
+				$manifest = self::manifest( $path, $reason );
+				if( $manifest === null ) {
+					$rejected[$entry] = (string) $reason;
 					continue;
+				}
 
 				if( isset( $features[ $manifest['key'] ] ) === true ) {
 					trigger_error( 'Feature in '. $path. ' claims the key "'. $manifest['key']. '" that '. $features[ $manifest['key'] ]['dir']. ' already holds', E_USER_WARNING );
+					$rejected[$entry] = 'claims the key "'. $manifest['key']. '" that the directory '. basename( $features[ $manifest['key'] ]['dir'] ). ' already holds';
 					continue;
 				}
 
@@ -217,8 +221,62 @@ namespace Nino {
 			unset( $feature );
 
 			$appData['./nino/features/all'] = $features;
+			$appData['./nino/features/rejected'] = $rejected;
 
 			return $features;
+		}
+
+		/**
+		 *	The directories below features/ whose manifest all() refused, with
+		 *	the reason - the sentence the warning in the log carries, in the order of the
+		 *	directory, as all() reads it, for the
+		 *	panel that lists the features. They are not loaded and not in all()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										directory name => reason
+		 */
+		public static function rejected( array &$appData ): array {
+
+			self::all( $appData );
+
+			return (array) ( $appData['./nino/features/rejected'] ?? [] );
+		}
+
+		/**
+		 *	Whether \Nino\Modules\<Name> is a module of the kernel or of the workbench: the autoloader
+		 *	serves those before a feature's, so a directory of that name is no feature's class
+		 *
+		 *	@param		string		$name					A directory name below features/
+		 *
+		 *	@return 	string|null							'the kernel' or 'the workbench', null where neither has a module of that name
+		 */
+		public static function moduleOwner( string $name ): ?string {
+
+			foreach( [ 'the kernel' => dirname( __DIR__, 2 ), 'the workbench' => dirname( __DIR__, 3 ). '/_admin' ] as $owner => $root )
+				if( is_dir( $root. '/Nino/Modules/'. $name ) === true )
+					return $owner;
+
+			return null;
+		}
+
+		/**
+		 *	Of rejected(), the directories whose class is listed in '/nino/modules' all
+		 *	the same - not the one that is named like a module of the kernel or of the workbench, whose
+		 *	class listed there is that module and no feature's: a feature that was switched on and whose manifest is refused now
+		 *	runs unfinished - its init() runs, its panel is in the menu - while all()
+		 *	does not know it, so nothing that reads the features sees it: not the
+		 *	panel's tabs, not a switch-off, not the data a backup carries
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										directory name => reason
+		 */
+		public static function rejectedActive( array &$appData ): array {
+
+			$active = array_map( static fn( mixed $class ): string => '\\'. ltrim( (string) $class, '\\' ), (array) ( $appData['/nino/modules'] ?? [] ) );
+
+			return array_filter( self::rejected( $appData ), static fn( string $directory ): bool => in_array( '\\Nino\\Modules\\'. $directory, $active, true ) === true && self::moduleOwner( $directory ) === null, ARRAY_FILTER_USE_KEY );
 		}
 
 		/**
@@ -260,7 +318,7 @@ namespace Nino {
 			foreach( \Nino\Html::shortcodes( $appData ) as $name )
 				foreach( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/'. $name ) as $callback ) {
 
-					$owner = self::_callbackClass( $callback );
+					$owner = \Nino\Callbacks::owner( $callback );
 
 					if( $owner !== null && ( $owner === $module || str_starts_with( $owner, $module. '\\' ) === true ) ) {
 						$names[] = $name;
@@ -274,33 +332,6 @@ namespace Nino {
 		}
 
 		/**
-		 *	The class a callable belongs to: [class|object, method],
-		 *	'Class::method', or the scope of a Closure
-		 *
-		 *	@param		mixed			$callback
-		 *
-		 *	@return 	string|null							The class name without a leading backslash, null for a plain function
-		 */
-		private static function _callbackClass( mixed $callback ): ?string {
-
-			if( is_array( $callback ) === true && isset( $callback[0] ) === true ) {
-
-				if( is_object( $callback[0] ) === true )
-					return $callback[0]::class;
-
-				return is_string( $callback[0] ) === true ? ltrim( $callback[0], '\\' ) : null;
-			}
-
-			if( is_string( $callback ) === true && str_contains( $callback, '::' ) === true )
-				return ltrim( explode( '::', $callback, 2 )[0], '\\' );
-
-			if( $callback instanceof \Closure )
-				return ( new \ReflectionFunction( $callback ) )->getClosureScopeClass()?->getName();
-
-			return null;
-		}
-
-		/**
 		 *	Read and validate one feature's manifest. Null with a warning when
 		 *	the file is missing or does not describe a feature - a manifest
 		 *	that is half right is not applied half way.
@@ -311,16 +342,19 @@ namespace Nino {
 		 *	when it says the same and refused when it says anything else.
 		 *
 		 *	@param		string		$dir					The feature directory
+		 *	@param		string|null	&$reason			(reference) Why the manifest was refused, null when it was not
 		 *
 		 *	@return 	array|null							The manifest with every key present and normalized, plus 'dir' and 'module'
 		 */
-		public static function manifest( string $dir ): ?array {
+		public static function manifest( string $dir, ?string &$reason = null ): ?array {
 
 			$dir = rtrim( $dir, '/' );
 			$path = $dir. '/'. self::MANIFEST;
 			$name = basename( $dir );
+			$reason = null;
 
-			$fail = static function( string $why ) use ( $path ): null {
+			$fail = static function( string $why ) use ( $path, &$reason ): null {
+				$reason = $why;
 				trigger_error( 'Feature manifest '. $path. ': '. $why, E_USER_WARNING );
 				return null;
 			};
@@ -333,14 +367,22 @@ namespace Nino {
 			// named like a module of the kernel or of the workbench, or a class below it (its
 			// panel is \Nino\Modules\<Name>\Admin), is the kernel's and never the feature's:
 			// a directory of that name in either root takes the name
-			foreach( [ 'the kernel' => dirname( __DIR__, 2 ), 'the workbench' => dirname( __DIR__, 3 ). '/_admin' ] as $owner => $root )
-				if( is_dir( $root. '/Nino/Modules/'. $name ) === true )
-					return $fail( 'the directory name is taken: \\Nino\\Modules\\'. $name. ' is a module of '. $owner. ', which the autoloader serves before a feature\'s' );
+			$owner = self::moduleOwner( $name );
+			if( $owner !== null )
+				return $fail( 'the directory name is taken: \\Nino\\Modules\\'. $name. ' is a module of '. $owner. ', which the autoloader serves before a feature\'s' );
 
 			if( is_file( $path ) === false )
 				return $fail( 'no such file' );
 
-			$raw = include $path;
+			// A manifest is a php file somebody wrote: one that does not parse or throws when it is
+			// included is a refusal with its reason, not a request that ends in a 500
+			try {
+				$raw = include $path;
+			}
+			catch( \Throwable $error ) {
+				return $fail( 'cannot be included: '. $error::class. ': '. $error->getMessage(). ' (line '. $error->getLine(). ')' );
+			}
+
 			if( is_array( $raw ) === false )
 				return $fail( 'must return an array' );
 

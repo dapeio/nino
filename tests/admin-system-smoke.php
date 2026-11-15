@@ -380,6 +380,39 @@ $failed = \Nino\Modules\Backups::now( $appData );
 $appData['/nino/backup/key'] = $goodKey;
 check( 'a backup that fails deletes no archive, whatever is over the limit', is_array( $failed ) === true && $dailyFiles() === $daysBefore && $timedFiles() === $handsBefore && count( $handsBefore ) > 3 );
 
+// A feature that is switched on and whose manifest is refused owns data no archive can name: the run ends with
+// the feature and the reason, writes no archive and prunes nothing. The features as the request read them are set by hand
+$modulesBefore = $appData['/nino/modules'];
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Probe';
+$appData['./nino/features/all'] = [];
+$appData['./nino/features/rejected'] = [ 'Probe' => 'cannot be included: RuntimeException: boom (line 1)' ];
+$daysBefore = $dailyFiles();
+$handsBefore = $timedFiles();
+$refusedRun = \Nino\Modules\Backups::now( $appData );
+check( 'a backup refuses to run while a feature that is switched on has a refused manifest, naming the feature and the reason',
+	is_array( $refusedRun ) === true && $refusedRun[0] === 500 && str_contains( (string) $refusedRun[1], 'features/Probe' ) && str_contains( (string) $refusedRun[1], 'RuntimeException: boom' ) );
+check( '...and writes no archive, leaves no temporary file and removes none', $dailyFiles() === $daysBefore && $timedFiles() === $handsBefore && glob( $nowDir. '/*.tmp' ) === [] );
+// ...nor does the stray directory of a kernel module's name, whose listed class is the kernel's own
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Elements';
+$appData['./nino/features/rejected'] = [ 'Elements' => 'the directory name is taken' ];
+$strayRun = \Nino\Modules\Backups::now( $appData );
+check( '...a refused manifest in a directory named like a module of the kernel does not stop a backup either', is_string( $strayRun ) === true );
+@unlink( $nowDir. '/'. $strayRun. '.php' );
+// The restore of the panel takes a safety copy first and is refused with the backup's sentence, before anything is touched
+$appData['./nino/features/rejected'] = [ 'Probe' => 'cannot be included: RuntimeException: boom (line 1)' ];
+$snapshotsBefore = glob( $nowDir. '/pre-restore-*.php' ) ?: [];
+$configBefore = (string) file_get_contents( \Nino\Filesystem::path( $appData, '/config.php' ) );
+[ $restoreRefused, $restoreBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => date( 'Y-m-d' ) ] );
+check( 'the restore of the panel is refused with the backup\'s reason while a feature that is on has a refused manifest, and touches nothing',
+	$restoreRefused === 409 && str_contains( (string) ( $restoreBody['error'] ?? '' ), 'features/Probe' ) && $restoreBody['error'] === \Nino\Backup::featureRefusal( $appData )
+	&& ( glob( $nowDir. '/pre-restore-*.php' ) ?: [] ) === $snapshotsBefore && (string) file_get_contents( \Nino\Filesystem::path( $appData, '/config.php' ) ) === $configBefore );
+$appData['./nino/features/rejected'] = [ 'Idle' => 'a reason' ];
+$idleRun = \Nino\Modules\Backups::now( $appData );
+check( '...a refused manifest of a feature that is not switched on does not stop a backup', is_string( $idleRun ) === true );
+@unlink( $nowDir. '/'. $idleRun. '.php' );
+$appData['/nino/modules'] = $modulesBefore;
+unset( $appData['./nino/features/all'], $appData['./nino/features/rejected'] );
+
 $pruneId = \Nino\Modules\Backups::now( $appData );
 $timedNow = $timedFiles();
 check( 'by default the newest three archives made by hand are kept, the new one among them', count( $timedNow ) === 3 && in_array( $pruneId. '.php', $timedNow, true ) === true

@@ -61,7 +61,7 @@ directory per feature as a `.tar.gz` that its signed catalogue lists by digest, 
 `feature.php` lies beside the class file and returns an array;
 `\Nino\Features::manifest()` reads and validates it. A manifest that breaks a rule
 is skipped whole, with a warning that names the file and the reason, and so is a
-second directory that claims a key an earlier one holds. The one of `Hello` is
+second directory that claims a key an earlier one holds; `\Nino\Features::rejected()` answers which directories, with the reason, and the Features panel lists them under **Inactive**, as text, for an account that may manage features. The one of `Hello` is
 `features/Hello/feature.php`:
 
 ```php features/Hello/feature.php
@@ -330,7 +330,7 @@ methods on a feature's classes:
 | a callback of `'/nino/admin/restore'` | by the Backups panel and the recovery page, with `{ dataDir, staging }` | none ([Data and restore](#data-and-restore)) |
 | on a panel class: `log( $action, $data )`, `summary( &$appData )`, `scopes( &$appData )` | after an action that completed; by the Dashboard; by the roles tab | the line of the activity log (`''` for none); a tile `{ value, label }`; the scoped permissions |
 
-What a feature may read where it draws the head of the Dashboard: `\Nino\Runtime::getSessionValue( $appData, './nino/auth/previous' )`, the login before the one that opened the session (`0` for the first login of an account, `null` where the session holds none), `\Nino\Modules\Logs\Admin::countSince( $appData, $since, $actor, $visit )`, the number of lines the activity log holds since a visit (the minute of `$since` and the sign-in of `$actor` at `$visit` are not counted), and `\Nino\Modules\Backups::lastDate()`. The kernel itself reads none of them; they are there for a feature, behind `class_exists()` where its module may be off. The callback of `'/nino/admin/dashboard/head'` is asked on its own for every account that opens the Dashboard: one that throws or answers no list is named in a warning and its answer dropped, an entry whose name is no slug or whose data is no array is named and left out, and a name that is taken stays with the first. The script is as safe: a `render()` that throws, or answers anything but an element or `null`, is named in the console and its area left out, and the rest of the Dashboard is drawn.
+What a feature may read where it draws the head of the Dashboard: `\Nino\Runtime::getSessionValue( $appData, './nino/auth/previous' )`, the login before the one that opened the session (`0` for the first login of an account, `null` where the session holds none), `\Nino\Modules\Logs\Admin::countSince( $appData, $since, $actor, $visit )`, the number of lines the activity log holds since a visit (the minute of `$since` and the sign-in of `$actor` at `$visit` are not counted), and `\Nino\Modules\Backups::lastDate()`. The kernel itself reads none of them; they are there for a feature, behind `class_exists()` where its module may be off. The callback of `'/nino/admin/dashboard/head'` is asked on its own for every account that opens the Dashboard: one that throws or answers no list is named in a warning and its answer dropped, an entry whose name is no slug or whose data is no array is named and left out, and a name that is taken stays with the first. The script is as safe: a `render()` that throws, or answers anything but an element or `null`, is named in the console and its area left out, and the rest of the Dashboard is drawn. A date an area shows is written by `\Nino\Format::date()`, `dateLong()` or `datetime()`: the callback runs in the interface language of the session, and they write in it.
 
 There is no install, activate, deactivate or uninstall hook: a feature lies in the
 directory, an activation applies its unit and lists its class, and nothing runs on
@@ -804,7 +804,7 @@ before the test was included - and `tests/harness.php` gives nine helpers:
 | Helper | What it does |
 |---|---|
 | `check( $label, $condition )` | one assertion, one line of output |
-| `ninoSandbox( $name )`, `ninoSandboxDir( $appData )` | a fresh, isolated project directory - `$appData` with every path in it, the locales `de_DE` and `en_US`, no modules, the test switches on what it tests - and its path |
+| `ninoSandbox( $name )`, `ninoSandboxDir( $appData )` | a fresh, isolated project directory - `$appData` with every path in it, the directory it is served from (`/nino/dir`, empty: the domain root), the locales `de_DE` and `en_US`, no modules, the test switches on what it tests - and its path |
 | `ninoWarnings()`, `ninoErrors( $run )` | the warnings raised since the last call, cleared as they are read - assert on the one you expect; every error one call raises, the level with it |
 | `ninoCall( $appData, $target, $data, $action )` | one workbench request as a panel method sees it: `$_POST['data']` is the json of `$data`; answers `[ status, body, request ]` |
 | `ninoUser( $appData, $mail, $perms )` | an account that exists and is signed in, full access unless `$perms` says otherwise |

@@ -172,7 +172,8 @@ namespace Nino\Modules\Features {
 		 *	the panel offers no Refresh button) and whether the features
 		 *	directory is writable, and the last cached catalogue, if there is
 		 *	one - so the Available tab fills without a request of its own,
-		 *	see \Nino\Catalogue::cached()
+		 *	see \Nino\Catalogue::cached(), and the directories whose manifest
+		 *	was refused with the reason ('rejected', see \Nino\Features::rejected())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -192,8 +193,18 @@ namespace Nino\Modules\Features {
 
 			self::_byName( $features );
 
+			// The directories whose manifest the kernel refused: not features, but listed with the
+			// reason, which the log holds too - a feature that vanishes without a word is the worst answer
+			// 'active' where the class of the directory is listed in the modules all the same: that feature
+			// runs unfinished, and the panel says so under Active
+			$rejected = [];
+			$running	= \Nino\Features::rejectedActive( $appData );
+			foreach( \Nino\Features::rejected( $appData ) as $directory => $reason )
+				$rejected[] = [ 'dir' => (string) $directory, 'reason' => $reason, 'active' => isset( $running[$directory] ) ];
+
 			\Nino\Http::ok( $request, [
 				'dir'					=> self::_dir(),
+				'rejected'		=> $rejected,
 				'catalogueUrl'	=> \Nino\Catalogue::url( $appData ),
 				'writable'		=> \Nino\Catalogue::writable(),
 				'catalogue'		=> self::_cachedCatalogue( $appData, $locale ),

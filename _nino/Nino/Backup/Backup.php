@@ -513,6 +513,23 @@ namespace Nino {
 			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features ], true ). ';';
 		}
 
+		/**
+		 *	Why a run that takes a safety copy of the project must not start: a feature is switched on
+		 *	and its manifest is refused (see \Nino\Features::rejectedActive()), so the data it owns
+		 *	cannot be named and an archive would lack it without a word. The one sentence of the backup
+		 *	and of the restore of the Backups panel
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							The reason, null where nothing stands in the way
+		 */
+		public static function featureRefusal( array &$appData ): ?string {
+
+			$refused = \Nino\Features::rejectedActive( $appData );
+
+			return $refused === [] ? null : 'backup refused: the feature in features/'. array_key_first( $refused ). ' is switched on and its manifest is refused ('. reset( $refused ). '), so its data cannot be named';
+		}
+
 
 		/**
 		 *	Pack the files of a manifest into a tar and compress it: one pass over

@@ -183,7 +183,7 @@ Fehlt die Datei einer Sprache, zeigt die Workbench die englischen Worte.
 
 ## Prüfen
 
-Lade `/_admin` neu. Ein Update ist nicht nötig, denn die Einheit hat sich nicht geändert.
+Lade `/_admin` neu. Ein Update ist nicht nötig, denn die Einheit hat sich nicht geändert. Siehst Du eine Änderung an einer PHP-Datei nicht, warte zwei Sekunden und lade noch einmal: OPcache prüft eine Datei nur alle zwei Sekunden (`opcache.revalidate_freq = 2`).
 
 - Im Menü steht unter **Features** der Eintrag „Treffen“. Ein Bereich eines Features steht immer in dieser Gruppe.
 - Der Bereich zeigt die Anmeldungen aus Tutorial 7 in einer Tabelle: Name, Treffen, Zeitpunkt.
@@ -193,6 +193,7 @@ Lade `/_admin` neu. Ein Update ist nicht nötig, denn die Einheit hat sich nicht
 ## Häufige Fehler
 
 - **Eine Aktion ohne `guardPerm()`.** Dann kann jedes angemeldete Konto sie aufrufen, auch eines ohne das Recht des Bereichs. Die Workbench prüft für eine Aktion nur das Token und die Anmeldung. Das Menü versteckt nur den Eintrag.
+- **`getElement()` in der Workbench.** `\Nino\Elements::getElement()` liest genau die Sprache, die Du nennst, und lässt einen Text weg, der dort fehlt. Der Code Deines Bereichs ruft deshalb `getElementWithFallback()`, wie das Beispiel oben: Die Funktion nimmt für ein fehlendes Feld die Sprache, die einen Text hat.
 - **Die Adresse ist vergeben.** Adressen wie `elements`, `text`, `users` oder `features` gehören der Workbench. Nino lässt einen zweiten Bereich mit derselben Adresse weg und schreibt eine Warnung.
 - **`innerHTML` mit Daten vom Server.** Setze Text mit `textContent` oder mit den Helfern von `Nino.adminUi`.
 

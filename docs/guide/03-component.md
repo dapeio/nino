@@ -155,8 +155,8 @@ Das Attribut `colour` steht nicht im Schema. Nino lässt es weg, und die Kompone
 ## Häufige Fehler
 
 - **Der alte Aufruf `[meetup-date 2026-12-24]` zeigt nichts mehr.** Das erste Argument ist jetzt eine Quelle. Ein fester Wert steht in `text="…"`.
-- **Ein Attribut ohne `default`.** Nino lehnt dann das ganze Manifest ab, und das Feature verschwindet aus dem Bereich Features. Der Grund steht in `private/data/logs.<Jahr>-<Monat>.php`, siehe [Beim Entwickeln](README.md#beim-entwickeln).
-- **Doppelt anmelden.** Melde eine Komponente entweder im Manifest an oder in `init()`, nie beides.
+- **Ein Attribut ohne `default`.** Nino lehnt dann das ganze Manifest ab und lädt das Feature nicht. Der Bereich Features zeigt es weiter an, mit dem Grund der Ablehnung. Derselbe Grund steht in `private/data/logs.<Jahr>-<Monat>.php`, siehe [Beim Entwickeln](README.md#beim-entwickeln). Ein Syntaxfehler oder eine Ausnahme in `feature.php` lehnt es ebenso ab. Dann nennt der Bereich Art, Meldung und Zeile des Fehlers. War das Feature eingeschaltet, steht es unter **Aktiv** mit dem Hinweis, dass es unvollständig läuft, und ein Backup hält an, bis Du das Manifest repariert hast.
+- **Doppelt anmelden.** Melde eine Komponente entweder im Manifest an oder in `init()`, nie beides. Trägt ein Name schon als Shortcode im Register und kommt er als Komponente dazu (oder umgekehrt), schreibt Nino eine Warnung ins Log. Sie nennt beide Klassen, die ihn anmelden.
 - **`$args['value']` noch einmal maskieren.** Aus `&` wird dann `&amp;amp;`.
 
 ## Nachschlagen

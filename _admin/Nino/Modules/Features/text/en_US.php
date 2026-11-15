@@ -31,6 +31,8 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
+	'[[/_admin/features/label/rejected]]'		=> 'Not loaded: its manifest was refused',
+	'[[/_admin/features/label/rejected-active]]'	=> 'Switched on, but its manifest was refused: the feature runs incomplete',
 	/*	The two tabs of a feature's own screen: what it is, and what can be
 		set on it. A feature that describes itself nowhere, or declares no
 		setting, has the one pane it has and no strip over it	*/

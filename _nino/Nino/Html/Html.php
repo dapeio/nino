@@ -281,6 +281,15 @@ namespace Nino {
 		 */
 		public static function addShortcode( array &$appData, string $shortcode, mixed $callback ): void {
 
+			// A name that is a component or a stack already, with its renderer registered: a plain
+			// shortcode joining it is handed the component's output as its arguments, which is
+			// never meant - said in the log with both registrants. (A component's own registration
+			// takes its callbacks away first, so it does not come this way)
+			if( ( isset( $appData[\Nino\Modules\Components::REGISTRY][$shortcode] ) === true || isset( $appData[\Nino\Modules\Components::STACKS][$shortcode] ) === true )
+				&& \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/'. $shortcode ) !== [] )
+				trigger_error( 'Html::addShortcode(): "'. $shortcode. '" is a component of '. $appData[\Nino\Modules\Components::OWNERS][$shortcode]
+					. ' already; the shortcode of '. ( \Nino\Callbacks::owner( $callback ) ?? 'a function' ). ' is handed its output', E_USER_WARNING );
+
 			// Add shortcode in appData
 			$appData['./nino/html/shortcodes'][$shortcode] = $shortcode;
 

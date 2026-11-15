@@ -84,6 +84,9 @@
 		_pendingMsg : {},
 		_dir 				: '',
 		_features 	: [],
+		// The directories whose manifest the kernel refused, { dir, reason } - shown with the
+		// inactive features, which they are not: they are listed so that none vanishes unexplained
+		_rejected 	: [],
 		// The catalogue url as features/list names it - '' when it is switched off,
 		// which is when the Available tab offers no Refresh button at all
 		_catalogueUrl : '',
@@ -173,6 +176,7 @@
 				Nino.admin.features._writable			= response.writable === true;
 				Nino.admin.features._cache 				= response.catalogue || null;
 				Nino.admin.features._features			= response.features || [];
+				Nino.admin.features._rejected			= response.rejected || [];
 				if( Nino.admin.features._ready === false )
 					Nino.admin.features._tabFromAddress();
 				Nino.admin.features._renderPanel();
@@ -280,11 +284,34 @@
 		_counts : function() {
 			const matches = Nino.admin.features._matches;
 			return {
-				active		: Nino.admin.features._features.filter( function( f ) { return f.active === true && matches( f ) } ).length,
-				inactive	: Nino.admin.features._features.filter( function( f ) { return f.active === false && matches( f ) } ).length,
+				active		: Nino.admin.features._features.filter( function( f ) { return f.active === true && matches( f ) } ).length
+					+ Nino.admin.features._rejectedShown( true ).length,
+				inactive	: Nino.admin.features._features.filter( function( f ) { return f.active === false && matches( f ) } ).length
+					+ Nino.admin.features._rejectedShown( false ).length,
 				available	: Nino.admin.features._availableOffers().filter( matches ).length,
 				applications	: Nino.admin.features._applications().filter( Nino.admin.features._matchesApplication ).length,
 			};
+		},
+
+		/**
+		 *	The refused manifests the filter lets through: by directory and by reason, in the
+		 *	query's terms; the category select, which a refused manifest has none of, hides them.
+		 *	Those whose class is listed in the modules all the same belong to Active, the others to Inactive
+		 *
+		 *	@param		{boolean}	active			Of the Active tab or of the Inactive one
+		 *
+		 *	@return		{Array}								Entries { dir, reason, active }
+		 */
+		_rejectedShown : function( active ) {
+
+			const query = Nino.admin.features._filter.trim().toLowerCase();
+
+			if( Nino.admin.features._category !== '' )
+				return [];
+
+			return Nino.admin.features._rejected.filter( function( entry ) {
+				return ( entry.active === true ) === active && ( query === '' || ( entry.dir+ ' '+ entry.reason ).toLowerCase().indexOf( query ) !== -1 );
+			} );
 		},
 
 		/**
@@ -746,16 +773,17 @@
 
 			const all	= Nino.admin.features._features.filter( function( f ) { return f.active === active } );
 			const list	= all.filter( Nino.admin.features._matches );
+			const refused	= Nino.admin.features._rejectedShown( active );
 
 			// The tab is empty, or the filter emptied it - two different things to
 			// be told, and the second one is not a reason to explain what a
 			// feature directory is
-			if( all.length === 0 ) {
+			if( all.length === 0 && Nino.admin.features._rejected.filter( function( entry ) { return ( entry.active === true ) === active } ).length === 0 ) {
 				panel.appendChild( Nino.adminUi.emptyState( Nino.adminUi.format( Nino.content.getText( active === true ? '/_admin/features/hint/active-empty' : '/_admin/features/hint/empty' ), Nino.admin.features._dir ) ) );
 				return;
 			}
 
-			if( list.length === 0 ) {
+			if( list.length === 0 && refused.length === 0 ) {
 				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/nomatch') ) );
 				return;
 			}
@@ -765,13 +793,48 @@
 				rows.className = 'nino-admin-list nino-admin-list-buttons';
 				list.forEach( function( feature ) { rows.appendChild( Nino.admin.features._renderActiveRow( feature ) ) } );
 				panel.appendChild( rows );
+
+				if( refused.length > 0 ) {
+					const running = dc.createElement('ul');
+					running.className = 'nino-admin-list';
+					refused.forEach( function( entry ) { running.appendChild( Nino.admin.features._renderRejected( entry ) ) } );
+					panel.appendChild( running );
+				}
+
 				return;
 			}
 
 			const rows = dc.createElement('ul');
 			rows.className = 'nino-admin-list';
 			list.forEach( function( feature ) { rows.appendChild( Nino.admin.features._renderFeature( feature ) ) } );
+			refused.forEach( function( entry ) { rows.appendChild( Nino.admin.features._renderRejected( entry ) ) } );
 			panel.appendChild( rows );
+		},
+
+		/**
+		 *	One directory whose manifest the kernel refused: its name, the line that says it is
+		 *	not loaded - or, for a feature that is switched on all the same, that it runs
+		 *	unfinished - and the reason as the kernel worded it - text, never markup. No actions:
+		 *	there is no feature to switch on, the manifest is to be mended
+		 *
+		 *	@param		{Object}	entry				An entry of 'rejected' in features/list
+		 *
+		 *	@return		{Element}							<li>
+		 */
+		_renderRejected : function( entry ) {
+
+			const row = dc.createElement('li');
+			row.dataset.rejected = entry.dir;
+
+			// The sentence and the reason are notes, which wrap: the one line under a name is cut off with an ellipsis
+			// and a sentence cut in the middle says nothing
+			const copy = Nino.admin.features._copy( entry.dir, '', '' );
+			copy.removeChild( copy.children[ copy.children.length - 1 ] );
+			copy.appendChild( Nino.admin.features._note( Nino.content.getText( entry.active === true ? '/_admin/features/label/rejected-active' : '/_admin/features/label/rejected' ), false ) );
+			copy.appendChild( Nino.admin.features._note( entry.reason, true ) );
+			row.appendChild( copy );
+
+			return row;
 		},
 
 		/**
@@ -1207,6 +1270,7 @@
 					Nino.admin.features._writable			= response.writable === true;
 					Nino.admin.features._cache 				= response.catalogue || null;
 					Nino.admin.features._features			= response.features || [];
+					Nino.admin.features._rejected			= response.rejected || [];
 
 					const now = Nino.admin.features._applications().filter( function( a ) { return a.key === application.key } )[0];
 

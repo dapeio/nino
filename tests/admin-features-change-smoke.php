@@ -448,7 +448,7 @@ check( 'with the file in order again, a taken lock is busy and a free one is had
 \Nino\Features::unlock( $holder );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $app ) );
 
-// A manifest that throws: every look at the features dies, in the middle of the change
+// A manifest that throws is refused with its reason (Features::manifest()): no look at the features dies on it, in the middle of a change or elsewhere, and the lock is free after each
 $reset();
 $app = $project( 'change-dies' );
 $publish( $app );
@@ -469,11 +469,11 @@ foreach( $dies as $name => $change ) {
 	$threw = false;
 	try { $change(); }
 	catch( \RuntimeException ) { $threw = true; }
-	if( $threw === false || \Nino\Features::lock( $holder ) !== true )
+	if( $threw === true || \Nino\Features::lock( $holder ) !== true )
 		$kept[] = $name;
 	\Nino\Features::unlock( $holder );
 }
-check( 'a change that dies in the middle gives the lock back: switching off, removing, installing, the panel\'s change, saving settings', $kept === [] );
+check( 'a manifest that throws kills none of the changes - switching off, removing, installing, the panel\'s change, saving settings - and is listed as refused', $kept === [] && isset( \Nino\Features::rejected( $app )['Throws'] ) === true );
 unlink( NINO_FEATURES_DIR. '/Throws/feature.php' );
 rmdir( NINO_FEATURES_DIR. '/Throws' );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $app ) );

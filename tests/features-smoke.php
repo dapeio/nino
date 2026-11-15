@@ -36,6 +36,8 @@ $appData['/nino/http/routes'] = [
 ninoWarnings();
 
 
+function Features_dir_of( string $name ): string { return \Nino\Features::dir(). '/'. $name; }
+
 /** A panel of some module that happens to use the uri a Settings tab would ask for */
 class FeaturesSmokeCollider {
 	public static function adminPanels( array &$appData ): array { return [ self::class ]; }
@@ -70,6 +72,18 @@ check( 'an incompatible one names every problem: kernel version, extension, miss
 check( 'get() answers one by key, null for an unknown one', \Nino\Features::get( $appData, 'sample' )['key'] === 'sample' && \Nino\Features::get( $appData, 'nope' ) === null );
 check( 'all() is read once per request', \Nino\Features::all( $appData ) === $all && ninoWarnings() === [] );
 
+// The reason of a refusal is a sentence of its own, not only a line of the log: the panel lists the directory with it
+$rejected = \Nino\Features::rejected( $appData );
+check( 'rejected() names the directories whose manifest was refused, in the order of the directory, with the reason and no path', array_keys( $rejected ) === [ 'Broken', 'Elements', 'Twin' ]
+	&& $rejected['Broken'] === '"version" must be major.minor.patch' );
+check( '...a second directory that claims the key of an earlier one is among them, naming the directory that holds the key', $rejected['Twin'] === 'claims the key "sample" that the directory Sample already holds'
+	&& isset( $all['sample'] ) === true && $all['sample']['dir'] === \Nino\Features::dir(). '/Sample' );
+check( '...and a directory that is a feature is not among them', isset( $rejected['Sample'] ) === false && ninoWarnings() === [] );
+$reason = 'unset';
+check( 'manifest() hands the reason back where it refuses, and null where it does not', \Nino\Features::manifest( Features_dir_of( 'Broken' ), $reason ) === null && $reason === '"version" must be major.minor.patch'
+	&& is_array( \Nino\Features::manifest( Features_dir_of( 'Sample' ), $reason ) ) && $reason === null );
+ninoWarnings();
+
 $active = $appData;
 $active['/nino/modules'] = [ 'Nino\\Modules\\Helper' ];
 unset( $active['./nino/features/all'] );
@@ -81,6 +95,12 @@ echo "\n";
 // --- Manifest validation -----------------------------------------------------
 
 echo "Features::manifest - what a manifest must say\n";
+
+// The sandbox is a project served from the root of its domain: what a feature test does with an address
+// (a redirect) needs no more than ninoSandbox() set up
+$redirected = [ '/nino/http/response' => [] ];
+\Nino\Http::redirect( $appData, $redirected, '/thanks' );
+check( 'a redirect in the sandbox answers its Location with no setup of the test\'s own', $redirected['/nino/http/response']['header']['Location'] === '/thanks' && ( $appData['/nino/dir'] ?? null ) === '' );
 
 // Every rescan of the fixture directory warns about Broken again - drained
 // here so the checks below see only their own warnings
@@ -117,6 +137,17 @@ check( 'a manifest that is not an array is refused', ( static function() use ( $
 	$r = \Nino\Features::manifest( $manifestDir. '/Scalar' );
 	return $r === null && str_contains( ninoWarnings()[0] ?? '', 'must return an array' );
 } )() );
+// A manifest is a php file: one that does not parse or throws is a refusal with its reason, not a fatal of the request
+foreach( [ 'Parsing' => [ '<?php return [ \'name\' => ;', 'ParseError', 'with a syntax error' ], 'Throwing' => [ '<?php throw new \\RuntimeException( \'boom\' );', 'RuntimeException: boom (line 1)', 'that throws' ] ] as $name => [ $source, $expected, $kind ] ) {
+	@mkdir( $manifestDir. '/'. $name, 0755, true );
+	file_put_contents( $manifestDir. '/'. $name. '/feature.php', $source );
+	file_put_contents( $manifestDir. '/'. $name. '/'. $name. '.php', '<?php namespace Nino\\Modules { class '. $name. ' {} }' );
+	$reason = null;
+	$result = \Nino\Features::manifest( $manifestDir. '/'. $name, $reason );
+	$warnings = ninoWarnings();
+	check( 'a manifest '. $kind. ' when it is included is refused with the kind of error, the message and the line, and warned about once',
+		$result === null && str_starts_with( (string) $reason, 'cannot be included: '. $expected ) === true && count( $warnings ) === 1 && str_contains( $warnings[0], $reason ) );
+}
 check( 'a key that is not a slug is refused', manifestFails( $manifestDir, 'BadKey', [ 'key' => 'Bad Key', 'name' => 'x', 'version' => '1.0.0' ], '"key"' ) );
 check( 'a key with a line break at its end is no slug: the warning names the file and "key"', manifestFails( $manifestDir, 'NewlineKey', [ 'key' => "helper\n", 'name' => 'x', 'version' => '1.0.0' ], 'NewlineKey/feature.php: "key"' ) );
 check( '...and neither is a version or a category with one', manifestFails( $manifestDir, 'NewlineVersion', [ 'name' => 'x', 'version' => "1.0.0\n" ], 'NewlineVersion/feature.php: "version"' )
@@ -1689,8 +1720,23 @@ foreach( $panelActions as $method => $data )
 // and would come last if the panel still answered in key order
 check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by the localized name', $status === 200 && $body['dir'] === '/tests/fixtures/features'
 	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
-	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'boxy', 'helper', 'mute', 'old', 'strict' ]
+	&& array_keys( $body ) === [ 'dir', 'rejected', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'boxy', 'helper', 'mute', 'old', 'strict' ]
 	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Boxy', 'Helper', 'Mute', 'Old', 'Strict' ] );
+check( 'apiList lists the directory whose manifest was refused, with the reason, apart from the features', $body['rejected'] === [ [ 'dir' => 'Broken', 'reason' => '"version" must be major.minor.patch', 'active' => false ], [ 'dir' => 'Elements', 'reason' => $rejected['Elements'], 'active' => false ], [ 'dir' => 'Twin', 'reason' => 'claims the key "sample" that the directory Sample already holds', 'active' => false ] ]
+	&& in_array( 'broken', array_column( $body['features'], 'key' ), true ) === false );
+// A feature that is switched on and whose manifest is refused is the one that runs unfinished: the answer says so
+$modulesBefore = $appData['/nino/modules'];
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Broken';
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Elements';
+check( 'rejectedActive() is the refused directories whose class is listed in the modules, listed with or without the leading separator', array_keys( \Nino\Features::rejectedActive( $appData ) ) === [ 'Broken' ] );
+[ , $running ] = callFeatures( $appData, 'apiList' );
+check( 'apiList says of a refused manifest whether its feature is switched on all the same', array_column( $running['rejected'], 'active', 'dir' ) === [ 'Broken' => true, 'Elements' => false, 'Twin' => false ] );
+check( 'a directory named like a module of the kernel is not a feature that runs unfinished, though the kernel\'s module of that name is listed', isset( $rejected['Elements'] ) === true && str_contains( $rejected['Elements'], 'is a module of the kernel' )
+	&& array_keys( \Nino\Features::rejectedActive( $appData ) ) === [ 'Broken' ] && \Nino\Features::moduleOwner( 'Elements' ) === 'the kernel' && \Nino\Features::moduleOwner( 'Users' ) === 'the workbench' && \Nino\Features::moduleOwner( 'Broken' ) === null );
+$appData['/nino/modules'] = [ 'Nino\\Modules\\Broken' ];
+check( '...a class written without the separator counts as well', array_keys( \Nino\Features::rejectedActive( $appData ) ) === [ 'Broken' ] );
+$appData['/nino/modules'] = $modulesBefore;
+check( '...and with none listed there is none', \Nino\Features::rejectedActive( $appData ) === [] );
 $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings', 'settingsTab' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'

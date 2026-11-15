@@ -31,6 +31,8 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installiert als %s',
 	'[[/_admin/features/label/requires]]'			=> 'Benötigt: %s',
+	'[[/_admin/features/label/rejected]]'		=> 'Nicht geladen: das Manifest wurde abgelehnt',
+	'[[/_admin/features/label/rejected-active]]'	=> 'Eingeschaltet, aber das Manifest wurde abgelehnt: das Feature läuft unvollständig',
 	/*	Die beiden Tabs im Screen eines Features: was es ist, und was sich
 		daran einstellen lässt. Ein Feature, das sich nirgends beschreibt oder
 		keine Einstellung mitbringt, hat nur die eine Seite - ohne Leiste	*/

@@ -46,8 +46,11 @@ Und diese Methode in die Klasse, direkt nach `init()` und vor `adminPanels()`, m
 			$next = \Nino\Elements::queryElements( $appData, '/meetups', [], '*', [], [ 'sort' => 'date' ] );
 			self::callbackUpcoming( $appData, $next );
 
-			if( $next !== [] )
-				$areas['meetups'] = [ 'title' => (string) ( $next[0]['title'] ?? '' ), 'date' => (string) $next[0]['date'] ];
+			// The date as the language of the workbench writes it; a meetup without a date makes no area
+			$date = $next === [] ? null : \Nino\Format::date( $appData, $next[0]['date'] ?? '' );
+
+			if( $date !== null )
+				$areas['meetups'] = [ 'title' => (string) ( $next[0]['title'] ?? '' ), 'date' => $date ];
 
 			return $areas;
 		}
@@ -57,6 +60,7 @@ Und diese Methode in die Klasse, direkt nach `init()` und vor `adminPanels()`, m
 - Der Name `meetups` ist ein Schlüssel aus Kleinbuchstaben. Die Daten sind ein Array.
 - Der Callback läuft für jedes Konto, das das Dashboard öffnet. Er prüft deshalb selbst, ob das Konto die Daten sehen darf.
 - `queryElements()` liest Elemente in PHP. `'*'` heißt: in jeder Sprache.
+- `\Nino\Format::date()` schreibt das Datum in der Sprache der Workbench, die das Konto gewählt hat: `24.12.2026` oder `12/24/2026`. `dateLong()` und `datetime()` gibt es auch. Für ein Datum, das es nicht gibt, antworten sie `null`. Dann zeichnet der Callback keine Fläche. Sende das Datum nie als ISO-Text, wenn Menschen es lesen.
 
 ### 3. Der Kopf: die Fläche im Skript
 
@@ -99,7 +103,7 @@ Und in `text/de_DE.php`:
 
 Lade `/_admin` neu und öffne das **Dashboard**.
 
-- Über den Hinweisen steht das nächste Treffen, zum Beispiel: „Nächstes Treffen: Christmas party am 2026-12-24.“ Dahinter steht der Link „Treffen“. Er öffnet den Bereich.
+- Über den Hinweisen steht das nächste Treffen, zum Beispiel: „Nächstes Treffen: Christmas party am 24.12.2026.“ In der englischen Workbench steht „12/24/2026“. Dahinter steht der Link „Treffen“. Er öffnet den Bereich.
 - Eine der Kacheln heißt „Anmeldungen zu Treffen“ und zeigt die Zahl der Anmeldungen.
 - Melde Dich mit einem Konto ohne das Recht `/_admin/meetups/manage` an. Kachel und Zeile fehlen.
 

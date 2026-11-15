@@ -409,6 +409,64 @@ check( 'one with problems offers Remove alone, and its requirements and every re
 	&& notes( row( mount, 'old' ) ).join('|') === text('/_admin/features/label/requires').replace( '%s', 'nowhere' )+ '|'+ FEATURES[0].problems.join('|')
 	&& byTag( row( mount, 'old' ), 'small' ).filter( function( el ) { return hasClass( el, 'nino-admin-error' ) } ).map( function( el ) { return el.textContent } ).join('|') === FEATURES[0].problems.join('|') );
 
+// A directory whose manifest the kernel refused is not a feature: it is a row of the Inactive tab, by its directory, with
+// the reason as text - no markup, no action - and it is counted and filtered with the rest
+panel._rejected = [ { dir : 'Meetups', reason : '"version" must be <img src=x onerror=boom()> major.minor.patch' } ];
+panel._renderPanel();
+check( 'a refused manifest is a row of Inactive with its directory and the reason beside it, and the features that are off stay as they were',
+	rowKeys( mount, 'rejected' ) === 'Meetups' && rowKeys( mount, 'feature' ) === 'old,fresh'
+	&& row( mount, 'Meetups' ) === undefined && findAll( mount, function( el ) { return el.dataset.rejected === 'Meetups' } )[0].tagName === 'LI' );
+const refusedRow = findAll( mount, function( el ) { return el.dataset.rejected === 'Meetups' } )[0];
+check( '...it says that it is not loaded, gives the reason as a line read whole and written as text, and offers no button', notes( refusedRow )[0] === text('/_admin/features/label/rejected')
+	&& notes( refusedRow ).slice( 1 ).join('|') === '"version" must be <img src=x onerror=boom()> major.minor.patch' && byTag( refusedRow, 'img' ).length === 0 && byTag( refusedRow, 'button' ).length === 0
+	&& hasClass( byTag( refusedRow, 'small' ).filter( function( el ) { return hasClass( el, 'admin-features-note' ) } )[1], 'nino-admin-error' ) && hasClass( byTag( refusedRow, 'small' )[0], 'nino-admin-error' ) === false );
+check( '...and the tab counts it', byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (3)' );
+panel._filter = 'onerror';
+panel._renderPanel();
+check( '...the filter reads its reason too, and a filter that matches nothing of it hides it', rowKeys( mount, 'rejected' ) === 'Meetups' && rowKeys( mount, 'feature' ) === '' );
+panel._filter = 'nomatchatall';
+panel._renderPanel();
+check( '...a filter that matches neither says so', rowKeys( mount, 'rejected' ) === '' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 1 );
+panel._filter = '';
+panel._rejected = [];
+panel._renderPanel();
+check( 'with none refused the tab is what it was', rowKeys( mount, 'rejected' ) === '' && rowKeys( mount, 'feature' ) === 'old,fresh' );
+// The refused manifests are not features: the Active tab never lists them, and a category - which they have none of - hides them
+panel._rejected = [ { dir : 'Meetups', reason : 'x' } ];
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
+check( 'the Active tab lists no refused manifest, and its count is the features alone', rowKeys( mount, 'rejected' ) === '' && byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (2)' );
+fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
+panel._category = 'system';
+panel._renderPanel();
+check( 'a category filter hides the refused manifests, which have no category', rowKeys( mount, 'rejected' ) === '' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (1)' );
+panel._category = '';
+// A tab that holds nothing but refused manifests shows them and not the empty hint
+const wasFeatures = panel._features;
+panel._features = [];
+panel._renderPanel();
+check( 'an Inactive tab with only refused manifests lists them, with no empty hint', rowKeys( mount, 'rejected' ) === 'Meetups' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 0 );
+panel._features = wasFeatures;
+panel._rejected = [];
+panel._renderPanel();
+// A refused manifest of a feature that is switched on all the same runs unfinished: it stands under Active, counted there, with
+// a sentence of its own and the reason; the ones that are off stay under Inactive and are never listed under Active
+panel._rejected = [ { dir : 'Running', reason : 'why', active : true }, { dir : 'Idle', reason : 'other', active : false } ];
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
+const runningRow = findAll( mount, function( el ) { return el.dataset.rejected === 'Running' } )[0];
+check( 'under Active a refused manifest of a feature that is on stands with its own sentence and the reason, and the one that is off is not there',
+	rowKeys( mount, 'rejected' ) === 'Running' && runningRow !== undefined && notes( runningRow )[0] === text('/_admin/features/label/rejected-active') && notes( runningRow ).slice( 1 ).join('|') === 'why' && byTag( runningRow, 'small' ).length === 2
+	&& text('/_admin/features/label/rejected-active') !== text('/_admin/features/label/rejected') );
+check( '...and Active counts it', byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (3)' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (3)' );
+fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
+check( '...under Inactive the one that is off is listed and the one that runs is not', rowKeys( mount, 'rejected' ) === 'Idle'
+	&& notes( findAll( mount, function( el ) { return el.dataset.rejected === 'Idle' } )[0] )[0] === text('/_admin/features/label/rejected') );
+panel._features = [];
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
+check( 'an Active tab with only a refused manifest lists it with no empty hint', rowKeys( mount, 'rejected' ) === 'Running' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 0 );
+panel._features = FEATURES;
+panel._rejected = [];
+panel._renderPanel();
+
 fire( tabs[0], 'click' );
 check( 'Active lists the features that are on', rowKeys( mount, 'feature' ) === 'plain,sample' );
 check( 'an active feature is the shared drill-down row - a button with a chevron, and no action of its own in the list', row( mount, 'plain' ).tagName === 'BUTTON'
@@ -1301,6 +1359,13 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	check( 'which now lists the feature that is still off alone, and the run starts with it', JSON.stringify( requests[requests.length - 1].payload ) === '{"application":"site","feature":"seo"}' );
 	answer( 200, { feature : 'seo', placed : true, activated : true, application : afterFailure[0] } );
 	check( 'and ends as a run does', reloads === reloadsAtFailure + 1 && alerts[alerts.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ) );
+
+	// The list read after a set-up that stopped brings the refused manifests as they are now, not as they were
+	panel._rejected = [ { dir : 'Stale', reason : 'old' } ];
+	panel._applicationStopped( APPLICATIONS[0], 'seo', 'why', appButton( 'site' ) );
+	answer( 200, Object.assign( listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ), { rejected : [ { dir : 'Fresh', reason : 'new' } ] } ) );
+	check( 'a list read after a set-up stopped replaces the refused manifests', JSON.stringify( panel._rejected ) === '[{"dir":"Fresh","reason":"new"}]' );
+	panel._rejected = [];
 
 	// Nothing on at all after a failure: the dialog says so by the word for none
 	panel._applicationMsg = {};

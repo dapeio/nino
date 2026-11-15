@@ -3939,6 +3939,35 @@ check( 'a component registered again replaces the one before it: its renderer, i
 \Nino\Modules\Components::init( $appData );
 check( '...and the kernel takes it back by registering its own again', $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>' );
 
+// A name that is a shortcode and becomes a component - or the other way round - is said in the log with both registrants;
+// a component that replaces a component is the documented way to change the markup of one and says nothing
+class ComponentsSmokeShortcodeOwner { public static function answer( array &$appData, array &$args ): string { return 'shortcode'; } }
+class ComponentsSmokeComponentOwner { public static function render( array &$appData, array $args ): string { return 'component'; } }
+$clash = [ 'label' => 'Clash', 'source' => 'none', 'group' => 'global' ];
+ninoWarnings();
+\Nino\Html::addShortcode( $appData, 'clash-a', [ ComponentsSmokeShortcodeOwner::class, 'answer' ] );
+\Nino\Modules\Components::addComponent( $appData, 'clash-a', [ ComponentsSmokeComponentOwner::class, 'render' ], $clash );
+$clashWarnings = ninoWarnings();
+check( 'a component that takes the name of a shortcode is a warning naming the name and both registrants, and it still replaces it',
+	count( $clashWarnings ) === 1 && str_contains( $clashWarnings[0], '"clash-a"' ) && str_contains( $clashWarnings[0], 'ComponentsSmokeComponentOwner' ) && str_contains( $clashWarnings[0], 'ComponentsSmokeShortcodeOwner' )
+	&& $render( '[clash-a]' ) === 'component' );
+\Nino\Modules\Components::addComponent( $appData, 'clash-b', [ ComponentsSmokeComponentOwner::class, 'render' ], $clash );
+\Nino\Modules\Components::addComponent( $appData, 'clash-b', [ ComponentsSmokeComponentOwner::class, 'render' ], $clash );
+check( 'a component that is new, or replaces a component, is no warning', ninoWarnings() === [] );
+\Nino\Html::addShortcode( $appData, 'clash-b', [ ComponentsSmokeShortcodeOwner::class, 'answer' ] );
+$clashWarnings = ninoWarnings();
+check( 'a shortcode that takes the name of a component is a warning naming the name and both registrants',
+	count( $clashWarnings ) === 1 && str_contains( $clashWarnings[0], '"clash-b"' ) && str_contains( $clashWarnings[0], 'ComponentsSmokeComponentOwner' ) && str_contains( $clashWarnings[0], 'ComponentsSmokeShortcodeOwner' ) );
+\Nino\Modules\Components::addComponent( $appData, 'clash-d', [ new ComponentsSmokeComponentOwner(), 'render' ], $clash );
+ninoWarnings();
+\Nino\Html::addShortcode( $appData, 'clash-d', [ ComponentsSmokeShortcodeOwner::class, 'answer' ] );
+$clashWarnings = ninoWarnings();
+check( 'a component registered with an object names that object\'s class as its registrant, not the module that wraps it',
+	count( $clashWarnings ) === 1 && str_contains( $clashWarnings[0], 'is a component of ComponentsSmokeComponentOwner already' ) );
+\Nino\Html::addShortcode( $appData, 'clash-c', [ ComponentsSmokeShortcodeOwner::class, 'answer' ] );
+\Nino\Html::addShortcode( $appData, 'clash-c', [ ComponentsSmokeShortcodeOwner::class, 'answer' ] );
+check( 'a shortcode that is new, or joins a shortcode, is no warning', ninoWarnings() === [] );
+
 // The words a bool attribute is read by are the two tables of the class, which
 // \Nino\Feature::flag() reads a flag of a shortcode without a schema by as well
 \Nino\Modules\Components::addComponent( $appData, 'wordprobe', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'group' => 'global', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => false ] ] ] );

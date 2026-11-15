@@ -71,7 +71,8 @@ function check( string $label, bool $condition ): void {
 
 /**
  *	A fresh, isolated project directory to run against: $appData with every
- *	filesystem path pointing into it, two locales, and no modules - the
+ *	filesystem path pointing into it, the directory it is served from ('', the
+ *	domain root), two locales, and no modules - the
  *	test switches on what it tests. The directory is removed by ninoDone().
  *
  *	@param		string		$name					Names the temp directory, eg. 'features'
@@ -93,6 +94,7 @@ function ninoSandbox( string $name ): array {
 	$appData['./nino/locales/current']				= 'de_DE';
 	$appData['/nino/locales/native']					= 'de_DE';
 	$appData['/nino/locales/available']				= [ 'de_DE', 'en_US' ];
+	$appData['/nino/dir']											= '';
 	$appData['/nino/modules']									= [];
 	$appData['/nino/install/texts']					= \Nino\VERSION;
 	$appData['./nino/test/sandbox']						= $sandbox;

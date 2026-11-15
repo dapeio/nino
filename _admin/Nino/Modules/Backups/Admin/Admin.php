@@ -330,7 +330,11 @@ namespace Nino\Modules\Backups {
 			// of what it puts back, and the line is the actor's to be written
 			$actor = \Nino\Auth::getCurrentUser( $appData );
 			$notice = null;
-			$result = self::restore( $appData, $date, $notice );
+
+			// The restore takes a safety copy first, which names every file a feature owns: the same refusal as
+			// the backup's, before anything is touched. recovery.php, which is for when nothing else works, does not ask
+			$refusal = \Nino\Backup::featureRefusal( $appData );
+			$result = $refusal !== null ? [ 409, $refusal ] : self::restore( $appData, $date, $notice );
 
 			if( $actor !== false )
 				self::recordRestore( $appData, $actor['mail'], $date, $result );

@@ -800,6 +800,14 @@ namespace Nino\Modules {
 		 */
 		private static function _create( array &$appData, string $dir, string $path, \stdClass $run ): void {
 
+			// A feature that is switched on and whose manifest is refused owns data this run cannot name
+			// (Backup::manifest() reads the manifests of the features it knows): the archive would lack it
+			// without a word, so the run ends here, before it writes or removes anything
+			$refusal = \Nino\Backup::featureRefusal( $appData );
+
+			if( $refusal !== null )
+				throw new \RuntimeException( $refusal );
+
 			if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false )
 				throw new \RuntimeException( 'backup directory could not be created' );
 

@@ -82,6 +82,10 @@ namespace Nino\Modules {
 		// thing, so that no name a component takes can meet another's
 		public const string REGISTRY = './nino/components';
 		public const string STACKS = './nino/components/stacks';
+
+		// name => the class that registered it, for a warning that names who has a name: the wrapper of a
+		// callback that is a closure or an object is the scope of this class, which says nothing
+		public const string OWNERS = './nino/components/owners';
 		public const string CONTEXT = './nino/components/element';
 
 		// How many names this request has made up for a stack without an id: the
@@ -712,7 +716,17 @@ namespace Nino\Modules {
 			if( $owner !== '' && class_exists( $owner ) === true && ( new \ReflectionClass( $owner ) )->isInternal() === false )
 				$wrapper = \Closure::bind( $wrapper, null, $owner );
 
+			// A name that is a plain shortcode so far: the component takes its place and the
+			// shortcode stops answering - said in the log with both registrants, since the
+			// replacement is silent otherwise and the shortcode simply shows nothing
+			if( isset( $appData[self::REGISTRY][$name] ) === false && isset( $appData[self::STACKS][$name] ) === false
+				&& \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/'. $name ) !== [] )
+				trigger_error( 'Components: "'. $name. '" is registered as a '. ( $stack === true ? 'stack' : 'component' ). ' by '
+					. ( \Nino\Callbacks::owner( $callback ) ?? 'a function' ). ' over the shortcode of '. \Nino\Callbacks::owners( $appData, '/nino/html/shortcode/'. $name )
+					. ', which it replaces', E_USER_WARNING );
+
 			$appData[$key][$name] = $clean;
+			$appData[self::OWNERS][$name] = \Nino\Callbacks::owner( $callback ) ?? 'a function';
 
 			\Nino\Callbacks::removeCallbacks( $appData, '/nino/html/shortcode/'. $name );
 			\Nino\Html::addShortcode( $appData, $name, $wrapper );

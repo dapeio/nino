@@ -25,8 +25,6 @@ require $root. '/tests/harness.php';
 
 $appData = ninoSandbox( 'meetups' );
 $appData['/nino/modules'] = [ '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
-// The sandbox is served from the root of its domain, which a redirect asks for
-$appData['/nino/dir'] = '';
 \Nino\AppData::writeContentData( $appData, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native' ] );
 
 check( 'the manifest validates without a warning', is_array( \Nino\Features::manifest( dirname( __DIR__ ) ) ) && ninoWarnings() === [] );
@@ -100,7 +98,7 @@ Die Helfer kommen aus `tests/harness.php` von Nino:
 
 | Helfer | Was er tut |
 |---|---|
-| `ninoSandbox( $name )` | legt ein leeres Wegwerf-Projekt an und gibt dessen `$appData` zurück |
+| `ninoSandbox( $name )` | legt ein leeres Wegwerf-Projekt an und gibt dessen `$appData` zurück, mit allen Pfaden und `/nino/dir` (leer: das Projekt läuft an der Wurzel der Domain) |
 | `check( $label, $bedingung )` | eine Prüfung, eine Zeile Ausgabe |
 | `ninoWarnings()` | die Warnungen seit dem letzten Aufruf |
 | `ninoVisit( $appData, $uri, $methode )` | baut eine Anfrage der Webseite |
@@ -186,7 +184,6 @@ Dahinter steht die Laufzeit. Ändere zur Probe in `Meetups.php` die Grenze des N
 ## Häufige Fehler
 
 - **Der Test findet Nino nicht.** Er sucht den Checkout drei Verzeichnisse über sich. Liegt das Feature woanders, nenne den Checkout: `NINO_ROOT=/pfad/zu/nino php …/meetups-smoke.php`.
-- **Eine Weiterleitung bricht im Test ab.** Das Wegwerf-Projekt kennt sein Verzeichnis `/nino/dir` nicht. Setze es im Test, wie oben: `$appData['/nino/dir'] = '';`.
 - **Der Test hängt vom Datum ab.** Rechne Daten aus `time()` aus, statt sie fest zu schreiben. Ein festes Datum liegt irgendwann in der Vergangenheit.
 - **Den privaten Schlüssel ins Repository legen.** Der private Schlüssel eines Katalogs gehört an einen sicheren Ort außerhalb jedes Repositorys.
 
