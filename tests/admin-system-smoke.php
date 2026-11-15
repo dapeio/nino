@@ -330,7 +330,7 @@ $standalone = json_decode( (string) shell_exec( 'php '. escapeshellarg( $standal
 check( '...and still finds the archives from there', in_array( date( 'Y-m-d' ), $standalone['dates'] ?? [], true ) === true );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
-$dates = $body['dates'] ?? [];
+$dates = array_column( $body['archives'] ?? [], 'id' );
 check( 'apiList finds today\'s backup without reading config.php\'s own copy of the dir/key', count( $dates ) === 1 && $dates[0] === date( 'Y-m-d' ) );
 
 /*	"Back up now": one more archive, named by date and time, beside the daily
@@ -339,18 +339,18 @@ check( 'apiList finds today\'s backup without reading config.php\'s own copy of 
 	replace it. Done before the restores below, which write snapshots of their
 	own into the same directory and would change what the checks above count	*/
 $nowDir			= $sandbox. '/private/.backups';
-$timedFiles	= static fn(): array => array_map( 'basename', glob( $nowDir. '/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].php' ) ?: [] );
+$timedFiles	= static fn(): array => array_map( 'basename', glob( $nowDir. '/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]{,-manual}.php', GLOB_BRACE ) ?: [] );
 $dailyFile	= $nowDir. '/'. date( 'Y-m-d' ). '.php';
 $dailyBytes	= (string) file_get_contents( $dailyFile );
 
 $nowId = \Nino\Modules\Backups::now( $appData );
-check( 'Backups::now writes an archive named by date and time', is_string( $nowId ) === true && preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}$/', (string) $nowId ) === 1 && is_file( $nowDir. '/'. $nowId. '.php' ) === true );
+check( 'Backups::now writes an archive named by date and time', is_string( $nowId ) === true && preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}-manual$/', (string) $nowId ) === 1 && is_file( $nowDir. '/'. $nowId. '.php' ) === true );
 check( '...behind the same stub a daily archive has, and no temporary file beside it', str_starts_with( (string) file_get_contents( $nowDir. '/'. $nowId. '.php' ), \Nino\Admin\Recovery::STUB_PREFIX ) && glob( $nowDir. '/*.tmp' ) === [] );
 check( '...and leaves today\'s daily archive byte for byte as it was', (string) file_get_contents( $dailyFile ) === $dailyBytes );
 check( 'dates() lists it before today\'s date, and an archive of its own is not a snapshot', \Nino\Modules\Backups\Admin::dates( $appData ) === [ $nowId, date( 'Y-m-d' ) ] );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
-check( 'apiList carries the dates and whether backups are on', ( $body['dates'] ?? [] ) === [ $nowId, date( 'Y-m-d' ) ] && ( $body['enabled'] ?? null ) === true );
+check( 'apiList carries the archives with how they came to be and whether backups are on', array_column( $body['archives'] ?? [], 'id' ) === [ $nowId, date( 'Y-m-d' ) ] && array_column( $body['archives'] ?? [], 'kind' ) === [ 'manual', 'daily' ] && ( $body['enabled'] ?? null ) === true );
 
 $idPattern = \Nino\Modules\Backups\Admin::ID_PATTERN;
 check( 'ID_PATTERN takes a date and time, and still turns away a time cut short and a path',
@@ -1060,7 +1060,7 @@ file_put_contents( $dailyFile, 'x' );
 $daysBefore = $dailyFiles();
 $handBlocked = [];
 for( $second = 0; $second <= 5; $second++ ) {
-	$handBlocked[] = $nowDir. '/'. date( 'Y-m-d-His', time() + $second ). '.php';
+	$handBlocked[] = $nowDir. '/'. date( 'Y-m-d-His', time() + $second ). '-manual.php';
 	mkdir( end( $handBlocked ) );
 	file_put_contents( end( $handBlocked ). '/in-the-way', 'x' );
 }

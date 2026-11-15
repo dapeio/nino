@@ -4,8 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Backups		The daily backup and restoring one
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the date rows, which
- *													read as filenames rather than as prose. Bundled while the
+ *													system in _admin/assets/style.css: the archive rows - the
+ *													name, which reads as a filename rather than as prose,
+ *													and what it is. Bundled while the
  *													module is there (see the panel's assets()), so the same
  *													layer rules apply - the shell's stylesheet fixes the layer
  *													order, this one only ever adds to nino.tool, scoped to the
@@ -22,15 +23,37 @@
 
 #backups-dates > li {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	gap: 1rem;
+	gap: .5rem 1rem;
 	min-height: var(--nino-admin-row-height);
 	padding: .55rem .75rem;
-	font: .8rem/1.4 var(--nino-admin-mono);
 }
 
-#backups-dates > li > button {
+#backups-dates .backups-info {
+	display: flex;
+	flex-direction: column;
+	gap: .1rem;
+	flex: 1 1 14rem;
+	min-width: 0;
+}
+
+#backups-dates .backups-id {
+	font: .8rem/1.4 var(--nino-admin-mono);
+	overflow-wrap: anywhere;
+}
+
+#backups-dates .backups-meta {
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	line-height: 1.4;
+}
+
+#backups-dates .backups-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
 	flex: 0 0 auto;
 }
 

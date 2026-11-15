@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino							A compact filesystembased php framework
- *	Modules\Backups\Admin	Backups panel: restoring a daily snapshot
+ *	Modules\Backups\Admin	Backups panel: restoring a snapshot, handing an archive over as a file, taking one back
  *
  *	@package					Dape/Nino
  *	@author						David Perchermeier <mail@dape.io>
@@ -12,7 +12,8 @@ namespace Nino\Modules\Backups {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Backups						Disaster recovery: restore a daily backup, and back up now.
+	 *	Backups						Disaster recovery: restore a daily backup, back up now, download an
+	 *											archive and upload one again.
 	 *
 	 *											Deliberately independent of config.php's own backup keys:
 	 *											- the archives are found under private/.backups, never
@@ -25,6 +26,14 @@ namespace Nino\Modules\Backups {
 	 *											record. A genuine config.php syntax error is out of scope:
 	 *											the recovery page boots through the same kernel bootstrap as the workbench
 	 *											and can't survive that either - that's a manual recovery.
+	 *
+	 *											An archive is opened with the key of this project only, which
+	 *											is the one in config.php and, as a copy, under private/.auth/
+	 *											- the copy follows config.php at every request of the
+	 *											workbench (see \Nino\Modules\Backups::_bootstrap()). The
+	 *											workbench neither shows nor exports the key: an archive that
+	 *											is downloaded is of use with a copy of the key file kept by
+	 *											the person who downloaded it.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -51,6 +60,8 @@ namespace Nino\Modules\Backups {
 				'backups/list' 		=> [ self::class, 'apiList' ],
 				'backups/restore' 	=> [ self::class, 'apiRestore' ],
 				'backups/now' 		=> [ self::class, 'apiNow' ],
+				'backups/download' 	=> [ self::class, 'apiDownload' ],
+				'backups/upload' 	=> [ self::class, 'apiUpload' ],
 			];
 		}
 
@@ -66,7 +77,7 @@ namespace Nino\Modules\Backups {
 
 		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
 		public static function manual(): array {
-			return [ 'intro', 'backup', 'restore' ];
+			return [ 'intro', 'backup', 'restore', 'external' ];
 		}
 
 		public static function icon(): string {
@@ -180,13 +191,21 @@ namespace Nino\Modules\Backups {
 		}
 
 		// What an archive's id may look like: a dated backup, one made on
-		// request (dated and timed, see \Nino\Modules\Backups::now()), or the
+		// request (dated and timed, marked "-manual", see
+		// \Nino\Modules\Backups::now(); the mark is optional because the ones
+		// made before it existed have none and are read all the same), or the
 		// safety snapshot a restore writes before it overwrites anything.
 		// The snapshot used to match nothing here - not in this list, not in
 		// apiRestore(), not in recovery.php - so "a wrong pick can itself be
 		// undone", which the docblock, the panel's confirm text and both
 		// manuals all promise, was true of a file only ssh could reach
-		public const string ID_PATTERN = '/^(?:\d{4}-\d{2}-\d{2}(?:-\d{6})?|pre-restore-\d{4}-\d{2}-\d{2}-\d{6})$/';
+		public const string ID_PATTERN = '/^(?:\d{4}-\d{2}-\d{2}(?:-\d{6}(?:-manual)?)?|pre-restore-\d{4}-\d{2}-\d{2}-\d{6})$/D';
+
+		// The name an uploaded archive comes in: its id, behind what the download
+		// put before it (apiDownload()) or nothing, and the extension it keeps. A
+		// snapshot is not uploaded: it is the way out of a restore on the project
+		// that made it, and no host in front of an id makes it one
+		private const string UPLOAD_NAME_PATTERN = '/^(?:backup-(?!.*pre-restore-)[a-z0-9][a-z0-9.-]*-)?(\d{4}-\d{2}-\d{2}(?:-\d{6}(?:-manual)?)?)\.php$/D';
 
 		/**
 		 *	Available backup dates, most recent first - shared by
@@ -194,7 +213,7 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ "Y-m-d" | "Y-m-d-His" | "pre-restore-Y-m-d-His", ... ]
+		 *	@return 	array										[ "Y-m-d" | "Y-m-d-His-manual" | "Y-m-d-His" | "pre-restore-Y-m-d-His", ... ]
 		 */
 		public static function dates( array &$appData ): array {
 
@@ -207,13 +226,17 @@ namespace Nino\Modules\Backups {
 
 				$id = basename( $file, '.php' );
 
-				if( preg_match( '/^\d{4}-\d{2}-\d{2}(?:-\d{6})?$/', $id ) === 1 )
+				if( preg_match( '/^\d{4}-\d{2}-\d{2}(?:-\d{6}(?:-manual)?)?$/', $id ) === 1 )
 					$dates[] = $id;
 				else if( preg_match( self::ID_PATTERN, $id ) === 1 )
 					$snapshots[] = $id;
 			}
 
-			rsort( $dates );
+			// By the date and time the name starts with: the mark behind them
+			// decides nothing about age
+			$byAge = static fn( string $a, string $b ): int => strcmp( substr( $b, 0, 17 ), substr( $a, 0, 17 ) ) ?: strcmp( $b, $a );
+
+			usort( $dates, $byAge );
 			rsort( $snapshots );
 
 			// The dated backups first, the snapshots after them: a snapshot is
@@ -222,10 +245,50 @@ namespace Nino\Modules\Backups {
 			return array_merge( $dates, $snapshots );
 		}
 
+		/**
+		 *	How an archive came to be, from its id: a snapshot, one made by hand -
+		 *	with or without the mark, see ID_PATTERN - or a daily one
+		 *
+		 *	@param		string		$id						An id that matches ID_PATTERN
+		 *
+		 *	@return 	string									'snapshot', 'manual' or 'daily'
+		 */
+		public static function kind( string $id ): string {
+
+			if( str_starts_with( $id, 'pre-restore-' ) === true )
+				return 'snapshot';
+
+			return preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}/', $id ) === 1 ? 'manual' : 'daily';
+		}
+
+		/**
+		 *	What the list shows of every archive: its id, how it came to be and how
+		 *	large the file is, in the order of dates()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ [ 'id' => string, 'kind' => 'daily'|'manual'|'snapshot', 'size' => bytes ], ... ]
+		 */
+		public static function archives( array &$appData ): array {
+
+			$dir 		= self::_backupDir( $appData );
+			$result = [];
+
+			foreach( self::dates( $appData ) as $id ) {
+				// An archive that went while the list was made is not listed
+				$size = $dir === false ? false : @filesize( $dir. '/'. $id. '.php' );
+				if( $size !== false )
+					$result[] = [ 'id' => $id, 'kind' => self::kind( $id ), 'size' => $size ];
+			}
+
+			return $result;
+		}
+
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'backups/restore'	=> 'Restore Backup '. \Nino\Admin\Admin::postString( $data, 'date' ),
 				'backups/now'			=> 'Create Backup',
+				'backups/download'	=> 'Download Backup '. \Nino\Admin\Admin::postString( $data, 'date' ),
 				default						=> '',
 			};
 		}
@@ -244,7 +307,11 @@ namespace Nino\Modules\Backups {
 				return;
 
 			\Nino\Http::ok( $request, [
-				'dates' 	=> self::dates( $appData ),
+				'archives' => self::archives( $appData ),
+				// The largest file the server takes in an upload, 0 where php names none
+				'uploadLimit' => \Nino\Images::limits()['php'],
+				// Whether the account may download and upload archives: full access only (see _fullAccess())
+				'full' => self::_fullAccess( $appData ),
 				'enabled' => ( $appData['/nino/admin/backups'] ?? true ) !== false,
 				// Why today's automatic backup is missing, while it is (see
 				// \Nino\Modules\Backups::missed())
@@ -281,6 +348,325 @@ namespace Nino\Modules\Backups {
 			}
 
 			\Nino\Http::ok( $request, [ 'id' => $result ] );
+		}
+
+		/**
+		 *	Whether the account that asks holds full access, '/*' - the way the Users
+		 *	panel tells it. Download and upload ask for it on top of the panel's own
+		 *	permission: a download is every datum of the project in one file, and an
+		 *	upload with a restore brings back any state the project had, with the
+		 *	rights the accounts held then
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		private static function _fullAccess( array &$appData ): bool {
+
+			$user = \Nino\Auth::getCurrentUser( $appData );
+
+			return $user !== false && in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true;
+		}
+
+		/**
+		 *	Hand one archive over as it lies: encrypted, behind its stub, as a file
+		 *	to save. The kernel sends it - in pieces, so that an archive of any size
+		 *	costs one piece of memory (see "Answering a File" in docs/development.md)
+		 *	- and the account that asked is the one the permission was asked of.
+		 *	The path is the archive directory's and the id's, which ID_PATTERN
+		 *	allows nothing else than a name of; a link is no archive.
+		 *
+		 *	No lock: an archive is written whole under another name and renamed into
+		 *	its place, so a file that is there is complete, and one that goes while
+		 *	it is sent (the retention of a backup that succeeded, a restore's
+		 *	snapshots) is still read to its end by the open file, or is a 404 if it
+		 *	went before - never half of a file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiDownload( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			if( self::_fullAccess( $appData ) === false ) {
+				\Nino\Http::fail( $request, 403, 'not allowed' );
+				return;
+			}
+
+			$id = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'date' );
+
+			if( preg_match( self::ID_PATTERN, $id ) !== 1 ) {
+				\Nino\Http::fail( $request, 400, 'invalid date' );
+				return;
+			}
+
+			$dir 	= self::_backupDir( $appData );
+			$path = $dir === false ? '' : $dir. '/'. $id. '.php';
+
+			if( $path === '' || is_file( $path ) === false || is_link( $path ) === true ) {
+				\Nino\Http::fail( $request, 404, 'unknown backup date', 'backups_gone' );
+				return;
+			}
+
+			// The name says where the archive comes from: the host of the request,
+			// kept to the characters of a host name, and the id - which is what the
+			// upload reads the date and the kind from
+			$host = (string) preg_replace( '/:\d+$/', '', strtolower( (string) ( $request['/nino/http/request']['header']['Host'] ?? '' ) ) );
+
+			if( preg_match( '/^[a-z0-9][a-z0-9.-]{0,60}$/', $host ) !== 1 )
+				$host = 'nino';
+
+			$request['/nino/http/response']['body'] 	= '';
+			$request['/nino/http/response']['file'] 	= $path;
+			$request['/nino/http/response']['header']['Content-Type'] 				= 'application/octet-stream';
+			$request['/nino/http/response']['header']['Content-Disposition'] 	= 'attachment; filename="backup-'. $host. '-'. $id. '.php"';
+			$request['/nino/http/response']['header']['Cache-Control'] 				= 'private, no-store';
+		}
+
+		/**
+		 *	Put an archive that was downloaded earlier back in the list, where it
+		 *	is restored like any other. Nothing is overwritten and nothing is
+		 *	deleted - the retention runs after a backup that succeeded and counts
+		 *	the archive in its kind, which the answer says (see
+		 *	\Nino\Modules\Backups::retention()).
+		 *
+		 *	What is checked, in this order, before the file is in its place:
+		 *	the permission, php's own verdict on the upload, the name (the date
+		 *	and the kind come from it: the archive carries no other mark of
+		 *	either), that nothing of that name exists, the shape of the stub
+		 *	(prefix, base64 and nothing else, suffix), that this project's key
+		 *	opens it - an archive of another project's key is refused - and that
+		 *	what it opens to is gzip. What is stored is written by this method:
+		 *	the stub's prefix and suffix are its own constants and what lies
+		 *	between them has been read as base64, so the file cannot be anything
+		 *	that php would run beyond the exit of the stub, whatever was
+		 *	uploaded. It is moved into its place with link(), which refuses an
+		 *	existing name atomically, under the lock a restore and the daily run
+		 *	take
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiUpload( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			if( self::_fullAccess( $appData ) === false ) {
+				\Nino\Http::fail( $request, 403, 'not allowed' );
+				return;
+			}
+
+			$failure = \Nino\Admin\Admin::uploadError( $_FILES['file'] ?? null );
+
+			if( $failure !== null ) {
+				// An archive over the limit has a way in that php does not stand in
+				if( $failure['code'] === 'upload_too_large' )
+					\Nino\Http::fail( $request, $failure['status'], $failure['error'], 'backups_too_large', $failure['params'] );
+				else
+					\Nino\Http::fail( $request, $failure['status'], $failure['error'], $failure['code'], $failure['params'] );
+				return;
+			}
+
+			$tmp 		= $_FILES['file']['tmp_name'] ?? null;
+			$given 	= $_FILES['file']['name'] ?? null;
+
+			if( is_string( $tmp ) === false || is_string( $given ) === false ) {
+				\Nino\Http::fail( $request, 400, 'no file uploaded', 'upload_missing' );
+				return;
+			}
+
+			// A name of the right shape that is no date or no time of day is none of a
+			// backup either: ids sort by age, and a month 13 would sort as one
+			if( preg_match( self::UPLOAD_NAME_PATTERN, basename( str_replace( '\\', '/', $given ) ), $match ) !== 1
+				|| checkdate( (int) substr( $match[1], 5, 2 ), (int) substr( $match[1], 8, 2 ), (int) substr( $match[1], 0, 4 ) ) === false
+				|| ( strlen( $match[1] ) > 10 && ( (int) substr( $match[1], 11, 2 ) > 23 || (int) substr( $match[1], 13, 2 ) > 59 || (int) substr( $match[1], 15, 2 ) > 59 ) ) ) {
+				\Nino\Http::fail( $request, 400, 'the file name is none of a backup', 'backups_upload_name' );
+				return;
+			}
+
+			$id 	= $match[1];
+			$key 	= self::_key( $appData );
+
+			if( $key === false || strlen( $key ) !== 32 ) {
+				\Nino\Http::fail( $request, 409, 'this project has no backup key yet', 'backups_upload_nokey' );
+				return;
+			}
+
+			// Not waited for, as a restore does not wait: what holds it is a run that
+			// reads and prunes this directory
+			if( \Nino\Filesystem::lockFile( $appData, \Nino\Modules\Backups::LOCK_PATH, false ) === false ) {
+				\Nino\Http::fail( $request, 409, 'a backup or a restore is running', 'backups_busy' );
+				return;
+			}
+
+			$temp = '';
+
+			try {
+
+				$dir = \Nino\Filesystem::getContentPath( $appData ). '/.backups';
+
+				if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false ) {
+					\Nino\Http::fail( $request, 500, 'the backup directory could not be created', 'backups_write' );
+					return;
+				}
+
+				$final = $dir. '/'. $id. '.php';
+
+				if( file_exists( $final ) === true ) {
+					\Nino\Http::fail( $request, 409, 'an archive of that name exists', 'backups_upload_exists', [ $id ] );
+					return;
+				}
+
+				$temp 		= $dir. '/upload-'. bin2hex( random_bytes( 6 ) ). '.tmp';
+				$staged 	= self::_stage( $tmp, $temp );
+
+				if( $staged !== true ) {
+					\Nino\Http::fail( $request, ...$staged );
+					return;
+				}
+
+				// Whether this project's key opens it is the one proof that it is one
+				// of its archives, and opening takes about what restoring it will: a
+				// server that cannot is told, before php runs out of memory in the
+				// middle of it
+				$short = \Nino\Modules\Backups::openShort( $appData, (int) @filesize( $temp ) );
+
+				if( $short !== null ) {
+					\Nino\Http::fail( $request, 413, 'the memory limit does not carry opening the archive', 'backups_upload_memory', $short );
+					return;
+				}
+
+				$gz = self::_decrypt( $temp, $key );
+
+				if( $gz === false ) {
+					\Nino\Http::fail( $request, 422, 'the archive cannot be opened with this project\'s key', 'backups_upload_key' );
+					return;
+				}
+
+				$gzip = str_starts_with( $gz, "\x1f\x8b" );
+				unset( $gz );
+
+				if( $gzip === false ) {
+					\Nino\Http::fail( $request, 422, 'the archive holds no gzip', 'backups_upload_format' );
+					return;
+				}
+
+				// An existing name is refused by link() itself: a second upload of the
+				// same name in the same moment does not replace the first
+				if( @link( $temp, $final ) === false ) {
+
+					if( file_exists( $final ) === true )
+						\Nino\Http::fail( $request, 409, 'an archive of that name exists', 'backups_upload_exists', [ $id ] );
+					else
+						\Nino\Http::fail( $request, 500, 'the archive could not be put in its place', 'backups_write' );
+
+					return;
+				}
+
+				$actor = \Nino\Auth::getCurrentUser( $appData );
+
+				if( $actor !== false )
+					\Nino\Admin\Admin::record( $appData, $actor['mail'], 'Upload Backup '. $id );
+
+				\Nino\Http::ok( $request, [ 'id' => $id, 'kind' => self::kind( $id ), 'size' => (int) @filesize( $final ) ] + \Nino\Modules\Backups::retention( $appData, $id ) );
+			}
+			finally {
+				if( $temp !== '' )
+					@unlink( $temp );
+				\Nino\Filesystem::unlockFile( $appData, \Nino\Modules\Backups::LOCK_PATH );
+			}
+		}
+
+		/**
+		 *	Read an uploaded file as the stub of an archive and write that stub
+		 *	again, piece by piece, so that no more than a piece is in memory: its
+		 *	prefix, then what lies between - base64, every piece of it decoding on
+		 *	its own, nothing else - and its suffix. The prefix and the suffix are
+		 *	the constants of the stub, checked against what the file starts and
+		 *	ends with and written from the constants
+		 *
+		 *	@param		string		$from					The uploaded file
+		 *	@param		string		$to						Where to write it, not existing yet
+		 *
+		 *	@return 	true|array								true, or [ http status, message, code ]
+		 */
+		private static function _stage( string $from, string $to ): true|array {
+
+			$prefix = \Nino\Admin\Recovery::STUB_PREFIX;
+			$suffix = \Nino\Admin\Recovery::STUB_SUFFIX;
+			$size 	= (int) @filesize( $from );
+			$inner 	= $size - strlen( $prefix ) - strlen( $suffix );
+
+			// Room for the 28 bytes of iv and tag and a byte of ciphertext at least,
+			// and base64 comes in fours
+			if( $inner < 40 || $inner % 4 !== 0 )
+				return [ 400, 'the file is no backup', 'backups_upload_format' ];
+
+			$in = @fopen( $from, 'rb' );
+
+			if( $in === false )
+				return [ 500, 'could not read upload', 'upload_server' ];
+
+			$out = @fopen( $to, 'xb' );
+
+			if( $out === false ) {
+				fclose( $in );
+				return [ 500, 'the archive could not be written', 'backups_write' ];
+			}
+
+			$result = true;
+
+			if( fread( $in, strlen( $prefix ) ) !== $prefix || fseek( $in, -strlen( $suffix ), SEEK_END ) !== 0 || fread( $in, strlen( $suffix ) ) !== $suffix )
+				$result = [ 400, 'the file is no backup', 'backups_upload_format' ];
+
+			if( $result === true && ( fseek( $in, strlen( $prefix ) ) !== 0 || fwrite( $out, $prefix ) !== strlen( $prefix ) ) )
+				$result = [ 500, 'the archive could not be written', 'backups_write' ];
+
+			// A multiple of four, so that each piece is base64 of its own
+			$remaining = $inner;
+
+			while( $result === true && $remaining > 0 ) {
+
+				$piece = fread( $in, min( 786432, $remaining ) );
+
+				if( $piece === false || $piece === '' || ( strlen( $piece ) % 4 !== 0 ) ) {
+					$result = [ 500, 'could not read upload', 'upload_server' ];
+					break;
+				}
+
+				// Base64 and nothing else - php's strict decoding skips white space -
+				// with the padding where it belongs, at the very end
+				$last = strlen( $piece ) === $remaining;
+
+				if( preg_match( $last === true ? '/^[A-Za-z0-9+\/]*={0,2}$/D' : '/^[A-Za-z0-9+\/]+$/D', $piece ) !== 1 || base64_decode( $piece, true ) === false ) {
+					$result = [ 400, 'the file is no backup', 'backups_upload_format' ];
+					break;
+				}
+
+				if( fwrite( $out, $piece ) !== strlen( $piece ) ) {
+					$result = [ 500, 'the archive could not be written', 'backups_write' ];
+					break;
+				}
+
+				$remaining -= strlen( $piece );
+			}
+
+			if( $result === true && fwrite( $out, $suffix ) !== strlen( $suffix ) )
+				$result = [ 500, 'the archive could not be written', 'backups_write' ];
+
+			fclose( $in );
+
+			if( fclose( $out ) === false && $result === true )
+				$result = [ 500, 'the archive could not be written', 'backups_write' ];
+
+			return $result;
 		}
 
 		/**

@@ -82,6 +82,16 @@ namespace Nino\Modules {
 		// the one never starts in the middle of the other
 		public const string LOCK_PATH = '/_admin/backup-daily';
 
+		// What an archive made by hand is called after its date and time, so that
+		// the name says how it came to be. The archives that were made before
+		// there was a suffix - "Y-m-d-His" alone - are read as made by hand all
+		// the same, and nothing renames them: that reading is the optional group
+		// of the patterns that name an archive (here, in _prune() and retention(),
+		// and in the panel's ID_PATTERN, dates() and UPLOAD_NAME_PATTERN). It is
+		// to be removed when no archive of the older name is left anywhere an
+		// upload could bring it from
+		public const string MANUAL_SUFFIX = '-manual';
+
 		// The note of the day's one attempt (see maybeRun()), in the archive
 		// directory behind the same exit-stub as an archive. Its name is no
 		// date, so no list offers it and no sweep touches it
@@ -272,10 +282,10 @@ namespace Nino\Modules {
 
 		/**
 		 *	Write one archive now, on request - the Backups panel's "Back up
-		 *	now". An archive of its own, named by date and time, beside the
-		 *	daily one and never in place of it: today's Y-m-d.php is the state
-		 *	before the day's work (see maybeRun()), and a click at five in the
-		 *	afternoon must not replace it. Kept like the daily ones - the same
+		 *	now". An archive of its own, named by date and time and marked as
+		 *	made by hand, beside the daily one and never in place of it: today's
+		 *	Y-m-d.php is the state before the day's work (see maybeRun()), and a
+		 *	click at five in the afternoon must not replace it. Kept like the daily ones - the same
 		 *	way - and only the newest ones, as many as the project keeps.
 		 *
 		 *	Without the daily lock: the name is to the second, so two clicks in
@@ -289,7 +299,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	string|array						The new archive's id ("Y-m-d-His"), or [ http status, message ] - and, where a write failed, the code the panel words it by as a third element
+		 *	@return 	string|array						The new archive's id ("Y-m-d-His-manual"), or [ http status, message ] - and, where a write failed, the code the panel words it by as a third element
 		 */
 		public static function now( array &$appData ): string|array {
 
@@ -303,7 +313,7 @@ namespace Nino\Modules {
 				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
 
 				$dir 	= self::dir( $appData );
-				$id 	= date( 'Y-m-d-His' );
+				$id 	= date( 'Y-m-d-His' ). self::MANUAL_SUFFIX;
 
 				$run = self::_begin( $dir, 'manual' );
 
@@ -935,7 +945,8 @@ namespace Nino\Modules {
 		 *	later than the new archive's counts as older than every other, so it
 		 *	is the first to go once there are more than the project keeps. Only
 		 *	ever touches files whose name is exactly a plain "Y-m-d.php" date or a
-		 *	"Y-m-d-His.php" one - the panel's own Admin::_safetySnapshot() also
+		 *	"Y-m-d-His-manual.php" one (or "Y-m-d-His.php", which an archive made by
+		 *	hand was called before the suffix) - the panel's own Admin::_safetySnapshot() also
 		 *	writes into this same directory (differently named,
 		 *	"pre-restore-<timestamp>.php", kept by its own bound) and must never
 		 *	be swept up here
@@ -956,25 +967,93 @@ namespace Nino\Modules {
 			foreach( @scandir( $dir ) ?: [] as $name ) {
 				if( preg_match( '/^\d{4}-\d{2}-\d{2}\.php$/', $name ) === 1 )
 					$days[] = $name;
-				else if( preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}\.php$/', $name ) === 1 )
+				else if( preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}(?:'. self::MANUAL_SUFFIX. ')?\.php$/', $name ) === 1 )
 					$hands[] = $name;
 			}
 
-			foreach( [ [ $days, $daily, date( 'Y-m-d' ). '.php' ], [ $hands, $manual, date( 'Y-m-d-His' ). '.php' ] ] as [ $names, $keep, $today ] ) {
-
-				// Of the kind just written the new one stays whatever its name, and
-				// with it the newest of the others; of the other kind, the newest
-				$mine 	= in_array( $written, $names, true );
-				$others = array_values( array_diff( $names, [ $written ] ) );
-				rsort( $others );
-
-				// Later than the new one, or than now: older than all the rest
-				$later 	= array_filter( $others, static fn( string $name ): bool => $name > ( $mine === true ? $written : $today ) );
-				$others = array_merge( array_diff( $others, $later ), $later );
-
-				foreach( array_slice( $others, $mine === true ? $keep - 1 : $keep ) as $name )
+			foreach( [ [ $days, $daily, date( 'Y-m-d' ). '.php', 10 ], [ $hands, $manual, date( 'Y-m-d-His' ). '.php', 17 ] ] as [ $names, $keep, $today, $length ] )
+				foreach( self::_doomed( $names, $keep, $written, $today, $length ) as $name )
 					@unlink( $dir. '/'. $name );
-			}
+		}
+
+		/**
+		 *	Which archives of one kind a run that wrote $written deletes: of the
+		 *	kind just written the new one stays whatever its name, and with it the
+		 *	newest of the others; of the other kind, the newest. A name is compared
+		 *	by its date and time, the first $length characters, so that a suffix
+		 *	decides nothing about its age
+		 *
+		 *	@param		string[]	$names				File names of the archives of the kind
+		 *	@param		int				$keep					How many of the kind are kept
+		 *	@param		string		$written			File name of the archive just written, or one of the other kind
+		 *	@param		string		$today				What "now" is called as a file name of the kind
+		 *	@param		int				$length				How many characters of a name are its date and time
+		 *
+		 *	@return 	string[]								The file names to delete
+		 */
+		private static function _doomed( array $names, int $keep, string $written, string $today, int $length ): array {
+
+			$mine 	= in_array( $written, $names, true );
+			$others = array_values( array_diff( $names, [ $written ] ) );
+			rsort( $others );
+
+			// Later than the new one, or than now: older than all the rest
+			$limit	= substr( $mine === true ? $written : $today, 0, $length );
+			$later 	= array_filter( $others, static fn( string $name ): bool => substr( $name, 0, $length ) > $limit );
+			$others = array_merge( array_diff( $others, $later ), $later );
+
+			return array_slice( $others, $mine === true ? $keep - 1 : $keep );
+		}
+
+		/**
+		 *	Whether the next backup that succeeds deletes this archive: it is not
+		 *	among the newest of its kind the project keeps. The panel says so after
+		 *	an upload, since an old archive that is put back counts in its kind like
+		 *	any other and is the first to go. A clock that was ahead counts as in
+		 *	_prune(): such a name is older than the rest
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id						An id of a daily archive or of one made by hand
+		 *
+		 *	@return 	array										[ 'drops' => bool, 'keep' => how many of its kind the project keeps ]
+		 */
+		public static function retention( array &$appData, string $id ): array {
+
+			$manual	= preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}/', $id ) === 1;
+			$names 	= [];
+
+			foreach( @scandir( self::dir( $appData ) ) ?: [] as $name )
+				if( preg_match( $manual === true ? '/^\d{4}-\d{2}-\d{2}-\d{6}(?:'. self::MANUAL_SUFFIX. ')?\.php$/' : '/^\d{4}-\d{2}-\d{2}\.php$/', $name ) === 1 )
+					$names[] = $name;
+
+			$keep = self::_keep( $appData, $manual === true ? 'manual' : 'daily' );
+
+			// Nothing was written: the first $keep of the kind stay
+			return [ 'drops' => in_array( $id. '.php', self::_doomed( $names, $keep, '', date( $manual === true ? 'Y-m-d-His' : 'Y-m-d' ). '.php', $manual === true ? 17 : 10 ), true ), 'keep' => $keep ];
+		}
+
+		/**
+		 *	What opening an archive of this size costs in memory beyond what is
+		 *	asked for already, and whether the limit carries it. An archive is read
+		 *	whole and decrypted whole (see Admin::_decrypt()): its ciphertext and
+		 *	its plain bytes are in memory together, about one and a half times the
+		 *	file, which is base64
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int				$bytes				Size of the archive file
+		 *
+		 *	@return 	array|null							null where it fits, else [ megabytes needed, megabytes the limit is ]
+		 */
+		public static function openShort( array &$appData, int $bytes ): ?array {
+
+			$limit = self::_limit( $appData );
+
+			if( $limit <= 0 )
+				return null;
+
+			$need = memory_get_usage() + (int) ( $bytes * 1.5 ) + self::PEAK_OVERHEAD;
+
+			return $need > $limit ? [ (int) ceil( $need / 1048576 ), (int) floor( $limit / 1048576 ) ] : null;
 		}
 	}
 }
