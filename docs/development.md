@@ -1,6 +1,6 @@
 # Nino — Developer Manual
 
-This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and security. Where the code states a list itself — the callbacks the kernel fires, the classes, the modules, the methods of a panel — the manual names the place instead of copying the list. Setting up a project is the [Setup Wizard](setup.md) manual; one kind of change at a time is walked through in the [recipes](recipes/README.md).
+This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and security. Where the code states a list itself — the callbacks the kernel fires, the classes, the modules, the methods of a panel — the manual names the place instead of copying the list. Setting up a project is the [Setup Wizard](setup.md) manual; one kind of change at a time is walked through in the [recipes](recipes/README.md). The way in before all of them is the [developer guide](guide/README.md), written in German: an overview in plain language and tutorials that build one feature from its first file to its test.
 
 **Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained in the workbench, `/_admin`.
 

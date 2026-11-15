@@ -17,3 +17,6 @@ decides which recipe applies.
 A feature - a module delivered as one directory under `features/` with a manifest,
 settings, a version and its own test - is not a recipe but a manual of its own:
 [Developing a feature](../features.md).
+
+The [developer guide](../guide/README.md), written in German, comes before both: an overview
+in plain language and tutorials that build one feature from its first file to its test.

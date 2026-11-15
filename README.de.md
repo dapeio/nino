@@ -135,10 +135,11 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 
 ## Dokumentation
 
-Die Handbücher und die Rezepte sind englisch. Der Agent-Leitfaden und die Rezepte sind der Arbeitstext dessen, der Nino erweitert.
+Die Handbücher und die Rezepte sind englisch; das Entwickler-Handbuch, der erste Eintrag unten, ist deutsch. Der Agent-Leitfaden und die Rezepte sind der Arbeitstext dessen, der Nino erweitert.
 
 **Handbücher**
 
+* **[Entwickler-Handbuch](docs/guide/README.md):** der Einstieg, auf Deutsch geschrieben – eine Übersicht in einfacher Sprache und Tutorials, die ein Feature von der ersten Datei bis zum Test bauen
 * **[Developer Manual](docs/development.md):** wie Nino läuft – Anfrage, Routing, Callbacks, Rendering, Module und Sicherheit
 * **[Setup Wizard](docs/setup.md):** die sechs Schritte, was sie schreiben, und das Library-Format
 * **[`/_admin` Workbench](docs/_admin.md):** Rollen und Rechte, Recovery und Fehlersuche

@@ -135,10 +135,11 @@ Nino deliberately keeps its architecture small: a central `$appData` array carri
 
 ## Documentation
 
-The manuals and the recipes are in English. The agent guide and the recipes are the working text of whoever extends Nino.
+The manuals and the recipes are in English; the developer guide, the first entry below, is in German. The agent guide and the recipes are the working text of whoever extends Nino.
 
 **Manuals**
 
+* **[Developer guide](docs/guide/README.md):** the way in, written in German - an overview in plain language and tutorials that build one feature from its first file to its test
 * **[Developer Manual](docs/development.md):** how Nino runs - the request, routing, callbacks, rendering, modules, and security
 * **[Setup Wizard](docs/setup.md):** the six steps, what they write, and the library format
 * **[`/_admin` Workbench](docs/_admin.md):** roles and rights, recovery, and troubleshooting
