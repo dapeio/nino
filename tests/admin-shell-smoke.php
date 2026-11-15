@@ -1574,6 +1574,11 @@ check( 'a page with an http uri that is none is "routes_invalid_http_uri" with t
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'key' => 'Bad Id', 'originalKey' => '' ] );
 check( 'a navigation id that is none is "navs_invalid_id" for the field "key"', $status === 400 && ( $body['code'] ?? '' ) === 'navs_invalid_id' && $body['params'] === [ 'Bad Id' ] && ( $body['field'] ?? '' ) === 'key' );
 
+foreach( [ '', '   ' ] as $blank ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'key' => $blank, 'originalKey' => '' ] );
+	check( 'a navigation without an id (\''. $blank. '\') is "navs_id_required" for the field "key"', $status === 400 && ( $body['code'] ?? '' ) === 'navs_id_required' && ( $body['field'] ?? '' ) === 'key' );
+}
+
 /*	Every code the kernel sends has words, in both interface languages. The
 	words of the shared ones live in the shell's own text, a panel's own - the
 	ones carrying its slug - in its text() directory, and the client finds

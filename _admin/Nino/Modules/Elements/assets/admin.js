@@ -855,7 +855,22 @@
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/elements/label/backtypes');
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'elements', [] ); Nino.admin.elements._showTypes( Nino.admin.elements._typeButton( Nino.admin.elements._currentType ) ) } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+			const toolbar = Nino.admin.formToolbar( backLink );
+			wrap.appendChild( toolbar );
+
+			// Which translation the cells show, said in the form the edit form says
+			// it in: the same select, and it moves the workbench's content locale
+			// with it. A type with no per-language field has nothing to switch
+			if( Nino.admin.elements._localeKeys.length > 0 )
+				toolbar.appendChild( Nino.adminUi.localeSelect( {
+					id : 'elements-list-locale-select',
+					locales : Nino.admin.elements._locales,
+					current : Nino.admin.elements._workingLocale( Nino.admin.elements._locales[0] ?? '' ),
+					onChange : function( locale ) {
+						Nino.admin.sessionLocale.set( locale );
+						Nino.admin.elements._refreshList();
+					},
+				} ) );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title--withuri';
@@ -890,9 +905,27 @@
 					mount 		: mount,
 					rowKey 		: '.uri',
 					columns 	: [ { key : '.uri', label : Nino.content.getText('/_admin/elements/label/uri'), type : 'string' } ].concat( columns.map( function( key ) {
-						return { key : key, label : Nino.admin.elements._fieldLabel( key ), type : ( ( Nino.admin.elements._currentModel || {} )[key] || {} ).type || 'string' };
+						const column = { key : key, label : Nino.admin.elements._fieldLabel( key ), type : ( ( Nino.admin.elements._currentModel || {} )[key] || {} ).type || 'string' };
+						// A text another language holds says whose it is, beside it, and sorts as
+						// no text: what is not translated yet stays with the cells that are empty
+						// (searching reads what is shown)
+						if( ( ( Nino.admin.elements._currentModel || {} )[key] || {} ).locale === true ) {
+							column.render = function( value, row ) {
+								const code = row['.from'][key];
+								if( code === undefined )
+									return undefined;
+								const cell = Nino.adminUi.el( 'span', '' );
+								const text = Nino.adminUi.el( 'span', '', Nino.adminUi.tableModel.format( value, column.type )+ ' ' );
+								text.lang = String( code ).replace( '_', '-' );
+								cell.appendChild( text );
+								Nino.admin.elements._markFallback( cell, code );
+								return cell;
+							};
+							column.absent = function( row ) { return row['.from'][key] !== undefined };
+						}
+						return column;
 					} ) ),
-					rows 			: elements.map( function( element ) { return Object.assign( { '.uri' : element.uri }, element.values || {} ) } ),
+					rows 			: elements.map( function( element ) { return Object.assign( { '.uri' : element.uri, '.from' : element.from ?? {} }, element.values || {} ) } ),
 					labels 		: {
 						search 	: Nino.content.getText('/_admin/elements/label/reference-search'),
 						empty 	: Nino.content.getText('/_admin/elements/label/reference-empty'),
@@ -910,6 +943,10 @@
 					link.href = Nino.admin.router.href( 'elements', [ Nino.admin.elements._currentType, element.uri ] );
 					link.dataset.row = element.uri;
 					link.textContent = element.label;
+					if( ( element.from ?? {} ).title !== undefined ) {
+						link.textContent = element.label+ ' ';
+						Nino.admin.elements._markFallback( link, element.from.title );
+					}
 					link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._visit( element.uri ) } );
 					li.appendChild( link );
 					ul.appendChild( li );
@@ -917,8 +954,9 @@
 				wrap.appendChild( ul );
 			}
 
+			// The select is one of the things the list holds that is not a row
 			if( held !== null )
-				( Nino.admin.elements._rowOf( held.dataset.row ?? null ) ?? backLink ).focus();
+				( ( held.id === 'elements-list-locale-select' ? dc.getElementById( held.id ) : null ) ?? Nino.admin.elements._rowOf( held.dataset.row ?? null ) ?? backLink ).focus();
 
 			// "New element" as an action below the list, not above it - and
 			// only for an account that may actually add one
@@ -931,6 +969,31 @@
 			addBtn.textContent = Nino.content.getText('/_admin/elements/label/add');
 			addBtn.addEventListener( 'click', function() { Nino.admin.elements._visit( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
+		},
+
+		/**
+		 *	Say beside a text of the list that it is not the element's own in the
+		 *	language the list shows but another language's: the language, in the
+		 *	spelling of the switch, in the workbench's pill - the word is the
+		 *	signal, the pill only sets it apart - and a sentence a screen reader
+		 *	reads in its place, since the pill alone is a code
+		 *
+		 *	@param		{Element}	host				Where the text stands
+		 *	@param		{string}	code				The locale the text is written in, eg. de_DE
+		 *
+		 *	@return		void
+		 */
+		_markFallback : function( host, code ) {
+
+			const sentence = Nino.adminUi.format( Nino.content.getText('/_admin/elements/label/fallback'), code );
+
+			const badge = Nino.adminUi.el( 'span', 'nino-admin-badge', code );
+			badge.dataset.state = 'muted';
+			badge.title = sentence;
+			badge.setAttribute( 'aria-hidden', 'true' );
+			host.appendChild( badge );
+
+			host.appendChild( Nino.adminUi.el( 'span', 'nino-admin-sr-only', sentence ) );
 		},
 
 		/**
@@ -994,7 +1057,10 @@
 				Nino.admin.elements._dirtyLocales	= [];
 				Nino.admin.elements._resetEdits();
 				Nino.admin.elements._remember();
-				Nino.admin.elements._selectedLocale = ( preferred !== null && response.locales[preferred] !== undefined ) ? preferred : ( Object.keys( response.locales )[0] ?? Nino.admin.elements._locales[0] ?? '' );
+				// The language the list shows is the one the form opens in, where the type has
+				// a field per language and the site serves it: an element with no text in it
+				// opens with empty fields, ready to be translated
+				Nino.admin.elements._selectedLocale = ( preferred !== null && ( response.locales[preferred] !== undefined || ( Nino.admin.elements._localeKeys.length > 0 && Nino.admin.elements._workingLocale('') === preferred ) ) ) ? preferred : ( Object.keys( response.locales )[0] ?? Nino.admin.elements._locales[0] ?? '' );
 				Nino.admin.elements._loadReferenceOptions( function() {
 					if( requestId !== Nino.admin.elements._formRequest || type !== Nino.admin.elements._currentType )
 						return;

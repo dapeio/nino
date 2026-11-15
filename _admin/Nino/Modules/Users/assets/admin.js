@@ -1031,6 +1031,8 @@
 
 			Nino.adminUi.confirm( 'big', {
 				message		: Nino.content.getText('/_admin/users/confirm/deactivate'),
+				kind			: 'danger',
+				visitors	: false,
 				yes				: Nino.content.getText('/_admin/users/label/deactivate'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
@@ -1077,6 +1079,7 @@
 
 			Nino.adminUi.confirm( 'big', {
 				message		: Nino.content.getText('/_admin/users/confirm/logoutall'),
+				visitors	: false,
 				yes				: Nino.content.getText('/_admin/users/label/logoutall'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {

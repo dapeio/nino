@@ -203,6 +203,11 @@ namespace Nino\Modules\Navigation {
 				$key 					= trim( \Nino\Admin\Admin::postString( $data, 'key' ) );
 				$originalKey 	= trim( \Nino\Admin\Admin::postString( $data, 'originalKey' ) );
 
+				if( $key === '' ) {
+					\Nino\Http::fail( $request, 400, 'navigation id is required', 'navs_id_required', [], 'key' );
+					return;
+				}
+
 				if( self::isValidKey( $key ) === false ) {
 					\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"', 'navs_invalid_id', [ $key ], 'key' );
 					return;

@@ -229,18 +229,65 @@ namespace Nino\Modules\Elements {
 			$locale = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'locale' );
 
 			// The table view reads one translation at a time: global fields plus
-			// the picked locale's. Without one, fall back to the old "any locale"
-			// behaviour, which is what the plain list wants
-			$results 	= \Nino\Elements::queryElements( $appData, '/'. $type, [],
-				$locale !== '' && \Nino\Locales::verifyLocale( $appData, $locale ) === true ? $locale : '*', [] );
+			// the picked locale's. Every element is listed, whichever languages
+			// hold it: an element with nothing in the picked language shows the
+			// text another language holds, and says for each field it took
+			// which language it came from ('from', field => locale), so a cell
+			// never reads as empty where the element has words. A field whose
+			// text is empty counts as having none. 'from' is made over every
+			// field of the language, the columns or not: the plain list takes
+			// its label from the title whether it is a column or not
+			$picked 	= $locale !== '' && \Nino\Locales::verifyLocale( $appData, $locale ) === true;
+			$results 	= \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
 
-			$columns = self::displayableColumns( $model );
+			$columns 	= self::displayableColumns( $model );
+
+			// The languages the fallback reads, in its order (see \Nino\Elements::getElementWithFallback()):
+			// the native one, the languages of the site, then every other bucket of the type file - a
+			// language without a text file or switched off is read too, and so is named
+			$order 		= array_merge( \Nino\Locales::verifyLocale( $appData, \Nino\Locales::getNativeLocale( $appData ) ) === true ? [ \Nino\Locales::getNativeLocale( $appData ) ] : [], \Nino\Locales::getAvailableLocales( $appData ) );
+			foreach( array_keys( $typeData ) as $bucket )
+				if( is_string( $bucket ) === true && preg_match( \Nino\Locales::PATTERN, $bucket ) === 1 && is_array( $typeData[$bucket] ) === true )
+					$order[] = $bucket;
+			$order 		= array_values( array_unique( $order ) );
 
 			$elements = [];
 			foreach( $results as $element ) {
 
 				$uri 		= basename( $element['.uri'] ?? '' );
 				$values = [];
+				$from 	= [];
+
+				if( $picked === true ) {
+
+					$fallback = \Nino\Elements::getElementWithFallback( $appData, '/'. $type. '/'. $uri, $locale );
+
+					if( $fallback !== false ) {
+
+						$own = \Nino\Elements::getElement( $appData, '/'. $type. '/'. $uri, $locale );
+						$own = is_array( $own ) === true ? $own : [];
+
+						foreach( $model as $key => $field ) {
+
+							if( ( $field['locale'] ?? false ) !== true || ( $fallback[$key] ?? null ) === ( $own[$key] ?? null ) )
+								continue;
+
+							// The first language, in the order the fallback reads them, that holds the very text
+							foreach( $order as $other ) {
+
+								if( $other === $locale )
+									continue;
+
+								if( ( $typeData[$other][$uri][$key] ?? null ) === $fallback[$key] ) {
+									$from[(string) $key] = $other;
+									break;
+								}
+							}
+						}
+
+						$element = $fallback;
+					}
+				}
 
 				// Only the fields a cell can actually show, so a type with a
 				// large rich-text or image field does not ship it to a list
@@ -256,6 +303,7 @@ namespace Nino\Modules\Elements {
 					'uri' 		=> $uri,
 					'label' 	=> self::label( $element, $uri ),
 					'values' 	=> $values,
+					'from' 		=> (object) $from,
 				];
 			}
 

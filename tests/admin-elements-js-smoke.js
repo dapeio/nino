@@ -880,6 +880,55 @@ if( typeof elements._renderNav === 'function' ) {
 	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );
 	check( 'a type with no field a cell can show keeps the plain list', dom.find( listNode, n => n.tagName === 'table' ).length === 0 && dom.find( listNode, n => n.tagName === 'ul' ).length === 1 );
 
+	// The language the list shows is said, in the form the edit form says it in: the same select, which moves the workbench's
+	// content locale with it and reads the list again. A text another language holds says whose it is, beside it - field by field
+	const localeKeysWas = elements._localeKeys;
+	const modelWas = elements._currentModel;
+	elements._localeKeys = [ 'title', 'subtitle', 'open' ];
+	elements._currentModel = { title : { type : 'string', locale : true }, subtitle : { type : 'string', locale : true }, open : { type : 'boolean', locale : true }, price : { type : 'double' } };
+	const refreshes = [];
+	const setLocales = [];
+	const refreshWas = elements._refreshList;
+	elements._refreshList = () => refreshes.push( 'refresh' );
+	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set : locale => setLocales.push( locale ), init(){} };
+	// What the server answers: 'from' is an object, field => locale, and an empty one is an empty object
+	const mixed = [
+		{ uri : 'ada', label : 'Ada', values : { title : 'Ada', subtitle : 'Adele', open : true, price : 9.5 }, from : { title : 'de_DE', subtitle : 'fr_FR', open : 'de_DE' } },
+		{ uri : 'bob', label : 'Bob', values : { title : 'Bobby', subtitle : '', open : false, price : 3 }, from : {} },
+	];
+	elements._renderList( mixed, [ 'title', 'subtitle', 'open', 'price' ] );
+	const listSelect = dom.find( listNode, n => n.tagName === 'select' && n.id === 'elements-list-locale-select' )[0];
+	check( 'a list of a type with a field per language has the switch of the form: the languages of the site, the working one picked', listSelect !== undefined && dom.find( listSelect, n => n.tagName === 'option' ).map( o => o.value + ( o.selected === true ? '*' : '' ) ).join() === 'de_DE,en_US*' );
+	listSelect.value = 'de_DE';
+	listSelect.listeners.change();
+	check( '...choosing another moves the workbench\'s language and reads the list again', setLocales.join() === 'de_DE' && refreshes.length === 1 );
+	// The table is the shared one and draws what a column's render() answers; what the list hands it is read here
+	const tableWas = sandbox.Nino.adminUi.table;
+	let tableOptions = null;
+	sandbox.Nino.adminUi.table = options => { tableOptions = options };
+	elements._renderList( mixed, [ 'title', 'subtitle', 'open', 'price' ] );
+	sandbox.Nino.adminUi.table = tableWas;
+	const column = key => tableOptions.columns.find( c => c.key === key );
+	const badgesOf = node => dom.find( node, n => n.className === 'nino-admin-badge' ).map( n => n.textContent );
+	const taken = column('title').render( 'Ada', tableOptions.rows[0] );
+	check( 'a cell holding the text of another language is the text and, beside it, the locale it is written in, in the spelling of the switch', dom.find( taken, n => n.tagName === 'span' && n.textContent === 'Ada ' ).length === 1 && badgesOf( taken ).join() === 'de_DE' );
+	check( '...the text says its own language to a screen reader, and the pill is not read twice: a sentence takes its place', dom.find( taken, n => n.tagName === 'span' && n.textContent === 'Ada ' )[0].lang === 'de-DE'
+		&& dom.find( taken, n => n.className === 'nino-admin-badge' )[0].attrs['aria-hidden'] === 'true'
+		&& dom.find( taken, n => n.className === 'nino-admin-sr-only' ).length === 1 && dom.find( taken, n => n.className === 'nino-admin-sr-only' )[0].textContent === dom.find( taken, n => n.className === 'nino-admin-badge' )[0].title );
+	check( '...each field says its own language', badgesOf( column('subtitle').render( 'Adele', tableOptions.rows[0] ) ).join() === 'fr_FR' );
+	check( '...and is formatted as the table formats it: a yes is the glyph, not the word', dom.find( column('open').render( true, tableOptions.rows[0] ), n => n.tagName === 'span' && n.textContent === '\u2713 ' ).length === 1 );
+	check( '...a cell with its own text is drawn as every cell is, and the columns that are no language\'s are not asked', column('title').render( 'Bobby', tableOptions.rows[1] ) === undefined && column('price').render === undefined );
+	check( 'a taken text counts as no text when the column is sorted - it stays with the cells that are empty - and an own one does not', column('title').absent( tableOptions.rows[0] ) === true && column('title').absent( tableOptions.rows[1] ) === false && column('price').absent === undefined );
+	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {}, from : { title : 'de_DE' } }, { uri : 'bob', label : 'Bob', values : {}, from : {} } ], [] );
+	check( 'the plain list says it beside the label as well, from the answer the server gives for a type with no column', dom.find( listNode, n => n.className === 'nino-admin-badge' ).map( n => n.textContent ).join() === 'de_DE' );
+	elements._localeKeys = [];
+	elements._renderList( [ { uri : 'ada', label : 'Ada', values : { title : 'Ada' }, from : {} } ], [ 'title' ] );
+	check( 'a type with nothing per language has nothing to switch', dom.find( listNode, n => n.id === 'elements-list-locale-select' ).length === 0 );
+	elements._localeKeys = localeKeysWas;
+	elements._currentModel = modelWas;
+	elements._refreshList = refreshWas;
+	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
+
 	// A type that has a note of its own - the legal texts say they are no
 	// legal advice - shows it above its elements, as text; one that has none is as it was
 	const contentBefore = sandbox.Nino.content;
@@ -2204,6 +2253,30 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	rowOf('one').focus();
 	elements._showTypes();
 	check( 'the list gone with the focus on its row: the focus goes to the name of the panel, where the person started', focus() === paneTitle );
+
+	// the language of the list: the select keeps the focus when the list is drawn anew under it, and a row opens
+	// the form in that language, with empty fields where the element has no text in it yet
+	elements._locales = [ 'de_DE', 'en_US' ];
+	elements._localeKeys = [ 'title' ];
+	elements._currentModel = Object.assign( {}, model, { title : { type : 'string', locale : true } } );
+	elements._currentType = 'post';
+	elements._renderList( tabled.elements.map( row => Object.assign( { from : {} }, row ) ), tabled.columns );
+	const listSelect = () => level.list.querySelector('#elements-list-locale-select');
+	listSelect().focus();
+	elements._renderList( tabled.elements.map( row => Object.assign( { from : {} }, row ) ), tabled.columns );
+	check( 'a list drawn anew with the focus on its language select gives it to the select that is drawn now', listSelect() !== null && focus() === listSelect() );
+
+	elements._showList();
+	rowOf('two').focus();
+	rowOf('two').fire( 'keydown', { key : 'Enter' } );
+	answer( 'get', 200, { global : { slug : 'x' }, locales : { de_DE : { title : 'Zwei' } }, raw : {} } );
+	check( 'a row opens the element in the language the list shows - one the element has no text in yet - and the fields are empty, ready to translate', elements._selectedLocale === 'en_US'
+		&& ( elements._localeValues.en_US ?? {} ).title === undefined );
+	elements._localeKeys = [];
+	elements._showList();
+	rowOf('two').fire( 'keydown', { key : 'Enter' } );
+	answer( 'get', 200, { global : { slug : 'x' }, locales : { de_DE : { title : 'Zwei' } }, raw : {} } );
+	check( 'a type with nothing per language opens as it did: on the first language the element has', elements._selectedLocale === 'de_DE' );
 }
 
 // --- the name of a field: a fill, a word, the key -----------------------------------

@@ -1014,7 +1014,7 @@ shell as `data-upload-bytes` and `data-upload-pixels`): put
 work in the server's own words without sending it.
 
 A question before an action is `Nino.adminUi.confirm( level, { title, message,
-yes, no, kind, opener, onChoose } )`, never `window.confirm()`: the project is in
+yes, no, kind, visitors, opener, onChoose } )`, never `window.confirm()`: the project is in
 a mode (`Nino.admin.mode.current()`; the rail's chip says Development), and the mode decides
 how much the workbench asks. `level` says what the action is worth:
 
@@ -1031,7 +1031,13 @@ or the shell has no policy - the setup wizard, a test, a shell older than the
 policy. `message` is the question; `yes` and `no` are what the two answers are
 called, in the interface language - the labels of `/_admin/common/label/*` serve
 for most - and `kind` is `'danger'` or `'primary'` for the answer that goes on,
-`'danger'` for a destructive level and `'primary'` otherwise. `onChoose( ok )` is
+`'danger'` for a destructive level and `'primary'` otherwise: say `'danger'`
+yourself where something is switched off or goes back to what the base has, whatever
+the level. A dialog whose way on is `'danger'` opens with the focus on the answer that
+does nothing, so Enter on a dialog that has just appeared is a No; any other keeps the
+focus on its first button. `visitors : false` says that the action does not touch what
+visitors see - an account, a role - and leaves out the line of a `'big'` level that
+the site is live. `onChoose( ok )` is
 called once with `true` or `false`, and **before `confirm()` returns** where
 nothing is asked, so what follows the question goes into it. When another
 question is open `confirm()` answers `false` and calls nobody back: a save that
@@ -1333,6 +1339,7 @@ buttons - has no sort button, nor has one that says `sortable: false`. With an
 Tab key of its own only where no control stands in it - a row that holds
 buttons or links is reached through them - and it carries the row key as
 `data-row`, which is how a panel finds it again after the table was drawn anew.
+A column may also carry `absent(row)`: a row for which it answers true counts as empty when the column is sorted, after the others in either direction, though its cell shows a value (a text shown in place of another language's); searching still reads what is shown.
 
 The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.

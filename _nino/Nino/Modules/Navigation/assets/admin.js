@@ -258,27 +258,8 @@
 			Nino.admin.navs._currentKey = nav ? nav.key : null;
 			Nino.admin.navs._opener 		= opener ?? null;
 
-			Nino.admin.navs._renderForm( nav || { key : Nino.admin.navs._freeKey(), entries : [] } );
+			Nino.admin.navs._renderForm( nav || { key : '', entries : [] } );
 			Nino.adminUi.showLevel( 'navs-form' );
-		},
-
-		/**
-		 *	A menu key not yet taken - "nav", then "nav-2", "nav-3", …
-		 *
-		 *	@return		{string}
-		 */
-		_freeKey : function() {
-
-			const taken = Nino.admin.navs._navs.map( function( nav ) { return nav.key } );
-
-			if( taken.indexOf('nav') === -1 )
-				return 'nav';
-
-			let n = 2;
-			while( taken.indexOf('nav-'+ n) !== -1 )
-				n++;
-
-			return 'nav-'+ n;
 		},
 
 		/**
@@ -307,6 +288,10 @@
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
+
+			// The browser's own bubble is not asked to say what is wrong: _save()
+			// does, at the field and in the form's own words
+			form.noValidate = true;
 
 			const navFieldset = dc.createElement('fieldset');
 			const navLegend = dc.createElement('legend');
@@ -663,9 +648,22 @@
 			};
 
 			const msg = dc.getElementById('navs-form-msg');
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			const key = dc.getElementById('navs-form-key').value.trim();
 
-			const key = dc.getElementById('navs-form-key').value;
+			Nino.adminUi.clearFieldErrors( dc.getElementById('navs-form') );
+
+			// The id is what a template asks for, so a menu cannot be made without
+			// one - and nothing is sent that the server would refuse: the same
+			// pattern as Admin::isValidKey(). The field says what is wrong with it
+			// where it stands, and takes the focus
+			if( key === '' || /^[a-z][a-z0-9_-]*$/.test( key ) === false ) {
+				Nino.admin.navs._markKey( key === '' ? Nino.content.getText('/_admin/common/error/required') : Nino.adminUi.format( Nino.content.getText('/_admin/error/navs_invalid_id'), key ) );
+				msg.textContent = Nino.content.getText('/_admin/common/error/save');
+				report( false );
+				return;
+			}
+
+			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
 			const payload = {
 				originalKey : Nino.admin.navs._isNew ? '' : Nino.admin.navs._currentKey,
@@ -680,6 +678,11 @@
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+
+					// A refusal that names the id (invalid, taken) stands at the field too
+					if( response !== null && typeof response === 'object' && response.field === 'key' )
+						Nino.admin.navs._markKey( msg.textContent );
+
 					report( false );
 					return;
 				}
@@ -698,6 +701,22 @@
 
 				report( true );
 			} );
+		},
+
+		/**
+		 *	Say at the id field what is wrong with it - a sentence under it that
+		 *	the field points at - and put the focus there
+		 *
+		 *	@param		{string}	text
+		 *
+		 *	@return		void
+		 */
+		_markKey : function( text ) {
+
+			const input = dc.getElementById('navs-form-key');
+
+			Nino.adminUi.fieldError( input.closest('label'), input, 'navs-error-key', text );
+			input.focus();
 		},
 
 		/**

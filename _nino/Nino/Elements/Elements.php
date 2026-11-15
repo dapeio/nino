@@ -365,12 +365,27 @@ namespace Nino {
 			return $result === [] ? $return : array_values( $result );
 		}
 
-		// Update an element
+		// Update an element - in a language it has nothing in yet as well: writing
+		// the text of a language is how an element is translated, so it has to
+		// exist in some language of the site (the languages a list shows it in),
+		// not in this one. One that none holds is refused, and so is one that only
+		// a bucket of a language the site does not serve still holds: that is what
+		// is left of a deleted element, not an element
 		static public function updateElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
 			self::_forgetRefused( $appData );
 
 			$element = \Nino\Elements::getElement( $appData, $uri, $locale );
+
+			if( $element === false ) {
+
+				$typeData		= self::getElementFile( $appData, self::getElementTypeFromUri( $uri ) );
+				$elementUri	= self::getElementUriFromUri( $uri );
+
+				foreach( array_merge( [ '*' ], \Nino\Locales::getAvailableLocales( $appData ) ) as $bucket )
+					if( is_array( $typeData ) === true && is_array( $typeData[$bucket] ?? null ) === true && array_key_exists( $elementUri, $typeData[$bucket] ) === true )
+						$element = true;
+			}
 
 			if( $element === false )
 				return ! trigger_error( 'Element \''. $uri. '\' does not exist.' );
@@ -580,9 +595,13 @@ namespace Nino {
 				// as a type file also has non-locale top-level keys (eg. its own
 				// display "title", a plain string rather than a data bucket) that
 				// would crash unset() on a string offset
+				// Every bucket of a language, those of languages the site does not serve (any more)
+				// included: what one of them keeps would make the element still exist to
+				// whoever reads that bucket
 				if( $locale === '*' )
-					foreach( \Nino\Locales::getAvailableLocales( $appData ) as $l )
-						unset( $typeData[$l][$elementUri] );
+					foreach( array_keys( $typeData ) as $l )
+						if( is_string( $l ) === true && $l !== '*' && preg_match( \Nino\Locales::PATTERN, $l ) === 1 && is_array( $typeData[$l] ) === true )
+							unset( $typeData[$l][$elementUri] );
 
 				// Delete last * (only if no other locale still references this element)
 				$lastEntry = true;

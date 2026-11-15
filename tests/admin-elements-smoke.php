@@ -886,6 +886,120 @@ check( 'emptying that number leaves no empty entry in the translation\'s bucket'
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList finds the element across locales', count( $body['elements'] ) === 1 && $body['elements'][0]['uri'] === 'first' );
 check( 'apiList labels an element by its title', $body['elements'][0]['label'] === 'Erster' );
+$fromOf = fn( array $row ): array => (array) $row['from'];
+check( 'an element is listed with the words of the language that was asked for, and none of them is another one\'s', $fromOf( $body['elements'][0] ) === [] );
+
+// The list is in the language the workbench is set to. An element that has no
+// words there is still listed, with the words another language holds, and the
+// answer says for each field it took which language the words are from - so
+// the cell never reads as empty where the element has text
+[ , $inEnglish ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'contenttype', 'locale' => 'en_US' ] );
+check( 'the list in a language the element has words in shows them', ( $inEnglish['elements'][0]['values']['title'] ?? null ) === 'First' && $inEnglish['elements'][0]['label'] === 'First' && $fromOf( $inEnglish['elements'][0] ) === [] );
+
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [
+	'type' => 'contenttype', 'uri' => 'only-german', 'locale' => 'de_DE', 'isNew' => true,
+	'fields' => [ 'title' => 'Nur Deutsch', 'views' => 7 ],
+] );
+[ , $inEnglish ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'contenttype', 'locale' => 'en_US' ] );
+$rows = array_column( $inEnglish['elements'], null, 'uri' );
+check( 'an element with no words in the language asked for is listed, not left out', isset( $rows['only-german'] ) === true && count( $inEnglish['elements'] ) === 2 );
+check( '...with the title of the other language, in the label and in the cell', ( $rows['only-german']['label'] ?? null ) === 'Nur Deutsch' && ( $rows['only-german']['values']['title'] ?? null ) === 'Nur Deutsch' );
+check( '...the field it took named with the locale the words are from, in the spelling of the switch', $fromOf( $rows['only-german'] ) === [ 'title' => 'de_DE' ] );
+check( '...a field every language shares is not named', ( $rows['only-german']['values']['views'] ?? null ) === 7 && isset( $fromOf( $rows['only-german'] )['views'] ) === false );
+
+[ , $inGerman ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'contenttype', 'locale' => 'de_DE' ] );
+check( 'in the language the element is written in it is its own', $fromOf( array_column( $inGerman['elements'], null, 'uri' )['only-german'] ) === [] );
+check( 'no language asked for: every element once', count( $body['elements'] ) === 1 );
+
+// An empty text is no text: the other language's takes its place, and is named
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'contenttype', 'uri' => 'empty-en', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Leer in Englisch', 'views' => 1 ] ] );
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'contenttype', 'uri' => 'empty-en', 'locale' => 'en_US', 'isNew' => false, 'fields' => [ 'title' => '' ] ] );
+[ , $inEnglish ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'contenttype', 'locale' => 'en_US' ] );
+$emptied = array_column( $inEnglish['elements'], null, 'uri' )['empty-en'] ?? [];
+check( 'a text that is empty in the language asked for counts as none: the other language\'s is shown and named', ( $emptied['values']['title'] ?? null ) === 'Leer in Englisch' && $fromOf( $emptied ) === [ 'title' => 'de_DE' ] );
+
+
+// A type that has nothing but fields per language: an element that exists in one
+// language only is in no global bucket, and is still listed in the others
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Types::class, 'apiCreate', [ 'uri' => 'langonly', 'title' => 'Language only', 'model' => [
+	'title' 	=> [ 'type' => 'string', 'locale' => true ],
+	'subtitle' 	=> [ 'type' => 'string', 'locale' => true ],
+] ] );
+check( 'a type of fields per language only is created', $status === 200 );
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'langonly', 'uri' => 'solo', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Allein' ] ] );
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'langonly', 'uri' => 'solo', 'locale' => 'fr_FR', 'isNew' => false, 'fields' => [ 'subtitle' => 'Seul' ] ] );
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'langonly', 'uri' => 'german', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Nur in Deutsch' ] ] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'langonly', 'locale' => 'en_US' ] );
+$rows = array_column( $listed['elements'], null, 'uri' );
+check( 'an element that exists in another language only is listed, though no global field holds its uri', count( $rows ) === 2 && isset( $rows['german'] ) === true && ( $rows['german']['values']['title'] ?? null ) === 'Nur in Deutsch' );
+check( '...every field says the language it comes from: a field from one language and one from another each have their own', $fromOf( $rows['solo'] ) === [ 'title' => 'de_DE', 'subtitle' => 'fr_FR' ] );
+
+// The element no global bucket knows: its uri stands in the bucket of one language only, which is what a
+// type of fields per language holds once the entry of '*' is not there. A list that asks the language
+// itself would not find it in another one
+\Nino\Filesystem::putFileContent( $appData, '/elements/ghosttype.php', [
+	'title'	=> 'Ghost Type',
+	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+	'*'			=> [ '*' => [] ],
+	'de_DE'	=> [ 'ghost' => [ 'title' => 'Geist' ] ],
+] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'ghosttype', 'locale' => 'en_US' ] );
+check( 'an element with no global field, that exists in one other language only, is listed with that language\'s title', array_column( $listed['elements'] ?? [], 'label', 'uri' ) === [ 'ghost' => 'Geist' ] && $fromOf( $listed['elements'][0] ) === [ 'title' => 'de_DE' ] );
+
+// Translating it: the element exists in German only, and saving the English text is what makes it
+// exist in English as well. One no language holds is refused, as it is
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'ghosttype', 'uri' => 'ghost', 'locale' => 'en_US', 'isNew' => false, 'fields' => [ 'title' => 'Ghost' ] ] );
+check( 'the text of a language an element has none in yet is saved, when it exists in another', $status === 200 );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'ghosttype', 'locale' => 'en_US' ] );
+check( '...the list in that language shows the element\'s own text and names nothing', ( $listed['elements'][0]['label'] ?? null ) === 'Ghost' && $fromOf( $listed['elements'][0] ) === [] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'ghosttype', 'locale' => 'de_DE' ] );
+check( '...and the other language is as it was', ( $listed['elements'][0]['label'] ?? null ) === 'Geist' );
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'ghosttype', 'uri' => 'nobody', 'locale' => 'en_US', 'isNew' => false, 'fields' => [ 'title' => 'Nobody' ] ] );
+check( 'an element no language has is refused all the same', $status === 400 );
+
+// A text in a language the site does not serve - a bucket with no text file, or one switched off - is read by
+// the fallback, so it is named as well
+\Nino\Filesystem::putFileContent( $appData, '/elements/offtype.php', [
+	'title'	=> 'Off Type',
+	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+	'*'			=> [ '*' => [], 'solo' => [] ],
+	'it_IT'	=> [ 'solo' => [ 'title' => 'Solo' ] ],
+] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'offtype', 'locale' => 'en_US' ] );
+check( 'a text from a language the site does not serve is shown and named with that language', ( $listed['elements'][0]['label'] ?? null ) === 'Solo' && $fromOf( $listed['elements'][0] ) === [ 'title' => 'it_IT' ] );
+
+// A deleted element does not come back by a save: the delete takes it out of every bucket of the type file,
+// those of languages the site does not serve included, and what an older delete left in such a bucket is not
+// an element that a write may revive
+\Nino\Filesystem::putFileContent( $appData, '/elements/gonetype.php', [
+	'title'	=> 'Gone Type',
+	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
+	'*'			=> [ '*' => [], 'alive' => [] ],
+	'de_DE'	=> [ 'alive' => [ 'title' => 'Lebt' ] ],
+	'it_IT'	=> [ 'alive' => [ 'title' => 'Vivo' ], 'old' => [ 'title' => 'Rest' ] ],
+] );
+$gone = fn(): array => \Nino\Filesystem::getFileContent( $appData, '/elements/gonetype.php', [] );
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'gonetype', 'uri' => 'alive', 'locale' => 'en_US', 'isNew' => false, 'fields' => [ 'title' => 'Alive' ] ] );
+check( 'an element that exists in a language of the site is translated, though a language the site does not serve holds a text of it too', $status === 200 && ( $gone()['en_US']['alive']['title'] ?? null ) === 'Alive' );
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'gonetype', 'uri' => 'old', 'locale' => 'en_US', 'isNew' => false, 'fields' => [ 'title' => 'Back' ] ] );
+check( 'what only a language the site does not serve still holds is no element: a save does not write it again', $status === 400 && isset( $gone()['en_US']['old'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiDelete', [ 'type' => 'gonetype', 'uri' => 'alive' ] );
+$left = array_filter( $gone(), fn( $bucket, $name ) => is_array( $bucket ) === true && $name !== 'model' && isset( $bucket['alive'] ), ARRAY_FILTER_USE_BOTH );
+check( 'deleting an element takes it out of every bucket, the one of a language the site does not serve among them', $status === 200 && $left === [] );
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'gonetype', 'uri' => 'alive', 'locale' => 'en_US', 'isNew' => false, 'fields' => [ 'title' => 'Again' ] ] );
+check( '...and a save from a tab that was open before it does not bring it back', $status === 400 && array_filter( $gone(), fn( $bucket, $name ) => is_array( $bucket ) === true && $name !== 'model' && isset( $bucket['alive'] ), ARRAY_FILTER_USE_BOTH ) === [] );
+
+// A type none of whose fields fits a cell is listed as a plain list of labels: the label's origin is
+// answered all the same, though the title is no column
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Types::class, 'apiCreate', [ 'uri' => 'plainlist', 'title' => 'Plain list', 'model' => [
+	'title' 	=> [ 'type' => 'string', 'locale' => true, 'html' => true ],
+	'photo' 	=> [ 'type' => 'image', 'width' => 10, 'height' => 10 ],
+] ] );
+check( 'a type with no field a cell can show is created', $status === 200 );
+callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'plainlist', 'uri' => 'one', 'locale' => 'de_DE', 'isNew' => true, 'fields' => [ 'title' => 'Eins' ] ] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'plainlist', 'locale' => 'en_US' ] );
+check( 'the plain list has no column, and its label is the other language\'s title', $listed['columns'] === [] && ( $listed['elements'][0]['label'] ?? null ) === 'Eins' );
+check( '...and says whose it is', $fromOf( $listed['elements'][0] ) === [ 'title' => 'de_DE' ] );
 
 // Only 'title', and the element's own uri otherwise. Guessing a label from
 // 'label'/'name' or from whichever string field came first in the model meant

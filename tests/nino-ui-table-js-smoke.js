@@ -85,6 +85,14 @@ check( 'empty values sort last ascending',
 check( '...and last descending too',
 	model.sort( sparse, 's', 'string', -1 ).map( r => r.s === null ? '-' : r.s ).join() === 'b,a,-' );
 
+// A cell that shows a value without owning it - a text a column only shows in place of another's - can be
+// said to be absent: it sorts with the empty ones, whichever way the column runs
+const lent = [ { s : 'b', lent : true }, { s : 'c', lent : false }, { s : 'a', lent : false }, { s : null, lent : false } ];
+check( 'a row the column calls absent sorts after the present ones, the empty ones among them, in either direction',
+	model.sort( lent, 's', 'string', 1, row => row.lent ).map( r => r.s ).slice( 0, 2 ).join() === 'a,c' && model.sort( lent, 's', 'string', -1, row => row.lent ).map( r => r.s ).slice( 0, 2 ).join() === 'c,a'
+	&& model.sort( lent, 's', 'string', 1, row => row.lent ).slice( 2 ).some( r => r.s === 'b' ) );
+check( '...and the search still reads what is shown', model.filter( lent, [ { key : 's', type : 'string' } ], 'b' ).length === 1 );
+
 check( 'sorting returns a new array rather than reordering the caller\'s',
 	( function() { const input = [ { n : 2 }, { n : 1 } ]; model.sort( input, 'n', 'integer', 1 ); return input[0].n === 2 } )() );
 
@@ -202,6 +210,22 @@ fire( sortButtons[1], 'click' );
 check( '...and says it again the other way round on a second press', headers[1].getAttribute('aria-sort') === 'descending' );
 fire( sortButtons[0], 'click' );
 check( '...and the column that lost the sort goes back to none', headers[1].getAttribute('aria-sort') === 'none' && headers[0].getAttribute('aria-sort') === 'ascending' );
+
+// A column may say that a row's cell counts as empty when it is sorted: the table asks it and
+// puts such a row after the others, whichever way the column runs
+const lentTable = element('div');
+ctx.Nino.adminUi.table( {
+	mount 	: lentTable,
+	columns	: [ { key : 'uri', label : 'Uri', type : 'string' }, { key : 's', label : 'S', type : 'string', absent : row => row.lent === true } ],
+	rows 		: [ { uri : '/lent', s : 'a', lent : true }, { uri : '/own-b', s : 'b' }, { uri : '/own-c', s : 'c' } ],
+	labels 	: { search : 'Search', empty : '', noMatch : '' },
+} );
+const lentSort = descendants( lentTable ).filter( el => el.className === 'nino-admin-table-sort' )[1];
+const lentOrder = () => descendants( lentTable ).filter( el => el.tagName === 'TR' && el.dataset !== undefined && el.dataset.row !== undefined ).map( el => el.dataset.row ).join();
+fire( lentSort, 'click' );
+const ascending = lentOrder();
+fire( lentSort, 'click' );
+check( 'a table orders a row its column calls absent after the others, ascending or descending', ascending === '/own-b,/own-c,/lent' && lentOrder() === '/own-c,/own-b,/lent' );
 
 
 /*	A column with no label is a column of a row's own buttons: its sort button

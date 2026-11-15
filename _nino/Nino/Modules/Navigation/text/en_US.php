@@ -24,6 +24,7 @@ return [
 	'[[/_admin/navs/msg/unsaved]]'	=> 'Unsaved changes – Save writes the running order.',
 	'[[/_admin/navs/confirm/discard]]'	=> 'The changes to this navigation are not saved. Leave without saving?',
 	'[[/_admin/navs/confirm/delete]]'		=> 'Really delete the navigation “%s”? Its routes stay, only their membership goes.',
+	'[[/_admin/error/navs_id_required]]'	=> 'The navigation id is missing.',
 	'[[/_admin/error/navs_invalid_id]]'	=> 'The navigation id “%s” is not valid. Start with a lowercase letter, then use lowercase letters, digits, hyphens and underscores.',
 	'[[/_admin/error/navs_id_taken]]'	=> 'The navigation id “%s” is already taken.',
 	'[[/_admin/error/navs_invalid_entries]]'	=> 'The navigation can only be saved with a list of routes.',

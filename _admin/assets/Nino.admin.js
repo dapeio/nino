@@ -408,7 +408,9 @@
 		 *	a native <dialog> in the workbench root, opened with showModal(),
 		 *	so the page behind keeps everything that was typed into it. Escape
 		 *	is the secondary choice, the one that does nothing; focus goes back
-		 *	to what had it when the question was asked.
+		 *	to what had it when the question was asked. The focus opens on the
+		 *	first button, unless the question has a 'danger' answer and no
+		 *	'primary' one: then it opens on the secondary answer.
 		 *
 		 *	Owns no strings and names no Nino.admin member: the caller says
 		 *	what to ask and what the answers are called, in the interface
@@ -503,11 +505,20 @@
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-dialog-actions';
 
+			// A question whose way on is a 'danger' one and has no 'primary' one - the
+			// one that destroys what is there, with nothing safe to press at its
+			// side - opens with the focus on the answer that does nothing: Enter
+			// on a dialog that has just appeared must not be the destroying
+			// answer. Any other question keeps what showModal() does, the first
+			// button; that is also where a Save stands beside a Discard
+			const cautious = choices.some( function( choice ) { return choice.kind === 'danger' } ) === true && choices.some( function( choice ) { return choice.kind === 'primary' } ) === false;
+
 			choices.forEach( function( choice ) {
 				const btn = dc.createElement('button');
 				btn.type = 'button';
 				btn.className = 'nino-admin-btn-'+ ( choice.kind === 'primary' || choice.kind === 'danger' ? choice.kind : 'secondary' );
 				btn.textContent = choice.label;
+				btn.autofocus = cautious === true && choice === cancel;
 				btn.addEventListener( 'click', function() {
 					chosen = choice;
 					dialog.close();
@@ -558,7 +569,8 @@
 		 *	@param		{string}		options.message					The question
 		 *	@param		{string}		options.yes							The label of the answer that goes on
 		 *	@param		{string}		options.no							The label of the answer that does not
-		 *	@param		{string}		[options.kind]					'danger' or 'primary' for the answer that goes on: 'danger' for a destructive level, else 'primary'
+		 *	@param		{string}		[options.kind]					'danger' or 'primary' for the answer that goes on: 'danger' for a destructive level, else 'primary'. Where something goes away or is switched off, the caller says 'danger' - what the level costs a visitor and what the action costs the person are two questions
+		 *	@param		{boolean}		[options.visitors]			false where the action does not touch what visitors see (an account, a role): the policy's note that visitors see the change at once is left out
 		 *	@param		{Element}		[options.opener]				See choiceDialog()
 		 *	@param		{Function}	options.onChoose				Called once with true or false - not at all when false is returned
 		 *
@@ -577,7 +589,7 @@
 			return Nino.adminUi.choiceDialog( {
 				title			: options.title,
 				message		: options.message,
-				note			: policy.note,
+				note			: options.visitors === false ? '' : policy.note,
 				opener		: options.opener,
 				choices		: [
 					{ value : 'yes', label : options.yes, kind : options.kind ?? ( level === 'routine' || level === 'big' ? 'primary' : 'danger' ) },
@@ -2124,10 +2136,11 @@
 			 *	@param		{string}	key				Column key, '' to leave the order alone
 			 *	@param		{string}	type			That column's model type
 			 *	@param		{number}	dir				1 ascending, -1 descending
+			 *	@param		{Function}	[absent]		absent( row ) is true for a row whose cell is to count as absent although it holds a value - a text a column only shows in place of another's
 			 *
 			 *	@return		{Array}								A new array; the input is not reordered
 			 */
-			sort : function( rows, key, type, dir ) {
+			sort : function( rows, key, type, dir, absent ) {
 
 				if( !key )
 					return rows.slice();
@@ -2137,7 +2150,8 @@
 				return rows.slice().sort( function( rowA, rowB ) {
 
 					const a = rowA[key], b = rowB[key];
-					const emptyA = model.isEmpty( a ), emptyB = model.isEmpty( b );
+					const emptyA = model.isEmpty( a ) || ( typeof absent === 'function' && absent( rowA ) === true );
+					const emptyB = model.isEmpty( b ) || ( typeof absent === 'function' && absent( rowB ) === true );
 
 					// Absent sorts last whichever way the column runs - an
 					// unset value is not "smaller", it is missing, and
@@ -2251,6 +2265,9 @@
 		 *																					`sortable` is true for a column that has a label
 		 *																					and false for one that has none - the column of
 		 *																					a row's own buttons - unless the caller says.
+		 *																					`absent(row)` says that a row's cell counts as empty
+		 *																					when the column is sorted, though it shows a value
+		 *																					(searching still reads what is shown).
 		 *																					`render(value, row)` may return an Element to
 		 *																					put in the cell instead of text - what a column
 		 *																					holding a mailto link or a per-row action needs.
@@ -2425,7 +2442,8 @@
 			function draw() {
 
 				const matched = model.filter( rows, columns, query );
-				const sorted 	= model.sort( matched, sortKey, ( columns.find( function( c ) { return c.key === sortKey } ) || {} ).type, sortDir );
+				const sortColumn = columns.find( function( c ) { return c.key === sortKey } ) || {};
+				const sorted 	= model.sort( matched, sortKey, sortColumn.type, sortDir, sortColumn.absent );
 				const view 		= model.page( sorted, pageSize, page );
 
 				page = view.page;

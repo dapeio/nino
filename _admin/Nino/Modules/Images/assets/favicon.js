@@ -463,6 +463,7 @@
 
 			Nino.adminUi.confirm( 'big', {
 				message		: Nino.content.getText('/_admin/favicon/confirm/reset'),
+				kind			: 'danger',
 				yes				: Nino.content.getText('/_admin/favicon/label/reset'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				opener		: opener,

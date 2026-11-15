@@ -216,6 +216,57 @@ console.log('Admin Navigations');
 }
 
 
+// --- the id is required -----------------------------------------------------
+
+{
+	const t = build( null );
+	t.panel.init();
+	t.answer( 200, payload( [ '/' ] ) );
+	fire( findAll( t.list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0], 'click' );
+
+	const key 	= t.field('navs-form-key');
+	const sent 	= t.requests.length;
+	const submit = function() { fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' ) };
+	const errors = function() { return findAll( t.form, function( el ) { return el.className === 'nino-admin-field-error' } ) };
+
+	check( 'a new menu opens with an empty id: nothing is suggested that a Save would take for a decision', key.value === '' && key.required === true );
+
+	submit();
+	check( 'Save on the blank form sends nothing', t.requests.length === sent && t.touched.length === 0 );
+	check( '...the field is marked and says at itself that it is a required one', key.attributes['aria-invalid'] === 'true' && errors().length === 1 && errors()[0].textContent === text('/_admin/common/error/required')
+		&& text('/_admin/common/error/required') !== '' && key.attributes['aria-describedby'] === errors()[0].id );
+	check( '...the focus is there, and the status line is not the one that says "saved"', key.focused === true && t.field('navs-form-msg').textContent !== text('/_admin/common/msg/saved') && t.field('navs-form-msg').textContent !== text('/_admin/common/msg/saving') );
+
+	key.value = '   ';
+	submit();
+	check( 'an id of blanks is no id', t.requests.length === sent && errors().length === 1 );
+
+	key.value = 'Main Menu';
+	submit();
+	check( 'an id the server would refuse is not sent either, and the sentence is the invalid-id one, with the id in it', t.requests.length === sent && errors().length === 1
+		&& errors()[0].textContent === text('/_admin/error/navs_invalid_id').replace( '%s', 'Main Menu' ) && key.attributes['aria-invalid'] === 'true' );
+
+	key.value = 'a.b';
+	submit();
+	check( 'a dot is no part of an id, as on the server', t.requests.length === sent && errors().length === 1 );
+	check( 'the form is not validated by the browser, whose bubble would say it in other words', findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0].noValidate === true );
+
+	// One pattern for both sides: the client's is the server's, written out
+	const fs = require('fs');
+	const server = fs.readFileSync( __dirname+ '/../_nino/Nino/Modules/Navigation/Admin/Admin.php', 'utf8' ).match( /private static function isValidKey[\s\S]*?preg_match\( '#(.+?)#'/ )[1];
+	const client = fs.readFileSync( __dirname+ '/../_nino/Nino/Modules/Navigation/assets/admin.js', 'utf8' ).match( /\/(\^\[a-z\][^\/]*\$)\/\.test\( key \)/ )[1];
+	check( 'the pattern the client checks an id against is the one the server does', server === client );
+
+	key.value = 'side-nav_2';
+	submit();
+	check( 'a valid id goes out with the first Save, and the marks of the attempts before it are gone', t.requests.length === sent + 1 && t.requests[sent].action === 'navs/save'
+		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : '', key : 'side-nav_2' } ) && errors().length === 0 && key.attributes['aria-invalid'] === undefined );
+
+	t.answer( 409, { error : 'navigation id already taken', code : 'navs_id_taken', params : [ 'side-nav_2' ], field : 'key' } );
+	check( 'an id the server refuses is marked at the field as well, with the server\'s sentence', errors().length === 1 && errors()[0].textContent === text('/_admin/error/navs_id_taken').replace( '%s', 'side-nav_2' ) && key.attributes['aria-invalid'] === 'true' );
+}
+
+
 // --- a menu deleted -------------------------------------------------------
 
 {

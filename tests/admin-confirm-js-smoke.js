@@ -232,6 +232,61 @@ console.log('Nino.adminUi.confirm');
 	check( 'a dialog that holds content in place of its message has no note either', paragraphs( w.dialogs[1] ).length === 0 );
 }
 
+// --- where the focus opens ---------------------------------------------------
+
+{
+	const w = world();
+	const asked = [];
+	const choose = choices => { w.ui.choiceDialog( { message : 'Sure?', choices : choices, onChoose : value => asked.push( value ) } ); return buttons( w.dialogs[w.dialogs.length - 1] ) };
+	const close = () => w.dialogs[w.dialogs.length - 1].close();
+
+	let btns = choose( [ { value : 'yes', label : 'Delete', kind : 'danger' }, { value : 'no', label : 'Cancel', kind : 'secondary' } ] );
+	check( 'a question whose way on is the dangerous answer opens with the focus on the one that does nothing', btns[0].autofocus !== true && btns[1].autofocus === true );
+	close();
+
+	btns = choose( [ { value : 'yes', label : 'Delete', kind : 'danger' }, { value : 'maybe', label : 'Later', kind : 'secondary' }, { value : 'no', label : 'Cancel', kind : 'secondary' } ] );
+	check( '...the first of the quiet answers where there are several, the one Escape means', btns.filter( b => b.autofocus === true ).length === 1 && btns[1].autofocus === true );
+	close();
+
+	btns = choose( [ { value : 'save', label : 'Save', kind : 'primary' }, { value : 'discard', label : 'Discard', kind : 'danger' }, { value : 'cancel', label : 'Cancel', kind : 'secondary' } ] );
+	check( 'a question that has a safe way on beside the dangerous one keeps the focus where it falls, on the first answer', btns.every( b => b.autofocus !== true ) );
+	close();
+
+	btns = choose( [ { value : 'yes', label : 'Go', kind : 'primary' }, { value : 'no', label : 'Cancel', kind : 'secondary' } ] );
+	check( '...and so does a question that destroys nothing', btns.every( b => b.autofocus !== true ) );
+	close();
+
+	const a = ask();
+	w.ui.confirm( 'destructive', a.options );
+	btns = buttons( w.dialogs[w.dialogs.length - 1] );
+	check( 'confirm() of a destructive weight asks with the focus on the quiet answer: Enter on it is a No', btns[0].className === 'nino-admin-btn-danger' && btns[1].autofocus === true );
+	close();
+	check( '...which is a No', a.answers.join() === 'false' );
+}
+
+
+// --- who the note is for ------------------------------------------------------
+
+{
+	const w = world( { mode : { policy : function() { return { ask : true, note : 'Visitors see this at once.' } } } } );
+
+	const a = ask();
+	w.ui.confirm( 'big', a.options );
+	check( 'the note of the policy is drawn where the caller does not say the change stays away from the visitors', paragraphs( w.dialogs[0] ).length === 2 );
+	w.dialogs[0].close();
+
+	const b = ask( { visitors : false } );
+	w.ui.confirm( 'big', b.options );
+	check( '...and left out where it does: an account or a role is not what a visitor sees', paragraphs( w.dialogs[1] ).length === 1 && w.dialogs[1].attributes['aria-describedby'] === 'nino-admin-choice-text' );
+	w.dialogs[1].close();
+
+	const c = ask( { visitors : true } );
+	w.ui.confirm( 'big', c.options );
+	check( '...only false leaves it out', paragraphs( w.dialogs[2] ).length === 2 );
+	w.dialogs[2].close();
+}
+
+
 // --- who asks, and how heavily ----------------------------------------------
 
 {
@@ -280,6 +335,19 @@ console.log('Nino.adminUi.confirm');
 		for( const match of source.matchAll( /Nino\.adminUi\.confirm\(\s*'(\w+)',\s*\{\s*(?:title[^\n]*\n\s*)?message\s*:[^\n]*?getText\('(\/_admin\/[^']+)'\)/g ) )
 			found[match[2]] = match[1];
 	} );
+	// What a question says besides its weight, by the same words: which of them are for the dangerous way on although the weight
+	// is not the heaviest (something is switched off, or goes back to what the base has), and which are not about the website
+	const said = {};
+	scripts.forEach( function( file ) {
+		for( const match of fs.readFileSync( file, 'utf8' ).matchAll( /Nino\.adminUi\.confirm\(\s*'(\w+)',\s*\{([\s\S]*?)onChoose/g ) ) {
+			const key = ( match[2].match( /getText\('(\/_admin\/[^']+)'\)/ ) ?? [] )[1];
+			if( key !== undefined )
+				said[key] = ( match[2].match( /\bkind\s*:\s*'(\w+)'/ ) ?? [ '', '' ] )[1]+ '/'+ ( /\bvisitors\s*:\s*false\b/.test( match[2] ) === true ? 'account' : 'site' );
+		}
+	} );
+	check( 'the questions that switch something off or take it back to the base make the dangerous answer the way on, and the ones about an account or a role do not tell of visitors',
+		said['/_admin/users/confirm/deactivate'] === 'danger/account' && said['/_admin/favicon/confirm/reset'] === 'danger/site'
+		&& said['/_admin/users/confirm/logoutall'] === '/account' && said['/_admin/roles/scope/warning'] === '/account' && said['/_admin/roles/scope/warning-leave'] === '/account' );
 	check( 'every panel script that asks names the weight of its question as the workbench has decided it, and a weight is one of three words - an unnamed one is taken for the heaviest, so a misspelled one would ask more than it was meant to and never say so',
 		calls === Object.keys( expected ).length && JSON.stringify( Object.keys( found ).sort().map( key => [ key, found[key] ] ) ) === JSON.stringify( Object.keys( expected ).sort().map( key => [ key, expected[key] ] ) ) );
 }

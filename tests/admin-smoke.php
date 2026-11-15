@@ -590,8 +590,10 @@ echo "Elements::apiList - the table view's columns and one translation's values\
 // The list answers the fields a table cell can show, in model order - not an
 // image, not a rich-text string - and every element's values for the
 // translation asked. An element that has no data in that translation yet is
-// still listed, with its translated cells empty: the table is where an editor
-// finds what is left to translate, so it cannot be the place it vanishes from
+// still listed, with the text another language holds in its translated cells
+// and the names of those cells: the table is where an editor finds what is
+// left to translate, so it cannot be the place it vanishes from, and the
+// cell that is not yet translated says whose words it shows
 \Nino\Elements::insertElementType( $appData, '/demotable', [
 	'title' 	=> [ 'type' => 'string', 'locale' => true ],
 	'body' 		=> [ 'type' => 'string', 'locale' => true, 'html' => true ],
@@ -612,7 +614,8 @@ check( 'apiList answers the columns and the rows, not the type\'s model or a cou
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiList' ], [ 'type' => 'demotable', 'locale' => 'en_US' ] );
 $listed = $body ?? [];
 check( 'a translation the element does not have yet still lists it', count( $listed['elements'] ?? [] ) === 1 && ( $listed['elements'][0]['uri'] ?? '' ) === 'one' );
-check( '...with its translated cell empty and the global one filled', ( $listed['elements'][0]['values'] ?? null ) === [ 'title' => null, 'price' => 9.5 ] );
+check( '...with the translated cell showing the other language\'s text, named with its locale, and the global one filled', ( $listed['elements'][0]['values'] ?? null ) === [ 'title' => 'Eins', 'price' => 9.5 ]
+	&& ( (array) ( $listed['elements'][0]['from'] ?? [] ) )['title'] === 'de_DE' );
 
 echo "\n";
 

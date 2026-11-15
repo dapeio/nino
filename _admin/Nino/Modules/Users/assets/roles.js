@@ -580,6 +580,7 @@
 
 				if( Nino.adminUi.confirm( 'big', {
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning-leave'), Nino.adminUi.text( leaving[0].label ) ),
+					visitors	: false,
 					yes				: Nino.content.getText('/_admin/common/label/remove'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					onChoose	: function( ok ) {
@@ -746,6 +747,7 @@
 
 				Nino.adminUi.confirm( 'big', {
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning'), Nino.adminUi.text( entering[0].label ) ),
+					visitors	: false,
 					yes				: Nino.content.getText('/_admin/common/label/add'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					onChoose	: function( ok ) {
