@@ -1704,10 +1704,16 @@ check( 'a stale restore-key copy is repaired from the locked config value', file
 
 $staleFile = $backupDir. '/2020-01-01.php';
 file_put_contents( $staleFile, $prefix. 'x'. $suffix );
+$recentDays = array_map( static fn( int $back ): string => $backupDir. '/'. date( 'Y-m-d', strtotime( "-$back days" ) ). '.php', [ 1, 2, 3 ] );
+foreach( $recentDays as $recent )
+	file_put_contents( $recent, $prefix. 'x'. $suffix );
 unlink( $today ); // force a fresh create+prune cycle, same as a new calendar day would
 callUsers( $appData, 'apiList' );
 
-check( 'a stale backup past the retention window gets pruned on the next create', is_file( $staleFile ) === false );
+check( 'a backup beyond the newest three daily ones gets pruned on the next create, the newer ones stay', is_file( $staleFile ) === false && is_file( $today ) === true
+	&& is_file( $recentDays[0] ) === true && is_file( $recentDays[1] ) === true && is_file( $recentDays[2] ) === false );
+unlink( $recentDays[0] );
+unlink( $recentDays[1] );
 check( 'a fresh backup for today exists after the prune cycle', is_file( $today ) === true );
 
 echo "\n";

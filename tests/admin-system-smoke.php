@@ -62,6 +62,53 @@ if( ( $argv[1] ?? '' ) === 'daily-backup' ) {
 
 require __DIR__. '/harness.php';
 
+/*	A stream that a disk that is full or a file that cannot be written is made of, without a disk that is full: it keeps
+	what it is given in memory and, past a limit, refuses it - loudly (a write that returns 0) or silently (a write that
+	says it wrote and keeps nothing, which is what the last piece of a gzip stream does on a full disk). One wrapper, so the
+	test needs neither root nor a mount	*/
+class NinoFullStream {
+	public static array $files = [];
+	public static int $limit = PHP_INT_MAX;
+	public static bool $silent = false;
+	public $context;
+	private string $key = '';
+	private int $at = 0;
+	public function stream_open( string $path, string $mode ): bool {
+		$this->key = $path;
+		if( str_contains( $mode, 'w' ) === true )
+			self::$files[$path] = '';
+		else if( isset( self::$files[$path] ) === false )
+			return false;
+		$this->at = 0;
+		return true;
+	}
+	public function stream_write( string $data ): int|false {
+		$room = max( 0, self::$limit - $this->at );
+		if( $room < strlen( $data ) && self::$silent === false )
+			return $room === 0 ? 0 : $room;
+		$put = substr( $data, 0, $room );
+		self::$files[$this->key] = substr( self::$files[$this->key], 0, $this->at ). $put. substr( self::$files[$this->key], $this->at + strlen( $put ) );
+		$this->at += strlen( $data );
+		return strlen( $data );
+	}
+	public function stream_read( int $count ): string|false {
+		$out = substr( self::$files[$this->key], $this->at, $count );
+		$this->at += strlen( $out );
+		return $out;
+	}
+	public function stream_eof(): bool { return $this->at >= strlen( self::$files[$this->key] ); }
+	public function stream_tell(): int { return $this->at; }
+	public function stream_seek( int $offset, int $whence ): bool {
+		$this->at = $whence === SEEK_CUR ? $this->at + $offset : ( $whence === SEEK_END ? strlen( self::$files[$this->key] ) + $offset : $offset );
+		return $this->at >= 0;
+	}
+	public function stream_stat(): array { return [ 'size' => strlen( self::$files[$this->key] ) ]; }
+	public function url_stat( string $path, int $flags ): array|false { return isset( self::$files[$path] ) ? [ 'size' => strlen( self::$files[$path] ), 'mode' => 0100644 ] : false; }
+	public function stream_flush(): bool { return true; }
+	public function stream_close(): void {}
+}
+stream_wrapper_register( 'ninofull', NinoFullStream::class );
+
 $appData = ninoSandbox( 'admin-system' );
 $sandbox = ninoSandboxDir( $appData );
 mkdir( $sandbox. '/private/elements', 0777, true );
@@ -310,22 +357,111 @@ check( 'ID_PATTERN takes a date and time, and still turns away a time cut short 
 	preg_match( $idPattern, '2026-10-02-170512' ) === 1 && preg_match( $idPattern, '2026-10-02' ) === 1 && preg_match( $idPattern, 'pre-restore-2026-10-02-170512' ) === 1
 	&& preg_match( $idPattern, '2026-10-02-1705' ) === 0 && preg_match( $idPattern, '../x' ) === 0 && preg_match( $idPattern, '2026-10-02-170512/../x' ) === 0 );
 
-// Retention: the days the daily archives have, and no more than ten of these.
-// A snapshot and a daily archive are not touched by it
-$staleTimed	= date( 'Y-m-d', strtotime( '-20 days' ) ). '-120000';
-$keptDaily	= date( 'Y-m-d', strtotime( '-3 days' ) );
-$oldSnap		= 'pre-restore-'. date( 'Y-m-d', strtotime( '-20 days' ) ). '-120000';
-foreach( [ $staleTimed, $keptDaily, $oldSnap ] as $name )
+// Retention: the newest three daily archives and the newest three made by hand, as many as the
+// project names. A snapshot is not touched by it
+$dayName		= static fn( int $back ): string => date( 'Y-m-d', strtotime( "-$back days" ) );
+$keptDaily	= $dayName( 1 );
+$oldSnap		= 'pre-restore-'. $dayName( 20 ). '-120000';
+foreach( [ $dayName( 1 ), $dayName( 2 ), $dayName( 3 ), $dayName( 4 ), $oldSnap ] as $name )
 	file_put_contents( $nowDir. '/'. $name. '.php', 'x' );
 for( $hour = 1; $hour <= 12; $hour++ )
-	file_put_contents( $nowDir. '/'. date( 'Y-m-d', strtotime( '-1 day' ) ). '-'. sprintf( '%02d', $hour ). '0000.php', 'x' );
+	file_put_contents( $nowDir. '/'. $dayName( 1 ). '-'. sprintf( '%02d', $hour ). '0000.php', 'x' );
+$dailyFiles = static fn(): array => array_map( 'basename', glob( $nowDir. '/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].php' ) ?: [] );
+
+// Never the last usable archive: a run that fails prunes nothing
+$daysBefore = $dailyFiles();
+$handsBefore = $timedFiles();
+$goodKey = $appData['/nino/backup/key'];
+$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => 'not a key' ] + $config );
+$appData['/nino/backup/key'] = 'not a key';
+$failed = \Nino\Modules\Backups::now( $appData );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => $goodKey ] + $config );
+$appData['/nino/backup/key'] = $goodKey;
+check( 'a backup that fails deletes no archive, whatever is over the limit', is_array( $failed ) === true && $dailyFiles() === $daysBefore && $timedFiles() === $handsBefore && count( $handsBefore ) > 3 );
 
 $pruneId = \Nino\Modules\Backups::now( $appData );
 $timedNow = $timedFiles();
-check( 'an archive of this kind older than the retention days is pruned', in_array( $staleTimed. '.php', $timedNow, true ) === false );
-check( '...and only the newest ten are kept - the new one among them', count( $timedNow ) === 10 && in_array( $pruneId. '.php', $timedNow, true ) === true && in_array( $nowId. '.php', $timedNow, true ) === true
-	&& in_array( date( 'Y-m-d', strtotime( '-1 day' ) ). '-010000.php', $timedNow, true ) === false && in_array( date( 'Y-m-d', strtotime( '-1 day' ) ). '-120000.php', $timedNow, true ) === true );
-check( '...the daily archives and the snapshots are left to their own sweeps', is_file( $nowDir. '/'. $keptDaily. '.php' ) === true && is_file( $dailyFile ) === true && is_file( $nowDir. '/'. $oldSnap. '.php' ) === true );
+check( 'by default the newest three archives made by hand are kept, the new one among them', count( $timedNow ) === 3 && in_array( $pruneId. '.php', $timedNow, true ) === true
+	&& in_array( $dayName( 1 ). '-010000.php', $timedNow, true ) === false && in_array( $dayName( 1 ). '-120000.php', $timedNow, true ) === true );
+check( '...and the newest three daily ones, by their dates', $dailyFiles() === [ date( 'Y-m-d' ). '.php', $dayName( 1 ). '.php', $dayName( 2 ). '.php' ] || $dailyFiles() === [ $dayName( 2 ). '.php', $dayName( 1 ). '.php', date( 'Y-m-d' ). '.php' ] );
+check( '...the safety snapshots are left to their own sweep', is_file( $nowDir. '/'. $oldSnap. '.php' ) === true && is_file( $dailyFile ) === true );
+
+// A clock that was ahead and was set back leaves names from the future. They never push out the
+// archive that was just written - both ways of writing one - and they are the first to go
+$futureDays = array_map( static fn( int $ahead ): string => date( 'Y-m-d', strtotime( "+$ahead days" ) ), [ 1, 2, 3, 4, 5 ] );
+$futureFiles = static function() use ( $nowDir, $futureDays ): array {
+	foreach( $futureDays as $day ) {
+		file_put_contents( $nowDir. '/'. $day. '.php', 'x' );
+		file_put_contents( $nowDir. '/'. $day. '-120000.php', 'x' );
+	}
+	return array_merge( array_map( static fn( string $day ): string => $nowDir. '/'. $day. '.php', $futureDays ), array_map( static fn( string $day ): string => $nowDir. '/'. $day. '-120000.php', $futureDays ) );
+};
+$aheadFiles = $futureFiles();
+unlink( $dailyFile );
+@unlink( $nowDir. '/attempt.php' );
+\Nino\Modules\Backups::maybeRun( $appData );
+check( 'the daily backup is there after its own sweep, whatever the names of the archives that are over the limit', is_file( $dailyFile ) === true
+	&& count( array_filter( array_slice( $aheadFiles, 0, 5 ), 'is_file' ) ) === 0 && is_file( $nowDir. '/'. $dayName( 1 ). '.php' ) === true && is_file( $nowDir. '/'. $dayName( 2 ). '.php' ) === true );
+$dailyInode = fileinode( $dailyFile );
+ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+clearstatcache();
+check( '...and the next actions of the day make no backup of their own', fileinode( $dailyFile ) === $dailyInode && is_file( $nowDir. '/attempt.php' ) === false );
+$aheadFiles = $futureFiles();
+$aheadId = \Nino\Modules\Backups::now( $appData );
+check( 'Back up now leaves the archive it made, whatever the names of the others', is_string( $aheadId ) === true && is_file( $nowDir. '/'. $aheadId. '.php' ) === true && count( $timedFiles() ) === 3
+	&& count( array_filter( array_slice( $aheadFiles, 5 ), 'is_file' ) ) === 0 );
+foreach( $aheadFiles as $left )
+	@unlink( $left );
+foreach( $timedFiles() as $name )
+	if( $name !== $aheadId. '.php' && $name !== $pruneId. '.php' )
+		unlink( $nowDir. '/'. $name );
+
+// Nothing is deleted by a run that fails: not by its sweep, not by what it does when it ends
+foreach( [ $dayName( 3 ), $dayName( 4 ), $dayName( 5 ) ] as $day )
+	file_put_contents( $nowDir. '/'. $day. '.php', 'x' );
+unlink( $dailyFile );
+@unlink( $nowDir. '/attempt.php' );
+$daysBefore = $dailyFiles();
+$handsBefore = $timedFiles();
+$appData['/nino/backup/key'] = 'not a key';
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => 'not a key' ] + $config );
+\Nino\Modules\Backups::maybeRun( $appData );
+$failWarned = ninoWarnings();
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => $goodKey ] + $config );
+$appData['/nino/backup/key'] = $goodKey;
+check( 'a daily backup that fails deletes no archive, whatever is over the limit', count( array_filter( $failWarned, static fn( string $warning ): bool => str_contains( $warning, 'Backup failed' ) ) ) === 1 && $dailyFiles() === $daysBefore && $timedFiles() === $handsBefore && is_file( $dailyFile ) === false );
+@unlink( $nowDir. '/attempt.php' );
+\Nino\Modules\Backups::maybeRun( $appData );
+unlink( $nowDir. '/'. $dayName( 5 ). '.php' );
+
+// Both numbers are the project's: whole numbers from 1 to 30, the default for anything else
+$appData['/nino/admin/backups-manual'] = 1;
+$appData['/nino/admin/backups-daily'] = 1;
+\Nino\Modules\Backups::now( $appData );
+check( 'a project that names one archive of each kind keeps one of each', count( $timedFiles() ) === 1 && $dailyFiles() === [ date( 'Y-m-d' ). '.php' ] );
+$keepNumber = static function( mixed $value ) use ( &$appData, $nowDir, $dayName, $timedFiles, $dailyFiles ): array {
+	$appData['/nino/admin/backups-manual'] = $value;
+	$appData['/nino/admin/backups-daily'] = $value;
+	foreach( $timedFiles() as $name )
+		unlink( $nowDir. '/'. $name );
+	foreach( $dailyFiles() as $name )
+		unlink( $nowDir. '/'. $name );
+	for( $hour = 1; $hour <= 33; $hour++ )
+		file_put_contents( $nowDir. '/'. $dayName( 1 ). '-'. sprintf( '%02d', $hour ). '0000.php', 'x' );
+	for( $back = 1; $back <= 33; $back++ )
+		file_put_contents( $nowDir. '/'. $dayName( $back ). '.php', 'x' );
+	\Nino\Modules\Backups::now( $appData );
+	return [ count( $timedFiles() ), count( $dailyFiles() ) ];
+};
+check( 'a number that is none, or less than one, is three of each', array_reduce( [ 0, -2, '0', 'many', null, true, [], 0.4 ], static fn( bool $ok, mixed $odd ): bool => $ok && $keepNumber( $odd ) === [ 3, 3 ], true ) === true );
+check( '...a number over 30 is 30, and a text that is a number is that number', $keepNumber( 31 ) === [ 30, 30 ] && $keepNumber( 9999 ) === [ 30, 30 ] && $keepNumber( '5' ) === [ 5, 5 ] && $keepNumber( 2.5 ) === [ 2, 2 ] );
+// The checks below count archives: they keep all of them
+$appData['/nino/admin/backups-manual'] = 30;
+$appData['/nino/admin/backups-daily'] = 30;
+file_put_contents( $nowDir. '/'. $keptDaily. '.php', 'x' );
+check( 'the defaults of the project are three and three', \Nino\AppData::DEFAULTS['/nino/admin/backups-daily'] === 3 && \Nino\AppData::DEFAULTS['/nino/admin/backups-manual'] === 3 );
 
 // The panel's door
 $nowCall = static function( array &$appData ): array {
@@ -415,7 +551,7 @@ check( '...after which the automatic one is tried again', is_file( $dailyFile ) 
 $attemptNote( date( 'Y-m-d' ), 'x' );
 unlink( $dailyFile );
 $listed = \Nino\Modules\Backups\Admin::dates( $appData );
-( new ReflectionMethod( '\Nino\Modules\Backups', '_prune' ) )->invoke( null, $nowDir );
+( new ReflectionMethod( '\Nino\Modules\Backups', '_prune' ) )->invoke( null, $nowDir, 3, 3, '2000-01-01.php' );
 $noteStub = (string) file_get_contents( $attemptFile );
 check( 'the note of the attempt is not listed as an archive', in_array( 'attempt', $listed, true ) === false && \Nino\Modules\Backups::lastDate( $appData ) !== 'attempt'
 	&& preg_match( \Nino\Modules\Backups\Admin::ID_PATTERN, 'attempt' ) === 0 );
@@ -426,8 +562,9 @@ check( '...nor can it be asked for as a restore', $status === 400 );
 unlink( $attemptFile );
 
 // What a step holds of memory, set against the limit where its size is known:
-// the largest file before the archive is built, the compressed archive before
-// it is read. What compresses costs nothing; the sources are never held together
+// the pictures before anything is packed (they do not compress, so their size
+// is the least the archive has), the compressed archive before it is read.
+// What compresses costs nothing; the sources are never held together or whole
 $imageDir = $sandbox. '/public/images';
 $formsDir = $sandbox. '/private/data';
 @mkdir( $imageDir, 0777, true );
@@ -458,30 +595,65 @@ check( 'sources several times the limit that compress away are archived: it is t
 $dropNew( $timedBefore );
 array_map( 'unlink', $wide );
 
-// Incompressible ones: refused once the compressed archive is known, with nothing left behind
-$noise = [ $imageDir. '/noise-a.bin', $imageDir. '/noise-b.bin' ];
+// Pictures: refused before anything is packed, with nothing left behind
+$noise = [ $imageDir. '/noise-a.jpg', $imageDir. '/noise-b.jpg' ];
 foreach( $noise as $file )
 	file_put_contents( $file, random_bytes( 6 * $mb ) );
 $timedBefore = $timedFiles();
 $tempBefore = $tempLeft();
 $refused = $withLimit( memory_get_usage() + 30 * $mb );
-check( 'incompressible sources are refused once the compressed archive is in the way, as the 500 now() answers, with the sizes', is_array( $refused ) === true && $refused[0] === 500
-	&& preg_match( '/\d+ MB for the compressed archive, \d+ MB in use\) and the limit is \d+ MB/', (string) $refused[1] ) === 1 );
-check( '...naming no path, writing no archive and leaving no temporary file', str_contains( (string) $refused[1], $sandbox ) === false && str_contains( (string) $refused[1], sys_get_temp_dir() ) === false
-	&& $timedFiles() === $timedBefore && $tempLeft() === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] );
-check( '...and the same sources are carried by a limit that holds the archive twice', is_string( $withLimit( memory_get_usage() + 80 * $mb ) ) === true );
+check( 'pictures the memory could not carry are refused at once, as the 500 now() answers, with the sizes', is_array( $refused ) === true && $refused[0] === 500
+	&& preg_match( '/\d+ MB for the pictures, \d+ MB in use\) and the limit is \d+ MB/', (string) $refused[1] ) === 1 );
+check( '...naming no path, writing no archive and leaving no temporary file or record of a run', str_contains( (string) $refused[1], $sandbox ) === false && str_contains( (string) $refused[1], sys_get_temp_dir() ) === false
+	&& $timedFiles() === $timedBefore && $tempLeft() === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] && is_file( $nowDir. '/run.php' ) === false );
+check( '...and the same pictures are carried by a limit that holds them twice', is_string( $withLimit( memory_get_usage() + 80 * $mb ) ) === true );
 $dropNew( $timedBefore );
 
-// One file larger than the limit leaves: refused before anything is built
+// The refusal before the packing is a lower bound: what the pictures need at the least, which a limit between that and
+// the size of the pictures twice does not refuse yet (the archive is checked when it exists), and what is no picture is not counted
 $timedBefore = $timedFiles();
-$tooBig = $withLimit( memory_get_usage() + 10 * $mb );
-check( 'a single file the limit cannot read whole is refused before a temporary file is made', is_array( $tooBig ) === true && $tooBig[0] === 500
-	&& preg_match( '/\d+ MB for the largest file, \d+ MB in use\) and the limit is \d+ MB/', (string) $tooBig[1] ) === 1 && $tempLeft() === $tempBefore && $timedFiles() === $timedBefore );
-$tooBig = $withLimit( memory_get_usage() + 16 * $mb + 3 * $mb );
-check( 'the file alone makes the refusal: a limit above the overhead and the use, but below them and the largest file, is refused at that stage', is_array( $tooBig ) === true
-	&& preg_match( '/\d+ MB for the largest file/', (string) $tooBig[1] ) === 1 );
-check( '...and the same sources pass once the limit is above that', is_string( $withLimit( memory_get_usage() + 80 * $mb ) ) === true );
+$between = $withLimit( memory_get_usage() + 16 * $mb + (int) ( 12 * $mb * 2 * 0.95 ) );
+check( 'a limit between the least and the whole of what the pictures need is not turned away before they are packed', is_array( $between ) === false || preg_match( '/for the pictures/', (string) $between[1] ) === 0 );
 $dropNew( $timedBefore );
+foreach( $noise as $file )
+	rename( $file, preg_replace( '/\.jpg$/', '.gif', $file ) );
+$gifs = array_map( static fn( string $file ): string => preg_replace( '/\.jpg$/', '.gif', $file ), $noise );
+$gifRefusal = $withLimit( memory_get_usage() + 30 * $mb );
+check( 'files that are no formats compressed already are not counted as pictures', is_array( $gifRefusal ) === false || preg_match( '/for the pictures/', (string) $gifRefusal[1] ) === 0 );
+$dropNew( $timedBefore );
+foreach( $gifs as $index => $file )
+	rename( $file, $noise[$index] );
+
+// What does not compress and is no picture is seen once the archive exists
+$other = $formsDir. '/forms.noise.php';
+file_put_contents( $other, random_bytes( 12 * $mb ) );
+foreach( $noise as $file )
+	unlink( $file );
+$refused = $withLimit( memory_get_usage() + 30 * $mb );
+check( 'incompressible data that is no picture is refused once the compressed archive is in the way, with the sizes', is_array( $refused ) === true && $refused[0] === 500
+	&& preg_match( '/\d+ MB for the compressed archive, \d+ MB in use\) and the limit is \d+ MB/', (string) $refused[1] ) === 1 && $timedFiles() === $timedBefore && $tempLeft() === $tempBefore );
+unlink( $other );
+file_put_contents( $noise[0], random_bytes( 6 * $mb ) );
+file_put_contents( $noise[1], random_bytes( 6 * $mb ) );
+
+// A file larger than the memory limit is packed in pieces and read whole by nobody
+foreach( $noise as $file )
+	unlink( $file );
+$huge = $formsDir. '/forms.huge.php';
+$handle = fopen( $huge, 'wb' );
+for( $i = 0; $i < 48; $i++ )
+	fwrite( $handle, str_repeat( 'a submission, much alike the next one. ', (int) ( $mb / 39 ) ) );
+fclose( $handle );
+memory_reset_peak_usage();
+$hugeBase = memory_get_peak_usage();
+$packed = $withLimit( -1 );
+$hugePeak = memory_get_peak_usage() - $hugeBase;
+check( 'a file of 48 MB is archived with a peak that is a fraction of it: no file is read whole', is_string( $packed ) === true && $hugePeak < 24 * $mb );
+$dropNew( $timedBefore );
+unlink( $huge );
+foreach( $noise as $file )
+	file_put_contents( $file, random_bytes( 6 * $mb ) );
+
 check( '-1 is no limit at all, and so is a huge one; a limit that is no int is not one', is_string( $withLimit( -1 ) ) === true && is_string( $withLimit( 1 << 40 ) ) === true );
 $appData['./nino/backups/memory'] = '1';
 $stringLimit = \Nino\Modules\Backups::now( $appData );
@@ -575,12 +747,344 @@ $childCommand = escapeshellarg( PHP_BINARY ). ' -d memory_limit=48M -d sys_temp_
 $first = (string) shell_exec( $childCommand );
 check( 'a request that runs out of memory in the daily backup ends, and leaves its note', str_contains( $first, 'survived' ) === false && is_file( $attemptFile ) === true
 	&& is_file( $dailyFile ) === false && ( \Nino\Modules\Backups::missed( $appData ) ?? [] ) === [ 'reason' => '' ] );
+$ended = \Nino\Modules\Backups::stopped( $appData );
+check( '...and the record of the run says that it was the daily one, what ended it and how much it had to pack', ( $ended['kind'] ?? null ) === 'daily' && ( $ended['cause'] ?? null ) === 'memory' && ( $ended['limit'] ?? null ) === 48 * 1048576
+	&& ( $ended['bytes'] ?? 0 ) >= 40 * 1048576 && ( $ended['files'] ?? 0 ) >= 2 && ( $ended['started'] ?? 0 ) >= time() - 600 );
+check( '...and the temporary files of the run are gone from where it made them', glob( $sandbox. '/tmp/ninobackup*' ) === [] );
 $second = (string) shell_exec( $childCommand );
 check( 'the request after it is answered - the workbench is not out of reach - and does not make the attempt again', str_contains( $second, 'survived' ) === true && is_file( $dailyFile ) === false );
 unlink( $imageDir. '/dies.bin' );
 // What the child left in its own temp directory goes with the sandbox, not into the system's
 @unlink( $attemptFile );
+@unlink( $nowDir. '/run.php' );
+
+// The same with the time limit: the request that is ended by it says so in its record, whatever it was doing.
+// Pictures that do not compress keep it busy for longer than the second it has
+$slow = fopen( $imageDir. '/dies.bin', 'wb' );
+for( $i = 0; $i < 9; $i++ )
+	fwrite( $slow, random_bytes( 10 * 1048576 ) );
+fclose( $slow );
+@unlink( $attemptFile );
+$timeCommand = escapeshellarg( PHP_BINARY ). ' -d max_execution_time=1 -d sys_temp_dir='. escapeshellarg( $sandbox. '/tmp' ). ' '. escapeshellarg( __FILE__ ). ' daily-backup '. escapeshellarg( $sandbox ). ' 2>&1';
+$timed = (string) shell_exec( $timeCommand );
+$ended = \Nino\Modules\Backups::stopped( $appData );
+check( 'a request ended by the time limit in the backup leaves a record that names the limit', str_contains( $timed, 'survived' ) === false && ( $ended['cause'] ?? null ) === 'time' && ( $ended['limit'] ?? null ) === 1 && ( $ended['kind'] ?? null ) === 'daily' );
+check( '...and its temporary files are gone too', glob( $sandbox. '/tmp/ninobackup*' ) === [] && is_file( $dailyFile ) === false );
+unlink( $imageDir. '/dies.bin' );
+@unlink( $attemptFile );
+@unlink( $nowDir. '/run.php' );
 rename( $dailyFile. '.kept', $dailyFile );
+
+/*	What a run that php ended leaves in the system's temp directory, which is the
+	server's and shared with every other site on it: the next run removes what is
+	this project's and nothing else, and not what a run that is going on holds.
+	A run holds the lock of its file for as long as it lives, and the system
+	takes it away with the process however that ends	*/
+$tempDir = sys_get_temp_dir();
+[ $leaseFile, $leaseHandle ] = \Nino\Backup::tempFile( $appData, 'backup' );
+preg_match( '/^ninobackup-([0-9a-f]{8})-[A-Za-z0-9]+$/', basename( $leaseFile ), $markMatch );
+$mark = $markMatch[1] ?? '';
+check( 'a run\'s temporary file carries the mark of its project and its kind, and is locked while the run lives', $mark !== '' && is_file( $leaseFile ) === true
+	&& flock( $probe = fopen( $leaseFile, 'r+b' ), LOCK_EX | LOCK_NB ) === false );
+fclose( $probe );
+$foreignMark = $mark === 'ffffffff' ? '00000000' : 'ffffffff';
+
+$leftovers = [];
+$leave = static function( string $name, string $kind = 'file', int $age = 0 ) use ( $tempDir, &$leftovers ): string {
+	$path = $tempDir. '/'. $name;
+	if( $kind === 'dir' ) {
+		mkdir( $path, 0700 );
+		file_put_contents( $path. '/staged.php', 'x' );
+	}
+	else
+		file_put_contents( $path, 'x' );
+	if( $age > 0 )
+		touch( $path, time() - $age );
+	$leftovers[] = $path;
+	return $path;
+};
+$dead = [
+	$leave( 'ninobackup-'. $mark. '-Dead01' ), $leave( 'ninobackup-'. $mark. '-Dead01.tar' ), $leave( 'ninobackup-'. $mark. '-Dead01.tar.gz' ),
+	$leave( 'ninosnapshot-'. $mark. '-Dead02' ), $leave( 'ninosnapshot-'. $mark. '-Dead02.tar' ),
+	$leave( 'ninorestore-'. $mark. '-Dead03' ), $leave( 'ninorestore-'. $mark. '-Dead03.tar.gz' ), $leave( 'ninorestore-'. $mark. '-Dead03.staging', 'dir' ),
+	$leave( 'ninobackup-'. $mark. '-Dead04.tar', 'file', 2 * 86400 ),
+];
+$kept = [
+	$leave( 'ninobackup-'. $foreignMark. '-Other1' ), $leave( 'ninobackup-'. $foreignMark. '-Other1.tar' ),
+	$leave( 'ninobackupLegacy' ), $leave( 'ninobackupLegacy.tar' ), $leave( 'ninorestore-'. $foreignMark. '-Other2.staging', 'dir' ),
+	$leave( 'something-'. $mark. '-Else01.tar' ), $leave( 'ninobackup-'. $mark. '-Young01.tar' ),
+];
+$linkTarget = $leave( 'ninotest-'. $mark. '-target.txt', 'file', 2 * 86400 );
+$linkPath = $tempDir. '/ninobackup-'. $mark. '-Link01.tar';
+symlink( $linkTarget, $linkPath );
+$leftovers[] = $linkPath;
+$kept[] = $linkPath;
+$kept[] = $linkTarget;
+$kept[] = $leave( 'ninobackup-'. $mark. '-Odd001.tmp', 'file', 2 * 86400 );
+$ownedElsewhere = $leave( 'ninobackup-'. $mark. '-Owner1.tar', 'file', 2 * 86400 );
+if( function_exists( 'posix_geteuid' ) === true && posix_geteuid() === 0 && @chown( $ownedElsewhere, 65534 ) === true )
+	$kept[] = $ownedElsewhere;
+else
+	unlink( $ownedElsewhere );
+file_put_contents( $leaseFile. '.tar', 'x' );
+$leftovers[] = $leaseFile. '.tar';
+
+\Nino\Backup::sweepTemp( $appData );
+check( 'what runs of this project left behind is removed: files and directories, of all three kinds', count( array_filter( $dead, 'file_exists' ) ) === 0 );
+check( '...and nothing else: the files of other projects, of the old names, of other owners, links, other endings and of no run at all stay, as does a leftover whose file is gone and that is not a day old', count( array_filter( $kept, 'file_exists' ) ) === count( $kept ) );
+check( '...and nothing of a run that is going on, whose temporary file is locked', is_file( $leaseFile ) === true && is_file( $leaseFile. '.tar' ) === true );
+fclose( $leaseHandle );
+\Nino\Backup::sweepTemp( $appData );
+check( '...which is removed as soon as that run is over', file_exists( $leaseFile ) === false && file_exists( $leaseFile. '.tar' ) === false );
+
+// A run that is killed leaves its file locked to nobody: the system lets go of the lock
+$childCode = '$appData = [ "./nino/uid" => '. var_export( $sandbox, true ). ' ]; require '. var_export( __DIR__. '/../_nino/Nino.php', true ). '; \Nino\AppData::prepare( $appData ); '
+	. '$appData["./nino/filesystem/contentpath"] = '. var_export( $sandbox. '/private', true ). '; '
+	. '[ $path, $handle ] = \Nino\Backup::tempFile( $appData, "backup" ); file_put_contents( $path. ".tar", "x" ); echo $path, "\n"; sleep( 60 );';
+$pipes = [];
+$child = proc_open( [ PHP_BINARY, '-d', 'sys_temp_dir='. sys_get_temp_dir(), '-r', $childCode ], [ 1 => [ 'pipe', 'w' ] ], $pipes );
+$childPath = trim( (string) fgets( $pipes[1] ) );
+\Nino\Backup::sweepTemp( $appData );
+$aliveKept = is_file( $childPath ) === true && is_file( $childPath. '.tar' ) === true;
+proc_terminate( $child, 9 );
+proc_close( $child );
+\Nino\Backup::sweepTemp( $appData );
+check( 'the files of a second run that is going on stay, and those of one that was killed are removed by the next', $childPath !== '' && $aliveKept === true && file_exists( $childPath ) === false && file_exists( $childPath. '.tar' ) === false );
+
+// The next backup does the sweeping
+$leftBehind = [ $leave( 'ninobackup-'. $mark. '-Dead05.tar' ), $leave( 'ninobackup-'. $mark. '-Dead05' ), $leave( 'ninorestore-'. $mark. '-Dead06' ), $leave( 'ninorestore-'. $mark. '-Dead06.staging', 'dir' ), $leave( 'ninosnapshot-'. $mark. '-Dead07' ) ];
+$timedBefore = $timedFiles();
+$sweepId = \Nino\Modules\Backups::now( $appData );
+check( 'a backup removes what an earlier one left in the temp directory', is_string( $sweepId ) === true && count( array_filter( $leftBehind, 'file_exists' ) ) === 0 );
+$dropNew( $timedBefore );
+foreach( array_filter( $leftovers, 'file_exists' ) as $left )
+	\Nino\Filesystem::removeDir( $left );
+
+/*	The archive is one pass over the files and is the archive the entry by entry
+	writer made: the same names in the same order - umlauts and spaces in them,
+	an empty file, a hidden file, a deep path, a name too long for one field of a
+	tar header - with the same bytes, and nino.php last. What a restore reads of
+	it is what it read of the other	*/
+$packDir = $sandbox. '/pack-source';
+mkdir( $packDir, 0777, true );
+$packEntries = [
+	'config.php' => '<?php return [ 1 ];', 'text/de_DE.php' => '<?php return [];', 'text/Übergrößen mit Leerzeichen.php' => 'ä ö ü ß',
+	'elements/leer.php' => '', 'data/.versteckt' => 'x', 'images/elements/'. str_repeat( 'tief/', 14 ). 'bild.webp' => random_bytes( 70000 ),
+	'images/ünï cödé/ö ö.jpg' => random_bytes( 1500 ), 'templates/'. str_repeat( 'a', 90 ). '/'. str_repeat( 'b', 90 ). '.tpl' => '<p>x</p>', 'assets/theme.css' => 'a{}',
+];
+$packManifest = [];
+foreach( array_keys( $packEntries ) as $index => $name ) {
+	$packManifest[$packDir. '/'. $index. '.dat'] = $name;
+	file_put_contents( $packDir. '/'. $index. '.dat', $packEntries[$name] );
+}
+$tarEntries = static function( string $tarGz ): array {
+	$entries = [];
+	$handle = gzopen( $tarGz, 'rb' );
+	while( ( $block = gzread( $handle, 512 ) ) !== false && strlen( $block ) === 512 && trim( $block, "\0" ) !== '' ) {
+		$size = (int) octdec( trim( substr( $block, 124, 12 ), "\0 " ) );
+		$name = rtrim( substr( $block, 345, 155 ), "\0" );
+		$name = ( $name === '' ? '' : $name. '/' ). rtrim( substr( $block, 0, 100 ), "\0" );
+		$entries[] = [ $name, $block[156], trim( substr( $block, 100, 8 ), "\0 " ), $size > 0 ? substr( (string) gzread( $handle, (int) ceil( $size / 512 ) * 512 ), 0, $size ) : '' ];
+	}
+	gzclose( $handle );
+	return $entries;
+};
+chmod( $packDir. '/2.dat', 0444 );
+chmod( $packDir. '/6.dat', 0600 );
+$oneTar = $packDir. '/one.tar';
+\Nino\Backup::pack( $appData, $packManifest, $oneTar );
+$byOne = new PharData( $packDir. '/each.tar' );
+foreach( $packManifest as $absolute => $name )
+	$byOne->addFromString( $name, (string) file_get_contents( $absolute ) );
+$byOne->addFromString( 'nino.php', \Nino\Backup::stamp( $appData ) );
+$byOne->compress( Phar::GZ );
+unset( $byOne );
+$packed 		= $tarEntries( $oneTar. '.gz' );
+$reference 	= $tarEntries( $packDir. '/each.tar.gz' );
+check( 'the archive holds the same entries in the same order with the same bytes as one made entry by entry, nino.php last', count( $packed ) === count( $packEntries ) + 1 && $packed === $reference
+	&& $packed[count( $packed ) - 1][0] === 'nino.php' && array_unique( array_column( $packed, 1 ) ) === [ '0' ] && array_unique( array_column( $packed, 2 ) ) === [ sprintf( '%07o', 0666 & ~umask() ) ] );
+check( '...and the plain tar is gone as soon as the compressed one exists', is_file( $oneTar ) === false && is_file( $oneTar. '.gz' ) === true );
+unlink( $packDir. '/3.dat' );
+$failure = null;
+try {
+	\Nino\Backup::pack( $appData, $packManifest, $packDir. '/two.tar' );
+}
+catch( \RuntimeException $e ) {
+	$failure = $e->getMessage();
+}
+check( 'a file that cannot be read ends the packing with a sentence that names it in the archive and no path', $failure !== null && str_contains( $failure, 'elements/leer.php' ) === true && str_contains( $failure, $sandbox ) === false );
+\Nino\Filesystem::removeDir( $packDir );
+
+/*	A write that fails ends the run, whatever step it fails at: no archive, no archive deleted, no temporary file, and the
+	reason. The failures are made by a stream that refuses what it is given (NinoFullStream above) and so need no root and no
+	mount; php's own answers when a disk is full are what the checks read: fwrite() false, gzwrite() 0 for a piece it cannot
+	pass on but the length for one it keeps, gzclose() true for a stream whose last piece did not reach the disk	*/
+$wrap = static function( callable $run ): ?\RuntimeException {
+	try {
+		$run();
+	}
+	catch( \RuntimeException $e ) {
+		return $e;
+	}
+	return null;
+};
+$gzipMethod		= new ReflectionMethod( '\Nino\Backup', '_gzip' );
+$modesMethod	= new ReflectionMethod( '\Nino\Backup', '_modes' );
+$rawMethod		= new ReflectionMethod( '\Nino\Modules\Backups', '_writeRawAtomic' );
+$tarFile			= $sandbox. '/write-fail.tar';
+$failTar			= new PharData( $tarFile );
+$failTar->addFromString( 'text/a.php', random_bytes( 300000 ) );
+$failTar->addFromString( 'nino.php', '<?php return 1;' );
+unset( $failTar );
+$tarBytes			= (string) file_get_contents( $tarFile );
+NinoFullStream::$files = [];
+
+$gzOk = $sandbox. '/write-ok.tar.gz';
+$gzipMethod->invoke( null, $tarFile, $gzOk );
+check( 'compressing a tar into a file that takes it ends with the whole of it, which reads back as the tar', gzdecode( (string) file_get_contents( $gzOk ) ) === $tarBytes );
+
+/*	php's own full disk, which needs no disk: /dev/full takes the open and refuses every write with ENOSPC. A link to it in
+	the place of the file does the same to the compressed copy, as root or not. Where the system has no /dev/full the
+	two checks below are not made	*/
+$fullDevice = is_writable( '/dev/full' ) === true;
+if( $fullDevice === true ) {
+	$smallTar = $sandbox. '/write-small.tar';
+	$small = new PharData( $smallTar );
+	$small->addFromString( 'a', 'x' );
+	unset( $small );
+	$gzFull = $sandbox. '/write-full.tar.gz';
+	symlink( '/dev/full', $gzFull );
+	$loud = $wrap( static fn() => $gzipMethod->invoke( null, $tarFile, $gzFull ) );
+	$quiet = $wrap( static fn() => $gzipMethod->invoke( null, $smallTar, $gzFull ) );
+	check( 'compressing into a file that has no room ends with the write code and no path in the message, where php refuses a piece', $loud !== null && $loud->getCode() === \Nino\Backup::WRITE_FAILED && str_contains( $loud->getMessage(), $sandbox ) === false );
+	check( '...and where it takes the last piece into its buffer, closes without a word, and the file is none: only the read back to its end says so', $quiet !== null && $quiet->getCode() === \Nino\Backup::WRITE_FAILED );
+	unlink( $gzFull );
+	unlink( $smallTar );
+}
+else
+	echo "  --  - /dev/full is not there: the full-disk writes of the compressed copy are not made\n";
+
+// The headers of a tar are set in place: a write that fails there ends the run too
+$modeNow = sprintf( '%07o', 0666 & ~umask() );
+NinoFullStream::$files['ninofull://tar'] = str_replace( $modeNow, '0000600', $tarBytes );
+NinoFullStream::$limit = PHP_INT_MAX;
+$modesMethod->invoke( null, 'ninofull://tar' );
+check( 'the modes of a tar are set through a stream that takes the write', substr( NinoFullStream::$files['ninofull://tar'], 100, 7 ) === $modeNow && strlen( NinoFullStream::$files['ninofull://tar'] ) === strlen( $tarBytes ) );
+NinoFullStream::$files['ninofull://tar'] = str_replace( $modeNow, '0000600', $tarBytes );
+NinoFullStream::$limit = 0;
+$failed = $wrap( static fn() => $modesMethod->invoke( null, 'ninofull://tar' ) );
+check( '...and a write of a header that fails ends it with the write code', $failed !== null && $failed->getCode() === \Nino\Backup::WRITE_FAILED );
+NinoFullStream::$limit = PHP_INT_MAX;
+NinoFullStream::$files['ninofull://tar'] = substr( $tarBytes, 0, -1024 );
+$failed = $wrap( static fn() => $modesMethod->invoke( null, 'ninofull://tar' ) );
+check( '...and so does a tar that does not end with its end', $failed !== null && $failed->getCode() === \Nino\Backup::WRITE_FAILED );
+NinoFullStream::$files['ninofull://tar'] = substr( $tarBytes, 0, 20000 );
+$failed = $wrap( static fn() => $modesMethod->invoke( null, 'ninofull://tar' ) );
+check( '...or one whose last entry is longer than the file', $failed !== null && $failed->getCode() === \Nino\Backup::WRITE_FAILED );
+
+// The file the archive is written to
+NinoFullStream::$files = [];
+NinoFullStream::$limit = 1000;
+NinoFullStream::$silent = false;
+$failed = $wrap( static fn() => $rawMethod->invoke( null, 'ninofull://dir/archive.php', [ str_repeat( 'a', 800 ), str_repeat( 'b', 800 ) ] ) );
+check( 'an archive that cannot be written to its end is none: the write code, said as a file that could not be written', $failed !== null && $failed->getCode() === \Nino\Backup::WRITE_FAILED && str_starts_with( $failed->getMessage(), 'file could not be written' ) === true );
+NinoFullStream::$silent = true;
+$failed = $wrap( static fn() => $rawMethod->invoke( null, 'ninofull://dir/archive.php', str_repeat( 'a', 1600 ) ) );
+check( '...also where the write says it was whole and the file is shorter', $failed !== null && $failed->getCode() === \Nino\Backup::WRITE_FAILED && str_starts_with( $failed->getMessage(), 'file could not be written' ) === true );
+NinoFullStream::$limit = PHP_INT_MAX;
+NinoFullStream::$files = [];
+
+// ...and the run as a whole: the archive cannot be put in its place. Nothing is deleted, nothing is left, and the panel is told
+$writeDays = [ $dayName( 1 ), $dayName( 2 ), $dayName( 3 ) ];
+foreach( $writeDays as $day )
+	file_put_contents( $nowDir. '/'. $day. '.php', 'x' );
+foreach( $timedFiles() as $name )
+	unlink( $nowDir. '/'. $name );
+for( $hour = 1; $hour <= 4; $hour++ )
+	file_put_contents( $nowDir. '/'. $dayName( 1 ). '-'. sprintf( '%02d', $hour ). '0000.php', 'x' );
+unlink( $dailyFile );
+@unlink( $nowDir. '/attempt.php' );
+$appData['/nino/admin/backups-daily'] = 1;
+$appData['/nino/admin/backups-manual'] = 1;
+$blocked = $nowDir. '/'. date( 'Y-m-d' ). '.php';
+mkdir( $blocked );
+file_put_contents( $blocked. '/in-the-way', 'x' );
+$daysBefore = $dailyFiles();
+$handsBefore = $timedFiles();
+$tempBefore = count( glob( sys_get_temp_dir(). '/ninobackup-*' ) ?: [] );
+ninoWarnings();
+\Nino\Modules\Backups::maybeRun( $appData );
+$writeWarned = ninoWarnings();
+check( 'an archive that cannot be put in its place leaves every archive that exists, and no temporary file', $dailyFiles() === $daysBefore && $timedFiles() === $handsBefore && is_file( $blocked ) === false
+	&& count( glob( sys_get_temp_dir(). '/ninobackup-*' ) ?: [] ) === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] && count( $writeWarned ) > 0 );
+check( '...and the panel is told it was a write that failed, and the run is not said to have ended without a word', ( ( \Nino\Modules\Backups::missed( $appData ) ?? [] )['code'] ?? null ) === 'write' && \Nino\Modules\Backups::stopped( $appData ) === null );
+[ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+check( '...in apiList too', ( $listBody['missed']['code'] ?? null ) === 'write' && is_string( $listBody['missed']['reason'] ?? null ) === true );
+unlink( $blocked. '/in-the-way' );
+rmdir( $blocked );
+@unlink( $nowDir. '/attempt.php' );
+file_put_contents( $dailyFile, 'x' );
+$daysBefore = $dailyFiles();
+$handBlocked = [];
+for( $second = 0; $second <= 5; $second++ ) {
+	$handBlocked[] = $nowDir. '/'. date( 'Y-m-d-His', time() + $second ). '.php';
+	mkdir( end( $handBlocked ) );
+	file_put_contents( end( $handBlocked ). '/in-the-way', 'x' );
+}
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiNow' ] );
+check( 'Back up now that cannot put its archive in its place is a 500 with the code of a write that failed, and deletes nothing', $status === 500 && ( $body['code'] ?? null ) === 'backups_write' && $dailyFiles() === $daysBefore && array_values( array_filter( $timedFiles(), static fn( string $name ): bool => is_file( $nowDir. '/'. $name ) ) ) === $handsBefore );
+foreach( $handBlocked as $dir ) {
+	@unlink( $dir. '/in-the-way' );
+	@rmdir( $dir );
+}
+$appData['/nino/admin/backups-daily'] = 30;
+$appData['/nino/admin/backups-manual'] = 30;
+unlink( $dailyFile );
+foreach( $writeDays as $day )
+	@unlink( $nowDir. '/'. $day. '.php' );
+foreach( $timedFiles() as $name )
+	unlink( $nowDir. '/'. $name );
+@unlink( $nowDir. '/attempt.php' );
+\Nino\Modules\Backups::maybeRun( $appData );
+file_put_contents( $nowDir. '/'. $keptDaily. '.php', 'x' );
+
+/*	The record of a run: the panel asks for it, and says what it holds	*/
+$runFile = $nowDir. '/run.php';
+$runNote = static function( array $note ) use ( $runFile ): void {
+	file_put_contents( $runFile, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( $note ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+};
+@unlink( $runFile );
+check( 'no record, no run that ended without an end of its own', \Nino\Modules\Backups::stopped( $appData ) === null );
+$runNote( [ 'kind' => 'manual', 'started' => 1700000000, 'files' => 541, 'bytes' => 44000000, 'cause' => 'time', 'limit' => 30 ] );
+check( 'a record that nobody holds is a run that ended without an end of its own, with what it had to pack and what ended it', \Nino\Modules\Backups::stopped( $appData ) === [ 'kind' => 'manual', 'started' => 1700000000, 'files' => 541, 'bytes' => 44000000, 'cause' => 'time', 'limit' => 30 ] );
+[ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+check( '...and apiList carries it', ( $listBody['stopped']['cause'] ?? null ) === 'time' && ( $listBody['stopped']['kind'] ?? null ) === 'manual' );
+$holder = fopen( $runFile, 'r+b' );
+flock( $holder, LOCK_EX | LOCK_NB );
+check( 'a record that a run holds is a run that is going on, and says nothing', \Nino\Modules\Backups::stopped( $appData ) === null );
+flock( $holder, LOCK_UN );
+fclose( $holder );
+$runNote( [ 'kind' => 'daily', 'started' => 1700000000 ] );
+check( 'a run that left no word of the cause or the work says only that it did not end', \Nino\Modules\Backups::stopped( $appData ) === [ 'kind' => 'daily', 'started' => 1700000000, 'files' => 0, 'bytes' => 0, 'cause' => '', 'limit' => 0 ] );
+$runNote( [ 'kind' => 'nobody', 'started' => 1700000000 ] );
+check( 'a record of no kind a run has, or without a time, is none', \Nino\Modules\Backups::stopped( $appData ) === null );
+$runNote( [ 'kind' => 'daily', 'started' => '1700000000' ] );
+check( '...nor is one whose time is not a number', \Nino\Modules\Backups::stopped( $appData ) === null );
+file_put_contents( $runFile, 'forged' );
+check( '...nor a file that is no stub', \Nino\Modules\Backups::stopped( $appData ) === null );
+$runNote( [ 'kind' => 'manual', 'started' => 1700000000 ] );
+$appData['/nino/admin/backups'] = false;
+[ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+unset( $appData['/nino/admin/backups'] );
+check( 'apiList says nothing ended while backups are switched off', array_key_exists( 'stopped', $listBody ?? [] ) === true && $listBody['stopped'] === null );
+$timedBefore = $timedFiles();
+$endedId = \Nino\Modules\Backups::now( $appData );
+check( 'a run that ends by itself leaves no record, and a record of an earlier one goes with it', is_string( $endedId ) === true && is_file( $runFile ) === false && \Nino\Modules\Backups::stopped( $appData ) === null );
+$dropNew( $timedBefore );
+$appData['./nino/backups/memory'] = memory_get_usage() + 10 * 1048576;
+$refusedNow = \Nino\Modules\Backups::now( $appData );
+unset( $appData['./nino/backups/memory'] );
+check( 'a run that is refused ends by itself too: nothing is left of it', is_array( $refusedNow ) === true && is_file( $runFile ) === false && \Nino\Modules\Backups::stopped( $appData ) === null );
 
 /*	An archive of this writer is the one the readers always had: the stub is
 	the prefix, the base64 of iv, tag and ciphertext, the suffix - cut into
@@ -1104,10 +1608,12 @@ check( 'the simulated corruption actually wiped the user record', \Nino\Filesyst
 // on that name plus a suffix - the file tempnam() made was never removed, two
 // per restore, for the life of the server
 $tempFiles	= static fn(): int => count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] ) + count( glob( sys_get_temp_dir(). '/ninosnapshot*' ) ?: [] );
-$tempBefore	= $tempFiles();
+$restoreLeft = [ $leave( 'ninorestore-'. $mark. '-Dead08' ), $leave( 'ninorestore-'. $mark. '-Dead08.tar.gz' ), $leave( 'ninosnapshot-'. $mark. '-Dead09' ) ];
+$tempBefore	= $tempFiles() - count( $restoreLeft );
 
 $csrfBefore = \Nino\Csrf::getToken( $appData );
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $dates[0] ] );
+check( 'a restore removes what an earlier one left in the temp directory', count( array_filter( $restoreLeft, 'file_exists' ) ) === 0 );
 check( 'apiRestore reports success', ( $body['ok'] ?? false ) === true );
 check( '...and ends the session of the account that ran it: no account on the request, no session values, a new csrf token, and the next action is 401 until the login', \Nino\Auth::getCurrentUser( $appData ) === false
 	&& \Nino\Runtime::getSessionValue( $appData, './nino/auth/current' ) === null && \Nino\Runtime::getSessionValue( $appData, './nino/auth/token' ) === null
@@ -1203,6 +1709,24 @@ unlink( $backupDir. '/2020-01-01.php' );
 	inode, nothing temporary left beside it), the file does not change while
 	somebody else holds the lock, and the module callback below runs with
 	the extracted backup in hand	*/
+// A source that is read-only is staged writable: the module that merges into the staged copy writes to it
+$readOnly = $sandbox. '/private/data/forms.readonly.php';
+file_put_contents( $readOnly, '<?php return [];' );
+chmod( $readOnly, 0444 );
+$readOnlyId = \Nino\Modules\Backups::now( $appData );
+$stagedMode = null;
+\Nino\Callbacks::registerCallback( $appData, '/nino/admin/restore', static function( array &$appData, array &$args ) use ( &$stagedMode ): void {
+	$staged = (string) ( $args['staging'] ?? '' ). '/data/forms.readonly.php';
+	if( is_file( $staged ) === true )
+		$stagedMode = fileperms( $staged ) & 0777;
+} );
+[ $roStatus ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $readOnlyId ] );
+check( 'a source that is read-only is staged by a restore with a mode its owner can write', $roStatus === 200 && $stagedMode !== null && ( $stagedMode & 0200 ) !== 0 );
+chmod( $readOnly, 0644 );
+unlink( $readOnly );
+unlink( $nowDir. '/'. $readOnlyId. '.php' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
 $restoreSeen = [];
 \Nino\Callbacks::registerCallback( $appData, '/nino/admin/restore', static function( array &$appData, array &$args ) use ( &$restoreSeen ): void {
 	// The first restore is the one under test; the lock experiment below
@@ -1436,11 +1960,11 @@ check( 'apiList succeeds', $status === 200 );
 check( 'apiList returns the field schema in render order', array_column( $body['fields'], 'key' ) === [
 	'/nino/mode',
 	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie', '/nino/http/proxies', '/nino/mail/cap',
-	'/nino/admin/backups', '/nino/admin/logs',
+	'/nino/admin/backups', '/nino/admin/backups-daily', '/nino/admin/backups-manual', '/nino/admin/logs',
 	'/nino/cache/status', '/nino/cache/ttl', '/nino/cache/blacklist',
 ] );
 check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
-	'select', 'bool', 'bool', 'bool', 'lines', 'int', 'bool', 'bool', 'bool', 'int', 'lines',
+	'select', 'bool', 'bool', 'bool', 'lines', 'int', 'bool', 'int', 'int', 'bool', 'bool', 'int', 'lines',
 ] );
 check( 'apiList returns the group headings, the mode before the rest', array_keys( $body['groups'] ) === [ 'mode', 'diagnostics', 'editor', 'cache' ] );
 check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
@@ -1448,6 +1972,7 @@ check( 'every field belongs to a declared group', array_diff( array_unique( arra
 $byKey = array_column( $body['fields'], null, 'key' );
 check( 'a stored value comes back typed, not as json text', $byKey['/nino/error/display']['value'] === true );
 check( 'an int comes back as an int', $byKey['/nino/cache/ttl']['value'] === 3600 );
+check( 'the number of archives kept, daily and by hand, are int fields of the editor group from 1 to 30 that report the default three', array_reduce( [ '/nino/admin/backups-daily', '/nino/admin/backups-manual' ], static fn( bool $ok, string $key ): bool => $ok && $byKey[$key]['type'] === 'int' && $byKey[$key]['group'] === 'editor' && $byKey[$key]['min'] === 1 && $byKey[$key]['max'] === 30 && $byKey[$key]['value'] === 3, true ) );
 check( 'an int field carries the bounds its editor and apiSave share', $byKey['/nino/cache/ttl']['min'] === 10 && $byKey['/nino/cache/ttl']['max'] === 2592000 );
 check( 'the mail cap is an int field of the diagnostics group, bounded 0 to 1000, in calls per hour', $byKey['/nino/mail/cap']['group'] === 'diagnostics'
 	&& $byKey['/nino/mail/cap']['min'] === 0 && $byKey['/nino/mail/cap']['max'] === 1000 && $byKey['/nino/mail/cap']['unit'] === 'per-hour' );
@@ -1652,6 +2177,18 @@ foreach( [ 0, 50 ] as $capValue ) {
 foreach( [ -1, 1001, '5.5', 'many' ] as $capValue ) {
 	[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mail/cap' => $capValue ] ] );
 	check( 'apiSave refuses the mail cap '. var_export( $capValue, true ). ' and leaves the 50', $status === 400 && ( $body['field'] ?? '' ) === '/nino/mail/cap' && $appData['/nino/mail/cap'] === 50 );
+}
+foreach( [ '/nino/admin/backups-daily', '/nino/admin/backups-manual' ] as $keepKey ) {
+	foreach( [ 0, 31, '2.5', 'many' ] as $keepValue ) {
+		[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ $keepKey => $keepValue ] ] );
+		check( "apiSave refuses $keepKey as ". var_export( $keepValue, true ), $status === 400 && ( $body['field'] ?? '' ) === $keepKey );
+	}
+	[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ $keepKey => 7 ] ] );
+	check( "apiSave writes $keepKey as an int", $status === 200 && $appData[$keepKey] === 7 && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )[$keepKey] === 7 );
+}
+foreach( [ 'en_US', 'de_DE' ] as $keepLocale ) {
+	$keepText = include __DIR__. '/../_admin/Nino/Modules/Config/text/'. $keepLocale. '.php';
+	check( "both numbers of kept archives have their label and hint in $keepLocale", array_reduce( [ 'label/backupsdaily', 'hint/backupsdaily', 'label/backupsmanual', 'hint/backupsmanual', 'hint/backupson' ], static fn( bool $ok, string $key ): bool => $ok && trim( (string) ( $keepText['[[/_admin/config/'. $key. ']]'] ?? '' ) ) !== '', true ) );
 }
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mail/cap' => '1000' ] ] );
 check( 'apiSave takes the upper bound 1000 from a posted string', $status === 200 && $appData['/nino/mail/cap'] === 1000 );

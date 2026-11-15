@@ -33,6 +33,11 @@ namespace Nino {
 			happens not to mention. A leading dot with it: '/data/.locks' is the
 			only one today, and everything hidden under /data/ is this
 			framework's own bookkeeping rather than a project's content	*/
+		// The code of the RuntimeException that says a write failed - no room left in
+		// the temporary directory or where the archives are kept, or a file that
+		// cannot be written - which the panel words in the interface language
+		public const int WRITE_FAILED = 1;
+
 		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'mail-status.php', 'catalogue.php' ];
 
 		/**
@@ -508,5 +513,306 @@ namespace Nino {
 			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features ], true ). ';';
 		}
 
+
+		/**
+		 *	Pack the files of a manifest into a tar and compress it: one pass over
+		 *	all of them, which is what keeps the time in step with the number of
+		 *	files - the entries added one by one made php write the archive again
+		 *	for each of them - and what reads a file in pieces rather than whole.
+		 *	The entries are the manifest's names with the file's bytes, and after
+		 *	them nino.php (see stamp()); the mode of an entry is the file's. The
+		 *	plain tar is removed as soon as the compressed one exists. The one
+		 *	packing of \Nino\Modules\Backups::_create() and
+		 *	\Nino\Modules\Backups\Admin::_safetySnapshot()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
+		 *	@param		string		$tar					Where the tar is made; the archive is $tar.'.gz'
+		 *
+		 *	@return 	void
+		 *
+		 *	@throws		\RuntimeException				If a file of the manifest cannot be read
+		 */
+		public static function pack( array &$appData, array $manifest, string $tar ): void {
+
+			$entries = [];
+			foreach( $manifest as $absolute => $name )
+				$entries[$name] = $absolute;
+
+			$phar = new \PharData( $tar );
+
+			try {
+				$phar->buildFromIterator( new \ArrayIterator( $entries ) );
+			}
+			catch( \UnexpectedValueException | \BadMethodCallException ) {
+
+				// The one that could not be read, by its name in the archive
+				foreach( $entries as $name => $absolute )
+					if( @is_readable( $absolute ) === false )
+						throw new \RuntimeException( 'backup source could not be read: '. $name );
+
+				throw new \RuntimeException( 'backup source could not be read' );
+			}
+
+			$phar->addFromString( 'nino.php', self::stamp( $appData ) );
+
+			// Written out to the tar before it is touched below
+			unset( $phar );
+
+			self::_modes( $tar );
+			self::_gzip( $tar, $tar. '.gz' );
+
+			@unlink( $tar );
+		}
+
+		/**
+		 *	Give every entry of a tar the mode an entry added from a string has,
+		 *	which is the mode of a file this process creates: 0666 without the
+		 *	umask. Packing a file takes the mode of the file along, and a source
+		 *	that is read-only would then be read-only in the copy a restore stages
+		 *	and hands to the features that merge into it. Only the mode field and
+		 *	the checksum of the headers change; the data is jumped over
+		 *
+		 *	@param		string		$tar					Absolute path of the tar
+		 *
+		 *	@return 	void
+		 */
+		private static function _modes( string $tar ): void {
+
+			$mode 	= sprintf( '%07o', 0666 & ~umask() );
+			$handle = @fopen( $tar, 'r+b' );
+
+			if( $handle === false )
+				throw new \RuntimeException( 'the backup could not be read back', self::WRITE_FAILED );
+
+			// A tar that php could not write to its end does not end with the zero
+			// blocks of its end, or its last entry is longer than the file
+			$stat 	= @fstat( $handle );
+			$length = is_array( $stat ) === true ? $stat['size'] : null;
+			$ended 	= false;
+
+			while( ( $block = fread( $handle, 512 ) ) !== false && strlen( $block ) === 512 ) {
+
+				if( trim( $block, "\0" ) === '' ) {
+					$ended = true;
+					break;
+				}
+
+				$size = (int) octdec( trim( substr( $block, 124, 12 ), "\0 " ) );
+
+				if( $length !== null && ftell( $handle ) + (int) ( ceil( $size / 512 ) * 512 ) > $length )
+					break;
+
+				if( substr( $block, 100, 7 ) !== $mode ) {
+
+					$block = substr_replace( $block, $mode, 100, 7 );
+					$sum 	 = array_sum( array_map( 'ord', str_split( substr( $block, 0, 148 ). '        '. substr( $block, 156 ) ) ) );
+					$block = substr_replace( $block, sprintf( '%06o', $sum ). "\0 ", 148, 8 );
+
+					if( fseek( $handle, -512, SEEK_CUR ) !== 0 || @fwrite( $handle, $block ) !== 512 ) {
+						fclose( $handle );
+						throw new \RuntimeException( 'the backup could not be written', self::WRITE_FAILED );
+					}
+				}
+
+				if( fseek( $handle, (int) ( ceil( $size / 512 ) * 512 ), SEEK_CUR ) !== 0 ) {
+					fclose( $handle );
+					throw new \RuntimeException( 'the backup could not be read back', self::WRITE_FAILED );
+				}
+			}
+
+			if( $ended === false || @fflush( $handle ) === false || @fclose( $handle ) === false )
+				throw new \RuntimeException( 'the backup could not be written', self::WRITE_FAILED );
+		}
+
+		/**
+		 *	Compress a tar into a gzip file, in pieces, and read the result back
+		 *	to its end: what comes out must be as long as what went in. Every
+		 *	step is checked, and the last one is read back because the close of a
+		 *	gzip stream says nothing of the last piece that php could not write
+		 *	- a disk that is full leaves a file that ends short and reports no
+		 *	error
+		 *
+		 *	@param		string		$tar					Absolute path of the tar
+		 *	@param		string		$gz						Where the compressed copy is written
+		 *
+		 *	@return 	void
+		 *
+		 *	@throws		\RuntimeException				If a step fails or the file is not whole
+		 */
+		private static function _gzip( string $tar, string $gz ): void {
+
+			$in 	= @fopen( $tar, 'rb' );
+			$out 	= $in === false ? false : @gzopen( $gz, 'wb' );
+
+			if( $in === false || $out === false ) {
+				if( $in !== false )
+					fclose( $in );
+				throw new \RuntimeException( 'the backup could not be compressed', self::WRITE_FAILED );
+			}
+
+			$total = 0;
+
+			try {
+				while( feof( $in ) === false ) {
+
+					$piece = fread( $in, 1048576 );
+
+					if( $piece === false )
+						throw new \RuntimeException( 'the backup could not be read back', self::WRITE_FAILED );
+
+					if( $piece === '' )
+						break;
+
+					if( @gzwrite( $out, $piece ) !== strlen( $piece ) )
+						throw new \RuntimeException( 'the backup could not be written', self::WRITE_FAILED );
+
+					$total += strlen( $piece );
+				}
+			}
+			finally {
+				fclose( $in );
+				$closed = @gzclose( $out );
+			}
+
+			if( $closed !== true )
+				throw new \RuntimeException( 'the backup could not be written', self::WRITE_FAILED );
+
+			// Read back to its end, without keeping it
+			$back 	= @gzopen( $gz, 'rb' );
+			$length = 0;
+
+			if( $back === false )
+				throw new \RuntimeException( 'the backup could not be read back', self::WRITE_FAILED );
+
+			while( gzeof( $back ) === false ) {
+
+				$piece = @gzread( $back, 1048576 );
+
+				if( $piece === false || $piece === '' )
+					break;
+
+				$length += strlen( $piece );
+
+				// A file that gives more than went in is not the one written
+				if( $length > $total )
+					break;
+			}
+
+			gzclose( $back );
+
+			if( $length !== $total )
+				throw new \RuntimeException( 'the backup is not whole: there was no room to write it, or it could not be written', self::WRITE_FAILED );
+		}
+
+		/**
+		 *	What marks a file in the system's temp directory as this project's:
+		 *	the temp directory is the server's, shared with every other site on
+		 *	it, and what a run of this project leaves there is told from theirs
+		 *	by the name of the private directory it came from
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									Eight hex digits
+		 */
+		private static function _tempId( array &$appData ): string {
+
+			$content = \Nino\Filesystem::getContentPath( $appData );
+
+			return substr( sha1( (string) ( realpath( $content ) ?: $content ) ), 0, 8 );
+		}
+
+		/**
+		 *	A file of a run's own in the system's temp directory, which stays
+		 *	locked for as long as the run lives: the name is made of the kind of the
+		 *	run and of the mark of this project, and what the run needs beside it
+		 *	is that name plus a suffix ('.tar', '.tar.gz', '.staging'). The lock
+		 *	is what tells a run that is going on from one that ended without a
+		 *	word (see sweepTemp()) - the system takes it away with the process,
+		 *	however that ends
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$kind					'backup', 'snapshot' or 'restore'
+		 *
+		 *	@return 	array|false							[ path, lock handle ], or false where there is no file to be made
+		 */
+		public static function tempFile( array &$appData, string $kind ): array|false {
+
+			$path = tempnam( sys_get_temp_dir(), 'nino'. $kind. '-'. self::_tempId( $appData ). '-' );
+
+			if( $path === false )
+				return false;
+
+			$handle = @fopen( $path, 'r+b' );
+
+			if( $handle === false || flock( $handle, LOCK_EX | LOCK_NB ) === false ) {
+				@unlink( $path );
+				return false;
+			}
+
+			return [ $path, $handle ];
+		}
+
+		/**
+		 *	Remove what runs of this project left in the system's temp directory
+		 *	when they ended without removing it - a request that php ended at
+		 *	its time or memory limit, or that was killed, never reaches a
+		 *	finally. Only the files and directories tempFile() names, with this
+		 *	project's mark: whatever else lies there is none of ours. A run that
+		 *	is going on holds the lock of its file, and what it has made stays
+		 *	where it is; what is left of a run whose file is gone is removed
+		 *	when it is a day old
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function sweepTemp( array &$appData ): void {
+
+			$temp		= rtrim( sys_get_temp_dir(), '/' );
+			$mark		= self::_tempId( $appData );
+			$groups	= [];
+
+			foreach( @scandir( $temp ) ?: [] as $name )
+				if( preg_match( '/^(nino(?:backup|snapshot|restore)-'. $mark. '-[A-Za-z0-9]{1,8})(?:\.tar|\.tar\.gz|\.staging)?$/', $name, $match ) === 1 )
+					$groups[$match[1]][] = $name;
+
+			$owner = function_exists( 'posix_geteuid' ) === true ? posix_geteuid() : null;
+
+			foreach( $groups as $base => $names ) {
+
+				// Only what this user made and that is no link: another user's file
+				// of the same name, or a link put in its place, is none of ours
+				foreach( $names as $index => $name ) {
+					$stat = @lstat( $temp. '/'. $name );
+					if( $stat === false || ( $stat['mode'] & 0170000 ) === 0120000 || ( $owner !== null && $stat['uid'] !== $owner ) )
+						unset( $names[$index] );
+				}
+
+				$baseKept = in_array( $base, $names, true );
+
+				// The main file is there and is somebody else's: the group is not ours
+				if( count( $names ) === 0 || ( $baseKept === false && @lstat( $temp. '/'. $base ) !== false ) )
+					continue;
+
+				$lease = $baseKept === true ? @fopen( $temp. '/'. $base, 'r+b' ) : false;
+
+				if( $lease !== false && flock( $lease, LOCK_EX | LOCK_NB ) === false ) {
+					fclose( $lease );
+					continue;
+				}
+
+				if( $lease === false )
+					foreach( $names as $name )
+						if( time() - (int) @filemtime( $temp. '/'. $name ) < 86400 )
+							continue 2;
+
+				foreach( $names as $name )
+					\Nino\Filesystem::removeDir( $temp. '/'. $name );
+
+				if( $lease !== false )
+					fclose( $lease );
+			}
+		}
 	}
 }

@@ -12,11 +12,17 @@ return [
 	'[[/_admin/backups/msg/created]]'		=> 'Backup erstellt: %s',
 	'[[/_admin/backups/msg/missed]]'		=> 'Das automatische Backup von heute wurde nicht angelegt: %s. Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an, sobald die Ursache behoben ist.',
 	'[[/_admin/backups/msg/interrupted]]'	=> 'Das automatische Backup von heute wurde nicht fertig: Die Anfrage, die es angelegt hat, wurde beendet, meist weil dem Server der Speicher oder die Zeit ausging. Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an.',
+	'[[/_admin/backups/msg/stopped-time]]'	=> 'Das Backup, das am %s begann, wurde vom Server beendet: Seine Zeitgrenze (%s s) war erreicht. Zu packen: %s MB, Dateien: %s.',
+	'[[/_admin/backups/msg/stopped-memory]]'	=> 'Das Backup, das am %s begann, wurde vom Server beendet: Seine Speichergrenze (%s MB) war erreicht. Zu packen: %s MB, Dateien: %s.',
+	'[[/_admin/backups/msg/stopped-open]]'	=> 'Das Backup, das am %s begann, wurde nicht beendet, und der Server hat nicht gesagt, warum – wahrscheinlich war seine Zeit- oder Speichergrenze erreicht. Zu packen: %s MB, Dateien: %s.',
+	'[[/_admin/backups/msg/stopped-retry]]'	=> 'Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an, sobald die Ursache behoben ist.',
+	'[[/_admin/backups/msg/reason-write]]'	=> 'es war kein Platz mehr, im Temp-Ordner oder dort, wo die Backups liegen, oder eine Datei ließ sich nicht schreiben',
+	'[[/_admin/error/backups_write]]'	=> 'Für das Backup war kein Platz mehr, im Temp-Ordner oder dort, wo die Backups liegen, oder eine Datei ließ sich nicht schreiben. Die vorhandenen Backups sind unberührt.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'Das Backup stammt aus Nino %s, hier läuft %s.',
 	'[[/_admin/error/backups_busy]]'	=> 'Ein Backup oder eine Wiederherstellung läuft gerade. Versuche es gleich noch einmal.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
-	'[[/_admin/backups/manual/intro]]'	=> 'Ein Backup ist eine Kopie der Inhalte Deiner Website, wie sie an einem Tag waren. Nino legt jeden Tag von selbst eines an und hebt vierzehn Tage auf; unter Konfiguration lässt sich das abschalten.',
+	'[[/_admin/backups/manual/intro]]'	=> 'Ein Backup ist eine Kopie der Inhalte Deiner Website, wie sie an einem Tag waren. Nino legt jeden Tag von selbst eines an und behält die neuesten; wie viele, stellst Du unter Konfiguration ein, dort lässt es sich auch abschalten.',
 	'[[/_admin/backups/manual/backup]]'	=> '„Jetzt sichern“ legt sofort eine Kopie an. Die Liste zeigt die Tage, für die es ein Backup gibt.',
 	'[[/_admin/backups/manual/restore]]'	=> 'Wähle einen Tag, um ihn wiederherzustellen; Nino fragt vorher nach. Der aktuelle Stand wird zuvor gesichert, so lässt sich eine Wiederherstellung zurücknehmen. Sie beendet Deine Sitzung: Danach bist Du abgemeldet und meldest Dich neu an.',
 ];

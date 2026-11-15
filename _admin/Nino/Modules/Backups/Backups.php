@@ -70,11 +70,13 @@ namespace Nino\Modules {
 	 */
 	class Backups {
 
-		private const int RETENTION_DAYS = 14;
-
-		// How many of the archives somebody asked for (see now()) are kept,
-		// the newest ones: the daily ones are bounded by their days alone
-		private const int MANUAL_KEEP = 10;
+		// How many archives are kept when the project says nothing: the newest
+		// daily ones and the newest of those made by hand (see now()). The
+		// backup is an emergency tool, not a history. The project sets both
+		// numbers in config.php: '/nino/admin/backups-daily' and
+		// '/nino/admin/backups-manual', each 1 to KEEP_MAX
+		private const int KEEP_DEFAULT = 3;
+		private const int KEEP_MAX = 30;
 
 		// Held by the daily run and by a restore (see \Nino\Modules\Backups\Admin::restore()):
 		// the one never starts in the middle of the other
@@ -85,13 +87,26 @@ namespace Nino\Modules {
 		// date, so no list offers it and no sweep touches it
 		private const string ATTEMPT_FILE = 'attempt.php';
 
+		// The record of the run that is going on (see _begin()), in the same
+		// place and behind the same stub. The run holds its lock for as long as
+		// it lives, so a record that is not locked is the one of a run that
+		// ended without a word - what stopped() reads for the panel. Its name
+		// is no date either
+		private const string RUN_FILE = 'run.php';
+
 		// What _create() holds at its peak is two copies of the compressed
-		// archive (it and its ciphertext, while it is encrypted, PEAK_FACTOR)
-		// or the largest single file of the manifest (read whole), whichever
-		// is more: the sources themselves are never in memory together, so what
+		// archive (it and its ciphertext, while it is encrypted, PEAK_FACTOR):
+		// the sources are packed in pieces and never in memory together, so what
 		// compresses costs nothing. Opening an archive (Admin::restore() and
 		// its snapshot) needs no more
 		private const int PEAK_FACTOR = 2;
+
+		// Formats that are compressed already: gzip takes the least of a file of
+		// these, never less than PICTURE_FLOOR of its size (jpeg gains under one
+		// percent, png and webp less), which makes the pictures a lower bound of the
+		// archive that is safe to refuse on before anything is packed
+		private const array PICTURE_FORMATS = [ 'jpg', 'jpeg', 'png', 'webp', 'avif', 'heic', 'heif' ];
+		private const float PICTURE_FLOOR = 0.9;
 
 		// Room for the code, the tar's own bookkeeping and the pieces the
 		// stub is written in
@@ -224,15 +239,19 @@ namespace Nino\Modules {
 
 				self::_noteAttempt( $dir, $today, '' );
 
+				$run = self::_begin( $dir, 'daily' );
+
 				try {
-					self::_create( $appData, $dir, $path );
+					self::_create( $appData, $dir, $path, $run );
 				} catch( \Throwable $e ) {
-					self::_noteAttempt( $dir, $today, self::_reason( $e ) );
+					self::_noteAttempt( $dir, $today, self::_reason( $e ), self::_code( $e ) );
 					throw $e;
+				} finally {
+					self::_end( $run );
 				}
 
 				@unlink( $dir. '/'. self::ATTEMPT_FILE );
-				self::_prune( $dir );
+				self::_prune( $dir, self::_keep( $appData, 'daily' ), self::_keep( $appData, 'manual' ), basename( $path ) );
 
 				// Through the shell rather than at the Logs module directly: the
 				// log is a module a delivery may drop, and this line sits inside
@@ -257,7 +276,7 @@ namespace Nino\Modules {
 		 *	daily one and never in place of it: today's Y-m-d.php is the state
 		 *	before the day's work (see maybeRun()), and a click at five in the
 		 *	afternoon must not replace it. Kept like the daily ones - the same
-		 *	days - and at most MANUAL_KEEP of them.
+		 *	way - and only the newest ones, as many as the project keeps.
 		 *
 		 *	Without the daily lock: the name is to the second, so two clicks in
 		 *	the same second make the same archive - the second write replaces
@@ -270,7 +289,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	string|array						The new archive's id ("Y-m-d-His"), or [ http status, message ]
+		 *	@return 	string|array						The new archive's id ("Y-m-d-His"), or [ http status, message ] - and, where a write failed, the code the panel words it by as a third element
 		 */
 		public static function now( array &$appData ): string|array {
 
@@ -286,17 +305,23 @@ namespace Nino\Modules {
 				$dir 	= self::dir( $appData );
 				$id 	= date( 'Y-m-d-His' );
 
-				self::_create( $appData, $dir, $dir. '/'. $id. '.php' );
+				$run = self::_begin( $dir, 'manual' );
+
+				try {
+					self::_create( $appData, $dir, $dir. '/'. $id. '.php', $run );
+				} finally {
+					self::_end( $run );
+				}
 
 				// An archive that was made is the way out of a day that went
 				// without one: the next request may try the daily one again
 				@unlink( $dir. '/'. self::ATTEMPT_FILE );
-				self::_prune( $dir );
+				self::_prune( $dir, self::_keep( $appData, 'daily' ), self::_keep( $appData, 'manual' ), $id. '.php' );
 
 				return $id;
 
 			} catch( \RuntimeException | \PharException $e ) {
-				return [ 500, $e->getMessage() ];
+				return self::_code( $e ) === 'write' ? [ 500, $e->getMessage(), 'backups_write' ] : [ 500, $e->getMessage() ];
 			}
 		}
 
@@ -318,7 +343,51 @@ namespace Nino\Modules {
 
 			$note = self::_readAttempt( $dir );
 
-			return $note === null || $note['date'] !== date( 'Y-m-d' ) ? null : [ 'reason' => $note['reason'] ];
+			return $note === null || $note['date'] !== date( 'Y-m-d' ) ? null : [ 'reason' => $note['reason'] ] + ( isset( $note['code'] ) === true ? [ 'code' => $note['code'] ] : [] );
+		}
+
+		/**
+		 *	The run that did not end, while there is one: the last run that began
+		 *	- the daily one or one by hand - and that php or the server ended
+		 *	before it was over, which no catch sees, and which nobody else
+		 *	reports. It says when it began, how many files and how many bytes it
+		 *	had to pack and, where php said so, what ended it: the time limit or
+		 *	the memory limit, with the limit. A run that is going on is none of
+		 *	this (it holds the lock of its record), and one that ended by itself
+		 *	has removed its record. Shared by the Backups panel, which says so
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|null							[ 'kind' => 'daily'|'manual', 'started' => unix time, 'files' => int, 'bytes' => int, 'cause' => 'time'|'memory'|'error'|'' (what ended it, '' where nothing says), 'limit' => seconds or bytes of that limit, 0 where there is none ], or null
+		 */
+		public static function stopped( array &$appData ): ?array {
+
+			$handle = @fopen( self::dir( $appData ). '/'. self::RUN_FILE, 'rb' );
+
+			if( $handle === false )
+				return null;
+
+			// A shared lock that is refused is a run that lives
+			if( flock( $handle, LOCK_SH | LOCK_NB ) === false ) {
+				fclose( $handle );
+				return null;
+			}
+
+			$note = self::_readNote( self::dir( $appData ). '/'. self::RUN_FILE );
+
+			fclose( $handle );
+
+			if( $note === null || in_array( $note['kind'] ?? null, [ 'daily', 'manual' ], true ) === false || is_int( $note['started'] ?? null ) === false )
+				return null;
+
+			return [
+				'kind' 		=> $note['kind'],
+				'started'	=> $note['started'],
+				'files' 	=> is_int( $note['files'] ?? null ) === true ? $note['files'] : 0,
+				'bytes' 	=> is_int( $note['bytes'] ?? null ) === true ? $note['bytes'] : 0,
+				'cause' 	=> in_array( $note['cause'] ?? null, [ 'time', 'memory', 'error' ], true ) === true ? $note['cause'] : '',
+				'limit' 	=> is_int( $note['limit'] ?? null ) === true ? $note['limit'] : 0,
+			];
 		}
 
 		/**
@@ -345,7 +414,24 @@ namespace Nino\Modules {
 		 */
 		private static function _readAttempt( string $dir ): ?array {
 
-			$raw = @file_get_contents( $dir. '/'. self::ATTEMPT_FILE );
+			$note = self::_readNote( $dir. '/'. self::ATTEMPT_FILE );
+
+			if( $note === null || is_string( $note['date'] ?? null ) === false || is_string( $note['reason'] ?? null ) === false )
+				return null;
+
+			return [ 'date' => $note['date'], 'reason' => $note['reason'] ] + ( ( $note['code'] ?? null ) === 'write' ? [ 'code' => 'write' ] : [] );
+		}
+
+		/**
+		 *	What a note file holds: the json inside its stub
+		 *
+		 *	@param		string		$path					Absolute path of the note
+		 *
+		 *	@return 	array|null							The decoded note, or null where the file is not one
+		 */
+		private static function _readNote( string $path ): ?array {
+
+			$raw = @file_get_contents( $path );
 
 			if( is_string( $raw ) === false || str_starts_with( $raw, \Nino\Admin\Recovery::STUB_PREFIX ) === false || str_ends_with( $raw, \Nino\Admin\Recovery::STUB_SUFFIX ) === false )
 				return null;
@@ -353,10 +439,7 @@ namespace Nino\Modules {
 			$json = base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ), true );
 			$note = is_string( $json ) === true ? json_decode( $json, true ) : null;
 
-			if( is_array( $note ) === false || is_string( $note['date'] ?? null ) === false || is_string( $note['reason'] ?? null ) === false )
-				return null;
-
-			return [ 'date' => $note['date'], 'reason' => $note['reason'] ];
+			return is_array( $note ) === true ? $note : null;
 		}
 
 		/**
@@ -368,12 +451,26 @@ namespace Nino\Modules {
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$date					"Y-m-d" of the day the attempt began
 		 *	@param		string		$reason				What the attempt reported, '' while there is none
+		 *	@param		string		$code					What kind of failure it was, where the panel words it: 'write', '' otherwise
 		 *
 		 *	@return 	void
 		 */
-		private static function _noteAttempt( string $dir, string $date, string $reason ): void {
+		private static function _noteAttempt( string $dir, string $date, string $reason, string $code = '' ): void {
 
-			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+		}
+
+		/**
+		 *	The kind of failure the panel words in the interface language: a write
+		 *	that failed, with no room or a file that cannot be written
+		 *
+		 *	@param		\Throwable	$e
+		 *
+		 *	@return 	string									'write', or '' for any other
+		 */
+		private static function _code( \Throwable $e ): string {
+
+			return get_class( $e ) === \RuntimeException::class && $e->getCode() === \Nino\Backup::WRITE_FAILED ? 'write' : '';
 		}
 
 		/**
@@ -513,6 +610,171 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	Begin a run: its record, which says that one is going on and what
+		 *	it has to do, and the function that php calls when the request ends
+		 *	without the run being over. That function is what php lets run even
+		 *	after the time limit or the memory limit has ended the request: it
+		 *	writes what ended it into the record and removes the temporary files
+		 *	of the run, which a finally does not for such an end. A run that ends
+		 *	by itself, with or without an archive, goes through _end() and leaves
+		 *	no record. The record is locked for as long as the run lives, so a
+		 *	panel that reads it can tell a run that is going on from one that is
+		 *	gone; where it cannot be locked - a second run, a directory that
+		 *	cannot be written - there is no record, and the run goes on without
+		 *	one
+		 *
+		 *	@param		string		$dir					Absolute path to the backup directory
+		 *	@param		string		$kind					'daily' or 'manual'
+		 *
+		 *	@return 	\stdClass								The state of the run: what _create(), _end() and the shutdown function share
+		 */
+		private static function _begin( string $dir, string $kind ): \stdClass {
+
+			$run 				= new \stdClass();
+			$run->done 	= false;
+			$run->path 	= $dir. '/'. self::RUN_FILE;
+			$run->note 	= [ 'kind' => $kind, 'started' => time() ];
+			$run->temp 	= '';
+			$run->lease = null;
+			$run->handle = @fopen( $run->path, 'c+b' );
+
+			if( $run->handle !== false && flock( $run->handle, LOCK_EX | LOCK_NB ) === false ) {
+				fclose( $run->handle );
+				$run->handle = false;
+			}
+
+			self::_record( $run, [] );
+
+			register_shutdown_function( static function() use ( $run ): void {
+
+				if( $run->done === true )
+					return;
+
+				$run->done = true;
+
+				$error 	= error_get_last();
+				$cause 	= [];
+
+				if( $error !== null && ( $error['type'] & ( E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR ) ) !== 0 ) {
+
+					$cause = [ 'cause' => 'error' ];
+
+					if( preg_match( '/^Maximum execution time of (\d+) seconds? exceeded/', $error['message'], $match ) === 1 )
+						$cause = [ 'cause' => 'time', 'limit' => (int) $match[1] ];
+					else if( preg_match( '/^Allowed memory size of (\d+) bytes exhausted/', $error['message'], $match ) === 1 )
+						$cause = [ 'cause' => 'memory', 'limit' => (int) $match[1] ];
+				}
+
+				self::_record( $run, $cause );
+				self::_dropTemp( $run );
+
+				if( is_resource( $run->handle ) === true )
+					fclose( $run->handle );
+			} );
+
+			return $run;
+		}
+
+		/**
+		 *	Write what is known of a run into its record
+		 *
+		 *	@param		\stdClass	$run					See _begin()
+		 *	@param		array 		$more					What to add to the record: 'files' and 'bytes' of the work, 'cause' and 'limit' of an end
+		 *
+		 *	@return 	void
+		 */
+		private static function _record( \stdClass $run, array $more ): void {
+
+			if( is_resource( $run->handle ) === false )
+				return;
+
+			$run->note = $more + $run->note;
+
+			ftruncate( $run->handle, 0 );
+			rewind( $run->handle );
+			fwrite( $run->handle, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( $run->note ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+			fflush( $run->handle );
+		}
+
+		/**
+		 *	End a run that ends by itself: its record goes, and its temporary files
+		 *
+		 *	@param		\stdClass	$run					See _begin()
+		 *
+		 *	@return 	void
+		 */
+		private static function _end( \stdClass $run ): void {
+
+			$run->done = true;
+
+			if( is_resource( $run->handle ) === true ) {
+				@unlink( $run->path );
+				fclose( $run->handle );
+			}
+
+			self::_dropTemp( $run );
+		}
+
+		/**
+		 *	Remove the temporary files of a run, and let go of the lock of the
+		 *	first of them
+		 *
+		 *	@param		\stdClass	$run					See _begin()
+		 *
+		 *	@return 	void
+		 */
+		private static function _dropTemp( \stdClass $run ): void {
+
+			if( $run->temp === '' )
+				return;
+
+			@unlink( $run->temp. '.tar' );
+			@unlink( $run->temp. '.tar.gz' );
+			@unlink( $run->temp );
+
+			if( is_resource( $run->lease ) === true )
+				fclose( $run->lease );
+
+			$run->temp 	= '';
+			$run->lease = null;
+		}
+
+		/**
+		 *	What the run has to pack, read from the files before anything is
+		 *	made: the manifest, the number of files and of bytes, and of those
+		 *	the bytes that do not compress - the pictures, which a compressed
+		 *	archive holds as large as they are. A file the manifest names that
+		 *	cannot be read ends the run here
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ 'manifest' => path -> name, 'files' => int, 'bytes' => int, 'pictures' => int ]
+		 *
+		 *	@throws		\RuntimeException					If a file of the manifest cannot be read
+		 */
+		private static function _plan( array &$appData ): array {
+
+			$manifest = \Nino\Backup::manifest( $appData );
+			$bytes 		= 0;
+			$pictures	= 0;
+
+			foreach( $manifest as $absolute => $archiveName ) {
+
+				$size = @filesize( $absolute );
+
+				if( $size === false )
+					throw new \RuntimeException( 'backup source could not be read: '. $archiveName );
+
+				$bytes += $size;
+
+				if( str_starts_with( $archiveName, 'images/' ) === true && in_array( strtolower( pathinfo( $archiveName, PATHINFO_EXTENSION ) ), self::PICTURE_FORMATS, true ) === true )
+					$pictures += $size;
+			}
+
+			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes, 'pictures' => $pictures ];
+		}
+
+		/**
 		 *	Tar+gzip every file the admin panel can write to at runtime and,
 		 *	after them, the note of the state they come from (see
 		 *	\Nino\Backup::stamp()), encrypt it, and write it out behind the .php
@@ -521,81 +783,71 @@ namespace Nino\Modules {
 		 *	PharData isn't restricted by the phar.readonly ini setting many
 		 *	hosts enable by default.
 		 *
-		 *	Reads each file's bytes itself and hands them to addFromString()
-		 *	rather than pointing addFile() at the path - addFile() alone
-		 *	archived a stale, already-out-of-date copy of a just-written file
-		 *	(config.php, right after _bootstrap() writes it) even though a
-		 *	plain file_get_contents() at that same point already saw the
-		 *	current content. Whatever addFile()'s own internal caching is
-		 *	keyed on, supplying the bytes directly sidesteps it.
+		 *	The files are packed in one pass (see \Nino\Backup::pack()), which
+		 *	reads each in pieces. A project whose pictures could not be carried
+		 *	by the memory limit is refused before anything is packed: the
+		 *	pictures do not compress, so their size is the least the archive
+		 *	will have, and it is held twice while it is encrypted. What the
+		 *	size of the compressed archive tells beyond that is checked once
+		 *	it exists
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$path					Absolute path of the backup file to write: today's, or the timed archive's
+		 *	@param		\stdClass	$run					The run this is part of, see _begin()
 		 *
 		 *	@return 	void
 		 */
-		private static function _create( array &$appData, string $dir, string $path ): void {
+		private static function _create( array &$appData, string $dir, string $path, \stdClass $run ): void {
 
 			if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false )
 				throw new \RuntimeException( 'backup directory could not be created' );
 
-			// The largest file is read whole
-			$largest = 0;
-			foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName )
-				$largest = max( $largest, (int) @filesize( $absolute ) );
+			// What an earlier run left that ended without a word
+			\Nino\Backup::sweepTemp( $appData );
 
-			self::_requireMemory( $appData, $largest, 'the largest file' );
+			$plan = self::_plan( $appData );
 
-			$tmpBase = tempnam( sys_get_temp_dir(), 'ninobackup' );
-			if( $tmpBase === false )
+			self::_record( $run, [ 'files' => $plan['files'], 'bytes' => $plan['bytes'] ] );
+			self::_requireMemory( $appData, (int) ( $plan['pictures'] * self::PICTURE_FLOOR ) * self::PEAK_FACTOR, 'the pictures' );
+
+			$temp = \Nino\Backup::tempFile( $appData, 'backup' );
+			if( $temp === false )
 				throw new \RuntimeException( 'temporary backup file could not be created' );
 
-			$tmpTar = $tmpBase. '.tar';
-			@unlink( $tmpBase );
+			[ $run->temp, $run->lease ] = $temp;
 
-			try {
-				$phar = new \PharData( $tmpTar );
-				foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName ) {
-					$bytes = @file_get_contents( $absolute );
-					if( $bytes === false )
-						throw new \RuntimeException( 'backup source could not be read: '. $archiveName );
-					$phar->addFromString( $archiveName, $bytes );
-					unset( $bytes );
-				}
-				$phar->addFromString( 'nino.php', \Nino\Backup::stamp( $appData ) );
-				$phar->compress( \Phar::GZ );
-				unset( $phar );
+			$tmpTar = $run->temp. '.tar';
 
-				// What compresses costs nothing here; what does not is read, and
-				// encrypted next to its plain bytes
-				self::_requireMemory( $appData, (int) @filesize( $tmpTar. '.gz' ) * self::PEAK_FACTOR, 'the compressed archive' );
+			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar );
 
-				$gz = @file_get_contents( $tmpTar. '.gz' );
-				if( $gz === false )
-					throw new \RuntimeException( 'compressed backup could not be read' );
+			// What compresses costs nothing here; what does not is read, and
+			// encrypted next to its plain bytes
+			self::_requireMemory( $appData, (int) @filesize( $tmpTar. '.gz' ) * self::PEAK_FACTOR, 'the compressed archive' );
 
-				$key = base64_decode( (string) $appData['/nino/backup/key'], true );
-				if( is_string( $key ) === false || strlen( $key ) !== 32 )
-					throw new \RuntimeException( 'backup encryption key is invalid' );
+			$gz = @file_get_contents( $tmpTar. '.gz' );
+			if( $gz === false )
+				throw new \RuntimeException( 'compressed backup could not be read' );
 
-				$iv 		= random_bytes( 12 );
-				$tag 		= '';
-				$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+			// Held in memory from here on
+			@unlink( $tmpTar. '.gz' );
 
-				// The plain archive is not needed past this line: the ciphertext
-				// is written from where it is, in pieces
-				unset( $gz );
+			$key = base64_decode( (string) $appData['/nino/backup/key'], true );
+			if( is_string( $key ) === false || strlen( $key ) !== 32 )
+				throw new \RuntimeException( 'backup encryption key is invalid' );
 
-				if( $cipher === false )
-					throw new \RuntimeException( 'backup encryption failed' );
+			$iv 		= random_bytes( 12 );
+			$tag 		= '';
+			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
 
-				self::_writeRawAtomic( $path, \Nino\Admin\Recovery::stubPieces( $iv, $tag, $cipher ) );
-			} finally {
-				@unlink( $tmpBase );
-				@unlink( $tmpTar );
-				@unlink( $tmpTar. '.gz' );
-			}
+			// The plain archive is not needed past this line: the ciphertext
+			// is written from where it is, in pieces
+			unset( $gz );
+
+			if( $cipher === false )
+				throw new \RuntimeException( 'backup encryption failed' );
+
+			self::_writeRawAtomic( $path, \Nino\Admin\Recovery::stubPieces( $iv, $tag, $cipher ) );
 		}
 
 		// Raw (non-serialized) counterpart to Filesystem's atomic writer. Backup
@@ -609,7 +861,7 @@ namespace Nino\Modules {
 			$handle = @fopen( $temp, 'wb' );
 
 			if( $handle === false )
-				throw new \RuntimeException( 'temporary file could not be opened: '. basename( $path ) );
+				throw new \RuntimeException( 'temporary file could not be opened: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
 
 			$written	= 0;
 			$expected	= 0;
@@ -625,11 +877,15 @@ namespace Nino\Modules {
 			}
 
 			$flushed = @fflush( $handle );
-			@fclose( $handle );
+			$closed	 = @fclose( $handle );
 
-			if( $written === false || $written !== $expected || $flushed === false ) {
+			// What is on the disk must be what was written: a write that was cut short
+			// is not an archive, and nothing is renamed into its place
+			clearstatcache( true, $temp );
+
+			if( $written === false || $written !== $expected || $flushed === false || $closed === false || @filesize( $temp ) !== $expected ) {
 				@unlink( $temp );
-				throw new \RuntimeException( 'file could not be written: '. basename( $path ) );
+				throw new \RuntimeException( 'file could not be written: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
 			}
 
 			$mode = @fileperms( $path );
@@ -638,40 +894,79 @@ namespace Nino\Modules {
 
 			if( @rename( $temp, $path ) === false ) {
 				@unlink( $temp );
-				throw new \RuntimeException( 'file could not be replaced: '. basename( $path ) );
+				throw new \RuntimeException( 'file could not be replaced: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
 			}
 		}
 
 		/**
-		 *	Delete dated backups older than RETENTION_DAYS, and the archives
-		 *	of now() beyond the newest MANUAL_KEEP. Only ever touches files
-		 *	whose name is exactly a plain "Y-m-d.php" date or a "Y-m-d-His.php"
-		 *	one - the panel's own Admin::_safetySnapshot() also writes into
-		 *	this same directory (differently named,
-		 *	"pre-restore-<timestamp>.php") and must never be swept up here
+		 *	How many archives of one kind the project keeps: the number config.php
+		 *	names - a number, or a text that is one - up to KEEP_MAX, and the
+		 *	default where it names none or less than one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$kind					'daily' or 'manual'
+		 *
+		 *	@return 	int
+		 */
+		private static function _keep( array &$appData, string $kind ): int {
+
+			$value = $appData['/nino/admin/backups-'. $kind] ?? null;
+
+			if( is_numeric( $value ) === false || (int) $value < 1 )
+				return self::KEEP_DEFAULT;
+
+			return min( (int) $value, self::KEEP_MAX );
+		}
+
+		/**
+		 *	Keep the archive that was just written, and the newest of the others
+		 *	up to $daily dated backups and $manual archives of now() in all, and
+		 *	delete the rest. Only ever called after a backup was made, and never
+		 *	deletes that one - a name from a clock that was ahead and was set back
+		 *	is later than the new one and would otherwise push it out: a name
+		 *	later than the new archive's counts as older than every other, so it
+		 *	is the first to go once there are more than the project keeps. Only
+		 *	ever touches files whose name is exactly a plain "Y-m-d.php" date or a
+		 *	"Y-m-d-His.php" one - the panel's own Admin::_safetySnapshot() also
+		 *	writes into this same directory (differently named,
+		 *	"pre-restore-<timestamp>.php", kept by its own bound) and must never
+		 *	be swept up here
 		 *
 		 *	@param		string		$dir					Absolute path to the backup directory
+		 *	@param		int				$daily				How many daily archives to keep
+		 *	@param		int				$manual				How many archives made by hand to keep
+		 *	@param		string		$written			File name of the archive just written
 		 *
 		 *	@return 	void
 		 */
-		private static function _prune( string $dir ): void {
-
-			$cutoff = ( new \DateTime( '-'. self::RETENTION_DAYS. ' days' ) )->setTime( 0, 0 );
-
-			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d', '.php', $cutoff );
-			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d-His', '.php', $cutoff );
+		private static function _prune( string $dir, int $daily, int $manual, string $written ): void {
 
 			// Read, not globbed (see RotatingLog::prune()); the name carries
-			// the time, so sorting it sorts by age
-			$manual = [];
-			foreach( @scandir( $dir ) ?: [] as $name )
-				if( preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}\.php$/', $name ) === 1 )
-					$manual[] = $name;
+			// the date and the time, so sorting it sorts by age
+			$days 	= [];
+			$hands	= [];
+			foreach( @scandir( $dir ) ?: [] as $name ) {
+				if( preg_match( '/^\d{4}-\d{2}-\d{2}\.php$/', $name ) === 1 )
+					$days[] = $name;
+				else if( preg_match( '/^\d{4}-\d{2}-\d{2}-\d{6}\.php$/', $name ) === 1 )
+					$hands[] = $name;
+			}
 
-			rsort( $manual );
+			foreach( [ [ $days, $daily, date( 'Y-m-d' ). '.php' ], [ $hands, $manual, date( 'Y-m-d-His' ). '.php' ] ] as [ $names, $keep, $today ] ) {
 
-			foreach( array_slice( $manual, self::MANUAL_KEEP ) as $name )
-				@unlink( $dir. '/'. $name );
+				// Of the kind just written the new one stays whatever its name, and
+				// with it the newest of the others; of the other kind, the newest
+				$mine 	= in_array( $written, $names, true );
+				$others = array_values( array_diff( $names, [ $written ] ) );
+				rsort( $others );
+
+				// Later than the new one, or than now: older than all the rest
+				$later 	= array_filter( $others, static fn( string $name ): bool => $name > ( $mine === true ? $written : $today ) );
+				$others = array_merge( array_diff( $others, $later ), $later );
+
+				foreach( array_slice( $others, $mine === true ? $keep - 1 : $keep ) as $name )
+					@unlink( $dir. '/'. $name );
+			}
 		}
 	}
 }

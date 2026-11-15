@@ -290,6 +290,61 @@ panel.init();
 answer( 200, { dates : [], enabled : false, missed : { reason : 'x' } } );
 check( 'while backups are switched off nothing is said to be missed', noticeOf().length === 0 );
 
+// A run that ended without an end of its own - the daily one or one by hand - is said once, with
+// the time it began, the work it had and, where the server said so, what ended it
+const stopped = function( cause, kind ) {
+	return { kind : kind, started : 1700000000, files : 2701, bytes : 223346688, cause : cause, limit : cause === 'memory' ? 134217728 : 30 };
+};
+const numbers = [ '2701', '213' ];
+const said = function( notices ) {
+	return notices.length === 1 && numbers.every( function( n ) { return notices[0].textContent.includes( n ) } );
+};
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : null, stopped : stopped( 'time', 'manual' ) } );
+const manualTime = noticeOf().length === 1 ? noticeOf()[0].textContent : '';
+check( 'a run by hand that the time limit ended is a notice with the size and the number of files it had, and the limit', said( noticeOf() ) && noticeOf()[0].textContent.includes( '30' ) && nowButton() !== null );
+
+const memoryText = function() { return noticeOf()[0].textContent };
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : null, stopped : stopped( 'memory', 'manual' ) } );
+check( '...the memory limit is told in megabytes', said( noticeOf() ) && memoryText().includes( '128' ) );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : null, stopped : stopped( '', 'manual' ) } );
+const openText = memoryText();
+check( '...and a run that nothing says why it ended is told as one that did not end', said( noticeOf() ) && openText !== '' );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : { reason : '' }, stopped : stopped( 'time', 'daily' ) } );
+const dailyText = memoryText();
+check( 'a missed daily backup that has no reason of its own is that run, said once, with the way out', said( noticeOf() ) && dailyText.includes( '30' ) && dailyText.length > manualTime.length );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : { reason : 'the backup needs about 443 MB' }, stopped : stopped( 'time', 'daily' ) } );
+check( 'a missed one with a reason of its own and a run that ended are two notices', noticeOf().length === 2 );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : false, missed : null, stopped : stopped( 'time', 'manual' ) } );
+check( 'while backups are switched off no run is said to have ended', noticeOf().length === 0 );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : null, stopped : null } );
+check( 'nothing stopped, nothing said', noticeOf().length === 0 );
+
 // A restore ends in a reload of the page and every form on it: whatever the
 // workbench holds unsaved is asked about first, after the restore was confirmed
 mount.innerHTML = '';

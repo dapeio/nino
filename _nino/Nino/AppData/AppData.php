@@ -71,6 +71,10 @@ namespace Nino {
 			'/nino/cache/ttl'			=> 3600,
 			'/nino/cache/blacklist'	=> [],
 			'/nino/admin/backups'		=> true,
+			// How many archives the workbench keeps: the daily ones, and those made by
+			// hand with Back up now. The backup is an emergency tool, not a history
+			'/nino/admin/backups-daily'	=> 3,
+			'/nino/admin/backups-manual'	=> 3,
 			'/nino/admin/logs'			=> true,
 			'/nino/dir'					=> '',
 			// Log by default, never display: a site that wants a stack trace on

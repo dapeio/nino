@@ -249,6 +249,9 @@ namespace Nino\Modules\Backups {
 				// Why today's automatic backup is missing, while it is (see
 				// \Nino\Modules\Backups::missed())
 				'missed' 	=> ( $appData['/nino/admin/backups'] ?? true ) !== false ? \Nino\Modules\Backups::missed( $appData ) : null,
+				// A run, daily or by hand, that ended without an end of its own and what ended it (see
+				// \Nino\Modules\Backups::stopped())
+				'stopped' => ( $appData['/nino/admin/backups'] ?? true ) !== false ? \Nino\Modules\Backups::stopped( $appData ) : null,
 			] );
 		}
 
@@ -270,7 +273,10 @@ namespace Nino\Modules\Backups {
 			$result = \Nino\Modules\Backups::now( $appData );
 
 			if( is_array( $result ) === true ) {
-				\Nino\Http::fail( $request, $result[0], $result[1] );
+				if( ( $result[2] ?? '' ) === 'backups_write' )
+					\Nino\Http::fail( $request, $result[0], $result[1], 'backups_write' );
+				else
+					\Nino\Http::fail( $request, $result[0], $result[1] );
 				return;
 			}
 
@@ -432,13 +438,20 @@ namespace Nino\Modules\Backups {
 				of here, past the staging directory and the archive it had
 				written, both left standing as well, and the panel answered a
 				500 with nothing said. Everything this makes is removed on every
-				way out now, and what fails answers a sentence	*/
-			$tmpBase = tempnam( sys_get_temp_dir(), 'ninorestore' );
-			if( $tmpBase === false )
+				way out now, and what fails answers a sentence. What an earlier
+				restore left where php ended it is removed first, and the file
+				tempnam() made is the lock that tells such a restore from this one
+				(see \Nino\Backup::sweepTemp())	*/
+			\Nino\Backup::sweepTemp( $appData );
+
+			$temp = \Nino\Backup::tempFile( $appData, 'restore' );
+			if( $temp === false )
 				return [ 500, 'the temporary restore file could not be created' ];
 
+			[ $tmpBase, $lease ] = $temp;
+
 			$tmpGz 		= $tmpBase. '.tar.gz';
-			$staging	= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
+			$staging	= $tmpBase. '.staging';
 
 			try {
 				// Not held in memory across the snapshot: that one needs as much
@@ -490,10 +503,11 @@ namespace Nino\Modules\Backups {
 				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true );
 			}
 			finally {
-				@unlink( $tmpBase );
 				@unlink( $tmpGz );
 				if( is_dir( $staging ) === true )
 					\Nino\Filesystem::removeDir( $staging );
+				@unlink( $tmpBase );
+				fclose( $lease );
 			}
 		}
 
@@ -678,31 +692,23 @@ namespace Nino\Modules\Backups {
 				this makes is removed on every way out, and what cannot be read
 				or written throws, which restore() answers as a refusal before
 				it touches anything	*/
-			$tmpBase = tempnam( sys_get_temp_dir(), 'ninosnapshot' );
-			if( $tmpBase === false )
+			$temp = \Nino\Backup::tempFile( $appData, 'snapshot' );
+			if( $temp === false )
 				throw new \RuntimeException( 'the temporary snapshot file could not be created' );
 
+			[ $tmpBase, $lease ] = $temp;
+
 			$tmpTar = $tmpBase. '.tar';
-			@unlink( $tmpBase );
 
 			try {
-				$phar = new \PharData( $tmpTar );
-
-				foreach( \Nino\Backup::manifest( $appData ) as $absolute => $archiveName ) {
-					$bytes = @file_get_contents( $absolute );
-					if( $bytes === false )
-						throw new \RuntimeException( 'a file could not be read: '. $archiveName );
-					$phar->addFromString( $archiveName, $bytes );
-					unset( $bytes );
-				}
-
-				$phar->addFromString( 'nino.php', \Nino\Backup::stamp( $appData ) );
-				$phar->compress( \Phar::GZ );
-				unset( $phar );
+				// One pass over the files, as a backup is made (see \Nino\Backup::pack())
+				\Nino\Backup::pack( $appData, \Nino\Backup::manifest( $appData ), $tmpTar );
 
 				$gz = @file_get_contents( $tmpTar. '.gz' );
 				if( $gz === false )
 					throw new \RuntimeException( 'the compressed snapshot could not be read' );
+
+				@unlink( $tmpTar. '.gz' );
 
 				$iv 		= random_bytes( 12 );
 				$tag 		= '';
@@ -719,9 +725,10 @@ namespace Nino\Modules\Backups {
 					throw new \RuntimeException( 'the snapshot could not be written' );
 			}
 			finally {
-				@unlink( $tmpBase );
 				@unlink( $tmpTar );
 				@unlink( $tmpTar. '.gz' );
+				@unlink( $tmpBase );
+				fclose( $lease );
 			}
 
 			self::_pruneSnapshots( $dir );

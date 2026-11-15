@@ -38,7 +38,7 @@
 					return Nino.admin.backups._showError( status, response );
 
 				// A missing 'enabled' is an answer from before there was one
-				Nino.admin.backups._renderList( response.dates, response.enabled !== false, response.missed );
+				Nino.admin.backups._renderList( response.dates, response.enabled !== false, response.missed, response.stopped );
 				Nino.admin.backups._ready = true;
 			} );
 		},
@@ -109,6 +109,29 @@
 		},
 
 		/**
+		 *	Say a run that ended without an end of its own: when it began, what
+		 *	ended it where the server said, and how much it had to pack
+		 *
+		 *	@param		{Object}		stopped				{ started: unix time, files, bytes, cause: 'time'|'memory'|'error'|'', limit: seconds or bytes }
+		 *
+		 *	@return		{string}
+		 */
+		_stoppedText : function( stopped ) {
+
+			const root = dc.documentElement;
+			const when = new Date( stopped.started * 1000 ).toLocaleString( root && root.lang ? root.lang : undefined );
+			const size = Nino.adminUi.megabytes( stopped.bytes );
+
+			if( stopped.cause === 'time' )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-time'), when, stopped.limit, size, stopped.files );
+
+			if( stopped.cause === 'memory' )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-memory'), when, Nino.adminUi.megabytes( stopped.limit ), size, stopped.files );
+
+			return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-open'), when, size, stopped.files );
+		},
+
+		/**
 		 *	Render the list of available backup dates, most recent first,
 		 *	each with its own restore button - and, below it, "Back up now",
 		 *	which is there for an empty list too: it is how the first archive
@@ -117,20 +140,32 @@
 		 *
 		 *	@param		{string[]}	dates
 		 *	@param		{boolean}		enabled				Whether backups are on
-		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason }, the reason empty where it ended without one
+		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason, code }, the reason empty where it ended without one, the code 'write' where a write failed
+		 *	@param		{Object=}		stopped				Set while the last run - the daily one or one by hand - ended without an end of its own: { kind, started, files, bytes, cause, limit }, see _stoppedText()
 		 *
 		 *	@return		void
 		 */
-		_renderList : function( dates, enabled, missed ) {
+		_renderList : function( dates, enabled, missed, stopped ) {
 
 			const wrap = dc.getElementById('backups-list');
 			wrap.innerHTML = '';
 
 			// The one thing to do about it is the button below
-			if( enabled !== false && typeof missed === 'object' && missed !== null )
-				wrap.appendChild( Nino.adminUi.notice( typeof missed.reason === 'string' && missed.reason !== ''
-					? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed'), missed.reason )
-					: Nino.content.getText('/_admin/backups/msg/interrupted') ) );
+			if( enabled !== false ) {
+
+				const isMissed = typeof missed === 'object' && missed !== null;
+				const detail = typeof stopped === 'object' && stopped !== null ? Nino.admin.backups._stoppedText( stopped ) : '';
+				const noReason = isMissed === true && ( typeof missed.reason !== 'string' || missed.reason === '' );
+
+				if( isMissed === true )
+					wrap.appendChild( Nino.adminUi.notice( noReason === false
+						? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed'), missed.code === 'write' ? Nino.content.getText('/_admin/backups/msg/reason-write') : missed.reason )
+						: ( detail !== '' ? detail+ ' '+ Nino.content.getText('/_admin/backups/msg/stopped-retry') : Nino.content.getText('/_admin/backups/msg/interrupted') ) ) );
+
+				// Said once: a missed backup that has no reason of its own is that run
+				if( detail !== '' && noReason === false )
+					wrap.appendChild( Nino.adminUi.notice( detail ) );
+			}
 
 			if( dates.length === 0 )
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/backups/empty') ) );
@@ -221,7 +256,7 @@
 						return;
 					}
 
-					Nino.admin.backups._renderList( body.dates, body.enabled !== false, body.missed );
+					Nino.admin.backups._renderList( body.dates, body.enabled !== false, body.missed, body.stopped );
 					dc.getElementById('backups-message').textContent = created;
 				} );
 			} );
