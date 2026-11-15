@@ -935,6 +935,107 @@ check( 'a picture cut before the field fitted is deleted by its removal', \Nino\
 callRemoveImage( $appData, $fitData + [ 'key' => 'logo' ] );
 check( 'a fit field whose value names the other field\'s file clears the value but leaves the file', is_file( $cropFile ) === true );
 
+// A save gives an image field no value of its own: the name is written by the upload, shown on
+// public pages and the file that is deleted with the picture. The field keeps what it holds,
+// or is emptied; every other value is refused with the field named, and nothing is written
+\Nino\Elements::insertElementType( $appData, '/imagesave', [
+	'photo' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40 ],
+	'local' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'locale' => true ],
+	'label' 	=> [ 'type' => 'string' ],
+] );
+\Nino\Elements::insertElement( $appData, '/imagesave/item1', [ 'label' => 'x' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/imagesave/item2', [ 'label' => 'y' ], 'de_DE' );
+[ , $savedUpload ] = callUploadImage( $appData, [ 'type' => 'imagesave', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+$saveFile = $savedUpload['filename'];
+
+$saveImage = static function( array $fields, array $more = [] ) use ( &$appData ): array {
+	return ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiSave' ], $more + [ 'type' => 'imagesave', 'uri' => 'item1', 'locale' => 'de_DE', 'fields' => $fields ] );
+};
+
+[ $status, $body ] = $saveImage( [ 'photo' => 'a [template /templates/page-intern] b' ] );
+check( 'a save that sets an image field to a name of its own is refused with the field and its code', $status === 400 && ( $body['field'] ?? null ) === 'photo' && ( $body['code'] ?? null ) === 'elements_image_upload' );
+check( '...and writes nothing, not even the other fields of the save', ( \Nino\Elements::getElement( $appData, '/imagesave/item1', '*' )['photo'] ?? null ) === $saveFile );
+[ $status ] = $saveImage( [ 'photo' => 'template/page-home/hero/background.svg', 'label' => 'changed' ] );
+check( 'a name of a file of another place is refused as well, and the field next to it is not written', $status === 400 && ( \Nino\Elements::getElement( $appData, '/imagesave/item1', '*' )['label'] ?? null ) === 'x' );
+[ $status ] = $saveImage( [ 'photo' => $savedUpload['filename'] ], [ 'uri' => 'item2' ] );
+check( 'the name of the picture of another element is refused', $status === 400 && ( \Nino\Elements::getElement( $appData, '/imagesave/item2', '*' )['photo'] ?? '' ) === '' );
+[ $status ] = $saveImage( [ 'photo' => [ 'x' ] ] );
+check( 'a value that is no string is refused too', $status === 400 );
+[ $status ] = $saveImage( [ 'photo' => $saveFile, 'label' => 'kept' ] );
+check( 'the name the element holds is accepted, as a form that sends the whole element sends it', $status === 200 && ( \Nino\Elements::getElement( $appData, '/imagesave/item1', '*' )['photo'] ?? null ) === $saveFile
+	&& ( \Nino\Elements::getElement( $appData, '/imagesave/item1', '*' )['label'] ?? null ) === 'kept' );
+[ $status ] = $saveImage( [ 'photo' => '', 'label' => 'kept' ] );
+check( 'an empty value takes the picture out of the field and leaves the file to the removal of the picture', $status === 200 && ( \Nino\Elements::getElement( $appData, '/imagesave/item1', '*' )['photo'] ?? 'x' ) === ''
+	&& \Nino\Filesystem::fileExists( $appData, '/images/'. $saveFile ) === true );
+[ $status ] = $saveImage( [ 'photo' => $saveFile ] );
+check( 'a name the field no longer holds is refused', $status === 400 );
+
+[ $status, $body ] = $saveImage( [ 'photo' => 'elements/imagesave/new.40x40.jpg' ], [ 'uri' => 'item3', 'isNew' => true ] );
+check( 'a new element takes no image name either, and is not created', $status === 400 && ( $body['field'] ?? null ) === 'photo' && \Nino\Elements::getElement( $appData, '/imagesave/item3', '*' ) === false );
+[ $status ] = $saveImage( [ 'photo' => '', 'label' => 'new' ], [ 'uri' => 'item3', 'isNew' => true ] );
+check( 'a new element with the field empty is created', $status === 200 && ( \Nino\Elements::getElement( $appData, '/imagesave/item3', '*' )['label'] ?? null ) === 'new' );
+
+// A field per language holds one name per language: what another language holds is no value of this one
+[ , $localUpload ] = callUploadImage( $appData, [ 'type' => 'imagesave', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'local' ] );
+[ $status ] = $saveImage( [ 'local' => $localUpload['filename'] ], [ 'locale' => 'en_US' ] );
+check( 'the name a field holds in one language is refused for another language', $status === 400 && ( \Nino\Elements::getElement( $appData, '/imagesave/item1', 'en_US' )['local'] ?? '' ) !== $localUpload['filename'] );
+[ $status ] = $saveImage( [ 'local' => $localUpload['filename'] ] );
+check( '...and accepted for the language that holds it', $status === 200 );
+
+// A name that only the language bucket of an element holds is held all the same, and so is one of another field of the element
+$localPath = \Nino\Filesystem::path( $appData, '/images/'. $localUpload['filename'] );
+\Nino\Elements::updateElement( $appData, '/imagesave/item1', [ 'local' => $localUpload['filename'] ], 'en_US' );
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'imagesave', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'local' ] );
+check( 'removing the picture of one language keeps the file another language still names', $status === 200 && ( \Nino\Elements::getElement( $appData, '/imagesave/item1', 'de_DE' )['local'] ?? 'x' ) === '' && is_file( $localPath ) === true );
+\Nino\Elements::insertElement( $appData, '/imagesave/item4', [ 'photo' => $localUpload['filename'] ], '*' );
+ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiDelete' ], [ 'type' => 'imagesave', 'uri' => 'item4' ] );
+check( 'deleting an element leaves a file the language bucket of another element names', is_file( $localPath ) === true );
+
+// A file is deleted only when it is one this type's uploads wrote and no element names it any more:
+// a name that is in an element by other means - written by hand, kept over a model that changed -
+// names whatever it likes
+\Nino\Elements::insertElementType( $appData, '/imagegone', [ 'photo' => [ 'type' => 'image', 'width' => 40, 'height' => 40 ] ] );
+$kept = [
+	'outside'	=> 'template/page-home/hero/background.svg',
+	'other'		=> 'elements/imageremove/neighbour.40x40.jpg',
+	'climbing'	=> 'elements/imagegone/../../outside.40x40.jpg',
+];
+foreach( [ 'template/page-home/hero/background.svg', 'elements/imageremove/neighbour.40x40.jpg', 'outside.40x40.jpg' ] as $file )
+	\Nino\Filesystem::putFileContent( $appData, '/images/'. $file, 'a picture of somebody else' );
+
+foreach( $kept as $name => $file ) {
+
+	\Nino\Elements::insertElement( $appData, '/imagegone/'. $name, [ 'photo' => $file ], 'de_DE' );
+	$target = \Nino\Filesystem::path( $appData, '/images/'. ( $name === 'climbing' ? 'outside.40x40.jpg' : $file ) );
+
+	[ $status ] = callUploadImage( $appData, [ 'type' => 'imagegone', 'uri' => $name, 'locale' => 'de_DE', 'key' => 'photo' ] );
+	check( 'replacing a picture by upload leaves the file of a name that is not this type\'s own ('. $name. ')', $status === 200 && is_file( $target ) === true && ( \Nino\Elements::getElement( $appData, '/imagegone/'. $name, '*' )['photo'] ?? '' ) !== $file );
+
+	\Nino\Elements::updateElement( $appData, '/imagegone/'. $name, [ 'photo' => $file ], 'de_DE' );
+	[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiDelete' ], [ 'type' => 'imagegone', 'uri' => $name ] );
+	check( 'deleting the element leaves the file of a name that is not this type\'s own ('. $name. ')', $status === 200 && is_file( $target ) === true && \Nino\Elements::getElement( $appData, '/imagegone/'. $name, '*' ) === false );
+}
+
+check( 'the folder of the type is no file of it', \Nino\Modules\Elements\Admin::removable( $appData, 'imagegone', 'elements/imagegone/' ) === false );
+check( 'a name that climbs out of the type\'s folder is no file of it', \Nino\Modules\Elements\Admin::removable( $appData, 'imagegone', 'elements/imagegone/../outside.40x40.jpg' ) === false );
+
+// ...and the file this type's upload wrote goes with the picture, unless another element names it
+\Nino\Elements::insertElement( $appData, '/imagegone/first', [], 'de_DE' );
+[ , $ownUpload ] = callUploadImage( $appData, [ 'type' => 'imagegone', 'uri' => 'first', 'locale' => 'de_DE', 'key' => 'photo' ] );
+$ownPath = \Nino\Filesystem::path( $appData, '/images/'. $ownUpload['filename'] );
+\Nino\Elements::insertElement( $appData, '/imagegone/second', [ 'photo' => $ownUpload['filename'] ], 'de_DE' );
+ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiDelete' ], [ 'type' => 'imagegone', 'uri' => 'first' ] );
+check( 'a picture two elements name stays when one of them is deleted', is_file( $ownPath ) === true );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiDelete' ], [ 'type' => 'imagegone', 'uri' => 'second' ] );
+check( '...and goes with the last element that names it', $status === 200 && is_file( $ownPath ) === false );
+
+\Nino\Elements::insertElement( $appData, '/imagegone/third', [], 'de_DE' );
+[ , $thirdUpload ] = callUploadImage( $appData, [ 'type' => 'imagegone', 'uri' => 'third', 'locale' => 'de_DE', 'key' => 'photo' ], true );
+$thirdPath = \Nino\Filesystem::path( $appData, '/images/'. $thirdUpload['filename'] );
+\Nino\Elements::insertElement( $appData, '/imagegone/fourth', [ 'photo' => $thirdUpload['filename'] ], 'de_DE' );
+callUploadImage( $appData, [ 'type' => 'imagegone', 'uri' => 'third', 'locale' => 'de_DE', 'key' => 'photo' ], false );
+check( 'a replaced picture that another element names is not deleted by the replacement', is_file( $thirdPath ) === true );
+
 echo "\n";
 
 

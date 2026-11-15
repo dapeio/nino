@@ -452,7 +452,7 @@ namespace Nino\Modules\Elements {
 				return;
 			}
 
-			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
+			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename && self::removable( $appData, $type, $oldFilename ) === true )
 				\Nino\Images::delete( $appData, $oldFilename );
 
 			$body = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ];
@@ -547,7 +547,7 @@ namespace Nino\Modules\Elements {
 
 			$owned = preg_match( '#^'. preg_quote( $basePath, '#' ). '\.(?:fit)?\d+x\d+\.[a-z0-9]+$#', $old ) === 1;
 
-			if( $owned === true && in_array( $old, self::imageFilenames( $appData, $type, $elementUri ), true ) === false )
+			if( $owned === true && self::removable( $appData, $type, $old ) === true )
 				\Nino\Images::delete( $appData, $old );
 
 			\Nino\Http::ok( $request, [ 'filename' => null ] );
@@ -722,6 +722,17 @@ namespace Nino\Modules\Elements {
 			// field: 'blocks' keeps paragraphs and lists too, and a 'breaks' field is
 			// plain text whose newlines are kept as they are
 			$model = self::typeData( $appData, $type )['model'] ?? [];
+
+			// An image field gets its value from the upload alone (apiUploadImage()),
+			// which writes a name of its own making. A save may leave what the element
+			// holds as it is or empty the field - nothing else, since the name is shown
+			// on public pages and is the file that is deleted with the picture
+			foreach( $fields as $key => $value )
+				if( ( $model[$key]['type'] ?? '' ) === 'image' && $value !== '' && $value !== self::_storedImage( $appData, '/'. $type. '/'. $uri, $model[$key], (string) $key, $locale ) ) {
+					\Nino\Http::fail( $request, 400, 'an image is set by uploading it: '. $key, 'elements_image_upload', [ (string) $key ], (string) $key );
+					return;
+				}
+
 			foreach( $fields as $key => $value )
 				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
 					$fields[$key] = \Nino\Html::sanitizeHtml( $value, \Nino\Html::fieldFormat( $model[$key] ) );
@@ -853,7 +864,8 @@ namespace Nino\Modules\Elements {
 			// value is just a filename reference, deleting the element wouldn't
 			// otherwise touch the file it points to at all
 			foreach( $imageFilenames as $filename )
-				\Nino\Images::delete( $appData, $filename );
+				if( self::removable( $appData, $type, $filename ) === true )
+					\Nino\Images::delete( $appData, $filename );
 
 			\Nino\Http::ok( $request );
 		}
@@ -890,6 +902,89 @@ namespace Nino\Modules\Elements {
 			}
 
 			return array_keys( $filenames );
+		}
+
+		/**
+		 *	What an element holds in one image field, for the scope the field is
+		 *	written in: its language for a field per language, the whole element
+		 *	otherwise - the same place apiUploadImage() reads the file it replaces
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$elementUri		Full element uri (eg. "/portfolio/item1")
+		 *	@param		array			$field				The field's model entry
+		 *	@param		string		$key					The field's key
+		 *	@param		string		$locale				The language the save is for
+		 *
+		 *	@return 	string										The filename, '' where the field holds none
+		 */
+		private static function _storedImage( array &$appData, string $elementUri, array $field, string $key, string $locale ): string {
+
+			$element = \Nino\Elements::getElement( $appData, $elementUri, ( $field['locale'] ?? false ) === true ? $locale : '*' );
+			$stored	 = is_array( $element ) === true ? ( $element[$key] ?? '' ) : '';
+
+			return is_string( $stored ) === true ? $stored : '';
+		}
+
+		/**
+		 *	Whether a file below /images may be deleted for an element of a type:
+		 *	it lies in the place this type's uploads write to (elements/<type>/,
+		 *	see apiUploadImage()), climbs out of nowhere, and no element of any
+		 *	type names it in an image field any more. A value that was written by
+		 *	hand, or by a type's model that changed, names whatever it likes; the
+		 *	file it names is not for this panel to remove unless the type made it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					Element type (eg. "services")
+		 *	@param		string		$filename			A filename below /images/
+		 *
+		 *	@return 	bool
+		 */
+		public static function removable( array &$appData, string $type, string $filename ): bool {
+
+			$prefix = 'elements/'. $type. '/';
+
+			if( str_starts_with( $filename, $prefix ) === false || strlen( $filename ) === strlen( $prefix ) || str_contains( $filename, '..' ) === true )
+				return false;
+
+			foreach( self::types( $appData ) as $other )
+				if( in_array( $filename, self::_namedImages( $appData, $other ), true ) === true )
+					return false;
+
+			return true;
+		}
+
+		/**
+		 *	Every filename the image fields of one type hold, in every language and
+		 *	for every element, read from the type's file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					Element type
+		 *
+		 *	@return 	array										Distinct, non-empty filenames
+		 */
+		private static function _namedImages( array &$appData, string $type ): array {
+
+			$typeData	= self::typeData( $appData, $type );
+			$keys			= [];
+
+			foreach( is_array( $typeData['model'] ?? null ) === true ? $typeData['model'] : [] as $key => $field )
+				if( is_array( $field ) === true && ( $field['type'] ?? '' ) === 'image' )
+					$keys[] = $key;
+
+			$named = [];
+
+			foreach( $keys === [] ? [] : $typeData as $bucket => $elements ) {
+
+				if( $bucket === 'model' || is_array( $elements ) === false )
+					continue;
+
+				foreach( $elements as $values )
+					foreach( is_array( $values ) === true ? $keys : [] as $key )
+						if( is_string( $values[$key] ?? null ) === true && $values[$key] !== '' )
+							$named[$values[$key]] = true;
+			}
+
+			return array_map( 'strval', array_keys( $named ) );
 		}
 
 		/**

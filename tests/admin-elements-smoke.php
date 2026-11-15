@@ -398,6 +398,21 @@ check( 'the type is gone from the list too', in_array( 'deletable', \Nino\Module
 
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiDelete' ], [ 'uri' => 'deletable', 'confirm' => 'deletable' ] );
 check( 'deleting it a second time is a plain 404, not a crash', $status === 404 );
+
+// The files that go with a deleted type are the ones its uploads wrote and no element of any type names
+// any more: a name an element holds by other means is not a file of the type
+ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'deletefar', 'title' => 'Deletefar', 'model' => [ 'photo' => [ 'type' => 'image' ] ] ] );
+ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'keepsit', 'title' => 'Keepsit', 'model' => [ 'photo' => [ 'type' => 'image' ] ] ] );
+$farFiles = [ 'own' => 'elements/deletefar/own.jpg', 'foreign' => 'foreignpic.png', 'shared' => 'elements/deletefar/shared.jpg' ];
+foreach( $farFiles as $farName => $farFile ) {
+	\Nino\Filesystem::putFileContent( $appData, '/images/'. $farFile, 'bytes' );
+	\Nino\Elements::insertElement( $appData, '/deletefar/'. $farName, [ 'photo' => $farFile ], '*' );
+}
+\Nino\Elements::insertElement( $appData, '/keepsit/one', [ 'photo' => $farFiles['shared'] ], '*' );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiDelete' ], [ 'uri' => 'deletefar', 'confirm' => 'deletefar' ] );
+check( 'a type is deleted with the files its uploads wrote', $status === 200 && \Nino\Filesystem::fileExists( $appData, '/images/'. $farFiles['own'] ) === false );
+check( '...and not with a file that is not in its place', \Nino\Filesystem::fileExists( $appData, '/images/'. $farFiles['foreign'] ) === true );
+check( '...nor with one an element of another type names', \Nino\Filesystem::fileExists( $appData, '/images/'. $farFiles['shared'] ) === true );
 pinTypeDeleteIsRemembered( $appData );
 
 echo "\n";

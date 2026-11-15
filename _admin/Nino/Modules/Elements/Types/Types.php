@@ -1048,7 +1048,8 @@ namespace Nino\Modules\Elements {
 			unset( $appData['./nino/elements/cache'] );
 
 			foreach( array_keys( $filenames ) as $filename )
-				\Nino\Images::delete( $appData, $filename );
+				if( Admin::removable( $appData, $typeUri, (string) $filename ) === true )
+					\Nino\Images::delete( $appData, (string) $filename );
 
 			// A type that was deleted is on the list of what was removed
 			// (\Nino\Elements::REMOVED), with no element named: whoever puts a type
