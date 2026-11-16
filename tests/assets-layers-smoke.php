@@ -280,6 +280,16 @@ check( 'a bundle that is minified keeps the layers: the declaration is the first
 	$top !== null && preg_replace( '/\s+/', '', $top[0]['head'] ) === '@layernino.reset,nino.components,nino.theme,project' && $stands( $top, '.theme-min' ) === [ '@layer nino.theme' ] && $stands( $top, '.project-min' ) === [ '@layer project' ]
 	&& array_slice( array_column( $top, 'head' ), 1 ) === [ '@layer nino.reset', '@layer nino.theme', '@layer project' ] );
 
+// what a part calculates with survives the minifier: a zero keeps its unit, and the value of a token is not folded
+$calc = layersBundle( $appData, '/.cache/site.min.css', [
+	'/_nino/Nino.css'	=> $nino,
+	'/assets/style.css'	=> ":root { --min-gap: 0px; --min-pair: 0 0; --min-half: 0.5rem; }\n.min-calc { gap: calc( var(--min-gap) * var(--min-f, 1) ); width: calc( 100% - 0px ); margin: 0 0 0 0; padding: 0 0; inset: 0px auto auto 0px; }\n",
+] );
+check( 'a minified bundle keeps the unit of a zero and the value of a token as it was written, and still folds the zeros of a property',
+	str_contains( $calc, '--min-gap:0px' ) === true && str_contains( $calc, '--min-pair:0 0' ) === true && str_contains( $calc, '--min-half:.5rem' ) === true
+	&& str_contains( $calc, 'gap:calc(var(--min-gap) * var(--min-f,1))' ) === true && str_contains( $calc, 'width:calc(100% - 0px)' ) === true
+	&& str_contains( $calc, 'margin:0;' ) === true && str_contains( $calc, 'padding:0;' ) === true && str_contains( $calc, 'inset:0px auto auto 0px' ) === true );
+
 // --- A bundle that was built before the layers --------------------------------------
 
 echo "The cache - a bundle of the time before the layers is built again\n";

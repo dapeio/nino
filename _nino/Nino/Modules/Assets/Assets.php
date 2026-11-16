@@ -42,8 +42,10 @@ namespace Nino\Modules {
 					[
 						'#("(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\')|\/\*(?!\!)(?>.*?\*\/)|^\s*|\s*$#s',
 						'#("(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\'|\/\*(?>.*?\*\/))|\s*+;\s*+(})\s*+|\s*+([*$~^|]?+=|[{};,>~]|\s(?![0-9\.])|!important\b)\s*+|([[(:])\s++|\s++([])])|\s++(:)\s*+(?!(?>[^{}"\']++|"(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\')*+{)|^\s++|\s++\z|(\s)\s+#si',
-						'#(?<=[\s:])(0)(cm|em|ex|in|mm|pc|pt|px|vh|vw|%)#si',
-						'#:(0\s+0|0\s+0\s+0\s+0)(?=[;\}]|\!important)#i',
+						// A zero keeps its unit: in calc() a length and a number do not add up, and a token that holds 0px is
+						// read by a calc() somewhere else. Zeros are folded into one for a property, never for a token (--name),
+						// whose value is whatever its reader makes of it
+						'#(?<=[\{;])([a-z][a-z-]*):(0\s+0|0\s+0\s+0\s+0)(?=[;\}]|\!important)#i',
 						'#(background-position):0(?=[;\}])#si',
 						'#(?<=[\s:,\-])0+\.(\d+)#s',
 						'#(\/\*(?>.*?\*\/))|(?<!content\:)([\'"])([a-z_][a-z0-9\-_]*?)\2(?=[\s\{\}\];,])#si',
@@ -54,8 +56,7 @@ namespace Nino\Modules {
 					], [
 						'$1',
 						'$1$2$3$4$5$6$7',
-						'$1',
-						':0',
+						'$1:0',
 						'$1:0 0',
 						'.$1',
 						'$1$3',
