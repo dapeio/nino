@@ -855,23 +855,32 @@ foreach( $lines as [ $label, $bytes, $peak, $ms ] )
 check( 'under a memory limit of 128 MB the 16 worst documents below the limits of marks, words and notes are read and written, each with a peak of less than 100 MB counted for itself',
 	$status === 0 && $error === '' && count( $lines ) === 16 && array_filter( $lines, static fn( array $line ): bool => (int) $line[2] >= 100 ) === [] );
 
+// A time is a measurement on a machine that does other things as well: the least of five rounds, and where the growth still
+// looks worse than linear the whole measurement is taken anew, three times at most - a reader that is quadratic fails each one
 $ratios = [];
-foreach( [ '[a]' => [], '[box]' => [ 'box' => true ], '[/a]' => [] ] as $mark => $list ) {
+for( $attempt = 0; $attempt < 3; $attempt++ ) {
 
-	$times = [];
-	foreach( [ 12500, 25000, 50000 ] as $count ) {
-		$source = str_repeat( $mark, $count );
-		$best = INF;
-		for( $round = 0; $round < 3; $round++ ) {
-			$notes = [];
-			[ , $ms ] = $timed( static function() use ( $source, $list, &$notes ): array { return \Nino\Markup::parse( $source, $list, $notes ); } );
-			$best = min( $best, $ms );
+	$ratios = [];
+	foreach( [ '[a]' => [], '[box]' => [ 'box' => true ], '[/a]' => [] ] as $mark => $list ) {
+
+		$times = [];
+		foreach( [ 12500, 25000, 50000 ] as $count ) {
+			$source = str_repeat( $mark, $count );
+			$best = INF;
+			for( $round = 0; $round < 5; $round++ ) {
+				$notes = [];
+				[ , $ms ] = $timed( static function() use ( $source, $list, &$notes ): array { return \Nino\Markup::parse( $source, $list, $notes ); } );
+				$best = min( $best, $ms );
+			}
+			$times[$count] = $best;
 		}
-		$times[$count] = $best;
+
+		$ratios[$mark] = $times[50000] / $times[12500];
+		printf( "  %-6s 12500: %6.1f ms   25000: %6.1f ms (x%.2f)   50000: %6.1f ms (x%.2f)\n", $mark, $times[12500], $times[25000], $times[25000] / $times[12500], $times[50000], $times[50000] / $times[25000] );
 	}
 
-	$ratios[$mark] = $times[50000] / $times[12500];
-	printf( "  %-6s 12500: %6.1f ms   25000: %6.1f ms (x%.2f)   50000: %6.1f ms (x%.2f)\n", $mark, $times[12500], $times[25000], $times[25000] / $times[12500], $times[50000], $times[50000] / $times[25000] );
+	if( max( $ratios ) < 8 )
+		break;
 }
 check( 'the time grows with the number of marks and not faster: four times the marks, less than eight times the time (linear is four)', max( $ratios ) < 8 );
 
