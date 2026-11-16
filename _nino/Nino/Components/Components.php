@@ -413,13 +413,25 @@ namespace Nino {
 					return $where. '"ladder" is a list of '. self::STEPS. ' steps';
 
 				foreach( $ladder as $step )
-					if( is_string( $step ) === false || preg_match( self::STEP, $step ) !== 1 || str_contains( $step, '/*' ) === true || str_contains( $step, '*/' ) === true || preg_match( '/url\s*\(/i', $step ) === 1 )
+					if( self::validStep( $step ) === false )
 						return $where. 'a step of the ladder is a value of css of at most 120 characters, with no quote, semicolon, brace, comment or url()';
 
 				$clean[$key] = [ 'token' => $knob['token'], 'label' => $words, 'ladder' => $ladder ];
 			}
 
 			return [ 'label' => $label, 'knobs' => $clean ];
+		}
+
+		/**
+		 *	Whether a text is a step of a ladder: a value of css the compiler of a theme may write as it is - at most 120
+		 *	characters of letters, digits, spaces and . , % ( ) + * / # -, no quote, semicolon, brace, comment or url()
+		 *
+		 *	@param		mixed			$step					What a ladder holds at a place
+		 *
+		 *	@return 	bool
+		 */
+		public static function validStep( mixed $step ): bool {
+			return is_string( $step ) === true && preg_match( self::STEP, $step ) === 1 && str_contains( $step, '/*' ) === false && str_contains( $step, '*/' ) === false && preg_match( '/url\s*\(/i', $step ) !== 1;
 		}
 
 		/**
@@ -2297,8 +2309,9 @@ namespace Nino {
 
 		/**
 		 *	The variants of a component and the standard: what the schema names, and what the callbacks of
-		 *	'/nino/components/variants' make of [ 'name' => ..., 'variants' => [...], 'standard' => 'regular' ].
-		 *	An answer that is not that shape - a list of words that holds regular, a standard of them - is a notice
+		 *	'/nino/components/variants' add to it, of [ 'name' => ..., 'variants' => [...], 'standard' => 'regular' ]: the list is
+		 *	the schema's and then the callback's words, the standard one of them.
+		 *	An answer that is not that shape - a list of words, a standard of the united list - is a notice
 		 *	(E_USER_NOTICE, once for the name in a request), and the schema stands. Asked once for a name in a drawing
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -2318,12 +2331,18 @@ namespace Nino {
 
 			$list = $answer['variants'] ?? null;
 			$standard = $answer['standard'] ?? null;
-			$right = is_array( $list ) === true && array_is_list( $list ) === true && in_array( 'regular', $list, true ) === true && is_string( $standard ) === true
-				&& in_array( $standard, $list, true ) === true && count( array_unique( $list ) ) === count( $list );
+			$right = is_array( $list ) === true && array_is_list( $list ) === true && is_string( $standard ) === true;
 
 			if( $right === true )
 				foreach( $list as $word )
 					$right = $right && is_string( $word ) === true && strlen( $word ) <= self::NAME_LENGTH && preg_match( self::WORD, $word ) === 1;
+
+			// What the schema names stays, first: a callback adds variants and chooses the standard, it takes none away
+			if( $right === true ) {
+
+				$list = array_values( array_unique( array_merge( $schema['variants'], $list ) ) );
+				$right = in_array( $standard, $list, true ) === true;
+			}
 
 			if( $right === false ) {
 

@@ -971,6 +971,16 @@ for( $i = 1; $i <= 7; $i++ )
 
 check( 'a component has six knobs at most, and a seventh is refused with the number - the sixth is not', is_string( $group( [ 'label' => 'T', 'knobs' => $knobs ] ) ) === true && str_contains( (string) $group( [ 'label' => 'T', 'knobs' => $knobs ] ), '6 knobs at most' ) === true
 	&& is_array( $group( [ 'label' => 'T', 'knobs' => array_slice( $knobs, 0, 6 ) ] ) ) === true && is_array( $group( [ 'label' => 'T', 'knobs' => array_slice( $knobs, 0, 6 ) + registerKnob( 'other.space' ) ], [ 'tidy', 'other' ] ) ) === true );
+check( 'validStep() is the check of a step of a ladder: a value of css as it is - a calc() with tokens, a colour - and nothing with a quote, brace, semicolon, comment, url(), a number, a null byte or more than 120 characters',
+	\Nino\Components::validStep( 'calc( var(--page-space-2) * 1.5 )' ) === true && \Nino\Components::validStep( 'rgb(0 0 0 / 50%)' ) === true && \Nino\Components::validStep( '#fff' ) === true
+	&& array_filter( [ '', '}', '"x"', 'a;b', '1px/* x', '1px */', 'URL (//evil.example/x)', 'url(x)', 5, null, [ '1px' ], "1px\0", str_repeat( '1', 121 ) ], static fn( mixed $step ): bool => \Nino\Components::validStep( $step ) === true ) === []
+	&& \Nino\Components::validStep( str_repeat( '1', 120 ) ) === true );
+
+$extra = $group( [ 'label' => 'Tidy', 'knobs' => registerKnob( 'tidy.x-glow' ) ] );
+check( 'an additional knob is --<component>-x-<name>: the key tidy.x-glow with that token is taken, and a part reads and sets it as it does a core one; another token for the key is refused',
+	is_array( $extra ) === true && $extra['knobs']['tidy.x-glow']['token'] === '--tidy-x-glow'
+	&& \Nino\Components::partProblems( '.tidy { --tidy-x-glow: 1px; box-shadow: 0 0 var( --tidy-x-glow ) var( --brand-accent ); }', [ 'tidy' ] ) === []
+	&& is_string( $group( [ 'label' => 'Tidy', 'knobs' => registerKnob( 'tidy.x-glow', [ 'token' => '--tidy-glow' ] ) ] ) ) === true );
 check( 'a group is named by a slug', is_string( \Nino\Components::validateGroup( '../tidy', [ 'label' => 'T' ], [] ) ) === true && is_string( \Nino\Components::validateGroup( 'Tidy', [ 'label' => 'T' ], [] ) ) === true
 	&& is_string( \Nino\Components::validateGroup( str_repeat( 'a', 41 ), [ 'label' => 'T' ], [] ) ) === true );
 

@@ -489,9 +489,14 @@ $said = $logged( static function() use ( $draw, &$out ): void {
 check( 'F2: an answer that is no list of words with regular and a standard in it leaves the schema, and says so: a bad word, a standard that is not there, a list that is none',
 	$out === '<p class="text">a</p><article class="card card--variant-poster"><div class="card-text">b</div></article><a class="button button--variant-primary" href="">c</a>' && count( $said ) === 3 );
 $out = $draw( '[card-title text="t" variant="soft"][/card-title]' );
-check( 'F2: ...and one that has no regular is none', $out === '<h3 class="card-title">t</h3>' );
+check( 'F2: ...an answer that names fewer than the schema does adds to the schema and takes nothing from it: a list with no regular is a list', $out === '<h3 class="card-title card-title--variant-soft">t</h3>' );
 $out = $draw( '[section-subtitle text="s" variant="x"][section-row variant="a"][/section-row]' );
-check( 'F2: ...and a map of words and a list with a word twice are no lists of words', $out === '<p class="section-subtitle">s</p><div class="section-row"></div>' );
+check( 'F2: ...and a map of words is no list of words, while a word named twice is one variant', $out === '<p class="section-subtitle">s</p><div class="section-row section-row--variant-a"></div>' );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Components::VARIANTS, static function( array &$appData, mixed &$args ): ?array {
+	return $args['name'] === 'section-wrap' ? [ 'name' => 'section-wrap', 'variants' => [ 'regular' ], 'standard' => 'regular' ] : null;
+} );
+$out = $draw( '[section-wrap variant="band"][/section-wrap]' );
+check( 'F2/V4: the variants of the schema are in the list whatever a callback answers - one that names only regular leaves band a variant', $out === '<section class="section-wrap section-wrap--variant-band"></section>' );
 unset( $appData['./nino/callbacks'][\Nino\Components::VARIANTS] );
 $out = $draw( '[card variant="poster"][/card]' );
 check( 'F2/V3: no callback, no variant of it - the call keeps what it wrote in the document, and it is drawn without it', $out === '<article class="card"></article>' );
