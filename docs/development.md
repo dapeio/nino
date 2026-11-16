@@ -544,7 +544,7 @@ With `features/Meetups/templates/banner.tpl` holding `<div class="banner">[[/pro
 | `template` | the name of the template whose words `~name` reads - `/template/<template>/<scope>/<name>`. `[template]` sets it to the category of the file it draws (`page-home` for `/templates/page-home`, `''` for a file that has none, see `\Nino\Modules\Template::category()`); a page that stands in no template has `''`, and `~name` then draws nothing and says so once |
 | `scope` | the value of the nearest attribute of the type `id` above the call (`id="hero"`), `''` where there is none |
 | `place` | `page` at the top of a document, else the name of the component the call stands in |
-| `element` | the element of a loop, `[ 'uri' => ..., 'id' => ..., 'element' => ..., 'model' => ... ]` as `\Nino\Modules\Components::element()` answers it - what a `.field` source reads - or `null`. `[elements]` and the stacks hand the fields of their element on as `fills` and set none |
+| `element` | the element of a loop, `[ 'uri' => ..., 'id' => ..., 'element' => ..., 'model' => ... ]` as `\Nino\Modules\Components::element()` answers it - what a `.field` source reads - or `null`. `[element]` and each round of `[elements]` set it - the type and the number of the round, or the uri of the element and `0` - beside the fields as `fills`, so that `[section-title .title]` reads the title of the element; a stack hands its fields on as `fills` and sets none, nor does `[elementvalues]` |
 | `fills` | `[ '[[token]]' => text ]` for the tokens of the loops the call stands in, the innermost winning: a textfill with no slash reads them first, and the call of a shortcode has them put into its arguments |
 | `depth` | how deep the nodes stand; a tree deeper than `\Nino\Markup::MAX_DEPTH` draws nothing |
 
@@ -622,8 +622,9 @@ A component is registered in the `init()` of a module or a feature, where the sh
 | `in` | The places it may stand in, a list of distinct slugs. `page` and `flow` are the kernel's. Without it the component is offered nowhere |
 | `offers` | The places it offers to what it holds. Its presence, even as `[]`, makes it a container; its own name is always one of them |
 | `once` | `true`: once in a container. The register stores it, and whoever lets a person place components enforces it |
+| `children` | `'nodes'`: the register does not draw what the component holds. Its renderer is handed the nodes and draws them itself, as often as it likes - the component of a loop. It is the only value there is, and a component that has it needs a renderer (see [The renderer](#the-renderer)) |
 | `source` | What its first word is: `text`, `image`, `link` or `none` (the default) |
-| `format` | For a `text`: `plain` (the default), `inline`, `lines` or `blocks` |
+| `format` | For a `text`: `plain` (the default), `inline`, `lines` or `blocks`. A component that has an attribute named `format` says it for each call, and the default of that attribute is the format of the schema (see below) |
 | `attributes` | `name => schema` of the attributes, below |
 | `variants` | The words of its one open axis, a list. `regular` is always there, first |
 | `template` | The markup, a string of at most 65 536 bytes. A string that is no more than the name of a `.tpl` file is a file name, which `validate()` reads in the directory of a feature where it is given one and `addComponent()` is not: there it is refused |
@@ -635,7 +636,7 @@ A name is a slug of at most 40 characters - lower case letters, digits and hyphe
 
 | Key | Holds |
 | --- | --- |
-| `type` | `choice`, `bool`, `int`, `string`, `image`, `link` or `id` |
+| `type` | `choice`, `bool`, `int`, `string`, `text`, `image`, `link` or `id` |
 | `default` | Required: a value of the type. A choice's is one of its options, an int's lies within its bounds, a bool's is `true` or `false`, and an id's is empty or a word |
 | `options` | For a choice: a list of strings or integers without a repeat - or `'\Namespace\Class::method'`, a public static method that answers `value => label` and is asked once for each component and attribute in a request |
 | `min`, `max` | For an int, integers, `min` not above `max` |
@@ -649,9 +650,10 @@ How a call's value becomes what the renderer is handed - always a string:
 - **bool**: a bare word, or one of `1 true yes on` - in any case - is on, `0 false no off` is off, any other word is the default. The renderer gets `'1'` or `'0'`; on, it is the class `callout--sticky`.
 - **int**: `-?` and up to nine digits, kept within `min` and `max`, else the default.
 - **string**: the value, escaped, with the fills of the site in it put in; the default where the call says none.
+- **text**: a second text of a call, a caption or an alternative text. What is written is a reference - `~name`, a key with a slash in front, `.field`, read as the first word of a call is, in the section of the call and with the format `plain` - or the text itself, with the fills of the site in it put in, escaped once. It is a reference where it is one word: a `~` or a `/` with a space in it, a `.` that is no field name and a bracket in it make a text, so that `~ about 5` and `.NET rocks` are what they say. A key nobody has a text for is nothing. The default is written the same way, so `'default' => '~alt'` is the key `alt` of the section. What it holds is never read: a call, a fill or a placeholder in the text of a key or in the value is the text it is.
 - **image**: the reference as it is written, escaped. The renderer looks the picture up and never writes it as a file name.
 - **link**: an address, below.
-- **id**: a slug of at most 64 characters (`[a-z][a-z0-9-]*`), else nothing. It is the `[[id]]` of the template, written ` id="top"`, and the **scope** of its children: the `scope` of their context, which `~name` reads. A component has one attribute of this type at most, and an attribute named `id` has to be of it.
+- **id**: a slug of at most 64 characters (`[a-z][a-z0-9-]*`), else nothing. It is the `[[id]]` of the template, written ` id="top"`, and the **scope** of its children: the `scope` of their context, which `~name` reads. It is the scope of the call's own words as well: `[section-wrap id="hero" image="~background"]` reads `/template/<template>/hero/background`, and `[section-title ~title id="hero"]` the title of the hero, whatever the section round the call is - an id that is none leaves the one round it. The id of the default counts where the call says none. A component has one attribute of this type at most, and an attribute named `id` has to be of it.
 
 **Places.** A place is a word. `page` is the page itself, the top of a document; `flow` is the flow of content; a component's own name is the place of what it holds, and `offers` adds the others. `\Nino\Components::allowed( $appData, $parent )` answers the components that may stand directly in a parent, in the order they were registered: those whose `in` names a place the parent offers. `''` and `'page'` are the page; a container offers its own name and the places it names; a leaf offers none; a name that is no component is a place that offers itself. For the two components above `allowed( $appData, '' )` is `[ 'callout' ]`, `allowed( $appData, 'callout' )` is `[ 'callout', 'tag' ]` and `allowed( $appData, 'tag' )` is `[]`. A tool asks it and the drawing does not: a component at a place that is not its own is drawn all the same.
 
@@ -678,7 +680,7 @@ A variant that the call names and the list does not hold is the standard, and so
 | Written | Is |
 | --- | --- |
 | `text="..."` | for a component whose `source` is `text`: a fixed text instead of the first word. The fills of the site in it are put in, `[[/key]]` as the text of the key |
-| `~name` | the key `/template/<template>/<scope>/<name>` of the context. Without a template or a scope there is no key: nothing is drawn and the log says so once |
+| `~name` | the key `/template/<template>/<scope>/<name>` of the context, the scope being the id of the call itself where it has one, else the nearest above. Without a template or a scope there is no key: nothing is drawn and the log says so once |
 | `/a/b/c/d` | a key, as it is written; a fill inside it is put in first |
 | `.field` | a field of the element of the context - `.id` the number in the loop, `.uri` its uri, `.slug` its name alone - and nothing where there is no element |
 | `page:/contact#form` | for a **link** - the text of a key, or the value of an attribute: the address of that page of the site in the language of the page, with the directory the project is served from in front and the anchor or query behind. Only a route that is a page of the website is one; otherwise the link is nothing |
@@ -698,7 +700,32 @@ The first word of a call is a key, `~name` or `.field`, because a source begins 
 | `[[attribute]]` | the value of each attribute that is no class |
 | `[[/a/b/c/d]]` | a fill of the site, with a slash in front: the text of the key as plain text, escaped, and nothing where the key has none |
 
-**The renderer.** A component that computes is handed `( array &$appData, array $args, string $content, array $context ): string`; with a renderer, the template is not drawn - the renderer may read it, `\Nino\Components::components( $appData )['name']['template']`, and fill it. `$args` holds `value` (as `[[value]]`), `source` (the first word as it is written, not escaped), `class`, `variant` and `lang` (as `[[lang]]`), then each attribute under its name as a string, the default where the call says none, an `id` as its slug. `$content` is what the children drew and `$context` the context of the call (see [Drawing a page](#drawing-a-page)). What it answers is finished and read by nobody. A scalar is written as a string, anything else is nothing. A renderer that throws a `\Exception` draws nothing, the page is finished, and the log has one line for the name in a request (`E_USER_WARNING`); an `\Error` is a bug of the renderer and goes on up.
+**The renderer.** A component that computes is handed `( array &$appData, array $args, string $content, array $context ): string`; with a renderer, the template is not drawn - the renderer has it filled, `\Nino\Components::fill()`, below. `$args` holds `value` (as `[[value]]`), `source` (the first word as it is written, not escaped), `class`, `variant` and `lang` (as `[[lang]]`), then each attribute under its name as a string, the default where the call says none, an `id` as its slug, and `content:<name>` for each `[[content:<name>]]` the template names: what the children of that name drew. `$content` is what the other children drew and `$context` the context of the call (see [Drawing a page](#drawing-a-page)). What it answers is finished and read by nobody. A scalar is written as a string, anything else is nothing. A renderer that throws a `\Exception` draws nothing, the page is finished, and the log has one line for the name in a request (`E_USER_WARNING`); an `\Error` is a bug of the renderer and goes on up.
+
+**`fill( $appData, $name, $args, $content, $tokens )`** answers the template of a component filled the way the register fills it - `[[class]]`, `[[value]]`, `[[content]]`, `[[content:name]]`, `[[id]]`, `[[lang]]`, `[[attribute]]` and the fills of the site the template names - with the tokens of the renderer's own added, in one pass. A renderer that has markup to leave out or to add - a link around a title only where there is an address, a `<figcaption>` only where there is a caption - makes that markup, escaped, and gives it as a token, so that the markup of the component stays in its template:
+
+```php
+public static function componentTitle( array &$appData, array $args, string $content, array $context ): string {
+
+	$open = $args['href'] === '' ? '' : '<a href="'. $args['href']. '">';
+
+	return \Nino\Components::fill( $appData, 'title', $args, $content, [ '[[open]]' => $open, '[[close]]' => $open === '' ? '' : '</a>' ] );
+}
+```
+
+With the template `<h2 class="[[class]]">[[open]][[value]][[close]]</h2>`, the call `[title text="Hi" href="/x"]` is `<h2 class="title"><a href="/x">Hi</a></h2>` and `[title text="Hi"]` is `<h2 class="title">Hi</h2>`. `$tokens` is `[ '[[token]]' => markup ]`; a token wins over a placeholder of the same name, and one whose value is no scalar is no token. What a token holds and what an argument holds is read by nobody - a token that spells `[[content]]` stays so - and the `$args` of the renderer may be changed before it asks; what is not there is nothing. A name nobody registered, and a component without a template, is `''`. The fills of the site are read when the template names one, so a fill the renderer added before is in it.
+
+**A component that draws what it holds.** With `'children' => 'nodes'` the register draws nothing of what the component holds: the renderer is handed `$content` as `''` and `$context` as the context its children are drawn in - the template, the scope its own id makes, its name as the place, one deeper, the element and the tokens of the call - with the nodes under `'children'`, an empty list for a call that holds nothing. It draws them with `\Nino\Components::render( $appData, $nodes, $context )`, once for each round of its own, and gives each round the context it needs, `'element'` and `'fills'` among them:
+
+```php
+foreach( $items as $index => $item ) {
+
+	$round = [ 'element' => $item, 'fills' => [ '[[n]]' => (string) $index ] ] + $context;
+	$html .= '<li>'. \Nino\Components::render( $appData, $nodes, $round ). '</li>';
+}
+```
+
+What the children are is not looked at before: a name nobody registered in them is not said, since nothing is drawn unless the renderer draws it. `addComponent()` refuses `'children' => 'nodes'` without a renderer.
 
 **When a call is not what the schema says.** The register never refuses a document; it draws what it can.
 
@@ -712,13 +739,16 @@ The first word of a call is a key, `~name` or `.field`, because a source begins 
 | a text that is missing in the language of the page | the text of another language, with its `lang`; where there is none the component draws nothing |
 | a call with no end, an end with no call | the open call is closed where the container round it or the document ends, a stray end is skipped; the page stays whole (the notes of [the notation](#html---the-notation)) |
 
+**What a source reads.** `\Nino\Components::sources( $appData, $source, $template )` answers what the calls of a source - html+, as a template file is written - read through the register, for a tool that looks for the keys a template uses or for the slots of its pictures, and draws nothing: no renderer runs, no key is looked up, and the log is not told. `$template` is the name `~name` reads under, as the context calls it (`page-home`). Of each call of a registered component, in the order they stand, it lists the first word where the source of the component is a text, an image or a link, and then each attribute of the type `text`, `image` or `link` - the default where the call says none - that names a key: `~name`, which the template and the id of the call itself, or else the nearest above it, make a key of, and a key with a slash in front. A link names a key only as `~name`: written with a slash it may be an address as well, which the drawing decides. Not listed are a fixed `text="..."`, a `.field`, a `~name` where there is no template or no id above, a name nobody registered, a fill that stands in the source (`[[/key]]`; whoever scans for fills finds it in the text), the template a `[template]` includes, and everything that holds a space, a bracket or a control character: a value is no call, and what a value holds reads nothing. An entry is `[ 'name' => 'figure', 'kind' => 'text', 'source' => '/template/page-home/hero/caption', 'written' => '~caption', 'attribute' => 'caption' ]`, the attribute for one that is an attribute. For `[hold anchor="hero" image="~background"][heading ~title][/hold]` it lists `/template/page-home/hero/background` as an image and `/template/page-home/hero/title` as a text, the same keys the drawing reads.
+
 **The rest of the API.** `components( $appData )` answers the clean schemas by name, in the order they were registered - an attribute whose options are a method carries the answer of the method as `options` and `optionLabels` - and `containers()` which names are containers (those that have `offers`), as `\Nino\Markup::parse()` is told them. `version( $appData )` is the sha1 of the schemas: what a tree kept in a file depends on. `escape()` escapes a value for html. `validate( $name, $schema )` answers the clean schema or what is wrong with it as a string; `addComponent()` makes an `E_USER_ERROR` of it - and of a component with neither a renderer nor a template - and registers nothing.
 
 **What is refused.** A schema is, with the reason in the message, when
 - the name is no slug, is longer than 40 characters, or is `page` or `flow`, or the schema is no array;
 - a key of the schema or of an attribute is none of those above - nothing unknown is left out;
 - `label` is empty or no text or map; `group`, `in`, `offers`, `variants` or the words in them are none, or a place is named twice; `once` is no bool;
-- `source` or `preview` is none of its words, `format` stands with a source that is no text or is none of its words;
+- `source` or `preview` is none of its words, `format` stands with a source that is no text or is none of its words, `children` is anything but `'nodes'`;
+- an attribute named `format` stands on a component whose source is no text, is no choice, has options that are a method or are none of `plain`, `inline`, `lines` and `blocks`, or has a default that is not the `format` of the schema where the schema names one - without it, the default is the format of the clean schema;
 - an attribute has no `default`, an unknown `type`, a name that is no lowerCamel identifier or that is reserved, a `choice` without options, with a repeated option, with a default outside them or with options that are no words where they are classes, an `int` with a bound that is no integer, `min` above `max` or a default outside them, a `bool` whose default is no bool, a `string`, `link` or `image` whose default is no string, an `id` whose default is no word or longer than 64 characters, a `class` that is no bool or is `true` on a type that makes no class, a `responsive` that is not on a choice that is a class, `options`, `min` or `max` on another type, or an `input` its type has not;
 - an attribute is named `id` and is not of the type `id`, or a second attribute is;
 - a `template` is no string, is longer than 65 536 bytes or has a null byte;

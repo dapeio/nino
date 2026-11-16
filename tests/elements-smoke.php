@@ -9,7 +9,8 @@ declare(strict_types=1);
  *											offset and limit of queryElements(), seed() and the 'elements' key
  *											of an install unit, the [element], [elements] and [elementvalues]
  *											shortcodes that draw them, an element that takes what it has no
- *											value for in a language from another, and the hook points of the accounts and
+ *											value for in a language from another, the element of a loop that a component
+ *											of the register reads with .field, and the hook points of the accounts and
  *											of the elements. Runs against an isolated sandbox directory, never
  *											touches the real project data.
  *
@@ -983,6 +984,43 @@ $feSeen = [];
 $feCut = \Nino\Html::renderHtml( $fe, '[elements /notes sort="rank" locale="en_US" callback="/test/notes/seen" offset="1" limit="2"]<i[[.lang]]>[[title]]</i>[/elements]' );
 check( 'a callback of the loop is handed what is drawn - the fallback, titles taken from another language among them - and offset and limit cut what it leaves',
 	$feSeen === [ 'One', 'Zwei', 'Trois', 'Vier', '0', 'Seven en' ] && $feCut === '<i lang="fr-FR">Trois</i><i lang="de-DE">Vier</i>' );
+
+// A component of the register reads the element of the round: [section-title .title] in a loop
+\Nino\Filesystem::putFileContent( $fe, '/elements/cards.php', [
+	'title'	=> 'Cards',
+	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ], 'summary' => [ 'type' => 'string', 'locale' => true ], 'rank' => [ 'type' => 'integer' ] ],
+	'*'			=> [ '*' => [], 'one' => [ 'rank' => 1 ], 'two' => [ 'rank' => 2 ], 'three' => [ 'rank' => 3 ] ],
+	'de_DE'	=> [ 'one' => [ 'title' => 'Fenster & Türen', 'summary' => 'Aus [Holz] gebaut' ], 'two' => [ 'title' => 'Möbel' ], 'three' => [ 'title' => 'Drei' ] ],
+	'en_US'	=> [ 'three' => [ 'title' => '"><script>alert(1)</script> [template /templates/x] [[content]] [Holz]', 'summary' => 'Three <b>x</b>' ] ],
+] );
+$feSeen = new \ArrayObject();
+\Nino\Components::addComponent( $fe, 'loop-card', [ 'label' => 'Card', 'in' => [ 'page' ], 'offers' => [], 'template' => '<article class="[[class]]">[[content]]</article>' ] );
+\Nino\Components::addComponent( $fe, 'loop-title', [ 'label' => 'Title', 'in' => [ 'loop-card' ], 'source' => 'text', 'attributes' => [ 'href' => [ 'type' => 'link', 'default' => '', 'class' => false ] ], 'template' => '<h3 class="[[class]]" data-href="[[href]]">[[value]]</h3>' ] );
+\Nino\Components::addComponent( $fe, 'loop-text', [ 'label' => 'Text', 'in' => [ 'loop-card' ], 'source' => 'text', 'template' => '<p>[[value]]</p>' ] );
+\Nino\Components::addComponent( $fe, 'loop-probe', [ 'label' => 'Probe', 'in' => [ 'loop-card' ] ], static function( array &$appData, array $args, string $content, array $context ) use ( $feSeen ): string {
+	$feSeen[] = $context['element'];
+	return '<probe>'. ( $args['value'] ?? '' ). '</probe>';
+} );
+
+ninoWarnings();
+$feCards = \Nino\Html::renderHtml( $fe, '[elements /cards sort="rank" locale="en_US"][loop-card][loop-title .title href=".slug"][loop-text .summary]<i>[[title]]</i>[/loop-card][/elements]' );
+$feCard = static fn( string $title, string $href, string $summary, string $token ): string => '<article class="loop-card"><h3 class="loop-title" data-href="'. $href. '">'. $title. '</h3>'. ( $summary === '' ? '' : '<p>'. $summary. '</p>' ). '<i>'. $token. '</i></article>';
+check( 'a component of the register in [elements] reads the fields of the element of the round with a source of the form .field: [section-title .title] is the title, the fallback of another language where the language has none, and an address from .slug',
+	str_starts_with( $feCards, $feCard( 'Fenster &amp; Türen', 'one', 'Aus [Holz] gebaut', 'Fenster &amp; Türen' ). $feCard( 'Möbel', 'two', '', 'Möbel' ) ) === true && ninoWarnings() === [] );
+check( '...what the field holds is a text and nothing else: a quote and a tag in it are escaped, and a call, a placeholder and a [ stay the text they are - the token [[title]] next to it is the field as it always was, with its [ written as an entity',
+	str_ends_with( $feCards, $feCard( '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; [template /templates/x] [[content]] [Holz]', 'three', 'Three &lt;b&gt;x&lt;/b&gt;', '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; &#91;template /templates/x] &#91;&#91;content]] &#91;Holz]' ) ) === true
+	&& str_contains( $feCards, '<script' ) === false );
+check( '[element] gives the element to the components of its content in the same way', \Nino\Html::renderHtml( $fe, '[element /cards/one locale="de_DE"][loop-title .title][loop-text .summary][/element]' ) === '<h3 class="loop-title" data-href="">Fenster &amp; Türen</h3><p>Aus [Holz] gebaut</p>' && ninoWarnings() === [] );
+check( '...the innermost loop gives its element, and the loop round it has its own again where the inner one is done: the elements of the inner loop are not the ones of the outer round',
+	\Nino\Html::renderHtml( $fe, '[elements /cards sort="rank" limit="1" locale="de_DE"][loop-title .title][elements /cards sort="rank" offset="1" limit="2" locale="de_DE"][loop-title .title][/elements][loop-title .title][/elements]' )
+	=== '<h3 class="loop-title" data-href="">Fenster &amp; Türen</h3><h3 class="loop-title" data-href="">Möbel</h3><h3 class="loop-title" data-href="">Drei</h3><h3 class="loop-title" data-href="">Fenster &amp; Türen</h3>' );
+check( 'the element does not outlive its loop, and a loop of the values of a field has none: .title there is nothing', \Nino\Html::renderHtml( $fe, '[elements /cards limit="1"][/elements][loop-title .title]' ) === ''
+	&& \Nino\Html::renderHtml( $fe, '[elementvalues /cards key="rank"][loop-title .title][/elementvalues]' ) === '' );
+$feSeen->exchangeArray( [] );
+\Nino\Html::renderHtml( $fe, '[elements /cards sort="rank" limit="2" locale="en_US"][loop-probe][/elements][element /cards/one locale="de_DE"][loop-probe][/element]' );
+check( 'the element of the context is the one the register reads, [ uri, id, element, model ]: the type and the number of the round for a loop, the uri of the element and 0 for [element]',
+	count( $feSeen ) === 3 && array_map( static fn( array $element ): array => [ $element['uri'], $element['id'], $element['element']['.uri'], array_keys( $element['model'] ) ], $feSeen->getArrayCopy() )
+	=== [ [ '/cards', 0, '/cards/one', [ 'title', 'summary', 'rank' ] ], [ '/cards', 1, '/cards/two', [ 'title', 'summary', 'rank' ] ], [ '/cards/one', 0, '/cards/one', [ 'title', 'summary', 'rank' ] ] ] );
 
 // A native language the site does not list is no first choice either: the type file's buckets of languages the site does not serve are the last resort
 $fe['/nino/locales/native'] = 'fr_FR';

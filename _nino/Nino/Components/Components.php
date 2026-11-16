@@ -30,8 +30,10 @@ namespace Nino {
 	 *																	makes it a container; its own name is always one of them
 	 *											'once'			true: once in a container, which the caller of a tool enforces
 	 *											'source'		text, image, link or none (the default): what its first word is
-	 *											'format'		for a text: plain (the default), inline, lines or blocks
-	 *											'attributes'	name => [ 'type' => choice|bool|int|string|image|link|id, 'default' => ..., ... ]
+	 *											'format'		for a text: plain (the default), inline, lines or blocks; an attribute named
+	 *																	format - a choice among them - says it for each call
+	 *											'children'	'nodes': the register does not draw what the component holds, its renderer does
+	 *											'attributes'	name => [ 'type' => choice|bool|int|string|text|image|link|id, 'default' => ..., ... ]
 	 *											'variants'	the words of the one open axis; regular is always there, first
 	 *											'template'	the markup, or the name of a *.tpl file in the directory a feature gives
 	 *											'icon', 'preview'	for a tool
@@ -42,13 +44,15 @@ namespace Nino {
 	 *										It is filled in one pass: what a value brings is never looked at
 	 *										again, so a value never becomes a call or a fill, and nothing a
 	 *										value holds is written as an entity to keep it from being one.
+	 *										A renderer has the template filled for it by fill(), with tokens of its own.
 	 *
 	 *										Where a tree is drawn from: the context
 	 *
 	 *											[ 'template' => 'page-home', 'scope' => 'hero', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ]
 	 *
 	 *										- the template whose words ~name reads, the id of the nearest
-	 *										ancestor that has one, the place the nodes stand in, the element
+	 *										ancestor that has one - a call that has one itself reads its own words in
+	 *										it - the place the nodes stand in, the element
 	 *										of a loop (the shape \Nino\Modules\Components::element() answers:
 	 *										[ 'uri', 'id', 'element', 'model' ]), the tokens of the loops the nodes stand
 	 *										in ('fills', [ '[[token]]' => text ]: a textfill with no slash reads them before the
@@ -79,7 +83,7 @@ namespace Nino {
 		public const array SOURCES = [ 'text', 'image', 'link', 'none' ];
 
 		// What an attribute may be
-		public const array TYPES = [ 'choice', 'bool', 'int', 'string', 'image', 'link', 'id' ];
+		public const array TYPES = [ 'choice', 'bool', 'int', 'string', 'text', 'image', 'link', 'id' ];
 
 		// The words a bool is read from. The same two lists as \Nino\Modules\Components::ON and ::OFF and the ones
 		// Nino.ui.js reads a flag with
@@ -104,7 +108,7 @@ namespace Nino {
 		public const array RESERVED = [ 'value', 'source', 'content', 'class', 'text', 'variant', 'lang' ];
 
 		// The keys of a schema and of an attribute, which is all validate() accepts
-		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'source', 'format', 'attributes', 'variants', 'template', 'icon', 'preview' ];
+		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'source', 'format', 'children', 'attributes', 'variants', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
@@ -114,6 +118,9 @@ namespace Nino {
 		private const string WORD = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D';
 		private const string ID = '/^[a-z][a-z0-9-]*$/D';
 		private const string FIELD = '/^[A-Za-z][A-Za-z0-9_-]*$/D';
+
+		// What a reference to a text is written as: one word, with no bracket, no space and no control character in it
+		private const string SHAPE = '/^[^\s\[\]\x00-\x1F\x7F]+$/D';
 
 		// The path of an internal page, as page:/path names it: the Element-URI of the page, with no way out of the site
 		private const string PAGE = '#^/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?$#D';
@@ -188,6 +195,8 @@ namespace Nino {
 				trigger_error( 'Components::addComponent(): '. $clean, E_USER_ERROR );
 			else if( $renderer === null && $clean['template'] === '' )
 				trigger_error( 'Components::addComponent(): component "'. $name. '": a component without a renderer needs a "template"', E_USER_ERROR );
+			else if( $renderer === null && isset( $clean['children'] ) === true )
+				trigger_error( 'Components::addComponent(): component "'. $name. '": a component whose "children" are "nodes" needs a renderer, which draws them', E_USER_ERROR );
 			else
 				self::_store( $appData, $name, $clean, $renderer );
 		}
@@ -224,7 +233,7 @@ namespace Nino {
 
 		/**
 		 *	Check a schema and make it complete: the answer is the schema with every key but the optional ones
-		 *	(group, offers, format, icon) present, or what is wrong with it. What it answers is a schema it
+		 *	(group, offers, format, children, icon) present, or what is wrong with it. What it answers is a schema it
 		 *	accepts again as it is. Anything the schema does not name is refused, not left out
 		 *
 		 *	@param		string		$name					The component, a slug of at most 40 characters that is none of the places of the kernel
@@ -289,6 +298,14 @@ namespace Nino {
 				return $what. ': "once" must be true or false';
 
 			$clean['once'] = ( $schema['once'] ?? false ) === true;
+
+			if( isset( $schema['children'] ) === true ) {
+
+				if( $schema['children'] !== 'nodes' )
+					return $what. ': "children" is "nodes", the one form there is: the renderer is handed what the component holds and draws it';
+
+				$clean['children'] = 'nodes';
+			}
 
 			$source = $schema['source'] ?? 'none';
 
@@ -367,6 +384,29 @@ namespace Nino {
 					return $what. ', attribute "'. $attribute. '": a component has one attribute of the type id at most';
 
 				$clean['attributes'][$attribute] = $result;
+			}
+
+			// An attribute named format says for each call what the text may hold: a choice among the formats of a text, whose default
+			// is the format of the schema where it names one
+			if( isset( $clean['attributes']['format'] ) === true ) {
+
+				$declared = $clean['attributes']['format'];
+				$where = $what. ', attribute "format": ';
+
+				if( $source !== 'text' )
+					return $where. 'the name is for a component whose source is a text';
+
+				if( $declared['type'] !== 'choice' || is_array( $declared['options'] ?? null ) === false )
+					return $where. 'must be a choice whose options are listed, among '. implode( ', ', \Nino\Html::FORMATS );
+
+				foreach( $declared['options'] as $option )
+					if( in_array( $option, \Nino\Html::FORMATS, true ) === false )
+						return $where. 'offers "'. self::_shown( $option ). '", which is none of '. implode( ', ', \Nino\Html::FORMATS );
+
+				if( isset( $schema['format'] ) === true && $schema['format'] !== $declared['default'] )
+					return $where. 'the default is the "format" of the schema, "'. $schema['format']. '"';
+
+				$clean['format'] = $declared['default'];
 			}
 
 			$template = self::_template( $what, $schema['template'] ?? '', $directory );
@@ -475,9 +515,10 @@ namespace Nino {
 		 *	Draw the nodes of a tree. The order of what is done for a call is the contract:
 		 *
 		 *	1. a name nobody registered draws nothing, and nor do its children (_unknown())
-		 *	2. the attributes are made ready: a foreign one falls away, a value outside its options is the default,
-		 *	   a bool is read from its words, an int is kept within its bounds, an id is a word or nothing, a string is
-		 *	   escaped, a link is an address a browser may be sent to, an image is the reference to a picture. The
+		 *	2. the attributes are made ready, the id first, since it is the scope of what the call reads itself: a foreign
+		 *	   one falls away, a value outside its options is the default, a bool is read from its words, an int is kept
+		 *	   within its bounds, an id is a word or nothing, a string is escaped, a text is a reference or the text as it
+		 *	   is written, a link is an address a browser may be sent to, an image is the reference to a picture. The
 		 *	   classes: the name, then for each attribute that is a class in the order of the schema - a choice that
 		 *	   is not its default as name--attribute-value, a bool that is on as name--attribute; a responsive choice
 		 *	   ('100 m:50 l:33') says the width for all in its first part, which is a class where it is not the default,
@@ -487,10 +528,12 @@ namespace Nino {
 		 *	4. the source: a fixed text="..." (a text), ~name (the key /template/<template>/<scope>/<name>), a key
 		 *	   with a slash in front, .field of the element - a text, a link (an address, a key whose text is one, a
 		 *	   field) or an image (the reference, as it is written, not looked up). Never read as markup, escaped for
-		 *	   its place (a text by its format), and with every [ left as it is
+		 *	   its place (a text by its format, which an attribute named format says for the call), and with every [
+		 *	   left as it is
 		 *	5. a component with a source and no value draws nothing, nor do its children
-		 *	6. an attribute of the type id gives the children the scope its value names
-		 *	7. the children, at the place of this component, one deeper than it
+		 *	6. an attribute of the type id gives the children the scope its value names - and the words of the call itself
+		 *	7. the children, at the place of this component, one deeper than it - or, for a component whose 'children' is
+		 *	   'nodes', not at all: the renderer is handed them
 		 *	8. the template is filled, or the renderer is asked
 		 *
 		 *	A text is drawn as it is. A textfill is looked up in the fills of the language (\Nino\Html::getFills()),
@@ -523,6 +566,7 @@ namespace Nino {
 				'tfills'		=> (array) ( $appData[self::FILLS] ?? [] ),
 				'fills'			=> null,
 				'variants'	=> [],
+				'plans'			=> [],
 			];
 
 			return self::_draw( $appData, $nodes, $context, $run );
@@ -538,6 +582,166 @@ namespace Nino {
 		 */
 		public static function escape( string $value ): string {
 			return htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+		}
+
+		/**
+		 *	The template of a component, filled as the register fills it - the placeholders of the class, the
+		 *	words and the values of the call, [[content]] and [[content:name]], the fills of the site the template
+		 *	names - with tokens of the renderer's own added, in one pass. A renderer that has markup to leave out
+		 *	or to add computes it and puts it in as a token of its own, so that the markup stays in the template
+		 *	of its component; what the tokens hold is what the renderer made, escaped by it. Nothing a value
+		 *	holds, of a call or of a token, is read again
+		 *
+		 *	Where a token has the name of a placeholder, the token wins. A component nobody registered, or one that
+		 *	has no template, is ''
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The component, usually the one the renderer is of
+		 *	@param		array			$args					What the renderer was handed, changed as it likes: the
+		 *																	strings under the names of its attributes, value, class, lang
+		 *																	and content:<name> for each slot; what is not there is nothing
+		 *	@param		string		$content			What the children drew, [[content]]
+		 *	@param		array			$tokens				[ '[[token]]' => markup ]
+		 *
+		 *	@return 	string
+		 */
+		public static function fill( array &$appData, string $name, array $args, string $content, array $tokens ): string {
+
+			$schema = $appData[self::REGISTRY][$name] ?? null;
+
+			if( $schema === null )
+				return '';
+
+			// What a renderer did to the fills is seen here, since the table is read where it is first needed
+			$run = [ 'fills' => null, 'slots' => (array) ( $appData[self::SLOTS] ?? [] ), 'tfills' => (array) ( $appData[self::FILLS] ?? [] ), 'plans' => [] ];
+			$own = [];
+
+			foreach( $tokens as $token => $markup )
+				if( is_scalar( $markup ) === true )
+					$own[(string) $token] = (string) $markup;
+
+			return strtr( $schema['template'], $own + self::_placeholders( $run, $name, $schema, $args, $content ) + self::_site( $appData, $run, $name ) );
+		}
+
+		/**
+		 *	The texts and the pictures a source reads through the register: what a tool that looks for the keys a
+		 *	template uses, or for the slots of its pictures, asks. It is the source as it is written - the tree of
+		 *	it, read once and not kept - and nothing is drawn or looked up: a value is no call, and a value that
+		 *	holds one, or a fill, reads nothing
+		 *
+		 *	Of each call of a registered component it lists, in the order they stand, the first word where its
+		 *	source is a text, an image or a link, and each attribute of the type text, image or link - the
+		 *	default where the call says none - that names a key: ~name, which the template and the nearest id
+		 *	above the call - its own, where it has one - make a key of, and a key with a slash in front. A link
+		 *	names a key only as ~name: written with a slash it is an address as well, which the drawing decides.
+		 *	Not listed: a fixed text="...", a .field, what has a space, a bracket or a control character in it,
+		 *	a ~name where there is no template or no id, a name nobody registered, a fill that stands in the
+		 *	source as a textfill with a slash in front and the template a [template] includes
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				html+
+		 *	@param		string		$template			The name the words of ~name are read under, what \Nino\Html::context() calls 'template'
+		 *
+		 *	@return 	array										[ [ 'name' => 'section-title', 'kind' => 'text', 'source' => '/template/page-home/hero/title', 'written' => '~title' ], ... ];
+		 *																	an attribute adds 'attribute' => the name of it
+		 */
+		public static function sources( array &$appData, string $source, string $template ): array {
+
+			$found = [];
+
+			self::_sources( (array) ( $appData[self::REGISTRY] ?? [] ), \Nino\Html::tree( $appData, $source, false ), $template, '', 0, $found );
+
+			return $found;
+		}
+
+		/**
+		 *	The sources of the nodes of one level, and below
+		 *
+		 *	@param		array			$registry			The clean schemas
+		 *	@param		array			$nodes
+		 *	@param		string		$template
+		 *	@param		string		$scope				The id of the nearest call above
+		 *	@param		int				$depth
+		 *	@param		array			&$found				(reference)
+		 *
+		 *	@return 	void
+		 */
+		private static function _sources( array $registry, array $nodes, string $template, string $scope, int $depth, array &$found ): void {
+
+			if( $depth > Markup::MAX_DEPTH )
+				return;
+
+			foreach( $nodes as $node ) {
+
+				if( is_array( $node ) === false || is_string( $node['n'] ?? null ) === false )
+					continue;
+
+				$inner = $scope;
+				$schema = $registry[$node['n']] ?? null;
+
+				if( $schema !== null ) {
+
+					$given = is_array( $node['a'] ?? null ) === true ? $node['a'] : [];
+
+					foreach( $schema['attributes'] as $attribute => $declared )
+						if( $declared['type'] === 'id' ) {
+
+							$own = self::_id( $declared, $given[$attribute] ?? null );
+							$inner = $own === '' ? $scope : $own;
+							break;
+						}
+
+					if( $schema['source'] !== 'none' && ( $schema['source'] !== 'text' || is_string( $given['text'] ?? null ) === false ) ) {
+
+						$written = is_string( $node['s'] ?? null ) === true ? $node['s'] : '';
+						$key = self::_key( $written, $schema['source'], $template, $inner );
+
+						if( $key !== null )
+							$found[] = [ 'name' => $node['n'], 'kind' => $schema['source'], 'source' => $key, 'written' => $written ];
+					}
+
+					foreach( $schema['attributes'] as $attribute => $declared )
+						if( in_array( $declared['type'], [ 'text', 'image', 'link' ], true ) === true ) {
+
+							$written = is_string( $given[$attribute] ?? null ) === true ? $given[$attribute] : $declared['default'];
+							$key = self::_key( $written, $declared['type'], $template, $inner );
+
+							if( $key !== null )
+								$found[] = [ 'name' => $node['n'], 'kind' => $declared['type'], 'source' => $key, 'written' => $written, 'attribute' => (string) $attribute ];
+						}
+				}
+
+				if( is_array( $node['c'] ?? null ) === true )
+					self::_sources( $registry, $node['c'], $template, $inner, $depth + 1, $found );
+			}
+		}
+
+		/**
+		 *	The key a written source names, where it names one a scan can know: ~name is of the template and the scope, a
+		 *	key with a slash in front is as it is written, but for a link, which has no such. What has a space, a
+		 *	bracket or a control character in it names no key
+		 *
+		 *	@param		string		$written
+		 *	@param		string		$kind					text, image or link
+		 *	@param		string		$template
+		 *	@param		string		$scope
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _key( string $written, string $kind, string $template, string $scope ): ?string {
+
+			if( $written === '' || ( $written[0] !== '~' && $written[0] !== '/' ) || preg_match( self::SHAPE, $written ) !== 1 )
+				return null;
+
+			if( $written[0] === '/' )
+				return $kind === 'link' ? null : $written;
+
+			if( $template === '' || $scope === '' || $written === '~' )
+				return null;
+
+			$key = '/template/'. $template. '/'. $scope. '/'. substr( $written, 1 );
+
+			return preg_match( self::SHAPE, $key ) === 1 ? $key : null;
 		}
 
 		/**
@@ -718,12 +922,25 @@ namespace Nino {
 			$given = is_array( $node['a'] ?? null ) === true ? $node['a'] : [];
 			$source = is_string( $node['s'] ?? null ) === true ? $node['s'] : '';
 
+			// 6. The id of the call, which is the scope of its children and of its own words as well: [section-wrap id="hero" image="~background"]
+			// reads the key of the background of the hero. Found first, since an attribute that reads a key may stand before the id in the schema
+			$plan = $run['plans'][$name] ?? self::_plan( $run, $name, $schema );
+			$here = $context;
+			$scope = $context['scope'];
+			$own = '';
+
+			if( $plan['id'] !== '' ) {
+
+				$own = self::_id( $schema['attributes'][$plan['id']], $given[$plan['id']] ?? null );
+
+				if( $own !== '' )
+					$scope = $here['scope'] = $own;
+			}
+
 			// 2. The attributes, and the classes they make
 			$class = $name;
 			$args = [];
 			$fills = [];
-			$id = '';
-			$scope = $context['scope'];
 			$none = '';
 
 			foreach( $schema['attributes'] as $attribute => $declared ) {
@@ -773,19 +990,23 @@ namespace Nino {
 
 					case 'id':
 
-						// A value that is no id is none; a bare word says nothing, which is the default
-						$value = is_string( $raw ) === false ? $declared['default'] : ( strlen( $raw ) <= self::ID_LENGTH && preg_match( self::ID, $raw ) === 1 ? $raw : '' );
-						$id = $value === '' ? '' : ' id="'. $value. '"';
-
-						if( $value !== '' )
-							$scope = $value;
-
+						$value = $own;
 						break;
 
 					case 'link':
 					case 'image':
 
-						$value = self::_reference( $appData, $run, $declared['type'], is_string( $raw ) === true ? $raw : $declared['default'], false, $context, 'plain', $none ) ?? '';
+						$value = self::_reference( $appData, $run, $declared['type'], is_string( $raw ) === true ? $raw : $declared['default'], false, $here, 'plain', $none ) ?? '';
+						break;
+
+					case 'text':
+
+						// A second text of a call, a caption or a label: a reference to one (~name, a key, .field) as the first word
+						// is, or the text as it is written, with the fills of the site in it
+						$written = is_string( $raw ) === true ? $raw : $declared['default'];
+						$value = self::_isReference( $written ) === true
+							? ( self::_reference( $appData, $run, 'text', $written, true, $here, 'plain', $none ) ?? '' )
+							: self::_text( self::_fills( $appData, $run, $written ), 'plain' );
 						break;
 
 					default:
@@ -815,10 +1036,16 @@ namespace Nino {
 
 				$fixed = $schema['source'] === 'text' && is_string( $given['text'] ?? null ) === true ? $given['text'] : null;
 
+				// What a text may hold is the format of the schema, and where the call has an attribute named format, what that says
+				$format = $schema['format'] ?? 'plain';
+
+				if( $plan['format'] === true )
+					$format = $args['format'];
+
 				if( $fixed !== null )
-					$resolved = self::_text( self::_fills( $appData, $run, $fixed ), $schema['format'] );
+					$resolved = self::_text( self::_fills( $appData, $run, $fixed ), $format );
 				else
-					$resolved = self::_reference( $appData, $run, $schema['source'], $source, true, $context, $schema['format'] ?? 'plain', $lang );
+					$resolved = self::_reference( $appData, $run, $schema['source'], $source, true, $here, $format, $lang );
 
 				if( $resolved === null || $resolved === '' )
 					return '';
@@ -828,27 +1055,34 @@ namespace Nino {
 
 			// 7. The children - 6. an id gives them its scope
 			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'element' => $context['element'], 'fills' => $context['fills'], 'depth' => $context['depth'] + 1 ];
-			$slots = $run['slots'][$name] ?? [];
 			$content = '';
 			$slotted = [];
 
-			foreach( $slots as $slot )
-				$slotted['[[content:'. $slot. ']]'] = '';
+			// A component that draws what it holds itself is handed the nodes, and the context to draw them in, which it changes for each round
+			if( ( $schema['children'] ?? '' ) === 'nodes' )
+				$context = $inner + [ 'children' => is_array( $node['c'] ?? null ) === true ? $node['c'] : [] ];
+			else {
 
-			if( is_array( $node['c'] ?? null ) === true ) {
+				$slots = $run['slots'][$name] ?? [];
 
-				if( $slots === [] )
-					$content = self::_draw( $appData, $node['c'], $inner, $run );
-				else
-					foreach( $node['c'] as $child ) {
+				foreach( $slots as $slot )
+					$slotted['[[content:'. $slot. ']]'] = '';
 
-						$html = self::_draw( $appData, [ $child ], $inner, $run );
+				if( is_array( $node['c'] ?? null ) === true ) {
 
-						if( is_array( $child ) === true && in_array( $child['n'] ?? null, $slots, true ) === true )
-							$slotted['[[content:'. $child['n']. ']]'] = ( $slotted['[[content:'. $child['n']. ']]'] ?? '' ). $html;
-						else
-							$content .= $html;
-					}
+					if( $slots === [] )
+						$content = self::_draw( $appData, $node['c'], $inner, $run );
+					else
+						foreach( $node['c'] as $child ) {
+
+							$html = self::_draw( $appData, [ $child ], $inner, $run );
+
+							if( is_array( $child ) === true && in_array( $child['n'] ?? null, $slots, true ) === true )
+								$slotted['[[content:'. $child['n']. ']]'] .= $html;
+							else
+								$content .= $html;
+						}
+				}
 			}
 
 			// 8. The renderer, or the template
@@ -857,6 +1091,9 @@ namespace Nino {
 				$renderer = $run['renderers'][$name];
 
 				$args = [ 'value' => $value, 'source' => $source, 'class' => $class, 'variant' => $variant, 'lang' => $lang ] + $args;
+
+				foreach( $slotted as $token => $html )
+					$args['content:'. substr( $token, 10, -2 )] = $html;
 
 				try {
 					$html = $renderer( $appData, $args, $content, $context );
@@ -876,13 +1113,120 @@ namespace Nino {
 				return is_string( $html ) === true ? $html : ( is_scalar( $html ) === true ? (string) $html : '' );
 			}
 
-			// The fills of the site that the template holds: the text of each key, as a plain text, nothing for a key nobody has a text for
+			$placeholders = [ '[[class]]' => $class, '[[value]]' => $value, '[[content]]' => $content, '[[id]]' => $own === '' ? '' : ' id="'. $own. '"', '[[lang]]' => $lang ] + $slotted + $fills;
+
+			if( ( $run['tfills'][$name] ?? [] ) !== [] )
+				$placeholders += self::_site( $appData, $run, $name );
+
+			return strtr( $schema['template'], $placeholders );
+		}
+
+		/**
+		 *	The fills of the site that the template of a component holds, written with a slash in front: the text of each
+		 *	key, as a plain text, nothing for a key nobody has a text for
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			&$run					(reference) Holds the keys each template names, and the fills of the drawing
+		 *	@param		string		$name
+		 *
+		 *	@return 	array										[ '[[<key>]]' => text ]
+		 */
+		private static function _site( array &$appData, array &$run, string $name ): array {
+
 			$site = [];
 
 			foreach( $run['tfills'][$name] ?? [] as $key )
 				$site['[['. $key. ']]'] = self::_text( self::_lookup( $appData, $run, $key ) ?? '', 'plain' );
 
-			return strtr( $schema['template'], [ '[[class]]' => $class, '[[value]]' => $value, '[[content]]' => $content, '[[id]]' => $id, '[[lang]]' => $lang ] + $slotted + $fills + $site );
+			return $site;
+		}
+
+		/**
+		 *	The placeholders of a template from what a renderer is handed - the other way round from what _call() makes
+		 *	of a call: class, value, content, the tag form of the id, lang, the children of each slot and each attribute that is no class,
+		 *	each a string and nothing where the argument is none
+		 *
+		 *	@param		array			&$run					(reference)
+		 *	@param		string		$name
+		 *	@param		array			$schema				The clean schema
+		 *	@param		array			$args
+		 *	@param		string		$content
+		 *
+		 *	@return 	array
+		 */
+		private static function _placeholders( array &$run, string $name, array $schema, array $args, string $content ): array {
+
+			$plan = $run['plans'][$name] ?? self::_plan( $run, $name, $schema );
+			$text = static fn( string $key ): string => is_string( $args[$key] ?? null ) === true ? $args[$key] : '';
+			$slug = $plan['id'] === '' ? '' : $text( $plan['id'] );
+			$placeholders = [ '[[class]]' => $text( 'class' ), '[[value]]' => $text( 'value' ), '[[content]]' => $content, '[[id]]' => $slug === '' ? '' : ' id="'. $slug. '"', '[[lang]]' => $text( 'lang' ) ];
+
+			foreach( $run['slots'][$name] ?? [] as $slot )
+				$placeholders['[[content:'. $slot. ']]'] = $text( 'content:'. $slot );
+
+			foreach( $plan['tokens'] as $attribute )
+				$placeholders += [ '[['. $attribute. ']]' => $text( $attribute ) ];
+
+			return $placeholders;
+		}
+
+		/**
+		 *	What the drawing of a component needs to know of its attributes, found once for a name in a drawing: the
+		 *	attribute of the type id, those that are the token of their own name (no class), and whether there is one
+		 *	named format
+		 *
+		 *	@param		array			&$run					(reference) The plan is kept in it
+		 *	@param		string		$name
+		 *	@param		array			$schema				The clean schema
+		 *
+		 *	@return 	array										[ 'id' => the attribute or '', 'tokens' => [ attribute, ... ], 'format' => bool ]
+		 */
+		private static function _plan( array &$run, string $name, array $schema ): array {
+
+			$plan = [ 'id' => '', 'tokens' => [], 'format' => isset( $schema['attributes']['format'] ) ];
+
+			foreach( $schema['attributes'] as $attribute => $declared ) {
+
+				if( $declared['type'] === 'id' )
+					$plan['id'] = (string) $attribute;
+
+				if( $declared['class'] === false )
+					$plan['tokens'][] = (string) $attribute;
+			}
+
+			return $run['plans'][$name] = $plan;
+		}
+
+		/**
+		 *	The value of an attribute of the type id: a word, or nothing. A value that is no id is none; a bare word says nothing, which is the default
+		 *
+		 *	@param		array			$declared			The attribute's clean schema
+		 *	@param		mixed			$raw					What the call says
+		 *
+		 *	@return 	string
+		 */
+		private static function _id( array $declared, mixed $raw ): string {
+			return is_string( $raw ) === false ? $declared['default'] : ( strlen( $raw ) <= self::ID_LENGTH && preg_match( self::ID, $raw ) === 1 ? $raw : '' );
+		}
+
+		/**
+		 *	Whether what an attribute of the type text says is a reference to a text - ~name, a key with a slash in
+		 *	front, .field - and not the text itself. A reference is one word: a ~ or a / with a space after it, or a
+		 *	dot that is no field, is a text that begins that way
+		 *
+		 *	@param		string		$written
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isReference( string $written ): bool {
+
+			if( $written === '' )
+				return false;
+
+			if( $written[0] === '.' )
+				return preg_match( self::FIELD, substr( $written, 1 ) ) === 1;
+
+			return ( $written[0] === '~' || $written[0] === '/' ) && preg_match( self::SHAPE, $written ) === 1;
 		}
 
 		/**

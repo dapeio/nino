@@ -335,12 +335,9 @@ public static function drawDaysLeft( array &$appData, array $args, string $conte
 
 	$days = max( 0, (int) ( new \DateTimeImmutable( 'today' ) )->diff( $date )->format( '%r%a' ) );
 
-	// The markup is the schema's own template; what a renderer returns is finished
-	return str_replace(
-		[ '[[class]]', '[[days]]' ],
-		[ $args['class'], (string) $days ],
-		\Nino\Components::components( $appData )['days-left']['template']
-	);
+	// The markup is the schema's own template, filled with the placeholders of the register and the token of the
+	// renderer; what a renderer returns is finished
+	return \Nino\Components::fill( $appData, 'days-left', $args, $content, [ '[[days]]' => (string) $days ] );
 }
 ```
 
@@ -356,6 +353,17 @@ What the rules of section 1 leave to the module, this register does itself:
   there is no element for - draws nothing and the renderer is not called. The
   first word is `~name`, a key or `.field`, and stands first in the call; the
   fixed `text="..."` stands for it.
+- A renderer has its template filled by `\Nino\Components::fill( $appData, $name, $args, $content, $tokens )`: the
+  placeholders of the register and the tokens of the renderer's own, in one pass, where a token wins over a
+  placeholder of the same name. Markup that stands only sometimes - a link round a title that has an address - is
+  made by the renderer, escaped, and given as a token, so that it stays in the template and not in the class.
+- A second text of a call - a caption, an alternative text - is an attribute of the type `text`: a
+  reference (`~caption`, a key, `.field`) or the text itself, escaped. A component that is given the id says
+  where its own `~name` is read: `[section-wrap id="hero" image="~background"]` reads the background of the hero.
+  An attribute named `format`, a choice among `plain`, `inline`, `lines` and `blocks`, says what the text of
+  a call may hold. A component of a loop - `'children' => 'nodes'` with a renderer - is handed what it holds
+  and draws it as often as it needs; `\Nino\Components::sources()` answers which keys and pictures a source
+  reads, for whoever scans a template.
 - What the renderer returns is finished. A `[` in `$args['value']` is a `[` and
   is no call, wherever it is written; `\Nino\Components::escape()` escapes
   for html and leaves a `[` as it is. A renderer that throws a
@@ -412,5 +420,5 @@ own test, then the syntax checks and the static analysis of the
 - [ ] A source that resolves to nothing renders nothing; a hand-written shortcode with a wrong attribute still renders.
 - [ ] A stack renders through `renderStack()`, never by filling `[[fields]]` of its content itself, and says its `cell` where that is not the components between its tags.
 - [ ] Registered one way: manifest or `init()`.
-- [ ] A component by schema validates by `\Nino\Components::validate()` without an error, has an `in` where it is to be offered, and its renderer, where it has one, returns finished markup and writes only `$args['value']` and what it made itself.
+- [ ] A component by schema validates by `\Nino\Components::validate()` without an error, has an `in` where it is to be offered, and its renderer, where it has one, returns finished markup and writes only `$args['value']` and what it made itself - the markup of its component is in the template, which the renderer has filled by `\Nino\Components::fill()`.
 - [ ] The cases above are in a smoke test and the suite named in the guide passes.

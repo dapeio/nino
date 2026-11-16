@@ -81,7 +81,7 @@ namespace Nino\Modules {
 
 			$fills['[[.slug]]'] = self::_escapeFieldValue( self::slug( $element ), [] );
 
-			return self::_draw( $appData, $content, $fills );
+			return self::_draw( $appData, $content, $fills, [ 'uri' => $uri, 'id' => 0, 'element' => $element, 'model' => $model ] );
 		}
 
 		/**
@@ -94,13 +94,19 @@ namespace Nino\Modules {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$content			html+, what stands between the tags
 		 *	@param		array			$fills				[ '[[token]]' => the text of the token ]
+		 *	@param		array|null	$element			[ 'uri', 'id', 'element', 'model' ] of the round: the element a component of the
+		 *																	register reads with the source .field - [section-title .title] - and nothing for
+		 *																	a round that has none
 		 *
 		 *	@return 	string
 		 */
-		private static function _draw( array &$appData, string $content, array $fills ): string {
+		private static function _draw( array &$appData, string $content, array $fills, ?array $element = null ): string {
 
 			$context = \Nino\Html::context( $appData );
 			$context['fills'] = array_map( 'strval', $fills ) + (array) ( $context['fills'] ?? [] );
+
+			if( $element !== null )
+				$context['element'] = $element;
 
 			return \Nino\Html::renderSource( $appData, $content, $context );
 		}
@@ -352,7 +358,7 @@ namespace Nino\Modules {
 
 			foreach( $result as $element ) {
 
-				$html .= self::_draw( $appData, $content, self::fills( $element, $model, $id ) );
+				$html .= self::_draw( $appData, $content, self::fills( $element, $model, $id ), [ 'uri' => $uri, 'id' => $id, 'element' => $element, 'model' => $model ] );
 
 				$id++;
 			}

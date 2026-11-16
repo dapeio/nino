@@ -11,7 +11,10 @@ declare(strict_types=1);
  *													places a component may stand in, what validate() turns down and why, the
  *													textfills against the fills of a page, and the values that must never be
  *													read as markup - a text, an attribute, a link, a class - in the shapes an
- *													editor could write them. The components are the suite's own probes.
+ *													editor could write them; a call that carries the id reads its own words in
+ *													it, the attribute format and the type text, fill() for a renderer, sources()
+ *													and a component that draws the nodes it holds. The components are the suite's
+ *													own probes.
  *													Runs against an isolated sandbox directory, never touches the real project
  *													data.
  *
@@ -684,7 +687,7 @@ check( 'a renderer is asked: its answer is the component, and what the children 
 ksort( $args );
 check( 'the arguments: every attribute as a string - a bool 1 or 0, an int its digits, a string, a link and an image escaped, the value for every width of a responsive one - and value, source, class, variant and lang - the slug of the id as the attribute says it, the tag form is the token of a template', $args === [
 	'anchor' => 'z', 'class' => 'probe-echo probe-echo--mode-b probe-echo--size-50 probe-echo--m-size-25 probe-echo--on probe-echo--variant-soft', 'count' => '7', 'flag' => '1', 'href' => '/x', 'label' => 'L&lt;',
-	'lang' => '', 'mode' => 'b', 'on' => '1', 'pic' => '/template/page-x/a/photo', 'quiet' => '0', 'size' => '50', 'source' => '/project/company/general/name', 'tag' => 'h2', 'value' => 'ACME', 'variant' => 'soft' ] );
+	'lang' => '', 'mode' => 'b', 'on' => '1', 'pic' => '/template/page-x/z/photo', 'quiet' => '0', 'size' => '50', 'source' => '/project/company/general/name', 'tag' => 'h2', 'value' => 'ACME', 'variant' => 'soft' ] );
 check( 'the context it is given is the one the call stands in - the scope above the call and not the one it makes - and the children are drawn one deeper at its place', $given === [ 'template' => 'page-x', 'scope' => 'a', 'place' => 'section-wrap', 'element' => null, 'fills' => [], 'depth' => 1 ] );
 $seen->exchangeArray( [] );
 $draw( '[probe-echo ~title][card][probe-echo .title][/card][/probe-echo]', [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'depth' => 3, 'element' => $element ] );
@@ -1339,6 +1342,281 @@ check( '...in the language of the page', $draw( '[scroll][/scroll]' ) === '<a ar
 $appData['./nino/locales/current'] = 'de_DE';
 
 check( 'an id is at most 64 characters', str_contains( $draw( '[anchored anchor="'. str_repeat( 'a', 64 ). '"][/anchored]' ), ' id="'. str_repeat( 'a', 64 ). '"' ) === true && $draw( '[anchored anchor="'. str_repeat( 'a', 65 ). '"][/anchored]' ) === '<a></a>' );
+
+echo "\n";
+
+
+// --- What a call carries: its own id, its format, its words, the nodes it holds ---------------------
+
+echo "A call that carries the id reads its own words in it\n";
+
+\Nino\Html::addFills( $appData, [
+	'/template/page-x/hero/caption'	=> 'Bild <1> [sic]',
+	'/template/page-x/hero/alt'			=> 'Alt "x" [sic]',
+] );
+
+$own = [
+	'hold' => [ 'label' => 'Hold', 'in' => [ 'page' ], 'offers' => [], 'attributes' => [
+		'image'		=> [ 'type' => 'image', 'default' => '' ],
+		'note'		=> [ 'type' => 'text', 'default' => '' ],
+		'anchor'	=> [ 'type' => 'id', 'default' => '' ] ],
+		'template' => '<section[[id]] data-image="[[image]]" data-note="[[note]]">[[content]]</section>' ],
+	'heading' => [ 'label' => 'Heading', 'in' => [ 'hold' ], 'source' => 'text', 'attributes' => [ 'anchor' => [ 'type' => 'id', 'default' => '' ] ],
+		'template' => '<h2[[id]]>[[value]]</h2>' ],
+	'heading-start' => [ 'label' => 'Heading', 'in' => [ 'hold' ], 'source' => 'text', 'attributes' => [ 'anchor' => [ 'type' => 'id', 'default' => 'start' ] ],
+		'template' => '<h2[[id]]>[[value]]</h2>' ],
+];
+
+foreach( $own as $name => $schema )
+	\Nino\Components::addComponent( $appData, $name, $schema );
+
+$title = 'Hallo &amp; &lt;Welt&gt; [sic]';
+$html = '';
+$said = $logged( function() use ( &$html, $draw ) { $html = $draw( '[hold image="~background"]' ); } );
+check( 'a call that has no id above it and none of its own reads no key: nothing is drawn for the attribute and the log says so once', $html === '<section data-image="" data-note=""></section>' && count( $said ) === 1 );
+$said = $logged( function() use ( &$html, $draw ) { $html = $draw( '[hold anchor="hero" image="~background" note="~title"][heading ~title][/hold]' ); } );
+check( 'a call that carries the id reads the image and the text of its attributes in its own section - [hold anchor="hero" image="~background"] is /template/page-x/hero/background, though the image stands before the id in its schema - and its children read the same',
+	$said === [] && $html === '<section id="hero" data-image="/template/page-x/hero/background" data-note="'. $title. '"><h2>'. $title. '</h2></section>' && array_keys( \Nino\Components::components( $appData )['hold']['attributes'] ) === [ 'image', 'note', 'anchor' ] );
+$said = $logged( function() use ( &$html, $draw ) { $html = $draw( '[hold anchor="outer"][hold anchor="hero" image="~background"][/hold][/hold]' ); } );
+check( '...in the section of a call round that has one as well: the nearest id is the call\'s own', $said === [] && str_contains( $html, '<section id="hero" data-image="/template/page-x/hero/background"' ) === true && str_contains( $html, 'data-image=""' ) === true );
+$said = $logged( function() use ( &$html, $draw ) { $html = $draw( '[heading ~title anchor="hero"]' ); } );
+check( 'the first word of a call that carries the id is read in its own section: [heading ~title anchor="hero"] is /template/page-x/hero/title', $said === [] && $html === '<h2 id="hero">'. $title. '</h2>' );
+check( '...and the id of its default is the section it reads in where the call says none', $draw( '[heading-start ~t]' ) === '<h2 id="start">Start T</h2>' && $draw( '[heading-start ~t anchor="a"]' ) === '<h2 id="a">Text A</h2>' && $draw( '[heading-start ~t anchor="Bad Id"]' ) === '' );
+$inHero = [ 'template' => 'page-x', 'scope' => 'hero' ];
+check( 'an id that is none is no section: the call reads the one round it, the bare word and a value that is too long as well',
+	$draw( '[heading ~title anchor="Bad Id"]', $inHero ) === '<h2>'. $title. '</h2>' && $draw( '[heading ~title anchor]', $inHero ) === '<h2>'. $title. '</h2>'
+	&& $draw( '[heading ~title anchor="'. str_repeat( 'a', 65 ). '"]', $inHero ) === '<h2>'. $title. '</h2>' && $draw( '[heading ~title anchor="'. str_repeat( 'a', 64 ). '"]', $inHero ) === '' );
+$seen->exchangeArray( [] );
+$draw( '[probe-echo ~title anchor="hero"]', [ 'template' => 'page-x', 'scope' => 'above' ] );
+check( 'a renderer is still handed the context the call stands in, which has the section above it, and what is written as the source', $seen[0][2]['scope'] === 'above' && $seen[0][0]['source'] === '~title' && $seen[0][0]['value'] === $title && $seen[0][0]['anchor'] === 'hero' );
+
+echo "\n";
+
+
+echo "The attribute format - what a text may hold, for each call\n";
+
+$said = [
+	'label' => 'Said', 'in' => [ 'page' ], 'source' => 'text', 'format' => 'blocks',
+	'attributes' => [ 'format' => [ 'type' => 'choice', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'class' => false ] ],
+	'template' => '<div class="[[class]]" data-format="[[format]]">[[value]]</div>',
+];
+\Nino\Components::addComponent( $appData, 'said', $said );
+\Nino\Html::addFills( $appData, [ '/template/page-x/hero/rich' => '<p>Eins</p><p onclick="x()">Zwei <strong>fett</strong><br>drei</p><script>alert(1)</script>' ] );
+$rich = static fn( string $call ): string => $draw( '[said /template/page-x/hero/rich '. $call. ']' );
+check( 'a text has the format its call says: blocks keeps the paragraphs, lines the breaks and inline the tags of a line',
+	$rich( 'format="blocks"' ) === '<div class="said" data-format="blocks"><p>Eins</p><p>Zwei <strong>fett</strong><br>drei</p></div>'
+	&& $rich( 'format="lines"' ) === '<div class="said" data-format="lines">Eins<br>Zwei <strong>fett</strong><br>drei</div>' && $rich( 'format="inline"' ) === '<div class="said" data-format="inline">Eins Zwei <strong>fett</strong> drei</div>' );
+check( '...a call that says none, a word that is none of the options and the bare word have the default; a fixed text is read by the format as well',
+	$rich( '' ) === $rich( 'format="blocks"' ) && $rich( 'format="plain"' ) === $rich( '' ) && $rich( 'format' ) === $rich( '' ) && $rich( 'format="x\"><script>"' ) === $rich( '' )
+	&& $draw( '[said text="<p>a</p><p>b<br>c</p>" format="lines"]' ) === '<div class="said" data-format="lines">a<br>b<br>c</div>' );
+check( '...and the script and the handler of an editor are in none of them', str_contains( $rich( 'format="blocks"' ). $rich( 'format="lines"' ). $rich( 'format="inline"' ), 'script' ) === false && str_contains( $rich( 'format="blocks"' ), 'onclick' ) === false );
+check( 'a component without the attribute has the format of its schema', $draw( '[rich /template/page-x/hero/rich]' ) === '<div><p>Eins</p><p>Zwei <strong>fett</strong><br>drei</p></div>' && $draw( '[inline /template/page-x/hero/rich]' ) === '<span>Eins Zwei <strong>fett</strong> drei</span>' );
+
+$clean = \Nino\Components::validate( 'said', $said );
+$withoutFormat = $said;
+unset( $withoutFormat['format'] );
+$withoutFormat['attributes']['format']['default'] = 'lines';
+check( 'the format of the attribute is the format of the clean schema, which validate() accepts as it is - and where the schema names none, the default of the attribute is it',
+	is_array( $clean ) === true && $clean['format'] === 'blocks' && \Nino\Components::validate( 'said', $clean ) === $clean && ( \Nino\Components::validate( 'said', $withoutFormat )['format'] ?? '' ) === 'lines' );
+$whyNot = static fn( mixed $schema, string $name = 'x' ): string => is_string( $answer = \Nino\Components::validate( $name, $schema ) ) === true ? $answer : '';
+$formatOf = static fn( array $declared, array $more = [], string $source = 'text' ): array => [ 'label' => 'F', 'source' => $source, 'template' => '<x>' ] + $more + [ 'attributes' => [ 'format' => $declared ] ];
+$inlineLines = [ 'type' => 'choice', 'options' => [ 'inline', 'lines' ], 'default' => 'inline' ];
+check( 'an attribute named format is refused with an option that is no format', str_contains( $whyNot( $formatOf( [ 'options' => [ 'inline', 'html' ] ] + $inlineLines ) ), '"html"' ) === true && str_contains( $whyNot( $formatOf( [ 'options' => [ 'inline', '' ] ] + $inlineLines ) ), 'none of' ) === true );
+check( '...with a type that is no choice, with options that a method answers, with a default that is not the format of the schema, on a component whose source is no text and on one that has no source',
+	str_contains( $whyNot( $formatOf( [ 'type' => 'string', 'default' => 'inline' ] ) ), '"format"' ) === true && str_contains( $whyNot( $formatOf( [ 'options' => '\Nino\Format::options', 'default' => '' ] + $inlineLines ) ), '"format"' ) === true
+	&& str_contains( $whyNot( $formatOf( $inlineLines, [ 'format' => 'lines' ] ) ), 'default' ) === true && str_contains( $whyNot( $formatOf( $inlineLines, [], 'image' ) ), 'source' ) === true && str_contains( $whyNot( $formatOf( $inlineLines, [], 'none' ) ), 'source' ) === true );
+check( '...and an attribute of another name with the same options is nothing special; a default of the format of the schema, or among plain, is fine',
+	is_array( \Nino\Components::validate( 'x', [ 'label' => 'F', 'source' => 'text', 'template' => '<x>', 'attributes' => [ 'shape' => [ 'type' => 'choice', 'options' => [ 'inline', 'html' ], 'default' => 'inline' ] ] ] ) ) === true
+	&& is_array( \Nino\Components::validate( 'x', $formatOf( $inlineLines, [ 'format' => 'inline' ] ) ) ) === true && ( \Nino\Components::validate( 'x', $formatOf( [ 'type' => 'choice', 'options' => [ 'plain', 'inline' ], 'default' => 'plain' ] ) )['format'] ?? '' ) === 'plain' );
+
+echo "\n";
+
+
+echo "The type text - a second text of a call\n";
+
+$figure = [ 'label' => 'Figure', 'in' => [ 'page' ], 'offers' => [], 'source' => 'image', 'attributes' => [
+	'caption'	=> [ 'type' => 'text', 'default' => '' ],
+	'alt'			=> [ 'type' => 'text', 'default' => '~alt' ] ],
+	'template' => '<figure data-src="[[value]]" data-alt="[[alt]]"><figcaption>[[caption]]</figcaption>[[content]]</figure>' ];
+\Nino\Components::addComponent( $appData, 'figure', $figure );
+$caption = static fn( string $written, array $context = [ 'template' => 'page-x', 'scope' => 'hero' ] ): string => $draw( '[figure /x/y/z/w caption="'. $written. '"]', $context );
+$figured = static fn( string $caption, string $alt = 'Alt &quot;x&quot; [sic]' ): string => '<figure data-src="/x/y/z/w" data-alt="'. $alt. '"><figcaption>'. $caption. '</figcaption></figure>';
+check( 'a text of a call is the text as it is written, escaped once, with the fills of the site in it, and nothing where the call says none; the default is read the way a call writes it',
+	$caption( 'A & B <i>' ) === $figured( 'A &amp; B &lt;i&gt;' ) && $caption( 'A &amp; B' ) === $figured( 'A &amp; B' ) && $caption( 'Von [[/project/company/general/name]]' ) === $figured( 'Von ACME' ) && $caption( '' ) === $figured( '' )
+	&& $draw( '[figure /x/y/z/w]', $inHero ) === $figured( '' ) && $draw( '[figure /x/y/z/w]', [ 'template' => 'page-x', 'scope' => 'a' ] ) === $figured( '', '' ) );
+check( '...a reference is read as the first word of a call is: ~name of the section, a key with a slash in front, a field of the element - a key nobody has a text for, and a field where there is no element, are nothing - and the text is plain',
+	$caption( '~caption' ) === $figured( 'Bild &lt;1&gt; [sic]' ) && $caption( '/project/company/general/name' ) === $figured( 'ACME' ) && $caption( '~nothing' ) === $figured( '' ) && $caption( '/x/y/z/w' ) === $figured( '' )
+	&& $caption( '~caption', [ 'template' => 'page-x', 'scope' => 'a' ] ) === $figured( '', '' ) && $caption( '.title', $inHero + [ 'element' => $element ] ) === $figured( 'T &amp; &lt;b&gt;x&lt;/b&gt; [sic]' ) && $caption( '.title' ) === $figured( '' )
+	&& str_contains( $draw( '[figure /x/y/z/w alt="~caption"]', $inHero ), 'data-alt="Bild &lt;1&gt; [sic]"' ) === true );
+check( '...and a ~ or a / that is followed by a space, a dot that is no field, a bracket in the word, are the text that begins so',
+	$caption( '~ about 5' ) === $figured( '~ about 5' ) && $caption( '/ and so on' ) === $figured( '/ and so on' ) && $caption( '.NET rocks' ) === $figured( '.NET rocks' ) && $caption( '..and more' ) === $figured( '..and more' ) && $caption( '~[[x]]' ) === $figured( '~[[x]]' ) );
+$seen->exchangeArray( [] );
+check( 'what a text brings is never read: a call, a fill and a placeholder in the text of a key, in the value or in the one pass stay the text they are',
+	$caption( '/project/company/general/macro' ) === $figured( '[template /templates/x] und [probe-echo]' ) && $caption( '/project/company/general/tokens' ) === $figured( '[[content]] [[class]]' ) && $caption( '[template /templates/x]' ) === $figured( '[template /templates/x]' )
+	&& $draw( '[figure /x/y/z/w caption="[[content]] [[class]] [[value]] [probe-echo]"]CHILD[/figure]', $inHero ) === '<figure data-src="/x/y/z/w" data-alt="Alt &quot;x&quot; [sic]"><figcaption>[[content]] [[class]] [[value]] [probe-echo]</figcaption>CHILD</figure>' && count( $seen ) === 0 );
+check( '...markup is text: a quote that ends the attribute, a tag, and a null byte or a control character in a reference, which makes it a text and no key',
+	$caption( '\"><script>alert(1)</script>' ) === $figured( '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;' ) && str_contains( $caption( "~caption\0" ), 'Bild' ) === false && str_contains( $caption( "/project/company/general/name\0" ), 'ACME' ) === false
+	&& str_contains( $caption( "~caption\x01" ), 'Bild' ) === false && str_contains( $caption( "~caption\0" ), "~caption\0" ) === true );
+check( 'validate() refuses a text whose default is no string, that is a class or has options, and accepts a reference as the default', str_contains( $whyNot( $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => 1 ] ] ] ), 'default' ) === true
+	&& str_contains( $whyNot( $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => '', 'class' => true ] ] ] ), 'class' ) === true && str_contains( $whyNot( $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => '', 'options' => [ 'a' ] ] ] ] ), 'options' ) === true
+	&& is_array( \Nino\Components::validate( 'x', $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => '~title' ] ] ] ) ) === true && in_array( 'text', \Nino\Components::TYPES, true ) === true );
+
+echo "\n";
+
+
+echo "fill() - the template of a component, filled for its renderer\n";
+
+$filler = [ 'label' => 'Filler', 'in' => [ 'page' ], 'offers' => [], 'variants' => [ 'soft' ], 'attributes' => [
+	'label'		=> [ 'type' => 'string', 'default' => 'L' ],
+	'size'		=> [ 'type' => 'choice', 'options' => [ 'a', 'b' ], 'default' => 'a' ],
+	'anchor'	=> [ 'type' => 'id', 'default' => '' ] ],
+	'template' => '<div[[id]] class="[[class]]"[[lang]] data-label="[[label]]" data-anchor="[[anchor]]">[[extra]]|[[value]]|[[content]]|[[content:card-title]]|[[/project/company/general/name]]|[[/nobody/has/a/text]]</div>' ];
+$fillArgs = new \ArrayObject();
+$fillMore = new \ArrayObject();
+\Nino\Components::addComponent( $appData, 'filler', $filler, static function( array &$appData, array $args, string $content, array $context ) use ( $fillArgs, $fillMore ): string {
+	$fillArgs[] = $args;
+	return \Nino\Components::fill( $appData, 'filler', $args, $content, $fillMore->getArrayCopy() );
+} );
+\Nino\Components::addComponent( $appData, 'twin', $filler );
+$fillMore->exchangeArray( [ '[[extra]]' => '<b>own</b>' ] );
+$call = '[%s label="A & B" size="b" anchor="top" variant="soft"][card-title text="Slot"][card-text text="Rest"][/%s]';
+$filled = $draw( sprintf( $call, 'filler', 'filler' ) );
+check( 'a renderer can have its template filled as the register fills it: the class, the id, the attributes that are no class, the children of a slot and the others, the fills of the site - and a token of its own, which is the markup it made',
+	$filled === '<div id="top" class="filler filler--size-b filler--variant-soft" data-label="A &amp; B" data-anchor="top"><b>own</b>||<div class="card-text">Rest</div>|<h3 class="card-title">Slot</h3>|ACME|</div>' );
+check( '...which is the markup the register makes of the template where there is no renderer', str_replace( [ 'twin', '[[extra]]' ], [ 'filler', '<b>own</b>' ], $draw( sprintf( $call, 'twin', 'twin' ) ) ) === $filled );
+check( 'the children of a slot are an argument of the renderer under content:<slot>, one for each slot the template names, and nothing else is an argument of the kind',
+	$fillArgs[0]['content:card-title'] === '<h3 class="card-title">Slot</h3>' && array_keys( array_filter( $fillArgs[0], static fn( string $value, int|string $key ): bool => str_starts_with( (string) $key, 'content:' ), ARRAY_FILTER_USE_BOTH ) ) === [ 'content:card-title' ]
+	&& array_keys( $fillArgs[0] ) === [ 'value', 'source', 'class', 'variant', 'lang', 'label', 'size', 'anchor', 'content:card-title' ] );
+
+$fillMore->exchangeArray( [ '[[extra]]' => '[[content]] [[label]] [template /x] [[/project/company/general/name]]' ] );
+$filled = $draw( '[filler label="[[extra]] [[content]] [[/project/company/general/name]] [template /x]" anchor="a"]' );
+check( 'one pass: what a token holds and what a value holds is read by nobody - a token with a placeholder, a call and a key in it, a label with a token, a placeholder and a key in it',
+	str_contains( $filled, '>[[content]] [[label]] [template /x] [[/project/company/general/name]]|' ) === true && str_contains( $filled, 'data-label="[[extra]] [[content]] ACME [template /x]"' ) === true );
+$fillMore->exchangeArray( [ '[[class]]' => 'mine', '[[extra]]' => 'x', '[[value]]' => 7, '[[content]]' => [ 'list' ], '[[lang]]' => null ] );
+check( 'a token of the renderer wins over the placeholder of the same name, a number is its digits, and what is no text is no token', str_contains( $draw( '[filler]' ), 'class="mine"' ) === true && str_contains( $draw( '[filler]' ), '>x|7||' ) === true );
+$fillMore->exchangeArray( [ '[[extra]]' => "a\0b\"><script>" ] );
+$filled = $draw( '[filler label="\"><script>x</script>"]' );
+check( '...what a renderer puts in is its own, a null byte and markup as they are; what the call says is escaped as ever', str_contains( $filled, ">a\0b\"><script>|" ) === true && str_contains( $filled, 'data-label="&quot;&gt;&lt;script&gt;x&lt;/script&gt;"' ) === true );
+
+\Nino\Components::addComponent( $appData, 'late', [ 'label' => 'Late', 'in' => [ 'page' ], 'template' => '<i>[[/project/company/general/late]]</i>' ], static function( array &$appData, array $args, string $content, array $context ): string {
+	\Nino\Html::addFills( $appData, [ '/project/company/general/late' => 'Spät' ] );
+	return \Nino\Components::fill( $appData, 'late', $args, $content, [] );
+} );
+check( 'the fills a renderer added before it asks are in the template: the table is read where the template needs it', $draw( '[late]' ) === '<i>Spät</i>' );
+check( 'a component nobody registered and a component with no template are nothing, and an argument that is no string is nothing',
+	\Nino\Components::fill( $appData, 'nobody', [], '', [ '[[x]]' => 'y' ] ) === '' && \Nino\Components::fill( $appData, 'probe-echo', [], '', [] ) === ''
+	&& \Nino\Components::fill( $appData, 'filler', [ 'class' => [ 'x' ], 'label' => 3, 'content:card-title' => null ], 'C', [ '[[extra]]' => 'E' ] ) === '<div class="" data-label="" data-anchor="">E||C||ACME|</div>' );
+$fillMore->exchangeArray( [] );
+
+echo "\n";
+
+
+echo "sources() - the keys and the pictures a source reads\n";
+
+\Nino\Components::addComponent( $appData, 'goto', [ 'label' => 'Go', 'in' => [ 'page' ], 'source' => 'link', 'attributes' => [ 'back' => [ 'type' => 'link', 'default' => '~back' ] ], 'template' => '<a href="[[value]]" data-back="[[back]]"></a>' ] );
+$reads = '[hold anchor="hero" image="~background" note="Caption of ~it"]'. "\n"
+	. "\t". '[heading ~title]'. "\n"
+	. "\t". '[heading /project/company/general/name anchor="inner"]'. "\n"
+	. "\t". '[heading .title]'. "\n"
+	. "\t". '[heading ~ignored text="~fixed"]'. "\n"
+	. "\t". '[figure /template/page-x/hero/photo caption="~caption" alt="/a/b/c/d"]'. "\n"
+	. "\t". '[figure ~photo]'. "\n"
+	. "\t". '[goto ~link back="/contact"][goto /contact back="~back2"]'. "\n"
+	. "\t". '[probe-echo /project/company/general/name]'. "\n"
+	. '[/hold]'. "\n"
+	. '[heading ~title]'. "\n"
+	. '[nobody ~x][section-title /a/b/c/d]';
+$seen->exchangeArray( [] );
+ninoWarnings();
+$list = \Nino\Components::sources( $appData, $reads, 'page-x' );
+$listed = array_map( static fn( array $entry ): string => $entry['name']. ' '. $entry['kind']. ' '. $entry['source']. ( isset( $entry['attribute'] ) === true ? ' ('. $entry['attribute']. ')' : '' ), $list );
+check( 'sources() lists what the calls read, in the order they stand: the first word of a registered component where its source is a text, an image or a link, then each attribute of the type text, image or link, the default where the call says none - ~name in the section of the call itself',
+	$listed === [
+		'hold image /template/page-x/hero/background (image)',
+		'heading text /template/page-x/hero/title',
+		'heading text /project/company/general/name',
+		'figure image /template/page-x/hero/photo',
+		'figure text /template/page-x/hero/caption (caption)',
+		'figure text /a/b/c/d (alt)',
+		'figure image /template/page-x/hero/photo',
+		'figure text /template/page-x/hero/alt (alt)',
+		'goto link /template/page-x/hero/link',
+		'goto link /template/page-x/hero/back2 (back)',
+		'probe-echo text /project/company/general/name',
+		'section-title text /a/b/c/d',
+	] );
+check( '...each with the name, the kind, the key and what is written, and the attribute where it is one - no field, no fixed text, no text with a space in it, no ~name where no id stands above, no name nobody registered, and no link written as an address',
+	$list[0] === [ 'name' => 'hold', 'kind' => 'image', 'source' => '/template/page-x/hero/background', 'written' => '~background', 'attribute' => 'image' ] && $list[1] === [ 'name' => 'heading', 'kind' => 'text', 'source' => '/template/page-x/hero/title', 'written' => '~title' ]
+	&& $list[8] === [ 'name' => 'goto', 'kind' => 'link', 'source' => '/template/page-x/hero/link', 'written' => '~link' ] );
+check( '...nothing is drawn, asked or said: no renderer ran, the log is empty', count( $seen ) === 0 && ninoWarnings() === [] );
+check( 'a source with no template, or with no id above a ~name, has the keys with a slash and nothing else; an empty source has none', \Nino\Components::sources( $appData, '[heading ~title][heading /a/b/c/d]', '' ) === [ [ 'name' => 'heading', 'kind' => 'text', 'source' => '/a/b/c/d', 'written' => '/a/b/c/d' ] ]
+	&& \Nino\Components::sources( $appData, '[heading ~title]', 'page-x' ) === [] && \Nino\Components::sources( $appData, '', 'page-x' ) === [] && \Nino\Components::sources( $appData, '[heading ~title anchor="x"]', 'page-x' )[0]['source'] === '/template/page-x/x/title' );
+check( 'it reads nothing out of a value: a fill, a call or a key in an attribute that is a string, a fixed text or a word with a bracket in it, a null byte or a control character in it, is no key',
+	\Nino\Components::sources( $appData, '[hold anchor="a" image="[[/a/b/c/d]]" note="[template /templates/x]"][heading text="[[/a/b/c/d]] /x/y/z/w" anchor="b"][figure /x/y/z/w caption="~a[[x]]" alt="[probe-echo]"][/hold]', 'page-x' ) === [ [ 'name' => 'figure', 'kind' => 'image', 'source' => '/x/y/z/w', 'written' => '/x/y/z/w' ] ]
+	&& \Nino\Components::sources( $appData, "[figure /x/y/z/w caption=\"~ti\0tle\" alt=\"/a/b\x01c/d\" anchor=\"x\"]", 'page-x' ) === [ [ 'name' => 'figure', 'kind' => 'image', 'source' => '/x/y/z/w', 'written' => '/x/y/z/w' ] ]
+	&& \Nino\Components::sources( $appData, '[hold anchor="a"][heading ~a][/hold]', "page\0x" ) === [] && \Nino\Components::sources( $appData, '[hold anchor="a"][heading ~a][/hold]', "page x" ) === [] );
+
+$keys = [];
+$drawn = '[hold anchor="deep" note="~n1" image="~i1"][heading ~a][heading /k/l/m/n][figure /i/m/g/x caption="~c" alt="/k/l/m/o"][hold anchor="inner" note="~n2"][heading ~b][/hold][/hold]';
+foreach( \Nino\Components::sources( $appData, $drawn, 'page-x' ) as $entry )
+	if( $entry['kind'] === 'text' )
+		$keys['/'. ltrim( $entry['source'], '/' )] = 'M'. count( $keys );
+\Nino\Html::addFills( $appData, $keys );
+$out = $draw( $drawn );
+$all = true;
+foreach( $keys as $marker )
+	$all = $all && str_contains( $out, $marker ) === true;
+check( 'what sources() names is what the drawing reads: the text of each key it lists for a document is in the page, in the section of each call', $all === true && count( $keys ) === 7 && ninoWarnings() === [] );
+
+echo "\n";
+
+
+echo "children => nodes - the component that draws what it holds\n";
+
+$loop = [ 'label' => 'Loop', 'in' => [ 'page' ], 'offers' => [], 'children' => 'nodes', 'attributes' => [ 'anchor' => [ 'type' => 'id', 'default' => '' ] ], 'template' => '<ul[[id]]>[[content]]</ul>' ];
+$handed = new \ArrayObject();
+$rounds = new \ArrayObject( [ 'a', 'b' ] );
+$loopRenderer = static function( array &$appData, array $args, string $content, array $context ) use ( $handed, $rounds ): string {
+
+	$handed[] = [ $args, $content, $context ];
+	$nodes = $context['children'];
+	unset( $context['children'] );
+	$items = '';
+
+	foreach( $rounds as $round )
+		$items .= '<li>'. \Nino\Components::render( $appData, $nodes, [ 'fills' => [ '[[n]]' => $round ] ] + $context ). '</li>';
+
+	return \Nino\Components::fill( $appData, 'loop', $args, $items, [] );
+};
+$clean = \Nino\Components::validate( 'loop', $loop );
+check( 'validate() accepts children => nodes and answers it, which it accepts as it is; anything else is refused, with a reason', is_array( $clean ) === true && $clean['children'] === 'nodes' && \Nino\Components::validate( 'loop', $clean ) === $clean
+	&& isset( \Nino\Components::validate( 'loop', [ 'children' => null ] + $loop )['children'] ) === false
+	&& str_contains( $whyNot( [ 'children' => 'draw' ] + $loop ), '"children"' ) === true && str_contains( $whyNot( [ 'children' => true ] + $loop ), '"children"' ) === true && str_contains( $whyNot( [ 'children' => [ 'nodes' ] ] + $loop ), '"children"' ) === true
+	&& str_contains( $whyNot( [ 'children' => 'Nodes' ] + $loop ), '"children"' ) === true && str_contains( $whyNot( [ 'children' => '' ] + $loop ), '"children"' ) === true );
+$errors = $errorsOf( function() use ( &$appData, $loop ) { \Nino\Components::addComponent( $appData, 'loop', $loop ); } );
+check( 'addComponent() refuses it without a renderer: the nodes are for it to draw - one error, nothing registered', count( $errors ) === 1 && $errors[0][0] === E_USER_ERROR && str_contains( $errors[0][1], 'renderer' ) === true && isset( \Nino\Components::components( $appData )['loop'] ) === false );
+\Nino\Components::addComponent( $appData, 'loop', $loop, $loopRenderer );
+check( '...and registers it with one', ( \Nino\Components::components( $appData )['loop']['children'] ?? '' ) === 'nodes' );
+
+$seen->exchangeArray( [] );
+$said = $logged( function() use ( &$html, $draw ) { $html = $draw( '[loop anchor="hero"][text ~title][probe-echo ~a][nobody][/loop]', [ 'template' => 'page-x', 'scope' => 'above', 'depth' => 2 ] ); } );
+$context = $handed[0][2];
+$nodes = $context['children'];
+unset( $context['children'] );
+check( 'the register does not draw what such a component holds: no child is drawn - none of them is asked, and a name nobody registered is not said - the renderer is handed \'\' as the content and the nodes as the children of its context',
+	count( $seen ) === 0 && $said === [] && $handed[0][1] === '' && array_column( $nodes, 'n' ) === [ 'text', 'probe-echo' ] && $nodes[1]['c'][0]['n'] === 'nobody' );
+check( '...and the context to draw them in: the scope its own id makes, the template, the place its name, one deeper, the element and the fills of the call', $context === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'loop', 'element' => null, 'fills' => [], 'depth' => 3 ] );
+check( '...so that it draws them as often as it likes, each time in a context of its own', $html === '<ul id="hero"><li><p class="text">'. $title. '</p></li><li><p class="text">'. $title. '</p></li></ul>' );
+$rounds->exchangeArray( [ 'x' ] );
+$html = $draw( '[loop][text ~title][/loop]', [ 'template' => 'page-x', 'scope' => 'hero', 'element' => $element, 'fills' => [ '[[o]]' => 'outer' ] ] );
+check( 'what the call stands in is handed on: the element of a loop and its tokens', $handed[1][2]['element'] === $element && $handed[1][2]['fills'] === [ '[[o]]' => 'outer' ] && $html === '<ul><li><p class="text">'. $title. '</p></li></ul>' );
+$draw( '[loop]' );
+check( 'a call that holds nothing is handed no nodes', $handed[2][2]['children'] === [] && $handed[2][1] === '' );
+$rounds->exchangeArray( [ 'a' ] );
+$deep = '[loop]'. str_repeat( '[loop]', 5 ). '[text ~title]'. str_repeat( '[/loop]', 6 );
+check( 'a loop in a loop draws, and the depth of what is drawn is counted all the way down', $draw( $deep, [ 'template' => 'page-x', 'scope' => 'hero' ] ) === str_repeat( '<ul><li>', 6 ). '<p class="text">'. $title. '</p>'. str_repeat( '</li></ul>', 6 ) );
+$tooDeep = \Nino\Components::render( $appData, \Nino\Markup::parse( '[loop][text ~title][/loop]', \Nino\Components::containers( $appData ) ), [ 'template' => 'page-x', 'scope' => 'hero', 'depth' => \Nino\Markup::MAX_DEPTH ] );
+check( '...and a tree that is too deep draws nothing, there as everywhere', $tooDeep === '<ul><li></li></ul>' );
 
 echo "\n";
 
