@@ -8,8 +8,8 @@
  *													what belongs here: this file is in the public script bundle,
  *													so anything only one audience needs is a file of its own.
  *
- *													Frontend design-system behaviors (cover, parallax, vpa,
- *													autoheight, slider, generic forms) live in Nino.ui.js;
+ *													The script of the contact form lives in the module Form
+ *													(Modules/Form/assets/form.js);
  *													the management design system's behaviour half - the DOM
  *													primitives and the table model - in Nino.admin.js. Both
  *													extend the namespace this file creates, so both load after
@@ -66,7 +66,7 @@
 		 *	this script and the ones written against it send a request to.
 		 *
 		 *	Modules\Assets writes the value into the literal below when it
-		 *	bundles this file, the same substitution Nino.ui.js's form and
+		 *	bundles this file, the same substitution the script of the Form module's form and
 		 *	newsletter endpoints rely on. Two pages load the file as it is on
 		 *	disk instead - the install wizard and the recovery page, which have
 		 *	to work before or without a bundle - and there the literal survives
@@ -255,7 +255,7 @@
 				// onResize
 				// Throttle native resize events and notify registered 'resize' callbacks. A
 				// phone fires the same event when it is rotated; what the address bar does
-				// to the height is sorted out by the callbacks (Nino.ui.onResize).
+				// to the height is sorted out by the callbacks that were registered.
 				// Passive, like the scroll listener below
 				wn.addEventListener( 'resize', ( e ) => {
 					if( Nino.events._calls['resize'] !== false )

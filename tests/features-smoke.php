@@ -801,7 +801,7 @@ $appData = \\Nino\\init();
 echo json_encode( [ $appData[\'/nino/html/assets\'], \\Nino\\Html::shortcodes( $appData ) ] );' );
 $booted = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $bootDir. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
 check( 'a boot lists the files of an active feature in the two bundles - behind the kernel\'s own, ahead of what its class adds itself, once each - and has its components registered', ( $booted[0]['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css', '/features/Sample/assets/late.css' ]
-	&& ( $booted[0]['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js' ] && array_diff( [ 'greeting', 'caption', 'sample' ], $booted[1] ?? [] ) === [] );
+	&& ( $booted[0]['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js' ] && array_diff( [ 'greeting', 'caption', 'sample' ], $booted[1] ?? [] ) === [] );
 
 echo "\n";
 
@@ -880,10 +880,10 @@ $ordered['/nino/html/assets']['/.cache/odd.css'] = [ '/_nino/Nino.css', [ 'neste
 $odd = ninoErrors( static function() use ( &$ordered ): void { \Nino\Html::addAsset( $ordered, '/.cache/odd.css', '/features/First/assets/first.css' ); } );
 check( 'what is no string in a list a person wrote is left out and raises nothing: the file goes between the kernel\'s and the project\'s',
 	$ordered['/nino/html/assets']['/.cache/odd.css'] === [ '/_nino/Nino.css', '/features/First/assets/first.css', '/assets/theme.css' ] && $odd === [] );
-$ordered['/nino/html/assets']['/.cache/two.css'] = [ '/_nino/Nino.css', '/assets/theme.css', '/_nino/Nino.ui.css', '/assets/style.css' ];
+$ordered['/nino/html/assets']['/.cache/two.css'] = [ '/_nino/Nino.css', '/assets/theme.css', '/_nino/Other.css', '/assets/style.css' ];
 \Nino\Html::addAsset( $ordered, '/.cache/two.css', '/features/First/assets/first.css' );
 check( '...and with files of the kernel at two places it is the last of them the file goes behind',
-	$ordered['/nino/html/assets']['/.cache/two.css'] === [ '/_nino/Nino.css', '/assets/theme.css', '/_nino/Nino.ui.css', '/features/First/assets/first.css', '/assets/style.css' ] );
+	$ordered['/nino/html/assets']['/.cache/two.css'] === [ '/_nino/Nino.css', '/assets/theme.css', '/_nino/Other.css', '/features/First/assets/first.css', '/assets/style.css' ] );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $ordered ) );
 
 /*	The boot itself, in a process of its own, over a project whose config.php lists both bundles with the files of the
@@ -901,7 +901,7 @@ file_put_contents( $orderDir. '/private/config.php', '<?php return '. var_export
 	'/nino/install/completed'		=> true,
 	'/nino/html/assets'					=> [
 		'/.cache/style.css'	=> [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css' ],
-		'/.cache/script.js'	=> [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/assets/site.js' ],
+		'/.cache/script.js'	=> [ '/_nino/Nino.js', '/assets/site.js' ],
 	],
 ], true ). ';' );
 file_put_contents( $orderDir. '/boot.php', '<?php declare(strict_types=1);
@@ -913,7 +913,7 @@ echo json_encode( $appData[\'/nino/html/assets\'] );' );
 $ordered = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $orderDir. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
 check( 'a boot with the project\'s files in config.php lists the kernel\'s files, then the feature\'s and the module\'s in the order they were added, then the project\'s own in the order of the list - in both bundles, with two features listed in the order of the list',
 	( $ordered['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css', '/features/Boxy/assets/boxy.css', '/features/Sample/assets/late.css', '/assets/theme.css', '/assets/style.css' ]
-	&& ( $ordered['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js', '/assets/site.js' ] );
+	&& ( $ordered['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js', '/assets/site.js' ] );
 
 // The bundle on disk holds the files in that order: the lists the boot answered, built by the Assets module in a project of its own
 $built = ninoSandbox( 'assets-built' );

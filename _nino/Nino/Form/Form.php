@@ -94,7 +94,7 @@ namespace Nino {
 		// an <input type>, 'select' and 'radio' are the two that list
 		// 'options'.
 		//
-		// What each posts is what the shared .nino-form script (_nino/Nino.ui.js)
+		// What each posts is what the shared .nino-form script (Modules/Form/assets/form.js)
 		// sends: a ticked 'checkbox' its value and an unticked one '', a 'radio'
 		// group the value of whichever member is ticked, a 'date' the Y-m-d the
 		// browser's own date input holds. A radio without one non-empty option

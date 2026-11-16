@@ -242,7 +242,7 @@ namespace Nino\Modules {
 			// straight from the webroot, that would turn any admin-editable fill
 			// into stored XSS on every page that includes the bundle. Only the
 			// developer/kernel-controlled tokens the shipped assets actually use are
-			// substituted here - both of them: Nino.ui.js falls back to
+			// substituted here - both of them: form.js falls back to
 			// '[[/nino/dir]]/.form' for a form that carries no action of its own,
 			// and with only the public one handled that shipped as a literal.
 			$content = str_replace(
@@ -281,8 +281,9 @@ namespace Nino\Modules {
 		 *	the project's assets/theme.css is 'nino.theme', any other file of the
 		 *	project's assets/ 'project', and what a feature or a module adds
 		 *	'nino.components'. A project never writes a layer, the bundle puts the
-		 *	file in it. Nino.css is the one file with two layers, so it holds them
-		 *	itself: null, it is taken as it is.
+		 *	file in it. Nino.css is the layer nino.reset and holds it itself - the
+		 *	order of the four is written by the bundle, not by the file: null, it is
+		 *	taken as it is.
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
 		 *	@param		string				$filepath			The absolute path of the file, as \Nino\Filesystem::path() resolves it

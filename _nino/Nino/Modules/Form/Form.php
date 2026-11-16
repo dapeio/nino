@@ -61,13 +61,16 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Register the POST handler
+		 *	Register the POST handler, and put the look and the script of the form into the two bundles of the site: they
+		 *	are there for as long as this module is switched on
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
+			\Nino\Html::addAsset( $appData, '/.cache/style.css', '/_nino/Nino/Modules/Form/assets/form.css' );
+			\Nino\Html::addAsset( $appData, '/.cache/script.js', '/_nino/Nino/Modules/Form/assets/form.js' );
 			$appData['/nino/http/routes']['POST://.form'] = [ 'uri' => '/.form' ];
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', [ self::class, 'callbackResponse' ] );
 		}

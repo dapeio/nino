@@ -29,18 +29,12 @@ namespace Nino\Modules {
 		public static
 			$html = [
 				'li'					=> '<li><a href="[[uri]]"[[attributes]]>[[title]]</a></li>',
-				'nav-burger'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-burger [[class]]" id="[[id]]"><button type="button" class="nino-nav-toggle" aria-expanded="false" aria-controls="[[list]]" hidden><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><span class="nino-sr-only">[[/template/common/navigation/menu]]</span></button><div class="nino-nav-bg"></div><div class="nino-nav-content" id="[[list]]">[[content]]</div></div>',
-				'nav-regular'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-regular [[class]]" id="[[id]]"><div class="nino-nav-content">[[content]]</div></div>',
-				'ul'					=> '<ul>[[content]]</ul>',
+				'ul'					=> '<ul[[id]][[class]]>[[content]]</ul>',
 				'div'					=> '<div>[[content]]</div>',
 			];
 
 		// What marks the entry of the page that is shown
-		private const string CURRENT = ' class="nino-is-active" aria-current="page"';
-
-		// How many burgers without an id this request has drawn: the id of the
-		// list its button names is made from it
-		private const string COUNTER = './nino/navigation/count';
+		private const string CURRENT = ' aria-current="page"';
 
 		/**
 		 *	The /_admin screen this module brings along - collected by
@@ -75,12 +69,11 @@ namespace Nino\Modules {
 		 *	hand-written menu keeps working exactly as before, and a generated
 		 *	one can still be extended by hand (an external link, a separator).
 		 *
-		 *	The argument burger folds the list away below 768px, behind a button: it
-		 *	names the list it opens (aria-controls) and says whether it is open
-		 *	(aria-expanded). Nino.ui.js shows the button - the markup carries it
-		 *	hidden, so that without the script the list stays open, as it is from
-		 *	768px on - and closes the list with Escape. The entry of the page that is
-		 *	shown is marked aria-current="page" beside its class.
+		 *	What it writes is a bare list - <ul><li><a> - with no class of its own: the
+		 *	look of a menu is the part of a feature (the header and the footer of Basis
+		 *	draw theirs from entries()). The id and the class the call names are the
+		 *	list's, and the entry of the page that is shown is marked
+		 *	aria-current="page".
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
@@ -116,15 +109,6 @@ namespace Nino\Modules {
 
 			if( count( $items ) === 0 )
 				return '';
-
-			// The counter runs before the lines are drawn: a menu inside a line of another is the second
-			$template = ( in_array( 'burger', $args ) === true ) ? 'burger' : 'regular';
-			$list			= '';
-
-			if( $template === 'burger' ) {
-				$appData[self::COUNTER] = (int) ( $appData[self::COUNTER] ?? 0 ) + 1;
-				$list = ( $id !== '' ? $id : 'nino-nav-'. $appData[self::COUNTER] ). '-list';
-			}
 
 			// An entry names its page the way the routes do, from the project's root; the page is reached
 			// under the directory the project is served from. A hand-written line that already names
@@ -184,17 +168,12 @@ namespace Nino\Modules {
 				$href				= self::_address( $dir, $element[0] );
 				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $href, $attributes, $title ], self::$html['li'] );
 			}
-			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
 
-			// The words of the fragment are fills of the site, put in here as the text they are and with every bracket an
-			// entity, as the words of a page are. What is filled in comes last, so that a bracket in it is never read again
-			$fragment = (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', static function( array $found ) use ( &$appData ): string {
-				$text = \Nino\Html::resolveTextfill( $appData, $found[1] );
-
-				return $text === null ? $found[0] : str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $text );
-			}, self::$html['nav-'. $template] );
-
-			$result = str_replace( [ '[[id]]', '[[class]]', '[[list]]', '[[content]]' ], [ $id, $class, $list, $html ], $fragment );
+			// The id and the class are the call's own words, written as an attribute
+			$attribute = static fn( string $name, string $value ): string => $value === '' ? '' : ' '. $name. '="'. htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '"';
+			$result = str_replace( [ '[[id]]', '[[class]]', '[[content]]' ], [ $attribute( 'id', (string) $id ), $attribute( 'class', (string) $class ), $lis ], self::$html['ul'] );
+			// A list with no entry is no list: lines with no address are drawn and nothing is drawn around them
+			$result = $html. ( $lis === '' ? '' : $result );
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );

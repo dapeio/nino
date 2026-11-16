@@ -34,6 +34,10 @@ $appData 	= ninoSandbox( 'keys' );
 $appData['/nino/dir'] 	= '';
 $appData['/nino/public'] = '/public';
 
+// The components the starter pages are written in, so that a source of a call is read as the register reads it
+$appData['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+\Nino\Features::registerComponents( $appData );
+
 // Keys the system writes itself: a page's details after its Element-URI, and
 // a language's name after its code
 const KEYS_SYSTEM_WEBPAGE 	= '#^/_nino/webpage(/.+)/(name|title|description|uri)$#';
@@ -48,10 +52,10 @@ const KEYS_SYSTEM_LOCALE 		= '#^/_nino/locale/[a-z]{2}_[A-Z]{2}/name$#';
 const KEYS_LEGAL_PAGES 	= '#^/_nino/webpage/legal/(imprint|privacy)/(name|title|description)$#';
 const KEYS_LEGAL_ADMIN 	= '#^/_admin/elements/(field/(legal|privacy)/(title|text|order|hidden)|type/(legal|privacy)/hint)$#';
 
-// The one key of a feature a page unit delivers: the specimen page's
-// newsletter specimen shows the label the Newsletter feature ships for
+// The one key of a feature a page unit delivers: the page of the tests with a
+// newsletter form shows the label the Newsletter feature ships for
 // markup any template writes
-const KEYS_NAMED_EXCEPTION = [ 'page:.demo-catalogue' => [ '/feature/newsletter/label/submit' ] ];
+const KEYS_NAMED_EXCEPTION = [ 'page:.uncategorized' => [ '/feature/newsletter/label/submit' ] ];
 
 /**
  *	@param		string		$dir
@@ -125,8 +129,8 @@ foreach( scandir( $libraryDir. '/pages' ) ?: [] as $page )
 foreach( glob( $root. '/_nino/Nino/Modules/*/install', GLOB_ONLYDIR ) ?: [] as $installDir )
 	$unitDirs['module:'. strtolower( basename( dirname( $installDir ) ) )] = $installDir;
 
-// The specimen page of the tests is read like a unit of the library: it is the one template that draws every building block
-$unitDirs['page:.demo-catalogue'] = $root. '/tests/fixtures/demo-catalogue';
+// The page of the tests whose file has no category is read like a unit of the library
+$unitDirs['page:.uncategorized'] = $root. '/tests/fixtures/unit-without-category';
 
 $units = [];
 foreach( $unitDirs as $id => $dir ) {
@@ -302,14 +306,19 @@ echo "\n";
 echo "B. Templates: every key they read exists, in their own category or common\n";
 
 /**
- *	The keys one template reads: every [[/...]] from the inside out, [json /...]
- *	and [image /...]
+ *	The keys one template reads: every [[/...]] from the inside out, [json /...],
+ *	[image /...] and what the components of the register take their words and their
+ *	pictures from - a key as the source of a call, or ~name under the id of its
+ *	section, as \Nino\Components::sources() reads them
  *
  *	@param		string		$source
+ *	@param		string		$category			The category of the template, what ~name reads under
  *
  *	@return 	array										[ [ key, composed, uri, image ], ... ] - composed: the key had a placeholder in it, replaced by "\x01" (and "/\x01" for the response uri)
  */
-function keysReadBy( string $source ): array {
+function keysReadBy( string $source, string $category = '' ): array {
+
+	global $appData;
 
 	$reads = [];
 	$work 	= $source;
@@ -346,6 +355,10 @@ function keysReadBy( string $source ): array {
 				if( $slot !== '' && $slot[0] === '/' )
 					$reads[] = [ 'key' => $slot, 'composed' => false, 'image' => true ];
 			}
+
+	foreach( \Nino\Components::sources( $appData, $source, $category ) as $component )
+		if( $component['source'] !== '' && $component['source'][0] === '/' )
+			$reads[] = [ 'key' => $component['source'], 'composed' => false, 'image' => $component['kind'] === 'image' ];
 
 	return $reads;
 }
@@ -425,7 +438,7 @@ foreach( $templateFiles as $template ) {
 	$required 	= array_map( static fn( string $key ): string => $moduleByUnitKey[$key] ?? $key, (array) ( $unit['manifest']['requiresModules'] ?? [] ) );
 	$sources 		= array_merge( [ $unit['id'], 'base' ], $required );
 
-	foreach( keysReadBy( (string) file_get_contents( $template['file'] ) ) as $read ) {
+	foreach( keysReadBy( (string) file_get_contents( $template['file'] ), (string) $category ) as $read ) {
 
 		$key = $read['key'];
 		$readCount++;
@@ -471,20 +484,19 @@ foreach( $templateFiles as $template ) {
 	}
 }
 check( 'the templates read keys ('. $readCount. ' reads): every one is a runtime fill, a key of the system, a placeholder put together in a shape that is allowed, or a key its own unit, the base unit or a module it requires delivers'
-	. ( $unknown === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $unknown ), 0, 6 ) ) ), $unknown === [] && $readCount > 150 );
-check( 'a template reads template keys of its own category or of /template/common only (the demo catalogue has no category, so only common)'
+	. ( $unknown === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $unknown ), 0, 6 ) ) ), $unknown === [] && $readCount > 120 );
+check( 'a template reads template keys of its own category or of /template/common only (the unit without a category has no category, so only common)'
 	. ( $strangers === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $strangers ), 0, 6 ) ) ), $strangers === [] );
 
 // A template without a category carries no keys of its own - what is delivered has a template with that category
-check( 'the template without a category delivers no key of a template: .demo-catalogue.tpl', \Nino\Modules\Template::category( '.demo-catalogue.tpl' ) === null
-	&& array_filter( $units['page:.demo-catalogue']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === [] );
+check( 'the template without a category delivers no key of a template: .uncategorized.tpl', \Nino\Modules\Template::category( '.uncategorized.tpl' ) === null
+	&& array_filter( $units['page:.uncategorized']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === [] );
 check( 'the two pages of the Legal module read the details of their page and carry no key of their own', array_filter( $units['module:legal']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === []
 	&& array_values( $units['module:legal']['templates'] ) === [ 'page-legal-imprint.tpl', 'page-legal-privacy.tpl' ] && isset( $units['page:legal'] ) === false );
 
 // The frames carry the keys of their own category, delivered by the base unit that delivers the frames
-check( 'the frames are frame-header.tpl and frame-footer.tpl, and their words are delivered with them - the label and the link of a header\'s button too, which a header of the library reads where the delivered one reads none', in_array( 'frame-header.tpl', $units['base']['templates'], true ) === true && in_array( 'frame-footer.tpl', $units['base']['templates'], true ) === true
-	&& isset( $provided['base']['/template/frame-header/navigation/label'], $provided['base']['/template/frame-footer/contact/title'], $provided['base']['/template/frame-footer/label/address'] ) === true
-	&& isset( $provided['base']['/template/frame-header/button/label'], $provided['base']['/template/frame-header/button/link'] ) === true );
+check( 'the frames are frame-header.tpl and frame-footer.tpl, and their words are delivered with them - the label of the header\'s button, which the header names by the id of its own section', in_array( 'frame-header.tpl', $units['base']['templates'], true ) === true && in_array( 'frame-footer.tpl', $units['base']['templates'], true ) === true
+	&& isset( $provided['base']['/template/frame-header/header/button'] ) === true );
 echo "\n";
 
 
@@ -550,7 +562,7 @@ $categoryCases = [
 	'page-common.tpl' 														=> 'page-common',
 	'/templates/page-x.[[/nino/http/response/locale]]' 		=> null,
 	'page-x.de_DE.tpl' 														=> null,
-	'.demo-catalogue.tpl' 												=> null,
+	'.uncategorized.tpl' 												=> null,
 	'theme.header.tpl' 														=> null,
 	'a/x.tpl' 																		=> null,
 	'page-Foo.tpl' 																=> null,

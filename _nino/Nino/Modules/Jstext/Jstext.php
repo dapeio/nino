@@ -31,10 +31,9 @@ namespace Nino\Modules {
 		/*	Which text keys the inline block carries. It used to carry every
 			fill the site has, on every page that renders [jstext] - the legal
 			copy, the addresses, and '/project/mail/address/owner', which is the mailbox a
-			contact form delivers to. The scripts reading it ask for three groups
-			(see Nino.ui.js: its form handler reads the Form module's words for a
-			.nino-form and the Newsletter feature's for a .nino-newsletter-form, its
-			.nino-slider the slider's), so those three are what it carries. The
+			contact form delivers to. The scripts reading it ask for two groups
+			(see Modules/Form/assets/form.js: its handler reads the Form module's words for a
+			.nino-form and the Newsletter feature's for a .nino-newsletter-form), so those two are what it carries. The
 			words of a form that names its own prefix in data-form-texts are the
 			feature's to publish().
 
@@ -44,7 +43,7 @@ namespace Nino\Modules {
 			is public - it is in the source of every page that renders the block	*/
 		public const string KEYS = '/nino/jstext/keys';
 
-		private const array DEFAULT_KEYS = [ '/module/form/info/', '/feature/newsletter/info/', '/template/common/slider/' ];
+		private const array DEFAULT_KEYS = [ '/module/form/info/', '/feature/newsletter/info/' ];
 
 		/**
 		 *	Module initiating

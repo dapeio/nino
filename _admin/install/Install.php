@@ -8,7 +8,7 @@ declare(strict_types=1);
  *												environment/permission checks, assembling starting content from
  *												_admin/install/library/ and every module's own install/ unit
  *												(locales/modules -> routes/templates/text/navigation, and
- *												the base unit's fixed look -> theme.css/fonts + the css bundle),
+ *												the base unit's features -> the css bundle),
  *												bulk-filling the site's always-present "Personal Infos" text,
  *												creating the first workbench account(s), placing the
  *												applications of the official catalogue that were picked and,
@@ -333,8 +333,9 @@ namespace Nino\Install {
 	 *												plus text/global.php and/or text/&lt;locale&gt;.php fragments
 	 *												merged into the real /text files - see docs/setup.md's
 	 *												Library format section. The site's look is not a choice
-	 *												here: the base unit delivers one fixed theme, and the
-	 *												Design feature is what replaces it later.
+	 *												here: the base unit switches on the feature Basis, which
+	 *												draws the starter pages, and a theme is what replaces its
+	 *												standard look later.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -342,12 +343,11 @@ namespace Nino\Install {
 	 */
 	class Setup {
 
-		// The css bundle this step seeds, and what goes into it. The theme is one
-		// file the base unit delivers - the framework's tokens, the theme that
-		// assigns them to roles and the header/footer rules, compiled into one -
-		// and style.css is the project's own, shipped empty
+		// The css bundle this step seeds, and what goes into it: style.css is the
+		// project's own, shipped empty. The look of the starter pages is the
+		// standard part of the feature Basis, which the base unit switches on
 		private const string BUNDLE_KEY = '/.cache/style.css';
-		private const array BASE_STYLESHEETS = [ '/assets/theme.css', '/assets/style.css' ];
+		private const array BASE_STYLESHEETS = [ '/assets/style.css' ];
 
 		// Unit keys (see units()) that used to be a picker choice and are now
 		// applied on every apply, exactly like a module a project actually
@@ -732,18 +732,18 @@ namespace Nino\Install {
 			$appData['/nino/modules'] = array_values( array_unique( $moduleClasses ) );
 
 			/*	The css bundle of a fresh project, in the one order that makes it
-				work: the framework first, then the look the base unit just
-				delivered, then the project's own - which ships empty and is never
-				touched again, so a rule put there overrules both. The stylesheets
-				of features and modules are not listed here: \Nino\Html::addAsset()
-				puts them in at every boot, in front of these two.
+				work: the framework first, then the project's own - which ships
+				empty and is never touched again, so a rule put there overrules
+				the framework. The stylesheets of features and modules are not
+				listed here: \Nino\Html::addAsset() puts them in at every boot,
+				in front of the project's own.
 
 				A kernel on its own carries '/_nino/Nino.css' and nothing else
-				(\Nino\AppData::DEFAULTS), which is the honest default: the two
-				files after it are project files, and until this step has run there
-				is no project. Anything a project added itself keeps its place -
-				only the two entries this unit owns are appended, and only when
-				they are not there yet.	*/
+				(\Nino\AppData::DEFAULTS), which is the honest default: the file
+				after it is a project file, and until this step has run there is
+				no project. Anything a project added itself keeps its place -
+				only the entry this unit owns is appended, and only when it is
+				not there yet.	*/
 			// The persisted bundle, or the kernel's default when there is none to
 			// persist yet - the same reading the routes above take, and for the
 			// same reason: the runtime value holds what the features and modules
@@ -830,6 +830,19 @@ namespace Nino\Install {
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
 					return array_values( array_unique( array_merge( $list, $blacklist ) ) );
 				} );
+
+			// The features the base unit names - Basis, which draws the starter pages - are switched on last: an activation reads
+			// the module list back from config.php, so the list this step wrote is what it adds to, and its words are written
+			// for the languages this step has just made the project's
+			foreach( (array) ( \Nino\Features::readUnitManifest( self::LIBRARY. '/base' )['features'] ?? [] ) as $feature ) {
+
+				$activated = \Nino\Features::activate( $appData, (string) $feature );
+
+				if( $activated !== true ) {
+					\Nino\Http::fail( $request, 500, 'the feature "'. $feature. '" could not be switched on: '. $activated );
+					return;
+				}
+			}
 
 			\Nino\Http::ok( $request, [ 'locales' => $appData['/nino/locales/available'], 'nativeLocale' => $appData['/nino/locales/native'], 'modules' => $modules ] );
 		}

@@ -103,8 +103,7 @@ namespace Nino {
 		// What an attribute may be
 		public const array TYPES = [ 'choice', 'bool', 'int', 'string', 'text', 'image', 'link', 'id' ];
 
-		// The words a bool is read from. The same two lists as \Nino\Modules\Components::ON and ::OFF and the ones
-		// Nino.ui.js reads a flag with
+		// The words a bool is read from. The same two lists as \Nino\Modules\Components::ON and ::OFF
 		public const array ON = [ '1', 'true', 'yes', 'on' ];
 		public const array OFF = [ '0', 'false', 'no', 'off' ];
 

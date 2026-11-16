@@ -1,16 +1,15 @@
 /**
  *	style.css						This site's own stylesheet - the layer "project", the last
  *												of the css bundle's four, so a rule here wins over the
- *												design tokens, the theme, the header/footer frame and the
- *												stylesheets of the features alike, whatever the selector
- *												of the rule it overrules says. The bundle wraps this file
- *												in its layer: write the rules, not the layer.
+ *												tokens of Nino.css and the stylesheets of the features
+ *												alike, whatever the selector of the rule it overrules
+ *												says. The bundle wraps this file in its layer: write the
+ *												rules, not the layer.
  *
- *												It ships empty on purpose. The delivered look is one
- *												file of its own, assets/theme.css - the design tokens,
- *												the roles they are assigned to, the webfaces and the
- *												css for both frames, all four in that order - and it
- *												is replaced wholesale whenever the look is delivered
- *												again, as the Design feature will. This one is never
- *												touched, so what you put here survives that.
+ *												It ships empty on purpose. The look of the starter pages
+ *												is the standard part of the feature Basis, which reads
+ *												the tokens --brand-... and --page-... that Nino.css
+ *												declares: turn them here, as in
+ *
+ *													:root { --brand-color-1: #0a7d5a; }
  */

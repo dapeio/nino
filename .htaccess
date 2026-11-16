@@ -114,7 +114,7 @@ SetEnv NINO_HTACCESS 1
 # (_admin/templates/, _admin/text/, _admin/Nino/) and the wizard but for its
 # assets/ - and the checkout's docs/ and history/, each from a .htaccess of its
 # own, as app/, features/ and tests/ do. What stays served of the tool folders
-# is their public part: _nino/Nino.css, Nino.js and Nino.ui.js, _admin/assets/,
+# is their public part: _nino/Nino.css and Nino.js, _admin/assets/,
 # _admin/.cache/, _admin/install/assets/.
 
 # The checkout's own metadata at its root - README.md, AGENTS.md, SECURITY.md,

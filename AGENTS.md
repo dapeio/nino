@@ -111,12 +111,12 @@ replaces none of them (see [Updates and Rollback](docs/deployment.md#updates-and
 
 | Path | What it is |
 | --- | --- |
-| `_nino/` | The kernel: `Nino.php` (boot and autoloader), one class per file in `_nino/Nino/<Class>/`, the modules Nino ships in `_nino/Nino/Modules/<Name>/` - each with its own `Admin/`, `assets/`, `text/`, `templates/` and `install/` - and the public `Nino.css`, `Nino.js` and `Nino.ui.js` |
+| `_nino/` | The kernel: `Nino.php` (boot and autoloader), one class per file in `_nino/Nino/<Class>/`, the modules Nino ships in `_nino/Nino/Modules/<Name>/` - each with its own `Admin/`, `assets/`, `text/`, `templates/` and `install/` - and the public `Nino.css` and `Nino.js` |
 | `_admin/` | The workbench: the shell (`Admin.php`, `recovery.php`, `assets/style.css`, `assets/Nino.admin.js`, which the workbench and the setup wizard load), its screens as modules in `_admin/Nino/Modules/<Name>/`, and the setup wizard with its library in `_admin/install/`, deletable after setup |
 | `app/` | The project's own PHP classes and runtime modules, under namespaces of their own |
 | `features/` | Installed features, one directory each with a `feature.php` manifest; the `nino` constraint it names is the kernel whose vocabulary the feature uses. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) |
 | `docs/` | The manuals, among them [`docs/features.md`](docs/features.md), the one manual of a feature; the five extension recipes in `docs/recipes/`; and the developer guide in `docs/guide/`, the way in for a newcomer, written in German |
-| `tests/` | Standalone contract tests, one suite per module or panel (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the fifty-one JS suites, and `fixtures/` |
+| `tests/` | Standalone contract tests, one suite per module or panel (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the forty-three JS suites, and `fixtures/` |
 | `history/` | The frozen `CHANGELOG.md` up to 1.7.0; from there the history is the git log and the tags |
 | `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
 
@@ -439,21 +439,20 @@ or the recovery page.
   `@layer nino.reset, nino.components, nino.theme, project;`
   (`\Nino\Modules\Assets`, see [Assets](docs/features.md#assets)). A rule in a
   later layer overrules a rule in an earlier one whatever its specificity and
-  wherever its file stands. `Nino.css` carries its two layers itself (the
-  tokens and the reset, then everything else); the bundle puts the stylesheets
+  wherever its file stands. `Nino.css` is the layer `nino.reset` and holds it
+  itself (the tokens and the reset); the bundle puts the stylesheets
   of features and modules in `nino.components`, the project's `assets/theme.css`
   in `nino.theme` and its other files below `assets/` - `style.css` among them
   - in `project`. A file never writes a layer of the four, and a project never
   writes one at all: the bundle does, and it repairs a file whose braces do
   not balance as a browser would, inside its layer. A rule of the project overrules a rule of a feature or of
   `Nino.css` with no more than a plain selector. An `!important` turns the
-  order of the layers round, so `Nino.css` keeps none in `nino.reset` and the
-  delivered `theme.css` has none; the workbench's bundles are no part of this.
+  order of the layers round, so `Nino.css` keeps none in `nino.reset`; the
+  workbench's bundles are no part of this.
 - A design layer turns `_nino/Nino.css` through the custom properties its
   `:root` declares, and the comments there are the reference. A new default is
-  declared in `Nino.css`. The delivered `theme.css` is a stylesheet of its own
-  in the layer `nino.theme`; it is no longer held byte for byte to the output of
-  a compiler.
+  declared in `Nino.css`. The standard parts of the feature Basis read those
+  tokens and nothing else of the page.
 
 ### Templates
 
@@ -580,8 +579,8 @@ PHPStan and ESLint MUST report nothing new: a finding listed in
 never added to the baseline. Report a check whose interpreter, extension,
 browser capability or fixture was unavailable as not run, with the reason.
 
-A change to what a catalogue feature reads from the kernel - the specimen page
-`tests/fixtures/demo-catalogue` and its `data-demo-preset` marks, `Nino.css`,
+A change to what a catalogue feature reads from the kernel - the page
+`tests/fixtures/unit-without-category`, `Nino.css`,
 the base unit's templates and keys, the feature contract - is also checked by
 the catalogue itself, before the push:
 `NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with

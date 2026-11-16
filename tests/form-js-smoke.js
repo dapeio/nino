@@ -1,11 +1,11 @@
 /**
  *	Nino						A compact filesystembased php framework
- *	nino-ui-form-js-smoke.js	DOM-light checks for the .nino-form submit handler:
+ *	form-js-smoke.js		DOM-light checks for the .nino-form submit handler of the module Form (assets/form.js):
  *								what actually reaches the server, which message a
  *								given status code produces, and which of them locks
  *								the form down.
  *
- *	Usage: node tests/nino-ui-form-js-smoke.js
+ *	Usage: node tests/form-js-smoke.js
  */
 
 'use strict';
@@ -169,9 +169,9 @@ sandbox.Nino = {
 	},
 };
 
-const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
+const source = fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Form/assets/form.js' ), 'utf8' );
 
-// Nino.ui.js is itself rendered through the normal textfill pipeline before
+// form.js is itself rendered through the normal textfill pipeline before
 // the browser executes it. Mirror that production step here: running the raw
 // source would post to the literal string "[[/nino/dir]]/.form" and test the
 // fixture rather than the form handler. This sandbox represents a root install.
@@ -180,10 +180,10 @@ const renderedSource = source.replaceAll( '[[/nino/dir]]', '' );
 vm.runInContext(
 	renderedSource,
 	vm.createContext( sandbox ),
-	{ filename : 'Nino.ui.js' }
+	{ filename : 'form.js' }
 );
 
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 
 check( 'every .nino-form on the page gets a submit handler', typeof forms[0].listeners.submit === 'function' && typeof forms[1].listeners.submit === 'function' );
 
@@ -357,7 +357,7 @@ check( 'the pending state is cleared either way', forms[0].classList.contains('p
 // the csrf 403 or the honeypot's 418 tells a spam bot which check it tripped
 const generic = form();
 forms.push( generic );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 generic.fill( { name : 'Bot', email : 'bot@example.com', message : 'spam', location : 'filled' } );
 generic.submit();
 respond( sent.length - 1, 418 );
@@ -372,7 +372,7 @@ check( 'a honeypot rejection stays on the generic message', generic.msg.textCont
 	behind "value.length > 0" cannot see either	*/
 const typedForm = form();
 forms.push( typedForm );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 typedForm.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
 
 const agree = field( 'agree', 'checkbox', '1', true, false );
@@ -424,7 +424,7 @@ check( 'a 400 on a form with a checkbox or a date asks to check the entries, not
 [ 'checkbox', 'radio', 'date' ].forEach( function( type ) {
 	const single = form();
 	forms.push( single );
-	sandbox.Nino.ui.onReady();
+	sandbox.Nino.form.onReady();
 	single.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
 	single.fieldList.push( field( 'extra', type, type === 'date' ? '' : 'x', false, type !== 'date' ) );
 	sent.length = 0;
@@ -435,7 +435,7 @@ check( 'a 400 on a form with a checkbox or a date asks to check the entries, not
 
 const plain = form();
 forms.push( plain );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 plain.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
 plain.submit();
 respond( sent.length - 1, 400 );
@@ -452,7 +452,7 @@ check( '...while one with neither still says it is the address', plain.msg.textC
 	an abort	*/
 const once = form();
 forms.push( once );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 once.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
 
 sent.length = 0;
@@ -480,7 +480,7 @@ const buttonless = form();
 const withButton = buttonless.querySelectorAll;
 buttonless.querySelectorAll = function( selector ) { return selector === 'button' ? [] : withButton.call( buttonless, selector ) };
 forms.push( buttonless );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 buttonless.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
 sent.length = 0;
 buttonless.submit();
@@ -493,7 +493,7 @@ check( 'a delivered message on a form without a button locks its fields', button
 // The address field: the pattern is for a value, not for none
 const optional = form();
 forms.push( optional );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 optional.fieldList[2].required = false;
 optional.fill( { name : 'Someone', email : '', message : 'Hello.' } );
 sent.length = 0;
@@ -514,7 +514,7 @@ check( 'an optional address of only blanks is refused', sent.length === 1 && opt
 
 const mandatory = form();
 forms.push( mandatory );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 mandatory.fill( { name : 'Someone', email : '', message : 'Hello.' } );
 sent.length = 0;
 mandatory.submit();
@@ -556,7 +556,7 @@ check( 'every form state the stylesheet styles or the script asks for is one the
 	every later attempt	*/
 const refused = form();
 forms.push( refused );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 
 check( 'the paragraph a form answers in is announced when it changes', refused.msg.getAttribute('role') === 'status' && refused.msg.getAttribute('aria-live') === 'polite' );
 
@@ -592,7 +592,7 @@ const signupMail = field( 'email', 'email', 'reader@example.com', true, false );
 const signupConsent = field( 'consent', 'checkbox', 'on', true, false );
 signup.fieldList.push( field( '_csrf', 'hidden', 'token-value', false ), signupMail, signupConsent );
 newsletterForms.push( signup );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 check( 'a newsletter signup gets a submit handler', typeof signup.listeners.submit === 'function' );
 
 sent.length = 0;
@@ -620,7 +620,7 @@ const signupSite = field( 'website', 'url', 'my site', false, false );
 signupSite.validity = { typeMismatch : true, badInput : false };
 signupOnly.fieldList.push( field( 'email', 'email', 'reader@example.com', true, false ), signupSite );
 newsletterForms.push( signupOnly );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 
 check( 'a signup and a contact form are submitted by one and the same handler', typeof signupOnly.listeners.submit === 'function' && signupOnly.listeners.submit === forms[0].listeners.submit );
 
@@ -642,7 +642,7 @@ check( 'a signup refuses a url the browser calls invalid in its own words, and c
 delete sandbox.Nino.content.text['/module/form/info/invalid'];
 const contactSite = form();
 forms.push( contactSite );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 contactSite.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
 const contactUrl = field( 'website', 'url', 'my site', false, false );
 contactUrl.validity = { typeMismatch : true, badInput : false };
@@ -668,7 +668,7 @@ const meetupPick = field( 'meetup', 'select', 'party', true, false );
 meetupPick.tagName = 'SELECT';
 meetup.fieldList.push( field( '_csrf', 'hidden', 'token-value', false ), field( 'website', 'text', '', false ), meetupPick, meetupName );
 forms.push( meetup );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 
 check( 'a form that names its texts is driven by the same handler', meetup.listeners.submit === forms[0].listeners.submit );
 
@@ -705,7 +705,7 @@ meetupLate.attributes.action = '/meetups';
 meetupLate.fieldList.length = 0;
 meetupLate.fieldList.push( field( 'name', 'text', '', true, false ) );
 forms.push( meetupLate );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 sent.length = 0;
 meetupLate.submit();
 check( 'a prefix without the texts shows an empty line, not the contact form\'s words', sent.length === 0 && meetupLate.msg.textContent === '' && meetupLate.fieldList[0].getAttribute('aria-invalid') === 'true' );
@@ -719,7 +719,7 @@ noAddress.attributes.action = '/meetups';
 noAddress.fieldList.length = 0;
 noAddress.fieldList.push( field( 'name', 'text', 'Ada', true, false ) );
 forms.push( noAddress );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 sent.length = 0;
 noAddress.submit();
 respond( sent.length - 1, 400 );
@@ -731,7 +731,7 @@ addressOnly.attributes.action = '/x';
 addressOnly.fieldList.length = 0;
 addressOnly.fieldList.push( field( 'email', 'email', 'reader@example.com', true, false ) );
 forms.push( addressOnly );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 sent.length = 0;
 addressOnly.submit();
 respond( sent.length - 1, 400 );
@@ -745,31 +745,9 @@ bothSpellings.attributes.action = '/meetups';
 bothSpellings.fieldList.length = 0;
 bothSpellings.fieldList.push( field( 'name', 'text', '', true, false ) );
 forms.push( bothSpellings );
-sandbox.Nino.ui.onReady();
+sandbox.Nino.form.onReady();
 sent.length = 0;
 bothSpellings.submit();
 check( 'where a form carries the attribute and the class of the signup, the attribute wins', sent.length === 0 && bothSpellings.msg.textContent === 'Please fill in your name.' );
-
-// --- A toast nobody was told about --------------------------------------
-
-/*	A toast is a sentence that appears without anybody looking for it and is
-	gone four seconds later, which is precisely the case a live region exists
-	for	*/
-const toasts = [];
-sandbox.document.createElement = function() {
-	const el = { className : '', textContent : '', attributes : {}, children : [],
-		classList : classList(), style : {},
-		setAttribute : function( key, value ) { this.attributes[key] = String( value ) },
-		getAttribute : function( key ) { return this.attributes[key] ?? null },
-		appendChild : function( child ) { this.children.push( child ) },
-		remove : function() {} };
-	toasts.push( el );
-	return el;
-};
-sandbox.document.querySelector = function() { return null };
-sandbox.document.body.appendChild = function() {};
-sandbox.Nino.ui.toast( 'Saved.', 'success' );
-const toast = toasts[toasts.length - 1];
-check( 'a toast is announced rather than only drawn', toast.textContent === 'Saved.' && toast.getAttribute('role') === 'status' && toast.getAttribute('aria-live') === 'polite' );
 
 done();

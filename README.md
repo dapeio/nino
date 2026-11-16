@@ -58,7 +58,7 @@ The workbench provides full access for development, diagnostics and corrections,
        width="49%">
 </a>
 
-Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through the languages (and the modules a project added itself, if any), copies the theme the base unit delivers along with the required assets, records basic information, creates the first developer accounts, offers the applications of the official catalogue (sets of features with a place to continue in), creates the starter pages and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
+Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through the languages (and the modules a project added itself, if any), switches on the feature Basis, which draws the starter pages, copies the frames and the required assets, records basic information, creates the first developer accounts, offers the applications of the official catalogue (sets of features with a place to continue in), creates the starter pages and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
 #### The Builder - a feature
 
@@ -70,7 +70,7 @@ The Builder composes a page template out of sections, rows, columns and componen
 * a dedicated template system with shortcodes and a clear separation of HTML and PHP
 * one workbench for developers and editors, with roles, recovery and an optional Builder for `.tpl` files, a feature from the catalogue
 * a file-based content model for textfills and recurring elements
-* one fixed theme, asset bundling, and frontend base components
+* a reset, asset bundling, and the frontend base components of the feature Basis
 * forms, navigation, language selection, and image processing
 * an imprint and a privacy policy as editable starting content, one element per section, in German and English, with the details of the company put in by placeholders
 * installable features with a manifest, settings and versioned updates, switched on in the workbench - a newsletter and a search among those the [dapeio/nino-features](https://github.com/dapeio/nino-features) catalogue provides
@@ -125,7 +125,7 @@ A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows u
 | [5. Application](docs/setup.md#5-application) | Which applications of the official catalogue - sets of features with a place to continue in - are placed and switched on, if any? |
 | [6. Finish](docs/setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? The starter pages are created here. |
 
-The look is not among its questions: the base unit delivers one theme and the two frame templates it is drawn against ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.
+The look is not among its questions: the base unit switches on the feature Basis and delivers the two frame templates written in its components ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.
 
 Then check the result. `/` delivers the configured website and `/_admin` opens the workbench with every panel for the root account. Look at every language and route, the navigation and the forms, and save a text and an image as a test. Once the wizard is complete, remove `_admin/install/` from a production delivery; everything it copied stays where it wrote it. The order and the checks are in [Verify the Result and Remove the Wizard](docs/setup.md#verify-the-result-and-remove-the-wizard).
 
@@ -174,6 +174,5 @@ Security issues should not be reported as public issues. Contact details and the
 ## License
 
 [MIT](https://github.com/dapeio/nino/blob/main/LICENSE). The icons of the workbench come from
-[Lucide](https://lucide.dev) (ISC, the ones taken over from Feather also MIT) and the typeface the base unit
-delivers is [Open Sans](https://github.com/googlefonts/opensans) (SIL Open Font License 1.1); their notices are in
+[Lucide](https://lucide.dev) (ISC, the ones taken over from Feather also MIT); their notice is in
 [THIRD-PARTY-NOTICES.md](https://github.com/dapeio/nino/blob/main/THIRD-PARTY-NOTICES.md).

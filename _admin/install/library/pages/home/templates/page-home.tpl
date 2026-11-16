@@ -1,17 +1,34 @@
 <!-- nino:template-name Home -->
 [template /templates/html-header]
-<div class="nino-wrap nino-wrap--vpa">
-
-<section id="hero" class="nino-section nino-section--black nino-cover nino-cover--dim nino-mt-0 nino-mb-0 nino-pl-0 nino-pr-0" data-cover-height="100">
-	<div class="nino-section-bg nino-img-focus--5">[image /template/page-home/hero/background alt=""]</div>
-	<div class="nino-grid-row nino-grid-row--wide nino-vpa">
-		<div class="nino-grid-100 nino-text-left">
-			[title /template/page-home/hero/title tag="h2" style="hero"]
-			[subtitle /template/page-home/hero/subtitle tag="p" style="hero"]
-			[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]
-		</div>
-	</div>
-</section>
-
-</div>
+[section-wrap id="hero" ground="dark" image="~background" dim height="80"]
+	[section-row]
+		[section-col]
+			[section-title ~title tag="h1" size="xl"]
+			[section-subtitle ~subtitle]
+			[button /_nino/webpage/contact/name href="page:/contact"]
+		[/section-col]
+	[/section-row]
+[/section-wrap]
+[section-wrap id="start" ground="alt"]
+	[section-row width="narrow"]
+		[section-col align="center"]
+			[section-title ~title]
+			[text ~text]
+		[/section-col]
+	[/section-row]
+	[section-row]
+		[section-col id="start-1" size="100 m:33" variant="card"]
+			[section-title ~title tag="h3" size="s"]
+			[text ~text]
+		[/section-col]
+		[section-col id="start-2" size="100 m:33" variant="card"]
+			[section-title ~title tag="h3" size="s"]
+			[text ~text]
+		[/section-col]
+		[section-col id="start-3" size="100 m:33" variant="card" link]
+			[section-title ~title tag="h3" size="s" href="page:/contact"]
+			[text ~text]
+		[/section-col]
+	[/section-row]
+[/section-wrap]
 [template /templates/html-footer]

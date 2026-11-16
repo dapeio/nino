@@ -29,13 +29,6 @@
 			<link rel="manifest" href="[[/nino/public]]/favicon/site.webmanifest?v=[[/nino/favicon/stamp]]">
 			[assets /.cache/style.css]
 
-			<!-- The preloader is a full-screen overlay that only Nino.ui.js
-			     takes back down, on window.load. Without this rule a visitor
-			     with javascript disabled - or one hitting a javascript error
-			     raised before that handler is bound - is left looking at a
-			     blank page over perfectly good markup -->
-			<noscript><style>.nino-preloader { display: none }</style></noscript>
-
 			<!-- Structured data (schema.org). Values go through [json ...]
 			     rather than "[[...]]" inside the quotes: a textfill is
 			     inserted verbatim, and /project/company/contact/address is multi-line by

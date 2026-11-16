@@ -5,7 +5,7 @@ declare(strict_types=1);
  *	Nino
  *	assets-layers-smoke.php	Contract test for the layers of the site's style bundle
  *													(\Nino\Modules\Assets): the bundle begins with the four
- *													layers, Nino.css holds two of them itself, every other
+ *													layers, Nino.css holds the first itself, every other
  *													source stands in the layer of the file it is, an @charset
  *													and an @import of a source break nothing, a source cannot
  *													leave its layer by its braces, and the workbench's bundles
@@ -105,40 +105,24 @@ function layersBundle( array &$appData, string $target, array $sources ): string
 
 $layers = ( new ReflectionClassConstant( \Nino\Modules\Assets::class, 'LAYERS' ) )->getValue();
 
-// --- Nino.css holds two layers -----------------------------------------------
+// --- Nino.css holds its layer -----------------------------------------------
 
-echo "Nino.css - the reset and the components\n";
+echo "Nino.css - the reset\n";
 
 check( 'the order of the layers is the four of the bundle, reset first and project last', $layers === '@layer nino.reset, nino.components, nino.theme, project;' );
 
 $kernel = layersTopLevel( $nino );
-check( 'Nino.css is two blocks and nothing outside them: the layer nino.reset, then the layer nino.components',
-	$kernel !== null && array_column( $kernel, 'head' ) === [ '@layer nino.reset', '@layer nino.components' ] && $kernel[0]['body'] !== null && $kernel[1]['body'] !== null );
-check( '...the tokens, the reset and the bare elements - chapters 00 and 01 - in the first, every other chapter in the second',
-	str_contains( (string) $kernel[0]['body'], '--base-size' ) === true && str_contains( (string) $kernel[0]['body'], 'box-sizing: inherit' ) === true
-	&& str_contains( (string) $kernel[0]['body'], '.nino-grid-row {' ) === false && str_contains( (string) $kernel[0]['body'], '.nino-hero' ) === false && str_contains( (string) $kernel[0]['body'], '.nino-hidden {' ) === false
-	&& str_contains( (string) $kernel[1]['body'], '.nino-grid-row {' ) === true && str_contains( (string) $kernel[1]['body'], '.nino-hero' ) === true && str_contains( (string) $kernel[1]['body'], '.nino-hidden {' ) === true
-	&& str_contains( (string) $kernel[1]['body'], 'box-sizing: inherit' ) === false );
+check( 'Nino.css is one block and nothing outside it: the layer nino.reset, which it holds itself',
+	$kernel !== null && array_column( $kernel, 'head' ) === [ '@layer nino.reset' ] && $kernel[0]['body'] !== null );
+check( '...the tokens of the brand and of the page, the reset and the bare elements - and no rule of a component',
+	str_contains( (string) $kernel[0]['body'], '--brand-color-1' ) === true && str_contains( (string) $kernel[0]['body'], 'box-sizing: border-box' ) === true
+	&& str_contains( (string) $kernel[0]['body'], '.nino-grid-row' ) === false && str_contains( (string) $kernel[0]['body'], '@layer' ) === false );
 check( '...with no @charset and no @import, which a block cannot hold',
 	preg_match( '/@(?:charset|import)\b/i', (string) preg_replace( '#/\*.*?\*/#s', '', $nino ) ) === 0 );
 
 /*	An !important turns the order of the layers round: of two important declarations the earlier layer wins. The
-	reset holds none, and neither does the theme the base unit delivers, so that nothing a layer later in the order
-	says is overruled by one it was meant to overrule	*/
-check( 'the reset layer and the delivered theme hold no !important',
-	str_contains( (string) $kernel[0]['body'], '!important' ) === false
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/assets/theme.css' ), '!important' ) === false );
-
-/*	The theme stands in a later layer than Nino.css, so a rule of Nino.css that used to win over a theme rule by a heavier selector
-	loses to it now. Two theme rules met such a rule on the pages of the base unit and the specimen page, and say it themselves: the
-	alignment of a title leaves a title that stands in a nino-text-left, -center or -right to the rule of Nino.css that carries
-	the class into it, and the room of the content of a card is asked for only where Nino.css does not take it away	*/
-$themeCss = (string) file_get_contents( __DIR__. '/../_admin/install/library/base/assets/theme.css' );
-check( 'the theme leaves the alignment of a title in a nino-text-left, -center or -right to the class: the rule that sets text-align from --section-align names what such a title stands in',
-	preg_match( '/\.nino-section-subtitle--loud\):where\(:not\([^{]*:is\(\.nino-text-left, \.nino-text-center, \.nino-text-right\) \*\)\)\s*\{\s*text-align:\s*var\(--section-align\);/', $themeCss ) === 1 );
-check( 'the theme asks for the room of the content of a card only where Nino.css does not take it away: the rule excludes the content of a card that is neither without padding nor of the full width',
-	preg_match( '/\n\.nino-card-content:where\(:not\([^{]*\.nino-card:where\(:not\(\.nino-p-0, \.nino-card--fullwidth\)\) > \*\)\) \{\s*padding:/', $themeCss ) === 1
-	&& preg_match( '/\n\.nino-card:where\(:not\(\.nino-p-0, \.nino-card--fullwidth\)\) > \.nino-card-content \{ padding: 0; \}/', $nino ) === 1 );
+	reset holds none, so that nothing a layer later in the order says is overruled by one it was meant to overrule	*/
+check( 'the reset layer holds no !important', str_contains( (string) $kernel[0]['body'], '!important' ) === false );
 
 // --- The bundle ----------------------------------------------------------------
 
@@ -166,19 +150,19 @@ $stands = static function ( array $top, string $needle ): array {
 	return $in;
 };
 
-check( 'Nino.css stands in its two layers, as it carries them',
-	$stands( $top, 'box-sizing: inherit' ) === [ '@layer nino.reset' ] && $stands( $top, '.nino-hidden {' ) === [ '@layer nino.components' ] );
+check( 'Nino.css stands in its layer, as it carries it',
+	$stands( $top, 'box-sizing: border-box' ) === [ '@layer nino.reset' ] && $stands( $top, '.nino-sr-only' ) === [ '@layer nino.reset' ] );
 check( 'the stylesheet of a feature stands in nino.components', $stands( $top, '.sample-notice' ) === [ '@layer nino.components' ] );
 check( 'the theme of the project stands in nino.theme', $stands( $top, '.theme-mark' ) === [ '@layer nino.theme' ] );
 check( 'the stylesheet of the project, and any other file of its assets, stand in project',
 	$stands( $top, '.project-mark' ) === [ '@layer project' ] && $stands( $top, '.own-mark' ) === [ '@layer project' ] );
 check( '...and the layers come in the order of the list, so that the blocks of a layer are never split by a block of another that stands before it',
-	array_column( array_slice( $top, 1 ), 'head' ) === [ '@layer nino.reset', '@layer nino.components', '@layer nino.components', '@layer nino.theme', '@layer project', '@layer project' ] );
+	array_column( array_slice( $top, 1 ), 'head' ) === [ '@layer nino.reset', '@layer nino.components', '@layer nino.theme', '@layer project', '@layer project' ] );
 
 /*	A rule of the project beats a rule of the kernel with a higher specificity, by the layer it stands in and not by what
 	it says: the rank of the layer in the order the bundle declares is what the browser compares	*/
 $rank = static fn( string $head ): int|false => array_search( substr( $head, strlen( '@layer ' ) ), $order, true );
-$kernelRule	= '.nino-section-title';
+$kernelRule	= '.nino-richtext';
 $beaten			= array_filter( array_slice( $top, 1 ), static fn( array $block ): bool => str_contains( (string) $block['body'], $kernelRule ) === true );
 $beatenRank	= $beaten === [] ? false : max( array_map( $rank, array_column( $beaten, 'head' ) ) );
 check( 'a rule of the project stands in a layer of a higher rank than the rule of Nino.css it is meant to overrule, and the theme between them',
@@ -237,7 +221,7 @@ foreach( $forms as $fault => [ $css, $kept, $tail ] ) {
 	$said		= ninoWarnings();
 
 	check( $fault. ': the bundle balances and has its four blocks in order - the source stays in its layer',
-		$top !== null && array_column( array_slice( $top, 1 ), 'head' ) === [ '@layer nino.reset', '@layer nino.components', '@layer nino.theme', '@layer project' ] );
+		$top !== null && array_column( array_slice( $top, 1 ), 'head' ) === [ '@layer nino.reset', '@layer nino.theme', '@layer project' ] );
 	check( '...the rules of the source before the fault, and the one after it where a browser keeps it, stand in nino.theme',
 		$stands( (array) $top, '.'. $kept. ' {' ) === [ '@layer nino.theme' ] && ( $tail === null || $stands( (array) $top, '.'. $tail ) === [ '@layer nino.theme' ] ) );
 	check( '...the source behind it stands whole in project, and one warning names the file and the fault',
@@ -250,7 +234,7 @@ $bundle	= layersBundle( $appData, '/.cache/escape.css', [ '/_nino/Nino.css' => $
 $top		= layersTopLevel( $bundle );
 $said		= ninoWarnings();
 check( 'a project file with a } and a layer of the kernel behind it stays in project: no block of nino.reset or nino.components holds a rule of it, the bundle balances',
-	$top !== null && array_column( array_slice( $top, 1 ), 'head' ) === [ '@layer nino.reset', '@layer nino.components', '@layer nino.theme', '@layer project' ]
+	$top !== null && array_column( array_slice( $top, 1 ), 'head' ) === [ '@layer nino.reset', '@layer nino.theme', '@layer project' ]
 	&& $stands( $top, '.escaped ' ) === [ '@layer project' ] && $stands( $top, '.escaped-too ' ) === [ '@layer project' ] && $stands( $top, '.esc-ok ' ) === [ '@layer project' ]
 	&& $stands( $top, '.theme-esc ' ) === [ '@layer nino.theme' ] && count( $said ) === 1 );
 
@@ -294,7 +278,7 @@ $minified = layersBundle( $appData, '/.cache/site.min.css', [
 $top = layersTopLevel( $minified );
 check( 'a bundle that is minified keeps the layers: the declaration is the first rule and each source is in its block',
 	$top !== null && preg_replace( '/\s+/', '', $top[0]['head'] ) === '@layernino.reset,nino.components,nino.theme,project' && $stands( $top, '.theme-min' ) === [ '@layer nino.theme' ] && $stands( $top, '.project-min' ) === [ '@layer project' ]
-	&& array_slice( array_column( $top, 'head' ), 1 ) === [ '@layer nino.reset', '@layer nino.components', '@layer nino.theme', '@layer project' ] );
+	&& array_slice( array_column( $top, 'head' ), 1 ) === [ '@layer nino.reset', '@layer nino.theme', '@layer project' ] );
 
 // --- A bundle that was built before the layers --------------------------------------
 

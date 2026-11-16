@@ -159,13 +159,10 @@ echo "\nThe shortcodes of the kernel\n";
 
 \Nino\Filesystem::putFileContent( $appData, '/templates/menu.tpl', 'unused' );
 $html = $render( '[navigation id="m"]/one:One:class="x"'. "\n". '[leaf] and [leaf]'. "\n". '/two:[[/project/company/general/name]]'. "\n". '[/navigation]' );
-check( 'a menu draws its lines by hand: the call in a line, the fill in a title, the attributes as they are written', $html === '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-regular " id="m"><div class="nino-nav-content"><div>leaf and leaf</div><ul><li><a href="/one"class="x">One</a></li><li><a href="/two">ACME</a></li></ul></div></div>' );
-$html = $render( '[navigation burger][/navigation]x[navigation][leaf][/navigation][navigation burger id="own"]/a:A[/navigation][navigation burger]/b:B[/navigation]' );
-check( 'the burgers count in the order they are drawn: a menu without lines takes no number, one with an id takes one and does not show it', substr_count( $html, 'own-list' ) === 2 && str_contains( $html, 'nino-nav-1-list' ) === false && substr_count( $html, 'nino-nav-2-list' ) === 2 && str_contains( $html, 'nino-nav-3-list' ) === false );
-check( '...and a label whose key nobody has a text for is written as a page writes such a key', str_contains( $html, '>[[/template/common/navigation/menu]]</span>' ) === true );
-\Nino\Html::addFills( $appData, [ '/template/common/navigation/menu' => 'Menu [csrf]' ], '*' );
-$html = $render( '[navigation burger]/a:A[/navigation]' );
-check( 'the label of a burger is the text of its key, its brackets entities, and no field of the page', str_contains( $html, '>Menu &#91;csrf&#93;</span>' ) === true && str_contains( $html, 'name="_csrf"' ) === false );
+check( 'a menu draws its lines by hand: the call in a line, the fill in a title, the attributes as they are written', $html === '<div>leaf and leaf</div><ul id="m"><li><a href="/one"class="x">One</a></li><li><a href="/two">ACME</a></li></ul>' );
+$html = $render( '[navigation burger][/navigation]x[navigation][leaf][/navigation][navigation burger id="own"]/a:A[/navigation]' );
+check( 'a menu without an entry draws no list, and the word burger is no switch: every menu is a bare list, which carries no label of a key and no class of its own',
+	$html === 'x<div>leaf</div><ul id="own"><li><a href="/a">A</a></li></ul>' );
 
 $_SERVER['REQUEST_URI'] = '/';
 \Nino\Html::addFills( $appData, [ '/module/localepicker/menu/title' => 'Sprache [csrf]', '/_nino/locale/de_DE/name' => 'Deutsch [template /templates/menu]', '/_nino/locale/en_US/name' => 'English' ], '*' );

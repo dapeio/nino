@@ -803,9 +803,9 @@ echo "\n";
 
 // Both scans and the lists of where a slot is used read what a template names as
 // the source of a component, which takes the components' registry: a project has
-// the Components module always on (see AppData::init()), and a sandbox that
-// lists no module registers it itself
-\Nino\Modules\Components::init( $appData );
+// the register of the components of Basis, which the sandbox registers itself
+$appData['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+\Nino\Features::registerComponents( $appData );
 
 echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
 
@@ -975,33 +975,40 @@ foreach( [ '/template/page-alpha/intro/title', '/template/common/form/submit' ] 
 
 // --- the texts a component names as its source -------------------------------
 //
-// A page the Builder writes names its texts as the source of a component, in no
-// fill: [card-text /template/page-delta/cards/one-text]. The scan reads those
-// calls too, as the rendering finds them - the ones inside a card or a stack
-// among them - and a source is a key where it begins with a slash and the
-// component takes a text. A name without one is a field of the element, a fixed
-// text="..." has no key to look up, and a stack's source is a type
+// A page of the components of Basis names its texts as the source of a component,
+// in no fill: [text /template/page-delta/cards/one-text], or by ~name, which the
+// template and the id of the section above the call make a key of. The scan reads
+// those calls too, as the rendering finds them - the ones inside a card or a loop
+// among them - and a source is a key where it begins with a slash or is ~name and
+// the component takes a text. A name of a field of the element, a fixed text="..."
+// and a loop's source have no key to look up
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-delta.tpl', implode( "\n", [
-	'[title /template/page-delta/intro/title]',
-	'[card padding="3"]',
-	'	[card-image /template/page-delta/cards/one-picture]',
-	'	[card-title /template/page-delta/cards/one-title]',
-	'	[card-text /template/page-omega/cards/one-text format="inline"]',
+	'[section-wrap id="intro"][section-row][section-col]',
+	'	[section-title ~title]',
+	'	[section-subtitle ~sub-title]',
+	'[/section-col][/section-row][/section-wrap]',
+	'[section-wrap][section-row]',
+	'[section-col variant="card"]',
+	'	[image /template/page-delta/cards/one-picture]',
+	'	[section-title /template/page-delta/cards/one-title]',
+	'	[text /template/page-omega/cards/one-text format="inline"]',
 	'	[button /template/common/button/more text="Fixed words" href="/more"]',
-	'[/card]',
-	'[stack /deltas sort="title"]',
-	'	[card-title title]',
-	'	[card-text summary]',
-	'	[card-text /template/page-delta/stack/one-text]',
-	'[/stack]',
-	'[card-text /template/[[/nino/http/response/locale]]/dynamic/text]',
-	'[subtitle /template/page-delta/intro/sub-title]',
+	'[/section-col]',
+	'[elements /deltas sort="title"]',
+	'	[section-col variant="card"]',
+	'		[section-title .title]',
+	'		[text .summary]',
+	'		[text /template/page-delta/stack/one-text]',
+	'	[/section-col]',
+	'[/elements]',
+	'[text /template/[[/nino/http/response/locale]]/dynamic/text]',
+	'[/section-row][/section-wrap]',
 ] ) );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
 $componentRows = array_column( $body['missing'], null, 'key' );
 check( 'a key that a component names as its source and nobody has made is a row of the scan, with the template that names it', $status === 200
 	&& ( $componentRows['/template/page-delta/intro/title']['files'] ?? [] ) === [ 'page-delta.tpl' ] && ( $componentRows['/template/page-delta/intro/title']['kind'] ?? '' ) === 'create' );
-check( '...also one in a card, one in a stack and one of another template\'s category', isset( $componentRows['/template/page-delta/cards/one-title'] ) === true && isset( $componentRows['/template/page-delta/stack/one-text'] ) === true
+check( '...also one in a card, one in a loop and one of another template\'s category', isset( $componentRows['/template/page-delta/cards/one-title'] ) === true && isset( $componentRows['/template/page-delta/stack/one-text'] ) === true
 	&& isset( $componentRows['/template/page-omega/cards/one-text'] ) === true && isset( $componentRows['/template/page-delta/intro/sub-title'] ) === true );
 check( '...and nothing else of that template: no picture\'s slot, no field of the element, no stack\'s type, no label that has a fixed text and no source that holds a fill',
 	array_keys( $componentRows ) === [ '/template/page-delta/cards/one-title', '/template/page-delta/intro/sub-title', '/template/page-delta/intro/title', '/template/page-delta/stack/one-text', '/template/page-omega/cards/one-text' ] );
@@ -1147,8 +1154,8 @@ unlink( $sandbox. '/private/templates/scan-fixture-img.tpl' );
 // panel warns about: an image uploaded to a slot no page shows never appears
 
 $usageTemplates = [
-	'usage-page' 	=> '<section>[image /use/hero alt=""]</section>[template /templates/usage-part][image uri="/use/viauri"]',
-	'usage-part' 	=> '<p>[image /use/inner alt="[[/use/alt]]"]</p>[template /templates/usage-deeper]',
+	'usage-page' 	=> '<section>[image /use/hero alt=""]</section>[template /templates/usage-part][section-wrap image="/use/viauri"][/section-wrap][section-wrap id="band" image="~photo"][/section-wrap]',
+	'usage-part' 	=> '<p>[image /use/inner alt="[[/use/alt]]"]</p>[template /templates/usage-deeper][section-wrap id="deep" image="~picture"][/section-wrap]',
 	'usage-deeper' => '[image /use/deep]',
 	'usage-orphan' => '[image /use/orphan]',
 	'usage-loop' 	=> '[image /use/loop][template /templates/usage-loop][template /templates/usage-loop2]',
@@ -1175,9 +1182,18 @@ foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'engli
 $usage = \Nino\Modules\Images\Slots::usage( $appData );
 $usagePage = [ 'httpUri' => '/usage', 'name' => 'Nutzung' ];
 check( 'a slot in the template a route renders: the template, and the page by its name and http uri', ( $usage['/use/hero'] ?? null ) === [ 'templates' => [ 'usage-page' ], 'pages' => [ $usagePage ] ] );
-check( '...the [image uri="..."] form is read like the bare one', ( $usage['/use/viauri']['pages'] ?? null ) === [ $usagePage ] );
+check( '...the image attribute of a section is read like the source of an image', ( $usage['/use/viauri']['pages'] ?? null ) === [ $usagePage ] );
 check( 'a slot reached through a [template] include, and one further down that include\'s own', ( $usage['/use/inner'] ?? null ) === [ 'templates' => [ 'usage-part' ], 'pages' => [ $usagePage ] ]
 	&& ( $usage['/use/deep'] ?? null ) === [ 'templates' => [ 'usage-deeper' ], 'pages' => [ $usagePage ] ] );
+check( '...and one that a template names by ~name under the id of its section: its key is made of the template it stands in - the template of the page and the template it includes each their own',
+	( $usage['/template/usage-page/band/photo'] ?? null ) === [ 'templates' => [ 'usage-page' ], 'pages' => [ $usagePage ] ] && ( $usage['/template/usage-part/deep/picture'] ?? null ) === [ 'templates' => [ 'usage-part' ], 'pages' => [ $usagePage ] ] );
+// The danger: a picture behind a section that is named by ~name and defined as a slot must be used, or an editor deletes the slot of the hero as one nobody shows
+$appData['/nino/html/images']['/template/usage-page/band/photo'] = [ 'label' => 'Band', 'width' => 10, 'height' => 10, 'filename' => null ];
+[ , $bandBody ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
+$bandRow = array_column( $bandBody['slots'], null, 'uri' )['/template/usage-page/band/photo'] ?? [];
+check( '...and a slot that exists and is shown only by image="~name" under the id of a section is used - by the template and by the page - and is not the slot nothing shows',
+	( $bandRow['usage'] ?? null ) === [ 'templates' => [ 'usage-page' ], 'pages' => [ $usagePage ] ] && ( $bandRow['usage'] ?? null ) !== \Nino\Modules\Images\Slots::NO_USAGE );
+unset( $appData['/nino/html/images']['/template/usage-page/band/photo'] );
 check( 'a template no route renders is listed with its templates and no pages', ( $usage['/use/orphan'] ?? null ) === [ 'templates' => [ 'usage-orphan' ], 'pages' => [] ] );
 check( 'templates that include themselves, directly or through another, are read once and do not run away', ( $usage['/use/loop']['pages'] ?? null ) === [ [ 'httpUri' => '/looped', 'name' => '/looped' ] ] );
 check( 'a body that names its template by language is read for every available language, and a page without a name of its own is named by its http uri',
@@ -1197,22 +1213,24 @@ foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'engli
 
 // --- the slots a component names as its source ---------------------------------
 //
-// The other way a page asks for a picture, and the way the Builder writes it:
-// [card-image /template/page-delta/cards/one-picture]. A slot that is named and
+// The other way a page asks for a picture, and the way a page of Basis is written:
+// [image /template/page-delta/cards/one-picture]. A slot that is named and
 // not defined is a row of the scan, like a picture hardcoded in the markup; one
 // that exists and is shown only so is used, for the list of where it is - and
 // not "included nowhere", which an image uploaded to it would then wrongly warn of
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-delta.tpl', implode( "\n", [
-	'[image /template/page-delta/hero/background alt=""]',
-	'[card padding="3"]',
-	'	[card-image /template/page-delta/cards/one-picture style="inline"]',
-	'[/card]',
-	'[image uri="/template/page-delta/viauri/picture"]',
-	'[stack /deltas]',
-	'	[image image focus="5"]',
-	'	[card-image /template/page-delta/stack/one-picture]',
-	'[/stack]',
-	'[card-image /template/[[/nino/http/response/locale]]/dynamic/picture]',
+	'[section-wrap id="hero" image="~background"][/section-wrap]',
+	'[section-wrap][section-row]',
+	'[section-col variant="card"]',
+	'	[image /template/page-delta/cards/one-picture]',
+	'[/section-col]',
+	'[section-wrap image="/template/page-delta/viauri/picture"][/section-wrap]',
+	'[elements /deltas]',
+	'	[image image focus="top"]',
+	'	[image /template/page-delta/stack/one-picture]',
+	'[/elements]',
+	'[image /template/[[/nino/http/response/locale]]/dynamic/picture]',
+	'[/section-row][/section-wrap]',
 ] ) );
 $namedRoutesBefore = $appData['/nino/http/routes'] ?? [];
 $appData['/nino/http/routes']['GET://delta'] = [ 'uri' => '/delta', 'body' => '[template /templates/page-delta]' ];
@@ -1221,7 +1239,7 @@ $appData['/nino/http/routes']['GET://delta'] = [ 'uri' => '/delta', 'body' => '[
 $namedRows = array_column( $body['missing'], null, 'src' );
 check( 'a slot that a component names as its source and nobody has made is a row of the scan: its uri is the src and the uri proposed, the template that names it is the file, and there is no file or size to propose',
 	$status === 200 && ( $namedRows['/template/page-delta/cards/one-picture'] ?? null ) === [ 'filename' => '', 'src' => '/template/page-delta/cards/one-picture', 'suggestedUri' => '/template/page-delta/cards/one-picture', 'width' => 0, 'height' => 0, 'files' => [ 'page-delta.tpl' ] ] );
-check( '...also the bare [image] and its uri="..." form, and one in a stack - and nothing else of that template: no field of the element, no source that holds a fill',
+check( '...also the picture behind a section by ~name and by its slot, and one in a loop - and nothing else of that template: no field of the element, no source that holds a fill',
 	array_keys( $namedRows ) === [ '/template/page-delta/cards/one-picture', '/template/page-delta/hero/background', '/template/page-delta/stack/one-picture', '/template/page-delta/viauri/picture' ] );
 check( 'the Dashboard counts them as it counts the pictures hardcoded in a template', \Nino\Modules\Images\Slots::missingCount( $appData ) === 4 );
 
@@ -1240,23 +1258,23 @@ callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/
 unlink( $sandbox. '/private/templates/page-delta.tpl' );
 $appData['/nino/http/routes'] = $namedRoutesBefore;
 
-// A slot an attribute names is as much a picture of the page: the background of a card. Not the image field of the
-// element in a stack, which is no slot
+// A slot an attribute names is as much a picture of the page: the picture behind a section. Not the image field of the
+// element in a loop, which is no slot
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-echo.tpl', implode( "\n", [
-	'[card background="/template/page-echo/cards/one-background" dim="1"]',
-	'	[card-text /template/page-echo/cards/one-text]',
-	'[/card]',
-	'[stack /deltas]',
-	'	[card background="image"]',
-	'		[card-title title]',
-	'	[/card]',
-	'[/stack]',
+	'[section-wrap image="/template/page-echo/cards/one-background" dim]',
+	'	[section-row][section-col][text /template/page-echo/cards/one-text][/section-col][/section-row]',
+	'[/section-wrap]',
+	'[elements /deltas]',
+	'	[section-col variant="card"]',
+	'		[image image]',
+	'	[/section-col]',
+	'[/elements]',
 ] ) );
 $appData['/nino/http/routes']['GET://echo'] = [ 'uri' => '/echo', 'body' => '[template /templates/page-echo]' ];
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiScan' );
 $backgroundRows = array_column( $body['missing'], null, 'src' );
-check( 'a slot a card names as its background and nobody has made is a row of the scan, as one a component names as its source is - and the image field of the element in a stack is none',
+check( 'a slot a section names as its picture and nobody has made is a row of the scan, as one a component names as its source is - and the image field of the element in a loop is none',
 	$status === 200 && array_keys( $backgroundRows ) === [ '/template/page-echo/cards/one-background' ] && ( $backgroundRows['/template/page-echo/cards/one-background']['files'] ?? null ) === [ 'page-echo.tpl' ] );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/template/page-echo/cards/one-background', 'label' => 'One background', 'width' => '30', 'height' => '20' ] );

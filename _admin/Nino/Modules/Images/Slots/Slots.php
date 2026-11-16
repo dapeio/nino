@@ -407,10 +407,10 @@ namespace Nino\Modules\Images {
 
 		/**
 		 *	Where every image slot is used: the templates that show it as the
-		 *	source of a component - [image <uri>], [image uri="<uri>"],
-		 *	[card-image <uri>] - or as the value of an attribute of the type
-		 *	image, the background of a card, as
-		 *	\Nino\Modules\Components::sources() reads them - and the pages that
+		 *	source of a component - [image <uri>], [footer-logo <uri>],
+		 *	[image ~name] - or as the value of an attribute of the type
+		 *	image, the picture behind a section, as
+		 *	\Nino\Components::sources() reads them - and the pages that
 		 *	end up rendering it. A page is a GET route as the project serves it,
 		 *	feature routes included, whose body shows the slot itself or
 		 *	through the [template /templates/<name>] includes that body pulls
@@ -448,7 +448,7 @@ namespace Nino\Modules\Images {
 
 			$found = [];
 			foreach( $sources as $name => $content )
-				foreach( array_keys( self::_scanSource( $appData, $content, $locales )['images'] ) as $uri )
+				foreach( array_keys( self::_scanSource( $appData, $content, $locales, (string) \Nino\Modules\Template::category( $name. '.tpl' ) )['images'] ) as $uri )
 					$found[$uri]['templates'][] = $name;
 
 			$text = [];
@@ -469,7 +469,7 @@ namespace Nino\Modules\Images {
 				$httpUri = substr( (string) $routeKey, strlen( 'GET:/' ) );
 				$images = [];
 				$visited = [];
-				self::_scanPage( $appData, (string) ( $route['body'] ?? '' ), $locales, $sources, $visited, $images, 0 );
+				self::_scanPage( $appData, (string) ( $route['body'] ?? '' ), '', $locales, $sources, $visited, $images, 0 );
 
 				foreach( array_keys( $images ) as $uri )
 					$found[$uri]['pages'][] = [ 'httpUri' => $httpUri, 'name' => $names( $appData, (string) ( $route['uri'] ?? $httpUri ), $httpUri ) ];
@@ -491,6 +491,7 @@ namespace Nino\Modules\Images {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source				A route body or a template
+		 *	@param		string		$template			The category of the template, '' for a route body
 		 *	@param		array			$locales			Available locales
 		 *	@param		array			$sources			Every template, name => content
 		 *	@param		array			&$visited			Templates already read for this page
@@ -499,9 +500,9 @@ namespace Nino\Modules\Images {
 		 *
 		 *	@return 	void
 		 */
-		private static function _scanPage( array &$appData, string $source, array $locales, array $sources, array &$visited, array &$images, int $depth ): void {
+		private static function _scanPage( array &$appData, string $source, string $template, array $locales, array $sources, array &$visited, array &$images, int $depth ): void {
 
-			$scan = self::_scanSource( $appData, $source, $locales );
+			$scan = self::_scanSource( $appData, $source, $locales, $template );
 
 			foreach( $scan['images'] as $uri => $true )
 				$images[$uri] = true;
@@ -515,7 +516,7 @@ namespace Nino\Modules\Images {
 					continue;
 
 				$visited[$name] = true;
-				self::_scanPage( $appData, $sources[$name], $locales, $sources, $visited, $images, $depth + 1 );
+				self::_scanPage( $appData, $sources[$name], (string) \Nino\Modules\Template::category( $name. '.tpl' ), $locales, $sources, $visited, $images, $depth + 1 );
 			}
 		}
 
@@ -528,10 +529,11 @@ namespace Nino\Modules\Images {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source
 		 *	@param		array			$locales			Available locales
+		 *	@param		string		$template			The category of the template the source is, what ~name reads under; '' for a route body
 		 *
 		 *	@return 	array										[ 'images' => [ uri => true ], 'includes' => [ template name => true ] ]
 		 */
-		private static function _scanSource( array &$appData, string $source, array $locales ): array {
+		private static function _scanSource( array &$appData, string $source, array $locales, string $template ): array {
 
 			$fill			= '[[/nino/http/response/locale]]';
 			$variants	= str_contains( $source, $fill ) === true
@@ -546,7 +548,7 @@ namespace Nino\Modules\Images {
 				// A slot is the source of [image] and [card-image], bare or as
 				// uri="...", and the value of an attribute of the type image (the
 				// background of a card): found as the rendering finds them
-				foreach( \Nino\Modules\Components::sources( $appData, $variant ) as $component )
+				foreach( \Nino\Components::sources( $appData, $variant, $template ) as $component )
 					if( $component['kind'] === 'image' )
 						$images[ $component['source'] ] = true;
 
@@ -574,9 +576,9 @@ namespace Nino\Modules\Images {
 		 *	An <img> outside /images/ (external url, data: uri, favicon,
 		 *	logo) is skipped entirely, none of those fit this slot system.
 		 *	A slot a template names as the source of a component is the other
-		 *	way it asks for a picture - [card-image /template/page-x/cards/one-picture],
-		 *	or the background of a card, [card background="/template/page-x/cards/one-background"],
-		 *	as the Builder writes a page (see \Nino\Modules\Components::sources()) -
+		 *	way it asks for a picture - [image /template/page-x/cards/one-picture],
+		 *	or the picture behind a section, [section-wrap image="~background"] under its id,
+		 *	as a page of the components of Basis is written (see \Nino\Components::sources()) -
 		 *	and where no slot is defined for it, it is a row too, after the
 		 *	files': its uri is the src and the uri proposed, with no file and no
 		 *	size to go with it
@@ -637,7 +639,7 @@ namespace Nino\Modules\Images {
 				if( $content === false )
 					continue;
 
-				foreach( \Nino\Modules\Components::sources( $appData, $content ) as $component )
+				foreach( \Nino\Components::sources( $appData, $content, (string) \Nino\Modules\Template::category( basename( $file ) ) ) as $component )
 					if( $component['kind'] === 'image' && isset( $appData['/nino/html/images'][ $component['source'] ] ) === false )
 						$named[ $component['source'] ][] = basename( $file );
 

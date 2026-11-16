@@ -235,7 +235,7 @@ The first Tab stop of the workbench is a link that skips the rail and lands on t
 ## Recommended Workflow
 
 1. Build the structure under **Element Types** (a tab of Elements), **Text Keys** (Text), **Image Slots** (Images), **Routes** and **Navigations**.
-2. Compose the pages by hand or, where the feature is installed, in the Builder; adjust `assets/theme.css` where the delivered look is not the one you want, and check the result in the browser - in the [website window](#following-the-website) beside the workbench, which loads it anew after every save.
+2. Compose the pages by hand or, where the feature is installed, in the Builder; adjust `assets/style.css` where the delivered look is not the one you want, and check the result in the browser - in the [website window](#following-the-website) beside the workbench, which loads it anew after every save.
 3. Fill the content under **Elements**, **Text** and **Images**; hand a language over under **Language › Translations**.
 4. Check the Dashboard and the two scans for missing definitions.
 5. Create the editor accounts under **Users** with the Editor role - add a role on the **User roles** tab where the two are not enough - and test what they see.

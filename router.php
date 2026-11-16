@@ -70,7 +70,7 @@ if( preg_match( '#^/features(?:/|$)#'. $i, $uri ) === 1 ) {
 // and the wizard but for its assets/, which its page loads. Nothing a page
 // loads is in them. Mirrors the .htaccess each of them carries, for the same
 // reason as the rules above. What stays served of the tool folders is their
-// public part: _nino/Nino.css, Nino.js and Nino.ui.js, _admin/assets/,
+// public part: _nino/Nino.css and Nino.js, _admin/assets/,
 // _admin/.cache/, _admin/install/assets/
 if( preg_match( '#^/(?:_nino/Nino|_admin/(?:templates|text|Nino))(?:/|$)#'. $i, $uri ) === 1
 	|| preg_match( '#^/_admin/install(?:/(?!assets/)|$)#'. $i, $uri ) === 1 ) {

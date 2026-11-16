@@ -157,10 +157,12 @@ function pagesSite( bool $tools ): string {
  *
  *	@param		string		$sandbox
  *	@param		string		$locale
+ *	@param		bool			$basis				Whether the feature Basis, which the wizard switched on, stays on: the components of the old module are drawn with it off, as the
+ *																	five names both have (text, button, image, spacer, html) are the register's where it is on
  *
  *	@return 	array
  */
-function pagesBoot( string $sandbox, string $locale ): array {
+function pagesBoot( string $sandbox, string $locale, bool $basis = true ): array {
 
 	$_SESSION = [];
 
@@ -184,6 +186,10 @@ function pagesBoot( string $sandbox, string $locale ): array {
 	\Nino\Csrf::init( $appData );
 	\Nino\Html::init( $appData );
 	\Nino\Auth::init( $appData );
+
+	if( $basis === false )
+		$appData['/nino/modules'] = array_values( array_diff( $appData['/nino/modules'], [ '\\Nino\\Modules\\Basis' ] ) );
+
 	\Nino\Features::registerAssets( $appData );
 	\Nino\Features::registerComponents( $appData );
 	\Nino\Modules::callModules( $appData, 'init' );
@@ -232,6 +238,23 @@ function pagesPage( string $sandbox, string $locale, string $uri ): string {
 }
 
 /**
+ *	One page of the starter site as a visitor gets it: the status code and the body of a request
+ *
+ *	@param		string		$sandbox
+ *	@param		string		$locale
+ *	@param		string		$uri
+ *
+ *	@return 	array										[ status, body ]
+ */
+function pagesVisit( string $sandbox, string $locale, string $uri ): array {
+
+	$appData = pagesBoot( $sandbox, $locale );
+	$request = \Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => $uri, 'REMOTE_ADDR' => '127.0.0.1', 'HTTP_HOST' => 'example.com', 'HTTPS' => 'on' ] );
+
+	return [ (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ), (string) ( $request['/nino/http/response']['body'] ?? '' ) ];
+}
+
+/**
  *	Source after source drawn the way a route body is, each one as the first thing of a request
  *
  *	@param		string		$sandbox
@@ -242,7 +265,7 @@ function pagesPage( string $sandbox, string $locale, string $uri ): string {
  */
 function pagesCases( string $sandbox, array $cases, string $locale = 'de_DE' ): string {
 
-	$appData = pagesBoot( $sandbox, $locale );
+	$appData = pagesBoot( $sandbox, $locale, false );
 	$out = '';
 
 	\Nino\Html::addFills( $appData, [ '/nino/date/year' => '2026' ], '*' );
@@ -289,7 +312,6 @@ function pagesComponentCases(): array {
 		'logo with a slot'			=> '[logo light="'. $slot. '" dark="" alt=""]',
 		'html with a call and a fill'	=> '[html class="nino-mt-2"]<p>Fixed [spacer size="1"] and [[/template/probe/x/plain]]</p>[/html]',
 		'spacer'								=> '[spacer size="3"]',
-		'scroll-hint'						=> '[scroll-hint]',
 		'col outside a table'		=> '[col /template/probe/x/plain field="title"]',
 		'panel outside'					=> '[panel title="A"]x[/panel]',
 		'stack'									=> '[stack /probe sort="title" cols="50"][card][card-title title][card-text body][button .uri text="More of [[title]]"][/card][/stack]',
@@ -543,6 +565,64 @@ check( 'the requests that found the trees drew the same pages, byte for byte, an
 foreach( $outputs as $name => $output )
 	if( str_ends_with( $name, '.html' ) === true && str_starts_with( $name, 'workbench' ) === false && str_starts_with( $name, 'components' ) === false && str_starts_with( $name, 'loop' ) === false )
 		check( $name. ' has no call and no fill left over', preg_match( '/\[(?:template|title|navigation|logo|image|localepicker|jstext|assets|json|csrf)[ \]]/', $output ) !== 1 );
+
+// --- A fresh installation, as a visitor meets it: the structure of the pages, not their markup -------------------
+
+echo "The starter site as a visitor meets it - the structure of its pages\n";
+
+// With the tools next to the project, so that the standard parts of Basis are files of the site as they are of an installation
+$site = pagesSite( true );
+$ignored = ninoWarnings();
+$visits = [];
+
+foreach( [ 'de_DE' => [ '/', '/contact', '/impressum', '/gibt-es-nicht', '/datenschutz' ], 'en_US' => [ '/', '/contact', '/imprint', '/not-there', '/privacy' ] ] as $locale => $uris )
+	foreach( $uris as $uri )
+		$visits[$locale. ' '. $uri] = pagesVisit( $site, $locale, $uri );
+
+$noticed = ninoWarnings();
+\Nino\Filesystem::removeDir( $site );
+\Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
+
+check( 'the start page, the contact page and the imprint answer 200 and an address that is not there 404, in both languages',
+	array_column( $visits, 0 ) === [ 200, 200, 200, 404, 200, 200, 200, 200, 404, 200 ] );
+
+$structure = [];
+$leftOver = [];
+$classes = [];
+$emptyNames = [];
+
+foreach( $visits as $label => [ , $body ] ) {
+
+	$structure[$label] = [ substr_count( $body, '<header' ), substr_count( $body, '<footer' ), substr_count( $body, '<section' ), substr_count( $body, '<h1' ) ];
+
+	// What the page says in its comments is the template's own explanation
+	if( preg_match( '/\[\[|\[(?:template|section-[a-z]+|header-[a-z]+|footer-[a-z]+|button|text|image|spacer|html|csrf|navigation|legal|localepicker)[ \]]/', (string) preg_replace( '/<!--.*?-->/s', '', $body ) ) === 1 )
+		$leftOver[] = $label;
+
+	preg_match_all( '/class="([^"]*)"/', $body, $found );
+
+	foreach( explode( ' ', implode( ' ', $found[1] ) ) as $class )
+		if( str_starts_with( $class, 'nino-' ) === true && preg_match( '/^nino-(?:sr-only|richtext|legal-section|form(?:-[a-z]+)?)$/', $class ) !== 1 )
+			$classes[$class] = true;
+
+	if( str_contains( $body, 'aria-label=""' ) === true )
+		$emptyNames[] = $label;
+}
+
+check( 'the start page and the contact page have one header, one footer and at least two sections, and every page has one h1',
+	$structure['de_DE /'][0] === 1 && $structure['de_DE /'][1] === 1 && $structure['de_DE /'][2] >= 2 && $structure['de_DE /contact'][0] === 1 && $structure['de_DE /contact'][1] === 1 && $structure['de_DE /contact'][2] >= 2
+	&& $structure['en_US /'][2] >= 2 && $structure['en_US /contact'][2] >= 2 && array_filter( $structure, static fn( array $counts ): bool => $counts[3] !== 1 && $counts[0] !== 0 ) === [] );
+check( '...the hero of the start page stands in the row of the page, in line with the header, and no link of a page is a telephone address the visitor\'s own spelling would break: no tel: link',
+	preg_match( '/<section id="hero"[^>]*>.*?<div class="section-row">/s', $visits['de_DE /'][1] ) === 1 && preg_match( '/href="tel:/', $visits['de_DE /contact'][1] . $visits['de_DE /'][1] ) !== 1 );
+check( '...the imprint holds the sections of the imprint and the privacy policy those of the privacy policy, in both languages, under one h1 and h2s',
+	array_filter( [ 'de_DE /impressum' => 'legal', 'en_US /imprint' => 'legal', 'de_DE /datenschutz' => 'privacy', 'en_US /privacy' => 'privacy' ], static function( string $type, string $label ) use ( $visits ): bool {
+		$body = $visits[$label][1];
+		$other = $type === 'legal' ? 'privacy' : 'legal';
+		return substr_count( $body, 'id="'. $type. '-' ) < 2 || str_contains( $body, 'id="'. $other. '-' ) === true || substr_count( $body, '<h1' ) !== 1 || str_contains( $body, '<h3' ) === true || str_contains( $body, '<h2>' ) === false;
+	}, ARRAY_FILTER_USE_BOTH ) === [] );
+check( '...no page has a call or a fill left over, and no page has a menu or a button with no name'. ( $leftOver === [] ? '' : ' - '. implode( ', ', $leftOver ) ), $leftOver === [] && $emptyNames === [] );
+check( '...the classes of the old stylesheet are in none of the pages: no class that starts with nino- but the ones the reset, the form and the legal texts name'. ( $classes === [] ? '' : ' - '. implode( ', ', array_keys( $classes ) ) ), $classes === [] );
+check( '...and the log has no notice and no warning from drawing any of them'. ( $noticed === [] ? '' : ' - '. substr( implode( ' | ', array_unique( $noticed ) ), 0, 300 ) ), $noticed === [] );
 
 $ignored = ninoWarnings();
 

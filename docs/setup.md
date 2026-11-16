@@ -31,7 +31,7 @@ Three different rules apply:
 | Languages and modules | the visible selection replaces the previously managed state by the assistant; a feature an application switched on stays on |
 | Applications | the features of the applications picked are placed and switched on; what is on already is left as it is, and nothing is switched off by picking less |
 | Templates, texts, and element types | are supplemented or updated but not automatically deleted |
-| The look - `assets/theme.css` and the two frame templates | files with the same name are overwritten |
+| The two frame templates | files with the same name are overwritten |
 
 This distinction protects your own changes. Deselecting a module may remove its configuration; automatically deleting a template file that has been edited in the meantime would not be safe.
 
@@ -82,13 +82,12 @@ A file a unit cannot copy - a target that is not writable - ends the step with a
 
 ### The Look
 
-Not a choice, and not a step: the base unit delivers one theme, and every project starts from it. Three files, copied like any other unit file:
+Not a choice, and not a step: the base unit delivers no look of its own, it switches on the feature **Basis**, whose components draw the starter pages with their standard look, and every project starts from that. Two files, copied like any other unit file:
 
 | File | What it is |
 |---|---|
-| `assets/theme.css` | the whole look in one stylesheet: the design tokens, the roles they are assigned to, the three webfaces, and the css for both frames below - the look the **Design** feature compiles at its defaults, under a header of the kernel's own; it is the project's `nino.theme` layer |
-| `templates/frame-header.tpl` | the site's `<header>`, included by `html-header.tpl` through `[template /templates/frame-header]` |
-| `templates/frame-footer.tpl` | the site's `<footer>`, included the same way |
+| `templates/frame-header.tpl` | the site's header, written in the components of Basis (`[header-wrap]`), included by `html-header.tpl` through `[template /templates/frame-header]` |
+| `templates/frame-footer.tpl` | the site's footer (`[footer-wrap]`), included the same way |
 
 The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
 
@@ -97,13 +96,12 @@ The delivery has no logo of its own. It declares two **image slots** (500 × 100
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
 ```
-_nino/Nino.css              framework defaults
-features and modules        the stylesheets they add, in the order they add them
-assets/theme.css            the look - tokens, roles, fonts, both frames
+_nino/Nino.css              the reset: the tokens --brand-... and --page-..., the elements at rest
+features and modules        the stylesheets they add, in the order they add them - the standard parts of Basis among them
 assets/style.css            the project's own, shipped empty
 ```
 
-Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. The stylesheets of the features and modules are not in that list: they are put into the bundle at every boot, in front of the project's files (see [Assets](features.md#assets)). `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it, a feature's stylesheet and the theme included. A file of the project that a module adds later is listed behind `style.css`. A feature SHOULD NOT build on where its stylesheet stands in relation to the theme.
+Setup seeds `/nino/html/assets`' bundle with the project's entry if it is not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. The stylesheets of the features and modules are not in that list: they are put into the bundle at every boot, in front of the project's files (see [Assets](features.md#assets)). `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it, a feature's stylesheet and the theme included. A file of the project that a module adds later is listed behind `style.css`. A feature SHOULD NOT build on where its stylesheet stands in relation to the theme.
 
 Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write. The delivered `assets/theme.css` carries the kernel's header and no stamp of the compiler's, which is why Design asks. It stands in the layer `nino.theme` of the style bundle, `assets/style.css` after it in `project`, so a rule of either overrules a rule of `Nino.css` or of a feature with no more than a plain selector.
 

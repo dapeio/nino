@@ -229,19 +229,21 @@ foreach( glob( \Nino\Install\Setup::units()['localepicker']. '/text/*.php' ) ?: 
 		if( str_contains( (string) $key, '/_nino/locale/' ) === true )
 			$pickerNameLines[] = basename( $file ). ' '. $key;
 check( '...since no unit delivers it: the text of the Localepicker unit has no name of a language in it, and reaches every project the languages it has or not', $pickerNameLines === [] );
-// The look is not a choice any more: the base unit delivers one theme.css and
-// this step puts it in the bundle, with the project's own stylesheet last
-var_export( $configAfterApply['/nino/html/assets'] ); echo "
-";
-check( 'the Setup step seeds the css bundle with the delivered look and the project\'s own', $configAfterApply['/nino/html/assets']['/.cache/style.css'] === [
-	'/_nino/Nino.css', '/assets/theme.css', '/assets/style.css',
+// The look is not a choice any more: the standard part of the feature Basis is the look, so this step seeds the
+// bundle with Nino.css and the project's own stylesheet, which stays empty and last
+check( 'the Setup step seeds the css bundle with the project\'s own stylesheet behind the one of the kernel', $configAfterApply['/nino/html/assets']['/.cache/style.css'] === [
+	'/_nino/Nino.css', '/assets/style.css',
 ] );
-check( '...and the two files it names are really in the project', is_file( $sandbox. '/private/assets/theme.css' ) === true && is_file( $sandbox. '/private/assets/style.css' ) === true
-	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true );
-// One face is delivered: Open Sans in three weights, with the license it is released under, and no file of any face before it
-$deliveredFonts = array_map( 'basename', glob( $sandbox. '/public/fonts/*' ) ?: [] );
-sort( $deliveredFonts );
-check( '...and so are the fonts it @font-faces: the three files of Open Sans and the license they are released under, and no file of another face', $deliveredFonts === [ 'open-sans-OFL.txt', 'open-sans-bold.woff2', 'open-sans-light.woff2', 'open-sans-regular.woff2' ] );
+check( '...and the file it names is really in the project, and no theme and no script of the kernel with it', is_file( $sandbox. '/private/assets/style.css' ) === true && is_file( $sandbox. '/private/assets/theme.css' ) === false
+	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true
+	&& ( $configAfterApply['/nino/html/assets']['/.cache/script.js'] ?? \Nino\AppData::DEFAULTS['/nino/html/assets']['/.cache/script.js'] ) === [ '/_nino/Nino.js' ] );
+// No face is delivered: the page is set in the fonts of the visitor's system
+check( '...and no font is delivered to the project', glob( $sandbox. '/public/fonts/*' ) === [] );
+// The wizard switches the feature Basis on, which draws the starter pages: it is in the module list and its words are in the project
+check( '...and the feature Basis is on: in the module list, in the record of the features, and its words are in the language of the project',
+	in_array( '\\Nino\\Modules\\Basis', $configAfterApply['/nino/modules'], true ) === true && isset( $configAfterApply['/nino/features']['basis'] ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/module/basis/navigation/primary]]'] ?? '' ) !== ''
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/module/basis/navigation/menu]]'] ?? '' ) !== '' );
 // A script in the project's assets is only ever loaded through a bundle - one
 // that no bundle names is a file that looks like the site's own hook and runs
 // nowhere
@@ -323,8 +325,10 @@ check( '...before any template can create that directory unprotected', strpos( $
 
 check( 'copies base\'s html-header.tpl', \Nino\Filesystem::fileExists( $appData, '/templates/html-header.tpl' ) === true );
 check( 'copies "forms"\'s own mail-header/footer templates', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
-check( 'copies "navigation"\'s own templates too - always-on now, nothing had to pick it', \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === true );
-check( '...and "localepicker"\'s', \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-localepicker.tpl' ) === true );
+check( 'copies the frames of the base unit, written in the components of Basis, and no template of "navigation" and "localepicker", whose menus the header and the footer of Basis draw',
+	\Nino\Filesystem::fileExists( $appData, '/templates/frame-header.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/frame-footer.tpl' ) === true
+	&& \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === false && \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-nav.tpl' ) === false
+	&& \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-localepicker.tpl' ) === false );
 
 $blacklistAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
 check( 'base\'s blacklist entries (design tokens) landed in text/blacklist.php', in_array( '/project/website/html/lang', $blacklistAfterApply, true ) === true );
@@ -375,7 +379,7 @@ check( '...each section with a title and a text, and the global bucket with its 
 	&& ( $privacyAfterApply['*']['hosting']['order'] ?? null ) === 200 );
 check( 'the menu legal is created with the two pages by Element-URI, in that order', ( $configAfterApply['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 1
 	&& ( $configAfterApply['/nino/html/navroutes']['/legal/privacy']['legal'] ?? null ) === 2 );
-check( '...and the footer of the base frames outputs it', str_contains( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-footer.tpl', '' ), '[navigation nav="legal" id="legal__nav"]' ) === true );
+check( '...and the footer of the base frames outputs it, with the component that draws the legal pages', str_contains( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-footer.tpl', '' ), '[footer-legal]' ) === true );
 check( 'the unit\'s words for the Elements panel are on the blacklist', in_array( '/_admin/elements/type/privacy/hint', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true
 	&& in_array( '/_admin/elements/field/legal/text', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
 
@@ -491,29 +495,7 @@ unset( $appData['/nino/http/routes']['GET://_admin'], $appData['/nino/http/route
 echo "\n";
 
 
-// --- a header that scrolls away really goes ---------------------------------
-
-// max-height is the weakest of the four ways a box keeps its height:
-// min-height beats it outright, padding is never squeezed below what it asks
-// for, and a border is drawn whatever the box does. Every header preset uses
-// at least one of them to give its bar a height, so the collapsed state has
-// to take all of them back - the rule that only said max-height: 0 left five
-// of the wizard's six header presets sitting on screen while the page
-// scrolled under them
-$collapsed = '';
-
-// ...not while the focus is in it: a bar folded to nothing with a link focused in it is a focus nobody can see. The condition is in :where(), so that the rule is as
-// specific as it was and the opt-out of a preset - the side rail's - still wins over it
-if( preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header:where\(:not\(:has\(:focus-visible\)\)\)\s*\{([^}]*)\}/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $match ) === 1 )
-	$collapsed = $match[1];
-
-check( 'the collapsed header takes back every way a frame can give its bar a height', $collapsed !== ''
-	&& preg_match( '/max-height:\s*0/', $collapsed ) === 1 && preg_match( '/min-height:\s*0/', $collapsed ) === 1
-	&& preg_match( '/padding-top:\s*0/', $collapsed ) === 1 && preg_match( '/padding-bottom:\s*0/', $collapsed ) === 1
-	&& preg_match( '/border-top-width:\s*0/', $collapsed ) === 1 && preg_match( '/border-bottom-width:\s*0/', $collapsed ) === 1 );
-check( '...and only while the focus is not in it: no rule folds the bar up without that condition, and the bar is as drawn as it is under the pointer while the focus is in it',
-	preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header\s*\{/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) !== 1
-	&& preg_match( '/\.nino-scroll-header:hover,\s*\.nino-scroll-header:has\(:focus-visible\)\s*\{[^}]*opacity:\s*1/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) === 1 );
+// --- the frame and the reset -------------------------------------------------
 
 // One step's message is shown by the same pane class the panes themselves are
 // shown by - so a class the shell never sets means that step's messages are
@@ -533,192 +515,44 @@ $orphans			= array_values( array_diff( $msgClasses, $stepClasses ) );
 check( 'the wizard has a pane class per step', count( $stepClasses ) === 6 && in_array( 'show-accounts', $stepClasses, true ) === true );
 check( 'every step message is shown by a class the shell actually sets'. ( $orphans === [] ? '' : ' - orphaned: '. implode( ', ', $orphans ) ), $orphans === [] );
 
-// The burger menu is a button, and the list it opens is one that nothing reaches while it is folded away. A checkbox behind a label was reached by the Tab key and
-// read every link of the menu out as its name; a list squeezed to no height kept its links in the order of the Tab key, where nobody could see them, and a
-// checkbox that is display:none is not rendered, and what is not rendered cannot be focused. So the folded list is hidden by visibility - which takes it out of that
-// order - and is shown at once when it opens, and the button is a control like every other, with the ring every control has
-$ninoCss  = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
-
-// Without the comments, and with the rules of a media query kept apart from the ones that stand alone: this file explains itself, and what a viewport says is
-// not what the page says before it is asked
-$ninoBare   = (string) preg_replace( '#/\*.*?\*/#s', '', $ninoCss );
-$ninoMedia  = [];
-$ninoAlone  = (string) preg_replace_callback( '/@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/', static function( array $found ) use ( &$ninoMedia ): string { $ninoMedia[] = $found[0]; return ''; }, $ninoBare );
-$ninoBody   = static function( string $css, string $selector ): string {
-	// A selector may stand in a list, after a comma
-	preg_match_all( '/(?:^|[{},])\s*'. preg_quote( $selector, '/' ). '\s*\{([^{}]*)\}/', $css, $found );
-	return implode( ' ', $found[1] );
-};
-$ninoWide   = implode( "\n", array_filter( $ninoMedia, static fn( string $block ): bool => str_contains( $block, '.nino-nav-burger' ) === true ) );
-$burgerOpen = '.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content';
-
-check( 'the folded list of the burger menu is hidden and not only squeezed - visibility, which takes its links out of the order of the Tab key - and it is shown at once when the menu opens',
-	preg_match( '/visibility:\s*hidden/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1 && preg_match( '/max-height:\s*0/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1
-	&& preg_match( '/visibility:\s*visible/', $ninoBody( $ninoAlone, $burgerOpen ) ) === 1 && preg_match( '/max-height:\s*100vh/', $ninoBody( $ninoAlone, $burgerOpen ) ) === 1 );
-check( '...the button the markup carries hidden is shown by the script, and a page without the script keeps its list open: the list is the bar it is from 768px on, in the flow and visible',
-	preg_match( '/display:\s*none/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden]' ) ) === 1
-	&& preg_match( '/position:\s*static/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
-	&& preg_match( '/visibility:\s*visible/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
-	&& preg_match( '/max-height:\s*none/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1 );
-check( '...from 768px the button is gone whatever it says and the list is the bar, visible: nothing there is folded',
-	preg_match( '/display:\s*none/', $ninoBody( $ninoWide, '.nino-nav-burger > button' ) ) === 1 && preg_match( '/visibility:\s*visible/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1
-	&& preg_match( '/position:\s*static/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 && preg_match( '/max-height:\s*none/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 );
-// The fold clips - overflow:hidden is what the max-height needs to fold the list - and a row that is open does not fold: the clipping goes with the fold, or it cuts the ring of the focus
-// of a link at the top, at the bottom and at both ends of the row, which reaches outside the box of the link
-check( '...and the list that is the bar, from 768px and with the button hidden, clips nothing: overflow is visible there, and hidden only where the list folds',
-	preg_match( '/overflow:\s*hidden/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1
-	&& preg_match( '/overflow:\s*visible/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
-	&& preg_match( '/overflow:\s*visible/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 );
-// The row of the links, from 768px, wraps: it is a flex row and without flex-wrap it was as wide as its links, ten of them ran out of the bar on the right, where the header clips them, and
-// the links that were cut off stayed stops of the Tab key. The bar is as tall as its content (min-height, never height), so the second row is room it grows into
-check( '...and the row of the links from 768px wraps: flex-wrap on the rule of the list, so that ten links make a second row and none runs out of the bar',
-	preg_match( '/display:\s*flex/', $ninoBody( $ninoWide, '.nino-nav-content ul' ) ) === 1 && preg_match( '/flex-wrap:\s*wrap\s*(;|$)/m', $ninoBody( $ninoWide, '.nino-nav-content ul' ) ) === 1
-	&& preg_match( '/\.nino-nav-content ul\s*\{[^}]*nowrap/', $ninoWide ) !== 1 );
-// The bar grows by a row at a time and its cap is what it may grow to: half of the window, and 200px where the window is lower than 400px - a row the bar clips is a row of links that
-// stay stops of the Tab key. The footer's contact icons take the colour of their row, since .nino-icon names the page's text colour for itself, and on a footer drawn in the ground
-// colour that is the ground
-check( '...the bar may grow to half the window, and to 200px in a window lower than that: no cap clips a row of links that stays a stop of the Tab key',
-	preg_match( '/max-height:\s*max\(200px,\s*50vh\)\s*;/', $ninoBody( $ninoAlone, '.nino-scroll-header' ) ) === 1 );
-check( '...the root declares how far the bar has grown, 0px where the script does not say',
-	preg_match( '/--nino-header-grow:\s*0px\s*;/', $ninoBody( $ninoAlone, ':root' ) ) === 1 );
-check( '...and the contact icons of a footer take the colour of their row, which they fill with',
-	preg_match( '/(?<![a-z-])color:\s*inherit\s*;/', $ninoBody( $ninoAlone, '.nino-footer-getintouch .nino-icon' ) ) === 1 && preg_match( '/fill:\s*currentColor/', $ninoBody( $ninoAlone, '.nino-footer-getintouch .nino-icon' ) ) === 1 );
-// The layers of the open menu - the list that is the overlay, and the ground behind it - are rules of their own and each has a z-index. A rule that has none reads as 0, which every
-// button is above without trying: the check fails for it, so that the button is held above two layers that are there
-$burgerLayer  = static function( string $selector ) use ( $ninoBody, $ninoAlone ): int {
-	return preg_match( '/z-index:\s*(\d+)/', $ninoBody( $ninoAlone, $selector ), $found ) === 1 ? (int) $found[1] : 0;
-};
-$burgerLayers = [ $burgerLayer( '.nino-nav-burger .nino-nav-content' ), $burgerLayer( '.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-bg' ) ];
-check( '...and the button has the ring every control has: no rule of the menu takes the outline from it, and it stands above the overlay that paints over whatever is below it and the ground behind that, both of which are layers',
-	preg_match( '/outline:\s*(?:none|0)/', $ninoBody( $ninoAlone, '.nino-nav-burger > button' ) ) !== 1
-	&& min( $burgerLayers ) > 0 && $burgerLayer( '.nino-nav-burger > button' ) > max( $burgerLayers ) );
-
-// The language picker is the same kind of control: a checkbox the overlay hangs on, and it is hidden the way the burger's control was and never taken out of the order of
-// the Tab key - the ring is on the globe and the name beside it, which is what the checkbox cannot show it with - and the list of links under it is not rendered while it is closed
-$pickerBox  = $ninoBody( $ninoAlone, '.nino-localepicker-wrap input' );
-$pickerRing = $ninoBody( $ninoAlone, '.nino-localepicker-wrap:has(input:focus-visible)' );
-check( 'the checkbox of the language picker is hidden without being taken out of the tab order, and something shows when it has the focus - the globe and its name',
-	$pickerBox !== '' && preg_match( '/display:\s*none/', $pickerBox ) !== 1 && preg_match( '/opacity:\s*0/', $pickerBox ) === 1 && preg_match( '/position:\s*absolute/', $pickerBox ) === 1
-	&& preg_match( '/outline:\s*2px solid var\(--color-focus\)/', $pickerRing ) === 1 );
-// The browser brings the box of the element that has the focus into view, and no more. The checkbox was one pixel at the top of the control: as soon as the footer link before it had
-// put that row at the edge of the screen the pixel was in view, nothing scrolled, and the globe, the name and the ring stayed where nobody could see them. Its box is the control's and
-// the ring's: the wrap, which it stands in, and as far out of it as the ring reaches - the outline and its offset, which are read from the rule of the ring
-$ringReach = preg_match( '/outline:\s*(\d+)px/', $pickerRing, $ringWidth ) === 1 && preg_match( '/outline-offset:\s*(\d+)px/', $pickerRing, $ringOffset ) === 1 ? (int) $ringWidth[1] + (int) $ringOffset[1] : 0;
-check( '...and it is as big as the control and its ring, the wrap it stands in and the outline and offset round it, so that focusing it brings all of that into view and not the one pixel it was',
-	$ringReach > 0 && preg_match( '/position:\s*relative/', $ninoBody( $ninoAlone, '.nino-localepicker-wrap' ) ) === 1
-	&& preg_match( '/(?<![a-z-])top:\s*-'. $ringReach. 'px/', $pickerBox ) === 1 && preg_match( '/(?<![a-z-])left:\s*-'. $ringReach. 'px/', $pickerBox ) === 1
-	&& preg_match( '/(?<![a-z-])width:\s*calc\(\s*100%\s*\+\s*'. ( 2 * $ringReach ). 'px\s*\)/', $pickerBox ) === 1 && preg_match( '/(?<![a-z-])height:\s*calc\(\s*100%\s*\+\s*'. ( 2 * $ringReach ). 'px\s*\)/', $pickerBox ) === 1 );
-check( '...and the links of a closed picker are not rendered, so that no Tab key stops at them, and those of an open one are',
-	preg_match( '/display:\s*none/', $ninoBody( $ninoAlone, '.nino-localepicker-wrap li' ) ) === 1 && preg_match( '/display:\s*block/', $ninoBody( $ninoAlone, '.nino-localepicker-wrap input:checked ~ div li' ) ) === 1 );
-
-// A visitor who asked their system for less motion. The parallax has said so
-// since it was written; everything else that moves on its own had not
-$reducedMotion = '';
-
-if( preg_match( '/@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/s', $ninoCss, $match ) === 1 )
-	$reducedMotion = $match[1];
-
-check( 'a visitor who asked for less motion sees a viewport animation simply there rather than arriving', str_contains( $reducedMotion, '.nino-vpa' ) === true
-	&& str_contains( $reducedMotion, 'opacity: 1' ) === true );
-check( '...and a jump to an anchor is a jump, not a ride', str_contains( $reducedMotion, 'scroll-behavior: auto' ) === true );
-
-// The attribute the scripts set beside their classes, said again in the
-// stylesheet: an author display rule beats the browser's own [hidden]
-check( 'the stylesheet keeps what the scripts hide hidden', str_contains( $ninoCss, '.nino-tabs-panel[hidden]' ) === true
-	&& str_contains( $ninoCss, '.nino-filter-item[hidden]' ) === true );
-
-// The form block: the fields, the labels, the status line, the checkbox and the radio group read custom properties, and a property a rule reads is
-// declared where it has no specificity - lengths, numbers and keywords at :where(:root), the colours a ground gives a role at :where(*) - so that a theme
-// moves it with a plain :root, whatever the order of the sheets. A property the rules read and nobody declares would leave the form without a value
-$formRead 	= [];
-$formRoot 	= $ninoBody( $ninoAlone, ':where(:root)' );
-$formEvery 	= $ninoBody( $ninoAlone, ':where(*)' );
-
-preg_match_all( '/var\(\s*(--forms-[a-z0-9-]+)/', $ninoBare, $formRead );
-
-$formRead 	= array_values( array_unique( $formRead[1] ) );
-$formKept 	= [];
-
-preg_match_all( '/(--forms-[a-z0-9-]+)\s*:/', $formRoot. ' '. $formEvery, $formKept );
-
-$formMissing = array_values( array_diff( $formRead, array_unique( $formKept[1] ) ) );
-
-check( 'the form block of Nino.css declares every --forms-* property its rules read, at :where(:root) and :where(*) - none is left without a value'. ( $formMissing === [] ? '' : ' - missing: '. implode( ', ', $formMissing ) ),
-	count( $formRead ) >= 20 && $formMissing === [] );
-check( '...the size, the space, the corners and the line of a field and the place of a label are lengths and numbers, so they stand at :where(:root); the line, the ink, the fill and the focus colour are roles of the ground a field stands on, so they stand at :where(*)',
-	preg_match_all( '/--forms-(?:scale|space|corners|line|labels)\s*:/', $formRoot ) === 5 && preg_match_all( '/--forms-(?:edge|label|fill|edge-focus)\s*:/', $formEvery ) === 4
-	&& preg_match( '/--forms-(?:edge|label|fill)\s*:/', $formRoot ) !== 1 );
-check( '...and no plain :root declares one: a default that had a specificity could not be moved by a theme that comes after it, nor by one that comes before',
-	preg_match( '/(?:^|[}\s])(?<![\w-]):root\s*\{[^{}]*--forms-/', $ninoBare ) !== 1 );
-
-// And the delivered header must not reach for the one thing that rule cannot
-// take back. A plain height on the bar would survive all of it - so the frame
-// the base unit ships does not have one, and this is where a replacement that
-// does finds that out
-$fixedHeight 	= [];
-$frameMarkup 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' );
-$frameStyle 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/assets/theme.css' );
-
-if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $frameMarkup, $match ) === 1 )
-	foreach( preg_split( '/\s+/', trim( $match[1] ) ) ?: [] as $class ) {
-
-		// A frame that is not a bar says so for itself: a sidebar rail hands
-		// max-height back above its own breakpoint, and from there its height is
-		// the layout's business rather than this rule's
-		if( preg_match( '/body\.nino-scroll-down[^{}]*\.'. preg_quote( $class, '/' ). '\s*\{[^}]*max-height:\s*none/', $frameStyle ) === 1 )
-			continue;
-
-		// Every block whose selector ends on one of the bar's own classes
-		if( preg_match_all( '/([^{}]*\.'. preg_quote( $class, '/' ). ')\s*\{([^}]*)\}/', $frameStyle, $blocks, PREG_SET_ORDER ) === 0 )
-			continue;
-
-		foreach( $blocks as $found )
-			if( preg_match( '/(?<![a-z-])height:\s*(?!auto)/', $found[2] ) === 1 )
-				$fixedHeight[] = $class;
-	}
-
-check( 'the header markup carries the class that rule acts on', preg_match( '/class="[^"]*nino-scroll-header/', $frameMarkup ) === 1 );
-
 // The first stop of every page is a link to its main part: a keyboard that has gone through the header on every page should not have to again. The link is hidden
 // until it has the focus (.nino-sr-only, which Nino.css shows then) and its target can be focused without being a stop of the Tab key
 $documentHead = (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' );
 check( 'the first element of the body of a page is a skip link to the main part, which the page names by an id and can focus: tabindex="-1", a target and no stop of the Tab key',
 	preg_match( '/<body>\s*<a class="nino-sr-only" href="#nino-main">\[\[\/template\/common\/navigation\/skip\]\]<\/a>/', $documentHead ) === 1
 	&& substr_count( $documentHead, 'id="nino-main"' ) === 1 && preg_match( '/<main id="nino-main" tabindex="-1">/', $documentHead ) === 1 );
-check( '...and the link of the logo writes the name of the site out, for the day no logo is uploaded: a copy that a screen reader is spared, since the heading beside it says it',
-	preg_match( '/<a [^>]*class="nino-logo">\s*\[logo alt=""\]\s*<span aria-hidden="true">\[\[\/project\/company\/general\/name\]\]<\/span>\s*<h1 class="nino-sr-only"/', $frameMarkup ) === 1 );
+check( '...and the frames of the base unit are written in the components of Basis alone: a header with its logo, its menu and its action, a footer with its columns and its legal line, and no class of Nino\'s own',
+	preg_match( '/^\[header-wrap\b.*\[header-logo\].*\[header-nav menu="main"\].*\[header-actions\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ) ) === 1
+	&& preg_match( '/^\[footer-wrap\b.*\[footer-col\b.*\[footer-nav menu="footer"\].*\[footer-legal\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ) ) === 1
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ). (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ), 'nino-' ) === false );
 $contactPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/contact/templates/page-contact.tpl' );
 check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and the browser\'s bubble would be in its own',
 	preg_match( '/<input type="text" id="contact-form-name"[^>]* autocomplete="name"/', $contactPage ) === 1 && preg_match( '/<input type="email" id="contact-form-email"[^>]* autocomplete="email"/', $contactPage ) === 1
 	&& preg_match( '/<form class="nino-form"[^>]* novalidate>/', $contactPage ) === 1 );
-check( 'and the delivered frame gives its bar no height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
 
-// The delivered bar is a ground of its own at every rung, so a cover or a parallax hero
-// that begins the page - in main or in the wrap the Builder writes around a page's
-// sections - starts under it: the one rule of the delivered styles that sets the top
-// padding of a main is the room under the bar, whatever form a rule for a cover would take
-$mainPadding = [];
+// Nino.css is the reset and nothing else: its size, the tokens a part reads and no class of a component
+$ninoCss = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
+check( 'Nino.css is the reset: under 15 KB, with the tokens of the brand and of the page and the contract of the grounds, and no rule of a component and no script beside it',
+	strlen( $ninoCss ) < 15 * 1024 && str_contains( $ninoCss, '--brand-color-1:' ) === true && str_contains( $ninoCss, '--page-width:' ) === true && str_contains( $ninoCss, '[class$="--ground-dark"], [class*="--ground-dark "]' ) === true && str_contains( $ninoCss, '@supports not ( color: light-dark(' ) === true
+	&& preg_match( '/\[class\*="--ground-[a-z]+"\]/', $ninoCss ) !== 1
+	&& preg_match( '/\.nino-(?!sr-only|richtext)[a-z]/', $ninoCss ) !== 1 && is_file( __DIR__. '/../_nino/Nino.ui.js' ) === false );
 
-if( preg_match_all( '/([^{}]*)\{([^{}]*)\}/', $frameStyle, $mainRules, PREG_SET_ORDER ) !== false )
-	foreach( $mainRules as $mainRule )
-		if( preg_match( '/\bmain\b/', $mainRule[1] ) === 1 && preg_match( '/(?<![\w-])padding(?:-top)?\s*:/', $mainRule[2] ) === 1 )
-			$mainPadding[] = trim( (string) preg_replace( '/\s+/', ' ', $mainRule[1] ) );
-
-check( 'the delivered frame leaves main its room under the bar for a cover and a parallax hero, in main and in the wrap of the Builder alike: the only rule that sets the padding of a main is the room under the bar'. ( count( $mainPadding ) === 1 ? '' : ' - found: '. implode( ' | ', $mainPadding ) ), $mainPadding === [ 'body main' ] );
-// ...and below a header that grew a row it starts under the whole bar: the padding is the bar's min-height and what the script says the bar has grown by, times the factor
-// the behaviour of the bar gives it - one where the bar stands fixed, nought where it goes with the page and needs no room. Design's regular header set writes the same line,
-// and its suite compares the delivered file with its own compile of it
-check( 'the delivered frame clears the bar as it is, not as it is at its least: the padding of main is the height plus --nino-header-grow, times the factor of the behaviour of the bar',
-	preg_match( '/\nbody main\s*\{\s*padding-top:\s*calc\( \( var\(--header-height\) \+ var\(--nino-header-grow, 0px\) \) \* var\(--header-behaviour-clear\) \);\s*\}/', $frameStyle ) === 1 );
-
-// The rule under a section title is the line Nino.css draws as the border of the title, drawn by the delivered stylesheet as a background of it - as high as the rule, as long as the
-// length - with the border taken to nothing and the room under the title the line and twice it, up to .375rem, so that it can be short, the hero style of the title among the titles that carry it. Design's section sets write the same
-// rule, and its suite compares the delivered file with its own compile of it
-check( 'the delivered stylesheet draws the rule under a section title as a background as high as the rule and as long as its length, with no border of its own and room under the title of the line and twice it, to .375rem, the hero title among them',
-	preg_match( '/\.nino-section-title[^{}]*\{[^}]*border-bottom-width:\s*0;[^}]*background-size:\s*var\(--section-rule-length\) var\(--section-rule\);/', $frameStyle ) === 1
-	&& preg_match( '/\.nino-section-title[^{}]*\{[^}]*padding-bottom:\s*calc\( [^;]*var\(--section-rule\) \+ min\( var\(--section-rule\) \* 2, \.375rem \) \);/', $frameStyle ) === 1
-	&& preg_match( '/:is\([^()]*\.nino-section-title--hero\)\s*\{[^}]*background-size:\s*var\(--section-rule-length\) var\(--section-rule\);/', $frameStyle ) === 1
-	&& preg_match( '/:not\([^()]*\.nino-section-title--hero[^{]*\{[^}]*(?:background-size|padding-bottom\s*:[^;]*--section-rule)/', $frameStyle ) === 0 );
+// What the reset does for every page, each its own check: less motion, the focus ring, the width of a picture, the skip link, a hidden element, the room under a bar, the foot
+$ninoRules = static function( string $selector ) use ( $ninoCss ): string {
+	preg_match_all( '/(?:^|[}\s])'. preg_quote( $selector, '/' ). '\s*\{([^{}]*)\}/m', $ninoCss, $found );
+	return implode( ' ', $found[1] );
+};
+check( 'a visitor who asked for less motion gets none: the block of the media query sets the motion token to nothing and the scroll to a jump, with no !important',
+	preg_match( '/@media \(prefers-reduced-motion: reduce\) \{[^{}]*:root \{ --page-motion: 0s; \}[^{}]*html \{ scroll-behavior: auto; \}/', $ninoCss ) === 1 );
+check( 'every control that has the focus has a ring of the accent, offset from the edge', preg_match( '/outline:\s*2px solid var\(--brand-accent\)/', $ninoRules( ':focus-visible' ) ) === 1 && preg_match( '/outline-offset:\s*2px/', $ninoRules( ':focus-visible' ) ) === 1 );
+check( 'a picture is never wider than the box it stands in', preg_match( '/img, picture, svg, video, canvas, iframe \{[^}]*max-width:\s*100%/', $ninoCss ) === 1 && preg_match( '/img, video \{[^}]*height:\s*auto/', $ninoCss ) === 1 );
+check( 'the skip link is shown when the keyboard reaches it: hidden only while it has no focus, and fixed, above the page and with a ground of its own where it has',
+	str_contains( $ninoCss, '.nino-sr-only:not(:focus):not(:focus-within)' ) === true && preg_match( '/a\.nino-sr-only:focus \{[^}]*position:\s*fixed[^}]*z-index:\s*1000[^}]*background:\s*var\(--brand-ground\)/', $ninoCss ) === 1 );
+check( 'an element that is hidden is hidden, whatever display a rule gives its tag, but for one that is found by the page search: no !important',
+	str_contains( $ninoCss, '[hidden]:not( [hidden="until-found"] ) { display: none; }' ) === true && strpos( $ninoCss, '[hidden]:not(' ) > strpos( $ninoCss, 'img, picture, svg' ) );
+check( 'the room under a bar that stands at the top is one token, which html keeps a focused element from', preg_match( '/--page-scroll-pad:\s*5rem/', $ninoCss ) === 1 && str_contains( $ninoCss, 'scroll-padding-top: var(--page-scroll-pad);' ) === true );
+check( 'the foot of a short page stands at the bottom: body is a column of at least the height of the window, and main takes the rest',
+	preg_match( '/\n\tbody \{\n.*?min-height:\s*100dvh;.*?display:\s*flex;\s*flex-direction:\s*column;/s', $ninoCss ) === 1 && preg_match( '/main \{ flex: 1 0 auto;/', $ninoCss ) === 1 );
 
 echo "\n";
 
@@ -802,17 +636,17 @@ check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1
 
 check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/hero/background.' ) === true
 	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
-\Nino\Modules\Components::init( $appData );
+// The request as \Nino\init() boots it: the feature Basis the wizard switched on is in the list of the modules, and its components are read from its folders
+\Nino\Features::registerComponents( $appData );
 \Nino\Modules\Template::init( $appData );
 $homeHtml = \Nino\Html::renderHtml( $appData, '[template /templates/page-home]' );
-check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/template/page-home/hero/background.svg" width="1920" height="1080" alt="">' ) === true
-	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[image' ) === false );
+check( 'the home template renders the slot as the picture behind its hero: an <img> with its size and an empty alt inside the section, and no literal image path', preg_match( '#<section id="hero"[^>]*>.*?<img [^>]*src="[^"]*/images/template/page-home/hero/background\.svg"[^>]*width="1920" height="1080" alt=""#s', $homeHtml ) === 1
+	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[section-wrap' ) === false );
 
 // The logo, which is a slot too: nothing in the shipped frames, the navigation
 // or the mail names a logo file, and with no logo uploaded none of them
 // leaves a broken <img> or an empty meta tag behind
 \Nino\Html::init( $appData );
-\Nino\Modules\Navigation::init( $appData );
 $logoFrames = static function( array &$appData ): array {
 	return [
 		'header'	=> \Nino\Html::renderHtml( $appData, '[template /templates/frame-header]' ),
@@ -821,49 +655,42 @@ $logoFrames = static function( array &$appData ): array {
 	];
 };
 $logoShipped = '';
-foreach( [ '/templates/frame-header.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl', '/templates/html-header-nav.tpl' ] as $logoTemplate )
+foreach( [ '/templates/frame-header.tpl', '/templates/frame-footer.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl' ] as $logoTemplate )
 	$logoShipped .= (string) \Nino\Filesystem::getFileContent( $appData, $logoTemplate, '' );
-check( 'no shipped template names a logo file: every one asks the logo slots - the header and the navigation as [logo], the page head and the mail as the light slot alone', preg_match( '#images/logo#', $logoShipped ) === 0
-	&& substr_count( $logoShipped, '[logo' ) === 2 && substr_count( $logoShipped, '[imagevalues /logo' ) === 3
-	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-header.tpl', '' ), '[logo alt=""]' ) === 1
+check( 'no shipped template names a logo file: every one asks the logo slots - the header as [header-logo], which takes both, the page head and the mail as the light slot alone',
+	preg_match( '#images/logo#', $logoShipped ) === 0 && substr_count( $logoShipped, '[header-logo' ) === 1 && substr_count( $logoShipped, '[footer-logo /logo]' ) === 1 && substr_count( $logoShipped, '[imagevalues /logo' ) === 3
 	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '[imagevalues /logo]' ) === 1
 	&& str_contains( $logoShipped, '/logo/dark' ) === false );
 
 \Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'www.example.com', '[[/project/company/general/name]]' => 'Acme' ], '*' );
 $noLogo = $logoFrames( $appData );
-check( 'without an uploaded logo the header has no <img> and the mail header no picture at all', str_contains( $noLogo['header'], '<img' ) === false && str_contains( $noLogo['header'], '[image' ) === false
+check( 'without an uploaded logo the header has no <img> and the mail header no picture at all', str_contains( $noLogo['header'], '<img' ) === false && str_contains( $noLogo['header'], '[header-logo' ) === false
 	&& str_contains( $noLogo['mail'], '<img' ) === false && str_contains( $noLogo['mail'], '[image' ) === false );
 check( '...and the page head has no og:image or twitter:image, not even an empty one', str_contains( $noLogo['meta'], 'og:image' ) === false && str_contains( $noLogo['meta'], 'twitter:image' ) === false && str_contains( $noLogo['meta'], '[image' ) === false );
-check( '...the navigation\'s logo is an empty wrapper', str_contains( $noLogo['header'], '<div class="nino-headernav-logo"></div>' ) === true );
 
 $appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
 $withLogo = $logoFrames( $appData );
 $logoUrl = \Nino\Images::getUrl( $appData, 'logo.webp' );
-check( 'with a logo the header shows it in the set of [logo] with an empty alt, as the frame always did - the one picture, of the class of the light ground, and no picture for the dark one',
-	str_contains( $withLogo['header'], '<span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"></span>' ) === true && str_contains( $withLogo['header'], 'nino-logo-dark' ) === false );
-check( '...the navigation shows it in its wrapper, with an empty alt: the link of the frame names the site, and the slot\'s own alt text comes first', preg_match( '#<div class="nino-headernav-logo"><span class="nino-logo-set"><img src="'. preg_quote( $logoUrl, '#' ). '" width="500" height="100" alt="" class="nino-logo-light"></span></div>#', $withLogo['header'] ) === 1 );
+check( 'with a logo the header shows the one picture, with its size and an empty alt, and no picture for the dark ground',
+	preg_match( '#<img [^>]*src="'. preg_quote( $logoUrl, '#' ). '"[^>]*width="500" height="100" alt=""#', $withLogo['header'] ) === 1 && substr_count( $withLogo['header'], '<img' ) === 1 );
 $appData['/nino/html/images']['/logo/dark']['filename'] = 'logo-dark.webp';
 $darkUrl = \Nino\Images::getUrl( $appData, 'logo-dark.webp' );
 $withBoth = $logoFrames( $appData );
-check( '...with the picture for a dark ground as well both are in the set, the light one first, in the header and in the navigation',
-	str_contains( $withBoth['header'], '<span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span>' ) === true
-	&& str_contains( $withBoth['header'], '<div class="nino-headernav-logo"><span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span></div>' ) === true );
-// The call of the logo carries no fill: a name with a quote or a bracket in it would break a call that had one, and the link of the frame names the site
+check( '...with the picture for a dark ground as well both are in the header, the light one first',
+	substr_count( $withBoth['header'], '<img' ) === 2 && strpos( $withBoth['header'], $logoUrl ) !== false && strpos( $withBoth['header'], $darkUrl ) > strpos( $withBoth['header'], $logoUrl ) );
+// A name with a quote or a bracket in it breaks nothing: the pictures are whole and no part of a call is left standing as text
 \Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => 'O\'Brien\'s "Studio" [Nord] GmbH' ], '*' );
 $oddName = $logoFrames( $appData );
 \Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => 'Acme' ], '*' );
-$navMarkup = (string) \Nino\Filesystem::getFileContent( $appData, '/templates/html-header-nav.tpl', '' );
-check( '...the navigation\'s logo asks for no fill in its call, so that a company name with a quote or a bracket in it breaks nothing: the set is whole, the alt text is empty, and no part of a call is left standing as text',
-	preg_match( '/\[logo[^\]]*\[\[/', $navMarkup ) !== 1 && str_contains( $navMarkup, '[logo alt=""]' ) === true
-	&& str_contains( $oddName['header'], '<div class="nino-headernav-logo"><span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span></div>' ) === true
-	&& str_contains( $oddName['header'], '[logo' ) === false && str_contains( $oddName['header'], 'GmbH"]' ) === false );
+check( '...a company name with a quote or a bracket in it leaves the pictures whole and no part of a call standing as text',
+	substr_count( $oddName['header'], '<img' ) === 2 && str_contains( $oddName['header'], '[header-logo' ) === false && str_contains( $oddName['header'], 'GmbH"]' ) === false );
 check( '...the page head and the mail ask the light slot alone: the dark one is in neither',
 	str_contains( $withBoth['meta'], 'https://www.example.com'. $darkUrl ) === false && str_contains( $withBoth['mail'], $darkUrl ) === false && str_contains( $withBoth['meta'], '<meta property="og:image" content="https://www.example.com'. $logoUrl. '">' ) === true
 	&& str_contains( $withBoth['mail'], '<img src="https://www.example.com'. $logoUrl. '" width="180" alt="Acme">' ) === true );
 $appData['/nino/html/images']['/logo']['filename'] = null;
 $onlyDark = $logoFrames( $appData );
-check( '...a project that uploaded the dark picture alone has it in the header, the one picture on every ground, and the mail and the page head have none',
-	str_contains( $onlyDark['header'], '<span class="nino-logo-set"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span>' ) === true && str_contains( $onlyDark['header'], 'nino-logo-light' ) === false
+check( '...a project that uploaded the dark picture alone has it in the header, and the mail and the page head have none',
+	str_contains( $onlyDark['header'], $darkUrl ) === true && str_contains( $onlyDark['header'], $logoUrl ) === false && substr_count( $onlyDark['header'], '<img' ) === 1
 	&& str_contains( $onlyDark['mail'], '<img' ) === false && str_contains( $onlyDark['meta'], 'og:image' ) === false );
 $appData['/nino/html/images']['/logo/dark']['filename'] = null;
 $appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
@@ -873,7 +700,7 @@ check( '...and the mail an <img> with the absolute address and the company name 
 $appData['/nino/html/images']['/logo']['filename'] = null;
 
 // So the Image Slots tab's scan has nothing to propose for it: the copied template is no literal <img> of the images directory
-check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[image /template/page-home/hero/background alt=""]' ) === true
+check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), 'image="~background"' ) === true
 	&& preg_match( '#<img\b[^>]*src="[^"]*/images/#i', (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ) ) === 0 );
 // A fresh install is the thing the dashboard's "Missing image slots" tile counts: with the logo and the hero both slots, no template has an <img> of the images directory left
 check( 'on a fresh install the Missing image slots tile reads 0 - every picture of the starter site is a slot', \Nino\Modules\Images\Slots::missingCount( $appData ) === 0 );
@@ -1627,6 +1454,16 @@ $ownGlobal = \Nino\Filesystem::getFileContent( $own, '/text/global.php', [] );
 preg_match_all( '#href="(/_nino/webpage/[^"]+)"#', $ownTemplate, $ownLinks );
 check( '...and every address the 404 page links to by name is written, so that no link of it leads nowhere', $ownLinks[1] !== [] && array_filter( $ownLinks[1], static fn( string $link ): bool => ( $ownGlobal['[['. $link. ']]'] ?? '' ) === '' ) === []
 	&& in_array( '/_nino/webpage/home/uri', \Nino\Filesystem::getFileContent( $own, '/text/blacklist.php', [] ), true ) );
+// Drawn: where an application brings the start page there is no page /home, and a link by page:/home would be a span - the button of the 404 page links by the address the wizard wrote
+$own['/nino/modules'] = \Nino\Filesystem::getFileContent( $own, '/config.php', [] )['/nino/modules'];
+$own['/nino/dir'] = '';
+\Nino\Html::init( $own );
+\Nino\Features::registerComponents( $own );
+\Nino\Modules\Template::init( $own );
+$own404 = \Nino\Html::renderHtml( $own, '[template /templates/page-404]' );
+check( '...and its button is a link to the address of the site, drawn so, and no span',
+	preg_match( '#<a class="button" href="/">#', $own404 ) === 1 && str_contains( $own404, '<span class="button">' ) === false
+	&& str_contains( \Nino\Html::renderHtml( $own, '[button /template/page-404/hero/button href="page:/home"]' ), '<span' ) === true );
 check( '...and the empty page is in the project, with no route of its own', \Nino\Filesystem::fileExists( $own, '/templates/page-blank.tpl' ) === true );
 check( '...and names its entry point', array_column( $body['targets'], 'next' ) === [ '/card' ] );
 
@@ -1999,10 +1836,9 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 
 check( 'every page unit ships the templates its own routes render'. ( $pageFailures === [] ? '' : ' - '. implode( ' | ', $pageFailures ) ), $pageFailures === [] );
 
-/*	The pages of the library are written in the form the Builder reads, so a fresh project edits them in it. A template that holds a section
-	has its name line at byte zero, the head, the wrap as the first line after the head and its closing tag as the last line before the foot,
-	and every section outside the markers of a block the Builder leaves alone has an id and no attribute but the ones the Builder keeps.
-	By grammar and position: no page, section or key of the library is named here	*/
+/*	The pages of the library are written in the components of Basis, so a fresh project edits them in that notation. A template has its name
+	line at byte zero, the head, the sections and the foot, every [section-wrap] has an id that is a slug no section before it has, and no page
+	draws a section, a column or a button by hand. By grammar and position: no page, section or key of the library is named here	*/
 $shapeFailures	= [];
 $shapeTemplates	= 0;
 
@@ -2010,31 +1846,29 @@ foreach( glob( $realRoot. '/_admin/install/library/pages/*/templates/*.tpl' ) ?:
 
 	$shapeSource = (string) file_get_contents( $shapeFile );
 
-	if( str_contains( $shapeSource, '<section' ) === false )
+	if( str_contains( $shapeSource, '[section-wrap' ) === false )
 		continue;
 
 	$shapeTemplates++;
 	$shapeLabel	= substr( $shapeFile, strlen( $realRoot. '/_admin/install/library/pages/' ) );
 	$shapeIds	= [];
 
-	if( preg_match( '~\A<!-- nino:template-name [^\r\n<>]+ -->\n\[template /templates/html-header(?:-[a-z0-9]+)*\]\n<div class="(?:[^"]* )?nino-wrap(?: [^"]*)?">\n.*\n</div>\n\[template /templates/html-footer(?:-[a-z0-9]+)*\]\n\z~s', $shapeSource ) !== 1 )
-		$shapeFailures[] = $shapeLabel. ': the name line, the head, the wrap, its closing tag and the foot do not stand where the Builder reads them';
+	if( preg_match( '~\A<!-- nino:template-name [^\r\n<>]+ -->\n\[template /templates/html-header(?:-[a-z0-9]+)*\]\n\[section-wrap\b.*\n\[template /templates/html-footer(?:-[a-z0-9]+)*\]\n\z~s', $shapeSource ) !== 1 )
+		$shapeFailures[] = $shapeLabel. ': the name line, the head, the sections and the foot do not stand where they are read';
 
-	// What stands between the markers of a block is the Builder's to leave alone
-	preg_match_all( '~<section\b([^>]*)>~', (string) preg_replace( '~<!-- nino:html -->.*?<!-- /nino:html -->~s', '', $shapeSource ), $shapeTags );
+	if( preg_match( '~<(?:section|header|footer)\b|class="[^"]*\bnino-(?!form)~', $shapeSource ) === 1 )
+		$shapeFailures[] = $shapeLabel. ': a section, a header or a footer drawn by hand, or a class of the old stylesheet';
 
-	foreach( $shapeTags[1] as $shapeTag ) {
+	preg_match_all( '~\[section-wrap\b([^\]]*)\]~', $shapeSource, $shapeTags );
 
-		if( preg_match( '~\A(?: (?:id|class|data-cover-height)="[^"]*")+\z~', $shapeTag ) !== 1 )
-			$shapeFailures[] = $shapeLabel. ': a section with an attribute the Builder does not keep ('. trim( $shapeTag ). ')';
-		elseif( preg_match( '~ id="([a-z0-9]+(?:-[a-z0-9]+)*)"~', $shapeTag, $shapeId ) !== 1 || isset( $shapeIds[$shapeId[1]] ) === true )
+	foreach( $shapeTags[1] as $shapeTag )
+		if( preg_match( '~ id="([a-z0-9]+(?:-[a-z0-9]+)*)"~', $shapeTag, $shapeId ) !== 1 || isset( $shapeIds[$shapeId[1]] ) === true )
 			$shapeFailures[] = $shapeLabel. ': a section without an id that is a slug, or with one a section before it has ('. trim( $shapeTag ). ')';
 		else
 			$shapeIds[$shapeId[1]] = true;
-	}
 }
 
-check( 'the pages of the library are written in the form the Builder reads ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 3 );
+check( 'the pages of the library are written in the components of Basis ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 3 );
 
 // The three a starter site is normally built from have to be among them, or
 // the starter pages have nothing to create on a fresh install
@@ -2076,18 +1910,14 @@ check( 'the always-on module list carries no unit the wizard offers', array_inte
 	\Nino\AppData::DEFAULTS['/nino/modules']
 ) === [] );
 
-/*	The look is one file the base unit delivers, so that file has to be
-	self-contained: the fonts it @font-faces are copied by the same unit, and
-	the two frame templates it styles are copied by it too. Nothing looks for
-	a theme unit any more - a missing font here is a font that silently never
-	loads, and a missing template a header or footer that silently is not
-	there (\Nino\Template resolves an absent include to '').	*/
+/*	The base unit delivers no look of its own: the look of the starter pages is the standard part of the feature Basis, and what the unit
+	copies is the project's own empty stylesheet, the frames and the favicons - no theme and no webfont	*/
 $baseUnit 	= $realRoot. '/_admin/install/library/base';
 $baseFiles 	= (array) ( ( include $baseUnit. '/manifest.php' )['files'] ?? [] );
-$themeCss 	= (string) file_get_contents( $baseUnit. '/assets/theme.css' );
 
-check( 'the base unit ships the one stylesheet the css bundle names, and copies the directory it is in', is_file( $baseUnit. '/assets/theme.css' ) === true
-	&& in_array( 'assets', $baseFiles, true ) === true );
+check( 'the base unit ships the project\'s own stylesheet and copies the directory it is in, and no theme, no webfont and no directory of fonts', is_file( $baseUnit. '/assets/style.css' ) === true
+	&& in_array( 'assets', $baseFiles, true ) === true && is_file( $baseUnit. '/assets/theme.css' ) === false && is_dir( $baseUnit. '/fonts' ) === false && in_array( 'fonts', $baseFiles, true ) === false
+	&& ( ( include $baseUnit. '/manifest.php' )['features'] ?? null ) === [ 'basis' ] );
 
 /*	And the mailbox every mail this framework sends is addressed from.
 	\Nino\Mail::_getSender() reads '[[/project/mail/address/owner]]' for the From header
@@ -2112,77 +1942,42 @@ check( 'the base unit ships the envelope sender fill, empty, beside the owner ad
 check( '...which the same unit ships, or it would resolve to nothing', isset( $baseGlobal['[[/project/company/contact/email]]'] ) === true
 	&& str_contains( (string) $baseGlobal['[[/project/company/contact/email]]'], '[[' ) === false );
 
-preg_match_all( '#url\(["\']?\[\[/nino/public\]\](/fonts/[^)"\']+)#', $themeCss, $themeFonts );
-check( 'and every webfont it @font-faces', count( $themeFonts[1] ) > 0
-	&& array_values( array_filter( array_unique( $themeFonts[1] ), fn( string $font ): bool => is_file( $baseUnit. $font ) === false ) ) === [] );
-check( '...and names fonts among the files it copies, so they reach the project at all', in_array( 'fonts', $baseFiles, true ) === true );
+/*	The root size is a percentage of the visitor's browser default - a px length here silently overrules someone who raised their default
+	to 20px, and that is the one setting a visitor changes because they need it rather than because they prefer it. Nino.css names it once,
+	as --page-size, and sets the size of the root from it	*/
+preg_match_all( '/--page-size:\s*([^;]+);/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $rootSizes );
+check( 'Nino.css sets the root size once, as a percentage and not as a length, and the root takes it', count( $rootSizes[1] ) === 1 && str_ends_with( trim( $rootSizes[1][0] ), '%' ) === true
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), 'font-size: var(--page-size);' ) === true );
 
-/*	The root size is a percentage of the visitor's browser default, in both
-	files that set it - a px length here silently overrules someone who raised
-	their default to 20px, and that is the one setting a visitor changes
-	because they need it rather than because they prefer it. theme.css matters
-	as much as Nino.css: it assigns --base-size from its own token, so a px
-	there wins over a correct kernel. Each file sets it at least twice - the
-	root's and the wide screen's - and how often is the compiler's to say: its
-	tokens and its section of the root size both carry the pair, so theme.css
-	sets it four times and Nino.css twice.	*/
-$rootSizes = [];
-$rootSizeSets = [];
-foreach( [ '/../_nino/Nino.css' => '--base-size', '/../_admin/install/library/base/assets/theme.css' => '--nino-base-size' ] as $file => $token )
-	if( preg_match_all( '/'. preg_quote( $token, '/' ). ':\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found ) > 0 ) {
-		$rootSizeSets[$file] = count( $found[1] );
-		foreach( $found[1] as $value )
-			$rootSizes[] = $file. ': '. trim( $value );
-	}
-
-check( 'both files set the root size, at least twice each, and neither as a length'. ( $rootSizes === [] ? ' - none found' : '' ), count( $rootSizeSets ) === 2 && min( $rootSizeSets ) >= 2
-	&& array_filter( $rootSizes, static fn( string $entry ): bool => str_ends_with( $entry, '%' ) === false ) === [] );
-
-/*	A font stack is a comma separated list of family names, and the quotes in
-	it belong to the single name that needs them - "Segoe UI". A value quoted
-	as a whole is one family whose name happens to contain commas: no system
-	has it, and the generic keyword that should have caught the fall sits
-	inside the string rather than after it, so the browser ends up on its own
-	standard font instead of the sans the stack asked for. Measured in
-	headless Chromium against the quoted value: a canvas set to it measured
-	the same text at the same width as a family name invented for the test,
-	and 8% narrower than the same stack unquoted.	*/
-$fontStacks		= 0;
+/*	A font stack is a comma separated list of family names, and the quotes in it belong to the single name that needs them - "Segoe UI". A value
+	quoted as a whole is one family whose name happens to contain commas: no system has it, and the generic keyword that should have caught the
+	fall sits inside the string rather than after it, so the browser ends up on its own standard font instead of the sans the stack asked for	*/
+$fontStacks		= [];
 $quotedWhole	= [];
 $withoutBackup	= [];
 
-foreach( [ '/../_nino/Nino.css', '/../_admin/install/library/base/assets/theme.css' ] as $file )
-	if( preg_match_all( '/(--fontfamily-[a-z]+):\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found, PREG_SET_ORDER ) > 0 ) {
+preg_match_all( '/(--brand-font-[a-z]+):\s*([^;]+);/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $found, PREG_SET_ORDER );
 
-		$stacksOf = array_column( $found, 2, 1 );
+foreach( $found as [ , $name, $value ] ) {
 
-		foreach( $found as [ , $name, $value ] ) {
+	$stack = trim( $value );
 
-			$stack = trim( $value );
+	// A role with the face of another - --brand-font-text is var(--brand-font-title) until a project names one - is that one's stack,
+	// which is checked as itself
+	if( preg_match( '/^var\((--brand-font-[a-z]+)\)$/', $stack ) === 1 )
+		continue;
 
-			// A role with the face of another - --fontfamily-button is
-			// var(--fontfamily-text) until a theme names one - has that one's
-			// stack, which is checked as itself; what it names has to be a
-			// stack, and not an alias of another
-			if( preg_match( '/^var\((--fontfamily-[a-z]+)\)$/', $stack, $alias ) === 1 ) {
-				if( isset( $stacksOf[$alias[1]] ) === false || str_starts_with( trim( $stacksOf[$alias[1]] ), 'var(' ) === true )
-					$withoutBackup[] = $file. ': '. $name. ': '. $stack;
-				continue;
-			}
+	$fontStacks[] = $name;
 
-			$fontStacks++;
+	if( preg_match( '/^(?:\'[^\']*\'|"[^"]*")$/', $stack ) === 1 )
+		$quotedWhole[] = $stack;
 
-			if( preg_match( '/^(?:\'[^\']*\'|"[^"]*")$/', $stack ) === 1 )
-				$quotedWhole[] = $file. ': '. $stack;
+	// The last entry is the one the browser is guaranteed to have, so it has to reach it as a keyword and not as part of a name
+	if( preg_match( '/,\s*(?:sans-serif|serif|monospace|system-ui|cursive|fantasy)$/', $stack ) !== 1 )
+		$withoutBackup[] = $name. ': '. $stack;
+}
 
-			// The last entry is the one the browser is guaranteed to have, so
-			// it has to reach it as a keyword and not as part of a name
-			if( preg_match( '/,\s*(?:sans-serif|serif|monospace|system-ui|cursive|fantasy)$/', $stack ) !== 1 )
-				$withoutBackup[] = $file. ': '. $stack;
-		}
-	}
-
-check( 'every font stack of both files is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks > 0 && $quotedWhole === [] );
+check( 'every font stack of Nino.css is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks !== [] && $quotedWhole === [] );
 check( '...and every one of them ends in a bare generic family'. ( $withoutBackup === [] ? '' : ' - '. implode( ', ', $withoutBackup ) ), $withoutBackup === [] );
 
 /*	An address a shipped template writes is the project's, and a site may sit
@@ -2270,6 +2065,37 @@ foreach( [ '/private/templates', '/public/images', '/private/text', '/private/as
 ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
 check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
+// The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the standard parts of Basis,
+// the look of the form and the project's own stylesheet, in at most 36 KB, and the reset alone in at most 12 KB
+$keysBuilt = $keysApp;
+$keysBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
+$keysBuilt['/nino/html/assets'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/html/assets'];
+$keysBuilt['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];
+\Nino\Html::init( $keysBuilt );
+\Nino\Features::registerAssets( $keysBuilt );
+\Nino\Modules\Form::init( $keysBuilt );
+\Nino\Features::registerComponents( $keysBuilt );
+\Nino\Features::registerParts( $keysBuilt );
+\Nino\Modules\Assets::doShortcode( $keysBuilt, [ '/.cache/style.css' ] );
+$keysBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, '/.cache/style.css' ) );
+check( 'the style bundle of a fresh starter site is the reset, the standard parts of Basis, the look of the form and the project\'s own stylesheet, and it is at most 36 KB; Nino.css alone is at most 12 KB',
+	strlen( $keysBundle ) > 20000 && strlen( $keysBundle ) <= 36 * 1024 && str_contains( $keysBundle, '.header-wrap' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
+	&& filesize( dirname( __DIR__ ). '/_nino/Nino.css' ) <= 12 * 1024 );
+// The scans of the workbench read the words and the pictures of a page of Basis through the register: ~title under the id of its section is a key read, image="~background" a place of a picture
+$keysApp['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];
+\Nino\Features::registerComponents( $keysApp );
+// The Features panel of the workbench lists Basis as delivered with the kernel and as on, and it cannot be removed
+ninoUser( $keysApp, 'dev@example.com' );
+[ $featuresStatus, $featuresBody ] = ninoCall( $keysApp, [ \Nino\Modules\Features\Admin::class, 'apiList' ] );
+$basisRow = array_values( array_filter( (array) ( $featuresBody['features'] ?? [] ), static fn( array $row ): bool => ( $row['key'] ?? '' ) === 'basis' ) )[0] ?? [];
+[ $removeStatus, $removeBody ] = ninoCall( $keysApp, [ \Nino\Modules\Features\Admin::class, 'apiRemove' ], [ 'key' => 'basis' ] );
+check( 'the Features panel lists Basis as delivered with the kernel and as on, and refuses to remove it', $featuresStatus === 200 && ( $basisRow['shipped'] ?? null ) === true && ( $basisRow['active'] ?? null ) === true
+	&& $removeStatus === 400 && ( $removeBody['code'] ?? '' ) === 'features_remove_shipped' );
+$keysRead = \Nino\Components::sources( $keysApp, (string) \Nino\Filesystem::getFileContent( $keysApp, '/templates/page-home.tpl', '' ), 'page-home' );
+$keysReadOf = static fn( string $kind ): array => array_column( array_filter( $keysRead, static fn( array $read ): bool => $read['kind'] === $kind ), 'source' );
+check( 'the scans read the home page through the register: its title and its text as the keys they are under the id of their section, and the picture behind the hero as a place of a picture',
+	array_diff( [ '/template/page-home/hero/title', '/template/page-home/hero/subtitle', '/template/page-home/start-1/text', '/template/page-home/start-3/title' ], $keysReadOf( 'text' ) ) === []
+	&& in_array( '/template/page-home/hero/background', $keysReadOf( 'image' ), true ) === true );
 $starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$keysApp ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
 	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $keysApp ) === 0 );
@@ -2389,7 +2215,7 @@ require '. var_export( __DIR__. '/harness.php', true ). ';
 require '. var_export( dirname( __DIR__ ). '/_admin/install/Install.php', true ). ';
 $css = \'/features/Sample/assets/sample.css\';
 $out = [];
-foreach( [ \'absent\' => null, \'held\' => [ \'/.cache/style.css\' => [ \'/_nino/Nino.css\', \'/assets/theme.css\', \'/assets/style.css\', \'/assets/own.css\' ] ] ] as $case => $held ) {
+foreach( [ \'absent\' => null, \'held\' => [ \'/.cache/style.css\' => [ \'/_nino/Nino.css\', \'/assets/style.css\', \'/assets/own.css\' ] ] ] as $case => $held ) {
 	$appData = ninoSandbox( \'install-features\' );
 	$sandbox = ninoSandboxDir( $appData );
 	$appData[\'/nino/dir\'] = \'\';
@@ -2424,9 +2250,9 @@ echo json_encode( $out );' );
 
 	$css = '/features/Sample/assets/sample.css';
 	check( 'with a feature switched on and no list in config.php, the setup writes the kernel\'s stylesheet and the two of the base unit, and not the one of the feature',
-		( $out['absent']['status'] ?? null ) === 200 && ( $out['absent']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css' ] );
+		( $out['absent']['status'] ?? null ) === 200 && ( $out['absent']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/style.css' ] );
 	check( '...and the page still carries the stylesheet of the feature, listed once and bundled once',
 		( array_count_values( $out['absent']['runtime'] ?? [] )[$css] ?? 0 ) === 1 && ( $out['absent']['times'] ?? null ) === 1 );
 	check( 'where config.php holds a list already, the setup leaves it as it is, with nothing of the feature in it',
-		( $out['held']['status'] ?? null ) === 200 && ( $out['held']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css', '/assets/own.css' ] );
+		( $out['held']['status'] ?? null ) === 200 && ( $out['held']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/style.css', '/assets/own.css' ] );
 }

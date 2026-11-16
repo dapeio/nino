@@ -1769,7 +1769,7 @@ $subAppData['./nino/http/requests'] = [];
 ninoVisit( $subAppData, '/sub/page' );
 $subMenu = \Nino\Modules\Navigation::doShortcode( $subAppData, [ 'content' => "/page:Page\n/other:Other\n//example.com/x:Elsewhere\n#top:Top" ] );
 check( 'a menu entry links under the directory', str_contains( $subMenu, 'href="/sub/page"' ) === true && str_contains( $subMenu, 'href="/sub/other"' ) === true );
-check( '...and the requested page is still the active entry', preg_match( '/href="\/sub\/page" class="nino-is-active"/', $subMenu ) === 1 );
+check( '...and the requested page is still the active entry', preg_match( '/href="\/sub\/page" aria-current="page"/', $subMenu ) === 1 );
 check( '...while a protocol-relative url and a fragment are written as they stand', str_contains( $subMenu, 'href="//example.com/x"' ) === true && str_contains( $subMenu, 'href="#top"' ) === true );
 \Nino\Html::addFills( $subAppData, [ '/_nino/webpage/page/name' => 'Page' ], 'en_US' );
 \Nino\Locales::setCurrentLocale( $subAppData, 'en_US' );

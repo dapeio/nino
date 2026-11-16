@@ -177,7 +177,7 @@ $privacyHtml = \Nino\Html::renderHtml( $appData, '[privacy]' );
 
 check( '[legal] draws one section element per section, each with its anchor', substr_count( $imprintHtml, '<section class="nino-legal-section"' ) === count( $legal['de_DE'] )
 	&& str_contains( $imprintHtml, 'id="legal-'. array_key_first( $legal['de_DE'] ). '"' ) );
-check( '...with a heading and the text in the richtext wrapper', substr_count( $privacyHtml, '<h3>' ) === count( $privacy['de_DE'] ) && substr_count( $privacyHtml, '<div class="nino-richtext">' ) === count( $privacy['de_DE'] ) );
+check( '...with a heading and the text in the richtext wrapper', substr_count( $privacyHtml, '<h2>' ) === count( $privacy['de_DE'] ) && str_contains( $privacyHtml, '<h3' ) === false && substr_count( $privacyHtml, '<div class="nino-richtext">' ) === count( $privacy['de_DE'] ) );
 check( '[privacy] draws the privacy policy, not the imprint', str_contains( $privacyHtml, 'id="privacy-hosting"' ) && str_contains( $imprintHtml, 'id="privacy-hosting"' ) === false );
 
 $orderedIds = [];
@@ -389,16 +389,26 @@ check( 'a language that has no route is given the page of the native one', \Nino
 check( 'the module answers a request for the page: the route is found for the language', \Nino\Http::findRouteUri( $appData, '/legal/imprint', 'en_US' ) === 'GET://imprint' );
 
 $templateImprint = (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-legal-imprint.tpl', '' );
-check( 'the page template draws the shortcode in a section of the page', str_contains( $templateImprint, '[legal]' ) && str_contains( $templateImprint, '<section class="nino-section">' ) );
+check( 'the page template is an article with the title of the page and the shortcode in it, and draws no component and no class of Nino\'s own', str_contains( $templateImprint, '[legal]' ) && str_contains( $templateImprint, '<article>' )
+	&& str_contains( $templateImprint, '<h1>' ) && preg_match( '/class=|\[(?:section|header|footer|button|text|image)/', $templateImprint ) !== 1 );
 
-// The reading width: the stylesheet gives a section its measure and centres it, which reaches a project whose templates are copied already, and both page templates stand in the narrow row
+// The reading width: Nino.css gives the article a page of a module is - the imprint, the privacy policy - a measure of its own and the middle of the page, which reaches a project whose templates are copied already
 $legalCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' );
-preg_match( '/^\.nino-legal-section\s*\{([^}]*)\}/m', $legalCss, $legalRule );
-check( 'a section of a legal page has a reading width of its own - at most 40rem - and stands in the middle of its row, under a title that is centred',
-	preg_match( '/max-width:\s*40rem\s*;/', $legalRule[1] ?? '' ) === 1 && preg_match( '/margin-inline:\s*auto\s*;/', $legalRule[1] ?? '' ) === 1 );
+preg_match( '/^\s*main > article\s*\{([^}]*)\}/m', $legalCss, $legalRule );
+check( 'an article in main has a reading width of its own - at most 46rem - and stands in the middle of the page',
+	preg_match( '/width:\s*min\(\s*100%\s*-[^;]*,\s*46rem\s*\)\s*;/', $legalRule[1] ?? '' ) === 1 && preg_match( '/margin:[^;]*\bauto\s*;/', $legalRule[1] ?? '' ) === 1 );
 foreach( [ 'imprint', 'privacy' ] as $legalKind ) {
 	$legalTemplate = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Legal/install/templates/page-legal-'. $legalKind. '.tpl' );
-	check( '...and the template of the '. $legalKind. ' page stands in a narrow row', str_contains( $legalTemplate, '<div class="nino-grid-row nino-grid-row--narrow">' ) );
+	$legalCall = $legalKind === 'imprint' ? '[legal]' : '[privacy]';
+	$legalOther = $legalKind === 'imprint' ? '[privacy]' : '[legal]';
+	check( '...and the template of the '. $legalKind. ' page is that article, with the call of its own kind and no other', str_contains( $legalTemplate, '<article>' ) === true && str_contains( $legalTemplate, $legalCall ) === true && str_contains( $legalTemplate, $legalOther ) === false );
+
+	// Drawn: the page of the privacy policy holds sections of that type and none of the imprint, the imprint the other way round, and the headings go h1, h2
+	$legalDrawn = \Nino\Html::renderHtml( $appData, str_replace( [ '[template /templates/html-header]', '[template /templates/html-footer]' ], '', $legalTemplate ) );
+	$legalOwn = $legalKind === 'imprint' ? 'id="legal-' : 'id="privacy-';
+	$legalForeign = $legalKind === 'imprint' ? 'id="privacy-' : 'id="legal-';
+	check( '...drawn, it holds the sections of its own type and none of the other, under one h1 and h2s'. ( $legalKind === 'privacy' ? '' : '' ), substr_count( $legalDrawn, $legalOwn ) >= 2 && str_contains( $legalDrawn, $legalForeign ) === false
+		&& substr_count( $legalDrawn, '<h1>' ) === 1 && substr_count( $legalDrawn, '<h2>' ) === substr_count( $legalDrawn, '<section' ) && str_contains( $legalDrawn, '<h3' ) === false );
 }
 
 // A path that is not free, invalid, shared or missing
@@ -615,6 +625,7 @@ function legalProject( string $name ): array {
 		}, [] );
 
 	\Nino\Html::init( $appData );
+	\Nino\Features::registerComponents( $appData );
 	\Nino\Modules\Legal::init( $appData );
 	\Nino\Locales::useLocale( $appData, 'de_DE' );
 	ninoWarnings();
@@ -713,6 +724,23 @@ $navFindings = array_values( array_filter( \Nino\Modules\Legal::check( $clean ),
 check( 'nav: a page in no menu of the website, with the languages', count( $navFindings ) === 2 && $navFindings[0]['values'] === [ 'Impressum', 'de_DE, en_US' ] && $navFindings[1]['values'] === [ 'Datenschutz', 'de_DE, en_US' ] && $navFindings[0]['link'] === '#navs' );
 \Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '<footer>[navigation nav="legal" id="legal__nav"][/navigation]</footer>' );
 check( '...and no finding once a template outputs the menu that has them', \Nino\Modules\Legal::check( $clean ) === [] );
+// ...and the menu components of Basis are outputs of a menu: [footer-nav] and [header-nav] of the menu they name or, where they name none, of the one they take, and [footer-legal] of the menu legal
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-col][footer-nav][/footer-col][/footer-wrap]' );
+check( 'nav: [footer-nav] with no menu named outputs the menu footer, which has not the pages', count( array_filter( \Nino\Modules\Legal::check( $clean ), static fn( array $finding ): bool => $finding['kind'] === 'nav' ) ) === 2 );
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-col][footer-nav menu="legal"][/footer-col][/footer-wrap]' );
+check( '...[footer-nav menu="legal"] outputs the menu that has them', \Nino\Modules\Legal::check( $clean ) === [] );
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-legal][/footer-wrap]' );
+check( '...and so does [footer-legal], which draws the legal pages itself', \Nino\Modules\Legal::check( $clean ) === [] );
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '' );
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-header.tpl', '[header-wrap][header-nav menu="legal"][/header-wrap]' );
+check( '...and [header-nav menu="legal"] in the header outputs the menu as well', \Nino\Modules\Legal::check( $clean ) === [] );
+// ...but only where they are registered: with Basis off a call of them draws nothing and no menu is output
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-legal][footer-nav menu="legal"][/footer-wrap]' );
+$noBasis = $clean;
+unset( $noBasis[\Nino\Components::REGISTRY] );
+check( '...but one for each page when Basis is off: its components draw no menu', $kindsOf( \Nino\Modules\Legal::check( $noBasis ) ) === [ 'nav', 'nav' ] && \Nino\Modules\Legal::check( $clean ) === [] );
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-header.tpl', '' );
+\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '<footer>[navigation nav="legal" id="legal__nav"][/navigation]</footer>' );
 $noNavigation = $clean;
 $noNavigation['/nino/modules'] = array_values( array_diff( $clean['/nino/modules'], [ '\\Nino\\Modules\\Navigation' ] ) );
 check( '...but one when the Navigation module is off: there is no menu', $kindsOf( \Nino\Modules\Legal::check( $noNavigation ) ) === [ 'nav', 'nav' ] );

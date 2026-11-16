@@ -8,13 +8,12 @@
  *													status line and the messages that say what failed.
  *													style.css is the vocabulary, this is what assembles it.
  *
- *													Separate from Nino.js for the same reason Nino.ui.js is:
- *													who needs it. Nino.js is in the public site's script
+ *													Separate from Nino.js for the reason of who needs it. Nino.js is in the public site's script
  *													bundle, so every visitor was being served the complete
  *													table renderer, the field builders and the switch - none
- *													of which a page has any use for. Three files, three
- *													audiences: Nino.js everywhere, Nino.ui.js on the public
- *													site, this one in the tool frontends.
+ *													of which a page has any use for. Two files, two
+ *													audiences: Nino.js everywhere, this one in the tool
+ *													frontends.
  *
  *													Loaded after Nino.js, which owns the namespace this
  *													extends - on its own it has nothing to attach to.
@@ -1180,8 +1179,7 @@
 		 *	them - the pane strip the shell renders (see \Nino\Admin\Panels::$html),
 		 *	and the Features panel's two - and every one of them was a row of
 		 *	buttons a pointer could operate and an arrow key could not. A tab
-		 *	is announced as a tab, so it is offered the keys a tab answers to;
-		 *	`Nino.ui.js` gives the public site's tabs the same four.
+		 *	is announced as a tab, so it is offered the keys a tab answers to.
 		 *
 		 *	@param	{Array}			tabs			The strip's buttons, in the order they are drawn
 		 *	@param	{Function}	onMove		Called with the index the operator moved to

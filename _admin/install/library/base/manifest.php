@@ -16,14 +16,18 @@
 			'header' 	=> [ 'Content-Type' => 'text/plain; charset=utf-8' ],
 		],
 	],
+	/*	The features the wizard switches on with this unit: Basis comes with the kernel and draws the header, the footer and the
+		starter pages written in its components. Whoever switches it off again and deletes the pages has the blank Nino	*/
+	'features' => [ 'basis' ],
 	'templates' => [
 		'html-header.tpl',
 		'html-footer.tpl',
-		// The site's header and footer markup. html-header.tpl includes them as
-		// [template /templates/frame-header] rather than carrying them inline,
-		// so a project can rewrite either file without touching the page frame
-		// around it - and a missing include resolves to an empty string, which
-		// is exactly the silent no-header a delivery must never ship
+		// The site's header and footer markup, written in the components of Basis.
+		// html-header.tpl includes them as [template /templates/frame-header]
+		// rather than carrying them inline, so a project can rewrite either file
+		// without touching the page frame around it - and a missing include
+		// resolves to an empty string, which is exactly the silent no-header a
+		// delivery must never ship
 		'frame-header.tpl',
 		'frame-footer.tpl',
 		'robots.tpl',
@@ -55,17 +59,13 @@
 	'files' => [
 		'private',
 		'assets',
-		// The three webfaces theme.css declares. They came with the theme unit
-		// while a theme was something the wizard asked about; the look is
-		// fixed now, so they come with everything else that is
-		'fonts',
 		'favicon'
 	],
 	/*	The logo is two image slots, not files the base unit ships: /logo, the
 		picture for a light ground, and /logo/dark, the one for a dark ground.
-		The frames and the navigation show them with [logo], which draws the
-		one the ground says, the mails and the page head ask /logo alone with
-		[image /logo], and until somebody uploads one - Images, in the
+		The header and the footer show them with [header-logo] and
+		[footer-logo], the mails and the page head ask /logo alone with
+		[imagevalues /logo], and until somebody uploads one - Images, in the
 		workbench - they show nothing. The size is the ratio of a wordmark;
 		an upload is cut to it, so a project whose logo is shaped otherwise
 		changes it under Image Slots	*/

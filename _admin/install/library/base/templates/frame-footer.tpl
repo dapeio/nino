@@ -1,16 +1,10 @@
-		<footer>
-			<section class="nino-footer-legal">
-				<div class="nino-grid-row">
-					<div class="nino-grid-100 nino-grid-l-25 nino-footer-copyright">
-						<p>&copy; [[/nino/date/year]] [[/project/company/general/name]]</p>
-					</div>
-					<nav class="nino-grid-100 nino-grid-l-50 nino-footer-nav" aria-label="[[/template/common/navigation/footer]]">
-						[template /templates/html-footer-nav]
-						[navigation nav="legal" id="legal__nav"][/navigation]
-					</nav>
-					<div class="nino-grid-100 nino-grid-l-25">
-						[template /templates/html-footer-localepicker]
-					</div>
-				</div>
-			</section>
-		</footer>
+[footer-wrap id="footer"]
+	[footer-col size="100 m:50"]
+		[footer-logo /logo]
+		[text /project/company/general/description format="inline" size="s"]
+	[/footer-col]
+	[footer-col size="100 m:50"]
+		[footer-nav menu="footer"]
+	[/footer-col]
+	[footer-legal]
+[/footer-wrap]

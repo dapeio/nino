@@ -216,20 +216,8 @@ preg_match_all( '/(--[a-zA-Z0-9-]+)\s*:/', $ninoCss, $declaredProperties );
 $undeclaredProperties = array_values( array_diff( array_unique( $consumedProperties[1] ), $declaredProperties[1] ) );
 check( 'every custom property Nino.css reads without a fallback is declared in Nino.css itself'. ( $undeclaredProperties === [] ? '' : ' - missing: '. implode( ', ', $undeclaredProperties ) ), $undeclaredProperties === [] );
 
-/*	How much room main leaves under the bar, and whether a cover that opens the
-	page starts at the top of the window or at the lower edge of the bar, is the
-	header set's to say: Nino.css itself takes the room away for no hero - every
-	rule of its that sets the padding of a main leaves the first child out of it	*/
-preg_match_all( '/([^{}]*\bmain\b[^{}]*)\{[^{}]*(?<![\w-])padding(?:-top)?\s*:[^{}]*\}/', $ninoCss, $mainPaddingRules );
-$heroRules = array_values( array_filter( $mainPaddingRules[1], static fn( string $selectors ): bool => preg_match( '/main[^{]*:first-child/', $selectors ) === 1 ) );
-check( 'Nino.css takes no room of main away for a hero that opens the page: no rule that sets the padding of a main names a first child'. ( $heroRules === [] ? '' : ' - '. implode( ' | ', array_map( 'trim', $heroRules ) ) ), $heroRules === [] && count( $mainPaddingRules[1] ) > 0 );
-
-// Nino.css uses one for .nino-hero-arrowdown, ie. the framework's own default
-// policy used to block the framework's own icon
+// A stylesheet of a project may use a data: uri image, which the default policy has to let through
 check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );
-check( '...which is what Nino.css\'s own data: uri needs', str_contains(
-	(string) @file_get_contents( __DIR__. '/../_nino/Nino.css' ), 'url("data:image/svg+xml'
-) === false || str_contains( $seededCsp, 'data:' ) === true );
 
 /*	A request that names neither a method nor a uri, and a uri that is
 	nothing but the markers a path is cut at. Neither REQUEST_METHOD nor
@@ -595,7 +583,6 @@ check( 'the csp is composed ahead of everything that can end a request', $jstext
 	'[[/module/form/info/success]]'	=> 'Danke!',
 	'[[/project/mail/address/owner]]'		=> 'post@example.com',
 	'[[/project/company/contact/street]]' 		=> 'Musterweg 1',
-	'[[/template/common/slider/prev]]'	=> 'Zurück',
 	'[[/feature/newsletter/info/success]]'	=> 'Eingetragen',
 	'[[/template/common/label/phone]]'	=> 'Telefon',
 ], '*' );
@@ -613,11 +600,10 @@ check( '...and not the mailbox a form delivers to, nor the rest of the site\'s t
 // What the module publishes when nobody asked for more is its private DEFAULT_KEYS,
 // and the public script's words are read against exactly those
 $jstextGroups = ( new ReflectionClassConstant( '\Nino\Modules\Jstext', 'DEFAULT_KEYS' ) )->getValue();
-check( 'the three groups are the form\'s messages, the newsletter\'s and the slider\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/template/common/slider/prev'] ?? null ) === 'Zurück'
-	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false
-	&& $jstextGroups === [ '/module/form/info/', '/feature/newsletter/info/', '/template/common/slider/' ] );
+check( 'the two groups are the form\'s messages and the newsletter\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false
+	&& $jstextGroups === [ '/module/form/info/', '/feature/newsletter/info/' ] );
 // ... in getText( '/group/...' ) and in the prefixes a form is given where its markup names none
-$jstextScript = (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' );
+$jstextScript = (string) file_get_contents( __DIR__. '/../_nino/Nino/Modules/Form/assets/form.js' );
 preg_match_all( '/getText\(\s*\'(\/[^\']*)\'/', $jstextScript, $jstextAsked );
 preg_match_all( '/\.texts\s*=[^;]*;/', $jstextScript, $jstextAssigned );
 preg_match_all( '/\'(\/[^\']*)\'/', implode( ' ', $jstextAssigned[0] ), $jstextPrefixes );
@@ -779,9 +765,9 @@ check( 'the localepicker names each language from /_nino/locale/<code>/name: the
 check( '...a language that is not the current one is a link with its lang and hreflang, and the current one a span that says so, in its own language - and it is no link to itself',
 	preg_match( '#<a href="\?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE">Deutsch</a>#', $pickerHtml ) === 1
 	&& preg_match( '#<span aria-current="true" lang="en-US">English \(US\)</span>#', $pickerHtml ) === 1 && str_contains( $pickerHtml, 'current=en_US' ) === false );
-check( '...the list is named by the title the overlay shows, and so is the checkbox that unfolds it - and the title is no heading',
-	preg_match( '#<ul aria-label="Choose your language">#', $pickerHtml ) === 1 && preg_match( '#<input type="checkbox" aria-label="Choose your language">#', $pickerHtml ) === 1
-	&& preg_match( '#<h[1-6][ >]#', $pickerHtml ) !== 1 );
+check( '...the list is named by the title of the menu - and the title is no heading, the picker is a bare list with no class, no checkbox and no wrapper',
+	str_starts_with( $pickerHtml, '<ul aria-label="Choose your language">' ) === true && str_ends_with( $pickerHtml, '</ul>' ) === true
+	&& preg_match( '#<h[1-6][ >]#', $pickerHtml ) !== 1 && str_contains( $pickerHtml, 'class=' ) === false && str_contains( $pickerHtml, '<input' ) === false && str_contains( $pickerHtml, '<svg' ) === false );
 \Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
 $pickerDe = \Nino\Html::renderHtml( $appData, \Nino\Modules\Localepicker::doShortcode( $appData, [] ) );
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
@@ -1302,22 +1288,12 @@ $navManual = \Nino\Modules\Navigation::doShortcode( $appData, [ 'content' => "/a
 check( 'a menu written entirely by hand still works, with no nav argument at all', substr_count( $navManual, '<li>' ) === 2 );
 /*	The entry of the page that is shown says so to what reads the markup and not only to what reads the class. The burger is a button that names the list it opens and
 	says whether it is open; the list is beside it, and not inside the button the way the whole of it was inside one label	*/
-check( 'the entry of the page that is shown carries aria-current="page" beside its class, and no other entry says either',
-	preg_match_all( '#<a [^>]*class="nino-is-active"[^>]*>#', $navHtml, $activeLinks ) === 1 && str_contains( $activeLinks[0][0], 'aria-current="page"' ) === true
-	&& substr_count( $navHtml, 'aria-current="page"' ) === 1 && substr_count( $navHtml, 'nino-is-active' ) === 1 );
-\Nino\Html::addFills( $appData, [ '[[/template/common/navigation/menu]]' => 'Menu' ], '*' );
-$burgerHtml = \Nino\Html::renderHtml( $appData, \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger', 'id' => 'primary' ] ) );
-check( 'the burger is a button that names the list it opens and says it is closed - hidden, for the script to show, with an icon that is no name and a name of its own - and the list stands beside the button, not inside it',
-	preg_match( '#<button type="button" class="nino-nav-toggle" aria-expanded="false" aria-controls="primary-list" hidden>(.*?)</button>#s', $burgerHtml, $burgerButton ) === 1
-	&& str_contains( $burgerButton[1], '<svg' ) === true && str_contains( $burgerButton[1], 'aria-hidden="true"' ) === true && str_contains( $burgerButton[1], '>Menu</span>' ) === true
-	&& str_contains( $burgerButton[1], '<li>' ) === false && preg_match( '#</button>.*<div class="nino-nav-content" id="primary-list">.*<li>#s', $burgerHtml ) === 1
-	&& str_contains( $burgerHtml, '<label' ) === false && str_contains( $burgerHtml, 'type="checkbox"' ) === false );
-$burgerA = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger' ] );
-$burgerB = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger' ] );
-check( '...a burger with no id of its own names its list after its place on the page, so that two of them name two lists - and what a button controls is the id of the list beside it',
-	preg_match( '#aria-controls="([^"]+)"#', $burgerA, $listA ) === 1 && preg_match( '#aria-controls="([^"]+)"#', $burgerB, $listB ) === 1 && $listA[1] !== $listB[1]
-	&& str_contains( $burgerA, 'id="'. $listA[1]. '"' ) === true && str_contains( $burgerB, 'id="'. $listB[1]. '"' ) === true );
-check( '...and the menu that is not a burger has no button and nothing to name: it is the list it is', str_contains( $navHtml, '<button' ) === false && str_contains( $navHtml, 'aria-controls' ) === false );
+check( 'the entry of the page that is shown carries aria-current="page", and no other entry says so',
+	preg_match_all( '#<a [^>]*aria-current="page"[^>]*>#', $navHtml, $activeLinks ) === 1 && substr_count( $navHtml, 'aria-current="page"' ) === 1 && str_contains( $navHtml, 'nino-' ) === false );
+$navNamed = \Nino\Html::renderHtml( $appData, \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger', 'id' => 'primary', 'class' => 'x "y' ] ) );
+check( 'a menu is a bare list - <ul><li><a> and nothing around it: no button, no wrapper, no class of Nino\'s own - and the id and the class of the call are the list\'s, as the attributes they are',
+	str_starts_with( $navNamed, '<ul id="primary" class="x &quot;y"><li><a href=' ) === true && str_ends_with( $navNamed, '</ul>' ) === true
+	&& str_contains( $navNamed, '<button' ) === false && str_contains( $navNamed, 'aria-controls' ) === false && str_contains( $navNamed, 'nino-' ) === false && str_contains( $navNamed, '<div' ) === false );
 check( 'an empty shortcode renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [] ) === '' );
 check( 'an unknown menu key renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'nope' ] ) === '' );
 
@@ -1991,7 +1967,7 @@ foreach( array_merge( glob( $checkout. '/*.md' ) ?: [], glob( $checkout. '/*.neo
 
 // What the pages of the workbench, the wizard and the recovery page name: the
 // files they link and the bundles they ask the [assets] shortcode for
-$served = [ '/_nino/Nino.css', '/_nino/Nino.js', '/_nino/Nino.ui.js' ];
+$served = [ '/_nino/Nino.css', '/_nino/Nino.js' ];
 foreach( array_merge( glob( $checkout. '/_admin/templates/*.tpl' ) ?: [], glob( $checkout. '/_admin/install/templates/*.tpl' ) ?: [] ) as $template ) {
 	$source = (string) file_get_contents( $template );
 	preg_match_all( '~(?:src|href)="\[\[/nino/dir\]\](/[^"?#]*[^/"?#])(?:[?#][^"]*)?"~', $source, $linked );

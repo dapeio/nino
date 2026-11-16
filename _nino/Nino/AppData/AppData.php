@@ -104,7 +104,6 @@ namespace Nino {
 		    ],
 		    '/.cache/script.js' => [
 		      '/_nino/Nino.js',
-		      '/_nino/Nino.ui.js',
 		    ],
 		  ],
 			'/nino/html/images'		=> [],

@@ -306,6 +306,17 @@ unset( $appData['/nino/maintenance/retry'] );
 
 echo "\n";
 
+// --- The page the unit delivers --------------------------------------------
+
+echo "The page of the unit: an article, readable with the reset alone\n";
+
+$unitPage = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Maintenance/install/templates/page-maintenance.tpl' );
+check( 'the maintenance page the wizard copies is an article with its title and its text between the head and the foot of the site, and draws no component and no class of a stylesheet: it reads with Nino.css alone, on a site without a feature',
+	str_contains( $unitPage, '<article>' ) === true && str_contains( $unitPage, '<h1>[[/module/maintenance/page/title]]</h1>' ) === true && str_contains( $unitPage, '[[/module/maintenance/page/text]]' ) === true
+	&& str_starts_with( $unitPage, '[template /templates/html-header]' ) === true && preg_match( '/class=|\[(?:section|header|footer|button|text|image)/', $unitPage ) !== 1 );
+
+echo "\n";
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

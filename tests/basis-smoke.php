@@ -664,8 +664,9 @@ check( 'a sixth step is refused, and so is a component with more than six knobs,
 $required = [ '--brand-scheme', '--brand-color-1', '--brand-color-2', '--brand-font-title', '--brand-font-text', '--brand-font-button', '--brand-ground-base', '--brand-ground-alt', '--brand-ground-tint', '--brand-ink-base',
 	'--brand-ink-quiet-base', '--brand-line-base', '--brand-accent-base', '--brand-on-accent-base', '--brand-on-color-1', '--brand-on-color-2', '--brand-ground', '--brand-ink', '--brand-ink-quiet', '--brand-line', '--brand-accent',
 	'--brand-on-accent', '--page-size', '--page-width', '--page-radius', '--page-line', '--page-motion', '--page-leading', '--page-space-1', '--page-space-2', '--page-space-3', '--page-space-4', '--page-space-5', '--page-space-6',
-	'--page-text-1', '--page-text-2', '--page-text-3', '--page-text-4', '--page-text-5', '--page-text-6' ];
-$resetLayer = substr( $nino, 0, (int) strpos( $nino, '@layer nino.components {' ) );
+	'--page-scroll-pad', '--page-text-1', '--page-text-2', '--page-text-3', '--page-text-4', '--page-text-5', '--page-text-6' ];
+// The whole of Nino.css is the layer nino.reset
+$resetLayer = $nino;
 check( 'Nino.css sets every token of the brand and of the page - '. count( $required ). ' of them - in the layer nino.reset, and no part reads another', array_diff( $required, $declaredTokens ) === [] && array_filter( $required, static fn( string $token ): bool => str_contains( $resetLayer, $token. ':' ) === false ) === [] );
 
 // the contract of the grounds: what the register writes is what the reset meets - the word whole, and what each word does to the roles

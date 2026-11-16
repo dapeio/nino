@@ -202,16 +202,12 @@ publicTemplates.forEach( function( file ) {
 
 check( 'every public nino-* class has an owner'+ ( undefinedClasses.length === 0 ? '' : ' - '+ undefinedClasses.join(', ') ), undefinedClasses.length === 0 );
 
-/* The frame stylesheet and the frame markup are one delivery, so a
- * .nino-frame-* rule with no element to hit is either a leftover of a frame
- * that was replaced or a template that lost the class it was styled by. */
-const themeCss = fs.readFileSync( path.join( LIBRARY, 'base/assets/theme.css' ), 'utf8' ).replace( /\/\*[\s\S]*?\*\//g, '' );
+/* The frames are written in the components of Basis alone, so no class of the old stylesheet and no markup of their own stands in them: the
+ * header and the footer are drawn by the feature, and what the stylesheet knows of them is the standard part of its groups. */
 const frameMarkup = FRAMES.map( function( frame ) { return fs.readFileSync( path.join( LIBRARY, frame ), 'utf8' ); } ).join('\n');
-const orphanedFrameClasses = Array.from( new Set(
-	Array.from( themeCss.matchAll( /\.(nino-frame-[a-z0-9-]+)/g ), function( match ) { return match[1]; } )
-) ).filter( function( name ) { return frameMarkup.includes( name ) === false; } );
 
-check( 'frame styles name markup the delivered frames render'+ ( orphanedFrameClasses.length === 0 ? '' : ' - '+ orphanedFrameClasses.join(', ') ), orphanedFrameClasses.length === 0 );
+check( 'the frames are calls of the components of Basis and no markup of their own', /^\[header-wrap\b/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[0] ), 'utf8' ) )
+	&& /^\[footer-wrap\b/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[1] ), 'utf8' ) ) && /<[a-z]/.test( frameMarkup ) === false );
 
 const semanticProblems = [];
 publicTemplates.forEach( function( file ) {
@@ -248,35 +244,8 @@ publicTemplates.forEach( function( file ) {
 
 check( 'finished templates keep non-visual HTML semantics'+ ( semanticProblems.length === 0 ? '' : ' - '+ semanticProblems.join('; ') ), semanticProblems.length === 0 );
 
-/* The frames are installed independently of optional modules. Any textfill
- * used by their own accessible labels therefore has to be part of base in
- * every shipped locale, or Html::_renderFills() leaves the raw [[...]] key. */
-const frameAriaLabels = new Set();
-publicTemplates.filter( function( file ) {
-	return FRAMES.some( function( frame ) { return relative( file ).endsWith( frame ); } );
-} ).forEach( function( file ) {
-	const source = fs.readFileSync( file, 'utf8' );
-	for( const match of source.matchAll( /\baria-label=["'](\[\[[^"']+\]\])["']/g ) )
-		frameAriaLabels.add( match[1] );
-} );
-
-const missingBaseFrameLabels = [];
-filesBelow( path.join( LIBRARY, 'base/text' ) ).filter( function( file ) {
-	return /^[a-z]{2}_[A-Z]{2}\.php$/.test( path.basename( file ) );
-} ).forEach( function( file ) {
-	const keys = new Set( Array.from(
-		fs.readFileSync( file, 'utf8' ).matchAll( /'(\[\[[^']+\]\])'\s*=>/g ),
-		function( match ) { return match[1]; }
-	) );
-	frameAriaLabels.forEach( function( key ) {
-		if( keys.has( key ) === false )
-			missingBaseFrameLabels.push( path.basename( file )+ ': '+ key );
-	} );
-} );
-
-check( 'frame aria-label fills resolve from base without optional modules'
-	+ ( missingBaseFrameLabels.length === 0 ? '' : ' - '+ missingBaseFrameLabels.join(', ') ),
-	frameAriaLabels.size === 2 && missingBaseFrameLabels.length === 0
-);
+/* The frames name nothing by a fill of their own: the menus of the header and of the footer are named by the words the feature Basis delivers when
+ * it is switched on, so a frame that carries an aria-label with a fill reads a key nobody delivers. */
+check( 'the frames carry no aria-label of their own', /\baria-label=/.test( frameMarkup ) === false );
 
 done();

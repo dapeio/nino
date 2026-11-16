@@ -1867,4 +1867,11 @@ const css = source('_admin/Nino/Modules/Features/assets/admin.css');
 check( 'the badge rule is in the module\'s stylesheet, for the list and for the screen behind it, with a border of its own so that the word is not carried by colour alone',
 	/#features-list \.admin-features-badge,\s*#features-detail \.admin-features-badge \{[^}]*border:/.test( css ) && css.indexOf( '@layer nino.tool {' ) !== -1 && css.indexOf( '.admin-features-badge' ) > css.indexOf( '@layer nino.tool {' ) );
 
+// A shortcode of a feature that is off draws nothing: the words of the dialog do not say it shows as text
+check( 'the dialog that switches a feature off says its shortcodes draw nothing while it is off, in both languages, and not that they show as text',
+	[ 'confirm/deactivate', 'msg/deactivated-found' ].every( function( key ) {
+		return /draw nothing/.test( moduleEn['/_admin/features/'+ key] ) && /nichts zeichnen|zeichnen nichts/.test( moduleDe['/_admin/features/'+ key] )
+			&& /plain text|als Text/.test( moduleEn['/_admin/features/'+ key]+ moduleDe['/_admin/features/'+ key] ) === false;
+	} ) );
+
 done();

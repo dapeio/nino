@@ -29,9 +29,7 @@ namespace Nino {
 			// into the page unescaped, so the csp is load-bearing here.
 			// img-src needs 'data:' spelled out: the '*' source covers
 			// network schemes only, so without it the browser refused
-			// every data: uri image - including the one Nino's own
-			// Nino.css uses for .nino-hero-arrowdown, which therefore
-			// rendered as an empty button on every page that has one.
+			// every data: uri image, one a project's own stylesheet may use.
 			'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
 			'X-Frame-Options' 						=> 'SAMEORIGIN',
 			'X-Content-Type-Options'			=> 'nosniff',

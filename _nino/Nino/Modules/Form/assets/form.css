@@ -1,0 +1,32 @@
+/*	form.css - the look of a form the script form.js drives: the contact form and every form that carries .nino-form.
+	It reads the tokens of Nino.css only (--brand-..., --page-...) and so it stands on a site with no feature at all.	*/
+.nino-form { display: grid; gap: var(--page-space-2); width: 100%; }
+.nino-form label { font-weight: 600; }
+.nino-form :where( input:not([type="checkbox"], [type="radio"], [type="hidden"]), select, textarea ) {
+	width: 100%; min-height: 2.75rem; padding: var(--page-space-2) var(--page-space-3);
+	border: var(--page-line) solid var(--brand-ink-quiet); border-radius: var(--page-radius); background: var(--brand-ground); color: var(--brand-ink);
+}
+.nino-form textarea { min-height: 8rem; resize: vertical; }
+.nino-form [aria-invalid="true"] { border-color: var(--nino-form-error-ink); outline: var(--page-line) solid var(--nino-form-error-ink); }
+.nino-form-trap { position: absolute; left: -200vw; }
+.nino-form-note { font-size: var(--page-text-1); color: var(--brand-ink-quiet); }
+.nino-form-message { font-size: var(--page-text-1); }
+.nino-form-message:empty { display: none; }
+.nino-is-error > .nino-form-message, .nino-is-success > .nino-form-message { padding: var(--page-space-2) var(--page-space-3); border-radius: var(--page-radius); }
+.nino-is-error > .nino-form-message { background: var(--nino-form-error-ground); color: var(--nino-form-error-ink); }
+.nino-is-success > .nino-form-message { background: var(--nino-form-success-ground); color: var(--nino-form-success-ink); }
+.nino-is-pending > .nino-form-submit { opacity: .6; pointer-events: none; }
+.nino-form-submit {
+	justify-self: start; min-height: 2.75rem; padding: var(--page-space-2) calc( var(--page-space-2) * 2.5 );
+	border: var(--page-line) solid var(--brand-accent); border-radius: var(--page-radius); background: var(--brand-accent); color: var(--brand-on-accent);
+	font-family: var(--brand-font-button); font-weight: 600; transition: filter var(--page-motion);
+}
+.nino-form-submit:hover { filter: brightness( .9 ); }
+.nino-forms-check { display: flex; align-items: center; gap: var(--page-space-2); font-weight: 400; }
+.nino-forms-group { display: grid; gap: var(--page-space-2); margin: 0; padding: 0; border: 0; }
+:root {
+	--nino-form-error-ground: light-dark( #fdecea, #3a1b1a );
+	--nino-form-error-ink: light-dark( #8a1c14, #ffb4ab );
+	--nino-form-success-ground: light-dark( #e8f5e9, #16301b );
+	--nino-form-success-ink: light-dark( #1b5e20, #a5d6a7 );
+}
