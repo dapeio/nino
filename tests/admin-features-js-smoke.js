@@ -212,9 +212,9 @@ const panel 	= Nino.admin.features;
 // features predate the field is the state the panel has to read well too
 const FEATURES = [
 	{ key : 'old', name : 'Old', description : '', category : 'system', maturity : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
-		shipped : false, components : [], problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '' },
-	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], shipped : false, components : [], problems : [], settings : [], settingsTab : '' },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], shipped : false, components : [], problems : [], settings : [
+		shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '' },
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '' },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
 		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
@@ -225,7 +225,7 @@ const FEATURES = [
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
 	], settingsTab : '' },
-	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], shipped : false, components : [], problems : [], settings : [], settingsTab : '' },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '' },
 ];
 
 /** A features/list answer: the catalogue url, whether features/ is writable, the cache - null unless given - and the installed features, FEATURES unless a list of its own is given (an install adds one the fixture does not carry) */
@@ -948,6 +948,21 @@ fire( deactivate, 'click' );
 check( '...and confirming asks once more, then posts', confirms.length === confirmsBefore + 2 && requests.length === requestsBeforeDeactivate + 1 );
 check( 'Deactivate, from the screen, posts features/deactivate with the key', requests[requests.length - 1].action === 'features/deactivate' && requests[requests.length - 1].payload.key === 'sample' && hasClass( deactivate, 'nino-admin-btn-danger' ) );
 answer( 200, { feature : FEATURES[2] } );
+// A feature with components is asked about with the templates that call them, and with how many more there are than are named
+const calledFeature = Object.assign( {}, FEATURES[2], { calledIn : { total : 12, templates : [ 'page-home.tpl', 'page-contact.tpl' ] } } );
+const confirmsBeforeCalled = confirms.length;
+const requestsBeforeCalled = requests.length;
+confirmAnswer = false;
+panel._switch( calledFeature, 'deactivate', deactivate, deactivateMsg );
+check( 'Deactivate of a feature whose components stand in templates names them after the question, with the number of the rest, and sends nothing',
+	confirms.length === confirmsBeforeCalled + 1 && confirms[confirms.length - 1] === text('/_admin/features/confirm/deactivate').replace( '%s', 'Beispiel-Feature' )+ ' '+ text('/_admin/features/confirm/deactivate-templates').replace( '%s', 'page-home.tpl, page-contact.tpl, '+ text('/_admin/features/label/found-more').replace( '%d', '10' ) )
+	&& requests.length === requestsBeforeCalled );
+const exactFeature = Object.assign( {}, FEATURES[2], { calledIn : { total : 1, templates : [ 'page-home.tpl' ] } } );
+panel._switch( exactFeature, 'deactivate', deactivate, deactivateMsg );
+check( '...with all of them named there is no rest, and the name of a template is set as text', confirms[confirms.length - 1].indexOf( 'page-home.tpl.' ) !== -1 && confirms[confirms.length - 1].indexOf( text('/_admin/features/label/found-more').replace( '%d', '' ) ) === -1
+	&& text('/_admin/features/confirm/deactivate-templates').indexOf( '%s' ) !== -1 && /draw nothing/.test( moduleEn['/_admin/features/confirm/deactivate-templates'] ) && /nichts zeichnen|zeichnen nichts/.test( moduleDe['/_admin/features/confirm/deactivate-templates'] ) );
+confirmAnswer = true;
+
 check( '...and reloads too', reloads === 2 );
 
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
@@ -1004,7 +1019,7 @@ fire( install, 'click' );
 answer( 500, null );
 check( 'a failed install falls back to its own error line', byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0].textContent === '(500) '+ text('/_admin/features/error/install') );
 
-const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], shipped : false, components : [], problems : [], settings : [], settingsTab : '' };
+const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '' };
 const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
 
 /*	What an install says, and where. Not on the offer's own row: an offer that
@@ -1211,6 +1226,18 @@ fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
 check( 'Inactive, empty, names the features directory', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
 check( 'Active, empty, says no feature is on', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
+// The empty tab says what is true: where features are installed and every one is on, the Inactive tab does not claim there are none; where none is on, the Active one says so
+panel._features = [ { key : 'running', name : 'Running', version : '1.0.0', active : true, shipped : false, requires : [], problems : [], category : 'system' } ];
+panel._renderPanel();
+fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
+check( 'Inactive, empty, with a feature installed and on, says every feature is switched on and names no directory', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/inactive-empty')
+	&& text('/_admin/features/hint/inactive-empty') !== text('/_admin/features/hint/empty').replace( '%s', '/features' ) && text('/_admin/features/hint/inactive-empty').indexOf( '%s' ) === -1 );
+panel._features = [ { key : 'resting', name : 'Resting', version : '1.0.0', active : false, shipped : false, requires : [], problems : [], category : 'system' } ];
+panel._renderPanel();
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
+check( '...and Active, empty, with one installed and off, says no feature is on', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
+panel._features = [];
+panel._renderPanel();
 check( 'and with nothing to narrow the category is not drawn at all - a select with one option is a control that cannot be used',
 	mount.children[0].children.length === 1 && byTag( mount.children[0], 'select' ).length === 0 );
 
@@ -1533,11 +1560,11 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	// leaves that question unasked, and the answer to it does not ask again
 	const confirmsBeforeSwitch = confirms.length;
 	confirmAnswer = false;
-	panel._switch( { key : 'sample', name : 'Beispiel-Feature' }, 'deactivate', button, line );
+	panel._switch( { key : 'sample', name : 'Beispiel-Feature', calledIn : { total : 0, templates : [] } }, 'deactivate', button, line );
 	check( 'declining the deactivation leaves the question about unsaved input unasked and sends nothing',
 		confirms.length === confirmsBeforeSwitch + 1 && asked.length === 0 && requests.length === sentBefore && button.disabled === false );
 	confirmAnswer = true;
-	panel._switch( { key : 'sample', name : 'Beispiel-Feature' }, 'deactivate', button, line );
+	panel._switch( { key : 'sample', name : 'Beispiel-Feature', calledIn : { total : 0, templates : [] } }, 'deactivate', button, line );
 	check( 'switching a feature off asks the deactivation first, then about unsaved input in the whole workbench, and sends nothing before the answer',
 		confirms.length === confirmsBeforeSwitch + 2 && asked.length === 1 && asked[0].names === null && requests.length === sentBefore && button.disabled === false );
 	asked[0].proceed();
@@ -1559,7 +1586,7 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 
 	delete Nino.admin.dirty;
 	const sent = requests.length;
-	panel._switch( { key : 'sample', name : 'Beispiel-Feature' }, 'deactivate', button, line );
+	panel._switch( { key : 'sample', name : 'Beispiel-Feature', calledIn : { total : 0, templates : [] } }, 'deactivate', button, line );
 	check( 'a shell without the registry asks nothing about unsaved input', requests.length === sent + 1 );
 }
 

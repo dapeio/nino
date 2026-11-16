@@ -73,6 +73,30 @@
 		},
 
 		/**
+		 *	Put the keyboard where the answer is.
+		 *
+		 *	The button is disabled while the request is out, and a focused element
+		 *	that is disabled gives the focus up: without this the keyboard stood on
+		 *	the body once the answer came, and after a delivered message - every field
+		 *	locked - there was nothing left to tab to but the top of the page. The
+		 *	paragraph is made a target for a script, not a stop of the tab order
+		 *	(tabindex -1), and it is the live region of _liveMessage(), so what it
+		 *	says is read as the focus arrives
+		 *
+		 *	@param		{Element}	[msg]
+		 *
+		 *	@return		void
+		 */
+		_focusMessage : function( msg ) {
+
+			if( msg === null || typeof msg === 'undefined' || typeof msg.setAttribute !== 'function' )
+				return;
+
+			msg.setAttribute( 'tabindex', '-1' );
+			msg.focus?.();
+		},
+
+		/**
 		 *	Bind the submit handler of every form on the page: the contact form, the newsletter signup and the form
 		 *	of a feature
 		 *
@@ -158,6 +182,8 @@
 						this.form.msg.textContent = ( xhr.status === 400 )
 							? ( ( typed === true || asksAddress === false ? formText( this.form, 'invalid' ) : '' ) || formText( this.form, 'email' ) )
 							: formText( this.form, ok === true ? 'success' : 'error' );
+
+						Nino.form._focusMessage( this.form.msg );
 
 						// Only a delivered message locks the form down. Disabling every
 						// field on any response left a visitor who mistyped their address

@@ -983,7 +983,9 @@ namespace Nino\Modules\Text {
 		 *
 		 *	A key counts when a template reads it as a textfill or as the source
 		 *	of a component - [text /template/page-x/cards/one-text], or ~text under
-		 *	the id of its section, see \Nino\Components::sources() -
+		 *	the id of its section, see \Nino\Components::sources() - or as the
+		 *	address of a link ([button ~name href="~target"]), but not as a picture,
+		 *	whose slot is a place of the Images panel -
 		 *	and no text file, runtime fill or blacklist line knows it. Only the
 		 *	innermost [[...]] of a nested fill is seen, as a static scan can see
 		 *	no more, and only the ones with a leading slash: [[name]] in
@@ -1039,7 +1041,7 @@ namespace Nino\Modules\Text {
 				// fill does: the key it asks for, to be known or to be missing
 				$read = $matches[1];
 				foreach( \Nino\Components::sources( $appData, $content, (string) $category ) as $component )
-					if( $component['kind'] === 'text' )
+					if( in_array( $component['kind'], [ 'text', 'link' ], true ) === true )
 						$read[] = $component['source'];
 
 				foreach( array_unique( $read ) as $key ) {

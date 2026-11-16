@@ -69,8 +69,9 @@
 /*	The card: a column that is a surface of its own	*/
 .section-col--variant-card { border: var(--page-line) solid var(--brand-line); border-radius: var(--section-col-radius); background-color: var(--brand-ground); overflow: hidden; }
 /*	A limit, kept on purpose: the picture that reaches the edge of the card keeps the corners of its own - this part may not meet the class of a picture,
-	and the picture's part draws its corners with --image-radius, the same on all four sides - so the two lower ones stay round inside the card	*/
-.section-col--bleed > :first-child { width: calc( 100% + 2 * var(--section-col-pad) ); max-width: none; margin: calc( -1 * var(--section-col-pad) ) calc( -1 * var(--section-col-pad) ) 0; }
+	and the picture's part draws its corners with --image-radius, the same on all four sides - so the two lower ones stay round inside the card. The picture
+	is found by what it holds - a picture, in its link if it has one, as the image component draws it - not by its class: any other first child keeps its padding	*/
+.section-col--bleed > :first-child:has( > img, > a > img ) { width: calc( 100% + 2 * var(--section-col-pad) ); max-width: none; margin: calc( -1 * var(--section-col-pad) ) calc( -1 * var(--section-col-pad) ) 0; }
 /*	A card that is a link: the link of its title covers the surface, and nothing else does. A link that stands in the card besides the title - a button, a link
 	in a text - is above the cover and keeps its own place and its own focus; a text and a picture are not, a click on them is a click on the link of the title
 	(and the text of a card that is a link cannot be marked with the mouse). A card that is marked link and has no link in its title has no cover. The ring of

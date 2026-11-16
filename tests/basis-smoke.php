@@ -621,6 +621,18 @@ ninoWarnings();
 $gone = basisDraw( $home, '[section-wrap][section-row][section-col]x[/section-col][/section-row][/section-wrap][section-wrap][/section-wrap]' );
 $said = ninoWarnings();
 check( 'F1: a component of a feature that is off is no component: it and what it holds draw nothing, and the log says so once', $gone === '' && count( $said ) === 1 && str_contains( $said[0], 'section-wrap' ) && str_contains( $said[0], 'no component that is registered' ) );
+// ...and the next requests do not say it a second time within the hour: a request is a new run of the register, the counter is the file of the project's data
+unset( $home[\Nino\Components::NOTICED] );
+basisDraw( $home, '[section-wrap][/section-wrap]' );
+$second = ninoWarnings();
+unset( $home[\Nino\Components::NOTICED] );
+basisDraw( $home, '[section-wrap][/section-wrap][section-row][/section-row]' );
+$other = ninoWarnings();
+\Nino\Filesystem::mutate( $home, '/data/component-notices.php', static fn( array $state ): array => array_map( static fn( array $entry ): array => [ 'reset' => time() - 1 ] + $entry, $state ), [] );
+unset( $home[\Nino\Components::NOTICED] );
+basisDraw( $home, '[section-wrap][/section-wrap]' );
+$later = ninoWarnings();
+check( 'F1b: the log says it once an hour for each name and not at every request - a second request is silent, another name says it, and when the hour is over it says it once more', $second === [] && count( $other ) === 1 && str_contains( $other[0], 'section-row' ) && count( $later ) === 1 && str_contains( $later[0], 'section-wrap' ) );
 check( 'F2: a variant that the schema does not have is the standard one', $draw( '[section-col variant="fancy"]x[/section-col]' ) === '<div class="section-col">x</div>' );
 check( 'F3: a value outside its list is the default and an attribute the schema does not have falls away', $draw( '[section-row gap="9" colour="red" width="wide"][/section-row]' ) === '<div class="section-row section-row--width-wide"></div>' );
 check( 'F7: a component at a place that is not meant for it is drawn all the same', $draw( '[section-col]x[/section-col][section-row]y[/section-row]' ) === '<div class="section-col">x</div><div class="section-row">y</div>' );
@@ -797,6 +809,13 @@ $ring = basisBody( $partRules['section'], '.section-col--link:has( > .section-ti
 if( str_contains( $cover, 'position: absolute;' ) === false || str_contains( $cover, 'inset: 0;' ) === false || str_contains( $above, 'position: relative;' ) === false || str_contains( $above, 'z-index: 1;' ) === false || str_contains( $ring, 'outline:' ) === false
 	|| str_contains( $css['section'], 'first-of-type' ) === true || str_contains( $css['section'], 'outline: none' ) === true )
 	$bad[] = 'the card that is a link does not cover with the link of its title alone';
+
+// a card with bleed lets a picture reach the edge, and only a picture: the rule asks the first child for a picture, in a link or not, as the image component draws it, not whatever comes first
+$bleeds = array_values( array_filter( $partRules['section'], static fn( array $rule ): bool => str_contains( $rule['selector'], '--bleed' ) ) );
+$figure = (string) file_get_contents( $basisDir. '/components/image/template.tpl' );
+
+if( count( $bleeds ) !== 1 || $bleeds[0]['selector'] !== '.section-col--bleed > :first-child:has( > img, > a > img )' || str_contains( $bleeds[0]['body'], 'margin: calc( -1 * var(--section-col-pad) )' ) === false || preg_match( '#^<figure [^>]*>\\[\\[open\\]\\]\\[\\[picture\\]\\]#', $figure ) !== 1 )
+	$bad[] = 'a card with bleed does not leave the padding to a first child that is no picture';
 
 if( str_contains( basisBody( $partRules['button'], '.button:focus-visible' ), 'outline:' ) === false )
 	$bad[] = 'a button has no ring of its own';
@@ -1312,6 +1331,9 @@ $register = static function( bool $opcache ) use ( $cold ): ?float {
 $plain = $register( false );
 $cached = $register( true );
 echo sprintf( "  registering the twenty from the cache of the register: median of 200 %.3f ms without opcache, %s with it (the file is %d bytes; parsing it is most of the first)\n", $plain, $cached === null ? 'not run' : sprintf( '%.3f ms', $cached ), (int) @filesize( ninoSandboxDir( $cold ). '/private/data/cache/register/basis.php' ) );
+// The limits are three times the measure on purpose: the plan names 0.1 ms with opcache and the median of 200 comes to 0.099 to 0.108 ms on a quiet machine
+// (0.42 to 0.74 ms without it), but to 0.185 ms in a run beside others - a limit at the measured value fails by chance whenever the machine is busy, and
+// a median of 200 does not take that away. Three times keeps the check from failing for the load alone
 check( 'the twenty register from the cache of the register in 1.5 ms without opcache and 0.35 ms with it (three times what is measured; the file is parsed at every request without it)', $plain > 0 && $plain < 1.5 && ( $cached === null || ( $cached > 0 && $cached < 0.35 ) ) );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $cold ) );
 

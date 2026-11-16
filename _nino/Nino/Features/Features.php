@@ -363,6 +363,29 @@ namespace Nino {
 		}
 
 		/**
+		 *	The components a feature has in the register of this request, by name. A component is called as a shortcode
+		 *	is - [name] - and is none of them: nothing is on record of it in \Nino\Html, the register keeps who owns
+		 *	each name. Only a feature that is active has registered anything
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *
+		 *	@return 	array										The names, sorted; [] for an unknown key or a feature that registered none
+		 */
+		public static function components( array &$appData, string $key ): array {
+
+			$names = [];
+
+			foreach( (array) ( $appData[\Nino\Components::OWNERS]['names'] ?? [] ) as $name => $owner )
+				if( $owner === $key )
+					$names[] = (string) $name;
+
+			sort( $names );
+
+			return $names;
+		}
+
+		/**
 		 *	Read and validate one feature's manifest. Null with a warning when
 		 *	the file is missing or does not describe a feature - a manifest
 		 *	that is half right is not applied half way.

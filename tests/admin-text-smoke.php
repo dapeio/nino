@@ -1030,6 +1030,21 @@ unlink( $sandbox. '/private/templates/page-delta.tpl' );
 foreach( [ '/template/page-omega/cards/one-text', '/template/page-delta/intro/title' ] as $cleanKey )
 	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $cleanKey ] );
 
+// A link a component names by ~name is a text key as well - its value is an address the text files hold - and the scan lists it; a picture's
+// slot is a place of the Images panel and none
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-link.tpl', implode( "\n", [
+	'[section-wrap id="intro"][section-row][section-col]',
+	'	[button ~knopf href="~ziel"]',
+	'	[section-title text="Fixed" href="~titel-ziel"]',
+	'	[image ~foto alt="~foto-alt"]',
+	'[/section-col][/section-row][/section-wrap]',
+] ) );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
+check( 'a link that a component names by ~name is a row of the scan like its text, and a picture\'s slot is none', $status === 200
+	&& array_values( array_filter( array_column( $body['missing'], 'key' ), static fn( string $key ): bool => str_starts_with( $key, '/template/page-link/' ) ) ) === [ '/template/page-link/intro/foto-alt', '/template/page-link/intro/knopf', '/template/page-link/intro/titel-ziel', '/template/page-link/intro/ziel' ] );
+check( 'the Dashboard counts them as well', \Nino\Modules\Text\Keys::missingCount( $appData ) === count( $body['missing'] ) );
+unlink( $sandbox. '/private/templates/page-link.tpl' );
+
 // --- apiScanApply: the three answers a scanned key can get -----------------
 //
 // The scan is a list to work through, not an all-or-nothing pass: a row with

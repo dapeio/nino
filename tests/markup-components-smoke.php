@@ -238,9 +238,10 @@ $draw = static function( string $source, array $context = [ 'template' => 'page-
 	return \Nino\Components::render( $appData, \Nino\Markup::parse( $source, \Nino\Components::containers( $appData ), $notes ), $context );
 };
 
-/*	The log of one draw: the levels and the messages it raised	*/
+/*	The log of one draw: the levels and the messages it raised - of the first request of an hour, for what a name that is no component is said once an hour of	*/
 $logged = static function( callable $run ) use ( &$appData ): array {
 	unset( $appData[\Nino\Components::NOTICED] );
+	@unlink( \Nino\Filesystem::path( $appData, '/data/component-notices.php' ) );
 	ninoWarnings();
 	$run();
 	return ninoWarnings();
@@ -452,6 +453,7 @@ $said = $logged( static function() use ( $draw ): void {
 check( 'F1: one line for each name', count( $said ) === 3 );
 check( 'F1: the line is a notice, the level the kernel logs and goes on from', ( static function() use ( &$appData, $draw, $errorsOf ): bool {
 	unset( $appData[\Nino\Components::NOTICED] );
+	@unlink( \Nino\Filesystem::path( $appData, '/data/component-notices.php' ) );
 	$errors = $errorsOf( static function() use ( $draw ): void { $draw( '[gallery]' ); } );
 	return count( $errors ) === 1 && $errors[0][0] === E_USER_NOTICE;
 } )() );

@@ -1203,6 +1203,29 @@ $entries = array_column( $body['features'] ?? [], null, 'key' );
 check( 'the Features panel lists a delivered feature with shipped true, an installed one with shipped false', $status === 200 && ( $entries['parcel']['shipped'] ?? null ) === true && ( $entries['probe']['shipped'] ?? null ) === false && $entries['parcel']['active'] === false && $entries['probe']['active'] === true );
 check( '...and the reason a component of a feature that is on is not registered - none where all are', $entries['probe']['components'] === [] && $entries['parcel']['components'] === [] );
 
+// Switching a feature off is asked about with the templates that call its components: the list says them before the switch, the answer of the switch
+// names the components among the shortcodes that stay behind, and a template that calls none of them, a closing tag, a name that only starts like one
+// and a feature that has no component say nothing
+$calledApp = registerBoot( $panelApp );
+\Nino\Filesystem::putFileContent( $calledApp, '/templates/page-one.tpl', "[probe-box][probe-note]x[/probe-note][/probe-box]\n[probe-line]" );
+\Nino\Filesystem::putFileContent( $calledApp, '/templates/page-two.tpl', '[probe-note]y[/probe-note]' );
+\Nino\Filesystem::putFileContent( $calledApp, '/templates/page-none.tpl', "[/probe-box] [probe-boxy] [probe] [text]z[/text]" );
+\Nino\Filesystem::putFileContent( $calledApp, '/text/de_DE.php', [ '[[/found/words]]' => '[probe-card]' ] );
+[ $status, $body ] = $panelCall( $calledApp, 'apiList' );
+$entries = array_column( $body['features'] ?? [], null, 'key' );
+check( 'the list says, for a feature that is on and has components, the templates that call them - by name, sorted, with their number - and an empty answer for the others',
+	$status === 200 && ( $entries['probe']['calledIn'] ?? null ) === [ 'total' => 2, 'templates' => [ 'page-one.tpl', 'page-two.tpl' ] ] && ( $entries['parcel']['calledIn'] ?? null ) === [ 'total' => 0, 'templates' => [] ] );
+for( $more = 1; $more <= 12; $more++ )
+	\Nino\Filesystem::putFileContent( $calledApp, '/templates/page-more-'. sprintf( '%02d', $more ). '.tpl', '[probe-line]' );
+[ , $body ] = $panelCall( $calledApp, 'apiList' );
+$entries = array_column( $body['features'] ?? [], null, 'key' );
+check( '...twelve more templates are counted, and ten of them named', ( $entries['probe']['calledIn']['total'] ?? 0 ) === 14 && count( $entries['probe']['calledIn']['templates'] ?? [] ) === 10 );
+for( $more = 1; $more <= 12; $more++ )
+	unlink( \Nino\Filesystem::path( $calledApp, '/templates/page-more-'. sprintf( '%02d', $more ). '.tpl' ) );
+[ $status, $body ] = $panelCall( $calledApp, 'apiDeactivate', [ 'key' => 'probe' ] );
+$found = array_column( $body['found'] ?? [], null, 'shortcode' );
+check( 'the answer of the switch-off names the components that stand in templates and texts as the shortcodes do, one entry for each name',
+	$status === 200 && array_keys( $found ) === [ 'probe-box', 'probe-card', 'probe-line', 'probe-note' ] && $found['probe-note']['total'] === 2 && $found['probe-card']['places'] === [ [ 'kind' => 'text', 'where' => '/found/words (de_DE)' ] ] );
 registerReads();
 $offApp = $panelApp;
 unset( $offApp['./nino/features/all'] );

@@ -1004,7 +1004,7 @@ namespace Nino\Modules\Features {
 			// Read before the switch: the shortcodes only stand registered while
 			// it is on, and what was on decides what this switched on
 			$wasOn	= $on === true ? self::_activeKeys( $appData ) : [];
-			$names	= $on === false ? \Nino\Features::shortcodes( $appData, $key ) : [];
+			$names	= $on === false ? self::_calls( $appData, $key ) : [];
 
 			$result = $on === true ? \Nino\Features::activate( $appData, $key ) : \Nino\Features::deactivate( $appData, $key );
 
@@ -1090,6 +1090,52 @@ namespace Nino\Modules\Features {
 			self::_byName( $rest );
 
 			return array_merge( $first, $rest );
+		}
+
+		/**
+		 *	What a feature is called by in a template: its shortcodes and its components, by name. Only what the register
+		 *	of this request holds, so a feature that is off has none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *
+		 *	@return 	array										The names, sorted and each once
+		 */
+		private static function _calls( array &$appData, string $key ): array {
+
+			$names = array_values( array_unique( array_merge( \Nino\Features::shortcodes( $appData, $key ), \Nino\Features::components( $appData, $key ) ) ) );
+			sort( $names );
+
+			return $names;
+		}
+
+		/**
+		 *	The templates that call a component of a feature, for the question before it is switched off: a template
+		 *	that calls one has a page that draws nothing once the feature is off. Read only; the opening tags, as
+		 *	_occurrences() reads them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *
+		 *	@return 	array										[ 'total' => how many templates, 'templates' => the first FOUND_PLACES of them, by file name ]
+		 */
+		private static function _calledIn( array &$appData, string $key ): array {
+
+			$names = \Nino\Features::components( $appData, $key );
+			$files = [];
+
+			if( $names !== [] ) {
+
+				$pattern = '/\[(?:'. implode( '|', array_map( static fn( string $name ): string => preg_quote( $name, '/' ), $names ) ). ')(?: [^\]]*)?\]/';
+
+				foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file )
+					if( is_file( $file ) === true && is_readable( $file ) === true && preg_match( $pattern, (string) file_get_contents( $file ) ) === 1 )
+						$files[] = basename( $file );
+			}
+
+			sort( $files );
+
+			return [ 'total' => count( $files ), 'templates' => array_slice( $files, 0, self::FOUND_PLACES ) ];
 		}
 
 		/**
@@ -1388,6 +1434,8 @@ namespace Nino\Modules\Features {
 				'problems'		=> $feature['problems'],
 				// Why a component or a group of a feature that is on is not registered - nothing that keeps it from running, so no problem of the ones above
 				'components'	=> \Nino\Features::componentProblems( $appData, $feature['key'] ),
+				// The templates that call its components: what the question before a switch-off names, since a page of them draws nothing while it is off
+				'calledIn'		=> self::_calledIn( $appData, $feature['key'] ),
 				// Whether it brings an install unit, which is what the Apply again action works on
 				'unit'				=> is_dir( $feature['dir']. '/install' ),
 				'settings'		=> $settings,

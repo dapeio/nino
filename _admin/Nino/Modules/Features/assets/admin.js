@@ -1003,7 +1003,9 @@
 			// be told, and the second one is not a reason to explain what a
 			// feature directory is
 			if( all.length === 0 && Nino.admin.features._rejected.filter( function( entry ) { return ( entry.active === true ) === active } ).length === 0 ) {
-				panel.appendChild( Nino.adminUi.emptyState( Nino.adminUi.format( Nino.content.getText( active === true ? '/_admin/features/hint/active-empty' : '/_admin/features/hint/empty' ), Nino.admin.features._dir ) ) );
+				// Only a directory with no feature in it at all is told what a feature directory is; a tab that is empty while features are installed says which way it is
+				const key = active === true ? '/_admin/features/hint/active-empty' : ( Nino.admin.features._features.length > 0 ? '/_admin/features/hint/inactive-empty' : '/_admin/features/hint/empty' );
+				panel.appendChild( Nino.adminUi.emptyState( Nino.adminUi.format( Nino.content.getText( key ), Nino.admin.features._dir ) ) );
 				return;
 			}
 
@@ -1955,6 +1957,27 @@
 		},
 
 		/**
+		 *	The sentence that names the templates calling the components of a feature, for the question before it is switched
+		 *	off: a page of such a template draws nothing there while the feature is off
+		 *
+		 *	@param		{Object}	feature			An entry of the list
+		 *
+		 *	@return		{string}							'' where no template calls one, else a space and the sentence
+		 */
+		_calledText : function( feature ) {
+
+			if( feature.calledIn.total === 0 )
+				return '';
+
+			const names = feature.calledIn.templates.slice();
+
+			if( feature.calledIn.total > names.length )
+				names.push( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/found-more'), feature.calledIn.total - names.length ) );
+
+			return ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate-templates'), names.join(', ') );
+		},
+
+		/**
 		 *	What the privacy policy still says about a feature that is off or
 		 *	gone: the titles of its sections, which no switch deletes
 		 *
@@ -2024,7 +2047,7 @@
 			// against it. Asked once, before the question about unsaved input
 			if( guarded !== true && what === 'deactivate' ) {
 				Nino.adminUi.confirm( 'big', {
-					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name ),
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name )+ Nino.admin.features._calledText( feature ),
 					yes				: Nino.content.getText('/_admin/features/label/deactivate'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					kind			: 'danger',

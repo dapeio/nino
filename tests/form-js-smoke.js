@@ -51,9 +51,10 @@ function form() {
 		field( 'location', 'text', '', false ),
 	];
 	const msg = {
-		textContent : '', innerHTML : '', attributes : {},
+		textContent : '', innerHTML : '', attributes : {}, focused : false,
 		setAttribute : function( key, value ) { this.attributes[key] = String( value ) },
 		getAttribute : function( key ) { return this.attributes[key] ?? null },
+		focus : function() { this.focused = true },
 	};
 	const btn = { disabled : false };
 
@@ -353,6 +354,12 @@ check( 'a 200 shows the success text', forms[0].msg.textContent === 'Thank you â
 check( 'a delivered message locks the form', forms[0].btn.disabled === true && forms[0].fieldList.every( function( f ) { return f.disabled === true } ) );
 check( 'the pending state is cleared either way', forms[0].classList.contains('pending') === false && forms[1].classList.contains('pending') === false );
 
+// The button is disabled while the request is out, and a disabled element gives the focus up: the answer is where the keyboard stands - a delivered
+// message and a refused one alike - and the paragraph is a target for the script, not a stop of the tab order
+check( 'a delivered message takes the focus: the paragraph is focused, has tabindex -1 and is the live region of role status',
+	forms[0].msg.focused === true && forms[0].msg.getAttribute('tabindex') === '-1' && forms[0].msg.getAttribute('role') === 'status' && forms[0].msg.getAttribute('aria-live') === 'polite' );
+check( '...a 400 from the server takes it as well, and the form is editable beside it', forms[1].msg.focused === true && forms[1].msg.getAttribute('tabindex') === '-1' );
+
 // Anything that is not the visitor's own field value stays generic - naming
 // the csrf 403 or the honeypot's 418 tells a spam bot which check it tripped
 const generic = form();
@@ -362,6 +369,7 @@ generic.fill( { name : 'Bot', email : 'bot@example.com', message : 'spam', locat
 generic.submit();
 respond( sent.length - 1, 418 );
 check( 'a honeypot rejection stays on the generic message', generic.msg.textContent === 'Your message could not be sent. Please try again later.' );
+check( '...and the focus is on that message', generic.msg.focused === true && generic.msg.getAttribute('tabindex') === '-1' );
 
 
 // --- Checkbox, radio and date: what the client refuses ------------------
@@ -382,6 +390,7 @@ typedForm.fieldList.push( agree, since );
 sent.length = 0;
 typedForm.submit();
 check( 'a required checkbox that is not ticked is refused before the request', sent.length === 0 && typedForm.msg.textContent === 'Please fill in every required field.' );
+check( '...and the caret stays with the field it names, not with the message', typedForm.msg.focused === false && typedForm.msg.getAttribute('tabindex') === null );
 check( '...and marked, and the caret goes to it', agree.classList.contains('nino-is-error') === true && agree.getAttribute('aria-invalid') === 'true' && agree.focused === true );
 
 agree.checked = true;

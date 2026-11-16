@@ -160,6 +160,10 @@ namespace Nino {
 		// own, and the names are an editor's
 		private const int NOTICES = 20;
 
+		// The counter of the things said once in a window (/data/component-notices.php), and the window of a name that is no component: an hour
+		private const string NOTICE_COUNTER = 'component-notices';
+		private const int UNKNOWN_WINDOW = 3600;
+
 		// The alignments an input of icons is for
 		private const array ALIGNMENTS = [
 			[ 'left', 'center', 'right' ],
@@ -1964,7 +1968,9 @@ namespace Nino {
 
 			$name = (string) $node['n'];
 
-			self::_notice( $appData, 'unknown '. $name, 'Components: "'. self::_shown( $name ). '" is no component that is registered; it and what it holds are not drawn' );
+			// A feature that is off leaves its names in every template, and every request of every page meets them: said once an hour for each name, as
+			// Http::_dropped() says what a server drops - a site without basis wrote 3 entries for each request, 121617 bytes of log for 132 requests
+			self::_notice( $appData, 'unknown '. $name, 'Components: "'. self::_shown( $name ). '" is no component that is registered; it and what it holds are not drawn', E_USER_NOTICE, self::UNKNOWN_WINDOW );
 
 			return '';
 		}
@@ -1976,10 +1982,11 @@ namespace Nino {
 		 *	@param		string		$what					What it is about: the same words, the same line
 		 *	@param		string		$message
 		 *	@param		int				$level				E_USER_NOTICE, or E_USER_WARNING for what is broken
+		 *	@param		int				$window				More than 0: the seconds in which the same thing is said once, however many requests meet it (\Nino\Feature::count()); 0 for once in a request
 		 *
 		 *	@return 	void
 		 */
-		private static function _notice( array &$appData, string $what, string $message, int $level = E_USER_NOTICE ): void {
+		private static function _notice( array &$appData, string $what, string $message, int $level = E_USER_NOTICE, int $window = 0 ): void {
 
 			$what = substr( $what, 0, 120 );
 
@@ -1987,6 +1994,9 @@ namespace Nino {
 				return;
 
 			$appData[self::NOTICED][$what] = true;
+
+			if( $window > 0 && \Nino\Feature::count( $appData, self::NOTICE_COUNTER, $what, 1, $window ) === false )
+				return;
 
 			trigger_error( $message, $level );
 		}

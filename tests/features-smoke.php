@@ -1644,7 +1644,7 @@ check( 'asked again it is no longer running, and the answer says so the way ever
 $appData['/nino/modules'] = $listedBefore;
 unset( $appData['./nino/features/all'] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'shipped', 'requires', 'problems', 'components', 'unit', 'settings', 'settingsTab' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'shipped', 'requires', 'problems', 'components', 'calledIn', 'unit', 'settings', 'settingsTab' ] );
 $units = array_column( $body['features'], 'unit', 'key' );
 ksort( $units );
 check( 'every entry says whether the feature brings an install unit - the three that have a directory of it do, the others do not', $units === [ 'basis' => true, 'boxy' => false, 'helper' => true, 'old' => false, 'sample' => true ] );
