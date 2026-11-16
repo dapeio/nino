@@ -1274,6 +1274,10 @@ Reach for an existing class first; only invent one when no role fits.
 | Run of checkbox rows | `.nino-admin-checklist` |
 | Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
 | List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
+| Sections one under another, one open or several, the open one in the address | `.nino-admin-accordion` via `Nino.adminUi.accordion()` - see [Settings screens](#settings-screens-accordion-steps-split-view-and-colour-field) |
+| One choice among a few steps (-2 to +2, or named) | `.nino-admin-steps` via `Nino.adminUi.steps()`, a radiogroup |
+| Controls on one side, a preview on the other, a switch between them where it is narrow | `.nino-admin-split` via `Nino.adminUi.split()` |
+| A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
 | Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
@@ -1342,6 +1346,120 @@ A column may also carry `absent(row)`: a row for which it answers true counts as
 The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.
 `tests/nino-ui-table-js-smoke.js` covers it.
+
+### Settings screens: accordion, steps, split view and colour field
+
+Four builders for a panel that sets a number of values with a preview beside
+them. Each answers an object whose `el` is the element to put into the panel;
+the words they draw themselves (the switch of the split view, the verdict of the
+colour field, the mark of a default) are fills of `_admin/text/<locale>.php`
+(`/_admin/common/split/*`, `/_admin/common/color/*`, `/_admin/common/label/default`),
+and every other word - a label, a summary, a title - is the caller's, set as
+text. The four examples each run on their own in a panel's `render()`, `mount` being
+the element it draws into.
+
+An **accordion** is a list of sections, a heading with a button each. One is open
+(the open head is `aria-disabled`: it says it is open and a press changes
+nothing) or, with `multiple`, as many as the person opens. Enter and Space press a
+head, Up and Down walk the heads, Home and End go to the ends; a section's body is
+hidden when closed and not removed, and one given as a function is made when it
+first opens. An accordion in the body of a section is the second level - give it
+`level : 4`. With `address` the open section is the address of the panel: a press
+adds a history entry, and `follow()` takes the section from the address, which is
+what the panel's `showCurrent()` does when the shell calls it after Back or a
+typed address. Several open sections are one part of the address, their keys
+joined by a comma, which is why a key holds none. Keys are unique within an
+accordion, and two accordions of one panel that both write the address need
+different `parts`, or each reads the other's section. Where one section is open
+at a time one always is: with no section in the address, or one the accordion has
+not, it is `open`, and with no `open` the first. `update( key, { summary, badge } )`
+changes the summary of a head and its badge and nothing else - not the label, the
+body or what is open. A summary or a badge says something that is true whether or
+not the section is open, and is set where the value changes, as the example does.
+
+```js
+const spacing = Nino.adminUi.steps( {
+	label : 'Spacing', steps : [ -2, -1, 0, 1, 2 ], value : 0, standard : 0,
+	onChange : function( value ) {
+		accordion.update( 'page', { summary : value === 0 ? '' : '1 of 2 knobs changed', badge : value === 0 ? '' : '● changed' } );
+	},
+} );
+const accordion = Nino.adminUi.accordion( {
+	address : { panel : 'themes', parts : [ 'craft' ] },
+	open : 'page',
+	sections : [
+		{ key : 'brand', label : 'Brand', summary : 'Two colours', content : function() { return Nino.adminUi.hint( 'Made when the section first opens.' ) } },
+		{ key : 'page', label : 'Page', content : spacing.el },
+	],
+} );
+mount.appendChild( accordion.el );
+accordion.follow();
+```
+
+**Steps** is a `radiogroup` of buttons: the chosen step is the one tab stop, the
+arrows move the choice and the focus (and wrap), Home and End go to the ends. A
+number is written with its sign; `standard` marks the default step with a dot
+and with its name for a screen reader. `onChange` is told what the hand chose,
+`set()` reports nothing, and `disable()` takes the strip out of use.
+
+```js
+const spacing = Nino.adminUi.steps( {
+	label : 'Spacing', steps : [ -2, -1, 0, 1, 2 ], value : 0, standard : 0,
+	onChange : function( value ) { mount.dataset.spacing = String( value ) },
+} );
+mount.appendChild( spacing.el );
+```
+
+The **split view** is the settings on one side and the preview on the other. Where
+the view itself is narrow (a container query: the pane beside the rail, not the
+window) a switch of two buttons shows one of them and keeps the other in the page,
+so a switch loses nothing. The preview is a page in an iframe or an element the
+caller draws; `reload()` loads the frame once more without touching the settings. The container's name, `nino-split`, is part of the contract: a panel's own
+stylesheet follows the width of the split view with `@container nino-split (max-width: 40rem)`
+and not with a media query. Only
+the project's own origin is loaded into the frame - a relative address, or an absolute
+one of this origin; `//host`, `\\host`, `javascript:`, `data:` and other hosts are refused,
+however they are written - the frame says `aria-busy` until it has loaded, and `sandbox` is the
+frame's own attribute where the caller wants one. `tools` is the place in the bar over
+the preview for what the panel wants beside its title (the widths of the preview, a
+line of advice), `words( { settings, preview } )` says the words of the switch
+afterwards without the frame being loaded once more, and with no preview given the view is
+the settings alone, with no switch and no bar.
+
+```js
+const settings = document.createElement( 'div' );
+settings.appendChild( Nino.adminUi.hint( 'The controls of the panel stand here.' ) );
+
+const split = Nino.adminUi.split( {
+	settings : settings,
+	preview : { src : '/', title : 'The website' },
+	onLoad : function( frame ) { frame.dataset.loaded = 'true' },
+} );
+split.tools.appendChild( Nino.adminUi.hint( 'Widths and notes of the panel stand in the bar.' ) );
+mount.appendChild( split.el );
+// after a change the preview has to show: split.reload()
+```
+
+The **colour field** is a hex code in a text field, the system's colour picker, a
+surface that shows the colour and, where `against` names a second colour, the
+contrast between them: the ratio as a number cut (not rounded) to two decimals and
+whether it reaches `minimum` (4.5 : 1 by default, the level WCAG asks of ordinary
+text), said in words and with a mark, never by colour alone. A code is `#rrggbb`
+or `#rgb`; it is taken as it is typed and reported through `onChange` as
+`#rrggbb`; the field takes what is pasted whole and trims the space round it, so a
+code of eight digits or `rgb()` is no colour. An empty field is one with the sentence of
+a required field only with `required`, and else no colour and no error. One that is no colour says so at the field (`aria-invalid`, the
+sentence pointed at by `aria-describedby`) and goes to `onInvalid` instead. The
+pure half is `Nino.adminUi.colorModel` - `parse()`, `luminance()`, `contrast()`.
+
+```js
+const brand = Nino.adminUi.color( {
+	label : 'Brand colour', value : '#2563eb', against : '#ffffff',
+	onChange : function( value ) { mount.dataset.brand = value },
+} );
+mount.appendChild( brand.el );
+// the colour it is measured against moved: brand.against( '#111111' )
+```
 
 ### Three traps
 

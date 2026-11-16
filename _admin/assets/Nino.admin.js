@@ -52,6 +52,9 @@
 	 *	They only assign the common chrome classes from style.css;
 	 *	application modules keep ownership of labels, state and events.
 	 */
+	// The counter behind the ids the building blocks make when they are given none
+	let serial = 0;
+
 	wn.Nino.adminUi = {
 
 		// How many search hits elementList() draws at once. The search itself
@@ -59,6 +62,11 @@
 		// with thousands of elements stays a panel rather than a page, and the
 		// control says how many more it found
 		ELEMENTLIST_RESULTS : 50,
+
+		// How long color() waits for the typing to rest before it tells a screen reader the
+		// contrast line, in milliseconds: a code typed digit by digit passes through valid ones
+		// that a live region would otherwise read out one by one
+		COLOR_QUIET : 400,
 
 
 		/**
@@ -2967,6 +2975,964 @@
 				},
 			};
 		},
+
+		/**
+		 *	An accordion: sections one above the other, each a heading with a
+		 *	button that opens it. One section is open (the way a screen of
+		 *	settings reads: a list of groups, the one in hand spread out) or, with
+		 *	options.multiple, as many as the person opens. An accordion stands in
+		 *	the body of a section of another - two levels is what the panels use -
+		 *	and each is its own: the arrows walk the heads of one accordion and
+		 *	never cross into the one inside.
+		 *
+		 *	The head is a button in a heading (options.level) carrying
+		 *	aria-expanded and aria-controls, the body a region labelled by it.
+		 *	Where one section is open at a time its head is aria-disabled - it
+		 *	says it is open and a press changes nothing - and stays in the tab
+		 *	order. Enter and Space press it, Up and Down walk the heads, Home and
+		 *	End go to the first and the last. A closed body is hidden, not
+		 *	removed: what a person entered into a section is still there when it
+		 *	opens a second time, and a body given as a function is made when its section
+		 *	opens for the first time.
+		 *
+		 *	The open sections are the address of the panel where it is given
+		 *	options.address: the parts of the level the accordion stands in, to
+		 *	which the open key follows (the keys joined by a comma where several
+		 *	may be open, so a key holds none). A press is the person's move - a
+		 *	new entry for Back to return to - and set() and follow() move without
+		 *	writing, which is what a panel does when the address has changed under
+		 *	it. Without the shell's router the address is left alone, as levels()
+		 *	does. Owns no strings: the labels, the summary and the badge are the
+		 *	caller's
+		 *
+		 *	@param		{Object}		options					{ id, sections, open, multiple, level, address, onToggle }
+		 *														- id          the beginning of the ids it makes, one the page has not
+		 *														- sections    [ { key, label, summary, badge, content } ] - content an Element, or a function that answers one when the section is first opened; summary is read on the closed head, badge a chip beside the label (a state such as "changed")
+		 *														- open        the key open at the start, or an array of them
+		 *														- multiple    several sections may be open
+		 *														- level       the heading level of the heads, 3 by default; 4 for an accordion inside a section
+		 *														- address     { panel, parts } - the router's panel and the parts before the open key
+		 *														- onToggle    called with the open keys and the key that was pressed, after a press
+		 *
+		 *	@return		{Object}										{ el, get(), set( keys ), follow(), update( key, { summary, badge } ), head( key ), body( key ) }
+		 */
+		accordion : function( options ) {
+
+			const prefix		= options.id || 'nino-admin-accordion-'+ ( ++serial );
+			const multiple	= options.multiple === true;
+			const level			= Number.isInteger( options.level ) === true && options.level >= 1 && options.level <= 6 ? options.level : 3;
+			const root			= dc.createElement('div');
+			root.className	= 'nino-admin-accordion';
+
+			let open = [];
+			const parts = [];
+
+			const keys = options.sections.map( function( section ) { return section.key } );
+
+			const known = function( wanted ) {
+				const list = ( Array.isArray( wanted ) === true ? wanted : [ wanted ] ).filter( function( key ) { return keys.indexOf( key ) !== -1 } );
+				return multiple === true ? list : list.slice( 0, 1 );
+			};
+
+			// Where one section is open at a time one is: what was asked for, else the one the
+			// accordion started with, else the first - a Back to the level with no section in
+			// its address, or a key the accordion has not, leaves no screen of closed heads
+			const settle = function( wanted ) {
+
+				const list = known( wanted );
+
+				if( list.length > 0 || multiple === true )
+					return list;
+
+				const first = known( options.open ?? [] );
+
+				return first.length > 0 ? first : keys.slice( 0, 1 );
+			};
+
+			const paint = function() {
+				parts.forEach( function( part, at ) {
+
+					const on = open.indexOf( part.key ) !== -1;
+
+					part.button.setAttribute( 'aria-expanded', on === true ? 'true' : 'false' );
+
+					if( multiple === false && on === true )
+						part.button.setAttribute( 'aria-disabled', 'true' );
+					else
+						part.button.removeAttribute('aria-disabled');
+
+					part.chevron.textContent = on === true ? '▾' : '▸';
+					part.summary.hidden = on === true;
+					part.body.hidden = on === false;
+					part.head.classList.toggle( 'is-open', on );
+
+					if( on === true && part.made === false ) {
+						part.made = true;
+						const content = typeof options.sections[at].content === 'function' ? options.sections[at].content() : options.sections[at].content;
+						if( content !== null && content !== undefined )
+							part.body.appendChild( content );
+					}
+				} );
+			};
+
+			// The router the shell has, if it has one: the address is the panel's, not the accordion's
+			const write = function() {
+
+				const address = options.address;
+				const router = shell().router;
+
+				if( typeof address !== 'object' || address === null || typeof router !== 'object' || router === null )
+					return;
+
+				const at = address.parts.slice();
+
+				if( open.length > 0 )
+					at.push( open.join(',') );
+
+				if( typeof router.go === 'function' )
+					router.go( address.panel, at );
+
+				if( typeof router.set === 'function' )
+					router.set( address.panel, at );
+			};
+
+			const press = function( key ) {
+
+				if( multiple === true )
+					open = open.indexOf( key ) === -1 ? open.concat( [ key ] ) : open.filter( function( other ) { return other !== key } );
+				else if( open[0] === key )
+					return;
+				else
+					open = [ key ];
+
+				paint();
+				write();
+
+				if( typeof options.onToggle === 'function' )
+					options.onToggle( open.slice(), key );
+			};
+
+			options.sections.forEach( function( section, at ) {
+
+				const id = prefix+ '-'+ at;
+
+				const heading = dc.createElement( 'h'+ level );
+				heading.className = 'nino-admin-accordion-head';
+
+				const button = dc.createElement('button');
+				button.type = 'button';
+				button.className = 'nino-admin-accordion-button';
+				button.id = id+ '-head';
+				button.setAttribute( 'aria-controls', id+ '-body' );
+
+				const label = Nino.adminUi.el( 'span', 'nino-admin-accordion-label', section.label );
+				const badge = Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-accordion-badge', section.badge ?? '' );
+				badge.dataset.state = 'warn';
+				badge.hidden = ( section.badge ?? '' ) === '';
+
+				const summary = Nino.adminUi.el( 'span', 'nino-admin-accordion-summary', section.summary ?? '' );
+				const chevron = Nino.adminUi.el( 'span', 'nino-admin-accordion-chevron' );
+				chevron.setAttribute( 'aria-hidden', 'true' );
+
+				[ label, badge, summary, chevron ].forEach( function( piece ) { button.appendChild( piece ) } );
+				heading.appendChild( button );
+
+				const body = dc.createElement('div');
+				body.id = id+ '-body';
+				body.className = 'nino-admin-accordion-body';
+				body.setAttribute( 'role', 'region' );
+				body.setAttribute( 'aria-labelledby', id+ '-head' );
+
+				button.addEventListener( 'click', function() { press( section.key ) } );
+
+				button.addEventListener( 'keydown', function( ev ) {
+
+					let next = -1;
+					if( ev.key === 'ArrowDown' )	next = at + 1;
+					if( ev.key === 'ArrowUp' )		next = at - 1;
+					if( ev.key === 'Home' )				next = 0;
+					if( ev.key === 'End' )				next = parts.length - 1;
+
+					if( [ 'ArrowDown', 'ArrowUp', 'Home', 'End' ].indexOf( ev.key ) === -1 )
+						return;
+
+					// The arrows scroll the page otherwise, and a head has no other use for them
+					ev.preventDefault();
+
+					if( next >= 0 && next < parts.length )
+						parts[next].button.focus();
+				} );
+
+				root.appendChild( heading );
+				root.appendChild( body );
+
+				parts.push( { key : section.key, head : heading, button : button, badge : badge, summary : summary, chevron : chevron, body : body, made : false } );
+			} );
+
+			open = settle( options.open ?? [] );
+			paint();
+
+			const part = function( key ) {
+				return parts.find( function( candidate ) { return candidate.key === key } ) ?? null;
+			};
+
+			return {
+
+				el : root,
+
+				get : function() {
+					return open.slice();
+				},
+
+				// Open what the address, or the caller, says: no address written, no callback
+				set : function( wanted ) {
+					open = settle( wanted ?? [] );
+					paint();
+				},
+
+				// Take the open sections from the router's current address, where it
+				// is the level this accordion stands in
+				follow : function() {
+
+					const address = options.address;
+					const router = shell().router;
+
+					if( typeof address !== 'object' || address === null || typeof router !== 'object' || router === null || typeof router.current !== 'function' )
+						return;
+
+					const current = router.current();
+					const own = address.parts;
+
+					if( current.panel !== address.panel || own.some( function( value, at ) { return current.parts[at] !== value } ) === true )
+						return;
+
+					const named = current.parts[own.length];
+					open = settle( typeof named === 'string' ? named.split(',') : [] );
+					paint();
+				},
+
+				update : function( key, changes ) {
+
+					const found = part( key );
+					if( found === null )
+						return;
+
+					if( changes.summary !== undefined )
+						found.summary.textContent = changes.summary;
+
+					if( changes.badge !== undefined ) {
+						found.badge.textContent = changes.badge;
+						found.badge.hidden = changes.badge === '';
+					}
+				},
+
+				head : function( key ) {
+					const found = part( key );
+					return found === null ? null : found.button;
+				},
+
+				body : function( key ) {
+					const found = part( key );
+					return found === null ? null : found.body;
+				},
+			};
+		},
+
+		/**
+		 *	A choice among a few steps, drawn as one strip: -2 to +2, or named
+		 *	steps. A radiogroup of buttons in the pattern's way - one tab stop
+		 *	(the chosen step, or the first where none is), the arrows move the
+		 *	choice and the focus with it and wrap at the ends, Home and End go
+		 *	to the first and the last. The step that is the default says so
+		 *	by a mark and by its name ("0 (Default)"), so that the way back is
+		 *	visible and a screen reader reads it; the chosen one is filled.
+		 *
+		 *	The strip does not own the value: it reports a choice made by hand
+		 *	through onChange and takes one from outside through set(), which
+		 *	reports nothing. A step may be disabled alone, the strip as a whole
+		 *	through disable(). Owns no strings, the word for the default apart
+		 *
+		 *	@param		{Object}		options					{ label, labelledby, steps, value, standard, disabled, id, wide, onChange }
+		 *														- label       the group's name for a screen reader; or labelledby, the id of what names it
+		 *														- steps       the steps, in order: a number or a string (a number is written -2, 0, +2), or { value, label, title, disabled }
+		 *														- value       the chosen step's value; none is chosen where it matches no step
+		 *														- standard    the value of the step that is the default
+		 *														- disabled    the strip cannot be operated
+		 *														- wide        the steps share the width, where the strip is otherwise as wide as they are
+		 *														- onChange    called with the value and its index after a choice made by hand
+		 *
+		 *	@return		{Object}										{ el, get(), set( value ), disable( bool ), focus() }
+		 */
+		steps : function( options ) {
+
+			const written = function( value ) {
+				if( typeof value !== 'number' )
+					return String( value );
+				return value < 0 ? '−'+ Math.abs( value ) : ( value > 0 ? '+'+ value : '0' );
+			};
+
+			const steps = options.steps.map( function( step ) {
+				return typeof step === 'object' && step !== null
+					? { value : step.value, label : step.label ?? written( step.value ), title : step.title, disabled : step.disabled === true }
+					: { value : step, label : written( step ), title : undefined, disabled : false };
+			} );
+
+			const group = dc.createElement('div');
+			group.className = 'nino-admin-steps'+ ( options.wide === true ? ' nino-admin-steps--wide' : '' );
+			group.setAttribute( 'role', 'radiogroup' );
+
+			if( options.labelledby )
+				group.setAttribute( 'aria-labelledby', options.labelledby );
+			else if( options.label )
+				group.setAttribute( 'aria-label', options.label );
+
+			if( options.id )
+				group.id = options.id;
+
+			let chosen = -1;
+			let off = options.disabled === true;
+
+			const buttons = steps.map( function( step, at ) {
+
+				const button = dc.createElement('button');
+				button.type = 'button';
+				button.className = 'nino-admin-steps-step';
+				button.setAttribute( 'role', 'radio' );
+				button.appendChild( Nino.adminUi.el( 'span', '', step.label ) );
+
+				if( step.title )
+					button.title = step.title;
+
+				if( options.standard !== undefined && step.value === options.standard ) {
+					button.dataset.standard = 'true';
+					button.appendChild( Nino.adminUi.el( 'span', 'nino-admin-sr-only', ' ('+ Nino.adminUi.text('/_admin/common/label/default')+ ')' ) );
+				}
+
+				button.addEventListener( 'click', function() { choose( at, true ) } );
+				button.addEventListener( 'keydown', function( ev ) {
+
+					if( [ 'ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End' ].indexOf( ev.key ) === -1 )
+						return;
+
+					ev.preventDefault();
+
+					const free = steps.map( function( other, index ) { return other.disabled === true ? -1 : index } ).filter( function( index ) { return index !== -1 } );
+					if( free.length === 0 )
+						return;
+
+					const here = Math.max( 0, free.indexOf( at ) );
+					let next = here;
+
+					if( ev.key === 'ArrowRight' || ev.key === 'ArrowDown' )	next = ( here + 1 ) % free.length;
+					if( ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' )		next = ( here - 1 + free.length ) % free.length;
+					if( ev.key === 'Home' )																	next = 0;
+					if( ev.key === 'End' )																	next = free.length - 1;
+
+					choose( free[next], true );
+					buttons[free[next]].focus();
+				} );
+
+				group.appendChild( button );
+
+				return button;
+			} );
+
+			const paint = function() {
+
+				// The one tab stop is the chosen step - or, where none is or it is disabled, the first that can be chosen
+				const stop = chosen !== -1 && steps[chosen].disabled === false ? chosen : steps.findIndex( function( step ) { return step.disabled === false } );
+
+				buttons.forEach( function( button, at ) {
+					button.setAttribute( 'aria-checked', at === chosen ? 'true' : 'false' );
+					button.classList.toggle( 'is-active', at === chosen );
+					button.tabIndex = at === stop ? 0 : -1;
+					button.disabled = off === true || steps[at].disabled === true;
+				} );
+
+				if( off === true )
+					group.setAttribute( 'aria-disabled', 'true' );
+				else
+					group.removeAttribute('aria-disabled');
+			};
+
+			const choose = function( at, byHand ) {
+
+				if( off === true || steps[at].disabled === true )
+					return;
+
+				const changed = chosen !== at;
+				chosen = at;
+				paint();
+
+				if( byHand === true && changed === true && typeof options.onChange === 'function' )
+					options.onChange( steps[at].value, at );
+			};
+
+			chosen = steps.findIndex( function( step ) { return step.value === options.value } );
+			paint();
+
+			return {
+
+				el : group,
+
+				get : function() {
+					return chosen === -1 ? null : steps[chosen].value;
+				},
+
+				set : function( value ) {
+					chosen = steps.findIndex( function( step ) { return step.value === value } );
+					paint();
+				},
+
+				disable : function( on ) {
+					off = on === true;
+					paint();
+				},
+
+				focus : function() {
+					const stop = buttons.find( function( button ) { return button.tabIndex === 0 } );
+					if( stop !== undefined )
+						stop.focus();
+				},
+			};
+		},
+
+		/**
+		 *	A split view: what a person sets on one side, the result on the
+		 *	other - a column of controls and a preview beside it. Where the
+		 *	view is too narrow for both (the container's, not the window's: the
+		 *	pane is narrower than the screen by the rail) a switch of two
+		 *	buttons, "Settings" and "Preview", shows one and keeps the other
+		 *	in the page, so that neither is rebuilt by a switch and what was
+		 *	typed is still there. Where there is room the switch is not drawn
+		 *	and both stand side by side.
+		 *
+		 *	The preview is a page in an iframe (options.preview.src) or an
+		 *	element the caller fills (an Element, or { slot }: a preview that is
+		 *	a drawing, not a page). reload() loads the frame once more, or another
+		 *	address into it, and touches nothing else (the frame says aria-busy until
+		 *	it has loaded): the controls are not
+		 *	redrawn, which is what a preview that has to be asked for a second time after
+		 *	every change needs. Only the project's own origin is loaded into the
+		 *	frame - a relative address or one on this host; //host, \\host, other
+		 *	schemes and other hosts are not: an address a person or a file could
+		 *	have written is not allowed to run in the workbench's origin.
+		 *	options.sandbox, where given, is the frame's sandbox
+		 *
+		 *	@param		{Object}		options					{ id, settings, preview, view, sandbox, previewTitle, text, onView, onReload, onLoad }
+		 *														- settings    the controls, an Element (more can be put into split.settings later)
+		 *														- preview     { src, title } for a page, an Element for a preview the caller draws
+		 *														- view        'settings' (the default) or 'preview', which one the narrow view starts on
+		 *														- sandbox     the iframe's sandbox attribute, as a string
+		 *														- tools       an Element for the bar over the preview, beside its title (split.tools is the place, where it is made later)
+		 *														- text        { settings, preview, reload, view } to say the four words differently
+		 *														- onView      called with the view after a switch
+		 *														- onReload    called when the preview is asked to load once more, by the button or by reload()
+		 *														- onLoad      called with the frame when the page in it has loaded
+		 *
+		 *	@return		{Object}										{ el, settings, preview, frame, tools, view(), show( view ), reload( [src] ), words( { settings, preview } ) } - with no preview given the view is the settings alone: no switch, no bar, and preview, frame and tools are null
+		 */
+		split : function( options ) {
+
+			const prefix	= options.id || 'nino-admin-split-'+ ( ++serial );
+			const text		= options.text || {};
+			const word		= function( key ) { return text[key] ?? Nino.adminUi.text( '/_admin/common/split/'+ key ) };
+
+			const root = dc.createElement('div');
+			root.className = 'nino-admin-split';
+			root.dataset.view = options.view === 'preview' ? 'preview' : 'settings';
+
+			const settings = dc.createElement('div');
+			settings.className = 'nino-admin-split-settings';
+			settings.id = prefix+ '-settings';
+
+			if( options.settings )
+				settings.appendChild( options.settings );
+
+			const pane = dc.createElement('div');
+			pane.className = 'nino-admin-split-preview';
+			pane.id = prefix+ '-preview';
+
+			const bar = dc.createElement('div');
+			bar.className = 'nino-admin-split-bar';
+
+			// The place in the bar for what the panel wants beside the title: the widths of the preview, a line of advice
+			const tools = dc.createElement('div');
+			tools.className = 'nino-admin-split-tools';
+
+			if( options.tools )
+				tools.appendChild( options.tools );
+
+			const preview = options.preview;
+			// An element is a slot even where it has a src of its own - an image, a frame the caller made
+			const isPage = typeof preview === 'object' && preview !== null && preview.nodeType !== 1 && typeof preview.src === 'string';
+			let frame = null;
+
+			// The preview is a page of the project itself, so only the project's own origin is
+			// loaded into the frame: a relative address, or an absolute one on this host. What
+			// the browser takes for a scheme ignores the tabs, the line breaks and the other
+			// control characters in it (java<TAB>script: runs) and takes a backslash for a
+			// slash (/\evil is //evil), so both are read the way it reads them
+			const allowed = function( src ) {
+
+				const plain = String( src ).replace( /[\u0000-\u0020]/g, '' ).replace( /\\/g, '/' );
+
+				if( /^[a-z][a-z0-9+.-]*:/i.test( plain ) === false )
+					return plain.indexOf('//') !== 0;
+
+				// The origin as the browser reads it: another scheme is another origin, and an
+				// address it cannot read is none of ours
+				try {
+					return /^https?:\/\//i.test( plain ) === true && new URL( plain, wn.location.href ).origin === wn.location.origin;
+				} catch( e ) {
+					return false;
+				}
+			};
+
+			const reload = function( src ) {
+
+				if( frame !== null ) {
+
+					const current = frame.getAttribute('src') ?? '';
+					const next = typeof src === 'string' ? src : current;
+
+					if( allowed( next ) === true ) {
+
+						// Set to the address it shows, an address with a # is not loaded: the browser
+						// takes it for a move within the page, so the frame reloads itself - when it
+						// shows exactly this page. After a click in the preview it shows another, and
+						// one of another origin cannot be asked: either way the panel's address is
+						// set. aria-busy ends with the next load
+						let same = false;
+
+						try {
+							same = frame.contentWindow.location.href === new URL( next, wn.location.href ).href;
+						} catch( e ) {}
+
+						frame.setAttribute( 'aria-busy', 'true' );
+
+						if( same === true )
+							frame.contentWindow.location.reload();
+						else
+							frame.setAttribute( 'src', next );
+					}
+				}
+
+				if( typeof options.onReload === 'function' )
+					options.onReload();
+			};
+
+			const title = Nino.adminUi.el( 'span', 'nino-admin-split-title', word('preview') );
+			const refresh = Nino.adminUi.button( '⟳', function() { reload() }, { className : 'nino-admin-btn--small', name : word('reload') } );
+
+			bar.appendChild( title );
+			bar.appendChild( tools );
+			bar.appendChild( refresh );
+			pane.appendChild( bar );
+
+			if( isPage === true ) {
+
+				frame = dc.createElement('iframe');
+				frame.className = 'nino-admin-split-frame';
+				frame.title = options.previewTitle ?? preview.title ?? word('preview');
+
+				if( typeof options.sandbox === 'string' )
+					frame.setAttribute( 'sandbox', options.sandbox );
+
+				frame.addEventListener( 'load', function() {
+					frame.removeAttribute('aria-busy');
+					if( typeof options.onLoad === 'function' )
+						options.onLoad( frame );
+				} );
+
+				pane.appendChild( frame );
+
+				if( allowed( preview.src ) === true ) {
+					frame.setAttribute( 'aria-busy', 'true' );
+					frame.setAttribute( 'src', preview.src );
+				}
+
+			} else if( typeof preview === 'object' && preview !== null ) {
+
+				const slot = preview.nodeType === 1 ? preview : preview.slot;
+				if( typeof slot === 'object' && slot !== null )
+					pane.appendChild( slot );
+			}
+
+			const switchBar = dc.createElement('div');
+			switchBar.className = 'nino-admin-steps nino-admin-steps--wide nino-admin-split-switch';
+			switchBar.setAttribute( 'role', 'group' );
+			switchBar.setAttribute( 'aria-label', word('view') );
+
+			const buttons = {
+				settings	: Nino.adminUi.button( word('settings'), null, { className : 'nino-admin-steps-step' } ),
+				preview		: Nino.adminUi.button( word('preview'), null, { className : 'nino-admin-steps-step' } ),
+			};
+
+			switchBar.appendChild( buttons.settings );
+			switchBar.appendChild( buttons.preview );
+
+			buttons.settings.setAttribute( 'aria-controls', settings.id );
+			buttons.preview.setAttribute( 'aria-controls', pane.id );
+
+			const paint = Nino.adminUi.buttonRow( buttons, root.dataset.view, function( view ) {
+				root.dataset.view = view;
+				if( typeof options.onView === 'function' )
+					options.onView( view );
+			} );
+
+			// The grid is a box of its own inside the root: the root is the container the
+			// narrow rules ask about, and a container's own box is not what they style
+			const grid = dc.createElement('div');
+			grid.className = 'nino-admin-split-grid';
+			grid.appendChild( settings );
+			grid.appendChild( pane );
+
+			// With nothing to preview there is nothing to switch to, to reload or to name
+			const solo = isPage === false && ( typeof preview !== 'object' || preview === null );
+
+			if( solo === true ) {
+				root.className += ' nino-admin-split--solo';
+				root.dataset.view = 'settings';
+				grid.removeChild( pane );
+			} else {
+				root.appendChild( switchBar );
+			}
+
+			root.appendChild( grid );
+
+			return {
+
+				el : root,
+				settings : settings,
+				preview : solo === true ? null : pane,
+				frame : frame,
+				tools : solo === true ? null : tools,
+
+				// The words of the switch and of the bar, said after the build - the frame is not touched
+				words : function( given ) {
+
+					if( given.settings !== undefined )
+						buttons.settings.textContent = given.settings;
+
+					if( given.preview !== undefined ) {
+						buttons.preview.textContent = given.preview;
+						title.textContent = given.preview;
+					}
+				},
+
+				view : function() {
+					return root.dataset.view;
+				},
+
+				show : function( view ) {
+
+					if( solo === true )
+						return;
+
+					root.dataset.view = view === 'preview' ? 'preview' : 'settings';
+					paint( root.dataset.view );
+				},
+
+				reload : reload,
+			};
+		},
+
+		/**
+		 *	A field for a colour: the hex code in a text field, the system's own
+		 *	colour picker beside it, a surface that shows the colour, and - where
+		 *	options.against names a second colour - the contrast between them as
+		 *	a number, with whether it reaches the ratio a text needs (4.5 : 1 by
+		 *	default, the level WCAG asks of ordinary text). The surface shows the
+		 *	second colour as text on this one, so the number can be checked by eye.
+		 *	The verdict is a word and a mark, not a colour alone.
+		 *
+		 *	What is typed is kept as it was typed while it is being typed: a
+		 *	valid code (#rrggbb, #rgb, the # may be left out) is taken at once and
+		 *	reported through onChange as #rrggbb; a code that is not one says so
+		 *	at the field - aria-invalid, the sentence pointed at by aria-describedby -
+		 *	and reports through onInvalid. The picker and the field follow each
+		 *	other. A short code is written out in full when the field is left. The field
+		 *	takes whatever is pasted into it - parse() alone says what is a colour, so
+		 *	#11223344 and rgb(37, 99, 235) are none, with the sentence - and trims the
+		 *	space round it. The contrast line is written once the typing has rested
+		 *	(COLOR_QUIET) for a screen reader - a copy of it in a live region of its
+		 *	own - while the line itself follows the typing; set() tells it at once and shows
+		 *	an error as a typed one would, without telling the caller; against() takes the
+		 *	way of the typing.
+		 *	The pure half, parsing and the contrast, is colorModel. Owns no
+		 *	strings, the words of the contrast and of the error apart
+		 *
+		 *	@param		{Object}		options					{ label, value, against, minimum, required, id, text, onChange, onInvalid }
+		 *														- label       the field's name
+		 *														- value       the colour at the start
+		 *														- against     the colour the contrast is measured against; none draws no contrast
+		 *														- minimum     the ratio that is enough, 4.5
+		 *														- required    the field may not be empty: an empty field is an error with the required field's sentence, and without it an empty field is no colour and no error (onChange is told '')
+		 *														- id          the text field's id, and the beginning of the ids around it
+		 *														- text        { invalid, pick, contrast, enough, short } to say the words differently
+		 *														- onChange    called with #rrggbb after a valid code, with '' after the emptying of a field that is not required
+		 *														- onInvalid   called with what stands in the field after one that is not
+		 *
+		 *	@return		{Object}										{ el, input, get(), set( value ), against( value ) } - get() is #rrggbb, or null where the field holds no colour
+		 */
+		color : function( options ) {
+
+			const model		= Nino.adminUi.colorModel;
+			const prefix	= options.id || 'nino-admin-color-'+ ( ++serial );
+			const text		= options.text || {};
+			const word		= function( key ) { return text[key] ?? Nino.adminUi.text( '/_admin/common/color/'+ key ) };
+			const minimum	= typeof options.minimum === 'number' ? options.minimum : model.ENOUGH;
+
+			const root = dc.createElement('div');
+			root.className = 'nino-admin-color';
+
+			let value = null;
+			let second = model.parse( options.against ?? '' );
+
+			const field = Nino.adminUi.textField( {
+				label : options.label, id : prefix, value : options.value ?? '', autocomplete : 'off', required : options.required === true,
+				onInput : function( typed ) { typedIn( typed, true ) },
+			} );
+
+			const input = field.querySelector('input');
+			input.spellcheck = false;
+			input.className += ' nino-admin-color-hex';
+
+			const picker = dc.createElement('input');
+			picker.type = 'color';
+			picker.className = 'nino-admin-color-picker';
+			picker.setAttribute( 'aria-label', ( options.label ? options.label+ ' – ' : '' )+ word('pick') );
+
+			const swatch = Nino.adminUi.el( 'span', 'nino-admin-color-swatch', 'Aa' );
+			swatch.setAttribute( 'aria-hidden', 'true' );
+
+			const contrast = dc.createElement('p');
+			contrast.className = 'nino-admin-color-contrast';
+			contrast.id = prefix+ '-contrast';
+			contrast.hidden = true;
+
+			// What a screen reader is told: a copy of the line in a live region of its own, written
+			// when the typing has rested - the line itself follows the typing and is no live region
+			const announce = Nino.adminUi.el( 'span', 'nino-admin-sr-only' );
+			announce.setAttribute( 'aria-live', 'polite' );
+
+			const mark = Nino.adminUi.el( 'span', 'nino-admin-color-mark' );
+			mark.setAttribute( 'aria-hidden', 'true' );
+
+			const verdict = dc.createElement('span');
+
+			contrast.appendChild( mark );
+			contrast.appendChild( verdict );
+
+			// What the field is described by: its error, and the contrast where that is shown - a
+			// hidden line that is still named is read out with the sentence that says it is stale
+			const describe = function() {
+
+				const ids = [];
+
+				if( root.querySelector('.nino-admin-field-error') !== null )
+					ids.push( prefix+ '-error' );
+
+				if( contrast.hidden === false )
+					ids.push( contrast.id );
+
+				if( ids.length === 0 )
+					input.removeAttribute('aria-describedby');
+				else
+					input.setAttribute( 'aria-describedby', ids.join(' ') );
+			};
+
+			const clear = function() {
+				const old = root.querySelector('.nino-admin-field-error');
+				if( old !== null )
+					old.remove();
+				input.removeAttribute('aria-invalid');
+			};
+
+			const write = function() {
+
+				const ratio = model.contrast( value, second );
+				const enough = ratio >= minimum;
+
+				contrast.dataset.state = enough === true ? 'ok' : 'error';
+				mark.textContent = enough === true ? '✓' : '✕';
+				verdict.textContent = Nino.adminUi.format( word('contrast'), model.truncate( ratio ) )+ ' · '+ Nino.adminUi.format( word( enough === true ? 'enough' : 'short' ), minimum );
+				contrast.hidden = false;
+				describe();
+			};
+
+			let quiet = null;
+
+			// The line is seen as it is typed; what is read out is written once the typing has rested -
+			// a code typed digit by digit, or a picker dragged beside it, passes through many valid ones
+			const settle = function( now ) {
+
+				wn.clearTimeout( quiet );
+				quiet = null;
+
+				if( value === null || second === null ) {
+					contrast.hidden = true;
+					announce.textContent = '';
+					return;
+				}
+
+				write();
+
+				if( now === true )
+					announce.textContent = verdict.textContent;
+				else
+					quiet = wn.setTimeout( function() { announce.textContent = verdict.textContent }, Nino.adminUi.COLOR_QUIET );
+			};
+
+			const draw = function( now ) {
+
+				// What is not a colour is not written anywhere: the picker keeps the last one it showed
+				if( value !== null ) {
+					picker.value = value;
+					swatch.style.backgroundColor = value;
+					swatch.style.color = second ?? value;
+				}
+
+				swatch.hidden = value === null;
+				settle( now );
+				describe();
+			};
+
+			// What is in the field, by hand (typed or picked: the caller is told) or put there (it is not)
+			const typedIn = function( typed, byHand ) {
+
+				clear();
+
+				const parsed = model.parse( typed );
+
+				if( parsed === null ) {
+
+					value = null;
+					draw( true );
+
+					if( typed.trim() === '' && options.required !== true ) {
+						if( byHand === true && typeof options.onChange === 'function' )
+							options.onChange( '' );
+						return;
+					}
+
+					Nino.adminUi.fieldError( field, input, prefix+ '-error', typed.trim() === '' ? Nino.adminUi.text('/_admin/common/error/required') : word('invalid') );
+					describe();
+
+					if( byHand === true && typeof options.onInvalid === 'function' )
+						options.onInvalid( typed );
+
+					return;
+				}
+
+				value = parsed;
+				draw( byHand !== true );
+
+				if( byHand === true && typeof options.onChange === 'function' )
+					options.onChange( parsed );
+			};
+
+			picker.addEventListener( 'input', function() {
+				input.value = picker.value;
+				typedIn( picker.value, true );
+			} );
+
+			// A short code is the long one when the person is done with the field
+			input.addEventListener( 'change', function() {
+				if( value !== null )
+					input.value = value;
+			} );
+
+			root.appendChild( field );
+			root.appendChild( picker );
+			root.appendChild( swatch );
+			root.appendChild( contrast );
+			root.appendChild( announce );
+
+			typedIn( String( options.value ?? '' ), false );
+
+			return {
+
+				el : root,
+				input : input,
+
+				get : function() {
+					return value;
+				},
+
+				set : function( next ) {
+					input.value = next ?? '';
+					typedIn( String( next ?? '' ), false );
+				},
+
+				against : function( next ) {
+					second = model.parse( next ?? '' );
+					draw( false );
+				},
+			};
+		},
+
+		/**
+		 *	The pure half of color(): what is a colour, how light it is, how far
+		 *	two colours are apart. Needs no DOM, so it is tested on its own and a
+		 *	panel that has colours without a field (the pairs a palette is made
+		 *	of) asks it the same questions
+		 *
+		 *	  - ENOUGH       4.5, the ratio WCAG 2.1 asks of ordinary text (AA)
+		 *	  - parse        #rrggbb of a code written #rrggbb, rrggbb, #rgb or rgb, in either
+		 *	                 case, or null for anything else - a name, rgb(), an alpha, a number
+		 *	  - luminance    the relative luminance of a code parse() accepts, 0 to 1
+		 *	  - contrast     the contrast ratio of two codes, 1 to 21, or null where one is none
+		 *	  - truncate     a ratio cut - not rounded - to two decimals: 4.499 is written 4.49,
+		 *	                 so that a number that reads as enough is enough
+		 */
+		colorModel : {
+
+			ENOUGH : 4.5,
+
+			parse : function( text ) {
+
+				const found = typeof text === 'string' ? /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec( text.trim() ) : null;
+
+				if( found === null )
+					return null;
+
+				const code = found[1].length === 3 ? found[1].replace( /./g, '$&$&' ) : found[1];
+
+				return '#'+ code.toLowerCase();
+			},
+
+			luminance : function( code ) {
+
+				const hex = Nino.adminUi.colorModel.parse( code );
+				if( hex === null )
+					return null;
+
+				const channel = function( at ) {
+					const value = parseInt( hex.slice( at, at + 2 ), 16 ) / 255;
+					return value <= 0.03928 ? value / 12.92 : Math.pow( ( value + 0.055 ) / 1.055, 2.4 );
+				};
+
+				return 0.2126 * channel( 1 ) + 0.7152 * channel( 3 ) + 0.0722 * channel( 5 );
+			},
+
+			contrast : function( first, second ) {
+
+				const one = Nino.adminUi.colorModel.luminance( first );
+				const two = Nino.adminUi.colorModel.luminance( second );
+
+				if( one === null || two === null )
+					return null;
+
+				return ( Math.max( one, two ) + 0.05 ) / ( Math.min( one, two ) + 0.05 );
+			},
+
+			truncate : function( ratio ) {
+				return Math.floor( ratio * 100 + 1e-9 ) / 100;
+			},
+		},
+
 
 		/**
 		 *	The lifecycle of a panel, from a spec: when the panel asks the server

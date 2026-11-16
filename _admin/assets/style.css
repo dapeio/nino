@@ -1795,15 +1795,21 @@ a {
 	color: var(--editor-text);
 	background: var(--editor-bg-elevated) !important;
 }
-:where(.nino-admin) .nino-admin-tab:last-child {
+:where(.nino-admin) .nino-admin-tab:last-child,
+:where(.nino-admin) .nino-admin-steps-step:last-child {
 	border-right:none;
 }
-:where(.nino-admin) .nino-admin-tab.is-active {
+:where(.nino-admin) .nino-admin-tab.is-active,
+:where(.nino-admin) .nino-admin-steps-step.is-active {
 	background-color: var(--editor-blue);
 	color: var(--nino-admin-active-text);
 }
 
-:where(.nino-admin) .nino-admin-tab:focus-visible {
+/* The steps of a strip and the heads of an accordion are drawn inside a clipped box
+   (the strip's and the accordion's rounded edge), where a ring outside would be cut */
+:where(.nino-admin) .nino-admin-tab:focus-visible,
+:where(.nino-admin) .nino-admin-steps-step:focus-visible,
+:where(.nino-admin) .nino-admin-accordion-button:focus-visible {
 	outline: 2px solid var(--editor-blue);
 	outline-offset: -2px;
 }
@@ -1812,6 +1818,7 @@ a {
    drawn in: blue on blue shows nothing of the keyboard's focus, so its ring is
    the ink of an active tab, inside the blue. A --bar tab has no fill and keeps
    the blue one */
+:where(.nino-admin) .nino-admin-steps-step.is-active:focus-visible,
 :where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--bar) .nino-admin-tab.is-active:focus-visible {
 	outline-color: var(--nino-admin-active-text);
 	outline-offset: -4px;
@@ -3128,6 +3135,351 @@ a {
 	.nino-admin .nino-admin-field textarea {
 		min-height: 3.4rem;
 	}
+}
+
+/* ------------------------------------------------------ Building blocks */
+
+/* The accordion: heads that open the section under them (Nino.adminUi.accordion()).
+   The head is a button over the whole width, so that the whole row is the target;
+   the open one is the page's own colour and the word in blue, the closed ones sit
+   on the muted ground with their summary at the right. An accordion in a section
+   of another is drawn without the frame it would double. */
+:where(.nino-admin) .nino-admin-accordion {
+	min-width: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	overflow: hidden;
+}
+
+:where(.nino-admin) .nino-admin-accordion-body .nino-admin-accordion {
+	border-width: 1px 0 0;
+	border-radius: 0;
+}
+
+:where(.nino-admin) .nino-admin-accordion-head {
+	margin: 0;
+	border-top: 1px solid var(--editor-separator);
+	font-size: inherit;
+}
+
+:where(.nino-admin) .nino-admin-accordion > :first-child {
+	border-top: 0;
+}
+
+:where(.nino-admin) .nino-admin-accordion-button {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	width: 100%;
+	padding: .3rem .75rem;
+	border-radius: 0;
+	background: var(--nino-admin-surface-muted);
+	box-shadow: none;
+	color: var(--editor-text);
+	font-weight: 700;
+	text-align: left;
+}
+
+:where(.nino-admin) .nino-admin-accordion-head.is-open > .nino-admin-accordion-button {
+	background: var(--editor-bg-elevated);
+	color: var(--editor-blue);
+	cursor: default;
+}
+
+:where(.nino-admin) .nino-admin-accordion-label {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-accordion-summary {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	font-weight: 400;
+	text-align: right;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-accordion-badge[hidden],
+:where(.nino-admin) .nino-admin-accordion-summary[hidden] {
+	display: none;
+}
+
+/* The chevron stays at the right edge whether or not there is a summary to push it */
+:where(.nino-admin) .nino-admin-accordion-chevron {
+	margin-left: auto;
+	flex: 0 0 auto;
+}
+
+:where(.nino-admin) .nino-admin-accordion-summary:not([hidden]) + .nino-admin-accordion-chevron {
+	margin-left: 0;
+}
+
+:where(.nino-admin) .nino-admin-accordion-body {
+	padding: .65rem .75rem;
+	border-top: 1px solid var(--editor-separator);
+}
+
+:where(.nino-admin) .nino-admin-accordion-body[hidden] {
+	display: none;
+}
+
+/* The steps: a strip of a few values, one chosen (Nino.adminUi.steps()). The
+   chosen step is filled the way an active tab is, and the default has a dot under
+   its word, which a screen reader gets as "(Default)" in the step's name. The
+   ring is drawn inside, where the strip's clipped edge cannot cut it (see the
+   rules of the tabs above, which the steps share: the fill, the last edge, the ring). */
+:where(.nino-admin) .nino-admin-steps {
+	display: inline-flex;
+	max-width: 100%;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	overflow: hidden;
+}
+
+:where(.nino-admin) .nino-admin-steps--wide {
+	display: flex;
+}
+
+:where(.nino-admin) .nino-admin-steps-step {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 2.4rem;
+	min-height: 2.2rem;
+	padding: 0 .55rem;
+	border-right: 1px solid var(--editor-separator);
+	border-radius: 0;
+	box-shadow: none;
+	font-size: .82rem;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The chosen step takes the fill of an active tab (the rule above, shared), so the
+   others are the ones that are given a ground: this rule comes after it and would win */
+:where(.nino-admin) .nino-admin-steps-step:not(.is-active) {
+	background: none;
+	color: var(--editor-text);
+}
+
+:where(.nino-admin) .nino-admin-steps-step.is-active {
+	font-weight: 700;
+}
+
+:where(.nino-admin) .nino-admin-steps-step[data-standard="true"]::after {
+	content: "";
+	position: absolute;
+	bottom: .2rem;
+	left: 50%;
+	width: .28rem;
+	height: .28rem;
+	margin-left: -.14rem;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+
+/* The split view: settings and a preview (Nino.adminUi.split()). The root is the
+   container, so that "narrow" is the width the view has - the pane beside the
+   rail - and not the window's; where it is too narrow for both, the switch is
+   drawn and one of the two is shown. Both stay in the page, so a switch loses
+   nothing. The switch is a strip of steps, and comes after them in this file so
+   that its display wins over the strip's. */
+:where(.nino-admin) .nino-admin-split {
+	container: nino-split / inline-size;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-split-switch {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-split-grid {
+	display: grid;
+	grid-template-columns: minmax(18rem, 23rem) minmax(0, 1fr);
+	gap: 1rem;
+	align-items: start;
+}
+
+:where(.nino-admin) .nino-admin-split--solo > .nino-admin-split-grid {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+:where(.nino-admin) .nino-admin-split-settings {
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-split-preview {
+	min-width: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	overflow: hidden;
+}
+
+:where(.nino-admin) .nino-admin-split-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .5rem;
+	padding: .3rem .6rem;
+	border-bottom: 1px solid var(--editor-separator);
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-split-tools {
+	display: flex;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .35rem;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-split-tools:empty {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-split-frame {
+	display: block;
+	width: 100%;
+	height: clamp(20rem, 70vh, 48rem);
+	border: 0;
+	background: #fff;
+}
+
+/* Forced colours drop every background: the chosen step and the dot of the default are drawn in
+   the system's highlight, so that the strip still says where it is */
+@media (forced-colors: active) {
+
+	:where(.nino-admin) .nino-admin-steps-step.is-active {
+		forced-color-adjust: none;
+		background: Highlight;
+		color: HighlightText;
+	}
+
+	:where(.nino-admin) .nino-admin-steps-step[data-standard="true"]::after {
+		forced-color-adjust: none;
+		background: ButtonText;
+	}
+
+	:where(.nino-admin) .nino-admin-steps-step.is-active[data-standard="true"]::after {
+		background: HighlightText;
+	}
+}
+
+@container nino-split (max-width: 44rem) {
+
+	.nino-admin .nino-admin-split-switch {
+		display: flex;
+		margin-bottom: .75rem;
+	}
+
+	.nino-admin .nino-admin-split-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split[data-view="settings"] > .nino-admin-split-grid > .nino-admin-split-preview,
+	.nino-admin .nino-admin-split[data-view="preview"] > .nino-admin-split-grid > .nino-admin-split-settings {
+		display: none;
+	}
+}
+
+/* The colour field: the hex code, the picker and the surface in a row, the
+   sentence of an error and the contrast under it (Nino.adminUi.color()). The
+   rows are named, since fieldError() puts its sentence after the label, which
+   is the picker's place in the document. The verdict is a mark and words;
+   the colour only supports them. */
+:where(.nino-admin) .nino-admin-color {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	gap: 0 .5rem;
+	align-items: end;
+	margin: 0 0 .72rem;
+}
+
+:where(.nino-admin) .nino-admin-color > .nino-admin-field {
+	grid-column: 1;
+	grid-row: 1;
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-color-hex {
+	font-family: var(--nino-admin-mono);
+}
+
+:where(.nino-admin) .nino-admin-color-picker {
+	grid-column: 2;
+	grid-row: 1;
+	width: 3rem;
+	height: var(--nino-admin-control-height);
+	padding: .2rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-color-picker::-webkit-color-swatch-wrapper {
+	padding: 0;
+}
+
+/* One rule each: a selector list with a pseudo-element the browser does not know is dropped whole */
+:where(.nino-admin) .nino-admin-color-picker::-webkit-color-swatch {
+	border: 0;
+	border-radius: 4px;
+}
+
+:where(.nino-admin) .nino-admin-color-picker::-moz-color-swatch {
+	border: 0;
+	border-radius: 4px;
+}
+
+:where(.nino-admin) .nino-admin-color-swatch {
+	grid-column: 3;
+	grid-row: 1;
+	display: grid;
+	place-items: center;
+	min-width: 3.4rem;
+	height: var(--nino-admin-control-height);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	font-weight: 700;
+}
+
+:where(.nino-admin) .nino-admin-color-swatch[hidden],
+:where(.nino-admin) .nino-admin-color-contrast[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-color > .nino-admin-field-error {
+	grid-column: 1 / -1;
+	grid-row: 2;
+	margin: .3rem 0 0;
+}
+
+:where(.nino-admin) .nino-admin-color-contrast {
+	display: flex;
+	grid-column: 1 / -1;
+	grid-row: 3;
+	gap: .4rem;
+	margin: .4rem 0 0;
+	font-size: .78rem;
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-color-contrast[data-state="ok"] {
+	color: var(--editor-green);
+}
+
+:where(.nino-admin) .nino-admin-color-contrast[data-state="error"] {
+	color: var(--editor-red-ink);
 }
 
 /* --------------------------------------------------------------- Mobile */

@@ -83,6 +83,19 @@ return [
 	'[[/_admin/common/label/prevpage]]'	=> 'Vorherige Seite',
 	'[[/_admin/common/label/nextpage]]'	=> 'Nächste Seite',
 	'[[/_admin/common/label/perpage]]'	=> 'Zeilen pro Seite',
+	// Die Wörter der Bausteine, die selbst welche zeichnen: Umschalter und
+	// Neuladen der geteilten Ansicht, Fehler und Urteil des Farbfelds, die
+	// Vorgabe der Stufenwahl (siehe Nino.adminUi.split(), color() und steps())
+	'[[/_admin/common/label/default]]'	=> 'Vorgabe',
+	'[[/_admin/common/split/view]]'	=> 'Ansicht',
+	'[[/_admin/common/split/settings]]'	=> 'Einstellungen',
+	'[[/_admin/common/split/preview]]'	=> 'Vorschau',
+	'[[/_admin/common/split/reload]]'	=> 'Vorschau neu laden',
+	'[[/_admin/common/color/pick]]'	=> 'Farbe wählen',
+	'[[/_admin/common/color/invalid]]'	=> 'Gib eine Farbe als #rrggbb oder #rgb ein.',
+	'[[/_admin/common/color/contrast]]'	=> 'Kontrast %s : 1',
+	'[[/_admin/common/color/enough]]'	=> 'reicht (ab %s : 1)',
+	'[[/_admin/common/color/short]]'	=> 'reicht nicht (ab %s : 1)',
 	'[[/_admin/common/msg/saving]]'			=> 'Wird gespeichert …',
 	'[[/_admin/common/msg/saved]]'			=> 'Gespeichert.',
 	'[[/_admin/common/msg/deleting]]'		=> 'Wird gelöscht …',
