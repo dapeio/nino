@@ -461,8 +461,10 @@ namespace Nino {
 		 *	- no [[: a textfill is a text of the project, and so is what a fixed text would fill in
 		 *	- every call is of a component named in $names - those of its own feature and of the feature that comes with the kernel
 		 *	- no source that names something of the project: a call has none, but a picture that is one of
-		 *	  \Nino\Images::PLACEHOLDERS - and no value of an attribute that begins like a reference (~, / or .), which a
-		 *	  text, a link or a picture would read as one, unless it is such a picture
+		 *	  \Nino\Images::PLACEHOLDERS or the type of elements that is one of \Nino\Elements::PLACEHOLDERS - and no value of
+		 *	  an attribute that begins like a reference (~, / or .), which a text, a link or a picture would read as one, unless it
+		 *	  is such a picture. Below a call of that type, and only there, a source or a value that is a dot and the name of
+		 *	  a field of its model - .title - is the field of the element of the round
 		 *
 		 *	\Nino\Features::readComponents() asks it of the demo of every group
 		 *
@@ -503,10 +505,11 @@ namespace Nino {
 		 *
 		 *	@param		array			$nodes				What \Nino\Markup::parse() answered
 		 *	@param		array			$names				The names a call may have
+		 *	@param		string|null	$type					The type of elements of the call these are below, null outside of one
 		 *
 		 *	@return 	string|null								The first thing that is wrong, null where nothing is
 		 */
-		private static function _demoNodes( array $nodes, array $names ): ?string {
+		private static function _demoNodes( array $nodes, array $names, ?string $type = null ): ?string {
 
 			foreach( $nodes as $node ) {
 
@@ -516,20 +519,37 @@ namespace Nino {
 				if( in_array( $node['n'], $names, true ) === false )
 					return 'calls "'. self::_shown( $node['n'] ). '", which is no component of its feature or of basis';
 
-				if( $node['s'] !== '' && isset( \Nino\Images::PLACEHOLDERS[$node['s']] ) === false )
+				$loop = isset( \Nino\Elements::PLACEHOLDERS[$node['s']] ) === true;
+				$inside = $loop === true ? $node['s'] : $type;
+
+				if( $node['s'] !== '' && $loop === false && isset( \Nino\Images::PLACEHOLDERS[$node['s']] ) === false && self::_demoField( $node['s'], $type ) === false )
 					return 'gives "'. self::_shown( $node['n'] ). '" a source - '. self::_shown( $node['s'] ). ' - which is a text, a field or a picture of the project\'s';
 
 				foreach( $node['a'] as $attribute => $value )
-					if( is_string( $value ) === true && $value !== '' && strpos( '~/.', $value[0] ) !== false && isset( \Nino\Images::PLACEHOLDERS[$value] ) === false )
+					if( is_string( $value ) === true && $value !== '' && strpos( '~/.', $value[0] ) !== false && isset( \Nino\Images::PLACEHOLDERS[$value] ) === false && self::_demoField( $value, $type ) === false )
 						return 'gives "'. self::_shown( $node['n'] ). '" a value for "'. self::_shown( (string) $attribute ). '" that begins like a reference of the project\'s';
 
-				$problem = is_array( $node['c'] ?? null ) === true ? self::_demoNodes( $node['c'], $names ) : null;
+				$problem = is_array( $node['c'] ?? null ) === true ? self::_demoNodes( $node['c'], $names, $inside ) : null;
 
 				if( $problem !== null )
 					return $problem;
 			}
 
 			return null;
+		}
+
+		/**
+		 *	Whether a source or a value of a demo is a field of the element of a round: a dot and the name of a field of the
+		 *	model of the type of elements the call around it has, which is one of \Nino\Elements::PLACEHOLDERS
+		 *
+		 *	@param		string			$reference			As it is written
+		 *	@param		string|null	$type					The type of the loop the call stands in; null outside of one
+		 *
+		 *	@return 	bool
+		 */
+		private static function _demoField( string $reference, ?string $type ): bool {
+
+			return $type !== null && $reference !== '' && $reference[0] === '.' && isset( \Nino\Elements::PLACEHOLDERS[$type]['model'][substr( $reference, 1 )] ) === true;
 		}
 
 		/**

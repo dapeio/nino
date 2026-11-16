@@ -1668,5 +1668,27 @@ check( '...a text of more than a template is too long, and one of that length is
 check( '...and not a container that a list of kinds says is a leaf, whose end is then stray', str_contains( (string) \Nino\Components::demoProblem( '[a]x[/a]', $names, [ 'a' => false ] ), 'stray-end' ) );
 check( '...a name that is a prefix of one of the names, or its capitals, is none', \Nino\Components::demoProblem( '[ab]', $names ) !== null && \Nino\Components::demoProblem( '[A]', $names ) === null && \Nino\Components::demoProblem( '[a-]', $names ) !== null );
 
+// The type of elements the kernel brings, in a demo
+$loopType = array_key_first( \Nino\Elements::PLACEHOLDERS );
+$loopFields = array_keys( \Nino\Elements::PLACEHOLDERS[$loopType]['model'] );
+$loopKinds = [ 'a' => true, 'b' => false ];
+check( 'a demo may loop the kernel\'s type of elements: the call names it, and a child takes a field of its model as its source and in an attribute',
+	\Nino\Components::demoProblem( '[a '. $loopType. '][b .'. $loopFields[0]. '][b text=".'. $loopFields[1]. '"][/a]', $names, $loopKinds ) === null
+	&& \Nino\Components::demoProblem( '[a '. $loopType. ' sort="-'. $loopFields[2]. '" limit="3"][a][b .'. $loopFields[0]. '][/a][/a]', $names, $loopKinds ) === null
+	&& array_filter( $loopFields, static fn( string $field ): bool => \Nino\Components::demoProblem( '[a '. $loopType. '][b .'. $field. '][/a]', $names, $loopKinds ) !== null ) === [] );
+check( '...a field outside the loop, after it and before it, is a reference of the project\'s',
+	str_contains( (string) \Nino\Components::demoProblem( '[b .'. $loopFields[0]. ']', $names, $loopKinds ), 'source' )
+	&& str_contains( (string) \Nino\Components::demoProblem( '[a '. $loopType. '][/a][b .'. $loopFields[0]. ']', $names, $loopKinds ), 'source' )
+	&& str_contains( (string) \Nino\Components::demoProblem( '[b text=".'. $loopFields[0]. '"][a '. $loopType. '][/a]', $names, $loopKinds ), 'value' ) );
+check( '...a field the model does not have, the number, the slug and the uri of the round, its fields in other letters or with other marks before them are none either',
+	array_filter( [ '.nothing', '.id', '.slug', '.uri', '..'. $loopFields[0], '.'. strtoupper( $loopFields[0] ), '.'. $loopFields[0]. '.x', '/'. $loopFields[0], '~'. $loopFields[0] ], static fn( string $reference ): bool => \Nino\Components::demoProblem( '[a '. $loopType. '][b '. $reference. '][/a]', $names, $loopKinds ) === null || \Nino\Components::demoProblem( '[a '. $loopType. '][b text="'. $reference. '"][/a]', $names, $loopKinds ) === null ) === [] );
+check( '...another type of elements, a project\'s type inside the loop and the name of the type as a value, none either',
+	str_contains( (string) \Nino\Components::demoProblem( '[a /services][b .'. $loopFields[0]. '][/a]', $names, $loopKinds ), 'source' )
+	&& str_contains( (string) \Nino\Components::demoProblem( '[a '. $loopType. '][a /services][/a][/a]', $names, $loopKinds ), 'source' )
+	&& str_contains( (string) \Nino\Components::demoProblem( '[a '. $loopType. '][b text="'. $loopType. '"][/a]', $names, $loopKinds ), 'value' )
+	&& str_contains( (string) \Nino\Components::demoProblem( '[a '. $loopType. 'x][/a]', $names, $loopKinds ), 'source' ) );
+check( '...a textfill stays one, in the loop as outside of it',
+	str_contains( (string) \Nino\Components::demoProblem( '[a '. $loopType. '][b text="[['. $loopFields[0]. ']]"][/a]', $names, $loopKinds ), '[[' ) );
+
 $none = [];
 ninoDone( $none );

@@ -177,6 +177,9 @@ check( 'apiCreate starts with an empty shell, no fabricated content', $created['
 
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'brandnewtype', 'title' => 'Brand New', 'model' => [ 'headline' => [ 'type' => 'string' ] ] ] );
 check( 'apiCreate rejects an already-existing type', $status === 409 );
+$kernelType = trim( (string) array_key_first( \Nino\Elements::PLACEHOLDERS ), '/' );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => $kernelType, 'title' => 'Mine', 'model' => [ 'headline' => [ 'type' => 'string' ] ] ] );
+check( 'apiCreate takes no type of the name the kernel\'s own type has, and writes no file for it', $status === 400 && file_exists( $sandbox. '/private/elements/'. $kernelType. '.php' ) === false && in_array( $kernelType, \Nino\Modules\Elements\Admin::types( $appData ), true ) === false );
 
 // --- element reference fields ---
 //

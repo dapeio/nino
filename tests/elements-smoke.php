@@ -1469,6 +1469,114 @@ check( 'the keys a write is told it wrote are the keys of the model: not the uri
 
 echo "\n";
 
+// --- The type of elements the kernel brings ---------------------------------
+
+echo "The placeholder type: read from the constant, written by nothing\n";
+
+$bare = ninoSandbox( 'elements-placeholder' );
+$bareDir = ninoSandboxDir( $bare );
+\Nino\Modules\Elements::init( $bare );
+$placeholderType = array_key_first( \Nino\Elements::PLACEHOLDERS );
+$placeholderFile = $bareDir. '/private/elements/'. trim( $placeholderType, '/' ). '.php';
+$placeholderTitles = static fn( array $elements ): array => array_column( $elements, 'title' );
+ninoWarnings();
+
+check( 'the constant is one type file: a model of valid fields, six elements below the global bucket, every value a value its field accepts',
+	count( \Nino\Elements::PLACEHOLDERS ) === 1 && preg_match( '#^/[A-Za-z_][A-Za-z0-9_-]*$#', $placeholderType ) === 1
+	&& is_array( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'] ?? null ) === true && count( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'] ) >= 4
+	&& array_filter( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'], static fn( array $field ): bool => in_array( $field['type'], \Nino\Elements::FIELD_TYPES, true ) === false || ( $field['locale'] ?? false ) !== false ) === []
+	&& count( array_diff_key( \Nino\Elements::PLACEHOLDERS[$placeholderType]['*'], [ '*' => true ] ) ) === 6
+	&& ( static function() use ( $placeholderType ): bool {
+
+		foreach( array_diff_key( \Nino\Elements::PLACEHOLDERS[$placeholderType]['*'], [ '*' => true ] ) as $id => $values ) {
+
+			if( array_keys( $values ) !== array_keys( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'] ) || preg_match( '/^[a-z0-9-]+$/', (string) $id ) !== 1 )
+				return false;
+
+			foreach( $values as $key => $value )
+				if( \Nino\Elements::valueError( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'][$key], $value, (string) $key, $placeholderType. '/'. $id ) !== null )
+					return false;
+		}
+
+		return true;
+	} )() );
+
+check( 'a project with no type at all reads it: the model, six elements, each by its uri, in the language of the page and in every other',
+	( is_dir( $bareDir. '/private/elements' ) === false || glob( $bareDir. '/private/elements/*.php' ) === [] )
+	&& array_keys( \Nino\Elements::getElementModel( $bare, $placeholderType ) ) === array_keys( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'] )
+	&& count( \Nino\Elements::queryElements( $bare, $placeholderType, [] ) ) === 6
+	&& ( \Nino\Elements::getElement( $bare, $placeholderType. '/one' )['.uri'] ?? '' ) === $placeholderType. '/one'
+	&& \Nino\Elements::getElement( $bare, $placeholderType. '/one', 'de_DE' )['title'] === \Nino\Elements::getElement( $bare, $placeholderType. '/one', 'en_US' )['title']
+	&& \Nino\Elements::getElement( $bare, $placeholderType. '/nothing' ) === false && ninoWarnings() === [] );
+
+$allTitles = $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType ], true ) );
+$byTitle = $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => 'title' ], true ) );
+$byTitleDown = $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => '-title' ], true ) );
+$byPrice = array_column( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => 'price' ], true ), 'price' );
+$byDate = array_column( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => '-date' ], true ), 'date' );
+$expectedTitles = $allTitles;
+usort( $expectedTitles, 'strnatcasecmp' );
+$expectedPrices = $byPrice;
+sort( $expectedPrices );
+$expectedDates = $byDate;
+rsort( $expectedDates );
+check( 'the loop of a call reads it: sort puts the titles in order and the prices and the dates in theirs, and the three orders differ',
+	count( $allTitles ) === 6 && $byTitle === $expectedTitles && array_reverse( $byTitle ) === $byTitleDown && $byPrice === $expectedPrices && $byDate === $expectedDates
+	&& $byTitle !== $allTitles && count( array_unique( [ implode( '|', $byTitle ), implode( '|', $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => 'price' ], true ) ) ), implode( '|', $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => '-date' ], true ) ) ) ] ) ) === 3 );
+check( '...its titles differ in length, so that a list and a table have a short row and a long one',
+	max( array_map( 'strlen', $allTitles ) ) >= 2 * min( array_map( 'strlen', $allTitles ) ) && count( array_unique( array_map( 'strlen', array_column( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType ], true ), 'text' ) ) ) ) === 6 );
+
+$page = $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => 'title', 'offset' => 1, 'limit' => 2 ], true ) );
+check( 'limit and offset cut what is sorted, as they cut a type of the project', $page === array_slice( $byTitle, 1, 2 ) && count( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'limit' => 4 ], true ) ) === 4 && count( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'offset' => 5 ], true ) ) === 1 );
+check( 'a query keeps what matches: a start of a text, a whole number, and nothing for a value no element has',
+	count( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'query' => 'title=Item%' ], true ) ) === 2 && count( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'query' => 'price=3' ], true ) ) === 1
+	&& \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'query' => 'title=nobody' ], true ) === [] && ninoWarnings() === [] );
+check( 'the shortcode that draws a loop draws one round for each element it is given',
+	substr_count( \Nino\Html::renderHtml( $bare, '['. 'elements '. $placeholderType. ' sort="title" limit="4"]<i>[[title]]</i>[/elements]' ), '<i>' ) === 4 && ninoWarnings() === [] );
+
+$counted = [];
+$beforeSeed = glob( $bareDir. '/private/elements/*.php' ) ?: [];
+check( 'values of a field are read of it: the distinct prices of the elements are those of the constant', count( \Nino\Elements::queryElementValues( $bare, $placeholderType, 'price' ) ) === 6 && \Nino\Elements::queryElementValues( $bare, $placeholderType, 'nothing', [], '', false ) === false );
+
+// Before a file of the project has the name: the type is not made, and nothing is left on the disk for it
+ninoWarnings();
+$madeType = \Nino\Elements::insertElementType( $bare, $placeholderType, [ 'title' => [ 'type' => 'string' ] ] );
+check( 'the type is not inserted where nothing of the name is on the disk, and no file is written for it, said once in the log', $madeType === false && file_exists( $placeholderFile ) === false && count( ninoWarnings() ) === 1 && count( \Nino\Elements::queryElements( $bare, $placeholderType, [] ) ) === 6 );
+
+// A file of the project with the same name is nobody's: it is not read, and nothing writes it
+mkdir( dirname( $placeholderFile ), 0777, true );
+file_put_contents( $placeholderFile, '<?php return '. var_export( [ 'model' => [ 'title' => [ 'type' => 'string' ] ], '*' => [ '*' => [], 'mine' => [ 'title' => 'Mine' ] ] ], true ). ';' );
+$placeholderHash = md5_file( $placeholderFile );
+$bare['./nino/elements/cache'] = [];
+check( 'a file of the project that has the name of the type is never read: the type answers as it did, and its element is none of the file',
+	count( \Nino\Elements::queryElements( $bare, $placeholderType, [] ) ) === 6 && \Nino\Elements::getElement( $bare, $placeholderType. '/mine' ) === false && count( \Nino\Elements::getElementModel( $bare, $placeholderType ) ) === count( \Nino\Elements::PLACEHOLDERS[$placeholderType]['model'] ) );
+
+ninoWarnings();
+$writes = [
+	\Nino\Elements::insertElement( $bare, $placeholderType. '/seven', [ 'title' => 'Seven' ] ),
+	\Nino\Elements::updateElement( $bare, $placeholderType. '/one', [ 'title' => 'Changed' ] ),
+	\Nino\Elements::updateElement( $bare, $placeholderType. '/one', [ 'title' => 'Changed' ], 'de_DE' ),
+	\Nino\Elements::deleteElement( $bare, $placeholderType. '/one' ),
+	\Nino\Elements::insertElementType( $bare, $placeholderType, [ 'title' => [ 'type' => 'string' ] ] ),
+];
+$writeWarnings = ninoWarnings();
+check( 'no way of writing knows the type: an element is neither inserted, updated nor deleted, the type is not inserted, each said once in the log',
+	$writes === [ false, false, false, false, false ] && count( $writeWarnings ) === 5 && md5_file( $placeholderFile ) === $placeholderHash );
+check( '...nor does the seed of a feature: it refuses the name and writes nothing', is_string( \Nino\Elements::seed( $bare, $placeholderType, [ 'model' => [ 'title' => [ 'type' => 'string' ] ] ], [ 'en_US' ] ) ) && md5_file( $placeholderFile ) === $placeholderHash && count( \Nino\Elements::queryElements( $bare, $placeholderType, [] ) ) === 6 );
+check( '...and what it holds is what it held', $placeholderTitles( \Nino\Modules\Elements::queryLoop( $bare, [ $placeholderType, 'sort' => 'title' ], true ) ) === $byTitle );
+
+unlink( $placeholderFile );
+check( 'it is no type of the project: the types the workbench lists are the files of the project, and the type is among none of them',
+	in_array( trim( $placeholderType, '/' ), \Nino\Modules\Elements\Admin::types( $bare ), true ) === false && \Nino\Modules\Elements\Admin::types( $bare ) === [] && \Nino\Modules\Elements\Admin::types( $appData ) !== []
+	&& in_array( trim( $placeholderType, '/' ), \Nino\Modules\Elements\Admin::types( $appData ), true ) === false );
+$validTypeName = new ReflectionMethod( \Nino\Modules\Elements\Types::class, 'isValidTypeUri' );
+check( '...and no project can have one of its name: the workbench takes no type with it, its name is none of the form of a type of a project',
+	$validTypeName->invoke( null, trim( $placeholderType, '/' ) ) === false && $validTypeName->invoke( null, 'services' ) === true );
+
+
+
+echo "\n";
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

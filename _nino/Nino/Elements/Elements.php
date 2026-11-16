@@ -25,6 +25,37 @@ namespace Nino {
 		// - which seed() never creates again. See Modules\Legal::callbackCommitted()
 		public const string REMOVED = '/nino/elements/removed';
 
+		// The one type of elements the kernel brings, for a reference that no project has a type for: the demo of a group (a piece of a
+		// page of components, see \Nino\Components::demoProblem()) has a loop to draw and no type of a project to name. It is a type file
+		// as the disk holds one - the model and the global bucket, every field global, so that it reads the same in any language of the
+		// site and whatever types the project has - answered by getElementFile() before the disk is asked, and by no write: a type
+		// file of the project with the same name is never read and never written. The name has one segment like the type of a
+		// project, which keeps the splitting of '/<type>/<slug>' as it is, and begins with an underscore, which no type of a
+		// project may (the workbench takes a letter first), so that the project can neither have such a type nor name one like it.
+		// The six elements differ in the length of their texts and in every sortable field, and their titles, dates and prices
+		// have different orders
+		public const array PLACEHOLDERS = [
+			'/_placeholder' => [
+				'title'		=> 'Placeholder elements',
+				'model'		=> [
+					'title'		=> [ 'type' => 'string' ],
+					'text'		=> [ 'type' => 'string' ],
+					'date'		=> [ 'type' => 'date' ],
+					'price'		=> [ 'type' => 'double' ],
+					'link'		=> [ 'type' => 'string' ],
+				],
+				'*'				=> [
+					'*'				=> [],
+					'one'			=> [ 'title' => 'Harbour Lights', 'text' => 'A short walk along the quay at dusk.', 'date' => '2026-03-14', 'price' => 24.5, 'link' => '#' ],
+					'two'			=> [ 'title' => 'Atlas of Quiet Places', 'text' => 'Forty maps of the valleys, lakes and old railway lines that the guidebooks leave out, each with a note on the best hour to arrive and the quickest way home again.', 'date' => '2025-11-02', 'price' => 9.0, 'link' => '#' ],
+					'three'		=> [ 'title' => 'Zinc and Linen', 'text' => 'Notes on a workshop.', 'date' => '2026-01-29', 'price' => 120.0, 'link' => '#' ],
+					'four'		=> [ 'title' => 'Item 10', 'text' => 'A plain entry that sorts after Item 9 and before every title that begins with a later letter.', 'date' => '2024-06-21', 'price' => 15.75, 'link' => '#' ],
+					'five'		=> [ 'title' => 'Item 9', 'text' => 'The same plain entry, one step earlier.', 'date' => '2026-08-05', 'price' => 3.0, 'link' => '#' ],
+					'six'			=> [ 'title' => 'Winter Garden Almanac, Revised and Extended', 'text' => 'A year of small tasks for a garden that rests: what to prune, what to leave for the birds, when to turn the compost and how to read the frost.', 'date' => '2025-02-17', 'price' => 48.0, 'link' => '#' ],
+				],
+			],
+		];
+
 		/**
 		 *	One element by its uri in one language: its fields from that
 		 *	language's bucket of the type file, then the global ones ('*'), then
@@ -632,6 +663,13 @@ namespace Nino {
 			$elementUri 	= self::getElementUriFromUri( $uri );
 			$typeUri			= self::getElementTypeFromUri( $uri );
 
+			if( isset( self::PLACEHOLDERS[$typeUri] ) === true ) {
+
+				trigger_error( 'Element type \''. $typeUri. '\' is the kernel\'s and is never written.' );
+
+				return false;
+			}
+
 			// Locked explicitly up front, distinct from mutate()'s own
 			// internal lockFile() call, purely to tell "could not lock" (a
 			// filesystem/permissions problem, worth an operator's attention)
@@ -750,6 +788,10 @@ namespace Nino {
 		private static function getElementFile( array &$appData, string $typeUri ): array|false {
 
 			$typeUri = '/'. trim( $typeUri, '/' );
+
+			if( isset( self::PLACEHOLDERS[$typeUri] ) === true )
+				return self::PLACEHOLDERS[$typeUri];
+
 			$typeFile = self::_typeFile( $typeUri );
 
 			$file = \Nino\Filesystem::getFileContent( $appData, $typeFile, false );
@@ -764,6 +806,14 @@ namespace Nino {
 		static public function insertElementType( array &$appData, string $typeUri, array $model, bool $autoincrement = false ): mixed {
 
 			$typeUri = '/'. trim( $typeUri, '/' );
+
+			if( isset( self::PLACEHOLDERS[$typeUri] ) === true ) {
+
+				trigger_error( 'Element type \''. $typeUri. '\' is the kernel\'s and is never written.' );
+
+				return false;
+			}
+
 			$typeFile = self::_typeFile( $typeUri );
 
 			// Check if element exists
@@ -1284,6 +1334,13 @@ namespace Nino {
 
 			// Flush, reload and lock element file
 			$typeUri			= self::getElementTypeFromUri( $uri );
+
+			if( isset( self::PLACEHOLDERS[$typeUri] ) === true ) {
+
+				trigger_error( 'Element type \''. $typeUri. '\' is the kernel\'s and is never written.' );
+
+				return false;
+			}
 
 			// See deleteElement()'s identical pre-lock: distinguishes "could
 			// not lock" from "type file missing" below, rather than folding
