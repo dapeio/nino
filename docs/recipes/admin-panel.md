@@ -1373,7 +1373,10 @@ the element it draws into.
 
 An **accordion** is a list of sections, a heading with a button each. One is open
 (the open head is `aria-disabled`: it says it is open and a press changes
-nothing) or, with `multiple`, as many as the person opens. Enter and Space press a
+nothing) or, with `multiple`, as many as the person opens; with `collapsible` at
+most one is open: a press on the open head closes it (so the head below it can be
+reached), no head is `aria-disabled`, and none is open at the start unless `open`
+names one. Enter and Space press a
 head, Up and Down walk the heads, Home and End go to the ends; a section's body is
 hidden when closed and not removed, and one given as a function is made when it
 first opens. An accordion in the body of a section is the second level - give it
@@ -1385,7 +1388,9 @@ joined by a comma, which is why a key holds none. Keys are unique within an
 accordion, and two accordions of one panel that both write the address need
 different `parts`, or each reads the other's section. Where one section is open
 at a time one always is: with no section in the address, or one the accordion has
-not, it is `open`, and with no `open` the first. `update( key, { summary, badge } )`
+not, it is `open`, and with no `open` the first. A collapsible accordion has none
+open there: its address without a section is the address of the level, and
+`follow()` closes every section on it. `update( key, { summary, badge } )`
 changes the summary of a head and its badge and nothing else - not the label, the
 body or what is open. A summary or a badge says something that is true whether or
 not the section is open, and is set where the value changes, as the example does.

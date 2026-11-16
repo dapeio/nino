@@ -576,7 +576,7 @@ check( 'a component that takes the name of a shortcode is one warning that names
 check( '...said once: the same component registered a second time says nothing, and takes the place of the first', ninoWarnings() === [] && \Nino\Html::renderHtml( $reverse, '[clash-c]' ) === '<b>second</b>' );
 $readGroup = \Nino\Components::validateGroup( 'clash', [ 'label' => 'Clash' ], [ 'clash-d' ] );
 $readComponent = \Nino\Components::validate( 'clash-d', [ 'label' => 'Clash', 'group' => 'clash', 'in' => [ 'page' ], 'template' => '<b>feature</b>' ], 'clash' );
-\Nino\Components::restore( $reverse, 'clash', [ 'groups' => [ 'clash' => $readGroup + [ 'part' => false ] ], 'components' => [ 'clash-d' => $readComponent ] ], [] );
+\Nino\Components::restore( $reverse, 'clash', [ 'groups' => [ 'clash' => $readGroup + [ 'part' => false, 'demo' => '' ] ], 'components' => [ 'clash-d' => $readComponent ] ], [] );
 $restoreSaid = ninoWarnings();
 check( 'the folders of a feature say it the same way, with the feature as the registrant of the component, and the register draws the name',
 	count( $restoreSaid ) === 1 && str_contains( $restoreSaid[0], '"clash-d"' ) && str_contains( $restoreSaid[0], 'HtmlSmokeShortcodeOwner' ) && str_contains( $restoreSaid[0], 'component of clash ' ) && str_contains( $restoreSaid[0], 'Components::restore()' ) && str_contains( $restoreSaid[0], 'addComponent' ) === false && \Nino\Html::renderHtml( $reverse, '[clash-d]' ) === '<b>feature</b>' );

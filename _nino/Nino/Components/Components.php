@@ -154,7 +154,7 @@ namespace Nino {
 		public const int NAME_LENGTH = 40;
 
 		// The longest template, in bytes. A page is a few KB; a template of 64 KB is something else
-		private const int TEMPLATE_LENGTH = 65536;
+		public const int TEMPLATE_LENGTH = 65536;
 
 		// How many things the log is told about in one request: a page of names nobody registered is a log of its
 		// own, and the names are an editor's
@@ -275,7 +275,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$feature			The key of the feature
-		 *	@param		array			$read					[ 'components' => name => clean schema, 'groups' => group => clean group ]
+		 *	@param		array			$read					[ 'components' => name => clean schema, 'groups' => group => clean group, with 'part' and 'demo' ]
 		 *	@param		array			$renderers		name => callable, for the components that compute
 		 *
 		 *	@return 	void
@@ -296,7 +296,7 @@ namespace Nino {
 				}
 
 				$appData[self::OWNERS]['groups'][$group] = $feature;
-				$appData[self::GROUPS][$group] = [ 'feature' => $feature, 'label' => $declared['label'], 'knobs' => $declared['knobs'], 'part' => $declared['part'], 'components' => (array) ( $appData[self::GROUPS][$group]['components'] ?? [] ) ];
+				$appData[self::GROUPS][$group] = [ 'feature' => $feature, 'label' => $declared['label'], 'knobs' => $declared['knobs'], 'part' => $declared['part'], 'demo' => $declared['demo'], 'components' => (array) ( $appData[self::GROUPS][$group]['components'] ?? [] ) ];
 			}
 
 			foreach( (array) ( $read['components'] ?? [] ) as $name => $clean ) {
@@ -331,7 +331,9 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	array										group => [ 'feature' => key, 'label' => text or map, 'knobs' => as the group says them,
-		 *																	'part' => whether the group has a standard part, 'components' => names in the order registered ]
+		 *																	'part' => whether the group has a standard part, 'demo' => the text of its demo.tpl as html+ for
+		 *																	\Nino\Html::renderSource() - '' where it has none, or one that \Nino\Components::demoProblem() refused -
+		 *																	'components' => names in the order registered ]
 		 */
 		public static function groups( array &$appData ): array {
 
@@ -446,6 +448,88 @@ namespace Nino {
 			}
 
 			return $open === 0;
+		}
+
+		/**
+		 *	What the demo of a group - groups/<group>/demo.tpl - does against the rule of its file. A demo is a short piece of a page
+		 *	made of components with texts of its own, which a caller draws with \Nino\Html::renderSource() to show what the knobs
+		 *	of the group do; it is read as html+ (\Nino\Markup::parse()), and it is a template of the feature, so that it
+		 *	is checked as one is:
+		 *
+		 *	- at most TEMPLATE_LENGTH bytes, no null byte, utf-8, not empty
+		 *	- read with no note: every call closed, no stray end, nothing deeper than the parser reads, nothing it gives up on
+		 *	- no [[: a textfill is a text of the project, and so is what a fixed text would fill in
+		 *	- every call is of a component named in $names - those of its own feature and of the feature that comes with the kernel
+		 *	- no source that names something of the project: a call has none, but a picture that is one of
+		 *	  \Nino\Images::PLACEHOLDERS - and no value of an attribute that begins like a reference (~, / or .), which a
+		 *	  text, a link or a picture would read as one, unless it is such a picture
+		 *
+		 *	\Nino\Features::readComponents() asks it of the demo of every group
+		 *
+		 *	@param		string		$source				The text of the demo
+		 *	@param		array			$names				The names of the components it may call
+		 *	@param		array			$containers		name => true for a container, false for a leaf, of the names whose kind is known
+		 *
+		 *	@return 	string|null								What it does wrong, as the rest of a sentence ("is longer than ..."); null where it keeps the rule
+		 */
+		public static function demoProblem( string $source, array $names, array $containers = [] ): ?string {
+
+			if( strlen( $source ) > self::TEMPLATE_LENGTH )
+				return 'is longer than '. self::TEMPLATE_LENGTH. ' bytes';
+
+			if( str_contains( $source, "\0" ) === true )
+				return 'holds a null byte';
+
+			if( preg_match( '//u', $source ) !== 1 )
+				return 'is not utf-8';
+
+			if( trim( $source ) === '' )
+				return 'is empty';
+
+			if( str_contains( $source, '[[' ) === true )
+				return 'holds "[[", the beginning of a textfill: a demo has texts of its own and reads none of the project\'s';
+
+			$notes = [];
+			$nodes = \Nino\Markup::parse( $source, $containers, $notes );
+
+			if( $notes !== [] )
+				return 'is not read as html+ without a note: '. $notes[0]['code']. ( $notes[0]['name'] === '' ? '' : ' of "'. self::_shown( $notes[0]['name'] ). '"' ). ' at '. $notes[0]['offset'];
+
+			return self::_demoNodes( $nodes, $names );
+		}
+
+		/**
+		 *	The calls of a demo, deepest included, against what demoProblem() asks of each
+		 *
+		 *	@param		array			$nodes				What \Nino\Markup::parse() answered
+		 *	@param		array			$names				The names a call may have
+		 *
+		 *	@return 	string|null								The first thing that is wrong, null where nothing is
+		 */
+		private static function _demoNodes( array $nodes, array $names ): ?string {
+
+			foreach( $nodes as $node ) {
+
+				if( isset( $node['n'] ) === false )
+					continue;
+
+				if( in_array( $node['n'], $names, true ) === false )
+					return 'calls "'. self::_shown( $node['n'] ). '", which is no component of its feature or of basis';
+
+				if( $node['s'] !== '' && isset( \Nino\Images::PLACEHOLDERS[$node['s']] ) === false )
+					return 'gives "'. self::_shown( $node['n'] ). '" a source - '. self::_shown( $node['s'] ). ' - which is a text, a field or a picture of the project\'s';
+
+				foreach( $node['a'] as $attribute => $value )
+					if( is_string( $value ) === true && $value !== '' && strpos( '~/.', $value[0] ) !== false && isset( \Nino\Images::PLACEHOLDERS[$value] ) === false )
+						return 'gives "'. self::_shown( $node['n'] ). '" a value for "'. self::_shown( (string) $attribute ). '" that begins like a reference of the project\'s';
+
+				$problem = is_array( $node['c'] ?? null ) === true ? self::_demoNodes( $node['c'], $names ) : null;
+
+				if( $problem !== null )
+					return $problem;
+			}
+
+			return null;
 		}
 
 		/**

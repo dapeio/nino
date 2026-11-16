@@ -343,7 +343,8 @@ a component whose `children` are `nodes` is handed what it holds and draws it ro
 with `\Nino\Components::render()`; `\Nino\Components::sources()` answers which keys and
 picture slots a source reads, as the scans of the workbench ask. A feature brings its
 components in folders - `components/<name>/component.php` with its `template.tpl`,
-`groups/<group>/group.php` and the standard part `groups/<group>/part/part.css` - which the
+`groups/<group>/group.php`, the standard part `groups/<group>/part/part.css` and, optional, a
+demo `groups/<group>/demo.tpl` - which the
 kernel reads and checks for a feature that is on
 ([a feature's components](docs/development.md#a-features-components)); a module of the kernel
 with a `feature.php` is a feature that comes with the kernel, and the feature Basis is one:

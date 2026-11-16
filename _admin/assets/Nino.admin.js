@@ -2980,16 +2980,19 @@
 		 *	An accordion: sections one above the other, each a heading with a
 		 *	button that opens it. One section is open (the way a screen of
 		 *	settings reads: a list of groups, the one in hand spread out) or, with
-		 *	options.multiple, as many as the person opens. An accordion stands in
+		 *	options.multiple, as many as the person opens, or - with
+		 *	options.collapsible - at most one: a press on the open head closes it, so
+		 *	that the head below it can be reached, and none is open then. An accordion stands in
 		 *	the body of a section of another - two levels is what the panels use -
 		 *	and each is its own: the arrows walk the heads of one accordion and
 		 *	never cross into the one inside.
 		 *
 		 *	The head is a button in a heading (options.level) carrying
 		 *	aria-expanded and aria-controls, the body a region labelled by it.
-		 *	Where one section is open at a time its head is aria-disabled - it
-		 *	says it is open and a press changes nothing - and stays in the tab
-		 *	order. Enter and Space press it, Up and Down walk the heads, Home and
+		 *	Where one section is open at a time and the accordion is not collapsible
+		 *	its head is aria-disabled - it says it is open and a press changes
+		 *	nothing - and stays in the tab order; a head that can be closed is not.
+		 *	Enter and Space press it, Up and Down walk the heads, Home and
 		 *	End go to the first and the last. A closed body is hidden, not
 		 *	removed: what a person entered into a section is still there when it
 		 *	opens a second time, and a body given as a function is made when its section
@@ -2998,18 +3001,21 @@
 		 *	The open sections are the address of the panel where it is given
 		 *	options.address: the parts of the level the accordion stands in, to
 		 *	which the open key follows (the keys joined by a comma where several
-		 *	may be open, so a key holds none). A press is the person's move - a
+		 *	may be open, so a key holds none); with no section open the address is
+		 *	the level's own, and follow() on such an address closes every section
+		 *	of a collapsible accordion (any other has one open at all times). A press is the person's move - a
 		 *	new entry for Back to return to - and set() and follow() move without
 		 *	writing, which is what a panel does when the address has changed under
 		 *	it. Without the shell's router the address is left alone, as levels()
 		 *	does. Owns no strings: the labels, the summary and the badge are the
 		 *	caller's
 		 *
-		 *	@param		{Object}		options					{ id, sections, open, multiple, level, address, onToggle }
+		 *	@param		{Object}		options					{ id, sections, open, multiple, collapsible, level, address, onToggle }
 		 *														- id          the beginning of the ids it makes, one the page has not
 		 *														- sections    [ { key, label, summary, badge, content } ] - content an Element, or a function that answers one when the section is first opened; summary is read on the closed head, badge a chip beside the label (a state such as "changed")
 		 *														- open        the key open at the start, or an array of them
 		 *														- multiple    several sections may be open
+		 *														- collapsible at most one section is open and a press on it closes it; none may be open, so without open none is at the start. Ignored with multiple
 		 *														- level       the heading level of the heads, 3 by default; 4 for an accordion inside a section
 		 *														- address     { panel, parts } - the router's panel and the parts before the open key
 		 *														- onToggle    called with the open keys and the key that was pressed, after a press
@@ -3020,6 +3026,7 @@
 
 			const prefix		= options.id || 'nino-admin-accordion-'+ ( ++serial );
 			const multiple	= options.multiple === true;
+			const collapsible	= multiple === false && options.collapsible === true;
 			const level			= Number.isInteger( options.level ) === true && options.level >= 1 && options.level <= 6 ? options.level : 3;
 			const root			= dc.createElement('div');
 			root.className	= 'nino-admin-accordion';
@@ -3034,14 +3041,15 @@
 				return multiple === true ? list : list.slice( 0, 1 );
 			};
 
-			// Where one section is open at a time one is: what was asked for, else the one the
-			// accordion started with, else the first - a Back to the level with no section in
-			// its address, or a key the accordion has not, leaves no screen of closed heads
+			// Where one section is open at a time one is, unless the accordion is collapsible:
+			// what was asked for, else the one the accordion started with, else the first - a
+			// Back to the level with no section in its address, or a key the accordion has not,
+			// leaves no screen of closed heads
 			const settle = function( wanted ) {
 
 				const list = known( wanted );
 
-				if( list.length > 0 || multiple === true )
+				if( list.length > 0 || multiple === true || collapsible === true )
 					return list;
 
 				const first = known( options.open ?? [] );
@@ -3056,7 +3064,7 @@
 
 					part.button.setAttribute( 'aria-expanded', on === true ? 'true' : 'false' );
 
-					if( multiple === false && on === true )
+					if( multiple === false && collapsible === false && on === true )
 						part.button.setAttribute( 'aria-disabled', 'true' );
 					else
 						part.button.removeAttribute('aria-disabled');
@@ -3100,8 +3108,10 @@
 
 				if( multiple === true )
 					open = open.indexOf( key ) === -1 ? open.concat( [ key ] ) : open.filter( function( other ) { return other !== key } );
-				else if( open[0] === key )
+				else if( open[0] === key && collapsible === false )
 					return;
+				else if( open[0] === key )
+					open = [];
 				else
 					open = [ key ];
 

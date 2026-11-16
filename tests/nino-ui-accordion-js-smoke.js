@@ -111,6 +111,34 @@ fire( manyHeads[2], 'click' );
 check( '...down to none', many.get().length === 0 );
 check( 'no head is aria-disabled where several may be open', manyHeads.every( function( button ) { return button.hasAttribute('aria-disabled') === false } ) );
 
+// --- one section open, and it can be closed ----------------------------------------
+
+const folded = [];
+const fold = build( { collapsible : true, open : 'two', onToggle : function( open, pressed ) { folded.push( open.join()+ '|'+ pressed ) } } );
+const foldHeads = heads( fold );
+
+check( 'a collapsible accordion has its open section open and no head aria-disabled', fold.get().join() === 'two' && foldHeads.every( function( button ) { return button.hasAttribute('aria-disabled') === false } ) );
+fire( foldHeads[2], 'click' );
+check( '...a press on a closed head opens it and closes the other: at most one is open', fold.get().join() === 'three' && foldHeads[1].getAttribute('aria-expanded') === 'false' );
+fire( foldHeads[2], 'click' );
+check( '...a press on the open head closes it, and no section is open', fold.get().length === 0 && foldHeads.every( function( button ) { return button.getAttribute('aria-expanded') === 'false' } ) );
+check( '...with its body hidden again and told to onToggle with no key open', fold.body('three').hidden === true && folded.join() === 'three|three,|three' );
+check( '...and a press on a head opens it again', ( function() { fire( foldHeads[0], 'click' ); return fold.get().join() === 'one' } )() );
+check( 'a collapsible accordion told nothing starts with none open', build( { collapsible : true } ).get().length === 0 && build( { collapsible : true, open : [] } ).get().length === 0 );
+check( '...and several keys given to it open the first of them', build( { collapsible : true, open : [ 'three', 'one' ] } ).get().join() === 'three' );
+check( '...and a key it has not opens none', build( { collapsible : true, open : 'nine' } ).get().length === 0 );
+check( 'collapsible with multiple is the several of multiple', build( { collapsible : true, multiple : true, open : [ 'one', 'two' ] } ).get().join() === 'one,two' );
+check( 'collapsible is a switch and nothing else is one', build( { collapsible : 'yes' } ).get().join() === 'one' && build( { collapsible : false } ).get().join() === 'one' );
+
+const foldKeys = build( { collapsible : true, open : 'one' } );
+const foldKeyHeads = heads( foldKeys );
+foldKeyHeads[0].focus();
+fire( foldKeyHeads[0], 'click' );
+check( 'Enter and Space are a press of the head (the browser clicks a button for them), and the arrows still walk the heads', ( function() {
+	const walked = key( foldKeyHeads[0], 'ArrowDown' );
+	return foldKeys.get().length === 0 && foldKeyHeads[1].focused === true && walked.prevented === true;
+} )() );
+
 // --- the keyboard -----------------------------------------------------------------
 
 const keyed = build( { open : 'one' } );
@@ -195,6 +223,24 @@ current = { panel : 'themes', parts : [ 'craft' ] };
 addressed.set( 'one' );
 addressed.follow();
 check( '...and so does the address of the level alone: Back to the level leaves one open', addressed.get().join() === 'one' );
+
+const foldAddress = { panel : 'themes', parts : [ 'craft' ] };
+const addressedFold = build( { collapsible : true, address : foldAddress, open : 'one' } );
+calls.length = 0;
+fire( heads( addressedFold )[0], 'click' );
+check( 'a collapsible accordion that closes its section writes the address of the level alone', addressedFold.get().length === 0 && calls.join() === 'go themes/craft,set themes/craft' );
+current = { panel : 'themes', parts : [ 'craft', 'two' ] };
+addressedFold.follow();
+check( '...follow() opens the section the address names', addressedFold.get().join() === 'two' );
+current = { panel : 'themes', parts : [ 'craft' ] };
+addressedFold.follow();
+check( '...and the address of the level alone closes them all, where any other has one open', addressedFold.get().length === 0 && heads( addressedFold ).every( function( button ) { return button.getAttribute('aria-expanded') === 'false' } ) );
+current = { panel : 'themes', parts : [ 'craft', 'nine' ] };
+addressedFold.set( 'one' );
+addressedFold.follow();
+check( '...and so does a key it has not', addressedFold.get().length === 0 );
+addressedFold.set( 'two' );
+check( 'set() opens a section of it, and set( [] ) closes it', addressedFold.get().join() === 'two' && ( function() { addressedFold.set( [] ); return addressedFold.get().length === 0 } )() );
 
 const started = build( { address : { panel : 'themes', parts : [ 'craft' ] }, open : 'two' } );
 started.set( 'three' );

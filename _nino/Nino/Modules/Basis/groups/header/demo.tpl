@@ -1,0 +1,8 @@
+[header-wrap]
+	[header-logo href="#" light="/nino/placeholder/mark" dark="/nino/placeholder/mark"]
+	[header-nav collapse="never"]
+	[header-actions]
+		[button href="#" size="s" text="Sign in"]
+		[button href="#" tone="quiet" size="s" text="Contact"]
+	[/header-actions]
+[/header-wrap]

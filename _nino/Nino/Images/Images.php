@@ -54,6 +54,16 @@ namespace Nino {
 		// server can decode
 		public const string RENDER = '/nino/images/render';
 
+		// The pictures the kernel brings for a reference that no project has a slot for: the demo of a group (a piece of a page of
+		// components, see \Nino\Components::demoProblem()) has pictures to draw and no slot of a project to put there. A reference is a
+		// path like the uri of a slot; picture() answers it with the vector picture as a data: address, which the policy of the
+		// kernel's own headers lets an <img> load, so that nothing is stored, served or asked for. A slot of the project with the
+		// same uri is never read: the reference is the kernel's
+		public const array PLACEHOLDERS = [
+			'/nino/placeholder/landscape'	=> [ 'width' => 800, 'height' => 600, 'svg' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><rect width="800" height="600" fill="#cbd5e1"/><circle cx="600" cy="170" r="70" fill="#f8fafc"/><path d="M0 600V420l180-150 150 120 170-200 300 230v180z" fill="#64748b"/><path d="M0 600V490l220-110 200 120 380-150v250z" fill="#475569"/></svg>' ],
+			'/nino/placeholder/mark'			=> [ 'width' => 160, 'height' => 160, 'svg' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="32" fill="#475569"/><path d="M48 116V44l64 72V44" fill="none" stroke="#f8fafc" stroke-width="14" stroke-linejoin="round"/></svg>' ],
+		];
+
 		// Public for the same reason as MAX_SOURCE_PIXELS below: it is what an
 		// upload form has to tell the person before they pick a file (see
 		// limits())
@@ -901,6 +911,7 @@ namespace Nino {
 		 *	The names are stored values and are not trusted: a filename that is empty, absolute or climbs out
 		 *	with '..' or holds a control character names no picture, as read() and delete() refuse it, and a reference that
 		 *	is no slot is none, whatever it looks like - the slots are looked up by name, never by path.
+		 *	A reference that is one of PLACEHOLDERS is the picture the kernel brings for it, whatever slots the project has.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$reference		The uri of a slot, or the name of an image field of the element
@@ -939,6 +950,9 @@ namespace Nino {
 					'alt'			=> is_string( $stored ) === true ? $stored : '',
 				];
 			}
+
+			if( isset( self::PLACEHOLDERS[$reference] ) === true )
+				return [ 'url' => 'data:image/svg+xml;base64,'. base64_encode( self::PLACEHOLDERS[$reference]['svg'] ), 'width' => self::PLACEHOLDERS[$reference]['width'], 'height' => self::PLACEHOLDERS[$reference]['height'], 'alt' => '' ];
 
 			$slot = self::getSlot( $appData, $reference );
 

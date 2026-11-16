@@ -725,7 +725,7 @@ $read = static function( string $dir, string $key = 'probe' ): array|string { re
 $reads = $read( registerProbe( $fixtureTime ) );
 check( 'readComponents() answers the clean schemas, the groups with their standard part and nothing refused for the folders of a feature that is whole',
 	is_array( $reads ) === true && array_keys( $reads['components'] ) === [ 'probe-box', 'probe-card', 'probe-line', 'probe-note' ] && $reads['rejected'] === [] && array_keys( $reads['groups'] ) === [ 'probe', 'probe-more' ]
-	&& $reads['groups']['probe']['part'] === true && array_keys( $reads['groups']['probe'] ) === [ 'label', 'knobs', 'part' ] );
+	&& $reads['groups']['probe']['part'] === true && array_keys( $reads['groups']['probe'] ) === [ 'label', 'knobs', 'part', 'demo' ] && $reads['groups']['probe']['demo'] === '' );
 check( '...and every schema is one the register takes again as it is: a clean schema is a schema', ( static function() use ( $reads ): bool {
 
 	foreach( $reads['components'] as $name => $clean )
@@ -1032,7 +1032,7 @@ $oddBooted = registerBoot( $project );
 $file = (string) file_get_contents( registerCache( $project, 'odd' ) );
 $kept = (array) include registerCache( $project, 'odd' );
 check( 'a value that spells php is data in the file of the cache: no token that is code, and what is included is what was registered',
-	registerOnlyData( $file ) === true && $kept['components'] === \Nino\Components::components( $oddBooted ) && $kept['groups'] === [ 'tidy' => [ 'label' => [ 'en_US' => "It's \\ \"quoted\"; ?> <?php phpinfo(); // ", 'de_DE' => "Tab\there\nnewline" ], 'knobs' => [], 'part' => false ] ]
+	registerOnlyData( $file ) === true && $kept['components'] === \Nino\Components::components( $oddBooted ) && $kept['groups'] === [ 'tidy' => [ 'label' => [ 'en_US' => "It's \\ \"quoted\"; ?> <?php phpinfo(); // ", 'de_DE' => "Tab\there\nnewline" ], 'knobs' => [], 'part' => false, 'demo' => '' ] ]
 	&& count( array_filter( token_get_all( $file ), static fn( mixed $token ): bool => is_array( $token ) === true && $token[0] === T_OPEN_TAG ) ) === 1 );
 $oddAgain = registerBoot( $project );
 check( '...and the second request has the same, from the file', \Nino\Components::components( $oddAgain ) === \Nino\Components::components( $oddBooted ) && \Nino\Html::renderHtml( $oddAgain, '[odd-one]' ) === '<b class="odd-one">\' . phpinfo() . \'</b>' );
@@ -1546,6 +1546,127 @@ check( '...and one that names the class inside a function only, or stands on & w
 	array_filter( $broken, static fn( string $css ): bool => \Nino\Components::partProblems( $css, $own ) === [] ) === [] );
 check( 'rules nested deeper than sixteen levels are not read: the part is refused', \Nino\Components::partProblems( str_repeat( '.probe-box {', 17 ). ' color: red; '. str_repeat( '}', 17 ), $own ) !== []
 	&& \Nino\Components::partProblems( str_repeat( '.probe-box {', 16 ). ' color: red; '. str_repeat( '}', 16 ), $own ) === [] );
+
+// --- The demo of a group ----------------------------------------------------------------------------------
+
+echo "\nThe demo of a group: groups/<group>/demo.tpl\n";
+
+ninoWarnings();
+
+$show = registerFeature( 'Show' );
+registerComponent( $show, 'show-box', registerSchema( [ 'group' => 'show', 'label' => 'Box', 'in' => [ 'page' ], 'offers' => [], 'template' => '<div class="[[class]]">[[content]]</div>' ] ) );
+registerComponent( $show, 'show-line', registerSchema( [ 'group' => 'show', 'label' => 'Line', 'in' => [ 'show-box' ], 'source' => 'text', 'template' => '<p class="[[class]]">[[value]]</p>' ] ) );
+registerGroup( $show, 'show', [ 'label' => 'Show' ] );
+$demo = '[show-box]'. "\n\t". '[show-line text="Hello"]'. "\n\t". '[section-title text="A title" href="#"]'. "\n\t". '[image /nino/placeholder/mark decorative]'. "\n". '[/show-box]'. "\n";
+file_put_contents( $show. '/groups/show/demo.tpl', $demo );
+$result = $read( $show, 'show' );
+check( 'a demo.tpl of a group is read with the folders: its text is the demo of the group, and nothing is refused', is_array( $result ) === true && $result['rejected'] === [] && $result['groups']['show']['demo'] === $demo
+	&& array_keys( $result['groups']['show'] ) === [ 'label', 'knobs', 'part', 'demo' ] && $result['groups']['show']['part'] === false );
+check( '...it may call the components of its feature and those of basis, and a picture of the kernel', array_keys( $result['components'] ) === [ 'show-box', 'show-line' ] );
+
+registerFeature( 'None' );
+registerComponent( NINO_FEATURES_DIR. '/None', 'none-box', registerSchema( [ 'group' => 'none', 'in' => [ 'page' ] ] ) );
+registerGroup( NINO_FEATURES_DIR. '/None', 'none', [ 'label' => 'None' ] );
+$result = $read( NINO_FEATURES_DIR. '/None', 'none' );
+check( 'a group with no demo.tpl has \'\' for a demo, and that is no reason to say anything', is_array( $result ) === true && $result['groups']['none']['demo'] === '' && $result['rejected'] === [] );
+registerRemove( NINO_FEATURES_DIR. '/None' );
+
+$refused = [
+	'a component nobody has'										=> [ '[nobody text="x"]', 'calls "nobody", which is no component' ],
+	'a component of a feature that is none of these'	=> [ '[show-box][form][/show-box]', 'calls "form"' ],
+	'a textfill of the project'								=> [ '[show-box][[/project/company/general/name]][/show-box]', 'holds "[["' ],
+	'a textfill in a fixed text'								=> [ '[show-box][show-line text="[[/project/company/general/name]]"][/show-box]', 'holds "[["' ],
+	'a source that is a key of the project'				=> [ '[show-box][show-line /project/company/general/name][/show-box]', 'a source' ],
+	'a source that is a text of the template'			=> [ '[show-box][show-line ~title][/show-box]', 'a source' ],
+	'a source that is a field'									=> [ '[show-box][show-line .title][/show-box]', 'a source' ],
+	'a picture that is a slot of the project'		=> [ '[show-box][image /logo decorative][/show-box]', 'a source' ],
+	'a picture that is none of the kernel\'s'		=> [ '[show-box][image /nino/placeholder/other decorative][/show-box]', 'a source' ],
+	'a picture of an attribute that is a slot'	=> [ '[show-box][header-logo light="/logo"][/show-box]', 'begins like a reference' ],
+	'an address of the project'								=> [ '[show-box][button text="x" href="/contact"][/show-box]', 'begins like a reference' ],
+	'a call that is not closed'								=> [ '[show-box][show-line text="x"]', 'unclosed of "show-box"' ],
+	'an end that is none'											=> [ '[show-box][/show-box][/show-box]', 'stray-end' ],
+	'a document of more levels than are read'	=> [ str_repeat( '[show-box]', 17 ). str_repeat( '[/show-box]', 17 ), 'depth' ],
+	'a null byte'															=> [ "[show-box]\0[/show-box]", 'null byte' ],
+	'bytes that are no utf-8'									=> [ "[show-box]\xff[/show-box]", 'not utf-8' ],
+	'nothing'																	=> [ " \n\t", 'is empty' ],
+	'a file of three megabytes'								=> [ '[show-box]'. str_repeat( 'a', 3 * 1024 * 1024 ). '[/show-box]', 'longer than '. \Nino\Components::TEMPLATE_LENGTH ],
+	'more than the template of a component'		=> [ '[show-box]'. str_repeat( 'a', \Nino\Components::TEMPLATE_LENGTH ). '[/show-box]', 'longer than '. \Nino\Components::TEMPLATE_LENGTH ],
+];
+$wrong = [];
+
+foreach( $refused as $what => [ $text, $says ] ) {
+
+	file_put_contents( $show. '/groups/show/demo.tpl', $text );
+	$result = $read( $show, 'show' );
+
+	if( is_array( $result ) === false || array_keys( $result['rejected'] ) !== [ 'demo show' ] || str_contains( $result['rejected']['demo show'], $says ) === false || $result['groups']['show']['demo'] !== ''
+		|| array_keys( $result['components'] ) !== [ 'show-box', 'show-line' ] || $result['groups']['show']['label'] !== 'Show' )
+		$wrong[] = $what. ' - '. ( is_array( $result ) === true ? json_encode( $result['rejected'] ) : $result );
+}
+check( 'a demo that calls what its feature and basis do not have, reads or fills in what is the project\'s, is not read as html+ without a note, holds a null byte or is too long is refused with a sentence and no demo: the group, its knobs and its components stay ('. count( $refused ). ' cases)'
+	. ( $wrong === [] ? '' : ' - '. implode( '; ', array_slice( $wrong, 0, 3 ) ) ), $wrong === [] );
+
+$result = $read( $show, 'show' );
+check( '...the sentence names the feature and the group', str_contains( (string) ( $result['rejected']['demo show'] ?? '' ), 'feature "show", group "show": its demo.tpl ' ) === true );
+
+file_put_contents( $show. '/groups/show/demo.tpl', '[show-box][show-line text="Hello"][/show-box]' );
+check( 'a demo of exactly the length of a template is read: the limit is the one of a component', ( static function() use ( $show, $read ): bool {
+
+	file_put_contents( $show. '/groups/show/demo.tpl', '[show-box]'. str_repeat( 'a', \Nino\Components::TEMPLATE_LENGTH - 21 ). '[/show-box]' );
+	$result = $read( $show, 'show' );
+
+	return is_array( $result ) === true && $result['rejected'] === [] && strlen( $result['groups']['show']['demo'] ) === \Nino\Components::TEMPLATE_LENGTH;
+} )() );
+
+// A demo that is a link, or is no file
+$away = $registerWork. '/away-demo';
+mkdir( $away, 0755, true );
+file_put_contents( $away. '/demo.tpl', '[show-box][/show-box]' );
+unlink( $show. '/groups/show/demo.tpl' );
+symlink( $away. '/demo.tpl', $show. '/groups/show/demo.tpl' );
+$result = $read( $show, 'show' );
+check( 'a demo.tpl that is a link, to a file outside the feature, is refused: no text is read through it, and the group stays', is_array( $result ) === true && $result['groups']['show']['demo'] === '' && str_contains( (string) ( $result['rejected']['demo show'] ?? '' ), 'is a link, or no file' ) === true );
+unlink( $show. '/groups/show/demo.tpl' );
+symlink( '../../../../away-demo', $show. '/groups/show/demo.tpl' );
+$result = $read( $show, 'show' );
+check( '...a link by a path that climbs out of the folder as well', is_array( $result ) === true && $result['groups']['show']['demo'] === '' && isset( $result['rejected']['demo show'] ) === true );
+unlink( $show. '/groups/show/demo.tpl' );
+mkdir( $show. '/groups/show/demo.tpl', 0755, true );
+$result = $read( $show, 'show' );
+check( '...and a folder with that name is no demo', is_array( $result ) === true && $result['groups']['show']['demo'] === '' && str_contains( (string) ( $result['rejected']['demo show'] ?? '' ), 'is a link, or no file' ) === true );
+rmdir( $show. '/groups/show/demo.tpl' );
+
+// The demo is in the register, the cache of it, and the stamp
+file_put_contents( $show. '/groups/show/demo.tpl', $demo );
+registerTouch( $show, $fixtureTime );
+$project = registerProject( 'register-demo', [ '\\Nino\\Modules\\Show' ] );
+$first = registerBoot( $project );
+$stored = (array) include registerCache( $project, 'show' );
+check( 'the demo is in the groups of the register, and in the file of the cache that a request writes', \Nino\Components::groups( $first )['show']['demo'] === $demo && ( $stored['groups']['show']['demo'] ?? null ) === $demo && ninoWarnings() === [] );
+$second = registerBoot( $project );
+check( '...and a request that finds the file as it was has the same demo from it', \Nino\Components::groups( $second )['show']['demo'] === $demo && \Nino\Components::groups( $second ) === \Nino\Components::groups( $first ) );
+file_put_contents( $show. '/groups/show/demo.tpl', str_replace( 'Hello', 'Hallo', $demo ) );
+touch( $show. '/groups/show/demo.tpl', $fixtureTime + 7 );
+$third = registerBoot( $project );
+check( '...a demo.tpl of the same size and another time is read again: the stamp holds it', \Nino\Components::groups( $third )['show']['demo'] === str_replace( 'Hello', 'Hallo', $demo ) );
+unlink( $show. '/groups/show/demo.tpl' );
+$fourth = registerBoot( $project );
+check( '...and one that goes is seen: the group has no demo', \Nino\Components::groups( $fourth )['show']['demo'] === '' );
+
+file_put_contents( $show. '/groups/show/demo.tpl', '[nobody]' );
+$fifth = registerBoot( $project );
+$said = ninoWarnings();
+check( 'a demo that is refused is said once in a request, with the group and the reason - and the group and its components are registered all the same, with no file of the cache written for it',
+	count( $said ) === 1 && str_contains( $said[0], 'demo.tpl' ) === true && str_contains( $said[0], 'calls "nobody"' ) === true && \Nino\Components::groups( $fifth )['show']['demo'] === '' && array_keys( \Nino\Components::components( $fifth ) ) === [ 'show-box', 'show-line' ] );
+check( '...and the Features panel is told the same sentence', in_array( 'feature "show", group "show": its demo.tpl calls "nobody", which is no component of its feature or of basis', \Nino\Features::componentProblems( $fifth, 'show' ), true ) === true );
+registerRemove( $show );
+
+// What demoProblem() asks, by itself
+$names = [ 'a', 'b' ];
+check( 'demoProblem() takes a piece of html+ of the names it is given, with a container that is closed, a leaf and text', \Nino\Components::demoProblem( '[a]x[b text="y"][/a]', $names, [ 'a' => true, 'b' => false ] ) === null && \Nino\Components::demoProblem( 'text only', $names ) === null );
+check( '...a text of more than a template is too long, and one of that length is not', str_contains( (string) \Nino\Components::demoProblem( str_repeat( 'a', \Nino\Components::TEMPLATE_LENGTH + 1 ), $names ), 'longer than' ) && \Nino\Components::demoProblem( str_repeat( 'a', \Nino\Components::TEMPLATE_LENGTH ), $names ) === null );
+check( '...and not a container that a list of kinds says is a leaf, whose end is then stray', str_contains( (string) \Nino\Components::demoProblem( '[a]x[/a]', $names, [ 'a' => false ] ), 'stray-end' ) );
+check( '...a name that is a prefix of one of the names, or its capitals, is none', \Nino\Components::demoProblem( '[ab]', $names ) !== null && \Nino\Components::demoProblem( '[A]', $names ) === null && \Nino\Components::demoProblem( '[a-]', $names ) !== null );
 
 $none = [];
 ninoDone( $none );

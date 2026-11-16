@@ -6,8 +6,8 @@ return [
 	'key'					=> 'basis',
 	'name'				=> [ 'en_US' => 'Basic components', 'de_DE' => 'Basis-Komponenten' ],
 	'description'	=> [
-		'en_US' => 'Header, footer, section, button, image and text: the components a page is built of, with their standard look - readable, responsive, light and dark, and nothing more.',
-		'de_DE' => 'Header, Footer, Abschnitt, Button, Bild und Text: die Komponenten, aus denen eine Seite gebaut wird, mit ihrem Standard-Aussehen - lesbar, responsiv, hell und dunkel, und mehr nicht.',
+		'en_US' => 'Header, footer, section, button, images and text blocks: the components a page is built of, with their standard look - readable, responsive, light and dark, and nothing more.',
+		'de_DE' => 'Header, Footer, Sektion, Button, Bilder und Textblöcke: die Komponenten, aus denen eine Seite gebaut wird, mit ihrem Standard-Aussehen - lesbar, responsiv, hell und dunkel, und mehr nicht.',
 	],
 	'manual'			=> [
 		'shortcodes' => [

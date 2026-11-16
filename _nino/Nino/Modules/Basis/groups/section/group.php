@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 return [
-	'label' => [ 'de_DE' => 'Abschnitt', 'en_US' => 'Section' ],
+	'label' => [ 'de_DE' => 'Sektion', 'en_US' => 'Section' ],
 	'knobs' => [
 		'section-wrap.space' => [ 'token' => '--section-wrap-space', 'label' => [ 'de_DE' => 'Abstand oben und unten', 'en_US' => 'Space above and below' ],
 			'ladder' => [ 'var(--page-space-4)', 'var(--page-space-5)', 'var(--page-space-6)', 'calc( var(--page-space-6) * 1.5 )', 'calc( var(--page-space-6) * 2 )' ] ],

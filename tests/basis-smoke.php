@@ -1291,6 +1291,116 @@ foreach( $schemas as $name => $schema )
 check( 'the fixture page calls every one of the twenty components'. ( $allCalled === [] ? '' : ' - '. implode( ', ', $allCalled ) ), $allCalled === [] );
 check( 'a card is a column: one h1 on the page, three cards in one row, the whole card a link where it says link', substr_count( $pages['de_DE'], '<h1' ) === 1 && substr_count( $pages['de_DE'], 'section-col--variant-card' ) === 3 && substr_count( $pages['de_DE'], 'section-col--link' ) === 1 );
 
+// --- H. The demos of the groups --------------------------------------------------------------------------
+
+echo "\nH. The demos: a piece of a page for each group, read and drawn\n";
+
+$demoSite = basisSite( 'en_US' );
+$demoSource = static fn( string $group ): string => (string) \Nino\Components::groups( $demoSite )[$group]['demo'];
+$demoGroups = array_keys( BASIS_COMPONENTS );
+
+check( 'the folders hand over a demo for each of the six groups, and nothing is refused for it', $read['rejected'] === [] && array_column( $read['groups'], 'demo' ) !== [] && count( array_filter( array_column( $read['groups'], 'demo' ), static fn( string $text ): bool => $text !== '' ) ) === 6
+	&& array_map( $demoSource, $demoGroups ) === array_map( static fn( string $group ): string => (string) file_get_contents( $basisDir. '/groups/'. $group. '/demo.tpl' ), $demoGroups ) );
+
+$demoProblems = [];
+$demoSeen = [];
+
+foreach( BASIS_COMPONENTS as $group => $members ) {
+
+	$source = $demoSource( $group );
+	$notes = [];
+	$tree = \Nino\Markup::parse( $source, \Nino\Components::containers( $demoSite ), $notes );
+
+	if( $notes !== [] )
+		$demoProblems[] = $group. ' is read with a note: '. $notes[0]['code'];
+
+	if( \Nino\Components::demoProblem( $source, array_keys( $schemas ) ) !== null )
+		$demoProblems[] = $group. ' breaks the rule of its file: '. \Nino\Components::demoProblem( $source, array_keys( $schemas ) );
+
+	// Every call of the demo, in the order of the document: name => the attributes of each
+	$calls = [];
+	$walk = static function( array $nodes ) use ( &$walk, &$calls ): void {
+
+		foreach( $nodes as $node )
+			if( isset( $node['n'] ) === true ) {
+
+				$calls[$node['n']][] = $node['a'];
+				$walk( (array) $node['c'] );
+			}
+	};
+	$walk( $tree );
+	$demoSeen[$group] = $calls;
+
+	// Every component of the group is in it
+	foreach( $members as $name )
+		if( isset( $calls[$name] ) === false )
+			$demoProblems[] = $group. ' does not call '. $name;
+
+	// Where a knob hangs on a choice of its component - section-row.gap on the gap of a row - every value of the choice is in it, a default one as a call that does not say it
+	foreach( \Nino\Components::groups( $demoSite )[$group]['knobs'] as $key => $knob ) {
+
+		[ $name, $word ] = explode( '.', $key );
+		$declared = $schemas[$name]['attributes'][$word] ?? null;
+
+		if( $declared === null || $declared['type'] !== 'choice' )
+			continue;
+
+		foreach( $declared['options'] as $value ) {
+
+			$found = array_filter( $calls[$name] ?? [], static fn( array $attributes ): bool => ( $attributes[$word] ?? $declared['default'] ) === $value );
+
+			if( $found === [] )
+				$demoProblems[] = $group. ': '. $key. ' has no call with '. $word. '="'. $value. '"';
+		}
+	}
+
+	// ...and every variant of a component of the group, the regular one as a call that names none
+	foreach( $members as $name )
+		foreach( $schemas[$name]['variants'] as $variant ) {
+
+			$found = array_filter( $calls[$name] ?? [], static fn( array $attributes ): bool => ( $attributes['variant'] ?? 'regular' ) === $variant );
+
+			if( $found === [] )
+				$demoProblems[] = $group. ': '. $name. ' has no call of the variant '. $variant;
+		}
+}
+check( 'each demo is read with no note, calls every component of its group, and shows every value of a choice a knob hangs on and every variant: the schema says which ('. count( $demoSeen ). ' demos)'
+	. ( $demoProblems === [] ? '' : ' - '. implode( '; ', array_slice( $demoProblems, 0, 6 ) ) ), $demoProblems === [] );
+
+// Drawn the way a caller draws it: renderSource() with nothing of the project's but its menus
+ninoWarnings();
+$drawProblems = [];
+
+foreach( BASIS_COMPONENTS as $group => $members ) {
+
+	$html = \Nino\Html::renderSource( $demoSite, $demoSource( $group ) );
+
+	if( $html === '' )
+		$drawProblems[] = $group. ' draws nothing';
+
+	foreach( $members as $name )
+		if( preg_match( '/class="'. preg_quote( $name, '/' ). '[ "]/', $html ) !== 1 )
+			$drawProblems[] = $group. ' draws no '. $name;
+
+	// What the project holds - the company in the copyright line apart, which is a component's own - is not in it, and a reference is not left written
+	if( str_contains( $html, '/nino/placeholder/' ) === true || str_contains( $html, '[' ) === true || str_contains( $html, 'logo.png' ) === true )
+		$drawProblems[] = $group. ' leaves a reference, a bracket or a picture of the project in the page';
+}
+$demoWarnings = ninoWarnings();
+check( 'each demo is drawn by renderSource(), with every component of its group in the page, no picture of the project and nothing said in the log'. ( $drawProblems === [] ? '' : ' - '. implode( '; ', array_slice( $drawProblems, 0, 6 ) ) ), $drawProblems === [] && $demoWarnings === [] );
+
+$landscape = \Nino\Html::renderSource( $demoSite, '[image /nino/placeholder/landscape decorative]' );
+check( 'a placeholder is a picture of the kernel: a data: address with its size, in the figure, whatever slots the project has - even one of the same uri', str_contains( $landscape, '<img src="data:image/svg+xml;base64,' ) && str_contains( $landscape, ' width="800" height="600"' )
+	&& ( static function() use ( $demoSite ): bool {
+
+		$demoSite['/nino/html/images']['/nino/placeholder/landscape'] = [ 'label' => 'x', 'width' => 1, 'height' => 1, 'filename' => 'logo.png', 'alt' => [] ];
+
+		return str_contains( \Nino\Html::renderSource( $demoSite, '[image /nino/placeholder/landscape decorative]' ), 'data:image/svg+xml' ) && str_contains( \Nino\Html::renderSource( $demoSite, '[image /nino/placeholder/landscape decorative]' ), 'logo.png' ) === false;
+	} )()
+	&& array_keys( \Nino\Images::PLACEHOLDERS ) === [ '/nino/placeholder/landscape', '/nino/placeholder/mark' ]
+	&& array_filter( \Nino\Images::PLACEHOLDERS, static fn( array $placeholder ): bool => ( simplexml_load_string( $placeholder['svg'] ) !== false ) === false ) === [] );
+ninoWarnings();
+
 // --- G. Words, activation, sizes, cost -----------------------------------------------------------------------
 
 echo "\nG. The words, the activation, the sizes and what a page costs\n";

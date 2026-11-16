@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 return [
-	'label' => [ 'de_DE' => 'Text', 'en_US' => 'Text' ],
+	'label' => [ 'de_DE' => 'Textblöcke', 'en_US' => 'Text blocks' ],
 	'knobs' => [
 		'text.size' => [ 'token' => '--text-size', 'label' => [ 'de_DE' => 'Schriftgröße', 'en_US' => 'Font size' ],
 			'ladder' => [ 'var(--page-text-1)', 'calc( ( var(--page-text-1) + var(--page-text-2) ) / 2 )', 'var(--page-text-2)', 'calc( ( var(--page-text-2) + var(--page-text-3) ) / 2 )', 'var(--page-text-3)' ] ],

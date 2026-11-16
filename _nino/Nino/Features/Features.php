@@ -60,6 +60,11 @@ namespace Nino {
 		// The longest standard part that is read: the parts of a feature of twenty components are 15 KB together
 		private const int PART_BYTES = 262144;
 
+		// The demo of a group: a template of the feature, drawn as a piece of a page where the knobs of the group are shown. The
+		// longest one is as long as the template of a component (\Nino\Components::demoProblem() asks for it); the six that
+		// basis brings are 1 KB to 3 KB
+		private const string DEMO = 'demo.tpl';
+
 		// What a settings schema may declare a value to be - each one is a
 		// form control the Features panel knows how to render and this class
 		// knows how to validate
@@ -747,7 +752,7 @@ namespace Nino {
 
 		/**
 		 *	The size and the time of every file the schemas of a feature are read from: the component.php and the
-		 *	template.tpl of each folder of components/, the group.php and the part.css of each folder of groups/ -
+		 *	template.tpl of each folder of components/, the group.php, the part.css and the demo.tpl of each folder of groups/ -
 		 *	null for a file that is not there, so that one that comes is seen, as a folder that comes or goes is seen
 		 *	by the names the lists hold. That is the limit of the comparison, and the one every cache of the kernel
 		 *	has: a file of the same size written within the second of the one before it, by a tool that does not set the
@@ -761,7 +766,7 @@ namespace Nino {
 
 			$stamp = [];
 
-			foreach( [ self::COMPONENTS => [ 'component.php', 'template.tpl' ], self::GROUPS => [ 'group.php', 'part/part.css' ] ] as $folder => $files ) {
+			foreach( [ self::COMPONENTS => [ 'component.php', 'template.tpl' ], self::GROUPS => [ 'group.php', 'part/part.css', 'demo.tpl' ] ] as $folder => $files ) {
 
 				$path = $dir. '/'. $folder. '/';
 
@@ -860,13 +865,14 @@ namespace Nino {
 		 *	real path is not the one it is written under - a link to a file outside of the feature or inside it - is
 		 *	refused, since what is read into the schemas and the style bundle of the site is not what the folder holds.
 		 *	A standard part that breaks the rule of mixing (\Nino\Components::partProblems()) is refused alone: the group
-		 *	and its components are the feature's, and the part is not put into the style bundle
+		 *	and its components are the feature's, and the part is not put into the style bundle. So is a demo.tpl that is
+		 *	no piece of html+ made of components with texts of its own (\Nino\Components::demoProblem()): the group has no demo
 		 *
 		 *	@param		string		$dir					The directory of the feature
 		 *	@param		string		$key					Its key, as the manifest says it
 		 *
-		 *	@return 	array|string							[ 'components' => name => clean schema, 'groups' => group => [ 'label', 'knobs', 'part' ],
-		 *																	'rejected' => name, 'group <name>' or 'part <name>' => why ], or why the folders cannot be read at all
+		 *	@return 	array|string							[ 'components' => name => clean schema, 'groups' => group => [ 'label', 'knobs', 'part', 'demo' ],
+		 *																	'rejected' => name, 'group <name>', 'part <name>' or 'demo <name>' => why ], or why the folders cannot be read at all
 		 */
 		public static function readComponents( string $dir, string $key ): array|string {
 
@@ -1019,10 +1025,59 @@ namespace Nino {
 					}
 				}
 
-				$groups[$group] = $declared + [ 'part' => $standard ];
+				// The demo is read like a template of the feature - a file of the folder, not a link, of a limited size - and must be html+ made of components
+				// with texts of its own (\Nino\Components::demoProblem()). One that is not is said and left out: the group, its knobs and its part are the feature's all the same
+				$source = '';
+				$demo = self::GROUPS. '/'. $group. '/'. self::DEMO;
+
+				if( file_exists( $base. '/'. $demo ) === true ) {
+
+					$which = $of. 'group "'. self::_shown( (string) $group ). '": its '. self::DEMO. ' ';
+					$problem = null;
+
+					if( self::_inside( $base, $demo ) === false || is_file( $base. '/'. $demo ) === false )
+						$problem = 'is a link, or no file';
+					else {
+
+						// One byte more than the longest demo is read: that is all the check of the length needs of a file of any size
+						$text = (string) file_get_contents( $base. '/'. $demo, false, null, 0, \Nino\Components::TEMPLATE_LENGTH + 1 );
+						$containers = [];
+
+						foreach( $components as $name => $clean )
+							$containers[$name] = isset( $clean['offers'] );
+
+						$problem = \Nino\Components::demoProblem( $text, array_unique( array_merge( array_keys( $components ), self::_basisNames() ) ), $containers );
+						$source = $problem === null ? $text : '';
+					}
+
+					if( $problem !== null )
+						$rejected['demo '. $group] = $which. $problem;
+				}
+
+				$groups[$group] = $declared + [ 'part' => $standard, 'demo' => $source ];
 			}
 
 			return [ 'components' => $components, 'groups' => $groups, 'rejected' => $rejected ];
+		}
+
+		/**
+		 *	The names of the components of the feature that comes with the kernel (Basis), which the demo of any group may call: the
+		 *	folders of its components/ - the name of a folder is the name of the component - so that a demo of another feature is
+		 *	checked against names and not against the register, which the cache of a feature is made without. The kind of a
+		 *	name that is not the feature's own - container or leaf - is the parser's to find, from the ends the demo has
+		 *
+		 *	@return 	array										The names
+		 */
+		private static function _basisNames(): array {
+
+			$names = [];
+			$path = self::_shipped(). '/Basis/'. self::COMPONENTS;
+
+			foreach( @scandir( $path ) ?: [] as $entry )
+				if( $entry[0] !== '.' && preg_match( \Nino\Components::NAME, $entry ) === 1 && is_dir( $path. '/'. $entry ) === true )
+					$names[] = $entry;
+
+			return $names;
 		}
 
 		/**
