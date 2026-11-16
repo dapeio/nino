@@ -424,14 +424,28 @@ namespace Nino {
 
 		/**
 		 *	Whether a text is a step of a ladder: a value of css the compiler of a theme may write as it is - at most 120
-		 *	characters of letters, digits, spaces and . , % ( ) + * / # -, no quote, semicolon, brace, comment or url()
+		 *	characters of letters, digits, spaces and . , % ( ) + * / # -, every bracket closed, no quote, semicolon, brace, comment or url()
 		 *
 		 *	@param		mixed			$step					What a ladder holds at a place
 		 *
 		 *	@return 	bool
 		 */
 		public static function validStep( mixed $step ): bool {
-			return is_string( $step ) === true && preg_match( self::STEP, $step ) === 1 && str_contains( $step, '/*' ) === false && str_contains( $step, '*/' ) === false && preg_match( '/url\s*\(/i', $step ) !== 1;
+			if( is_string( $step ) === false || preg_match( self::STEP, $step ) !== 1 || str_contains( $step, '/*' ) === true || str_contains( $step, '*/' ) === true || preg_match( '/url\s*\(/i', $step ) === 1 )
+				return false;
+
+			// The brackets close in the order they opened: a calc( that is never closed swallows what the stylesheet says after it
+			$open = 0;
+
+			foreach( str_split( $step ) as $character ) {
+
+				$open += $character === '(' ? 1 : ( $character === ')' ? -1 : 0 );
+
+				if( $open < 0 )
+					return false;
+			}
+
+			return $open === 0;
 		}
 
 		/**

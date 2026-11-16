@@ -984,9 +984,9 @@ for( $i = 1; $i <= 7; $i++ )
 
 check( 'a component has six knobs at most, and a seventh is refused with the number - the sixth is not', is_string( $group( [ 'label' => 'T', 'knobs' => $knobs ] ) ) === true && str_contains( (string) $group( [ 'label' => 'T', 'knobs' => $knobs ] ), '6 knobs at most' ) === true
 	&& is_array( $group( [ 'label' => 'T', 'knobs' => array_slice( $knobs, 0, 6 ) ] ) ) === true && is_array( $group( [ 'label' => 'T', 'knobs' => array_slice( $knobs, 0, 6 ) + registerKnob( 'other.space' ) ], [ 'tidy', 'other' ] ) ) === true );
-check( 'validStep() is the check of a step of a ladder: a value of css as it is - a calc() with tokens, a colour - and nothing with a quote, brace, semicolon, comment, url(), a number, a null byte or more than 120 characters',
+check( 'validStep() is the check of a step of a ladder: a value of css as it is - a calc() with tokens, a colour - and nothing with a quote, brace, semicolon, comment, url(), a bracket that does not close, a number, a null byte or more than 120 characters',
 	\Nino\Components::validStep( 'calc( var(--page-space-2) * 1.5 )' ) === true && \Nino\Components::validStep( 'rgb(0 0 0 / 50%)' ) === true && \Nino\Components::validStep( '#fff' ) === true
-	&& array_filter( [ '', '}', '"x"', 'a;b', '1px/* x', '1px */', 'URL (//evil.example/x)', 'url(x)', 5, null, [ '1px' ], "1px\0", str_repeat( '1', 121 ) ], static fn( mixed $step ): bool => \Nino\Components::validStep( $step ) === true ) === []
+	&& array_filter( [ '', '}', '"x"', 'a;b', '1px/* x', '1px */', 'URL (//evil.example/x)', 'url(x)', 'calc( 1px', '1px )', ')(', 'calc( ( 1px + 2px )', 5, null, [ '1px' ], "1px\0", str_repeat( '1', 121 ) ], static fn( mixed $step ): bool => \Nino\Components::validStep( $step ) === true ) === []
 	&& \Nino\Components::validStep( str_repeat( '1', 120 ) ) === true );
 
 $extra = $group( [ 'label' => 'Tidy', 'knobs' => registerKnob( 'tidy.x-glow' ) ] );
