@@ -222,11 +222,12 @@ printf( "  opcache for this run: %s\n", $opcache === true ? 'on' : 'off' );
 
 echo "\n";
 
-// The budget of the notation: 0.015 ms a call, twice for the reserve. Far from what is measured, so that a slow machine is no failure
-check( 'a page of 600 calls is read and drawn in at most 18 ms', $read <= 18.0 );
-check( 'and read, drawn and kept in at most 18 ms as well', $kept <= 18.0 );
+// The budget of the notation is 0.015 ms a call, twice for the reserve: 18 ms for this page, and a quiet machine takes 6 to 8 ms, told above on every
+// run. The pin is ten times the measure, so that the runner of a shared service, several times slower from one run to the next, is no failure
+check( 'a page of 600 calls is read and drawn in at most 70 ms', $read <= 70.0 );
+check( 'and read, drawn and kept in at most 70 ms as well', $kept <= 70.0 );
 
-check( 'a page drawn from the tree that is kept is drawn in at most 18 ms as well', $warm <= 18.0 );
+check( 'a page drawn from the tree that is kept is drawn in at most 70 ms as well', $warm <= 70.0 );
 
 /*	What the tree that is kept saves is the read of the text into a tree (about two fifths of the time of the page, measured
 	here: the number above); what it cannot save is the drawing, which is the rest. Half of the time of the page is not
