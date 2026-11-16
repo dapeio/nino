@@ -38,7 +38,7 @@ $appData['/nino/locales/available']			= [ 'de_DE' ];
 // The framework's menus, as AppData::init() merges them under every request
 // the wizard answers - the sandbox only runs prepare()
 $appData['/nino/html/navs']								= \Nino\AppData::DEFAULTS['/nino/html/navs'];
-$appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
+$appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf' ];
 
 mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/public/images', 0777, true );
@@ -1096,7 +1096,7 @@ $appProject = static function( string $name, bool $account = true ) use ( &$appR
 	$app['/nino/dir']								= '';
 	$app['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
 	$app['/nino/html/navs']					= \Nino\AppData::DEFAULTS['/nino/html/navs'];
-	$app['/nino/modules']						= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
+	$app['/nino/modules']						= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf' ];
 	foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $sub )
 		mkdir( $dir. $sub, 0777, true );
 	\Nino\Filesystem::putFileContent( $app, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ] ] );

@@ -16,10 +16,13 @@ namespace Nino {
 	 *										registry of names, each a function that gets the raw value
 	 *										of a field or a text and answers plain text, or null where
 	 *										it cannot read the value - the value is then shown as it
-	 *										is shown without a formatter. The kernel escapes the
-	 *										answer (\Nino\Modules\Components::escape()); a formatter
+	 *										is shown without a formatter. The caller escapes the
+	 *										answer (\Nino\Components::escape()); a formatter
 	 *										never writes html. A template names a formatter and never
 	 *										a callable: only what add() registered is ever called.
+	 *										No code of the kernel calls it, options() included: it is
+	 *										the API of the feature collections of the catalogue, whose
+	 *										components format a field by "as".
 	 *
 	 *										The seven built in write a number or a date in the
 	 *										conventions of the language of the page - German for a
@@ -120,7 +123,7 @@ namespace Nino {
 		 *	Register a formatter, or replace one - a built-in too, at its place. From
 		 *	the init() of a module or a feature. It is called with the raw value
 		 *	( array &$appData, mixed $value ): ?string and answers plain text, or
-		 *	null for a value it cannot read; the kernel escapes the answer. A name
+		 *	null for a value it cannot read; the caller escapes the answer. A name
 		 *	that is no slug or a label that is no string or locale => string map is
 		 *	refused as addComponent() refuses a schema
 		 *

@@ -635,7 +635,6 @@ check( 'the head of a mail carries the tag of the language it is rendered in: th
 $appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 500, 'height' => 100, 'filename' => 'logo.500x100.png' ];
 $appData['/nino/html/images']['/logo/dark'] = [ 'label' => 'Logo, dark', 'width' => 500, 'height' => 100, 'filename' => 'logo-dark.500x100.png' ];
 \Nino\Html::init( $appData );
-\Nino\Modules\Components::init( $appData );
 $dirBefore = $appData['/nino/dir'] ?? null;
 $appData['/nino/dir'] = '';
 $bothLogos = \Nino\Html::renderHtml( $appData, $mailHead );

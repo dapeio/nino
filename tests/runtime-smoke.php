@@ -973,23 +973,26 @@ check( '...and a key it does carry overrides that default', ( $partial['/nino/ca
 // project that drops a locale has to actually lose it
 check( '...including a list, which is replaced rather than appended to', ( $partial['/nino/locales/available'] ?? null ) === [ 'en_US', 'fr_FR' ] );
 
-// A config.php written before Components: it lists Images, and a project module
-// that registers a component of a kernel name. Components has to stand where
-// Images stood, so that the project's module boots after it and its markup wins
-class KernelSmokeTitleOverride {
+// A config.php the setup wizard of an earlier release wrote lists the module class of the components, which the kernel does not have, and a list
+// is replaced wholesale: it is read without that name and in the order the file has it, a project's own module among the rest, and the file
+// itself is not rewritten. A list that names \Nino\Modules\Images, as a still older file does, is left as it is
+class KernelSmokeProjectModule {
+	public static array $booted = [];
 	public static function init( array &$appData ): void {
-		\Nino\Modules\Components::addComponent( $appData, 'title', static fn( array &$appData, array $args ): string => '<b class="mine">'. $args['value']. '</b>', [ 'label' => 'Title', 'source' => 'text', 'group' => 'section' ] );
+		self::$booted[] = $appData['/nino/modules'];
 	}
 }
-$migrations = [
-	'with Images'		=> [ [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images', '\\Nino\\Modules\\Cache', '\\KernelSmokeTitleOverride' ], 5 ],
-	'without Images'	=> [ [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Cache', '\\KernelSmokeTitleOverride', '\\Nino\\Modules\\Form' ], 3 ],
+$staleLists = [
+	'with Components'				=> [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components', '\\Nino\\Modules\\Cache', '\\KernelSmokeProjectModule' ],
+	'with Components, no slash'	=> [ 'Nino\\Modules\\Assets', 'Nino\\Modules\\Components', '\\KernelSmokeProjectModule', '\\Nino\\Modules\\Form' ],
+	'with Images'						=> [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Images', '\\Nino\\Modules\\Cache', '\\KernelSmokeProjectModule' ],
 ];
-foreach( $migrations as $label => [ $modules, $position ] ) {
+foreach( $staleLists as $label => $modules ) {
 
 	$oldRoot = $sandbox. '/oldmodules-'. strlen( $label );
 	mkdir( $oldRoot. '/private', 0777, true );
-	file_put_contents( $oldRoot. '/private/config.php', '<?php return '. var_export( [ '/nino/modules' => $modules ], true ). ';' );
+	$written = '<?php return '. var_export( [ '/nino/modules' => $modules ], true ). ';';
+	file_put_contents( $oldRoot. '/private/config.php', $written );
 
 	$old = [ './nino/uid' => $oldRoot ];
 	\Nino\AppData::prepare( $old );
@@ -999,14 +1002,30 @@ foreach( $migrations as $label => [ $modules, $position ] ) {
 	$old['./nino/filesystem/publicpath'] 	= $oldRoot. '/public';
 	\Nino\AppData::init( $old );
 
-	check( 'a config.php of 1.5 ('. $label. '): Components is listed once, where it takes the place before the project\'s own modules', array_search( '\\Nino\\Modules\\Components', $old['/nino/modules'], true ) === $position
-		&& count( array_keys( $old['/nino/modules'], '\\Nino\\Modules\\Components', true ) ) === 1 && in_array( '\\Nino\\Modules\\Images', $old['/nino/modules'], true ) === false
-		&& array_search( '\\KernelSmokeTitleOverride', $old['/nino/modules'], true ) > $position );
+	$expected = array_values( array_filter( $modules, static fn( string $class ): bool => ltrim( $class, '\\' ) !== 'Nino\\Modules\\Components' ) );
+	check( 'a config.php of an earlier release ('. $label. '): the list is read without \\Nino\\Modules\\Components and as the file has it otherwise', $old['/nino/modules'] === $expected
+		&& array_key_exists( 'Nino\\Modules\\Components', array_flip( array_map( static fn( string $class ): string => ltrim( $class, '\\' ), $old['/nino/modules'] ) ) ) === false );
 
+	KernelSmokeProjectModule::$booted = [];
+	ninoWarnings();
 	\Nino\Modules::callModules( $old, 'init' );
-	\Nino\Html::addFills( $old, [ '/t/k' => 'Hi' ], '*' );
-	check( '...and the project\'s [title] is the one that renders', \Nino\Html::renderHtml( $old, '[title /t/k]' ) === '<b class="mine">Hi</b>' );
+	check( '...the modules are walked with nothing said, the project\'s own one among them, and the file is not rewritten', ninoWarnings() === [] && count( KernelSmokeProjectModule::$booted ) === 1
+		&& file_get_contents( $oldRoot. '/private/config.php' ) === $written );
 }
+check( 'a list that does not name it is the list: nothing is added in its place, and the kernel does not list it as a default', in_array( '\\Nino\\Modules\\Components', \Nino\AppData::DEFAULTS['/nino/modules'], true ) === false
+	&& ( $partial['/nino/modules'] ?? null ) === \Nino\AppData::DEFAULTS['/nino/modules'] );
+
+// The same, booted: \Nino\init() over the config.php of such a project, in a process of its own
+$bootRoot = $sandbox. '/oldboot';
+mkdir( $bootRoot. '/private', 0777, true );
+file_put_contents( $bootRoot. '/private/config.php', '<?php return '. var_export( [ '/nino/modules' => $staleLists['with Components'], '/nino/install/completed' => true ], true ). ';' );
+$booted = runIsolated( '
+	$appData = \Nino\init();
+	echo json_encode( [ $appData["/nino/modules"], \Nino\Html::shortcodes( $appData ) ] );
+', 'define( "NINO_PRIVATE_DIR", '. var_export( $bootRoot. '/private', true ). ' );' );
+$bootedLists = json_decode( $booted['stdout'], true );
+check( 'a boot over such a config.php is a boot: the list is without \\Nino\\Modules\\Components, the shortcodes of the kernel are there, nothing was fatal', $booted['exitCode'] === 0 && is_array( $bootedLists ) === true
+	&& in_array( '\\Nino\\Modules\\Components', $bootedLists[0], true ) === false && in_array( '\\Nino\\Modules\\Cache', $bootedLists[0], true ) === true && array_diff( [ 'json', 'imagevalues' ], $bootedLists[1] ) === [] );
 
 $bootstrap = '
 	$sandbox = sys_get_temp_dir(). "/nino-handleerror-". bin2hex( random_bytes( 4 ) );

@@ -413,7 +413,7 @@ namespace Nino\Modules {
 		/**
 		 *	Replace html: what stands between the tags is the page's own markup, drawn, and then what
 		 *	\Nino\Html::sanitizeHtml() keeps of it in the format blocks - paragraphs, lists and the inline tags - with the
-		 *	brackets it was written with, as the module Components keeps them. What a fill put into it is cleaned with the rest. Where nothing is left, nothing is drawn
+		 *	brackets it was written with. What a fill put into it is cleaned with the rest. Where nothing is left, nothing is drawn
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by the register

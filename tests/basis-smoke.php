@@ -13,8 +13,8 @@ declare(strict_types=1);
  *										   the markup of each one, the pictures, the menus, the links that are none; the fall-back rules
  *										C. the contract of group, part, ladder and token: the seven things a group keeps, the tokens that Nino.css
  *										   sets and the parts read, the parts in the bundle and what the hook of the parts does to them
- *										D. both states: where basis is off the module of the kernel draws text, button, image, spacer and html as it
- *										   always did, where it is on the register does
+ *										D. both states: where basis is off text, button, image, spacer and html are names nobody registered, where it
+ *										   is on the register draws them; [title] is such a name in both
  *										E. what must never be read: a text, a field, an alt text, a caption and the title of a menu that spell a call,
  *										   a fill, a quote, a null byte, a megabyte; an address that is none
  *										F. the fixture page - all twenty components, cards, header and footer - drawn in both languages and compared
@@ -884,7 +884,7 @@ check( 'a theme is asked for each of the six parts and may replace one (a file t
 
 // --- D. Both states --------------------------------------------------------------------------------------
 
-echo "\nD. Both states: the module of the kernel and the register\n";
+echo "\nD. Both states: the names basis has and the names it does not\n";
 
 $sources = [
 	'text'		=> '[text /template/page-basis/hero/title]',
@@ -895,18 +895,36 @@ $sources = [
 ];
 $off = basisSite( 'de_DE', false );
 $on = basisSite();
-\Nino\Modules\Components::init( $off );
-\Nino\Modules\Components::init( $on );
-ninoWarnings();
 $states = [];
+$quiet = [];
 
 foreach( $sources as $name => $source ) {
 
+	ninoWarnings();
 	$before = \Nino\Html::renderSource( $off, $source, [ 'template' => 'page-basis' ] );
+	$saidOff = ninoWarnings();
 	$after = \Nino\Html::renderSource( $on, $source, [ 'template' => 'page-basis' ] );
-	$states[$name] = $before !== '' && $before !== $after && preg_match( '/class="'. preg_quote( $name, '/' ). '[" ]/', $before ) !== 1 && preg_match( '/class="'. preg_quote( $name, '/' ). '[" ]/', $after ) === 1;
+	$saidOn = ninoWarnings();
+	$states[$name] = $before === '' && $after !== '' && preg_match( '/class="'. preg_quote( $name, '/' ). '[" ]/', $after ) === 1;
+	$quiet[$name] = count( $saidOff ) === 1 && str_contains( $saidOff[0], '"'. $name. '"' ) && $saidOn === [];
 }
-check( 'where basis is off the module of the kernel draws text, button, image, spacer and html and none of them has the class of its name; where it is on the register does, and the log says nothing', array_filter( $states ) === $states && ninoWarnings() === [] );
+check( 'where basis is off text, button, image, spacer and html are names nobody registered: nothing is drawn and the log says so once for each; where it is on the register draws each with the class of its name and the log says nothing',
+	array_filter( $states ) === $states && array_filter( $quiet ) === $quiet );
+
+// A page of the first releases: it calls [title] and the five. [title] is no name of basis, so the page is drawn without it in
+// either state; the rest of the page is the register's where basis is on and is not drawn where it is off. A request says an
+// unknown name once, so each state is a site of its own
+$page = "<main>\n[title /template/page-basis/hero/title]\n". implode( "\n", $sources ). "\n</main>";
+$pageSites = [ 'off' => basisSite( 'de_DE', false ), 'on' => basisSite() ];
+ninoWarnings();
+$pageOff = \Nino\Html::renderSource( $pageSites['off'], $page, [ 'template' => 'page-basis' ] );
+$saidPageOff = ninoWarnings();
+$pageOn = \Nino\Html::renderSource( $pageSites['on'], $page, [ 'template' => 'page-basis' ] );
+$saidPageOn = ninoWarnings();
+check( 'a page that calls [title] and the five: without basis it is the page with its six calls left out and one line in the log for each, with basis the five are drawn by the register and [title] alone is left out and said once',
+	$pageOff === '<main>'. str_repeat( "\n", 7 ). '</main>' && count( $saidPageOff ) === 6 && str_contains( $saidPageOff[0], '"title"' )
+	&& str_starts_with( $pageOn, "<main>\n\n" ) && str_ends_with( $pageOn, "\n</main>" ) && count( $saidPageOn ) === 1 && str_contains( $saidPageOn[0], '"title"' )
+	&& array_filter( array_keys( $sources ), static fn( string $name ): bool => preg_match( '/class="'. preg_quote( $name, '/' ). '[" ]/', $pageOn ) !== 1 ) === [] );
 
 // --- E. What must never be read -------------------------------------------------------------------------------
 

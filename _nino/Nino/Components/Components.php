@@ -53,8 +53,7 @@ namespace Nino {
 	 *										- the template whose words ~name reads, the id of the nearest
 	 *										ancestor that has one - a call that has one itself reads its own words in
 	 *										it - the place the nodes stand in, the element
-	 *										of a loop (the shape \Nino\Modules\Components::element() answers:
-	 *										[ 'uri', 'id', 'element', 'model' ]), the tokens of the loops the nodes stand
+	 *										of a loop (the shape [ 'uri', 'id', 'element', 'model' ] has), the tokens of the loops the nodes stand
 	 *										in ('fills', [ '[[token]]' => text ]: a textfill with no slash reads them before the
 	 *										element, and the call of a shortcode has them put into its arguments) and how
 	 *										deep the nodes are.
@@ -103,7 +102,7 @@ namespace Nino {
 		// What an attribute may be
 		public const array TYPES = [ 'choice', 'bool', 'int', 'string', 'text', 'image', 'link', 'id' ];
 
-		// The words a bool is read from. The same two lists as \Nino\Modules\Components::ON and ::OFF
+		// The words a bool is read from. The two lists \Nino\Feature::flag() reads a flag of a shortcode without a schema by as well
 		public const array ON = [ '1', 'true', 'yes', 'on' ];
 		public const array OFF = [ '0', 'false', 'no', 'off' ];
 
@@ -166,7 +165,7 @@ namespace Nino {
 
 		// What an icon is made of: the tags a part may be, each with the attributes it takes (the radii of a rect may
 		// be left out), how a value is written, how long it may be and what a message calls it, and how many parts an
-		// icon has and how many characters its values have together. The rules of \Nino\Modules\Components::validate()
+		// icon has and how many characters its values have together
 		private const array ICON_TAGS = [
 			'path'		=> [ 'd' ],
 			'circle'	=> [ 'cx', 'cy', 'r' ],
@@ -186,8 +185,8 @@ namespace Nino {
 		private const int ICON_LENGTH = 2048;
 
 		/**
-		 *	Register a component. The schema is checked by validate(), and a schema that is none is what
-		 *	\Nino\Modules\Components::addComponent() makes of it: an E_USER_ERROR, nothing registered. A
+		 *	Register a component. The schema is checked by validate(), and a schema that is none is an
+		 *	E_USER_ERROR, nothing registered. A
 		 *	component that is registered again under its name takes the place of the first, which keeps its
 		 *	position in the list - nothing is said
 		 *
@@ -1886,8 +1885,7 @@ namespace Nino {
 		 *	said once. A key with a slash in front is as it is written. .field is a field of the element, nothing
 		 *	where there is none. A text is escaped by its format - plain: the entities read as the characters they are,
 		 *	then escaped once; the others are sanitized - and for the key's text the language it is in, where that is
-		 *	not the language of the page, goes into $lang as the attribute that says it. A link is an address as
-		 *	\Nino\Modules\Components::value() reads one: a key with a slash in front that has no text is written as
+		 *	not the language of the page, goes into $lang as the attribute that says it. A link is an address: a key with a slash in front that has no text is written as
 		 *	the address it is, a key under /_nino/webpage/ - the address of a page, which is written without the
 		 *	directory the site is served from - has that directory put in front, and nothing is an address that
 		 *	a browser would take for a script (a scheme but http, https, mailto and tel, a control character, a

@@ -1196,7 +1196,7 @@ function callImagesAdmin( array &$appData, string $method, array $data, int $sta
 	return ninoCall( $appData, [ \Nino\Modules\Images\Admin::class, $method ], $data, null, $statusBefore );
 }
 
-\Nino\Modules\Components::init( $appData );
+\Nino\Html::init( $appData );
 
 [ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/nope' ] );
 check( 'removing the image of an unknown slot is a 404', $status === 404 );
@@ -1207,13 +1207,13 @@ $slotsBeforeEmpty = $appData['/nino/html/images'];
 check( 'a slot without an image answers 200 with no filename and changes nothing - the call can be repeated', $status === 200 && array_key_exists( 'filename', $body ) === true && $body['filename'] === null && $appData['/nino/html/images'] === $slotsBeforeEmpty );
 
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
-check( 'the slot to remove from shows its image', str_contains( \Nino\Html::renderHtml( $appData, '[image /hero]' ), '<img src=' ) === true && is_file( $slotUploadPath ) === true );
+check( 'the slot to remove from shows its image', str_contains( \Nino\Html::renderHtml( $appData, '[imagevalues /hero]<img src="[[src]]">[/imagevalues]' ), '<img src=' ) === true && is_file( $slotUploadPath ) === true );
 [ $status, $body ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/hero' ] );
 $persistedSlots = ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images'];
 check( 'removing answers 200 with no filename; the record is null in memory and in config.php', $status === 200 && array_key_exists( 'filename', $body ) === true && $body['filename'] === null
 	&& $appData['/nino/html/images']['/hero']['filename'] === null && array_key_exists( 'filename', $persistedSlots['/hero'] ) === true && $persistedSlots['/hero']['filename'] === null );
-check( '...the file is deleted, the slot stays with its size, and [image] renders nothing', is_file( $slotUploadPath ) === false
-	&& ( $appData['/nino/html/images']['/hero']['width'] ?? null ) === 60 && \Nino\Html::renderHtml( $appData, '[image /hero]' ) === '' );
+check( '...the file is deleted, the slot stays with its size, and [imagevalues] renders nothing', is_file( $slotUploadPath ) === false
+	&& ( $appData['/nino/html/images']['/hero']['width'] ?? null ) === 60 && \Nino\Html::renderHtml( $appData, '[imagevalues /hero]<img src="[[src]]">[/imagevalues]' ) === '' );
 
 // A name an editor wrote into config.php by hand - a logo a template includes literally - is cleared from the slot, and its file is not the slot's to delete
 \Nino\Filesystem::putFileContent( $appData, '/images/logo.png', 'a logo a template includes literally' );
@@ -1245,7 +1245,6 @@ rmdir( $configLock );
 // A request that already failed its csrf check changes nothing
 [ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/failing' ], 403 );
 check( 'a request whose status is already 403 (csrf) removes nothing', $status === 403 && $appData['/nino/html/images']['/failing']['filename'] === 'failing.60x40.jpg' && \Nino\Filesystem::fileExists( $appData, '/images/failing.60x40.jpg' ) === true );
-unset( $appData['./nino/html/shortcodes']['image'], $appData['./nino/callbacks']['/nino/html/shortcode/image'] );
 unset( $appData['./nino/html/cache'] );
 
 // --- apiAlt: the alt text per language ---------------------------------------

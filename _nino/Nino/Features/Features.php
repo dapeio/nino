@@ -579,31 +579,10 @@ namespace Nino {
 				$settings[$settingName] = $clean;
 			}
 
-			// The components and the stacks a feature declares: name => schema,
-			// each read the way \Nino\Modules\Components registers a schema, so
-			// that the manifest is refused here and not when a request is
-			// rendered - and a component's schema as it is registered, which is
-			// the feature's own: "by", the registry's word for who registered it,
-			// is the key of the feature whatever the schema says, which is why the
-			// reader is handed the key (and the directory, which a method named for the
-			// options of an attribute is looked for in), and a tool offers it under the feature, so
-			// that a schema naming a "group" is refused. The callbacks are not
-			// declared but derived (see registerManifestComponents())
-			$declared = [ 'components' => [], 'stacks' => [] ];
-			foreach( $declared as $what => $none ) {
-
-				if( is_array( $raw[$what] ?? [] ) === false )
-					return $fail( '"'. $what. '" must be a name => schema map' );
-
-				foreach( (array) ( $raw[$what] ?? [] ) as $name => $schema ) {
-
-					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks', $key, $dir );
-					if( is_string( $clean ) === true )
-						return $fail( $clean );
-
-					$declared[$what][(string) $name] = $clean;
-				}
-			}
+			// The manifest keys components and stacks are not read: the components of a feature are the
+			// files of its folder components/. A manifest that still has one of them is kept
+			// and says so as a reason in componentProblems()
+			$unread = array_key_exists( 'components', $raw ) === true || array_key_exists( 'stacks', $raw ) === true;
 
 			return [
 				'key'					=> $key,
@@ -622,90 +601,8 @@ namespace Nino {
 				'data'				=> $data,
 				'assets'			=> $assets,
 				'settings'		=> $settings,
-				'components'	=> $declared['components'],
-				'stacks'			=> $declared['stacks'],
+				'unread'			=> $unread,
 			];
-		}
-
-		/**
-		 *	Register what the active features declare as 'components' and
-		 *	'stacks' in their manifest - the way into the registry of
-		 *	\Nino\Modules\Components, beside a module calling addComponent()
-		 *	itself. What a feature brings to the register of \Nino\Components,
-		 *	from its folders, is registerComponents(). Each name is a shortcode whose renderer is by convention
-		 *	[ '\Nino\Modules\<Directory>', 'component<Name>' ] - or 'stack<Name>' -
-		 *	with the name written in studly caps: 'newsletter-signup' is
-		 *	componentNewsletterSignup(). A component whose class has no such
-		 *	method is rendered by the class's doShortcode() where it has one: the
-		 *	shortcode a feature would write by hand and the component of its
-		 *	manifest are then one method, which is handed the arguments the way
-		 *	any renderer is, made ready. A stack keeps the strict rule. A renderer
-		 *	the class does not have is said out loud and skipped, the way a
-		 *	callback that is not callable is. A component is registered as the
-		 *	feature's own - its schema says 'by' the key of the manifest (see
-		 *	manifest()) - which is how a tool that lists the registry tells it
-		 *	from the kernel's, and why it has no 'group': a tool offers it under
-		 *	the feature.
-		 *
-		 *	Asked at every boot, by the Components module, and so only the
-		 *	manifests of the features listed in '/nino/modules' are read: not
-		 *	all() with its scan of the directory and its record of which are
-		 *	active, which the workbench needs and a visitor does not
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	void
-		 */
-		public static function registerManifestComponents( array &$appData ): void {
-
-			foreach( self::_listed( $appData ) as $manifest ) {
-
-				if( $manifest['components'] === [] && $manifest['stacks'] === [] )
-					continue;
-
-				foreach( [ 'component' => 'components', 'stack' => 'stacks' ] as $prefix => $what )
-					foreach( $manifest[$what] as $name => $schema ) {
-
-						$callback = [ $manifest['module'], $prefix. str_replace( ' ', '', ucwords( str_replace( '-', ' ', (string) $name ) ) ) ];
-
-						if( $what === 'components' && is_callable( $callback ) === false && is_callable( [ $manifest['module'], 'doShortcode' ] ) === true )
-							$callback = [ $manifest['module'], 'doShortcode' ];
-
-						if( is_callable( $callback ) === false ) {
-							trigger_error( 'Feature manifest '. $manifest['dir']. '/'. self::MANIFEST. ': the '. $prefix. ' "'. $name. '" has no renderer '. $callback[0]. '::'. $callback[1]. '()', E_USER_WARNING );
-							continue;
-						}
-
-						// A manifest is read on paper where it names a method for the options of an
-						// attribute, and a class that does not load or lacks the method is found
-						// here, with the check a module's registration gets: said and left out like a
-						// renderer that is missing, and not the E_USER_ERROR of addComponent() on
-						// every request
-						$problem = null;
-
-						if( array_filter( array_column( (array) $schema['attributes'], 'options' ), 'is_string' ) !== [] )
-							try {
-								$problem = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks', $manifest['key'] );
-							}
-							catch( \Throwable $thrown ) {
-
-								// Loading the class is what the check does: a file that does not parse, or
-								// anything else that goes wrong as it loads, is a feature that is left out
-								// of the registry and not a page that is a 500 for every visitor
-								$problem = $prefix. ' "'. $name. '": "options": '. get_class( $thrown ). ': '. $thrown->getMessage();
-							}
-
-						if( is_string( $problem ) === true ) {
-							trigger_error( 'Feature manifest '. $manifest['dir']. '/'. self::MANIFEST. ': '. $problem. ' - not registered', E_USER_WARNING );
-							continue;
-						}
-
-						if( $what === 'stacks' )
-							\Nino\Modules\Components::addStack( $appData, (string) $name, $callback, $schema );
-						else
-							\Nino\Modules\Components::addComponent( $appData, (string) $name, $callback, $schema );
-					}
-			}
 		}
 
 		/**
@@ -1165,8 +1062,8 @@ namespace Nino {
 		/**
 		 *	Why a component or a group of an active feature is not registered, for the Features panel: what
 		 *	readComponents() refused, and what another feature has claimed before it (the register of the
-		 *	request holds who owns a name and a group). [] for a feature that is off, that has no folder components/
-		 *	or whose components are all there. Reads the folders, so it is for a panel and not for a request of a visitor
+		 *	request holds who owns a name and a group); and, once, that the manifest has the keys components or stacks, which are not read.
+		 *	[] for a feature that is off or whose components are all there. Reads the folders, so it is for a panel and not for a request of a visitor
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					The key of a feature
@@ -1177,18 +1074,24 @@ namespace Nino {
 
 			$feature = self::get( $appData, $key );
 
-			if( $feature === null || $feature['active'] === false || is_dir( $feature['dir']. '/'. self::COMPONENTS ) === false )
+			if( $feature === null || $feature['active'] === false )
 				return [];
+
+			// Said once, however many keys the manifest has of the two
+			$unread = $feature['unread'] === true ? [ 'the manifest keys components and stacks are not read; components live in the folder components/' ] : [];
+
+			if( is_dir( $feature['dir']. '/'. self::COMPONENTS ) === false )
+				return $unread;
 
 			$read = self::readComponents( $feature['dir'], $key );
 
 			if( is_string( $read ) === true )
-				return [ $read ];
+				return array_merge( $unread, [ $read ] );
 
 			$refused = [];
 			self::_renderers( $feature, $read['components'], $refused );
 
-			$problems = array_merge( array_values( $read['rejected'] ), array_values( $refused ) );
+			$problems = array_merge( $unread, array_values( $read['rejected'] ), array_values( $refused ) );
 
 			foreach( array_keys( $read['groups'] ) as $group )
 				if( ( $appData[\Nino\Components::OWNERS]['groups'][$group] ?? $key ) !== $key )
@@ -1267,11 +1170,7 @@ namespace Nino {
 		 *	\Nino\Html::addAsset()).
 		 *
 		 *	Only the manifests of the features listed in '/nino/modules' are read,
-		 *	as registerManifestComponents() reads them.
-		 *
-		 *	Not the 'assets' of a stack's schema (\Nino\Modules\Components::validate()),
-		 *	which is a note for a tool about the files a stack needs and adds nothing
-		 *	to a page.
+		 *	as registerComponents() reads them.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

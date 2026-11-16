@@ -29,36 +29,4 @@ return [
 		'apiKey'	=> [ 'type' => 'secret', 'label' => 'API key' ],
 		'hosts'		=> [ 'type' => 'lines', 'label' => 'Hosts' ],
 	],
-	// Two components and a stack, the way a feature declares them: the kernel
-	// registers each as a shortcode whose renderer is componentGreeting() and
-	// stackRows() of the class - and componentCaption(), which the class does
-	// not have, so that the component falls back to its doShortcode()
-	'components'	=> [
-		'greeting'	=> [
-			'label'				=> [ 'en_US' => 'Greeting', 'de_DE' => 'Begrüßung' ],
-			'source'			=> 'text',
-			'attributes'	=> [
-				'shout'		=> [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Shout', 'de_DE' => 'Rufen' ] ],
-			],
-			'preview'			=> 'text',
-			// What a tool shows it by: the parts of a 24 by 24 icon, a tag and its attributes each
-			'icon'				=> [ [ 'path', [ 'd' => 'M4 12h16' ] ] ],
-			// Where the editor may put it and what it draws, the two keys the kernel's own titles carry
-			'in'					=> [ 'section', 'card' ],
-			'draws'				=> 'p .sample-greeting',
-		],
-		'caption'		=> [
-			'label'				=> [ 'en_US' => 'Caption', 'de_DE' => 'Beschriftung' ],
-			'source'			=> 'none',
-			// Who registered it is the feature's key whatever the manifest says: a
-			// feature that claims to be the kernel's is registered as its own
-			'by'					=> 'nino',
-		],
-	],
-	'stacks'			=> [
-		'rows'			=> [
-			'label'				=> [ 'en_US' => 'Rows', 'de_DE' => 'Zeilen' ],
-			'preview'			=> 'block',
-		],
-	],
 ];

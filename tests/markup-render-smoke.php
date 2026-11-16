@@ -33,7 +33,6 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 \Nino\Html::init( $appData );
 \Nino\Modules\Template::init( $appData );
 \Nino\Modules\Elements::init( $appData );
-\Nino\Modules\Components::init( $appData );
 \Nino\Modules\Navigation::init( $appData );
 \Nino\Modules\Localepicker::init( $appData );
 \Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', str_repeat( 'c', 64 ) );
@@ -99,8 +98,10 @@ $notices = ninoWarnings();
 check( 'a name nobody registered draws nothing, and nor does what it holds', $html === 'before  after  and  ' );
 check( '...and the log is told once for a name', count( $notices ) === 3 && str_contains( $notices[0], '"nosuch"' ) === true && str_contains( $notices[1], 'nosuch2' ) === true && str_contains( $notices[2], 'nosuch3' ) === true );
 
-check( 'an apostrophe is the character it is, and no quote: the value of a call is what stands between the double quotes', $render( '[button text="it\'s" href="#"]' ) === '<a class="nino-btn" href="#">it&#039;s</a>' );
-check( '...a value in single quotes is no value: the attribute is dropped and the call is drawn without it', $render( '[button text=\'it\' href="#"]' ) === '<a class="nino-btn" href="#"></a>' || $render( '[button text=\'it\' href="#"]' ) === '' );
+$seen->exchangeArray( [] );
+$render( '[probe text="it\'s" href="#" /][probe text=\'it\' href="#" /]' );
+check( 'an apostrophe is the character it is, and no quote: the value of a call is what stands between the double quotes', $seen[0][0]['text'] === "it's" && $seen[0][0]['href'] === '#' );
+check( '...a value in single quotes is no value: the attribute is not handed on and the call is made without it', array_key_exists( 'text', $seen[1][0] ) === false && $seen[1][0]['href'] === '#' );
 check( '\\[ in front of a call is the text of the call, with the backslash gone', $render( '\\[leaf] [leaf]' ) === '[leaf] leaf' );
 check( 'a call with a line break in its value is no call: it is the text it is', $render( "[leaf a=\"x\ny\"]" ) === "[leaf a=\"x\ny\"]" );
 check( 'a fill whose key is none of a key is text, and one with a field name and no loop stays written', $render( '[[ ]] [[title]] [[/nothing/here/at/all]]' ) === '[[ ]] [[title]] [[/nothing/here/at/all]]' );
@@ -178,25 +179,15 @@ foreach( \Nino\Html::shortcodes( $appData ) as $name )
 	$flags[$name] = $appData['./nino/html/shortcodes'][$name];
 $pick = static fn( array $names ): array => array_map( static fn( string $name ): mixed => array_key_exists( $name, $flags ) === true ? $flags[$name] : 'not registered', array_combine( $names, $names ) );
 check( 'the kernel says what each of its shortcodes is: a leaf, a container, or both',
-	array_values( array_unique( $pick( [ 'template', 'csrf', 'json', 'localepicker', 'title', 'subtitle', 'card-title', 'card-subtitle', 'text', 'card-text', 'button', 'spacer', 'line', 'scroll-hint' ] ), SORT_REGULAR ) ) === [ false ]
-	&& array_values( array_unique( $pick( [ 'element', 'elements', 'elementvalues', 'imagevalues', 'card', 'html', 'panel' ] ), SORT_REGULAR ) ) === [ true ]
-	&& array_values( array_unique( $pick( [ 'navigation', 'image', 'card-image', 'col', 'logo', 'stack', 'repeat', 'slider', 'filter', 'list', 'sections', 'tabs', 'accordion', 'table' ] ), SORT_REGULAR ) ) === [ null ] );
+	array_values( array_unique( $pick( [ 'template', 'csrf', 'json', 'localepicker' ] ), SORT_REGULAR ) ) === [ false ]
+	&& array_values( array_unique( $pick( [ 'element', 'elements', 'elementvalues', 'imagevalues' ] ), SORT_REGULAR ) ) === [ true ]
+	&& array_values( array_unique( $pick( [ 'navigation' ] ), SORT_REGULAR ) ) === [ null ] );
 
-check( 'a feature that registers a shortcode says what it is, and a component of the module keeps its own say', ( static function() use ( &$appData ): bool {
+check( 'a feature that registers a shortcode says what it is', ( static function() use ( &$appData ): bool {
 	\Nino\Feature::shortcode( $appData, 'fx-leaf', static fn( array &$appData, array $args ): string => 'L', false );
 	\Nino\Feature::shortcode( $appData, 'fx-box', static fn( array &$appData, array $args ): string => 'B', true );
 	return $appData['./nino/html/shortcodes']['fx-leaf'] === false && $appData['./nino/html/shortcodes']['fx-box'] === true;
 } )() );
-
-echo "\nImage, card, panels and a table are drawn where they stand\n";
-
-\Nino\Html::addFills( $appData, [ '/template/render/c/title' => 'Card title' ], '*' );
-check( 'a card draws its children in the order they stand, with its picture first', $render( '[card][card-title /template/render/c/title][card-text text="Body"][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><h4 class="nino-card-title">Card title</h4><div class="nino-card-descr nino-richtext"><p>Body</p></div></div></article>' );
-check( 'a set of tabs of its own names its group before its panels are drawn, and the group inside is the next', ( static function() use ( $render ): bool {
-	$html = $render( '[tabs][panel title="A"][tabs][panel title="B"]x[/panel][/tabs][/panel][/tabs]' );
-	return str_contains( $html, 'data-tabs-target="tabs-1-1"' ) === true && str_contains( $html, 'data-tabs-target="tabs-2-1"' ) === true && strpos( $html, 'tabs-1-1' ) < strpos( $html, 'tabs-2-1' );
-} )() );
-check( 'a [col] that holds a call, and one that holds none, in one table, each written as the notation says: the one without an end is [col ... /]', $render( '[table /loop sort="title" limit="1"][col field="title" /][col][leaf][/col][/table]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>One</td><td>leaf</td></tr></tbody></table></div>' );
 
 echo "\nWhat the fix round pins\n";
 
@@ -221,24 +212,11 @@ check( 'a fill a shortcode adds is read by the nodes that follow it, though the 
 $parts = \Nino\Html::shortcodeParts( $appData, 'x [probe]a[/probe] [probe /] y' );
 check( 'the parts of a text hold a container with its content and its end, and a leaf of a name that is a container elsewhere as [name /]', array_column( $parts, 'name' ) === [ '', 'probe', '', 'probe', '' ] && $parts[1]['text'] === '[probe]a[/probe]' && $parts[3]['text'] === '[probe /]' );
 
-check( 'a card and a block with no end are closed where the page ends and draw what they hold', str_contains( $render( '[card][card-title text="T"]' ), 'nino-card-title' ) === true && $render( '[html]<p>x</p>' ) === '<p>x</p>' );
+check( 'a loop in a loop reads the tokens of its own element for what it names: the inner ones win', $render( '[elements /loop sort="title"][elements /loop query="kind=[[kind]]" sort="title"]<u>[[title]]</u>[/elements][/elements]' ) === '<u>One</u><u>Three</u><u>One</u><u>Three</u><u>Two</u>' );
 
-check( 'a fill in an [html] block is put in as it is: the block sanitizes its own markup, and the Text panel sanitizes a fill when it is saved', $render( '[html]<p>[[/template/rv/x/html]]</p>[/html]' ) === '<p><b onclick="x">b</b><script>a()</script></p>' );
-
-unset( $appData['./nino/components/count'] );
-$html = $render( '[tabs][panel title="O"][accordion][panel title="I"]x[/panel][/accordion][/panel][/tabs]' );
-check( 'a group of panels in a panel is a group of its own: the outer one is named first', str_contains( $html, 'data-tabs-target="tabs-1-1"' ) === true && str_contains( $html, 'name="accordion-2"' ) === true && str_contains( $html, '>I</summary>' ) === true );
-unset( $appData['./nino/components/count'] );
-$html = $render( '[accordion][panel title="O"][tabs][panel title="I"]x[/panel][/tabs][/panel][/accordion]' );
-check( '...and the other way round', str_contains( $html, 'name="accordion-1"' ) === true && str_contains( $html, 'data-tabs-target="tabs-2-1"' ) === true );
-
-check( 'a stack in a loop reads the tokens of its own element for what it names: the inner ones win', $render( '[elements /loop sort="title"][repeat /loop query="kind=[[kind]]" sort="title"]<u>[[title]]</u>[/repeat][/elements]' ) === '<u>One</u><u>Three</u><u>One</u><u>Three</u><u>Two</u>' );
-
-$html = $render( '[elements /loop sort="title"][tabs][panel title="[[title]]" class="c-[[kind]]"]<i>[[title]]</i>[/panel][/tabs][/elements]' );
-check( 'the title and the class of a panel in a loop are filled with the tokens of the round', str_contains( $html, '>One</button>' ) === true && str_contains( $html, 'nino-tabs-panel nino-is-active c-x"' ) === true && str_contains( $html, ' c-y"' ) === true && str_contains( $html, '[[' ) === false && str_contains( $html, '&#91;' ) === false );
-
-$html = $render( '[list /loop sort="title" limit="1"][line text="[[/_nino/webpage[[/nino/http/response/uri]]/title]] / [[title]]"][/list]' );
-check( 'a line of a cell with a fill in the name of a fill puts it in, and the token of the element too', str_contains( $html, 'Kontakt / One' ) === true );
+$seen->exchangeArray( [] );
+$render( '[elements /loop sort="title" limit="1"][probe text="[[/_nino/webpage[[/nino/http/response/uri]]/title]] / [[title]]" /][/elements]' );
+check( 'a call in a loop with a fill in the name of a fill puts it in, and the token of the element too', $seen[0][0]['text'] === 'Kontakt / One' );
 
 $trees = static function() use ( &$appData ): int {
 	return count( $appData['./nino/html/cache']['trees'] ?? [] );
@@ -268,7 +246,6 @@ check( '...keeps the tree of a text unless it is told not to, and keeps no more 
 for( $i = 0; $i < 300; $i++ )
 	\Nino\Html::tree( $appData, 'many '. $i. ' [leaf]' );
 check( '...and the limit is the one of drawing', count( $appData['./nino/html/cache']['trees'] ) === \Nino\Html::MAX_TREES );
-check( 'a card draws the nodes of its own content, in the order the picture first: a call in a value of it is no call', $render( '[card][card-title text="[csrf]"][card-image /template/render/none/image][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><h4 class="nino-card-title">&#91;csrf]</h4></div></article>' );
 
 echo "\nThe template of a panel of the workbench is drawn where the panes are made\n";
 
@@ -294,10 +271,10 @@ check( '...and the pane that is the value of a fill is put into the page as it i
 
 $ignored = ninoWarnings();
 
-// The field a component of a cell reads is the first word of its call, and the name of a field may hold an underscore, a hyphen and a capital
+// The name of a field may hold an underscore, a hyphen and a capital, and a loop has a token for each
 \Nino\Elements::insertElementType( $appData, '/render-fields', [ 'title' => [ 'type' => 'string' ], 'long_name' => [ 'type' => 'string' ], 'long-name' => [ 'type' => 'string' ], 'Camel' => [ 'type' => 'string' ] ] );
 \Nino\Elements::insertElement( $appData, '/render-fields/a', [ 'title' => 'plain', 'long_name' => 'underscored', 'long-name' => 'hyphenated', 'Camel' => 'capital' ], 'de_DE' );
-$html = \Nino\Html::renderHtml( $appData, '[stack /render-fields][text title][text long_name][text long-name][text Camel][/stack]' );
-check( 'a field named with an underscore, a hyphen or a capital is read as the first word of a call in a cell', str_contains( $html, 'plain' ) === true && str_contains( $html, 'underscored' ) === true && str_contains( $html, 'hyphenated' ) === true && str_contains( $html, 'capital' ) === true && str_contains( $html, '[text' ) === false );
+$html = \Nino\Html::renderHtml( $appData, '[elements /render-fields][[title]] [[long_name]] [[long-name]] [[Camel]][/elements]' );
+check( 'a field named with an underscore, a hyphen or a capital is a token of the element in a loop', $html === 'plain underscored hyphenated capital' );
 
 ninoDone( $appData );

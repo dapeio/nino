@@ -140,7 +140,7 @@ namespace Nino {
 		 *	string, leave it to $default.
 		 *
 		 *	A component declares a 'bool' attribute instead and is handed '1' or
-		 *	'0' (Components::dispatch()); this is for the shortcode a feature
+		 *	'0' (\Nino\Components::render()); this is for the shortcode a feature
 		 *	registers by itself.
 		 *
 		 *	@param		array 		$args					The arguments of the shortcode
@@ -160,7 +160,7 @@ namespace Nino {
 			if( is_string( $raw ) === false )
 				return $default;
 
-			/*	Trimmed here and not in Components::_normalize(), which reads the
+			/*	Trimmed here and not in \Nino\Components::render(), which reads the
 				same words. That one reads what the Builder and the schemas write,
 				as it is written, and a space around a word has always sent it to the
 				default there; widening it would turn ' yes ' from the default into
@@ -423,35 +423,26 @@ namespace Nino {
 		}
 
 		/**
-		 *	Register a shortcode unless the Components module owns the name:
-		 *	\Nino\Modules\Components::REGISTRY or STACKS has an entry for it when
-		 *	the manifest of a feature registered it as a component or as a stack
-		 *	(read as they stand: components() and stacks() ask the methods that an
-		 *	attribute's options may name, and a registration is no time for that),
-		 *	and the two registries are the whole answer to "is the module
-		 *	on and does it know it". What the module owns it renders itself -
-		 *	registering a callback beside it would chain a second renderer onto
-		 *	the first.
+		 *	Register a shortcode unless the register of \Nino\Components owns the name:
+		 *	it has an entry for every component, those of a feature among them
+		 *	(read as they stand: components() asks the methods that an
+		 *	attribute's options may name, and a registration is no time for that).
+		 *	The register draws what it owns itself - registering a callback beside it
+		 *	would be a renderer nobody asks.
 		 *
-		 *	The answer says which it was, so a feature that has something to do
-		 *	where the component owns the name asks for it - a feature that
-		 *	rewrites the arguments of its component before the module sees them,
-		 *	by a callback of '/nino/html/shortcode/<name>' at priority 1, does so
-		 *	where this answers false:
-		 *
-		 *		if( \Nino\Feature::shortcode( $appData, 'copy', [ self::class, 'doShortcode' ] ) === false )
-		 *			\Nino\Callbacks::registerCallback( $appData, '/nino/html/shortcode/copy', [ self::class, 'callbackShortcode' ], 1 );
+		 *	The answer says which it was: a feature that has something else to do where the
+		 *	register owns the name asks for it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$name					The shortcode
 		 *	@param		callable	$callback			( array &$appData, array $args ): string
 		 *	@param		bool|null	$container			true a container - its end is needed -, false a leaf, null a container where its end stands in the document (see \Nino\Html::addShortcode())
 		 *
-		 *	@return 	bool											True if it registered the shortcode, false if the Components module owns the name and nothing was registered
+		 *	@return 	bool											True if it registered the shortcode, false if the register owns the name and nothing was registered
 		 */
 		public static function shortcode( array &$appData, string $name, callable $callback, ?bool $container = null ): bool {
 
-			if( isset( $appData[\Nino\Modules\Components::REGISTRY][$name] ) === true || isset( $appData[\Nino\Modules\Components::STACKS][$name] ) === true )
+			if( isset( $appData[\Nino\Components::REGISTRY][$name] ) === true )
 				return false;
 
 			\Nino\Html::addShortcode( $appData, $name, $callback, $container );

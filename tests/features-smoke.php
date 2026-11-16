@@ -60,12 +60,12 @@ $warnings = ninoWarnings();
 check( 'dir() is the constant', \Nino\Features::dir() === __DIR__. '/fixtures/features' );
 check( 'a virtual /features path resolves there too, so a feature can name its own files', \Nino\Filesystem::path( $appData, '/features/Sample/feature.php' ) === __DIR__. '/fixtures/features/Sample/feature.php' );
 check( 'every readable manifest is listed, sorted by key - the ones below features/ and the one the kernel delivers (a module of the kernel with a feature.php)',
-	array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === false ) ) === [ 'boxy', 'helper', 'mute', 'old', 'sample', 'strict' ]
-	&& array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === [ 'basis' ] && array_keys( $all ) === [ 'basis', 'boxy', 'helper', 'mute', 'old', 'sample', 'strict' ] );
+	array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === false ) ) === [ 'boxy', 'helper', 'old', 'sample' ]
+	&& array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === [ 'basis' ] && array_keys( $all ) === [ 'basis', 'boxy', 'helper', 'old', 'sample' ] );
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'shipped', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'assets', 'settings', 'components', 'stacks', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'shipped', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'assets', 'settings', 'unread', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -127,9 +127,9 @@ function manifestFails( string $dir, string $name, mixed $manifest, string $why,
 check( 'a minimal manifest is name and version', is_array( \Nino\Features::manifest( writeManifest( $manifestDir, 'Mini', [ 'name' => 'Mini', 'version' => '0.1.0' ] ) ) ) && ninoWarnings() === [] );
 check( 'the key defaults to the lowercased directory name', \Nino\Features::manifest( $manifestDir. '/Mini' )['key'] === 'mini' );
 check( 'a directory named like a module of the kernel or of the workbench is refused: the autoloader serves that class before a feature\'s, so the name is taken',
-	manifestFails( $manifestDir, 'Components', [ 'name' => 'x', 'version' => '1.0.0' ], 'the directory name is taken: \\Nino\\Modules\\Components is a module of the kernel' )
+	manifestFails( $manifestDir, 'Cache', [ 'name' => 'x', 'version' => '1.0.0' ], 'the directory name is taken: \\Nino\\Modules\\Cache is a module of the kernel' )
 	&& manifestFails( $manifestDir, 'Users', [ 'name' => 'x', 'version' => '1.0.0' ], 'the directory name is taken: \\Nino\\Modules\\Users is a module of the workbench' )
-	&& is_array( \Nino\Features::manifest( writeManifest( $manifestDir, 'Componentsx', [ 'name' => 'x', 'version' => '1.0.0' ] ) ) ) && ninoWarnings() === [] );
+	&& is_array( \Nino\Features::manifest( writeManifest( $manifestDir, 'Cachex', [ 'name' => 'x', 'version' => '1.0.0' ] ) ) ) && ninoWarnings() === [] );
 check( 'a lowercase directory is refused - it cannot serve a class', manifestFails( $manifestDir, 'lower', [ 'name' => 'x', 'version' => '1.0.0' ], 'directory name' ) );
 check( 'a missing class file is refused', manifestFails( $manifestDir, 'NoClass', [ 'name' => 'x', 'version' => '1.0.0' ], 'NoClass.php is missing', false ) );
 check( 'a manifest that is not an array is refused', ( static function() use ( $manifestDir ): bool {
@@ -199,109 +199,24 @@ check( '...one that climbs out of the directory, or hides', manifestFails( $mani
 check( '...and an entry that is no path at all', manifestFails( $manifestDir, 'ArrayAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ [ '/features/ArrayAssets/assets/a.css' ] ] ], '"assets"' )
 	&& manifestFails( $manifestDir, 'TextAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ 'a.css' ] ], '"assets"' ) );
 
-// The components and the stacks a manifest declares are read by the schema the
-// Components module registers them by, so a bad one is refused here, with the
-// name of the component, and not when a request renders a page
-$goodComponent = [ 'label' => 'Probe', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
-check( 'components and stacks are a name => schema map', manifestFails( $manifestDir, 'BadComponents', [ 'name' => 'x', 'version' => '1.0.0', 'components' => 'title' ], '"components"' )
-	&& manifestFails( $manifestDir, 'BadStacks', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => 'rows' ], '"stacks"' ) );
-check( 'a component whose schema does not validate refuses the manifest and names the component', manifestFails( $manifestDir, 'BadComponent', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => [ 'label' => 'x', 'source' => 'weird' ] ] ], 'component "probe": "source"' )
-	&& manifestFails( $manifestDir, 'BadComponentName', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'Not A Slug' => $goodComponent ] ], 'a slug' )
-	&& manifestFails( $manifestDir, 'BadStack', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'rows' => [ 'label' => 'x', 'grid' => 'yes' ] ] ], 'stack "rows": "grid"' ) );
-check( 'a manifest that declares them is read complete, the schemas normalized; one that does not has none', \Nino\Features::manifest( writeManifest( $manifestDir, 'WithComponents', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent ], 'stacks' => [ 'rows' => [ 'label' => 'Rows', 'grid' => true ] ] ] ) ) === \Nino\Features::manifest( $manifestDir. '/WithComponents' )
-	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['preview'] === 'block'
-	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
-	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'panels' => false, 'preview' => 'cells', 'attributes' => [] ]
-	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
-// A component of a manifest says 'formatted' as it says 'link': the clean schema carries it, the registry hands the component out with the three attributes of a formatted
-// text, and a manifest that declares one of them itself, or says it of a component that has no text, is refused with the name of the component
-$formattedComponent = [ 'label' => 'Price', 'source' => 'text', 'formatted' => true, 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
-check( 'a manifest whose component says formatted is read, the flag in the clean schema and the three attributes in none',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithFormatted', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => $formattedComponent, 'plain' => $goodComponent ] ] ) )['components']['price']['formatted'] === true
-	&& array_keys( \Nino\Features::manifest( $manifestDir. '/WithFormatted' )['components']['price']['attributes'] ) === [ 'tone' ] && \Nino\Features::manifest( $manifestDir. '/WithFormatted' )['components']['plain']['formatted'] === false && ninoWarnings() === [] );
-check( '...handed to the registry as it was read, it is issued with "as", "prefix" and "suffix" after its own attributes - the list of "as" the formatters there are - and the component without the flag has none',
-	( static function() use ( $manifestDir ): bool {
-		$formatted = ninoSandbox( 'features-formatted' );
-		$components = \Nino\Features::manifest( $manifestDir. '/WithFormatted' )['components'];
-		\Nino\Modules\Components::addComponent( $formatted, 'price', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', $components['price'] );
-		\Nino\Modules\Components::addComponent( $formatted, 'plain', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', $components['plain'] );
-		$issued = \Nino\Modules\Components::components( $formatted );
-		$ok = array_keys( $issued['price']['attributes'] ) === [ 'tone', 'as', 'prefix', 'suffix' ] && array_keys( $issued['plain']['attributes'] ) === [ 'tone' ]
-			&& $issued['price']['attributes']['as']['options'] === [ '', 'number', 'currency', 'percent', 'date', 'date-long', 'datetime', 'time' ];
-		\Nino\Filesystem::removeDir( ninoSandboxDir( $formatted ) );
-		return $ok;
-	} )() === true && ninoWarnings() === [] );
-check( '...a component that says it of a source that is no text, declares one of the three itself, or says it is no bool is refused, naming the component',
-	manifestFails( $manifestDir, 'FormattedContent', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'source' => 'content' ] + $formattedComponent ] ], 'component "price": "formatted" is for a component whose source is text or none' )
-	&& manifestFails( $manifestDir, 'FormattedImage', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'source' => 'image' ] + $formattedComponent ] ], 'component "price": "formatted" is for a component whose source is text or none' )
-	&& manifestFails( $manifestDir, 'FormattedPrefix', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'attributes' => [ 'prefix' => [ 'type' => 'string', 'default' => '' ] ] ] + $formattedComponent ] ], 'the schema declares "prefix" itself' )
-	&& manifestFails( $manifestDir, 'FormattedFlag', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'formatted' => 'yes' ] + $formattedComponent ] ], 'component "price": "formatted" must be true or false' ) );
-$requiredStack = static fn( array $attributes ): array => [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'logos' => [ 'label' => 'Logos', 'cell' => 'none', 'attributes' => $attributes ] ] ];
-check( 'a manifest stack says required on a field attribute - true, false or the name of a bool attribute of the stack - and the manifest as read carries it, false where it says nothing; a field that names no bool attribute, and required on another type, refuse the manifest',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithRequired', $requiredStack( [
-		'image'	=> [ 'type' => 'field', 'default' => 'image', 'required' => true ],
-		'link'	=> [ 'type' => 'field', 'default' => '', 'required' => 'links' ],
-		'name'	=> [ 'type' => 'field', 'default' => '' ],
-		'links'	=> [ 'type' => 'bool', 'default' => false ],
-	] ) ) )['stacks']['logos']['attributes']['link']['required'] === 'links'
-	&& \Nino\Features::manifest( $manifestDir. '/WithRequired' )['stacks']['logos']['attributes']['image']['required'] === true
-	&& \Nino\Features::manifest( $manifestDir. '/WithRequired' )['stacks']['logos']['attributes']['name']['required'] === false
-	&& manifestFails( $manifestDir, 'BadRequired', $requiredStack( [ 'link' => [ 'type' => 'field', 'default' => '', 'required' => 'links' ] ] ), 'attribute "link": "required" names "links"' )
-	&& manifestFails( $manifestDir, 'BadRequiredType', $requiredStack( [ 'link' => [ 'type' => 'string', 'default' => '', 'required' => true ] ] ), 'attribute "link": only a field has "required"' )
-	&& manifestFails( $manifestDir, 'BadRequiredValue', $requiredStack( [ 'link' => [ 'type' => 'field', 'default' => '', 'required' => 1 ] ] ), 'attribute "link": "required" must be true, false or the name of a bool attribute' ) );
-check( 'a stack of a manifest says what its cell is, one of the kernel\'s five - none, a loop with no content, among them - and the manifest of a stack whose cell is none of them is refused, naming the stack',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'lines' => [ 'label' => 'Lines', 'cell' => 'row' ], 'logos' => [ 'label' => 'Logos', 'cell' => 'none' ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['lines']['cell'] === 'row'
-	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['logos']['cell'] === 'none'
-	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['rows']['cell'] === 'components'
-	&& manifestFails( $manifestDir, 'BadCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'rows' => [ 'label' => 'x', 'cell' => 'page' ] ] ], 'stack "rows": "cell"' ) );
-check( 'a stack of a manifest may say it takes [panel]s for panels, true or false, the manifest carries it and a stack that says nothing has false - anything but a bool is refused, naming the stack',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithPanels', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'steps' => [ 'label' => 'Steps', 'panels' => true ], 'plain' => [ 'label' => 'Plain', 'panels' => false ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['steps']['panels'] === true
-	&& \Nino\Features::manifest( $manifestDir. '/WithPanels' )['stacks']['plain']['panels'] === false && \Nino\Features::manifest( $manifestDir. '/WithPanels' )['stacks']['rows']['panels'] === false
-	&& array_filter( [ 'yes', 1, 0, 'true', [ true ] ], static fn( mixed $wrong ): bool => manifestFails( $manifestDir, 'BadPanels', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'steps' => [ 'label' => 'x', 'panels' => $wrong ] ] ], 'stack "steps": "panels" must be true or false' ) === false ) === []
-	&& manifestFails( $manifestDir, 'NonePanels', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'steps' => [ 'label' => 'x', 'cell' => 'none', 'panels' => true ] ] ], 'stack "steps": "panels" is for a stack with content' ) );
-// ...and so are the two keys that say where a component may stand and what it draws: the manifest is read by the same
-// validate() the kernel's own components are, so a wrong word is refused here with the name of the component
-check( 'the places a component may stand in, and what it draws, are carried by the manifest when good',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithPlaces', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'section', 'card' ], 'draws' => 'p .x-probe-{tone}' ] ] ] ) )['components']['probe']['in'] === [ 'section', 'card' ]
-	&& \Nino\Features::manifest( $manifestDir. '/WithPlaces' )['components']['probe']['draws'] === 'p .x-probe-{tone}'
-	&& array_key_exists( 'in', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false
-	&& array_key_exists( 'draws', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
-check( '...so a place outside section and card - the hero is none -, a place twice, none and not a list are refused',
-	manifestFails( $manifestDir, 'HeroIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'section', 'hero' ] ] ] ], 'component "probe": "in" lists only section, card, table, panels' )
-	&& manifestFails( $manifestDir, 'BadIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'page' ] ] ] ], 'component "probe": "in"' )
-	&& manifestFails( $manifestDir, 'TwiceIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'card', 'card' ] ] ] ], 'component "probe": "in"' )
-	&& manifestFails( $manifestDir, 'NoIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [] ] ] ], 'component "probe": "in"' )
-	&& manifestFails( $manifestDir, 'StringIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => 'card' ] ] ], 'component "probe": "in"' ) );
-// ...and what a component holds: one of the places, the calls of whose components its content is, and only a component whose source is its content
-$holdingComponent = [ 'label' => 'Box', 'source' => 'content', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
-check( 'what a component holds is carried by the manifest when good, and a schema that says nothing has none',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'card' ] ] ] ) )['components']['box']['holds'] === 'card'
-	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'WithHoldsSection', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'section' ] ] ] ) )['components']['box']['holds'] === 'section'
-	&& array_key_exists( 'holds', \Nino\Features::manifest( writeManifest( $manifestDir, 'NoHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent ] ] ) )['components']['box'] ) === false
-	&& array_key_exists( 'holds', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
-check( '...so a place that is none, a list, a number, an empty word, and a component whose source is not its content are refused',
-	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card, table or panels' )
-	&& manifestFails( $manifestDir, 'ListHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => [ 'card' ] ] ] ], 'component "box": "holds" names a place' )
-	&& manifestFails( $manifestDir, 'IntHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 5 ] ] ], 'component "box": "holds" names a place' )
-	&& manifestFails( $manifestDir, 'EmptyHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => '' ] ] ], 'component "box": "holds" names a place' )
-	&& manifestFails( $manifestDir, 'TextHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'holds' => 'card' ] ] ], 'component "probe": "holds" needs the source content' ) );
-check( '...and what it draws is a short selector of letters, digits, space, dot and dash whose placeholders are attributes it declares, and not empty',
-	manifestFails( $manifestDir, 'BadDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => 'p > .x' ] ] ], 'component "probe": "draws"' )
-	&& manifestFails( $manifestDir, 'LongDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => str_repeat( 'a', 65 ) ] ] ], 'component "probe": "draws"' )
-	&& manifestFails( $manifestDir, 'LostDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '{tag} .x' ] ] ], 'component "probe": "draws"' )
-	&& manifestFails( $manifestDir, 'EmptyDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '' ] ] ], 'component "probe": "draws"' ) );
-// ...and the icon: the parts of a 24 by 24 picture a tool shows a component by, which the manifest hands on as they are written
-$goodIcon = [ [ 'path', [ 'd' => 'M4 12h16' ] ], [ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '3' ] ] ];
-check( 'the icon of a component is carried by the manifest as it was written, and a schema that says none has none; a stack has no icon to carry',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => $goodIcon ] ], 'stacks' => [ 'rows' => [ 'label' => 'Rows', 'icon' => $goodIcon ] ] ] ) )['components']['probe']['icon'] === $goodIcon
-	&& array_key_exists( 'icon', \Nino\Features::manifest( $manifestDir. '/WithIcon' )['stacks']['rows'] ) === false
-	&& array_key_exists( 'icon', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
-check( '...so an icon that is no list of parts, a tag of none of the seven, an attribute that is none of its tag\'s, a value that is no path and a 13th part are refused, with the name of the component',
-	manifestFails( $manifestDir, 'WordIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => 'M4 12h16' ] ] ], 'component "probe": "icon" is a list of parts, each a tag and its attributes' )
-	&& manifestFails( $manifestDir, 'ScriptIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => [ [ 'script', [ 'd' => 'M4 12h16' ] ] ] ] ] ], 'component "probe": "icon" part 1 names "script", which is no tag of an icon' )
-	&& manifestFails( $manifestDir, 'ClickIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => [ [ 'path', [ 'd' => 'M4 12h16', 'onclick' => 'x' ] ] ] ] ] ], 'component "probe": "icon" part 1: "onclick" is none of a path' )
-	&& manifestFails( $manifestDir, 'PathIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ], [ 'path', [ 'd' => 'M4 12h16;' ] ] ] ] ] ], 'component "probe": "icon" part 2: "d" is not a path' )
-	&& manifestFails( $manifestDir, 'ManyIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => array_fill( 0, 13, $goodIcon[0] ) ] ] ], 'component "probe": "icon" holds more than 12 parts' ) );
+// The keys 'components' and 'stacks' of a manifest are not read: the components of a feature are the files of its folder
+// components/ (see tests/register-features-smoke.php). A manifest that still has one of them is a manifest all the same, whatever
+// the keys hold, and it says so: 'unread', a flag of the manifest as it is read, which the Features panel turns into one sentence
+$legacy = static fn( array $keys ): array => [ 'name' => 'x', 'version' => '1.0.0' ] + $keys;
+check( 'a manifest with the key components, with the key stacks, with both - whatever they hold, a list or a word or nothing - is read, with no warning, and is marked unread; one without them is not',
+	array_filter( [
+		[ 'components' => [ 'probe' => [ 'label' => 'Probe', 'source' => 'weird' ] ] ],
+		[ 'stacks' => [ 'rows' => [ 'label' => 'Rows', 'grid' => 'yes' ] ] ],
+		[ 'components' => [ 'probe' => [ 'label' => 'Probe' ] ], 'stacks' => [ 'rows' => [ 'label' => 'Rows' ] ] ],
+		[ 'components' => 'title' ],
+		[ 'stacks' => null ],
+		[ 'components' => [] ],
+	], static function( array $keys ) use ( $manifestDir, $legacy ): bool {
+		$read = \Nino\Features::manifest( writeManifest( $manifestDir, 'WithLegacyKeys', $legacy( $keys ) ) );
+		return is_array( $read ) === false || $read['unread'] !== true || ninoWarnings() !== [];
+	} ) === []
+	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['unread'] === false && array_key_exists( 'components', \Nino\Features::manifest( $manifestDir. '/Mini' ) ) === false
+	&& array_key_exists( 'stacks', \Nino\Features::manifest( $manifestDir. '/Mini' ) ) === false && ninoWarnings() === [] );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
 
 // The vocabulary is CATEGORIES, the rule is a slug. A feature written for a
@@ -651,91 +566,35 @@ check( 'a shortcode belongs to the feature whose class answers it, a closure inc
 		&& \Nino\Features::shortcodes( $appData, 'helper' ) === [ 'other' ] && \Nino\Features::shortcodes( $appData, 'nope' ) === [];
 } )() );
 
-// What the manifest declares becomes shortcodes, once per boot, for the features
-// that are listed in '/nino/modules' and for no other
-echo "Features::registerManifestComponents - the components and stacks of a manifest\n";
+// The keys 'components' and 'stacks' of a manifest are not read: a feature that has them goes on as it is, registers nothing
+// of them and says so once, as the reason the Features panel shows at its card
+echo "Features::componentProblems - the keys components and stacks of a manifest are not read\n";
 
-check( 'the reference feature declares two components and a stack, a feature without the keys none', array_keys( $all['sample']['components'] ) === [ 'greeting', 'caption' ] && array_keys( $all['sample']['stacks'] ) === [ 'rows' ]
-	&& $all['helper']['components'] === [] && $all['helper']['stacks'] === [] );
+check( 'the reference feature has neither key and is not marked; the feature whose manifest has both is', $all['sample']['unread'] === false && $all['helper']['unread'] === false && $all['boxy']['unread'] === true
+	&& array_key_exists( 'components', $all['boxy'] ) === false && array_key_exists( 'stacks', $all['boxy'] ) === false );
 
 ninoWarnings();
 $declared = ninoSandbox( 'components' );
 $declared['/nino/dir'] = '';
 \Nino\Html::init( $declared );
-$declared['/nino/modules'] = [ '\\Nino\\Modules\\Helper' ];
-\Nino\Features::registerManifestComponents( $declared );
-check( 'a feature that is not listed registers nothing, and one that declares nothing none either', \Nino\Modules\Components::components( $declared ) === [] && \Nino\Modules\Components::stacks( $declared ) === [] && ninoWarnings() === [] );
-
-$declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
-\Nino\Features::registerManifestComponents( $declared );
-check( 'a listed feature\'s components and stacks are registered with the schema of its manifest', array_keys( \Nino\Modules\Components::components( $declared ) ) === [ 'greeting', 'caption' ] && array_keys( \Nino\Modules\Components::stacks( $declared ) ) === [ 'rows' ]
-	&& \Nino\Modules\Components::components( $declared )['greeting'] === $all['sample']['components']['greeting'] && \Nino\Modules\Components::stacks( $declared )['rows'] === $all['sample']['stacks']['rows']
-	&& \Nino\Modules\Components::defaults( $declared, 'greeting' ) === [ 'shout' => '0', 'class' => '' ] && ninoWarnings() === [] );
-check( '...every component of it the feature\'s own: "by", the registry\'s word for who registered it, is the key of the feature in the manifest as it is read and in the registry - whatever the manifest says: the caption of the reference feature claims to be the kernel\'s - and a manifest whose "by" is no slug is refused',
-	array_column( \Nino\Modules\Components::components( $declared ), 'by' ) === [ 'sample', 'sample' ] && array_column( $all['sample']['components'], 'by' ) === [ 'sample', 'sample' ] && ( ( include __DIR__. '/fixtures/features/Sample/feature.php' )['components']['caption']['by'] ?? null ) === 'nino'
-	&& manifestFails( $manifestDir, 'ClaimsBadly', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'by' => 'Not A Slug' ] ] ], 'component "probe": "by" is a slug' ) );
-check( '...a tool offers a feature\'s components under the feature and not under a group: the manifest as it is read and the registry have none for them, and a manifest that names one - a word of the four, a fifth, or one that claims to be the kernel\'s - is refused with the sentence for it',
-	array_filter( $all['sample']['components'], static fn( array $schema ): bool => array_key_exists( 'group', $schema ) === true ) === []
-	&& array_filter( \Nino\Modules\Components::components( $declared ), static fn( array $schema ): bool => array_key_exists( 'group', $schema ) === true ) === []
-	&& manifestFails( $manifestDir, 'NamesAGroup', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'group' => 'section' ] ] ], 'component "probe": a feature\'s components are offered under the feature, not under a group' )
-	&& manifestFails( $manifestDir, 'NamesAFifthGroup', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'group' => 'footer' ] ] ], 'component "probe": a feature\'s components are offered under the feature, not under a group' )
-	&& manifestFails( $manifestDir, 'NamesAGroupAsNino', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'by' => 'nino', 'group' => 'global' ] ] ], 'component "probe": a feature\'s components are offered under the feature, not under a group' ) );
-check( '...and the places and the drawing of a component arrive in the registry with it, as the Builder reads them',
-	\Nino\Modules\Components::components( $declared )['greeting']['in'] === [ 'section', 'card' ] && \Nino\Modules\Components::components( $declared )['greeting']['draws'] === 'p .sample-greeting'
-	&& $all['sample']['components']['greeting']['in'] === [ 'section', 'card' ] && $all['sample']['components']['greeting']['draws'] === 'p .sample-greeting' );
-check( '...and so does its icon, the parts of the picture a tool shows it by: the registry has them as the manifest wrote them',
-	\Nino\Modules\Components::components( $declared )['greeting']['icon'] === [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]
-	&& $all['sample']['components']['greeting']['icon'] === [ [ 'path', [ 'd' => 'M4 12h16' ] ] ] );
-\Nino\Filesystem::putFileContent( $declared, '/text/global.php', [ '[[/feature/sample/greeting/text]]' => 'Hello [there]' ] );
-check( 'the renderer is componentGreeting() of the class: the name in studly caps behind the kind', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>'
-	&& \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text shout="1"]' ) === '<p class="sample-greeting">HELLO &#91;THERE]</p>' && \Nino\Html::renderHtml( $declared, '[greeting /nope/nope/nope/nope]' ) === '' );
-\Nino\Elements::insertElementType( $declared, '/rowtype', [ 'title' => [ 'type' => 'string', 'locale' => true ] ] );
-\Nino\Elements::insertElement( $declared, '/rowtype/one', [ 'title' => 'One' ], 'de_DE' );
-\Nino\Elements::insertElement( $declared, '/rowtype/two', [ 'title' => 'Two' ], 'de_DE' );
-check( 'a stack of a feature loops the elements through the kernel\'s renderStack()', \Nino\Html::renderHtml( $declared, '[rows /rowtype sort="-title"][greeting title][/rows]' ) === '<div class="sample-rows"><span><p class="sample-greeting">Two</p></span><span><p class="sample-greeting">One</p></span></div>' );
-check( '...and the shortcodes are the feature\'s: the class of the renderer is what says whose they are', \Nino\Features::shortcodes( $declared, 'sample' ) === [ 'caption', 'greeting', 'rows' ] );
-
-// A component whose class has no renderer of its name is rendered by the
-// class's doShortcode(), the method that is also the shortcode a feature would
-// write by hand: Sample has no componentCaption(), and [caption] answers what
-// doShortcode() does
-check( 'a component whose class has no renderer of its name is rendered by the class\'s doShortcode()', \Nino\Modules\Components::components( $declared )['caption']['source'] === 'none'
-	&& \Nino\Html::renderHtml( $declared, '[caption]' ) === \Nino\Modules\Sample::doShortcode( $declared, [] ) && \Nino\Html::renderHtml( $declared, '[caption]' ) !== '' );
-check( '...the renderer a class does name still wins over its doShortcode()', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>' );
-
-// A component that draws a link of its own and says 'stretched' - the link may be the link of a linked card - is read from the manifest as it was written, is registered
-// without a word, and the schema the registry issues carries the key; the class on its <a> is the component's own, since the kernel wraps nothing it did not make
-$boxy = ninoSandbox( 'boxy' );
-$boxy['/nino/dir'] = '';
-\Nino\Html::init( $boxy );
+$declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample', '\\Nino\\Modules\\Boxy' ];
+\Nino\Features::registerComponents( $declared );
+\Nino\Features::registerAssets( $declared );
+$declaredSaid = ninoWarnings();
+check( 'a listed feature whose manifest has the keys registers nothing of them: no component, no group, nothing said, and the rest of it is as it was - its files are in the bundle',
+	\Nino\Components::components( $declared ) === [] && \Nino\Components::groups( $declared ) === [] && $declaredSaid === []
+	&& ( $declared['/nino/html/assets']['/.cache/style.css'] ?? [] ) === [ '/features/Sample/assets/sample.css', '/features/Boxy/assets/boxy.css' ] );
+check( '...and the Features panel is told once, in one sentence, why - however many of the two keys the manifest has - and nothing for a feature that has neither', count( \Nino\Features::componentProblems( $declared, 'boxy' ) ) === 1
+	&& \Nino\Features::componentProblems( $declared, 'sample' ) === [] && \Nino\Features::componentProblems( $declared, 'helper' ) === [] && \Nino\Features::componentProblems( $declared, 'nope' ) === [] );
 ninoWarnings();
-check( 'a feature whose component says stretched is read and activates: the manifest holds the key as it was written, and nothing is said',
-	\Nino\Features::manifest( \Nino\Features::dir(). '/Boxy' )['components']['boxy-link']['stretched'] === true && \Nino\Features::activate( $boxy, 'boxy' ) === true
-	&& array_filter( ninoWarnings(), static fn( string $warning ): bool => str_contains( $warning, 'Boxy' ) === true ) === [] );
-\Nino\Features::registerManifestComponents( $boxy );
-check( '...registering it says nothing, and the schema the registry issues carries stretched as true - and not link, which the component does not say - under the feature that registered it',
-	ninoWarnings() === [] && ( \Nino\Modules\Components::components( $boxy )['boxy-link']['stretched'] ?? null ) === true && \Nino\Modules\Components::components( $boxy )['boxy-link']['link'] === false
-	&& \Nino\Modules\Components::components( $boxy )['boxy-link']['by'] === 'boxy'
-	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $boxy ) ), true ) )['boxy-link']['stretched'] === true );
-check( '...and it renders the <a> it draws, with the class it gave it, and the kernel adds nothing',
-	\Nino\Html::renderHtml( $boxy, '[boxy-link text="Go"]' ) === '<a class="nino-stretch boxy-link" href="#boxy">Go</a>' && ninoWarnings() === [] );
-
-// ...and where the class has neither, the component is skipped with the warning
-// that names the renderer it looked for, and nothing is registered
-$declared['/nino/modules'] = [ '\\Nino\\Modules\\Mute' ];
-$mute = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerManifestComponents( $declared ); } );
-check( 'a component whose class has neither a renderer nor doShortcode() is a warning that names the renderer it looked for', count( $mute ) === 1 && $mute[0][0] === E_USER_WARNING
-	&& str_contains( $mute[0][1], '"chime"' ) === true && str_contains( $mute[0][1], 'Mute::componentChime()' ) === true );
-check( '...and the component is not registered, so that no shortcode answers for it', isset( \Nino\Modules\Components::components( $declared )['chime'] ) === false && \Nino\Features::shortcodes( $declared, 'mute' ) === [] );
-
-// A stack keeps the strict rule: the fallback to doShortcode() is a component's.
-// Strict has a doShortcode() and no stackLedger()
-$declared['/nino/modules'] = [ '\\Nino\\Modules\\Strict' ];
-$strict = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerManifestComponents( $declared ); } );
-check( 'a stack whose class has no renderer of its name is skipped with the warning, though the class has a doShortcode() - the fallback is a component\'s', count( $strict ) === 1 && $strict[0][0] === E_USER_WARNING
-	&& str_contains( $strict[0][1], '"ledger"' ) === true && str_contains( $strict[0][1], 'Strict::stackLedger()' ) === true
-	&& isset( \Nino\Modules\Components::stacks( $declared )['ledger'] ) === false && \Nino\Features::shortcodes( $declared, 'strict' ) === [] );
-$declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
+check( '...the same sentence on every ask, and none for the feature when it is off', \Nino\Features::componentProblems( $declared, 'boxy' ) === \Nino\Features::componentProblems( $declared, 'boxy' )
+	&& ( static function() use ( $declared ): bool { $declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets' ]; unset( $declared['./nino/features/all'], $declared['./nino/features/listed'] ); return \Nino\Features::componentProblems( $declared, 'boxy' ) === []; } )() );
+check( '...and a feature whose manifest has a key and is switched on boots: the module is called, the features are listed with the key in none of them', ( static function() use ( &$declared ): bool {
+	ninoWarnings();
+	\Nino\Modules::callModules( $declared, 'init' );
+	$said = ninoWarnings();
+	return count( array_filter( \Nino\Features::all( $declared ), static fn( array $feature ): bool => array_key_exists( 'components', $feature ) === true || array_key_exists( 'stacks', $feature ) === true ) ) === 0 && $said === [];
+} )() );
 
 echo "\n";
 
@@ -776,15 +635,14 @@ $asked = ninoSandbox( 'assets-asked' );
 $asked['/nino/dir'] = '';
 \Nino\Html::init( $asked );
 $asked['/nino/modules'] = [ '\\Nino\\Modules\\Broken', '\\Nino\\Modules\\Sample' ];
-$askedErrors = ninoErrors( function() use ( &$asked ) { \Nino\Features::registerAssets( $asked ); \Nino\Features::registerManifestComponents( $asked ); } );
+$askedErrors = ninoErrors( function() use ( &$asked ) { \Nino\Features::registerAssets( $asked ); \Nino\Features::registerComponents( $asked ); } );
 check( 'a listed manifest that does not validate is said once per boot, though the bundles and the components both ask for it - and the features after it are read all the same', count( $askedErrors ) === 1 && $askedErrors[0][0] === E_USER_WARNING
-	&& str_contains( $askedErrors[0][1], '/Broken/feature.php' ) === true && ( $asked['/nino/html/assets']['/.cache/style.css'] ?? [] ) === [ '/features/Sample/assets/sample.css' ]
-	&& isset( \Nino\Modules\Components::components( $asked )['greeting'] ) === true );
+	&& str_contains( $askedErrors[0][1], '/Broken/feature.php' ) === true && ( $asked['/nino/html/assets']['/.cache/style.css'] ?? [] ) === [ '/features/Sample/assets/sample.css' ] );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $asked ) );
 
 // The boot itself, in a process of its own: \Nino\init() over a project whose config.php lists the feature.
 // The files of the manifest come after the ones the kernel puts in the bundles and before whatever a module
-// adds in its init() - Sample adds one - and the components of the manifest are registered by then
+// adds in its init() - Sample adds one
 $bootDir = $sandbox. '/boot';
 mkdir( $bootDir. '/private', 0755, true );
 file_put_contents( $bootDir. '/private/config.php', '<?php return '. var_export( [
@@ -801,7 +659,7 @@ $appData = \\Nino\\init();
 echo json_encode( [ $appData[\'/nino/html/assets\'], \\Nino\\Html::shortcodes( $appData ) ] );' );
 $booted = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $bootDir. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
 check( 'a boot lists the files of an active feature in the two bundles - behind the kernel\'s own, ahead of what its class adds itself, once each - and has its components registered', ( $booted[0]['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css', '/features/Sample/assets/late.css' ]
-	&& ( $booted[0]['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js' ] && array_diff( [ 'greeting', 'caption', 'sample' ], $booted[1] ?? [] ) === [] );
+	&& ( $booted[0]['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js' ] && array_diff( [ 'sample' ], $booted[1] ?? [] ) === [] );
 
 echo "\n";
 
@@ -997,16 +855,16 @@ check( 'a directory that climbs out of the features is read as getFileContent() 
 // classes(): the value of a class attribute, as the arguments of a shortcode give it
 check( 'classes() is nothing where there is no class argument, or a blank one', \Nino\Feature::classes( [] ) === '' && \Nino\Feature::classes( [ 'class' => '' ] ) === '' && \Nino\Feature::classes( [ 'class' => " \t " ] ) === '' );
 check( '...a space and the classes otherwise, trimmed - the space is what a template\'s attribute is written to take', \Nino\Feature::classes( [ 'class' => '  wide dark ' ] ) === ' wide dark' );
-check( '...escaped as the Components module escapes: a [ is written as &#91;, so that the next pass cannot read a fill or a shortcode in it', \Nino\Feature::classes( [ 'class' => 'a[b' ] ) === ' a&#91;b'
-	&& \Nino\Feature::classes( [ 'class' => 'x"y<z' ] ) === ' '. \Nino\Modules\Components::escape( 'x"y<z' ) && str_contains( \Nino\Feature::classes( [ 'class' => 'x"y<z' ] ), '"' ) === false );
+check( '...escaped as the register escapes: a [ is written as &#91;, so that the next pass cannot read a fill or a shortcode in it', \Nino\Feature::classes( [ 'class' => 'a[b' ] ) === ' a&#91;b'
+	&& \Nino\Feature::classes( [ 'class' => 'x"y<z' ] ) === ' '. \Nino\Components::escape( 'x"y<z' ) && str_contains( \Nino\Feature::classes( [ 'class' => 'x"y<z' ] ), '"' ) === false );
 
 // flag(): a bare word and a named value, read through the shortcode parser
 \Nino\Html::addShortcode( $toolset, 'flagprobe', static fn( array &$appData, array $args ): string => \Nino\Feature::flag( $args, 'block' ) === true ? 'on' : 'off' );
 \Nino\Html::addShortcode( $toolset, 'flagdefault', static fn( array &$appData, array $args ): string => \Nino\Feature::flag( $args, 'block', true ) === true ? 'on' : 'off' );
 check( 'flag() takes a bare word as on', \Nino\Html::renderHtml( $toolset, '[flagprobe block]' ) === 'on' && \Nino\Html::renderHtml( $toolset, '[flagprobe wide block]' ) === 'on' && \Nino\Html::renderHtml( $toolset, '[flagprobe wide]' ) === 'off' );
 check( '...a named value by the words of a bool attribute: yes, on, true and 1 are on, no, off, false and 0 are off',
-	array_filter( \Nino\Modules\Components::ON, static fn( string $word ): bool => \Nino\Html::renderHtml( $toolset, '[flagprobe block="'. $word. '"]' ) !== 'on' ) === []
-	&& array_filter( \Nino\Modules\Components::OFF, static fn( string $word ): bool => \Nino\Html::renderHtml( $toolset, '[flagdefault block="'. $word. '"]' ) !== 'off' ) === [] );
+	array_filter( \Nino\Components::ON, static fn( string $word ): bool => \Nino\Html::renderHtml( $toolset, '[flagprobe block="'. $word. '"]' ) !== 'on' ) === []
+	&& array_filter( \Nino\Components::OFF, static fn( string $word ): bool => \Nino\Html::renderHtml( $toolset, '[flagdefault block="'. $word. '"]' ) !== 'off' ) === [] );
 check( '...whatever the case of the letters, and with a space around the word', \Nino\Html::renderHtml( $toolset, '[flagdefault block="OFF"]' ) === 'off' && \Nino\Html::renderHtml( $toolset, '[flagprobe block=" Yes "]' ) === 'on' && \Nino\Html::renderHtml( $toolset, '[flagdefault block=" no "]' ) === 'off' );
 check( '...any other word, and an argument that is not there, give the default - which is off unless it is asked to be on', \Nino\Html::renderHtml( $toolset, '[flagprobe block="maybe"]' ) === 'off' && \Nino\Html::renderHtml( $toolset, '[flagdefault block="maybe"]' ) === 'on'
 	&& \Nino\Html::renderHtml( $toolset, '[flagprobe]' ) === 'off' && \Nino\Html::renderHtml( $toolset, '[flagdefault]' ) === 'on' );
@@ -1143,17 +1001,12 @@ foreach( [ 'Bad Name', '../x', 'a_b', 'x.php', '' ] as $toolName ) {
 }
 check( 'a name that is no slug is no counter: a warning for each of the three, nothing counted - false from count() and spent()', $toolBad === [] );
 
-// shortcode(): register one, unless the Components module owns the name
+// shortcode(): register one, unless the register of the components owns the name
 $toolPlain = static fn( array &$appData, array $args ): string => 'by the feature';
-check( 'shortcode() registers the shortcode where the Components module owns no such name, and says so', \Nino\Feature::shortcode( $toolset, 'note', $toolPlain ) === true && \Nino\Html::renderHtml( $toolset, '[note]' ) === 'by the feature' );
-\Nino\Modules\Components::addComponent( $toolset, 'owned', static fn( array &$appData, array $args ): string => 'by the component', [ 'label' => 'Owned', 'source' => 'none', 'group' => 'global' ] );
-check( '...and registers nothing where a component of that name is in the registry: it says so, and the component renders as it did', \Nino\Feature::shortcode( $toolset, 'owned', $toolPlain ) === false
-	&& \Nino\Html::renderHtml( $toolset, '[owned]' ) === 'by the component' );
-$toolset['/nino/modules'] = [ '\\Nino\\Modules\\Sample' ];
-\Nino\Features::registerManifestComponents( $toolset );
-$toolRows = \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/rows' );
-check( '...and where the manifest of a feature declared the name under stacks: false as well, and the one callback of the stack is still the module\'s', isset( \Nino\Modules\Components::stacks( $toolset )['rows'] ) === true
-	&& count( $toolRows ) === 1 && \Nino\Feature::shortcode( $toolset, 'rows', $toolPlain ) === false && \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/rows' ) === $toolRows );
+check( 'shortcode() registers the shortcode where the register owns no such name, and says so', \Nino\Feature::shortcode( $toolset, 'note', $toolPlain ) === true && \Nino\Html::renderHtml( $toolset, '[note]' ) === 'by the feature' );
+\Nino\Components::addComponent( $toolset, 'owned', [ 'label' => 'Owned', 'in' => [ 'page' ], 'source' => 'none', 'template' => '<b>by the component</b>' ] );
+check( '...and registers nothing where a component of that name is in the register: it says so, and the component renders as it did', \Nino\Feature::shortcode( $toolset, 'owned', $toolPlain ) === false
+	&& \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/owned' ) === [] && \Nino\Html::renderHtml( $toolset, '[owned]' ) === '<b>by the component</b>' );
 
 // slug(): a name made into a word of a url or a file
 check( 'slug() lower-cases, writes the letters ascii lacks as its table says, and turns every run of anything else into one hyphen', \Nino\Feature::slug( 'Äpfel & Öl, groß!' ) === 'aepfel-oel-gross'
@@ -1740,8 +1593,8 @@ foreach( $panelActions as $method => $data )
 // and would come last if the panel still answered in key order
 check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by the localized name', $status === 200 && $body['dir'] === '/tests/fixtures/features'
 	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
-	&& array_keys( $body ) === [ 'dir', 'rejected', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'basis', 'sample', 'boxy', 'helper', 'mute', 'old', 'strict' ]
-	&& array_column( $body['features'], 'name' ) === [ 'Basis-Komponenten', 'Beispiel-Feature', 'Boxy', 'Helper', 'Mute', 'Old', 'Strict' ] );
+	&& array_keys( $body ) === [ 'dir', 'rejected', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'basis', 'sample', 'boxy', 'helper', 'old' ]
+	&& array_column( $body['features'], 'name' ) === [ 'Basis-Komponenten', 'Beispiel-Feature', 'Boxy', 'Helper', 'Old' ] );
 check( 'apiList lists the directory whose manifest was refused, with the reason, apart from the features', $body['rejected'] === [ [ 'dir' => 'Broken', 'reason' => '"version" must be major.minor.patch', 'active' => false ], [ 'dir' => 'Elements', 'reason' => $rejected['Elements'], 'active' => false ], [ 'dir' => 'Twin', 'reason' => 'claims the key "sample" that the directory Sample already holds', 'active' => false ] ]
 	&& in_array( 'broken', array_column( $body['features'], 'key' ), true ) === false );
 // A feature that is switched on and whose manifest is refused is the one that runs unfinished: the answer says so
@@ -1794,7 +1647,7 @@ $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'shipped', 'requires', 'problems', 'components', 'unit', 'settings', 'settingsTab' ] );
 $units = array_column( $body['features'], 'unit', 'key' );
 ksort( $units );
-check( 'every entry says whether the feature brings an install unit - the three that have a directory of it do, the others do not', $units === [ 'basis' => true, 'boxy' => false, 'helper' => true, 'mute' => false, 'old' => false, 'sample' => true, 'strict' => false ] );
+check( 'every entry says whether the feature brings an install unit - the three that have a directory of it do, the others do not', $units === [ 'basis' => true, 'boxy' => false, 'helper' => true, 'old' => false, 'sample' => true ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so

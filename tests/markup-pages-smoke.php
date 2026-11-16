@@ -4,8 +4,8 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	markup-pages-smoke.php	Test of what a page is drawn as: the four starter pages with their frame in
- *											both languages, the workbench shell with a panel open, a loop with
- *											components in it, the components and stacks one by one, the content of
+ *											both languages, the workbench shell with a panel open, the loops over
+ *											the elements with components in them, the content of
  *											a mail and the maintenance page - each compared byte for byte with the
  *											file under tests/fixtures/markup/starter/. The setup wizard is run for real
  *											(Setup::apiApply) in a sandbox whose path and file times are fixed, so
@@ -52,7 +52,7 @@ function pagesSite( bool $tools ): string {
 	$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
 	$appData['/nino/html/navs'] = \Nino\AppData::DEFAULTS['/nino/html/navs'];
-	$appData['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
+	$appData['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf' ];
 
 	foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $dir )
 		mkdir( $sandbox. $dir, 0777, true );
@@ -127,10 +127,10 @@ function pagesSite( bool $tools ): string {
 	\Nino\Elements::insertElement( $appData, '/probe/drei', [ 'title' => 'Drei "quoted" & more', 'body' => '<p>Text drei</p>', 'category' => 'A', 'price' => 3.0 ], '*' );
 
 	foreach( [
-		'probe-empty'				=> '<p class="empty">[[/project/company/general/name]] has [title text="nothing"]</p>',
+		'probe-empty'				=> '<p class="empty">[[/project/company/general/name]] has [text text="nothing"]</p>',
 		'probe-row'					=> '<li>[[/project/company/general/name]]</li>',
-		'page-x.de_DE'			=> '<main>[title text="Deutsch"]</main>',
-		'page-x.en_US'			=> '<main>[title text="English"]</main>',
+		'page-x.de_DE'			=> '<main>[text text="Deutsch"]</main>',
+		'page-x.en_US'			=> '<main>[text text="English"]</main>',
 	] as $name => $template )
 		\Nino\Filesystem::putFileContent( $appData, '/templates/'. $name. '.tpl', $template );
 
@@ -157,12 +157,10 @@ function pagesSite( bool $tools ): string {
  *
  *	@param		string		$sandbox
  *	@param		string		$locale
- *	@param		bool			$basis				Whether the feature Basis, which the wizard switched on, stays on: the components of the old module are drawn with it off, as the
- *																	five names both have (text, button, image, spacer, html) are the register's where it is on
  *
  *	@return 	array
  */
-function pagesBoot( string $sandbox, string $locale, bool $basis = true ): array {
+function pagesBoot( string $sandbox, string $locale ): array {
 
 	$_SESSION = [];
 
@@ -186,9 +184,6 @@ function pagesBoot( string $sandbox, string $locale, bool $basis = true ): array
 	\Nino\Csrf::init( $appData );
 	\Nino\Html::init( $appData );
 	\Nino\Auth::init( $appData );
-
-	if( $basis === false )
-		$appData['/nino/modules'] = array_values( array_diff( $appData['/nino/modules'], [ '\\Nino\\Modules\\Basis' ] ) );
 
 	\Nino\Features::registerAssets( $appData );
 	\Nino\Features::registerComponents( $appData );
@@ -265,8 +260,11 @@ function pagesVisit( string $sandbox, string $locale, string $uri ): array {
  */
 function pagesCases( string $sandbox, array $cases, string $locale = 'de_DE' ): string {
 
-	$appData = pagesBoot( $sandbox, $locale, false );
+	$appData = pagesBoot( $sandbox, $locale );
 	$out = '';
+
+	// A call that hands on what it was given as it is - a loop has escaped the values of its element - to read what a loop puts into the attributes of a call
+	\Nino\Html::addShortcode( $appData, 'pages-echo', static fn( array &$appData, array $args ): string => '<a href="'. (string) ( $args['href'] ?? '' ). '">'. (string) ( $args['text'] ?? '' ). '</a>', false );
 
 	\Nino\Html::addFills( $appData, [ '/nino/date/year' => '2026' ], '*' );
 
@@ -283,55 +281,6 @@ function pagesCases( string $sandbox, array $cases, string $locale = 'de_DE' ): 
 }
 
 /**
- *	Every case of the component pages: what a card, a stack or a loop is drawn as
- *
- *	@return 	array
- */
-function pagesComponentCases(): array {
-
-	$slot = '/template/page-home/hero/background';
-
-	return [
-		'title'									=> '[title /template/probe/x/plain tag="h2"]',
-		'title, a raw value in the file'	=> '[title /template/probe/x/roh]',
-		'title, a fill in text='		=> '[title text="[[/project/company/general/name]]"]',
-		'subtitle'							=> '[subtitle /template/probe/x/plain]',
-		'text, blocks'					=> '[text /template/probe/x/blocks]',
-		'line, a fill in text='	=> '[line text="[[/project/company/general/name]] - fixed"]',
-		'card-title with a link'	=> '[card-title /template/probe/x/plain href="/x"]',
-		'card-subtitle'					=> '[card-subtitle /template/probe/x/plain]',
-		'card-text'							=> '[card-text /template/probe/x/blocks]',
-		'card-image'						=> '[card-image '. $slot. ' alt="x"]',
-		'card, sorted children'	=> '[card padding="2"][card-title /template/probe/x/plain][card-image '. $slot. '][card-text /template/probe/x/blocks][/card]',
-		'card, no end'					=> '[card padding="2"]',
-		'button'								=> '[button /template/probe/x/plain href="/_nino/webpage/contact/uri" style="primary"]',
-		'image'									=> '[image '. $slot. ' alt=""]',
-		'image, with content'		=> '[image '. $slot. ']<meta property="og:image" content="[[url]]" data-w="[[width]]">[/image]',
-		'image, a call in its content'	=> '[image '. $slot. ']<i data-w="[[width]]">[spacer size="2"][[/project/company/general/name]]</i>[/image]',
-		'logo'									=> '[logo alt=""]',
-		'logo with a slot'			=> '[logo light="'. $slot. '" dark="" alt=""]',
-		'html with a call and a fill'	=> '[html class="nino-mt-2"]<p>Fixed [spacer size="1"] and [[/template/probe/x/plain]]</p>[/html]',
-		'spacer'								=> '[spacer size="3"]',
-		'col outside a table'		=> '[col /template/probe/x/plain field="title"]',
-		'panel outside'					=> '[panel title="A"]x[/panel]',
-		'stack'									=> '[stack /probe sort="title" cols="50"][card][card-title title][card-text body][button .uri text="More of [[title]]"][/card][/stack]',
-		'stack, no end'					=> '[stack /probe]',
-		'repeat'								=> '[repeat /probe sort="title"]<p data-n="[[.id]]">[[title]] ([[.slug]])</p>[/repeat]',
-		'slider'								=> '[slider /probe sort="title"][title title][/slider]',
-		'filter'								=> '[filter /probe by="category" sort="title"][title title][/filter]',
-		'tabs, a loop'					=> '[tabs /probe sort="title" title="title"][text body][/tabs]',
-		'tabs, fixed with panels'	=> '[tabs id="t"][panel title="One"][title /template/probe/x/plain][/panel][panel title="Two"]<p>[[/project/company/general/name]]</p>[/panel][/tabs]',
-		'tabs, fixed with no id'	=> '[tabs][panel title="One"][spacer size="1"][/panel][panel title="Two"][spacer size="2"][/panel][/tabs]',
-		'accordion, fixed'			=> '[accordion][panel title="A"][spacer size="1"][/panel][/accordion]',
-		'accordion, a loop'			=> '[accordion /probe sort="title" text="&#91;&#91;title&#93;&#93; costs &#91;&#91;price&#93;&#93;"][text body][/accordion]',
-		'list'									=> '[list /probe sort="title" style="check"][line text="[[title]]: [[price]] EUR"][/list]',
-		'table'									=> '[table /probe sort="title"][col /template/probe/x/plain field="title"][col field="price" align="right"][col][button .uri text="To [[title]]"][/col][/table]',
-		'sections'							=> '[sections /probe sort="title" alternate="1"]<div class="nino-grid-row">[title title]</div>[/sections]',
-		'stack in a loop'				=> '[repeat /probe sort="title"]<h4>[[title]]</h4>[elements /probe query="category=[[category]]"]<i>[[title]]</i>[/elements][/repeat]',
-	];
-}
-
-/**
  *	The cases of a loop over the elements, and of the templates that are included
  *
  *	@return 	array
@@ -339,26 +288,26 @@ function pagesComponentCases(): array {
 function pagesLoopCases(): array {
 
 	return [
-		'elements, a call in the content'	=> '[elements /probe sort="title"]<h3>[[title]]</h3><span data-n="[[.id]]" data-s="[[.slug]]" data-u="[[.uri]]"[[.lang]]>[[price]]</span><i>[[note]]</i>[text body][title text="[[title]]" tag="h4"][/elements]',
-		'elements, a field in an attribute'	=> '[elements /probe sort="title" limit="2"][button .uri text="Read [[title]]" href="/blog/[[.slug]]"][/elements]',
+		'elements, a call in the content'	=> '[elements /probe sort="title"]<h3>[[title]]</h3><span data-n="[[.id]]" data-s="[[.slug]]" data-u="[[.uri]]"[[.lang]]>[[price]]</span><i>[[note]]</i>[text .body][text .title tag="h4"][/elements]',
+		'elements, a field in an attribute'	=> '[elements /probe sort="title" limit="2"][pages-echo text="Read [[title]]" href="/blog/[[.slug]]"][/elements]',
 		'elements, empty with a template'		=> '[elements /probe query="category=Z" empty="probe-empty"]<b>[[title]]</b>[/elements]',
 		'elements, empty with no template'	=> '[elements /probe query="category=Z"]<b>[[title]]</b>[/elements]',
 		'elements, empty="" a path that is none'	=> '[elements /probe query="category=Z" empty="../x"]<b>[[title]]</b>[/elements]',
-		'elements, a loop in a stack'			=> '[repeat /probe sort="title"]<h4>[[title]]</h4>[elements /probe query="category=[[category]]" sort="title"]<i>[[title]]</i>[/elements][/repeat]',
+		'elements, a loop in a loop'				=> '[elements /probe sort="title"]<h4>[[title]]</h4>[elements /probe query="category=[[category]]" sort="title"]<i>[[title]]</i>[/elements][/elements]',
 		'elements, a template in a loop'	=> '[elements /probe sort="title"][template /templates/probe-row][/elements]',
-		'element'													=> '[element /probe/eins]<b>[[title]]</b> [[.id]] [[.slug]] [[category]] [[note]][title text="[[title]]"][/element]',
+		'element'													=> '[element /probe/eins]<b>[[title]]</b> [[.id]] [[.slug]] [[category]] [[note]][text .title][/element]',
 		'element, a name that is none'		=> '[element /probe/nobody]<b>[[title]]</b>[/element]',
 		'elementvalues'										=> '[elementvalues /probe key="category"]<b>[[.id]]:[[.value]]([[.count]])</b>[spacer size="1"][/elementvalues]',
 		'elementvalues, a loop in a value'	=> '[elementvalues /probe key="category"]<h5>[[.value]]</h5>[elements /probe query="category=[[.value]]" sort="title"]<i>[[title]]</i>[/elements][/elementvalues]',
 		'template with a fill in the path'	=> '[template /templates/page-x.[[/nino/http/response/locale]]]',
 		'template, a name that is none'		=> '[template /templates/nobody]after',
-		'a fill in the text and in a call'	=> '<p>[[/project/company/general/name]]</p>[title text="[[/project/company/general/name]] / [[/_nino/webpage/contact/title]]"]',
+		'a fill in the text and in a call'	=> '<p>[[/project/company/general/name]]</p>[text text="[[/project/company/general/name]] / [[/_nino/webpage/contact/title]]"]',
 		'a fill that is none stays'				=> '<p>[[/project/nobody/nothing/here]] [[loose]]</p>',
 		'a fill with a fill in its name'		=> '<p>[[/_nino/webpage[[/nino/http/response/uri]]/title]]</p>',
 		'csrf'														=> '<form>[csrf]</form>',
 		'json'														=> '<script>[json /project/company/contact/address] [json /project/company/general/name]</script>',
 		'navigation, lines of a menu'			=> '[navigation nav="main" id="m" class="c"][/navigation]',
-		'navigation, lines by hand'				=> '[navigation id="hand"]/about:About us:class="x"'. "\n". 'https://example.com:Elsewhere'. "\n  \n". '<span>[title text="A line"]</span>'. "\n". '[/navigation]',
+		'navigation, lines by hand'				=> '[navigation id="hand"]/about:About us:class="x"'. "\n". 'https://example.com:Elsewhere'. "\n  \n". '<span>[text text="A line"]</span>'. "\n". '[/navigation]',
 		'navigation, a burger with a counter'	=> '[navigation nav="legal" burger][/navigation][navigation nav="footer" burger][/navigation]',
 		'localepicker'										=> '[localepicker]',
 		'legal'														=> '[legal]',
@@ -386,7 +335,7 @@ function pagesStarter( string $sandbox ): array {
 }
 
 /**
- *	The loop, the components and the other cases: file name => output
+ *	The loops and the other cases: file name => output
  *
  *	@param		string		$sandbox			The site, without the tools
  *
@@ -395,7 +344,6 @@ function pagesStarter( string $sandbox ): array {
 function pagesCaseFiles( string $sandbox ): array {
 
 	return [
-		'components.de_DE.html'	=> pagesCases( $sandbox, pagesComponentCases(), 'de_DE' ),
 		'loop.de_DE.html'				=> pagesCases( $sandbox, pagesLoopCases(), 'de_DE' ),
 		'loop.en_US.html'				=> pagesCases( $sandbox, pagesLoopCases(), 'en_US' ),
 	];
@@ -563,7 +511,7 @@ check( 'every request that found no tree kept a tree of the templates it drew', 
 check( 'the requests that found the trees drew the same pages, byte for byte, and the same trees stand', $warm === $outputs && $keptAgain >= $kept );
 
 foreach( $outputs as $name => $output )
-	if( str_ends_with( $name, '.html' ) === true && str_starts_with( $name, 'workbench' ) === false && str_starts_with( $name, 'components' ) === false && str_starts_with( $name, 'loop' ) === false )
+	if( str_ends_with( $name, '.html' ) === true && str_starts_with( $name, 'workbench' ) === false && str_starts_with( $name, 'loop' ) === false )
 		check( $name. ' has no call and no fill left over', preg_match( '/\[(?:template|title|navigation|logo|image|localepicker|jstext|assets|json|csrf)[ \]]/', $output ) !== 1 );
 
 // --- A fresh installation, as a visitor meets it: the structure of the pages, not their markup -------------------

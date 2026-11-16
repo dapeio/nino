@@ -151,7 +151,7 @@ namespace Nino\Modules {
 		 *	Escape a single element field value before it is made a token of a
 		 *	loop. Values are editor content, not developer-authored markup -
 		 *	htmlspecialchars() neutralizes raw HTML/script (matches
-		 *	Modules\Components::escape()'s pattern). The '[' is an entity as well,
+		 *	\Nino\Components::escape()'s pattern). The '[' is an entity as well,
 		 *	though nobody reads a value for calls: the token goes into the
 		 *	arguments of the calls of the content as it is, and into the page.
 		 *
@@ -202,11 +202,9 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	The elements an [elements] block - or a stack, see
-		 *	\Nino\Modules\Components::renderStack() - loops over: queried with
+		 *	The elements an [elements] block loops over: queried with
 		 *	the shortcode's own arguments, handed to its callback, then cut to
-		 *	the offset and the limit. One place, so that the two read the same
-		 *	arguments the same way
+		 *	the offset and the limit
 		 *
 		 *	With $fallback each element is the one \Nino\Elements::getElementWithFallback()
 		 *	answers for the language of the loop - what it has no value for taken
@@ -271,8 +269,8 @@ namespace Nino\Modules {
 		 *	in front, or nothing. A field of the model the element has no value
 		 *	for is a fill of nothing, as is the alt text an image field names, so
 		 *	that no token of the block is left standing. The one making of them, for
-		 *	[elements] and for the cell of a stack (see
-		 *	\Nino\Modules\Components::renderStack()); a caller replaces the tokens
+		 *	[elements] and for the element of a loop the register draws (see
+		 *	\Nino\Components::render()); a caller replaces the tokens
 		 *	of its block by the values with str_replace()
 		 *
 		 *	@param		array 		$element			The element, with '.uri' and, from getElementWithFallback(), '.lang'

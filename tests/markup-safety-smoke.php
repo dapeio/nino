@@ -34,7 +34,6 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 \Nino\Html::init( $appData );
 \Nino\Modules\Template::init( $appData );
 \Nino\Modules\Elements::init( $appData );
-\Nino\Modules\Components::init( $appData );
 \Nino\Runtime::setSessionValue( $appData, './nino/csrf/token', str_repeat( 'c', 64 ) );
 
 \Nino\Html::addFills( $appData, [ '/project/company/general/name' => 'ACME-NAME' ], '*' );
@@ -44,6 +43,12 @@ $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
 \Nino\Elements::insertElementType( $appData, '/safety', [ 'title' => [ 'type' => 'string' ] ] );
 
+// The components of the probes: one that draws the text of its source, one that draws a text of its own as the value of an attribute,
+// one that holds what stands between its tags
+\Nino\Components::addComponent( $appData, 'safety-text', [ 'label' => 'Text', 'in' => [ 'page' ], 'source' => 'text', 'template' => '<h3>[[value]]</h3>' ] );
+\Nino\Components::addComponent( $appData, 'safety-link', [ 'label' => 'Link', 'in' => [ 'page' ], 'source' => 'none', 'attributes' => [ 'caption' => [ 'type' => 'text', 'default' => '' ] ], 'template' => '<a href="#">[[caption]]</a>' ] );
+\Nino\Components::addComponent( $appData, 'safety-wrap', [ 'label' => 'Wrap', 'in' => [ 'page' ], 'source' => 'none', 'template' => '<div>[[content]]</div>' ] );
+
 $render = static function( string $source ) use ( &$appData ): string {
 	return \Nino\Html::renderHtml( $appData, $source );
 };
@@ -51,6 +56,7 @@ $render = static function( string $source ) use ( &$appData ): string {
 // The value of an attribute written the way the notation writes one
 $quoted = static fn( string $value ): string => '"'. str_replace( [ '\\', '"' ], [ '\\\\', '\\"' ], $value ). '"';
 $escaped = static fn( string $value ): string => str_replace( '[', '&#91;', htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
+$plain = static fn( string $value ): string => \Nino\Components::escape( $value );
 
 $payloads = [
 	'a call of a template'	=> '[template /templates/x]',
@@ -76,9 +82,9 @@ foreach( $payloads as $what => $payload ) {
 
 	// The text of a key, drawn by a component
 	\Nino\Html::addFills( $appData, [ $key => $payload ], '*' );
-	$html = $render( '[title '. $key. ']' );
+	$html = $render( '[safety-text '. $key. ']' );
 	$shown = $payload === '[[/project/company/general/name]]' ? 'ACME-NAME' : $payload;
-	check( 'the text of a key that holds '. $what. ' is escaped text, whole, and no call', $read( $html ) === false && $html === '<h3 class="nino-section-title">'. $escaped( $shown ). '</h3>' );
+	check( 'the text of a key that holds '. $what. ' is escaped text, whole, and no call', $read( $html ) === false && $html === '<h3>'. $plain( $shown ). '</h3>' );
 
 	// The value of a fill, in the page: the project's own words go in as they are, and a fill inside is a fill - and nothing is a call
 	$html = $render( '<p>[[/template/safety/value'. $index. '/text]]</p>' );
@@ -91,12 +97,12 @@ foreach( $payloads as $what => $payload ) {
 	$html = $render( '[element /safety/e'. $index. ']<i>[[title]]</i>[/element]' );
 	check( 'the field of an element that holds '. $what. ' is escaped text in the text of a loop, and no call', $read( $html ) === false && $html === '<i>'. $escaped( $stored ). '</i>' );
 
-	$html = $render( '[element /safety/e'. $index. '][button text="[[title]]" href="#"][/element]' );
-	check( '...and the text of a call in it, which the field is put into', $read( $html ) === false && $html === '<a class="nino-btn" href="#">'. $escaped( $stored ). '</a>' );
+	$html = $render( '[element /safety/e'. $index. '][safety-text .title][/element]' );
+	check( '...and the text of a call in it, which reads the field', $read( $html ) === false && $html === '<h3>'. $plain( $stored ). '</h3>' );
 
 	// The value of an attribute of a call of the page: a value, whatever it holds - a fill in it is put in, as the page has always had them, and nothing else is read
-	$html = $render( '[button text='. $quoted( $payload ). ' href="#"]' );
-	check( 'the value of an attribute that holds '. $what. ' is escaped text, and no call', $read( $html ) === false && $html === '<a class="nino-btn" href="#">'. $escaped( $shown ). '</a>' );
+	$html = $render( '[safety-link caption='. $quoted( $payload ). ']' );
+	check( 'the value of an attribute that holds '. $what. ' is escaped text, and no call', $read( $html ) === false && $html === '<a href="#">'. $plain( $shown ). '</a>' );
 
 	// The alt text and the file name of a picture, as the tokens of what [imagevalues] draws
 	$file = 'p/'. $payload. '.jpg';
@@ -174,8 +180,8 @@ $html = $render( str_repeat( '[x]', 60000 ) );
 check( 'a page with more brackets than the reader reads is the text it is, and the log says so', $html === str_repeat( '[x]', 60000 ) && count( ninoWarnings() ) === 1 );
 
 \Nino\Html::addFills( $appData, [ '/template/safety/break/attribute' => 'x" [csrf] y="' ], '*' );
-$html = $render( '[button text="[[/template/safety/break/attribute]]" href="#"]' );
-check( 'a fill that tries to break out of the value of an attribute is that value', $read( $html ) === false && $html === '<a class="nino-btn" href="#">'. $escaped( 'x" [csrf] y="' ). '</a>' );
+$html = $render( '[safety-link caption="[[/template/safety/break/attribute]]"]' );
+check( 'a fill that tries to break out of the value of an attribute is that value', $read( $html ) === false && $html === '<a href="#">'. $plain( 'x" [csrf] y="' ). '</a>' );
 
 echo "\nWhat is too deep, too much or too large ends\n";
 
@@ -240,11 +246,11 @@ check( 'an attribute named content never reaches a callback as its content: writ
 
 $html = '';
 
-foreach( [ '[html content="<p>[csrf]</p>"][/html]', '[html content="[[/safety/attribute/content/value]]"][/html]', '[card content="<p>[csrf]</p>" /]', '[card content="[[/safety/attribute/content/value]]"][/card]', '[navigation id="safety-nav" content="[[/safety/attribute/content/value]]"]', '[image /safety/slot content="<b>[csrf]</b>"]' ] as $call )
+foreach( [ '[safety-wrap content="<p>[csrf]</p>"][/safety-wrap]', '[safety-wrap content="[[/safety/attribute/content/value]]"][/safety-wrap]', '[safety-wrap content="<p>[csrf]</p>" /]', '[safety-text /safety/slot content="<b>[csrf]</b>"]' ] as $call )
 	$html .= \Nino\Html::renderHtml( $appData, $call );
 
-check( '...and the components that draw their content draw none of it: no token and no template, and a card with nothing between its tags has no content and draws nothing', str_contains( $html, '_csrf' ) === false && str_contains( $html, 'type="hidden"' ) === false
-	&& \Nino\Html::renderHtml( $appData, '[card content="<p>x</p>" /]' ) === '' && \Nino\Html::renderHtml( $appData, '[card content="<p>x</p>"][/card]' ) === '' );
+check( '...and the components that draw their content draw none of it: no token and no template, and a component with nothing between its tags has no content', str_contains( $html, '_csrf' ) === false && str_contains( $html, 'type="hidden"' ) === false
+	&& \Nino\Html::renderHtml( $appData, '[safety-wrap content="<p>x</p>" /]' ) === '<div></div>' && \Nino\Html::renderHtml( $appData, '[safety-wrap content="<p>x</p>"][/safety-wrap]' ) === '<div></div>' );
 
 // The tree of a content is answered from the nodes of the call that is being drawn, and from nobody else's
 $trees = new \ArrayObject();

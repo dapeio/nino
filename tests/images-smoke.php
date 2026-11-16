@@ -594,10 +594,11 @@ check( '...and writes again once it can', \Nino\Images::setSlotFilename( $appDat
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
-\Nino\Modules\Components::init( $appData );
-check( '[image] shortcode renders an <img> tag under the public prefix', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
-check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
-check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
+\Nino\Html::init( $appData );
+$pictureTag = '<img src="[[src]]" width="[[width]]" height="[[height]]">';
+check( '[imagevalues] draws the file of a slot under the public prefix, with the size the slot has', \Nino\Html::renderHtml( $appData, '[imagevalues hero]'. $pictureTag. '[/imagevalues]' ) === '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600">' );
+check( '[imagevalues] renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[imagevalues logo]'. $pictureTag. '[/imagevalues]' ) === '' );
+check( '[imagevalues] renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[imagevalues nope]'. $pictureTag. '[/imagevalues]' ) === '' );
 
 // What a shortcode is handed. An empty value used to read as no value at all,
 // so alt="" - the way a decorative picture is written, and the way AGENTS.md
@@ -616,30 +617,9 @@ check( '...a value that reads like its own name is one too', ( $probeArgs['name'
 check( '...and the ordinary two shapes are unchanged', ( $probeArgs['title'] ?? null ) === 'A title'
 	&& in_array( '/uri', $probeArgs ?? [], true ) === true && in_array( 'bare', $probeArgs ?? [], true ) === true );
 
-// The picture this is really about
-check( 'a decorative picture is written with an empty alt and keeps it', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt=""]' ), 'alt=""' ) === true );
-
-/*	The <img> is a named property, not a string the method builds - which is
-	what makes it one place to read and something a project can replace. Proven
-	by replacing it: a project that wants loading="lazy" on every picture sets
-	the entry, and the shortcode renders through it	*/
-$shippedImg = \Nino\Modules\Components::$html['img'];
-\Nino\Modules\Components::$html['img'] = '<img loading="lazy" src="[[src]]" alt="[[alt]]" data-size="[[width]]x[[height]]">';
-$replacedImg = \Nino\Html::renderHtml( $appData, '[image hero]' );
-$replacedCardImg = \Nino\Html::renderHtml( $appData, '[card-image hero]' );
-\Nino\Modules\Components::$html['img'] = $shippedImg;
-check( 'the <img> fragment is the property, so replacing it replaces what the shortcode renders', $replacedImg === '<img loading="lazy" src="/public/images/hero.1600x600.jpg" alt="" data-size="1600x600">' );
-check( '...and [card-image] renders through it as well: a fragment with no place for a class loses the class of the card\'s picture, not the picture', $replacedCardImg === $replacedImg );
-check( '...and putting the shipped one back renders the shipped markup again', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true
-	&& \Nino\Html::renderHtml( $appData, '[image hero alt=""]' ) === '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600" alt="">'
-	&& \Nino\Html::renderHtml( $appData, '[card-image hero]' ) === '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600" alt="" class="nino-card-img">' );
-
-unset( $appData['./nino/html/shortcodes']['argprobe'], $appData['./nino/callbacks']['/nino/html/shortcode/argprobe'] );
-
-// The alt text of a slot: the one stored for the language, then the template's
-// own, then none - and never the slot's label, which is a name for the person
+// The alt text of a slot: the one stored for the language, then none - and never the slot's label, which is a name for the person
 // who edits the slot and says nothing about the picture
-check( '[image] with no alt anywhere is alt="" - the label of the slot is not an alt text', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), ' alt="">' ) === true );
+check( 'a slot with no alt text stored has an empty [[alt]] - the label of the slot is not an alt text', \Nino\Html::renderHtml( $appData, '[imagevalues hero]<m a="[[alt]]">[/imagevalues]' ) === '<m a="">' );
 
 check( 'setSlotAlt answers false for an unknown slot, a language the site does not have, a value that is no string and bytes that are not utf-8',
 	\Nino\Images::setSlotAlt( $appData, 'nope', [ 'de_DE' => 'x' ] ) === false
@@ -685,40 +665,22 @@ check( 'setSlotFilename answers false for a slot config.php does not hold any mo
 	&& $staleSlot['/nino/html/images']['ghost']['filename'] === null
 	&& isset( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['ghost'] ) === false );
 
-check( '[image] prefers the alt stored for the current language over the template\'s own', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt="tpl"]' ), ' alt="Haus">' ) === true );
-$appData['./nino/locales/current'] = 'en_US';
-check( '...and uses the template\'s where nothing is stored for that language', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt="tpl"]' ), ' alt="tpl">' ) === true );
-check( '...and none, alt="", where there is neither', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), ' alt="">' ) === true );
 
-// Shortcode output is rendered once more: a text an editor wrote must not open a fill or a shortcode there
-\Nino\Html::addFills( $appData, [ '[[/k]]' => 'FILLED' ], '*' );
-\Nino\Filesystem::putFileContent( $appData, '/templates/t.tpl', 'INCLUDED' );
-\Nino\Modules\Template::init( $appData );
-\Nino\Images::setSlotAlt( $appData, 'hero', [ 'en_US' => 'x [[/k]] [template /templates/t] "q" <b>' ] );
-$hostileAlt = \Nino\Html::renderHtml( $appData, '[image hero]' );
-check( 'a stored alt text is escaped and its brackets neutralised: neither the fill nor the template runs', str_contains( $hostileAlt, 'alt="x &#91;&#91;/k]] &#91;template /templates/t] &quot;q&quot; &lt;b&gt;"' ) === true
-	&& str_contains( $hostileAlt, 'FILLED' ) === false && str_contains( $hostileAlt, 'INCLUDED' ) === false );
-check( '...and it wins over the template\'s own alt text in that language', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt="y"]' ), 'alt="x &#91;' ) === true );
-// Between the tags the content is what is rendered, and only for a slot that has a picture: where an address and not a <img> is wanted - a meta tag, a mail
-check( '[image]...[/image] renders its content with [[src]] filled in, and an alt text stored for the slot is brackets-neutralised there too', \Nino\Html::renderHtml( $appData, '[image hero]<i data-alt="[[alt]]"></i>[/image]' ) === '<i data-alt="x &#91;&#91;/k]] &#91;template /templates/t] &quot;q&quot; &lt;b&gt;"></i>' );
-\Nino\Images::setSlotAlt( $appData, 'hero', [ 'en_US' => '' ] );
-check( '[image]...[/image] fills [[src]], [[width]], [[height]] and [[alt]] - the alt from the template where nothing is stored', \Nino\Html::renderHtml( $appData, '[image hero alt="Haus"]<meta content="https://example.com[[src]]" data-size="[[width]]x[[height]]" data-alt="[[alt]]">[/image]' )
-	=== '<meta content="https://example.com/public/images/hero.1600x600.jpg" data-size="1600x600" data-alt="Haus">' );
-check( '...and renders nothing at all - no content, no empty tag - for a slot with no file or one that is not there', \Nino\Html::renderHtml( $appData, '[image logo]<meta content="[[src]]">[/image]' ) === '' && \Nino\Html::renderHtml( $appData, '[image nope]<meta content="[[src]]">[/image]' ) === '' );
-check( '...and a bare [image] with no content is the <img> as before', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true );
-// The content of a shortcode runs up to the first closing tag, across a second opening of the same one: a bare [image] ahead of the content form has to close itself
-check( '...a bare [image] ahead of the content form in one template is written [image x][/image], and then the two do not run into each other', \Nino\Html::renderHtml( $appData, '<p>[image hero alt=""][/image]</p><h1>T</h1>[image hero]<meta content="[[src]]">[/image]' )
-	=== '<p><img src="/public/images/hero.1600x600.jpg" width="1600" height="600" alt=""></p><h1>T</h1><meta content="/public/images/hero.1600x600.jpg">' );
+$altOfSlot = static function() use ( &$appData ): string {
+	return \Nino\Html::renderHtml( $appData, '[imagevalues hero]<m a="[[alt]]">[/imagevalues]' );
+};
+check( '[imagevalues] draws the alt stored for the current language', $altOfSlot() === '<m a="Haus">' );
+$appData['./nino/locales/current'] = 'en_US';
+check( '...and an empty one where nothing is stored for that language', $altOfSlot() === '<m a="">' );
 $appData['./nino/locales/current'] = 'de_DE';
 \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => '' ] );
-unset( $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
 unset( $appData['./nino/html/cache'] );
+
 
 // --- Images::picture and [imagevalues] ------------------------------------
 
 echo "\nImages::picture / [imagevalues]\n";
 
-\Nino\Html::init( $appData );
 \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => 'Haus am See', 'en_US' => 'House' ] );
 $appData['./nino/locales/current'] = 'de_DE';
 
@@ -773,8 +735,8 @@ $values = '<m u="[[url]]" s="[[src]]" w="[[width]]" h="[[height]]" a="[[alt]]">'
 check( '[imagevalues] draws its content with [[url]], [[src]], [[width]], [[height]] and [[alt]] of the picture of the slot',
 	\Nino\Html::renderHtml( $appData, '[imagevalues hero]'. $values. '[/imagevalues]' )
 	=== '<m u="https://example.com/public/images/hero.1600x600.jpg" s="/public/images/hero.1600x600.jpg" w="1600" h="600" a="Haus am See">' );
-check( '...a fill and a shortcode in the content are drawn as they are anywhere', \Nino\Html::renderHtml( $appData, '[imagevalues hero]<i>[[/project/company/general/name]][spacer size="2"]</i>[/imagevalues]' )
-	=== '<i>ACME'. \Nino\Html::renderHtml( $appData, '[spacer size="2"]' ). '</i>' );
+check( '...a fill and a shortcode in the content are drawn as they are anywhere', \Nino\Html::renderHtml( $appData, '[imagevalues hero]<i>[[/project/company/general/name]][json /project/company/general/name]</i>[/imagevalues]' )
+	=== '<i>ACME"ACME"</i>' );
 check( '...and nothing at all - no content, no empty tag - for a slot with no file, a slot that is not there, a call with no slot and a call with no content',
 	\Nino\Html::renderHtml( $appData, '[imagevalues logo]'. $values. '[/imagevalues]' ) === '' && \Nino\Html::renderHtml( $appData, '[imagevalues nope]'. $values. '[/imagevalues]' ) === ''
 	&& \Nino\Html::renderHtml( $appData, '[imagevalues]'. $values. '[/imagevalues]' ) === '' && \Nino\Html::renderHtml( $appData, '[imagevalues hero][/imagevalues]' ) === '' );
@@ -790,17 +752,18 @@ check( '...[[src]] carries the directory the project is served from and [[url]] 
 $appData['/nino/dir'] = '';
 \Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'example.com' ], '*' );
 
-// What the shipped templates write: the head of a page and the mail draw as the content form of [image] drew them
+// What the shipped templates write: the head of a page and the mail ask for the address of the logo, and the content is the line with that address in it
 $shippedLines = [];
 foreach( [ '/_admin/install/library/base/templates/html-header.tpl', '/_nino/Nino/Modules/Form/install/templates/mail-header.tpl' ] as $template )
 	foreach( explode( "\n", (string) file_get_contents( dirname( __DIR__ ). $template ) ) as $line )
 		if( str_contains( $line, '[imagevalues /logo]' ) === true )
 			$shippedLines[] = trim( $line );
 $appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 100, 'filename' => 'logo.400x100.png' ];
-$sameAsImage = count( $shippedLines ) === 3;
+$drawnLines = count( $shippedLines ) === 3;
 foreach( $shippedLines as $line )
-	$sameAsImage = $sameAsImage && \Nino\Html::renderHtml( $appData, $line ) !== '' && \Nino\Html::renderHtml( $appData, $line ) === \Nino\Html::renderHtml( $appData, str_replace( [ '[imagevalues', '[/imagevalues]' ], [ '[image', '[/image]' ], $line ) );
-check( 'the three places that ask for the address of the logo - og:image, twitter:image and the mail - draw the same with [imagevalues] as with the content form of [image]', $sameAsImage === true );
+	$drawnLines = $drawnLines && str_contains( $line, '[[url]]' ) === true
+		&& \Nino\Html::renderHtml( $appData, $line ) === str_replace( [ '[imagevalues /logo]', '[/imagevalues]', '[[url]]', '[[/project/company/general/name]]' ], [ '', '', 'https://example.com/public/images/logo.400x100.png', 'ACME' ], $line );
+check( 'the three places that ask for the address of the logo - og:image, twitter:image and the mail - draw their line with the absolute address of the file in it', $drawnLines === true );
 check( '...and nothing, no empty tag, without a logo', ( static function() use ( &$appData, $shippedLines ): bool {
 	$appData['/nino/html/images']['/logo']['filename'] = null;
 	$empty = true;

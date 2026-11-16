@@ -144,10 +144,9 @@ namespace Nino {
 		/**
 		 *	Take every callable registered under a name away - what a
 		 *	registration that replaces its predecessor rather than joining it
-		 *	does first (see \Nino\Modules\Components::addComponent()), since a
-		 *	second callback under a shortcode's name is not an alternative to
-		 *	the first but its successor: it would be handed the first one's
-		 *	output as its arguments
+		 *	does first, since a second callback under a name is not an
+		 *	alternative to the first but its successor: it would be handed the
+		 *	first one's output as its arguments
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$name					The hook name

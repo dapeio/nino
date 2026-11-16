@@ -744,8 +744,8 @@ namespace Nino {
 		 *	The callback is registered under '/nino/html/shortcode/<name>' (see
 		 *	\Nino\Callbacks::registerCallback()), so a second registration under
 		 *	the same name does not replace the first but is handed its answer as
-		 *	the arguments. A shortcode with a schema is registered through
-		 *	\Nino\Modules\Components, a feature's plain one through
+		 *	the arguments. A component with a schema is registered through
+		 *	\Nino\Components, a feature's plain shortcode through
 		 *	\Nino\Feature::shortcode().
 		 *
 		 *	$container tells the reader whether the name has an end: true, a
@@ -764,14 +764,13 @@ namespace Nino {
 		 */
 		public static function addShortcode( array &$appData, string $shortcode, mixed $callback, ?bool $container = null ): void {
 
-			// A name that is a component or a stack already, with its renderer registered: a plain
-			// shortcode joining it is handed the component's output as its arguments, which is
-			// never meant - said in the log with both registrants. (A component's own registration
-			// takes its callbacks away first, so it does not come this way)
-			if( ( isset( $appData[\Nino\Modules\Components::REGISTRY][$shortcode] ) === true || isset( $appData[\Nino\Modules\Components::STACKS][$shortcode] ) === true )
-				&& \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/'. $shortcode ) !== [] )
-				trigger_error( 'Html::addShortcode(): "'. $shortcode. '" is a component of '. $appData[\Nino\Modules\Components::OWNERS][$shortcode]
-					. ' already; the shortcode of '. ( \Nino\Callbacks::owner( $callback ) ?? 'a function' ). ' is handed its output', E_USER_WARNING );
+			// A name that is a component of the register already: the register draws it, a shortcode
+			// of the same name is never asked - said in the log with both registrants. (The names of
+			// the register are read as they stand: components() asks the methods an attribute's
+			// options may name, and a registration is no time for that)
+			if( isset( $appData[\Nino\Components::REGISTRY][$shortcode] ) === true )
+				trigger_error( 'Html::addShortcode(): "'. $shortcode. '" is a component of '. ( $appData[\Nino\Components::OWNERS]['names'][$shortcode] ?? 'the register' )
+					. ' already; the shortcode of '. ( \Nino\Callbacks::owner( $callback ) ?? 'a function' ). ' is never drawn', E_USER_WARNING );
 
 			// Add shortcode in appData, and let the reader be told again
 			$appData['./nino/html/shortcodes'][$shortcode] = $container;

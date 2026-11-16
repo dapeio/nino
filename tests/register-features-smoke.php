@@ -298,6 +298,15 @@ check( 'a component is drawn with the renderer of the class of the feature - [ t
 check( 'the options of an attribute are the answer of the method the schema names, and the places of a component are the ones the register reads',
 	\Nino\Components::components( $a )['probe-line']['attributes']['tone']['options'] === [ 'calm', 'loud' ] && \Nino\Components::allowed( $a, 'probe-box' ) === [ 'probe-box', 'probe-card', 'probe-line', 'probe-note' ]
 	&& \Nino\Html::renderHtml( $a, '[probe-line text="x" tone="loud"][probe-line text="x" tone="wild"]' ) === '<p class="probe-line probe-line--tone-loud" data-mark="loud">x</p><p class="probe-line" data-mark="calm">x</p>' );
+// A shortcode that takes the name of a component of a feature is said, with the feature that has it and who registers the shortcode, and is never asked
+class RegisterSmokeShortcodeOwner { public static function answer( array &$appData, array $args ): string { return 'shortcode'; } }
+$clash = $a;
+ninoWarnings();
+\Nino\Html::addShortcode( $clash, 'probe-note', [ RegisterSmokeShortcodeOwner::class, 'answer' ] );
+$clashSaid = ninoWarnings();
+check( 'a shortcode that takes the name of the component of a feature is one warning that names the name, the key of the feature and the class of the shortcode - and the component is the one that draws',
+	count( $clashSaid ) === 1 && str_contains( $clashSaid[0], '"probe-note"' ) && str_contains( $clashSaid[0], ' of probe ' ) && str_contains( $clashSaid[0], 'RegisterSmokeShortcodeOwner' )
+	&& \Nino\Html::renderHtml( $clash, '[probe-note text="n"]' ) === '<i class="probe-note">n</i>' );
 check( 'the groups are claimed by the feature, with the words, the knobs and the components of each in the order they were registered',
 	array_keys( \Nino\Components::groups( $a ) ) === [ 'probe', 'probe-more' ] && \Nino\Components::groups( $a )['probe']['feature'] === 'probe'
 	&& \Nino\Components::groups( $a )['probe']['components'] === [ 'probe-box', 'probe-line', 'probe-note' ] && \Nino\Components::groups( $a )['probe-more']['components'] === [ 'probe-card' ]
@@ -1359,26 +1368,24 @@ check( 'a callback a module registers in its init() is asked for the parts: the 
 echo "\n";
 
 
-echo "The two ways side by side\n";
+echo "The keys of a manifest that are not read, beside the folders\n";
 
-// A feature may have both: the keys 'components' and 'stacks' of its manifest, which \Nino\Modules\Components registers, and the folders
+// A feature may still have the keys 'components' and 'stacks' in its manifest: they are not read, the folders are, and the Features panel says why once
 registerRemove( NINO_FEATURES_DIR. '/Twofold' );
-$twofold = registerFeature( 'Twofold', [ 'components' => [ 'old-way' => [ 'label' => 'Old', 'source' => 'text', 'attributes' => [] ] ] ] );
+$twofold = registerFeature( 'Twofold', [ 'components' => [ 'old-way' => [ 'label' => 'Old', 'source' => 'text', 'attributes' => [] ] ], 'stacks' => [ 'old-rows' => [ 'label' => 'Rows' ] ] ] );
 registerGroup( $twofold, 'tidy', [ 'label' => 'Tidy' ] );
 registerComponent( $twofold, 'new-way', registerSchema( [ 'template' => '<n>[[value]]</n>', 'source' => 'text' ] ) );
 file_put_contents( $twofold. '/Twofold.php', '<?php namespace Nino\\Modules { class Twofold { public static function componentOldWay( array &$appData, array $args ): string { return "<o>". $args["value"]. "</o>"; } } }' );
 $project = registerProject( 'register-twofold', [ '\\Nino\\Modules\\Twofold' ] );
 $project['./nino/filesystem/path'] = $registerKernel;
 ninoWarnings();
-\Nino\Features::registerManifestComponents( $project );
 $project = registerBoot( $project );
-check( 'a feature that has both registers each its own way: the manifest in the register of the module, the folders in the register of the kernel, and neither disturbs the other',
-	array_keys( \Nino\Modules\Components::components( $project ) ) === [ 'old-way' ] && array_keys( \Nino\Components::components( $project ) ) === [ 'new-way' ] && ninoWarnings() === [] );
-check( '...and both are drawn', \Nino\Html::renderHtml( $project, '[old-way text="a"][new-way text="b"]' ) === '<o>a</o><n>b</n>' );
-$other = registerProject( 'register-twofold-reverse', [ '\\Nino\\Modules\\Twofold' ] );
-$other = registerBoot( $other );
-\Nino\Features::registerManifestComponents( $other );
-check( '...whichever is asked first', array_keys( \Nino\Modules\Components::components( $other ) ) === [ 'old-way' ] && array_keys( \Nino\Components::components( $other ) ) === [ 'new-way' ] );
+check( 'a feature that has the keys and the folders registers the folders and nothing of the keys, and says nothing at boot',
+	array_keys( \Nino\Components::components( $project ) ) === [ 'new-way' ] && array_keys( \Nino\Components::groups( $project ) ) === [ 'tidy' ] && ninoWarnings() === [] );
+check( '...the page is drawn by the folders alone: the call of a component of the key is a name nobody registered', \Nino\Html::renderHtml( $project, '[old-way text="a"][new-way text="b"]' ) === '<n>b</n>' );
+$reasons = \Nino\Features::componentProblems( $project, 'twofold' );
+check( '...and the Features panel is told one thing of the keys, however many there are, beside what it says of the folders: here nothing else',
+	count( $reasons ) === 1 && is_string( $reasons[0] ) === true && $reasons[0] !== '' );
 
 echo "\n";
 

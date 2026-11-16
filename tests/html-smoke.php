@@ -509,6 +509,27 @@ check( 'the tag of a language is its id with a hyphen, as a lang attribute is wr
 
 echo "\n";
 
+// --- Html::addShortcode and the names of the register -----------------------
+
+echo "Html::addShortcode - a name that is a component of the register\n";
+
+class HtmlSmokeShortcodeOwner { public static function answer( array &$appData, array $args ): string { return 'shortcode'; } }
+
+$clash = ninoSandbox( 'html-clash' );
+\Nino\Components::addComponent( $clash, 'clash-a', [ 'label' => 'Clash', 'in' => [ 'page' ], 'source' => 'none', 'template' => '<b>component</b>' ] );
+ninoWarnings();
+\Nino\Html::addShortcode( $clash, 'clash-a', [ HtmlSmokeShortcodeOwner::class, 'answer' ] );
+$clashSaid = ninoWarnings();
+check( 'a shortcode that takes the name of a component of the register is one warning that names the name and the class of the shortcode',
+	count( $clashSaid ) === 1 && str_contains( $clashSaid[0], '"clash-a"' ) && str_contains( $clashSaid[0], 'HtmlSmokeShortcodeOwner' ) );
+check( '...and the register draws the name: the shortcode is never asked', \Nino\Html::renderHtml( $clash, '[clash-a]' ) === '<b>component</b>' );
+\Nino\Html::addShortcode( $clash, 'clash-b', [ HtmlSmokeShortcodeOwner::class, 'answer' ] );
+\Nino\Html::addShortcode( $clash, 'clash-b', [ HtmlSmokeShortcodeOwner::class, 'answer' ] );
+check( 'a name that is no component of the register is no warning, whether it is new or joins a shortcode', ninoWarnings() === [] );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $clash ) );
+
+echo "\n";
+
 // --- Html::shortcodeCalls ---------------------------------------------------
 
 echo "Html::shortcodeCalls - the calls a piece of html+ makes, found and read as the rendering does\n";

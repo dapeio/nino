@@ -3,11 +3,7 @@ declare(strict_types=1);
 
 namespace Nino\Modules {
 
-	// The renderer of Boxy: a link it draws itself, with the class a linked card stretches
+	// The class of Boxy: a feature has one, and this one has nothing to say
 	class Boxy {
-
-		public static function componentBoxyLink( array &$appData, array $args ): string {
-			return '<a class="nino-stretch boxy-link" href="#boxy">'. $args['value']. '</a>';
-		}
 	}
 }

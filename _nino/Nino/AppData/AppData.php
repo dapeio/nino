@@ -62,7 +62,6 @@ namespace Nino {
 				'\\Nino\\Modules\\Template',
 				'\\Nino\\Modules\\Jstext',
 				'\\Nino\\Modules\\Csrf',
-				'\\Nino\\Modules\\Components',
 				// Inert until '/nino/cache/status' is switched on in /_admin's Config -
 				// present in every project so that switch has something to switch
 				'\\Nino\\Modules\\Cache',
@@ -275,43 +274,17 @@ namespace Nino {
 				them with the same value.	*/
 			$appData = self::_merge( $appData, self::_merge( self::DEFAULTS, $staticAppData ) );
 
-			/*	The one thing a config.php can lack that defaults cannot give it:
-				a list is replaced wholesale, so a file written before a module
-				became always-on never names it. Components took over [image]
-				from Images, and a project that lists the one and not the other
-				would lose its pictures at the update. It is put where Images
-				stood, and where there is none before the first module that is
-				no default - a project's module that registers a component of
-				a kernel name has to boot after the kernel's own, and an
-				appended one would replace it. Named here rather than migrated
-				into the file: a change of the features writes its own entry
-				and leaves the rest of the list as the file has it	*/
-			$modules = array_values( (array) ( $appData['/nino/modules'] ?? [] ) );
-			$name = static fn( mixed $class ): string => '\\'. ltrim( (string) $class, '\\' );
-			$listed = array_map( $name, $modules );
-
-			if( in_array( '\\Nino\\Modules\\Components', $listed, true ) === false ) {
-
-				$at = array_search( '\\Nino\\Modules\\Images', $listed, true );
-
-				if( $at !== false )
-					$modules[$at] = '\\Nino\\Modules\\Components';
-				else {
-
-					$at = count( $modules );
-
-					foreach( $listed as $index => $class )
-						if( in_array( $class, array_map( $name, self::DEFAULTS['/nino/modules'] ), true ) === false ) {
-
-							$at = $index;
-							break;
-						}
-
-					array_splice( $modules, $at, 0, [ '\\Nino\\Modules\\Components' ] );
-				}
-
-				$appData['/nino/modules'] = $modules;
-			}
+			/*	The setup wizard of an earlier release wrote the module class of
+				the components into the list of every config.php, and a list is
+				replaced wholesale: it is read without that name, a class the
+				kernel does not have. The file is not rewritten - a change of the
+				features writes its own entry and leaves the rest of the list as
+				the file has it	*/
+			if( isset( $appData['/nino/modules'] ) === true && is_array( $appData['/nino/modules'] ) === true )
+				$appData['/nino/modules'] = array_values( array_filter(
+					$appData['/nino/modules'],
+					static fn( mixed $class ): bool => '\\'. ltrim( (string) $class, '\\' ) !== '\\Nino\\Modules\\Components'
+				) );
 		}
 
 		// Merges $overlay into $base: associative arrays merge key-by-key
