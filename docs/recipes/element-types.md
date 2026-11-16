@@ -221,28 +221,27 @@ lowercase hyphenated IDs.
 
 ```html
 [elements /services limit="6" query="featured=1"]
-<article id="service-[[.id]]" class="nino-card"[[.lang]]>
+<article id="service-[[.id]]" class="service"[[.lang]]>
 	<img
-		class="nino-card-img"
+		class="service-img"
 		src="[[/nino/public]]/images/[[image]]"
 		alt="[[imageAlt]]"
 	>
-	<div class="nino-card-content">
-		<h2 class="nino-card-title">[[title]]</h2>
-		<div class="nino-card-descr">[[description]]</div>
-		<a class="nino-btn nino-btn--primary" href="[[link]]">
-			[[linkLabel]]
-		</a>
+	<div class="service-content">
+		<h2>[[title]]</h2>
+		<div class="nino-richtext">[[description]]</div>
+		[button .linkLabel href=".link"]
 	</div>
 </article>
 [/elements]
 ```
 
 - `[[.id]]` is the internal record ID.
+- A component of the register reads a field of the element as its source, `.title`, and an attribute of the type `link` reads one as its address, `href=".link"` (the component `button` is one of [the feature Basis](../features.md#the-feature-basis)); the field is written as its type writes it.
 - `[[.uri]]` is the uri of the element, `/<type>/<name>`, and `[[.slug]]` is the name alone - the last segment of the uri, nothing where the element has no uri: the token of a link to a page of the element, `href="/blog/[[.slug]]"`; the type is in `[[.uri]]`.
 - In `[elements]`, `[[.lang]]` is ` lang="<tag>"` - the attribute with its space in front - where the block shows text of another language than the page's, and nothing where the page's language had it all: put it on the element that holds the text. A per-language field that the page's language has no value for - no version of the element at all, or an empty field - takes its value from the native language, then the other languages of the site in their order, then the other languages the type file holds (`\Nino\Elements::getElementWithFallback()`); the element is listed in every language the query lists it for.
-- `empty="<name>"` on `[elements]` is the template of the project, `private/templates/<name>.tpl`, that stands in the page where the loop finds no element: `[elements /services empty="services-none"]`. Without it a list with no element is nothing. A stack does not take it.
-- `[[field]]` is local to the current Elements block, and to the cell of a stack. A field of the model that no language has a value for is empty: the placeholder never stays standing.
+- `empty="<name>"` on `[elements]` is the template of the project, `private/templates/<name>.tpl`, that stands in the page where the loop finds no element: `[elements /services empty="services-none"]`. Without it a list with no element is nothing.
+- `[[field]]` is local to the current Elements block. A field of the model that no language has a value for is empty: the placeholder never stays standing.
 - normal field output is HTML-escaped;
 - `html: true` fields are sanitized by the Elements renderer, to the inline tags, or - with `blocks: true` - to paragraphs and lists as well; a `breaks: true` field is escaped and its newlines become `<br>`. The rule is `\Nino\Html::fieldValue( $value, $field )`, which `[element]` and `[elements]` call and a feature that draws a field itself calls instead of a copy. `[elementvalues]` lists values and always escapes them;
 - wrap the output of a `blocks` field in an element with the class `nino-richtext`: the reset at the top of `Nino.css` takes every paragraph gap and list marker away, and the class restores them;
@@ -252,7 +251,7 @@ lowercase hyphenated IDs.
   forms.
 
 Do not use absolute `[[/template/*]]` fills for per-record data. Do not use local
-`[[title]]` outside an Element block or the cell of a stack.
+`[[title]]` outside an Element block.
 
 ## Render one field's distinct values
 

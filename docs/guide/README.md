@@ -112,9 +112,9 @@ Eine Vorlage enthält nie PHP. Umgekehrt gilt: PHP enthält kein Markup. Das Mar
 
 Nino liest eine Vorlage einmal und setzt dann der Reihe nach ein, was dasteht: Text bleibt Text, ein Textfill wird durch seinen Text ersetzt, ein Shortcode durch seine Ausgabe. Was ein Shortcode zurückgibt, ist fertig. Nino liest es nicht noch einmal, und der Wert eines Textfills wird nie als Shortcode gelesen. Dieses Einsetzen heißt in diesem Handbuch „rendern“.
 
-Eine **Komponente** ist ein Shortcode mit Schema. Das Schema sagt, woher der Wert kommt und welche Attribute es gibt. Werkzeuge wie der Builder können eine Komponente deshalb anbieten.
+Eine **Komponente** ist ein Shortcode mit Schema. Das Schema sagt, woher der Wert kommt, welche Attribute es gibt und wie sie gezeichnet wird. Werkzeuge wie der Builder können eine Komponente deshalb anbieten. Ein Feature bringt seine Komponenten in Ordnern: `components/<name>/` mit dem Schema und der Vorlage. Das Feature **Basis** kommt mit Nino und bringt die Bausteine einer Seite mit, Abschnitt, Zeile, Spalte, Überschrift, Text, Button und Bild, mit einem Standard-Aussehen.
 
-Nachschlagen: [Rendering](../development.md#rendering-from-html-to-html), [HTML+ - the notation](../development.md#html---the-notation), [Components](../development.md#components).
+Nachschlagen: [Rendering](../development.md#rendering-from-html-to-html), [HTML+ - the notation](../development.md#html---the-notation), [The Register of Components](../development.md#the-register-of-components), [A feature's components](../development.md#a-features-components).
 
 ## Texte und Sprachen
 
@@ -185,7 +185,7 @@ Nachschlagen: [Developing a feature](../features.md), [Features in der Workbench
 
 ## Sicherheit in fünf Regeln
 
-1. **Escaping.** Schreibe jeden fremden Wert nur maskiert ins HTML. Fremd ist alles, was aus einer Anfrage, einer Datei oder von der Redaktion kommt. In einem Feature maskiert `\Nino\Modules\Components::escape()`.
+1. **Escaping.** Schreibe jeden fremden Wert nur maskiert ins HTML. Fremd ist alles, was aus einer Anfrage, einer Datei oder von der Redaktion kommt. In einem Feature maskiert `\Nino\Components::escape()`.
 2. **CSRF.** Nino prüft jede schreibende Anfrage auf ein Token. Ein Token ist ein geheimer Wert der Sitzung. Jedes Formular enthält deshalb `[csrf]`. Schalte die Prüfung nicht ab.
 3. **Rechte.** Prüfe in jeder Aktion der Workbench als Erstes das Recht: `\Nino\Admin\Admin::guardPerm()`. Die Workbench verlangt nur, dass ein Konto angemeldet ist. Das Recht prüft sie nicht. Ohne diese Zeile kann jedes angemeldete Konto die Aktion aufrufen.
 4. **Uploads.** Nimm Bilder nur über die Bild-Funktionen von Nino an (`\Nino\Images`). Baue nie einen Dateipfad aus einem Wert der Anfrage.

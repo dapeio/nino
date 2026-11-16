@@ -2,7 +2,7 @@
 
 [Übersicht](README.md) · zurück: [10. Eine Aktion im Bereich: löschen](10-action.md) · weiter: [12. Auf dem Dashboard erscheinen](12-dashboard.md)
 
-**Ziel:** Das Feature bringt ein Stylesheet und ein Skript für die Webseite mit. Die Liste der Treffen bekommt ein Aussehen, das dem Design des Projekts folgt.
+**Ziel:** Das Feature bringt ein Stylesheet und ein Skript für die Webseite mit. Die Liste der Treffen bekommt ein Aussehen, das der Marke und der Seite des Projekts folgt.
 
 ## Wie Nino CSS und JavaScript ausliefert
 
@@ -11,9 +11,9 @@ Nino fasst alle Stylesheets zu einer Datei zusammen und alle Skripte zu einer zw
 Das Stylesheet-Bundle hat vier Lagen. Jede Datei steht in einer davon, und die Lage entscheidet, welche Regel gewinnt:
 
 ```text
-nino.reset        _nino/Nino.css, erster Teil: Variablen, Reset, Grundelemente
-nino.components   _nino/Nino.css, Rest; Features und Module: ihre Stylesheets
-nino.theme        private/assets/theme.css: das Design des Projekts
+nino.reset        _nino/Nino.css: Variablen, Reset, Grundelemente
+nino.components   Features und Module: ihre Stylesheets
+nino.theme        private/assets/theme.css: ein Design, das das Projekt dort ablegt
 project           private/assets/style.css: eigene Regeln des Projekts
 ```
 
@@ -38,43 +38,37 @@ Lege `features/Meetups/assets/meetups.css` an:
 
 ```css features/Meetups/assets/meetups.css
 /* The look of the Meetups feature on the site. Every size and colour is a
-   custom property of _nino/Nino.css, so the list follows the theme */
+   token of _nino/Nino.css, so the list follows the brand and the page of the project */
 
 .meetups-list {
-	margin: var(--space-2) 0;
+	margin: var(--page-space-2) 0;
 	padding: 0;
 	list-style: none;
 }
 
 .meetups-list li {
-	padding: var(--space-1) 0;
-	border-bottom: 1px solid var(--color-border);
+	padding: var(--page-space-1) 0;
+	border-bottom: var(--page-line) solid var(--brand-line);
 }
 
-.meetups-date {
+.meetup-date {
 	display: inline-block;
 	min-width: 12em;
-	color: var(--color-primary);
+	color: var(--brand-accent);
 }
 
 /* Set by meetups.js on a date within the next seven days */
-.meetups-date.meetups-is-soon {
+.meetup-date.meetups-is-soon {
 	font-weight: bold;
 }
 
 .meetups-signup {
-	display: grid;
-	gap: var(--space-1);
 	max-width: 30em;
-	margin-top: var(--space-3);
-}
-
-.meetups-signup-message:empty {
-	display: none;
+	margin-top: var(--page-space-3);
 }
 ```
 
-Werte wie `var(--space-2)` und `var(--color-primary)` sind **Custom Properties** von Nino. Eine Custom Property ist eine Variable in CSS. Nino legt sie in `_nino/Nino.css` fest, das Design des Projekts setzt sie neu. Benutzt Du sie, folgt Dein Feature dem Design von selbst.
+Werte wie `var(--page-space-2)` und `var(--brand-accent)` sind **Custom Properties** von Nino, die **Tokens**. Eine Custom Property ist eine Variable in CSS. Nino legt sie in `_nino/Nino.css` fest, und das Projekt setzt sie in `private/assets/style.css` neu. Die Tokens der Marke heißen `--brand-…`, die der Seite `--page-…`. Benutzt Du sie, folgt Dein Feature der Marke von selbst, in hell und in dunkel: Die Farben `--brand-ink`, `--brand-line` und `--brand-accent` wechseln mit dem Modus der Seite.
 
 ### 3. Das Skript
 
@@ -93,7 +87,7 @@ Lege `features/Meetups/assets/meetups.js` an:
 
 		const now = Date.now();
 
-		document.querySelectorAll('.meetups-date time[datetime]').forEach( function( time ) {
+		document.querySelectorAll('.meetup-date time[datetime]').forEach( function( time ) {
 
 			const ahead = ( new Date( time.getAttribute('datetime') ) ).getTime() - now;
 
@@ -111,24 +105,24 @@ Lege `features/Meetups/assets/meetups.js` an:
 
 Lade die Seite `/meetups` neu. Nino baut die Bundles selbst neu, wenn sich eine Datei ändert.
 
-## Zusammenspiel mit dem Design-Feature
+## Zusammenspiel mit dem Projekt
 
-Das Feature **Design** aus dem Katalog erzeugt `private/assets/theme.css` aus Einstellungen in der Workbench. Für Dein Feature heißt das:
+Das Aussehen der Seite gehört dem Projekt. Es dreht die Tokens in `private/assets/style.css` oder legt ein Design in `private/assets/theme.css` ab. Für Dein Feature heißt das:
 
-- Benutze die Custom Properties von Nino für Farben, Abstände und Radien. Dann folgt Dein Feature jedem Design.
-- Schreibe keine Regel, die davon abhängt, dass Dein Stylesheet vor oder nach dem Design steht.
-- Ein Feature kann dem Design-Feature keine eigenen Regler hinzufügen. Wer das Aussehen Deines Features ändern will, schreibt Regeln in `private/assets/style.css`.
+- Benutze die Tokens von Nino für Farben, Abstände und Radien. Dann folgt Dein Feature jeder Marke.
+- Schreibe keine Regel, die davon abhängt, dass Dein Stylesheet vor oder nach einem Design steht. Die Lagen entscheiden das.
+- Wer das Aussehen Deines Features ändern will, schreibt Regeln in `private/assets/style.css`. Sie liegen in der Lage `project` und gewinnen gegen jede Regel Deines Stylesheets mit einem einfachen Selektor.
 
 ## Prüfen
 
-- Im Quelltext von `/meetups` steht ein Stylesheet `…/.cache/style.css` und ein Skript `…/.cache/script.js`. Beide enthalten jetzt Deine Regeln und Dein Skript. In `style.css` stehen Deine Regeln in einem Block `@layer nino.components { … }`, nach denen von `Nino.css` und vor denen von `theme.css`.
-- Die Liste hat Linien zwischen den Treffen. Jedes Datum hat die Hauptfarbe des Designs.
+- Im Quelltext von `/meetups` steht ein Stylesheet `…/.cache/style.css` und ein Skript `…/.cache/script.js`. Beide enthalten jetzt Deine Regeln und Dein Skript. In `style.css` stehen Deine Regeln in einem Block `@layer nino.components { … }`, nach denen von `Nino.css` und vor denen der Lagen `nino.theme` und `project`.
+- Die Liste hat Linien zwischen den Treffen. Jedes Datum hat die Akzentfarbe der Marke.
 - Lege im Bereich **Elemente** ein Treffen in den nächsten sieben Tagen an. Sein Datum steht fett da. Es trägt die Klasse `meetups-is-soon`.
-- Schreibe zur Probe `.meetups-date { color: rgb(200, 0, 0); }` ans Ende von `private/assets/style.css`. Jedes Datum wird rot. Die Regel des Projekts gewinnt. Nimm die Zeile wieder heraus.
+- Schreibe zur Probe `.meetup-date { color: rgb(200, 0, 0); }` ans Ende von `private/assets/style.css`. Jedes Datum wird rot. Die Regel des Projekts gewinnt. Nimm die Zeile wieder heraus.
 
 ## Häufige Fehler
 
-- **Feste Farben und Abstände.** `color: #1a7bb8` passt zu einem Design und zu keinem anderen. Nimm `var(--color-primary)`.
+- **Feste Farben und Abstände.** `color: #1a7bb8` passt zu einer Marke und zu keiner anderen und bleibt im dunklen Modus, wie es ist. Nimm `var(--brand-accent)`.
 - **Eine Datei direkt verlinken.** `<link href="/features/Meetups/assets/meetups.css">` lädt nichts. Der Webserver liefert aus `features/` nie eine Datei aus.
 - **Textfills im CSS.** In CSS und JavaScript ersetzt Nino keine Textfills und keine Shortcodes. Nur `[[/nino/dir]]` und `[[/nino/public]]` werden ersetzt.
 - **Ein Skript, ohne das die Seite nicht geht.** Inhalte und Formulare müssen ohne JavaScript funktionieren.
@@ -137,5 +131,5 @@ Das Feature **Design** aus dem Katalog erzeugt `private/assets/theme.css` aus Ei
 
 - [Assets](../features.md#assets): die Reihenfolge im Bundle
 - [Assets Are Not Templates](../development.md#assets-are-not-templates): Bundles und der Shortcode `[assets]`
-- [The Look](../setup.md#the-look): `theme.css` und `style.css`
+- [The Look](../setup.md#the-look): die Reihenfolge im Bundle und `style.css`
 - [The toolset](../features.md#the-toolset): die Helfer im Browser und die CSS-Namen von Nino

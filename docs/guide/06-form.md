@@ -6,23 +6,24 @@
 
 ## Schritte
 
-### 1. Die Komponente im Manifest
+### 1. Die Komponente im Ordner
 
-Das Formular wird eine zweite Komponente. Füge in `features/Meetups/feature.php` unter `components` einen Eintrag ein, nach dem Eintrag `meetup-date`:
+Das Formular wird eine zweite Komponente, im Ordner `features/Meetups/components/meetups-signup/`. Lege `component.php` an:
 
-```php features/Meetups/feature.php
-		// The sign-up form. It has no value of its own, so its source is none
-		'meetups-signup' => [
-			'label'      => [ 'en_US' => 'Meetup sign-up', 'de_DE' => 'Anmeldung zu einem Treffen' ],
-			'source'     => 'none',
-			'preview'    => 'block',
-			'draws'      => 'form .meetups-signup',
-			'in'         => [ 'section' ],
-			'attributes' => [],
-		],
+```php features/Meetups/components/meetups-signup/component.php
+<?php
+declare(strict_types=1);
+
+// The sign-up form has no value of its own: no source, which is what a schema says without one
+return [
+	'group'   => 'meetups',
+	'label'   => [ 'en_US' => 'Meetup sign-up', 'de_DE' => 'Anmeldung zu einem Treffen' ],
+	'in'      => [ 'page', 'flow' ],
+	'preview' => 'block',
+];
 ```
 
-`'source' => 'none'` heißt: Die Komponente hat keinen Wert. Der Aufruf ist nur `[meetups-signup]`.
+Die Komponente hat keinen Wert und keine Attribute. Der Aufruf ist nur `[meetups-signup]`. Eine Vorlage `template.tpl` legst Du nicht an: Die Methode in Schritt 4 liest ihre Vorlage selbst, weil sie html+ ist, die sie nach dem Einsetzen noch zeichnen lässt. Eine Komponente ohne Vorlage braucht eine Methode, und die hat sie.
 
 Setze die Version auf `0.4.0`:
 
@@ -35,16 +36,16 @@ Setze die Version auf `0.4.0`:
 Lege `features/Meetups/templates/meetups-signup.tpl` an:
 
 ```html features/Meetups/templates/meetups-signup.tpl
-<form class="nino-form meetups-signup[[classes]]" method="post" action="[[/nino/dir]]/meetups" novalidate data-form-texts="/feature/meetups/signup/">
+<form class="nino-form [[class]]" method="post" action="[[/nino/dir]]/meetups" novalidate data-form-texts="/feature/meetups/signup/">
 	[csrf]
 	<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 	<label for="meetups-signup-meetup">[[/feature/meetups/signup/meetup]]</label>
-	<select id="meetups-signup-meetup" name="meetup" class="nino-form-select" required>
+	<select id="meetups-signup-meetup" name="meetup" required>
 		[elements /meetups sort="date" callback="/meetups/upcoming"]<option value="[[.slug]]">[[title]]</option>[/elements]
 	</select>
 	<label for="meetups-signup-name">[[/feature/meetups/signup/name]]</label>
-	<input type="text" id="meetups-signup-name" name="name" class="nino-form-input" maxlength="80" autocomplete="name" required>
-	<button type="submit" class="nino-btn nino-btn--primary">[[/feature/meetups/signup/submit]]</button>
+	<input type="text" id="meetups-signup-name" name="name" maxlength="80" autocomplete="name" required>
+	<button type="submit" class="nino-form-submit">[[/feature/meetups/signup/submit]]</button>
 	<p class="nino-form-message meetups-signup-message">[[message]]</p>
 </form>
 ```
@@ -52,12 +53,12 @@ Lege `features/Meetups/templates/meetups-signup.tpl` an:
 - `[csrf]` setzt ein verstecktes Feld mit dem Token der Sitzung ein. Ohne dieses Feld lehnt Nino jede Anfrage des Formulars ab.
 - `[[/nino/dir]]` ist das Verzeichnis, unter dem das Projekt läuft. Setze es vor jede Adresse.
 - Das Feld `website` ist eine Falle für Bots. Menschen sehen es nicht. Die Klasse `nino-form-trap` versteckt es.
-- `class="nino-form"` übergibt das Formular dem Skript von Nino. Es sendet ohne Neuladen ab, prüft die Pflichtfelder, markiert das falsche Feld und sagt in der Sprache der Seite, was fehlt. Eigenes JavaScript brauchst Du nicht.
+- `class="nino-form"` übergibt das Formular dem Skript von Nino und dem Stylesheet des Moduls Form (`form.css`), das Felder, Meldung und Knopf zeichnet; `nino-form-submit` ist die Klasse des Knopfes. `[[class]]` ist der Name der Komponente, `meetups-signup`. Es sendet ohne Neuladen ab, prüft die Pflichtfelder, markiert das falsche Feld und sagt in der Sprache der Seite, was fehlt. Eigenes JavaScript brauchst Du nicht.
 - `novalidate` schaltet die Meldung des Browsers ab, die in der Sprache des Browsers spräche. Die Prüfung macht das Skript.
 - `data-form-texts` nennt den Anfang der Schlüssel, unter denen die Sätze des Skripts liegen. Der Schlüssel endet mit `/`. Der nächste Schritt legt sie an.
 - Das erste `<p>` des Formulars ist die Meldung: Das Skript schreibt den Satz hinein und macht den Absatz zur Live-Region. Der erste `<button>` ist der Knopf, den es während der Anfrage sperrt.
 - Die Auswahl der Treffen ist dieselbe Schleife wie in Tutorial 5. `[[.slug]]` ist der Name des Elements, zum Beispiel `christmas`.
-- `[[message]]` füllt PHP. Die anderen Platzhalter sind Textfills.
+- `[[class]]` und `[[message]]` füllt PHP. Die anderen Platzhalter sind Textfills.
 
 Die Vorlage eines Features darf Textfills und Shortcodes enthalten. Nino liest die Ausgabe einer Komponente aber nicht noch einmal: Was die Methode zurückgibt, ist fertig, und ein `[csrf]` darin bliebe als Text im Formular stehen. Die Komponente zeichnet ihre Vorlage deshalb selbst (Schritt 4).
 
@@ -93,16 +94,17 @@ Füge in `features/Meetups/Meetups.php` diese Methode in die Klasse ein, direkt 
 
 ```php features/Meetups/Meetups.php
 		// [meetups-signup]
-		public static function componentMeetupsSignup( array &$appData, array $args ): string {
+		public static function componentMeetupsSignup( array &$appData, array $args, string $content, array $context ): string {
 
 			$state = $appData['./meetups/signup'] ?? '';
 
 			// One of three fixed words picks the text key. Nothing of the request is written
 			$message = in_array( $state, [ 'success', 'invalid', 'error' ], true ) === true ? '[[/feature/meetups/signup/'. $state. ']]' : '';
 
+			// $args['class'] is the name of the component: the register made it, and nobody wrote it
 			$source = str_replace(
-				[ '[[classes]]', '[[message]]' ],
-				[ \Nino\Feature::classes( $args ), $message ],
+				[ '[[class]]', '[[message]]' ],
+				[ $args['class'], $message ],
 				\Nino\Feature::template( $appData, self::TEMPLATES, 'meetups-signup' )
 			);
 
@@ -111,9 +113,9 @@ Füge in `features/Meetups/Meetups.php` diese Methode in die Klasse ein, direkt 
 		}
 ```
 
-- Die Methode heißt nach der Komponente: `meetups-signup` wird `componentMeetupsSignup()`.
+- Die Methode heißt nach der Komponente: `meetups-signup` wird `componentMeetupsSignup()`. Sie nimmt dieselben vier Argumente wie die Methode aus Tutorial 3.
 - Die Vorlage ist HTML+. Die Methode setzt zuerst die Platzhalter ein und lässt das Ergebnis dann von `\Nino\Html::renderSource()` zeichnen. `\Nino\Html::context()` sagt, wo der Aufruf auf der Seite steht, damit die Vorlage dort so wirkt, als stünde sie in der Seite.
-- Was Du vor dem Zeichnen einsetzt, wird mitgelesen. Setze deshalb nur Sicheres ein: `Feature::classes()` schreibt jedes `[` als `&#91;`, und die Meldung ist einer von drei festen Schlüsseln.
+- Was Du vor dem Zeichnen einsetzt, wird mitgelesen. Setze deshalb nur Sicheres ein: `$args['class']` besteht aus dem Namen der Komponente und festen Wörtern, und die Meldung ist einer von drei festen Schlüsseln. Würdest Du einen Wert der Anfrage einsetzen, schriebest Du jedes `[` darin als `&#91;`, wie `\Nino\Feature::classes()` es tut.
 - `$appData['./meetups/signup']` ist ein Wert, der nur für diese Anfrage gilt. Schlüssel mit `./` am Anfang speichert Nino nie. Tutorial 7 setzt den Wert.
 - Der Satz im Formular ist ein Textfill. Die Methode wählt seinen Schlüssel aus drei festen Worten. Sie schreibt nichts aus der Anfrage ins HTML. Der Satz ist für einen Besucher ohne JavaScript: Das Skript schreibt seine Sätze selbst in die Meldung.
 
@@ -167,7 +169,7 @@ Sende das Formular ab, erst ohne Namen: Unter dem Knopf steht „Bitte gib Deine
 
 ## Nachschlagen
 
-- [Components and stacks](../features.md#components-and-stacks): Komponenten ohne Quelle
+- [Components in folders](../features.md#components-in-folders): Komponenten ohne Quelle
 - [CSRF](../development.md#csrf): wo Nino das Token liest
 - [A form of a feature](../development.md#a-form-of-a-feature): was das Skript voraussetzt und was die Route selbst tun muss
 - [Forms](../development.md#forms): das Kontaktformular von Nino und die Klassen für Formulare

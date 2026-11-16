@@ -71,16 +71,17 @@ Der Shortcode `[elements]` wiederholt seinen Inhalt für jedes Element. Ersetze 
 ```html features/Meetups/install/templates/page-meetups.tpl
 			<ul class="meetups-list">
 			[elements /meetups sort="date" callback="/meetups/upcoming" empty="meetups-none"]
-				<li[[.lang]]>[meetup-date text="[[date]]" time="[[time]]"] <strong>[[title]]</strong> [[place]]</li>
+				<li[[.lang]]>[meetup-date .date time=".time"] <strong>[[title]]</strong> [[place]]</li>
 			[/elements]
 			</ul>
 ```
 
 - `/meetups` ist der Typ, `sort="date"` sortiert nach dem Feld `date`.
-- `[[title]]`, `[[date]]`, `[[time]]` und `[[place]]` sind die Felder des Elements. Nino maskiert sie.
+- `.date` ist die Quelle der Komponente: das Feld `date` des Elements. `time=".time"` ist der Verweis, den das Attribut `time` liest (Tutorial 3): das Feld `time`. Ein Element ohne Uhrzeit hat dort nichts, und die Komponente schreibt dann nur das Datum.
+- `[[title]]` und `[[place]]` sind Felder des Elements als Textfills. Nino maskiert sie.
 - `[[.lang]]` setzt ein `lang`-Attribut, wenn der Text aus einer anderen Sprache stammt.
 - `callback` nennt einen Callback, der die Liste verändern darf. Den schreibst Du im nächsten Schritt.
-- `empty` nennt die Vorlage, die auf der Seite steht, wenn die Schleife kein Element findet. Das ist `private/templates/meetups-none.tpl`, gelesen wie ein `[template]`. Ohne das Attribut bleibt eine leere Liste leer. Das Attribut gilt für `[elements]`, nicht für Stapel (Stacks).
+- `empty` nennt die Vorlage, die auf der Seite steht, wenn die Schleife kein Element findet. Das ist `private/templates/meetups-none.tpl`, gelesen wie ein `[template]`. Ohne das Attribut bleibt eine leere Liste leer.
 
 Die Vorlage für die leere Liste ist eine Datei mehr in der Einheit. Lege `features/Meetups/install/templates/meetups-none.tpl` an:
 
@@ -154,8 +155,8 @@ Das Formular beschriftet die Felder mit dem `label` aus dem Modell, bei `date` u
 Öffne `/meetups`. Die Liste zeigt zwei Treffen, das frühere zuerst. Das vergangene Treffen fehlt. Der Quelltext zeigt zum Beispiel:
 
 ```html
-<li><span class="meetups-date"><time datetime="2026-12-24T19:30">24.12.2026, 19:30</time></span> <strong>Christmas party</strong> Clubhouse</li>
-<li><span class="meetups-date"><time datetime="2027-03-06">06.03.2027</time></span> <strong>Spring hike &lt;b&gt;!&lt;/b&gt;</strong> </li>
+<li><span class="meetup-date"><time datetime="2026-12-24T19:30">24.12.2026, 19:30</time></span> <strong>Christmas party</strong> Clubhouse</li>
+<li><span class="meetup-date"><time datetime="2027-03-06">06.03.2027</time></span> <strong>Spring hike &lt;b&gt;!&lt;/b&gt;</strong> </li>
 ```
 
 Lösche zur Probe die beiden Treffen in der Zukunft. Die Liste zeigt dann „Noch keine Termine.“, auf Englisch „No dates yet.“. Lege sie danach wieder an.

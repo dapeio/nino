@@ -63,8 +63,8 @@ Ersetze in `features/Meetups/Meetups.php` die Methode `doShortcode()` samt ihrem
 				[
 					\Nino\Feature::classes( $args ),
 					$time === '' ? $date : $date. 'T'. $time,
-					$label === '' ? '' : \Nino\Modules\Components::escape( $label ). ': ',
-					\Nino\Modules\Components::escape( $text ),
+					$label === '' ? '' : \Nino\Components::escape( $label ). ': ',
+					\Nino\Components::escape( $text ),
 				],
 				\Nino\Feature::template( $appData, self::TEMPLATES, 'meetup-date' )
 			);
@@ -77,7 +77,7 @@ Was hier neu ist:
 - **Die Sprache der Seite.** `\Nino\Format::date()`, `dateLong()` und `datetime()` schreiben ein Datum so, wie die Sprache der Seite es schreibt. Für ein Datum, das es nicht gibt, antworten sie `null`.
 - **Der Schalter.** `\Nino\Feature::flag()` liest ein bloßes Wort wie `long`. Es versteht auch `long="yes"` und `long="no"`.
 - **Die Klasse.** Jeder Shortcode darf `class="…"` tragen. `\Nino\Feature::classes()` gibt die Klassen maskiert zurück, mit einem Leerzeichen davor.
-- **Maskieren.** `label` ist freier Text. `\Nino\Modules\Components::escape()` maskiert ihn für HTML. Die Funktion schreibt auch `[` als `&#91;`. Nino liest die Ausgabe eines Shortcodes nicht noch einmal: Was Du zurückgibst, ist fertig, und ein `[` darin öffnet nichts. Das `&#91;` schützt trotzdem, und zwar dort, wo ein Wert in eine Vorlage kommt, die ein Shortcode selbst zeichnet (Tutorial 6). Es kostet nichts, und der Wert bleibt überall derselbe Text.
+- **Maskieren.** `label` ist freier Text. `\Nino\Components::escape()` maskiert ihn für HTML: `<`, `>`, `&` und die Anführungszeichen, dazu entfernt es Steuerzeichen. Nino liest die Ausgabe eines Shortcodes nicht noch einmal: Was Du zurückgibst, ist fertig, und ein `[` darin öffnet nichts. Anders ist es dort, wo ein Wert in eine Vorlage kommt, die ein Shortcode selbst zeichnet (Tutorial 6): Dort wird mitgelesen, was Du einsetzt, und ein `[` schreibst Du als `&#91;`. `\Nino\Feature::classes()` tut das für die Klassen.
 
 ### 3. Die Vorlage
 
@@ -115,7 +115,7 @@ Wechsle die Sprache: Öffne `/?/_nino/localepicker/current=en_US` oder nimm die 
 
 ## Häufige Fehler
 
-- **Einen Wert unmaskiert ausgeben.** Auch ein Attribut aus einer Vorlage ist fremd: Texte lassen sich in der Workbench ändern, und ein Attribut kann einen Textfill enthalten. Maskiere alles, was Du nicht selbst erzeugt oder streng geprüft hast, mit `Components::escape()` und nicht mit `htmlspecialchars()` allein: Das lässt ein `[` stehen.
+- **Einen Wert unmaskiert ausgeben.** Auch ein Attribut aus einer Vorlage ist fremd: Texte lassen sich in der Workbench ändern, und ein Attribut kann einen Textfill enthalten. Maskiere alles, was Du nicht selbst erzeugt oder streng geprüft hast, mit `\Nino\Components::escape()` und nicht mit `htmlspecialchars()` allein: Ohne `ENT_SUBSTITUTE` löscht ein einziges Byte, das kein UTF-8 ist, den ganzen Wert.
 - **Eine Marke, die Nino nicht liest.** Sie steht dann als Text auf der Seite oder fehlt ganz. Eine Marke über zwei Zeilen ist Text, ebenso ein Wort, das weder Quelle noch Name eines Attributs ist (`[meetup-date 2026-12-24]`), und ein Wert in Anführungszeichen, die nie schließen. Ein Wert ohne Anführungszeichen (`time=19:30`) oder in einfachen (`time='19:30'`) fällt weg, und der Shortcode läuft ohne ihn. Ein Name, den niemand anmeldet, zeichnet nichts.
 - **Beide Formen eines Namens mischen.** Steht `[meetup-date …]` in einer Datei einmal mit `[/meetup-date]` und einmal ohne, hält Nino das erste für einen Behälter und verschluckt den Rest. Das Blatt schreibst Du dann `[meetup-date … /]`, mit einem Leerzeichen vor dem `/`.
 - **Markup in PHP bauen.** `'<span>'. $text. '</span>'` in der Methode ist nicht erlaubt. Das Markup gehört in die Vorlage.

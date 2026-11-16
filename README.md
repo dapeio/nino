@@ -35,7 +35,7 @@ Solid HTML, CSS, and JavaScript skills plus basic PHP knowledge are useful for i
 
 The frontend is built from simple HTML-based templates, textfills, shortcodes, and recurring elements. Nino does not impose a ready-made page structure: the visible result remains an individual project.
 
-The included design system, with its base components and modules, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
+The feature Basis that comes with Nino, with its base components, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
 
 ### `/_admin` — the workbench
 
@@ -62,7 +62,7 @@ Every fresh checkout is configured through the wizard, which is what `/_admin` s
 
 #### The Builder - a feature
 
-The Builder composes a page template out of sections, rows, columns and components, and writes it back as the `page-*.tpl` file it read: the file is the truth, and what the Builder does not read it leaves byte for byte. Its panel sits in the Features group of the rail and is a workspace panel - the rail folds to its icons, and the preview, which is the editor with tools on every frame, takes the whole width. A component is a shortcode with a schema; the kernel's `Components` module is the registry the Builder reads, and features declare their own in their manifest.
+The Builder composes a page template out of sections, rows, columns and components, and writes it back as the `page-*.tpl` file it read: the file is the truth, and what the Builder does not read it leaves byte for byte. Its panel sits in the Features group of the rail and is a workspace panel - the rail folds to its icons, and the preview, which is the editor with tools on every frame, takes the whole width. A component is a shortcode with a schema; the register of the kernel, `\Nino\Components`, is where a tool such as the Builder asks for them, and a feature brings its own in folders.
 
 ## What Nino includes
 
@@ -151,7 +151,7 @@ The manuals and the recipes are in English; the developer guide, the first entry
 
 * **[Add a panel to the workbench](docs/recipes/admin-panel.md):** a new screen in `/_admin`
 * **[Add a runtime module](docs/recipes/runtime-module.md):** PHP behavior at boot, a shortcode, an endpoint
-* **[Add a component](docs/recipes/component.md):** a shortcode with a schema, or a stack that loops elements
+* **[Add a component](docs/recipes/component.md):** a shortcode with a schema, in a feature's folders or from a module
 * **[Add an installer module package](docs/recipes/installer-package.md):** a module the setup wizard can select
 * **[Define Element types](docs/recipes/element-types.md):** repeated structured content
 * **[Developing a feature](docs/features.md):** a module delivered as one directory with a manifest, settings, and a version - the manual, not a recipe

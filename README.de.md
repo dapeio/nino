@@ -35,7 +35,7 @@ Für die Umsetzung sind gute HTML/CSS/JavaScript-Kenntnisse und PHP-Grundkenntni
 
 Das Frontend entsteht aus einfachen HTML-basierten Templates, Textfills, Shortcodes und wiederkehrenden Elementen. Nino gibt keine fertige Seitenstruktur vor: Das sichtbare Ergebnis bleibt ein individuelles Projekt.
 
-Das mitgelieferte Design-System mit Basiskomponenten und Modulen bietet einen schnellen Ausgangspunkt für klassische Webseiten. Mehrsprachige Inhalte, Responsive Design, Performance und Sicherheit bleiben dabei Teil des Projekts.
+Das mit Nino gelieferte Feature Basis mit seinen Basiskomponenten bietet einen schnellen Ausgangspunkt für klassische Webseiten. Mehrsprachige Inhalte, Responsive Design, Performance und Sicherheit bleiben dabei Teil des Projekts.
 
 ### `/_admin` – die Workbench
 
@@ -62,7 +62,7 @@ Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_a
 
 #### Der Builder – ein Feature
 
-Der Builder setzt ein Seitentemplate aus Sections, Zeilen, Spalten und Komponenten zusammen und schreibt es als die `page-*.tpl`-Datei zurück, die er gelesen hat: Die Datei ist die Wahrheit, und was der Builder nicht liest, lässt er Byte für Byte stehen. Sein Panel steht in der Gruppe Features der Leiste und ist ein Workspace-Panel – die Leiste klappt zu ihren Symbolen zusammen, und die Vorschau, die zugleich der Editor ist und an jedem Rahmen Werkzeuge trägt, nimmt die ganze Breite ein. Eine Komponente ist ein Shortcode mit Schema; das Kernel-Modul `Components` ist das Register, das der Builder liest, und Features melden ihre eigenen in ihrem Manifest an.
+Der Builder setzt ein Seitentemplate aus Sections, Zeilen, Spalten und Komponenten zusammen und schreibt es als die `page-*.tpl`-Datei zurück, die er gelesen hat: Die Datei ist die Wahrheit, und was der Builder nicht liest, lässt er Byte für Byte stehen. Sein Panel steht in der Gruppe Features der Leiste und ist ein Workspace-Panel – die Leiste klappt zu ihren Symbolen zusammen, und die Vorschau, die zugleich der Editor ist und an jedem Rahmen Werkzeuge trägt, nimmt die ganze Breite ein. Eine Komponente ist ein Shortcode mit Schema; das Register des Kernels, `\Nino\Components`, ist die Stelle, bei der ein Werkzeug wie der Builder sie erfragt, und ein Feature bringt seine eigenen in Ordnern mit.
 
 ## Was Nino mitbringt
 
@@ -151,7 +151,7 @@ Die Handbücher und die Rezepte sind englisch; das Entwickler-Handbuch, der erst
 
 * **[Add a panel to the workbench](docs/recipes/admin-panel.md):** ein neuer Bildschirm in `/_admin`
 * **[Add a runtime module](docs/recipes/runtime-module.md):** PHP-Verhalten beim Start, ein Shortcode, ein Endpunkt
-* **[Add a component](docs/recipes/component.md):** ein Shortcode mit Schema oder ein Stack, der Elemente durchläuft
+* **[Add a component](docs/recipes/component.md):** ein Shortcode mit Schema, in den Ordnern eines Features oder aus einem Modul
 * **[Add an installer module package](docs/recipes/installer-package.md):** ein Modul, das der Assistent auswählen kann
 * **[Define Element types](docs/recipes/element-types.md):** wiederkehrende strukturierte Inhalte
 * **[Developing a feature](docs/features.md):** ein Modul als ein Verzeichnis mit Manifest, Einstellungen und Version – das Handbuch, kein Rezept

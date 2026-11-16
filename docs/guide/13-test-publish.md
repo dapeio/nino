@@ -24,7 +24,7 @@ defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', dirname(
 require $root. '/tests/harness.php';
 
 $appData = ninoSandbox( 'meetups' );
-$appData['/nino/modules'] = [ '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
+$appData['/nino/modules'] = [ '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Csrf' ];
 \Nino\AppData::writeContentData( $appData, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native' ] );
 
 check( 'the manifest validates without a warning', is_array( \Nino\Features::manifest( dirname( __DIR__ ) ) ) && ninoWarnings() === [] );
@@ -33,14 +33,17 @@ check( 'activation applies the unit: the page, the type and the words', \Nino\Fe
 	&& \Nino\Elements::getElementModel( $appData, '/meetups' ) !== []
 	&& \Nino\Text::entry( $appData, '/feature/meetups/signup/submit' ) !== null );
 
+// As \Nino\init() does it: the register reads the folders of the features that are on, then the modules run
 \Nino\Html::init( $appData );
+\Nino\Features::registerComponents( $appData );
 \Nino\Modules::callModules( $appData, 'init' );
 $appData['./nino/locales/current'] = 'en_US';
 
-check( 'the component draws a date in the language of the page', \Nino\Html::renderHtml( $appData, '[meetup-date text="2026-12-24" long="yes" class="wide"]' )
-	=== '<span class="meetups-date wide"><time datetime="2026-12-24">December 24, 2026</time></span>' );
+// The template of the component ends with a line break, which the markup keeps: the checks look at the markup
+check( 'the component draws a date in the language of the page', trim( \Nino\Html::renderHtml( $appData, '[meetup-date text="2026-12-24" long="yes" variant="highlight"]' ) )
+	=== '<span class="meetup-date meetup-date--long meetup-date--variant-highlight"><time datetime="2026-12-24">December 24, 2026</time></span>' );
 check( 'a date that is none draws nothing', \Nino\Html::renderHtml( $appData, '[meetup-date text="2026-02-30"][meetup-date text="soon"]' ) === '' );
-check( 'a label is escaped', str_contains( \Nino\Html::renderHtml( $appData, '[meetup-date text="2026-12-24" label="<b>"]' ), '&lt;b&gt;: ' ) );
+check( 'a label is escaped, once', str_contains( \Nino\Html::renderHtml( $appData, '[meetup-date text="2026-12-24" label="<b>"]' ), '&lt;b&gt;: ' ) );
 
 // One date that is over and one that is ahead
 $ahead = date( 'Y-m-d', time() + 30 * 86400 );

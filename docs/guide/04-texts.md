@@ -39,25 +39,23 @@ Lege `features/Meetups/install/templates/page-meetups.tpl` an:
 <!-- nino:template-name Meetups -->
 [template /templates/html-header]
 
-<section class="nino-section">
-	<div class="nino-grid-row">
-		<div class="nino-grid-100">
-
-			<h1 class="nino-section-title">[[/template/page-meetups/intro/title]]</h1>
-			<p class="nino-section-text">[[/template/page-meetups/intro/text]]</p>
-
-			<p>[meetup-date text="2026-12-24" time="19:30"]</p>
-
-		</div>
-	</div>
-</section>
+[section-wrap id="intro"]
+	[section-row]
+		[section-col]
+			[section-title ~title tag="h1"]
+			[text ~text]
+			[meetup-date text="2026-12-24" time="19:30"]
+		[/section-col]
+	[/section-row]
+[/section-wrap]
 
 [template /templates/html-footer]
 ```
 
 - Die erste Zeile gibt der Vorlage ihren Namen in der Workbench.
 - `html-header` und `html-footer` sind die Rahmen jeder Seite des Projekts.
-- Die Worte stehen als Textfills da, nicht als Text.
+- `[section-wrap]`, `[section-row]`, `[section-col]`, `[section-title]` und `[text]` sind Komponenten des Features **Basis**: ein Abschnitt, eine Zeile, eine Spalte, eine Überschrift und ein Text. Basis kommt mit Nino, und der Einrichtungsassistent schaltet es ein ([The Look](../setup.md#the-look)). Ist es aus, sind das Namen, die niemand anmeldet: Sie zeichnen nichts.
+- Die Worte stehen nicht in der Vorlage. `~title` ist ein Verweis auf einen Textschlüssel: Nino bildet ihn aus dem Namen der Vorlage, der `id` des Abschnitts und dem Namen, hier `/template/page-meetups/intro/title`. Der nächste Schritt legt die Worte an.
 
 ### 3. Die Worte
 
@@ -115,7 +113,21 @@ Liefere in jeder Sprache dieselben Schlüssel. Hat das Projekt eine Sprache, fü
 
 ## Prüfen
 
-Öffne `/meetups`. Die Seite zeigt die Überschrift „Treffen“, den Satz „Hier trifft sich unser Verein.“ und das Datum. Im Reiter des Browsers steht „Treffen des Vereins“. Auf Englisch steht dort „Meetups“, „Here is when our club meets.“ und „Meetups of the club“.
+Öffne `/meetups`. Die Seite zeigt die Überschrift „Treffen“, den Satz „Hier trifft sich unser Verein.“ und das Datum. Im Reiter des Browsers steht „Treffen des Vereins“. Auf Englisch steht dort „Meetups“, „Here is when our club meets.“ und „Meetups of the club“. Zeigt die Seite nur den Rahmen, ist das Feature **Basis** aus: Schalte es im Bereich **Features** ein.
+
+Der Quelltext der deutschen Seite zeigt:
+
+```html
+<section id="intro" class="section-wrap">
+	<div class="section-row">
+		<div class="section-col">
+			<h1 class="section-title">Treffen</h1>
+			<div class="text"><p>Hier trifft sich unser Verein.</p></div>
+			<span class="meetup-date"><time datetime="2026-12-24T19:30">24.12.2026, 19:30</time></span>
+		</div>
+	</div>
+</section>
+```
 
 Die Seite steht noch in keinem Menü. Welche Seite in welches Menü kommt, entscheidet das Projekt: Öffne den Bereich **Routen**, klicke auf `/meetups` und wähle „In der Navigation „main“ zeigen“. Der Eintrag heißt dann „Treffen“.
 

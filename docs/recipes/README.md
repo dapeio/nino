@@ -12,7 +12,7 @@ decides which recipe applies.
 | [Add a runtime module](runtime-module.md) | PHP behaviour at boot, a shortcode, a state-changing endpoint, module configuration |
 | [Add an installer module package](installer-package.md) | a module the setup wizard can select, copy and configure |
 | [Define Element types for repeated content](element-types.md) | repeated structured content: model fields, uris, rendering |
-| [Add a component](component.md) | a shortcode with a schema - a component, or a stack that loops the elements of a type - registered from a project or declared in a feature's manifest |
+| [Add a component](component.md) | a shortcode with a schema - a component - brought in a feature's folders or registered from a module |
 
 A feature - a module delivered as one directory under `features/` with a manifest,
 settings, a version and its own test - is not a recipe but a manual of its own:

@@ -10,308 +10,272 @@ comes from and which attributes it has, each with a type and a default, so
 that a tool such as the Builder feature can offer it and a template can still
 be written by hand. A shortcode without a schema stays a shortcode - for
 behaviour that needs no tool, the [runtime module recipe](runtime-module.md)
-is enough. A **stack** is a component that loops the elements of one type
-around its content (`[slider]`, `[filter]`, `[list]` are three the kernel
-brings, with `[repeat]`, `[tabs]` and `[accordion]` among the others); an element type is the [element types recipe](element-types.md)'s
-business, not this one's. The contract this recipe writes against is
-`\Nino\Modules\Components`, described in the
-[Developer Manual](../development.md#components) - and, for a component that is
-new, the register of the kernel, `\Nino\Components` (section 4 and
-[The Register of Components](../development.md#the-register-of-components)).
-The kernel's own components and stacks, and every one of sections 1 to 3, are
-shortcodes without a schema in the sense of that register.
+is enough - and a loop over the elements of a type is the [element types
+recipe](element-types.md)'s business: `[elements]` draws what stands between its
+tags once for each element, and a component in it reads the fields of the
+element as its source. The contract this recipe writes against is the register of
+the kernel, `\Nino\Components`, described in
+[The Register of Components](../development.md#the-register-of-components): its
+schema says where a component may stand, what it offers to what it holds, where
+its value comes from, which attributes it takes, which variants it has and the
+markup it is drawn as. A component with nothing to compute is a schema and a
+template and needs no code; one that computes has a renderer.
 
-The example is a countdown: `[countdown /template/page-home/launch/date]`
-draws the days that are left until a date a text key holds.
+The example is a countdown: `[countdown /template/page-home/launch/date]` draws the
+days that are left until a date a text key holds.
 
-## 1. A component from the project
+## 1. A component in a feature
 
-A project's component is registered where its module boots. Create
-`app/Project/Countdown/Countdown/Countdown.php` and list
-`\Project\Countdown\Countdown` in `/nino/modules` (after the kernel's own
-modules, so that a replacement of one of theirs comes last):
+A feature brings its components in folders, and the kernel registers them while
+the feature is on ([A feature's components](../development.md#a-features-components)).
+Create `features/Countdown/` with these files:
 
-```php
+```text
+features/Countdown/
+├── feature.php                          the manifest
+├── Countdown.php                        the class \Nino\Modules\Countdown: the renderer
+├── components/countdown/component.php   the schema
+├── components/countdown/template.tpl    the markup
+├── groups/countdown/group.php           the group the component is offered under
+└── groups/countdown/part/part.css       the standard part of the group: its look
+```
+
+The manifest says what the feature is. It names no component:
+
+```php features/Countdown/feature.php
 <?php
-declare(strict_types=1);
-
-namespace Project\Countdown;
-
-class Countdown {
-
-	// The markup is a fragment declared once, not built in the method - AGENTS.md,
-	// "Markup belongs in a template" - so that a project changes it in one place
-	public static
-		$html = [
-			'countdown' => '<p class="project-countdown[[style]][[class]]">[[days]]</p>',
-		];
-
-	public static function init( array &$appData ): void {
-
-		\Nino\Modules\Components::addComponent( $appData, 'countdown', [ self::class, 'componentCountdown' ], [
-			'label'      => [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
-			'source'     => 'text',
-			'loop'       => true,
-			'attributes' => [
-				'style' => [ 'type' => 'select', 'options' => [ '', 'big' ], 'default' => '',
-				             'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
-			],
-			'preview'    => 'block',
-			'group'      => 'global',
-		] );
-	}
-
-	public static function componentCountdown( array &$appData, array $args ): string {
-
-		// $args['value'] is the source made safe already: a text key's value, or
-		// in a stack the field of the element, escaped, every [ written as &#91;.
-		// Parse it for what it means, and write only what you made yourself
-		$date = \DateTimeImmutable::createFromFormat( '!Y-m-d', html_entity_decode( $args['value'] ) );
-
-		if( $date === false )
-			return '';
-
-		$days = max( 0, (int) ( new \DateTimeImmutable( 'today' ) )->diff( $date )->format( '%r%a' ) );
-
-		return str_replace(
-			[ '[[style]]', '[[class]]', '[[days]]' ],
-			[ $args['style'] === 'big' ? ' project-countdown--big' : '', $args['class'] !== '' ? ' '. \Nino\Modules\Components::escape( $args['class'] ) : '', (string) $days ],
-			self::$html['countdown']
-		);
-	}
-}
-```
-
-The rules the module keeps for you, and the ones it leaves to the renderer:
-
-- The first argument is resolved over `Components::value()` before the
-  renderer runs: a `/key` is its text, a name without a slash is a field of the
-  element in a stack, `.id`, `.uri` and `.slug` are the place in the loop, the
-  element's uri and its name alone (the last segment of the uri), and `text="..."` is a fixed value. A source that resolves to
-  nothing renders nothing - the renderer is not called.
-- Missing attributes arrive as their defaults, a `select` outside its options
-  is the default, an attribute nobody declared is not there. All strings.
-- Anything the renderer writes that did not come from `$args['value']` is its
-  own to escape. `Components::escape()` escapes and writes `[` as `&#91;`;
-  everything you return is finished - nobody reads it again - and a renderer that has html+ of its own to
-  draw (the children of a container) draws it with `\Nino\Html::renderSource()`.
-- The markup is a fragment with `[[tokens]]`, declared as a property of the
-  class (`public static $html`, as `Components::$html` is) and filled with
-  `str_replace()`; what is filled in comes last in the list of tokens.
-- `addComponent()` **replaces** a component or a shortcode of the same name.
-  Register `title` again with a schema of your own and the kernel's is gone; the
-  module's `init()` takes it back where it is called again.
-- A schema that cannot be worked with is an `E_USER_ERROR` at registration - a
-  name that is no slug, an unknown `source` or type, a `select` without options
-  or with a default outside them, an attribute without a default, a `group`
-  that is missing or none of the three.
-- `draws`, `in` and `holds` are optional and change nothing about the
-  rendering: the tag and the class the renderer draws (`'p .project-countdown'`,
-  with a name in braces for an attribute of the schema), where a tool offers the
-  component (a list of the places `section` and `card`) and, for a
-  component whose source is `content`, the place whose components its content
-  is the calls of (`'holds' => 'card'` is the kernel's `[card]`), and
-  `stretched` is a bool, `true` for a component whose one link may be the link
-  of a linked holder it stands in (the kernel's `card-title` says it; a holder
-  cannot, it is no link): the `<a>` carries the class `nino-stretch` - the
-  kernel writes it on the wrapper of a component that says `'link' => true`, a
-  component that draws its own `<a>` gives it the class in its template, to a
-  lone link and not to the links of a list - and `Nino.css` stretches that link
-  over a card that says `linked`, one link per card. A renderer
-  reads no context, so a component that is drawn another way in another place
-  is another component. A container that holds components draws them itself,
-  with `\Nino\Html::renderSource()` and `\Nino\Html::context()`, inside its own
-  markup, as the kernel's `[card]` does - with a stack's element still the
-  context. What it returns is finished.
-- `group` is the word a tool offers a component under: `section`,
-  `card` or `global`, the last for what stands anywhere, as the countdown does.
-  A component a module registers has to declare one. It says nothing about where
-  the component may stand, which `in` does: the scroll hint stands in a
-  section only and is offered under `global`. A feature's component declares
-  none (section 3): a tool offers it under the feature.
-- `icon` is optional as well, and as little a matter of rendering: the picture a
-  tool shows the component by, where a tool without it shows one of its own. It
-  is geometry and not markup - a list of 1 to 12 parts, each a tag (`path`,
-  `circle`, `ellipse`, `rect`, `line`, `polyline` or `polygon`) and the map of
-  the attributes that tag takes, every value a string.
-  `'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]` is a line across the middle.
-  Optional does not mean left out: a component should carry `draws`, `in` and
-  `icon`, so that the Builder can show it, place it and offer it with a picture.
-  A 24 by 24 stroke icon of Lucide is the shape the workbench draws, so an icon
-  of that kind sits among the kernel's own; the tool builds the elements from
-  the parts.
-- The options of a `select` or a `variant` are a list, or the name of a static
-  method of the feature's own class (`\Nino\Modules\<Directory>` or below it)
-  that answers them where the project alone knows them (its forms, its albums):
-  `'options' => '\Nino\Modules\Countdown::zones'`, a method
-  `public static function zones( array &$appData, string $attribute ): array`
-  that answers `value => label`, a label a string or a `locale => string` map.
-  It is asked when the schema is handed out (`components()`, `stacks()`) and
-  when a value is made ready, once for each attribute in a request, and a value
-  outside the list is the default. A manifest is read without loading anything,
-  so a class or method that is not there is found out when it is asked. An
-  answer that cannot be read - no array, a label that is no string or map, a
-  class or a method that is none, a method that throws - is an `E_USER_WARNING`
-  and the attribute a `string`, so **a renderer checks the value itself** where
-  it names a record or a file: after a failure any value passes (a `variant`
-  keeps to words). The default is a string, and `input` `icons` needs a list of
-  its own. `components()` and `stacks()` hand out schemas with the answers in
-  them; to register a component again, read `Components::registered()`. The full
-  contract is in the [development manual](../development.md#components).
-- A `variant` is a `select` whose words are the modifiers of a class:
-  `[ 'type' => 'variant', 'options' => [ '', 'big' ], 'default' => '', 'prefix' => 'project-countdown--' ]`
-  is a style that is none or `project-countdown--big`. The options are words,
-  never class names, and a tool draws them as a row of buttons; writing the
-  class is the renderer's business, and a renderer that wants the prefix of the
-  schema reads it from the registry. `input`
-  on a `select`, a `variant` or a `bool` is a hint for the tool on how to draw
-  the attribute (`segment` or `icons` for words, `checkbox` for a flag) and
-  changes nothing about the rendering. `tab` is another such hint, on an
-  attribute of any type: `'tab' => 'background'` says that a tool draws the
-  attribute on the tab of the background in its dialog for the component, with
-  the others that say so (the kernel's card does for its colour, its picture,
-  its focus and its dimming). The word has to be one of `Components::TABS`, the
-  list the registry knows.
-- `link => true` makes a component a link where it is given one: it has an
-  `href` and a `target` without declaring them, and what the renderer made is
-  wrapped in the `<a>` they say - nothing the renderer has to know. The `<a>` is
-  then the outer element: a stylesheet rule that names the component as a direct
-  child (`>`) does not match it while it is linked, and a text that holds a link
-  of its own would be a link inside a link. `by` is the slug of who registered a
-  component: a feature's manifest has it set to the feature's key, and a module
-  of a project that says nothing is `nino`.
-- `formatted => true` (**1.12**) gives a component whose source is `text` or `none`
-  three attributes without declaring them: `as`, a formatter of
-  `\Nino\Format` by its name (the options are the formatters of the project),
-  `prefix` and `suffix`, plain texts set before and after the value. For a
-  source `text` the kernel does it - `$args['value']` already holds the written
-  value with the texts around it, escaped. For a source `none` the renderer writes
-  its value itself: `\Nino\Format::apply( $appData, $args['as'], $raw )` answers
-  plain text or `null` (then write the value as you did), `Components::escape()`
-  makes it safe and `Components::affix( $appData, $args, $html )` sets the texts
-  around it, nothing where the value is empty. A schema that declares `as`,
-  `prefix` or `suffix` itself is refused; one that does not say `formatted` may
-  keep an attribute of such a name. Register a formatter of your own with
-  `\Nino\Format::add( $appData, 'name', $callback, $label )` in `init()` - the
-  callback is `( array &$appData, mixed $value ): ?string`, gets the raw value
-  and answers plain text, never html ([Formatting a value](../development.md#formatting-a-value)).
-
-## 2. A stack from the project
-
-A stack is registered with `addStack()`, takes the type uri as its first
-argument and calls `renderStack()` for the loop. A project's list of the
-people of a type, drawn as a definition list - with `'people' => '<dl class="project-people">[[items]]</dl>'`
-and `'person' => '<dd>[[inner]]</dd>'` beside the other fragment:
-
-```php
-\Nino\Modules\Components::addStack( $appData, 'people', [ self::class, 'stackPeople' ], [
-	'label'      => [ 'en_US' => 'People', 'de_DE' => 'Personen' ],
-	'grid'       => false,
-	'cell'       => 'components',   // components | section | columns | row | none
-	'attributes' => [],
-	'preview'    => 'block',
-] );
-
-public static function stackPeople( array &$appData, array $args ): string {
-
-	$items = \Nino\Modules\Components::renderStack( $appData, $args,
-		static fn( string $inner, array $element, int $index ): string => str_replace( '[[inner]]', $inner, self::$html['person'] ) );
-
-	return $items === '' ? '' : str_replace( '[[items]]', $items, self::$html['people'] );
-}
-```
-
-`cell` says what stands between the tags: `components` (the default), the
-components drawn once for each element; `section`, a whole section for each
-(the kernel's `[sections]`); `columns`, the `[col]`s of a table and nothing else;
-`row`, one field or one line of text (`[list]`); `none`, no content at all: the
-stack draws each cell from the fields its attributes of the type `field` name, the
-call is a single tag (`[logos /logo image="image" link="url"]`) and what stands
-between a pair of tags is not read. A single tag that is followed later by a `[/logos]` is paired with it, and everything between the two - text, a second call of the stack - becomes the content of the first call and is not drawn: write the call as a single tag and close it nowhere. `value()` reads a name that is no field of the element as an address of its own, so a renderer checks `element()['model']` before it reads a field attribute as an href. A tool reads it to know what it may offer
-inside the loop, so a stack names it where it is not `components`; for `none` it
-offers no content and shows the `field` attributes as the choice.
-A stack may declare a `text` of the type `string` and no other: it arrives as the call wrote it, a line of fields for the cells to fill - written with plain brackets (`[[title]]`) or with entities (`&#91;&#91;title&#93;&#93;`) in the call of a stack, where no field has been filled yet, and with plain brackets in a `[col]` or `[line]` in the content of a loop, where the fields are filled in before the call is read. An attribute of the type `field` is the name of a field of the element's type
-(`'by' => [ 'type' => 'field', 'default' => '' ]`), which a tool draws as a choice
-of the type's fields; the kernel reads a value that is none as the default, and one the call writes empty (`link=""`) as no field, so a renderer draws nothing for an empty field attribute. `'required' => true`, or the name of a `bool` attribute of the stack (`'required' => 'links'`), tells a tool the field must be chosen, while that bool is on in the second case. A loop
-that draws something of the element besides its content - the title of a tab - does
-it in the cell function, where the element is still the context
-(`Components::element()`, `Components::value()`); `[tabs]` and `[accordion]`
-are the kernel's two to read. A stack that says `panels => true` takes `[panel]`s
-between its tags where its call names no type: its renderer reads them with
-`Components::panels( $appData, $args['content'] )` and puts the html+ of each as it is
-into its markup (see [Developing a feature](../features.md#components-and-stacks)).
-
-`renderStack()` runs the loop of `[elements]` with the same `sort`, `offset`,
-`limit`, `query` and `callback`, renders the content once per element with the
-element as the context, and gives each cell to the function. `grid => true`
-adds `cols`, `gap` and `autoheight` and passes the cell's classes and
-attributes as the fourth argument; `\Nino\Modules\Components::cell()` puts
-them on the element you draw - the `<div>` of the cell, which is never a card:
-a card is a `[card]` in the content. Inside the content a component's
-source is a field of the element (`[title name]`). A stack never stands
-directly inside another, and a `[card]` never stands directly inside
-another.
-
-## 3. A component from a feature
-
-A feature declares it in its manifest - no `init()` call to write - and
-brings the renderer under the name the kernel derives:
-
-```php
-// features/Countdown/feature.php
+// What Nino reads about the feature. The class is not named here:
+// features/Countdown/ can only serve \Nino\Modules\Countdown
 return [
-	'key'        => 'countdown',
-	'name'       => 'Countdown',
-	'version'    => '1.0.0',
-	'nino'       => '^1.6',
-	'components' => [
-		'countdown' => [
-			'label'      => [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
-			'source'     => 'text',
-			'attributes' => [
-				'style' => [ 'type' => 'select', 'options' => [ '', 'big' ], 'default' => '' ],
-			],
-			'preview'    => 'block',
-		],
-	],
-	'stacks'     => [],
+	'key'					=> 'countdown',
+	'name'				=> [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
+	'description'	=> [ 'en_US' => 'The days that are left until a date.', 'de_DE' => 'Die Tage, die bis zu einem Datum bleiben.' ],
+	'category'		=> 'content',
+	'version'			=> '1.0.0',
 ];
 ```
 
-```php
-// features/Countdown/Countdown.php
+The schema is the file `components/countdown/component.php`. The name of the
+folder is the name of the component, and a component of a feature **names its
+group**:
+
+```php features/Countdown/components/countdown/component.php
+<?php
+declare(strict_types=1);
+
+return [
+	'group'      => 'countdown',
+	'label'      => [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
+	'in'         => [ 'page', 'flow' ],
+	'source'     => 'text',
+	'preview'    => 'text',
+	'attributes' => [
+		'size' => [ 'type' => 'choice', 'options' => [ 'regular', 'big' ], 'default' => 'regular', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
+	],
+];
+```
+
+`in` says where a tool offers the component - `page` is the page itself, `flow`
+the flow of content - and changes nothing about the drawing. `source` says that
+the first word of a call is a text. An attribute has a `type` and a `default`,
+and every attribute needs one. The markup is the file beside the schema; a
+schema that names a template itself does not belong in a folder:
+
+```html features/Countdown/components/countdown/template.tpl
+<p class="[[class]]">[[days]]</p>
+```
+
+`[[class]]` is the name of the component and one class for each attribute that is
+a class: `size="big"` is `countdown--size-big`, and `regular`, the default,
+writes none. `[[days]]` is no placeholder of the register: the renderer makes it.
+
+A group is a folder of its own with the words a tool shows and the standard
+part, the look of the components of the group. `group.php` names the group and
+its **knobs** - a knob is a token of a component and the five steps a theme may
+turn it through, `'<component>.<name>'` with the token `--<component>-<name>`:
+
+```php features/Countdown/groups/countdown/group.php
+<?php
+declare(strict_types=1);
+
+return [
+	'label' => [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
+	'knobs' => [
+		'countdown.size' => [ 'token' => '--countdown-size', 'label' => [ 'en_US' => 'Font size', 'de_DE' => 'Schriftgröße' ],
+			'ladder' => [ 'var(--page-text-1)', 'var(--page-text-2)', 'var(--page-text-3)', 'var(--page-text-4)', 'var(--page-text-5)' ] ],
+	],
+];
+```
+
+The standard part is `part/part.css`. It keeps the **rule of mixing**: it reads
+the tokens of the brand and of the page (`--brand-...`, `--page-...`, which
+`Nino.css` sets) and its own, it sets only its own, every selector has a class of
+its own components, and it has no `!important`, no `@import`, no `@layer` and no
+`url()`:
+
+```css features/Countdown/groups/countdown/part/part.css
+/*	countdown - the standard part: the days that are left, in the ink of the page	*/
+:root {
+	--countdown-size: var(--page-text-3);
+}
+.countdown { margin: 0; color: var(--brand-ink); font-size: var(--countdown-size); font-weight: 700; }
+.countdown--size-big { --countdown-size: var(--page-text-6); }
+```
+
+The kernel puts the part into the style bundle in the layer `nino.components`, so
+that a rule of the project overrules it with a plain selector. The renderer is
+the method `component<Name>()` of the feature's class, the name in studly caps -
+`componentCountdown()` for `countdown`, `componentNewsletterSignup()` for
+`newsletter-signup`:
+
+```php features/Countdown/Countdown.php
+<?php
+declare(strict_types=1);
+
 namespace Nino\Modules {
+
 	class Countdown {
-		public static function componentCountdown( array &$appData, array $args ): string { /* as above */ }
+
+		// [countdown /template/page-home/launch/date size="big"]
+		public static function componentCountdown( array &$appData, array $args, string $content, array $context ): string {
+
+			// $args['value'] is the text of the key, escaped: parse it for what it means, and write only what you made yourself
+			$text = html_entity_decode( $args['value'] );
+			$date = \DateTimeImmutable::createFromFormat( '!Y-m-d', $text );
+
+			// A day the calendar does not have, 2026-02-30, is rolled over by php: it is none
+			if( $date === false || $date->format( 'Y-m-d' ) !== $text )
+				return '';
+
+			$days = max( 0, (int) ( new \DateTimeImmutable( 'today' ) )->diff( $date )->format( '%r%a' ) );
+
+			// The markup is the template of the component; the renderer gives it the token it made
+			return \Nino\Components::fill( $appData, 'countdown', $args, $content, [ '[[days]]' => (string) $days ] );
+		}
 	}
 }
 ```
 
-`[ '\Nino\Modules\Countdown', 'componentCountdown' ]` is the convention - the
-name in studly caps behind `component`, or `stack` for a stack
-(`stackSlider()`, `componentNewsletterSignup()` for `newsletter-signup`). A
-manifest whose schema does not validate is refused as a whole, naming the
-component - so is one that names a `group`, as a tool offers a feature's
-component under the feature - and a renderer the class lacks is a warning and
-skipped. The kernel registers the feature's components at boot while it is
-listed in `/nino/modules`; the shortcode is the feature's, and the Features
-panel lists it so. Register a component by manifest or in `init()`, not both - a
-second callback beside the first is not a replacement.
+Switch the feature on in the Features panel - the kernel reads the folders and
+registers the component at the next request - and write the call. For a key
+`/template/page-home/launch/date` that holds a date twelve days from today,
+`[countdown /template/page-home/launch/date]` and
+`[countdown /template/page-home/launch/date size="big"]` are drawn as
 
-## 4. A component by schema
+```html
+<p class="countdown">12</p>
+<p class="countdown countdown--size-big">12</p>
+```
 
-A component that is new can be registered in the register of the kernel,
-`\Nino\Components`, whose schema says what the kernel draws: where the
-component may stand, what it offers, the source of its value, its attributes,
-variants and markup ([the schema](../development.md#the-register-of-components)
-has every key). A component with nothing to compute is a schema and a template
-and needs no code; one that computes has a renderer. It is registered in the
-`init()` of a module or a feature - the manifest's `components` are the module's
-(section 3) - and the register has no stacks: a loop around content is section 2.
+and `[countdown text="soon"]`, a date that is none, draws nothing. A component of
+a feature that is off is a name nobody registered: it draws nothing, nor what
+stands between its tags, and the log says so once.
 
-The countdown of section 1 as a component by schema is the same class with one
-more registration in `init()`, beside the first, and the renderer that goes with
-it. It is named `days-left` so that the two do not meet:
+What the register does for the renderer, and what it leaves to it:
+
+- The attributes are made ready before the renderer runs - a `choice` outside its
+  options is the default, a `bool` is `'1'` or `'0'`, an `int` is kept within its
+  bounds, an attribute nobody declared falls away - and arrive as strings under
+  their names, beside `value`, `source`, `class`, `variant` and `lang`.
+- The first word of a call is the source: `~name` (the key
+  `/template/<template>/<scope>/<name>`, the template being the page that is drawn
+  and the scope the `id` of the call or of the nearest call above it that has one),
+  a key with a slash in front, or `.field` of the element in a loop; `text="..."`
+  stands for it. A source that resolves to nothing - a key nobody wrote, an empty
+  text, a field there is no element for - draws nothing and the renderer is not
+  called.
+- A renderer has its template filled by `\Nino\Components::fill( $appData, $name,
+  $args, $content, $tokens )`: the placeholders of the register and the tokens of
+  the renderer's own, in one pass, where a token wins over a placeholder of the
+  same name. Markup that stands only sometimes - a link round a title that has an
+  address - is made by the renderer, escaped, and given as a token, so that the
+  markup stays in the template and not in the class: the markup of a component
+  is in its `template.tpl`, and no PHP builds it.
+- What the renderer returns is finished: nobody reads it again. A `[` in
+  `$args['value']` is a `[` and is no call, wherever it is written.
+  `\Nino\Components::escape()` escapes for html and leaves the `[` as it is; a
+  renderer that draws html+ of its own - the children of a container - draws it
+  with `\Nino\Html::renderSource()` and `\Nino\Html::context()`, and writes every
+  `[` of a value it puts into that text as `&#91;`. A renderer that throws a
+  `\Exception` leaves its place empty, and the log says it once.
+- A second text of a call - a caption, an alternative text - is an attribute of
+  the type `text`: a reference (`~caption`, a key, `.field`) or the text itself,
+  escaped. A component that has an attribute of the type `id` says where its own
+  `~name` is read: `[section-wrap id="hero" image="~background"]` reads the
+  background of the hero. A component of a loop - `'children' => 'nodes'` with a
+  renderer - is handed what it holds and draws it as often as it needs;
+  `\Nino\Components::sources()` answers which keys and pictures a source reads,
+  for whoever scans a template.
+- The `options` of a `choice` are a list, or the name of a static method of the
+  feature's own class (`\Nino\Modules\<Directory>` or below it) that answers them
+  where the project alone knows them - its menus, its forms:
+  `'options' => '\Nino\Modules\Countdown::zones'`, a method
+  `public static function zones( array &$appData, string $attribute ): array`
+  that answers `value => label`, a label a string or a `locale => string` map. The
+  feature's own class is not loaded to check the schema, and a method that is none
+  is found out when it is asked: an answer that cannot be read is an
+  `E_USER_WARNING` and the attribute a `string`, so **a renderer checks the value
+  itself** where it names a record or a file.
+- `variants` is the list of words of the one open axis of a component:
+  `'variants' => [ 'card' ]` is `variant="card"`, the class `<name>--variant-card`
+  (`regular` is always there and writes none). A theme may add words through the
+  hook `/nino/components/variants`.
+- A `ground` is the one attribute the kernel names itself: a choice among `none`,
+  `base`, `alt`, `tint`, `primary` and `dark`, written as `<name>--ground-<word>`,
+  which `Nino.css` answers for every component alike.
+- `icon` and `preview` are for a tool and change nothing about the drawing. An
+  icon is geometry and not markup: a list of 1 to 12 parts, each a tag (`path`,
+  `circle`, `ellipse`, `rect`, `line`, `polyline` or `polygon`) and the map of the
+  attributes that tag takes, every value a string.
+  `'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]` is a line across the middle.
+- A schema that cannot be worked with is refused: the component is not
+  registered, the feature goes on without it and the log says why once - and the
+  Features panel shows the reason. A name that is no slug, a key that is none of
+  the schema's, an attribute without a default, a `choice` whose default is no
+  option, a `group` that is missing or has no `groups/<group>/group.php`, a
+  template that names a file.
+- A group and a component name belong to **one feature**. What a second feature
+  claims is refused, with a sentence that names both, and that feature goes on
+  without it.
+
+## 2. A component with no renderer
+
+A component with nothing to compute is a schema and a template. The template is
+filled in one pass with `[[class]]`, `[[value]]`, `[[content]]` and
+`[[<attribute>]]` for each attribute that is no class, and a fill of the site with
+a slash in front, `[[/project/company/general/name]]`, is its text:
+
+```php features/Countdown/components/note/component.php
+<?php
+declare(strict_types=1);
+
+return [
+	'group'    => 'countdown',
+	'label'    => 'Note',
+	'in'       => [ 'page', 'flow' ],
+	'source'   => 'text',
+];
+```
+
+```html features/Countdown/components/note/template.tpl
+<p class="[[class]]"[[lang]]>[[value]] - [[/project/company/general/name]]</p>
+```
+
+`[note /template/page-home/launch/note]` is drawn as
+`<p class="note">Soon - ACME</p>` for a key that holds `Soon`, with the name of
+the company `ACME`. `[[lang]]` is ` lang="..."` where the text of the key is
+another language's than the page's, and nothing where it is the page's. The class
+`note` is the name of the component, a class of the group `countdown` like the other.
+
+## 3. A component from a module
+
+A project that has no feature registers a component from the `init()` of a
+module of its own - `app/Project/DaysLeft/DaysLeft/DaysLeft.php`, listed in
+`/nino/modules` - with `\Nino\Components::addComponent( $appData, $name, $schema,
+$renderer )`. The schema is the same array, with the template in it (`'template'`)
+since no folder holds one, and `group` is optional. It is checked by
+`\Nino\Components::validate()`, and a schema that is none is an `E_USER_ERROR` at
+registration, nothing registered:
 
 ```php
 // in init()
@@ -328,97 +292,102 @@ it. It is named `days-left` so that the two do not meet:
 public static function drawDaysLeft( array &$appData, array $args, string $content, array $context ): string {
 
 	// $args['value'] is the text of the key, escaped; $args['class'] is the name and the classes the attributes make
-	$date = \DateTimeImmutable::createFromFormat( '!Y-m-d', html_entity_decode( $args['value'] ) );
+	$text = html_entity_decode( $args['value'] );
+	$date = \DateTimeImmutable::createFromFormat( '!Y-m-d', $text );
 
-	if( $date === false )
+	if( $date === false || $date->format( 'Y-m-d' ) !== $text )
 		return '';
 
 	$days = max( 0, (int) ( new \DateTimeImmutable( 'today' ) )->diff( $date )->format( '%r%a' ) );
 
-	// The markup is the schema's own template, filled with the placeholders of the register and the token of the
-	// renderer; what a renderer returns is finished
 	return \Nino\Components::fill( $appData, 'days-left', $args, $content, [ '[[days]]' => (string) $days ] );
 }
 ```
 
 `[days-left /template/page-home/launch/date size="big"]`, for a key that holds a
 date twelve days away, is `<p class="days-left days-left--size-big">12</p>`.
-What the rules of section 1 leave to the module, this register does itself:
+`addComponent()` **replaces** a component of the same name, which is how a project
+changes the markup of one; a component that has no renderer needs a `template`,
+and one whose `children` are `nodes` needs a renderer. A look for it is the
+project's own `assets/style.css`.
 
-- The attributes are made ready before the renderer runs - a `choice` outside
-  its options is the default, a `bool` is `'1'` or `'0'`, an `int` is kept within
-  its bounds, an attribute nobody declared falls away - and arrive as strings
-  under their names, beside `value`, `source`, `class`, `variant` and `lang`.
-- A source that resolves to nothing - a key nobody wrote, an empty text, a `.field`
-  there is no element for - draws nothing and the renderer is not called. The
-  first word is `~name`, a key or `.field`, and stands first in the call; the
-  fixed `text="..."` stands for it.
-- A renderer has its template filled by `\Nino\Components::fill( $appData, $name, $args, $content, $tokens )`: the
-  placeholders of the register and the tokens of the renderer's own, in one pass, where a token wins over a
-  placeholder of the same name. Markup that stands only sometimes - a link round a title that has an address - is
-  made by the renderer, escaped, and given as a token, so that it stays in the template and not in the class.
-- A second text of a call - a caption, an alternative text - is an attribute of the type `text`: a
-  reference (`~caption`, a key, `.field`) or the text itself, escaped. A component that is given the id says
-  where its own `~name` is read: `[section-wrap id="hero" image="~background"]` reads the background of the hero.
-  An attribute named `format`, a choice among `plain`, `inline`, `lines` and `blocks`, says what the text of
-  a call may hold. A component of a loop - `'children' => 'nodes'` with a renderer - is handed what it holds
-  and draws it as often as it needs; `\Nino\Components::sources()` answers which keys and pictures a source
-  reads, for whoever scans a template.
-- What the renderer returns is finished. A `[` in `$args['value']` is a `[` and
-  is no call, wherever it is written; `\Nino\Components::escape()` escapes
-  for html and leaves a `[` as it is. A renderer that throws a
-  `\Exception` leaves its place empty, and the log says it once.
-- A schema that cannot be worked with is an `E_USER_ERROR` at registration and
-  nothing is registered; a call that does not follow the schema is drawn as well
-  as it can be (see the table in the manual).
+## 4. Test it
 
-Without a renderer the template is the component - `[[class]]`, `[[value]]`,
-`[[content]]` and `[[<attribute>]]` for each attribute that is no class are
-filled in one pass, and a fill of the site with a slash in front
-(`[[/project/company/general/name]]`) is its text:
+Add the cases to the feature's own test,
+`features/Countdown/tests/countdown-smoke.php`, which loads `tests/harness.php`:
 
-```php
-\Nino\Components::addComponent( $appData, 'note', [
-	'label'    => 'Note',
-	'in'       => [ 'page', 'flow' ],
-	'source'   => 'text',
-	'template' => '<p class="[[class]]"[[lang]]>[[value]] - [[/project/company/general/name]]</p>',
-] );
+```php features/Countdown/tests/countdown-smoke.php
+<?php
+declare(strict_types=1);
+
+// The test of the Countdown feature. It runs against the Nino checkout three
+// levels up, or the one NINO_ROOT names, in a project of its own that it
+// creates and removes: php features/Countdown/tests/countdown-smoke.php
+$root = getenv( 'NINO_ROOT' ) ?: dirname( __DIR__, 3 );
+defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', dirname( __DIR__, 2 ) );
+require $root. '/tests/harness.php';
+
+$appData = ninoSandbox( 'countdown' );
+$appData['/nino/modules'] = [ '\\Nino\\Modules\\Countdown' ];
+
+// As \Nino\init() does it: the register reads the folders of the features that are on, then the modules run
+\Nino\Html::init( $appData );
+\Nino\Features::registerComponents( $appData );
+\Nino\Modules::callModules( $appData, 'init' );
+\Nino\Features::registerParts( $appData );
+
+$ahead = date( 'Y-m-d', time() + 3 * 86400 );
+\Nino\Html::addFills( $appData, [ '/template/page-home/launch/date' => $ahead, '/template/page-home/launch/never' => '2026-02-30' ], '*' );
+// A template file ends with a line break, which the markup of the component keeps: the checks look at the markup
+$draw = static fn( string $source ): string => trim( \Nino\Html::renderSource( $appData, $source, [ 'template' => 'page-home' ] + \Nino\Html::context( $appData ) ) );
+
+check( 'the folders are read without a warning', ninoWarnings() === [] && \Nino\Features::componentProblems( $appData, 'countdown' ) === [] );
+check( 'the component is registered in its group, which has a standard part', ( \Nino\Components::components( $appData )['countdown']['group'] ?? '' ) === 'countdown'
+	&& ( \Nino\Components::groups( $appData )['countdown']['part'] ?? false ) === true );
+check( 'the standard part keeps the rule of mixing', \Nino\Components::partProblems( (string) file_get_contents( dirname( __DIR__ ). '/groups/countdown/part/part.css' ), [ 'countdown', 'note' ] ) === [] );
+
+check( 'it draws the days that are left, and the size as a class', $draw( '[countdown /template/page-home/launch/date]' ) === '<p class="countdown">3</p>'
+	&& $draw( '[countdown /template/page-home/launch/date size="big"]' ) === '<p class="countdown countdown--size-big">3</p>' );
+check( 'a size outside the options is the default, an attribute nobody declared falls away', $draw( '[countdown /template/page-home/launch/date size="huge" colour="red"]' ) === '<p class="countdown">3</p>' );
+check( 'a date that is none, a key nobody wrote and a text with a call in it draw nothing',
+	$draw( '[countdown /template/page-home/launch/never]' ) === '' && $draw( '[countdown /template/page-home/launch/nobody]' ) === '' && $draw( '[countdown text="[csrf]"]' ) === '' );
+check( 'a fixed text is the source', $draw( '[countdown text="'. $ahead. '"]' ) === '<p class="countdown">3</p>' );
+
+// The feature is off: its names are names nobody registered
+$off = ninoSandbox( 'countdown-off' );
+\Nino\Html::init( $off );
+\Nino\Features::registerComponents( $off );
+check( 'where the feature is off the call draws nothing, and the log says so once', \Nino\Html::renderSource( $off, '[countdown text="'. $ahead. '"]x[/countdown]', \Nino\Html::context( $off ) ) === ''
+	&& count( ninoWarnings() ) === 1 );
+
+ninoDone( $appData );
 ```
 
-## 5. Test it
+The cases are the ones every component has: the folders are read and the schema
+is accepted, with no warning and no reason in `\Nino\Features::componentProblems()`;
+the standard part keeps the rule of mixing, which `\Nino\Components::partProblems()`
+answers with `[]` - the kernel asks it too, and a part that breaks it is left out of
+the bundle; the component draws what it should, a value outside the options is the
+default and an attribute nobody declared falls away; a source that is none, a key
+nobody wrote and a text with a call in it (`[csrf]`, an editor's `[[/other/key]]`)
+draw nothing and open nothing, wherever the renderer writes them; and with the
+feature off the call draws nothing. A component in a loop is tested with
+`[elements /meetups]` around a call that reads a field, `.date`, as its source.
 
-Add the cases to the module's own test, or to the feature's
-(`features/Countdown/tests/countdown-smoke.php`, loading `tests/harness.php`):
+Run the test, then the syntax checks and the static analysis of the
+[agent guide](../../AGENTS.md#10-tests-and-validation):
 
-- the registry knows it: `Components::components( $appData )['countdown']`
-  holds the schema, `Components::defaults( $appData, 'countdown' )` its
-  defaults as strings;
-- it renders: a text key with a date, a date that is none, a key nobody wrote
-  (nothing), a `select` outside its options (the default), an attribute that
-  is not declared (ignored);
-- a value with a `[` in it - an editor's `[[/other/key]]` - arrives as `&#91;`
-  and is no call or fill, wherever the renderer writes it;
-- in a stack, a field of the element is the source, and after the stack
-  `Components::element( $appData )` is `null` again;
-- a schema with a `select` whose default is no option is refused with an
-  `E_USER_ERROR` (capture it with a handler of the test's own; php 8.4 raises
-  a deprecation beside it);
-- for options that come from a method: the list in the schema that is handed
-  out, a value outside it, an answer that is no array or a class that does not
-  load (a warning, a `string`), and how often the method is asked in a request.
-
-Run `tests/components-smoke.php`, `tests/features-smoke.php` and the feature's
-own test, then the syntax checks and the static analysis of the
-[agent guide](../../AGENTS.md#10-tests-and-validation).
+```bash
+php features/Countdown/tests/countdown-smoke.php
+php tests/register-features-smoke.php
+```
 
 ## Definition of done
 
-- [ ] The schema validates: every attribute has a default, every select an option list that holds it, and a component of a project has its group, a feature's none.
-- [ ] The renderer has the signature `( array &$appData, array $args ): string` and returns nothing it did not escape or make itself.
-- [ ] Nothing in `$args['value']` is escaped a second time, and nothing outside it is written unescaped. For `image` the value is an escaped reference, to look the picture up by `$args['source']`, never a filename to write; for `content` it is the template's own markup.
-- [ ] A source that resolves to nothing renders nothing; a hand-written shortcode with a wrong attribute still renders.
-- [ ] A stack renders through `renderStack()`, never by filling `[[fields]]` of its content itself, and says its `cell` where that is not the components between its tags.
-- [ ] Registered one way: manifest or `init()`.
-- [ ] A component by schema validates by `\Nino\Components::validate()` without an error, has an `in` where it is to be offered, and its renderer, where it has one, returns finished markup and writes only `$args['value']` and what it made itself - the markup of its component is in the template, which the renderer has filled by `\Nino\Components::fill()`.
+- [ ] The schema validates: every attribute has a default, every choice an option list that holds it, a component of a feature its `group` and the feature the folder `groups/<group>/` with a `group.php`.
+- [ ] The renderer is `component<Name>()` of the feature's class with the signature `( array &$appData, array $args, string $content, array $context ): string`, returns nothing it did not escape or make itself, and has its template filled by `\Nino\Components::fill()`.
+- [ ] Nothing in `$args['value']` is escaped a second time, and nothing outside it is written unescaped. For an `image` the value is an escaped reference, to look the picture up by `$args['source']`, never a filename to write.
+- [ ] A source that resolves to nothing renders nothing; a call with a wrong attribute still renders.
+- [ ] The markup of the component is in its `template.tpl`, and the standard part keeps the rule of mixing (`\Nino\Components::partProblems()`).
+- [ ] Registered one way: in folders by a feature, or by `addComponent()` in the `init()` of a module.
 - [ ] The cases above are in a smoke test and the suite named in the guide passes.

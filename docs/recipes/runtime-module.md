@@ -233,7 +233,7 @@ private static function escapeHtml( string $value ): string {
 		'UTF-8'
 	);
 
-	// A bracket in a value is no call, but a component writes every one as an entity all the same.
+	// A bracket in a value is no call, but a shortcode that draws a template it filled reads what it put in: every one is an entity.
 	return str_replace(
 		[ '[', ']' ],
 		[ '&#91;', '&#93;' ],
