@@ -841,6 +841,8 @@ $dead = [
 	$leave( 'ninosnapshot-'. $mark. '-Dead02' ), $leave( 'ninosnapshot-'. $mark. '-Dead02.tar' ),
 	$leave( 'ninorestore-'. $mark. '-Dead03' ), $leave( 'ninorestore-'. $mark. '-Dead03.tar.gz' ), $leave( 'ninorestore-'. $mark. '-Dead03.staging', 'dir' ),
 	$leave( 'ninobackup-'. $mark. '-Dead04.tar', 'file', 2 * 86400 ),
+	// the end of a name as a php that names the file itself makes it: longer than the six characters of the system's
+	$leave( 'ninobackup-'. $mark. '-Dead08uudmh6vqp8ip9eWErKw' ), $leave( 'ninobackup-'. $mark. '-Dead08uudmh6vqp8ip9eWErKw.tar' ),
 ];
 $kept = [
 	$leave( 'ninobackup-'. $foreignMark. '-Other1' ), $leave( 'ninobackup-'. $foreignMark. '-Other1.tar' ),

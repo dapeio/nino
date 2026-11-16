@@ -969,8 +969,11 @@ namespace Nino {
 			$mark		= self::_tempId( $appData );
 			$groups	= [];
 
+			// The end of the name is what tempnam() made of it, and how long that is belongs to the php that runs: six
+			// characters where the system names the file, around twenty where php does - so no length is asked of it
+			// but one that a name can have
 			foreach( @scandir( $temp ) ?: [] as $name )
-				if( preg_match( '/^(nino(?:backup|snapshot|restore)-'. $mark. '-[A-Za-z0-9]{1,8})(?:\.tar|\.tar\.gz|\.staging)?$/', $name, $match ) === 1 )
+				if( preg_match( '/^(nino(?:backup|snapshot|restore)-'. $mark. '-[A-Za-z0-9]{1,64})(?:\.tar|\.tar\.gz|\.staging)?$/', $name, $match ) === 1 )
 					$groups[$match[1]][] = $name;
 
 			$owner = function_exists( 'posix_geteuid' ) === true ? posix_geteuid() : null;
