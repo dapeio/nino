@@ -303,4 +303,80 @@ $stamp = (string) file_get_contents( $path );
 \Nino\Modules\Assets::doShortcode( $appData, [ '/.cache/old.css' ] );
 check( '...and a bundle that is current is left as it is', (string) file_get_contents( $path ) === $stamp && $old !== '' );
 
+// --- The bundle in memory -------------------------------------------------------------
+
+echo "stylesheet() - the bundle as a string, files put in place of others\n";
+
+$ignored	= ninoWarnings();
+$memory		= [
+	'/_nino/Nino.css'				=> $nino,
+	'/features/Sample/assets/sample.css'	=> (string) file_get_contents( __DIR__. '/fixtures/features/Sample/assets/sample.css' ),
+	'/assets/theme.css'			=> '.theme-disk { color: #111; }',
+	'/assets/style.css'			=> '.project-disk { color: #222; }',
+];
+$onDisk		= layersBundle( $appData, '/.cache/memory.css', $memory );
+$publicPath	= \Nino\Filesystem::path( $appData, '/.cache/memory.css' );
+$cacheDir	= dirname( $publicPath );
+$listing	= static fn(): array => array_map( static fn( string $file ): string => $file. '|'. filesize( $cacheDir. '/'. $file ). '|'. filemtime( $cacheDir. '/'. $file ), (array) scandir( $cacheDir ) );
+$before		= $listing();
+$stampOf	= static fn( string $css ): string => explode( "\n", $css )[0];
+
+$plain = \Nino\Modules\Assets::stylesheet( $appData, '/.cache/memory.css' );
+check( 'with nothing to put in place the string is the bytes of the bundle file, stamp line included', $plain !== '' && $plain === $onDisk );
+check( '...an empty $swap is the same', \Nino\Modules\Assets::stylesheet( $appData, '/.cache/memory.css', [] ) === $onDisk );
+
+$swapped	= \Nino\Modules\Assets::stylesheet( $appData, '/.cache/memory.css', [ '/assets/theme.css' => '.theme-swap { color: #abc; }', '/_nino/Nino.css' => '@layer nino.reset { .reset-swap { margin: 0; } }' ] );
+$top		= layersTopLevel( $swapped );
+check( 'a file put in place of one stands in the layer of the file it replaces: the theme in nino.theme, Nino.css in the layer it holds itself',
+	$top !== null && $stands( $top, '.theme-swap' ) === [ '@layer nino.theme' ] && $stands( $top, '.reset-swap' ) === [ '@layer nino.reset' ]
+	&& array_slice( array_column( $top, 'head' ), 1 ) === [ '@layer nino.reset', '@layer nino.components', '@layer nino.theme', '@layer project' ] );
+check( '...and the file it replaces is gone from the bundle, the others stand as they were',
+	str_contains( $swapped, '.theme-disk' ) === false && str_contains( $swapped, '.project-disk' ) === true && $stands( $top, '.project-disk' ) === [ '@layer project' ] );
+check( '...with the stamp of another bundle, which no public bundle can be taken for', $stampOf( $swapped ) !== $stampOf( $onDisk ) && preg_match( '#^/\*\*[0-9a-f]{40}\*\*/$#', $stampOf( $swapped ) ) === 1 );
+
+// The file way and the memory way are one code: the same sources put in files give the same bundle
+$twin		= layersBundle( $appData, '/.cache/twin.css', [ '/assets/theme.css' => '.theme-swap { color: #abc; }' ] + $memory );
+$memory2	= \Nino\Modules\Assets::stylesheet( $appData, '/.cache/twin.css', [ '/assets/theme.css' => '.theme-swap { color: #abc; }' ] );
+check( 'what a swap puts in place of a file is built as the file is: the bundle of files that hold the same text equals it after the stamp line',
+	preg_replace( '/^[^\n]*\n/', '', $twin ) === preg_replace( '/^[^\n]*\n/', '', $memory2 ) && preg_replace( '/^[^\n]*\n/', '', $twin ) !== '' );
+\Nino\Filesystem::putFileContent( $appData, '/assets/theme.css', $memory['/assets/theme.css'] );
+$onDisk		= layersBundle( $appData, '/.cache/memory.css', $memory );
+// An hour back, so that a write of the same bytes shows in the time of the file
+touch( $publicPath, time() - 3600 );
+clearstatcache();
+$before		= $listing();
+
+// A source whose braces do not balance is repaired as a file is, and says so
+$bad		= new ArrayObject();
+set_error_handler( static function( int $no, string $message ) use ( $bad ): bool { $bad[] = $message; return true; }, E_USER_WARNING );
+$repaired	= \Nino\Modules\Assets::stylesheet( $appData, '/.cache/memory.css', [ '/assets/theme.css' => '.t-open { color: #1; } } .t-more { color: #2; ' ] );
+restore_error_handler();
+$top		= layersTopLevel( $repaired );
+check( 'a replacement whose braces do not balance is repaired and stays in its layer: the file after it is not swallowed',
+	$top !== null && $stands( $top, '.t-open' ) === [ '@layer nino.theme' ] && $stands( $top, '.t-more' ) === [ '@layer nino.theme' ] && $stands( $top, '.project-disk' ) === [ '@layer project' ] );
+check( '...one warning names the file and the faults', count( $bad ) === 1 && str_contains( $bad[0], '/assets/theme.css' ) && str_contains( $bad[0], 'a } that closes no block' ) && str_contains( $bad[0], 'a { that is never closed' ) );
+
+// Refused: a path the bundle does not list, one outside the project, a replacement that is no string, a target that is no stylesheet
+$refused	= [
+	'a file the bundle does not hold'			=> [ '/assets/other.css' => '.x { }' ],
+	'a path below the project'						=> [ '/assets/../../outside.css' => '.x { }' ],
+	'an absolute path outside the project'	=> [ '/etc/passwd' => '.x { }' ],
+	'the spelling of a listed file that is not the listed one'	=> [ 'assets/theme.css' => '.x { }' ],
+	'a path with a null byte'							=> [ "/assets/theme.css\0.png" => '.x { }' ],
+	'a listed file beside a stranger'		=> [ '/assets/theme.css' => '.ok { }', '/assets/stranger.css' => '.x { }' ],
+	'a replacement that is no string'			=> [ '/assets/theme.css' => [ '.x { }' ] ],
+];
+foreach( $refused as $label => $swap ) {
+	$caught = new ArrayObject();
+	set_error_handler( static function( int $no, string $message ) use ( $caught ): bool { $caught[] = $message; return true; }, E_USER_WARNING );
+	$answer = \Nino\Modules\Assets::stylesheet( $appData, '/.cache/memory.css', $swap );
+	restore_error_handler();
+	check( 'refused: '. $label. ' - an empty string and one warning', $answer === '' && count( $caught ) === 1 && str_contains( $caught[0], 'refused' ) && str_contains( $caught[0], "\0" ) === false );
+}
+check( 'a target that is no stylesheet and one with no files give an empty string',
+	\Nino\Modules\Assets::stylesheet( $appData, '/.cache/script.js' ) === '' && \Nino\Modules\Assets::stylesheet( $appData, '/.cache/nothing.css' ) === '' && \Nino\Modules\Assets::stylesheet( $appData, '' ) === '' );
+
+check( 'the public bundle and the folder it stands in are as they were after all of it: no file written, none touched, the stamp the same',
+	$listing() === $before && (string) file_get_contents( $publicPath ) === $onDisk && $stampOf( $onDisk ) === $stampOf( $plain ) );
+
 ninoDone( $appData );

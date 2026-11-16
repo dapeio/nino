@@ -161,6 +161,15 @@ source:
 - The bundles of the workbench (`/_admin/.cache/...`) hold no file of the project and
   have no layers.
 
+`\Nino\Modules\Assets::stylesheet( $appData, $target, $swap = [] )` answers the stylesheet bundle
+of a target - `'/.cache/style.css'`, as the shortcode names it - as a string, built by the code that
+builds the file: the same layers, order and repair, the stamp line first. With no `$swap` it is the
+bytes of the bundle file. `$swap` maps the path of a file of the bundle, as the list in
+`/nino/html/assets` writes it, to css that stands in its place and in its layer, for a preview of a
+file that is not saved. Nothing is written and the public bundle is left as it is. A path that is
+no file of the bundle (one outside the project is none) or a replacement that is no string refuses
+the call: it answers `''` and raises one warning, as a source that is repaired does.
+
 `\Nino\Html::addAsset()` keeps the order of the list. A file of the project goes to the end; any other
 file goes in front of the first file of the project that stands after the last file
 of the kernel in the list, and to the end of a bundle that has none. A file that is

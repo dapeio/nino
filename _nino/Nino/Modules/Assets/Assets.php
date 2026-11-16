@@ -203,6 +203,45 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The stylesheet bundle of a target as a string, built in memory: the
+		 *	layers, the files in them, the repair of a source whose braces do not
+		 *	balance and the first line with the stamp are the ones of the file
+		 *	_createCachefile() writes, from the same code (_compose()). With an empty
+		 *	$swap the string is the file's bytes. A file named in $swap is
+		 *	replaced by the css given and stands in the layer of the file it
+		 *	replaces; the stamp of such a bundle differs from the public one. Nothing
+		 *	is written and the public bundle is left as it is.
+		 *
+		 *	A target that is no stylesheet, a bundle without files, a path in $swap
+		 *	that is no file of the bundle as \Nino\Html::getAssets() lists it (a path
+		 *	outside the project is none) and a replacement that is no string give
+		 *	'' and a warning - the call is refused as a whole.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$target				The bundle as the shortcode names it, eg. '/public/.cache/style.css'
+		 *	@param		array			$swap					Path of a file of the bundle => the css that stands in its place
+		 *
+		 *	@return 	string									The bundle, '' if refused
+		 */
+		public static function stylesheet( array &$appData, string $target, array $swap = [] ): string {
+
+			$pathinfo		= pathinfo( $target );
+			$assetFiles	= \Nino\Html::getAssets( $appData, $target );
+
+			if( ( $pathinfo['extension'] ?? '' ) !== 'css' || $assetFiles === [] )
+				return '';
+
+			foreach( $swap as $file => $css ) {
+				if( in_array( (string) $file, $assetFiles, true ) === false || is_string( $css ) === false ) {
+					trigger_error( 'Assets: '. addcslashes( (string) $file, "\0" ). ' is no file of the bundle '. addcslashes( $target, "\0" ). ' with a css to put in its place, the bundle is refused', E_USER_WARNING );
+					return '';
+				}
+			}
+
+			return self::_compose( $appData, $pathinfo, $assetFiles, $swap );
+		}
+
+		/**
 		 *	Write all asset files from source dir into an target file
 		 *
 		 *	A stylesheet bundle of the site (not the workbench's, see _layered())
@@ -217,13 +256,29 @@ namespace Nino\Modules {
 		 */
 		private static function _createCachefile( array &$appData, array $pathinfo, array $assetFiles ): void {
 
+			\Nino\Filesystem::putFileContent( $appData, $pathinfo['dirname']. '/'. $pathinfo['basename'], self::_compose( $appData, $pathinfo, $assetFiles, [] ) );
+		}
+
+		/**
+		 *	The content of a bundle file, first line included - the one way a bundle
+		 *	is built, for the file (_createCachefile()) and for the string (stylesheet())
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		array					$pathinfo			Pathinfo of target asset file
+		 *	@param		array					$assetFiles		Asset files array
+		 *	@param		array					$swap					Path of a file => the text that stands in its place, already checked
+		 *
+		 *	@return 	string											The bundle
+		 */
+		private static function _compose( array &$appData, array $pathinfo, array $assetFiles, array $swap ): string {
+
 			$layered	= self::_layered( $appData, $pathinfo );
 
 			// Loop through files and collect content
 			$content	= '';
 			$imports	= '';
 			foreach( $assetFiles AS $file ) {
-				$source = \Nino\Filesystem::getFileContent( $appData, $file, '' );
+				$source = $swap[$file] ?? \Nino\Filesystem::getFileContent( $appData, $file, '' );
 
 				$content .= $layered === true && is_string( $source ) === true
 					? self::_layer( $source, self::_layerOf( $appData, \Nino\Filesystem::path( $appData, $file ) ), $file, $imports )
@@ -255,9 +310,13 @@ namespace Nino\Modules {
 			if( substr( $pathinfo['filename'], -4 ) === '.min' )
 				$content = trim( preg_replace( self::$_minifyRegex[$pathinfo['extension']][0], self::$_minifyRegex[$pathinfo['extension']][1], $content ), ';' );
 
-			// Add prefix and write file
-			$content			= '/**'. self::_getFileHashes( $appData, $assetFiles, $layered ). '**/'. PHP_EOL. trim( $content, ';' );
-			\Nino\Filesystem::putFileContent( $appData, $pathinfo['dirname']. '/'. $pathinfo['basename'], $content );
+			// Add prefix: the stamp of the files, and of what was put in place of one
+			$stamp				= self::_getFileHashes( $appData, $assetFiles, $layered );
+
+			if( $swap !== [] )
+				$stamp = sha1( $stamp. serialize( $swap ) );
+
+			return '/**'. $stamp. '**/'. PHP_EOL. trim( $content, ';' );
 		}
 
 		/**
