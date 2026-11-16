@@ -8,16 +8,16 @@
 
 Nino fasst alle Stylesheets zu einer Datei zusammen und alle Skripte zu einer zweiten. So eine Datei heißt **Bundle**. Der Browser lädt nie eine Datei aus `features/`.
 
-Das Stylesheet-Bundle hat eine feste Reihenfolge:
+Das Stylesheet-Bundle hat vier Lagen. Jede Datei steht in einer davon, und die Lage entscheidet, welche Regel gewinnt:
 
 ```text
-_nino/Nino.css              die Vorgaben von Nino
-Features und Module         ihre Stylesheets
-private/assets/theme.css    das Design des Projekts
-private/assets/style.css    eigene Regeln des Projekts
+nino.reset        _nino/Nino.css, erster Teil: Variablen, Reset, Grundelemente
+nino.components   _nino/Nino.css, Rest; Features und Module: ihre Stylesheets
+nino.theme        private/assets/theme.css: das Design des Projekts
+project           private/assets/style.css: eigene Regeln des Projekts
 ```
 
-Was später kommt, gewinnt bei gleich genauen Selektoren. Das Projekt kann also jede Regel Deines Features überstimmen.
+Eine Regel in einer späteren Lage gewinnt gegen eine Regel in einer früheren, egal wie genau der Selektor ist. Das Projekt kann also jede Regel Deines Features überstimmen. Die Lage schreibt Nino beim Zusammenbauen, Dein Stylesheet nennt sie nicht. Ein `!important` kehrt die Reihenfolge der Lagen um: Verwende es nicht.
 
 ## Schritte
 
@@ -121,7 +121,7 @@ Das Feature **Design** aus dem Katalog erzeugt `private/assets/theme.css` aus Ei
 
 ## Prüfen
 
-- Im Quelltext von `/meetups` steht ein Stylesheet `…/.cache/style.css` und ein Skript `…/.cache/script.js`. Beide enthalten jetzt Deine Regeln und Dein Skript. In `style.css` stehen Deine Regeln nach denen von `Nino.css` und vor denen von `theme.css`.
+- Im Quelltext von `/meetups` steht ein Stylesheet `…/.cache/style.css` und ein Skript `…/.cache/script.js`. Beide enthalten jetzt Deine Regeln und Dein Skript. In `style.css` stehen Deine Regeln in einem Block `@layer nino.components { … }`, nach denen von `Nino.css` und vor denen von `theme.css`.
 - Die Liste hat Linien zwischen den Treffen. Jedes Datum hat die Hauptfarbe des Designs.
 - Lege im Bereich **Elemente** ein Treffen in den nächsten sieben Tagen an. Sein Datum steht fett da. Es trägt die Klasse `meetups-is-soon`.
 - Schreibe zur Probe `.meetups-date { color: rgb(200, 0, 0); }` ans Ende von `private/assets/style.css`. Jedes Datum wird rot. Die Regel des Projekts gewinnt. Nimm die Zeile wieder heraus.

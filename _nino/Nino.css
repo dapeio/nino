@@ -1,3 +1,12 @@
+/*	Two layers, in the order the bundle declares them (\Nino\Modules\Assets,
+	"@layer nino.reset, nino.components, nino.theme, project;"): this file's
+	chapters 00 and 01 - the tokens on :root, the reset and the bare elements
+	- are the layer nino.reset, every chapter after them the layer nino.components.
+	A rule of the theme or of the project stands in a later layer and overrules
+	any rule below whatever its specificity and wherever its file stands. The
+	rules are written as they always were and not indented, so that the two
+	blocks open at the top and close at the bottom of what they hold.	*/
+@layer nino.reset {
 /****************************************************************************************************
  *
  *
@@ -7,10 +16,10 @@
  *			Design tokens as native CSS custom properties. --color-primary defaults
  *			to the workbench's blue - everything else is a project-neutral placeholder.
  *			A project overrides whatever it needs in its own stylesheet
- *			(assets/theme.css, or the assets/style.css after it), loaded after
- *			this file, via a plain :root { --token: value; } block - no build
- *			step, no load-order juggling, the cascade resolves var() at compute
- *			time.
+ *			(assets/theme.css, or the assets/style.css after it), which the
+ *			bundle puts in layers behind this file's, via a plain
+ *			:root { --token: value; } block - no build step, no load-order
+ *			juggling, the cascade resolves var() at compute time.
  *
  *			If a token still needs to stay editable per project, define it
  *			as --token: [[/project/website/color/primary]]; instead of a literal value.
@@ -748,8 +757,10 @@ h1, h2, h3, h4, h5, h6 {
 		hyphenate-limit-chars: 12 4 4;
 	}
 }
+}
 
 
+@layer nino.components {
 /****************************************************************************************************
  *
  *
@@ -5727,4 +5738,5 @@ a.nino-sr-only:focus {
 @media (min-width: 1280px) {
 	.nino-visible-xl { display: block !important; }
 	.nino-hidden-xl { display: none !important; }
+}
 }

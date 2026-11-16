@@ -132,10 +132,48 @@ files first (`Nino.css`, `Nino.js`), then what features and modules add, in the 
 they add it, then the project's own files - the ones below `/assets/`
 (`private/assets/`), `theme.css` and `style.css` among them - in the order
 `/nino/html/assets` lists them. For the stylesheet that is `Nino.css`, the features,
-`theme.css`, `style.css`: a rule of a feature overrules a rule of `Nino.css` of the
-same specificity, and a rule of the theme or of the project's own `style.css`
-overrules a rule of a feature of the same specificity.
-`\Nino\Html::addAsset()` keeps it. A file of the project goes to the end; any other
+`theme.css`, `style.css`.
+
+What decides between two rules of the stylesheet is not that order but four layers.
+The bundle begins with `@layer nino.reset, nino.components, nino.theme, project;` and
+holds every file in a block of its layer:
+
+| Layer | What stands in it |
+|---|---|
+| `nino.reset` | the first part of `Nino.css`: the tokens on `:root`, the reset and the bare elements |
+| `nino.components` | the rest of `Nino.css` (the grid, the components, the modules' markup) and the stylesheets of features and modules |
+| `nino.theme` | the project's `assets/theme.css` |
+| `project` | every other file of the project's `assets/`, `style.css` among them |
+
+A rule in a later layer overrules a rule in an earlier one whatever its selector says
+and whichever file comes first, so a rule of the theme or of the project's own
+`style.css` overrules a rule of a feature or of `Nino.css` with a plain selector,
+and a feature does not need a heavier one to hold its own against the reset. Inside
+one layer the order of the list decides, as it always did. `Nino.css` is the one
+file with two layers and holds them itself; for every other file the bundle writes
+the block, so a project writes no layer of its own. What the bundle does with a
+source:
+
+- An `@charset` is dropped (the bundle is served with its encoding), and an `@import`
+  is moved in front of the first block with `layer(<the file's layer>)`, a layer it
+  named itself replaced. Fonts, `@keyframes` and `@property` stand in the block as they are.
+- A source whose braces do not balance is repaired the way a browser reads it and stays
+  in its layer: a `}` that closes nothing is left out, a `{` never closed is closed at
+  the end, and a comment, string or `url()` that does not end ends where the source
+  does. Written as it is, such a source could close its own block and put what follows
+  in another layer. One warning per source names the file and the faults, when the
+  bundle is built. A brace in a string, a comment, an unquoted `url()` or behind a
+  backslash is no brace.
+- An `!important` turns the order of the layers round: of two important declarations
+  the one in the earlier layer wins. A project that needs an `!important` against one
+  of `Nino.css` loses it; take the selector, not the flag.
+- A stylesheet that is linked by itself - `[assets /assets/x.css]` for a file with no
+  list, or a `<link>` of your own - is no part of the bundle and stands outside the
+  layers: unlayered rules overrule every layer. `Nino.css` linked alone keeps its two.
+- The bundles of the workbench (`/_admin/.cache/...`) hold no file of the project and
+  have no layers.
+
+`\Nino\Html::addAsset()` keeps the order of the list. A file of the project goes to the end; any other
 file goes in front of the first file of the project that stands after the last file
 of the kernel in the list, and to the end of a bundle that has none. A file that is
 listed already stays where it is, whatever way its path is written
@@ -145,7 +183,8 @@ project runs after the scripts of the features. The bundles of the workbench
 (`/_admin/.cache/...`) hold no file of the project and are not touched by the rule.
 
 That is what the kernel does, not a promise to a feature: a feature SHOULD NOT build
-on where its stylesheet stands in relation to the theme.
+on where its stylesheet stands in relation to the theme - the layers already say that
+the theme and the project come after it.
 
 ### Components and stacks
 

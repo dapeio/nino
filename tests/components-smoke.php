@@ -27,7 +27,10 @@ echo "Sandbox: $sandbox\n\n";
 
 echo "Nino.css - the hero style, the font roles, the scale and the hooks\n";
 
-$hookCss = (string) preg_replace( '#/\*.*?\*/#s', '', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) );
+/*	The rules, not the layers they stand in (tests/assets-layers-smoke.php has those): the two blocks of the sheet are
+	taken off, so that the readers below see the rules as they stand one after the other	*/
+$hookCss = (string) preg_replace( '#/\*.*?\*/#s', '', (string) preg_replace( '/^@layer nino\.reset \{\n(.*?)\n\}\n+@layer nino\.components \{\n(.*)\n\}\n\z/ms', "$1\n\n$2", (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), -1, $hookLayers ) );
+check( 'Nino.css is the two blocks of its layers, which the readers below take off', $hookLayers === 1 );
 check( 'the fold keeps its name: body.nino-scroll-atf is still what Nino.css and Nino.ui.js say', str_contains( $hookCss, 'body.nino-scroll-atf ' ) === true
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' ), "'nino-scroll-atf'" ) === true );
 check( 'the arrow Nino.ui.js listens on is the one Nino.css draws', str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' ), "'.nino-hero-arrowdown'" ) === true

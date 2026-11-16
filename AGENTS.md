@@ -423,17 +423,25 @@ or the recovery page.
 
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
   and `prefers-reduced-motion`; do not encode meaning only by color or hover.
-- The style bundle has one order: `Nino.css`, the stylesheets of features and
-  modules, then the project's `assets/theme.css` and `assets/style.css`
-  (`\Nino\Html::addAsset()` keeps it, see [Assets](docs/features.md#assets)). A
-  rule of the theme or of the project overrules a rule of a feature of the same
-  specificity. That is what the kernel does; a feature SHOULD NOT build on where
-  its stylesheet stands in relation to the theme.
+- The style bundle of the site has four layers, declared in its first rule:
+  `@layer nino.reset, nino.components, nino.theme, project;`
+  (`\Nino\Modules\Assets`, see [Assets](docs/features.md#assets)). A rule in a
+  later layer overrules a rule in an earlier one whatever its specificity and
+  wherever its file stands. `Nino.css` carries its two layers itself (the
+  tokens and the reset, then everything else); the bundle puts the stylesheets
+  of features and modules in `nino.components`, the project's `assets/theme.css`
+  in `nino.theme` and its other files below `assets/` - `style.css` among them
+  - in `project`. A file never writes a layer of the four, and a project never
+  writes one at all: the bundle does, and it repairs a file whose braces do
+  not balance as a browser would, inside its layer. A rule of the project overrules a rule of a feature or of
+  `Nino.css` with no more than a plain selector. An `!important` turns the
+  order of the layers round, so `Nino.css` keeps none in `nino.reset` and the
+  delivered `theme.css` has none; the workbench's bundles are no part of this.
 - A design layer turns `_nino/Nino.css` through the custom properties its
   `:root` declares, and the comments there are the reference. A new default is
-  declared in `Nino.css`; the delivered `theme.css` is the body the catalogue's
-  Design feature compiles at its defaults, and the catalogue's tests compare the
-  two byte for byte, so a change there is made in both repositories.
+  declared in `Nino.css`. The delivered `theme.css` is a stylesheet of its own
+  in the layer `nino.theme`; it is no longer held byte for byte to the output of
+  a compiler.
 
 ### Templates
 

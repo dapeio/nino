@@ -23,6 +23,15 @@ namespace Nino\Modules {
 
 	class Assets {
 
+		/**
+		 *	The first rule of every stylesheet bundle of the site: the four layers in
+		 *	the order that decides the cascade - the kernel's reset, then its
+		 *	components, then the theme, then the project. A layer that comes later
+		 *	overrules an earlier one whatever the specificity of the rules in them.
+		 *	The bundles of the workbench (/_admin/) are no part of it.
+		 */
+		public const string LAYERS = '@layer nino.reset, nino.components, nino.theme, project;';
+
 		private static
 			$_template				= [
 				'css'							=> '<link rel="stylesheet" href="[[filename]]" type="text/css" />',
@@ -106,7 +115,7 @@ namespace Nino\Modules {
 				return '';
 
 			// Compare hash / create cache
-			if( empty( $assetFiles ) === false && self::_getFileHashes( $appData, $assetFiles ) !== self::_readHashLine( $appData, $targetFile ) )
+			if( empty( $assetFiles ) === false && self::_getFileHashes( $appData, $assetFiles, self::_layered( $appData, $pathinfo ) ) !== self::_readHashLine( $appData, $targetFile ) )
 				self::_createCachefile( $appData, $pathinfo, $assetFiles );
 
 			// Fill template
@@ -134,10 +143,11 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
 		 *	@param		array					$assetFiles		Asset files array
+		 *	@param		bool					$layered			Whether the bundle puts each file in a layer: the layer each file gets is part of the hash
 		 *
 		 *	@return 	string											Filehash
 		 */
-		private static function _getFileHashes( array &$appData, array $assetFiles ): string {
+		private static function _getFileHashes( array &$appData, array $assetFiles, bool $layered ): string {
 
 				$hash 	= '';
 
@@ -148,7 +158,7 @@ namespace Nino\Modules {
 					$filepath = \Nino\Filesystem::path( $appData, $file );
 
 					if( is_file( $filepath ) === true )
-						$hash .= $filepath. '|'. filesize( $filepath ). '|'. filemtime(  $filepath );
+						$hash .= $filepath. '|'. filesize( $filepath ). '|'. filemtime(  $filepath ). ( $layered === true ? '|'. ( self::_layerOf( $appData, $filepath ) ?? '' ) : '' );
 				}
 
 				return sha1( $hash );
@@ -195,6 +205,10 @@ namespace Nino\Modules {
 		/**
 		 *	Write all asset files from source dir into an target file
 		 *
+		 *	A stylesheet bundle of the site (not the workbench's, see _layered())
+		 *	begins with the four layers and holds every file in its own: see
+		 *	_layerOf() for which and _layer() for how.
+		 *
 		 *	@param		array 				&$appData			(reference) Array with current app data
 		 *	@param		array					$pathinfo			Pathinfo of target asset file
 		 *	@param		array					$assetFiles		Asset files array
@@ -203,11 +217,23 @@ namespace Nino\Modules {
 		 */
 		private static function _createCachefile( array &$appData, array $pathinfo, array $assetFiles ): void {
 
+			$layered	= self::_layered( $appData, $pathinfo );
 
 			// Loop through files and collect content
-			$content = '';
-			foreach( $assetFiles AS $file )
-				$content .= \Nino\Filesystem::getFileContent( $appData, $file, '' );
+			$content	= '';
+			$imports	= '';
+			foreach( $assetFiles AS $file ) {
+				$source = \Nino\Filesystem::getFileContent( $appData, $file, '' );
+
+				$content .= $layered === true && is_string( $source ) === true
+					? self::_layer( $source, self::_layerOf( $appData, \Nino\Filesystem::path( $appData, $file ) ), $file, $imports )
+					: $source;
+			}
+
+			// The layers are declared before any rule, and the @import rules a source
+			// had stand between them and the first block: an @import is void behind a rule
+			if( $layered === true )
+				$content = self::LAYERS. PHP_EOL. $imports. $content;
 
 			// Deliberately NOT Html::renderHtml(): that pipeline also runs admin-
 			// editable textfills (text/global.php, per-locale text files) and every
@@ -230,8 +256,195 @@ namespace Nino\Modules {
 				$content = trim( preg_replace( self::$_minifyRegex[$pathinfo['extension']][0], self::$_minifyRegex[$pathinfo['extension']][1], $content ), ';' );
 
 			// Add prefix and write file
-			$content			= '/**'. self::_getFileHashes( $appData, $assetFiles ). '**/'. PHP_EOL. trim( $content, ';' );
+			$content			= '/**'. self::_getFileHashes( $appData, $assetFiles, $layered ). '**/'. PHP_EOL. trim( $content, ';' );
 			\Nino\Filesystem::putFileContent( $appData, $pathinfo['dirname']. '/'. $pathinfo['basename'], $content );
+		}
+
+		/**
+		 *	Whether a bundle puts its files in layers: every stylesheet bundle of the
+		 *	site. The workbench has its own order and is left as it is - its bundles
+		 *	are the ones written below /_admin/.
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		array					$pathinfo			Pathinfo of target asset file
+		 *
+		 *	@return 	bool
+		 */
+		private static function _layered( array &$appData, array $pathinfo ): bool {
+
+			return $pathinfo['extension'] === 'css'
+				&& str_starts_with( \Nino\Filesystem::path( $appData, $pathinfo['dirname']. '/'. $pathinfo['basename'] ), \Nino\Filesystem::path( $appData, '/_admin' ). '/' ) === false;
+		}
+
+		/**
+		 *	The layer a stylesheet of the site's bundle stands in, by the file it is:
+		 *	the project's assets/theme.css is 'nino.theme', any other file of the
+		 *	project's assets/ 'project', and what a feature or a module adds
+		 *	'nino.components'. A project never writes a layer, the bundle puts the
+		 *	file in it. Nino.css is the one file with two layers, so it holds them
+		 *	itself: null, it is taken as it is.
+		 *
+		 *	@param		array 				&$appData			(reference) Array with current app data
+		 *	@param		string				$filepath			The absolute path of the file, as \Nino\Filesystem::path() resolves it
+		 *
+		 *	@return 	string|null									The layer, null for the file that carries its own
+		 */
+		private static function _layerOf( array &$appData, string $filepath ): ?string {
+
+			if( $filepath === \Nino\Filesystem::path( $appData, '/_nino/Nino.css' ) )
+				return null;
+
+			if( $filepath === \Nino\Filesystem::path( $appData, '/assets/theme.css' ) )
+				return 'nino.theme';
+
+			return str_starts_with( $filepath, \Nino\Filesystem::path( $appData, '/assets' ). '/' ) === true ? 'project' : 'nino.components';
+		}
+
+		/**
+		 *	One stylesheet made ready for the bundle: in a block of its layer, which
+		 *	nothing it holds can leave. The source is read once, as a css parser
+		 *	reads it - comments, strings, escapes and an unquoted url() are skipped,
+		 *	braces counted - and
+		 *	- a source whose braces do not balance is repaired as a browser reads it,
+		 *	  and stays in its block: a } that closes nothing is left out, a { that
+		 *	  is never closed is closed at the end, and a comment, string or url()
+		 *	  that does not end ends where the source does. Wrapped as it is, such a
+		 *	  source would close its own block and put what follows in another
+		 *	  layer, or swallow the files behind it. One warning says which faults
+		 *	  the source held;
+		 *	- an @charset is dropped: it is void anywhere but the first byte of a file,
+		 *	  and the bundle is served with its encoding;
+		 *	- an @import is taken out of the block and handed back in $imports with
+		 *	  layer(<its layer>), to stand in front of every rule of the bundle as
+		 *	  the language wants it. A layer the import names itself is replaced.
+		 *	@font-face, @keyframes and @property stand in the block as they are.
+		 *
+		 *	@param		string				$css					The source
+		 *	@param		string|null		$layer				Its layer, null for a file that holds its own (see _layerOf())
+		 *	@param		string				$file					The path as the bundle lists it, for the warning
+		 *	@param		string				&$imports			(reference) The @import rules of the bundle so far
+		 *
+		 *	@return 	string											The block, '' for an empty source
+		 */
+		private static function _layer( string $css, ?string $layer, string $file, string &$imports ): string {
+
+			$css			= (string) preg_replace( '/^\xEF\xBB\xBF/', '', $css );
+			$length		= strlen( $css );
+			$body			= '';
+			$found		= '';
+			$copied		= 0;
+			$depth		= 0;
+			$i				= 0;
+			$space		= " \t\r\n\f";
+			$faults		= [];
+			$open			= '';
+
+			while( $open === '' && ( $i += strcspn( $css, '/"\'(\\{}@', $i ) ) < $length ) {
+
+				$char = $css[$i];
+
+				if( $char === '/' ) {
+					if( ( $css[$i + 1] ?? '' ) !== '*' )
+						$i++;
+					elseif( ( $end = strpos( $css, '*/', $i + 2 ) ) === false ) {
+						$faults[]	= 'a comment that does not end';
+						$open			= '*/';
+					}
+					else
+						$i = $end + 2;
+				}
+				elseif( $char === '"' || $char === "'" ) {
+					$i++;
+					while( true ) {
+						$i += strcspn( $css, $char. "\\\r\n\f", $i );
+
+						if( $i >= $length ) {
+							$faults[]	= 'a string that does not end';
+							$open			= $char;
+							break;
+						}
+						if( $css[$i] === "\\" )
+							$i += substr( $css, $i + 1, 2 ) === "\r\n" ? 3 : 2;
+						elseif( $css[$i] === $char ) {
+							$i++;
+							break;
+						}
+						else
+							break;
+					}
+				}
+				elseif( $char === '(' ) {
+					$i++;
+
+					// url( without a quote: the bytes up to the ) are one token, { and } among them
+					if( $i >= 4 && strcasecmp( substr( $css, $i - 4, 3 ), 'url' ) === 0 && in_array( $css[$i + strspn( $css, $space, $i )] ?? '', [ '"', "'" ], true ) === false ) {
+						if( preg_match( '/\G(?:[^)\\\\]++|\\\\.)*+\)/s', $css, $match, 0, $i ) !== 1 ) {
+							$faults[]	= 'a url() that does not end';
+							$open			= ')';
+						}
+						else
+							$i += strlen( $match[0] );
+					}
+				}
+				elseif( $char === '\\' )
+					$i += 2;
+				elseif( $char === '{' ) {
+					$depth++;
+					$i++;
+				}
+				elseif( $char === '}' ) {
+					if( $depth === 0 ) {
+						$faults[]	= 'a } that closes no block';
+						$body		 .= substr( $css, $copied, $i - $copied );
+						$copied		= ++$i;
+					}
+					else {
+						$depth--;
+						$i++;
+					}
+				}
+				elseif( $depth === 0 && preg_match( '/\G@(charset|import)(?![\w-])/i', $css, $match, 0, $i ) === 1 ) {
+					$string = '"(?:[^"\\\\\r\n\f]|\\\\.)*+"|\'(?:[^\'\\\\\r\n\f]|\\\\.)*+\'';
+
+					if( strtolower( $match[1] ) === 'charset' )
+						$statement = preg_match( '/\G@charset['. $space. ']*+(?:'. $string. ')['. $space. ']*+;?/i', $css, $cut, 0, $i ) === 1;
+					else
+						$statement = preg_match( '/\G@import['. $space. ']*+(url\(['. $space. ']*+(?:'. $string. '|(?:[^)\\\\]|\\\\.)*+)\)|'. $string. ')([^;{}]*+);/is', $css, $cut, 0, $i ) === 1;
+
+					if( $statement === false )
+						$i++;
+					else {
+						if( isset( $cut[2] ) === true ) {
+							$rest		= trim( (string) preg_replace( '/(?<![\w-])layer(?:\([^)]*\))?(?![\w-])/i', '', $cut[2] ) );
+							$found .= '@import '. $cut[1]. ( $layer !== null ? ' layer('. $layer. ')' : '' ). ( $rest !== '' ? ' '. $rest : '' ). ';'. PHP_EOL;
+						}
+
+						$body		.= substr( $css, $copied, $i - $copied );
+						$i			+= strlen( $cut[0] );
+						$copied	 = $i;
+					}
+				}
+				else
+					$i++;
+			}
+
+			// What was open when the source ended ends there, and so does every block
+			$body	.= substr( $css, $copied ). $open;
+
+			if( $depth !== 0 ) {
+				$faults[]	= 'a { that is never closed';
+				$body		 .= PHP_EOL. str_repeat( '}', $depth );
+			}
+
+			if( $faults !== [] )
+				trigger_error( 'Assets: '. addcslashes( $file, "\0" ). ' is repaired in its bundle, it holds '. implode( ', ', array_unique( $faults ) ), E_USER_WARNING );
+
+			if( trim( $body ) === '' )
+				return '';
+
+			$imports .= $found;
+
+			return $layer === null ? $body. PHP_EOL : '@layer '. $layer. ' {'. PHP_EOL. $body. PHP_EOL. '}'. PHP_EOL;
 		}
 	}
 

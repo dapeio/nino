@@ -3,20 +3,19 @@
  *									project by the base install unit, first of the two
  *									stylesheets in the css bundle - the project's own
  *									assets/style.css comes after it and overrules it. The
- *									stylesheets of the features come before it, between
- *									Nino.css and this file, so a rule here overrules a rule
- *									of a feature of the same specificity.
+ *									bundle puts this file in the layer nino.theme, behind
+ *									the layers of Nino.css and of the features and in front
+ *									of the project's: a rule here overrules a rule of a
+ *									feature whatever the selector says. Write the rules,
+ *									not the layer.
  *
- *									Everything below this comment is what the catalogue's
+ *									Everything below this comment is the look the catalogue's
  *									Design feature compiles at its defaults: the eighteen
  *									numbered sections, every part on the set the first
  *									shipped theme names - Nino, the default construction
  *									of each tab -, every knob where that theme puts it: the middle,
  *									but for the navigation of the header on the right and its button
- *									hidden. It is regenerated from
- *									that compiler with each kernel release, so that the look
- *									a project starts from and the look Design compiles have
- *									one source. Nino.css carries the defaults; this file is
+ *									hidden. Nino.css carries the defaults; this file is
  *									what the tokens, the roles, the webfaces and the two
  *									frames make of them.
  *
@@ -1635,10 +1634,10 @@ footer a:focus-visible {
 }
 
 /*	The alignment: where the title and the subtitle stand, where the text of a section does, the hero style's among them. Only where the page says nothing of
-	its own - a nino-text-* class on the element, or on what it stands in, is the page's, and Nino.css carries the one on what it stands in into the
-	titles and the subtitles. The boxes that are narrower than their column stand where the alignment says: a title as wide as its words and the
+	its own - a nino-text-* class on the element, or a left, centre or right on what it stands in, is the page's. The theme stands in a later layer than
+	Nino.css and would overrule the rule of Nino.css that carries the class on what the title stands in into the title, so it says it itself here. The boxes that are narrower than their column stand where the alignment says: a title as wide as its words and the
 	column of a text take the margins of the knob	*/
-:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud):where(:not([class*="nino-text-"])) {
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud):where(:not([class*="nino-text-"], :is(.nino-text-left, .nino-text-center, .nino-text-right) *)) {
 	text-align: var(--section-align);
 }
 :is(.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *)) {
@@ -2183,7 +2182,9 @@ footer a:focus-visible {
 	text-transform: var(--card-subtitle-case);
 }
 
-.nino-card-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
+/*	Not the content of a card that pads itself - the padding of a card is the card's, and Nino.css takes the content's away for it - so the room of the content is
+	asked for only where Nino.css leaves it: a card without padding, a card of the full width, and a content that is no card's	*/
+.nino-card-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"], .nino-card:where(:not(.nino-p-0, .nino-card--fullwidth)) > *)) {
 	padding: calc( var(--card-space) / 2 * var(--whitespace-scale, 1) ) calc( var(--card-space) * var(--whitespace-scale, 1) );
 }
 .nino-card-title:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
