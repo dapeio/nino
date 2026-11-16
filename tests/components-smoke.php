@@ -3548,6 +3548,7 @@ check( '...where the website has no address [[url]] is the path alone, as [[src]
 	&& $render( '[image /template/page-home/hero/empty]<meta content="[[url]]">[/image]' ) === ''
 	&& $render( '[card-image /template/page-home/hero/background]<meta content="[[url]]">[/card-image]' ) === '<meta content="/public/images/bg.1600x900.jpg">' );
 // The templates that ship write it: the head of a page under /sub carries og:image and twitter:image with the directory once
+\Nino\Html::init( $appData );
 $appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 500, 'height' => 100, 'filename' => 'logo.500x100.png' ];
 $shipped = [ 'head' => '/_admin/install/library/base/templates/html-header.tpl', 'mail' => '/_nino/Nino/Modules/Form/install/templates/mail-header.tpl' ];
 $shippedHead = (string) file_get_contents( dirname( __DIR__ ). $shipped['head'] );

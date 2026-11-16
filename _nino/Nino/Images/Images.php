@@ -892,6 +892,82 @@ namespace Nino {
 		}
 
 		/**
+		 *	The picture a reference names: in a loop, a name that is a field of the type image in the model
+		 *	of the element is the file that field holds; anything else is the uri of a slot. What the picture
+		 *	is drawn as is the caller's business, and so is the alt text it chooses: this gives the one
+		 *	stored with the picture. A value is never read as a call: the answer is data, and the caller
+		 *	escapes what it writes.
+		 *
+		 *	The names are stored values and are not trusted: a filename that is empty, absolute or climbs out
+		 *	with '..' names no picture, as read() and delete() refuse it (a null byte is left to dimensions(), which
+		 *	answers no size for it, so that such a name draws the box of its field), and a reference that
+		 *	is no slot is none, whatever it looks like - the slots are looked up by name, never by path.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$reference		The uri of a slot, or the name of an image field of the element
+		 *	@param		array|null	$element			The element of the loop the reference is read in, [ 'element' => the element,
+		 *																	'model' => the type's model ] as \Nino\Components hands a loop's element on, or null
+		 *
+		 *	@return 	array|null							[ 'url', 'width', 'height', 'alt' ] - the url as getUrl() writes it, the alt text as it is stored
+		 *																	for the language of the page and '' where there is none; null where the slot has no file,
+		 *																	the field holds none, or the reference names nothing
+		 */
+		public static function picture( array &$appData, string $reference, ?array $element ): ?array {
+
+			if( $reference === '' )
+				return null;
+
+			if( $element !== null && $reference[0] !== '/' && ( $element['model'][$reference]['type'] ?? '' ) === 'image' ) {
+
+				$filename = $element['element'][$reference] ?? '';
+
+				if( is_string( $filename ) === false || self::_named( $filename ) === false )
+					return null;
+
+				$link		= $element['model'][$reference]['alt'] ?? null;
+				$stored	= is_string( $link ) === true ? ( $element['element'][$link] ?? '' ) : '';
+
+				// The field's box is the size of a picture cut to it; one set into
+				// the box (fit) has the size its file has - the field's, or a file
+				// that carries the name of one, whatever the field says today
+				$fits = ( $element['model'][$reference]['fit'] ?? false ) === true || preg_match( '/\.fit\d+x\d+\.[a-z0-9]+$/D', $filename ) === 1;
+				$size = $fits === true ? self::dimensions( $appData, $filename ) : false;
+
+				return [
+					'url'			=> self::getUrl( $appData, $filename ),
+					'width'		=> $size !== false ? $size['width'] : (int) ( $element['model'][$reference]['width'] ?? 0 ),
+					'height'	=> $size !== false ? $size['height'] : (int) ( $element['model'][$reference]['height'] ?? 0 ),
+					'alt'			=> is_string( $stored ) === true ? $stored : '',
+				];
+			}
+
+			$slot = self::getSlot( $appData, $reference );
+
+			if( $slot === false || is_string( $slot['filename'] ?? null ) === false || self::_named( $slot['filename'] ) === false )
+				return null;
+
+			$stored = $slot['alt'][ \Nino\Locales::getCurrentLocale( $appData ) ] ?? '';
+
+			return [
+				'url'			=> self::getUrl( $appData, $slot['filename'] ),
+				'width'		=> (int) ( $slot['width'] ?? 0 ),
+				'height'	=> (int) ( $slot['height'] ?? 0 ),
+				'alt'			=> is_string( $stored ) === true ? $stored : '',
+			];
+		}
+
+		/**
+		 *	Whether a stored filename can name a file below /images/: not empty, not absolute, no '..'
+		 *
+		 *	@param		string		$filename
+		 *
+		 *	@return 	bool
+		 */
+		private static function _named( string $filename ): bool {
+			return $filename !== '' && str_contains( $filename, '..' ) === false && str_starts_with( $filename, '/' ) === false;
+		}
+
+		/**
 		 *	Every developer-fixed image slot ("/nino/html/images" in config.php).
 		 *	The set and the values are two panes, the same split Element Types and
 		 *	Elements have: the Image Slots tab creates a slot, edits its label and

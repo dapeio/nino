@@ -714,6 +714,141 @@ $appData['./nino/locales/current'] = 'de_DE';
 unset( $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
 unset( $appData['./nino/html/cache'] );
 
+// --- Images::picture and [imagevalues] ------------------------------------
+
+echo "\nImages::picture / [imagevalues]\n";
+
+\Nino\Html::init( $appData );
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => 'Haus am See', 'en_US' => 'House' ] );
+$appData['./nino/locales/current'] = 'de_DE';
+
+// The element of a loop, as \Nino\Components hands it on: [ 'uri', 'id', 'element', 'model' ]
+$fitFile = 'marks/fit.fit400x300.png';
+\Nino\Filesystem::putFileContent( $appData, '/images/'. $fitFile, makeTestImage( 120, 40, true ) );
+$loopModel = [
+	'photo'		=> [ 'type' => 'image', 'width' => 400, 'height' => 300, 'alt' => 'photoAlt' ],
+	'photoAlt'	=> [ 'type' => 'string', 'locale' => true ],
+	'mark'		=> [ 'type' => 'image', 'width' => 400, 'height' => 300, 'fit' => true ],
+	'title'		=> [ 'type' => 'string' ],
+];
+$loopElement = static fn( array $fields ): array => [ 'uri' => '/marks', 'id' => 0, 'element' => $fields, 'model' => $loopModel ];
+$field = $loopElement( [ 'photo' => 'marks/a.400x300.jpg', 'photoAlt' => 'Ein Foto', 'mark' => $fitFile, 'title' => 'T' ] );
+
+check( 'picture() of a slot is its file, its size and the alt text stored for the language of the page', \Nino\Images::picture( $appData, 'hero', null )
+	=== [ 'url' => '/public/images/hero.1600x600.jpg', 'width' => 1600, 'height' => 600, 'alt' => 'Haus am See' ] );
+$appData['./nino/locales/current'] = 'en_US';
+check( '...in the language of the page', \Nino\Images::picture( $appData, 'hero', null )['alt'] === 'House' );
+$appData['./nino/locales/current'] = 'fr_FR';
+check( '...and none where nothing is stored for it', \Nino\Images::picture( $appData, 'hero', null )['alt'] === '' );
+$appData['./nino/locales/current'] = 'de_DE';
+check( 'picture() is null for a slot with no file, a slot nobody defined and a reference that is nothing',
+	\Nino\Images::picture( $appData, 'logo', null ) === null && \Nino\Images::picture( $appData, 'nope', null ) === null && \Nino\Images::picture( $appData, '', null ) === null );
+check( '...a slot is looked up by its name, never as a path: a way out of the directory finds nothing, and a name that holds a null byte is no slot', \Nino\Images::picture( $appData, '/../../config', null ) === null
+	&& \Nino\Images::picture( $appData, "hero\0", null ) === null && \Nino\Images::picture( $appData, '../hero', $field ) === null );
+
+check( 'picture() of an image field of the element is the file the field holds, the size of its box and the alt text of the field the model links it to',
+	\Nino\Images::picture( $appData, 'photo', $field ) === [ 'url' => '/public/images/marks/a.400x300.jpg', 'width' => 400, 'height' => 300, 'alt' => 'Ein Foto' ] );
+check( '...a field that fits is the size its file has', \Nino\Images::picture( $appData, 'mark', $field ) === [ 'url' => '/public/images/'. $fitFile, 'width' => 120, 'height' => 40, 'alt' => '' ] );
+check( '...a field that holds nothing, a name that is no field, a field that is no image and a field that is no string are none',
+	\Nino\Images::picture( $appData, 'photo', $loopElement( [ 'photo' => '' ] ) ) === null && \Nino\Images::picture( $appData, 'photo', $loopElement( [] ) ) === null
+	&& \Nino\Images::picture( $appData, 'title', $field ) === null && \Nino\Images::picture( $appData, 'photo', $loopElement( [ 'photo' => [ 'marks/a.jpg' ] ] ) ) === null
+	&& \Nino\Images::picture( $appData, 'photo', null ) === null );
+check( '...a slot is still a slot in a loop: what is no field of the element is looked up as the uri of one, and one that starts with a slash never is a field',
+	\Nino\Images::picture( $appData, 'hero', $field )['url'] === '/public/images/hero.1600x600.jpg' && \Nino\Images::picture( $appData, '/hero', $field ) === null );
+check( '...and a stored file name that is empty, absolute or climbs out of the directory names no picture - in a field and in a slot',
+	\Nino\Images::picture( $appData, 'photo', $loopElement( [ 'photo' => '../../config.php' ] ) ) === null && \Nino\Images::picture( $appData, 'photo', $loopElement( [ 'photo' => 'a/../../b.jpg' ] ) ) === null
+	&& \Nino\Images::picture( $appData, 'photo', $loopElement( [ 'photo' => '/etc/passwd' ] ) ) === null
+	&& ( static function() use ( &$appData ): bool {
+		$appData['/nino/html/images']['up'] = [ 'label' => 'Up', 'width' => 1, 'height' => 1, 'filename' => '../../config.php' ];
+		$appData['/nino/html/images']['abs'] = [ 'label' => 'Abs', 'width' => 1, 'height' => 1, 'filename' => '/etc/passwd' ];
+		$appData['/nino/html/images']['odd'] = [ 'label' => 'Odd', 'width' => 1, 'height' => 1, 'filename' => [ 'x' ] ];
+		$none = \Nino\Images::picture( $appData, 'up', null ) === null && \Nino\Images::picture( $appData, 'abs', null ) === null && \Nino\Images::picture( $appData, 'odd', null ) === null;
+		unset( $appData['/nino/html/images']['up'], $appData['/nino/html/images']['abs'], $appData['/nino/html/images']['odd'] );
+		return $none;
+	} )() );
+
+// [imagevalues]: the content, drawn with the values of the picture
+\Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'example.com', '[[/project/company/general/name]]' => 'ACME' ], '*' );
+$values = '<m u="[[url]]" s="[[src]]" w="[[width]]" h="[[height]]" a="[[alt]]">';
+check( '[imagevalues] draws its content with [[url]], [[src]], [[width]], [[height]] and [[alt]] of the picture of the slot',
+	\Nino\Html::renderHtml( $appData, '[imagevalues hero]'. $values. '[/imagevalues]' )
+	=== '<m u="https://example.com/public/images/hero.1600x600.jpg" s="/public/images/hero.1600x600.jpg" w="1600" h="600" a="Haus am See">' );
+check( '...a fill and a shortcode in the content are drawn as they are anywhere', \Nino\Html::renderHtml( $appData, '[imagevalues hero]<i>[[/project/company/general/name]][spacer size="2"]</i>[/imagevalues]' )
+	=== '<i>ACME'. \Nino\Html::renderHtml( $appData, '[spacer size="2"]' ). '</i>' );
+check( '...and nothing at all - no content, no empty tag - for a slot with no file, a slot that is not there, a call with no slot and a call with no content',
+	\Nino\Html::renderHtml( $appData, '[imagevalues logo]'. $values. '[/imagevalues]' ) === '' && \Nino\Html::renderHtml( $appData, '[imagevalues nope]'. $values. '[/imagevalues]' ) === ''
+	&& \Nino\Html::renderHtml( $appData, '[imagevalues]'. $values. '[/imagevalues]' ) === '' && \Nino\Html::renderHtml( $appData, '[imagevalues hero][/imagevalues]' ) === '' );
+$appData['/nino/dir'] = '/sub';
+\Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'example.com/sub' ], '*' );
+check( '...[[src]] carries the directory the project is served from and [[url]] names it once; where the website has no address [[url]] is the path as [[src]] has it',
+	\Nino\Html::renderHtml( $appData, '[imagevalues hero]<m u="[[url]]" s="[[src]]">[/imagevalues]' ) === '<m u="https://example.com/sub/public/images/hero.1600x600.jpg" s="/sub/public/images/hero.1600x600.jpg">'
+	&& ( static function() use ( &$appData ): bool {
+		$bare = $appData;
+		\Nino\Html::removeFill( $bare, '/project/website/general/url' );
+		return \Nino\Html::renderHtml( $bare, '[imagevalues hero]<m u="[[url]]">[/imagevalues]' ) === '<m u="/sub/public/images/hero.1600x600.jpg">';
+	} )() );
+$appData['/nino/dir'] = '';
+\Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'example.com' ], '*' );
+
+// What the shipped templates write: the head of a page and the mail draw as the content form of [image] drew them
+$shippedLines = [];
+foreach( [ '/_admin/install/library/base/templates/html-header.tpl', '/_nino/Nino/Modules/Form/install/templates/mail-header.tpl' ] as $template )
+	foreach( explode( "\n", (string) file_get_contents( dirname( __DIR__ ). $template ) ) as $line )
+		if( str_contains( $line, '[imagevalues /logo]' ) === true )
+			$shippedLines[] = trim( $line );
+$appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 100, 'filename' => 'logo.400x100.png' ];
+$sameAsImage = count( $shippedLines ) === 3;
+foreach( $shippedLines as $line )
+	$sameAsImage = $sameAsImage && \Nino\Html::renderHtml( $appData, $line ) !== '' && \Nino\Html::renderHtml( $appData, $line ) === \Nino\Html::renderHtml( $appData, str_replace( [ '[imagevalues', '[/imagevalues]' ], [ '[image', '[/image]' ], $line ) );
+check( 'the three places that ask for the address of the logo - og:image, twitter:image and the mail - draw the same with [imagevalues] as with the content form of [image]', $sameAsImage === true );
+check( '...and nothing, no empty tag, without a logo', ( static function() use ( &$appData, $shippedLines ): bool {
+	$appData['/nino/html/images']['/logo']['filename'] = null;
+	$empty = true;
+	foreach( $shippedLines as $line )
+		$empty = $empty && \Nino\Html::renderHtml( $appData, $line ) === '';
+	return $empty;
+} )() );
+
+// A value is a value: never a call, a fill or the end of an attribute
+\Nino\Filesystem::putFileContent( $appData, '/templates/t.tpl', 'INCLUDED' );
+\Nino\Modules\Template::init( $appData );
+\Nino\Html::addFills( $appData, [ '[[/k]]' => 'FILLED' ], '*' );
+\Nino\Modules\Csrf::init( $appData );
+$hostile = 'x [csrf] [[/k]] [template /templates/t] [[width]] "><script>alert(1)</script> ] [/imagevalues]';
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => $hostile ] );
+$out = \Nino\Html::renderHtml( $appData, '[imagevalues hero]<m a="[[alt]]">[[alt]][/imagevalues]' );
+check( 'the alt text of an editor is text: escaped, not a csrf field, not a fill, not a template, not a token of the picture, and no end of the shortcode or of the attribute',
+	$out === '<m a="'. \Nino\Components::escape( $hostile ). '">'. \Nino\Components::escape( $hostile )
+	&& str_contains( $out, '<script>' ) === false && str_contains( $out, '_csrf' ) === false && str_contains( $out, 'FILLED' ) === false && str_contains( $out, 'INCLUDED' ) === false
+	&& str_contains( $out, '1600' ) === false );
+$appData['/nino/html/images']['evil'] = [ 'label' => 'Evil', 'width' => 3, 'height' => 4, 'filename' => 'a"><script>x</script>]b[csrf].jpg' ];
+$out = \Nino\Html::renderHtml( $appData, '[imagevalues evil]<m u="[[url]]" s="[[src]]" w="[[width]]">[/imagevalues]' );
+check( 'an address with a quote, a tag, a bracket and a call in it is one value of the attribute it is written in', str_contains( $out, '<script>' ) === false && str_contains( $out, '_csrf' ) === false
+	&& preg_match( '#^<m u="[^"]*" s="[^"]*" w="3">$#', $out ) === 1 && str_contains( $out, 'a&quot;&gt;&lt;script&gt;x&lt;/script&gt;]b[csrf].jpg' ) === true );
+unset( $appData['/nino/html/images']['evil'] );
+check( 'a slot reference that is a path is a name that no slot has, and draws nothing', \Nino\Html::renderHtml( $appData, '[imagevalues /../../config]x[/imagevalues]' ) === ''
+	&& \Nino\Html::renderHtml( $appData, '[imagevalues ../hero]x[/imagevalues]' ) === '' );
+
+// In a loop: a name that is an image field of the element is the file the field holds
+$inLoop = static fn( string $source, array $element ): string => \Nino\Html::renderSource( $appData, $source, array_merge( \Nino\Html::context( $appData ), [ 'element' => $element ] ) );
+check( 'in a loop [imagevalues] reads an image field of the element: its file, the size of its box and the alt text of its field - and a name that is no field is a slot',
+	$inLoop( '[imagevalues photo]<m s="[[src]]" w="[[width]]" h="[[height]]" a="[[alt]]">[/imagevalues]', $field ) === '<m s="/public/images/marks/a.400x300.jpg" w="400" h="300" a="Ein Foto">'
+	&& $inLoop( '[imagevalues /hero]<m s="[[src]]">[/imagevalues]', $field ) === '' && $inLoop( '[imagevalues hero]<m s="[[src]]">[/imagevalues]', $field ) === '<m s="/public/images/hero.1600x600.jpg">' );
+$field['element']['photoAlt'] = 'Foto "<b>" [csrf] [[/k]]';
+check( '...an alt text an editor wrote in a field is text, too, and a field that holds no picture draws nothing',
+	$inLoop( '[imagevalues photo]<m a="[[alt]]">[/imagevalues]', $field ) === '<m a="Foto &quot;&lt;b&gt;&quot; [csrf] [[/k]]">'
+	&& $inLoop( '[imagevalues photo]x[/imagevalues]', $loopElement( [ 'photo' => '' ] ) ) === '' );
+check( '...and outside a loop a name that is a field is the uri of a slot nobody has', \Nino\Html::renderHtml( $appData, '[imagevalues photo]x[/imagevalues]' ) === '' );
+
+// One inside another: the tokens of the inner picture win, the outer ones stay visible, and a picture that is not there changes nothing
+$appData['/nino/html/images']['mark'] = [ 'label' => 'Mark', 'width' => 20, 'height' => 30, 'filename' => 'mark.20x30.png' ];
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => 'Haus' ] );
+check( 'a picture inside a picture is drawn with its own values, and the outer values stand beside them',
+	\Nino\Html::renderHtml( $appData, '[imagevalues hero]<a w="[[width]]">[imagevalues mark]<b w="[[width]]" h="[[height]]">[/imagevalues]<c w="[[width]]">[/imagevalues]' ) === '<a w="1600"><b w="20" h="30"><c w="1600">'
+	&& \Nino\Html::renderHtml( $appData, '[imagevalues hero]<a w="[[width]]">[imagevalues nope]<b w="[[width]]">[/imagevalues]<c w="[[width]]">[/imagevalues]' ) === '<a w="1600"><c w="1600">'
+	&& \Nino\Html::renderHtml( $appData, '[imagevalues nope]<a>[imagevalues hero]<b>[/imagevalues]</a>[/imagevalues]' ) === '' );
+check( '...and the tokens of a picture are not left behind where the shortcode ends', \Nino\Html::renderHtml( $appData, '[imagevalues hero]<a>[/imagevalues]<z w="[[width]]">' ) === '<a><z w="[[width]]">' );
+
 echo "\n";
 
 // --- Cleanup ------------------------------------------------------------

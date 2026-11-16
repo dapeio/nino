@@ -107,8 +107,8 @@ namespace Nino {
 		/**
 		 *	The value of the class attribute of a component's markup, from the
 		 *	argument every shortcode may carry: '' where there is none, otherwise
-		 *	a space and the classes, escaped as \Nino\Modules\Components::escape()
-		 *	escapes - a '[' is written as &#91;, so that the next rendering pass
+		 *	a space and the classes, escaped as \Nino\Components::escape()
+		 *	escapes and with a '[' written as &#91;, so that the next rendering pass
 		 *	cannot read it as a fill or a shortcode. The space in front is the
 		 *	point: a template spells the attribute with the classes it has itself
 		 *	and this behind them,
@@ -128,14 +128,14 @@ namespace Nino {
 
 			$class = trim( (string) ( $args['class'] ?? '' ) );
 
-			return $class === '' ? '' : ' '. \Nino\Modules\Components::escape( $class );
+			return $class === '' ? '' : ' '. str_replace( '[', '&#91;', \Nino\Components::escape( $class ) );
 		}
 
 		/**
 		 *	Whether a flag of a shortcode is on. A shortcode without a schema takes
 		 *	one two ways: a bare word - [copy block] - is on, and a named one -
 		 *	[copy block="no"] - is read by the words a component's bool attribute
-		 *	is read by, \Nino\Modules\Components::ON and OFF, case and a space
+		 *	is read by, \Nino\Components::ON and OFF, case and a space
 		 *	around the word ignored. Any other word, and a value that is no
 		 *	string, leave it to $default.
 		 *
@@ -169,10 +169,10 @@ namespace Nino {
 				slip and not another word	*/
 			$word = strtolower( trim( $raw ) );
 
-			if( in_array( $word, \Nino\Modules\Components::ON, true ) === true )
+			if( in_array( $word, \Nino\Components::ON, true ) === true )
 				return true;
 
-			return in_array( $word, \Nino\Modules\Components::OFF, true ) === true ? false : $default;
+			return in_array( $word, \Nino\Components::OFF, true ) === true ? false : $default;
 		}
 
 		/**

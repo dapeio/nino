@@ -97,7 +97,15 @@ foreach( $payloads as $what => $payload ) {
 	// The value of an attribute of a call of the page: a value, whatever it holds - a fill in it is put in, as the page has always had them, and nothing else is read
 	$html = $render( '[button text='. $quoted( $payload ). ' href="#"]' );
 	check( 'the value of an attribute that holds '. $what. ' is escaped text, and no call', $read( $html ) === false && $html === '<a class="nino-btn" href="#">'. $escaped( $shown ). '</a>' );
+
+	// The alt text and the file name of a picture, as the tokens of what [imagevalues] draws
+	$file = 'p/'. $payload. '.jpg';
+	$appData['/nino/html/images']['/safety'] = [ 'label' => 'Safety', 'width' => 5, 'height' => 6, 'filename' => $file, 'alt' => [ \Nino\Locales::getCurrentLocale( $appData ) => $payload ] ];
+	$html = $render( '[imagevalues /safety]<m s="[[src]]" a="[[alt]]">[[alt]][/imagevalues]' );
+	check( 'the alt text and the address of a picture that hold '. $what. ' are escaped text, whole, in the attribute and in the text, and no call', $read( $html ) === false
+		&& $html === '<m s="'. \Nino\Components::escape( \Nino\Images::getUrl( $appData, $file ) ). '" a="'. \Nino\Components::escape( $payload ). '">'. \Nino\Components::escape( $payload ) );
 }
+unset( $appData['/nino/html/images']['/safety'] );
 
 echo "\nThe label of a field and the subject of a mail are texts\n";
 

@@ -26,8 +26,8 @@ namespace Nino\Modules {
 		private static
 			$_tpl = [
 				'ul'	=> '<div class="nino-localepicker-wrap"><label><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 16 16" width="32" height="32" color="currentColor" aria-hidden="true"><g><path fill="currentColor" fill-rule="evenodd" d="M.017 7.482a8 8 0 0 1 15.967 0q.025.115.01.225a8 8 0 1 1-15.99 0 .6.6 0 0 1 .013-.225m1.247.951a6.75 6.75 0 0 0 4.197 5.823 7 7 0 0 1-.416-.781c-.555-1.213-.92-2.787-1.018-4.518a29 29 0 0 1-2.763-.524m2.739-.742a28 28 0 0 1-2.7-.535A6.76 6.76 0 0 1 5.46 1.744q-.229.372-.416.781c-.623 1.363-1.006 3.18-1.042 5.166Zm1.286 1.413c.109 1.516.436 2.852.893 3.85.59 1.292 1.28 1.796 1.818 1.796s1.228-.504 1.818-1.795c.457-1 .784-2.335.893-3.85-1.803.17-3.619.17-5.422 0Zm5.46-1.26a27.5 27.5 0 0 1-5.498 0c.018-1.904.38-3.596.93-4.799C6.774 1.755 7.462 1.25 8 1.25s1.228.504 1.818 1.795c.55 1.203.913 2.895.931 4.8Zm1.224 1.113c-.099 1.731-.463 3.305-1.018 4.518a7 7 0 0 1-.416.781 6.75 6.75 0 0 0 4.197-5.823q-1.372.33-2.763.524m2.725-1.801q-1.341.336-2.7.535c-.037-1.985-.42-3.803-1.043-5.166a7 7 0 0 0-.416-.781 6.76 6.76 0 0 1 4.159 5.412" clip-rule="evenodd"></path></g></svg><input type="checkbox" aria-label="[[/module/localepicker/menu/title]]"><div><p aria-hidden="true">[[/module/localepicker/menu/title]]:</p><ul aria-label="[[/module/localepicker/menu/title]]">[[li]]</ul></div><div class="nino-localepicker-bg"></div></label></div>',
-				'li'	=> '<li><a href="?/_nino/localepicker/current=[[locale]]" lang="[[lang]]" hreflang="[[lang]]">[[/_nino/locale/[[locale]]/name]]</a></li>',
-				'li-current'	=> '<li class="nino-is-active"><span aria-current="true" lang="[[lang]]">[[/_nino/locale/[[locale]]/name]]</span></li>',
+				'li'	=> '<li><a href="[[href]]" lang="[[lang]]" hreflang="[[lang]]">[[name]]</a></li>',
+				'li-current'	=> '<li class="nino-is-active"><span aria-current="true" lang="[[lang]]">[[name]]</span></li>',
 			];
 
 		/**
@@ -59,6 +59,44 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The languages of the site as data, for what draws the choice in a markup of its own: one entry for
+		 *	each available language, in the order the site lists them. [localepicker] draws its list from this
+		 *	function.
+		 *
+		 *	The values are raw - text, not markup: the caller escapes what it writes, and a name is never read as
+		 *	a call or a fill, whatever an editor typed into it. The address that switches to a language is the
+		 *	one this module answers: ?/_nino/localepicker/current=<locale>, a query of the page that is shown.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										A list of [ 'locale' => 'de_DE', 'lang' => the tag of it, 'de-DE', 'name' => the language in
+		 *																	its own tongue, as the text /_nino/locale/<locale>/name has it (decoded; the locale where
+		 *																	the site has no name for it), 'href' => the address that switches
+		 *																	to it, 'current' => whether it is the language of the page ]
+		 */
+		public static function entries( array &$appData ): array {
+
+			$current	= \Nino\Locales::getCurrentLocale( $appData );
+			$entries	= [];
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+
+				$name = \Nino\Html::resolveTextfill( $appData, '/_nino/locale/'. $locale. '/name' );
+
+				$entries[] = [
+					'locale'	=> $locale,
+					// A language tag is hyphenated - en-US - where the locale is en_US
+					'lang'		=> str_replace( '_', '-', $locale ),
+					'name'		=> $name === null || $name === '' ? $locale : html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
+					'href'		=> '?/_nino/localepicker/current='. $locale,
+					'current'	=> $current === $locale,
+				];
+			}
+
+			return $entries;
+		}
+
+		/**
 		 *	Replace shortcode - a leaf, which answers finished html
 		 *
 		 *	The fold-out is presentation: Nino.css draws a checkbox and a list as an
@@ -83,24 +121,31 @@ namespace Nino\Modules {
 			// warning, and the error handler turns that into a 500
 			$actLi					= '';
 			$htmlLi 				= '';
-			$currentLocale	= \Nino\Locales::getCurrentLocale( $appData );
 
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) AS $locale ) {
+			foreach( self::entries( $appData ) as $entry ) {
 
-				// A language tag is hyphenated - en-US - where the locale is en_US
-				$values = [ $locale, str_replace( '_', '-', $locale ) ];
+				// What the entry says is text, written escaped; a bracket in a name is no call, since what is
+				// filled in comes last and nobody reads it again
+				$values = array_map( static fn( string $value ): string => htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ), [ $entry['href'], $entry['lang'], $entry['name'] ] );
 
-				if( $currentLocale === $locale )
-					$actLi = str_replace( [ '[[locale]]', '[[lang]]' ], $values, self::$_tpl['li-current'] );
+				if( $entry['current'] === true )
+					$actLi = str_replace( [ '[[href]]', '[[lang]]', '[[name]]' ], $values, self::$_tpl['li-current'] );
 				else
-					$htmlLi .= str_replace( [ '[[locale]]', '[[lang]]' ], $values, self::$_tpl['li'] );
+					$htmlLi .= str_replace( [ '[[href]]', '[[lang]]', '[[name]]' ], $values, self::$_tpl['li'] );
 			}
 
-			// The words of the fragment - the title of the list, the name of each language - are fills of the site: put in
-			// here, as the text they are, since what a shortcode answers is read by nobody
-			$content = (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', static function( array $found ) use ( &$appData ): string {
-				return \Nino\Html::resolveTextfill( $appData, $found[1] ) ?? $found[0];
-			}, str_replace( [ '[[li]]' ], [ $actLi. $htmlLi ], self::$_tpl['ul'] ) );
+			// The words of the fragment - the title of the list - are fills of the site: put in here, as the text they
+			// are, since what a shortcode answers is read by nobody. The list is put in after them, so that what an
+			// editor typed as the name of a language is never read for a fill
+			$fill = static function( string $fragment ) use ( &$appData ): string {
+				return (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', static function( array $found ) use ( &$appData ): string {
+					return \Nino\Html::resolveTextfill( $appData, $found[1] ) ?? $found[0];
+				}, $fragment );
+			};
+
+			[ $before, $after ] = explode( '[[li]]', self::$_tpl['ul'], 2 );
+
+			$content = $fill( $before ). $actLi. $htmlLi. $fill( $after );
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $content );

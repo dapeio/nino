@@ -811,6 +811,7 @@ check( 'the home template renders the slot as an <img> with its size and an empt
 // The logo, which is a slot too: nothing in the shipped frames, the navigation
 // or the mail names a logo file, and with no logo uploaded none of them
 // leaves a broken <img> or an empty meta tag behind
+\Nino\Html::init( $appData );
 \Nino\Modules\Navigation::init( $appData );
 $logoFrames = static function( array &$appData ): array {
 	return [
@@ -823,9 +824,9 @@ $logoShipped = '';
 foreach( [ '/templates/frame-header.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl', '/templates/html-header-nav.tpl' ] as $logoTemplate )
 	$logoShipped .= (string) \Nino\Filesystem::getFileContent( $appData, $logoTemplate, '' );
 check( 'no shipped template names a logo file: every one asks the logo slots - the header and the navigation as [logo], the page head and the mail as the light slot alone', preg_match( '#images/logo#', $logoShipped ) === 0
-	&& substr_count( $logoShipped, '[logo' ) === 2 && substr_count( $logoShipped, '[image /logo' ) === 3
+	&& substr_count( $logoShipped, '[logo' ) === 2 && substr_count( $logoShipped, '[imagevalues /logo' ) === 3
 	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-header.tpl', '' ), '[logo alt=""]' ) === 1
-	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '[image /logo]' ) === 1
+	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '[imagevalues /logo]' ) === 1
 	&& str_contains( $logoShipped, '/logo/dark' ) === false );
 
 \Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'www.example.com', '[[/project/company/general/name]]' => 'Acme' ], '*' );

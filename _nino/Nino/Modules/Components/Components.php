@@ -2797,8 +2797,8 @@ namespace Nino\Modules {
 		 *	The picture a reference names, looked up the way [image] looks it up:
 		 *	in a stack, a name that is a field of the type image in the model of
 		 *	the element is the file that field holds; anything else is the uri of
-		 *	a slot. What the picture is drawn as is the caller's business, and so
-		 *	is the alt text it chooses: this gives the one stored with the picture
+		 *	a slot. The lookup is \Nino\Images::picture(), with the element the
+		 *	stack is drawing
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$reference		The uri of a slot, or the name of an image field of the element
@@ -2808,49 +2808,7 @@ namespace Nino\Modules {
 		 *																	the slot has no file and where the field holds none
 		 */
 		private static function _picture( array &$appData, string $reference ): ?array {
-
-			if( $reference === '' )
-				return null;
-
-			$context = self::element( $appData );
-
-			if( $context !== null && $reference[0] !== '/' && ( $context['model'][$reference]['type'] ?? '' ) === 'image' ) {
-
-				$filename = $context['element'][$reference] ?? '';
-
-				if( is_string( $filename ) === false || $filename === '' )
-					return null;
-
-				$link		= $context['model'][$reference]['alt'] ?? null;
-				$stored	= is_string( $link ) === true ? ( $context['element'][$link] ?? '' ) : '';
-
-				// The field's box is the size of a picture cut to it; one set into
-				// the box (fit) has the size its file has - the field's, or a file
-				// that carries the name of one, whatever the field says today
-				$fits = ( $context['model'][$reference]['fit'] ?? false ) === true || preg_match( '/\.fit\d+x\d+\.[a-z0-9]+$/D', $filename ) === 1;
-				$size = $fits === true ? \Nino\Images::dimensions( $appData, $filename ) : false;
-
-				return [
-					'url'			=> \Nino\Images::getUrl( $appData, $filename ),
-					'width'		=> $size !== false ? $size['width'] : (int) ( $context['model'][$reference]['width'] ?? 0 ),
-					'height'	=> $size !== false ? $size['height'] : (int) ( $context['model'][$reference]['height'] ?? 0 ),
-					'alt'			=> is_string( $stored ) === true ? $stored : '',
-				];
-			}
-
-			$slot = \Nino\Images::getSlot( $appData, $reference );
-
-			if( $slot === false || empty( $slot['filename'] ) === true )
-				return null;
-
-			$stored = $slot['alt'][ \Nino\Locales::getCurrentLocale( $appData ) ] ?? '';
-
-			return [
-				'url'			=> \Nino\Images::getUrl( $appData, $slot['filename'] ),
-				'width'		=> (int) ( $slot['width'] ?? 0 ),
-				'height'	=> (int) ( $slot['height'] ?? 0 ),
-				'alt'			=> is_string( $stored ) === true ? $stored : '',
-			];
+			return \Nino\Images::picture( $appData, $reference, self::element( $appData ) );
 		}
 
 		/**

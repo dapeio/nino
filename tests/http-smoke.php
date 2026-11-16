@@ -788,6 +788,28 @@ $pickerDe = \Nino\Html::renderHtml( $appData, \Nino\Modules\Localepicker::doShor
 check( '...and which one is the current one is the page\'s: in German it is Deutsch that is the span and English that is the link',
 	preg_match( '#<span aria-current="true" lang="de-DE">Deutsch</span>#', $pickerDe ) === 1 && preg_match( '#<a href="\?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English \(US\)</a>#', $pickerDe ) === 1 );
 
+// The languages as data: what [localepicker] draws its list from
+$pickerApp = $appData;
+check( 'entries() of the picker are the available languages in the order the site lists them: the code, its tag, its name, the address that switches to it, and which one is the page\'s',
+	\Nino\Modules\Localepicker::entries( $pickerApp ) === [
+		[ 'locale' => 'de_DE', 'lang' => 'de-DE', 'name' => 'Deutsch', 'href' => '?/_nino/localepicker/current=de_DE', 'current' => false ],
+		[ 'locale' => 'en_US', 'lang' => 'en-US', 'name' => 'English (US)', 'href' => '?/_nino/localepicker/current=en_US', 'current' => true ],
+	] );
+\Nino\Html::addFills( $pickerApp, [ '[[/_nino/locale/de_DE/name]]' => 'D &amp; E &quot;q&quot; [csrf] [template /templates/t]' ], '*' );
+$pickerRaw = array_column( \Nino\Modules\Localepicker::entries( $pickerApp ), 'name', 'locale' );
+check( '...a name is the text the site holds, decoded and not escaped: the caller escapes it, and [localepicker] does', $pickerRaw['de_DE'] === 'D & E "q" [csrf] [template /templates/t]'
+	&& str_contains( \Nino\Modules\Localepicker::doShortcode( $pickerApp, [] ), '>D &amp; E &quot;q&quot; [csrf] [template /templates/t]</a>' ) === true );
+\Nino\Html::addFills( $pickerApp, [ '[[/_nino/locale/de_DE/name]]' => 'x [[li]] y [[name]] [[href]]' ], '*' );
+$pickerLi = \Nino\Modules\Localepicker::doShortcode( $pickerApp, [] );
+check( '...and no token of the fragment is read in a name: the list is not put in twice and the name of a language is not filled in again', substr_count( $pickerLi, '<li' ) === 2 && str_contains( $pickerLi, '>x [[li]] y [[name]] [[href]]</a>' ) === true );
+\Nino\Html::addFills( $pickerApp, [ '[[/_nino/locale/de_DE/name]]' => 'a [[/_nino/locale/de_DE/name]]' ], '*' );
+$pickerSelf = array_column( \Nino\Modules\Localepicker::entries( $pickerApp ), 'name', 'locale' )['de_DE'];
+check( '...a name that holds a fill that is its own is the text the fills make of it, and the page reads no more of it than the entry says',
+	str_contains( $pickerSelf, '[[/_nino/locale/de_DE/name]]' ) === true && str_contains( \Nino\Modules\Localepicker::doShortcode( $pickerApp, [] ), '>'. $pickerSelf. '</a>' ) === true );
+$pickerApp['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
+check( '...a language the site has no name for is named by its code', array_column( \Nino\Modules\Localepicker::entries( $pickerApp ), 'name', 'locale' )['fr_FR'] === 'fr_FR'
+	&& array_column( \Nino\Modules\Localepicker::entries( $pickerApp ), 'locale' ) === [ 'de_DE', 'en_US', 'fr_FR' ] );
+
 /*	The two switches are one method under two keys now. Modules\Localepicker's
 	callback used to be a verbatim copy of the kernel's - every line and every
 	comment, differing in the query key alone - which is two places to fix
@@ -1298,6 +1320,42 @@ check( '...a burger with no id of its own names its list after its place on the 
 check( '...and the menu that is not a burger has no button and nothing to name: it is the list it is', str_contains( $navHtml, '<button' ) === false && str_contains( $navHtml, 'aria-controls' ) === false );
 check( 'an empty shortcode renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [] ) === '' );
 check( 'an unknown menu key renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'nope' ] ) === '' );
+
+// The entries of a menu as data: what [navigation] draws its generated lines from, for a component that draws the menu in a markup of its own
+$entriesApp = $appData;
+check( 'entries() are the routes of a menu as data - the address, the title, whether it is the page that is shown - in menu order, and nothing is escaped or drawn',
+	\Nino\Modules\Navigation::entries( $entriesApp, 'main' ) === [
+		[ 'href' => '/top', 'title' => 'Top', 'current' => false ],
+		[ 'href' => '/', 'title' => 'Home', 'current' => true ],
+		[ 'href' => '/kontakt', 'title' => 'Contact', 'current' => false ],
+	] && \Nino\Modules\Navigation::entries( $entriesApp, 'nope' ) === [] );
+$entriesApp['/nino/dir'] = '/shop';
+check( '...the address of a route is reached under the directory the project is served from, once', array_column( \Nino\Modules\Navigation::entries( $entriesApp, 'main' ), 'href' ) === [ '/shop/top', '/shop/', '/shop/kontakt' ] );
+$entriesApp['/nino/dir'] = '';
+\Nino\Html::addFills( $entriesApp, [ '/_nino/webpage/top/name' => 'Sale &amp; Co: &lt;b&gt;&quot;x&quot;&lt;/b&gt; [csrf] [[/k]]' ], 'en_US' );
+$entriesRaw = \Nino\Modules\Navigation::entries( $entriesApp, 'main' )[0]['title'];
+check( '...a title is the text an editor typed - the entities it is stored with decoded, a colon and a bracket in it kept - and the caller escapes it',
+	$entriesRaw === 'Sale & Co: <b>"x"</b> [csrf] [[/k]]' );
+$entriesHtml = \Nino\Modules\Navigation::doShortcode( $entriesApp, [ 'nav' => 'main' ] );
+check( '[navigation] draws its generated entries from them, escaped with every bracket an entity: no tag, no call and no fill comes out of a title',
+	str_contains( $entriesHtml, '<li><a href="/top">Sale &amp; Co: &lt;b&gt;&quot;x&quot;&lt;/b&gt; &#91;csrf&#93; &#91;&#91;/k&#93;&#93;</a></li>' ) === true && str_contains( $entriesHtml, '<b>' ) === false );
+\Nino\Callbacks::registerCallback( $entriesApp, '/nino/navigation/lines', static function( array &$appData, array &$args ): void {
+	if( $args['nav'] === 'main' )
+		$args['lines'] = [ '/a"b]:A', 'a line [csrf]', '   ', '#frag:Out', '//cdn.example/y:Cdn', '/z:' ];
+} );
+$entriesLines = \Nino\Modules\Navigation::entries( $entriesApp, 'main' );
+check( 'a line a callback left is read the way a hand-written one is: an address that names somewhere else is not moved under the directory, a line with no address is an entry without one, a blank one is none',
+	$entriesLines === [
+		[ 'href' => '/a"b]', 'title' => 'A', 'current' => false ],
+		[ 'href' => '', 'title' => 'a line [csrf]', 'current' => false ],
+		[ 'href' => '#frag', 'title' => 'Out', 'current' => false ],
+		[ 'href' => '//cdn.example/y', 'title' => 'Cdn', 'current' => false ],
+		[ 'href' => '/z', 'title' => '', 'current' => false ],
+	] );
+$entriesHtml = \Nino\Modules\Navigation::doShortcode( $entriesApp, [ 'nav' => 'main' ] );
+check( '...and [navigation] writes the address as an attribute value, a line without one as text',
+	str_contains( $entriesHtml, '<a href="/a&quot;b&#93;">A</a>' ) === true && str_contains( $entriesHtml, '<div>a line &#91;csrf&#93;</div>' ) === true && str_contains( $entriesHtml, '<a href="//cdn.example/y">Cdn</a>' ) === true );
+
 
 // A page's name is editor content, and a line is '<uri>:<title>'. Splitting
 // on every ':' made the second colon of a perfectly ordinary name ("Angebot:

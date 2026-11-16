@@ -35,6 +35,9 @@ namespace Nino\Modules {
 				'div'					=> '<div>[[content]]</div>',
 			];
 
+		// What marks the entry of the page that is shown
+		private const string CURRENT = ' class="nino-is-active" aria-current="page"';
+
 		// How many burgers without an id this request has drawn: the id of the
 		// list its button names is made from it
 		private const string COUNTER = './nino/navigation/count';
@@ -96,22 +99,22 @@ namespace Nino\Modules {
 			// Render list elements
 			$lis	= '';
 
-			/*	Two sources, and they are not read the same way. A generated line
-				carries a page's name, which is editor content: everything after
-				the first ':' is that name, colons and all, and it is escaped on
-				the way into the page. A hand-written line is the template
-				author's own, so it keeps the third field it has always had -
-				attributes for the tag - and keeps being written verbatim	*/
-			$lines = [];
+			/*	Two sources, and they are not read the same way. A generated entry
+				carries a page's name, which is editor content: it is the text of
+				entries(), and it is escaped on the way into the page. A hand-written
+				line is the template author's own, so it keeps the third field it
+				has always had - attributes for the tag - and keeps being written
+				verbatim	*/
+			$items = [];
 
-			foreach( ( $nav !== '' ) ? self::routeLines( $appData, (string) $nav ) : [] as $line )
-				$lines[] = [ 'line' => $line, 'authored' => false ];
+			foreach( ( $nav !== '' ) ? self::entries( $appData, (string) $nav ) : [] as $entry )
+				$items[] = [ 'entry' => $entry ];
 
 			if( $content !== '' )
 				foreach( explode( PHP_EOL, $content ) as $line )
-					$lines[] = [ 'line' => $line, 'authored' => true ];
+					$items[] = [ 'line' => $line ];
 
-			if( count( $lines ) === 0 )
+			if( count( $items ) === 0 )
 				return '';
 
 			// The counter runs before the lines are drawn: a menu inside a line of another is the second
@@ -123,9 +126,8 @@ namespace Nino\Modules {
 				$list = ( $id !== '' ? $id : 'nino-nav-'. $appData[self::COUNTER] ). '-list';
 			}
 
-			// A generated entry names its page the way the routes do, from the
-			// project's root; the page is reached under the directory the
-			// project is served from. A hand-written line that already names
+			// An entry names its page the way the routes do, from the project's root; the page is reached
+			// under the directory the project is served from. A hand-written line that already names
 			// somewhere else (a full url, a fragment) is written as it stands
 			$dir = rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
 
@@ -135,10 +137,29 @@ namespace Nino\Modules {
 				return \Nino\Html::renderSource( $appData, $source, $context );
 			};
 
-			foreach( $lines as $entry ) {
+			// What an editor's words are written as: text, with every bracket an entity, the same swap every other
+			// place their words reach a page makes
+			$text = static function( string $value ): string {
+				return str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
+			};
 
-				$line 		= $entry['line'];
-				$authored	= $entry['authored'];
+			foreach( $items as $item ) {
+
+				// A generated entry: its address and its title are the text they are
+				if( isset( $item['entry'] ) === true ) {
+
+					$entry = $item['entry'];
+
+					// An entry without an address is a line a callback left behind: text, escaped the way a title is
+					if( $entry['href'] === '' )
+						$html .= str_replace( '[[content]]', $text( $entry['title'] ), self::$html['div'] );
+					else
+						$lis .= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $text( $entry['href'] ), $entry['current'] === true ? self::CURRENT : '', $text( $entry['title'] ) ], self::$html['li'] );
+
+					continue;
+				}
+
+				$line = $item['line'];
 
 				// Blank, not just empty: with the list coming from the routes,
 				// what stands between the tags is usually nothing but the
@@ -148,48 +169,19 @@ namespace Nino\Modules {
 					continue;
 
 				if( strpos( $line, ':' ) === false ) {
-
-					// A line a callback left behind is text, whether it has a
-					// colon or not: it is escaped the way a generated title is
-					if( $authored === false )
-						$line = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], htmlspecialchars( $line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
-					else
-						$line = $draw( $line );
-
-					$html .= str_replace( '[[content]]', $line, self::$html['div'] );
+					$html .= str_replace( '[[content]]', $draw( $line ), self::$html['div'] );
 					continue;
 				}
 
-				// A generated line is split once: a page called "Angebot: Sommer"
-				// used to end at the second colon, and the rest of its own name
-				// was written into the <a> tag as attributes - a name typed in
-				// the Text panel deciding what the markup says
-				$element		= explode( ':', $line, $authored === true ? 3 : 2 );
+				// A hand-written line stays what its author wrote - drawn, each of its three parts as the source it is
+				$element		= explode( ':', $line, 3 );
 				$uri				= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
-				$attributes = $element[2] ?? '';
-				$element[0]	= trim( $element[0] );
-				$title			= $element[1] ?? '';
+				$element[0]	= $draw( trim( $element[0] ) );
+				$title			= $draw( $element[1] ?? '' );
+				$attributes	= $draw( $element[2] ?? '' );
 
-				// And a page's name is text: a '<' an editor typed is a '<' on
-				// the page, the same rule every other place their words reach one
-				// follows. A hand-written line stays what its author wrote - drawn,
-				// each of its three parts as the source it is
-				if( $authored === false ) {
-					$title			= htmlspecialchars( $title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
-					$element[0]	= htmlspecialchars( $element[0], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
-					// ...and a '[' is an entity on the way out, the same swap every
-					// other place an editor's words reach a page makes
-					$title			= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $title );
-					$element[0]	= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $element[0] );
-				}
-				else {
-					$title			= $draw( $title );
-					$element[0]	= $draw( $element[0] );
-					$attributes	= $draw( $attributes );
-				}
-
-				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active" aria-current="page"' : '';
-				$href				= ( str_starts_with( $element[0], '/' ) === true && str_starts_with( $element[0], '//' ) === false ) ? $dir. $element[0] : $element[0];
+				$attributes	.= ( $uri === $element[0] ) ? self::CURRENT : '';
+				$href				= self::_address( $dir, $element[0] );
 				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $href, $attributes, $title ], self::$html['li'] );
 			}
 			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
@@ -208,6 +200,66 @@ namespace Nino\Modules {
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
 
 			return $result;
+		}
+
+		/**
+		 *	The entries of one navigation as data, for what draws a menu in a markup of its own: the routes that
+		 *	put themselves into it (routeLines(), so '/nino/navigation/lines' has had its say), in menu order. The
+		 *	hand-written lines between the tags of [navigation] are not part of it.
+		 *
+		 *	The values are raw - text, not markup: the caller escapes what it writes, for the place it writes it
+		 *	to, and a title is never read as a call or a fill. The title is the page's name as an editor typed it
+		 *	(the entities it is stored with are decoded), whatever it holds. [navigation] draws its generated
+		 *	entries from this function and escapes them, with every bracket an entity.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$nav					Navigation key, eg. "main"
+		 *
+		 *	@return 	array										A list of [ 'href' => the address as a link takes it: the path from the project's
+		 *																	root with the directory the project is served from in front of it, '' for a line a
+		 *																	callback left behind that has none, 'title' => the text, 'current' => whether it is the
+		 *																	page that is shown ]
+		 */
+		public static function entries( array &$appData, string $nav ): array {
+
+			$dir		= rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
+			$shown	= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
+			$entries	= [];
+
+			foreach( self::routeLines( $appData, $nav ) as $line ) {
+
+				// Blank, as a hand-written line is
+				if( trim( $line ) === '' )
+					continue;
+
+				// A line is split once: a page called "Angebot: Sommer" ends at the first colon, and the rest of
+				// its own name is its name
+				if( strpos( $line, ':' ) === false ) {
+					$entries[] = [ 'href' => '', 'title' => $line, 'current' => false ];
+					continue;
+				}
+
+				[ $address, $title ] = explode( ':', $line, 2 );
+
+				$address = trim( $address );
+
+				$entries[] = [ 'href' => self::_address( $dir, $address ), 'title' => $title, 'current' => $shown === $address ];
+			}
+
+			return $entries;
+		}
+
+		/**
+		 *	The address of a link: a path from the project's root is reached under the directory the project is
+		 *	served from, anything else - a full url, a fragment, '//host' - is as it is written
+		 *
+		 *	@param		string		$dir					The directory, without a slash at the end
+		 *	@param		string		$address
+		 *
+		 *	@return 	string
+		 */
+		private static function _address( string $dir, string $address ): string {
+			return ( str_starts_with( $address, '/' ) === true && str_starts_with( $address, '//' ) === false ) ? $dir. $address : $address;
 		}
 
 		/**

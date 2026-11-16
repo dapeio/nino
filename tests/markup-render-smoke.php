@@ -182,7 +182,7 @@ foreach( \Nino\Html::shortcodes( $appData ) as $name )
 $pick = static fn( array $names ): array => array_map( static fn( string $name ): mixed => array_key_exists( $name, $flags ) === true ? $flags[$name] : 'not registered', array_combine( $names, $names ) );
 check( 'the kernel says what each of its shortcodes is: a leaf, a container, or both',
 	array_values( array_unique( $pick( [ 'template', 'csrf', 'json', 'localepicker', 'title', 'subtitle', 'card-title', 'card-subtitle', 'text', 'card-text', 'button', 'spacer', 'line', 'scroll-hint' ] ), SORT_REGULAR ) ) === [ false ]
-	&& array_values( array_unique( $pick( [ 'element', 'elements', 'elementvalues', 'card', 'html', 'panel' ] ), SORT_REGULAR ) ) === [ true ]
+	&& array_values( array_unique( $pick( [ 'element', 'elements', 'elementvalues', 'imagevalues', 'card', 'html', 'panel' ] ), SORT_REGULAR ) ) === [ true ]
 	&& array_values( array_unique( $pick( [ 'navigation', 'image', 'card-image', 'col', 'logo', 'stack', 'repeat', 'slider', 'filter', 'list', 'sections', 'tabs', 'accordion', 'table' ] ), SORT_REGULAR ) ) === [ null ] );
 
 check( 'a feature that registers a shortcode says what it is, and a component of the module keeps its own say', ( static function() use ( &$appData ): bool {

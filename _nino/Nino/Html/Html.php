@@ -80,11 +80,13 @@ namespace Nino {
 
 		// The shortcodes the kernel provides itself. Called unconditionally
 		// from \Nino\init(), same as Csrf::init() - the base templates use
-		// [json] in their schema.org block, so it has to be there whichever
-		// optional modules a project has enabled (or removed).
+		// [json] in their schema.org block and [imagevalues] in the head of the
+		// page, so they have to be there whichever optional modules a project
+		// has enabled (or removed).
 		public static function init( array &$appData ): void {
 
 			self::addShortcode( $appData, 'json', [ self::class, 'doJsonShortcode' ], false );
+			self::addShortcode( $appData, 'imagevalues', [ self::class, 'doImageValuesShortcode' ], true );
 		}
 
 		public static function response( array &$appData, array &$request ): void {
@@ -128,6 +130,65 @@ namespace Nino {
 			$value = self::resolveTextfill( $appData, (string) ( $args[0] ?? '' ) ) ?? '';
 
 			return (string) json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+		}
+
+		/**
+		 *	[imagevalues /logo]...[/imagevalues] - what stands between the tags, drawn with the values of one
+		 *	picture, and nothing where there is none: a meta tag or a mail writes its address only when a file
+		 *	is uploaded, and is left out, not left empty, where nothing is. The picture is what
+		 *	\Nino\Images::picture() finds for the first argument - the uri of a slot or, in a loop, the name of an
+		 *	image field of its element - and the values are tokens of the context the content is drawn in:
+		 *
+		 *		[[src]]			the path of the file, with the directory the project is served from in front of it - what an <img> takes
+		 *		[[url]]			the absolute address of the file, the website's address and the path with the directory once, as
+		 *								absoluteUrl() writes it; the path as [[src]] has it where the website has no address. What a meta
+		 *								tag or a mail takes, and never "https://[[/project/website/general/url]][[src]]", which names the
+		 *								directory twice under a subdirectory
+		 *		[[width]]		the width in pixels, 0 where nothing is known
+		 *		[[height]]	the height
+		 *		[[alt]]			the alt text stored with the picture for the language of the page, '' where there is none
+		 *
+		 *	Each is escaped for html text and for the value of an attribute. No value is put into the text that
+		 *	is read for calls: a '[' of an alt text, a ']' or a quote of an address is a character of that value
+		 *	and never a call, a fill or the end of an attribute, whatever an editor wrote. Where the shortcode
+		 *	stands inside another, the tokens of the outer one stay visible and the ones of this picture win
+		 *	over them; a picture that is not there draws nothing, and the outer tokens are not changed by it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments, $args[0] is the slot or the field, $args['content'] what is drawn
+		 *
+		 *	@return 	string									Rendered html, '' for a picture that is not there
+		 */
+		public static function doImageValuesShortcode( array &$appData, array $args ): string {
+
+			$content = (string) ( $args['content'] ?? '' );
+
+			if( $content === '' )
+				return '';
+
+			$context = self::context( $appData );
+			$picture = \Nino\Images::picture( $appData, (string) ( $args[0] ?? '' ), is_array( $context['element'] ?? null ) === true ? $context['element'] : null );
+
+			if( $picture === null )
+				return '';
+
+			// The absolute address is the website's, which carries the directory, and the path of the file
+			// without the one the picture's own address starts with
+			$dir	= rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
+			$path	= $dir !== '' && str_starts_with( $picture['url'], $dir. '/' ) === true ? substr( $picture['url'], strlen( $dir ) ) : $picture['url'];
+
+			$values = [
+				'[[src]]'		=> $picture['url'],
+				'[[url]]'		=> self::absoluteUrl( $appData, $path ) ?: $picture['url'],
+				'[[width]]'		=> (string) $picture['width'],
+				'[[height]]'	=> (string) $picture['height'],
+				'[[alt]]'		=> $picture['alt'],
+			];
+
+			foreach( $values as $token => $value )
+				$context['fills'][$token] = \Nino\Components::escape( $value );
+
+			return self::renderSource( $appData, $content, $context, false );
 		}
 
 		/**
