@@ -31,6 +31,8 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
+	'[[/_admin/features/label/shipped]]'		=> 'Comes with Nino',
+	'[[/_admin/features/label/component-refused]]'	=> 'Not registered: %s',
 	'[[/_admin/features/label/rejected]]'		=> 'Not loaded: its manifest was refused',
 	'[[/_admin/features/label/rejected-active]]'	=> 'Switched on, but its manifest was refused: the feature runs incomplete',
 	/*	The two tabs of a feature's own screen: what it is, and what can be
@@ -166,6 +168,7 @@ return [
 	'[[/_admin/error/features_unknown]]'	=> 'There is no such feature in this project.',
 	'[[/_admin/error/features_invalid]]'	=> 'The request names no feature or no version.',
 	'[[/_admin/error/features_remove_active]]'	=> 'The feature is switched on. Switch it off before removing its directory.',
+	'[[/_admin/error/features_remove_shipped]]'	=> 'The feature comes with Nino and has no directory of its own. Switch it off to stop using it.',
 	'[[/_admin/error/features_activate_failed]]'	=> 'The feature could not be switched on: %s',
 	'[[/_admin/error/features_deactivate_failed]]'	=> 'The feature could not be switched off: %s',
 	'[[/_admin/error/features_reapply_inactive]]'	=> 'The feature is switched off. Switch it on and its content is placed.',

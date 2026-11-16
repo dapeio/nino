@@ -31,6 +31,8 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installiert als %s',
 	'[[/_admin/features/label/requires]]'			=> 'Benötigt: %s',
+	'[[/_admin/features/label/shipped]]'		=> 'Gehört zu Nino',
+	'[[/_admin/features/label/component-refused]]'	=> 'Nicht angemeldet: %s',
 	'[[/_admin/features/label/rejected]]'		=> 'Nicht geladen: das Manifest wurde abgelehnt',
 	'[[/_admin/features/label/rejected-active]]'	=> 'Eingeschaltet, aber das Manifest wurde abgelehnt: das Feature läuft unvollständig',
 	/*	Die beiden Tabs im Screen eines Features: was es ist, und was sich
@@ -166,6 +168,7 @@ return [
 	'[[/_admin/error/features_unknown]]'	=> 'Dieses Feature gibt es in diesem Projekt nicht.',
 	'[[/_admin/error/features_invalid]]'	=> 'Die Anfrage nennt kein Feature oder keine Version.',
 	'[[/_admin/error/features_remove_active]]'	=> 'Das Feature ist eingeschaltet. Schalte es aus, bevor sein Verzeichnis entfernt wird.',
+	'[[/_admin/error/features_remove_shipped]]'	=> 'Das Feature gehört zu Nino und hat kein eigenes Verzeichnis. Schalte es aus, um es nicht mehr zu nutzen.',
 	'[[/_admin/error/features_activate_failed]]'	=> 'Das Feature konnte nicht eingeschaltet werden: %s',
 	'[[/_admin/error/features_deactivate_failed]]'	=> 'Das Feature konnte nicht ausgeschaltet werden: %s',
 	'[[/_admin/error/features_reapply_inactive]]'	=> 'Das Feature ist ausgeschaltet. Schalte es ein, dann werden seine Inhalte angelegt.',

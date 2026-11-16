@@ -48,6 +48,18 @@ namespace Nino {
 		// The manifest beside a feature's class file
 		public const string MANIFEST = 'feature.php';
 
+		// Where the schemas of the components a feature brings are kept between requests: a php file for each
+		// feature below the private tree (never served), not in a backup, emptied with the trees of the templates
+		// (\Nino\Html::dropTrees()) and turned off by the same switch
+		public const string REGISTER = '/data/cache/register';
+
+		// What the folder of a feature that brings components is made of
+		private const string COMPONENTS = 'components';
+		private const string GROUPS = 'groups';
+
+		// The longest standard part that is read: the parts of a feature of twenty components are 15 KB together
+		private const int PART_BYTES = 262144;
+
 		// What a settings schema may declare a value to be - each one is a
 		// form control the Features panel knows how to render and this class
 		// knows how to validate
@@ -156,10 +168,25 @@ namespace Nino {
 		}
 
 		/**
+		 *	The directory of the modules of the kernel: a module of it that has a feature.php is a feature that
+		 *	is delivered with the kernel (see all())
+		 *
+		 *	@return 	string
+		 */
+		private static function _shipped(): string {
+
+			return dirname( __DIR__ ). '/Modules';
+		}
+
+		/**
 		 *	Every feature the directory holds, keyed by manifest key and sorted
 		 *	by it - its manifest plus what this installation knows about it:
 		 *
 		 *	- 'dir'				absolute directory
+		 *	- 'shipped'		whether it is delivered with the kernel: a module of the kernel with a
+		 *								feature.php, which is switched on and off like any other, has no
+		 *								directory to remove, and is updated with the kernel and not from the
+		 *								catalogue
 		 *	- 'module'		the class it brings, \Nino\Modules\<Directory>
 		 *	- 'active'		whether that class is listed in '/nino/modules'
 		 *	- 'installed'	the version activate() last recorded, null before the first
@@ -181,16 +208,20 @@ namespace Nino {
 
 			$features = [];
 			$rejected = [];
-			$dir = self::dir();
 
-			foreach( is_dir( $dir ) === true ? ( scandir( $dir ) ?: [] ) : [] as $entry ) {
+			// The kernel's own come first: the key of a feature below features/ that one of them holds is refused
+			$directories = [];
 
-				$path = $dir. '/'. $entry;
+			foreach( [ self::_shipped() => true, self::dir() => false ] as $dir => $shipped )
+				foreach( is_dir( $dir ) === true ? ( scandir( $dir ) ?: [] ) : [] as $entry )
+					$directories[] = [ $dir. '/'. $entry, $entry, $shipped ];
+
+			foreach( $directories as [ $path, $entry, $shipped ] ) {
 
 				if( $entry[0] === '.' || is_dir( $path ) === false || is_file( $path. '/'. self::MANIFEST ) === false )
 					continue;
 
-				$manifest = self::manifest( $path, $reason );
+				$manifest = self::manifest( $path, $reason, $shipped );
 				if( $manifest === null ) {
 					$rejected[$entry] = (string) $reason;
 					continue;
@@ -343,10 +374,11 @@ namespace Nino {
 		 *
 		 *	@param		string		$dir					The feature directory
 		 *	@param		string|null	&$reason			(reference) Why the manifest was refused, null when it was not
+		 *	@param		bool			$shipped			The directory is a module of the kernel that has a manifest: its name is a module's, as it is there
 		 *
-		 *	@return 	array|null							The manifest with every key present and normalized, plus 'dir' and 'module'
+		 *	@return 	array|null							The manifest with every key present and normalized, plus 'dir', 'module' and 'shipped'
 		 */
-		public static function manifest( string $dir, ?string &$reason = null ): ?array {
+		public static function manifest( string $dir, ?string &$reason = null, bool $shipped = false ): ?array {
 
 			$dir = rtrim( $dir, '/' );
 			$path = $dir. '/'. self::MANIFEST;
@@ -368,7 +400,7 @@ namespace Nino {
 			// panel is \Nino\Modules\<Name>\Admin), is the kernel's and never the feature's:
 			// a directory of that name in either root takes the name
 			$owner = self::moduleOwner( $name );
-			if( $owner !== null )
+			if( $owner !== null && $shipped === false )
 				return $fail( 'the directory name is taken: \\Nino\\Modules\\'. $name. ' is a module of '. $owner. ', which the autoloader serves before a feature\'s' );
 
 			if( is_file( $path ) === false )
@@ -526,7 +558,7 @@ namespace Nino {
 			// own, so a manifest can name no file of another feature, and a file
 			// is a style sheet or a script, never a '..' away from where it is
 			$assets = [];
-			$assetsDir = '/features/'. $name. '/assets/';
+			$assetsDir = ( $shipped === true ? '/_nino/Nino/Modules/' : '/features/' ). $name. '/assets/';
 			foreach( (array) ( $raw['assets'] ?? [] ) as $file ) {
 				if( is_string( $file ) === false || str_starts_with( $file, $assetsDir ) === false
 					|| preg_match( self::ASSET_PATTERN, substr( $file, strlen( $assetsDir ) ) ) !== 1 || str_contains( $file, '..' ) === true )
@@ -556,7 +588,7 @@ namespace Nino {
 			// reader is handed the key (and the directory, which a method named for the
 			// options of an attribute is looked for in), and a tool offers it under the feature, so
 			// that a schema naming a "group" is refused. The callbacks are not
-			// declared but derived (see registerComponents())
+			// declared but derived (see registerManifestComponents())
 			$declared = [ 'components' => [], 'stacks' => [] ];
 			foreach( $declared as $what => $none ) {
 
@@ -576,6 +608,7 @@ namespace Nino {
 			return [
 				'key'					=> $key,
 				'dir'					=> $dir,
+				'shipped'			=> $shipped,
 				'module'			=> $module,
 				'name'				=> $raw['name'],
 				'description'	=> $raw['description'] ?? '',
@@ -596,9 +629,10 @@ namespace Nino {
 
 		/**
 		 *	Register what the active features declare as 'components' and
-		 *	'stacks' in their manifest - the other way into the registry of
+		 *	'stacks' in their manifest - the way into the registry of
 		 *	\Nino\Modules\Components, beside a module calling addComponent()
-		 *	itself. Each name is a shortcode whose renderer is by convention
+		 *	itself. What a feature brings to the register of \Nino\Components,
+		 *	from its folders, is registerComponents(). Each name is a shortcode whose renderer is by convention
 		 *	[ '\Nino\Modules\<Directory>', 'component<Name>' ] - or 'stack<Name>' -
 		 *	with the name written in studly caps: 'newsletter-signup' is
 		 *	componentNewsletterSignup(). A component whose class has no such
@@ -622,7 +656,7 @@ namespace Nino {
 		 *
 		 *	@return 	void
 		 */
-		public static function registerComponents( array &$appData ): void {
+		public static function registerManifestComponents( array &$appData ): void {
 
 			foreach( self::_listed( $appData ) as $manifest ) {
 
@@ -675,6 +709,544 @@ namespace Nino {
 		}
 
 		/**
+		 *	Register what the active features bring in their folders components/ and groups/ with the register of
+		 *	\Nino\Components: for each feature that is listed in '/nino/modules' and has a folder components/, the
+		 *	schemas as the cache of the register keeps them - where the files are as they were when it was written, and
+		 *	not one of them is included - or as readComponents() reads and checks them, and then
+		 *	\Nino\Components::restore(). The renderer of a component is [ the class of the feature,
+		 *	'component'<Name> ], the name in studly caps, where the class has that method; a component with neither a
+		 *	renderer nor a template is said and left out, as is one whose schema is refused: the feature goes on
+		 *	without it, and what a request found wrong with a feature it says once.
+		 *
+		 *	The cache is written only where everything read was accepted, and only from what was checked: the file is
+		 *	php that holds nothing but the data of the schemas. It is the cache of what a request would have to
+		 *	do again and nothing a request needs: a folder that cannot be written is a feature that is read at every
+		 *	request. It is never a reason for a warning, and not a thing a backup takes. '/nino/markup/cache' => false
+		 *	turns it off, \Nino\Html::dropTrees() empties it.
+		 *
+		 *	Asked at every boot by \Nino\init(), ahead of the init() of every module
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function registerComponents( array &$appData ): void {
+
+			// The features the kernel delivers first, then the others in the order of the modules: who has a name or a group
+			// does not depend on the order a project switched them on in
+			$manifests = array_merge(
+				array_filter( self::_listed( $appData ), static fn( array $manifest ): bool => $manifest['shipped'] === true ),
+				array_filter( self::_listed( $appData ), static fn( array $manifest ): bool => $manifest['shipped'] === false )
+			);
+
+			foreach( $manifests as $manifest ) {
+
+				if( is_dir( $manifest['dir']. '/'. self::COMPONENTS ) === false )
+					continue;
+
+				$read = self::_register( $appData, $manifest );
+
+				foreach( $read['rejected'] as $name => $why )
+					self::_said( $appData, $manifest['key']. '/'. $name, 'Features::registerComponents(): '. $why. ' - not registered' );
+
+				$refused = [];
+				$renderers = self::_renderers( $manifest, $read['components'], $refused );
+
+				foreach( $refused as $name => $why ) {
+
+					self::_said( $appData, $manifest['key']. '/'. $name, 'Features::registerComponents(): '. $why. ' - not registered' );
+					unset( $read['components'][$name] );
+				}
+
+				\Nino\Components::restore( $appData, $manifest['key'], $read, $renderers );
+			}
+		}
+
+		/**
+		 *	The renderers of the components a feature brings: [ the class of the feature, 'component'<Name> ] where the class
+		 *	has that method. A component with neither that nor a template, and one that draws what it holds and has no
+		 *	renderer, is refused
+		 *
+		 *	@param		array 		$manifest			The feature
+		 *	@param		array 		$components		name => clean schema
+		 *	@param		array			&$refused			(reference) name => why, of what has no renderer
+		 *
+		 *	@return 	array										name => callable
+		 */
+		private static function _renderers( array $manifest, array $components, array &$refused ): array {
+
+			$renderers = [];
+
+			foreach( $components as $name => $schema ) {
+
+				$callback = [ $manifest['module'], 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', (string) $name ) ) ) ];
+
+				if( is_callable( $callback ) === true )
+					$renderers[$name] = $callback;
+				else if( $schema['template'] === '' || isset( $schema['children'] ) === true )
+					$refused[$name] = 'feature "'. $manifest['key']. '", component "'. $name. '" has no renderer '. $callback[0]. '::'. $callback[1]. '(), which it needs to '. ( isset( $schema['children'] ) === true ? 'draw what it holds' : 'draw anything: it has no template either' );
+			}
+
+			return $renderers;
+		}
+
+		/**
+		 *	The schemas of the components of a feature for one request: from its file in the cache of the register
+		 *	where that is the file's stamp - the kernel it was written for and the size and the time of every file
+		 *	of components/ and groups/ - or read, and kept where all of it is accepted
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			The feature
+		 *
+		 *	@return 	array										See readComponents(); 'rejected' is [] for what comes from the cache, and the folder itself unreadable is every component refused
+		 */
+		private static function _register( array &$appData, array $manifest ): array {
+
+			$on = ( $appData[\Nino\Html::TREES_SWITCH] ?? true ) !== false;
+			$kept = self::REGISTER. '/'. $manifest['key']. '.php';
+			$stamp = self::_stamp( $manifest['dir'] );
+			$stored = $on === true ? self::_stored( $appData, $kept ) : null;
+
+			if( $stored !== null && $stored['kernel'] === \Nino\VERSION && $stored['stamp'] === $stamp )
+				return [ 'components' => $stored['components'], 'groups' => $stored['groups'], 'rejected' => [] ];
+
+			$read = self::readComponents( $manifest['dir'], $manifest['key'] );
+
+			if( is_string( $read ) === true )
+				return [ 'components' => [], 'groups' => [], 'rejected' => [ '' => $read ] ];
+
+			if( $on === true && $read['rejected'] === [] ) {
+
+				// Written atomically and without a lock: two requests that write the file write the same schemas
+				\Nino\Filesystem::putFileContent( $appData, $kept, [ 'kernel' => \Nino\VERSION, 'stamp' => $stamp, 'components' => $read['components'], 'groups' => $read['groups'] ], true );
+				unset( $appData['./nino/filesystem/cache'][$kept] );
+			}
+
+			return $read;
+		}
+
+		/**
+		 *	The size and the time of every file the schemas of a feature are read from: the component.php and the
+		 *	template.tpl of each folder of components/, the group.php and the part.css of each folder of groups/ -
+		 *	null for a file that is not there, so that one that comes is seen, as a folder that comes or goes is seen
+		 *	by the names the lists hold. That is the limit of the comparison, and the one every cache of the kernel
+		 *	has: a file of the same size written within the second of the one before it, by a tool that does not set the
+		 *	time, is not seen until it changes again or the folder is emptied
+		 *
+		 *	@param		string		$dir					The directory of the feature
+		 *
+		 *	@return 	array										'<path>' => the time and the size as one number, 0 where there is no file
+		 */
+		private static function _stamp( string $dir ): array {
+
+			$stamp = [];
+
+			foreach( [ self::COMPONENTS => [ 'component.php', 'template.tpl' ], self::GROUPS => [ 'group.php', 'part/part.css' ] ] as $folder => $files ) {
+
+				$path = $dir. '/'. $folder. '/';
+
+				// A name that begins with a dot is none of the folders a feature has
+				foreach( @scandir( $path ) ?: [] as $entry ) {
+
+					if( $entry[0] === '.' )
+						continue;
+
+					foreach( $files as $file ) {
+
+						// The time and the size of one file are one look at the disk - php keeps the answer of the first call for the second - and
+						// one number: the size in front of the time, which is less than ten digits
+						$full = $path. $entry. '/'. $file;
+						$time = @filemtime( $full );
+						$stamp[$full] = $time === false ? 0 : $time + filesize( $full ) * 10000000000;
+					}
+				}
+			}
+
+			return $stamp;
+		}
+
+		/**
+		 *	What the cache of the register holds for a feature, if what is in the file is that. The file is php that the kernel
+		 *	wrote from var_export() of an array; a file that does not parse, one that says something or holds another
+		 *	shape is no cache and is written over. Whatever the file prints is dropped
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$kept					The virtual path of the file
+		 *
+		 *	@return 	array|null								[ 'kernel' => ..., 'stamp' => ..., 'components' => ..., 'groups' => ... ]
+		 */
+		private static function _stored( array &$appData, string $kept ): ?array {
+
+			$path = \Nino\Filesystem::path( $appData, $kept );
+
+			if( $path === '' || is_file( $path ) === false )
+				return null;
+
+			ob_start();
+
+			try {
+				$value = ( static fn( string $path ): mixed => @include $path )( $path );
+			}
+			catch( \Throwable ) {
+				$value = null;
+			}
+			finally {
+				ob_end_clean();
+			}
+
+			if( is_array( $value ) === false || array_keys( $value ) !== [ 'kernel', 'stamp', 'components', 'groups' ]
+				|| is_string( $value['kernel'] ) === false || is_array( $value['stamp'] ) === false
+				|| is_array( $value['components'] ) === false || is_array( $value['groups'] ) === false )
+				return null;
+
+			foreach( [ 'components', 'groups' ] as $what )
+				foreach( $value[$what] as $name => $entry )
+					if( is_string( $name ) === false || is_array( $entry ) === false )
+						return null;
+
+			return $value;
+		}
+
+		/**
+		 *	Say what a request found wrong with a feature, once for the request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$what					Which thing it is about
+		 *	@param		string		$message
+		 *
+		 *	@return 	void
+		 */
+		private static function _said( array &$appData, string $what, string $message ): void {
+
+			if( isset( $appData['./nino/features/said'][$what] ) === true )
+				return;
+
+			$appData['./nino/features/said'][$what] = true;
+
+			trigger_error( $message, E_USER_WARNING );
+		}
+
+		/**
+		 *	Read the folders components/ and groups/ of a feature: the schema of each components/<name>/component.php,
+		 *	with the template.tpl beside it as its template where it names none, checked by
+		 *	\Nino\Components::validate() with the key and the directory of the feature - and, for a feature's
+		 *	component, with a 'group' that names a folder groups/<group>/ whose group.php is accepted by
+		 *	\Nino\Components::validateGroup(). The name of the folder is the name of the component. A group that is
+		 *	refused takes its components with it.
+		 *
+		 *	What is read is php of the feature, as its manifest is, and is included only for a feature that is on: the
+		 *	request that registers it, and the Features panel for the one that is on - not for a feature that is off.
+		 *	Nothing in a folder is a link: a folder, a component.php, a template.tpl, a group.php or a part.css whose
+		 *	real path is not the one it is written under - a link to a file outside of the feature or inside it - is
+		 *	refused, since what is read into the schemas and the style bundle of the site is not what the folder holds.
+		 *	A standard part that breaks the rule of mixing (\Nino\Components::partProblems()) is refused alone: the group
+		 *	and its components are the feature's, and the part is not put into the style bundle
+		 *
+		 *	@param		string		$dir					The directory of the feature
+		 *	@param		string		$key					Its key, as the manifest says it
+		 *
+		 *	@return 	array|string							[ 'components' => name => clean schema, 'groups' => group => [ 'label', 'knobs', 'part' ],
+		 *																	'rejected' => name, 'group <name>' or 'part <name>' => why ], or why the folders cannot be read at all
+		 */
+		public static function readComponents( string $dir, string $key ): array|string {
+
+			$dir = rtrim( $dir, '/' );
+			$base = realpath( $dir );
+
+			if( $base === false )
+				return 'feature "'. $key. '": the directory cannot be read';
+
+			$components = [];
+			$groups = [];
+			$rejected = [];
+			$of = 'feature "'. $key. '", ';
+
+			foreach( [ self::COMPONENTS, self::GROUPS ] as $folder )
+				if( file_exists( $dir. '/'. $folder ) === true && self::_inside( $base, $folder ) === false )
+					return $of. 'the folder "'. $folder. '" is a link or not a folder: nothing is read from it';
+
+			// What the folders hold: a directory is a component or a group, whatever its name is, and a file is none
+			$names = [];
+
+			foreach( @scandir( $base. '/'. self::COMPONENTS ) ?: [] as $entry )
+				if( $entry[0] !== '.' && is_dir( $base. '/'. self::COMPONENTS. '/'. $entry ) === true )
+					$names[] = $entry;
+
+			foreach( $names as $name ) {
+
+				// Nothing is included from a folder that is named no component
+				if( strlen( $name ) > \Nino\Components::NAME_LENGTH || preg_match( \Nino\Components::NAME, $name ) !== 1 ) {
+					$rejected[$name] = $of. 'component "'. self::_shown( $name ). '": a name is a slug of lower case letters, digits and hyphens, at most '. \Nino\Components::NAME_LENGTH. ' characters';
+					continue;
+				}
+
+				$file = self::COMPONENTS. '/'. $name. '/component.php';
+
+				if( self::_inside( $base, $file ) === false ) {
+					$rejected[$name] = $of. 'component "'. self::_shown( $name ). '": the folder has no component.php of its own - a link, or none';
+					continue;
+				}
+
+				$schema = self::_include( $base. '/'. $file, $failed );
+
+				if( $failed !== null ) {
+					$rejected[$name] = $of. 'component "'. self::_shown( $name ). '": component.php cannot be included: '. $failed;
+					continue;
+				}
+
+				// The markup is the schema's own, or the template.tpl beside it: a file the schema names elsewhere is no file of the stamp
+				if( is_array( $schema ) === true && is_string( $schema['template'] ?? null ) === true && str_ends_with( $schema['template'], '.tpl' ) === true
+					&& str_contains( $schema['template'], '<' ) === false && str_contains( $schema['template'], '[[' ) === false ) {
+
+					$rejected[$name] = $of. 'component "'. self::_shown( $name ). '": "template" is the markup, or no key at all with a template.tpl beside component.php - not the name of a file';
+					continue;
+				}
+
+				// The template beside it, where the schema names none
+				$template = self::COMPONENTS. '/'. $name. '/template.tpl';
+
+				if( is_array( $schema ) === true && isset( $schema['template'] ) === false && file_exists( $base. '/'. $template ) === true ) {
+
+					if( self::_inside( $base, $template ) === false ) {
+						$rejected[$name] = $of. 'component "'. self::_shown( $name ). '": template.tpl is a link, or no file';
+						continue;
+					}
+
+					$schema['template'] = $template;
+				}
+
+				$clean = \Nino\Components::validate( $name, $schema, $key, $dir );
+
+				if( is_string( $clean ) === false && isset( $clean['group'] ) === false )
+					$clean = $of. 'component "'. self::_shown( $name ). '": a component of a feature names its "group"';
+
+				if( is_string( $clean ) === true )
+					$rejected[$name] = $clean;
+				else
+					$components[$name] = $clean;
+			}
+
+			// The groups the components name, one folder each
+			$members = [];
+
+			foreach( $components as $name => $clean )
+				$members[$clean['group']][] = $name;
+
+			foreach( $members as $group => $own ) {
+
+				$file = self::GROUPS. '/'. $group. '/group.php';
+				$declared = null;
+				$why = null;
+
+				if( self::_inside( $base, $file ) === false )
+					$why = $of. 'group "'. self::_shown( (string) $group ). '": there is no groups/'. self::_shown( (string) $group ). '/group.php of its own - a link, or none';
+				else {
+
+					$declared = self::_include( $base. '/'. $file, $failed );
+
+					if( $failed !== null )
+						$why = $of. 'group "'. self::_shown( (string) $group ). '": group.php cannot be included: '. $failed;
+					else {
+
+						$declared = \Nino\Components::validateGroup( (string) $group, $declared, $own );
+
+						if( is_string( $declared ) === true )
+							$why = $of. $declared;
+					}
+				}
+
+				// The standard part is a file the style bundle of the site carries as it is
+				$part = self::GROUPS. '/'. $group. '/part/part.css';
+
+				if( $why === null && file_exists( $base. '/'. $part ) === true && self::_inside( $base, $part ) === false )
+					$why = $of. 'group "'. self::_shown( (string) $group ). '": part/part.css is a link, or no file';
+
+				if( $why !== null ) {
+
+					$rejected['group '. $group] = $why;
+
+					foreach( $own as $name ) {
+						$rejected[$name] = $of. 'component "'. self::_shown( $name ). '": its group "'. self::_shown( (string) $group ). '" is refused';
+						unset( $components[$name] );
+					}
+
+					continue;
+				}
+
+				// ...and keeps the rule of mixing, which costs 0.09 ms for the six parts of 15 KB that a feature of twenty components has (measured with
+				// opcache, on a read that is a cold one: a request that has the file of the cache asks nobody). A part that breaks it does not go
+				// into the bundle; the group and its components are the feature's all the same
+				$standard = is_file( $base. '/'. $part ) === true;
+
+				if( $standard === true ) {
+
+					$css = filesize( $base. '/'. $part ) > self::PART_BYTES ? null : file_get_contents( $base. '/'. $part );
+					$broken = is_string( $css ) === true ? \Nino\Components::partProblems( $css, $own ) : [ 'is longer than '. self::PART_BYTES. ' bytes' ];
+
+					if( $broken !== [] ) {
+
+						$rejected['part '. $group] = $of. 'group "'. self::_shown( (string) $group ). '": its standard part breaks the rule of mixing: '. implode( '; ', $broken );
+						$standard = false;
+					}
+				}
+
+				$groups[$group] = $declared + [ 'part' => $standard ];
+			}
+
+			return [ 'components' => $components, 'groups' => $groups, 'rejected' => $rejected ];
+		}
+
+		/**
+		 *	Whether a path below the directory of a feature is a path of its own: there is a file or a folder at it
+		 *	and its real path is the very path, so that nothing on the way is a link
+		 *
+		 *	@param		string		$base					The real path of the directory of the feature
+		 *	@param		string		$relative			The path below it
+		 *
+		 *	@return 	bool
+		 */
+		private static function _inside( string $base, string $relative ): bool {
+
+			return str_contains( $relative, "\0" ) === false && realpath( $base. '/'. $relative ) === $base. '/'. $relative;
+		}
+
+		/**
+		 *	Include a php file of a feature that answers data, with no output of its own and whatever it throws
+		 *	said as a sentence
+		 *
+		 *	@param		string		$file					An absolute path
+		 *	@param		string|null	&$failed			(reference) What was thrown, null where nothing was
+		 *
+		 *	@return 	mixed
+		 */
+		private static function _include( string $file, ?string &$failed ): mixed {
+
+			$failed = null;
+
+			// A file that was changed is the file that is read: opcache would hand back what it compiled before, within the
+			// seconds it does not look at the time of a file, and the schemas of the old text would be kept under the stamp of the new
+			if( function_exists( 'opcache_invalidate' ) === true )
+				@opcache_invalidate( $file, true );
+
+			ob_start();
+
+			try {
+				return ( static fn( string $file ): mixed => include $file )( $file );
+			}
+			catch( \Throwable $thrown ) {
+
+				$failed = self::_shown( $thrown::class. ': '. $thrown->getMessage(). ' (line '. $thrown->getLine(). ')', 200 );
+
+				return null;
+			}
+			finally {
+				ob_end_clean();
+			}
+		}
+
+		/**
+		 *	What a message may say of a name it was found under or of what a file threw: printable characters and not many
+		 *
+		 *	@param		string		$name
+		 *	@param		int				$length				How many characters at most
+		 *
+		 *	@return 	string
+		 */
+		private static function _shown( string $name, int $length = 60 ): string {
+
+			return (string) preg_replace( '/[^\x20-\x7E]/', '?', substr( $name, 0, $length ) ). ( strlen( $name ) > $length ? '...' : '' );
+		}
+
+		/**
+		 *	Why a component or a group of an active feature is not registered, for the Features panel: what
+		 *	readComponents() refused, and what another feature has claimed before it (the register of the
+		 *	request holds who owns a name and a group). [] for a feature that is off, that has no folder components/
+		 *	or whose components are all there. Reads the folders, so it is for a panel and not for a request of a visitor
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The key of a feature
+		 *
+		 *	@return 	array										Sentences
+		 */
+		public static function componentProblems( array &$appData, string $key ): array {
+
+			$feature = self::get( $appData, $key );
+
+			if( $feature === null || $feature['active'] === false || is_dir( $feature['dir']. '/'. self::COMPONENTS ) === false )
+				return [];
+
+			$read = self::readComponents( $feature['dir'], $key );
+
+			if( is_string( $read ) === true )
+				return [ $read ];
+
+			$refused = [];
+			self::_renderers( $feature, $read['components'], $refused );
+
+			$problems = array_merge( array_values( $read['rejected'] ), array_values( $refused ) );
+
+			foreach( array_keys( $read['groups'] ) as $group )
+				if( ( $appData[\Nino\Components::OWNERS]['groups'][$group] ?? $key ) !== $key )
+					$problems[] = 'group "'. $group. '" is the feature "'. $appData[\Nino\Components::OWNERS]['groups'][$group]. '"\'s';
+
+			foreach( array_keys( $read['components'] ) as $name )
+				if( ( $appData[\Nino\Components::OWNERS]['names'][$name] ?? $key ) !== $key )
+					$problems[] = 'component "'. $name. '" is the feature "'. $appData[\Nino\Components::OWNERS]['names'][$name]. '"\'s';
+
+			return $problems;
+		}
+
+		/**
+		 *	Put the standard part of each group the features bring into the style bundle of the site: the file
+		 *	groups/<group>/part/part.css of the feature, a file of the bundle like the stylesheets a manifest names - so
+		 *	it stands in the layer of the components. Before that the hook '/nino/components/parts' is asked, with
+		 *	[ 'group' => 'section', 'feature' => 'basis', 'css' => '/features/Basis/groups/section/part/part.css' ]: what
+		 *	a callback answers as 'css' - a css file of the site, written as a path of the bundle - is the part that
+		 *	goes in, and '' leaves the group without one. An answer that is no such array is said once and the standard
+		 *	part stands.
+		 *
+		 *	Asked at every boot by \Nino\init(), behind the init() of every module, since that is where a module registers
+		 *	a callback, and behind registerComponents(), which says which groups there are
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function registerParts( array &$appData ): void {
+
+			$listed = [];
+
+			foreach( self::_listed( $appData ) as $manifest )
+				$listed[$manifest['key']] = $manifest;
+
+			foreach( \Nino\Components::groups( $appData ) as $group => $declared ) {
+
+				$manifest = $listed[$declared['feature']] ?? null;
+
+				if( $declared['part'] !== true || $manifest === null )
+					continue;
+
+				$standard = ( $manifest['shipped'] === true ? '/_nino/Nino/Modules/' : '/features/' ). basename( $manifest['dir'] ). '/'. self::GROUPS. '/'. $group. '/part/part.css';
+				$asked = [ 'group' => (string) $group, 'feature' => $manifest['key'], 'css' => $standard ];
+				$answer = \Nino\Callbacks::doCallbacks( $appData, \Nino\Components::PARTS, $asked );
+
+				// A stylesheet that is there, below a feature - a folder of features/ or a module of the kernel - or nothing: the bundle is served
+				$named = is_array( $answer ) === true && is_string( $answer['css'] ?? null ) === true
+					&& ( $answer['css'] === '' || ( preg_match( '#^/(?:features|_nino/Nino/Modules)/[A-Z][A-Za-z0-9]*/[A-Za-z0-9_][A-Za-z0-9_./-]*\.css$#D', $answer['css'] ) === 1
+						&& str_contains( $answer['css'], '..' ) === false && is_file( \Nino\Filesystem::path( $appData, $answer['css'] ) ) === true ) );
+
+				if( $named === false ) {
+
+					self::_said( $appData, 'part '. $group, 'Features: an answer to the hook "'. \Nino\Components::PARTS. '" for the group "'. $group. '" names no stylesheet of a feature that is there and no "" - the standard part stands' );
+					$answer = [ 'css' => $standard ];
+				}
+
+				if( $answer['css'] !== '' )
+					\Nino\Html::addAsset( $appData, '/.cache/style.css', $answer['css'] );
+			}
+		}
+
+		/**
 		 *	Put the files the active features name under 'assets' into the two
 		 *	bundles of the site: a style sheet into '/.cache/style.css', a script
 		 *	into '/.cache/script.js', each once and in the order the manifest
@@ -690,7 +1262,7 @@ namespace Nino {
 		 *	\Nino\Html::addAsset()).
 		 *
 		 *	Only the manifests of the features listed in '/nino/modules' are read,
-		 *	as registerComponents() reads them.
+		 *	as registerManifestComponents() reads them.
 		 *
 		 *	Not the 'assets' of a stack's schema (\Nino\Modules\Components::validate()),
 		 *	which is a note for a tool about the files a stack needs and adds nothing
@@ -709,8 +1281,8 @@ namespace Nino {
 
 		/**
 		 *	The manifests of the features listed in '/nino/modules', in that
-		 *	order: the walk the two readers of a boot share, registerAssets() and
-		 *	registerComponents(). A class that is no feature's, a directory
+		 *	order: the walk the readers of a boot share, registerAssets(),
+		 *	registerComponents() and registerParts(). A class that is no feature's, a directory
 		 *	without a manifest and a manifest that does not validate - said in a
 		 *	warning, as manifest() does - are left out.
 		 *
@@ -737,12 +1309,21 @@ namespace Nino {
 				if( preg_match( '/^\\\\?Nino\\\\Modules\\\\([A-Z][A-Za-z0-9]*)$/D', (string) $class, $match ) !== 1 )
 					continue;
 
-				$dir = self::dir(). '/'. $match[1];
+				// A module of the kernel with a manifest first, as all() and the autoloader have it: a directory below features/ that is
+				// named like one is refused there and is no feature of its own
+				$shipped = true;
+				$dir = self::_shipped(). '/'. $match[1];
 
-				if( is_file( $dir. '/'. self::MANIFEST ) === false )
-					continue;
+				if( is_file( $dir. '/'. self::MANIFEST ) === false ) {
 
-				$manifest = self::manifest( $dir );
+					$shipped = false;
+					$dir = self::dir(). '/'. $match[1];
+
+					if( is_file( $dir. '/'. self::MANIFEST ) === false )
+						continue;
+				}
+
+				$manifest = self::manifest( $dir, $reason, $shipped );
 
 				if( $manifest !== null )
 					$listed[] = $manifest;
@@ -1489,7 +2070,8 @@ namespace Nino {
 		 *	the project's now, and putting the same feature back finds its
 		 *	settings where it left them.
 		 *
-		 *	Refused for an active feature. Its class is listed in
+		 *	Refused for a feature that is delivered with the kernel (a module of it with a
+		 *	manifest, 'shipped'), and for an active feature. Its class is listed in
 		 *	'/nino/modules', so removing the directory would leave the
 		 *	autoloader looking for a class that is not there - switch it off
 		 *	first, which is one click and says what it is doing. Made under the
@@ -1529,6 +2111,9 @@ namespace Nino {
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
 				return 'unknown feature "'. $key. '"';
+
+			if( $feature['shipped'] === true )
+				return 'feature "'. $key. '" is delivered with the kernel and has no directory of its own to remove';
 
 			if( $feature['active'] === true )
 				return 'feature "'. $key. '" is active - switch it off before removing it';

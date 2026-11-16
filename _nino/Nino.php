@@ -106,9 +106,15 @@ namespace Nino {
 
 		// The files the manifests of the active features name, in the two
 		// bundles of the site - ahead of the init() of any module, so that what a
-		// feature adds to a bundle itself comes after them
+		// feature adds to a bundle itself comes after them - and the components
+		// their folders hold, so that a module's init() finds them in the register
 		\Nino\Features::registerAssets( $appData );
+		\Nino\Features::registerComponents( $appData );
 		\Nino\Modules::callModules( $appData, 'init' );
+
+		// The standard parts of their groups, behind the init() of the modules: the hook that
+		// replaces a part is registered there
+		\Nino\Features::registerParts( $appData );
 
 		return $appData;
 	}

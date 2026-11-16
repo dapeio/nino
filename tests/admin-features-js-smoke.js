@@ -212,9 +212,9 @@ const panel 	= Nino.admin.features;
 // features predate the field is the state the panel has to read well too
 const FEATURES = [
 	{ key : 'old', name : 'Old', description : '', category : 'system', maturity : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
-		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '' },
-	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [], settingsTab : '' },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
+		shipped : false, components : [], problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '' },
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], shipped : false, components : [], problems : [], settings : [], settingsTab : '' },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], shipped : false, components : [], problems : [], settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
 		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
@@ -225,7 +225,7 @@ const FEATURES = [
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
 	], settingsTab : '' },
-	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [], settingsTab : '' },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], shipped : false, components : [], problems : [], settings : [], settingsTab : '' },
 ];
 
 /** A features/list answer: the catalogue url, whether features/ is writable, the cache - null unless given - and the installed features, FEATURES unless a list of its own is given (an install adds one the fixture does not carry) */
@@ -428,6 +428,12 @@ check( 'an inactive feature without problems offers Remove and Activate', byTag(
 check( 'one with problems offers Remove alone, and its requirements and every refusal are read whole rather than ellipsized', byTag( row( mount, 'old' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')
 	&& notes( row( mount, 'old' ) ).join('|') === text('/_admin/features/label/requires').replace( '%s', 'nowhere' )+ '|'+ FEATURES[0].problems.join('|')
 	&& byTag( row( mount, 'old' ), 'small' ).filter( function( el ) { return hasClass( el, 'nino-admin-error' ) } ).map( function( el ) { return el.textContent } ).join('|') === FEATURES[0].problems.join('|') );
+
+// A feature that comes with Nino is a module of the kernel: there is no directory of the project's to delete, so no Remove, and the row says where it comes from
+const shippedRow = panel._renderFeature( Object.assign( {}, FEATURES[3], { key : 'bundled', name : 'Bundled', shipped : true } ) );
+check( 'a feature that comes with Nino offers Activate alone and says that it comes with Nino; one that does not carries no such line',
+	byTag( shippedRow, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && notes( shippedRow ).join('|') === text('/_admin/features/label/shipped')
+	&& notes( row( mount, 'fresh' ) ).indexOf( text('/_admin/features/label/shipped') ) === -1 );
 
 // A directory whose manifest the kernel refused is not a feature: it is a row of the Inactive tab, by its directory, with
 // the reason as text - no markup, no action - and it is counted and filtered with the rest
@@ -998,7 +1004,7 @@ fire( install, 'click' );
 answer( 500, null );
 check( 'a failed install falls back to its own error line', byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0].textContent === '(500) '+ text('/_admin/features/error/install') );
 
-const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], problems : [], settings : [], settingsTab : '' };
+const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], shipped : false, components : [], problems : [], settings : [], settingsTab : '' };
 const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
 
 /*	What an install says, and where. Not on the offer's own row: an offer that
@@ -1737,6 +1743,18 @@ check( 'answered, it builds the workbench again - the panel it brought leaves th
 	const withState = function( changes, helperChanges ) { return [ FEATURES[0], FEATURES[1], Object.assign( {}, sample, changes ), FEATURES[3], Object.assign( {}, helperOn, helperChanges ) ] };
 	panel._features = withState( {}, {} );
 	check( 'the button is drawn for a feature with a unit whose requirements are on, current and able to run', panel._canReapply( panel._features[2] ) === true );
+	// What a feature that is on runs without: a component the kernel did not register, with the kernel's reason, on the screen of the feature
+	panel._features = withState( { components : [ 'component "probe-box" is the feature "other"\'s', 'group "probe": <b>no</b>' ], shipped : true }, {} );
+	panel._renderDetail();
+	const refusedNotes = findAll( screen, function( el ) { return hasClass( el, 'admin-features-refused' ) } );
+	check( 'the screen of a feature that is on says, for each component it runs without, that it is not registered and why - as text, in the style of an error - and that the feature comes with Nino',
+		refusedNotes.map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/component-refused').replace( '%s', 'component "probe-box" is the feature "other"\'s' )+ '|'+ text('/_admin/features/label/component-refused').replace( '%s', 'group "probe": <b>no</b>' )
+		&& refusedNotes.every( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.children.length === 0 } )
+		&& findAll( screen, function( el ) { return el.textContent === text('/_admin/features/label/shipped') } ).length === 1 );
+	panel._features = withState( {}, {} );
+	panel._renderDetail();
+	check( '...and a screen of a feature that runs with all its components has neither line', findAll( screen, function( el ) { return hasClass( el, 'admin-features-refused' ) } ).length === 0
+		&& findAll( screen, function( el ) { return el.textContent === text('/_admin/features/label/shipped') } ).length === 0 );
 	panel._features = withState( {}, { active : false } );
 	check( '...not while a requirement is off - an activation would switch it on', panel._canReapply( panel._features[2] ) === false );
 	panel._features = withState( {}, { update : true } );

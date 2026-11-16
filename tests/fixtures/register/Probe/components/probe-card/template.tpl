@@ -1,0 +1,1 @@
+<article class="[[class]]">[[value]]</article>

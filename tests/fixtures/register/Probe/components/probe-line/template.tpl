@@ -1,0 +1,1 @@
+<p class="[[class]]" data-mark="[[mark]]">[[value]]</p>

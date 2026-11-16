@@ -374,6 +374,8 @@ namespace Nino {
 		 *						newest is shown with what it asks for)
 		 *	- 'local'	the version on disk, null when not there
 		 *	- 'active'	whether the local one is active
+		 *	- 'shipped'	whether the local one is delivered with the kernel: it is 'current' whatever
+		 *						the catalogue lists, and install() refuses it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$catalogue		A parsed catalogue
@@ -404,11 +406,16 @@ namespace Nino {
 				$offer['fits']		= $best !== null;
 				$offer['local']		= $installed[$key]['version'] ?? null;
 				$offer['active']	= $installed[$key]['active'] ?? false;
-				$offer['state']		= $best === null
-					? 'incompatible'
-					: ( $offer['local'] === null
-						? 'available'
-						: ( version_compare( self::_comparable( $offer['version'] ), self::_comparable( $offer['local'] ) ) > 0 ? 'upgrade' : 'current' ) );
+				$offer['shipped']	= ( $installed[$key]['shipped'] ?? false ) === true;
+
+				// A feature that is delivered with the kernel is updated with it: the catalogue offers no version of it
+				$offer['state']		= $offer['shipped'] === true
+					? 'current'
+					: ( $best === null
+						? 'incompatible'
+						: ( $offer['local'] === null
+							? 'available'
+							: ( version_compare( self::_comparable( $offer['version'] ), self::_comparable( $offer['local'] ) ) > 0 ? 'upgrade' : 'current' ) ) );
 
 				$offers[$key] = $offer;
 			}
@@ -541,6 +548,10 @@ namespace Nino {
 		 *	@return 	array|string						The entries to place, or why not
 		 */
 		private static function _plan( array &$appData, array $catalogue, string $key, string $version, array $chain ): array|string {
+
+			// A feature that is delivered with the kernel is updated with it, and nothing in the features directory takes its place
+			if( ( \Nino\Features::get( $appData, $key )['shipped'] ?? false ) === true )
+				return 'the feature "'. $key. '" is delivered with the kernel and is updated with it';
 
 			$entry = null;
 

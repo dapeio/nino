@@ -4954,7 +4954,7 @@ $pickFeature['/nino/modules'] = [ '\Nino\Modules\Picker' ];
 $pickFeature['./nino/features/listed'] = [ 'modules' => $pickFeature['/nino/modules'], 'manifests' => [ [ 'key' => 'picker', 'dir' => '/features/Picker', 'module' => '\Nino\Modules\Picker', 'components' => [ 'picker-form' => $pickBad, 'picker-broken' => $pickGood ], 'stacks' => [] ] ] ];
 ninoWarnings();
 $pickRegisterErrors = ninoErrors( static function() use ( &$pickFeature ): void {
-	\Nino\Features::registerComponents( $pickFeature );
+	\Nino\Features::registerManifestComponents( $pickFeature );
 } );
 check( 'a listed feature whose method is not there is registered without that component and with a warning, not a fatal error - the others of its manifest are registered',
 	count( $pickRegisterErrors ) === 1 && $pickRegisterErrors[0][0] === E_USER_WARNING
@@ -4978,7 +4978,7 @@ ninoWarnings();
 $pickThrown = null;
 $pickParseErrors = ninoErrors( static function() use ( &$pickParse, &$pickThrown ): void {
 	try {
-		\Nino\Features::registerComponents( $pickParse );
+		\Nino\Features::registerManifestComponents( $pickParse );
 	}
 	catch( \Throwable $thrown ) {
 		$pickThrown = $thrown;

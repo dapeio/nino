@@ -421,6 +421,12 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
+			// A feature that is delivered with the kernel is a module of it, and has no directory of its own
+			if( $feature['shipped'] === true ) {
+				\Nino\Http::fail( $request, 400, 'feature "'. $key. '" is delivered with the kernel and has no directory of its own to remove', 'features_remove_shipped' );
+				return;
+			}
+
 			// An active feature is not a directory that cannot be removed: its own code
 			if( $feature['active'] === true ) {
 				\Nino\Http::fail( $request, 400, 'feature "'. $key. '" is active - switch it off before removing it', 'features_remove_active' );
@@ -1376,8 +1382,12 @@ namespace Nino\Modules\Features {
 				'installed'		=> $feature['installed'],
 				'active'			=> $feature['active'],
 				'update'			=> $feature['update'],
+				// Delivered with the kernel: switched on and off like the others, with no directory to remove and no update from the catalogue
+				'shipped'			=> $feature['shipped'],
 				'requires'		=> $feature['requires'],
 				'problems'		=> $feature['problems'],
+				// Why a component or a group of a feature that is on is not registered - nothing that keeps it from running, so no problem of the ones above
+				'components'	=> \Nino\Features::componentProblems( $appData, $feature['key'] ),
 				// Whether it brings an install unit, which is what the Apply again action works on
 				'unit'				=> is_dir( $feature['dir']. '/install' ),
 				'settings'		=> $settings,

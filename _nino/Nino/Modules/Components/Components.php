@@ -594,7 +594,7 @@ namespace Nino\Modules {
 				] + ( $holds !== null ? [ 'holds' => $holds ] : [] ) );
 			}
 
-			\Nino\Features::registerComponents( $appData );
+			\Nino\Features::registerManifestComponents( $appData );
 		}
 
 		/**

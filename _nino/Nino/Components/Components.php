@@ -76,8 +76,22 @@ namespace Nino {
 		public const string NOTICED = './nino/register/noticed';
 		public const string VERSION = './nino/register/version';
 
+		// What the features that bring components have claimed: the groups by name - the feature, the words, the
+		// knobs, whether the group has a standard part and the components in it - and the feature of every
+		// name, see restore()
+		public const string GROUPS = './nino/register/groups';
+		public const string OWNERS = './nino/register/owners';
+
 		// The hook that adds the variants a theme brings, see _variants()
 		public const string VARIANTS = '/nino/components/variants';
+
+		// The hook that is asked for the standard part of a group before it goes into the style bundle, see
+		// \Nino\Features::registerParts()
+		public const string PARTS = '/nino/components/parts';
+
+		// What a group may say of a knob: how many of a component, how many steps of the ladder
+		public const int KNOBS = 6;
+		public const int STEPS = 5;
 
 		// What a component takes its first word from, see _reference()
 		public const array SOURCES = [ 'text', 'image', 'link', 'none' ];
@@ -113,10 +127,12 @@ namespace Nino {
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
 		// the word of a variant or of an option that is written as a class; the value of an id; a field of an element
-		private const string NAME = '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D';
+		public const string NAME = '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D';
 		private const string ATTRIBUTE = '/^[a-z][a-zA-Z0-9]*$/D';
 		private const string WORD = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D';
 		private const string ID = '/^[a-z][a-z0-9-]*$/D';
+		private const string KNOB = '/^([a-z][a-z0-9]*(?:-[a-z0-9]+)*)\.([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/D';
+		private const string STEP = '/^[A-Za-z0-9 .,%()+*\/#-]{1,120}$/D';
 		private const string FIELD = '/^[A-Za-z][A-Za-z0-9_-]*$/D';
 
 		// What a reference to a text is written as: one word, with no bracket, no space and no control character in it
@@ -129,7 +145,7 @@ namespace Nino {
 		private const int ID_LENGTH = 64;
 
 		// The longest name of a component, of a place and of an attribute
-		private const int NAME_LENGTH = 40;
+		public const int NAME_LENGTH = 40;
 
 		// The longest template, in bytes. A page is a few KB; a template of 64 KB is something else
 		private const int TEMPLATE_LENGTH = 65536;
@@ -229,6 +245,567 @@ namespace Nino {
 			$appData[self::FILLS][$name] = array_values( array_unique( $fills[1] ) );
 
 			unset( $appData[self::VERSION] );
+		}
+
+		/**
+		 *	Register what a feature brings from its folders, as \Nino\Features::readComponents() read and checked it
+		 *	- the schemas are not checked again, which is what a request that takes them from the cache of the
+		 *	register saves. What a renderer is for a component is the caller's to say, since it is code.
+		 *
+		 *	A name and a group belong to one feature: what another feature has claimed is refused, with a warning
+		 *	that names both, and the feature goes on without it. A component whose group is refused goes with it.
+		 *	The same feature that registers again takes the place of what it registered
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$feature			The key of the feature
+		 *	@param		array			$read					[ 'components' => name => clean schema, 'groups' => group => clean group ]
+		 *	@param		array			$renderers		name => callable, for the components that compute
+		 *
+		 *	@return 	void
+		 */
+		public static function restore( array &$appData, string $feature, array $read, array $renderers ): void {
+
+			$refused = [];
+
+			foreach( (array) ( $read['groups'] ?? [] ) as $group => $declared ) {
+
+				$owner = $appData[self::OWNERS]['groups'][$group] ?? null;
+
+				if( $owner !== null && $owner !== $feature ) {
+
+					$refused[$group] = true;
+					self::_notice( $appData, 'group '. $group, 'Components: the group "'. self::_shown( (string) $group ). '" of the feature "'. $feature. '" is the feature "'. $owner. '"\'s - the feature goes on without it and its components', E_USER_WARNING );
+					continue;
+				}
+
+				$appData[self::OWNERS]['groups'][$group] = $feature;
+				$appData[self::GROUPS][$group] = [ 'feature' => $feature, 'label' => $declared['label'], 'knobs' => $declared['knobs'], 'part' => $declared['part'], 'components' => (array) ( $appData[self::GROUPS][$group]['components'] ?? [] ) ];
+			}
+
+			foreach( (array) ( $read['components'] ?? [] ) as $name => $clean ) {
+
+				$name = (string) $name;
+				$group = (string) ( $clean['group'] ?? '' );
+				$owner = $appData[self::OWNERS]['names'][$name] ?? null;
+
+				if( isset( $refused[$group] ) === true ) {
+
+					self::_notice( $appData, 'name '. $name, 'Components: the component "'. self::_shown( $name ). '" of the feature "'. $feature. '" is in a group that is refused - the feature goes on without it', E_USER_WARNING );
+					continue;
+				}
+
+				if( $owner !== null && $owner !== $feature ) {
+
+					self::_notice( $appData, 'name '. $name, 'Components: the component "'. self::_shown( $name ). '" of the feature "'. $feature. '" is the feature "'. $owner. '"\'s - the feature goes on without it', E_USER_WARNING );
+					continue;
+				}
+
+				$appData[self::OWNERS]['names'][$name] = $feature;
+				self::_store( $appData, $name, $clean, isset( $renderers[$name] ) === true ? $renderers[$name] : null );
+
+				if( in_array( $name, (array) ( $appData[self::GROUPS][$group]['components'] ?? [] ), true ) === false )
+					$appData[self::GROUPS][$group]['components'][] = $name;
+			}
+		}
+
+		/**
+		 *	The groups the features that bring components have claimed, in the order they were registered
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										group => [ 'feature' => key, 'label' => text or map, 'knobs' => as the group says them,
+		 *																	'part' => whether the group has a standard part, 'components' => names in the order registered ]
+		 */
+		public static function groups( array &$appData ): array {
+
+			return (array) ( $appData[self::GROUPS] ?? [] );
+		}
+
+		/**
+		 *	Check what a group.php says and make it complete: a name and the knobs of the group. A knob is
+		 *	'<component>.<name>' => [ 'token' => '--<component>-<name>', 'label' => text or map, 'ladder' => five
+		 *	steps ], of a component of the group, at most KNOBS for a component. A step is a value of css the
+		 *	compiler of a theme may write as it is: no quote, no semicolon, no brace, no comment, no url()
+		 *
+		 *	@param		string		$group				The group, a slug
+		 *	@param		mixed			$declared			What group.php returned
+		 *	@param		array			$components		The names of the components that are in the group
+		 *
+		 *	@return 	array|string						[ 'label' => ..., 'knobs' => ... ], or what is wrong with it
+		 */
+		public static function validateGroup( string $group, mixed $declared, array $components ): array|string {
+
+			$what = 'group "'. self::_shown( $group ). '"';
+
+			if( strlen( $group ) > self::NAME_LENGTH || preg_match( self::NAME, $group ) !== 1 )
+				return $what. ': a name is a slug of lower case letters, digits and hyphens, at most '. self::NAME_LENGTH. ' characters';
+
+			if( is_array( $declared ) === false )
+				return $what. ': group.php must return an array';
+
+			foreach( array_keys( $declared ) as $key )
+				if( $key !== 'label' && $key !== 'knobs' )
+					return $what. ': "'. self::_shown( (string) $key ). '" is no key of a group - there are label, knobs';
+
+			$label = $declared['label'] ?? '';
+
+			if( self::_words( $label ) === false || array_filter( (array) $label, static fn( mixed $text ): bool => trim( (string) $text ) === '' ) !== [] || $label === [] )
+				return $what. ': "label" must be a string or a locale => string map, with no empty text';
+
+			$knobs = $declared['knobs'] ?? [];
+
+			if( is_array( $knobs ) === false )
+				return $what. ': "knobs" must be a map of component.name => knob';
+
+			$clean = [];
+			$counts = [];
+
+			foreach( $knobs as $key => $knob ) {
+
+				$where = $what. ', knob "'. self::_shown( (string) $key ). '": ';
+
+				if( is_string( $key ) === false || preg_match( self::KNOB, $key, $parts ) !== 1 || strlen( $key ) > 2 * self::NAME_LENGTH + 1 )
+					return $where. 'the key is <component>.<name>, words of lower case letters, digits and hyphens';
+
+				if( in_array( $parts[1], $components, true ) === false )
+					return $where. '"'. $parts[1]. '" is no component of the group';
+
+				$counts[$parts[1]] = ( $counts[$parts[1]] ?? 0 ) + 1;
+
+				if( $counts[$parts[1]] > self::KNOBS )
+					return $where. 'a component has '. self::KNOBS. ' knobs at most';
+
+				if( is_array( $knob ) === false )
+					return $where. 'a knob is an array of token, label and ladder';
+
+				foreach( array_keys( $knob ) as $name )
+					if( in_array( $name, [ 'token', 'label', 'ladder' ], true ) === false )
+						return $where. '"'. self::_shown( (string) $name ). '" is no key of a knob - there are token, label, ladder';
+
+				if( ( $knob['token'] ?? null ) !== '--'. $parts[1]. '-'. $parts[2] )
+					return $where. '"token" is "--'. $parts[1]. '-'. $parts[2]. '"';
+
+				$words = $knob['label'] ?? '';
+
+				if( self::_words( $words ) === false || array_filter( (array) $words, static fn( mixed $text ): bool => trim( (string) $text ) === '' ) !== [] || $words === [] )
+					return $where. '"label" must be a string or a locale => string map, with no empty text';
+
+				$ladder = $knob['ladder'] ?? null;
+
+				if( is_array( $ladder ) === false || array_is_list( $ladder ) === false || count( $ladder ) !== self::STEPS )
+					return $where. '"ladder" is a list of '. self::STEPS. ' steps';
+
+				foreach( $ladder as $step )
+					if( is_string( $step ) === false || preg_match( self::STEP, $step ) !== 1 || str_contains( $step, '/*' ) === true || str_contains( $step, '*/' ) === true || preg_match( '/url\s*\(/i', $step ) === 1 )
+						return $where. 'a step of the ladder is a value of css of at most 120 characters, with no quote, semicolon, brace, comment or url()';
+
+				$clean[$key] = [ 'token' => $knob['token'], 'label' => $words, 'ladder' => $ladder ];
+			}
+
+			return [ 'label' => $label, 'knobs' => $clean ];
+		}
+
+		/**
+		 *	What a standard part - the css of a group - does against the rule of mixing. It is read as css is - comments, strings
+		 *	with their escapes, blocks - and not searched for patterns:
+		 *
+		 *	- no backslash outside a string: a part spells no name, selector or function with an escape
+		 *	- every selector has a class of its own components (the name, or the name and a hyphen and more), or is :root; a class
+		 *	  of another component, an id and an attribute selector on the class are none of its business, and neither is a
+		 *	  selector with no class of its own (a type, `*`)
+		 *	- it reads only --brand-..., --page-... and the tokens of its own components (--<component>-...) and sets only the
+		 *	  latter, :root among the selectors as well
+		 *	- no !important, no @import, @layer, @namespace or @charset, and nothing that loads from outside: url(), image-set(),
+		 *	  -webkit-image-set(), src(), in any case
+		 *
+		 *	\Nino\Features::readComponents() asks it of the part of every group, and a suite of a feature asks it of the
+		 *	parts it ships
+		 *
+		 *	@param		string		$css					The text of the part
+		 *	@param		array			$components		The names of the components of the group
+		 *
+		 *	@return 	array										What it does wrong, one sentence each; [] where it keeps the rule
+		 */
+		public static function partProblems( string $css, array $components ): array {
+
+			$problems = [];
+			$escaped = false;
+
+			// Comments become a blank, a string is what it is without its text, a backslash outside of one is said
+			$plain = preg_replace_callback( '~/\*.*?\*/|"(?:[^"\\\\\n]|\\\\.)*"|\'(?:[^\'\\\\\n]|\\\\.)*\'|\\\\~s', static function( array $found ) use ( &$escaped ): string {
+
+				if( $found[0] === '\\' )
+					$escaped = true;
+
+				return $found[0][0] === '/' || $found[0] === '\\' ? ' ' : "\x01";
+			}, $css );
+
+			if( $plain === null || preg_match( '/["\']|\/\*/', $plain ) === 1 )
+				return [ 'cannot be read: a string or a comment is never closed, or it is too long for the check' ];
+
+			if( $escaped === true )
+				$problems[] = 'uses an escape (a backslash), which a part has no use for';
+
+			$items = [];
+			$at = 0;
+
+			if( self::_blocks( $plain, $at, 0, $items ) === false || $at < strlen( $plain ) )
+				return array_merge( $problems, [ 'cannot be read: its braces do not balance, or it is nested too deep' ] );
+
+			self::_checkPart( $items, $components, false, $problems );
+
+			return array_values( array_unique( $problems ) );
+		}
+
+		/**
+		 *	The blocks of css: the statements one level holds, each a rule - its prelude and what it holds - or a declaration
+		 *
+		 *	@param		string		$css					Without comments and without the text of strings
+		 *	@param		int				$at						(reference) Where to read from, and where it stopped
+		 *	@param		int				$depth
+		 *	@param		array			$items				(reference) [ 'rule' => prelude, 'in' => items ] or [ 'declaration' => text ]
+		 *
+		 *	@return 	bool										Whether the blocks balance
+		 */
+		private static function _blocks( string $css, int &$at, int $depth, array &$items ): bool {
+
+			if( $depth > 16 )
+				return false;
+
+			$length = strlen( $css );
+
+			while( $at < $length ) {
+
+				$stop = strcspn( $css, ';{}', $at );
+				$text = trim( substr( $css, $at, $stop ) );
+				$at += $stop;
+
+				if( $at >= $length ) {
+
+					if( $text !== '' )
+						$items[] = [ 'declaration' => $text ];
+
+					return $depth === 0;
+				}
+
+				$mark = $css[$at++];
+
+				if( $mark === '}' ) {
+
+					if( $text !== '' )
+						$items[] = [ 'declaration' => $text ];
+
+					return $depth > 0;
+				}
+
+				if( $mark === ';' ) {
+
+					if( $text !== '' )
+						$items[] = [ 'declaration' => $text ];
+
+					continue;
+				}
+
+				$inside = [];
+
+				if( self::_blocks( $css, $at, $depth + 1, $inside ) === false )
+					return false;
+
+				$items[] = [ 'rule' => $text, 'in' => $inside ];
+			}
+
+			return $depth === 0;
+		}
+
+		/**
+		 *	Hold the statements of a part to the rule of mixing
+		 *
+		 *	@param		array			$items				See _blocks()
+		 *	@param		array			$components		The components of the group
+		 *	@param		bool			$keyframes		The rules are the steps of an animation: no selectors
+		 *	@param		array			$problems			(reference)
+		 *	@param		bool			$owned				Whether the rules stand in a rule of the part's own
+		 *
+		 *	@return 	void
+		 */
+		private static function _checkPart( array $items, array $components, bool $keyframes, array &$problems, bool $owned = false ): void {
+
+			foreach( $items as $item ) {
+
+				if( isset( $item['declaration'] ) === true ) {
+
+					self::_checkDeclaration( $item['declaration'], $components, $problems );
+					continue;
+				}
+
+				$prelude = $item['rule'];
+
+				if( str_starts_with( $prelude, '@' ) === true ) {
+
+					self::_checkAt( $prelude, $problems );
+					self::_checkPart( $item['in'], $components, preg_match( '/^@(?:-[a-z]+-)?keyframes\b/i', $prelude ) === 1, $problems, $owned );
+					continue;
+				}
+
+				// A rule nested in this one stands on its elements with &: that holds where this rule is the part's own
+				$inner = $keyframes === false ? self::_checkSelector( $prelude, $components, $problems, $owned ) : false;
+
+				self::_checkPart( $item['in'], $components, false, $problems, $inner );
+			}
+		}
+
+		/**
+		 *	A declaration, or an at-rule that has no block (@import "x";)
+		 *
+		 *	@param		string		$text
+		 *	@param		array			$components
+		 *	@param		array			$problems			(reference)
+		 *
+		 *	@return 	void
+		 */
+		private static function _checkDeclaration( string $text, array $components, array &$problems ): void {
+
+			if( str_starts_with( $text, '@' ) === true ) {
+
+				self::_checkAt( $text, $problems );
+				return;
+			}
+
+			$colon = strpos( $text, ':' );
+
+			if( $colon === false )
+				return;
+
+			$property = trim( substr( $text, 0, $colon ) );
+			$value = substr( $text, $colon + 1 );
+
+			if( str_starts_with( $property, '--' ) === true && self::_ownToken( $property, $components ) === false )
+				$problems[] = 'sets '. self::_shown( $property ). ', which is no token of its own components';
+
+			if( preg_match( '/!\s*important/i', $value ) === 1 )
+				$problems[] = 'uses !important';
+
+			if( preg_match( '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:url|image-set|src)\s*\(/i', $value ) === 1 )
+				$problems[] = preg_match( '/(?<![A-Za-z0-9_])url\s*\(/i', $value ) === 1 ? 'uses url()' : 'loads from outside: it uses image-set() or src()';
+
+			if( preg_match_all( '/(?<![A-Za-z0-9_-])var\(\s*(--[^\s,)]*)/i', $value, $read ) > 0 )
+				foreach( array_unique( $read[1] ) as $token )
+					if( str_starts_with( $token, '--brand-' ) === false && str_starts_with( $token, '--page-' ) === false && self::_ownToken( $token, $components ) === false )
+						$problems[] = 'reads '. self::_shown( $token ). ', which is no token of the brand, of the page or of its own components';
+		}
+
+		/**
+		 *	The at-rules a part has none of
+		 *
+		 *	@param		string		$prelude
+		 *	@param		array			$problems			(reference)
+		 *
+		 *	@return 	void
+		 */
+		private static function _checkAt( string $prelude, array &$problems ): void {
+
+			if( preg_match( '/^@([A-Za-z-]+)/', $prelude, $name ) === 1 && in_array( strtolower( $name[1] ), [ 'import', 'layer', 'namespace', 'charset' ], true ) === true )
+				$problems[] = 'uses @'. strtolower( $name[1] );
+		}
+
+		/**
+		 *	The selectors of a rule: each starts from an element of the components of the group or is :root, and none meets what is not theirs
+		 *
+		 *	@param		string		$prelude
+		 *	@param		array			$components
+		 *	@param		array			$problems			(reference)
+		 *	@param		bool			$owned				Whether the rule stands in a rule whose selectors all are the part's own
+		 *
+		 *	@return 	bool										Whether every selector of the list is the part's own: what a rule nested in this one is relative to
+		 */
+		private static function _checkSelector( string $prelude, array $components, array &$problems, bool $owned = false ): bool {
+
+			// The commas of a list, not the ones inside a :is( , ) or an attribute
+			$list = [];
+			$depth = 0;
+			$one = '';
+
+			foreach( str_split( $prelude ) as $char ) {
+
+				if( $char === '(' || $char === '[' )
+					$depth++;
+				else if( $char === ')' || $char === ']' )
+					$depth--;
+
+				if( $char === ',' && $depth === 0 ) {
+					$list[] = $one;
+					$one = '';
+				}
+				else
+					$one .= $char;
+			}
+
+			$list[] = $one;
+
+			$all = true;
+
+			foreach( $list as $selector ) {
+
+				$selector = trim( $selector );
+
+				if( $selector === ':root' ) {
+					$all = false;
+					continue;
+				}
+
+				preg_match_all( '/\.([A-Za-z_][A-Za-z0-9_-]*)/', $selector, $classes );
+				$foreign = false;
+
+				foreach( array_unique( $classes[1] ) as $class ) {
+
+					$own = false;
+
+					foreach( $components as $component )
+						$own = $own === true || $class === $component || str_starts_with( $class, $component. '-' ) === true;
+
+					if( $own === false )
+						$foreign = true;
+
+					if( $own === false )
+						$problems[] = 'meets the class .'. self::_shown( $class ). ', which is no class of its own components';
+				}
+
+				if( preg_match( '/#[A-Za-z_-]/', $selector ) === 1 )
+					$problems[] = 'meets an id: '. self::_shown( $selector );
+
+				// An attribute selector on class is a way round the rule - [class*="section"] meets what it likes - but for
+				// one that only narrows an element the part owns: .section-col:where( [class*="--ground-"] ) is the column
+				// with a ground, and meets no element that .section-col does not meet
+				if( preg_match( '/\[\s*(?:[A-Za-z0-9_|*-]*\|)?class\b/i', $selector ) === 1 && self::_narrows( $selector, $components ) === false )
+					$problems[] = 'meets the classes of the page by an attribute selector: '. self::_shown( $selector );
+
+				// The element the selector speaks of first has to be the part's own: a class of its components at the top of
+				// the selector, outside every function - *:not(.own) and :is(body, .own) name the class and meet the page -
+				// or the selector is nested in a rule of its own, which it is relative to. At the top of the sheet, and under :root, & is the
+				// root of the page
+				$top = '';
+				$depth = 0;
+
+				foreach( str_split( $selector ) as $char ) {
+
+					if( $char === '(' || $char === '[' )
+						$depth++;
+					else if( $char === ')' || $char === ']' )
+						$depth--;
+					else if( $depth === 0 )
+						$top .= $char;
+				}
+
+				$stands = $owned;
+				preg_match_all( '/\.([A-Za-z_][A-Za-z0-9_-]*)/', $top, $named );
+
+				foreach( $named[1] as $class )
+					foreach( $components as $component )
+						$stands = $stands === true || $class === $component || str_starts_with( $class, $component. '-' ) === true;
+
+				// A selector that was told of a foreign class has its sentence already
+				if( $stands === false ) {
+
+					$all = false;
+
+					if( $foreign === false )
+						$problems[] = 'has a selector with no class of its own components: '. self::_shown( $selector );
+				}
+			}
+
+			return $all;
+		}
+
+		/**
+		 *	Whether every attribute selector on class of a selector stands on an element the part owns: in a
+		 *	compound that names a class of the components by itself, the attribute either beside that class or
+		 *	in a function on it - :where(), :is(), :not(), never :has() - whose arguments are compounds with no
+		 *	combinator, so that they speak of the same element
+		 *
+		 *	@param		string		$selector			One selector of a list, strings taken out
+		 *	@param		array			$components		The names of the components of the group
+		 *
+		 *	@return 	bool
+		 */
+		private static function _narrows( string $selector, array $components ): bool {
+
+			// The compounds of the top level: cut at the combinators that stand in no bracket
+			$compounds = [];
+			$depth = 0;
+			$one = '';
+
+			foreach( str_split( $selector ) as $char ) {
+
+				if( $char === '(' || $char === '[' )
+					$depth++;
+				else if( $char === ')' || $char === ']' )
+					$depth--;
+
+				if( $depth === 0 && ( $char === ' ' || $char === "\t" || $char === "\n" || $char === "\r" || $char === '>' || $char === '+' || $char === '~' ) ) {
+					$compounds[] = $one;
+					$one = '';
+				}
+				else
+					$one .= $char;
+			}
+
+			$compounds[] = $one;
+
+			foreach( $compounds as $compound ) {
+
+				if( preg_match( '/\[\s*(?:[A-Za-z0-9_|*-]*\|)?class\b/i', $compound ) !== 1 )
+					continue;
+
+				// The class of its own at the top of the compound, outside every function
+				$top = '';
+				$depth = 0;
+
+				foreach( str_split( $compound ) as $char ) {
+
+					if( $char === '(' )
+						$depth++;
+					else if( $char === ')' )
+						$depth--;
+					else if( $depth === 0 )
+						$top .= $char;
+				}
+
+				$own = false;
+				preg_match_all( '/\.([A-Za-z_][A-Za-z0-9_-]*)/', (string) preg_replace( '/\[[^\]]*\]/', '', $top ), $classes );
+
+				foreach( $classes[1] as $class )
+					foreach( $components as $component )
+						$own = $own === true || $class === $component || str_starts_with( $class, $component. '-' ) === true;
+
+				if( $own === false )
+					return false;
+
+				// Inside its functions no combinator: what is left once the attributes are taken out has no blank
+				// between two parts and none of > + ~
+				$inside = (string) preg_replace( '/\[[^\]]*\]/', 'A', $compound );
+
+				if( preg_match( '/[>+~]|[^\s,(]\s+[^\s,)]/', $inside ) === 1 || stripos( $inside, ':has(' ) !== false )
+					return false;
+			}
+
+			return true;
+		}
+
+		/**
+		 *	Whether a custom property is the token of one of the components: --<component>-...
+		 *
+		 *	@param		string		$token
+		 *	@param		array			$components
+		 *
+		 *	@return 	bool
+		 */
+		private static function _ownToken( string $token, array $components ): bool {
+
+			foreach( $components as $component )
+				if( str_starts_with( $token, '--'. $component. '-' ) === true )
+					return true;
+
+			return false;
 		}
 
 		/**

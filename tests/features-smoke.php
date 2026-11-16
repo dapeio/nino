@@ -63,7 +63,7 @@ check( 'every readable manifest is listed, sorted by key', array_keys( $all ) ==
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'assets', 'settings', 'components', 'stacks', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'shipped', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'assets', 'settings', 'components', 'stacks', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -651,7 +651,7 @@ check( 'a shortcode belongs to the feature whose class answers it, a closure inc
 
 // What the manifest declares becomes shortcodes, once per boot, for the features
 // that are listed in '/nino/modules' and for no other
-echo "Features::registerComponents - the components and stacks of a manifest\n";
+echo "Features::registerManifestComponents - the components and stacks of a manifest\n";
 
 check( 'the reference feature declares two components and a stack, a feature without the keys none', array_keys( $all['sample']['components'] ) === [ 'greeting', 'caption' ] && array_keys( $all['sample']['stacks'] ) === [ 'rows' ]
 	&& $all['helper']['components'] === [] && $all['helper']['stacks'] === [] );
@@ -661,11 +661,11 @@ $declared = ninoSandbox( 'components' );
 $declared['/nino/dir'] = '';
 \Nino\Html::init( $declared );
 $declared['/nino/modules'] = [ '\\Nino\\Modules\\Helper' ];
-\Nino\Features::registerComponents( $declared );
+\Nino\Features::registerManifestComponents( $declared );
 check( 'a feature that is not listed registers nothing, and one that declares nothing none either', \Nino\Modules\Components::components( $declared ) === [] && \Nino\Modules\Components::stacks( $declared ) === [] && ninoWarnings() === [] );
 
 $declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
-\Nino\Features::registerComponents( $declared );
+\Nino\Features::registerManifestComponents( $declared );
 check( 'a listed feature\'s components and stacks are registered with the schema of its manifest', array_keys( \Nino\Modules\Components::components( $declared ) ) === [ 'greeting', 'caption' ] && array_keys( \Nino\Modules\Components::stacks( $declared ) ) === [ 'rows' ]
 	&& \Nino\Modules\Components::components( $declared )['greeting'] === $all['sample']['components']['greeting'] && \Nino\Modules\Components::stacks( $declared )['rows'] === $all['sample']['stacks']['rows']
 	&& \Nino\Modules\Components::defaults( $declared, 'greeting' ) === [ 'shout' => '0', 'class' => '' ] && ninoWarnings() === [] );
@@ -710,7 +710,7 @@ ninoWarnings();
 check( 'a feature whose component says stretched is read and activates: the manifest holds the key as it was written, and nothing is said',
 	\Nino\Features::manifest( \Nino\Features::dir(). '/Boxy' )['components']['boxy-link']['stretched'] === true && \Nino\Features::activate( $boxy, 'boxy' ) === true
 	&& array_filter( ninoWarnings(), static fn( string $warning ): bool => str_contains( $warning, 'Boxy' ) === true ) === [] );
-\Nino\Features::registerComponents( $boxy );
+\Nino\Features::registerManifestComponents( $boxy );
 check( '...registering it says nothing, and the schema the registry issues carries stretched as true - and not link, which the component does not say - under the feature that registered it',
 	ninoWarnings() === [] && ( \Nino\Modules\Components::components( $boxy )['boxy-link']['stretched'] ?? null ) === true && \Nino\Modules\Components::components( $boxy )['boxy-link']['link'] === false
 	&& \Nino\Modules\Components::components( $boxy )['boxy-link']['by'] === 'boxy'
@@ -721,7 +721,7 @@ check( '...and it renders the <a> it draws, with the class it gave it, and the k
 // ...and where the class has neither, the component is skipped with the warning
 // that names the renderer it looked for, and nothing is registered
 $declared['/nino/modules'] = [ '\\Nino\\Modules\\Mute' ];
-$mute = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerComponents( $declared ); } );
+$mute = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerManifestComponents( $declared ); } );
 check( 'a component whose class has neither a renderer nor doShortcode() is a warning that names the renderer it looked for', count( $mute ) === 1 && $mute[0][0] === E_USER_WARNING
 	&& str_contains( $mute[0][1], '"chime"' ) === true && str_contains( $mute[0][1], 'Mute::componentChime()' ) === true );
 check( '...and the component is not registered, so that no shortcode answers for it', isset( \Nino\Modules\Components::components( $declared )['chime'] ) === false && \Nino\Features::shortcodes( $declared, 'mute' ) === [] );
@@ -729,7 +729,7 @@ check( '...and the component is not registered, so that no shortcode answers for
 // A stack keeps the strict rule: the fallback to doShortcode() is a component's.
 // Strict has a doShortcode() and no stackLedger()
 $declared['/nino/modules'] = [ '\\Nino\\Modules\\Strict' ];
-$strict = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerComponents( $declared ); } );
+$strict = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerManifestComponents( $declared ); } );
 check( 'a stack whose class has no renderer of its name is skipped with the warning, though the class has a doShortcode() - the fallback is a component\'s', count( $strict ) === 1 && $strict[0][0] === E_USER_WARNING
 	&& str_contains( $strict[0][1], '"ledger"' ) === true && str_contains( $strict[0][1], 'Strict::stackLedger()' ) === true
 	&& isset( \Nino\Modules\Components::stacks( $declared )['ledger'] ) === false && \Nino\Features::shortcodes( $declared, 'strict' ) === [] );
@@ -774,7 +774,7 @@ $asked = ninoSandbox( 'assets-asked' );
 $asked['/nino/dir'] = '';
 \Nino\Html::init( $asked );
 $asked['/nino/modules'] = [ '\\Nino\\Modules\\Broken', '\\Nino\\Modules\\Sample' ];
-$askedErrors = ninoErrors( function() use ( &$asked ) { \Nino\Features::registerAssets( $asked ); \Nino\Features::registerComponents( $asked ); } );
+$askedErrors = ninoErrors( function() use ( &$asked ) { \Nino\Features::registerAssets( $asked ); \Nino\Features::registerManifestComponents( $asked ); } );
 check( 'a listed manifest that does not validate is said once per boot, though the bundles and the components both ask for it - and the features after it are read all the same', count( $askedErrors ) === 1 && $askedErrors[0][0] === E_USER_WARNING
 	&& str_contains( $askedErrors[0][1], '/Broken/feature.php' ) === true && ( $asked['/nino/html/assets']['/.cache/style.css'] ?? [] ) === [ '/features/Sample/assets/sample.css' ]
 	&& isset( \Nino\Modules\Components::components( $asked )['greeting'] ) === true );
@@ -1148,7 +1148,7 @@ check( 'shortcode() registers the shortcode where the Components module owns no 
 check( '...and registers nothing where a component of that name is in the registry: it says so, and the component renders as it did', \Nino\Feature::shortcode( $toolset, 'owned', $toolPlain ) === false
 	&& \Nino\Html::renderHtml( $toolset, '[owned]' ) === 'by the component' );
 $toolset['/nino/modules'] = [ '\\Nino\\Modules\\Sample' ];
-\Nino\Features::registerComponents( $toolset );
+\Nino\Features::registerManifestComponents( $toolset );
 $toolRows = \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/rows' );
 check( '...and where the manifest of a feature declared the name under stacks: false as well, and the one callback of the stack is still the module\'s', isset( \Nino\Modules\Components::stacks( $toolset )['rows'] ) === true
 	&& count( $toolRows ) === 1 && \Nino\Feature::shortcode( $toolset, 'rows', $toolPlain ) === false && \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/rows' ) === $toolRows );
@@ -1789,7 +1789,7 @@ check( 'asked again it is no longer running, and the answer says so the way ever
 $appData['/nino/modules'] = $listedBefore;
 unset( $appData['./nino/features/all'] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'unit', 'settings', 'settingsTab' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'shipped', 'requires', 'problems', 'components', 'unit', 'settings', 'settingsTab' ] );
 $units = array_column( $body['features'], 'unit', 'key' );
 ksort( $units );
 check( 'every entry says whether the feature brings an install unit - the two that have a directory of it do, the others do not', $units === [ 'boxy' => false, 'helper' => true, 'mute' => false, 'old' => false, 'sample' => true, 'strict' => false ] );

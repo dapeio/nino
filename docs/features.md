@@ -21,6 +21,7 @@ project holds it with a version, settings in `config.php` and files under `data/
 |---|---|---|
 | **Kernel module** | `_nino/Nino/Modules/<Name>/`, Nino's own | the setup wizard, or `/nino/modules` by hand |
 | **Feature** | `features/<Name>/` with `feature.php`: from outside, held by the project | the Features panel, or an application of the setup wizard |
+| **Feature that comes with the kernel** | `_nino/Nino/Modules/<Name>/` with a `feature.php` | the Features panel, like any feature ([below](#a-feature-that-comes-with-the-kernel)) |
 | **Project module** | `app/<Vendor>/...` under a namespace of its own, the project's | `/nino/modules` by hand |
 
 "Module" is a class listed in `/nino/modules` whose `init()` the kernel calls;
@@ -217,7 +218,7 @@ manifest that names one. A component should carry `draws`, `in` and `icon`, opti
 are ([component recipe](recipes/component.md)): they are how the Builder shows it
 in a section, places it where it may stand and offers it with a picture.
 
-The manifest's `components` and `stacks` are the Components module's. A component that the kernel draws from its schema and template is not declared in a manifest: a feature registers it in its `init()` with `\Nino\Components::addComponent()` ([The Register of Components](development.md#the-register-of-components)).
+The manifest's `components` and `stacks` are the Components module's. A component that the kernel draws from its schema and template is not declared in a manifest: a feature brings it [in folders](#components-in-folders), or registers it in its `init()` with `\Nino\Components::addComponent()` ([The Register of Components](development.md#the-register-of-components)).
 
 A stack says what its cell is with `cell` and may take a field of the element as
 an attribute with the type `field`. `cell` is one of `components` (the default:
@@ -317,6 +318,16 @@ from, with a space in front, or nothing, which a cell does not fill. The first
 argument of a component in a cell may be `.slug` as it may be `.uri` and `.id`
 ([Components](development.md#components)); the renderer of a stack calls `renderStack()`
 and finds the cell filled.
+
+### Components in folders
+
+A component by schema of the [register](development.md#the-register-of-components) is not declared in the manifest: a feature brings it in folders, `components/<name>/component.php` with a `template.tpl` beside it and, for each group its components are in, `groups/<group>/group.php` and the standard part `groups/<group>/part/part.css`. The kernel reads them for a feature that is on, keeps what it checked in `private/data/cache/register/<key>.php` and registers the components before the `init()` of any module. The renderer is `component<Name>()` of the feature's class, the name in studly caps, where the class has one; a component needs a template or that method. A component of a feature names its `group`, and a group and a component name belong to one feature - the second claim is said and refused. The folders, the group file, the standard part, the hook `/nino/components/parts` that lets a theme replace it, the rule of mixing and the cache are in [A feature's components](development.md#a-features-components). A feature may have these folders and the manifest keys `components` and `stacks` above; each registers its own way. A feature's own test reads the parts it ships with `\Nino\Components::partProblems()`.
+
+The Features panel lists the reason a component of a feature that is on is not registered (`components` of an entry of `features/list`, from `\Nino\Features::componentProblems()`), which is no problem that keeps the feature from being switched on.
+
+### A feature that comes with the kernel
+
+A module of the kernel that has a `feature.php` - `_nino/Nino/Modules/<Name>/feature.php`, with the class `\Nino\Modules\<Name>` and the folders above - is a feature that is delivered with the kernel: `\Nino\Features::all()` lists it with `'shipped' => true`, among the features below `features/` and in the order of the keys, and the Features panel switches it on and off like any other, which lists its class in `/nino/modules` and records its version. It differs in three things. It has no directory of the project's to delete, so `\Nino\Features::remove()` refuses it (the panel's Remove answers that sentence, with the code of a removal that failed) and nothing is removed. It is updated with the kernel, so the catalogue offers no version of it: `\Nino\Catalogue::offers()` says `current` and `'shipped' => true` for its key whatever the catalogue lists, and `install()` refuses it - and does not place a requirement that is one. And its name is the kernel's: a directory below `features/` with that name, or one that claims its key, is refused. Its files are where the kernel's are, so a standard part is the file `/_nino/Nino/Modules/<Name>/groups/<group>/part/part.css` of the style bundle.
 
 ### The manual
 
@@ -474,7 +485,7 @@ The kernel classes a feature calls, by home:
 | `\Nino\AppData` | `writeContentData( $appData, $keys )` persists the given top-level keys of `config.php`; `stored()` **1.8** reads one as the file holds it |
 | `\Nino\Http` | `fail( $request, $status, $error, $code, $params, $field )` and `ok( $request, $body )` end a handler; `redirect()`, `allowSource()` a policy directive widened by one source, `pages()`, `matchesPath()`, `answersHtml()` for a sitemap or a protected area, all **1.8**; `isReservedUri( $uri )` **1.9** whether an address is one a page cannot have, `/_nino` or `/features` and what lies below; `requestRoute()`, `getRequest()`, `getClientIp()`; `afterResponse( $appData, $work )` (from the kernel that has it) work that runs once the response is out and the client let go - by `fastcgi_finish_request()` where php has it, else by the `Content-Length` the kernel tells for a body that goes out as it is, counted after every callback of `/nino/http/output` and after the body was encoded; for a file, a stream, a length or an encoding somebody else set, or a page php compresses itself, the work does not run in that request, and a response without asked-for work is sent byte for byte as it was |
 | `\Nino\Html` | `renderHtml()` a string as a page is rendered - read once into a tree and drawn from it - and `renderSource()` html+ drawn with the context of a call, `context()` that context, `tree()` the nodes of a source and `putFills()` a text with its fills put in, for a shortcode that has html+ of its own to draw (see [Drawing a page](development.md#drawing-a-page)), `renderTextfill()`, `resolveTextfill()` one fill; `addShortcode()` - a fourth argument says whether the name has an end -, `addAsset()`; `addFills()`; `getFills( $appData, $locale )` every fill of a language, the argument **1.8**; `removeFill()`, `absoluteUrl()` **1.8**; `sanitizeHtml()`; `shortcodeCalls()` the calls a template makes, `shortcodeParts()` a piece of html cut into its calls and the text between, `fillOrigin()` the language a fill's text was taken from, all **1.9** |
-| `\Nino\Components` | `addComponent( $appData, $name, $schema, $renderer )` a component by schema, `validate()`, `components()`, `allowed()` (see [The Register of Components](development.md#the-register-of-components)) |
+| `\Nino\Components` | `addComponent( $appData, $name, $schema, $renderer )` a component by schema, `validate()`, `components()`, `allowed()`, `groups()` the groups of the features that bring components in folders, `validateGroup()`, `partProblems()` what a standard part does against the rule of mixing (see [The Register of Components](development.md#the-register-of-components) and [A feature's components](development.md#a-features-components)) |
 | `\Nino\Text` | `entries()`, `entry()`, `isGrammarKey()`, `sanitizeValue()`: the project's texts and their keys |
 | `\Nino\Form` | `forms()`, `form()`, `posted()`, `validate()`, `entries()`; `blocked()` **1.8** whether the CSRF guard refused the request |
 | `\Nino\Images` | `getUrl()`, `getSlot()`, `getSlots()`, `setSlotFilename()`, `setSlotAlt()`, `cleanAlt()`, `process()`, `fit()`, `limits()`, `reject()`, `read()`, `restore()`, `delete()` |

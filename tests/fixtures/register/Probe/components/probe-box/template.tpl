@@ -1,0 +1,1 @@
+<section class="[[class]]" data-mark="[[mark]]">[[content]]</section>

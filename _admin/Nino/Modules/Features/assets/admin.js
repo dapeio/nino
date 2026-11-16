@@ -1663,6 +1663,9 @@
 			if( feature.requires.length > 0 )
 				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) ), false ) );
 
+			if( feature.shipped === true )
+				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/shipped'), false ) );
+
 			// What stands in the way of switching it on, one line each - the
 			// kernel's own words, which is where the check lives. These wrap
 			// rather than ellipsize: a reason cut off in the middle is no reason
@@ -1802,12 +1805,15 @@
 			// /nino/modules, so its directory is not something to delete from
 			// under the autoloader. Switching it off first is one click and
 			// says what it is doing
-			const remove = dc.createElement('button');
-			remove.type = 'button';
-			remove.className = 'nino-admin-btn-danger';
-			remove.textContent = Nino.content.getText('/_admin/features/label/remove');
-			remove.addEventListener( 'click', function() { Nino.admin.features._remove( feature, remove, msg ) } );
-			actions.appendChild( remove );
+			// ...except for a feature that comes with Nino: it is a module of the kernel, there is no directory of the project's to delete
+			if( feature.shipped !== true ) {
+				const remove = dc.createElement('button');
+				remove.type = 'button';
+				remove.className = 'nino-admin-btn-danger';
+				remove.textContent = Nino.content.getText('/_admin/features/label/remove');
+				remove.addEventListener( 'click', function() { Nino.admin.features._remove( feature, remove, msg ) } );
+				actions.appendChild( remove );
+			}
 
 			if( feature.problems.length === 0 ) {
 				const activate = dc.createElement('button');
@@ -2390,6 +2396,22 @@
 				requires.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) );
 				form.appendChild( requires );
 			}
+
+			if( feature.shipped === true ) {
+				const shipped = dc.createElement('p');
+				shipped.className = 'nino-admin-hint';
+				shipped.textContent = Nino.content.getText('/_admin/features/label/shipped');
+				form.appendChild( shipped );
+			}
+
+			// What the feature runs without - a component of its folders the kernel did not register, and why - in the kernel's words:
+			// nothing that keeps it from running, so it is no problem of the ones that keep it from being switched on
+			feature.components.forEach( function( reason ) {
+				const refused = dc.createElement('p');
+				refused.className = 'nino-admin-hint nino-admin-error admin-features-refused';
+				refused.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/label/component-refused'), reason );
+				form.appendChild( refused );
+			} );
 
 			/*	Where the feature has a panel of its own the settings are edited
 				there, in a tab of that panel (see settings.js): this screen then

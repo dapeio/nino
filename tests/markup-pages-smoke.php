@@ -185,7 +185,9 @@ function pagesBoot( string $sandbox, string $locale ): array {
 	\Nino\Html::init( $appData );
 	\Nino\Auth::init( $appData );
 	\Nino\Features::registerAssets( $appData );
+	\Nino\Features::registerComponents( $appData );
 	\Nino\Modules::callModules( $appData, 'init' );
+	\Nino\Features::registerParts( $appData );
 
 	$appData['./nino/locales/current'] = $locale;
 

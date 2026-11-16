@@ -1,0 +1,9 @@
+/*	probe - the standard part	*/
+:root {
+	--probe-box-space: var(--page-space-3);
+	--probe-line-size: 1rem;
+}
+.probe-box { padding: var(--probe-box-space); border: var(--page-line) solid var(--brand-line); }
+.probe-box--size-l { padding: calc( var(--probe-box-space) * 2 ); }
+.probe-line { font-size: var(--probe-line-size); color: var(--brand-text); }
+.probe-note { font-style: italic; }
