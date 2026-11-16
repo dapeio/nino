@@ -187,6 +187,91 @@ foreign.reload();
 check( 'a frame that cannot be asked (a page of another origin) is sent to the panel\'s address, busy, and the caller is told',
 	foreignGiven.join() === '/page#part' && foreignReloads() === 0 && foreign.frame.getAttribute('aria-busy') === 'true' && events.join() === 'reload' );
 
+// A page that takes the place of the one the frame shows does not add a step to the history of the window: it is given to the
+// frame's own location.replace(), and the src attribute, which would, is left alone. Where the frame cannot be asked the attribute is the way
+function replacing( split, href ) {
+	const replaced = [];
+	split.frame.contentWindow = { location : { replace : function( address ) { replaced.push( address ) }, reload : function() { replaced.push('reload') } } };
+	Object.defineProperty( split.frame.contentWindow.location, 'href', { get : href } );
+	return replaced;
+}
+
+const stepless = build();
+const steplessReplaced = replacing( stepless, function() { return 'http://localhost:8080/preview' } );
+const steplessGiven = watch( stepless );
+events.length = 0;
+stepless.reload( '/other?x=2' );
+check( 'another address replaces the one the frame shows, as an absolute address, and no src is set: that would be a step in the history',
+	steplessReplaced.join() === 'http://localhost:8080/other?x=2' && steplessGiven.length === 0 && stepless.frame.getAttribute('src') === '/preview' && stepless.frame.getAttribute('aria-busy') === 'true' && events.join() === 'reload' );
+stepless.reload( 'sub/page.html' );
+check( '...a relative address is made absolute against the workbench, not against the page in the frame', steplessReplaced[1] === 'http://localhost:8080/_admin/sub/page.html' );
+stepless.reload();
+check( '...and the page that is loaded once more is the last one it was given', steplessReplaced[2] === 'http://localhost:8080/_admin/sub/page.html' );
+unsafe.forEach( function( src ) { stepless.reload( src ) } );
+check( '...an address that is not allowed is not given to it either', steplessReplaced.length === 3 );
+
+const sameFrame = build();
+const sameReplaced = replacing( sameFrame, function() { return 'http://localhost:8080/preview' } );
+sameFrame.reload();
+check( 'the page the frame shows is reloaded by the frame, and nothing is replaced', sameReplaced.join() === 'reload' );
+
+const refusing = build();
+const refusingGiven = watch( refusing );
+refusing.frame.contentWindow = { location : { replace : function() { throw new Error('SecurityError') } } };
+Object.defineProperty( refusing.frame.contentWindow.location, 'href', { get : function() { return 'http://localhost:8080/elsewhere' } } );
+refusing.reload( '/next' );
+check( 'a frame that refuses the replacing is given the address as its src', refusingGiven.join() === '/next' && refusing.frame.getAttribute('aria-busy') === 'true' );
+
+check( 'a frame that was refused its first address has nothing to load once more', ( function() {
+	const empty = build( { preview : { src : 'javascript:1' } } );
+	const emptyGiven = watch( empty );
+	empty.reload();
+	return emptyGiven.length === 0 && empty.frame.hasAttribute('aria-busy') === false;
+} )() );
+
+// --- a page at a layout width ---------------------------------------------------------------------
+
+const scaled = [];
+const realScale = adminUi.scaleFrame;
+adminUi.scaleFrame = function( frame, port, width, height ) { scaled.push( { frame : frame, port : port, width : width, height : height } ) };
+
+const flat = build();
+const flatPort = flat.frame.parentNode;
+check( 'the frame stands in a port of its own, in the pane, after the bar', flatPort.className === 'nino-admin-split-port' && flat.preview.children[1] === flatPort && flat.preview.children[0] === byClass( flat.preview, 'nino-admin-split-bar' )[0] );
+check( 'with no width it is as it is: not scaled, no width, the port not marked', scaled.length === 0 && flat.width() === null && flatPort.className === 'nino-admin-split-port' && flat.frame.style.transform === undefined );
+
+const wide = build( { preview : { src : '/preview', width : 1280 } } );
+const widePort = wide.frame.parentNode;
+check( 'preview.width lays the frame out on that width and scales it into the port, which says so', scaled.length === 1 && scaled[0].frame === wide.frame && scaled[0].port === widePort && scaled[0].width === 1280 && scaled[0].height === undefined
+	&& widePort.className.split(' ').indexOf('nino-admin-split-port--scaled') !== -1 && wide.width() === 1280 );
+
+const narrowed = wide.width( 768 );
+check( 'width( px ) lays it out on the new width, and answers it', narrowed === 768 && wide.width() === 768 && scaled.length === 2 && scaled[1].width === 768 && scaled[1].port === widePort );
+
+wide.frame.style.width = '768px';
+wide.frame.style.height = '900px';
+wide.frame.style.transform = 'scale(.5)';
+wide.frame.style.left = '10px';
+wide.frame.style.top = '5px';
+widePort._ninoScaleObserver = { disconnect : function() { events.push('disconnected') } };
+events.length = 0;
+wide.width( null );
+check( 'width( null ) takes the frame back to the width of the pane: no inline size, no transform, the observer let go, the port not marked',
+	wide.width() === null && [ 'width', 'height', 'transform', 'left', 'top' ].every( function( name ) { return wide.frame.style[name] === '' } )
+	&& events.join() === 'disconnected' && widePort._ninoScaleObserver === null && widePort.className === 'nino-admin-split-port' && scaled.length === 2 );
+
+[ 0, -5, 0.4, 10001, NaN, Infinity, '1280', {}, true, undefined ].forEach( function( bad ) {
+	wide.width( 768 );
+	wide.width( bad );
+	check( 'width( '+ String( bad ) + ' ) is no width: it is none', wide.width() === null && widePort.className === 'nino-admin-split-port' );
+} );
+check( '...and a number of the range is taken, rounded to a whole px', wide.width( 400.4 ) === 400 && wide.width( 1 ) === 1 && wide.width( 10000 ) === 10000 );
+
+// What has no frame has nothing to lay out
+const scaledBefore = scaled.length;
+check( 'a preview the caller draws, and the settings alone, take width() and keep none', build( { preview : element('div') } ).width( 1280 ) === null && build( { preview : undefined } ).width( 1280 ) === null && scaled.length === scaledBefore );
+adminUi.scaleFrame = realScale;
+
 // --- the bar and the words ----------------------------------------------------------------------
 
 const barred = build();
@@ -237,5 +322,10 @@ const block = css.slice( css.indexOf('@container nino-split') );
 const narrow = block.slice( 0, block.indexOf('\n}\n') );
 check( 'narrow, the switch is drawn', /nino-admin-split-switch\s*\{[^}]*display:\s*flex/.test( narrow ) );
 check( '...and the pane the switch has not chosen is not', /\[data-view="settings"\][^{]*-preview,[^{]*\[data-view="preview"\][^{]*-settings\s*\{\s*display:\s*none/.test( narrow ) );
+
+check( 'a scaled port is the box the frame is placed in and cut by',
+	/\.nino-admin-split-port--scaled\s*\{[^}]*position:\s*relative[^}]*overflow:\s*hidden/.test( css ) );
+check( '...and the frame in it is placed by the scaler, from its corner, and not held to the width of the pane',
+	/\.nino-admin-split-port--scaled\s*>\s*\.nino-admin-split-frame\s*\{[^}]*position:\s*absolute[^}]*max-width:\s*none[^}]*transform-origin:\s*0 0/.test( css ) );
 
 done();

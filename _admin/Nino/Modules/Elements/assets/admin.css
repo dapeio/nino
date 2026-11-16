@@ -38,7 +38,7 @@
 #admin-page-wrap .elements-raw-bucket {
 	margin-top: .75rem;
 	font-family: var(--nino-admin-mono);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 	font-weight: 650;
 }
 
@@ -49,7 +49,7 @@
 	border: 1px solid var(--editor-separator);
 	border-radius: var(--editor-radius-sm);
 	background: var(--nino-admin-surface-muted);
-	font: .76rem/1.5 var(--nino-admin-mono);
+	font: max( .76rem, 12px )/1.5 var(--nino-admin-mono);
 	white-space: pre;
 }
 
@@ -113,7 +113,7 @@
 	align-items: center;
 	gap: .3rem;
 	color: var(--editor-text-secondary);
-	font-size: .76rem;
+	font-size: max( .76rem, 12px );
 }
 
 #admin-page-wrap .admin-field-options :is(input[type="text"], input[type="number"]) {
@@ -179,7 +179,7 @@
 #admin-page-wrap #admin-form-duplicate-msg {
 	margin: .55rem 0 0;
 	color: var(--editor-text-secondary);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 }
 
 /* The only control in the type form that destroys content, so it does not
@@ -218,7 +218,7 @@
 #admin-page-wrap #admin-form-delete-msg {
 	margin: .55rem 0 0;
 	color: var(--editor-text-secondary);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 }
 
 }

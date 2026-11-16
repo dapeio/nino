@@ -3413,15 +3413,23 @@
 		 *	address into it, and touches nothing else (the frame says aria-busy until
 		 *	it has loaded): the controls are not
 		 *	redrawn, which is what a preview that has to be asked for a second time after
-		 *	every change needs. Only the project's own origin is loaded into the
-		 *	frame - a relative address or one on this host; //host, \\host, other
+		 *	every change needs. Another address replaces the one the frame shows in the
+		 *	history of the window - a preview that is reloaded after every change would
+		 *	otherwise put a step into it for each, and the Back key would walk through
+		 *	them before it came to the address of the panel. Only the project's own
+		 *	origin is loaded into the frame - a relative address or one on this host; //host, \\host, other
 		 *	schemes and other hosts are not: an address a person or a file could
 		 *	have written is not allowed to run in the workbench's origin.
-		 *	options.sandbox, where given, is the frame's sandbox
+		 *	options.sandbox, where given, is the frame's sandbox.
+		 *
+		 *	With preview.width, or width( px ), the page is laid out as a browser that
+		 *	wide would lay it out and scaled down as a whole into the room the pane has
+		 *	(see scaleFrame()), so that a page of 1280px is seen on a pane of 600
+		 *	with everything in proportion. With none the frame is as wide as the pane
 		 *
 		 *	@param		{Object}		options					{ id, settings, preview, view, sandbox, previewTitle, text, onView, onReload, onLoad }
 		 *														- settings    the controls, an Element (more can be put into split.settings later)
-		 *														- preview     { src, title } for a page, an Element for a preview the caller draws
+		 *														- preview     { src, title, width } for a page, an Element for a preview the caller draws; width is the layout width of the page in px, 1 to 10000
 		 *														- view        'settings' (the default) or 'preview', which one the narrow view starts on
 		 *														- sandbox     the iframe's sandbox attribute, as a string
 		 *														- tools       an Element for the bar over the preview, beside its title (split.tools is the place, where it is made later)
@@ -3430,7 +3438,7 @@
 		 *														- onReload    called when the preview is asked to load once more, by the button or by reload()
 		 *														- onLoad      called with the frame when the page in it has loaded
 		 *
-		 *	@return		{Object}										{ el, settings, preview, frame, tools, view(), show( view ), reload( [src] ), words( { settings, preview } ) } - with no preview given the view is the settings alone: no switch, no bar, and preview, frame and tools are null
+		 *	@return		{Object}										{ el, settings, preview, frame, tools, view(), show( view ), reload( [src] ), width( [px] ), words( { settings, preview } ) } - width( px ) lays the page out at px and scales it into the pane, width( null ) takes it back to the pane's own width, width() answers the one that is set (null for none); a number that is not 1 to 10000 is none. With no preview given the view is the settings alone: no switch, no bar, and preview, frame and tools are null
 		 */
 		split : function( options ) {
 
@@ -3467,6 +3475,8 @@
 			// An element is a slot even where it has a src of its own - an image, a frame the caller made
 			const isPage = typeof preview === 'object' && preview !== null && preview.nodeType !== 1 && typeof preview.src === 'string';
 			let frame = null;
+			let port = null;
+			let layout = null;
 
 			// The preview is a page of the project itself, so only the project's own origin is
 			// loaded into the frame: a relative address, or an absolute one on this host. What
@@ -3489,14 +3499,17 @@
 				}
 			};
 
+			// The address the panel asked the frame to show last: the page that is loaded once more
+			let shown = '';
+
 			const reload = function( src ) {
 
 				if( frame !== null ) {
 
-					const current = frame.getAttribute('src') ?? '';
-					const next = typeof src === 'string' ? src : current;
+					const next = typeof src === 'string' ? src : shown;
 
-					if( allowed( next ) === true ) {
+					// A frame that was refused its first address has nothing to load once more
+					if( next !== '' && allowed( next ) === true ) {
 
 						// Set to the address it shows, an address with a # is not loaded: the browser
 						// takes it for a move within the page, so the frame reloads itself - when it
@@ -3510,11 +3523,22 @@
 						} catch( e ) {}
 
 						frame.setAttribute( 'aria-busy', 'true' );
+						shown = next;
 
 						if( same === true )
 							frame.contentWindow.location.reload();
-						else
-							frame.setAttribute( 'src', next );
+						else {
+
+							// The address takes the place of the one the frame shows: a src
+							// set to another address is a step of its own in the history of the window, one for
+							// every change of the panel. A frame that cannot be asked (another
+							// origin, none yet) is given the attribute
+							try {
+								frame.contentWindow.location.replace( new URL( next, wn.location.href ).href );
+							} catch( e ) {
+								frame.setAttribute( 'src', next );
+							}
+						}
 					}
 				}
 
@@ -3545,11 +3569,17 @@
 						options.onLoad( frame );
 				} );
 
-				pane.appendChild( frame );
+				// The frame stands in a box of its own, which it is scaled inside where the page
+				// has a layout width: moving it there later would reload it
+				port = dc.createElement('div');
+				port.className = 'nino-admin-split-port';
+				port.appendChild( frame );
+				pane.appendChild( port );
 
 				if( allowed( preview.src ) === true ) {
 					frame.setAttribute( 'aria-busy', 'true' );
 					frame.setAttribute( 'src', preview.src );
+					shown = preview.src;
 				}
 
 			} else if( typeof preview === 'object' && preview !== null ) {
@@ -3587,6 +3617,33 @@
 			grid.className = 'nino-admin-split-grid';
 			grid.appendChild( settings );
 			grid.appendChild( pane );
+
+			// The page at a layout width, scaled into the pane; none lets the frame be as wide as the pane
+			const width = function( px ) {
+
+				if( arguments.length === 0 || frame === null )
+					return layout;
+
+				layout = typeof px === 'number' && Number.isFinite( px ) === true && px >= 1 && px <= 10000 ? Math.round( px ) : null;
+
+				port.classList.toggle( 'nino-admin-split-port--scaled', layout !== null );
+
+				if( layout !== null )
+					Nino.adminUi.scaleFrame( frame, port, layout );
+				else {
+
+					if( port._ninoScaleObserver )
+						port._ninoScaleObserver.disconnect();
+					port._ninoScaleObserver = null;
+
+					[ 'width', 'height', 'transform', 'left', 'top' ].forEach( function( name ) { frame.style[name] = '' } );
+				}
+
+				return layout;
+			};
+
+			if( isPage === true && preview.width !== undefined )
+				width( preview.width );
 
 			// With nothing to preview there is nothing to switch to, to reload or to name
 			const solo = isPage === false && ( typeof preview !== 'object' || preview === null );
@@ -3635,6 +3692,7 @@
 				},
 
 				reload : reload,
+				width : width,
 			};
 		},
 

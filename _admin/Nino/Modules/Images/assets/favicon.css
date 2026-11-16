@@ -45,7 +45,7 @@
 	display: block;
 	margin-top: .22rem;
 	color: var(--editor-text-secondary);
-	font-size: .72rem;
+	font-size: max( .72rem, 12px );
 	line-height: 1.45;
 }
 

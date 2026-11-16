@@ -49,7 +49,7 @@
 	min-height: 30px;
 	padding-top: .25rem;
 	padding-bottom: .25rem;
-	font-size: .76rem;
+	font-size: max( .76rem, 12px );
 }
 
 #admin-page-wrap .admin-text-limit-input {
@@ -59,14 +59,14 @@
 #admin-page-wrap .admin-text-key-input {
 	flex: 1 1 auto;
 	min-width: 8rem;
-	font: .76rem/1.4 var(--nino-admin-mono);
+	font: max( .76rem, 12px )/1.4 var(--nino-admin-mono);
 }
 
 #admin-page-wrap .admin-text-key-btn {
 	flex: 0 0 auto;
 	min-height: 30px;
 	padding: .3rem .55rem;
-	font-size: .76rem;
+	font-size: max( .76rem, 12px );
 }
 
 /* ----------------------------------------------- Dense text-key editing */
@@ -163,7 +163,7 @@
 	border-radius: 999px;
 	background: transparent;
 	color: var(--editor-text-secondary);
-	font-size: .76rem;
+	font-size: max( .76rem, 12px );
 	font-weight: 600;
 }
 
@@ -178,7 +178,7 @@
 #keys-list .admin-text-block > h2 {
 	margin: 1.4rem 0 .5rem;
 	color: var(--editor-text-secondary);
-	font-size: .72rem;
+	font-size: max( .72rem, 12px );
 	font-weight: 750;
 	letter-spacing: .065em;
 	text-transform: uppercase;
@@ -188,7 +188,7 @@
 #keys-list .admin-text-block > h3 {
 	margin: 1rem 0 .4rem;
 	color: var(--editor-text-secondary);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 	font-weight: 650;
 }
 
@@ -245,7 +245,7 @@
 #text-list .admin-text-hit-snippet,
 #keys-list .admin-text-hit-snippet {
 	color: var(--editor-text-secondary);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 	font-weight: 400;
 	line-height: 1.4;
 	overflow-wrap: anywhere;
@@ -265,7 +265,7 @@
 	min-height: 26px;
 	margin: 0 .78rem 0 0;
 	padding: .1rem .5rem;
-	font-size: .7rem;
+	font-size: max( .7rem, 12px );
 }
 
 #text-list mark,
@@ -284,7 +284,7 @@
 #text-form .admin-text-section-route,
 #text-form .admin-text-section-preview {
 	margin-left: .6rem;
-	font-size: .72rem;
+	font-size: max( .72rem, 12px );
 	font-weight: 400;
 	letter-spacing: 0;
 	text-transform: none;
@@ -306,7 +306,7 @@
 	border-radius: 999px;
 	background: var(--editor-blue-soft);
 	color: var(--editor-text-secondary);
-	font-size: .68rem;
+	font-size: max( .68rem, 12px );
 	font-weight: 600;
 	white-space: nowrap;
 }
@@ -336,7 +336,7 @@
 	display: block;
 	margin: 0 0 .25rem;
 	color: var(--editor-text-secondary);
-	font-size: .74rem;
+	font-size: max( .74rem, 12px );
 	font-weight: 600;
 }
 

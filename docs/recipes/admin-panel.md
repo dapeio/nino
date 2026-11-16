@@ -1109,6 +1109,19 @@ answers `isDirty()` itself - compared with what the controls held when they
 were drawn, never with the stored string. `name` is the uri of the panel or tab:
 the shell finds the pane by `admin-tab-<name>`, else `admin-content-<name>`.
 
+A panel whose levels are several forms over one draft goes up a level inside
+itself with a back link that says `data-keep-draft`: the shell asks nothing of
+it and leaves what was typed where it is, and a Discard from the rail does not
+press it as the link that leaves the form. The panel's own click handler does
+the going up.
+
+```js
+const up = Nino.adminUi.el( 'a', 'nino-admin-back-link', 'Back to the groups' );
+up.href = Nino.admin.router.href( 'catalog', [ 'craft' ] );
+up.setAttribute( 'data-keep-draft', '' );
+up.addEventListener( 'click', function( event ) { event.preventDefault(); showLevel( 1 ) } );
+```
+
 Four rules follow:
 
 - `save( done )` calls `done( true )` or `done( false )` on **every** way it can
@@ -1414,7 +1427,9 @@ The **split view** is the settings on one side and the preview on the other. Whe
 the view itself is narrow (a container query: the pane beside the rail, not the
 window) a switch of two buttons shows one of them and keeps the other in the page,
 so a switch loses nothing. The preview is a page in an iframe or an element the
-caller draws; `reload()` loads the frame once more without touching the settings. The container's name, `nino-split`, is part of the contract: a panel's own
+caller draws; `reload()` loads the frame once more without touching the settings, and
+another address given to it takes the place of the one the frame shows in the history of
+the window, so that Back walks through the panel and not through the previews. The container's name, `nino-split`, is part of the contract: a panel's own
 stylesheet follows the width of the split view with `@container nino-split (max-width: 40rem)`
 and not with a media query. Only
 the project's own origin is loaded into the frame - a relative address, or an absolute
@@ -1424,7 +1439,11 @@ frame's own attribute where the caller wants one. `tools` is the place in the ba
 the preview for what the panel wants beside its title (the widths of the preview, a
 line of advice), `words( { settings, preview } )` says the words of the switch
 afterwards without the frame being loaded once more, and with no preview given the view is
-the settings alone, with no switch and no bar.
+the settings alone, with no switch and no bar. A page that is to be seen on a layout width
+of its own - 1280, 768 or 390 px - is given `preview : { src, width }`, or `split.width( px )`
+later: the frame is laid out as a browser that wide would lay it out and scaled down as a whole
+into the room the pane has (`Nino.adminUi.scaleFrame()`), and `split.width( null )` gives it back
+the width of the pane.
 
 ```js
 const settings = document.createElement( 'div' );
@@ -1438,6 +1457,7 @@ const split = Nino.adminUi.split( {
 split.tools.appendChild( Nino.adminUi.hint( 'Widths and notes of the panel stand in the bar.' ) );
 mount.appendChild( split.el );
 // after a change the preview has to show: split.reload()
+// a phone's width in the room of the pane: split.width( 390 )
 ```
 
 The **colour field** is a hex code in a text field, the system's colour picker, a

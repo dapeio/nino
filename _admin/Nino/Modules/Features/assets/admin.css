@@ -121,7 +121,7 @@
 	border: 1px solid var(--editor-separator);
 	border-radius: 999px;
 	color: var(--editor-text-secondary);
-	font-size: .72rem;
+	font-size: max( .72rem, 12px );
 	font-weight: 600;
 	line-height: 1.5;
 	vertical-align: .1em;

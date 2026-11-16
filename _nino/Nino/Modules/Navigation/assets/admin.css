@@ -32,7 +32,7 @@
 	justify-content: space-between;
 	min-height: var(--nino-admin-row-height);
 	padding-left: .75rem;
-	font: .78rem/1.4 var(--nino-admin-mono);
+	font: max( .78rem, 12px )/1.4 var(--nino-admin-mono);
 }
 
 #navs-form .nino-admin-list .admin-page-label {

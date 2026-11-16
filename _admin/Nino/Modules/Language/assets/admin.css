@@ -54,7 +54,7 @@
 	border-radius: 999px;
 	background: var(--editor-blue-soft);
 	color: var(--editor-blue-hover);
-	font-size: .68rem;
+	font-size: max( .68rem, 12px );
 	font-weight: 750;
 	letter-spacing: .065em;
 	text-transform: uppercase;
@@ -94,7 +94,7 @@
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-blue);
 	color: var(--nino-admin-active-text);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 	font-weight: 800;
 }
 
@@ -119,7 +119,7 @@
 }
 
 #translations-json {
-	font: .78rem/1.5 var(--nino-admin-mono);
+	font: max( .78rem, 12px )/1.5 var(--nino-admin-mono);
 	resize: vertical;
 	tab-size: 2;
 }

@@ -46,7 +46,7 @@
 
 #backups-dates .backups-meta {
 	color: var(--editor-text-secondary);
-	font-size: .78rem;
+	font-size: max( .78rem, 12px );
 	line-height: 1.4;
 }
 

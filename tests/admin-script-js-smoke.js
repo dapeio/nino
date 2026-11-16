@@ -842,6 +842,18 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	check( 'Cancel on it writes the panel on screen back into the address, where the panel writes none of its own', shell.location.hash === '#roles' && browser.entries[browser.at] === '#roles' );
 	check( '...with the rail and the select on it, and the history left alone', current() === 'users' && navSelect.value === 'users' && browser.traversals.length === 0 && unsaved.users === true );
 
+	// ...and where the address had a level of the panel's own, it is that one that comes back - the panel's name is not where the screen stood
+	shell.history.replaceState( browser.states[browser.at], '', '#roles/ada' );
+	shell.location.hash = '#dashboard';
+	windowListeners.hashchange( { oldURL : 'http://localhost:8080/_admin/#roles/ada' } );
+	check( 'an address typed over a level of the panel asks too', asked.length === before + 3 && current() === 'users' && browser.traversals.length === 0 );
+	asked[before + 2].onChoose('cancel');
+	check( 'Cancel on it puts back the address that stood there, the level and all, over the entry the typing made', shell.location.hash === '#roles/ada' && browser.entries[browser.at] === '#roles/ada' && browser.entries.length === browser.at + 1 );
+	check( '...with the panel on screen, its input and the history left alone', current() === 'users' && unsaved.users === true && browser.traversals.length === 0 );
+
+	// The address that was typed or followed is not kept past the hashchange that carried it
+	check( 'the address that was replaced is held for the length of the hashchange only', shell.Nino.admin.router._was === '' );
+
 	unsaved.users = false;
 	registry._entries.users.isDirty = function() { return false };
 	registry._entries.roles.isDirty = function() { return false };
@@ -897,12 +909,16 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	registry.snapshot('roles');
 
 	const own = backLink( usersPane );
+	// The link of the panel that goes up a level with the draft is not the one that leaves the form
+	const keeping = backLink( usersPane );
+	keeping.dataset.keepDraft = '';
+	keeping.click = function() { presses.push('kept the draft') };
 	const hidden = node( '', {} );
 	hidden.classList.add('admin-hidden');
 	hidden.parent = usersPane;
 	const inHidden = backLink( hidden );
 	const inTab = backLink( rolesPane );
-	let links = [ inHidden, inTab, own ];
+	let links = [ inHidden, inTab, keeping, own ];
 	usersPane.querySelectorAll = function( selector ) { return selector === 'a.nino-admin-back-link' ? links : realQuery.call( usersPane, selector ) };
 	rolesPane.querySelectorAll = function( selector ) { return selector === 'a.nino-admin-back-link' ? [ inTab ] : [] };
 
@@ -913,7 +929,7 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	check( 'a move through the rail with a watched form holding input asks, and has put nothing back and pressed nothing', asked.length === 1 && input.value === 'typed' && presses.length === 0 && current() === 'users' );
 	asked[0].onChoose('discard');
 	check( 'Discard puts the fields of the form back to what it held when it was drawn or saved, and it is clean', input.value === 'stored' && box.checked === false && registry.isDirty( [ 'users' ] ) === false );
-	check( '...and presses the back link of the level that is on screen in the pane, once, after the panel was left and past the question the shell asks of a back link: not the link of a hidden level, not the link of a tab', current() === 'dashboard' && presses.join() === 'users at dashboard past the question' && registry._bypass === null );
+	check( '...and presses the back link of the level that is on screen in the pane, once, after the panel was left and past the question the shell asks of a back link: not the link of a hidden level, not the link of a tab, not the one that keeps the draft', current() === 'dashboard' && presses.join() === 'users at dashboard past the question' && registry._bypass === null );
 	registry._entries.users.save( function() {} );
 	check( '...and a Save from there sends what is stored, not what was discarded', saved.join() === 'stored' );
 	saved.length = 0;
@@ -1625,6 +1641,21 @@ listenerFor( 'click', true ).fn( ev );
 check( 'a back link out of a form holding unsaved input is held back and asked about', ev.prevented === 1 && ev.stopped === 1 && dirtyAsked.length === 1 );
 answer('discard');
 check( '...and clicked again, past the question, once the person has answered', clicks === 1 && dirty._bypass === null );
+
+// A back link of the panel's own, which goes up a level with the draft: it is none of the shell's business
+const keeper = node( '', {} );
+keeper.parent = keysPane;
+keeper.dataset.keepDraft = '';
+keeper.closest = function( selector ) { return selector === 'a.nino-admin-back-link' ? keeper : null };
+dirtyState.keys = true;
+dirtyAsked.length = 0;
+ev = clickEvent( keeper );
+listenerFor( 'click', true ).fn( ev );
+check( 'a back link with data-keep-draft is not held back in a form that holds unsaved input, and nothing is asked', ev.prevented === 0 && ev.stopped === 0 && dirtyAsked.length === 0 );
+ev = clickEvent( backLink );
+listenerFor( 'click', true ).fn( ev );
+check( '...while the one beside it, with none, is', ev.prevented === 1 && dirtyAsked.length === 1 );
+answer('cancel');
 
 const unregistered = node( '', {} );
 unregistered.parent = imagesPane;

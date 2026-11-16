@@ -101,6 +101,28 @@ console.log( 'Router' );
 	router.leave( [ 'x' ], true, () => shown++, () => kept++ );
 	router._keep = false;
 	check( 'while the shell brings a panel on screen as it stands, leave() keeps the level in memory and asks nothing', kept === 1 && shown === 2 );
+
+	// restore(): the address put back where it stood, after a move that was cancelled
+	const entriesBefore = entries.length;
+	box.history.replaceState( { nino : at }, '', '#dashboard' );
+	router.restore( '#images/a%20b/team', 'images' );
+	check( 'restore() writes the address that was replaced over the entry the browser is on, exactly - with the levels', box.location.hash === '#images/a%20b/team' && entries[at] === '#images/a%20b/team' && entries.length === entriesBefore );
+	check( '...numbered as the entry it replaced', box.history.states[at].nino === at && router._index === at );
+	router.restore( '#images/a%20b/team', 'images' );
+	check( '...and writes nothing where the address already says it', entries.length === entriesBefore && box.history.states[at].nino === at );
+
+	box.history.replaceState( { nino : at }, '', '#dashboard' );
+	router.restore( '', 'images' );
+	check( 'with no address that was replaced it is the shell\'s own: the name of the panel on screen', box.location.hash === '#images' );
+	box.history.replaceState( { nino : at }, '', '#dashboard' );
+	router.restore( undefined, 'images' );
+	check( '...as it is where none is known', box.location.hash === '#images' );
+
+	box.history.replaceState( { nino : at }, '', '#dashboard' );
+	router._undoing = { index : at - 1 };
+	router.restore( '#images/team', 'images' );
+	check( 'while a traversal the shell asked for is on its way, the entry the browser is leaving is not written over', box.location.hash === '#dashboard' );
+	router._undoing = null;
 }
 
 

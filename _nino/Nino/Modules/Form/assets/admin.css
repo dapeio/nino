@@ -25,7 +25,7 @@
 }
 .submissions-entry-date {
 	color: var(--editor-text-secondary);
-	font-size: .76rem;
+	font-size: max( .76rem, 12px );
 }
 .submissions-entry-cat {
 	display: inline-block;
@@ -33,7 +33,7 @@
 	border-radius: 999px;
 	background: var(--editor-blue-soft);
 	color: var(--editor-blue);
-	font-size: .72rem;
+	font-size: max( .72rem, 12px );
 	font-weight: 650;
 }
 .submissions-entry-name {
@@ -119,7 +119,7 @@
 	display: none;
 	margin-top: .4rem;
 	color: var(--editor-blue);
-	font-size: .76rem;
+	font-size: max( .76rem, 12px );
 }
 .submissions-entry.has-overflow .submissions-entry-toggle {
 	display: inline-block;

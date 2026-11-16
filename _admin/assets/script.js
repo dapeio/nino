@@ -80,6 +80,12 @@
 			// held by leave() while a question about unsaved input is open
 			_step : null,
 
+			// The address the one that was just written over, for the length of the
+			// hashchange that carries it: where the screen stood before an address
+			// was typed or a link followed, to put it back there when the move is
+			// cancelled. '' where there was none
+			_was : '',
+
 			// A traversal the shell asked for to take a refused step back:
 			// { index }, the entry it is going to. Until it arrives the address
 			// is not written to - what a panel shows again belongs to the entry
@@ -435,6 +441,29 @@
 			settle : function( name ) {
 				if( Nino.admin.router.current().panel !== name )
 					Nino.admin.router.set( name, [] );
+			},
+
+			/**
+			 *	Put the address back where it stood before a move that was not
+			 *	made: the entry the browser is on, which an address typed or a link
+			 *	followed has just made, is written over by the address it replaced -
+			 *	exactly, with the levels the panel was on. Where there was none (a
+			 *	page opened with no address) it is the shell's own, the panel's name
+			 *	(see settle())
+			 *
+			 *	@param		{string}	was						The address that was replaced, with its #, or ''
+			 *	@param		{string}	name					The panel or tab on screen
+			 *
+			 *	@return		void
+			 */
+			restore : function( was, name ) {
+
+				const router = Nino.admin.router;
+
+				if( typeof was !== 'string' || was === '' )
+					router.settle( name );
+				else if( wn.location.hash !== was && router._holdsAddress() === false )
+					router._write( false, was );
 			},
 		},
 
@@ -1177,7 +1206,8 @@
 			 *	panel's own handler does what it does there, which is what makes the
 			 *	form be drawn again at its next opening. The question the shell asks
 			 *	before a back link of a form with unsaved input is not asked: the
-			 *	input was given up already
+			 *	input was given up already. A link with data-keep-draft is not the back
+			 *	link of the form - it leaves nothing - and is passed over
 			 *
 			 *	@param		{string}		name
 			 *
@@ -1187,7 +1217,7 @@
 
 				const pane = dc.getElementById( 'admin-tab-'+ name ) ?? dc.getElementById( 'admin-content-'+ name );
 				const link = pane === null || pane === undefined ? undefined : Array.from( pane.querySelectorAll('a.nino-admin-back-link') ).find( function( el ) {
-					return Nino.admin.dirty._owner( el ) === name && Nino.admin.dirty._shown( el ) === true;
+					return el.dataset.keepDraft === undefined && Nino.admin.dirty._owner( el ) === name && Nino.admin.dirty._shown( el ) === true;
 				} );
 
 				if( link === undefined )
@@ -1359,10 +1389,11 @@
 
 			/**
 			 *	Wire the page: a back link out of a form that holds unsaved input
-			 *	asks first, and whatever is typed, changed or clicked makes the
-			 *	markers follow. Many changes fire neither input nor change (a
-			 *	reference list's commit, the rich-text toolbar), which is why a
-			 *	click counts as well
+			 *	asks first - one with data-keep-draft goes up a level inside the
+			 *	panel with what was typed, and asks nothing - and whatever is
+			 *	typed, changed or clicked makes the markers follow. Many changes
+			 *	fire neither input nor change (a reference list's commit, the
+			 *	rich-text toolbar), which is why a click counts as well
 			 *
 			 *	@param		{Function}	show				Brings the panel or tab that owns a name on screen
 			 *
@@ -1384,6 +1415,10 @@
 
 					const link = ev.target && typeof ev.target.closest === 'function' ? ev.target.closest('a.nino-admin-back-link') : null;
 					if( link === null || link === undefined || Nino.admin.dirty._bypass === link )
+						return;
+
+					// A link of the panel's own that goes up a level and keeps what is typed
+					if( link.dataset.keepDraft !== undefined )
 						return;
 
 					const owner = Nino.admin.dirty._owner( link );
@@ -2494,8 +2529,10 @@
 					return;
 				}
 
-				// The step through the history that brought the move, if one did
+				// The step through the history that brought the move, if one did, and the
+				// address it came from: a typed one has no step to take back, and is put back by hand
 				const step = Nino.admin.router._step;
+				const was = Nino.admin.router._was;
 				// A pane with a screen of its own draws it as its first tab, named like the
 				// panel (see Panels::panesHtml()): the panel is in the list once, or its entry
 				// would be saved twice and its back link pressed twice
@@ -2515,10 +2552,11 @@
 					Nino.admin.navGroups.show( screen.panel );
 
 					// A step the history can take back is taken back; an address that was typed
-					// is written over by the screen's own, or by the panel's where it has one
+					// is written over by the one it replaced - the panel's own level, which its
+					// showCurrent() may not write - or by the screen's where there was none
 					if( Nino.admin.router._undo( step ) === false && Nino.admin.router.current().panel !== screen.name ) {
 						show( screen.name );
-						Nino.admin.router.settle( screen.name );
+						Nino.admin.router.restore( was, screen.name );
 					}
 				} );
 			}
@@ -2741,15 +2779,21 @@
 			// never adds an entry itself: selectTab() is not asked to push here)
 			Nino.admin.router.start();
 			selectTabFromHash();
-			wn.addEventListener( 'hashchange', function() {
+			wn.addEventListener( 'hashchange', function( ev ) {
+
+				// Where the address was before it changed: the fragment of the one it replaced
+				const old = ev !== undefined && typeof ev.oldURL === 'string' ? ev.oldURL : '';
+				Nino.admin.router._was = old.indexOf('#') === -1 ? '' : old.slice( old.indexOf('#') );
+
 				try {
 					if( Nino.admin.router.arrive() === true )
 						selectTabFromHash();
 				}
 				finally {
 					// What was answered synchronously is over; a question that is open
-					// holds its own reference to the step (see router.leave())
+					// holds its own reference to the step (see router.leave()) and to the address
 					Nino.admin.router._step = null;
+					Nino.admin.router._was = '';
 				}
 			} );
 			// A traversal between two entries of the same address fires no
