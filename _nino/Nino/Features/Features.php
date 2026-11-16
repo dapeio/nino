@@ -1020,6 +1020,11 @@ namespace Nino {
 				if( is_string( $clean ) === false && isset( $clean['group'] ) === false )
 					$clean = $of. 'component "'. self::_shown( $name ). '": a component of a feature names its "group"';
 
+				// The attribute ground is the contract of the grounds, which Nino.css answers for every component alike: a choice among the five words or none
+				if( is_string( $clean ) === false && isset( $clean['attributes']['ground'] ) === true
+					&& ( $clean['attributes']['ground']['type'] !== 'choice' || is_array( $clean['attributes']['ground']['options'] ?? null ) === false || array_diff( $clean['attributes']['ground']['options'], \Nino\Components::GROUNDS ) !== [] ) )
+					$clean = $of. 'component "'. self::_shown( $name ). '": the attribute "ground" is a choice among '. implode( ', ', \Nino\Components::GROUNDS );
+
 				if( is_string( $clean ) === true )
 					$rejected[$name] = $clean;
 				else

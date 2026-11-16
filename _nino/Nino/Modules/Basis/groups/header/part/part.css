@@ -1,0 +1,71 @@
+/*	header - the standard part: one line, the logo at the start, the menu and the actions at the end	*/
+:root {
+	--header-wrap-space: var(--page-space-3);
+	--header-logo-height: 2.25rem;
+	--header-nav-gap: var(--page-space-4);
+}
+.header-wrap { color-scheme: var(--brand-scheme); background-color: var(--brand-ground); color: var(--brand-ink); border-bottom: var(--page-line) solid var(--brand-line); }
+.header-wrap--sticky { position: sticky; top: 0; z-index: 100; }
+/*	An open menu that is taller than the window would keep its last entries out of reach under a header that stays: where the menu folds, the header scrolls away with the page.
+	A menu that is never collapsed is always open and has no such header; one that is open in a line is no [open] either */
+.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { position: static; }
+.header-wrap-inner {
+	display: flex; flex-wrap: wrap; align-items: center; gap: var(--header-nav-gap);
+	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto; padding-block: var(--header-wrap-space);
+}
+.header-logo { display: flex; align-items: center; gap: var(--page-space-2); margin-inline-end: auto; color: inherit; font-family: var(--brand-font-title); font-weight: 700; text-decoration: none; }
+.header-logo img { width: auto; height: var(--header-logo-height); }
+.header-logo:has( img ) .header-logo-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/*	The logo for a dark ground follows the mode of the device and not the ground the header stands on: a limit, kept on purpose. The picture for a light
+	ground is the one that stands where :has() is not known (the rules that need it are dropped, and the dark picture stays hidden) and on paper	*/
+.header-logo-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+	.header-logo:has( .header-logo-dark ) .header-logo-light { display: none; }
+	.header-logo:has( .header-logo-dark ) .header-logo-dark { display: block; }
+}
+@media print {
+	.header-logo:has( .header-logo-dark ) .header-logo-light { display: block; }
+	.header-logo:has( .header-logo-dark ) .header-logo-dark { display: none; }
+}
+
+/*	The menu is a details of the browser, with no script: a button of three bars that opens the list below the line of the header, over the whole width,
+	and pushes the page down. The button stays where it is. Where the browser draws the inside of a details as a part of its own (::details-content),
+	the nav and the details are no boxes and the button and the list are items of the line of the header; a wide screen then shows the list open beside the
+	logo and the actions, in as many lines as it needs, and no button. Where the browser does not, the nav is one box beside the logo, the button stays at
+	every width and the list opens below it - a menu that works	*/
+.header-nav { margin-inline-start: auto; }
+.header-nav:not( .header-nav--collapse-never ):has( .header-nav-details[open] ) { flex: 1 0 100%; }
+.header-nav-toggle { display: flex; align-items: center; justify-content: center; margin-inline-start: auto; width: 2.75rem; height: 2.75rem; padding: 0; border: var(--page-line) solid var(--brand-line); border-radius: var(--page-radius); background: none; list-style: none; cursor: pointer; }
+.header-nav-toggle::-webkit-details-marker { display: none; }
+.header-nav-toggle span, .header-nav-toggle span::before, .header-nav-toggle span::after { display: block; width: 1.25rem; height: 2px; background: currentColor; }
+.header-nav-toggle span { position: relative; }
+.header-nav-toggle span::before, .header-nav-toggle span::after { content: ""; position: absolute; left: 0; }
+.header-nav-toggle span::before { top: -6px; }
+.header-nav-toggle span::after { top: 6px; }
+.header-nav-list { display: flex; flex-direction: column; margin-top: var(--page-space-2); }
+.header-nav a { display: block; padding-block: var(--page-space-2); color: inherit; overflow-wrap: anywhere; text-decoration: none; }
+.header-nav a:hover, .header-nav a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; }
+.header-nav--collapse-never .header-nav-toggle { display: none; }
+.header-nav--collapse-never .header-nav-list { flex-direction: row; flex-wrap: wrap; gap: var(--page-space-1) var(--header-nav-gap); margin-top: 0; }
+.header-actions { display: flex; align-items: center; gap: var(--page-space-2); }
+@supports selector( ::details-content ) {
+	.header-nav, .header-nav-details { display: contents; }
+	.header-nav-details::details-content { flex: 1 0 100%; min-width: 0; }
+	.header-nav-details:not( [open] )::details-content { display: none; }
+}
+@media (max-width: 767.98px) {
+	.header-actions { display: none; }
+}
+@media (min-width: 768px) {
+	@supports selector( ::details-content ) {
+		.header-nav:not( .header-nav--collapse-always ) .header-nav-details::details-content { display: block; content-visibility: visible; flex: 1 1 0; }
+		.header-nav:not( .header-nav--collapse-always ) .header-nav-toggle { display: none; }
+		.header-nav:not( .header-nav--collapse-always ) .header-nav-list { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: var(--page-space-1) var(--header-nav-gap); margin-top: 0; }
+	}
+}
+
+@media print {
+	.header-wrap { color-scheme: light; background: none; color: #000; position: static; }
+	.header-nav-toggle { display: none; }
+}

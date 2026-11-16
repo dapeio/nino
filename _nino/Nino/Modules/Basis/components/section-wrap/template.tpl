@@ -1,0 +1,1 @@
+<section[[id]] class="[[class]]">[[picture]][[content]]</section>

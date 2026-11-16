@@ -1,0 +1,1 @@
+<footer[[id]] class="[[class]]"><div class="footer-wrap-inner">[[content]]</div>[[content:footer-legal]]</footer>

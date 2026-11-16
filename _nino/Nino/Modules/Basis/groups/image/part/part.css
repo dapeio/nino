@@ -1,0 +1,22 @@
+/*	image - the standard part	*/
+:root {
+	--image-radius: var(--page-radius);
+}
+.image { width: 100%; }
+.image img { width: 100%; border-radius: var(--image-radius); object-fit: cover; }
+.image a { display: block; }
+.image--ratio-1-1 img { aspect-ratio: 1; }
+.image--ratio-4-3 img { aspect-ratio: 4 / 3; }
+.image--ratio-3-2 img { aspect-ratio: 3 / 2; }
+.image--ratio-3-4 img { aspect-ratio: 3 / 4; }
+.image--ratio-16-9 img { aspect-ratio: 16 / 9; }
+.image--ratio-21-9 img { aspect-ratio: 21 / 9; }
+.image--focus-top img { object-position: top; }
+.image--focus-right img { object-position: right; }
+.image--focus-bottom img { object-position: bottom; }
+.image--focus-left img { object-position: left; }
+.image--focus-top-left img { object-position: top left; }
+.image--focus-top-right img { object-position: top right; }
+.image--focus-bottom-left img { object-position: bottom left; }
+.image--focus-bottom-right img { object-position: bottom right; }
+.image figcaption { margin-top: var(--page-space-2); font-size: var(--page-text-1); color: var(--brand-ink-quiet); }

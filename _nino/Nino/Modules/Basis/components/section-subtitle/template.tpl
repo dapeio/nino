@@ -1,0 +1,1 @@
+<p class="[[class]]"[[lang]]>[[value]]</p>

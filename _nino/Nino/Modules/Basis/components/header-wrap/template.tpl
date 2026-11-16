@@ -1,0 +1,1 @@
+<header[[id]] class="[[class]]"><div class="header-wrap-inner">[[content:header-logo]][[content:header-nav]][[content:header-actions]][[content]]</div></header>

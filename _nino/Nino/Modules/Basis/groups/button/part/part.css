@@ -1,0 +1,27 @@
+/*	button - the standard part	*/
+:root {
+	--button-space: var(--page-space-2);
+	--button-radius: var(--page-radius);
+	--button-size: var(--page-text-2);
+}
+.button {
+	display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem;
+	padding: var(--button-space) calc( var(--button-space) * 2.5 ); border: var(--page-line) solid var(--brand-accent); border-radius: var(--button-radius);
+	background-color: var(--brand-accent); color: var(--brand-on-accent);
+	font-family: var(--brand-font-button); font-size: var(--button-size); font-weight: 600; line-height: 1.2; text-align: center; text-decoration: none;
+	transition: filter var(--page-motion);
+}
+a.button:hover { filter: brightness( .9 ); }
+.button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+.button--tone-quiet { background-color: transparent; color: var(--brand-accent); }
+.button--size-s { --button-size: var(--page-text-1); min-height: 2.25rem; }
+.button--size-l { --button-size: var(--page-text-3); min-height: 3.25rem; }
+.button--wide { display: flex; width: 100%; }
+.button-group { display: flex; flex-wrap: wrap; gap: var(--page-space-2); max-width: 100%; }
+.button-group--align-center { justify-content: center; align-self: center; }
+.button-group--align-end { justify-content: flex-end; align-self: flex-end; }
+
+/*	On paper a button is its frame and its words: a ground that is not printed would take the words with it	*/
+@media print {
+	.button, .button--tone-quiet { background: none; color: #000; border-color: #000; }
+}

@@ -1,0 +1,1 @@
+<div class="[[class]]" aria-hidden="true"></div>

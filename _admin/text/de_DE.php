@@ -180,6 +180,7 @@ return [
 	'[[/_admin/common/word/background]]'	=> 'Hintergrund',
 	'[[/_admin/common/word/backup]]'	=> 'Backup',
 	'[[/_admin/common/word/banner]]'	=> 'Banner',
+	'[[/_admin/common/word/basis]]'	=> 'Basis-Komponenten',
 	'[[/_admin/common/word/before]]'	=> 'Vorher',
 	'[[/_admin/common/word/border]]'	=> 'Rahmenlinie',
 	'[[/_admin/common/word/button]]'	=> 'Schaltfläche',

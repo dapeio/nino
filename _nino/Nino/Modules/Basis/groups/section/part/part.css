@@ -1,0 +1,134 @@
+/*	section - the standard part: a section, its rows and columns, the title and the subtitle. Where an element is named
+	(img, a), it stands below a component that has no children of its own - the title - or is one this part draws itself	*/
+:root {
+	--section-wrap-space: var(--page-space-6);
+	--section-row-gap: var(--page-space-4);
+	--section-col-pad: var(--page-space-4);
+	--section-col-radius: var(--page-radius);
+	--section-title-space: var(--page-space-3);
+}
+.section-wrap { position: relative; padding-block: var(--section-wrap-space); background-color: var(--brand-ground); color: var(--brand-ink); }
+/*	The mode of the page, said where the section stands: the pairs of the palette turn with it. The ground dark has its own (Nino.css) and keeps it */
+.section-wrap:not( [class$="--ground-dark"], [class*="--ground-dark "] ) { color-scheme: var(--brand-scheme); }
+.section-wrap--height-60 { min-height: 60vh; }
+.section-wrap--height-80 { min-height: 80vh; }
+.section-wrap--height-100 { min-height: 100vh; min-height: 100svh; }
+.section-wrap:where( [class*="--height-"] ) { display: flex; flex-direction: column; justify-content: center; }
+/*	A section with a picture is a dark one: the picture is under a veil and the writing is light, whatever the picture is. The rows that follow the picture say it
+	themselves, which needs no :has(); the section is dark as well where :has() is known. Over a white picture the veil of .75 leaves the ground at 64 of 255:
+	the writing is 8.9 : 1, a quiet button and a link in the accent of the dark page 4.95 : 1, the quiet text of the subtitle 4.75 : 1; .735 is the least that
+	keeps 4.5 : 1. dim is the stronger veil of .82 (6.2 : 1 at the least)	*/
+.section-wrap-image ~ .section-row { color-scheme: dark; color: var(--brand-ink); }
+.section-wrap:has( > .section-wrap-image ) { color-scheme: dark; }
+.section-wrap-image { position: absolute; inset: 0; overflow: hidden; }
+.section-wrap-picture { width: 100%; height: 100%; object-fit: cover; }
+.section-wrap-image::after { content: ""; position: absolute; inset: 0; background: rgb( 0 0 0 / .75 ); }
+.section-wrap--dim > .section-wrap-image::after { background: rgb( 0 0 0 / .82 ); }
+.section-wrap > .section-row { position: relative; }
+
+.section-row {
+	display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--section-row-gap);
+	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto;
+}
+.section-row + .section-row { margin-top: var(--section-row-gap); }
+.section-row--width-narrow { width: min( 100% - 2 * var(--page-space-3), calc( var(--page-width) * .62 ) ); }
+.section-row--width-wide { width: min( 100% - 2 * var(--page-space-3), calc( var(--page-width) * 1.25 ) ); }
+.section-row--width-full { width: 100%; }
+.section-row--gap-0 { --section-row-gap: 0px; }
+.section-row--gap-1 { --section-row-gap: var(--page-space-2); }
+.section-row--gap-3 { --section-row-gap: var(--page-space-5); }
+.section-row--gap-4 { --section-row-gap: var(--page-space-6); }
+.section-row--valign-start { align-items: flex-start; }
+.section-row--valign-center { align-items: center; }
+.section-row--valign-end { align-items: flex-end; }
+.section-row--reverse-on { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+
+/*	A column is as wide as its share of the row less its share of the gaps: --section-col-n is how many of it fill a row	*/
+.section-col {
+	--section-col-n: 1;
+	flex: 0 0 calc( 100% / var(--section-col-n) - var(--section-row-gap) * ( var(--section-col-n) - 1 ) / var(--section-col-n) );
+	min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--section-title-space);
+}
+.section-col > * { max-width: 100%; }
+.section-col--size-75 { --section-col-n: 1.3333; }
+.section-col--size-66 { --section-col-n: 1.5; }
+.section-col--size-50 { --section-col-n: 2; }
+.section-col--size-33 { --section-col-n: 3; }
+.section-col--size-25 { --section-col-n: 4; }
+.section-col--align-center { align-items: center; text-align: center; }
+.section-col--align-end { align-items: flex-end; text-align: end; }
+.section-col--hide-on { display: none; }
+.section-col--pad-0 { --section-col-pad: 0px; }
+.section-col--pad-1 { --section-col-pad: var(--page-space-2); }
+.section-col--pad-2 { --section-col-pad: var(--page-space-3); }
+.section-col--pad-3 { --section-col-pad: var(--page-space-4); }
+.section-col--pad-4 { --section-col-pad: var(--page-space-5); }
+.section-col:where( [class*="--ground-"], [class*="--pad-"], .section-col--variant-card ) { padding: var(--section-col-pad); }
+.section-col:where( [class*="--ground-"] ) { background-color: var(--brand-ground); color: var(--brand-ink); }
+
+/*	The card: a column that is a surface of its own	*/
+.section-col--variant-card { border: var(--page-line) solid var(--brand-line); border-radius: var(--section-col-radius); background-color: var(--brand-ground); overflow: hidden; }
+/*	A limit, kept on purpose: the picture that reaches the edge of the card keeps the corners of its own - this part may not meet the class of a picture,
+	and the picture's part draws its corners with --image-radius, the same on all four sides - so the two lower ones stay round inside the card	*/
+.section-col--bleed > :first-child { width: calc( 100% + 2 * var(--section-col-pad) ); max-width: none; margin: calc( -1 * var(--section-col-pad) ) calc( -1 * var(--section-col-pad) ) 0; }
+/*	A card that is a link: the link of its title covers the surface, and nothing else does. A link that stands in the card besides the title - a button, a link
+	in a text - is above the cover and keeps its own place and its own focus; a text and a picture are not, a click on them is a click on the link of the title
+	(and the text of a card that is a link cannot be marked with the mouse). A card that is marked link and has no link in its title has no cover. The ring of
+	the title's link is drawn round the card	*/
+.section-col--link { position: relative; }
+.section-col--link > .section-title a::after { content: ""; position: absolute; inset: 0; }
+.section-col--link :where( [href] ):not( .section-title * ) { position: relative; z-index: 1; }
+.section-col--link:has( > .section-title a:focus-visible ) { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+
+.section-title { font-size: var(--page-text-5); }
+.section-title--size-s { font-size: var(--page-text-4); }
+.section-title--size-l { font-size: calc( ( var(--page-text-5) + var(--page-text-6) ) / 2 ); }
+.section-title--size-xl { font-size: var(--page-text-6); }
+.section-title a { color: inherit; text-decoration: none; }
+.section-subtitle { font-size: var(--page-text-3); color: var(--brand-ink-quiet); }
+
+@media (min-width: 768px) {
+	.section-row--m-reverse-on { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+	.section-row--m-reverse-off { flex-direction: row; flex-wrap: wrap; }
+	.section-col--m-size-100 { --section-col-n: 1; }
+	.section-col--m-size-75 { --section-col-n: 1.3333; }
+	.section-col--m-size-66 { --section-col-n: 1.5; }
+	.section-col--m-size-50 { --section-col-n: 2; }
+	.section-col--m-size-33 { --section-col-n: 3; }
+	.section-col--m-size-25 { --section-col-n: 4; }
+	.section-col--m-align-start { align-items: flex-start; text-align: start; }
+	.section-col--m-align-center { align-items: center; text-align: center; }
+	.section-col--m-align-end { align-items: flex-end; text-align: end; }
+	.section-col--m-hide-on { display: none; }
+	.section-col--m-hide-off { display: flex; }
+}
+@media (min-width: 1024px) {
+	.section-row--l-reverse-on { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+	.section-row--l-reverse-off { flex-direction: row; flex-wrap: wrap; }
+	.section-col--l-size-100 { --section-col-n: 1; }
+	.section-col--l-size-75 { --section-col-n: 1.3333; }
+	.section-col--l-size-66 { --section-col-n: 1.5; }
+	.section-col--l-size-50 { --section-col-n: 2; }
+	.section-col--l-size-33 { --section-col-n: 3; }
+	.section-col--l-size-25 { --section-col-n: 4; }
+	.section-col--l-align-start { align-items: flex-start; text-align: start; }
+	.section-col--l-align-center { align-items: center; text-align: center; }
+	.section-col--l-align-end { align-items: flex-end; text-align: end; }
+	.section-col--l-hide-on { display: none; }
+	.section-col--l-hide-off { display: flex; }
+}
+
+/*	Without light-dark() the pairs of the palette have no value: a section with a picture is written out in the colours of the dark page, which is all
+	it needs to stay readable. A ground of Nino.css has its own	*/
+@supports not ( color: light-dark( #000, #fff ) ) {
+	.section-wrap-image ~ .section-row { color: #eceef1; }
+	.section-wrap:has( > .section-wrap-image ) { background-color: #15171b; color: #eceef1; }
+}
+
+/*	On paper: no ground, no veil, no picture, dark writing - a button keeps its frame	*/
+@media print {
+	.section-wrap, .section-wrap:has( > .section-wrap-image ), .section-wrap-image ~ .section-row, .section-col:where( [class*="--ground-"] ) { color-scheme: light; background: none; color: #000; min-height: 0; }
+	.section-wrap-image { display: none; }
+	.section-col--variant-card { border-color: #000; }
+	.section-subtitle { color: #000; }
+}

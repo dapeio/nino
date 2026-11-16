@@ -767,6 +767,22 @@ check( 'a template that leaves the folder - up, absolute, a stream, a backslash,
 	is_array( $result ) === true && $result['components'] === [] && count( $result['rejected'] ) === 11 && str_contains( $result['rejected']['ev-nogroup'], 'a component of a feature names its "group"' ) === true && str_contains( $result['rejected']['ev-up'], 'not the name of a file' ) === true
 	&& str_contains( $result['rejected']['ev-no-file'], 'not the name of a file' ) === true && str_contains( $result['rejected']['ev-group'], '"group" is a slug' ) === true && $GLOBALS['ninoRegisterEvil'] === [] );
 
+// The attribute ground is the contract of the grounds, like the variant: a choice among none, base, alt, tint, primary, dark - nothing else is a ground
+registerRemove( $evil );
+$evil = registerFeature( 'Evil' );
+registerGroup( $evil, 'tidy', [ 'label' => 'Tidy' ] );
+$ground = static fn( array $declared ): array => registerSchema( [ 'attributes' => [ 'ground' => $declared + [ 'default' => 'base', 'label' => 'Ground' ] ] ] );
+registerComponent( $evil, 'g-all', $ground( [ 'type' => 'choice', 'options' => [ 'none', 'base', 'alt', 'tint', 'primary', 'dark' ] ] ) );
+registerComponent( $evil, 'g-some', $ground( [ 'type' => 'choice', 'options' => [ 'base', 'dark' ] ] ) );
+registerComponent( $evil, 'g-more', $ground( [ 'type' => 'choice', 'options' => [ 'base', 'alternative' ] ] ) );
+registerComponent( $evil, 'g-word', $ground( [ 'type' => 'choice', 'options' => [ 'base', 'alt', 'blue' ] ] ) );
+registerComponent( $evil, 'g-string', $ground( [ 'type' => 'string', 'default' => 'alt' ] ) );
+registerComponent( $evil, 'g-bool', $ground( [ 'type' => 'bool', 'default' => false ] ) );
+$result = $read( $evil, 'evil' );
+check( 'an attribute named ground is accepted as a choice among the words of the grounds, or part of them, and refused as anything else: another word, a text, a switch',
+	is_array( $result ) === true && array_keys( $result['components'] ) === [ 'g-all', 'g-some' ] && array_keys( $result['rejected'] ) === [ 'g-bool', 'g-more', 'g-string', 'g-word' ]
+	&& str_contains( $result['rejected']['g-word'], 'the attribute "ground" is a choice among none, base, alt, tint, primary, dark' ) === true );
+
 // A schema that brings what is none of a schema
 registerRemove( $evil );
 $evil = registerFeature( 'Evil' );
@@ -1094,8 +1110,8 @@ $all = \Nino\Features::all( $shipped );
 
 check( 'a module of the kernel with a feature.php is a feature: it is listed beside the ones below features/, with shipped true - and the others with shipped false',
 	isset( $all['parcel'] ) === true && $all['parcel']['shipped'] === true && $all['parcel']['dir'] === $registerKernel. '/_nino/Nino/Modules/Parcel' && $all['parcel']['module'] === '\\Nino\\Modules\\Parcel'
-	&& $all['probe']['shipped'] === false && array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) === [ 'parcel' => $all['parcel'] ] && $all['parcel']['active'] === false );
-check( '...with the kernel\'s modules that have no manifest not among them, in the order of the keys', array_keys( $all ) === [ 'parcel', 'probe' ] );
+	&& $all['probe']['shipped'] === false && array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === [ 'basis', 'parcel' ] && $all['parcel']['active'] === false );
+check( '...with the kernel\'s modules that have no manifest not among them, in the order of the keys: the feature the kernel really delivers, and the one this suite puts there', array_keys( $all ) === [ 'basis', 'parcel', 'probe' ] );
 
 $taken = registerFeature( 'Parcel', [ 'key' => 'parceltwin' ] );
 $mine = registerFeature( 'Mine', [ 'key' => 'parcel' ] );

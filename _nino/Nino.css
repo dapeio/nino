@@ -757,6 +757,132 @@ h1, h2, h3, h4, h5, h6 {
 		hyphenate-limit-chars: 12 4 4;
 	}
 }
+
+/****************************************************************************************************
+ *
+ *
+ *			01b Brand, page and ground
+ *
+ *
+ *			The words the parts of the components of a feature read - the standard
+ *			parts of the feature Basis among them - and nothing else of the page:
+ *			--brand-... is the project's (its two colours, its three faces, the mode)
+ *			and the palette worked out of them, --page-... is the theme's (the size
+ *			of the text, the room, the width of a line, the corner). Each colour of
+ *			the palette is a light-dark() pair, so that the mode of the page - light,
+ *			dark, or the visitor's own, --brand-scheme - turns all of them at once,
+ *			with no script and no second file. A browser without light-dark() leaves
+ *			the declaration out of use and the page shows what it shows without it:
+ *			the colours of the browser - a ground that is dark is written out below.
+ *
+ *			The roles (--brand-ground, --brand-ink, ...) are what a part reads, and
+ *			where a thing stands on another ground they are written again - the
+ *			contract of the grounds below - so that a part never has to know what it
+ *			stands on. Nothing in this chapter styles an element or a class of
+ *			Nino's own; the declarations are used by whatever reads them.
+ *
+ *
+ ****************************************************************************************************/
+
+:root {
+	/*	The brand. --brand-scheme is the mode: light, dark, or both for the visitor's own	*/
+	--brand-scheme: light dark;
+	--brand-color-1: #1c5db8;
+	--brand-color-2: #17233a;
+	--brand-on-color-1: #fff;
+	--brand-on-color-2: #fff;
+	--brand-font-title: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--brand-font-text: var(--brand-font-title);
+	--brand-font-button: var(--brand-font-title);
+
+	/*	The palette worked out of the brand, for a light and for a dark page	*/
+	--brand-ground-base: light-dark( #fff, #15171b );
+	--brand-ground-alt: light-dark( #f2f3f5, #1e2127 );
+	--brand-ground-tint: light-dark( #e6eefa, #1b2a44 );
+	--brand-ink-base: light-dark( #1b1d21, #eceef1 );
+	--brand-ink-quiet-base: light-dark( #565b64, #aab0b9 );
+	--brand-line-base: light-dark( #cfd3d9, #3c414a );
+	--brand-accent-base: light-dark( var(--brand-color-1), #86b6f6 );
+	--brand-on-accent-base: light-dark( var(--brand-on-color-1), #0f1b2e );
+
+	/*	The roles a part reads: the ground a thing stands on, and what is written on it	*/
+	--brand-ground: var(--brand-ground-base);
+	--brand-ink: var(--brand-ink-base);
+	--brand-ink-quiet: var(--brand-ink-quiet-base);
+	--brand-line: var(--brand-line-base);
+	--brand-accent: var(--brand-accent-base);
+	--brand-on-accent: var(--brand-on-accent-base);
+
+	/*	The page: the size of the text, the width of a line, the room in six steps, the type scale, the corner	*/
+	--page-size: 100%;
+	--page-width: 72rem;
+	--page-leading: 1.6;
+	--page-space-1: .25rem;
+	--page-space-2: .5rem;
+	--page-space-3: 1rem;
+	--page-space-4: 1.5rem;
+	--page-space-5: 2.5rem;
+	--page-space-6: 4rem;
+	--page-text-1: .875rem;
+	--page-text-2: 1rem;
+	--page-text-3: 1.125rem;
+	--page-text-4: 1.375rem;
+	--page-text-5: clamp( 1.6rem, 1.25rem + 1.6vw, 2.25rem );
+	--page-text-6: clamp( 2rem, 1.3rem + 3.2vw, 3.5rem );
+	--page-radius: .375rem;
+	--page-line: 1px;
+	--page-motion: .15s;
+}
+
+/*	The contract of the grounds. A component that has the attribute ground - base, alt, tint, primary or dark - is
+	written <name>--ground-<word> by the register, and that class is all there is to it: the same for every
+	component, it names the roles again for what stands on it. dark is the dark page (the pairs of the palette turn
+	by themselves), alt and tint change the ground, primary takes the ground, the ink and the accent from the first
+	colour of the brand. The selectors meet the word whole, at the end of the value of class or before the next
+	class: --ground-alt is not --ground-alternative. A feature may only say ground as a choice among the five
+	words (\Nino\Features::readComponents() refuses the rest), and no class of Nino's own has --ground- in it	*/
+:where( [class$="--ground-base"], [class*="--ground-base "], [class$="--ground-alt"], [class*="--ground-alt "], [class$="--ground-tint"], [class*="--ground-tint "], [class$="--ground-dark"], [class*="--ground-dark "] ) {
+	color-scheme: var(--brand-scheme);
+	--brand-ground: var(--brand-ground-base);
+	--brand-ink: var(--brand-ink-base);
+	--brand-ink-quiet: var(--brand-ink-quiet-base);
+	--brand-line: var(--brand-line-base);
+	--brand-accent: var(--brand-accent-base);
+	--brand-on-accent: var(--brand-on-accent-base);
+}
+:where( [class$="--ground-alt"], [class*="--ground-alt "] ) {
+	--brand-ground: var(--brand-ground-alt);
+}
+:where( [class$="--ground-tint"], [class*="--ground-tint "] ) {
+	--brand-ground: var(--brand-ground-tint);
+}
+:where( [class$="--ground-dark"], [class*="--ground-dark "] ) {
+	color-scheme: dark;
+}
+:where( [class$="--ground-primary"], [class*="--ground-primary "] ) {
+	--brand-ground: var(--brand-color-1);
+	--brand-ink: var(--brand-on-color-1);
+	--brand-ink-quiet: var(--brand-on-color-1);
+	--brand-line: var(--brand-on-color-1);
+	--brand-accent: var(--brand-on-color-1);
+	--brand-on-accent: var(--brand-color-1);
+}
+:where( [class$="--ground-base"], [class*="--ground-base "], [class$="--ground-alt"], [class*="--ground-alt "], [class$="--ground-tint"], [class*="--ground-tint "], [class$="--ground-dark"], [class*="--ground-dark "], [class$="--ground-primary"], [class*="--ground-primary "] ) {
+	background-color: var(--brand-ground);
+	color: var(--brand-ink);
+}
+/*	Where light-dark() is not known the palette has no value, and the roles of a ground that is dark are written out in the colours of the dark page, so
+	that the words on it stay readable (primary needs none: it takes the brand's own). The other grounds are the page's, whatever it shows	*/
+@supports not ( color: light-dark( #000, #fff ) ) {
+	:where( [class$="--ground-dark"], [class*="--ground-dark "] ) {
+		--brand-ground: #15171b;
+		--brand-ink: #eceef1;
+		--brand-ink-quiet: #aab0b9;
+		--brand-line: #3c414a;
+		--brand-accent: #86b6f6;
+		--brand-on-accent: #0f1b2e;
+	}
+}
 }
 
 

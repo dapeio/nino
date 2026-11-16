@@ -1,0 +1,1240 @@
+<?php
+declare(strict_types=1);
+
+/**
+ *	Nino
+ *	basis-smoke.php	Contract test for the feature Basis - the twenty components in six groups that come with the kernel,
+ *									switched off, and the standard part of each group:
+ *
+ *										A. the folders: twenty schemas read and accepted, each as clean as validate() makes it, the places they
+ *										   offer, the six groups, the standard parts that keep the rule of mixing; the feature is delivered, listed,
+ *										   off, with no script, and nothing in the kernel names it
+ *										B. what every component draws: the classes of every value of every attribute, computed from the schema;
+ *										   the markup of each one, the pictures, the menus, the links that are none; the fall-back rules
+ *										C. the contract of group, part, ladder and token: the seven things a group keeps, the tokens that Nino.css
+ *										   sets and the parts read, the parts in the bundle and what the hook of the parts does to them
+ *										D. both states: where basis is off the module of the kernel draws text, button, image, spacer and html as it
+ *										   always did, where it is on the register does
+ *										E. what must never be read: a text, a field, an alt text, a caption and the title of a menu that spell a call,
+ *										   a fill, a quote, a null byte, a megabyte; an address that is none
+ *										F. the fixture page - all twenty components, cards, header and footer - drawn in both languages and compared
+ *										   byte for byte with tests/fixtures/basis/page.<locale>.html
+ *										G. the words of the feature, the activation, the sizes, the cost of a page of seven sections
+ *
+ *									Runs against an isolated sandbox directory; the kernel is the checkout's own, and the feature is the one
+ *									the checkout delivers (_nino/Nino/Modules/Basis).
+ *
+ *	Usage: php tests/basis-smoke.php
+ *				 php tests/basis-smoke.php --record=DIR	writes the drawn fixture pages into DIR
+ */
+
+// A project with no features of its own: the one feature of the run is the one the kernel delivers
+define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-basis-features-'. getmypid() );
+mkdir( NINO_FEATURES_DIR, 0755, true );
+$GLOBALS['basisSandboxes'] = [];
+register_shutdown_function( static function(): void {
+
+	foreach( $GLOBALS['basisSandboxes'] as $sandbox )
+		if( is_dir( $sandbox ) === true )
+			\Nino\Filesystem::removeDir( $sandbox );
+
+	@rmdir( NINO_FEATURES_DIR );
+} );
+
+require __DIR__. '/harness.php';
+
+$notes			= [];
+$basisDir		= dirname( __DIR__ ). '/_nino/Nino/Modules/Basis';
+$fixtureDir	= __DIR__. '/fixtures/basis';
+$record			= getopt( '', [ 'record:' ] )['record'] ?? null;
+
+// What the feature is made of, by the order of the table in docs/features.md
+const BASIS_COMPONENTS = [
+	'header'	=> [ 'header-wrap', 'header-logo', 'header-nav', 'header-actions' ],
+	'footer'	=> [ 'footer-wrap', 'footer-col', 'footer-logo', 'footer-nav', 'footer-legal' ],
+	'section'	=> [ 'section-wrap', 'section-row', 'section-col', 'section-title', 'section-subtitle' ],
+	'button'	=> [ 'button', 'button-group' ],
+	'image'		=> [ 'image' ],
+	'text'		=> [ 'text', 'spacer', 'html' ],
+];
+
+/**
+ *	A project with basis switched on and a site to draw in: two languages, the menus main and footer, a few pages with a
+ *	name in each language, a logo and a few pictures. As \Nino\init() registers it: the components are read from the folders
+ *
+ *	@param		string		$locale
+ *	@param		bool			$on						Whether basis is in the list of the modules
+ *
+ *	@return 	array										$appData
+ */
+function basisSite( string $locale = 'de_DE', bool $on = true ): array {
+
+	$appData = ninoSandbox( 'basis' );
+	$GLOBALS['basisSandboxes'][] = ninoSandboxDir( $appData );
+	$appData['./nino/locales/current'] = $locale;
+
+	// The root of the site is the checkout: the standard parts are files of the kernel below it (/_nino/Nino/Modules/Basis/...), which the hook of the parts is
+	// told to be there. Private and public stay in the sandbox
+	$appData['./nino/filesystem/path'] = dirname( __DIR__ );
+	$appData['/nino/modules'] = $on === true ? [ '\\Nino\\Modules\\Basis' ] : [];
+	$appData['/nino/html/navs'] = [ 'main', 'footer', 'empty' ];
+
+	// A page is a route with the menus it is in; its name is a text of each language
+	$appData['/nino/http/routes'] = [
+		'GET://'					=> [ 'uri' => '/home', 'navs' => [ 'main' => 1 ] ],
+		'GET://contact'		=> [ 'uri' => '/contact', 'navs' => [ 'main' => 2, 'footer' => 1 ] ],
+		'GET://about'			=> [ 'uri' => '/about', 'navs' => [ 'main' => 3, 'footer' => 2 ] ],
+		'GET://imprint'		=> [ 'uri' => '/imprint', 'navs' => [ 'legal' => 1 ] ],
+		'GET://privacy'		=> [ 'uri' => '/privacy', 'navs' => [ 'legal' => 2 ] ],
+		'POST://send'			=> [ 'uri' => '/send', 'navs' => [ 'main' => 4 ] ],
+	];
+
+	// The pictures: the logo for a light and for a dark ground, and the places of the fixture page
+	$slot = static fn( string $file, int $width, int $height, array $alt = [] ): array => [ 'label' => $file, 'width' => $width, 'height' => $height, 'filename' => $file, 'alt' => $alt ];
+	$appData['/nino/html/images'] = [
+		'/logo'												=> $slot( 'logo.png', 160, 48 ),
+		'/logo/dark'									=> $slot( 'logo-dark.png', 160, 48 ),
+		'/template/page-basis/hero/background'	=> $slot( 'hero.jpg', 1600, 900 ),
+		'/template/page-basis/card-1/photo'		=> $slot( 'card.jpg', 800, 450, [ 'de_DE' => 'Ein Bild im Speicher', 'en_US' => 'A stored picture' ] ),
+		'/template/page-basis/story/photo'		=> $slot( 'story.jpg', 800, 600 ),
+		'/template/page-basis/picture/background'	=> $slot( 'picture.jpg', 1600, 900 ),
+		'/nosize'											=> $slot( 'plain.png', 0, 0 ),
+		'/empty'											=> [ 'label' => 'Empty', 'width' => 100, 'height' => 100, 'filename' => '', 'alt' => [] ],
+	];
+
+	// What the site says, in both languages: the words of the project, of the page and of the feature
+	$words = include __DIR__. '/fixtures/basis/text.php';
+
+	foreach( [ 'de_DE', 'en_US' ] as $language ) {
+
+		$fills = $words[$language];
+
+		foreach( (array) include __DIR__. '/../_nino/Nino/Modules/Basis/install/text/'. $language. '.php' as $key => $text )
+			$fills[trim( (string) $key, '[]' )] = $text;
+
+		\Nino\Html::addFills( $appData, $fills, $language );
+	}
+
+	\Nino\Html::addFills( $appData, [ '/nino/date/year' => '2026' ], '*' );
+
+	// As \Nino\init() does it: the register first, then the standard parts
+	\Nino\Features::registerComponents( $appData );
+	\Nino\Features::registerParts( $appData );
+
+	return $appData;
+}
+
+/**
+ *	A source drawn the way a page is, in the template page-basis
+ *
+ *	@param		array 		&$appData			(reference) A project of basisSite()
+ *	@param		string		$source				html+
+ *	@param		array			$context			More of the context the nodes are drawn in
+ *
+ *	@return 	string
+ */
+function basisDraw( array &$appData, string $source, array $context = [] ): string {
+
+	$notes = [];
+
+	return \Nino\Components::render( $appData, \Nino\Markup::parse( $source, \Nino\Components::containers( $appData ), $notes ), $context + [ 'template' => 'page-basis' ] );
+}
+
+
+/**
+ *	One call of a component as the smallest thing that draws: a container with nothing in it, or a leaf with the word it reads
+ *
+ *	@param		string		$name
+ *	@param		array			$schema				The clean schema
+ *	@param		string		$attributes		What stands after the name, '' or ' size="m"'
+ *
+ *	@return 	string
+ */
+function basisCall( string $name, array $schema, string $attributes ): string {
+
+	$source = $schema['source'] === 'image' ? ' /logo' : ( $schema['source'] === 'text' ? ' text="Hi"' : '' );
+
+	return isset( $schema['offers'] ) === true ? '['. $name. $source. $attributes. ']'. ( $name === 'html' ? '<p>x</p>' : '' ). '[/'. $name. ']' : '['. $name. $source. $attributes. ' /]';
+}
+
+/**
+ *	The classes a call writes, worked out of the schema: the name, then for each attribute that is a class a choice that is not
+ *	its default (name--attribute-value), a bool that is on (name--attribute), and for a responsive choice the value for every
+ *	width and each breakpoint that is named (name--m-attribute-value)
+ *
+ *	@param		string		$name
+ *	@param		array			$schema
+ *	@param		array			$given				attribute => the word written, for a bool true
+ *
+ *	@return 	string
+ */
+function basisClasses( string $name, array $schema, array $given ): string {
+
+	$class = $name;
+
+	foreach( $schema['attributes'] as $attribute => $declared ) {
+
+		if( $declared['class'] !== true || isset( $given[$attribute] ) === false )
+			continue;
+
+		if( $declared['type'] === 'bool' )
+			$class .= ' '. $name. '--'. $attribute;
+		else if( ( $declared['responsive'] ?? false ) === true ) {
+
+			foreach( explode( ' ', (string) $given[$attribute] ) as $index => $part ) {
+
+				[ $width, $value ] = str_contains( $part, ':' ) === true ? explode( ':', $part, 2 ) : [ '', $part ];
+
+				if( $width === '' && $value !== $declared['default'] )
+					$class .= ' '. $name. '--'. $attribute. '-'. $value;
+				else if( $width !== '' )
+					$class .= ' '. $name. '--'. $width. '-'. $attribute. '-'. $value;
+			}
+		}
+		else if( $given[$attribute] !== $declared['default'] )
+			$class .= ' '. $name. '--'. $attribute. '-'. $given[$attribute];
+	}
+
+	return $class;
+}
+
+/**	The classes of the first element a drawing writes	*/
+function basisFirstClass( string $html ): string {
+	return preg_match( '/class="([^"]*)"/', $html, $found ) === 1 ? $found[1] : '';
+}
+
+/**	The table of the components docs/features.md has, worked out of the registered schemas	*/
+function basisTable( array $schemas ): string {
+
+	$rows = "| Group | Component | In | Holds | Source | Renderer | Classes next to the name | Tokens of the template |\n|---|---|---|---|---|---|---|---|\n";
+	$last = '';
+
+	foreach( BASIS_COMPONENTS as $group => $names )
+		foreach( $names as $name ) {
+
+			$schema = $schemas[$name];
+			$classes = [];
+			$tokens = [];
+
+			foreach( $schema['attributes'] as $attribute => $declared ) {
+
+				if( $declared['class'] === true && $declared['type'] === 'choice' ) {
+
+					$responsive = ( $declared['responsive'] ?? false ) === true;
+					$values = $responsive === true ? $declared['options'] : array_values( array_diff( $declared['options'], [ $declared['default'] ] ) );
+					$classes[] = '`--'. ( $responsive === true ? '[m-\|l-]' : '' ). $attribute. '-{'. implode( ',', $values ). '}`';
+				}
+				else if( $declared['class'] === true )
+					$classes[] = '`--'. $attribute. '`';
+				else
+					$tokens[] = '`[['. ( $declared['type'] === 'id' ? 'id' : $attribute ). ']]`';
+			}
+
+			foreach( array_diff( $schema['variants'], [ 'regular' ] ) as $variant )
+				$classes[] = '`--variant-'. $variant. '`';
+
+			$rows .= '| '. ( $group === $last ? '' : '**'. $group. '**' ). ' | `'. $name. '`'. ( $schema['once'] === true ? ' (once)' : '' ). ' | '. implode( ', ', $schema['in'] ). ' | '
+				. ( isset( $schema['offers'] ) === true ? ( $schema['offers'] === [] ? 'itself' : 'itself, '. implode( ', ', $schema['offers'] ) ) : '- (a leaf)' ). ' | '
+				. $schema['source']. ( isset( $schema['format'] ) === true ? '/'. $schema['format'] : '' ). ' | '. ( is_callable( [ '\\Nino\\Modules\\Basis', 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ] ) === true ? 'yes' : '-' ). ' | '
+				. ( implode( ' ', $classes ) ?: '-' ). ' | '. ( implode( ' ', $tokens ) ?: '-' ). " |\n";
+			$last = $group;
+		}
+
+	return $rows;
+}
+
+/**
+ *	The rules of a css text, the ones inside @media and @supports among them: [ 'at' => the prelude of the at-rule they stand in, '' for none,
+ *	'selector' => as written with one space for each run of white space, 'body' => the declarations ]. Comments are left out
+ *
+ *	@param		string		$css
+ *
+ *	@return 	array
+ */
+function basisRules( string $css ): array {
+
+	$css = (string) preg_replace( '#/\*.*?\*/#s', '', $css );
+	$rules = [];
+	$stack = [];
+	$buffer = '';
+
+	for( $at = 0, $length = strlen( $css ); $at < $length; $at++ ) {
+
+		$char = $css[$at];
+
+		if( $char === '{' ) {
+
+			$prelude = trim( (string) preg_replace( '/\s+/', ' ', $buffer ) );
+			$stack[] = [ $prelude, $at + 1 ];
+			$buffer = '';
+		}
+		else if( $char === '}' ) {
+
+			[ $prelude, $from ] = array_pop( $stack );
+			$inner = substr( $css, $from, $at - $from );
+
+			if( str_contains( $inner, '{' ) === false )
+				$rules[] = [ 'at' => implode( ' ', array_column( $stack, 0 ) ), 'selector' => $prelude, 'body' => trim( (string) preg_replace( '/\s+/', ' ', $inner ) ) ];
+
+			$buffer = '';
+		}
+		else
+			$buffer .= $char;
+	}
+
+	return $rules;
+}
+
+/**	The rules of a text whose selector holds a word: the declarations of each, joined	*/
+function basisBody( array $rules, string $word, string $at = '' ): string {
+
+	$bodies = [];
+
+	foreach( $rules as $rule )
+		if( $rule['at'] === $at && str_contains( $rule['selector'], $word ) === true )
+			$bodies[] = $rule['body'];
+
+	return implode( ' ', $bodies );
+}
+
+/**	The contrast of two colours given as [ r, g, b ], 1 to 21	*/
+function basisContrast( array $one, array $two ): float {
+
+	$light = static function( array $colour ): float {
+
+		$channels = array_map( static function( float $value ): float {
+
+			$value /= 255;
+
+			return $value <= 0.03928 ? $value / 12.92 : ( ( $value + 0.055 ) / 1.055 ) ** 2.4;
+		}, $colour );
+
+		return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+	};
+
+	$a = $light( $one );
+	$b = $light( $two );
+
+	return ( max( $a, $b ) + 0.05 ) / ( min( $a, $b ) + 0.05 );
+}
+
+if( in_array( '--table', $argv, true ) === true ) {
+
+	$appData = basisSite();
+	echo basisTable( \Nino\Components::components( $appData ) );
+	exit( 0 );
+}
+
+
+// --- A. The folders -----------------------------------------------------------------------------------
+
+echo "A. The folders of the feature: schemas, groups, parts\n";
+
+$read = \Nino\Features::readComponents( $basisDir, 'basis' );
+check( 'the folders are read and nothing is refused: no component, no group and no standard part', is_array( $read ) === true && $read['rejected'] === [] && count( $read['groups'] ) === 6
+	&& array_column( $read['groups'], 'part' ) === [ true, true, true, true, true, true ] );
+
+$names = array_merge( ...array_values( BASIS_COMPONENTS ) );
+sort( $names );
+$have = array_keys( $read['components'] );
+sort( $have );
+check( 'twenty components in six groups: header, footer, section, button, image and text', count( $have ) === 20 && $have === $names
+	&& array_keys( $read['groups'] ) !== [] && count( $read['groups'] ) === 6 );
+
+$members = [];
+foreach( $read['components'] as $name => $clean )
+	$members[$clean['group']][] = $name;
+$byGroup = [];
+foreach( BASIS_COMPONENTS as $group => $list ) {
+	sort( $list );
+	$byGroup[$group] = $list;
+}
+ksort( $byGroup );
+ksort( $members );
+foreach( $members as &$list )
+	sort( $list );
+unset( $list );
+check( 'every component names its group, and the groups hold what the table says', $members === $byGroup );
+
+$unstable = [];
+foreach( $read['components'] as $name => $clean )
+	if( \Nino\Components::validate( $name, $clean ) !== $clean )
+		$unstable[] = $name;
+check( 'validate() accepts every clean schema as it is, unchanged'. ( $unstable === [] ? '' : ' - '. implode( ', ', $unstable ) ), $unstable === [] );
+
+$appData = basisSite();
+$schemas = \Nino\Components::components( $appData );
+check( 'switched on, the register holds the twenty and the six groups', count( $schemas ) === 20 && count( \Nino\Components::groups( $appData ) ) === 6
+	&& array_keys( array_diff_key( \Nino\Components::groups( $appData ), array_flip( [ 'button', 'footer', 'header', 'image', 'section', 'text' ] ) ) ) === [] );
+
+// what a tool offers where: the nine that hold something
+$holds = [
+	''							=> [ 'footer-wrap', 'header-wrap', 'html', 'section-wrap' ],
+	'header-wrap'		=> [ 'header-actions', 'header-logo', 'header-nav' ],
+	'section-wrap'	=> [ 'section-row' ],
+	'section-row'		=> [ 'section-col' ],
+	'section-col'		=> [ 'button', 'button-group', 'html', 'image', 'section-subtitle', 'section-title', 'spacer', 'text' ],
+	'footer-wrap'		=> [ 'footer-col', 'footer-legal' ],
+	'footer-col'		=> [ 'button', 'button-group', 'footer-logo', 'footer-nav', 'html', 'image', 'spacer', 'text' ],
+	'button-group'	=> [ 'button' ],
+	'html'					=> [],
+	'header-actions'	=> [ 'button', 'button-group', 'html', 'image', 'spacer', 'text' ],
+];
+$wrong = [];
+foreach( $holds as $parent => $expected ) {
+	$allowed = \Nino\Components::allowed( $appData, $parent );
+	sort( $allowed );
+	if( $allowed !== $expected )
+		$wrong[] = $parent;
+}
+check( 'allowed() answers for the nine components that hold something, and for the page, what each may hold - no row in a column, no column in a column'. ( $wrong === [] ? '' : ' - '. implode( ', ', $wrong ) ), $wrong === [] );
+$containers = array_keys( array_filter( \Nino\Components::containers( $appData ) ) );
+sort( $containers );
+check( 'the containers are the nine', $containers === [ 'button-group', 'footer-col', 'footer-wrap', 'header-actions', 'header-wrap', 'html', 'section-col', 'section-row', 'section-wrap' ] );
+$once = array_keys( array_filter( array_map( static fn( array $schema ): bool => $schema['once'], $schemas ) ) );
+sort( $once );
+check( 'header-logo, header-nav and footer-legal are once, and the column has the variant card', $once === [ 'footer-legal', 'header-logo', 'header-nav' ]
+	&& $schemas['section-col']['variants'] === [ 'regular', 'card' ] );
+
+$renderers = array_keys( (array) $appData[\Nino\Components::RENDERERS] );
+sort( $renderers );
+check( 'ten of the twenty have a renderer, the ones that compute; the others are drawn from their template alone', $renderers === [ 'button', 'footer-legal', 'footer-logo', 'footer-nav', 'header-logo', 'header-nav', 'html', 'image', 'section-title', 'section-wrap' ] );
+
+// the feature: delivered, listed, off, with no script, and nothing of the kernel names it
+$manifestWarnings = ninoWarnings();
+$all = \Nino\Features::all( $appData );
+check( 'the feature is delivered with the kernel: listed with shipped true, off, its class the module of its directory, its manifest read with no warning', isset( $all['basis'] ) === true && $all['basis']['shipped'] === true
+	&& $all['basis']['module'] === '\\Nino\\Modules\\Basis' && $all['basis']['dir'] === $basisDir && $all['basis']['problems'] === [] && $manifestWarnings === [] );
+$fresh = ninoSandbox( 'basis-fresh' );
+check( 'it is off on a fresh project, and the wizard does not list it', in_array( '\\Nino\\Modules\\Basis', \Nino\AppData::DEFAULTS['/nino/modules'] ?? [], true ) === false
+	&& \Nino\Features::get( $fresh, 'basis' )['active'] === false && is_file( $basisDir. '/install/manifest.php' ) === false );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $fresh ) );
+
+$scripts = [];
+$mentions = [];
+foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__ ). '/_nino', \FilesystemIterator::SKIP_DOTS ) ) as $file ) {
+
+	if( str_starts_with( $file->getPathname(), $basisDir. '/' ) === true )
+		$scripts[] = $file->getExtension() === 'js' ? $file->getPathname() : null;
+	else if( $file->getExtension() === 'php' && preg_match( '/Modules\\\\+Basis\b/', (string) file_get_contents( $file->getPathname() ) ) === 1 )
+		$mentions[] = $file->getPathname();
+}
+foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__ ). '/_admin', \FilesystemIterator::SKIP_DOTS ) ) as $file )
+	if( $file->getExtension() === 'php' && preg_match( '/Modules\\\\+Basis\b/', (string) file_get_contents( $file->getPathname() ) ) === 1 )
+		$mentions[] = $file->getPathname();
+check( 'no file of the feature is a script, and no file of the kernel or of the workbench names the class: nothing uses it'. ( $mentions === [] ? '' : ' - '. implode( ', ', $mentions ) ), array_filter( $scripts ) === [] && $mentions === [] );
+
+// the cache of the register: a request that finds it as it was includes no component.php and no group.php - a process of its own says what it included
+$warm = ninoSandbox( 'basis-warm' );
+$warmDir = ninoSandboxDir( $warm );
+$request = static function() use ( $warmDir ): array {
+
+	$script = sys_get_temp_dir(). '/nino-basis-warm-'. getmypid(). '.php';
+	file_put_contents( $script, '<?php define( "NINO_FEATURES_DIR", '. var_export( NINO_FEATURES_DIR, true ). ' ); require '. var_export( __DIR__. '/harness.php', true ). ';
+		$a = [ "./nino/uid" => '. var_export( $warmDir, true ). ' ]; \\Nino\\AppData::prepare( $a );
+		$a["./nino/filesystem/path"] = '. var_export( dirname( __DIR__ ), true ). '; $a["./nino/filesystem/configpath"] = $a["./nino/filesystem/contentpath"] = '. var_export( $warmDir. '/private', true ). '; $a["./nino/filesystem/publicpath"] = '. var_export( $warmDir. '/public', true ). ';
+		$a["/nino/modules"] = [ "\\\\Nino\\\\Modules\\\\Basis" ]; $a["/nino/dir"] = ""; $a["./nino/locales/current"] = "de_DE"; $a["/nino/locales/native"] = "de_DE"; $a["/nino/locales/available"] = [ "de_DE", "en_US" ];
+		\\Nino\\Features::registerComponents( $a );
+		echo json_encode( [ count( \\Nino\\Components::components( $a ) ), count( \\Nino\\Components::groups( $a ) ), array_values( array_filter( get_included_files(), static fn( string $file ): bool => preg_match( "#/Modules/Basis/(components/[^/]+/component|groups/[^/]+/group)\\.php$#", $file ) === 1 ) ) ] );' );
+	$out = (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $script ). ' 2>&1' );
+	unlink( $script );
+
+	return (array) json_decode( $out, true );
+};
+$first = $request();
+$second = $request();
+check( 'the first request reads the twenty component.php and the six group.php and writes the cache of the register; the second registers the same from it and includes none of them', ( $first[0] ?? 0 ) === 20 && ( $first[1] ?? 0 ) === 6 && count( $first[2] ?? [] ) === 26
+	&& is_file( $warmDir. '/private/data/cache/register/basis.php' ) === true && ( $second[0] ?? 0 ) === 20 && ( $second[1] ?? 0 ) === 6 && ( $second[2] ?? [ 'x' ] ) === [] );
+\Nino\Filesystem::removeDir( $warmDir );
+
+// --- B. What every component draws ----------------------------------------------------------------
+
+echo "\nB. What every component draws\n";
+
+$classProblems = [];
+$cases = 0;
+
+foreach( $schemas as $name => $schema ) {
+
+	foreach( $schema['attributes'] as $attribute => $declared ) {
+
+		if( $declared['class'] !== true )
+			continue;
+
+		$tries = [];
+
+		if( $declared['type'] === 'bool' )
+			$tries[] = [ ' '. $attribute, true ];
+		else if( ( $declared['responsive'] ?? false ) === true ) {
+
+			foreach( $declared['options'] as $value )
+				$tries[] = [ ' '. $attribute. '="'. $value. '"', $value ];
+
+			$tries[] = [ ' '. $attribute. '="'. $declared['options'][0]. ' m:'. end( $declared['options'] ). ' l:'. $declared['options'][1]. '"', $declared['options'][0]. ' m:'. end( $declared['options'] ). ' l:'. $declared['options'][1] ];
+		}
+		else
+			foreach( $declared['options'] as $value )
+				$tries[] = [ ' '. $attribute. '="'. $value. '"', $value ];
+
+		foreach( $tries as [ $written, $value ] ) {
+
+			$cases++;
+			$html = basisDraw( $appData, basisCall( $name, $schema, $written ) );
+			$expected = basisClasses( $name, $schema, [ $attribute => $value ] );
+
+			if( basisFirstClass( $html ) !== $expected )
+				$classProblems[] = $name. $written. ' is '. basisFirstClass( $html ). ', not '. $expected;
+		}
+	}
+
+	foreach( array_diff( $schema['variants'], [ 'regular' ] ) as $variant ) {
+
+		$cases++;
+		$html = basisDraw( $appData, basisCall( $name, $schema, ' variant="'. $variant. '"' ) );
+
+		if( basisFirstClass( $html ) !== $name. ' '. $name. '--variant-'. $variant )
+			$classProblems[] = $name. ' variant '. $variant;
+	}
+
+	// nothing written: the name alone
+	if( basisFirstClass( basisDraw( $appData, basisCall( $name, $schema, '' ) ) ) !== $name )
+		$classProblems[] = $name. ' with nothing written';
+}
+check( 'every component with every value of every attribute that is a class, and every variant, writes the classes the schema says ('. $cases. ' calls)'. ( $classProblems === [] ? '' : ' - '. implode( '; ', array_slice( $classProblems, 0, 5 ) ) ), $classProblems === [] && $cases > 100 );
+ninoWarnings();
+
+// the markup each one writes, by what it is for
+$draw = static fn( string $source ): string => basisDraw( $appData, $source );
+
+check( 'a section is a section with an id, a row a div, a column a div that may hold a card', $draw( '[section-wrap id="a" ground="alt"][section-row][section-col variant="card"]x[/section-col][/section-row][/section-wrap]' )
+	=== '<section id="a" class="section-wrap section-wrap--ground-alt"><div class="section-row"><div class="section-col section-col--variant-card">x</div></div></section>' );
+check( 'a title is the element its tag says, in a link where it has an address that is one; the subtitle is a paragraph', $draw( '[section-title text="T" tag="h3" size="s" href="page:/contact"]' ) === '<h3 class="section-title section-title--size-s"><a href="/contact">T</a></h3>'
+	&& $draw( '[section-title text="T" tag="h4"]' ) === '<h4 class="section-title">T</h4>' && $draw( '[section-subtitle text="S"]' ) === '<p class="section-subtitle">S</p>' );
+check( 'a title with a tag that is none of the list is the default', $draw( '[section-title text="T" tag="script"]' ) === '<h2 class="section-title">T</h2>' );
+check( 'a button is a link, opens in a new window with rel where it says so, and is a span of the same classes without an address', $draw( '[button text="Go" href="/x" size="l" tone="quiet" wide]' ) === '<a class="button button--tone-quiet button--size-l button--wide" href="/x">Go</a>'
+	&& $draw( '[button text="Go" href="https://example.test/" target="blank"]' ) === '<a class="button" href="https://example.test/" target="_blank" rel="noopener">Go</a>' && $draw( '[button text="Go"]' ) === '<span class="button">Go</span>' );
+check( 'a text keeps its paragraphs and lists, its format is the one the call says', $draw( '[text text="<p>a</p><ul><li>b</li></ul><script>x()</script>"]' ) === '<div class="text"><p>a</p><ul><li>b</li></ul></div>'
+	&& $draw( '[text text="a b" format="inline" size="l"]' ) === '<div class="text text--size-l">a b</div>' );
+check( 'a spacer is empty and hidden from a screen reader; a group of buttons is a div', $draw( '[spacer size="4"]' ) === '<div class="spacer spacer--size-4" aria-hidden="true"></div>'
+	&& $draw( '[button-group align="end"][button text="A" href="/a"][/button-group]' ) === '<div class="button-group button-group--align-end"><a class="button" href="/a">A</a></div>' );
+check( 'html is what is left of its markup after it is cleaned: paragraphs, lists and the inline tags; nothing, where nothing is left', $draw( '[html]<p>Hi <b>x</b></p><script>alert(1)</script><iframe src="x"></iframe><ul><li onclick="x()">a</li></ul>[/html]' ) === '<div class="html"><p>Hi x</p><ul><li>a</li></ul></div>'
+	&& $draw( '[html]<script>alert(1)</script>[/html]' ) === '' && $draw( '[html]<p>a \[b] and \[c]</p>[/html]' ) === '<div class="html"><p>a [b] and [c]</p></div>' );
+$brackets = basisSite();
+\Nino\Html::addFills( $brackets, [ '/template/page-basis/ev/br' => 'a &#91;x&#93; &#91;&#91;y&#93;&#93;' ], '*' );
+check( 'the brackets of the markup stay what they were written as, and a bracket that a fill spells as an entity stays an entity: it is text and is read by nobody', basisDraw( $brackets, '[html]<p>[[/template/page-basis/ev/br]] \[z]</p>[/html]' ) === '<div class="html"><p>a &#91;x&#93; &#91;&#91;y&#93;&#93; [z]</p></div>' );
+
+// pictures
+check( 'an image is the figure of the picture of a slot: its size, lazy, the alt text of the call before the one stored for the language - and none where the call says decorative - a caption, a link', $draw( '[image /template/page-basis/card-1/photo alt="Call" caption="Cap" ratio="4-3" href="/x"]' )
+	=== '<figure class="image image--ratio-4-3"><a href="/x"><img src="/public/images/card.jpg" width="800" height="450" alt="Call" loading="lazy" decoding="async"></a><figcaption>Cap</figcaption></figure>'
+	&& str_contains( $draw( '[image /template/page-basis/card-1/photo]' ), ' alt="Ein Bild im Speicher" ' ) && str_contains( $draw( '[image /template/page-basis/card-1/photo decorative]' ), ' alt="" ' ) && str_contains( $draw( '[image /template/page-basis/card-1/photo decorative alt="Call"]' ), ' alt="Call" ' )
+	&& $draw( '[image /logo alt="Call"]' ) === '<figure class="image"><img src="/public/images/logo.png" width="160" height="48" alt="Call" loading="lazy" decoding="async"></figure>' );
+$noticed = ninoWarnings();
+$anchored = $draw( '[image /template/page-basis/story/photo href="/x"][image /template/page-basis/story/photo href="/y" decorative][image /template/page-basis/story/photo alt="Named" href="/z"]' );
+$said = ninoWarnings();
+check( 'a picture with no alt text is no link: without a name the anchor would be one nobody can use, so it is left out, and the log says it once for the picture', substr_count( $anchored, '<a ' ) === 1 && str_contains( $anchored, '<a href="/z">' ) && count( $said ) === 1 && str_contains( $said[0], 'no alt text' ) && str_contains( $said[0], 'story/photo' ) );
+check( 'a picture whose size is not known has no width and no height: a box of nothing is no size', $draw( '[image /nosize]' ) === '<figure class="image"><img src="/public/images/plain.png" alt="" loading="lazy" decoding="async"></figure>' );
+check( 'a slot with no file, one that is none and a field that holds none draw no image and no logo: an empty box is no picture', $draw( '[image /empty][image /nothing][footer-logo /empty][footer-logo /nothing]' ) === ''
+	&& $draw( '[section-wrap image="/empty"][/section-wrap]' ) === '<section class="section-wrap"></section>' );
+check( 'a section with a picture puts it behind its content, with no alt text, since it is no content, and not lazy: it is what a visitor sees first', str_contains( $draw( '[section-wrap image="/template/page-basis/hero/background" dim][/section-wrap]' ), '<div class="section-wrap-image"><img class="section-wrap-picture" src="/public/images/hero.jpg" width="1600" height="900" alt="" decoding="async"></div></section>' ) );
+check( 'the logo of the header is the picture for a light and the one for a dark ground and the name of the company, which is the name of the link; with no picture the name stays', $draw( '[header-logo]' )
+	=== '<a class="header-logo" href="/"><img class="header-logo-light" src="/public/images/logo.png" width="160" height="48" alt=""><img class="header-logo-dark" src="/public/images/logo-dark.png" width="160" height="48" alt=""><span class="header-logo-name">Muster &amp; Söhne</span></a>'
+	&& $draw( '[header-logo light="/empty" dark="/empty" href="/start"]' ) === '<a class="header-logo" href="/start"><span class="header-logo-name">Muster &amp; Söhne</span></a>' );
+check( 'the logo of the footer is an image in a span, with the alt text of the call before the one stored for the picture', $draw( '[footer-logo /logo alt="L"]' ) === '<span class="footer-logo"><img src="/public/images/logo.png" width="160" height="48" alt="L" loading="lazy" decoding="async"></span>'
+	&& str_contains( $draw( '[footer-logo /template/page-basis/card-1/photo alt="L"]' ), ' alt="L" ' ) && str_contains( $draw( '[footer-logo /template/page-basis/card-1/photo]' ), ' alt="Ein Bild im Speicher" ' ) && str_contains( $draw( '[footer-logo /template/page-basis/card-1/photo decorative]' ), ' alt="" ' ) );
+
+// menus
+$menuSite = basisSite();
+$menu = basisDraw( $menuSite, '[header-nav]' );
+check( 'the menu of the header is a details with a button that opens and closes it, no script and no popover, the entries of the pages in the menu in their order, the page that is shown marked, a route that is no page left out',
+	str_contains( $menu, '<nav class="header-nav" aria-label="Hauptnavigation"><details class="header-nav-details"><summary class="header-nav-toggle" aria-label="Menü"><span aria-hidden="true"></span></summary><ul class="header-nav-list">' )
+	&& str_contains( $menu, '<ul class="header-nav-list"><li><a href="/" aria-current="page">Start</a></li><li><a href="/contact">Kontakt</a></li><li><a href="/about">Über uns</a></li></ul></details></nav>' ) && str_contains( $menu, 'popover' ) === false && str_contains( $menu, 'script' ) === false && str_contains( $menu, 'id=' ) === false );
+check( 'a menu that is never collapsed is a details that is open, one that collapses always or on a small screen is closed - the classes say which', str_contains( basisDraw( $menuSite, '[header-nav collapse="never"]' ), 'header-nav--collapse-never" aria-label="Hauptnavigation"><details class="header-nav-details" open>' )
+	&& str_contains( basisDraw( $menuSite, '[header-nav collapse="always"]' ), 'header-nav--collapse-always" aria-label="Hauptnavigation"><details class="header-nav-details">' ) && str_contains( $menu, '<details class="header-nav-details">' ) );
+check( 'a menu with no entry draws nothing - no list, no button - in the header and in the footer', $draw( '[header-nav menu="empty"][footer-nav menu="empty"]' ) === '' );
+check( 'the menu of the footer is a list named by the word of the feature, or by the label the call gives it - a key, ~name or a text - so that two of them have two names', $draw( '[footer-nav menu="footer"]' ) === '<nav class="footer-nav" aria-label="Navigation im Fuß"><ul><li><a href="/contact">Kontakt</a></li><li><a href="/about">Über uns</a></li></ul></nav>'
+	&& str_contains( $draw( '[footer-nav menu="main" label="Seiten &quot;x&quot;"]' ), '<nav class="footer-nav" aria-label="Seiten &quot;x&quot;">' ) && str_contains( $draw( '[footer-nav label="/template/page-basis/top/signin"]' ), 'aria-label="Anmelden"' )
+	&& str_contains( $draw( '[header-nav label="Haupt"]' ), 'aria-label="Haupt"' ) && str_contains( $draw( '[header-nav]' ), 'aria-label="Hauptnavigation"' ) );
+check( 'the foot of the page: the year and the company, the legal pages, the languages with the current one marked and each one in its own', $draw( '[footer-legal]' )
+	=== '<div class="footer-legal"><p class="footer-legal-copyright">&copy; 2026 Muster &amp; Söhne</p><ul class="footer-legal-pages"><li><a href="/imprint">Impressum</a></li><li><a href="/privacy">Datenschutz</a></li></ul><ul class="footer-legal-locales"><li><a href="?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE" aria-current="true">Deutsch</a></li><li><a href="?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English</a></li></ul></div>' );
+
+// where the project says nothing: the right to see it
+$one = basisSite();
+$one['/nino/locales/available'] = [ 'de_DE' ];
+$one['/nino/http/routes'] = [];
+check( 'a site of one language and no legal page draws only the line of the copyright', \Nino\Components::render( $one, \Nino\Markup::parse( '[footer-legal]', \Nino\Components::containers( $one ), $notes ), [ 'template' => 'page-basis' ] ) === '<div class="footer-legal"><p class="footer-legal-copyright">&copy; 2026 Muster &amp; Söhne</p></div>' );
+
+// the fall-back rules, each at a component of this feature
+$home = basisSite( 'de_DE', false );
+ninoWarnings();
+$gone = basisDraw( $home, '[section-wrap][section-row][section-col]x[/section-col][/section-row][/section-wrap][section-wrap][/section-wrap]' );
+$said = ninoWarnings();
+check( 'F1: a component of a feature that is off is no component: it and what it holds draw nothing, and the log says so once', $gone === '' && count( $said ) === 1 && str_contains( $said[0], 'section-wrap' ) && str_contains( $said[0], 'no component that is registered' ) );
+check( 'F2: a variant that the schema does not have is the standard one', $draw( '[section-col variant="fancy"]x[/section-col]' ) === '<div class="section-col">x</div>' );
+check( 'F3: a value outside its list is the default and an attribute the schema does not have falls away', $draw( '[section-row gap="9" colour="red" width="wide"][/section-row]' ) === '<div class="section-row section-row--width-wide"></div>' );
+check( 'F7: a component at a place that is not meant for it is drawn all the same', $draw( '[section-col]x[/section-col][section-row]y[/section-row]' ) === '<div class="section-col">x</div><div class="section-row">y</div>' );
+
+$words = $basisDir. '/../../../../tests/fixtures/basis';
+$lang = basisSite( 'en_US' );
+\Nino\Filesystem::putFileContent( $lang, '/text/de_DE.php', [ '[[/template/page-basis/fall/back]]' => 'Nur deutsch' ] );
+unset( $lang['./nino/html/filecache'] );
+check( 'F8: a text that is missing in the language of the page is the text of the native language, with its lang; one that is missing everywhere draws nothing', basisDraw( $lang, '[section-title /template/page-basis/fall/back]' ) === '<h2 class="section-title" lang="de-DE">Nur deutsch</h2>'
+	&& basisDraw( $lang, '[section-title /template/page-basis/fall/none][button /template/page-basis/fall/none href="/x"]' ) === '' );
+
+// --- C. group, part, ladder and token --------------------------------------------------------------------
+
+echo "\nC. The contract of group, part, ladder and token\n";
+
+$nino = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' );
+$problems = [];
+$declaredTokens = [];
+
+preg_match_all( '/^\s*(--(?:brand|page)-[a-z0-9-]+)\s*:/m', $nino, $tokens );
+$declaredTokens = array_unique( $tokens[1] );
+$bytes = 0;
+
+foreach( $read['groups'] as $group => $declared ) {
+
+	$css = (string) file_get_contents( $basisDir. '/groups/'. $group. '/part/part.css' );
+	$bytes += strlen( $css );
+	$own = $members[$group];
+
+	if( $declared['part'] !== true || \Nino\Components::partProblems( $css, $own ) !== [] )
+		$problems[] = $group. ': the part breaks the rule of mixing';
+
+	if( is_array( $declared['label'] ) === false || isset( $declared['label']['de_DE'], $declared['label']['en_US'] ) === false )
+		$problems[] = $group. ': no name in both languages';
+
+	$per = [];
+
+	foreach( $declared['knobs'] as $key => $knob ) {
+
+		[ $component, $knobName ] = explode( '.', $key );
+		$per[$component] = ( $per[$component] ?? 0 ) + 1;
+
+		if( in_array( $component, $own, true ) === false || $knob['token'] !== '--'. $component. '-'. $knobName || count( $knob['ladder'] ) !== 5 )
+			$problems[] = $key. ': not a knob of a component of the group, not its token or not five steps';
+
+		// the middle step is the default, and it stands in the part, in the first :root
+		$firstRoot = preg_match( '/^\s*:root\s*\{([^}]*)\}/', (string) preg_replace( '#/\*.*?\*/#s', '', $css ), $found ) === 1 ? $found[1] : '';
+
+		if( preg_match( '/(?:^|[\s;])'. preg_quote( $knob['token'], '/' ). ':\s*'. preg_quote( $knob['ladder'][2], '/' ). '\s*;/', $firstRoot ) !== 1 )
+			$problems[] = $key. ': the middle step is not what the part sets';
+
+		if( preg_match( '/--[a-z-]+:[^;]*;/', explode( '}', $css )[0] ) !== 1 || str_starts_with( ltrim( preg_replace( '#/\*.*?\*/#s', '', $css ) ), ':root' ) === false )
+			$problems[] = $group. ': the part does not begin with :root';
+
+		foreach( $knob['ladder'] as $step )
+			if( preg_match( '/var\(\s*(--[a-z0-9-]+)/', $step, $used ) === 1 && in_array( $used[1], $declaredTokens, true ) === false )
+				$problems[] = $key. ': a step reads '. $used[1]. ', which Nino.css does not set';
+	}
+
+	foreach( $per as $component => $count )
+		if( $count > 6 )
+			$problems[] = $component. ': more than six knobs';
+
+	// what a part reads of the brand and of the page is set in Nino.css
+	preg_match_all( '/var\(\s*(--(?:brand|page)-[a-z0-9-]+)/', $css, $reads );
+
+	foreach( array_unique( $reads[1] ) as $token )
+		if( in_array( $token, $declaredTokens, true ) === false )
+			$problems[] = $group. ' reads '. $token. ', which Nino.css does not set';
+
+	if( preg_match( '/!important|@import|url\s*\(/i', $css ) === 1 )
+		$problems[] = $group. ': important, import or url';
+}
+check( 'every group: components, a name in both languages, knobs of its components with their token and five steps, the middle step set in the part, at most six knobs for a component, a part that keeps the rule of mixing and reads only what Nino.css sets'
+	. ( $problems === [] ? '' : ' - '. implode( '; ', array_slice( $problems, 0, 5 ) ) ), $problems === [] && count( $read['groups'] ) === 6 );
+
+// Mutations of the rule, in the suite: the check has to see a foreign class, a foreign token and a sixth step
+$section = (string) file_get_contents( $basisDir. '/groups/section/part/part.css' );
+check( 'T3 sees a class that is no component of the group\'s, a token that is none of the brand, the page or the group\'s, and an important', \Nino\Components::partProblems( $section. "\n.card { color: red; }", $members['section'] ) !== []
+	&& \Nino\Components::partProblems( $section. "\n.section-col { color: var(--foreign-ink); }", $members['section'] ) !== [] && \Nino\Components::partProblems( $section. "\n.section-col { color: red !important; }", $members['section'] ) !== []
+	&& \Nino\Components::partProblems( (string) file_get_contents( $basisDir. '/groups/button/part/part.css' ), $members['section'] ) !== [] );
+$group = include $basisDir. '/groups/section/group.php';
+$six = $group;
+$six['knobs']['section-wrap.space']['ladder'][] = '1rem';
+$seven = $group;
+for( $more = 0; $more < 7; $more++ )
+	$seven['knobs']['section-wrap.more'. $more] = [ 'token' => '--section-wrap-more'. $more, 'label' => 'x', 'ladder' => [ '1rem', '2rem', '3rem', '4rem', '5rem' ] ];
+check( 'a sixth step is refused, and so is a component with more than six knobs, and a knob of a component that is in no such group', is_string( \Nino\Components::validateGroup( 'section', $six, $members['section'] ) ) === true
+	&& is_string( \Nino\Components::validateGroup( 'section', $seven, $members['section'] ) ) === true && is_string( \Nino\Components::validateGroup( 'section', $group, $members['button'] ) ) === true
+	&& is_array( \Nino\Components::validateGroup( 'section', $group, $members['section'] ) ) === true );
+
+// the tokens of the brand and of the page are the contract: all of them in Nino.css, in the layer of the reset
+$required = [ '--brand-scheme', '--brand-color-1', '--brand-color-2', '--brand-font-title', '--brand-font-text', '--brand-font-button', '--brand-ground-base', '--brand-ground-alt', '--brand-ground-tint', '--brand-ink-base',
+	'--brand-ink-quiet-base', '--brand-line-base', '--brand-accent-base', '--brand-on-accent-base', '--brand-on-color-1', '--brand-on-color-2', '--brand-ground', '--brand-ink', '--brand-ink-quiet', '--brand-line', '--brand-accent',
+	'--brand-on-accent', '--page-size', '--page-width', '--page-radius', '--page-line', '--page-motion', '--page-leading', '--page-space-1', '--page-space-2', '--page-space-3', '--page-space-4', '--page-space-5', '--page-space-6',
+	'--page-text-1', '--page-text-2', '--page-text-3', '--page-text-4', '--page-text-5', '--page-text-6' ];
+$resetLayer = substr( $nino, 0, (int) strpos( $nino, '@layer nino.components {' ) );
+check( 'Nino.css sets every token of the brand and of the page - '. count( $required ). ' of them - in the layer nino.reset, and no part reads another', array_diff( $required, $declaredTokens ) === [] && array_filter( $required, static fn( string $token ): bool => str_contains( $resetLayer, $token. ':' ) === false ) === [] );
+
+// the contract of the grounds: what the register writes is what the reset meets - the word whole, and what each word does to the roles
+$rules = basisRules( $resetLayer );
+$grounds = $schemas['section-wrap']['attributes']['ground']['options'];
+$meets = [];
+
+foreach( [ 'section-wrap', 'section-col' ] as $name )
+	foreach( array_diff( $schemas[$name]['attributes']['ground']['options'], [ 'none' ] ) as $ground ) {
+
+		$written = basisFirstClass( basisDraw( $appData, basisCall( $name, $schemas[$name], ' ground="'. $ground. '"' ) ) );
+
+		if( $ground !== $schemas[$name]['attributes']['ground']['default'] && str_contains( $written, '--ground-'. $ground ) === false )
+			$meets[] = $name. ' '. $ground;
+	}
+
+$whole = static fn( string $word ): string => '[class$="--ground-'. $word. '"], [class*="--ground-'. $word. ' "]';
+$ofRoles = static fn( string $selector ): string => basisBody( array_filter( $rules, static fn( array $rule ): bool => $rule['at'] === '@layer nino.reset' && $rule['selector'] === ':where( '. $selector. ' )' ), ':where', '@layer nino.reset' );
+
+foreach( $grounds as $ground )
+	if( $ofRoles( $whole( $ground ) ) === '' && in_array( $ground, [ 'base' ], true ) === false )
+		$meets[] = 'no rule for '. $ground;
+
+$palette = [ 'ground', 'ink', 'ink-quiet', 'line', 'accent', 'on-accent' ];
+$page = $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark' ] ) ) );
+
+foreach( $palette as $role )
+	if( str_contains( $page, '--brand-'. $role. ': var(--brand-'. $role. '-base);' ) === false )
+		$meets[] = 'base does not set '. $role;
+
+if( str_contains( $page, 'color-scheme: var(--brand-scheme);' ) === false )
+	$meets[] = 'base does not set the mode';
+
+$meets = array_merge( $meets,
+	str_contains( $ofRoles( $whole( 'alt' ) ), '--brand-ground: var(--brand-ground-alt);' ) === true ? [] : [ 'alt does not change the ground' ],
+	str_contains( $ofRoles( $whole( 'tint' ) ), '--brand-ground: var(--brand-ground-tint);' ) === true ? [] : [ 'tint does not change the ground' ],
+	$ofRoles( $whole( 'dark' ) ) === 'color-scheme: dark;' ? [] : [ 'dark does not turn the mode' ],
+	array_filter( [ '--brand-ground: var(--brand-color-1);', '--brand-ink: var(--brand-on-color-1);', '--brand-accent: var(--brand-on-color-1);', '--brand-on-accent: var(--brand-color-1);' ], static fn( string $line ): bool => str_contains( $ofRoles( $whole( 'primary' ) ), $line ) === false ),
+	str_contains( $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark', 'primary' ] ) ) ), 'background-color: var(--brand-ground); color: var(--brand-ink);' ) === true ? [] : [ 'a ground does not paint itself' ] );
+$fallback = basisBody( $rules, '--ground-dark', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' );
+check( 'the ground of a section and of a column is the class <name>--ground-<word>; Nino.css names the roles for each word, whole - base, alt, tint, primary, dark -: base the palette, alt and tint the ground, primary the colour of the brand, dark the mode, and a ground paints itself; dark is written out where light-dark() is not known'
+	. ( $meets === [] ? '' : ' - '. implode( '; ', $meets ) ), $meets === [] && $grounds === [ 'base', 'alt', 'tint', 'primary', 'dark' ] && str_contains( $fallback, '--brand-ground: #15171b;' ) && str_contains( $fallback, '--brand-ink: #eceef1;' )
+	&& preg_match( '/\[class\*="--ground-[a-z]+"\]/', $resetLayer ) !== 1 );
+check( 'no class of the old Nino.css has --ground- in it, so the selector meets only what the register writes', preg_match( '/\.nino-[a-z0-9-]*--ground-/', $nino ) !== 1 );
+
+// what the parts do about the mode, the grounds and the picture
+$partRules = [];
+foreach( array_keys( $read['groups'] ) as $partGroup )
+	$partRules[$partGroup] = basisRules( (string) file_get_contents( $basisDir. '/groups/'. $partGroup. '/part/part.css' ) );
+$css = [ 'header' => (string) file_get_contents( $basisDir. '/groups/header/part/part.css' ), 'section' => (string) file_get_contents( $basisDir. '/groups/section/part/part.css' ), 'footer' => (string) file_get_contents( $basisDir. '/groups/footer/part/part.css' ), 'button' => (string) file_get_contents( $basisDir. '/groups/button/part/part.css' ) ];
+$bad = [];
+
+// the mode of the device reaches a header, a footer and a section that has no ground, and does not take the dark ground its mode from it
+foreach( [ 'header' => '.header-wrap { ', 'footer' => '.footer-wrap { ' ] as $partGroup => $selector ) {
+
+	$body = basisBody( array_filter( $partRules[$partGroup], static fn( array $rule ): bool => $rule['selector'] === trim( $selector, ' {' ) ), trim( $selector, ' {' ) );
+
+	if( str_contains( $body, 'color-scheme: var(--brand-scheme);' ) === false )
+		$bad[] = $partGroup. ' has no mode of its own';
+}
+
+$wrap = array_values( array_filter( $partRules['section'], static fn( array $rule ): bool => $rule['at'] === '' && str_starts_with( $rule['selector'], '.section-wrap:not(' ) ) );
+$veiled = basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )' );
+
+if( count( $wrap ) !== 1 || str_contains( $wrap[0]['body'], 'color-scheme: var(--brand-scheme);' ) === false || str_contains( $wrap[0]['selector'], '[class$="--ground-dark"]' ) === false || str_contains( $wrap[0]['selector'], '[class*="--ground-dark "]' ) === false )
+	$bad[] = 'a section that is not dark has no mode of its own, or it takes the one of the dark ground';
+
+if( str_contains( $veiled, 'color-scheme: dark;' ) === false )
+	$bad[] = 'a section with a picture is not dark';
+
+// a card that is a link: the link of its title covers it and nothing else does; what is in the card is above the cover and has its own focus
+$cover = basisBody( $partRules['section'], '.section-col--link > .section-title a::after' );
+$above = basisBody( $partRules['section'], '.section-col--link :where( [href] ):not( .section-title * )' );
+$ring = basisBody( $partRules['section'], '.section-col--link:has( > .section-title a:focus-visible )' );
+
+if( str_contains( $cover, 'position: absolute;' ) === false || str_contains( $cover, 'inset: 0;' ) === false || str_contains( $above, 'position: relative;' ) === false || str_contains( $above, 'z-index: 1;' ) === false || str_contains( $ring, 'outline:' ) === false
+	|| str_contains( $css['section'], 'first-of-type' ) === true || str_contains( $css['section'], 'outline: none' ) === true )
+	$bad[] = 'the card that is a link does not cover with the link of its title alone';
+
+if( str_contains( basisBody( $partRules['button'], '.button:focus-visible' ), 'outline:' ) === false )
+	$bad[] = 'a button has no ring of its own';
+
+// a row that is turned round turns when its columns stand one under the other as well
+foreach( [ '', 'm-', 'l-' ] as $width )
+	if( str_contains( basisBody( $partRules['section'], '.section-row--'. $width. 'reverse-on', $width === '' ? '' : ( $width === 'm-' ? '@media (min-width: 768px)' : '@media (min-width: 1024px)' ) ), 'flex-wrap: wrap-reverse;' ) === false )
+		$bad[] = 'reverse '. $width. 'on does not turn wrapped rows';
+
+// the picture of a section is under a veil that leaves the words of the dark page legible over a white picture, and dim is stronger
+$veil = [];
+foreach( [ '.section-wrap-image::after', '.section-wrap--dim > .section-wrap-image::after' ] as $veilSelector )
+	$veil[] = preg_match( '/rgb\( 0 0 0 \/ (\.\d+) \)/', basisBody( $partRules['section'], $veilSelector ), $found ) === 1 ? (float) $found[1] : 0.0;
+
+preg_match_all( '/--brand-(ink-base|ink-quiet-base|accent-base): light-dark\( [^,]+, (#[0-9a-f]{6}) \)/', $nino, $dark );
+$onWhite = (int) round( 255 * ( 1 - $veil[0] ) );
+$weakest = 21.0;
+
+foreach( $dark[2] as $hex )
+	$weakest = min( $weakest, basisContrast( [ hexdec( substr( $hex, 1, 2 ) ), hexdec( substr( $hex, 3, 2 ) ), hexdec( substr( $hex, 5, 2 ) ) ], [ $onWhite, $onWhite, $onWhite ] ) );
+
+$dimmed = (int) round( 255 * ( 1 - $veil[1] ) );
+$weakestDim = 21.0;
+
+foreach( $dark[2] as $hex )
+	$weakestDim = min( $weakestDim, basisContrast( [ hexdec( substr( $hex, 1, 2 ) ), hexdec( substr( $hex, 3, 2 ) ), hexdec( substr( $hex, 5, 2 ) ) ], [ $dimmed, $dimmed, $dimmed ] ) );
+
+if( count( $dark[2] ) !== 3 || $veil[0] <= 0 || $veil[1] <= $veil[0] || $veil[1] > 0.85 || $weakest < 4.5 || $weakest > 5.0 || $weakestDim < 4.5 )
+	$bad[] = 'the veil leaves '. sprintf( '%.2f', $weakest ). ' : 1 over a white picture, and '. sprintf( '%.2f', $weakestDim ). ' : 1 with dim, which is stronger by a step and not by more than it needs';
+
+// ...and the rows that follow the picture say that they are dark themselves, which needs no :has()
+if( str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .section-row' ), 'color-scheme: dark; color: var(--brand-ink);' ) === false || str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .section-row', '@supports not ( color: light-dark( #000, #fff ) )' ), 'color: #eceef1;' ) === false )
+	$bad[] = 'a row after a picture does not say it is dark without :has()';
+
+// the header that folds its menu scrolls away when the menu is open; the button stays in the line and the list opens below it
+if( str_contains( basisBody( $partRules['header'], '.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )' ), 'position: static;' ) === false
+	|| str_contains( basisBody( $partRules['header'], '.header-nav-details', '@supports selector( ::details-content )' ), 'display: contents;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav-details::details-content', '@supports selector( ::details-content )' ), 'flex: 1 0 100%;' ) === false
+	|| str_contains( basisBody( $partRules['header'], '.header-nav-toggle' ), 'margin-inline-start: auto;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav a' ), 'overflow-wrap: anywhere;' ) === false )
+	$bad[] = 'the menu does not keep its button in the line or its header does not scroll away open';
+
+if( basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )', '@supports not ( color: light-dark( #000, #fff ) )' ) === '' )
+	$bad[] = 'a section with a picture has no colours of its own where light-dark() is not known';
+
+// the logo for a dark ground is the one of the device, the one for a light ground stands where :has() is not known and on paper
+$dark = basisBody( $partRules['header'], '.header-logo:has( .header-logo-dark ) .header-logo-dark', '@media (prefers-color-scheme: dark)' );
+$paper = basisBody( $partRules['header'], '.header-logo:has( .header-logo-dark ) .header-logo-light', '@media print' );
+
+if( basisBody( $partRules['header'], '.header-logo-dark' ) !== 'display: none;' || str_contains( $dark, 'display: block;' ) === false || str_contains( $paper, 'display: block;' ) === false )
+	$bad[] = 'the logo for a light ground is not the one that stands without :has() and on paper';
+
+// the menu is a details, with no popover, and a wide screen shows its list where the browser lets the rules reach it
+$nav = basisBody( $partRules['header'], '.header-nav-details::details-content', '@media (min-width: 768px) @supports selector( ::details-content )' );
+
+if( str_contains( $css['header'], 'popover' ) === true || str_contains( $nav, 'content-visibility: visible;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav-toggle', '@media (min-width: 768px) @supports selector( ::details-content )' ), 'display: none;' ) === false )
+	$bad[] = 'the menu is no details that a wide screen shows open where it can';
+
+// on paper: no ground, dark writing, a button with a frame
+foreach( [ 'header' => '.header-wrap', 'footer' => '.footer-wrap', 'section' => '.section-wrap', 'button' => '.button' ] as $partGroup => $printed )
+	if( preg_match( '/(?:^|[ ;])color: #000;/', basisBody( $partRules[$partGroup], $printed, '@media print' ) ) !== 1 )
+		$bad[] = $partGroup. ' is not printed in dark writing';
+
+check( 'the parts: the mode of the device reaches header, footer and a section; a card that is a link is covered by the link of its title alone; reverse turns wrapped rows; the picture of a section is under a veil that is legible over white ('. sprintf( '%.1f', $weakest ). ' : 1); the logo and the menu fall back; paper is dark on white'
+	. ( $bad === [] ? '' : ' - '. implode( '; ', $bad ) ), $bad === [] );
+
+// an element - a, p, li, img - is met only below a component that holds nothing: a container never styles what the page put into it
+$leaves = array_keys( array_filter( $schemas, static fn( array $schema ): bool => isset( $schema['offers'] ) === false ) );
+$owner = static function( string $class ) use ( $schemas ): ?string {
+
+	$found = null;
+
+	foreach( array_keys( $schemas ) as $component )
+		if( ( $class === $component || str_starts_with( $class, $component. '-' ) ) && strlen( (string) $found ) < strlen( $component ) )
+			$found = $component;
+
+	return $found;
+};
+$elements = [];
+
+foreach( $partRules as $partGroup => $groupRules )
+	foreach( $groupRules as $rule ) {
+
+		if( str_starts_with( $rule['selector'], '@' ) === true || $rule['selector'] === ':root' )
+			continue;
+
+		foreach( preg_split( '/,(?![^(]*\))/', $rule['selector'] ) ?: [] as $selector ) {
+
+			// what is only a state or a part of a thing is not a thing: the pseudo-classes and elements and the attributes are cut away
+			$plain = (string) preg_replace( [ '/::?[a-z-]+\((?:[^()]|\([^()]*\))*\)/', '/::?[a-z-]+/', '/\[[^\]]*\]/' ], '', $selector );
+			$seen = [];
+
+			foreach( preg_split( '/\s*[>+~]\s*|\s+/', trim( $plain ) ) ?: [] as $compound ) {
+
+				preg_match_all( '/\.([a-z][a-z0-9-]*)/', $compound, $classes );
+				$classes = array_map( $owner, $classes[1] );
+				$typed = preg_match( '/^[a-z][a-z0-9]*(?=[.#]|$)/', $compound ) === 1;
+
+				if( $typed === true && array_intersect( array_merge( $seen, $classes ), $leaves ) === [] )
+					$elements[] = $partGroup. ': '. trim( $selector );
+
+				$seen = array_merge( $seen, $classes );
+			}
+		}
+	}
+check( 'an element selector (a, p, li, img, ul) stands below a component that holds nothing, or beside its class - no container styles what the page put into it'. ( $elements === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $elements ), 0, 5 ) ) ), $elements === [] );
+
+// the parts in the bundle, and the hook that asks for them
+$bundle = $appData['/nino/html/assets']['/.cache/style.css'] ?? [];
+sort( $bundle );
+check( 'the six standard parts are in the style bundle, once each, as files of the kernel', array_map( static fn( string $path ): string => substr( $path, strlen( '/_nino/Nino/Modules/Basis/groups/' ) ), $bundle ) === [ 'button/part/part.css', 'footer/part/part.css', 'header/part/part.css', 'image/part/part.css', 'section/part/part.css', 'text/part/part.css' ]
+	&& array_filter( $bundle, static fn( string $path ): bool => is_file( dirname( __DIR__ ). $path ) === false ) === [] );
+
+$asked = new \ArrayObject();
+$themed = ninoSandbox( 'basis-theme' );
+$themed['./nino/filesystem/path'] = dirname( __DIR__ );
+$themed['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+\Nino\Callbacks::registerCallback( $themed, \Nino\Components::PARTS, static function( array &$appData, array $answer ) use ( $asked ): array {
+
+	$asked[] = $answer['group'];
+
+	// the text part is taken away, the image part is another file of the feature, the section part is answered with a file that is no feature's
+	return match( $answer['group'] ) {
+		'text'		=> [ 'css' => '' ] + $answer,
+		'image'		=> [ 'css' => '/_nino/Nino/Modules/Basis/groups/button/part/part.css' ] + $answer,
+		'section'	=> [ 'css' => '/assets/image.css' ] + $answer,
+		default		=> $answer,
+	};
+} );
+\Nino\Features::registerComponents( $themed );
+\Nino\Features::registerParts( $themed );
+$themedBundle = $themed['/nino/html/assets']['/.cache/style.css'];
+$themedSaid = ninoWarnings();
+check( 'a theme is asked for each of the six parts and may replace one (a file the bundle holds already stands once), take one away - and an answer that is no stylesheet of a feature is said once and leaves the standard part', count( $asked ) === 6 && array_diff( [ 'button', 'footer', 'header', 'image', 'section', 'text' ], $asked->getArrayCopy() ) === []
+	&& count( $themedBundle ) === 4 && count( array_keys( $themedBundle, '/_nino/Nino/Modules/Basis/groups/button/part/part.css', true ) ) === 1 && in_array( '/_nino/Nino/Modules/Basis/groups/section/part/part.css', $themedBundle, true ) === true
+	&& array_filter( $themedBundle, static fn( string $path ): bool => str_contains( $path, '/text/part' ) || str_contains( $path, '/image/part' ) || str_contains( $path, '/assets/' ) ) === []
+	&& count( $themedSaid ) === 1 && str_contains( $themedSaid[0], 'section' ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $themed ) );
+
+// --- D. Both states --------------------------------------------------------------------------------------
+
+echo "\nD. Both states: the module of the kernel and the register\n";
+
+$sources = [
+	'text'		=> '[text /template/page-basis/hero/title]',
+	'button'	=> '[button /template/page-basis/hero/start href="/x"]',
+	'image'		=> '[image /logo]',
+	'spacer'	=> '[spacer size="2"]',
+	'html'		=> '[html]<p>x</p>[/html]',
+];
+$off = basisSite( 'de_DE', false );
+$on = basisSite();
+\Nino\Modules\Components::init( $off );
+\Nino\Modules\Components::init( $on );
+ninoWarnings();
+$states = [];
+
+foreach( $sources as $name => $source ) {
+
+	$before = \Nino\Html::renderSource( $off, $source, [ 'template' => 'page-basis' ] );
+	$after = \Nino\Html::renderSource( $on, $source, [ 'template' => 'page-basis' ] );
+	$states[$name] = $before !== '' && $before !== $after && preg_match( '/class="'. preg_quote( $name, '/' ). '[" ]/', $before ) !== 1 && preg_match( '/class="'. preg_quote( $name, '/' ). '[" ]/', $after ) === 1;
+}
+check( 'where basis is off the module of the kernel draws text, button, image, spacer and html and none of them has the class of its name; where it is on the register does, and the log says nothing', array_filter( $states ) === $states && ninoWarnings() === [] );
+
+// --- E. What must never be read -------------------------------------------------------------------------------
+
+echo "\nE. What a value must never do\n";
+
+$evil = [
+	'a call'			=> '[template /templates/x] [section-title text="called"]',
+	'a fill'			=> '[[/project/company/general/name]] [[content]] [[class]]',
+	'a quote'			=> '"><script>alert(1)</script>\' onmouseover="x()',
+	'a null byte'		=> "a\0b<scr\0ipt>x()</scr\0ipt>",
+	'a megabyte'		=> str_repeat( 'x [y] ', 175000 ),
+];
+$element = static fn( string $value ): array => [ 'uri' => '/p', 'id' => 1, 'element' => [ 'f' => $value, 'h' => $value ], 'model' => [ 'f' => [ 'type' => 'string' ], 'h' => [ 'type' => 'string' ] ] ];
+// What a page is made of is what a browser reads of it: no script, no frame, no attribute that runs, whatever the text says
+$clean = static function( string $html ): bool {
+
+	$document = new \DOMDocument();
+	@$document->loadHTML( '<?xml encoding="utf-8"?><body>'. $html. '</body>', LIBXML_NOERROR | LIBXML_NOWARNING );
+
+	foreach( $document->getElementsByTagName( '*' ) as $element ) {
+
+		if( in_array( $element->nodeName, [ 'script', 'iframe', 'style', 'object', 'embed', 'form', 'input' ], true ) === true )
+			return false;
+
+		foreach( $element->attributes as $attribute )
+			if( str_starts_with( $attribute->nodeName, 'on' ) === true || in_array( $attribute->nodeName, [ 'src', 'href', 'class', 'alt', 'id', 'width', 'height', 'loading', 'decoding', 'lang', 'hreflang', 'aria-label', 'aria-current', 'aria-hidden', 'target', 'rel', 'type', 'popover', 'popovertarget', 'popovertargetaction' ], true ) === false )
+				return false;
+	}
+
+	return str_contains( $html, 'Söhne' ) === false;
+};
+$bad = [];
+
+foreach( $evil as $label => $value ) {
+
+	$context = [ 'element' => $element( $value ) ];
+	ninoWarnings();
+
+	foreach( [
+		'section-title'		=> '[section-title .f]',
+		'section-subtitle'	=> '[section-subtitle .f]',
+		'text'				=> '[text .f]',
+		'button'			=> '[button .f href="/x"]',
+		'an alt text'		=> '[image /logo alt=".f"]',
+		'a caption'			=> '[image /logo caption=".f"]',
+		'an alt text of a logo'	=> '[footer-logo /logo alt=".f"]',
+	] as $where => $source ) {
+
+		$html = basisDraw( $appData, $source, $context );
+
+		if( $clean( $html ) === false || strlen( $html ) > 7 * strlen( $value ) + 400 )
+			$bad[] = $where. ' with '. $label;
+	}
+
+	$warned = ninoWarnings();
+
+	if( $warned !== [] )
+		$bad[] = $label. ' was said in the log';
+}
+check( 'a text, a field, an alt text, a caption and a label that spell a call, a fill, a quote, a null byte or fill a megabyte come out as text - nothing is read, nothing is drawn but what was asked, nothing stands as a tag'. ( $bad === [] ? '' : ' - '. implode( '; ', array_slice( $bad, 0, 5 ) ) ), $bad === [] );
+
+// the same words stored as the Text panel stores them - entities for the angle brackets, the quotes and the square brackets - and written raw by a hand that bypassed it,
+// read through the key of a text and through ~name: they are text, and what the entities spell is the text they spell
+$stored = [
+	'stored with entities'	=> '&lt;script&gt;alert(1)&lt;/script&gt; &quot;&gt;&lt;img src=x onerror=alert(1)&gt; &#91;template /templates/x&#93; &#91;&#91;/project/company/general/name&#93;&#93; &#91;section-title text=&quot;called&quot;&#93;',
+	'stored raw'			=> '<script>alert(1)</script> "><img src=x onerror=alert(1)> [template /templates/x] [section-title text="called"]',
+	'stored as control entities'	=> 'a&#1;b&#x7f;c&#0;d&#x1f;e <b>f&#x7f;g</b>',
+	'stored with a control'	=> "a&#0;b\0c&#7;d<scr\0ipt>x()</scr\0ipt>",
+];
+$bad = [];
+
+foreach( $stored as $label => $value ) {
+
+	$keyed = basisSite();
+	\Nino\Html::addFills( $keyed, [ '/template/page-basis/ev/t' => $value, '/template/page-basis/ev/blocks' => '<p>'. $value. '</p>' ], 'de_DE' );
+	ninoWarnings();
+
+	foreach( [
+		'section-title'		=> '[section-title /template/page-basis/ev/t]',
+		'section-subtitle'	=> '[section-subtitle /template/page-basis/ev/t]',
+		'text'				=> '[text /template/page-basis/ev/blocks]',
+		'button'			=> '[button /template/page-basis/ev/t href="/x"]',
+		'an alt text'		=> '[image /logo alt="/template/page-basis/ev/t"]',
+		'a caption'			=> '[image /logo caption="/template/page-basis/ev/t"]',
+		'a logo'			=> '[footer-logo /logo alt="/template/page-basis/ev/t"]',
+		'html'				=> '[html]<p>[[/template/page-basis/ev/t]]</p>[/html]',
+		'a title in a link'	=> '[section-title /template/page-basis/ev/t href="page:/contact"]',
+	] as $where => $source ) {
+
+		$html = basisDraw( $keyed, $source );
+
+		if( $clean( $html ) === false || preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $html ) === 1 )
+			$bad[] = $where. ' with '. $label;
+	}
+
+	if( ninoWarnings() !== [] )
+		$bad[] = $label. ' was said in the log';
+}
+check( 'a text that was stored - with entities, raw, with a control character - and is read through a key or ~name comes out as text in a title, a text, a button, an alt text, a caption and a block of html'. ( $bad === [] ? '' : ' - '. implode( '; ', array_slice( $bad, 0, 5 ) ) ), $bad === [] );
+
+// the title of a menu: as the lines of the menu say it, whatever it holds
+$lines = new \ArrayObject();
+\Nino\Callbacks::registerCallback( $appData, '/nino/navigation/lines', static function( array &$appData, array $args ) use ( $lines ): array {
+
+	foreach( $lines as $line )
+		$args['lines'][] = $line;
+
+	return $args;
+} );
+$bad = [];
+
+foreach( $evil as $label => $value ) {
+
+	$lines->exchangeArray( [ '/evil:'. $value, '/second:fine', '/blank:   ', ':'. $value ] );
+	unset( $appData[\Nino\Components::OPTIONS] );
+	$html = basisDraw( $appData, '[footer-nav][footer-nav menu="footer"][header-nav]' );
+
+	if( $clean( $html ) === false || str_contains( $html, "\0" ) === true || str_contains( $html, 'fine' ) === false || str_contains( $html, 'blank' ) === true )
+		$bad[] = $label;
+}
+check( 'the title of an entry of a menu that spells a call, a fill, a quote, a null byte or fills a megabyte is text in the list; an entry with no title is none; no bracket is left to read'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+$lines->exchangeArray( [ '/x:[a] [[b]]' ] );
+check( 'every bracket of a title is an entity', str_contains( basisDraw( $appData, '[footer-nav]' ), '&#91;a&#93; &#91;&#91;b&#93;&#93;' ) );
+$lines->exchangeArray( [] );
+
+// what the feature writes itself - the alt text stored with a picture, the name of a language - has no control character, whatever was stored
+$control = basisSite();
+$control['/nino/html/images']['/logo']['alt'] = [ 'de_DE' => "L\0o\x01go<b>" ];
+\Nino\Html::addFills( $control, [ '/_nino/locale/de_DE/name' => "De\0ut\x07sch" ], '*' );
+$written = basisDraw( $control, '[image /logo][footer-logo /logo][footer-legal]' );
+check( 'the alt text stored for a picture and the name of a language are written with no null byte and no control character, and what is left of them is text', preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $written ) !== 1 && substr_count( $written, 'alt="Logo&lt;b&gt;"' ) === 2 && str_contains( $written, '>Deutsch</a>' ) );
+
+// an address that is none is no link: the button is a span, the title and the image have no anchor
+$addresses = [ 'javascript:alert(1)', '//evil.test/x', '/\\evil.test', "java\tscript:alert(1)", "/ok\x01", "data:text/html,x", 'vbscript:x' ];
+$bad = [];
+
+foreach( $addresses as $address ) {
+
+	$context = [ 'element' => $element( $address ) ];
+	$html = basisDraw( $appData, '[button text="Go" href=".f"][section-title text="T" href=".f"][image /logo href=".f"]', $context );
+
+	if( str_contains( $html, '<span class="button">Go</span>' ) === false || str_contains( $html, '<a ' ) === true || str_contains( $html, 'href=' ) === true )
+		$bad[] = $address;
+}
+check( 'an address with javascript:, //host, a backslash, a scheme that is none or a control character is no link: the button is a span, the title and the picture have no anchor'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+check( 'an address a browser may take is a link, with its characters escaped', basisDraw( $appData, '[button text="Go" href="https://example.test/?a=1&b=\'2\'"]' ) === '<a class="button" href="https://example.test/?a=1&amp;b=&#039;2&#039;">Go</a>' );
+
+// --- F. The fixture page, drawn in both languages --------------------------------------------------------
+
+echo "\nF. The fixture page, drawn in both languages\n";
+
+$pages = [];
+
+foreach( [ 'de_DE', 'en_US' ] as $locale ) {
+
+	$site = basisSite( $locale );
+	$pages[$locale] = basisDraw( $site, (string) file_get_contents( $fixtureDir. '/page.tpl' ) );
+
+	$said = ninoWarnings();
+	check( 'the page of '. $locale. ' is drawn with one thing said in the log: its picture that is a link and has no alt text', count( $said ) === 1 && str_contains( $said[0], 'no alt text' ) && str_contains( $said[0], 'story/photo' ) );
+}
+
+if( is_string( $record ) === true ) {
+
+	is_dir( $record ) === true || mkdir( $record, 0755, true );
+
+	foreach( $pages as $locale => $page )
+		file_put_contents( $record. '/page.'. $locale. '.html', $page );
+
+	echo 'recorded '. count( $pages ). " files\n";
+	exit( 0 );
+}
+
+foreach( $pages as $locale => $page ) {
+
+	$expected = (string) @file_get_contents( $fixtureDir. '/page.'. $locale. '.html' );
+	check( 'the page of '. $locale. ' is drawn byte for byte as tests/fixtures/basis/page.'. $locale. '.html has it ('. strlen( $page ). ' bytes)', $expected !== '' && $page === $expected );
+}
+
+$allCalled = [];
+foreach( $schemas as $name => $schema )
+	if( preg_match( '/\['. preg_quote( $name, '/' ). '[\s\]\/]/', (string) file_get_contents( $fixtureDir. '/page.tpl' ) ) !== 1 )
+		$allCalled[] = $name;
+check( 'the fixture page calls every one of the twenty components'. ( $allCalled === [] ? '' : ' - '. implode( ', ', $allCalled ) ), $allCalled === [] );
+check( 'a card is a column: one h1 on the page, three cards in one row, the whole card a link where it says link', substr_count( $pages['de_DE'], '<h1' ) === 1 && substr_count( $pages['de_DE'], 'section-col--variant-card' ) === 3 && substr_count( $pages['de_DE'], 'section-col--link' ) === 1 );
+
+// --- G. Words, activation, sizes, cost -----------------------------------------------------------------------
+
+echo "\nG. The words, the activation, the sizes and what a page costs\n";
+
+$grammar = [];
+foreach( [ 'de_DE', 'en_US' ] as $language ) {
+
+	$fragment = include $basisDir. '/install/text/'. $language. '.php';
+
+	foreach( array_keys( $fragment ) as $key )
+		if( \Nino\Text::isGrammarKey( trim( $key, '[]' ) ) === false || str_starts_with( $key, '[[/module/basis/' ) === false )
+			$grammar[] = $language. ' '. $key;
+}
+check( 'the words of the feature are keys of the grammar of the module basis, and the same in both languages'. ( $grammar === [] ? '' : ' - '. implode( ', ', $grammar ) ), $grammar === []
+	&& array_keys( include $basisDir. '/install/text/de_DE.php' ) === array_keys( include $basisDir. '/install/text/en_US.php' ) );
+
+$project = ninoSandbox( 'basis-activate' );
+\Nino\AppData::writeContentData( $project, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native', '/nino/http/routes' ] );
+ninoWarnings();
+$result = \Nino\Features::activate( $project, 'basis' );
+$config = (array) \Nino\Filesystem::getFileContent( $project, '/config.php', [] );
+$de = (array) \Nino\Filesystem::getFileContent( $project, '/text/de_DE.php', [] );
+$en = (array) \Nino\Filesystem::getFileContent( $project, '/text/en_US.php', [] );
+check( 'it is switched on in the Features panel: the class is listed, the version recorded, the three words are in the Text of both languages', $result === true && in_array( '\\Nino\\Modules\\Basis', (array) ( $config['/nino/modules'] ?? [] ), true ) === true
+	&& ( $config['/nino/features']['basis']['version'] ?? '' ) === '1.0.0' && ( $de['[[/module/basis/navigation/primary]]'] ?? '' ) === 'Hauptnavigation' && ( $en['[[/module/basis/navigation/menu]]'] ?? '' ) === 'Menu' && count( $de ) === 3 && count( $en ) === 3 );
+unset( $project['./nino/features/all'] );
+check( 'it has nothing to remove: Remove is refused for a feature of the kernel, and switching it off lists it off again', is_string( \Nino\Features::remove( $project, 'basis' ) ) === true && \Nino\Features::deactivate( $project, 'basis' ) === true
+	&& in_array( '\\Nino\\Modules\\Basis', (array) \Nino\Filesystem::getFileContent( $project, '/config.php', [] )['/nino/modules'], true ) === false );
+ninoWarnings();
+\Nino\Filesystem::removeDir( ninoSandboxDir( $project ) );
+
+// sizes
+$total = $bytes;
+$parts = array_map( static fn( string $group ): int => (int) filesize( $basisDir. '/groups/'. $group. '/part/part.css' ), array_keys( $read['groups'] ) );
+check( 'the six standard parts are 24 KB together at most ('. $total. ' bytes: '. implode( ', ', $parts ). ')', $total <= 24576 && count( $parts ) === 6 );
+
+$listing = [];
+foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $basisDir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+	$listing[] = $file->getExtension();
+check( 'the feature brings no script, and its parts no font or image: a file of css, php or a template, and nothing else', array_diff( array_unique( $listing ), [ 'php', 'tpl', 'css' ] ) === [] );
+
+// the table of docs/features.md is worked out of the schemas
+$docs = (string) file_get_contents( dirname( __DIR__ ). '/docs/features.md' );
+check( 'the table of the components in docs/features.md is the one the schemas make', str_contains( $docs, basisTable( $schemas ) ) );
+
+// the cost of a start page of seven sections: 70 calls, 28 of them texts - the median of 400 drawings, the smallest of up to three rounds
+$home = '';
+$fills = [];
+
+for( $s = 1; $s <= 7; $s++ ) {
+
+	$k = '/template/page-basis/s'. $s. '/';
+
+	foreach( [ 'title' => 'Title '. $s, 'subtitle' => 'A subtitle that is a little longer', 'text' => 'A paragraph of text as a start page has it. It has two sentences.', 'more' => 'Learn more', 'side' => 'A second paragraph in the right column.', 'note' => 'And a third, short one.' ] as $n => $v )
+		$fills[$k. $n] = $v;
+
+	$home .= "[section-wrap id=\"s$s\" ground=\"alt\"]\n\t[section-row]\n\t\t[section-col size=\"100 m:50\"]\n\t\t\t[section-title ~title]\n\t\t\t[section-subtitle ~subtitle]\n\t\t\t[text ~text]\n\t\t\t[text ~more]\n\t\t[/section-col]\n\t\t[section-col size=\"100 m:50\" variant=\"card\"]\n\t\t\t[text ~side]\n\t\t\t[text ~note]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]\n";
+}
+
+$timed = basisSite();
+\Nino\Html::addFills( $timed, $fills, '*' );
+$tree = \Nino\Markup::parse( $home, \Nino\Components::containers( $timed ), $notes );
+$calls = preg_match_all( '/\[(?!\/)[a-z]/', $home );
+$texts = preg_match_all( '/\[text /', $home );
+$output = \Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] );
+$rounds = [];
+
+for( $round = 0; $round < 3; $round++ ) {
+
+	$times = [];
+
+	for( $i = 0; $i < 400; $i++ ) {
+
+		$started = hrtime( true );
+		\Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] );
+		$times[] = ( hrtime( true ) - $started ) / 1e6;
+	}
+
+	sort( $times );
+	$rounds[] = $times[200];
+
+	if( min( $rounds ) <= 2.1 )
+		break;
+}
+echo sprintf( "  %d calls, %d of them texts, %d bytes drawn: median of 400 %s ms (rounds: %s)\n", $calls, $texts, strlen( $output ), sprintf( '%.3f', min( $rounds ) ), implode( ', ', array_map( static fn( float $ms ): string => sprintf( '%.3f', $ms ), $rounds ) ) );
+check( 'a start page of seven sections - 70 calls, 28 of them texts in the format blocks - is drawn in 2.1 ms at the median (smallest of up to three rounds)', $calls === 70 && $texts === 28 && substr_count( $output, '<section' ) === 7 && min( $rounds ) <= 2.1 );
+
+$cold = ninoSandbox( 'basis-cold' );
+$cold['./nino/filesystem/path'] = dirname( __DIR__ );
+$cold['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+\Nino\Features::registerComponents( $cold );
+
+/**	The median of 200 registrations of the twenty from the cache of the register, in ms: in this process, or in one that has opcache on	*/
+$register = static function( bool $opcache ) use ( $cold ): ?float {
+
+	$run = static function() use ( $cold ): string {
+
+		$times = [];
+
+		for( $n = 0; $n < 200; $n++ ) {
+
+			$one = $cold;
+			unset( $one['./nino/features/listed'], $one[\Nino\Components::REGISTRY], $one[\Nino\Components::OWNERS], $one[\Nino\Components::GROUPS] );
+			$started = hrtime( true );
+			\Nino\Features::registerComponents( $one );
+			$times[] = ( hrtime( true ) - $started ) / 1e6;
+		}
+
+		sort( $times );
+
+		return (string) ( count( \Nino\Components::components( $one ) ) === 20 ? $times[100] : -1 );
+	};
+
+	if( $opcache === false ) {
+
+		$best = (float) $run();
+		$best = min( $best, (float) $run() );
+
+		return $best;
+	}
+
+	if( extension_loaded( 'Zend OPcache' ) === false )
+		return null;
+
+	$script = sys_get_temp_dir(). '/nino-basis-opcache-'. getmypid(). '.php';
+	file_put_contents( $script, '<?php define( "NINO_FEATURES_DIR", '. var_export( NINO_FEATURES_DIR, true ). ' ); require '. var_export( __DIR__. '/harness.php', true ). ';
+		$cold = [ "./nino/uid" => '. var_export( ninoSandboxDir( $cold ), true ). ' ]; \\Nino\\AppData::prepare( $cold );
+		$cold["./nino/filesystem/path"] = '. var_export( dirname( __DIR__ ), true ). '; $cold["./nino/filesystem/configpath"] = $cold["./nino/filesystem/contentpath"] = '. var_export( ninoSandboxDir( $cold ). '/private', true ). '; $cold["./nino/filesystem/publicpath"] = '. var_export( ninoSandboxDir( $cold ). '/public', true ). ';
+		$cold["/nino/modules"] = [ "\\\\Nino\\\\Modules\\\\Basis" ]; $cold["/nino/dir"] = "";
+		$best = 9999.0;
+		for( $round = 0; $round < 2; $round++ ) { $times = [];
+			for( $n = 0; $n < 200; $n++ ) { $one = $cold; $started = hrtime( true ); \\Nino\\Features::registerComponents( $one ); $times[] = ( hrtime( true ) - $started ) / 1e6; }
+			sort( $times ); $best = min( $best, $times[100] ); }
+		echo count( \\Nino\\Components::components( $one ) ) === 20 ? $best : -1;' );
+	$out = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' -d opcache.enable_cli=1 -d opcache.file_update_protection=0 '. escapeshellarg( $script ). ' 2>&1' ) );
+	unlink( $script );
+
+	return is_numeric( $out ) === true ? (float) $out : null;
+};
+$plain = $register( false );
+$cached = $register( true );
+echo sprintf( "  registering the twenty from the cache of the register: median of 200 %.3f ms without opcache, %s with it (the file is %d bytes; parsing it is most of the first)\n", $plain, $cached === null ? 'not run' : sprintf( '%.3f ms', $cached ), (int) @filesize( ninoSandboxDir( $cold ). '/private/data/cache/register/basis.php' ) );
+check( 'the twenty register from the cache of the register in 1.5 ms without opcache and 0.35 ms with it (three times what is measured; the file is parsed at every request without it)', $plain > 0 && $plain < 1.5 && ( $cached === null || ( $cached > 0 && $cached < 0.35 ) ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $cold ) );
+
+ninoDone( $appData );

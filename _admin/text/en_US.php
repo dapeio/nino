@@ -178,6 +178,7 @@ return [
 	'[[/_admin/common/word/background]]'	=> 'Background',
 	'[[/_admin/common/word/backup]]'	=> 'Backup',
 	'[[/_admin/common/word/banner]]'	=> 'Banner',
+	'[[/_admin/common/word/basis]]'	=> 'Basic components',
 	'[[/_admin/common/word/before]]'	=> 'Before',
 	'[[/_admin/common/word/border]]'	=> 'Border',
 	'[[/_admin/common/word/button]]'	=> 'Button',

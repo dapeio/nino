@@ -553,6 +553,30 @@ $rich = $draw( '[rich /template/page-x/hero/blocks][inline /template/page-x/hero
 check( 'the format: no script, no handler, no iframe in what comes out, and a [ is a [', str_contains( $rich, 'script' ) === false && str_contains( $rich, 'onclick' ) === false && str_contains( $rich, 'iframe' ) === false && str_contains( $rich, '<p>[x]</p>' ) === true );
 check( 'a field of the element: the text of its type, escaped; .id the number in the loop, .uri and .slug', $draw( '[text .title][text .id][text .uri][text .slug]', [ 'template' => 'page-x', 'element' => $element ] )
 	=== '<p class="text">T &amp; &lt;b&gt;x&lt;/b&gt; [sic]</p><p class="text">3</p><p class="text">/post/hello-world</p><p class="text">hello-world</p>' );
+/*	A control character is no character of a page: none is written, whatever carries it - a text, an attribute, a field, a fill - and a tab and a line break stay	*/
+$control = "a\0b\x01c\x07d\x0Be\x0Cf\x0Eg\x1Fh\x7Fi\tj\nk";
+$controlElement = [ 'uri' => '/post', 'id' => 3, 'element' => [ 'title' => $control, 'body' => '<p>'. $control. '</p>' ], 'model' => [ 'title' => [ 'type' => 'string' ], 'body' => [ 'type' => 'string', 'html' => true, 'blocks' => true ] ] ];
+\Nino\Html::addFills( $appData, [ '/project/company/general/control' => $control ], '*' );
+$controlDrawn = [
+	$draw( '[text text="'. str_replace( [ "\n" ], [ ' ' ], $control ). '"]' ),
+	$draw( '[titled text="x" note="'. str_replace( "\n", ' ', $control ). '"]' ),
+	$draw( '[text .title][rich .body]', [ 'template' => 'page-x', 'element' => $controlElement ] ),
+	$draw( '[text /project/company/general/control]' ),
+	\Nino\Components::escape( $control ),
+];
+/*	...and one that is written as an entity - &#1;, &#x7f;, &#0; - is the character once the text is read, in every format, and is taken out then	*/
+\Nino\Html::addFills( $appData, [ '/project/company/general/entity' => 'a&#1;b&#x7f;c&#0;d&#x1f;e <b>f&#x7f;g</b>' ], '*' );
+$entityDrawn = [];
+foreach( [ 'plain', 'inline', 'lines', 'blocks' ] as $entityFormat ) {
+
+	\Nino\Components::addComponent( $appData, 'entity-'. $entityFormat, [ 'label' => 'Entity', 'source' => 'text', 'format' => $entityFormat, 'template' => '<i>[[value]]</i>' ] );
+	$entityDrawn[$entityFormat] = $draw( '[entity-'. $entityFormat. ' /project/company/general/entity]' );
+}
+$entityDrawn['a field'] = $draw( '[rich .body]', [ 'template' => 'page-x', 'element' => [ 'uri' => '/p', 'id' => 1, 'element' => [ 'body' => '<p>a&#x7f;b&#1;c</p>' ], 'model' => [ 'body' => [ 'type' => 'string', 'html' => true, 'blocks' => true ] ] ] ] );
+check( 'a control character written as an entity - &#1;, &#x7f;, &#0; - is taken out as well, whatever the format of the text is: plain, inline, lines, blocks, and the field of an element',
+	array_filter( $entityDrawn, static fn( string $html ): bool => $html === '' || preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $html ) === 1 ) === [] && str_contains( $entityDrawn['inline'], 'abcde' ) === true && str_contains( $entityDrawn['blocks'], 'abc' ) === true && str_contains( $entityDrawn['a field'], 'abc' ) === true );
+check( 'a control character - U+0000 to U+0008, U+000B, U+000C, U+000E to U+001F, U+007F - is written by nothing the register draws: a text, an attribute, a field of a string and one of html, a fill, escape(); a tab and a line break stay',
+	array_filter( $controlDrawn, static fn( string $html ): bool => preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $html ) === 1 ) === [] && str_contains( $controlDrawn[4], "i\tj\nk" ) === true && str_starts_with( $controlDrawn[4], 'abcdefghi' ) === true );
 check( 'a field that holds html is written as its model says it: sanitized to its format, whatever format the component has', $draw( '[text .body]', [ 'template' => 'page-x', 'element' => $element ] ) === '<p class="text"><p>Hi <em>there</em></p></p>' );
 $said = $logged( static function() use ( $draw, $element, &$out ): void {
 	$out = $draw( '[text .empty][text .nothing][text .list][text .a/b][text .1x]', [ 'template' => 'page-x', 'element' => $element ] );
@@ -1456,7 +1480,7 @@ check( 'what a text brings is never read: a call, a fill and a placeholder in th
 	&& $draw( '[figure /x/y/z/w caption="[[content]] [[class]] [[value]] [probe-echo]"]CHILD[/figure]', $inHero ) === '<figure data-src="/x/y/z/w" data-alt="Alt &quot;x&quot; [sic]"><figcaption>[[content]] [[class]] [[value]] [probe-echo]</figcaption>CHILD</figure>' && count( $seen ) === 0 );
 check( '...markup is text: a quote that ends the attribute, a tag, and a null byte or a control character in a reference, which makes it a text and no key',
 	$caption( '\"><script>alert(1)</script>' ) === $figured( '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;' ) && str_contains( $caption( "~caption\0" ), 'Bild' ) === false && str_contains( $caption( "/project/company/general/name\0" ), 'ACME' ) === false
-	&& str_contains( $caption( "~caption\x01" ), 'Bild' ) === false && str_contains( $caption( "~caption\0" ), "~caption\0" ) === true );
+	&& str_contains( $caption( "~caption\x01" ), 'Bild' ) === false && $caption( "~caption\0" ) === $figured( '~caption' ) );
 check( 'validate() refuses a text whose default is no string, that is a class or has options, and accepts a reference as the default', str_contains( $whyNot( $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => 1 ] ] ] ), 'default' ) === true
 	&& str_contains( $whyNot( $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => '', 'class' => true ] ] ] ), 'class' ) === true && str_contains( $whyNot( $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => '', 'options' => [ 'a' ] ] ] ] ), 'options' ) === true
 	&& is_array( \Nino\Components::validate( 'x', $ok + [ 'attributes' => [ 'a' => [ 'type' => 'text', 'default' => '~title' ] ] ] ) ) === true && in_array( 'text', \Nino\Components::TYPES, true ) === true );

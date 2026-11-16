@@ -93,6 +93,10 @@ namespace Nino {
 		public const int KNOBS = 6;
 		public const int STEPS = 5;
 
+		// The words of the attribute ground, which a feature's component may only say as a choice among them: the contract of the
+		// grounds, which Nino.css answers for the class <name>--ground-<word> of every component alike
+		public const array GROUNDS = [ 'none', 'base', 'alt', 'tint', 'primary', 'dark' ];
+
 		// What a component takes its first word from, see _reference()
 		public const array SOURCES = [ 'text', 'image', 'link', 'none' ];
 
@@ -1158,7 +1162,20 @@ namespace Nino {
 		 *	@return 	string
 		 */
 		public static function escape( string $value ): string {
-			return htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+			return htmlspecialchars( self::clean( $value ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+		}
+
+		/**
+		 *	A value without the control characters html has no use for: U+0000 to U+0008, U+000B, U+000C, U+000E to
+		 *	U+001F and U+007F. A tab, a line break and a carriage return stay. Every value the register writes - a text,
+		 *	an attribute, a field, a fill of a template - goes through it
+		 *
+		 *	@param		string		$value
+		 *
+		 *	@return 	string
+		 */
+		public static function clean( string $value ): string {
+			return preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value ) ?? '';
 		}
 
 		/**
@@ -2035,7 +2052,7 @@ namespace Nino {
 				return self::_address( (string) $value );
 
 			// A field is written by its type, as every renderer of a field writes it; the brackets are the characters they are
-			return $model === null ? self::escape( (string) $value ) : str_replace( '&#91;', '[', \Nino\Html::fieldValue( $value, $model ) );
+			return $model === null ? self::escape( (string) $value ) : str_replace( '&#91;', '[', self::clean( \Nino\Html::fieldValue( is_string( $value ) === true ? self::clean( $value ) : $value, $model ) ) );
 		}
 
 		/**
@@ -2064,10 +2081,13 @@ namespace Nino {
 		 */
 		private static function _text( string $text, string $format ): string {
 
+			$text = self::clean( $text );
+
 			if( $format === 'plain' )
 				return self::escape( html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 
-			return \Nino\Html::sanitizeHtml( $text, $format );
+			// What the cleaning of the html reads out of an entity - &#x7f; - is a character again, and is taken out once more
+			return self::clean( \Nino\Html::sanitizeHtml( $text, $format ) );
 		}
 
 		/**

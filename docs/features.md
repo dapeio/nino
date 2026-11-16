@@ -329,6 +329,37 @@ The Features panel lists the reason a component of a feature that is on is not r
 
 A module of the kernel that has a `feature.php` - `_nino/Nino/Modules/<Name>/feature.php`, with the class `\Nino\Modules\<Name>` and the folders above - is a feature that is delivered with the kernel: `\Nino\Features::all()` lists it with `'shipped' => true`, among the features below `features/` and in the order of the keys, and the Features panel switches it on and off like any other, which lists its class in `/nino/modules` and records its version. It differs in three things. It has no directory of the project's to delete, so `\Nino\Features::remove()` refuses it (the panel's Remove answers that sentence, with the code of a removal that failed) and nothing is removed. It is updated with the kernel, so the catalogue offers no version of it: `\Nino\Catalogue::offers()` says `current` and `'shipped' => true` for its key whatever the catalogue lists, and `install()` refuses it - and does not place a requirement that is one. And its name is the kernel's: a directory below `features/` with that name, or one that claims its key, is refused. Its files are where the kernel's are, so a standard part is the file `/_nino/Nino/Modules/<Name>/groups/<group>/part/part.css` of the style bundle.
 
+#### The feature Basis
+
+`_nino/Nino/Modules/Basis/` is the feature that comes with the kernel: twenty components in six groups - `header`, `footer`, `section`, `button`, `image` and `text` - the pages of a site are written in, each group with a standard part, a stylesheet that makes them readable, responsive, light and dark and nothing more. It is **off** until the Features panel switches it on, and nothing in the kernel uses it. It has no script: the menu of a small screen is a `details` of the browser that opens below the line of the header, over its whole width, with the button where it was, and pushes the page down - a `sticky` header scrolls away with the page while the menu is open - a wide one shows it open in a line (where the browser knows `::details-content`; where it does not, the button stays), light and dark are `light-dark()` pairs - the mode of the device is said at the header, the footer and every section - and a section with a picture lies under a veil and is dark, so that the writing is legible whatever the picture is. The logo for a dark ground follows the device and not the ground the header stands on, and on paper the one for a light ground is the one that is drawn. The alt text of an `image` is the one of the call, else the one stored with the picture; `decorative` says there is none, and a picture without one is no link - it is drawn without the anchor and the log says so once. Its words - the names a screen reader reads for the menus - are `/module/basis/navigation/<name>`, delivered by `install/text/` on activation like those of any feature.
+
+A card is a column: `[section-col variant="card"]` with a `[section-title]`, a `[text]` and an `[image]` in it; `bleed` lets the first child reach the edge (the picture keeps the corners of its own), `link` makes the link of the title - `[section-title href="..."]` - cover the surface: every other link in the card, a button or a link in a text, lies above the cover and keeps its own target and focus, while a click on a text or a picture of the card opens the link of the title (so the text of such a card cannot be marked with the mouse); a card that is marked `link` and has no link in its title has no cover. A `ground` - `base`, `alt`, `tint`, `primary` or `dark` - is written as the class `<name>--ground-<word>` and is the same for every component; `Nino.css` names the roles for it, so that a button on a dark section is right without knowing it. The standard parts read `--brand-...` and `--page-...`, which `Nino.css` sets, and the tokens of their own components. The names `text`, `button`, `image`, `spacer` and `html` are the module `Components`' as well: where the feature is on the register draws them, where it is off the module does.
+
+The components, as their schemas say them (a leaf has no end; the classes are the ones the register writes next to the name):
+
+| Group | Component | In | Holds | Source | Renderer | Classes next to the name | Tokens of the template |
+|---|---|---|---|---|---|---|---|
+| **header** | `header-wrap` | page | itself | none | - | `--sticky` | `[[id]]` |
+|  | `header-logo` (once) | header-wrap | - (a leaf) | none | yes | - | `[[light]]` `[[dark]]` `[[href]]` |
+|  | `header-nav` (once) | header-wrap | - (a leaf) | none | yes | `--collapse-{always,never}` | `[[menu]]` `[[label]]` |
+|  | `header-actions` | header-wrap | itself, flow | none | - | - | - |
+| **footer** | `footer-wrap` | page | itself | none | - | - | `[[id]]` |
+|  | `footer-col` | footer-wrap | itself, flow | none | - | `--[m-\|l-]size-{25,33,50,66,75,100}` | - |
+|  | `footer-logo` | footer-col | - (a leaf) | image | yes | - | `[[alt]]` `[[decorative]]` |
+|  | `footer-nav` | footer-col | - (a leaf) | none | yes | - | `[[menu]]` `[[label]]` |
+|  | `footer-legal` (once) | footer-wrap | - (a leaf) | none | yes | - | - |
+| **section** | `section-wrap` | page | itself | none | yes | `--ground-{alt,tint,primary,dark}` `--dim` `--height-{60,80,100}` | `[[id]]` `[[image]]` |
+|  | `section-row` | section-wrap | itself | none | - | `--width-{narrow,wide,full}` `--gap-{0,1,3,4}` `--valign-{start,center,end}` `--[m-\|l-]reverse-{off,on}` | - |
+|  | `section-col` | section-row | itself, flow | none | - | `--[m-\|l-]size-{25,33,50,66,75,100}` `--[m-\|l-]align-{start,center,end}` `--[m-\|l-]hide-{off,on}` `--ground-{base,alt,tint,primary,dark}` `--pad-{0,1,2,3,4}` `--bleed` `--link` `--variant-card` | `[[id]]` |
+|  | `section-title` | section-col | - (a leaf) | text/inline | yes | `--size-{s,l,xl}` | `[[tag]]` `[[href]]` |
+|  | `section-subtitle` | section-col | - (a leaf) | text/inline | - | - | - |
+| **button** | `button` | flow, button-group | - (a leaf) | text/plain | yes | `--tone-{quiet}` `--size-{s,l}` `--wide` | `[[href]]` `[[target]]` |
+|  | `button-group` | flow | itself | none | - | `--align-{center,end}` | - |
+| **image** | `image` | flow | - (a leaf) | image | yes | `--ratio-{1-1,4-3,3-2,3-4,16-9,21-9}` `--focus-{top,right,bottom,left,top-left,top-right,bottom-left,bottom-right}` | `[[alt]]` `[[decorative]]` `[[caption]]` `[[href]]` |
+| **text** | `text` | flow | - (a leaf) | text/blocks | - | `--size-{s,l}` | `[[format]]` |
+|  | `spacer` | flow | - (a leaf) | none | - | `--size-{1,3,4,5,6}` | - |
+|  | `html` | page, flow | itself | none | yes | - | - |
+
 ### The manual
 
 The `manual` key is what the **Description** tab of the feature's screen shows:

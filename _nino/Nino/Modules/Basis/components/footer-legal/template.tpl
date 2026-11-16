@@ -1,0 +1,1 @@
+<div class="[[class]]"><p class="footer-legal-copyright">&copy; [[/nino/date/year]] [[/project/company/general/name]]</p>[[legal]][[locales]]</div>
