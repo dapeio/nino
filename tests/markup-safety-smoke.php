@@ -108,8 +108,9 @@ foreach( $payloads as $what => $payload ) {
 	$file = 'p/'. $payload. '.jpg';
 	$appData['/nino/html/images']['/safety'] = [ 'label' => 'Safety', 'width' => 5, 'height' => 6, 'filename' => $file, 'alt' => [ \Nino\Locales::getCurrentLocale( $appData ) => $payload ] ];
 	$html = $render( '[imagevalues /safety]<m s="[[src]]" a="[[alt]]">[[alt]][/imagevalues]' );
-	check( 'the alt text and the address of a picture that hold '. $what. ' are escaped text, whole, in the attribute and in the text, and no call', $read( $html ) === false
-		&& $html === '<m s="'. \Nino\Components::escape( \Nino\Images::getUrl( $appData, $file ) ). '" a="'. \Nino\Components::escape( $payload ). '">'. \Nino\Components::escape( $payload ) );
+	// A file name with a control character names no picture, so the block draws nothing at all
+	check( 'the alt text and the address of a picture that hold '. $what. ' are escaped text, whole, in the attribute and in the text, and no call - and a file name with a control character is no picture', $read( $html ) === false
+		&& $html === ( preg_match( '/[\x00-\x1F\x7F]/', $file ) === 1 ? '' : '<m s="'. \Nino\Components::escape( \Nino\Images::getUrl( $appData, $file ) ). '" a="'. \Nino\Components::escape( $payload ). '">'. \Nino\Components::escape( $payload ) ) );
 }
 unset( $appData['/nino/html/images']['/safety'] );
 

@@ -665,7 +665,7 @@ check( 'a bracket in a stored text is no shortcode in the page: one script eleme
 check( '...and the table parses with the text as typed', ( $jstextLiveRows['/module/form/info/live'] ?? null ) === 'Hi [navigation nav=main] and [jstext] and [json /module/form/info/other] We couldn\'t send "this" & that' );
 check( 'a byte that is no UTF-8 is a replacement character, not a table that is lost', ( $jstextLiveRows['/module/form/info/utf8'] ?? null ) === "bad \u{FFFD} byte" );
 $jstextEmpty = $appData;
-unset( $jstextEmpty['./nino/html/fills'] );
+unset( $jstextEmpty['./nino/html/fills'], $jstextEmpty['./nino/html/filecache'] );
 check( 'a table with no text is an object a script reads', str_contains( \Nino\Modules\Jstext::doShortcode( $jstextEmpty, [] ), 'NinoJstext={};' ) === true );
 
 // A project or a feature whose own script reads a fill says so

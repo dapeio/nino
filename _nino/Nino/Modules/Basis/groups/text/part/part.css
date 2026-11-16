@@ -1,9 +1,11 @@
-/*	text - the standard part: a text, the room between two things, and the html a developer wrote	*/
+/*	text - the standard part: a text, the room between two things, and the html a developer wrote. A word that is longer than the line breaks where the
+	line ends: the break-word of Nino.css leaves a box that is as wide as its content - an item of a row or a column, which a text is - as wide as the word,
+	and anywhere does not. A title, a subtitle and a caption stand in blocks that are as wide as their parent and need nothing	*/
 :root {
 	--text-size: var(--page-text-2);
 	--text-gap: var(--page-space-3);
 }
-.text { font-size: var(--text-size); max-width: 70ch; }
+.text { font-size: var(--text-size); max-width: 70ch; overflow-wrap: anywhere; }
 .text--size-s { --text-size: var(--page-text-1); }
 .text--size-l { --text-size: var(--page-text-3); }
 .text > * + * { margin-top: var(--text-gap); }

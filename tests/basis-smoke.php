@@ -387,6 +387,18 @@ foreach( $holds as $parent => $expected ) {
 	if( $allowed !== $expected )
 		$wrong[] = $parent;
 }
+// A name is a component or a shortcode and never both, where every module of the kernel is at work and basis is on: the register would draw the one and never ask the other
+$both = basisSite( 'de_DE' );
+ninoWarnings();
+\Nino\Html::init( $both );
+
+foreach( (array) glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*', GLOB_ONLYDIR ) as $moduleDir )
+	if( method_exists( '\\Nino\\Modules\\'. basename( $moduleDir ), 'init' ) === true )
+		( '\\Nino\\Modules\\'. basename( $moduleDir ) )::init( $both );
+
+check( 'the modules of the kernel and the components of basis share no name: every shortcode is one the register does not draw, and the registrations are no warning',
+	count( \Nino\Html::shortcodes( $both ) ) >= 13 && array_intersect( \Nino\Html::shortcodes( $both ), array_keys( \Nino\Components::components( $both ) ) ) === [] && ninoWarnings() === [] );
+
 check( 'allowed() answers for the nine components that hold something, and for the page, what each may hold - no row in a column, no column in a column'. ( $wrong === [] ? '' : ' - '. implode( ', ', $wrong ) ), $wrong === [] );
 $containers = array_keys( array_filter( \Nino\Components::containers( $appData ) ) );
 sort( $containers );
@@ -533,6 +545,46 @@ $anchored = $draw( '[image /template/page-basis/story/photo href="/x"][image /te
 $said = ninoWarnings();
 check( 'a picture with no alt text is no link: without a name the anchor would be one nobody can use, so it is left out, and the log says it once for the picture', substr_count( $anchored, '<a ' ) === 1 && str_contains( $anchored, '<a href="/z">' ) && count( $said ) === 1 && str_contains( $said[0], 'no alt text' ) && str_contains( $said[0], 'story/photo' ) );
 check( 'a picture whose size is not known has no width and no height: a box of nothing is no size', $draw( '[image /nosize]' ) === '<figure class="image"><img src="/public/images/plain.png" alt="" loading="lazy" decoding="async"></figure>' );
+// In a loop the fields of the round are in the words of a call: a button, an image, a title, a text and the name of a menu
+$loopContext = [ 'fills' => [ '[[title]]' => 'Ärzte &amp; &quot;Co&quot; &#91;x]', '[[.slug]]' => 'aerzte', '[[.id]]' => '2' ], 'element' => [ 'uri' => '/x', 'id' => 2, 'element' => [ '.uri' => '/x/aerzte' ], 'model' => [] ] ];
+check( 'in a loop the fields of the round are put into the text of a button, its link, the alt text and the caption of an image, a title, a text and the name of a menu - escaped as the text they are',
+	basisDraw( $appData, '[button text="Mehr zu [[title]]" href="/leistungen/[[.slug]]"]', $loopContext ) === '<a class="button" href="/leistungen/aerzte">Mehr zu Ärzte &amp; &quot;Co&quot; [x]</a>'
+	&& basisDraw( $appData, '[image /logo alt="[[title]]" caption="Nr. [[.id]]: [[title]]" href="/p/[[.slug]]"]', $loopContext ) === '<figure class="image"><a href="/p/aerzte"><img src="/public/images/logo.png" width="160" height="48" alt="Ärzte &amp; &quot;Co&quot; [x]" loading="lazy" decoding="async"></a><figcaption>Nr. 2: Ärzte &amp; &quot;Co&quot; [x]</figcaption></figure>'
+	&& basisDraw( $appData, '[section-title text="[[title]]"][text text="[[title]] [[.slug]]"]', $loopContext ) === '<h2 class="section-title">Ärzte &amp; "Co" [x]</h2><div class="text"><p>Ärzte &amp; "Co" [x] aerzte</p></div>'
+	&& str_contains( basisDraw( $appData, '[footer-nav label="[[title]]"]', $loopContext ), '<nav class="footer-nav" aria-label="Ärzte &amp; &quot;Co&quot; [x]">' ) === true );
+$pageRound = static fn( string $v ): array => [ 'fills' => [ '[[v]]' => $v, '[[.slug]]' => 'holz' ], 'element' => [ 'uri' => '/x', 'id' => 0, 'element' => [ '.uri' => '/x/holz' ], 'model' => [] ] ];
+$pageSite = $appData;
+$pageSite['/nino/http/routes']['GET://leistungen/holz'] = [ 'uri' => '/leistungen/holz' ];
+check( 'a field after page: is the path of a page of the site, checked as one: a routed page is the link, a page nobody routes and a way out of the site are none',
+	basisDraw( $pageSite, '[button text="Holz" href="page:[[v]]"]', $pageRound( '/leistungen/holz' ) ) === '<a class="button" href="/leistungen/holz">Holz</a>'
+	&& basisDraw( $pageSite, '[button text="Holz" href="page:/leistungen/[[.slug]]#top"]', $pageRound( '/' ) ) === '<a class="button" href="/leistungen/holz#top">Holz</a>'
+	&& basisDraw( $pageSite, '[button text="Holz" href="page:[[v]]"]', $pageRound( '/nowhere' ) ) === '<span class="button">Holz</span>'
+	&& basisDraw( $pageSite, '[button text="Holz" href="page:[[v]]"]', $pageRound( '/leistungen/../contact' ) ) === '<span class="button">Holz</span>' );
+// The picture of an image field of the element of a loop: the call names the field, the model of the field names the field that holds its alt text
+$photoModel = [ 'title' => [ 'type' => 'string' ], 'photo' => [ 'type' => 'image', 'alt' => 'photoAlt' ], 'photoAlt' => [ 'type' => 'string' ], 'empty' => [ 'type' => 'image' ] ];
+$photoRound = static fn( string $file, string $alt = 'Holz & "Stein"' ): array => [ 'fills' => [ '[[title]]' => 'Holz' ], 'element' => [ 'uri' => '/x', 'id' => 0, 'element' => [ '.uri' => '/x/holz', 'title' => 'Holz', 'photo' => $file, 'photoAlt' => $alt ], 'model' => $photoModel ] ];
+$photoCalls = '[image .photo][footer-logo .photo][section-wrap image=".photo"]x[/section-wrap][image .photo alt="[[title]]"]';
+check( 'the picture of an image field of a loop is drawn by an image, a logo and the picture behind a section: the file the field holds, the alt text of the field named by its model and the one of the call before it, none behind a section',
+	basisDraw( $appData, $photoCalls, $photoRound( 'elements/h/holz.jpg' ) ) === '<figure class="image"><img src="/public/images/elements/h/holz.jpg" alt="Holz &amp; &quot;Stein&quot;" loading="lazy" decoding="async"></figure>'
+	. '<span class="footer-logo"><img src="/public/images/elements/h/holz.jpg" alt="Holz &amp; &quot;Stein&quot;" loading="lazy" decoding="async"></span>'
+	. '<section class="section-wrap"><div class="section-wrap-image"><img class="section-wrap-picture" src="/public/images/elements/h/holz.jpg" alt="" decoding="async"></div>x</section>'
+	. '<figure class="image"><img src="/public/images/elements/h/holz.jpg" alt="Holz" loading="lazy" decoding="async"></figure>'
+	&& basisDraw( $appData, '[image .empty][image .title][image .nothing]', $photoRound( 'elements/h/holz.jpg' ) ) === '' && basisDraw( $appData, '[image .photo]', $photoRound( '' ) ) === '' );
+$hostilePhotos = [];
+ninoWarnings();
+
+foreach( [ '../../private/config.php', '/etc/passwd', 'a/../b.jpg', '"><script>alert(1)</script>.jpg', '[template /templates/evil].jpg', "a\0b.jpg", "a\x01b.jpg" ] as $hostileFile )
+	$hostilePhotos[$hostileFile] = basisDraw( $appData, $photoCalls, $photoRound( $hostileFile, '[template /x] "><b>' ) );
+
+check( 'a file name in an image field that climbs out of the directory, is absolute, spells a tag or a call or holds a control character draws no picture of the site and nothing that runs: no path out, no tag, no call read',
+	$hostilePhotos['../../private/config.php'] === '<section class="section-wrap">x</section>' && $hostilePhotos['/etc/passwd'] === '<section class="section-wrap">x</section>' && $hostilePhotos['a/../b.jpg'] === '<section class="section-wrap">x</section>'
+	&& $hostilePhotos["a\0b.jpg"] === '<section class="section-wrap">x</section>' && $hostilePhotos["a\x01b.jpg"] === '<section class="section-wrap">x</section>' && ninoWarnings() === []
+	&& array_filter( $hostilePhotos, static fn( string $html ): bool => str_contains( $html, '<script' ) || str_contains( $html, '<b>' ) || str_contains( $html, 'private/config' ) || str_contains( $html, '/etc/passwd' ) ) === []
+	&& str_contains( $hostilePhotos['"><script>alert(1)</script>.jpg'], 'src="/public/images/&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;.jpg"' ) === true && str_contains( $hostilePhotos['[template /templates/evil].jpg'], 'src="/public/images/&#91;template /templates/evil&#93;.jpg"' ) === true );
+ninoWarnings();
+check( '...a link that a field makes is no link where it is none of a site: a script, another host - and outside a loop the same words are what they are written as',
+	basisDraw( $appData, '[button text="Mehr" href="javascript:[[.slug]]"][button text="Mehr" href="//[[.slug]]"]', $loopContext ) === '<span class="button">Mehr</span><span class="button">Mehr</span>'
+	&& basisDraw( $appData, '[button text="Mehr zu [[title]]" href="/leistungen/[[.slug]]"]' ) === '<a class="button" href="/leistungen/[[.slug]]">Mehr zu [[title]]</a>' );
 check( 'a slot with no file, one that is none and a field that holds none draw no image and no logo: an empty box is no picture', $draw( '[image /empty][image /nothing][footer-logo /empty][footer-logo /nothing]' ) === ''
 	&& $draw( '[section-wrap image="/empty"][/section-wrap]' ) === '<section class="section-wrap"></section>' );
 check( 'a section with a picture puts it behind its content, with no alt text, since it is no content, and not lazy: it is what a visitor sees first', str_contains( $draw( '[section-wrap image="/template/page-basis/hero/background" dim][/section-wrap]' ), '<div class="section-wrap-image"><img class="section-wrap-picture" src="/public/images/hero.jpg" width="1600" height="900" alt="" decoding="async"></div></section>' ) );
@@ -748,6 +800,13 @@ if( str_contains( $cover, 'position: absolute;' ) === false || str_contains( $co
 
 if( str_contains( basisBody( $partRules['button'], '.button:focus-visible' ), 'outline:' ) === false )
 	$bad[] = 'a button has no ring of its own';
+
+// a word longer than the box it stands in breaks where the box ends: the boxes whose width is that of their content - a button, a text, the name of a
+// logo, a menu entry, a column of the foot and its line - say anywhere, since the break-word of the page leaves them as wide as the word
+foreach( [ 'button' => [ '.button' ], 'text' => [ '.text' ], 'header' => [ '.header-logo', '.header-nav a' ], 'footer' => [ '.footer-col', '.footer-legal' ] ] as $wrapGroup => $wrapSelectors )
+	foreach( $wrapSelectors as $wrapSelector )
+		if( str_contains( basisBody( array_filter( $partRules[$wrapGroup], static fn( array $rule ): bool => $rule['selector'] === $wrapSelector ), $wrapSelector ), 'overflow-wrap: anywhere;' ) === false )
+			$bad[] = $wrapSelector. ' lets a word longer than the box leave it';
 
 // a row that is turned round turns when its columns stand one under the other as well
 foreach( [ '', 'm-', 'l-' ] as $width )

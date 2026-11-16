@@ -359,6 +359,26 @@ check( 'a leaf offers nothing, whatever places say its name - a badge says it st
 check( 'a component with no place stands nowhere, and is drawn where it is written all the same', !in_array( 'free', \Nino\Components::allowed( $appData, 'page' ), true ) && !in_array( 'free', \Nino\Components::allowed( $appData, 'flow' ), true )
 	&& $draw( '[card-title text="x"]' ) === '<h3 class="card-title">x</h3>' );
 
+// A container that draws no element of its own is through: what may stand in it is what the container it stands in allows
+$through = $appData;
+$loopRenderer = static fn( array &$appData, array $args, string $content, array $context ): string => '';
+\Nino\Components::addComponent( $through, 'probe-loop', [ 'label' => 'Loop', 'in' => [ 'section-row' ], 'offers' => [ 'page', 'flow', 'section-row' ], 'through' => true, 'children' => 'nodes' ], $loopRenderer );
+\Nino\Components::addComponent( $through, 'probe-plain', [ 'label' => 'Plain loop', 'in' => [ 'section-row' ], 'offers' => [ 'page', 'flow', 'section-row' ], 'children' => 'nodes' ], $loopRenderer );
+$unbound = \Nino\Components::allowed( $through, 'probe-loop' );
+check( 'a loop that offers the page, the flow and a row, asked for with no container, is what those places offer: the wrap of the page and the column of a row both', in_array( 'section-wrap', $unbound, true ) === true && in_array( 'section-col', $unbound, true ) === true
+	&& $unbound === \Nino\Components::allowed( $through, 'probe-plain' ) && $unbound === \Nino\Components::allowed( $through, 'probe-loop', '' ) );
+check( '...and asked for with the container it stands in, a through loop holds what that container holds: the columns of a row, no wrap, no header; the same for a column and for the page',
+	\Nino\Components::allowed( $through, 'probe-loop', 'section-row' ) === \Nino\Components::allowed( $through, 'section-row' ) && in_array( 'section-wrap', \Nino\Components::allowed( $through, 'probe-loop', 'section-row' ), true ) === false
+	&& \Nino\Components::allowed( $through, 'probe-loop', 'section-col' ) === \Nino\Components::allowed( $through, 'section-col' ) && \Nino\Components::allowed( $through, 'probe-loop', 'page' ) === \Nino\Components::allowed( $through, 'page' )
+	&& \Nino\Components::allowed( $through, 'probe-loop', 'flow' ) === \Nino\Components::allowed( $through, 'flow' ) );
+check( '...a container that is not through takes no notice of where it stands, and a through loop in a through loop is asked for with the container of the outer one - or, with the outer one, has the places it offers',
+	\Nino\Components::allowed( $through, 'probe-plain', 'section-col' ) === $unbound && \Nino\Components::allowed( $through, 'section-row', 'section-wrap' ) === \Nino\Components::allowed( $through, 'section-row' )
+	&& \Nino\Components::allowed( $through, 'probe-loop', 'section-row' ) === \Nino\Components::allowed( $through, 'section-row' ) && \Nino\Components::allowed( $through, 'probe-loop', 'probe-loop' ) === $unbound
+	&& \Nino\Components::allowed( $through, 'nobody', 'section-row' ) === [] && \Nino\Components::allowed( $through, 'button', 'section-row' ) === [] );
+$throughSchemas = \Nino\Components::components( $through );
+check( 'through is a key of the schema that is there where it is true and nowhere else: the schemas of the other components are what they were, and so is their version', $throughSchemas['probe-loop']['through'] === true && array_key_exists( 'through', $throughSchemas['probe-plain'] ) === false && array_key_exists( 'through', $throughSchemas['section-col'] ) === false
+	&& array_key_exists( 'through', (array) \Nino\Components::validate( 'x', [ 'label' => 'X', 'template' => '<x>', 'offers' => [], 'through' => false ] ) ) === false );
+
 echo "\n";
 
 
@@ -601,7 +621,7 @@ check( 'a link from a field of the element: the address of the field, .id, .uri 
 check( 'an image is the reference to the picture: the key of the slot as it is, escaped, and not looked up', $draw( '[section-wrap id="hero"][pic ~photo][pic /logo][/section-wrap]' )
 	=== '<section id="hero" class="section-wrap"><img src="/template/page-x/hero/photo" alt=""><img src="/logo" alt=""></section>'
 	&& \Nino\Components::render( $appData, [ [ 'n' => 'pic', 's' => '/a/b"c<d', 'a' => [], 'c' => null, 'o' => 0 ] ] ) === '<img src="/a/b&quot;c&lt;d" alt="">' );
-check( '...a field of the element that is an image is the file; a field of another type, an image field without a file and a name that is no field are no image', $draw( '[pic .photo][pic .title][pic .empty][pic .cover][pic .nothing][pic ~photo]', [ 'template' => 'page-x', 'element' => $element ] ) === '<img src="a.jpg" alt="">' );
+check( '...a field of the element that is an image is the name of the field, which the renderer looks the picture up by; a field of another type, an image field without a file and a name that is no field are no image', $draw( '[pic .photo][pic .title][pic .empty][pic .cover][pic .nothing][pic ~photo]', [ 'template' => 'page-x', 'element' => $element ] ) === '<img src="photo" alt="">' );
 $wild = [ 'template' => 'page-x', 'element' => [ 'uri' => '/post', 'id' => 1, 'element' => [ '.uri' => '/post/<x>&"y' ], 'model' => [] ] ];
 check( 'the uri and the slug of the element are written escaped: they are what the element is called', $draw( '[text .uri][text .slug]', $wild ) === '<p class="text">/post/&lt;x&gt;&amp;&quot;y</p><p class="text">&lt;x&gt;&amp;&quot;y</p>' );
 check( 'an element with no model is none: a field of it is nothing, a textfill of it too', $draw( '[text .title][text .id]', [ 'template' => 'page-x', 'element' => [ 'id' => 1, 'element' => [ 'title' => 'x' ] ] ] ) === '' && $draw( '[[title]]|', [ 'template' => 'page-x', 'element' => [ 'id' => 1, 'element' => [ 'title' => 'x' ] ] ] ) === '[[title]]|' );
@@ -866,6 +886,9 @@ $refused = [
 	[ 'offers that is a string', 'x', $ok + [ 'offers' => 'flow' ], '"offers"' ],
 	[ 'offers with a place that is too long', 'x', $ok + [ 'offers' => [ str_repeat( 'a', 41 ) ] ], '"offers"' ],
 	[ 'once that is no bool', 'x', $ok + [ 'once' => 'yes' ], '"once"' ],
+	[ 'through that is no bool', 'x', $ok + [ 'offers' => [ 'flow' ], 'through' => 'yes' ], '"through"' ],
+	[ 'through in a leaf: it has no offers to stand for', 'x', $ok + [ 'through' => true, 'children' => 'nodes' ], '"through"' ],
+	[ 'through without children => nodes: the component does not draw what it holds itself', 'x', $ok + [ 'offers' => [ 'flow' ], 'through' => true ], '"children"' ],
 	[ 'a source that is none of them', 'x', $ok + [ 'source' => 'content' ], '"source"' ],
 	[ 'a source that is no string', 'x', $ok + [ 'source' => [ 'text' ] ], '"source"' ],
 	[ 'a format for a component that is no text', 'x', $ok + [ 'format' => 'plain' ], '"format"' ],
@@ -1010,6 +1033,7 @@ check( 'a message that names the feature says it', str_contains( (string) \Nino\
 $accepted = [
 	'the least a schema is: a label and a template' => [ 'x', $ok, null, null ],
 	'a container that offers nothing' => [ 'x', $ok + [ 'offers' => [] ], null, null ],
+	'a container that is through, and one that says it is not' => [ 'x', $ok + [ 'offers' => [ 'flow' ], 'through' => true, 'children' => 'nodes' ], null, null ],
 	'all the keys' => [ 'x', [ 'label' => [ 'de_DE' => 'X', 'en_US' => 'X' ], 'group' => 'basis', 'in' => [ 'flow', 'card' ], 'offers' => [ 'flow' ], 'once' => true, 'source' => 'text', 'format' => 'lines', 'variants' => [ 'soft' ],
 		'preview' => 'button', 'icon' => [ [ 'path', [ 'd' => 'M0 0L1 1' ] ], [ 'rect', [ 'x' => '1', 'y' => '1', 'width' => '2', 'height' => '2' ] ] ], 'template' => '<x>[[value]]</x>',
 		'attributes' => [ 'size' => $choice + [ 'responsive' => true, 'input' => 'segment', 'label' => [ 'de_DE' => 'Größe' ], 'hint' => 'How big' ], 'on' => [ 'type' => 'bool', 'default' => true, 'input' => 'checkbox' ], 'n' => [ 'type' => 'int', 'default' => 2, 'min' => 1, 'max' => 3 ],
@@ -1274,7 +1298,7 @@ check( 'a link that is a key: its text, and a link with a key that is no text is
 	&& $draw( '[button text="x" href="~nothing"]', [ 'template' => 'page-x', 'scope' => 'hero' ] ) === '<a class="button" href="">x</a>' && $draw( '[button text="x" href="~evil"]', [ 'template' => 'page-x', 'scope' => 'hero' ] ) === '<a class="button" href="">x</a>' );
 check( 'a link that is a field of the element', $draw( '[button text="x" href=".target"]', [ 'template' => 'page-x', 'element' => $element ] ) === '<a class="button" href="/blog/x?a=1&amp;b=2">x</a>' && $draw( '[button text="x" href=".target"]' ) === '<a class="button" href="">x</a>' );
 check( 'an image attribute is the reference, escaped: a key of the slot, a field of the element, anything else is none', $draw( '[knob pic="~photo"][/knob]', [ 'template' => 'page-x', 'scope' => 'hero' ] ) === '<i class="knob" t="p" f="0" n="3" l="L" h="" p="/template/page-x/hero/photo" a=""></i>'
-	&& str_contains( $draw( '[knob pic=".photo"][/knob]', [ 'template' => 'page-x', 'element' => $element ] ), 'p="a.jpg"' ) === true && str_contains( $draw( '[knob pic="x.jpg"][/knob]' ), 'p=""' ) === true && str_contains( $draw( '[knob pic="/a\"b"][/knob]' ), 'p="/a&quot;b"' ) === true );
+	&& str_contains( $draw( '[knob pic=".photo"][/knob]', [ 'template' => 'page-x', 'element' => $element ] ), 'p="photo"' ) === true && str_contains( $draw( '[knob pic="x.jpg"][/knob]' ), 'p=""' ) === true && str_contains( $draw( '[knob pic="/a\"b"][/knob]' ), 'p="/a&quot;b"' ) === true );
 
 $said = $logged( static function() use ( &$appData ): void {
 	\Nino\Components::render( $appData, [ [ 'n' => str_repeat( 'x', 1000000 ), 's' => '', 'a' => [], 'c' => null, 'o' => 0 ] ] );
@@ -1735,6 +1759,103 @@ printf( "  Time (not a check) - the same page with a fill in each of its 480 tex
 printf( "  Time (not a check) - 600 calls of today's counting, 960 of this notation, median of 30: read %.2f ms, draw %.2f ms, both %.2f ms\n", $read[15], $draw[15], $both[15] );
 
 echo "\n";
+
+// --- The tokens of a loop in the values of attributes -----------------------
+
+echo "The tokens of a loop in what an attribute says\n";
+
+// One that draws with no word of its own, and one that has a text
+foreach( [ 'tokened' => 'none', 'tokenedt' => 'text' ] as $tokenName => $tokenSource )
+\Nino\Components::addComponent( $appData, $tokenName, [ 'label' => 'Tokened', 'source' => $tokenSource, 'variants' => [ 'soft' ], 'attributes' => [
+	'label'		=> [ 'type' => 'string', 'default' => '', 'class' => false ],
+	'caption'	=> [ 'type' => 'text', 'default' => '', 'class' => false ],
+	'href'		=> [ 'type' => 'link', 'default' => '', 'class' => false ],
+	'pic'			=> [ 'type' => 'image', 'default' => '', 'class' => false ],
+	'mode'		=> [ 'type' => 'choice', 'options' => [ 'a', 'b' ], 'default' => 'a', 'class' => false ],
+	'count'		=> [ 'type' => 'int', 'default' => 3, 'min' => 1, 'max' => 9, 'class' => false ],
+	'on'			=> [ 'type' => 'bool', 'default' => false, 'class' => false ],
+	'anchor'	=> [ 'type' => 'id', 'default' => '' ],
+], 'template' => '<a[[id]] l="[[label]]" c="[[caption]]" h="[[href]]" p="[[pic]]" m="[[mode]]" n="[[count]]" o="[[on]]">[[value]]</a>' ] );
+
+$leaf = static function( string $source, array $context = [ 'template' => 'page-x' ] ) use ( &$appData ): string {
+
+	$notes = [];
+
+	return \Nino\Components::render( $appData, \Nino\Markup::parse( $source, \Nino\Components::containers( $appData ), $notes ), $context );
+};
+$loopModel = [ 'title' => [ 'type' => 'string' ], 'body' => [ 'type' => 'string', 'html' => true, 'blocks' => true ], 'target' => [ 'type' => 'string' ], 'note' => [ 'type' => 'string', 'breaks' => true ] ];
+$loopRound = static function( array $fields, int $id = 0 ) use ( $loopModel ): array {
+
+	$element = $fields + [ '.uri' => '/things/'. ( $fields['slug'] ?? 'one' ), '.lang' => 'de-DE' ];
+
+	return [ 'element' => [ 'uri' => '/things', 'id' => $id, 'element' => $element, 'model' => $loopModel ], 'fills' => array_map( 'strval', \Nino\Modules\Elements::fills( $element, $loopModel, $id ) ) ];
+};
+$loopDraw = static function( string $source, array $fields, int $id = 0 ) use ( $leaf, $loopRound ): string {
+	return $leaf( $source, [ 'template' => 'page-x', 'scope' => 'hero' ] + $loopRound( $fields, $id ) );
+};
+$plain = [ 'title' => 'Ärzte & "Co"', 'target' => '/ok/path', 'body' => '<p>Ein <b>Satz</b> &amp; mehr</p>', 'note' => "a\nb" ];
+
+$one = $loopDraw( '[tokenedt text="Mehr zu [[title]] ([[.id]])" label="L [[title]]" caption="C [[title]]" href="/leistungen/[[.slug]]"][/tokenedt]', $plain + [ 'slug' => 'one' ], 4 );
+check( 'in a loop the tokens of its round are put into a fixed text, a string, a text and a link: the title, the number, the name alone - and what is put in is escaped once, as the text it is',
+	$one === '<a l="L Ärzte &amp; &quot;Co&quot;" c="C Ärzte &amp; &quot;Co&quot;" h="/leistungen/one" p="" m="a" n="3" o="0">Mehr zu Ärzte &amp; &quot;Co&quot; (4)</a>' );
+check( '...a field of rich text is its text: the tags are no part of an attribute, the entities are the characters they are, and a field with line breaks keeps them as a text has them',
+	$loopDraw( '[tokenedt text="[[body]]" label="[[body]]" caption="[[note]]"][/tokenedt]', $plain ) === "<a l=\"Ein Satz &amp; mehr\" c=\"a\nb\" h=\"\" p=\"\" m=\"a\" n=\"3\" o=\"0\">Ein Satz &amp; mehr</a>" );
+check( 'outside a loop nothing changes: a token is the text it is written as, in every one of them, and the fills of the site are put in as they were',
+	$leaf( '[tokenedt text="Mehr zu [[title]]" label="[[title]]" caption="[[.slug]]" href="/leistungen/[[.slug]]"][/tokenedt]' ) === '<a l="[[title]]" c="[[.slug]]" h="/leistungen/[[.slug]]" p="" m="a" n="3" o="0">Mehr zu [[title]]</a>'
+	&& $leaf( '[tokenedt text="[[/project/company/general/name]]" label="[[/project/company/general/name]] [[title]]"][/tokenedt]' ) === '<a l="ACME [[title]]" c="" h="" p="" m="a" n="3" o="0">ACME</a>' );
+check( 'a token the loop has no field for, [[.lang]] - which is markup - and a name that is no token stay as they are written; a key of the site is the text of the key in each of them, in a loop and outside of one',
+	$loopDraw( '[tokenedt text="[[nothing]] [[.lang]] [[ title ]]" label="[[/project/company/general/name]] [[title]] [[/project/company/general/nobody]]"][/tokenedt]', $plain )
+	=== '<a l="ACME Ärzte &amp; &quot;Co&quot; " c="" h="" p="" m="a" n="3" o="0">[[nothing]] [[.lang]] [[ title ]]</a>' );
+
+// What an editor wrote in a field is a text and nothing else
+$hostile = "[template /templates/x] [[/project/company/general/name]] [[.slug]] [[title]] \"><script>alert(1)</script> ' onload=\"x\" [csrf] \0 end";
+$said = ninoWarnings();
+$text = $loopDraw( '[tokenedt text="T:[[title]]" label="[[title]]" caption="[[title]]" href="/p/[[title]]"][/tokenedt]', [ 'title' => $hostile, 'slug' => 'one' ] );
+$expectText = htmlspecialchars( str_replace( "\0", '', $hostile ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+check( 'a field that spells a call, a template, a key of the site, a token, a tag, a quote and a null byte is written as the text it is in each place: no call is read, no key looked up, no token put in a second time, no quote ends an attribute',
+	$text === '<a l="'. $expectText. '" c="'. $expectText. '" h="/p/'. rawurlencode( str_replace( "\0", '', $hostile ) ). '" p="" m="a" n="3" o="0">T:'. $expectText. '</a>' && str_contains( $text, 'ACME' ) === false && str_contains( $text, '<script' ) === false && $said === [] );
+check( '...the same through a field that holds a token of its own round: [[.slug]] in the title is the text [[.slug]] and not the name, and the name is put in where the call says so',
+	$loopDraw( '[tokened label="[[title]]" caption="[[.slug]]"][/tokened]', [ 'title' => '[[.slug]]', 'slug' => 'x' ] ) === '<a l="[[.slug]]" c="x" h="" p="" m="a" n="3" o="0"></a>' );
+
+// A field that holds what looks like an entity is that text: it is written once more, as the characters it is made of, in each place
+$entities = 'Tom &amp; Jerry &lt;b&gt; &#39;x&#39;';
+$escaped = 'Tom &amp;amp; Jerry &amp;lt;b&amp;gt; &amp;#39;x&amp;#39;';
+check( 'what a field holds that looks like an entity is the text it is: written as its characters in a fixed text, a string, a text and a link, and not read as the character it would stand for',
+	$loopDraw( '[tokenedt text="[[title]]" label="[[title]]" caption="[[title]]" href="/p/[[title]]"][/tokenedt]', [ 'title' => $entities, 'slug' => 'one' ] )
+	=== '<a l="'. $escaped. '" c="'. $escaped. '" h="/p/'. rawurlencode( $entities ). '" p="" m="a" n="3" o="0">'. $escaped. '</a>' );
+
+// A link is looked at after the tokens are in
+$links = [];
+
+foreach( [ 'javascript:alert(1)', ' javascript:alert(1)', "java\tscript:alert(1)", 'JaVaScRiPt:alert(1)', '//evil.test/x', '/\\evil.test', '\\evil.test', 'data:text/html,x', 'vbscript:x', "java\0script:alert(1)", "java\x01script:alert(1)", 'ftp://x.test/' ] as $bad )
+	$links[$bad] = $loopDraw( '[tokened href="[[target]]"][/tokened]', [ 'target' => $bad ] );
+
+check( 'a link that is a field is looked at as a link that is written is, after the field is in: a script - with a blank, a tab or a null byte in it, in any case -, a data address, another host by a second slash or a backslash, a scheme that is none of four - no link',
+	array_filter( $links, static fn( string $html ): bool => $html !== '<a l="" c="" h="" p="" m="a" n="3" o="0"></a>' ) === [] && count( $links ) === 12 );
+check( '...and an address that is one is: a path, a page of the site, a mail address, a telephone number, a query, an anchor, an address of another site by https',
+	array_map( static fn( string $target ): string => $loopDraw( '[tokened href="[[target]]"][/tokened]', [ 'target' => $target ] ), [ '/ok/path', 'https://example.test/a?b=c&d=e#f', 'mailto:a@b.test', 'tel:+4912345', '#anchor', '?q=1' ] )
+	=== [ '<a l="" c="" h="/ok/path" p="" m="a" n="3" o="0"></a>', '<a l="" c="" h="https://example.test/a?b=c&amp;d=e#f" p="" m="a" n="3" o="0"></a>', '<a l="" c="" h="mailto:a@b.test" p="" m="a" n="3" o="0"></a>',
+		'<a l="" c="" h="tel:+4912345" p="" m="a" n="3" o="0"></a>', '<a l="" c="" h="#anchor" p="" m="a" n="3" o="0"></a>', '<a l="" c="" h="?q=1" p="" m="a" n="3" o="0"></a>' ] );
+$path = $loopDraw( '[tokened href="/s/[[target]]/x"][/tokened]', [ 'target' => '../..//evil.test/a b?c=d#e&f' ] );
+check( 'a field in the path of a link is a part of the path and no more: its slash, its dots, its question mark, its anchor and its space are written as the characters of a part, so that it cannot make a path, an address or a query of its own',
+	$path === '<a l="" c="" h="/s/..%2F..%2F%2Fevil.test%2Fa%20b%3Fc%3Dd%23e%26f/x" p="" m="a" n="3" o="0"></a>' );
+check( '...after mailto: and tel: it keeps the @ and the + that an address needs and nothing that would add a header or a number; after page: it is the path of a page, which is checked as one',
+	$loopDraw( '[tokened href="mailto:[[target]]"][/tokened]', [ 'target' => 'a@b.test?bcc=c@d.test' ] ) === '<a l="" c="" h="mailto:a@b.test%3Fbcc%3Dc@d.test" p="" m="a" n="3" o="0"></a>'
+	&& $loopDraw( '[tokened href="tel:[[target]]"][/tokened]', [ 'target' => '+49 123' ] ) === '<a l="" c="" h="tel:+49%20123" p="" m="a" n="3" o="0"></a>'
+	&& $loopDraw( '[tokened href="page:[[target]]"][/tokened]', [ 'target' => '/nowhere' ] ) === '<a l="" c="" h="" p="" m="a" n="3" o="0"></a>' && $loopDraw( '[tokened href="page:/[[target]]"][/tokened]', [ 'target' => '../x' ] ) === '<a l="" c="" h="" p="" m="a" n="3" o="0"></a>' );
+check( 'an address that starts with a key is no key where it holds a token of the loop - it is an address, whatever a field says - and one that holds none is what it was: the text of the key, or the address the key is',
+	$loopDraw( '[tokened href="/project/company/[[target]]"][/tokened]', [ 'target' => 'general/name' ] ) === '<a l="" c="" h="/project/company/general%2Fname" p="" m="a" n="3" o="0"></a>'
+	&& $leaf( '[tokened href="/project/company/general/name"][/tokened]' ) === '<a l="" c="" h="ACME" p="" m="a" n="3" o="0"></a>' );
+
+// A choice, a bool, an int, an id and an image fill nothing
+check( 'a choice, a bool, an int, an id and an image take no token: what is written is read as it was - a word that is none of the options is the default, a bool outside its words and an int that is no number too, an id that is none is nothing, and a reference that is none is no picture',
+	$loopDraw( '[tokened mode="[[title]]" count="[[id]]" on="[[title]]" anchor="[[title]]" pic="[[title]]"][/tokened]', [ 'title' => 'b' ], 5 ) === '<a l="" c="" h="" p="" m="a" n="3" o="0"></a>' );
+check( '...and the text of the first word, a key or a field, is read as it was: no token is looked for in it', $loopDraw( '[tokenedt .title][/tokenedt][tokenedt ~x text="[[title]]"][/tokenedt]', [ 'title' => 'T' ] ) === '<a l="" c="" h="" p="" m="a" n="3" o="0">T</a><a l="" c="" h="" p="" m="a" n="3" o="0">T</a>' );
+check( 'a text that is a reference stays one: a field, a key and a ~name are read where the text starts with them, and the token is no reference', $loopDraw( '[tokened caption=".title" label="[[title]]"][/tokened]', [ 'title' => 'T' ] ) === '<a l="T" c="T" h="" p="" m="a" n="3" o="0"></a>' );
+
+// The children of a loop in a loop: the round that is nearest wins, and what is in a round is in every call of it
+$inner = $leaf( '[loop][tokened label="[[n]]-[[title]]"][/tokened][/loop]', [ 'template' => 'page-x', 'scope' => 'hero' ] + $loopRound( [ 'title' => 'T' ] ) );
+check( 'a call in the children of a component that draws its children in rounds of its own has the tokens of the round its component hands it - a token of the round outside it is the text it is written as, for the renderer made the fills of the round alone', $inner === '<ul><li><a l="a-[[title]]" c="" h="" p="" m="a" n="3" o="0"></a></li></ul>' );
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $other ) );
 

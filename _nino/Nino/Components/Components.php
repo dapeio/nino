@@ -55,7 +55,8 @@ namespace Nino {
 	 *										it - the place the nodes stand in, the element
 	 *										of a loop (the shape [ 'uri', 'id', 'element', 'model' ] has), the tokens of the loops the nodes stand
 	 *										in ('fills', [ '[[token]]' => text ]: a textfill with no slash reads them before the
-	 *										element, and the call of a shortcode has them put into its arguments) and how
+	 *										element, the call of a shortcode has them put into its arguments, and a string, a text, a link and the
+	 *										fixed text of a component the text of the field - see _fills()) and how
 	 *										deep the nodes are.
 	 *
 	 *	@package					Dape/Nino
@@ -124,7 +125,7 @@ namespace Nino {
 		public const array RESERVED = [ 'value', 'source', 'content', 'class', 'text', 'variant', 'lang' ];
 
 		// The keys of a schema and of an attribute, which is all validate() accepts
-		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'source', 'format', 'children', 'attributes', 'variants', 'template', 'icon', 'preview' ];
+		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'source', 'format', 'children', 'attributes', 'variants', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
@@ -139,6 +140,9 @@ namespace Nino {
 
 		// What a reference to a text is written as: one word, with no bracket, no space and no control character in it
 		private const string SHAPE = '/^[^\s\[\]\x00-\x1F\x7F]+$/D';
+
+		// A token of a loop in the value of an attribute, [[title]] or [[.slug]], and what is read there: that, or a key of the site
+		private const string TOKEN = '/\[\[(\/[^\[\]]+|\.?[A-Za-z][A-Za-z0-9_-]*)\]\]/';
 
 		// The path of an internal page, as page:/path names it: the Element-URI of the page, with no way out of the site
 		private const string PAGE = '#^/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?$#D';
@@ -226,10 +230,17 @@ namespace Nino {
 		 *	@param		string		$name
 		 *	@param		array			$clean				The schema, as validate() answered it
 		 *	@param		callable|null	$renderer
+		 *	@param		string		$by						The method the registrant called, for the log
 		 *
 		 *	@return 	void
 		 */
-		private static function _store( array &$appData, string $name, array $clean, ?callable $renderer ): void {
+		private static function _store( array &$appData, string $name, array $clean, ?callable $renderer, string $by = 'addComponent' ): void {
+
+			// A name that is a shortcode already: the register draws it and the shortcode is never asked - said in the log with both
+			// registrants, as \Nino\Html::addShortcode() says it of the other order. The kernel has no name that is both
+			if( array_key_exists( $name, (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) === true )
+				self::_notice( $appData, 'shortcode '. $name, 'Components::'. $by. '(): "'. self::_shown( $name ). '" is a shortcode of '. \Nino\Callbacks::owners( $appData, '/nino/html/shortcode/'. $name )
+					. ' already; the component of '. ( $appData[self::OWNERS]['names'][$name] ?? 'the register' ). ' takes its place and the shortcode is never drawn', E_USER_WARNING );
 
 			$appData[self::REGISTRY][$name] = $clean;
 
@@ -303,7 +314,7 @@ namespace Nino {
 				}
 
 				$appData[self::OWNERS]['names'][$name] = $feature;
-				self::_store( $appData, $name, $clean, isset( $renderers[$name] ) === true ? $renderers[$name] : null );
+				self::_store( $appData, $name, $clean, isset( $renderers[$name] ) === true ? $renderers[$name] : null, 'restore' );
 
 				if( in_array( $name, (array) ( $appData[self::GROUPS][$group]['components'] ?? [] ), true ) === false )
 					$appData[self::GROUPS][$group]['components'][] = $name;
@@ -878,6 +889,21 @@ namespace Nino {
 
 			$clean['once'] = ( $schema['once'] ?? false ) === true;
 
+			if( isset( $schema['through'] ) === true ) {
+
+				if( is_bool( $schema['through'] ) === false )
+					return $what. ': "through" must be true or false';
+
+				if( $schema['through'] === true && isset( $clean['offers'] ) === false )
+					return $what. ': "through" is for a container: it needs "offers"';
+
+				if( $schema['through'] === true && ( $schema['children'] ?? null ) !== 'nodes' )
+					return $what. ': "through" is for a component that draws what it holds itself: it needs "children" => "nodes"';
+
+				if( $schema['through'] === true )
+					$clean['through'] = true;
+			}
+
 			if( isset( $schema['children'] ) === true ) {
 
 				if( $schema['children'] !== 'nodes' )
@@ -1047,15 +1073,26 @@ namespace Nino {
 		 *	A tool reads this, and so does whoever enforces 'once'; drawing does neither: a component at a
 		 *	place that is not its own is drawn all the same
 		 *
+		 *	A container that is 'through' - a loop, which draws no element of its own round what it holds - has
+		 *	no places of its own to offer: what may stand in it is what the container it stands in allows, so
+		 *	that the columns of a loop in a row are the columns of the row, and not every place the loop offers
+		 *	where it is not asked for. A tool that knows the container says it, the nearest one that is not
+		 *	'through' itself (for a loop in a loop, the one the outer loop stands in); without one the answer is
+		 *	what the places it offers say, as for every container
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$parent				The name of a container, a place, or '' for the page
+		 *	@param		string		$container		Where $parent stands, the name of a container or a place; only a 'through' container reads it
 		 *
 		 *	@return 	array										The names
 		 */
-		public static function allowed( array &$appData, string $parent ): array {
+		public static function allowed( array &$appData, string $parent, string $container = '' ): array {
 
 			$registry = (array) ( $appData[self::REGISTRY] ?? [] );
 			$parent = $parent === '' ? 'page' : $parent;
+
+			if( $container !== '' && ( $registry[$parent]['through'] ?? false ) === true )
+				return self::allowed( $appData, $container );
 
 			if( isset( $registry[$parent] ) === false )
 				$offers = [ $parent ];
@@ -1097,7 +1134,9 @@ namespace Nino {
 		 *	2. the attributes are made ready, the id first, since it is the scope of what the call reads itself: a foreign
 		 *	   one falls away, a value outside its options is the default, a bool is read from its words, an int is kept
 		 *	   within its bounds, an id is a word or nothing, a string is escaped, a text is a reference or the text as it
-		 *	   is written, a link is an address a browser may be sent to, an image is the reference to a picture. The
+		 *	   is written, a link is an address a browser may be sent to, an image is the reference to a picture. In a
+		 *	   loop a string, a text, a link and a fixed text hold the tokens of the round put in - the text of the field,
+		 *	   see _fills() The
 		 *	   classes: the name, then for each attribute that is a class in the order of the schema - a choice that
 		 *	   is not its default as name--attribute-value, a bool that is on as name--attribute; a responsive choice
 		 *	   ('100 m:50 l:33') says the width for all in its first part, which is a class where it is not the default,
@@ -1436,20 +1475,96 @@ namespace Nino {
 		 *	fixed text of a call has always had them: the text of the key in the language of the page, nothing where
 		 *	nobody has one. What is put in is a text like the rest and is escaped with it
 		 *
+		 *	In a loop the tokens of its round are put in, in the same pass: the [[title]] and the [[.slug]] the
+		 *	element has a field for. They are the loop's own and the value is no source for another one - what a token
+		 *	holds is the text of the field, read as the text it is: it is never looked at for a fill, a key of the site
+		 *	or a call, and a token the loop has no field for stays written. [[.lang]] is markup, not a field, and is
+		 *	none of them. $mode says how the text of a token is put in, since the value is read on by what the caller
+		 *	does with it: 'raw' - it is escaped as it stands, a string -; 'text' - the text is read as written and
+		 *	entities become their characters, so what goes in is escaped once more, which the reading undoes; 'link' -
+		 *	the value is read as an address: a token at its start or after page: is the address (its scheme is looked
+		 *	at by _address() afterwards), anywhere else it is one part of it and written as such, percent-encoded -
+		 *	after mailto: or tel: with the @ and the + it needs left - so that a field cannot make a path of its own
+		 *	of what it holds
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			&$run					(reference)
 		 *	@param		string		$value
+		 *	@param		array			$tokens				The fills of the loops the value stands in, [ '[[token]]' => escaped text ]; [] outside a loop
+		 *	@param		string		$mode					raw, text or link
 		 *
 		 *	@return 	string
 		 */
-		private static function _fills( array &$appData, array &$run, string $value ): string {
+		private static function _fills( array &$appData, array &$run, string $value, array $tokens = [], string $mode = 'raw' ): string {
 
 			if( str_contains( $value, '[[' ) === false )
 				return $value;
 
-			return (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', function( array $found ) use ( &$appData, &$run ): string {
-				return self::_lookup( $appData, $run, $found[1] ) ?? '';
-			}, $value );
+			if( $tokens === [] )
+				return (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', function( array $found ) use ( &$appData, &$run ): string {
+					return self::_lookup( $appData, $run, $found[1] ) ?? '';
+				}, $value );
+
+			return (string) preg_replace_callback( self::TOKEN, function( array $found ) use ( &$appData, &$run, $value, $tokens, $mode ): string {
+
+				if( $found[1][0][0] === '/' )
+					return self::_lookup( $appData, $run, $found[1][0] ) ?? '';
+
+				$token = '[['. $found[1][0]. ']]';
+
+				if( $found[1][0] === '.lang' || isset( $tokens[$token] ) === false || is_scalar( $tokens[$token] ) === false )
+					return $found[0][0];
+
+				$text = self::_tokenText( (string) $tokens[$token] );
+
+				if( $mode === 'raw' )
+					return $text;
+
+				$before = substr( $value, 0, $found[0][1] );
+
+				if( $mode === 'text' || $before === '' || $before === 'page:' )
+					return self::escape( $text );
+
+				if( preg_match( '/^[a-z][a-z0-9+.-]*:$/iD', $before ) === 1 )
+					return str_replace( [ '%40', '%2B' ], [ '@', '+' ], rawurlencode( $text ) );
+
+				return rawurlencode( $text );
+			}, $value, -1, $count, PREG_OFFSET_CAPTURE );
+		}
+
+		/**
+		 *	Whether a value holds a token of the loop it stands in - one the loop has a field for
+		 *
+		 *	@param		string		$value
+		 *	@param		array			$tokens				The fills of the loops
+		 *
+		 *	@return 	bool
+		 */
+		private static function _holds( string $value, array $tokens ): bool {
+
+			if( $tokens === [] || preg_match_all( self::TOKEN, $value, $found ) === 0 )
+				return false;
+
+			foreach( $found[1] as $name )
+				if( $name !== '.lang' && $name[0] !== '/' && isset( $tokens['[['. $name. ']]'] ) === true )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	What a token of a loop says as a text: the text of the field, as the fill of the loop holds it - escaped for
+		 *	html and, for a field that may hold some, with its tags - read back to the characters it is, so that the
+		 *	caller escapes it for the place it writes it to. A line break of a field is a line break of the text
+		 *
+		 *	@param		string		$fill					The token of the loop
+		 *
+		 *	@return 	string
+		 */
+		private static function _tokenText( string $fill ): string {
+			$fill = (string) preg_replace( '#<br\s*/?>(?:\r?\n)?#i', "\n", $fill );
+
+			return trim( self::clean( html_entity_decode( strip_tags( \Nino\Html::breaksToNewlines( $fill ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
 		}
 
 		/**
@@ -1598,12 +1713,12 @@ namespace Nino {
 						$written = is_string( $raw ) === true ? $raw : $declared['default'];
 						$value = self::_isReference( $written ) === true
 							? ( self::_reference( $appData, $run, 'text', $written, true, $here, 'plain', $none ) ?? '' )
-							: self::_text( self::_fills( $appData, $run, $written ), 'plain' );
+							: self::_text( self::_fills( $appData, $run, $written, $context['fills'], 'text' ), 'plain' );
 						break;
 
 					default:
 
-						$value = self::escape( is_string( $raw ) === true ? self::_fills( $appData, $run, $raw ) : $declared['default'] );
+						$value = self::escape( is_string( $raw ) === true ? self::_fills( $appData, $run, $raw, $context['fills'], 'raw' ) : $declared['default'] );
 				}
 
 				$args[$attribute] = $value;
@@ -1635,7 +1750,7 @@ namespace Nino {
 					$format = $args['format'];
 
 				if( $fixed !== null )
-					$resolved = self::_text( self::_fills( $appData, $run, $fixed ), $format );
+					$resolved = self::_text( self::_fills( $appData, $run, $fixed, $context['fills'], 'text' ), $format );
 				else
 					$resolved = self::_reference( $appData, $run, $schema['source'], $source, true, $here, $format, $lang );
 
@@ -1890,7 +2005,7 @@ namespace Nino {
 		 *	directory the site is served from - has that directory put in front, and nothing is an address that
 		 *	a browser would take for a script (a scheme but http, https, mailto and tel, a control character, a
 		 *	second slash). In an attribute, a link that is no ~key and no .field is an address. An image is the
-		 *	reference to the picture - the key as it is, escaped, or the file an image field holds - and the
+		 *	reference to the picture - the key as it is, escaped, or, for an image field of the element, the name of the field - and the
 		 *	renderer looks the picture up
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -1914,9 +2029,13 @@ namespace Nino {
 
 			// Any other value of a link that is no key is an address, with the fills of the site in it. page:/contact is the address of that page
 			// in the language of the page
-			if( $kind === 'link' && $start !== '~' && $start !== '/' ) {
+			// In a loop an address that holds a token of it is one as well, whatever it starts with: the key it might be is the author's,
+			// not the field's
+			$tokens = $first === false ? $context['fills'] : [];
 
-				$address = html_entity_decode( self::_fills( $appData, $run, $reference ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			if( $kind === 'link' && $start !== '~' && ( $start !== '/' || self::_holds( $reference, $tokens ) === true ) ) {
+
+				$address = html_entity_decode( self::_fills( $appData, $run, $reference, $tokens, 'link' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 				return str_starts_with( $address, 'page:' ) === true ? self::_page( $appData, substr( $address, 5 ) ) : self::_address( $address );
 			}
@@ -2015,7 +2134,8 @@ namespace Nino {
 		/**
 		 *	A field of the element of a loop, as a source names it: .id the number in the loop, .uri the uri of the
 		 *	element, .slug its name, any other the field of that name - a text by the format of its field, a link as
-		 *	an address, an image as the file the field holds
+		 *	an address, an image as the name of the field: the reference \Nino\Images::picture() reads for the element of a
+		 *	loop, which looks the file up itself, with the alt text the model of the field names
 		 *
 		 *	@param		string		$kind					text, link or image
 		 *	@param		string		$field				Without the dot
@@ -2043,7 +2163,7 @@ namespace Nino {
 			$model = $field === 'id' || $field === 'uri' || $field === 'slug' ? null : $element['model'][$field];
 
 			if( $kind === 'image' )
-				return $model === null || ( $model['type'] ?? '' ) !== 'image' ? null : self::escape( (string) $value );
+				return $model === null || ( $model['type'] ?? '' ) !== 'image' || is_string( $value ) === false || $value === '' ? null : self::escape( $field );
 
 			if( $kind === 'link' )
 				return self::_address( (string) $value );

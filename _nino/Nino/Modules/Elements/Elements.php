@@ -208,8 +208,9 @@ namespace Nino\Modules {
 		 *
 		 *	With $fallback each element is the one \Nino\Elements::getElementWithFallback()
 		 *	answers for the language of the loop - what it has no value for taken
-		 *	from another language, with '.lang' - before the sort, the callback and
-		 *	the cut see it, so that they work on what is drawn. What the query asks
+		 *	from another language, with '.lang' and '.langs' - before the sort, the callback and
+		 *	the cut see it, so that they work on what is drawn, and the texts are sorted
+		 *	in the language of the loop (\Nino\Elements::sortElements()). What the query asks
 		 *	for is still asked of the language's own version: it lists the elements
 		 *	it lists.
 		 *
@@ -244,7 +245,7 @@ namespace Nino\Modules {
 				foreach( $result as $index => $element )
 					$result[$index] = ( is_array( $element ) === true && is_string( $element['.uri'] ?? null ) === true ? \Nino\Elements::getElementWithFallback( $appData, $element['.uri'], $locale ) : false ) ?: $element;
 
-				$result = \Nino\Elements::sortElements( $result, $sort );
+				$result = \Nino\Elements::sortElements( $result, $sort, \Nino\Elements::sortLocale( $appData, $locale ) );
 			}
 
 			if( $callback !== '' )
@@ -439,9 +440,7 @@ namespace Nino\Modules {
 					return $b['count'] <=> $a['count'];
 				} );
 			elseif( $sort === 'value' )
-				usort( $rows, static function( array $a, array $b ): int {
-					return strnatcasecmp( $a['value'], $b['value'] );
-				} );
+				$rows = \Nino\Elements::sortElements( $rows, 'value', \Nino\Elements::sortLocale( $appData, $locale ) );
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $rows );

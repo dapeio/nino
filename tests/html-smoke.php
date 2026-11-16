@@ -302,6 +302,40 @@ check( 'asked for *, it is the global text and the fills that belong to no langu
 check( '...and no file is read for it, not even one that has a star in its name', is_file( \Nino\Filesystem::path( $fills, '/text' ). '/*.php' ) === true && isset( $fillsOfNone['[[/t/starfile]]'] ) === false );
 check( 'a language the site does not have has no fills - none from a file of that name either', \Nino\Html::getFills( $fills, 'fr_FR' ) === [] && \Nino\Html::getFills( $fills, '../private/config' ) === [] && ninoWarnings() === [] );
 
+// The table of a language is made once for the request and kept: a loop that reads a key of the site in every round asks for it in every round
+$memoFilecache = './nino/html/filecache';
+\Nino\Html::getFills( $fills );
+\Nino\Html::getFills( $fills, 'en_US' );
+check( 'the table of a language is kept for the request, a language each: what is put into the fills behind the back of addFills() is not in it', ( static function() use ( &$fills ): bool {
+
+	$fills['./nino/html/fills']['de_DE']['[[/t/memo/behind]]'] = 'behind';
+	$kept = isset( \Nino\Html::getFills( $fills )['[[/t/memo/behind]]'] ) === false && isset( \Nino\Html::getFills( $fills, 'de_DE' )['[[/t/memo/behind]]'] ) === false;
+	unset( $fills['./nino/html/fills']['de_DE']['[[/t/memo/behind]]'] );
+
+	return $kept;
+} )() === true && isset( $fills[$memoFilecache]['de_DE']['table'] ) === true && isset( $fills[$memoFilecache]['en_US']['table'] ) === true );
+\Nino\Html::addFills( $fills, [ '/t/memo/de' => 'added for de' ] );
+check( 'addFills() for the current language is seen by the next read of it, and of that language only: the other one keeps its table', \Nino\Html::getFills( $fills )['[[/t/memo/de]]'] === 'added for de'
+	&& isset( \Nino\Html::getFills( $fills, 'en_US' )['[[/t/memo/de]]'] ) === false && isset( $fills[$memoFilecache]['en_US']['table'] ) === true );
+\Nino\Html::addFills( $fills, [ '/t/memo/en' => 'added for en' ], 'en_US' );
+check( '...the same for a language that is not the current one', \Nino\Html::getFills( $fills, 'en_US' )['[[/t/memo/en]]'] === 'added for en' && isset( \Nino\Html::getFills( $fills )['[[/t/memo/en]]'] ) === false );
+\Nino\Html::addFills( $fills, [ '/t/memo/star' => 'added for none' ], '*' );
+check( '...and a fill that belongs to no language is in the table of every language that was kept', \Nino\Html::getFills( $fills )['[[/t/memo/star]]'] === 'added for none' && \Nino\Html::getFills( $fills, 'en_US' )['[[/t/memo/star]]'] === 'added for none' && \Nino\Html::getFills( $fills, '*' )['[[/t/memo/star]]'] === 'added for none' );
+\Nino\Html::removeFill( $fills, '/t/memo/star' );
+\Nino\Html::removeFill( $fills, '/t/memo/de', '' );
+check( 'removeFill() is seen by the next read as well: of * in every language, of a language in that one', isset( \Nino\Html::getFills( $fills )['[[/t/memo/star]]'] ) === false && isset( \Nino\Html::getFills( $fills, 'en_US' )['[[/t/memo/star]]'] ) === false
+	&& isset( \Nino\Html::getFills( $fills )['[[/t/memo/de]]'] ) === false && \Nino\Html::getFills( $fills, 'en_US' )['[[/t/memo/en]]'] === 'added for en' );
+\Nino\Filesystem::putFileContent( $fills, '/text/de_DE.php', [ '[[/t/both]]' => 'de text', '[[/t/de]]' => 'only de', '[[/t/memo/file]]' => 'written to the file' ] );
+check( 'a write under /text/ is seen by the next read: the table is made anew from the files, with what was added at runtime laid over them', \Nino\Html::getFills( $fills )['[[/t/memo/file]]'] === 'written to the file'
+	&& \Nino\Html::getFills( $fills )['[[/t/both]]'] === 'de runtime' && \Nino\Html::getFills( $fills, 'en_US' )['[[/t/memo/en]]'] === 'added for en' );
+\Nino\Locales::setCurrentLocale( $fills, 'en_US' );
+$memoEnglish = \Nino\Html::getFills( $fills );
+\Nino\Locales::setCurrentLocale( $fills, 'de_DE' );
+check( 'the current language is the language of the table: a switch of it reads the table of the other language, and back, the first one, each with its own words', $memoEnglish['[[/t/both]]'] === 'en text' && $memoEnglish['[[/t/memo/en]]'] === 'added for en'
+	&& \Nino\Html::getFills( $fills )['[[/t/both]]'] === 'de runtime' && \Nino\Html::getFills( $fills )['[[/t/memo/file]]'] === 'written to the file' );
+\Nino\Html::removeFill( $fills, '/t/memo/en', 'en_US' );
+\Nino\Filesystem::putFileContent( $fills, '/text/de_DE.php', [ '[[/t/both]]' => 'de text', '[[/t/de]]' => 'only de' ] );
+
 \Nino\Html::addFills( $fills, [ '/project/website/general/url' => 'example.com/shop/' ], '*' );
 check( 'absoluteUrl() is https:// and the address of the website, the slash at the end of the value gone, and the path as it is given', \Nino\Html::absoluteUrl( $fills, '/page' ) === 'https://example.com/shop/page'
 	&& \Nino\Html::absoluteUrl( $fills ) === 'https://example.com/shop' && \Nino\Html::absoluteUrl( $fills, '/' ) === 'https://example.com/shop/' && \Nino\Html::absoluteUrl( $fills, '/a?b=1#c' ) === 'https://example.com/shop/a?b=1#c' );
@@ -527,6 +561,28 @@ check( '...and the register draws the name: the shortcode is never asked', \Nino
 \Nino\Html::addShortcode( $clash, 'clash-b', [ HtmlSmokeShortcodeOwner::class, 'answer' ] );
 check( 'a name that is no component of the register is no warning, whether it is new or joins a shortcode', ninoWarnings() === [] );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $clash ) );
+
+// ...and the other way round: a component that takes the name of a shortcode - by addComponent() or from the folders of a feature - is the same warning with
+// both registrants, once, and the register draws the name from then on
+$reverse = ninoSandbox( 'html-clash-reverse' );
+\Nino\Html::addShortcode( $reverse, 'clash-c', [ HtmlSmokeShortcodeOwner::class, 'answer' ] );
+\Nino\Html::addShortcode( $reverse, 'clash-d', [ HtmlSmokeShortcodeOwner::class, 'answer' ] );
+ninoWarnings();
+\Nino\Components::addComponent( $reverse, 'clash-c', [ 'label' => 'Clash', 'in' => [ 'page' ], 'source' => 'none', 'template' => '<b>component</b>' ] );
+$reverseSaid = ninoWarnings();
+check( 'a component that takes the name of a shortcode is one warning that names the name, the class of the shortcode and the registrant of the component',
+	count( $reverseSaid ) === 1 && str_contains( $reverseSaid[0], '"clash-c"' ) && str_contains( $reverseSaid[0], 'HtmlSmokeShortcodeOwner' ) && str_contains( $reverseSaid[0], 'the register' ) && str_contains( $reverseSaid[0], 'Components::addComponent()' ) );
+\Nino\Components::addComponent( $reverse, 'clash-c', [ 'label' => 'Clash', 'in' => [ 'page' ], 'source' => 'none', 'template' => '<b>second</b>' ] );
+check( '...said once: the same component registered a second time says nothing, and takes the place of the first', ninoWarnings() === [] && \Nino\Html::renderHtml( $reverse, '[clash-c]' ) === '<b>second</b>' );
+$readGroup = \Nino\Components::validateGroup( 'clash', [ 'label' => 'Clash' ], [ 'clash-d' ] );
+$readComponent = \Nino\Components::validate( 'clash-d', [ 'label' => 'Clash', 'group' => 'clash', 'in' => [ 'page' ], 'template' => '<b>feature</b>' ], 'clash' );
+\Nino\Components::restore( $reverse, 'clash', [ 'groups' => [ 'clash' => $readGroup + [ 'part' => false ] ], 'components' => [ 'clash-d' => $readComponent ] ], [] );
+$restoreSaid = ninoWarnings();
+check( 'the folders of a feature say it the same way, with the feature as the registrant of the component, and the register draws the name',
+	count( $restoreSaid ) === 1 && str_contains( $restoreSaid[0], '"clash-d"' ) && str_contains( $restoreSaid[0], 'HtmlSmokeShortcodeOwner' ) && str_contains( $restoreSaid[0], 'component of clash ' ) && str_contains( $restoreSaid[0], 'Components::restore()' ) && str_contains( $restoreSaid[0], 'addComponent' ) === false && \Nino\Html::renderHtml( $reverse, '[clash-d]' ) === '<b>feature</b>' );
+\Nino\Components::addComponent( $reverse, 'clash-f', [ 'label' => 'Clash', 'in' => [ 'page' ], 'source' => 'none', 'template' => '<b>f</b>' ] );
+check( 'a component whose name is no shortcode is no warning, though others are', ninoWarnings() === [] );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $reverse ) );
 
 echo "\n";
 

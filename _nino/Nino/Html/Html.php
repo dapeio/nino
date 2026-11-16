@@ -74,8 +74,11 @@ namespace Nino {
 
 		// Where getFills() keeps what it made of the text files for the length of
 		// the request, a language each: the fills and the language each was taken
-		// from where it was not the language's own. A write under /text/ drops it
-		// (see \Nino\Filesystem::putFileContent())
+		// from where it was not the language's own, and under 'table' the whole
+		// table of the language - the files with what was added at runtime laid
+		// over them. A write under /text/ drops all of it (see
+		// \Nino\Filesystem::putFileContent()); addFills() and removeFill() drop
+		// the table of the language they change, or of every language for '*'
 		private const string FILE_CACHE = './nino/html/filecache';
 
 		// The shortcodes the kernel provides itself. Called unconditionally
@@ -818,6 +821,28 @@ namespace Nino {
 
 			foreach( $fills as $fillKey => $fillValue )
 				$appData['./nino/html/fills'][$locale]['[['. trim( $fillKey, '[[]]' ). ']]'] = $fillValue;
+
+			self::_forget( $appData, $locale );
+		}
+
+		/**
+		 *	Drop the table getFills() kept for a language - for '*' the one of every language, since what belongs to
+		 *	no language is in all of them. The text files' own layer stays: it is not what changed
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				A language of the site, or '*'
+		 *
+		 *	@return 	void
+		 */
+		private static function _forget( array &$appData, string $locale ): void {
+
+			if( $locale !== '*' ) {
+				unset( $appData[self::FILE_CACHE][$locale]['table'] );
+				return;
+			}
+
+			foreach( array_keys( (array) ( $appData[self::FILE_CACHE] ?? [] ) ) as $kept )
+				unset( $appData[self::FILE_CACHE][$kept]['table'] );
 		}
 
 		/**
@@ -847,6 +872,8 @@ namespace Nino {
 				return;
 
 			unset( $appData['./nino/html/fills'][$locale]['[['. trim( $key, '[[]]' ). ']]'] );
+
+			self::_forget( $appData, $locale );
 		}
 
 		// The fills the kernel registers at runtime rather than reading from a
@@ -909,9 +936,11 @@ namespace Nino {
 		 *	/project/website/html/lang has none either (NO_FALLBACK). Where a text
 		 *	came from is fillOrigin()'s answer.
 		 *
-		 *	The fills of the text files are made once for a request and a language
-		 *	and kept; a write under /text/ drops them (see
-		 *	\Nino\Filesystem::putFileContent()). The fill [[/nino/html/lang]] is
+		 *	The table - the fills of the text files with the ones added at runtime
+		 *	laid over them - is made once for a request and a language and kept;
+		 *	a write under /text/ drops it (see \Nino\Filesystem::putFileContent()),
+		 *	and so does addFills() and removeFill() for the language they change,
+		 *	for every language where they change '*'. The fill [[/nino/html/lang]] is
 		 *	made here: the value /project/website/html/lang has in the language, else
 		 *	its tag (LANG_FILL).
 		 *
@@ -934,6 +963,11 @@ namespace Nino {
 			else if( $locale !== '*' && \Nino\Locales::verifyLocale( $appData, $locale ) === false )
 				return [];
 
+			// The table is made once for a language and kept (see FILE_CACHE): a loop that reads a key of the site in every
+			// round asks for it in every round, and building it takes as long as the table is long
+			if( isset( $appData[self::FILE_CACHE][$locale]['table'] ) === true )
+				return $appData[self::FILE_CACHE][$locale]['table'];
+
 			$fills = array_merge(
 				self::_textFills( $appData, $locale )['fills'],
 				( $appData['./nino/html/fills'][$locale] ?? [] ),
@@ -948,7 +982,7 @@ namespace Nino {
 				$fills[self::LANG_FILL] = self::_blank( $own ) === false && is_string( $own ) === true ? $own : \Nino\Locales::languageTag( $locale );
 			}
 
-			return $fills;
+			return $appData[self::FILE_CACHE][$locale]['table'] = $fills;
 		}
 
 		/**

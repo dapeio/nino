@@ -8,7 +8,7 @@
 	display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem;
 	padding: var(--button-space) calc( var(--button-space) * 2.5 ); border: var(--page-line) solid var(--brand-accent); border-radius: var(--button-radius);
 	background-color: var(--brand-accent); color: var(--brand-on-accent);
-	font-family: var(--brand-font-button); font-size: var(--button-size); font-weight: 600; line-height: 1.2; text-align: center; text-decoration: none;
+	font-family: var(--brand-font-button); font-size: var(--button-size); font-weight: 600; line-height: 1.2; text-align: center; text-decoration: none; overflow-wrap: anywhere;
 	transition: filter var(--page-motion);
 }
 a.button:hover { filter: brightness( .9 ); }

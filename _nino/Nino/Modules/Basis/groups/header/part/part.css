@@ -13,7 +13,7 @@
 	display: flex; flex-wrap: wrap; align-items: center; gap: var(--header-nav-gap);
 	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto; padding-block: var(--header-wrap-space);
 }
-.header-logo { display: flex; align-items: center; gap: var(--page-space-2); margin-inline-end: auto; color: inherit; font-family: var(--brand-font-title); font-weight: 700; text-decoration: none; }
+.header-logo { display: flex; align-items: center; gap: var(--page-space-2); margin-inline-end: auto; color: inherit; font-family: var(--brand-font-title); font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
 .header-logo img { width: auto; height: var(--header-logo-height); }
 .header-logo:has( img ) .header-logo-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 

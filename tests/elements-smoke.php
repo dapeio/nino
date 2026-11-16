@@ -867,6 +867,7 @@ check( 'Elements::fills() makes the fills of one element: the number in the loop
 check( '...an element with no value at all has a blank fill for every field of the model, the alt text of an image among them, and no language: nothing, never a leftover token',
 	$fillsOf( [], $fillsModel, 0 ) === $fillsWant( [ '[[.id]]' => 0, '[[.lang]]' => '', '[[.slug]]' => '', '[[globalAlt]]' => '', '[[photo]]' => '', '[[photoAlt]]' => '', '[[plain]]' => '' ] )
 	&& \Nino\Modules\Elements::fills( [ 'x' => 1 ], [], 2 )['[[x]]'] === '1' );
+check( '...and what the element says of the language of each field, .langs, is no fill: the fills are the same with it as without', $fillsOf( [ '.uri' => '/alttest/one', '.lang' => 'de-DE', '.langs' => [ 'plain' => 'de-DE' ] ], $fillsModel, 1 ) === $fillsOf( [ '.uri' => '/alttest/one', '.lang' => 'de-DE' ], $fillsModel, 1 ) );
 // The slug is the name alone: the part of the uri after its last slash, escaped as a plain text is
 $slugOf = static fn( array $element ): string => \Nino\Modules\Elements::fills( $element, [], 0 )['[[.slug]]'];
 check( 'Elements::fills() fills [[.slug]] with the part of the uri after its last slash, and [[.uri]] keeps the whole of it',
@@ -927,7 +928,7 @@ check( 'an element takes each field it has no value for in the language - none, 
 check( '...with the tag of the language it took from beside it, and the place and the language the way getElement() has them', $feOne['.lang'] === 'de-DE' && $feOne['.locale'] === 'en_US' && $feOne['.uri'] === '/notes/one'
 	&& \Nino\Elements::getElement( $fe, '/notes/one', 'en_US' )['summary'] === '   ' );
 $feOwn = \Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'de_DE' );
-check( '...and an element that has it all in the language is what getElement() answers, with no language taken from', $feOwn['.lang'] === '' && array_diff_key( $feOwn, [ '.lang' => '' ] ) === \Nino\Elements::getElement( $fe, '/notes/one', 'de_DE' ) );
+check( '...and an element that has it all in the language is what getElement() answers, with no language taken from', $feOwn['.lang'] === '' && array_diff_key( $feOwn, [ '.lang' => '', '.langs' => [] ] ) === \Nino\Elements::getElement( $fe, '/notes/one', 'de_DE' ) );
 $feSix = \Nino\Elements::getElementWithFallback( $fe, '/notes/six', 'en_US' );
 check( 'a text of 0 is a text: it is kept, and nothing is taken for it', $feSix['title'] === '0' && $feSix['summary'] === 'Six text' && $feSix['.lang'] === '' );
 
@@ -939,6 +940,10 @@ check( '...the others the type file holds a bucket of come last: an element that
 $feFour = \Nino\Elements::getElementWithFallback( $fe, '/notes/four', 'en_US' );
 check( '...every field from the first language that has it, and the tag is the one of the first field that was taken', $feFour['title'] === 'Vier' && $feFour['summary'] === 'Quatre text' && $feFour['.lang'] === 'de-DE'
 	&& \Nino\Elements::getElementWithFallback( $fe, '/notes/four', 'de_DE' )['.lang'] === 'fr-FR' );
+check( '.langs says for each field taken which language gave it - one language for the fields that came from the native one, each its own where they came from two - and nothing for a field the language had',
+	$feOne['.langs'] === [ 'summary' => 'de-DE', 'tags' => 'de-DE' ] && $feFour['.langs'] === [ 'title' => 'de-DE', 'summary' => 'fr-FR' ] && $feSix['.langs'] === [] && $feOwn['.langs'] === [] && \Nino\Elements::getElementWithFallback( $fe, '/notes/five', 'en_US' )['.langs'] === []
+	&& \Nino\Elements::getElementWithFallback( $fe, '/notes/three', 'en_US' )['.langs'] === [ 'title' => 'fr-FR', 'summary' => 'fr-FR' ]
+	&& \Nino\Elements::getElementWithFallback( $fe, '/notes/four', 'de_DE' )['.langs'] === [ 'summary' => 'fr-FR' ] );
 check( '...the native language first, then the other languages of the site, then the type file\'s own: asked in the language of a file only, the native text is taken before the English one, and the English before the French',
 	\Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'fr_FR' )['title'] === 'Eins' && \Nino\Elements::getElementWithFallback( $fe, '/notes/seven', 'de_DE' )['title'] === 'Seven en'
 	&& \Nino\Elements::getElementWithFallback( $fe, '/notes/seven', 'de_DE' )['.lang'] === 'en-US' );
@@ -947,8 +952,9 @@ check( 'an element that has only its global fields is answered with them and not
 	$feFive['rank'] === 5 && isset( $feFive['title'] ) === false && $feFive['.lang'] === '' && \Nino\Elements::getElementWithFallback( $fe, '/notes/ghost', 'en_US' ) === false
 	&& \Nino\Elements::getElementWithFallback( $fe, '/nonesuch/one', 'en_US' ) === false );
 $feStar = \Nino\Elements::getElementWithFallback( $fe, '/notes/one', '*' );
+check( '...with no language taken from for any field: .lang is \'\' and .langs is []', $feStar['.lang'] === '' && $feStar['.langs'] === [] );
 check( 'asked for *, which is no language, it is getElement()\'s answer for the first language that holds it, with no tag - and false where none does',
-	$feStar['.lang'] === '' && array_diff_key( $feStar, [ '.lang' => '' ] ) === \Nino\Elements::getElement( $fe, '/notes/one', '*' ) && \Nino\Elements::getElementWithFallback( $fe, '/notes/ghost', '*' ) === false );
+	$feStar['.lang'] === '' && array_diff_key( $feStar, [ '.lang' => '', '.langs' => [] ] ) === \Nino\Elements::getElement( $fe, '/notes/one', '*' ) && \Nino\Elements::getElementWithFallback( $fe, '/notes/ghost', '*' ) === false );
 check( '...and \'\' or a name that is no language is the current language, as for getElement()', \Nino\Elements::getElementWithFallback( $fe, '/notes/one', '' ) === $feOne && \Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'xx_XX' ) === $feOne );
 
 // A language that has a text file but is not switched on is one an element is read, queried and written in
@@ -976,12 +982,72 @@ check( '...and a field of the model that no language has a value for is nothing,
 check( 'the order of a sort is the order of what is drawn: a title taken from another language stands where it sorts, an element with none comes last', preg_match_all( '/data-rank="(\d)"/', \Nino\Html::renderHtml( $fe, sprintf( $feLoop, 'title', 'en_US' ) ), $feRanks ) === 7
 	&& implode( ',', $feRanks[1] ) === '6,1,7,3,4,2,5' );
 
+// Texts are sorted in the language of the page: by the collation of it where intl is there, by the bytes (naturally, without regard to case) where it is not
+$feWords = [ 'a' => 'Zebra', 'b' => 'Ärzte', 'c' => 'apfel', 'd' => 'Öl', 'e' => 'Ofen', 'f' => 'Item 10', 'g' => 'Item 9', 'h' => 'Äpfel', 'i' => 'Apfel' ];
+$feWordType = [ 'title' => 'Words', 'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ], 'rank' => [ 'type' => 'integer' ] ], '*' => [ '*' => [] ], 'de_DE' => [], 'sv_SE' => [] ];
+foreach( array_keys( $feWords ) as $position => $name ) {
+
+	$feWordType['*'][$name] = [ 'rank' => 10 - $position ];
+	$feWordType['de_DE'][$name] = [ 'title' => $feWords[$name] ];
+	$feWordType['sv_SE'][$name] = [ 'title' => $feWords[$name] ];
+}
+\Nino\Filesystem::putFileContent( $fe, '/elements/words.php', $feWordType );
+\Nino\Filesystem::putFileContent( $fe, '/text/sv_SE.php', [] );
+$feTitles = static fn( array $elements ): string => implode( ',', array_column( $elements, 'title' ) );
+$feBytes = 'apfel,Apfel,Item 9,Item 10,Ofen,Zebra,Äpfel,Ärzte,Öl';
+check( 'a sort without a language is the one by the bytes: naturally, without regard to case, a letter with an umlaut after every letter without', $feTitles( \Nino\Elements::sortElements( array_map( static fn( string $title ): array => [ 'title' => $title ], array_values( $feWords ) ), 'title' ) ) === $feBytes );
+check( 'numbers stay numbers and the sort stays stable in every language: what is equal keeps its order, a number is no text', $feTitles( \Nino\Elements::sortElements( [ [ 'title' => 'x', 'rank' => '10' ], [ 'title' => 'y', 'rank' => '9' ], [ 'title' => 'z', 'rank' => '9' ] ], 'rank', 'de_DE' ) ) === 'y,z,x'
+	&& $feTitles( \Nino\Elements::sortElements( [ [ 'title' => 'x', 'rank' => '10' ], [ 'title' => 'y', 'rank' => '9' ] ], '-rank', '' ) ) === 'x,y' );
+check( 'numbers are compared as numbers whatever the language: a negative one, one with a fraction, one with more digits', $feTitles( \Nino\Elements::sortElements( array_map( static fn( string $rank ): array => [ 'title' => $rank, 'rank' => $rank ], [ '10', '3', '-5', '2.5', '-20' ] ), 'rank', 'de_DE' ) ) === '-20,-5,2.5,3,10' );
+check( 'the language a list is sorted in is the one it is asked for, and the current one for the languages of the site together (*)', \Nino\Elements::sortLocale( $fe, 'de_DE' ) === 'de_DE' && \Nino\Elements::sortLocale( $fe, '*' ) === 'en_US' && \Nino\Elements::sortLocale( $fe, '' ) === 'en_US' && \Nino\Elements::sortLocale( $fe, 'xx_XX' ) === 'en_US' );
+
+if( extension_loaded( 'intl' ) === true ) {
+
+	$feGerman = $feTitles( \Nino\Modules\Elements::queryLoop( $fe, [ '/words', 'sort' => 'title', 'locale' => 'de_DE' ], true ) );
+	check( 'with intl the texts of a loop are in the order of the language of the loop: Ärzte with Arzt, Öl with Ofen, the case of a letter no difference, "Item 9" before "Item 10"', $feGerman === 'apfel,Apfel,Äpfel,Ärzte,Item 9,Item 10,Ofen,Öl,Zebra' );
+	// The sort keys are made once for each element and give the order compare() gives, for what a text is made of
+	$feCollator = new \Collator( 'de_DE' );
+	$feCollator->setStrength( \Collator::SECONDARY );
+	$feCollator->setAttribute( \Collator::NUMERIC_COLLATION, \Collator::ON );
+	$feMixed = [ 'Zebra', 'Ärzte', 'apfel', 'Apfel', 'Item 10', 'Item 9', 'éclair', 'Eclair', 'a-b', 'ab', ' b', 'Öl', 'Oz', 'ß', 'ss', 'Straße', 'Strasse', 'Item 9b', 'item 09', 'x1y', 'x10y', 'x2y', 'Ärzte 2', 'Ärzte 10' ];
+	$feExpected = $feMixed;
+	usort( $feExpected, static fn( string $a, string $b ): int => $feCollator->compare( $a, $b ) );
+	$feMixedRows = array_map( static fn( string $title ): array => [ 'title' => $title ], $feMixed );
+	check( 'the order of the sort keys is the order of compare(): umlauts, case, a hyphen, a blank, an sz, numbers inside a text - and what is equal stays where it was',
+		$feTitles( \Nino\Elements::sortElements( $feMixedRows, 'title', 'de_DE' ) ) === implode( ',', $feExpected )
+		&& implode( ',', $feExpected ) === ' b,a-b,ab,apfel,Apfel,Ärzte,Ärzte 2,Ärzte 10,Eclair,éclair,Item 9,item 09,Item 9b,Item 10,Öl,Oz,ss,ß,Strasse,Straße,x1y,x2y,x10y,Zebra'
+		&& $feTitles( \Nino\Elements::sortElements( $feMixedRows, '-title', 'de_DE' ) ) === 'Zebra,x10y,x2y,x1y,Straße,Strasse,ß,ss,Oz,Öl,Item 10,Item 9b,Item 9,item 09,éclair,Eclair,Ärzte 10,Ärzte 2,Ärzte,apfel,Apfel,ab,a-b, b' );
+	$feBroken = \Nino\Elements::sortElements( [ [ 'title' => 'b' ], [ 'title' => "a\xC3" ], [ 'title' => 'c' ], [ 'title' => 'a' ], [ 'title' => "\xFF" ] ], 'title', 'de_DE' );
+	check( 'a text that is no UTF-8 is sorted by the key of its text with what is wrong replaced, as every other is, and does not stop the sort: no text of its kind is compared by its bytes against the keys of the others',
+		array_column( $feBroken, 'title' ) === [ "\xFF", 'a', "a\xC3", 'b', 'c' ] );
+	$feBars = [];
+
+	foreach( [ 'sv_SE', 'de_DE' ] as $feBarLocale ) {
+
+		preg_match_all( '/<b>([^<]*)<\/b>/', \Nino\Html::renderHtml( $fe, '[elementvalues /words key="title" sort="value" locale="'. $feBarLocale. '"]<b>[[.value]]</b>[/elementvalues]' ), $feBar );
+		$feBars[$feBarLocale] = implode( ',', $feBar[1] );
+	}
+
+	check( '[elementvalues] sorts the values in the language of the loop as [elements] sorts what it draws: the bar of a filter and the cards beside it have one order, in each language',
+		$feBars['sv_SE'] === 'apfel,Apfel,Item 9,Item 10,Ofen,Zebra,Äpfel,Ärzte,Öl' && $feBars['de_DE'] === $feGerman && $feBars['sv_SE'] === $feTitles( \Nino\Modules\Elements::queryLoop( $fe, [ '/words', 'sort' => 'title', 'locale' => 'sv_SE' ], true ) ) );
+	check( '...another language of the same words is another order - Swedish puts Ä and Ö after Z - and the sort of a query that asks the elements itself is the same one',
+		$feTitles( \Nino\Modules\Elements::queryLoop( $fe, [ '/words', 'sort' => 'title', 'locale' => 'sv_SE' ], true ) ) === 'apfel,Apfel,Item 9,Item 10,Ofen,Zebra,Äpfel,Ärzte,Öl'
+		&& $feTitles( \Nino\Elements::queryElements( $fe, '/words', [], 'de_DE', [], [ 'sort' => 'title' ] ) ) === $feGerman );
+	check( '...a descending sort turns the order round, what is equal staying as it was', $feTitles( \Nino\Modules\Elements::queryLoop( $fe, [ '/words', 'sort' => '-title', 'locale' => 'de_DE' ], true ) ) === 'Zebra,Öl,Ofen,Item 10,Item 9,Ärzte,Äpfel,apfel,Apfel' );
+}
+else
+	echo "not run: the sort of texts by the collation of a language - intl is not loaded; only the sort by the bytes is checked\n";
+
 $feSeen = [];
 \Nino\Callbacks::registerCallback( $fe, '/test/notes/seen', static function( array &$appData, array &$elements ) use ( &$feSeen ): void {
 	$feSeen = array_column( $elements, 'title' );
 	$elements = array_slice( $elements, 1 );
 } );
 $feCut = \Nino\Html::renderHtml( $fe, '[elements /notes sort="rank" locale="en_US" callback="/test/notes/seen" offset="1" limit="2"]<i[[.lang]]>[[title]]</i>[/elements]' );
+$feLoopLangs = array_column( \Nino\Modules\Elements::queryLoop( $fe, [ '/notes', 'sort' => 'rank', 'locale' => 'en_US' ], true ), '.langs', 'rank' );
+check( 'the loop hands on .langs with each element: the field and the language it was taken from, and nothing for an element that has it all - while .lang says it for the element, as it did',
+	$feLoopLangs[1] === [ 'summary' => 'de-DE', 'tags' => 'de-DE' ] && $feLoopLangs[4] === [ 'title' => 'de-DE', 'summary' => 'fr-FR' ] && $feLoopLangs[6] === [] && $feLoopLangs[5] === []
+	&& array_column( \Nino\Modules\Elements::queryLoop( $fe, [ '/notes', 'sort' => 'rank', 'locale' => 'en_US' ], true ), '.lang', 'rank' )[4] === 'de-DE' );
 check( 'a callback of the loop is handed what is drawn - the fallback, titles taken from another language among them - and offset and limit cut what it leaves',
 	$feSeen === [ 'One', 'Zwei', 'Trois', 'Vier', '0', 'Seven en' ] && $feCut === '<i lang="fr-FR">Trois</i><i lang="de-DE">Vier</i>' );
 

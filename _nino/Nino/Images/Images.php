@@ -899,8 +899,7 @@ namespace Nino {
 		 *	escapes what it writes.
 		 *
 		 *	The names are stored values and are not trusted: a filename that is empty, absolute or climbs out
-		 *	with '..' names no picture, as read() and delete() refuse it (a null byte is left to dimensions(), which
-		 *	answers no size for it, so that such a name draws the box of its field), and a reference that
+		 *	with '..' or holds a control character names no picture, as read() and delete() refuse it, and a reference that
 		 *	is no slot is none, whatever it looks like - the slots are looked up by name, never by path.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -957,14 +956,14 @@ namespace Nino {
 		}
 
 		/**
-		 *	Whether a stored filename can name a file below /images/: not empty, not absolute, no '..'
+		 *	Whether a stored filename can name a file below /images/: not empty, not absolute, no '..', no control character
 		 *
 		 *	@param		string		$filename
 		 *
 		 *	@return 	bool
 		 */
 		private static function _named( string $filename ): bool {
-			return $filename !== '' && str_contains( $filename, '..' ) === false && str_starts_with( $filename, '/' ) === false;
+			return $filename !== '' && str_contains( $filename, '..' ) === false && str_starts_with( $filename, '/' ) === false && preg_match( '/[\x00-\x1F\x7F]/', $filename ) !== 1;
 		}
 
 		/**
