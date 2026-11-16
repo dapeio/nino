@@ -724,14 +724,68 @@ check( 'a sixth step is refused, and so is a component with more than six knobs,
 	&& is_string( \Nino\Components::validateGroup( 'section', $seven, $members['section'] ) ) === true && is_string( \Nino\Components::validateGroup( 'section', $group, $members['button'] ) ) === true
 	&& is_array( \Nino\Components::validateGroup( 'section', $group, $members['section'] ) ) === true );
 
+// a helper token of a part is --<component>--<name>: a part may set it, since it is its own, and no knob can be named so - a name has no hyphen at its start
+$twoHyphens = $group;
+$twoHyphens['knobs']['section-row.-f'] = [ 'token' => '--section-row--f', 'label' => 'x', 'ladder' => [ '1rem', '2rem', '3rem', '4rem', '5rem' ] ];
+check( 'a helper token of two hyphens (--section-row--f) is a token of its component for a part, and the group refuses a knob that would be named so',
+	\Nino\Components::partProblems( ".section-row { --section-row--f: 1; gap: calc( var(--section-row-gap) * var(--section-row--f) ); }", [ 'section-row' ] ) === []
+	&& is_string( \Nino\Components::validateGroup( 'section', $twoHyphens, $members['section'] ) ) === true );
+
+// what a standard part sets itself is a knob of a group or a helper of two hyphens: a helper of one hyphen has the form of a knob and would meet one
+$basisGroups = dirname( __DIR__ ). '/_nino/Nino/Modules/Basis/groups';
+$knobTokens = [];
+$setAside = [];
+
+foreach( (array) glob( $basisGroups. '/*/group.php' ) as $groupFile )
+	if( preg_match_all( '/--[a-z0-9-]+/', (string) file_get_contents( (string) $groupFile ), $found ) > 0 )
+		$knobTokens = array_merge( $knobTokens, $found[0] );
+
+foreach( (array) glob( $basisGroups. '/*/part/part.css' ) as $partFile )
+	if( preg_match_all( '/(?<![\w-])(--[a-z0-9-]+)\s*:/', (string) preg_replace( '~/\*.*?\*/~s', '', (string) file_get_contents( (string) $partFile ) ), $found ) > 0 )
+		foreach( array_unique( $found[1] ) as $token )
+			if( in_array( $token, $knobTokens, true ) === false && preg_match( '/^--[a-z]+(?:-[a-z]+)*--[a-z]+(?:-[a-z]+)*$/', $token ) !== 1 )
+				$setAside[] = basename( dirname( (string) $partFile, 2 ) ). ': '. $token;
+
+check( 'a standard part sets no token but the knobs of the groups and helpers named --<component>--<name>'. ( $setAside === [] ? '' : ' - '. implode( ', ', $setAside ) ), $setAside === [] && count( $knobTokens ) >= 16 );
+
 // the tokens of the brand and of the page are the contract: all of them in Nino.css, in the layer of the reset
 $required = [ '--brand-scheme', '--brand-color-1', '--brand-color-2', '--brand-font-title', '--brand-font-text', '--brand-font-button', '--brand-ground-base', '--brand-ground-alt', '--brand-ground-tint', '--brand-ink-base',
 	'--brand-ink-quiet-base', '--brand-line-base', '--brand-accent-base', '--brand-on-accent-base', '--brand-on-color-1', '--brand-on-color-2', '--brand-ground', '--brand-ink', '--brand-ink-quiet', '--brand-line', '--brand-accent',
 	'--brand-on-accent', '--page-size', '--page-width', '--page-radius', '--page-line', '--page-motion', '--page-leading', '--page-space-1', '--page-space-2', '--page-space-3', '--page-space-4', '--page-space-5', '--page-space-6',
-	'--page-scroll-pad', '--page-text-1', '--page-text-2', '--page-text-3', '--page-text-4', '--page-text-5', '--page-text-6' ];
+	'--page-scroll-pad', '--page-weight-title', '--page-weight-text', '--page-bleed', '--page-text-1', '--page-text-2', '--page-text-3', '--page-text-4', '--page-text-5', '--page-text-6' ];
 // The whole of Nino.css is the layer nino.reset
 $resetLayer = $nino;
 check( 'Nino.css sets every token of the brand and of the page - '. count( $required ). ' of them - in the layer nino.reset, and no part reads another', array_diff( $required, $declaredTokens ) === [] && array_filter( $required, static fn( string $token ): bool => str_contains( $resetLayer, $token. ':' ) === false ) === [] );
+
+// the weights are tokens of the page, and what wrote a weight of a title or of the text reads them; bleed is told to the first child by the reset alone and read by the picture
+$formCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/assets/form.css' );
+$imageCss = (string) file_get_contents( $basisDir. '/groups/image/part/part.css' );
+$partOf = static fn( string $group ): string => (string) file_get_contents( $basisDir. '/groups/'. $group. '/part/part.css' );
+check( 'the weight of a title and of the text are --page-weight-title (700) and --page-weight-text (400): the headings, the name of the logo, the body and the check of a form read them, and no part writes a fixed 700 or 400'
+	, preg_match( '/^\s*--page-weight-title:\s*700;/m', $nino ) === 1 && preg_match( '/^\s*--page-weight-text:\s*400;/m', $nino ) === 1
+	&& preg_match( '/h1, h2, h3, h4, h5, h6 \{[^}]*font-weight: var\(--page-weight-title\);/', $nino ) === 1 && str_contains( basisBody( array_filter( basisRules( $nino ), static fn( array $rule ): bool => $rule['selector'] === 'body' ), 'body', '@layer nino.reset' ), 'font-weight: var(--page-weight-text);' ) === true
+	&& str_contains( basisBody( basisRules( $partOf( 'header' ) ), '.header-logo' ), 'font-weight: var(--page-weight-title);' ) === true && str_contains( $formCss, '.nino-forms-check { display: flex; align-items: center; gap: var(--page-space-2); font-weight: var(--page-weight-text); }' ) === true
+	&& preg_match( '/font-weight:\s*(?:700|400|normal|bold)\b/', $nino. $partOf( 'header' ). $imageCss. $partOf( 'text' ). $partOf( 'section' ). $partOf( 'button' ). str_replace( '.footer-nav a[aria-current], .footer-legal a[aria-current] { font-weight: 700; text-decoration: none; }', '', $partOf( 'footer' ) ). $formCss ) !== 1
+	&& str_contains( $partOf( 'footer' ), '.footer-legal a[aria-current] { font-weight: 700; text-decoration: none; }' ) === true
+	&& str_contains( basisBody( array_filter( basisRules( $partOf( 'section' ) ), static fn( array $rule ): bool => $rule['selector'] === '.section-title' ), '.section-title' ), 'font-family: var(--brand-font-title); font-size: var(--page-text-5); font-weight: var(--page-weight-title);' ) === true );
+// the knobs of basis in the manual are the ones the group.php files hold: token and ladder, no knob left out or kept after it is gone
+$manual = (string) file_get_contents( dirname( __DIR__ ). '/docs/development.md' );
+$rows = [];
+
+foreach( glob( $basisDir. '/groups/*/group.php' ) as $groupFile )
+	foreach( ( include $groupFile )['knobs'] as $knobKey => $knobOf )
+		$rows[] = '| `'. $knobKey. '` | `'. $knobOf['token']. '` | `'. implode( '`, `', $knobOf['ladder'] ). '` |';
+
+preg_match_all( '/^\| `[a-z-]+\.[a-z-]+` \| `--[a-z-]+` \| .*\|$/m', $manual, $listed );
+check( 'the manual lists the '. count( $rows ). ' knobs of basis with their token and ladder, as the group.php files hold them',
+	count( $rows ) === 16 && array_diff( $rows, $listed[0] ) === [] && array_diff( $listed[0], $rows ) === [] );
+$bleedRule = array_values( array_filter( basisRules( $nino ), static fn( array $rule ): bool => str_contains( $rule['body'], '--page-bleed' ) ) );
+$bleedWhole = ':where( [class$="--bleed"], [class*="--bleed "] ) > :first-child';
+check( 'bleed is a name of the page and is for the first child only: the reset sets --page-bleed to 1 there, whole word, and to 0 on everything inside it, and nothing else sets it; the figure of a picture works its corner out of it, with 0 where it is not set, and the picture reads that'
+	, count( $bleedRule ) === 2 && $bleedRule[0]['selector'] === $bleedWhole. ' *' && trim( $bleedRule[0]['body'] ) === '--page-bleed: 0;' && $bleedRule[1]['selector'] === $bleedWhole && trim( $bleedRule[1]['body'] ) === '--page-bleed: 1;'
+	&& substr_count( $partOf( 'section' ). $partOf( 'text' ). $partOf( 'button' ). $partOf( 'header' ). $partOf( 'footer' ), '--page-bleed:' ) === 0
+	&& str_contains( basisBody( array_filter( basisRules( $imageCss ), static fn( array $rule ): bool => $rule['selector'] === '.image' ), '.image' ), '--image--corner: calc( var(--image-radius) * ( 1 - var(--page-bleed, 0) ) );' ) === true
+	&& str_contains( basisBody( array_filter( basisRules( $imageCss ), static fn( array $rule ): bool => $rule['selector'] === '.image img' ), '.image img' ), 'border-radius: var(--image--corner);' ) === true );
 
 // the contract of the grounds: what the register writes is what the reset meets - the word whole, and what each word does to the roles
 $rules = basisRules( $resetLayer );
@@ -814,7 +868,7 @@ if( str_contains( $cover, 'position: absolute;' ) === false || str_contains( $co
 $bleeds = array_values( array_filter( $partRules['section'], static fn( array $rule ): bool => str_contains( $rule['selector'], '--bleed' ) ) );
 $figure = (string) file_get_contents( $basisDir. '/components/image/template.tpl' );
 
-if( count( $bleeds ) !== 1 || $bleeds[0]['selector'] !== '.section-col--bleed > :first-child:has( > img, > a > img )' || str_contains( $bleeds[0]['body'], 'margin: calc( -1 * var(--section-col-pad) )' ) === false || preg_match( '#^<figure [^>]*>\\[\\[open\\]\\]\\[\\[picture\\]\\]#', $figure ) !== 1 )
+if( count( $bleeds ) !== 1 || $bleeds[0]['selector'] !== '.section-col--bleed > :first-child:has( > img, > a > img )' || str_contains( $bleeds[0]['body'], 'margin: calc( -1 * var(--section-col--inset) ) calc( -1 * var(--section-col--inset) ) 0;' ) === false || preg_match( '#^<figure [^>]*>\\[\\[open\\]\\]\\[\\[picture\\]\\]#', $figure ) !== 1 )
 	$bad[] = 'a card with bleed does not leave the padding to a first child that is no picture';
 
 if( str_contains( basisBody( $partRules['button'], '.button:focus-visible' ), 'outline:' ) === false )
@@ -866,12 +920,60 @@ if( str_contains( basisBody( $partRules['header'], '.header-wrap--sticky:has( .h
 if( basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )', '@supports not ( color: light-dark( #000, #fff ) )' ) === '' )
 	$bad[] = 'a section with a picture has no colours of its own where light-dark() is not known';
 
-// the logo for a dark ground is the one of the device, the one for a light ground stands where :has() is not known and on paper
-$dark = basisBody( $partRules['header'], '.header-logo:has( .header-logo-dark ) .header-logo-dark', '@media (prefers-color-scheme: dark)' );
-$paper = basisBody( $partRules['header'], '.header-logo:has( .header-logo-dark ) .header-logo-light', '@media print' );
+// the logo for a dark ground follows the colour scheme of its element: both pictures stand in one cell, each under a mask of light-dark() that is the other's reverse; where light-dark() is not known the one for a light ground stands
+$cell = basisBody( $partRules['header'], '.header-logo img' );
+$lightMask = basisBody( $partRules['header'], '.header-logo-light:not( :only-of-type )' );
+$darkMask = basisBody( $partRules['header'], '.header-logo-dark:not( :only-of-type )' );
+$noPair = basisBody( $partRules['header'], '.header-logo-dark:not( :only-of-type )', '@supports not ( color: light-dark( #000, #fff ) )' );
+$forced = basisBody( $partRules['header'], '.header-logo', '@media (forced-colors: active)' );
 
-if( basisBody( $partRules['header'], '.header-logo-dark' ) !== 'display: none;' || str_contains( $dark, 'display: block;' ) === false || str_contains( $paper, 'display: block;' ) === false )
-	$bad[] = 'the logo for a light ground is not the one that stands without :has() and on paper';
+if( str_contains( $cell, 'grid-area: 1 / 1;' ) === false || str_contains( basisBody( $partRules['header'], '.header-logo' ), 'display: grid;' ) === false
+	|| str_contains( $lightMask, 'mask-image: linear-gradient( light-dark( #000, transparent ), light-dark( #000, transparent ) );' ) === false
+	|| str_contains( $darkMask, 'mask-image: linear-gradient( light-dark( transparent, #000 ), light-dark( transparent, #000 ) );' ) === false
+	|| str_contains( $noPair, 'display: none;' ) === false || str_contains( $forced, 'color-scheme: light dark;' ) === false
+	// a picture that stands alone is on every ground: no mask or hiding names it without :not( :only-of-type ), and the pair's own rules are the only ones to
+	|| preg_match( '/\.header-logo-(?:light|dark)(?!:not\( :only-of-type \))[^{]*\{[^}]*(?:mask-image|display: none)/', $css['header'] ) === 1 || str_contains( $css['header'], 'prefers-color-scheme' ) === true || str_contains( $css['header'], '.header-logo:has( .header-logo-dark )' ) === true )
+	$bad[] = 'the logo for a dark ground does not follow the colour scheme of the header it stands in';
+
+// a fixed step is a factor on the knob of the same size: it never sets the token of the knob, so a theme that turns the knob turns the steps with it, in the same order
+// ...by the factors the manual names: 0, a half, one, one and a half, two and a half for a gap and a pad, an eighth under and over for a size; each grounds rule of the component says its own 1, so that no factor is inherited by what stands in it
+$steps = [ 'section' => [ 'section-row' => [ 'gap', '--section-row--f', '--section-row-gap', [ 0.0, 0.5, 1.0, 1.5, 2.5 ] ], 'section-col' => [ 'pad', '--section-col--f', '--section-col-pad', [ 0.0, 0.5, 1.0, 1.5, 2.5 ] ] ],
+	'text' => [ 'text' => [ 'size', '--text--f', '--text-size', [ 0.875, 1.0, 1.125 ] ] ], 'button' => [ 'button' => [ 'size', '--button--f', '--button-size', [ 0.875, 1.0, 1.125 ] ] ] ];
+
+foreach( $steps as $stepGroup => $stepComponents )
+	foreach( $stepComponents as $stepComponent => [ $stepName, $factor, $knob, $values ] ) {
+
+		$options = array_values( array_diff( $schemas[$stepComponent]['attributes'][$stepName]['options'], [ 'auto' ] ) );
+		$default = $schemas[$stepComponent]['attributes'][$stepName]['default'];
+		$last = -1.0;
+		$got = [];
+
+		if( str_contains( basisBody( array_filter( $partRules[$stepGroup], static fn( array $rule ): bool => $rule['selector'] === '.'. $stepComponent ), '.'. $stepComponent ), $factor. ': 1;' ) === false )
+			$bad[] = $stepComponent. ' does not say its own factor of 1, and so inherits the one of what it stands in';
+
+		foreach( $options as $option ) {
+
+			$body = basisBody( array_filter( $partRules[$stepGroup], static fn( array $rule ): bool => $rule['selector'] === '.'. $stepComponent. '--'. $stepName. '-'. $option ), '.'. $stepComponent. '--'. $stepName. '-'. $option );
+			$value = $option === $default && $body === '' ? 1.0 : ( preg_match( '/^'. preg_quote( $factor, '/' ). ': (\d*\.?\d+);/', $body, $found ) === 1 ? (float) $found[1] : -2.0 );
+
+			if( $value <= $last || str_contains( $body, $knob ) === true )
+				$bad[] = $stepComponent. ' '. $stepName. '="'. $option. '" is no factor above the step before it';
+
+			$last = $value;
+			$got[] = $value;
+		}
+
+		if( $got !== $values )
+			$bad[] = $stepComponent. ' '. $stepName. ' has the factors '. implode( ' ', $got ). ' and not '. implode( ' ', $values );
+	}
+
+if( str_contains( basisBody( $partRules['section'], '.section-row' ), '--section-row--space: calc( var(--section-row-gap) * var(--section-row--f) );' ) === false
+	|| str_contains( basisBody( array_filter( $partRules['section'], static fn( array $rule ): bool => $rule['selector'] === '.section-row' ), '.section-row' ), 'gap: var(--section-row--space);' ) === false
+	|| str_contains( basisBody( $partRules['section'], '.section-col', '' ), '--section-col--inset: calc( var(--section-col-pad) * var(--section-col--f) );' ) === false
+	|| str_contains( basisBody( $partRules['text'], '.text' ), 'font-size: calc( var(--text-size) * var(--text--f) );' ) === false
+	|| str_contains( basisBody( $partRules['button'], '.button' ), 'font-size: calc( var(--button-size) * var(--button--f) );' ) === false
+	|| substr_count( $css['section'], 'var(--section-row-gap)' ) !== 1 || substr_count( $css['section'], 'var(--section-col-pad)' ) !== 1 )
+	$bad[] = 'a part reads the knob of a step where it should read the knob times the factor';
 
 // the menu is a details, with no popover, and a wide screen shows its list where the browser lets the rules reach it
 $nav = basisBody( $partRules['header'], '.header-nav-details::details-content', '@media (min-width: 768px) @supports selector( ::details-content )' );

@@ -22,7 +22,7 @@
 	font-family: var(--brand-font-button); font-weight: 600; transition: filter var(--page-motion);
 }
 .nino-form-submit:hover { filter: brightness( .9 ); }
-.nino-forms-check { display: flex; align-items: center; gap: var(--page-space-2); font-weight: 400; }
+.nino-forms-check { display: flex; align-items: center; gap: var(--page-space-2); font-weight: var(--page-weight-text); }
 .nino-forms-group { display: grid; gap: var(--page-space-2); margin: 0; padding: 0; border: 0; }
 :root {
 	--nino-form-error-ground: light-dark( #fdecea, #3a1b1a );

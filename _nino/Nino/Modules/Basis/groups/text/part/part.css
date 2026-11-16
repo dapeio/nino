@@ -5,9 +5,10 @@
 	--text-size: var(--page-text-2);
 	--text-gap: var(--page-space-3);
 }
-.text { font-size: var(--text-size); max-width: 70ch; overflow-wrap: anywhere; }
-.text--size-s { --text-size: var(--page-text-1); }
-.text--size-l { --text-size: var(--page-text-3); }
+.text { --text--f: 1; font-size: calc( var(--text-size) * var(--text--f) ); max-width: 70ch; overflow-wrap: anywhere; }
+/*	A fixed size is a factor on the knob, as the steps of a row are: smaller by an eighth, larger by an eighth	*/
+.text--size-s { --text--f: .875; }
+.text--size-l { --text--f: 1.125; }
 .text > * + * { margin-top: var(--text-gap); }
 .text :where( ul, ol ) { padding-left: 1.25em; text-align: start; }
 .text ul { list-style: disc; }

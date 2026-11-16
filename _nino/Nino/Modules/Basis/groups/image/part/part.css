@@ -2,8 +2,10 @@
 :root {
 	--image-radius: var(--page-radius);
 }
-.image { width: 100%; }
-.image img { width: 100%; border-radius: var(--image-radius); object-fit: cover; }
+.image { --image--corner: calc( var(--image-radius) * ( 1 - var(--page-bleed, 0) ) ); width: 100%; }
+/*	A picture that stands at the edge of its component (--page-bleed, Nino.css) has no corner of its own: the edge of the component is the corner. The figure works the
+	corner out, for the token is 0 again on the picture inside it	*/
+.image img { width: 100%; border-radius: var(--image--corner); object-fit: cover; }
 .image a { display: block; }
 .image--ratio-1-1 img { aspect-ratio: 1; }
 .image--ratio-4-3 img { aspect-ratio: 4 / 3; }

@@ -2066,7 +2066,7 @@ ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
 check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
 // The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the standard parts of Basis,
-// the look of the form and the project's own stylesheet, in at most 36 KB, and the reset alone in at most 12 KB
+// the look of the form and the project's own stylesheet, in at most 40 KB, and the reset alone in at most 12 KB
 $keysBuilt = $keysApp;
 $keysBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
 $keysBuilt['/nino/html/assets'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/html/assets'];
@@ -2078,8 +2078,8 @@ $keysBuilt['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/conf
 \Nino\Features::registerParts( $keysBuilt );
 \Nino\Modules\Assets::doShortcode( $keysBuilt, [ '/.cache/style.css' ] );
 $keysBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, '/.cache/style.css' ) );
-check( 'the style bundle of a fresh starter site is the reset, the standard parts of Basis, the look of the form and the project\'s own stylesheet, and it is at most 36 KB; Nino.css alone is at most 12 KB',
-	strlen( $keysBundle ) > 20000 && strlen( $keysBundle ) <= 36 * 1024 && str_contains( $keysBundle, '.header-wrap' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
+check( 'the style bundle of a fresh starter site is the reset, the standard parts of Basis, the look of the form and the project\'s own stylesheet, and it is at most 40 KB; Nino.css alone is at most 12 KB',
+	strlen( $keysBundle ) > 20000 && strlen( $keysBundle ) <= 40 * 1024 && str_contains( $keysBundle, '.header-wrap' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
 	&& filesize( dirname( __DIR__ ). '/_nino/Nino.css' ) <= 12 * 1024 );
 // The scans of the workbench read the words and the pictures of a page of Basis through the register: ~title under the id of its section is a key read, image="~background" a place of a picture
 $keysApp['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];

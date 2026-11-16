@@ -792,6 +792,19 @@ check( 'an attribute named ground is accepted as a choice among the words of the
 	is_array( $result ) === true && array_keys( $result['components'] ) === [ 'g-all', 'g-some' ] && array_keys( $result['rejected'] ) === [ 'g-bool', 'g-more', 'g-string', 'g-word' ]
 	&& str_contains( $result['rejected']['g-word'], 'the attribute "ground" is a choice among none, base, alt, tint, primary, dark' ) === true );
 
+// bleed is the other name of the kernel: a bool, or it is refused
+registerRemove( $evil );
+$evil = registerFeature( 'Evil' );
+registerGroup( $evil, 'tidy', [ 'label' => 'Tidy' ] );
+$bleed = static fn( array $declared ): array => registerSchema( [ 'attributes' => [ 'bleed' => $declared + [ 'label' => 'Bleed' ] ] ] );
+registerComponent( $evil, 'b-bool', $bleed( [ 'type' => 'bool', 'default' => false ] ) );
+registerComponent( $evil, 'b-string', $bleed( [ 'type' => 'string', 'default' => 'yes' ] ) );
+registerComponent( $evil, 'b-choice', $bleed( [ 'type' => 'choice', 'options' => [ 'on', 'off' ], 'default' => 'off' ] ) );
+$result = $read( $evil, 'evil' );
+check( 'an attribute named bleed is accepted as a bool and refused as anything else: a text, a choice',
+	is_array( $result ) === true && array_keys( $result['components'] ) === [ 'b-bool' ] && array_keys( $result['rejected'] ) === [ 'b-choice', 'b-string' ]
+	&& str_contains( $result['rejected']['b-string'], 'the attribute "bleed" is a bool' ) === true );
+
 // A schema that brings what is none of a schema
 registerRemove( $evil );
 $evil = registerFeature( 'Evil' );

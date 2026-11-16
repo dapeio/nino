@@ -59,6 +59,8 @@
 		--page-radius: .375rem;
 		--page-line: 1px;
 		--page-motion: .15s;
+		--page-weight-title: 700;
+		--page-weight-text: 400;
 
 		color-scheme: var(--brand-scheme);
 		font-size: var(--page-size);
@@ -111,6 +113,17 @@
 		}
 	}
 
+	/*	The contract of bleed. A component that has the attribute bleed is written <name>--bleed by the register, and its first child
+		is told: --page-bleed is 1 there, and what draws a corner of its own - the picture of Basis - leaves it out, so that the edge
+		of the component is the corner. The first child is told and what stands in it is not: bleed is for that one box. Only these two rules set the token; a part reads it with a fallback of 0 (\Nino\Features::readComponents()
+		refuses a bleed that is no bool)	*/
+	:where( [class$="--bleed"], [class*="--bleed "] ) > :first-child * {
+		--page-bleed: 0;
+	}
+	:where( [class$="--bleed"], [class*="--bleed "] ) > :first-child {
+		--page-bleed: 1;
+	}
+
 	/*	The elements at rest	*/
 	*, *::before, *::after { box-sizing: border-box; }
 	html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-behavior: smooth; }
@@ -127,12 +140,13 @@
 		color: var(--brand-ink);
 		font-family: var(--brand-font-text);
 		font-size: var(--page-text-2);
+		font-weight: var(--page-weight-text);
 		line-height: var(--page-leading);
 		overflow-wrap: break-word;
 	}
 	main { flex: 1 0 auto; display: block; }
 	main:focus { outline: none; }
-	h1, h2, h3, h4, h5, h6 { margin: 0; font-family: var(--brand-font-title); font-size: inherit; font-weight: 700; line-height: 1.2; text-wrap: balance; }
+	h1, h2, h3, h4, h5, h6 { margin: 0; font-family: var(--brand-font-title); font-size: inherit; font-weight: var(--page-weight-title); line-height: 1.2; text-wrap: balance; }
 	p, ul, ol, dl, dd, figure, blockquote, pre { margin: 0; }
 	ul, ol { padding: 0; list-style: none; }
 	img, picture, svg, video, canvas, iframe { display: block; max-width: 100%; }

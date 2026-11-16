@@ -945,6 +945,10 @@ namespace Nino {
 					&& ( $clean['attributes']['ground']['type'] !== 'choice' || is_array( $clean['attributes']['ground']['options'] ?? null ) === false || array_diff( $clean['attributes']['ground']['options'], \Nino\Components::GROUNDS ) !== [] ) )
 					$clean = $of. 'component "'. self::_shown( $name ). '": the attribute "ground" is a choice among '. implode( ', ', \Nino\Components::GROUNDS );
 
+				// The attribute bleed is a name of the kernel as well: Nino.css tells the first child of a component that has it, so it is a bool or it is refused
+				if( is_string( $clean ) === false && isset( $clean['attributes']['bleed'] ) === true && $clean['attributes']['bleed']['type'] !== 'bool' )
+					$clean = $of. 'component "'. self::_shown( $name ). '": the attribute "bleed" is a bool';
+
 				if( is_string( $clean ) === true )
 					$rejected[$name] = $clean;
 				else

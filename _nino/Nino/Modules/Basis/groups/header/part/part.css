@@ -13,20 +13,22 @@
 	display: flex; flex-wrap: wrap; align-items: center; gap: var(--header-nav-gap);
 	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto; padding-block: var(--header-wrap-space);
 }
-.header-logo { display: flex; align-items: center; gap: var(--page-space-2); margin-inline-end: auto; color: inherit; font-family: var(--brand-font-title); font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+.header-logo { display: grid; justify-items: start; align-items: center; margin-inline-end: auto; color: inherit; font-family: var(--brand-font-title); font-weight: var(--page-weight-title); text-decoration: none; overflow-wrap: anywhere; }
 .header-logo img { width: auto; height: var(--header-logo-height); }
 .header-logo:has( img ) .header-logo-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/*	The logo for a dark ground follows the mode of the device and not the ground the header stands on: a limit, kept on purpose. The picture for a light
-	ground is the one that stands where :has() is not known (the rules that need it are dropped, and the dark picture stays hidden) and on paper	*/
-.header-logo-dark { display: none; }
-@media (prefers-color-scheme: dark) {
-	.header-logo:has( .header-logo-dark ) .header-logo-light { display: none; }
-	.header-logo:has( .header-logo-dark ) .header-logo-dark { display: block; }
+/*	The logo for a dark ground follows the ground it stands on: both pictures stand in one cell, and each has a mask of light-dark(), which takes the colour scheme of
+	the element - the mode of the brand, a ground that is dark, a header a theme makes dark - and so shows the picture that fits and hides the other. A logo of one picture
+	stands on every ground, so the masks are for the pair only. Where light-dark() is not known the picture for a light ground is the one that stands	*/
+.header-logo img { grid-area: 1 / 1; }
+.header-logo-light:not( :only-of-type ) { mask-image: linear-gradient( light-dark( #000, transparent ), light-dark( #000, transparent ) ); }
+.header-logo-dark:not( :only-of-type ) { mask-image: linear-gradient( light-dark( transparent, #000 ), light-dark( transparent, #000 ) ); }
+@supports not ( color: light-dark( #000, #fff ) ) {
+	.header-logo-dark:not( :only-of-type ) { display: none; }
 }
-@media print {
-	.header-logo:has( .header-logo-dark ) .header-logo-light { display: block; }
-	.header-logo:has( .header-logo-dark ) .header-logo-dark { display: none; }
+/*	Forced colours paint their own ground, which light-dark() does not know: the system's mode decides there	*/
+@media (forced-colors: active) {
+	.header-logo { color-scheme: light dark; }
 }
 
 /*	The menu is a details of the browser, with no script: a button of three bars that opens the list below the line of the header, over the whole width,
