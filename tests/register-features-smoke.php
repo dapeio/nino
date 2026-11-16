@@ -1270,7 +1270,7 @@ openssl_pkey_export( $keypair, $privateKey );
 $publicKey = openssl_pkey_get_details( $keypair )['key'];
 $archive = 'not an archive';
 $entryOf = static fn( string $key, string $version, array $more = [] ): array => $more + [
-	'key' => $key, 'name' => ucfirst( $key ), 'description' => [ 'en_US' => 'A '. $key, 'de_DE' => 'Ein '. $key ], 'version' => $version, 'nino' => '^1.0', 'php' => [ 'ext' => [] ], 'requires' => [],
+	'key' => $key, 'name' => ucfirst( $key ), 'description' => [ 'en_US' => 'A '. $key, 'de_DE' => 'Ein '. $key ], 'version' => $version, 'nino' => '^2.0', 'php' => [ 'ext' => [] ], 'requires' => [],
 	'directory' => ucfirst( $key ), 'archive' => 'https://catalogue.test/features/'. $key. '-'. $version. '.tar.gz', 'sha256' => hash( 'sha256', $archive ), 'size' => strlen( $archive ), 'released' => '2026-11-13',
 ];
 $json = (string) json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'probe', '9.9.9' ), $entryOf( 'newcomer', '1.0.0' ) ] ], JSON_UNESCAPED_SLASHES );

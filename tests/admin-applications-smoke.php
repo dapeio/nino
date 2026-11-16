@@ -78,7 +78,7 @@ $makeFeature = static function( string $key, array $extra = [], string $manifest
 	$bytes = $tar( $files );
 	$url = 'https://catalogue.test/features/'. $key. '-1.0.0.tar.gz';
 	$remote[$url] = $bytes;
-	$features[$key] = $entry + [ 'key' => $key, 'name' => [ 'en_US' => $directory. ' feature', 'de_DE' => $directory. ' Funktion' ], 'description' => 'The '. $key, 'version' => '1.0.0', 'nino' => '^1.0', 'php' => [ 'ext' => [] ],
+	$features[$key] = $entry + [ 'key' => $key, 'name' => [ 'en_US' => $directory. ' feature', 'de_DE' => $directory. ' Funktion' ], 'description' => 'The '. $key, 'version' => '1.0.0', 'nino' => '^2.0', 'php' => [ 'ext' => [] ],
 		'requires' => [], 'directory' => $directory, 'archive' => $url, 'sha256' => hash( 'sha256', $bytes ), 'size' => strlen( $bytes ), 'released' => '2026-11-13' ];
 };
 

@@ -9,7 +9,7 @@ return [
 	'category'		=> 'content',
 	'maturity'		=> [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ],
 	'version'			=> '1.2.0',
-	'nino'				=> '^1.0',
+	'nino'				=> '^2.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],
 	'requires'		=> [ 'helper' ],
 	// One file and one directory: a backup has to carry both shapes

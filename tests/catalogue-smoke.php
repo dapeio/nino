@@ -108,7 +108,7 @@ function entry( string $key, string $version, string $bytes, array $more = [] ):
 		'name'				=> ucfirst( $key ),
 		'description'	=> [ 'en_US' => 'A '. $key, 'de_DE' => 'Ein '. $key ],
 		'version'			=> $version,
-		'nino'				=> '^1.0',
+		'nino'				=> '^2.0',
 		'php'					=> [ 'ext' => [] ],
 		'requires'		=> [],
 		'directory'		=> ucfirst( $key ),
@@ -675,7 +675,7 @@ check( 'the features directory is writable here', \Nino\Catalogue::writable() ==
 check( 'a key the catalogue does not list', \Nino\Catalogue::install( $appData, 'nope', '1.0.0' ) === 'the catalogue does not list "nope" in version 1.0.0' );
 check( 'a version the catalogue does not list', \Nino\Catalogue::install( $appData, 'helper', '1.0.1' ) === 'the catalogue does not list "helper" in version 1.0.1' );
 check( 'a version that does not fit names what it asks for', \Nino\Catalogue::install( $appData, 'helper', '9.0.0' ) === '"helper" 9.0.0 requires Nino ^9.0'
-	&& \Nino\Catalogue::install( $appData, 'needy', '1.0.0' ) === '"needy" 1.0.0 requires Nino ^1.0 and the php extensions no_such_extension' );
+	&& \Nino\Catalogue::install( $appData, 'needy', '1.0.0' ) === '"needy" 1.0.0 requires Nino ^2.0 and the php extensions no_such_extension' );
 
 rename( NINO_FEATURES_DIR, NINO_FEATURES_DIR. '.away' );
 $requests = [];
@@ -971,7 +971,7 @@ check( 'the state travels with each offer: helper and sample current, ancient an
 	$offers['helper']['state'] === 'current' && $offers['helper']['version'] === '1.1.0' && $offers['helper']['local'] === '1.1.0'
 	&& $offers['sample']['state'] === 'current' && $offers['sample']['local'] === '3.0.0'
 	&& $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['local'] === null && $offers['ancient']['nino'] === '^0.9' && $offers['ancient']['ext'] === []
-	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['nino'] === '^1.0' && $offers['needy']['ext'] === [ 'no_such_extension' ] );
+	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['nino'] === '^2.0' && $offers['needy']['ext'] === [ 'no_such_extension' ] );
 check( 'the archive url and the release date pass through', $offers['sample']['archive'] === 'https://catalogue.test/features/sample-3.0.0.tar.gz'
 	&& $offers['sample']['released'] === '2026-09-07' && $offers['sample']['requires'] === [] );
 
@@ -1014,7 +1014,7 @@ check( 'a malformed or missing key or version is a 400 before the kernel is aske
 check( 'a version the catalogue does not list is a 400 carrying the kernel\'s reason', callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.0.1' ] ) === failedWith( 'features_install_failed', 'the catalogue does not list "helper" in version 1.0.1' )
 	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'nope', 'version' => '1.0.0' ] ) === failedWith( 'features_install_failed', 'the catalogue does not list "nope" in version 1.0.0' ) );
 check( 'so is one that does not fit this kernel', callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '9.0.0' ] ) === failedWith( 'features_install_failed', '"helper" 9.0.0 requires Nino ^9.0' )
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'needy', 'version' => '1.0.0' ] ) === failedWith( 'features_install_failed', '"needy" 1.0.0 requires Nino ^1.0 and the php extensions no_such_extension' ) );
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'needy', 'version' => '1.0.0' ] ) === failedWith( 'features_install_failed', '"needy" 1.0.0 requires Nino ^2.0 and the php extensions no_such_extension' ) );
 check( 'none of that downloaded anything', array_filter( $requests, static fn( array $r ): bool => str_ends_with( $r['url'], '.tar.gz' ) ) === [] );
 
 rename( NINO_FEATURES_DIR, NINO_FEATURES_DIR. '.away' );

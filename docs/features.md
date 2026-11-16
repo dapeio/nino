@@ -81,7 +81,7 @@ return [
 	'category'		=> 'system',				// one of \Nino\Features::CATEGORIES
 	'maturity'		=> 'Example',				// the badge beside the name, 24 characters at most
 	'version'			=> '1.1.0',
-	'nino'				=> '^1.8',					// the kernel whose vocabulary it uses
+	'nino'				=> '^2.0',					// the kernel whose vocabulary it uses
 	'data'				=> [ '/data/hello.php' ],					// what a backup carries
 	'assets'			=> [ '/features/Hello/assets/hello.css' ],	// into the site's style bundle
 	'settings'		=> [
@@ -96,7 +96,7 @@ return [
 | `key` | a slug (`/^[a-z][a-z0-9-]*$/D`), the lower-cased directory name where left out; `requires` and `/nino/features` name features by it |
 | `name`, `description`, `label`, `hint`, the label of an `options` entry | a string or a `locale => string` map, `name` required: the panel shows features that are not active, whose fills are not loaded, so the words travel in the manifest. `\Nino\Features::localized( $value, $locale )` reads one: the locale asked for, else `en_US`, else the first entry, else `''` |
 | `version`, `maturity` | `major.minor.patch`, a pre-release suffix allowed; a string or a `locale => string` map of at most 24 characters each |
-| `nino` | the constraint on the kernel, `*` where left out: the floor, the kernel whose vocabulary the feature uses. What this manual marks **1.8** or **1.9** is that version's, and so are the key `assets` (1.8), `[[.slug]]` and the source `.slug` in a loop of elements (1.9) and `\Nino\Format` (1.12): a feature that uses one of them says `^1.8`, `^1.9` or `^1.12`, and an older kernel refuses it. The vocabulary is that of `\Nino\Features::satisfies( $constraint, $version )`: `*`, a version (`1.2.3`, `1.2`, `1`), a comparison (`>=1.2`, `!=1.2.3`), a caret (`^1.0`: the same major version from there on; `^0.13` the same minor version) or tilde (`~1.2`: the same major version from 1.2; `~1.2.3` the same minor version from 1.2.3), parts joined by a comma or a space (all must hold) and alternatives joined by `\|\|`; a pre-release kernel counts as the release it precedes |
+| `nino` | the constraint on the kernel, `*` where left out: the floor, the kernel whose vocabulary the feature uses. A feature written for this kernel says `^2.0`: the register of components, the folders of a feature and everything this manual describes are that version's, and a kernel of the 1.x line refuses it, as this one refuses a feature that says `^1.8`. The marks **1.8**, **1.9** and **1.12** in the tables below say in which version a member came and are no floor a feature of this kernel needs. The vocabulary is that of `\Nino\Features::satisfies( $constraint, $version )`: `*`, a version (`1.2.3`, `1.2`, `1`), a comparison (`>=1.2`, `!=1.2.3`), a caret (`^1.0`: the same major version from there on; `^0.13` the same minor version) or tilde (`~1.2`: the same major version from 1.2; `~1.2.3` the same minor version from 1.2.3), parts joined by a comma or a space (all must hold) and alternatives joined by `\|\|`; a pre-release kernel counts as the release it precedes |
 | `php`, `requires`, `data` | `php` => `ext`, the extensions it needs; the feature keys it cannot run without (its own is dropped; an activation activates them first); the files under `/data/` it owns, no `..` - what a backup carries |
 | `assets`, `settings` | the subsections below and the chapter [Settings](#settings); the components of a feature are no key of the manifest, they are [folders](#components-in-folders) |
 | `module` | may name `\Nino\Modules\<Directory>` and nothing else, and the class file must exist |
@@ -364,8 +364,7 @@ the Routes panel under *Routes of features and modules*).
 
 What a feature once wrote for itself, the kernel has once, and the docblock of a
 member is its reference. A method whose name starts with `_` is internal, every
-other is public; **1.8** and **1.9** mark what kernels before them lack, so a feature
-that calls one says `^1.8` or `^1.9`. `\Nino\Feature` **1.8** (not `\Nino\Features`, the contract) holds
+other is public; **1.8** and **1.9** mark the version a member came in. `\Nino\Feature` **1.8** (not `\Nino\Features`, the contract) holds
 the helpers of a feature's own code, static methods that render no markup:
 
 | Call | What it does |
@@ -811,7 +810,7 @@ sentences, the panel there while the feature is active and gone after, the upgra
 hook, the data that deactivation keeps. `php features/Hello/tests/hello-smoke.php`
 runs it (`NINO_ROOT=...` before it for another Nino), `php tests/features-smoke.php`
 is the kernel's contract test beside it. `ninoErrors()`, `ninoCall()`, `ninoUser()`
-and `ninoVisit()` are 1.8: a test that uses them needs a floor of `^1.8`.
+and `ninoVisit()` are 1.8.
 
 CI runs the contract test and then every feature's own test (a loop over
 `features/*/tests/*-smoke.php`, guarded because a checkout ships no feature). The

@@ -36,14 +36,14 @@ return [
 	'description' => [ 'en_US' => 'The meetups of a club.', 'de_DE' => 'Die Treffen eines Vereins.' ],
 	'category'    => 'content',
 	'version'     => '0.1.0',
-	'nino'        => '^1.12',
+	'nino'        => '^2.0',
 ];
 ```
 
 - `key` ist der Schlüssel des Features: Kleinbuchstaben, Ziffern, Bindestriche.
 - `name` und `description` zeigt der Bereich **Features**. Sie stehen im Manifest, weil Nino sie auch für ein ausgeschaltetes Feature braucht.
 - `version` hat drei Zahlen: `major.minor.patch`.
-- `nino` nennt den Kernel, für den Du schreibst. `^1.12` heißt: ab 1.12, unter 2.0.
+- `nino` nennt den Kernel, für den Du schreibst. `^2.0` heißt: ab 2.0, unter 3.0. Eine Vorabversion des Kernels (`2.0.0-dev`) zählt als die Version, der sie vorausgeht.
 
 ### 3. Die Klasse
 
