@@ -96,7 +96,8 @@ check( 'the kind of an id: a date is daily, a time is by hand with or without th
 	&& \Nino\Modules\Backups\Admin::kind( '2026-10-02-170512-manual' ) === 'manual' && \Nino\Modules\Backups\Admin::kind( 'pre-restore-2026-10-02-170512' ) === 'snapshot' );
 
 // An archive of the name made before the suffix, on a project that updated: listed, kept as one made by hand, restorable, and renamed by nothing
-$legacy = date( 'Y-m-d-His', time() - 3600 );
+// An hour before, and in the first hour of a day the start of the day: the list is told by days, and this archive belongs to the day of the other
+$legacy = date( 'Y-m-d-His', max( time() - 3600, strtotime( 'today' ) ) );
 copy( $dir. '/'. $id. '.php', $dir. '/'. $legacy. '.php' );
 
 check( 'an archive of the older name is listed as made by hand, after the newer one', ninoCall( $appData, $list )[1]['archives'][1] === [ 'id' => $legacy, 'kind' => 'manual', 'size' => filesize( $dir. '/'. $legacy. '.php' ) ] && \Nino\Modules\Backups\Admin::dates( $appData ) === [ $id, $legacy, $today ] );
