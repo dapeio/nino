@@ -882,10 +882,59 @@ error colour); `textField( options )` the labelled line of text beside
 `selectField()`, `switchField()` and `numberField()` - the label with the star
 and the `aria-required` of a required field, its `input` the control;
 `button( text, onClick, options )` a real button, whose `name` is the title and
-the `aria-label` of a glyph; `el( tag, className, text )` an element with a class
+the `aria-label` of a glyph (its kind, size and icon are in
+[Buttons and icons](#buttons-and-icons)); `el( tag, className, text )` an element with a class
 and a text; and `localeSelect( options )` the switch of the translation a form
 shows, for the context bar - what a change does is the panel's. Their docblocks in
 `_admin/assets/Nino.admin.js` are the reference.
+
+## Buttons and icons
+
+Three builders of `Nino.adminUi` make every button of a screen; none of them owns a
+word, the text and the name are the caller's.
+
+`icon( name, { size, label } )` is an inline `<svg>` of the Lucide set (ISC; the
+notice is in `THIRD-PARTY-NOTICES.md`), drawn in the colour of the text it stands in
+and 16 pixels wide unless `size` says otherwise. Without a `label` it is decoration
+and is `aria-hidden`; with one it is `role="img"` of that name. A name the set does
+not have draws nothing and says so once in the console; it throws nothing.
+
+```js
+const trash = Nino.adminUi.icon( 'trash-2', { label : Nino.content.getText('/_admin/catalog/label/delete') } );
+```
+
+`button( text, onClick, { kind, small, icon, name, type, className, id, disabled } )`
+keeps its call as it was: no `kind` is the look of a plain button. `kind` is
+`'primary'`, `'secondary'`, `'danger'` or `'link'` and puts the class of that kind on
+it (`.nino-admin-btn-primary`, `-secondary`, `-danger`, `.nino-admin-linkbutton`); any
+other value throws a `TypeError`. `small` adds `.nino-admin-btn--small`. `icon` is the
+name of an icon drawn before the word, hidden from a screen reader since the word is
+the button's name; `name` is the `aria-label` and the title where the name is not the
+text.
+
+```js
+const add = Nino.adminUi.button( Nino.content.getText('/_admin/catalog/label/new'), onNew, { kind : 'primary', icon : 'plus' } );
+```
+
+`iconButton( icon, name, onClick, { danger, small, disabled, id, className } )` is a
+button that shows an icon and no word: for the rows and tools of an ordered list, a
+reload. The `name` is the `aria-label` and the title and is not optional - a call
+without a non-empty text throws a `TypeError`. It is a square target of 28 pixels (24
+when `small`) with the focus ring of every button, and `danger` gives it the colour of
+`.nino-admin-btn-danger`.
+
+```js
+const up = Nino.adminUi.iconButton( 'arrow-up', Nino.content.getText('/_admin/catalog/label/up'), function() { move( index, -1 ) }, { disabled : index === 0 } );
+```
+
+The names of the set are `arrow-down`, `arrow-up`, `brackets`, `check`, `chevron-down`,
+`chevron-left`, `chevron-right`, `chevron-up`, `code`, `copy`, `database`,
+`external-link`, `eye`, `eye-off`, `list`, `panel-top`, `panels-top-left`, `pencil`,
+`plus`, `redo-2`, `refresh-cw`, `repeat`, `search`, `settings-2`, `sliders-horizontal`,
+`trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
+spells them, in the `ICONS` table of `_admin/assets/Nino.admin.js`. Another icon is
+added to that table, as a string for a path and `[ tag, attributes ]` for any other
+shape, from the same version of Lucide.
 
 ## What one panel tells another
 

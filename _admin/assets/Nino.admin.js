@@ -61,6 +61,54 @@
 	// How long a save of a saveBar() is on its way before the line says "Saving", in milliseconds
 	const SAVING_AFTER = 400;
 
+	// The icons of icon(): Lucide 0.577.0 (ISC, notice in THIRD-PARTY-NOTICES.md), the geometry of each on its
+	// 24 by 24 grid - a string is the "d" of a path, anything else is [ tag, attributes ]. This is the one place
+	// the scripts of the workbench take an icon from; the rail's and the panels' own icons are markup of the
+	// pages, and a table in a script is the cheapest way to have the same drawings without a request or a build
+	const ICONS = {
+		'arrow-down' : [ 'M12 5v14', 'm19 12-7 7-7-7' ],
+		'arrow-up' : [ 'm5 12 7-7 7 7', 'M12 19V5' ],
+		brackets : [ 'M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3', 'M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3' ],
+		check : [ 'M20 6 9 17l-5-5' ],
+		'chevron-down' : [ 'm6 9 6 6 6-6' ],
+		'chevron-left' : [ 'm15 18-6-6 6-6' ],
+		'chevron-right' : [ 'm9 18 6-6-6-6' ],
+		'chevron-up' : [ 'm18 15-6-6-6 6' ],
+		code : [ 'm16 18 6-6-6-6', 'm8 6-6 6 6 6' ],
+		copy : [ [ 'rect', { width : '14', height : '14', x : '8', y : '8', rx : '2', ry : '2' } ], 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' ],
+		database : [ [ 'ellipse', { cx : '12', cy : '5', rx : '9', ry : '3' } ], 'M3 5V19A9 3 0 0 0 21 19V5', 'M3 12A9 3 0 0 0 21 12' ],
+		'external-link' : [ 'M15 3h6v6', 'M10 14 21 3', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' ],
+		eye : [ 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0', [ 'circle', { cx : '12', cy : '12', r : '3' } ] ],
+		'eye-off' : [ 'M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49', 'M14.084 14.158a3 3 0 0 1-4.242-4.242', 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143', 'm2 2 20 20' ],
+		list : [ 'M3 5h.01', 'M3 12h.01', 'M3 19h.01', 'M8 5h13', 'M8 12h13', 'M8 19h13' ],
+		'panel-top' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18' ],
+		'panels-top-left' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18', 'M9 21V9' ],
+		pencil : [ 'M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z', 'm15 5 4 4' ],
+		plus : [ 'M5 12h14', 'M12 5v14' ],
+		'redo-2' : [ 'm15 14 5-5-5-5', 'M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13' ],
+		'refresh-cw' : [ 'M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8', 'M21 3v5h-5', 'M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16', 'M8 16H3v5' ],
+		repeat : [ 'm17 2 4 4-4 4', 'M3 11v-1a4 4 0 0 1 4-4h14', 'm7 22-4-4 4-4', 'M21 13v1a4 4 0 0 1-4 4H3' ],
+		search : [ 'm21 21-4.34-4.34', [ 'circle', { cx : '11', cy : '11', r : '8' } ] ],
+		'settings-2' : [ 'M14 17H5', 'M19 7h-9', [ 'circle', { cx : '17', cy : '17', r : '3' } ], [ 'circle', { cx : '7', cy : '7', r : '3' } ] ],
+		'sliders-horizontal' : [ 'M10 5H3', 'M12 19H3', 'M14 3v4', 'M16 17v4', 'M21 12h-9', 'M21 19h-5', 'M21 5h-7', 'M8 10v4', 'M8 12H3' ],
+		'trash-2' : [ 'M10 11v6', 'M14 11v6', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M3 6h18', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' ],
+		'triangle-alert' : [ 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01' ],
+		'undo-2' : [ 'M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11' ],
+		x : [ 'M18 6 6 18', 'm6 6 12 12' ],
+	};
+
+	// The names icon() has warned about, so that a name that is wrong warns once and not at every row it is drawn in
+	const UNKNOWN_ICONS = new Set();
+
+	// The classes of a button's kind: what button() puts on it for `kind`. A button without a kind has none and
+	// looks as the base rule of style.css draws a button
+	const BUTTON_KINDS = {
+		primary		: 'nino-admin-btn-primary',
+		secondary	: 'nino-admin-btn-secondary',
+		danger		: 'nino-admin-btn-danger',
+		link			: 'nino-admin-linkbutton',
+	};
+
 	wn.Nino.adminUi = {
 
 		// How many search hits elementList() draws at once. The search itself
@@ -1074,16 +1122,84 @@
 		},
 
 		/**
+		 *	An icon of the Lucide set (see ICONS): an inline <svg> that draws in the
+		 *	colour of the text it stands in (currentColor) and is as high as it is
+		 *	wide. Without a label it is decoration - aria-hidden, for the word beside
+		 *	it - and with one it is an image with that name. A name the set does not
+		 *	have is no error: the answer is the same <svg> with nothing drawn in it,
+		 *	and the console is told once per name. Owns no strings
+		 *
+		 *	@param		{string}		name							A name of ICONS, as Lucide spells it ('trash-2')
+		 *	@param		{Object}		[options]					{ size, label } - size in pixels (16), label the name of an icon that stands alone
+		 *
+		 *	@return		{Element}
+		 */
+		icon : function( name, options ) {
+
+			options = options || {};
+
+			const svg = dc.createElementNS( 'http://www.w3.org/2000/svg', 'svg' );
+			const size = Number.isFinite( options.size ) === true && options.size > 0 ? options.size : 16;
+
+			svg.setAttribute( 'class', 'nino-admin-icon' );
+			svg.setAttribute( 'width', String( size ) );
+			svg.setAttribute( 'height', String( size ) );
+			svg.setAttribute( 'viewBox', '0 0 24 24' );
+			svg.setAttribute( 'fill', 'none' );
+			svg.setAttribute( 'stroke', 'currentColor' );
+			svg.setAttribute( 'stroke-width', '2' );
+			svg.setAttribute( 'stroke-linecap', 'round' );
+			svg.setAttribute( 'stroke-linejoin', 'round' );
+			svg.setAttribute( 'focusable', 'false' );
+
+			const parts = typeof name === 'string' && Object.hasOwn( ICONS, name ) === true ? ICONS[name] : null;
+
+			if( parts === null ) {
+
+				if( UNKNOWN_ICONS.has( name ) === false ) {
+					UNKNOWN_ICONS.add( name );
+					console.warn( 'Nino.adminUi.icon(): no icon named "'+ String( name )+ '"' );
+				}
+
+				svg.setAttribute( 'aria-hidden', 'true' );
+				return svg;
+			}
+
+			for( const part of parts ) {
+
+				const shape = dc.createElementNS( 'http://www.w3.org/2000/svg', typeof part === 'string' ? 'path' : part[0] );
+
+				if( typeof part === 'string' )
+					shape.setAttribute( 'd', part );
+				else
+					for( const attribute of Object.keys( part[1] ) )
+						shape.setAttribute( attribute, part[1][attribute] );
+
+				svg.appendChild( shape );
+			}
+
+			if( typeof options.label === 'string' && options.label !== '' ) {
+				svg.setAttribute( 'role', 'img' );
+				svg.setAttribute( 'aria-label', options.label );
+			} else
+				svg.setAttribute( 'aria-hidden', 'true' );
+
+			return svg;
+		},
+
+		/**
 		 *	A button: a real button, which does not submit unless it is asked to,
-		 *	showing a word or a glyph. A glyph is no name - a screen reader says
-		 *	"button ↑" - so a button whose face is one is given its name, which
-		 *	becomes its title and its aria-label both. The look is the caller's
-		 *	class (nino-admin-btn-primary, nino-admin-btn--small...). Owns no
-		 *	strings: the face and the name are the caller's
+		 *	showing a word, a glyph or an icon before the word. A glyph is no name -
+		 *	a screen reader says "button ↑" - so a button whose face is one is given
+		 *	its name, which becomes its title and its aria-label both. The look is
+		 *	its kind (primary, secondary, danger, link; none is how a plain button
+		 *	looks), its size, and then the caller's class (nino-admin-btn--small...).
+		 *	An unknown kind throws a TypeError. Owns no strings: the face and the
+		 *	name are the caller's
 		 *
 		 *	@param		{string}		text						What the button shows
 		 *	@param		{Function}	[onClick]				Called on a click
-		 *	@param		{Object}		[options]				{ className, name, disabled, id, type } - type 'submit' for a button that submits
+		 *	@param		{Object}		[options]				{ kind, small, icon, className, name, disabled, id, type } - type 'submit' for a button that submits, icon the name of an icon() drawn before the text
 		 *
 		 *	@return		{Element}
 		 */
@@ -1091,13 +1207,36 @@
 
 			options = options || {};
 
+			if( options.kind !== undefined && Object.hasOwn( BUTTON_KINDS, options.kind ) === false )
+				throw new TypeError( 'Nino.adminUi.button(): "'+ String( options.kind )+ '" is no kind of button' );
+
 			const button = dc.createElement('button');
 			button.type = options.type === 'submit' ? 'submit' : 'button';
 
-			if( options.className )
-				button.className = options.className;
+			const classes = [];
 
-			button.textContent = text;
+			if( options.kind !== undefined )
+				classes.push( BUTTON_KINDS[options.kind] );
+
+			if( options.small === true )
+				classes.push( 'nino-admin-btn--small' );
+
+			if( options.icon !== undefined )
+				classes.push( 'nino-admin-btn--lead-icon' );
+
+			if( options.className )
+				classes.push( options.className );
+
+			if( classes.length > 0 )
+				button.className = classes.join(' ');
+
+			if( options.icon !== undefined ) {
+				button.appendChild( Nino.adminUi.icon( options.icon ) );
+
+				if( text !== '' )
+					button.appendChild( Nino.adminUi.el( 'span', '', text ) );
+			} else
+				button.textContent = text;
 
 			if( options.name ) {
 				button.title = options.name;
@@ -1111,6 +1250,43 @@
 
 			if( typeof onClick === 'function' )
 				button.addEventListener( 'click', onClick );
+
+			return button;
+		},
+
+		/**
+		 *	A button that shows an icon and no word: the row's up, down and remove,
+		 *	the toolbar's reload. An icon is no name, so the name is not optional -
+		 *	it becomes the title and the aria-label - and a call without one throws
+		 *	a TypeError. 28 pixels square, 24 when it is small
+		 *
+		 *	@param		{string}		icon						The name of an icon() to show
+		 *	@param		{string}		name						What the button does, as a person reads it
+		 *	@param		{Function}	[onClick]				Called on a click
+		 *	@param		{Object}		[options]				{ danger, small, className, disabled, id }
+		 *
+		 *	@return		{Element}
+		 */
+		iconButton : function( icon, name, onClick, options ) {
+
+			options = options || {};
+
+			if( typeof name !== 'string' || name.trim() === '' )
+				throw new TypeError( 'Nino.adminUi.iconButton(): a button with an icon alone needs a name' );
+
+			const classes = [ 'nino-admin-btn-icon' ];
+
+			if( options.danger === true )
+				classes.push( 'nino-admin-btn-danger' );
+
+			if( options.small === true )
+				classes.push( 'nino-admin-btn-icon--small' );
+
+			if( options.className )
+				classes.push( options.className );
+
+			const button = Nino.adminUi.button( '', onClick, { className : classes.join(' '), name : name, disabled : options.disabled, id : options.id } );
+			button.appendChild( Nino.adminUi.icon( icon ) );
 
 			return button;
 		},

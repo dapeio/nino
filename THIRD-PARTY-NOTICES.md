@@ -4,7 +4,8 @@ Nino's own code is released under the [MIT License](LICENSE). It bundles no
 third-party library, but it draws icons from one: the workbench's pages, the
 install wizard and the `icon()` of every workbench panel inline SVG icons
 from [Lucide](https://lucide.dev), and the kernel's components carry Lucide's
-icons as geometry in `Components.php`. Lucide is released under the ISC License;
+icons as geometry in `Components.php`, and the scripts of the workbench draw the
+icons of their buttons from a table of it. Lucide is released under the ISC License;
 the icons it took over from Feather, the project it grew out of, are under
 the MIT License as well. Both licenses ask for their notice to travel with
 every copy of the icons, and this file is where it does.
@@ -14,6 +15,7 @@ every copy of the icons, and this file is where it does.
 | `_admin/templates/page-*.tpl`, `_admin/install/templates/page-*.tpl` | the Nino mark (`box`), the workbench's toggles, the wizard's step and progress icons |
 | `_admin/Nino/Modules/*/Admin/Admin.php`, `_nino/Nino/Modules/*/Admin/Admin.php` | one per panel, the one its entry in the workbench menu shows |
 | `_nino/Nino/Modules/Components/Components.php` | the geometry of the sixteen components' icons, as a tool shows them |
+| `_admin/assets/Nino.admin.js` | the table behind `Nino.adminUi.icon()`: the geometry of 29 icons of Lucide 0.577.0 that the buttons of the workbench's scripts show |
 
 Most of them keep Lucide's own class names - `lucide lucide-<name>` - in
 their markup, which is how to find them.

@@ -719,6 +719,40 @@ a {
 	font-size: max( .76rem, 12px );
 }
 
+/* A button that has an icon before its word (Nino.adminUi.button( text, fn,
+   { icon } )): the icon and the word in one line, a space between them */
+:where(.nino-admin) .nino-admin-btn--lead-icon {
+	display: inline-flex;
+	align-items: center;
+	gap: .4rem;
+}
+
+:where(.nino-admin) .nino-admin-icon {
+	flex: none;
+}
+
+/* A button that is an icon and nothing else (Nino.adminUi.iconButton()): a
+   square that is a target of 28px, 24px when it is small, whatever the
+   height of a form control is */
+:where(.nino-admin) .nino-admin-btn-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 28px;
+	min-width: 28px;
+	height: 28px;
+	min-height: 28px;
+	padding: 0;
+}
+
+:where(.nino-admin) .nino-admin-btn-icon--small {
+	width: 24px;
+	min-width: 24px;
+	height: 24px;
+	min-height: 24px;
+}
+
 /* Buttons - and a line of status, a link - in one row inside a form or under
    a list; the fixed bar at the bottom of the pane is .nino-admin-actionbar.
    The row wraps, so a narrow pane puts the last of them on a row of its own.
