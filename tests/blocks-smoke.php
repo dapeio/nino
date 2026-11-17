@@ -316,7 +316,9 @@ $links = @symlink( $jump, $own. '/linked-folder' ) && @unlink( $linked. '/block.
 blocksWrite( $own, 'dot.name', blocksParts() );
 \Nino\Callbacks::registerCallback( $appData, '/nino/blocks', static function( array &$appData, array &$roots ) use ( $theme ): array {
 
-	$roots[] = [ 'dir' => $theme, 'origin' => 'theme-probe' ];
+	$roots[] = [ 'dir' => $theme, 'origin' => 'theme-probe', 'label' => [ 'de_DE' => 'Theme-Probe', 'en_US' => 'Theme probe' ] ];
+	$roots[] = [ 'dir' => $theme. '/none', 'origin' => 'label-bad', 'label' => "two\nlines" ];
+	$roots[] = [ 'dir' => $theme. '/none', 'origin' => 'label-less' ];
 	$roots[] = [ 'dir' => 'relative/path', 'origin' => 'bad' ];
 	$roots[] = 'not a root';
 
@@ -329,12 +331,17 @@ $rejected = \Nino\Blocks::rejected( $appData );
 $said = ninoWarnings();
 
 check( 'a block of the project and one a hook adds are listed with the origin they come from, beside those of basis', ( $all['mine']['origin'] ?? '' ) === 'project' && ( $all['themed']['origin'] ?? '' ) === 'theme-probe' && ( $all['hero-full']['origin'] ?? '' ) === 'basis' );
+$labels = array_column( \Nino\Blocks::roots( $appData ), 'label', 'origin' );
+$features = \Nino\Features::all( $appData );
+check( 'a block carries the label of its origin: the name of the feature, the word for the project, what the hook gave, and the origin where the hook gave none or a bad one', $all['hero-full']['label'] === $features['basis']['name']
+	&& $all['mine']['label'] === \Nino\Blocks::PROJECT && $all['themed']['label'] === [ 'de_DE' => 'Theme-Probe', 'en_US' => 'Theme probe' ]
+	&& $labels['label-bad'] === 'label-bad' && $labels['label-less'] === 'label-less' );
 check( 'a key that an earlier root has is the earlier one: the later is refused', ( $rejected['theme-probe/mine'] ?? '' ) !== '' );
 check( 'a folder with php in it - in plain sight, hidden at its top, hidden in text/ - and one with a file that is none of the three, and a name that is no slug, are no blocks', array_intersect( [ 'with-code', 'hidden-code', 'hidden-text-code', 'upper-code', 'seven-code', 'with-extra', 'Capital', 'dot.name' ], array_keys( $all ) ) === []
 	&& count( array_intersect_key( $rejected, array_flip( [ 'project/with-code', 'project/hidden-code', 'project/hidden-text-code', 'project/upper-code', 'project/seven-code', 'project/with-extra', 'project/Capital', 'project/dot.name' ] ) ) ) === 8 );
 check( 'a folder that is a link, and a file of a block that is one, are no blocks'. ( $links === true ? '' : ' (no links here: not run)' ), $links === false || ( isset( $all['linked-folder'] ) === false && isset( $all['linked-file'] ) === false && isset( $rejected['project/linked-folder'], $rejected['project/linked-file'] ) === true ) );
 check( 'a block that is refused is said once, with its reason, and nothing else is said but an entry of the hook that is none', count( array_filter( $said, static fn( string $line ): bool => str_contains( $line, 'with-code' ) ) ) === 1
-	&& count( array_filter( $said, static fn( string $line ): bool => str_contains( $line, '"/nino/blocks"' ) ) ) === 2 && count( $said ) === count( $rejected ) + 2 );
+	&& count( array_filter( $said, static fn( string $line ): bool => str_contains( $line, '"/nino/blocks"' ) ) ) === 3 && count( array_filter( $said, static fn( string $line ): bool => str_contains( $line, '"label"' ) ) ) === 1 && count( $said ) === count( $rejected ) + 3 );
 
 // What decides between two blocks of one key: Basis, the project, the other features by their keys
 blocksWrite( NINO_FEATURES_DIR. '/Aaa/blocks', 'hero-full', blocksParts() );
@@ -346,7 +353,7 @@ $all = \Nino\Blocks::all( $appData );
 $rejected = \Nino\Blocks::rejected( $appData );
 ninoWarnings();
 check( 'the order of the roots is Basis, the project, the other features by key, the hook: a block of the project is not put out by a feature that comes later, and none puts out one of Basis, and what is put out says by whom',
-	array_column( \Nino\Blocks::roots( $appData ), 'origin' ) === [ 'basis', 'project', 'aaa', 'zzz', 'theme-probe' ] && $all['hero-full']['origin'] === 'basis' && $all['pricing']['origin'] === 'project'
+	array_column( \Nino\Blocks::roots( $appData ), 'origin' ) === [ 'basis', 'project', 'aaa', 'zzz', 'theme-probe', 'label-bad', 'label-less' ] && $all['hero-full']['origin'] === 'basis' && $all['pricing']['origin'] === 'project'
 	&& str_contains( (string) ( $rejected['aaa/hero-full'] ?? '' ), '"basis"' ) && str_contains( (string) ( $rejected['zzz/pricing'] ?? '' ), '"project"' ) );
 
 // A component that a feature which is off brings: the block is listed and needs that feature

@@ -1267,7 +1267,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
 | Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
 | Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
-| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again - except in the bar of `Nino.adminUi.saveBar()`, whose line stays and says it) - not a `p`, not `role="status"` |
+| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again - except in the bar of `Nino.adminUi.saveBar()`, whose badge says it) - not a `p`, not `role="status"` |
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger`, built with `Nino.adminUi.button()` |
 | A button small enough for a row - the actions of one entry, a button beside a field | `.nino-admin-btn--small` beside the variant that says what it does (30px high, where the base button is as high as a field) |
 | Buttons and a status line in one row inside a form or under a list - not the fixed bar | `.nino-admin-actions` (wraps; `--end` stands it at the right edge, `--between` spreads it); the space above it is the screen's own rule |
@@ -1515,7 +1515,7 @@ the split view and `api( action, data, done )` the panel's own request to its ac
 **`Nino.adminUi.previewFrame( options )`** is the loop that keeps the preview in step with the draft. The panel
 says what changed with `schedule()` and the loop sends the draft when the hand has rested (150 ms), one request at
 a time: what changes while a request is out is sent in the next, once, and the frame is loaded only with the last
-answer. The answer of `send` is `{ token, query, ttl }` - the token of a [draft](../development.md#a-draft-for-a-preview),
+answer. `flush()` sends at once and takes back the wait that `schedule()` had out, so a change and an at once are one request. The answer of `send` is `{ token, query, ttl }` - the token of a [draft](../development.md#a-draft-for-a-preview),
 the query that makes a request for the page ask for it and the seconds it holds. The token goes with the next
 `send`, so that the server renews it, and is asked for again 5 seconds before it runs out (`grace`). A failed
 request, an answer that is no draft and a renewal are told to the panel (`onError`, `onUnavailable`, `onRenew`), and
@@ -1561,7 +1561,8 @@ on the screen once there is a last state and waits while changes are unsaved. Sa
 panel's `onSave( done )` ends with `done( true )` or `done( false )` on every way it can end - a failure says
 itself on `bar.line` before it ends the save, and where it says nothing the line is back to "unsaved changes" -, and what
 was changed while it was on its way stays a change. The first change of a saved screen is said once on the line, a status a
-screen reader reads out; `calm` is a third, quiet state with a word of its own ("Applied"). `entry()` is the entry for the shell's registry of unsaved input
+screen reader reads out: the sentence is kept off the screen - the badge shows the state - and goes after four seconds, and what the
+panel says itself (an error, a reason in `blocked`, words of its own) stays on the line until the panel changes it; `calm` is a third, quiet state with a word of its own ("Applied"). `entry()` is the entry for the shell's registry of unsaved input
 (`Nino.admin.dirty.register()`), so that Ctrl+S, leaving the panel and the question that is asked then are the
 bar's.
 
@@ -1586,7 +1587,7 @@ Nino.admin.dirty.register( 'pd', bar.entry( { discard : drop } ) );
 
 Each has a suite - `tests/nino-ui-previewframe-js-smoke.js`, `tests/nino-ui-conflict-js-smoke.js` and
 `tests/nino-ui-savebar-js-smoke.js` - and they are drawn in the browser by the same stylesheet as the other builders
-(`.nino-admin-savebar` is an action bar, and on a phone its line is a row of its own above the buttons).
+(`.nino-admin-savebar` is an action bar, and on a phone the bar is the badge and the buttons, two rows at most, and its line is a row of its own only while it holds words).
 
 ### A tree
 

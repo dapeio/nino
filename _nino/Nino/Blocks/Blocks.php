@@ -21,7 +21,9 @@ namespace Nino {
 	 *	Blocks are read from three places: the folder blocks/ of every feature that is on (the one that comes with the kernel,
 	 *	Basis, among them), the folder blocks/ of the project's private tree, and the roots that a callback of the hook
 	 *	'/nino/blocks' adds - it is handed a list and answers it with [ 'dir' => the absolute path of a folder of blocks, 'origin'
-	 *	=> a word that says whose they are ] added, which is where a theme or a package of blocks puts its own.
+	 *	=> a word that says whose they are, 'label' => the same for a person: a text or a locale => text map, optional ] added, which is
+	 *	where a theme or a package of blocks puts its own. The label of Basis and of every other feature is the name of the feature, the
+	 *	one of the project is PROJECT; an entry of the hook without a label, or with one that is none, is labelled by its origin.
 	 *
 	 *	What a block may be is checked by validate(), the same for each place - a block of the project is no more trusted than one of the
 	 *	kernel's - and a block that is not what it says it is is left out of all(), said once in the log, and named by rejected():
@@ -103,6 +105,9 @@ namespace Nino {
 		// Where the words of ~name are read under, while a block is looked at: any template name does
 		private const string TEMPLATE = 'block';
 
+		// What a person reads where the origin is the project's own, in each language the kernel has words for
+		public const array PROJECT = [ 'en_US' => 'Project', 'de_DE' => 'Projekt' ];
+
 		// What the cache of the request keeps
 		private const string STATE = './nino/blocks/state';
 		private const string SAID = './nino/blocks/said';
@@ -112,7 +117,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										key => [ 'key', 'origin' => the key of the feature, 'project' or what the hook said, 'name' and 'description' =>
+		 *	@return 	array										key => [ 'key', 'origin' => the key of the feature, 'project' or what the hook said, 'label' => what a person reads for the origin (text or locale => text map), 'name' and 'description' =>
 		 *																	locale => text, 'category', 'rank', 'wrap' => the root, 'locales', 'features' => the keys of
 		 *																	the features whose components it calls - worked out from the register -, 'variants' => component => the
 		 *																	variants it names, 'images' => name => [ 'placeholder', 'width', 'height', 'label' => locale => text ],
@@ -179,7 +184,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ [ 'origin' => ..., 'dir' => the path of the folder, 'own' => the path it must be inside of, so that it is no link, or '' ], ... ]
+		 *	@return 	array										[ [ 'origin' => ..., 'label' => text or locale => text map, 'dir' => the path of the folder, 'own' => the path it must be inside of, so that it is no link, or '' ], ... ]
 		 */
 		public static function roots( array &$appData ): array {
 
@@ -191,14 +196,14 @@ namespace Nino {
 			$content = (string) ( $appData['./nino/filesystem/contentpath'] ?? '' );
 
 			if( isset( $features['basis'] ) === true )
-				$roots[] = [ 'origin' => 'basis', 'dir' => $features['basis']['dir']. '/blocks', 'own' => $features['basis']['dir'] ];
+				$roots[] = [ 'origin' => 'basis', 'label' => $features['basis']['name'], 'dir' => $features['basis']['dir']. '/blocks', 'own' => $features['basis']['dir'] ];
 
 			if( $content !== '' )
-				$roots[] = [ 'origin' => 'project', 'dir' => $content. self::OWN, 'own' => $content ];
+				$roots[] = [ 'origin' => 'project', 'label' => self::PROJECT, 'dir' => $content. self::OWN, 'own' => $content ];
 
 			foreach( $features as $key => $feature )
 				if( $key !== 'basis' )
-					$roots[] = [ 'origin' => $key, 'dir' => $feature['dir']. '/blocks', 'own' => $feature['dir'] ];
+					$roots[] = [ 'origin' => $key, 'label' => $feature['name'], 'dir' => $feature['dir']. '/blocks', 'own' => $feature['dir'] ];
 
 			$given = [];
 			$given = \Nino\Callbacks::doCallbacks( $appData, self::HOOK, $given );
@@ -207,7 +212,16 @@ namespace Nino {
 				if( is_array( $entry ) === true && is_string( $entry['dir'] ?? null ) === true && $entry['dir'] !== '' && $entry['dir'][0] === '/'
 					&& is_string( $entry['origin'] ?? null ) === true && preg_match( self::ID, $entry['origin'] ) === 1 && strlen( $entry['origin'] ) <= \Nino\Components::NAME_LENGTH
 					&& str_contains( $entry['dir'], "\0" ) === false )
-					$roots[] = [ 'origin' => $entry['origin'], 'dir' => rtrim( $entry['dir'], '/' ), 'own' => '' ];
+				{
+					$label = $entry['label'] ?? $entry['origin'];
+
+					if( self::_label( $label ) === false ) {
+						self::_said( $appData, 'label '. md5( serialize( $entry ) ), 'Blocks: the "label" of an entry of the hook "'. self::HOOK. '" is no text or map of language => text of at most '. self::MAX_NAME. ' characters, without control character, < and > - the origin is read instead' );
+						$label = $entry['origin'];
+					}
+
+					$roots[] = [ 'origin' => $entry['origin'], 'label' => $label, 'dir' => rtrim( $entry['dir'], '/' ), 'own' => '' ];
+				}
 				else
 					self::_said( $appData, 'hook '. md5( serialize( $entry ) ), 'Blocks: an entry of the hook "'. self::HOOK. '" is no array of an absolute "dir" and an "origin" of lower case letters, digits and hyphens - left out' );
 
@@ -393,7 +407,7 @@ namespace Nino {
 						continue;
 					}
 
-					$blocks[$name] = [ 'origin' => $root['origin'] ] + $block;
+					$blocks[$name] = [ 'origin' => $root['origin'], 'label' => $root['label'] ] + $block;
 				}
 
 			uasort( $blocks, static fn( array $a, array $b ): int => [ array_search( $a['category'], self::CATEGORIES, true ), $a['rank'], $a['key'] ] <=> [ array_search( $b['category'], self::CATEGORIES, true ), $b['rank'], $b['key'] ] );
@@ -602,6 +616,7 @@ namespace Nino {
 			foreach( $roots as $root ) {
 
 				$stamp['root '. $root['origin']] = $root['dir'];
+				$stamp['label '. $root['origin']] = $root['label'];
 
 				foreach( self::_names( $root ) as $name ) {
 
@@ -659,7 +674,7 @@ namespace Nino {
 				return null;
 
 			foreach( $value['blocks'] as $key => $block )
-				if( is_string( $key ) === false || is_array( $block ) === false || isset( $block['source'], $block['texts'], $block['slots'], $block['origin'], $block['category'], $block['rank'] ) === false )
+				if( is_string( $key ) === false || is_array( $block ) === false || isset( $block['source'], $block['texts'], $block['slots'], $block['origin'], $block['label'], $block['category'], $block['rank'] ) === false )
 					return null;
 
 			return $value;
@@ -793,6 +808,26 @@ namespace Nino {
 				return 'a text has no <, no > and no [[: it is words, not markup and not a key of the project';
 
 			return null;
+		}
+
+		/**
+		 *	Whether a label of an origin is what a person may read: a text, or a map of language => text, each of at most MAX_NAME
+		 *	characters, as the name of a block is
+		 *
+		 *	@param		mixed			$label
+		 *
+		 *	@return 	bool
+		 */
+		private static function _label( mixed $label ): bool {
+
+			if( is_array( $label ) === true && $label === [] )
+				return false;
+
+			foreach( is_array( $label ) === true ? $label : [ '' => $label ] as $locale => $text )
+				if( ( is_array( $label ) === true && ( is_string( $locale ) === false || preg_match( '/^[a-z]{2,3}_[A-Z]{2}$/D', $locale ) !== 1 ) ) || self::_text( $text, self::MAX_NAME, false ) !== null )
+					return false;
+
+			return true;
 		}
 
 		/**

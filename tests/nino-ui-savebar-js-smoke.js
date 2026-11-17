@@ -15,7 +15,10 @@ const fs = require('fs');
 const path = require('path');
 const { check, done, load, documentOf, element, findAll, fire, fills } = require( './harness.js' );
 
+const timers = [];
 const sandbox = { console : console, document : documentOf( element('div') ) };
+sandbox.setTimeout = function( fn, ms ) { timers.push( { fn : fn, ms : ms, live : true } ); return timers.length - 1 };
+sandbox.clearTimeout = function( id ) { if( timers[id] !== undefined ) timers[id].live = false };
 sandbox.window = sandbox;
 sandbox.Nino = { content : { getText : function( key ) { return fills( '_admin/text/en_US.php' )[key] ?? '' } } };
 load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
@@ -39,10 +42,11 @@ function build( extra ) {
 
 const names = bar => findAll( bar.el, el => el.tagName === 'BUTTON' ).map( el => el.textContent );
 
-// The bar keeps its line on a phone, so the registry's mark is hidden there: the sentence is said once
+// On a phone the line is a row of its own only while it holds words, and the registry's mark is not drawn beside the badge
 const stylesheet = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
-check( 'on a phone the bar of a saveBar shows its line and does not draw the registry\'s mark of unsaved changes beside it',
-	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-status \{\s*display: block;[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheet ) === true );
+check( 'on a phone the bar of a saveBar shows its line only where it is not empty and does not draw the registry\'s mark of unsaved changes',
+	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-status:not\(:empty\) \{\s*display: block;[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheet ) === true );
+check( 'the sentence of a first change is kept off the screen by the stylesheet, and only while the line still says it', /\.nino-admin-savebar > \.nino-admin-status\[data-once\]\[data-state="dirty"\] \{[^}]*clip-path: inset\(50%\)/.test( stylesheet ) === true );
 
 console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whole\n' );
 
@@ -142,6 +146,30 @@ console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whol
 	check( '...and a change takes it over again with the mark of a change', w.bar.state.dataset.state === 'warn' );
 	w.bar.set( { dirty : false, calm : '' } );
 	check( 'and with no word it is the saved one', w.bar.state.textContent === '\u2713 Saved' && w.bar.state.dataset.state === 'ok' );
+}
+
+{
+	const w = build();
+
+	timers.length = 0;
+	w.bar.set( { dirty : true } );
+	w.bar.set( { dirty : true } );
+	check( 'the sentence of the first change is marked as said once and is taken back after a few seconds, once', w.bar.line.element.dataset.once === 'dirty' && timers.length === 1 && timers[0].ms === 4000 );
+	timers[0].fn();
+	check( '...the line is empty then, the badge still says the state and the changes stand', w.bar.line.state === 'idle' && w.bar.line.element.textContent === '' && w.bar.line.element.dataset.once === undefined && w.bar.state.dataset.state === 'warn' && w.bar.save.disabled === false );
+
+	w.bar.set( { dirty : false } );
+	w.bar.set( { dirty : true } );
+	w.bar.line.fail( 'Said by the caller.' );
+	timers[timers.length - 1].fn();
+	check( 'what the caller says in the meantime stays where it is: a timer that finds other words takes nothing back', w.bar.line.state === 'error' && w.bar.line.element.textContent === 'Said by the caller.' );
+
+	w.bar.line.idle();
+	w.bar.set( { dirty : false } );
+	w.bar.set( { dirty : true } );
+	w.bar.line.dirty( 'Not named yet.' );
+	timers[timers.length - 1].fn();
+	check( '...and so do words of its own that the caller gave in the state of changes', w.bar.line.state === 'dirty' && w.bar.line.element.textContent === 'Not named yet.' );
 }
 
 {

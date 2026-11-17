@@ -55,6 +55,9 @@
 	// The counter behind the ids the building blocks make when they are given none
 	let serial = 0;
 
+	// How long the line of a saveBar() holds the sentence "unsaved changes" before it goes: the badge says the state from then on
+	const SAID_FOR = 4000;
+
 	wn.Nino.adminUi = {
 
 		// How many search hits elementList() draws at once. The search itself
@@ -3778,6 +3781,9 @@
 				if( typeof then === 'function' )
 					waiting.push( then );
 
+				// A wait that is still out is this send: it is taken back, so that a change and an at once make one request
+				wn.clearTimeout( timer );
+
 				if( stopped === true ) {
 					finish( false );
 					return;
@@ -3921,7 +3927,9 @@
 		 *	last state" once there is one and nothing unsaved, and Save. Save is pressed once at a time: while the save is on its way
 		 *	it is disabled, and where the caller says what keeps it from being saved, the line says it and Save waits. The
 		 *	caller says what is the case, with set(); the bar draws it and does nothing of its own accord. The first change of a
-	 *	saved screen is said once on the line - a status, which a screen reader reads out - and not again while the changes stand. A save that
+	 *	saved screen is said once on the line - a status, which a screen reader reads out - and not again while the changes stand; the
+	 *	sentence is for the screen reader - the stylesheet keeps it off the screen - and goes after four seconds, the badge says the state.
+	 *	What the caller says (an error, a reason, words of its own) stays on the line until the caller changes it. A save that
 	 *	ends with done( false ) leaves the line as the caller left it: where it still says "Saving" it is back to "unsaved
 	 *	changes", and a caller that has an error to say says it before it ends the save
 		 *
@@ -3985,6 +3993,26 @@
 			let restorable = false;
 			let busy = false;
 			let typed = false;
+			let heard = null;
+
+			// The line says "unsaved changes" once, for the screen reader (the stylesheet keeps it off the screen: the badge shows
+			// the state), and the sentence goes after SAID_FOR where nobody has put another in its place
+			const tell = function() {
+
+				wn.clearTimeout( heard );
+				line.dirty();
+				line.element.dataset.once = 'dirty';
+
+				const words = line.element.textContent;
+
+				heard = wn.setTimeout( function() {
+
+					delete line.element.dataset.once;
+
+					if( line.state === 'dirty' && line.element.textContent === words )
+						line.idle();
+				}, SAID_FOR );
+			};
 
 			const paint = function() {
 
@@ -4004,7 +4032,7 @@
 					said = '';
 
 					if( dirty === true )
-						line.dirty();
+						tell();
 					else
 						line.idle();
 				}
@@ -4037,12 +4065,12 @@
 						dirty = typed;
 
 						if( typed === true )
-							line.dirty();
+							tell();
 						else
 							line.saved();
 					}
 					else if( line.state === 'saving' )
-						line.dirty();
+						tell();
 
 					paint();
 					refresh();
@@ -4071,7 +4099,7 @@
 
 						// The first change of a saved screen is said, once: the line is a status that is read out
 						if( now.dirty === true && dirty === false && busy === false && blocked === '' && ( typeof now.blocked !== 'string' || now.blocked === '' ) && line.state !== 'error' )
-							line.dirty();
+							tell();
 
 						// What the line said of changes is not true of a screen that is back to what is saved
 						if( now.dirty === false && dirty === true && busy === false && line.state === 'dirty' )

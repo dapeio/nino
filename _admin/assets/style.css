@@ -3408,11 +3408,31 @@ a {
 }
 
 /* The bar of a screen that is saved as a whole (Nino.adminUi.saveBar()): the state first,
-   then the status line, then the buttons. The state is a badge, a word and a mark. On a phone
-   the line stays - it says what keeps Save from being done - and is a row of its own above
-   the buttons, which wrap where they do not fit */
+   then the status line, then the buttons. The state is a badge, a word and a mark. The line
+   is empty most of the time - the first change is said for the screen reader and goes, what
+   the caller has to say stays - so on a phone it is a row of its own only while it holds words, and
+   the bar keeps to the badge and the buttons: two rows at most, the buttons wrap where they
+   do not fit */
 .nino-admin .nino-admin-actionbar > .nino-admin-savebar-state {
 	order: -2;
+}
+
+.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status {
+	text-align: left;
+}
+
+/* The sentence the bar says of a first change (data-once) is for the screen reader: the badge shows the state, and a line that
+   came and went would move the bar. It is out of the way, not out of the accessibility tree (see .nino-admin-sr-only) */
+.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status[data-once][data-state="dirty"] {
+	position: absolute;
+	display: block;
+	flex: none;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }
 
 @media (max-width: 38rem) {
@@ -3421,14 +3441,16 @@ a {
 		flex-wrap: wrap;
 	}
 
-	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status {
-		display: block;
-		flex: 1 0 100%;
-		text-align: left;
+	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-savebar-state {
+		margin-right: auto;
 	}
 
-	/* Its line says "unsaved changes" here, so the registry's mark is not drawn
-	   a second time (above 38rem the :has() rule of the shell hides it) */
+	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status:not(:empty) {
+		display: block;
+		flex: 1 0 100%;
+	}
+
+	/* The badge says it, so the registry's mark is not drawn beside it */
 	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-actionbar-dirty {
 		display: none;
 	}

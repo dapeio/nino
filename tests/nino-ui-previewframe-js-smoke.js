@@ -125,6 +125,12 @@ console.log( 'Nino.adminUi.previewFrame - a preview that follows a draft\n' );
 
 	timers[1].fn();
 	check( '...and then sends the draft', w.sent.length === 1 );
+	const mine = build();
+	timers.length = 0;
+	mine.frame.schedule();
+	mine.frame.flush();
+	check( 'a flush takes back the wait that is still out: a change and an at once are one request, and the wait does not send a second', mine.sent.length === 1 && timers[0].live === false );
+
 	check( 'the rest and the grace can be set', build( { quiet : 20 } ).frame.schedule() === undefined && timers[timers.length - 1].ms === 20 );
 }
 
