@@ -758,10 +758,11 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 			wrap.appendChild( list );
 
+			// "New <thing>" is the one main button of the bar of a list
 			const add = Nino.adminUi.button( Nino.content.getText('/_admin/catalog/label/new'), function() {
 				Nino.admin.catalog._renderForm( null, add );
-			}, { className : 'nino-admin-btn-primary' } );
-			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
+			} );
+			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : add } ).el );
 		},
 
 		// opener: the button that opened the blank form, which Back returns to
@@ -1414,14 +1415,15 @@ Reach for an existing class first; only invent one when no role fits.
 | Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
 | Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
 | Scrolling content column | `.nino-admin-pane` |
-| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()`; the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
-| Back link inside that row | `.nino-admin-back-link` |
-| Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
+| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar( { back, title, tools, panel } )` (called with a link and its controls it takes them as they are); the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
+| Back link inside that row | `.nino-admin-back-link`, drawn by `contextBar( { back : { to, onClick } } )` as "Back to <to>" |
+| Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar( { danger, status, secondary, primary } )`: the destructive action at the left, the state and its line, the side actions, ONE main button at the right edge |
+| The answer to an action that went well | `Nino.adminUi.say( text )`: the toast above the bar, one at a time, never for an error |
 | The manual of a screen - sections of a handle and what it does, or running text - in a dialog or on the screen | `.nino-admin-manual` via `Nino.adminUi.manual( content, options )`: `[ { heading, entries : [ { handle, text } ] } ]` or a text, `options.named` to name a handle in words instead of code, `options.none` for the sentence of an empty section, `options.level` for the headings; `Nino.adminUi.manualDialog()` shows it in `.nino-admin-dialog--manual` |
-| Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
+| Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.actionBar( { list : true, primary } )` for "New <thing>"; `Nino.adminUi.listActions( buttons )` for a list bar with more than one button (a scan and a new one, an export) |
 | Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
 | Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
-| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again - except in the bar of `Nino.adminUi.saveBar()`, whose badge says it) - not a `p`, not `role="status"` |
+| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again - except in a bar that has the badge of `Nino.adminUi.actionBar()` or `saveBar()`: there the registry paints the badge and draws no mark of its own) - not a `p`, not `role="status"` |
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger`, built with `Nino.adminUi.button()` |
 | A button small enough for a row - the actions of one entry, a button beside a field | `.nino-admin-btn--small` beside the variant that says what it does (30px high, where the base button is as high as a field) |
 | Buttons and a status line in one row inside a form or under a list - not the fixed bar | `.nino-admin-actions` (wraps; `--end` stands it at the right edge, `--between` spreads it); the space above it is the screen's own rule |
@@ -1451,6 +1453,25 @@ Reach for an existing class first; only invent one when no role fits.
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
 | Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
 | Error text | `.nino-admin-error` |
+
+The bar, the toast and the way back of a form, in the three calls the Routes and Navigations panels make:
+
+```js
+// The way back: "Back to <name of the panel>", the name read from the head of the pane
+wrap.appendChild( Nino.adminUi.contextBar( { back : { to : wrap, onClick : function() { Nino.adminUi.backTo( 'notes-list', opener ) } } } ) );
+
+// The bar: Delete at the left, the badge and the line, Save at the right edge - and nothing else
+const bar = Nino.adminUi.actionBar( {
+	danger  : Nino.adminUi.button( Nino.content.getText('/_admin/notes/label/delete'), remove, { kind : 'danger' } ),
+	status  : true,
+	primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ),
+} );
+form.appendChild( bar.el );
+bar.line.bind( form );
+
+// What went well, said once the answer is in; a failure goes to bar.line.error()
+Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
+```
 
 **Every word is a fill.** A panel script never renders a literal English
 sentence: the workbench's strings are `_admin/text/<locale>.php`, a module's are

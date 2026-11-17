@@ -253,12 +253,8 @@
 			msg.setAttribute( 'aria-live', 'polite' );
 			wrap.appendChild( msg );
 
-			const addBtn = dc.createElement('button');
-			addBtn.type = 'button';
-			addBtn.className = 'nino-admin-btn-primary';
-			addBtn.textContent = Nino.content.getText('/_admin/routes/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.routes._openForm( null, addBtn ) } );
-			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
+			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/routes/label/new'), function() { Nino.admin.routes._openForm( null, addBtn ) } );
+			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : addBtn } ).el );
 		},
 
 		/**
@@ -517,12 +513,7 @@
 			const wrap = dc.getElementById('routes-form');
 			wrap.innerHTML = '';
 
-			const backLink = dc.createElement('a');
-			backLink.href = '#';
-			backLink.className = 'nino-admin-back-link';
-			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'routes-list', Nino.admin.routes._opener ) } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+			wrap.appendChild( Nino.adminUi.contextBar( { back : { to : wrap, onClick : function() { Nino.adminUi.backTo( 'routes-list', Nino.admin.routes._opener ) } } } ) );
 
 			const form = dc.createElement('form');
 			form.noValidate = true;
@@ -571,22 +562,15 @@
 
 			form.appendChild( contentFieldset );
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
 			const msg = dc.createElement('p');
 			msg.id = 'routes-form-msg';
-			actions.appendChild( msg );
-			Nino.admin.routes._line = Nino.adminUi.status( msg );
+
+			const bar = Nino.adminUi.actionBar( { status : { line : msg }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
+			Nino.admin.routes._line = bar.line;
 			// A bar with a status line shows no other mark of unsaved input: the line follows the form
 			Nino.admin.routes._line.bind( form );
 
-			form.appendChild( actions );
+			form.appendChild( bar.el );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.routes._save() } );
 
@@ -616,12 +600,7 @@
 			const wrap = dc.getElementById('routes-form');
 			wrap.innerHTML = '';
 
-			const backLink = dc.createElement('a');
-			backLink.href = '#';
-			backLink.className = 'nino-admin-back-link';
-			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'routes-list', Nino.admin.routes._opener ) } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+			wrap.appendChild( Nino.adminUi.contextBar( { back : { to : wrap, onClick : function() { Nino.adminUi.backTo( 'routes-list', Nino.admin.routes._opener ) } } } ) );
 
 			const form = dc.createElement('form');
 			form.noValidate = true;
@@ -781,34 +760,17 @@
 
 			form.appendChild( contentFieldset );
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
-			// In the actions row, not loose below the form: that row is pinned
-			// to the bottom of the viewport now (see assets/style.css), and a
-			// button left outside it would be the one control that scrolls away
-			if( Nino.admin.routes._isNew === false ) {
-				const deleteBtn = dc.createElement('button');
-				deleteBtn.type = 'button';
-				deleteBtn.className = 'nino-admin-btn-danger';
-				deleteBtn.textContent = Nino.content.getText('/_admin/routes/label/delete');
-				deleteBtn.addEventListener( 'click', function() { Nino.admin.routes._delete() } );
-				actions.appendChild( deleteBtn );
-			}
-
+			// The bar is the one of every form (actionBar()): Delete at the left where there is a page to delete, Save at the right edge
+			const deleteBtn = Nino.admin.routes._isNew === true ? null : Nino.adminUi.button( Nino.content.getText('/_admin/routes/label/delete'), function() { Nino.admin.routes._delete() }, { kind : 'danger' } );
 			const msg = dc.createElement('p');
 			msg.id = 'routes-form-msg';
-			actions.appendChild( msg );
-			Nino.admin.routes._line = Nino.adminUi.status( msg );
+
+			const bar = Nino.adminUi.actionBar( { danger : deleteBtn, status : { line : msg, fresh : Nino.admin.routes._isNew === true }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
+			Nino.admin.routes._line = bar.line;
 			// A bar with a status line shows no other mark of unsaved input: the line follows the form
 			Nino.admin.routes._line.bind( form );
 
-			form.appendChild( actions );
+			form.appendChild( bar.el );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.routes._save() } );
 
@@ -1155,6 +1117,7 @@
 				// The page that was saved is the one a window beside this one goes to
 				Nino.admin.touch( 'routes', Nino.admin.routes._publicPath( addressed.httpUris ) );
 				line.saved();
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
 				Nino.admin.routes.init();
@@ -1209,6 +1172,7 @@
 				}
 				Nino.admin.touch( 'routes', Nino.admin.routes._publicPath( { '' : page.httpUri } ) );
 				line.saved();
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
 				Nino.admin.routes.init();
@@ -1318,6 +1282,7 @@
 							return;
 						}
 						Nino.admin.touch( 'routes' );
+						Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/deleted') );
 						Nino.admin.routes.init();
 					} );
 				},

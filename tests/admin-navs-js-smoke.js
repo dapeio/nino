@@ -53,6 +53,9 @@ function build( shell ) {
 	form.classList.add('admin-hidden');
 	pane.appendChild( form );
 
+	// The page a toast is drawn in
+	const page = element('body');
+
 	const requests = [];
 	const confirms = [];
 	// What the panel said it wrote (see Nino.admin.touch() of the shell)
@@ -75,18 +78,19 @@ function build( shell ) {
 		console : console,
 		document : {
 			createElement : element,
+			createElementNS : function( space, tag ) { return element( tag ) },
 			getElementById : function( id ) {
 				if( id === 'navs-list' ) return list;
 				if( id === 'navs-form' ) return form;
 				return findAll( list, function( el ) { return el.id === id } )[0] ?? findAll( form, function( el ) { return el.id === id } )[0] ?? null;
 			},
 			documentElement : null,
-			body : null,
+			body : page,
 			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
 		},
 		Nino : Nino,
 	};
-	sandbox.window = { Nino : Nino, location : { hash : '' }, confirm : function( message ) { confirms.push( message ); return box.confirmAnswer } };
+	sandbox.window = { Nino : Nino, location : { hash : '' }, setTimeout : function() { return 1 }, clearTimeout : function() {}, confirm : function( message ) { confirms.push( message ); return box.confirmAnswer } };
 
 	const context = vm.createContext( sandbox );
 	load( '_admin/assets/Nino.admin.js', context );
@@ -100,6 +104,7 @@ function build( shell ) {
 		requests : requests,
 		confirms : confirms,
 		touched : touched,
+		page : page,
 		box : box,
 		/** Answer the last request the panel made, the way Nino.http.sendRequest() calls back */
 		answer : function( status, body ) { requests[requests.length - 1].callback( { status : status, responseJSON : body } ) },
@@ -198,7 +203,7 @@ console.log('Admin Navigations');
 		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : 'main', key : 'primary', entries : [ '/about', '/contact' ] } ) );
 	t.answer( 200, { navs : [ { key : 'primary', entries : [ ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES } );
 	check( 'the answer is drawn: the copy is the saved menu now', t.entries().join() === 'About (/about),Contact (/contact)' && t.panel._isDirty() === false && t.panel._currentKey === 'primary' );
-	check( '...and says it was saved', t.field('navs-form-msg').textContent === text('/_admin/common/msg/saved') );
+	check( '...and says it was saved as a toast, not as a line that stays', t.page.querySelectorAll('.nino-admin-toast-text')[0].textContent === text('/_admin/common/msg/saved') && t.field('navs-form-msg').textContent === '' );
 	check( '...and tells the other panels that navigations were written', t.touched.join() === 'navigations' );
 }
 
@@ -444,7 +449,7 @@ console.log('Admin Navigations');
 	t.button( 1, 'up' ).listeners.click[0]();
 	check( 'a change to the copy is unsaved input for the shell, and the shell is told', registered.navs.isDirty() === true && refreshes.length > 0 );
 	check( '...and the panel does not say "unsaved" a second time next to the shell\'s own marker', t.field('navs-form-msg').textContent === '' );
-	check( 'the marker goes in the action bar of the form', registered.navs.bar() === t.byClass('nino-admin-actionbar')[0] );
+	check( 'the marker goes in the action bar of the form', registered.navs.bar() === findAll( t.form, function( el ) { return el.classList.contains('nino-admin-actionbar') } )[0] );
 
 	// With the shell there, it asks in its own dialog, so the panel does not ask a second time
 	t.box.confirmAnswer = false;

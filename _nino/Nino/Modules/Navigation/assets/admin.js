@@ -47,6 +47,9 @@
 		_savedKey 	: '',
 		_entriesHost : null,
 
+		// The status line of the bar of the open menu (see Nino.adminUi.status())
+		_line 			: null,
+
 		// The row or the button that opened the menu that is open: Back returns
 		// the focus to it (see Nino.adminUi.backTo())
 		_opener 		: null,
@@ -236,12 +239,8 @@
 			} );
 			wrap.appendChild( ul );
 
-			const addBtn = dc.createElement('button');
-			addBtn.type = 'button';
-			addBtn.className = 'nino-admin-btn-primary';
-			addBtn.textContent = Nino.content.getText('/_admin/navs/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.navs._openForm( null, addBtn ) } );
-			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
+			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/navs/label/new'), function() { Nino.admin.navs._openForm( null, addBtn ) } );
+			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : addBtn } ).el );
 		},
 
 		/**
@@ -280,12 +279,7 @@
 			const wrap = dc.getElementById('navs-form');
 			wrap.innerHTML = '';
 
-			const backLink = dc.createElement('a');
-			backLink.href = '#';
-			backLink.className = 'nino-admin-back-link';
-			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.navs._back() } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+			wrap.appendChild( Nino.adminUi.contextBar( { back : { to : wrap, onClick : function() { Nino.admin.navs._back() } } } ) );
 
 			const form = dc.createElement('form');
 
@@ -335,28 +329,15 @@
 				Nino.admin.navs._renderEntries();
 			}
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
-			if( Nino.admin.navs._isNew === false ) {
-				const deleteBtn = dc.createElement('button');
-				deleteBtn.type = 'button';
-				deleteBtn.className = 'nino-admin-btn-danger';
-				deleteBtn.textContent = Nino.content.getText('/_admin/navs/label/delete');
-				deleteBtn.addEventListener( 'click', function() { Nino.admin.navs._delete() } );
-				actions.appendChild( deleteBtn );
-			}
-
+			// The bar is the one of every form (actionBar()): Delete at the left where there is a menu to delete, Save at the right edge
+			const deleteBtn = Nino.admin.navs._isNew === true ? null : Nino.adminUi.button( Nino.content.getText('/_admin/navs/label/delete'), function() { Nino.admin.navs._delete() }, { kind : 'danger' } );
 			const msg = dc.createElement('p');
 			msg.id = 'navs-form-msg';
-			actions.appendChild( msg );
 
-			form.appendChild( actions );
+			const bar = Nino.adminUi.actionBar( { danger : deleteBtn, status : { line : msg, fresh : Nino.admin.navs._isNew === true }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
+			Nino.admin.navs._line = bar.line;
+
+			form.appendChild( bar.el );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.navs._save() } );
 
@@ -507,9 +488,12 @@
 				Nino.admin.dirty.refresh();
 			else {
 
-				const msg = dc.getElementById('navs-form-msg');
-				if( msg !== null )
-					msg.textContent = Nino.content.getText('/_admin/navs/msg/unsaved');
+				const line = Nino.admin.navs._line;
+
+				if( line !== null ) {
+					line.dirty( Nino.content.getText('/_admin/navs/msg/unsaved') );
+					Nino.adminUi.barState( line.element.parentNode, { dirty : true } );
+				}
 			}
 		},
 
@@ -647,7 +631,7 @@
 					done( ok );
 			};
 
-			const msg = dc.getElementById('navs-form-msg');
+			const line = Nino.admin.navs._line;
 			const key = dc.getElementById('navs-form-key').value.trim();
 
 			Nino.adminUi.clearFieldErrors( dc.getElementById('navs-form') );
@@ -658,12 +642,12 @@
 			// where it stands, and takes the focus
 			if( key === '' || /^[a-z][a-z0-9_-]*$/.test( key ) === false ) {
 				Nino.admin.navs._markKey( key === '' ? Nino.content.getText('/_admin/common/error/required') : Nino.adminUi.format( Nino.content.getText('/_admin/error/navs_invalid_id'), key ) );
-				msg.textContent = Nino.content.getText('/_admin/common/error/save');
+				line.fail( Nino.content.getText('/_admin/common/error/save') );
 				report( false );
 				return;
 			}
 
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			line.saving();
 
 			const payload = {
 				originalKey : Nino.admin.navs._isNew ? '' : Nino.admin.navs._currentKey,
@@ -677,11 +661,11 @@
 			Nino.admin.navs._apiCall( 'save', payload, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
 
 					// A refusal that names the id (invalid, taken) stands at the field too
 					if( response !== null && typeof response === 'object' && response.field === 'key' )
-						Nino.admin.navs._markKey( msg.textContent );
+						Nino.admin.navs._markKey( line.element.textContent );
 
 					report( false );
 					return;
@@ -695,9 +679,7 @@
 				Nino.admin.navs._currentKey = key;
 				Nino.admin.navs._apply( response );
 
-				const saved = dc.getElementById('navs-form-msg');
-				if( saved !== null )
-					saved.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 
 				report( true );
 			} );
@@ -737,15 +719,16 @@
 					if( ok === false )
 						return;
 
-					const msg = dc.getElementById('navs-form-msg');
-					msg.textContent = Nino.content.getText('/_admin/common/msg/deleting');
+					const line = Nino.admin.navs._line;
+					line.idle( Nino.content.getText('/_admin/common/msg/deleting') );
 
 					Nino.admin.navs._apiCall( 'delete', { key : Nino.admin.navs._currentKey }, function( status, response ) {
 						if( status !== 200 || response === null ) {
-							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
+							line.error( status, response, '/_admin/common/error/delete' );
 							return;
 						}
 						Nino.admin.touch( 'navigations' );
+						Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/deleted') );
 						Nino.admin.navs._showList();
 						Nino.admin.navs._apply( response );
 					} );

@@ -110,6 +110,10 @@ const form = element('div');
 form.id = 'routes-form';
 pane.appendChild( form );
 
+// The page the toasts are drawn in
+const page = element('body');
+const toasts = () => findAll( page, el => el.classList.contains('nino-admin-toast') );
+
 const requests = [];
 
 const confirms = [];
@@ -157,13 +161,14 @@ const sandbox = {
 				return findAll( form, function( el ) { return el.dataset.address !== undefined } );
 			return [];
 		},
+		createElementNS : function( space, tag ) { return element( tag ) },
 		documentElement : null,
-		body : null,
+		body : page,
 		get activeElement() { return active },
 	},
 	Nino : Nino,
 };
-sandbox.window = { Nino : Nino, location : { hash : '' }, confirm : function( message ) { confirms.push( message ); return confirmAnswer } };
+sandbox.window = { Nino : Nino, location : { hash : '' }, setTimeout : function() { return 1 }, clearTimeout : function() {}, confirm : function( message ) { confirms.push( message ); return confirmAnswer } };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
@@ -382,6 +387,7 @@ touched.length = 0; touchedUris.length = 0;
 answer( 200, {} );
 check( 'a save that went through tells the other panels that routes were written', touched.join() === 'routes' );
 check( '...and names the page it saved by its address, which is what a window beside the workbench goes to', touchedUris.join() === '/new' );
+check( '...and says it was saved as a toast, once', toasts().length === 1 );
 answer( 200, listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ] } ) );
 check( 'a save returns to the list, and the focus that stood in the form goes to the name of the panel', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && active === paneTitle );
 
@@ -457,6 +463,7 @@ touched.length = 0; touchedUris.length = 0;
 answer( 200, {} );
 check( '...and a delete that went through tells the other panels that routes were written', touched.join() === 'routes' );
 check( '...with no address: the page is gone, and a move or a delete is no page to go to', touchedUris.length === 1 && touchedUris[0] === undefined );
+check( '...and says it was deleted as a toast that takes the place of the one before it', toasts().length === 1 );
 
 /*	The address a window beside the workbench goes to: that of the language the panel edits,
 	else the one of every language, else the first there is - always a path with its slash	*/
@@ -860,7 +867,7 @@ answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page
 			events : { bindCallback : function() {} },
 			http : { sendRequest : ( uri, method, callback, data ) => sent.push( { action : data.action, callback : callback } ) },
 			content : { getText : key => key },
-			adminUi : { clearFieldErrors : () => {}, api : { errorText : status => 'error '+ status, call : ( endpoint, payload, callback ) => sent.push( { action : endpoint, callback : callback } ) } },
+			adminUi : { clearFieldErrors : () => {}, say : text => calls.push( 'say' ), api : { errorText : status => 'error '+ status, call : ( endpoint, payload, callback ) => sent.push( { action : endpoint, callback : callback } ) } },
 		},
 	};
 	box.window = box;
@@ -880,7 +887,7 @@ answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page
 
 	box.Nino.admin.routes._save( ok => outcomes.push( ok ) );
 	sent[sent.length - 1].callback( 200, {} );
-	check( 'a save that goes through says what it wrote, takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'touch routes,snapshot routes' && said.slice( 2 ).join() === 'saving,saved' );
+	check( 'a save that goes through says what it wrote, takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'touch routes,say,snapshot routes' && said.slice( 2 ).join() === 'saving,saved' );
 	check( '...the shell\'s Save runs the same save', typeof watched[0].save === 'function' );
 }
 

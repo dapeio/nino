@@ -25,9 +25,9 @@ bar ──────────── [Delete thing] [● Changed]   line  [S
 | Part | Rule | Block |
 |---|---|---|
 | Head | A list or form view has the head with the panel's title and the "?" of its manual - the Dashboard too. The tabs of the first level stand in the head and nowhere else. A count at a tab is a badge, not a part of the word. | `panelHead()`, `tabBadge()` |
-| Work surface | A work surface - a draft with a preview that is saved as a whole - has no head: it uses the whole height. The panel's name stands small in the context bar above the way back and stays the heading of the view, which the focus goes to; the "?" of the manual is an icon button at the right of the context bar. The name of the thing and the tools of the view stand in the context bar, `split()` follows it directly and reaches down to the bar, and the preview is the one scroll area. What is rarely needed (the frame of a page, an identifier, markup) is behind an icon button beside the name. The list of the same panel keeps its head. | `contextBar()`, `split()` |
+| Work surface | A work surface - a draft with a preview that is saved as a whole - has no head: it uses the whole height. The panel's name stands small in the context bar above the way back (`contextBar( { panel } )`, which then gives the head of the pane way: its heading stays for a screen reader) and stays the heading of the view, which the focus goes to; the "?" of the manual is an icon button at the right of the context bar. The name of the thing and the tools of the view stand in the context bar, `split()` follows it directly and reaches down to the bar, and the preview is the one scroll area. What is rarely needed (the frame of a page, an identifier, markup) is behind an icon button beside the name. The list of the same panel keeps its head. | `contextBar()`, `split()` |
 | Address | Every view has an address: `#panel`, `#panel/<tab>`, `#panel/<tab>/<thing>`, `#panel/<thing>/new`. Reloading and the browser's back button keep it. | `Nino.admin.router`, `levels()` |
-| Way back | Exactly ONE back link, at the left of the context bar: "Back to <name of the level above>". A deeper level replaces the link; it does not put a second one under it. | `contextBar()`, `.nino-admin-back-link`, `levels()` |
+| Way back | Exactly ONE back link, at the left of the context bar: "Back to <name of the level above>" - one wording, the name from the head of the pane or given. A deeper level replaces the link; it does not put a second one under it. | `contextBar( { back } )`, `levels()` |
 | Tools of the view | The width of a preview, the choice of a page and "Reload" stand at the right of the context bar or in the bar of the preview - never in the content. | `split()` |
 | Working language | The language in which content is shown and edited is chosen once for the whole workbench, in the account area of the rail. No panel has a language switch of its own. A view with values that depend on the language shows the working language as a quiet badge in the context bar as soon as it is not the native one. The interface language and the working language have two different names. | - |
 | Introduction | At most one paragraph, directly under the context bar, before the content. | `hint( text, 'lead' )` |
@@ -36,10 +36,13 @@ bar ──────────── [Delete thing] [● Changed]   line  [S
 | Two columns | Settings at the left, a preview at the right: only `split()`. At 390 px its switch says "Settings | Preview" unless the view has a better fixed name. | `split()`, `previewFrame()` |
 
 ```js
-// The level "element" under "Elements > Imprint": one back link, the tools of the level beside it
-const back = Nino.adminUi.el( 'a', 'nino-admin-back-link', Nino.adminUi.format( t('/_admin/elements/label/back-to'), typeTitle ) );
-back.href = '#elements/'+ type;
-mount.appendChild( Nino.adminUi.contextBar( back, tools ) );
+// The level "thing" under "Routes": one back link that says where it leads, the tools of the level beside it
+mount.appendChild( Nino.adminUi.contextBar( {
+	back  : { to : mount, onClick : function() { Nino.adminUi.backTo( 'routes-list', opener ) } },
+	tools : [ reload ],
+} ) );
+// A work surface with no head: the name of the panel stands small over the link
+Nino.adminUi.contextBar( { panel : 'Themes', title : theme.name, back : { to : 'Themes', onClick : leave } } );
 ```
 
 ## Lists and tables
@@ -53,7 +56,7 @@ mount.appendChild( Nino.adminUi.contextBar( back, tools ) );
 | Entries that are only read | A dense list. | `.nino-admin-list-dense` |
 | Ordered rows in a draft | The row with icon buttons up, down and remove at the end. | `.nino-admin-move`, `iconButton()`, `tree()` |
 | Actions of a row | Opening is the row. Further actions: at most three small buttons at the end of the row, in the order of the bar (side ... main), the dangerous one last and as `danger`. No 38 px buttons in a row. | `button( ..., { small : true } )` |
-| New | "New <thing>" is the main button at the right of the bar of the list - in every panel. | `listActions()` |
+| New | "New <thing>" is the main button at the right of the bar of the list - in every panel. | `actionBar( { list : true, primary } )`; a list bar with several buttons (scan, import, export): `listActions( buttons )` |
 | Search and filter | The search field stands at the left above the list, its placeholder is "Search <things>" (without "..."); a filter is a select or a chip beside it. From 12 entries on a list SHOULD have a search. | `table()` |
 | Empty | A box with one sentence and - where there is one - the next step as a button. Never a bare sentence, never a hint line. An empty result of a filter says that the filter finds nothing. | `emptyState()` |
 | A list that failed to load | The error stands in place of the list. | `showError()` |
@@ -99,9 +102,9 @@ Three models. A view has exactly one.
 
 | Model | When | Bar | Block |
 |---|---|---|---|
-| **A form** | the fields of a record or of a setting | `[Delete <thing>] [● Changed] ... line · [side actions] · [Save]` | `actionBar()`, `status()`, `Nino.admin.dirty.watchForm()` |
+| **A form** | the fields of a record or of a setting | `[Delete <thing>] [● Changed] ... line · [side actions] · [Save]` | `actionBar( { danger, status, secondary, primary } )`, `Nino.admin.dirty.watchForm()` |
 | **B work surface** | a draft with a preview that is saved as a whole | `[● Changed] line ... [Undo] [Redo] [more] · [Save]` | `saveBar()`, `previewFrame()`, `conflict()` |
-| **C immediate** | one single action without a form: upload, switch on or off, the order of a list, back up, duplicate, copy | no bar (or only `listActions()`) | the answer as a toast |
+| **C immediate** | one single action without a form: upload, switch on or off, the order of a list, back up, duplicate, copy | no bar (or only a list's bar: `actionBar( { list : true, primary } )`, `listActions()`) | the answer as a toast, `say()` |
 
 - **Exactly one main button per view, at the far right of the bar.** No Save button in the content, none per row. What reads "Apply" per row belongs to the form (model A) or is a view of its own.
 - **The word:** "Save" for what exists; "Create <thing>" in a view or a dialog that creates; never "Apply", "OK", "Done". An effect beyond saving has a name of its own and stands to the LEFT of the main button ("Apply to website"), or it is the main button of a view of its own.
@@ -110,13 +113,17 @@ Three models. A view has exactly one.
 - **After saving the view stays as it is.** A new thing gets its address; there is no jump to the list.
 - **Unsaved input** is reported by every view of the models A and B to `Nino.admin.dirty`; the shell asks "Save · Discard · Cancel". `save( done )` ends on every way with `done( ok )`. **Ctrl/Cmd+S** saves through the registry.
 - **Conflict (409):** model B asks with `conflict()`; model A shows the server's sentence in the line and leaves the form as it is.
-- **Immediate (C)** says what happened, for 4 s, and to a screen reader (`role="status"`). The form is **one toast** at the bottom right above the bar, at most one at a time, and never for an error.
+- **Immediate (C)** says what happened, for 4 s, and to a screen reader (`role="status"`). The form is **one toast**, `say( text )`, at the bottom right above the bar, at most one at a time, and never for an error: an error stays at the field, in the line of the bar or in `showError()`, and `say()` refuses it. The same toast says the success of a form that was saved or deleted.
 
 ```js
-const bar = Nino.adminUi.actionBar( barElement );
-bar.appendChild( Nino.adminUi.button( t('/_admin/routes/label/delete'), remove, { kind : 'danger' } ) );
-const status = Nino.adminUi.status( line );
+const bar = Nino.adminUi.actionBar( {
+	danger  : Nino.adminUi.button( t('/_admin/routes/label/delete'), remove, { kind : 'danger' } ),
+	status  : true,                // the badge "● Changed" / "✓ Saved" and the line; the shell paints the badge
+	primary : Nino.adminUi.button( t('/_admin/common/label/save'), null, { type : 'submit' } ),
+} );
+form.appendChild( bar.el );        // danger first, ONE main button last - a second one is refused
 Nino.admin.dirty.watchForm( 'routes', function() { return form }, save );
+Nino.adminUi.say( t('/_admin/common/msg/saved') );
 ```
 
 ## Dialogs
@@ -170,8 +177,8 @@ Nino.adminUi.confirm( 'destructive', {
 | Error at a field | A sentence, red, `aria-invalid` | under the field | `fieldError()` |
 | Saving refused or failed | A sentence, `role="alert"` | the line of the bar | `status.fail()`, `status.error()`, `saveBar().line` |
 | A list or view could not load | A sentence | in place of the content | `showError()` |
-| Success of a form | "Saved at hh:mm." and the badge "✓ Saved" | the bar | `status.saved()` |
-| Success of an immediate action | A toast: one sentence with "✓", 4 s, `role="status"`, it stays while the pointer rests on it | bottom right above the bar | - |
+| Success of a form | The badge "✓ Saved" and a toast "Saved."; a work surface also says "Saved at hh:mm." on the line | the bar, the toast above it | `say()`, `status.saved()` |
+| Success of an immediate action | A toast: one sentence with "✓", 4 s, `role="status"`, it stays while the pointer rests on it or the focus is in it, at most one | bottom right above the bar | `say()` |
 | Something needs attention until it is fixed | A box with a sign and a sentence, optionally a link | at the top of the content | `notice()` |
 | The explanation of a whole view or section | Quiet text | above the content or in the section | `hint()` - only explanation, never success, error or emptiness, never the help of ONE field (that stands behind the "?") |
 | Nothing there | A box | in place of the list | `emptyState()` |

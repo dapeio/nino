@@ -310,6 +310,32 @@ foreach( [ 'light' => [ $light, [ $light ] ], 'dark (system)' => [ $system, [ $s
 		check( "$name: the word of a danger button holds 4.5 : 1 on its pale red over $ground", $contrast( $ink, $over( $soft, $rgb ) ) >= 4.5 );
 }
 
+// --- the panels that have gone over to the blocks of the bar ------------------------------------------
+
+/*	The panels that draw their bar and their way back with actionBar() and contextBar() and not by hand. The list grows: the
+	patch that brings another panel over adds its script here, and from then on the panel keeps to it	*/
+$converted = [
+	'_admin/Nino/Modules/Routes/assets/admin.js',
+	'_nino/Nino/Modules/Navigation/assets/admin.js',
+];
+
+$byHand = [];
+$lacking = [];
+
+foreach( $converted as $script ) {
+
+	$source = $bare( $read( $script ) );
+
+	if( preg_match( '/className\s*=\s*[\'"][^\'"]*nino-admin-(actionbar|btn-primary|btn-danger|back-link)|listActions\(|formToolbar\(/', $source ) === 1 )
+		$byHand[] = $script;
+
+	if( str_contains( $source, 'adminUi.actionBar(' ) === false || str_contains( $source, 'adminUi.contextBar(' ) === false || str_contains( $source, 'adminUi.say(' ) === false )
+		$lacking[] = $script;
+}
+
+check( 'the panels that have gone over to the blocks of the bar build neither the bar, its buttons by class, the way back nor the list bar by hand'. ( $byHand === [] ? '' : ' - '. implode( ', ', $byHand ) ), $byHand === [] );
+check( '...and use actionBar(), contextBar() and say()'. ( $lacking === [] ? '' : ' - not '. implode( ', ', $lacking ) ), $lacking === [] );
+
 // --- the chapter is linked and its links land ----------------------------------------------------------
 
 $chapter = $read( 'docs/admin-ui.md' );

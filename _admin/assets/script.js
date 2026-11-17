@@ -988,6 +988,13 @@
 					return;
 				}
 
+				// A bar with the state badge of actionBar() says it there: one display of "unsaved changes", not a badge and a mark
+				if( typeof Nino.adminUi === 'object' && Nino.adminUi.barState( bar, { dirty : unsaved } ) === true ) {
+					if( span !== null )
+						span.hidden = true;
+					return;
+				}
+
 				if( span === null || span.parentNode !== bar ) {
 					if( unsaved === false )
 						return;

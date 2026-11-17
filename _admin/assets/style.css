@@ -2802,6 +2802,113 @@ a {
 	margin: 0;
 }
 
+/* The context bar of contextBar() with options: the panel's name small over the way back, then the name of the view, the
+   tools at the right. Where a bar has the name of the panel, the head of the pane gives way: its heading stays for a screen
+   reader, what else stood in it (tabs, actions) is out of the page and the tab order */
+.nino-admin .nino-admin-contextbar-lead {
+	display: flex;
+	flex: 0 1 auto;
+	flex-direction: column;
+	align-items: flex-start;
+	min-width: 0;
+}
+
+.nino-admin .nino-admin-contextbar-panel {
+	padding: 0 var(--nino-admin-space-3);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	line-height: 1.2;
+}
+
+.nino-admin .nino-admin-contextbar-help {
+	flex: 0 0 auto;
+}
+
+.nino-admin .nino-admin-contextbar-title {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	overflow: hidden;
+	font-size: var(--nino-admin-text-md);
+	font-weight: var(--nino-admin-weight-strong);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The toast of say(): the answer to a thing that went well, at the bottom right ABOVE the bar - its place is the height of the
+   bar that is on the screen (the script measures it into --nino-admin-toast-rise, a phone's bar being two rows), the token's
+   height where there is none to measure. It is never in the bar. The host is the live region, in the page before the first sentence */
+.nino-admin-toasts {
+	position: fixed;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 80;
+	height: 0;
+	pointer-events: none;
+}
+
+.nino-admin-toast {
+	position: absolute;
+	right: var(--nino-admin-space-6);
+	bottom: calc(var(--nino-admin-toast-rise, var(--nino-admin-actionbar-height)) + var(--nino-admin-space-4));
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	max-width: min(26rem, calc(100vw - var(--nino-admin-space-6) * 2));
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-3) var(--nino-admin-space-2) var(--nino-admin-space-4);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+	box-shadow: var(--editor-shadow);
+	color: var(--editor-text);
+	font-size: var(--nino-admin-text-sm);
+	line-height: 1.4;
+	pointer-events: auto;
+}
+
+.nino-admin-toast-said {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.nino-admin-toast-mark {
+	flex: 0 0 auto;
+	color: var(--editor-green);
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+.nino-admin-toast-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 38rem) {
+	.nino-admin-toast {
+		right: var(--nino-admin-space-5);
+		left: var(--nino-admin-space-5);
+		max-width: none;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.nino-admin-toast {
+		animation: nino-admin-toast-in .18s ease-out;
+	}
+
+	@keyframes nino-admin-toast-in {
+		from {
+			opacity: 0;
+			transform: translateY(.5rem);
+		}
+	}
+}
+
 .nino-admin .nino-admin-actionbar {
 	position: fixed;
 	right: 0;
@@ -3668,17 +3775,29 @@ a {
 	}
 }
 
-/* The bar of a screen that is saved as a whole (Nino.adminUi.saveBar()): the state first,
+/* The bar of every screen that has a state (Nino.adminUi.actionBar() with a status, and saveBar(), which is built on it): the state first,
    then the status line, then the buttons. The state is a badge, a word and a mark. The line
    is empty most of the time - the first change is said for the screen reader and goes, what
    the caller has to say stays - so on a phone it is a row of its own only while it holds words, and
    the bar keeps to the badge and the buttons: two rows at most, the buttons wrap where they
    do not fit */
-.nino-admin .nino-admin-actionbar > .nino-admin-savebar-state {
+.nino-admin .nino-admin-actionbar > :is(.nino-admin-actionbar-state, .nino-admin-savebar-state) {
 	order: -2;
 }
 
-.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status {
+/* The left of the bar is the destructive action and the state, and the right is the side actions and the main button, whatever the
+   line holds - the line is empty or out of the way most of the time, so no space is kept by it: the state (or, where there is none,
+   the destructive action) takes the free room to its right */
+.nino-admin .nino-admin-actionbar.nino-admin-bar > .nino-admin-actionbar-state,
+.nino-admin .nino-admin-actionbar.nino-admin-bar:not(:has(> .nino-admin-actionbar-state)) > .nino-admin-btn-danger {
+	margin-right: auto;
+}
+
+.nino-admin .nino-admin-actionbar-state[hidden] {
+	display: none;
+}
+
+.nino-admin .nino-admin-actionbar.nino-admin-bar > .nino-admin-status {
 	text-align: left;
 }
 
@@ -3696,36 +3815,45 @@ a {
 	white-space: nowrap;
 }
 
+/* A bar that has the badge says "unsaved changes" there and nowhere else: the line's sentence of it is for the screen reader alone, whoever wrote it */
+.nino-admin .nino-admin-actionbar.nino-admin-bar:not(.nino-admin-savebar) > .nino-admin-status[data-state="dirty"] {
+	position: absolute;
+	display: block;
+	flex: none;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
 @media (max-width: 38rem) {
 
 	/* The line, where it has words, is one row above; the badge and the buttons share the rows under it, the badge at the left and the
 	   buttons at the right, and the buttons are compact (30 px, 12 px words) so that three of them and the badge are two rows at most */
-	.nino-admin .nino-admin-savebar {
+	.nino-admin .nino-admin-bar {
 		flex-wrap: wrap;
 		gap: var(--nino-admin-space-2) var(--nino-admin-space-2);
 		padding-top: var(--nino-admin-space-3);
 		padding-bottom: max(var(--nino-admin-space-3), env(safe-area-inset-bottom));
 	}
 
-	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-savebar-state {
-		margin-right: auto;
-	}
-
-	.nino-admin .nino-admin-actionbar.nino-admin-savebar > button {
+	.nino-admin .nino-admin-actionbar.nino-admin-bar > button {
 		min-height: var(--nino-admin-control-small);
 		padding: var(--nino-admin-space-1) var(--nino-admin-space-4);
 		font-size: var(--nino-admin-text-xs);
 		line-height: 1.2rem;
 	}
 
-	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status:not(:empty) {
+	.nino-admin .nino-admin-actionbar.nino-admin-bar > .nino-admin-status:not(:empty) {
 		display: block;
 		order: -3;
 		flex: 1 0 100%;
 	}
 
 	/* The badge says it, so the registry's mark is not drawn beside it */
-	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-actionbar-dirty {
+	.nino-admin .nino-admin-actionbar.nino-admin-bar > .nino-admin-actionbar-dirty {
 		display: none;
 	}
 }
@@ -4226,6 +4354,25 @@ a {
 	#admin-page-wrap.nino-admin-shell--workspace #admin-content-wrap > [data-panel] > .admin-panel-head {
 		margin: 0;
 	}
+}
+
+/*	Where the context bar of the level that is on the screen has the name of the panel (Nino.adminUi.contextBar( { panel } )) the
+	head of the pane gives way, and is there again with the level of the list: out of the page and out of the tab order, its heading left for a screen reader. Said here, in the layer of the head, for
+	the reason the bleed above is	*/
+#admin-content-wrap > [data-panel]:has(> :not(.admin-hidden):not([hidden]) .nino-admin-contextbar[data-panel]) > .admin-panel-head {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	min-height: 0;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+#admin-content-wrap > [data-panel]:has(> :not(.admin-hidden):not([hidden]) .nino-admin-contextbar[data-panel]) > .admin-panel-head > :not(.admin-panel-title) {
+	display: none;
 }
 
 /* --------------------------------------------------------------- Rail head */

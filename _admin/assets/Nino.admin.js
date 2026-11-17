@@ -61,6 +61,32 @@
 	// How long a save of a saveBar() is on its way before the line says "Saving", in milliseconds
 	const SAVING_AFTER = 400;
 
+	// How long the toast of say() stays once nothing holds it, in milliseconds
+	const SAY_FOR = 4000;
+
+	// The kinds a toast may have: it says what a person did and went well - an error stays where it happened
+	const SAY_KINDS = [ 'success', 'info' ];
+
+	// Whether a value is a DOM element - an options object has no tag
+	const isElement = function( value ) {
+		return value !== null && typeof value === 'object' && typeof value.tagName === 'string';
+	};
+
+	// What the badge of a bar says: "● Changed" while there is something to save, "✓ Saved" (or the caller's calm word) where what is
+	// on the screen is what is stored - and nothing for a thing that was never saved, until the first change. fresh sets or takes
+	// that state; it stays on the badge until a call takes it off
+	const paintBadge = function( badge, now, word ) {
+
+		const calm = typeof now.calm === 'string' ? now.calm : '';
+
+		if( typeof now.fresh === 'boolean' )
+			badge.dataset.fresh = now.fresh === true ? 'true' : '';
+
+		badge.hidden = now.dirty !== true && calm === '' && badge.dataset.fresh === 'true';
+		badge.dataset.state = now.dirty === true ? 'warn' : ( calm !== '' ? 'muted' : 'ok' );
+		badge.textContent = badge.hidden === true ? '' : ( now.dirty === true ? '\u25CF '+ word( 'changed', '/_admin/common/savebar/changed' ) : '\u2713 '+ ( calm !== '' ? calm : word( 'saved', '/_admin/common/savebar/saved' ) ) );
+	};
+
 	// The icons of icon(): Lucide 0.577.0 (ISC, notice in THIRD-PARTY-NOTICES.md), the geometry of each on its
 	// 24 by 24 grid - a string is the "d" of a path, anything else is [ tag, attributes ]. This is the one place
 	// the scripts of the workbench take an icon from; the rail's and the panels' own icons are markup of the
@@ -74,6 +100,7 @@
 		'chevron-left' : [ 'm15 18-6-6 6-6' ],
 		'chevron-right' : [ 'm9 18 6-6-6-6' ],
 		'chevron-up' : [ 'm18 15-6-6-6 6' ],
+		'circle-help' : [ [ 'circle', { cx : '12', cy : '12', r : '10' } ], 'M9.09 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3', 'M12 17h.01' ],
 		code : [ 'm16 18 6-6-6-6', 'm8 6-6 6 6 6' ],
 		copy : [ [ 'rect', { width : '14', height : '14', x : '8', y : '8', rx : '2', ry : '2' } ], 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' ],
 		database : [ [ 'ellipse', { cx : '12', cy : '5', rx : '9', ry : '3' } ], 'M3 5V19A9 3 0 0 0 21 19V5', 'M3 12A9 3 0 0 0 21 12' ],
@@ -124,24 +151,102 @@
 
 
 		/**
-		 *	The pinned row at the top of a drill-down level: the back link, then
-		 *	the controls that belong to the level (a locale select, a button).
-		 *	Its class is .nino-admin-contextbar
+		 *	The pinned row at the top of a view: the way back, the name of the view and its tools. Its class is
+		 *	.nino-admin-contextbar
 		 *
-		 *	@param		{Element}				[backLink]			The link out of the level
-		 *	@param		{Element|Array}	[controls]			One element or a list of them
+		 *	Called with an element it is the back link and the controls: contextBar( backLink, controls ).
+		 *	Called with options it builds the link itself, and says where it leads
 		 *
-		 *	@return		{Element}											The row
+		 *	  - back    { to, onClick, href } - the link: "Back to <to>", one wording (/_admin/common/label/back-to). to is the
+		 *	            name of the level it leads to, or an element of the pane (a mount, a level) - then it is the name the pane's
+		 *	            head says (panelHead()); onClick( event ) is called with the default of the click already prevented
+		 *	  - title   the name of the view, shown after the link, a heading the focus goes to when the view opens
+		 *	  - tools   one element or a list of them, at the right
+		 *	  - panel   the name of the panel, small above the link, for a work surface that has no head of its own: the head of
+		 *	            the pane (.admin-panel-head) gives way while the level with this bar is on the screen - its heading stays for
+		 *	            a screen reader - and the "?" of its manual is an icon button at the right end of the bar, the same
+		 *	            trigger (data-manual) with the same name
+		 *	  - within  an element of the pane, where the head is looked for when back.to is a name
+		 *
+		 *	@param		{Element|Object}	[backLink]			The link out of the level, or the options
+		 *	@param		{Element|Array}		[controls]			One element or a list of them
+		 *
+		 *	@return		{Element}														The row
 		 */
 		contextBar : function( backLink, controls ) {
+
 			const bar = dc.createElement('div');
 			bar.className = 'nino-admin-contextbar';
+
+			const list = function( value ) {
+				return Array.isArray( value ) ? value : ( value ? [ value ] : [] );
+			};
+
+			if( backLink !== null && typeof backLink === 'object' && isElement( backLink ) === false ) {
+
+				const options = backLink;
+				const lead = Nino.adminUi.el( 'div', 'nino-admin-contextbar-lead' );
+
+				const within = isElement( options.within ) ? options.within : ( options.back && isElement( options.back.to ) ? options.back.to : null );
+
+				if( typeof options.panel === 'string' && options.panel !== '' ) {
+					bar.dataset.panel = options.panel;
+					lead.appendChild( Nino.adminUi.el( 'span', 'nino-admin-contextbar-panel', options.panel ) );
+				}
+
+				if( options.back !== undefined && options.back !== null ) {
+
+					const to = isElement( options.back.to ) ? Nino.adminUi.panelName( options.back.to ) : String( options.back.to ?? '' );
+					const link = Nino.adminUi.el( 'a', 'nino-admin-back-link', Nino.adminUi.format( Nino.adminUi.text('/_admin/common/label/back-to'), to ) );
+
+					link.href = typeof options.back.href === 'string' ? options.back.href : '#';
+					link.addEventListener( 'click', function( ev ) {
+						ev.preventDefault();
+						if( typeof options.back.onClick === 'function' )
+							options.back.onClick( ev );
+					} );
+					lead.appendChild( link );
+				}
+
+				bar.appendChild( lead );
+
+				if( typeof options.title === 'string' && options.title !== '' )
+					bar.appendChild( Nino.adminUi.el( 'h3', 'nino-admin-contextbar-title', options.title ) );
+
+				list( options.tools ).forEach( function( tool ) { bar.appendChild( tool ) } );
+
+				// The head of the pane gives way to this bar, and its "?" goes with it: the same trigger, the same name
+				const head = within !== null && typeof options.panel === 'string' && options.panel !== '' ? Nino.adminUi.panelHead( within ) : null;
+				const manual = head === null ? null : head.element.querySelector('.admin-panel-manual');
+
+				if( manual !== null ) {
+					const help = Nino.adminUi.iconButton( 'circle-help', manual.getAttribute('aria-label') || manual.title || manual.textContent, null, { className : 'nino-admin-contextbar-help' } );
+					help.dataset.manual = manual.dataset.manual;
+					bar.appendChild( help );
+				}
+
+				return bar;
+			}
+
 			if( backLink )
 				bar.appendChild( backLink );
-			( Array.isArray( controls ) ? controls : ( controls ? [ controls ] : [] ) ).forEach( function( control ) {
+			list( controls ).forEach( function( control ) {
 				bar.appendChild( control );
 			} );
 			return bar;
+		},
+
+		/**
+		 *	The name of the panel an element stands in, as the head of its pane says it: what the back link
+		 *	"Back to <name>" leads to where the list of the panel is the level above. Empty where the element has no pane
+		 *
+		 *	@param		{Element}		el							Any element inside the pane
+		 *
+		 *	@return		{string}
+		 */
+		panelName : function( el ) {
+			const head = Nino.adminUi.panelHead( el );
+			return head === null || head.title === null || head.title === undefined ? '' : String( head.title.textContent ).trim();
 		},
 
 		/**
@@ -243,18 +348,206 @@
 		},
 
 		/**
-		 *	Turn an element into the fixed bar at the bottom of a screen, where
-		 *	its Save and its status line stand: it gets the class
-		 *	.nino-admin-actionbar and nothing else is touched. The caller puts
-		 *	the buttons and the status line in
+		 *	The fixed bar at the bottom of a screen, where its main button, its state and its line stand. Two forms
 		 *
-		 *	@param		{Element}		bar						The element that becomes the bar, usually a div
+		 *	Called with an element it turns it into the bar - it gets the class .nino-admin-actionbar and nothing else is
+		 *	touched; the caller puts the buttons and the status line in - and returns the element
 		 *
-		 *	@return		{Element}										The same element
+		 *	Called with options it builds the bar in the one order of the guide: the destructive action at the left, then the
+		 *	state with its line, the side actions, and ONE main button at the right edge. Nothing else is in it, so every bar
+		 *	reads the same
+		 *
+		 *	  - danger      the button that destroys (Delete <thing>): one element; it gets the class of its kind
+		 *	  - status      true, or { line, fresh } - line the element (a p, say) that is to be the status line, fresh true for a thing
+		 *	                that was never saved: the state as a badge ("● Changed" / "✓ Saved", the one place the shell's mark of
+		 *	                unsaved input is drawn too, see barState()) - a fresh one has none until something is typed - and the
+		 *	                line (status()) that says what the last action did
+		 *	  - secondary   the side actions, a list of buttons, in the order they stand
+		 *	  - primary     the main button: ONE element, which gets the class of its kind; a second one (in secondary, in danger, or a
+		 *	                list) is a TypeError, and so is a bar without one
+		 *	  - list        true for the bar of a list: it carries .nino-admin-list-actions, which the shell's mark leaves alone, and
+		 *	                is drawn as every bar of a list (listActions()) is
+		 *	  - id, className, text   the id and the extra class of the bar, and { changed, saved } to word the state differently
+		 *
+		 *	@param		{Element|Object}		bar					The element that becomes the bar, or the options
+		 *
+		 *	@return		{Element|Object}									The same element; with options { el, state, line, danger, primary, secondary, paint( { dirty, calm } ) } - state and line only where there is a status
 		 */
 		actionBar : function( bar ) {
-			bar.classList.add('nino-admin-actionbar');
-			return bar;
+
+			if( isElement( bar ) === true ) {
+				bar.classList.add('nino-admin-actionbar');
+				return bar;
+			}
+
+			const options = bar ?? {};
+			const secondary = options.secondary === undefined ? [] : options.secondary;
+			const text = options.text || {};
+			const word = function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
+			const isPrimary = function( el ) { return isElement( el ) === true && el.classList.contains('nino-admin-btn-primary') };
+
+			if( isElement( options.primary ) === false )
+				throw new TypeError( 'Nino.adminUi.actionBar(): a bar has exactly one main button, given as primary' );
+
+			if( Array.isArray( secondary ) === false || secondary.every( isElement ) === false )
+				throw new TypeError( 'Nino.adminUi.actionBar(): secondary is a list of buttons' );
+
+			if( options.danger !== undefined && options.danger !== null && isElement( options.danger ) === false )
+				throw new TypeError( 'Nino.adminUi.actionBar(): danger is one button' );
+
+			if( secondary.some( isPrimary ) === true || isPrimary( options.danger ) === true )
+				throw new TypeError( 'Nino.adminUi.actionBar(): a bar has exactly one main button - a second one is no main button' );
+
+			if( secondary.some( function( el ) { return el.classList.contains('nino-admin-btn-danger') } ) === true )
+				throw new TypeError( 'Nino.adminUi.actionBar(): the destructive button is given as danger, at the left' );
+
+			const stated = options.status !== undefined && options.status !== false && options.status !== null;
+			const el = Nino.adminUi.el( 'div', 'nino-admin-actionbar' + ( stated === true ? ' nino-admin-bar' : '' ) + ( options.list === true ? ' nino-admin-list-actions' : '' ) + ( options.className ? ' '+ options.className : '' ) );
+			const made = { el : el, secondary : secondary, primary : options.primary, danger : options.danger ?? null };
+
+			if( options.id )
+				el.id = options.id;
+
+			if( made.danger !== null ) {
+				made.danger.classList.add('nino-admin-btn-danger');
+				el.appendChild( made.danger );
+			}
+
+			if( stated === true ) {
+
+				const given = options.status === true ? null : options.status.line;
+
+				made.state = Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-actionbar-state' );
+				made.line = Nino.adminUi.status( isElement( given ) ? given : Nino.adminUi.el('p') );
+
+				made.paint = function( now ) { paintBadge( made.state, now || {}, word ) };
+
+				made.state.dataset.fresh = options.status !== true && options.status.fresh === true ? 'true' : '';
+				made.paint( { dirty : false } );
+				el.appendChild( made.state );
+				el.appendChild( made.line.element );
+			}
+
+			secondary.forEach( function( button ) { el.appendChild( button ) } );
+
+			made.primary.classList.add('nino-admin-btn-primary');
+			el.appendChild( made.primary );
+
+			return made;
+		},
+
+		/**
+		 *	Paint the state badge of a bar that has one - the one display of "unsaved changes", which the shell's registry of
+		 *	unsaved input uses instead of a mark of its own. A bar of saveBar() paints itself and is left alone
+		 *
+		 *	@param		{Element}		bar						The bar element
+		 *	@param		{Object}		now						{ dirty, calm, fresh } - fresh true or false sets whether the thing was never saved, and is kept until said again
+		 *
+		 *	@return		{boolean}										Whether the bar has a state badge, a bar of saveBar() included
+		 */
+		barState : function( bar, now ) {
+
+			const badge = bar.querySelector('.nino-admin-actionbar-state');
+
+			if( badge === null || badge === undefined )
+				return false;
+
+			if( bar.classList.contains('nino-admin-savebar') === false )
+				paintBadge( badge, now, function( key, fill ) { return Nino.adminUi.text( fill ) } );
+
+			return true;
+		},
+
+		/**
+		 *	The answer to a thing a person did that went well and needs nothing more from them - saved, deleted, copied, moved:
+		 *	one sentence with a check mark, as a toast at the bottom right ABOVE the bar, never over it. At most one is on the
+		 *	screen, a new one replaces the one before it; it goes after four seconds, and stays while the pointer rests on it
+		 *	or the focus is in it. It is a status, which a screen reader reads out, and it moves only where the person
+		 *	allows motion. It is for success alone: an error stays where it happened - at the field, in the line of the bar, in
+		 *	showError() - and a kind that says so is a TypeError. Owns no strings: the sentence is the caller's
+		 *	(/_admin/common/msg/saved is the shared one for a save)
+		 *
+		 *	@param		{string}		text						The sentence
+		 *	@param		{Object}		[options]				{ kind } - 'success' (the default) or 'info'
+		 *
+		 *	@return		{Element|null}								The toast; null on a page that has nothing to draw it in
+		 */
+		say : function( text, options ) {
+
+			const kind = ( options || {} ).kind ?? 'success';
+
+			if( SAY_KINDS.indexOf( kind ) === -1 )
+				throw new TypeError( 'Nino.adminUi.say(): "'+ String( kind )+ '" is no kind of toast - an error is said where it happened, not here' );
+
+			// Inside the workbench's own element, where the rules of the design system apply; a page without one has its body
+			const body = ( typeof dc.querySelector === 'function' ? dc.querySelector('.nino-admin') : null ) ?? dc.body ?? bd;
+
+			if( body === null || body === undefined )
+				return null;
+
+			// The live region stays in the page, empty, before the first sentence arrives, so that the sentence is read out; the card
+			// with the mark and the button is what is seen, and no part of what is said
+			let host = Array.from( body.children ).find( function( child ) { return child.classList.contains('nino-admin-toasts') } );
+
+			if( host === undefined ) {
+				host = Nino.adminUi.el( 'div', 'nino-admin-toasts' );
+				host.appendChild( Nino.adminUi.el( 'p', 'nino-admin-toast-said' ) );
+				host.firstChild.setAttribute( 'role', 'status' );
+				host.firstChild.setAttribute( 'aria-live', 'polite' );
+				body.appendChild( host );
+			}
+
+			const said = host.firstChild;
+
+			Array.from( host.children ).forEach( function( old ) {
+				if( old === said )
+					return;
+				wn.clearTimeout( old.timer );
+				host.removeChild( old );
+			} );
+
+			// A new node every time: the same sentence twice is said twice
+			Array.from( said.children ).forEach( function( old ) { said.removeChild( old ) } );
+			said.appendChild( Nino.adminUi.el( 'span', '', String( text ) ) );
+
+			const toast = Nino.adminUi.el( 'div', 'nino-admin-toast' );
+			const mark = Nino.adminUi.el( 'span', 'nino-admin-toast-mark', '\u2713' );
+			const words = Nino.adminUi.el( 'span', 'nino-admin-toast-text', String( text ) );
+
+			toast.dataset.kind = kind;
+			mark.setAttribute( 'aria-hidden', 'true' );
+			words.setAttribute( 'aria-hidden', 'true' );
+			toast.appendChild( mark );
+			toast.appendChild( words );
+
+			const close = function() {
+				wn.clearTimeout( toast.timer );
+				if( toast.parentNode !== null )
+					toast.parentNode.removeChild( toast );
+			};
+			const start = function() {
+				wn.clearTimeout( toast.timer );
+				toast.timer = wn.setTimeout( close, SAY_FOR );
+			};
+			const hold = function() { wn.clearTimeout( toast.timer ) };
+
+			// The bar may be two rows high on a phone: the toast stands over the one that is on the screen, and the stylesheet falls
+			// back to the height of the token where the page has none to measure
+			const rise = typeof dc.querySelectorAll === 'function' ? Array.from( dc.querySelectorAll('.nino-admin-actionbar') ).reduce( function( most, bar ) { return Math.max( most, Number.isFinite( bar.offsetHeight ) === true ? bar.offsetHeight : 0 ) }, 0 ) : 0;
+
+			if( rise > 0 && typeof toast.style.setProperty === 'function' )
+				toast.style.setProperty( '--nino-admin-toast-rise', rise+ 'px' );
+
+			toast.appendChild( Nino.adminUi.iconButton( 'x', Nino.adminUi.text('/_admin/common/label/close'), close, { small : true } ) );
+			toast.addEventListener( 'mouseenter', hold );
+			toast.addEventListener( 'mouseleave', start );
+			toast.addEventListener( 'focusin', hold );
+			toast.addEventListener( 'focusout', start );
+
+			host.appendChild( toast );
+			start();
+
+			return toast;
 		},
 
 		/**
@@ -4842,15 +5135,16 @@
 		 *	the entry of that registry, with the bar as the one the marker is drawn in). Where the registry is there, set() tells it
 		 *	that the state changed. The words are /_admin/common/savebar/*, and the caller's where it gives them
 		 *
-		 *	@param		{Object}		options					{ id, text, buttons, restore, onSave, onRestore }
+		 *	@param		{Object}		options					{ id, text, buttons, restore, fresh, onSave, onRestore }
 		 *														- id          the beginning of the ids it makes
 		 *														- text        { changed, saved, save, restore, restoreHint } to say the words differently
 		 *														- buttons     [ { key, label, name, onPress } ] put between the line and Restore, in this order
 		 *														- restore     false for a bar that has no last state to go back to
+		 *														- fresh       true for a screen whose thing was never saved: the badge says nothing until the first change, and "Saved" after the first save
 		 *														- onSave      onSave( done ) saves, and says with done( true ) or done( false ) how it ended - on every way it can end
 		 *														- onRestore   onRestore( opener ) is called by Restore, which is on the screen only where set() says there is a last state
 		 *
-		 *	@return		{Object}										{ el, line, state, save, restore, buttons, set( { dirty, blocked, restorable, calm } ), press( [done] ), entry( [extra] ) } - buttons is key => element, line the status() control. calm is a third, quiet state for a screen whose saved state is something else than "saved" ("Applied"): its word, shown with a check mark where nothing is changed; '' takes it back
+		 *	@return		{Object}										{ el, line, state, save, restore, buttons, set( { dirty, blocked, restorable, calm, fresh } ), press( [done] ), entry( [extra] ) } - buttons is key => element, line the status() control. calm is a third, quiet state for a screen whose saved state is something else than "saved" ("Applied"): its word, shown with a check mark where nothing is changed; '' takes it back
 		 */
 		saveBar : function( options ) {
 
@@ -4858,23 +5152,15 @@
 			const text		= options.text || {};
 			const word		= function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
 
-			const bar			= Nino.adminUi.actionBar( Nino.adminUi.el( 'div', 'nino-admin-savebar' ) );
-			bar.id				= prefix;
-
-			const state		= Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-savebar-state' );
-			const line		= Nino.adminUi.status( Nino.adminUi.el('p') );
 			const buttons	= {};
-
-			state.id = prefix+ '-state';
-			bar.appendChild( state );
-			bar.appendChild( line.element );
+			const side		= [];
 
 			( Array.isArray( options.buttons ) === true ? options.buttons : [] ).forEach( function( given ) {
 
 				const button = Nino.adminUi.button( given.label, given.onPress, { name : given.name, id : prefix+ '-'+ given.key } );
 
 				buttons[given.key] = button;
-				bar.appendChild( button );
+				side.push( button );
 			} );
 
 			const restore = Nino.adminUi.button( word( 'restore', '/_admin/common/savebar/restore' ), function() {
@@ -4882,19 +5168,27 @@
 					options.onRestore( restore );
 			}, { id : prefix+ '-restore' } );
 
-			const save = Nino.adminUi.button( word( 'save', '/_admin/common/savebar/save' ), function() { press() }, { className : 'nino-admin-btn-primary', id : prefix+ '-save' } );
+			const save = Nino.adminUi.button( word( 'save', '/_admin/common/savebar/save' ), function() { press() }, { id : prefix+ '-save' } );
 
 			restore.hidden = true;
 
 			if( options.restore !== false )
-				bar.appendChild( restore );
+				side.push( restore );
 
-			bar.appendChild( save );
+			// The bar is the one of every screen (actionBar()): the state, the line, the buttons of the caller, Restore, and Save at the right edge
+			const core		= Nino.adminUi.actionBar( { id : prefix, className : 'nino-admin-savebar', status : { fresh : options.fresh === true }, secondary : side, primary : save, text : { changed : text.changed, saved : text.saved } } );
+			const bar			= core.el;
+			const state		= core.state;
+			const line		= core.line;
+
+			state.classList.add('nino-admin-savebar-state');
+			state.id = prefix+ '-state';
 
 			let dirty = false;
 			let blocked = '';
 			let said = '';
 			let calm = '';
+			let fresh = options.fresh === true;
 			let restorable = false;
 			let busy = false;
 			let typed = false;
@@ -4922,8 +5216,7 @@
 
 			const paint = function() {
 
-				state.dataset.state = dirty === true ? 'warn' : ( calm !== '' ? 'muted' : 'ok' );
-				state.textContent = dirty === true ? '\u25CF '+ word( 'changed', '/_admin/common/savebar/changed' ) : '\u2713 '+ ( calm !== '' ? calm : word( 'saved', '/_admin/common/savebar/saved' ) );
+				core.paint( { dirty : dirty, calm : calm, fresh : fresh } );
 				save.disabled = busy === true || dirty === false || blocked !== '';
 				restore.hidden = restorable === false;
 				restore.disabled = busy === true || dirty === true;
@@ -4977,6 +5270,7 @@
 					// What was changed while the save was on its way is not in what was sent: it stays a change
 					if( ok === true ) {
 						dirty = typed;
+						fresh = false;
 
 						if( typed === true )
 							tell();
@@ -5025,6 +5319,9 @@
 
 					if( typeof now.calm === 'string' )
 						calm = now.calm;
+
+					if( typeof now.fresh === 'boolean' )
+						fresh = now.fresh;
 
 					if( typeof now.blocked === 'string' )
 						blocked = now.blocked;

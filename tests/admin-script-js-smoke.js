@@ -1613,6 +1613,16 @@ statusLine.parent = hasStatus;
 barHolder.bar = hasStatus;
 dirty.refresh();
 check( 'a bar with a status line of its own gets the marker as well - the style sheet hides it there, and shows it where the phone rule hides the line', markerOf( hasStatus ) !== undefined && markerOf( hasStatus ).hidden === false );
+// A bar that has the badge of actionBar() says "unsaved" there: the registry paints the badge and draws no mark of its own
+const hasBadge = append( node( '', {} ) );
+hasBadge.classList.add('nino-admin-actionbar');
+const painted = [];
+const realBarState = dirtyCtx.Nino.adminUi.barState;
+dirtyCtx.Nino.adminUi.barState = function( bar, now ) { painted.push( bar === hasBadge && now.dirty ); return bar === hasBadge };
+barHolder.bar = hasBadge;
+dirty.refresh();
+check( 'a bar with the state badge of actionBar() is painted through it and gets no mark of its own: one display of unsaved changes', painted.includes( true ) === true && markerOf( hasBadge ) === undefined );
+dirtyCtx.Nino.adminUi.barState = realBarState;
 barHolder.bar = oldBar;
 dirtyState.keys = false;
 dirty.refresh();
