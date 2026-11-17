@@ -109,6 +109,28 @@ namespace Nino {
 		// grounds, which Nino.css answers for the class <name>--ground-<word> of every component alike
 		public const array GROUNDS = [ 'none', 'base', 'alt', 'tint', 'primary', 'dark' ];
 
+		// How many levels a block may have, from its first component down: Wrap > Row > Column > Card > Title is five
+		public const int LEVELS = 6;
+
+		// What offer() says of a component that may not stand at a place, and what check() calls the same thing where it finds it
+		// written. HTML is offer()'s alone: the register has no word on who may write html, it says that the name is that one
+		public const string CODE_ONCE = 'once';
+		public const string CODE_DEPTH = 'depth';
+		public const string CODE_SELF = 'self';
+		public const string CODE_HTML = 'html';
+
+		// What check() finds besides: a name that is no component (F1) and one that is a shortcode, which has no schema; a variant the
+		// component does not know (F2); a value outside what its attribute takes and an attribute the schema does not name (F3); a
+		// component at a place that is not meant for it (F7); an id that stands twice; a text between calls that holds html
+		public const string CODE_UNKNOWN = 'unknown';
+		public const string CODE_BARE = 'bare';
+		public const string CODE_VARIANT = 'variant';
+		public const string CODE_OUTSIDE = 'outside';
+		public const string CODE_FOREIGN = 'foreign';
+		public const string CODE_PLACE = 'place';
+		public const string CODE_DUPLICATE = 'duplicate';
+		public const string CODE_FREE = 'free';
+
 		// What a component takes its first word from, see _reference()
 		public const array SOURCES = [ 'text', 'image', 'link', 'none' ];
 
@@ -1260,6 +1282,347 @@ namespace Nino {
 					$names[] = (string) $name;
 
 			return $names;
+		}
+
+		/**
+		 *	What may be put at a place, and what may not and why: each component that allowed() names for the container,
+		 *	with true where it may be put and the reason where it may not
+		 *
+		 *	- CODE_SELF: a container for the flow does not stand in itself, no card in a card, however far up the other one is; nor
+		 *	  does one that is 'through'
+		 *	- CODE_ONCE: its schema says 'once' and the container holds one already
+		 *	- CODE_DEPTH: it would be a level beyond LEVELS, counted from the first name of the path; a 'through' container is none
+		 *	- CODE_HTML: it is the component html and nothing else is against it. Who may write html is no rule of the register:
+		 *	  a caller that may takes it for true
+		 *
+		 *	The path is where the container stands - the names of the components from the page to it, [] for the page - and the
+		 *	siblings are what it holds, the nodes \Nino\Markup::parse() answers. A container that is 'through' stands where the
+		 *	nearest one before it on the path that is not stands, as allowed() has it: a loop of columns in a row offers the
+		 *	columns of the row, and so does a row of loops, one in the next. What may stand in such a container is the cut of that and of what the container lets in: what names it in 'in', and what stands at a place it offers, so that a filter with no 'offers' holds only what names it. A path of nothing but such containers is the page. Every name on the path is a level but a 'through' one.
+		 *	Nothing is read but the register and the names; check() finds wrong what is not offered here
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$path					The names from the page to the container
+		 *	@param		array			$siblings			The nodes the container holds
+		 *
+		 *	@return 	array										name => true, or name => the reason, in the order allowed() gives
+		 */
+		public static function offer( array &$appData, array $path, array $siblings ): array {
+
+			$registry = (array) ( $appData[self::REGISTRY] ?? [] );
+			$path = array_values( array_filter( $path, 'is_string' ) );
+			$taken = [];
+
+			foreach( $siblings as $node )
+				if( is_array( $node ) === true && is_string( $node['n'] ?? null ) === true )
+					$taken[$node['n']] = ( $taken[$node['n']] ?? 0 ) + 1;
+
+			$answer = [];
+
+			foreach( self::_letIn( $appData, $registry, $path ) as $name )
+				$answer[$name] = self::_blocked( $registry, $path, $name, $taken[$name] ?? 0 ) ?? ( $name === 'html' ? self::CODE_HTML : true );
+
+			return $answer;
+		}
+
+		/**
+		 *	What is against a tree of a template by the rules offer() offers by: for each node that has something against it its
+		 *	position - the path of the trace, the index of the node in each level, text nodes counted ('0.1.0') - and a list of
+		 *	findings, each [ 'code' => a CODE_ constant, 'detail' => what it is about ]
+		 *
+		 *	- CODE_UNKNOWN (F1) a name that is no component and no shortcode; CODE_BARE a shortcode, a call with no schema, whose
+		 *	  content is its own. Neither is looked into
+		 *	- CODE_VARIANT (F2) a variant that the list of the component does not have - the schema's and what the callbacks of
+		 *	  '/nino/components/variants' add; the detail is the word
+		 *	- CODE_OUTSIDE (F3) a value that is none of what its attribute takes; CODE_FOREIGN an attribute the schema does not
+		 *	  name; the detail is the attribute
+		 *	- CODE_PLACE (F7) a component at a place that offers none for it, and the rules of offer(): CODE_ONCE (K4, for the
+		 *	  second and each after), CODE_SELF, CODE_DEPTH (K5; said once, at the first, what is below it is looked at all the same); the detail is the name
+		 *	- CODE_DUPLICATE an id of an attribute of the type id that stands twice in the tree, for the second and each after
+		 *	- CODE_FREE a text between calls that holds a <, which is html that is no component. What stands in a call of html
+		 *	  is its content, and no finding
+		 *	- CODE_HTML the call of html itself: whether that is wrong is for the caller, who knows what the account may write
+		 *
+		 *	Nothing is drawn or written. A tree with nothing against it is []. What it does not look at: the sources of the calls, textfills
+		 *	in values and between calls, the length and the control characters of a value, where a link goes, the ids of what a call with no
+		 *	schema holds - the drawing makes these safe, or the caller looks
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$nodes				What \Nino\Markup::parse() answered, the nodes of a page or of a frame
+		 *
+		 *	@return 	array										position => [ [ 'code' => ..., 'detail' => ... ], ... ]
+		 */
+		public static function check( array &$appData, array $nodes ): array {
+
+			$run = [
+				'registry'		=> self::components( $appData ),
+				'variants'		=> [],
+				'shortcodes'	=> array_flip( \Nino\Html::shortcodes( $appData ) ),
+				'places'			=> [],
+				'ids'					=> [],
+			];
+
+			$found = [];
+			self::_inspect( $appData, $nodes, [], '', $run, $found );
+
+			return $found;
+		}
+
+		/**
+		 *	The nodes of one container, for check(): each call by its place, by the rules of the container and by its words, and
+		 *	what it holds one level down
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$nodes				The children of the container
+		 *	@param		array			$path					The names from the page to the container
+		 *	@param		string		$prefix				The position of the container, '' for the page
+		 *	@param		array			&$run					(reference) The register, what was asked, the ids seen
+		 *	@param		array			&$found				(reference) The findings
+		 *	@param		bool			$deep					The container stands below a level that was found too deep
+		 *
+		 *	@return 	void
+		 */
+		private static function _inspect( array &$appData, array $nodes, array $path, string $prefix, array &$run, array &$found, bool $deep = false ): void {
+
+			$places = $run['places'][implode( '/', $path )] ??= self::_letIn( $appData, $run['registry'], $path );
+			$taken = [];
+
+			foreach( $nodes as $at => $node ) {
+
+				if( is_array( $node ) === false )
+					continue;
+
+				$where = $prefix === '' ? (string) $at : $prefix. '.'. $at;
+
+				if( isset( $node['n'] ) === false ) {
+
+					if( is_string( $node['t'] ?? null ) === true && str_contains( $node['t'], '<' ) === true && ( $path[count( $path ) - 1] ?? '' ) !== 'html' )
+						$found[$where][] = [ 'code' => self::CODE_FREE, 'detail' => '' ];
+
+					continue;
+				}
+
+				if( is_string( $node['n'] ) === false )
+					continue;
+
+				$name = $node['n'];
+				$schema = $run['registry'][$name] ?? null;
+
+				if( $schema === null ) {
+
+					$found[$where][] = [ 'code' => isset( $run['shortcodes'][$name] ) === true ? self::CODE_BARE : self::CODE_UNKNOWN, 'detail' => $name ];
+					continue;
+				}
+
+				if( in_array( $name, $places, true ) === false )
+					$found[$where][] = [ 'code' => self::CODE_PLACE, 'detail' => $name ];
+
+				$blocked = self::_blocked( $run['registry'], $path, $name, $taken[$name] ?? 0 );
+				$taken[$name] = ( $taken[$name] ?? 0 ) + 1;
+
+				// Below a level that is too deep everything is too deep: said once, at the first, and the rest is looked at all the same
+				if( $blocked === self::CODE_DEPTH && $deep === true )
+					$blocked = null;
+
+				if( $blocked !== null )
+					$found[$where][] = [ 'code' => $blocked, 'detail' => $name ];
+
+				if( $name === 'html' )
+					$found[$where][] = [ 'code' => self::CODE_HTML, 'detail' => $name ];
+
+				foreach( self::_said( $appData, $run, $name, $schema, $node ) as $finding )
+					$found[$where][] = $finding;
+
+				if( is_array( $node['c'] ?? null ) === true )
+					self::_inspect( $appData, $node['c'], array_merge( $path, [ $name ] ), $where, $run, $found, $deep === true || $blocked === self::CODE_DEPTH );
+			}
+		}
+
+		/**
+		 *	The components that may stand directly in the container at the end of a path: what allowed() says of the container
+		 *	they stand at - the nearest on the path that is no 'through' - and, where the container itself is 'through', only those
+		 *	of them it lets in: the ones that name it in their 'in', and the ones that stand at a place it offers. A filter that offers
+		 *	nothing holds what names it and nothing else. What is in a container that is 'through' is the cut of what its container
+		 *	offers and what it lets in, and a container in another is placed by the cut of that one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$registry
+		 *	@param		array			$path
+		 *
+		 *	@return 	array										The names, in the order allowed() gives
+		 */
+		private static function _letIn( array &$appData, array $registry, array $path ): array {
+
+			$names = self::allowed( $appData, self::_parent( $registry, $path ) );
+			$last = $path === [] ? '' : $path[count( $path ) - 1];
+
+			if( ( $registry[$last]['through'] ?? false ) !== true )
+				return $names;
+
+			$offers = (array) ( $registry[$last]['offers'] ?? [] );
+
+			return array_values( array_filter( $names, static fn( string $name ): bool => in_array( $last, $registry[$name]['in'], true ) === true || array_intersect( $registry[$name]['in'], $offers ) !== [] ) );
+		}
+
+		/**
+		 *	The container whose places a component stands at: the last name of the path, or - where that is 'through', a loop that
+		 *	draws no element of its own - the nearest before it that is not, however many stand in a row. A path of nothing but such
+		 *	containers has none, and the places are the page's; '' for the page
+		 *
+		 *	@param		array			$registry
+		 *	@param		array			$path
+		 *
+		 *	@return 	string
+		 */
+		private static function _parent( array $registry, array $path ): string {
+
+			for( $at = count( $path ) - 1; $at >= 0; $at-- )
+				if( ( $registry[$path[$at]]['through'] ?? false ) !== true )
+					return $path[$at];
+
+			return '';
+		}
+
+		/**
+		 *	The rule that is against a component at a place, the place aside: it stands in itself, it is there once and may be
+		 *	once, it is deeper than a block goes. The one place of these rules, for offer() and for check()
+		 *
+		 *	@param		array			$registry
+		 *	@param		array			$path					Where the container stands
+		 *	@param		string		$name
+		 *	@param		int				$before				How many of the name the container holds before it
+		 *
+		 *	@return 	string|null							A CODE_ constant, null for none
+		 */
+		private static function _blocked( array $registry, array $path, string $name, int $before ): ?string {
+
+			$schema = $registry[$name] ?? [];
+
+			// A container of the flow, and one that draws nothing, does not stand in itself
+			if( ( in_array( 'flow', (array) ( $schema['offers'] ?? [] ), true ) === true || ( $schema['through'] ?? false ) === true ) && in_array( $name, $path, true ) === true )
+				return self::CODE_SELF;
+
+			if( ( $schema['once'] ?? false ) === true && $before > 0 )
+				return self::CODE_ONCE;
+
+			// A 'through' container draws no element of its own and is no level
+			$levels = count( array_filter( $path, static fn( string $step ): bool => ( $registry[$step]['through'] ?? false ) !== true ) );
+
+			return $levels >= self::LEVELS ? self::CODE_DEPTH : null;
+		}
+
+		/**
+		 *	What a call says that the register would not take as it is: a variant, an attribute that is none, a value that is none
+		 *	of the attribute's, an id that stood before
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			&$run					(reference)
+		 *	@param		string		$name
+		 *	@param		array			$schema				The clean schema, the options of a method answered
+		 *	@param		array			$node
+		 *
+		 *	@return 	array										[ [ 'code' => ..., 'detail' => ... ], ... ]
+		 */
+		private static function _said( array &$appData, array &$run, string $name, array $schema, array $node ): array {
+
+			$given = is_array( $node['a'] ?? null ) === true ? $node['a'] : [];
+			$findings = [];
+
+			foreach( $given as $attribute => $raw ) {
+
+				$attribute = (string) $attribute;
+
+				if( $attribute === 'variant' ) {
+
+					if( is_string( $raw ) === true && in_array( $raw, self::_variants( $appData, $run, $name, $schema )[0], true ) === false )
+						$findings[] = [ 'code' => self::CODE_VARIANT, 'detail' => substr( $raw, 0, self::NAME_LENGTH ) ];
+
+					continue;
+				}
+
+				// The fixed text of a component whose source is a text
+				if( $attribute === 'text' && $schema['source'] === 'text' )
+					continue;
+
+				$declared = $schema['attributes'][$attribute] ?? null;
+
+				if( $declared === null )
+					$findings[] = [ 'code' => self::CODE_FOREIGN, 'detail' => $attribute ];
+				else if( self::_takes( $declared, $raw ) === false )
+					$findings[] = [ 'code' => self::CODE_OUTSIDE, 'detail' => $attribute ];
+				else if( $declared['type'] === 'id' ) {
+
+					if( isset( $run['ids'][$raw] ) === true )
+						$findings[] = [ 'code' => self::CODE_DUPLICATE, 'detail' => $attribute ];
+
+					$run['ids'][$raw] = true;
+				}
+			}
+
+			return $findings;
+		}
+
+		/**
+		 *	Whether an attribute takes what a call says as it is, where the drawing would take its default
+		 *
+		 *	@param		array			$declared			The attribute's clean schema
+		 *	@param		mixed			$raw					A string, or true for a bare word
+		 *
+		 *	@return 	bool
+		 */
+		private static function _takes( array $declared, mixed $raw ): bool {
+
+			switch( $declared['type'] ) {
+
+				case 'choice':
+
+					if( is_string( $raw ) === false )
+						return false;
+
+					if( ( $declared['responsive'] ?? false ) !== true )
+						return in_array( $raw, $declared['options'], true );
+
+					$parts = preg_split( '/ +/', $raw, -1, PREG_SPLIT_NO_EMPTY ) ?: [];
+					$seen = [];
+
+					foreach( $parts as $index => $part ) {
+
+						$colon = strpos( $part, ':' );
+
+						if( $colon === false ) {
+
+							if( $index !== 0 || in_array( $part, $declared['options'], true ) === false )
+								return false;
+
+							continue;
+						}
+
+						$width = substr( $part, 0, $colon );
+
+						if( isset( Markup::BREAKPOINTS[$width] ) === false || isset( $seen[$width] ) === true || in_array( substr( $part, $colon + 1 ), $declared['options'], true ) === false )
+							return false;
+
+						$seen[$width] = true;
+					}
+
+					return $parts !== [];
+
+				case 'bool':
+
+					return $raw === true || ( is_string( $raw ) === true && in_array( strtolower( $raw ), array_merge( self::ON, self::OFF ), true ) === true );
+
+				case 'int':
+
+					return is_string( $raw ) === true && preg_match( '/^-?\d{1,9}$/D', $raw ) === 1 && (int) $raw >= ( $declared['min'] ?? PHP_INT_MIN ) && (int) $raw <= ( $declared['max'] ?? PHP_INT_MAX );
+
+				case 'id':
+
+					return is_string( $raw ) === true && self::_id( $declared, $raw ) !== '';
+
+				default:
+
+					return is_string( $raw ) === true;
+			}
 		}
 
 		/**

@@ -603,6 +603,74 @@ namespace Nino {
 		}
 
 		/**
+		 *	A tree that is new - a block made by a tool - set out the way a person writes a template: each call on a line of its
+		 *	own, a tab for each level, the end of a container at the level of its start. The blank texts between the calls of a
+		 *	level are replaced by a line break and the tabs, and where a container holds calls and nothing else, one stands before
+		 *	each and one before its end. A level that holds anything but calls and blank text - words, a textfill, html, a node that is
+		 *	none - is inline content and stays as it is, with what it holds: a line break there would be part of the text.
+		 *	A call that is a leaf stays a leaf. The first call of $nodes has no line break before it: whatever stands before it in the
+		 *	document is the document's
+		 *
+		 *	What it answers is the tree: write() of it is the template as it would be written by hand, and parse() of that is the tree
+		 *	again but for the blank texts. Nothing that was not given is touched - a tree that is read from a file and not given here
+		 *	stays byte for byte as it was, which is what a tool lays out for what it makes and for nothing else
+		 *
+		 *	@param		array 		$nodes				The nodes of the new part, as parse() gives them
+		 *	@param		int				$depth				How many tabs the first level stands behind, at most MAX_DEPTH
+		 *
+		 *	@return 	array
+		 */
+		public static function layout( array $nodes, int $depth ): array {
+			return self::_lay( $nodes, max( 0, min( self::MAX_DEPTH, $depth ) ), false );
+		}
+
+		/**
+		 *	One level of layout()
+		 *
+		 *	@param		array 		$nodes
+		 *	@param		int				$depth				The level, 1 or more where $inside
+		 *	@param		bool			$inside				The children of a call: a line break before each and before the end
+		 *
+		 *	@return 	array
+		 */
+		private static function _lay( array $nodes, int $depth, bool $inside ): array {
+
+			$calls = 0;
+
+			foreach( $nodes as $node ) {
+
+				if( is_array( $node ) === true && isset( $node['n'] ) === true && is_string( $node['n'] ) === true && isset( $node['t'] ) === false && isset( $node['f'] ) === false )
+					$calls++;
+				else if( is_array( $node ) === false || isset( $node['n'] ) === true || isset( $node['f'] ) === true || is_string( $node['t'] ?? null ) === false || trim( $node['t'], " \t\r\n" ) !== '' )
+					return $nodes;
+			}
+
+			if( $calls === 0 )
+				return $nodes;
+
+			$out = [];
+
+			foreach( $nodes as $node ) {
+
+				if( isset( $node['n'] ) === false )
+					continue;
+
+				if( $out !== [] || $inside === true )
+					$out[] = [ 't' => "\n". str_repeat( "\t", $depth ) ];
+
+				if( is_array( $node['c'] ?? null ) === true )
+					$node['c'] = self::_lay( $node['c'], min( self::MAX_DEPTH, $depth + 1 ), true );
+
+				$out[] = $node;
+			}
+
+			if( $inside === true )
+				$out[] = [ 't' => "\n". str_repeat( "\t", $depth - 1 ) ];
+
+			return $out;
+		}
+
+		/**
 		 *	What waits in write() is written before whatever comes next: the text, then the ends of the calls that
 		 *	closed after it. The text loses a \ at its end where a mark follows, as the doc of write() says. An end that
 		 *	comes right behind a [ gets a blank inside: a [ and an end written [/x] would read as a textfill with the
