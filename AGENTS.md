@@ -118,7 +118,7 @@ replaces none of them (see [Updates and Rollback](docs/deployment.md#updates-and
 | `docs/` | The manuals, among them [`docs/features.md`](docs/features.md), the one manual of a feature; the five extension recipes in `docs/recipes/`; and the developer guide in `docs/guide/`, the way in for a newcomer, written in German |
 | `tests/` | Standalone contract tests, one suite per module or panel (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the forty-three JS suites, and `fixtures/` |
 | `history/` | The frozen `CHANGELOG.md` up to 1.7.0; from there the history is the git log and the tags |
-| `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
+| `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `packages/` (the installed themes and packages of blocks, see [Packages](docs/features.md#packages)), `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
 
 Reach project state through `Filesystem::path()` and `Filesystem::url()` (or the
 `[[/nino/public]]` fill), never a url built by hand from `[[/nino/dir]]`. Write

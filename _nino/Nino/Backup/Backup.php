@@ -286,7 +286,7 @@ namespace Nino {
 		}
 
 		/**
-		 *	Whether a path below blocks/ is a file of a block: a json or a template, in no hidden folder. A block
+		 *	Whether a path below blocks/ is a file of a block: a json, a template or the picture of a slot, in no hidden folder. A block
 		 *	is data and has no code (see \Nino\Blocks), so what else lies there is none of the project's
 		 *	blocks. The one rule of what a backup collects there and of what a restore takes
 		 *
@@ -490,9 +490,9 @@ namespace Nino {
 		// what the directory is open to
 		private const string IMAGE_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:jpe?g|png|webp|gif|avif|ico|svg)$/D';
 
-		// The names a file below blocks/ may have, and one below fonts/: a block is a json and a template, a font is the font and the two
-		// files that say what it is. Nothing a webserver hands to an interpreter, and fonts/ is open to it
-		private const string BLOCK_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:json|tpl)$/D';
+		// The names a file below blocks/ may have, and one below fonts/: a block is a json, a template and the pictures of its slots, a font is
+		// the font and the two files that say what it is. Nothing a webserver hands to an interpreter, and fonts/ is open to it
+		private const string BLOCK_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:json|tpl|svg|webp|png|jpg)$/D';
 		private const string FONT_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:woff2?|ttf|otf|json|txt)$/D';
 
 		// One token of a data file's body: what var_export() writes for an array of strings, numbers,
@@ -641,7 +641,8 @@ namespace Nino {
 				if( str_starts_with( $relative, 'images/' ) === true && ( preg_match( self::IMAGE_NAME, $name ) !== 1 || preg_match( '/\.(?:php|phtml|phar|pht|phps)(?:\d|\.|$)/i', $name ) === 1 ) )
 					return self::_refuse( $relative, 'a file that is no picture' );
 
-				if( str_starts_with( $relative, 'images/' ) === true && preg_match( '/\.svg$/', $name ) === 1 ) {
+				// A svg of a block is read by the kernel as a drawing as well; what a restore puts there is held to the same rule
+				if( ( str_starts_with( $relative, 'images/' ) === true || str_starts_with( $relative, 'blocks/' ) === true ) && preg_match( '/\.svg$/', $name ) === 1 ) {
 
 					$drawing = @file_get_contents( $item->getPathname() );
 

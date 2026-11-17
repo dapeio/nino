@@ -17,9 +17,12 @@ namespace Nino {
 	 *		block.json			name and description in every language, the category, the rank, the picture slots
 	 *		block.tpl				one call - a section-wrap, a header-wrap or a footer-wrap - with an id, made of components
 	 *		text/<locale>.json	the words of the sources the template reads with ~name, one file for each language
+	 *		images/<name>.<ext>	optional: the picture of a slot of block.json, svg, webp, png or jpg, at most one for a slot
 	 *
-	 *	Blocks are read from three places: the folder blocks/ of every feature that is on (the one that comes with the kernel,
-	 *	Basis, among them), the folder blocks/ of the project's private tree, and the roots that a callback of the hook
+	 *	Blocks are read from four places: the folder blocks/ of every feature that is on (the one that comes with the kernel,
+	 *	Basis, among them), the folder blocks/ of the project's private tree, the packages of blocks that are installed
+	 *	(private/packages/blocks/<key>/<block>/, see \Nino\Packages; the origin is 'pack:' and the key of the package, the label the name in its
+	 *	pack.json), and the roots that a callback of the hook
 	 *	'/nino/blocks' adds - it is handed a list and answers it with [ 'dir' => the absolute path of a folder of blocks, 'origin'
 	 *	=> a word that says whose they are, 'label' => the same for a person: a text or a locale => text map, optional ] added, which is
 	 *	where a theme or a package of blocks puts its own. The label of Basis and of every other feature is the name of the feature, the
@@ -29,8 +32,8 @@ namespace Nino {
 	 *	kernel's - and a block that is not what it says it is is left out of all(), said once in the log, and named by rejected():
 	 *
 	 *	- the folder is a name of lower case letters, digits and hyphens that no other block has, a folder of its own and no link; it holds
-	 *	  block.json, block.tpl and text/ and nothing else - no php, whatever it is called - and text/ holds <locale>.json (xx_XX) and
-	 *	  nothing else, en_US among them; a name that begins with a dot is the file system's, not read
+	 *	  block.json, block.tpl, text/ and, where a slot has a picture, images/ - and nothing else - no php, whatever it is called - and text/ holds
+	 *	  <locale>.json (xx_XX) and nothing else, en_US among them; a name that begins with a dot is the file system's, not read
 	 *	- block.json and the texts are json of a depth and a length that are limited, keys that are words, the same keys in every language,
 	 *	  and no control character, no < and no [[ in any text
 	 *	- the template is at most MAX_TEMPLATE bytes of utf-8, is read by \Nino\Markup with no note and written back byte for byte, and is one call
@@ -45,7 +48,9 @@ namespace Nino {
 	 *	  .field is a field of its model - and nothing else: no key of the project, no slot, no file; a value of an attribute that begins like
 	 *	  a source is the same
 	 *	- each ~name has a text in every language, and each text is read; a ~name that is a picture has a slot of block.json with a placeholder
-	 *	  of the kernel - the block brings no file of its own - and each slot is read
+	 *	  of the kernel, and each slot is read. A slot may have a picture of its own, images/<slot>.svg|webp|png|jpg: at most MAX_PICTURE
+	 *	  bytes, MAX_SIDE pixels on a side, of the type its ending says (\Nino\Images::size()), a svg that \Nino\Images::cleanSvg() takes -
+	 *	  and no other file in images/
 	 *	- the category says what the root is: 'frame' for a header-wrap and a footer-wrap, one of the others for a section-wrap
 	 *
 	 *	The name a text has in its file is the name of the source for a call whose nearest id above is the id of the root, and for one
@@ -89,6 +94,16 @@ namespace Nino {
 		public const int MAX_TEXTS = 60;
 		public const int MAX_IMAGES = 8;
 
+		// The picture a slot may bring: bytes, pixels on a side, and the type of the picture each ending stands for (a svg is read by cleanSvg())
+		public const int MAX_PICTURE = 524288;
+		public const int MAX_SIDE = 4096;
+		public const array PICTURE_TYPES = [ 'webp' => IMAGETYPE_WEBP, 'png' => IMAGETYPE_PNG, 'jpg' => IMAGETYPE_JPEG ];
+
+		// Where the packages of blocks are installed, below the private tree of the project, and the files that stand beside the folders of the blocks in one
+		public const string PACKAGES = '/packages/blocks';
+		public const string PACK = 'pack:';
+		public const array PACK_FILES = [ 'pack.json', 'preview.webp', 'LICENSE.txt' ];
+
 		// How many levels of json a file may have, how long the id of a root and the word of a source may be
 		private const int DEPTH = 5;
 		private const int ID_LENGTH = 32;
@@ -98,6 +113,7 @@ namespace Nino {
 		private const string LOCALE = '/^[a-z]{2}_[A-Z]{2}$/D';
 		private const string WORD = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D';
 		private const string SOURCE = '/^~[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D';
+		private const string PICTURE = '/^([a-z0-9]+(?:-[a-z0-9]+)*)\.(svg|webp|png|jpg)$/D';
 
 		// What no folder of a block holds, whatever the name is spelt like
 		private const string CODE = '/\.(?:php\d?|phtml|phar|inc)(?:\.|$)/i';
@@ -120,7 +136,8 @@ namespace Nino {
 		 *	@return 	array										key => [ 'key', 'origin' => the key of the feature, 'project' or what the hook said, 'label' => what a person reads for the origin (text or locale => text map), 'name' and 'description' =>
 		 *																	locale => text, 'category', 'rank', 'wrap' => the root, 'locales', 'features' => the keys of
 		 *																	the features whose components it calls - worked out from the register -, 'variants' => component => the
-		 *																	variants it names, 'images' => name => [ 'placeholder', 'width', 'height', 'label' => locale => text ],
+		 *																	variants it names, 'images' => name => [ 'placeholder', 'width', 'height', 'label' => locale => text ], 'pictures' => slot =>
+		 *																	'images/<slot>.<ext>', the file below the folder of the block, for each slot that has a picture of its own,
 		 *																	'missing' => the keys of the features that are off and whose components it calls, [] where it can be put in ]
 		 */
 		public static function all( array &$appData ): array {
@@ -179,12 +196,16 @@ namespace Nino {
 
 		/**
 		 *	The places blocks are read from, in the order the first block of a key wins: Basis, the
-		 *	project's own folder, the other features that are on by their keys, and what the hook adds. An entry the hook adds that is no [ 'dir', 'origin' ] of the kind the root has
+		 *	project's own folder, the installed packages of blocks by their keys, the other features that are on by their keys, and
+		 *	what the hook adds. A package is a thing the project chose to install: it stands behind what the project wrote itself and before
+		 *	the features, so that no feature that is switched on later puts out a block of it. The origin of a package is 'pack:<key>', a name no feature, no
+		 *	project and no root of the hook can have, so that no origin is another's. An entry the hook adds that is no [ 'dir', 'origin' ] of the kind the root has
 		 *	is said once and left out
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ [ 'origin' => ..., 'label' => text or locale => text map, 'dir' => the path of the folder, 'own' => the path it must be inside of, so that it is no link, or '' ], ... ]
+		 *	@return 	array										[ [ 'origin' => ..., 'label' => text or locale => text map, 'dir' => the path of the folder, 'own' => the path it must be inside of, so that it is no link, or '',
+		 *																	'except' => the names in the folder that are no blocks, optional ], ... ]
 		 */
 		public static function roots( array &$appData ): array {
 
@@ -200,6 +221,10 @@ namespace Nino {
 
 			if( $content !== '' )
 				$roots[] = [ 'origin' => 'project', 'label' => self::PROJECT, 'dir' => $content. self::OWN, 'own' => $content ];
+
+			if( $content !== '' )
+				foreach( self::_packages( $content. self::PACKAGES ) as $package )
+					$roots[] = $package;
 
 			foreach( $features as $key => $feature )
 				if( $key !== 'basis' )
@@ -234,7 +259,8 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					The key the block is to have
-		 *	@param		array			$parts				[ 'json' => the text of block.json, 'tpl' => the text of block.tpl, 'texts' => locale => the text of the file ]
+		 *	@param		array			$parts				[ 'json' => the text of block.json, 'tpl' => the text of block.tpl, 'texts' => locale => the text of the file,
+		 *																	'pictures' => the name of a file below images/ => its bytes, optional ]
 		 *
 		 *	@return 	array|string							The block as all() and get() answer it, without its origin; or what is wrong with it
 		 */
@@ -296,6 +322,11 @@ namespace Nino {
 
 			if( is_string( $block ) === true )
 				return $block;
+
+			$own = self::_pictures( (array) ( $parts['pictures'] ?? [] ), $block['images'] );
+
+			if( is_string( $own ) === true )
+				return $own;
 
 			$found = self::_template( $appData, (string) ( $parts['tpl'] ?? '' ) );
 
@@ -364,11 +395,24 @@ namespace Nino {
 				'missing'			=> $found['missing'],
 				'variants'		=> $found['variants'],
 				'images'			=> $block['images'],
+				'pictures'		=> $own,
 				'id'					=> $found['id'],
 				'source'			=> (string) $parts['tpl'],
 				'slots'				=> $found['slots'],
 				'texts'				=> $texts,
 			];
+		}
+
+		/**
+		 *	Forget what this request read of the blocks, so that the next call reads the folders again: after a package of blocks was put in place or taken away
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function forget( array &$appData ): void {
+
+			unset( $appData[self::STATE] );
 		}
 
 		/**
@@ -430,6 +474,98 @@ namespace Nino {
 		}
 
 		/**
+		 *	The packages of blocks that are installed: a folder of a key in the folder of the packages, with the name its pack.json says
+		 *
+		 *	@param		string		$base					The folder of the packages of blocks
+		 *
+		 *	@return 	array										Roots as roots() lists them, by the key of the package
+		 */
+		private static function _packages( string $base ): array {
+
+			$packages = [];
+
+			$real = is_dir( $base ) === true && is_link( $base ) === false ? realpath( $base ) : false;
+
+			if( $real === false )
+				return $packages;
+
+			foreach( @scandir( $base ) ?: [] as $entry ) {
+
+				if( strlen( $entry ) > \Nino\Components::NAME_LENGTH || preg_match( \Nino\Components::NAME, $entry ) !== 1 || self::_folder( $base. '/'. $entry, $base ) === false )
+					continue;
+
+				$label = $entry;
+				$raw = self::_file( $real. '/'. $entry. '/pack.json', self::MAX_JSON );
+
+				if( $raw !== null ) {
+
+					$pack = json_decode( $raw, true, self::DEPTH );
+
+					if( is_array( $pack ) === true && self::_label( $pack['name'] ?? null ) === true )
+						$label = $pack['name'];
+				}
+
+				$packages[] = [ 'origin' => self::PACK. $entry, 'label' => $label, 'dir' => $base. '/'. $entry, 'own' => $base, 'except' => self::PACK_FILES ];
+			}
+
+			return $packages;
+		}
+
+		/**
+		 *	The pictures a block has of its own: the files of images/ against the slots of block.json
+		 *
+		 *	@param		array			$pictures			The name of a file => its bytes
+		 *	@param		array			$slots				The slots of block.json, by name
+		 *
+		 *	@return 	array|string							slot => 'images/<file>', or what is wrong
+		 */
+		private static function _pictures( array $pictures, array $slots ): array|string {
+
+			$found = [];
+
+			foreach( $pictures as $file => $bytes ) {
+
+				$file = (string) $file;
+
+				if( preg_match( self::PICTURE, $file, $match ) !== 1 )
+					return 'images/ holds "'. self::_shown( $file ). '": there are <slot>.svg, .webp, .png and .jpg files and nothing else';
+
+				[ , $name, $type ] = $match;
+
+				if( isset( $slots[$name] ) === false )
+					return 'images/'. $file. ' is the picture of no slot of block.json';
+
+				if( isset( $found[$name] ) === true )
+					return 'the slot "'. $name. '" has more than one picture';
+
+				if( is_string( $bytes ) === false || $bytes === '' || strlen( $bytes ) > self::MAX_PICTURE )
+					return 'images/'. $file. ' is empty or longer than '. self::MAX_PICTURE. ' bytes';
+
+				if( $type === 'svg' ) {
+
+					if( \Nino\Images::cleanSvg( $bytes ) === null )
+						return 'images/'. $file. ' is no svg that the kernel takes';
+				}
+				else {
+
+					$size = \Nino\Images::size( $bytes );
+
+					if( $size === false || $size['type'] !== self::PICTURE_TYPES[$type] )
+						return 'images/'. $file. ' is no '. $type. ' picture';
+
+					if( $size['width'] > self::MAX_SIDE || $size['height'] > self::MAX_SIDE )
+						return 'images/'. $file. ' is wider or higher than '. self::MAX_SIDE. ' pixels';
+				}
+
+				$found[$name] = 'images/'. $file;
+			}
+
+			ksort( $found );
+
+			return $found;
+		}
+
+		/**
 		 *	The components that the features which are off bring, by the name of the folder components/<name>/ of each: name => the key of the
 		 *	feature, the first by key where two bring one. Read once in a request; the kernel does not read a feature that is off, so that
 		 *	nothing but the names of the folders is looked at
@@ -474,7 +610,7 @@ namespace Nino {
 			$names = [];
 
 			foreach( @scandir( $root['dir'] ) ?: [] as $entry )
-				if( $entry[0] !== '.' )
+				if( $entry[0] !== '.' && in_array( $entry, (array) ( $root['except'] ?? [] ), true ) === false )
 					$names[] = $entry;
 
 			return $names;
@@ -526,7 +662,7 @@ namespace Nino {
 			if( $base === false || is_dir( $path ) === false || realpath( $path ) !== $path )
 				return 'the folder is a link, or no folder';
 
-			$parts = [ 'json' => '', 'tpl' => '', 'texts' => [] ];
+			$parts = [ 'json' => '', 'tpl' => '', 'texts' => [], 'pictures' => [] ];
 			$seen = [];
 
 			foreach( @scandir( $path ) ?: [] as $entry ) {
@@ -579,8 +715,32 @@ namespace Nino {
 
 					$seen['text'] = true;
 				}
+				else if( $entry === 'images' ) {
+
+					if( is_dir( $path. '/images' ) === false || realpath( $path. '/images' ) !== $path. '/images' )
+						return 'images is a link, or no folder';
+
+					foreach( @scandir( $path. '/images' ) ?: [] as $file ) {
+
+						if( $file === '.' || $file === '..' )
+							continue;
+
+						if( preg_match( self::CODE, $file ) === 1 )
+							return 'images/ holds "'. self::_shown( $file ). '": a block is data and has no code';
+
+						if( $file[0] === '.' )
+							continue;
+
+						$read = self::_file( $path. '/images/'. $file, self::MAX_PICTURE );
+
+						if( $read === null )
+							return 'images/'. self::_shown( $file ). ' is a link, no file, too long or cannot be read';
+
+						$parts['pictures'][$file] = $read;
+					}
+				}
 				else
-					return 'the folder holds "'. self::_shown( $entry ). '": there are block.json, block.tpl and text/';
+					return 'the folder holds "'. self::_shown( $entry ). '": there are block.json, block.tpl, text/ and images/';
 			}
 
 			foreach( [ 'block.json', 'block.tpl', 'text' ] as $needed )
@@ -630,7 +790,7 @@ namespace Nino {
 					$own = @filemtime( $root['dir']. '/'. $name );
 					$stamp[$root['dir']. '/'. $name] = $own === false ? 0 : $own;
 
-					foreach( [ '', 'text/' ] as $inner ) {
+					foreach( [ '', 'text/', 'images/' ] as $inner ) {
 
 						$path = $root['dir']. '/'. $name. '/'. $inner;
 
@@ -681,7 +841,7 @@ namespace Nino {
 				return null;
 
 			foreach( $value['blocks'] as $key => $block )
-				if( is_string( $key ) === false || is_array( $block ) === false || isset( $block['source'], $block['texts'], $block['slots'], $block['origin'], $block['label'], $block['category'], $block['rank'] ) === false )
+				if( is_string( $key ) === false || is_array( $block ) === false || isset( $block['source'], $block['texts'], $block['slots'], $block['pictures'], $block['origin'], $block['label'], $block['category'], $block['rank'] ) === false )
 					return null;
 
 			return $value;

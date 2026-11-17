@@ -190,7 +190,7 @@ namespace Nino {
 
 	// The kernel classes - AppData, Auth, Callbacks, Catalogue, Csrf,
 	// Failure, Feature, Features, Fetch, Filesystem, Form, Backup, RotatingLog, Elements, Html, Http, Markup,
-	// Images, Locales, Text, Mail, Modules and Runtime - each live in their own file under
+	// Images, Locales, Packages, Text, Mail, Modules and Runtime - each live in their own file under
 	// _nino/Nino/<Class>/<Class>.php and are autoloaded on first use by
 	// the spl_autoload_register() call at the bottom of this file, from
 	// the same <namespace-as-path>/<basename>.php layout every module

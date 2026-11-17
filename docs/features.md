@@ -840,6 +840,55 @@ checkout's `tests/harness.js` (1.8; `NINO_ROOT` or three levels up) and `load()`
 feature outside it names its script as `path.relative( root, ... )`. The catalogue's
 JavaScript tests carry a stand-in of their own and run with any Nino.
 
+## Packages
+
+A feature is one of three kinds of package that come from outside as a folder of files; the other two are data and have no code. `\Nino\Packages` is the one
+mechanism for them (`_nino/Nino/Packages/Packages.php`, checked by `tests/packages-smoke.php`): it looks at the files of a package in memory - as
+`\Nino\Archive::read()` answers them, path => bytes - and puts them in place; where the files come from is not its business.
+
+| Kind | Lives in | May hold |
+| --- | --- | --- |
+| `feature` | `features/<Directory>/` | code: the rules of the archive are all |
+| `theme` | `private/packages/themes/<key>/` | `theme.json`, `parts/<group>/part.json`, `parts/<group>/part.css`, `blocks/<block>/` (below), `preview.webp`, `LICENSE.txt`, `README.md` |
+| `blocks` | `private/packages/blocks/<key>/` | `pack.json`, `<block>/` (below), `preview.webp`, `LICENSE.txt` |
+
+A block is `block.json`, `block.tpl`, `text/<xx_XX>.json` and, for a slot of `block.json` that has a picture of its own, `images/<slot>.svg`, `.webp`, `.png` or
+`.jpg`. The list is a list of paths, not of endings: a file that no path of the list names - a php file, an `.htaccess`, a script, a hidden file, a part
+file that nobody reads - is refused with its path, and a theme or a package of blocks with one such file is refused as a whole; nothing of it is written.
+Names are lower case words joined by hyphens (a locale is `xx_XX`), no name stands twice in another spelling (a Mac folds the case), every text is UTF-8
+without a null byte, and every JSON is a map of at most eight levels and at most 32 KB (a block's own files by the limits of `\Nino\Blocks`).
+
+What the files hold is read by the rules of what reads them later, and none of them is new: a `part.css` by `\Nino\Components::partProblems()` (no `@import`, no
+`url()`, no `!important`, no class or token of another component, no token of another group), a `part.json` by `\Nino\Components::validateGroup()` where the
+project has the group (where it has not, the components the part names stand for the group, and the one who reads the theme when the feature comes
+says the rest), a block by `\Nino\Blocks::validate()`, a raster picture by `\Nino\Images::size()` - of the type its ending says, at most 512 KB and 4 096 pixels
+on a side - and a svg only where `\Nino\Images::cleanSvg()` takes it: a svg is written as the picture `cleanSvg()` rebuilds, never as it came. What `cleanSvg()` takes is rebuilt, not refused - a svg that has a shape and a `<script>` or an `onload` is installed as the drawing without them - and what it does not take (a document type, a link by `xlink:href`, no shape at all) refuses the package. That a rebuild lost something is for the build of the catalogue to say. A theme has at most 40 parts, as the reader of themes takes; the `brand` of `theme.json` is a map here and the feature that reads themes says what it may suggest. A block whose
+components belong to a feature the project does not have is refused by `validate()` like any block that calls what nobody registered.
+
+```php
+$problem = \Nino\Packages::check( $appData, 'theme', $files );    // null, or [ 'code' => a key of Packages::WHY, 'path' => the file, 'params' => [ ... ] ]
+$done    = \Nino\Packages::place( $appData, 'theme', 'craft', $files ); // true, or a problem as above - nothing is written but a package that is whole
+$done    = \Nino\Packages::remove( $appData, 'theme', 'craft' );
+```
+
+`check()` is what the catalogue's build and the installation both ask; `Packages::why()` words a problem as the English sentence of the log, and a tool says it in its own
+words by the code. `place()` checks again, writes the files to a staging folder below `data/.packages/`, exchanges it for the folder of the package under the lock
+of the features - the old folder beside it, and put back where the exchange fails - and removes the staging folder however it ends. A change that finds the
+lock taken is not made (`busy`). What a run that was killed left - a staging folder, a folder that was put aside - the next change clears under the lock
+(`Packages::sweep()`). `rename()` is tried first; where the two folders lie on two file systems the files are copied beside the place (`.incoming-<key>-<hex>`) and moved in by one `rename()`. What an exchange puts aside is renamed to `.removing-<key>-<hex>` before it is deleted, so that `.previous-<key>-<hex>` stands between the two moves only, which is what `sweep()` relies on to put it back. `remove()` takes a theme or a package
+of blocks away whatever uses it: a site never hangs on a package, it draws from the copies it keeps and the blocks that are put in a page are the page's;
+a feature is taken away by `Features::remove()`, which asks that it is switched off first.
+
+A package of blocks is read by `\Nino\Blocks` as a root of its own: the origin of its blocks is `pack:<key>` - a name no feature, no project and no root of the hook has, so that no origin is another's -, the label the name in its `pack.json`. The roots stand
+in this order, and the first block of a key wins: the blocks of Basis, of the project (`private/blocks/`), of the installed packages by their keys, of the other
+features by their keys, and what the hook `/nino/blocks` adds. A package is a choice of the project, so no feature that is switched on later puts out one of its
+blocks, and what the project wrote itself stands before it; `Blocks::forget()` makes the request read the folders again, which `place()` and `remove()` do. `private/` is never
+served and no reader includes a file of a package.
+
+The packages are **not** in a backup. They come from the catalogue again and nothing of a site hangs on them: a theme that is applied is kept as a copy of the
+parts it uses, and a block that is put in a page is the page's. The blocks the project wrote itself (`private/blocks/`, with the pictures of their slots) and the
+fonts are.
+
 ## What a feature does not do
 
 - It does not install or uninstall itself: deactivation only removes the class from
