@@ -728,9 +728,10 @@
 			else
 				wrapper.appendChild( error );
 
+			// The error replaces what the control was described by - except the sentence of its help, which stays behind it
 			if( control !== null ) {
 				control.setAttribute( 'aria-invalid', 'true' );
-				control.setAttribute( 'aria-describedby', id );
+				control.setAttribute( 'aria-describedby', [ id ].concat( Nino.adminUi._helpTokens( control ) ).join(' ') );
 			}
 
 			return error;
@@ -748,8 +749,475 @@
 
 			root.querySelectorAll('.nino-admin-field-error').forEach( function( el ) { el.remove() } );
 			root.querySelectorAll('[aria-invalid]').forEach( function( el ) {
+
 				el.removeAttribute('aria-invalid');
-				el.removeAttribute('aria-describedby');
+
+				// What the field is described by besides its errors - the sentence of its help - stays
+				const kept = Nino.adminUi._helpTokens( el );
+
+				if( kept.length === 0 )
+					el.removeAttribute('aria-describedby');
+				else
+					el.setAttribute( 'aria-describedby', kept.join(' ') );
+			} );
+		},
+
+		/**
+		 *	The ids in a control's aria-describedby that name a sentence of its own - the help (see fieldHelp()) or a note the caller wrote with an id of nino-admin-note-* - which an error does not replace
+		 *
+		 *	@param		{Element}		control
+		 *
+		 *	@return		{Array}
+		 */
+		_helpTokens : function( control ) {
+			return String( control.getAttribute('aria-describedby') ?? '' ).split(/\s+/).filter( function( token ) { return token.indexOf('nino-admin-help-') === 0 || token.indexOf('nino-admin-note-') === 0 } );
+		},
+
+		/**
+		 *	The (?) at the title of a section - a fieldset's legend, a card's heading - for the sentence that explains
+		 *	the whole section. The section is a group named by the words of its title alone, and described by the
+		 *	sentence: what a screen reader announces on entering it. Name of the button: "Help for <title>"
+		 *
+		 *	@param		{Element}		title				The legend or heading that holds the words of the title
+		 *	@param		{Element}		group				The element the section is: the fieldset, or a div that gets role="group"
+		 *	@param		{string}		text				The sentence
+		 *
+		 *	@return		{Element}									The (?) as fieldHelp() makes it, already in the title
+		 */
+		sectionHelp : function( title, group, text ) {
+
+			const words = dc.createElement('span');
+			words.className = 'nino-admin-field-text';
+			words.id = 'nino-admin-name-'+ ( ++serial );
+
+			Array.from( title.childNodes ?? title.children ).forEach( function( node ) {
+				title.removeChild( node );
+				words.appendChild( node );
+			} );
+
+			title.appendChild( words );
+
+			if( String( group.tagName ).toLowerCase() !== 'fieldset' )
+				group.setAttribute( 'role', 'group' );
+
+			group.setAttribute( 'aria-labelledby', words.id );
+
+			const help = Nino.adminUi.fieldHelp( text, { field : group, name : words.textContent || ( words.children[0] ? words.children[0].textContent : '' ) } );
+			title.appendChild( help );
+
+			return help;
+		},
+
+		// The help bubble that is open: at most one. { close() } while there is one
+		_helpOpen : null,
+		_helpListening : false,
+
+		/**
+		 *	The (?) at the name of a field: a button of 24 px, named "Help for <field>", whose press opens the
+		 *	sentence that explains what the value does as a small bubble at the field. Escape and a press anywhere
+		 *	else close it, a second one opens in place of the first, and the bubble stays inside the window (inside
+		 *	the dialog, where the field stands in one). The sentence is always in the document - hidden from the eye,
+		 *	not from a screen reader - and the field is described by it (aria-describedby), so it is heard without a
+		 *	press. It explains; what has to stay in view - an error, a counter, a limit, a conversion, the result of a
+		 *	check - is no help and stands at the field as a note. Owns no strings, the name of the button apart
+		 *
+		 *	@param		{string}		text						The sentence
+		 *	@param		{Object}		[options]				{ field, name }
+		 *															- field   the control the sentence describes: aria-describedby names it, the existing ones stay
+		 *															- name    the name of the field, which the button is named after
+		 *
+		 *	@return		{Element}									The wrapper: the button and the sentence (.sentence), the sentence's id in .sentenceId
+		 */
+		fieldHelp : function( text, options ) {
+
+			options = options || {};
+
+			const root = dc.createElement('span');
+			root.className = 'nino-admin-help';
+
+			const sentence = dc.createElement('span');
+			sentence.className = 'nino-admin-help-text';
+			sentence.id = 'nino-admin-help-'+ ( ++serial );
+			sentence.textContent = String( text ?? '' );
+
+			const button = Nino.adminUi.iconButton( 'circle-help', Nino.adminUi.format( Nino.adminUi.text('/_admin/common/label/help-for'), String( options.name ?? '' ) ), null, { small : true, className : 'nino-admin-help-button' } );
+			button.setAttribute( 'aria-expanded', 'false' );
+			button.setAttribute( 'aria-controls', sentence.id );
+
+			const handle = {
+				root : root,
+				close : function() {
+					delete root.dataset.open;
+					button.setAttribute( 'aria-expanded', 'false' );
+					sentence.style.left = '';
+					sentence.style.top = '';
+					if( Nino.adminUi._helpOpen === handle )
+						Nino.adminUi._helpOpen = null;
+				},
+				button : button,
+			};
+
+			button.addEventListener( 'click', function() {
+
+				if( Nino.adminUi._helpOpen === handle ) {
+					handle.close();
+					return;
+				}
+
+				if( Nino.adminUi._helpOpen !== null )
+					Nino.adminUi._helpOpen.close();
+
+				root.dataset.open = 'true';
+				button.setAttribute( 'aria-expanded', 'true' );
+				Nino.adminUi._helpOpen = handle;
+				Nino.adminUi._helpPlace( button, sentence, options.field ?? null );
+				Nino.adminUi._helpListen();
+			} );
+
+			// Tabbing on to another control takes the bubble away; a press on something that cannot take the focus is the document's to judge
+			root.addEventListener( 'focusout', function( event ) {
+
+				const next = event.relatedTarget;
+
+				if( next === null || next === undefined )
+					return;
+
+				for( let node = next; node !== null && node !== undefined; node = node.parentNode )
+					if( node === root )
+						return;
+
+				handle.close();
+			} );
+
+			root.appendChild( button );
+			root.appendChild( sentence );
+			root.sentence = sentence;
+			root.sentenceId = sentence.id;
+
+			if( options.field !== undefined && options.field !== null )
+				Nino.adminUi._describe( options.field, sentence.id );
+
+			return root;
+		},
+
+		/**
+		 *	Name one more sentence as what a control is described by, behind what describes it already
+		 *
+		 *	@param		{Element}		control
+		 *	@param		{string}		id
+		 *
+		 *	@return		void
+		 */
+		_describe : function( control, id ) {
+
+			const tokens = String( control.getAttribute('aria-describedby') ?? '' ).split(/\s+/).filter( function( token ) { return token !== '' } );
+
+			if( tokens.indexOf( id ) === -1 )
+				tokens.push( id );
+
+			control.setAttribute( 'aria-describedby', tokens.join(' ') );
+		},
+
+		/**
+		 *	Put an open bubble where it reads and covers nothing it belongs to: under its button where the field is not
+		 *	there, else under the field, else over the button - a field that stands under its name (a narrow column, a
+		 *	dialog, the sheet of properties) is never hidden by the sentence about it. As far left as the button, moved
+		 *	left where it would leave the window or the dialog the button stands in, and never lower than what shows
+		 *	above the bar at the foot of the page. Fixed, so that no scroll area the field stands in cuts it off - which
+		 *	is why any scrolling closes it
+		 *
+		 *	@param		{Element}		button
+		 *	@param		{Element}		bubble
+		 *	@param		{Element|null}	field		The control the sentence is about
+		 *
+		 *	@return		void
+		 */
+		_helpPlace : function( button, bubble, field ) {
+
+			if( typeof button.getBoundingClientRect !== 'function' || typeof bubble.getBoundingClientRect !== 'function' )
+				return;
+
+			const margin = 8;
+			const at = button.getBoundingClientRect();
+			const dialog = typeof button.closest === 'function' ? button.closest('.nino-admin-dialog') : null;
+			const area = dialog !== null && typeof dialog.getBoundingClientRect === 'function'
+				? dialog.getBoundingClientRect()
+				: { left : 0, right : Number( dc.documentElement?.clientWidth ?? wn.innerWidth ?? 0 ), top : 0, bottom : Number( wn.innerHeight ?? 0 ) };
+
+			// The bar at the foot of the page covers the window: what shows is what is above it
+			if( dialog === null && typeof dc.querySelectorAll === 'function' )
+				Array.from( dc.querySelectorAll('.nino-admin-actionbar') ).forEach( function( bar ) {
+
+					const box = typeof bar.getBoundingClientRect === 'function' ? bar.getBoundingClientRect() : null;
+
+					// A bar of a pane that is not shown has no size
+					if( box !== null && box.width > 0 && box.height > 0 && box.top > 0 )
+						area.bottom = Math.min( area.bottom, box.top );
+				} );
+
+			bubble.style.left = '0px';
+			bubble.style.top = '0px';
+
+			const size = bubble.getBoundingClientRect();
+			const wide = Math.min( size.width, Math.max( 0, area.right - area.left - 2 * margin ) );
+
+			let left = Math.min( at.left, area.right - margin - wide );
+			left = Math.max( left, area.left + margin );
+
+			const control = field !== null && field !== undefined && typeof field.getBoundingClientRect === 'function' ? field.getBoundingClientRect() : null;
+			const covers = function( top ) {
+				return control !== null && left < control.right && left + wide > control.left && top < control.bottom && top + size.height > control.top;
+			};
+			const fits = function( top ) { return top >= area.top + margin && top + size.height <= area.bottom - margin };
+
+			const under = at.bottom + 4;
+			const afterField = control === null ? under : control.bottom + 4;
+			const over = at.top - 4 - size.height;
+			const choices = [ under, afterField, over ];
+			let top = choices.find( function( candidate ) { return covers( candidate ) === false && fits( candidate ) === true } );
+
+			if( top === undefined )
+				top = choices.find( function( candidate ) { return fits( candidate ) === true } ) ?? under;
+
+			bubble.style.left = Math.round( left )+ 'px';
+			bubble.style.top = Math.round( top )+ 'px';
+		},
+
+		/**
+		 *	Escape, a press beside the bubble and any scrolling close the open bubble - listened for once, on the
+		 *	document, from the first bubble that opens
+		 *
+		 *	@return		void
+		 */
+		_helpListen : function() {
+
+			if( Nino.adminUi._helpListening === true || typeof dc.addEventListener !== 'function' )
+				return;
+
+			Nino.adminUi._helpListening = true;
+
+			// In the capture phase and ahead of the dialog: Escape closes the bubble, and the dialog it stands in stays
+			dc.addEventListener( 'keydown', function( event ) {
+
+				const open = Nino.adminUi._helpOpen;
+
+				if( open === null || event.key !== 'Escape' )
+					return;
+
+				event.preventDefault();
+				event.stopPropagation();
+				open.close();
+				open.button.focus();
+			}, true );
+
+			dc.addEventListener( 'click', function( event ) {
+
+				const open = Nino.adminUi._helpOpen;
+
+				if( open === null )
+					return;
+
+				for( let node = event.target; node !== null && node !== undefined; node = node.parentNode )
+					if( node === open.root )
+						return;
+
+				open.close();
+			}, true );
+
+			const away = function() {
+				if( Nino.adminUi._helpOpen !== null )
+					Nino.adminUi._helpOpen.close();
+			};
+
+			dc.addEventListener( 'scroll', away, true );
+
+			if( typeof wn.addEventListener === 'function' )
+				wn.addEventListener( 'resize', away );
+		},
+
+		/**
+		 *	What a field builder does with the name of a field and its control once they exist: the help behind the (?)
+		 *	and the textfill icon at the name, and the names the control is read by. The name is read from the words of
+		 *	the name alone - the sentence of the help stands in the label too, and would be part of what the control is
+		 *	called otherwise (aria-labelledby). A field with neither has nothing changed
+		 *
+		 *	@param		{Element}		name				The element that holds the name of the field
+		 *	@param		{Element}		control			The control the field is for
+		 *	@param		{Object}		options			The builder's options: help (or hint), fills, and the label
+		 *	@param		{string}		label				The name of the field, as the button is named after it
+		 *
+		 *	@return		void
+		 */
+		_tools : function( name, control, options, label ) {
+
+			const sentence = typeof ( options.help ?? options.hint ) === 'string' ? String( options.help ?? options.hint ) : '';
+			const fills = options.fills !== undefined && options.fills !== null && options.fills.editable === true ? options.fills : null;
+
+			if( sentence === '' && fills === null )
+				return;
+
+			const words = dc.createElement('span');
+			words.className = 'nino-admin-field-text';
+			words.id = 'nino-admin-name-'+ ( ++serial );
+
+			Array.from( name.childNodes ?? name.children ).forEach( function( node ) {
+				name.removeChild( node );
+				words.appendChild( node );
+			} );
+
+			name.appendChild( words );
+			control.setAttribute( 'aria-labelledby', words.id );
+
+			// The label points at the field: a press on the name or on the label's surface focuses the field, and the
+			// first control in the label - which would be the (?) - is no longer what the label stands for
+			const holder = name.parentNode;
+
+			if( holder !== null && holder !== undefined && String( holder.tagName ).toLowerCase() === 'label' ) {
+
+				if( !control.id )
+					control.id = 'nino-admin-control-'+ ( ++serial );
+
+				holder.setAttribute( 'for', control.id );
+			}
+
+			if( sentence !== '' )
+				name.appendChild( Nino.adminUi.fieldHelp( sentence, { field : control, name : label } ) );
+
+			if( fills !== null )
+				name.appendChild( Nino.adminUi.fillsButton( fills, control, label ) );
+		},
+
+		/**
+		 *	The "[ ]" at the name of a field whose work textfills decide, in the size and the place of the (?). A press
+		 *	asks the caller for the textfills this field takes and opens fillsDialog(); where they could not be had it
+		 *	says so at the field. The caller draws the button only for an account that may edit the field - the field
+		 *	builders do it for the option fills, a field they do not build (an editor) takes the button from here.
+		 *	Owns no strings
+		 *
+		 *	@param		{Object}		fills				{ title, items | load( done ), opener } - see textareaField(); opener a function that answers what gets the focus back when the dialog closes, for a field whose control is made later
+		 *	@param		{Element|null}	control	The field's control, which gets the focus back when the dialog closes; null where the caller says it by opener
+		 *	@param		{string}		label				The name of the field
+		 *
+		 *	@return		{Element}									The button; it goes into the element that holds the name of the field
+		 */
+		fillsButton : function( fills, control, label ) {
+
+			const button = Nino.adminUi.iconButton( 'brackets', Nino.adminUi.text('/_admin/common/label/fills'), null, { small : true, className : 'nino-admin-fills-button' } );
+			let said = null;
+
+			button.addEventListener( 'click', function() {
+
+				if( said !== null )
+					said.remove();
+
+				said = null;
+
+				const show = function( list ) {
+
+					if( Array.isArray( list ) === false ) {
+						// The field is not wrong, the list is missing: said at the field, which is left as it is
+						said = Nino.adminUi.fieldError( button.closest('.nino-admin-field') ?? button.parentNode, null, 'nino-admin-fills-error-'+ ( ++serial ), Nino.adminUi.text('/_admin/common/error/request') );
+						return;
+					}
+
+					// Back to the field when the dialog closes: what is copied is pasted there next
+					const back = typeof fills.opener === 'function' ? fills.opener() : ( control ?? button );
+
+					Nino.adminUi.fillsDialog( { title : fills.title ?? Nino.adminUi.format( Nino.adminUi.text('/_admin/common/fills/title'), label ), fills : list, opener : back ?? button } );
+				};
+
+				if( typeof fills.load === 'function' )
+					fills.load( show );
+				else
+					show( fills.items ?? [] );
+			} );
+
+			return button;
+		},
+
+		/**
+		 *	The textfills a field takes, in a dialog: a search, and a row for each - its name, how it is written, and
+		 *	what it says today. A press on a row copies the NOTATION to the clipboard, says so as a toast and closes
+		 *	the dialog; nothing is pasted at the caret. A browser that has no clipboard for the page (no https, no
+		 *	localhost) cannot copy: the notation is selected in the row instead, a sentence in the dialog says to copy
+		 *	it with the keyboard - no toast, no mark of success -, and the dialog stays. Owns no strings
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{string}		options.title			What the dialog is: "Textfills for Text"
+		 *	@param		{Array}			options.fills			[ { name, notation, value } ] - the notation as the field reads it (the key in brackets or between hashes), the value in the working language
+		 *	@param		{Element}		[options.opener]	See choiceDialog()
+		 *
+		 *	@return		{boolean}										false when a dialog is already open
+		 */
+		fillsDialog : function( options ) {
+
+			const fills = Array.isArray( options.fills ) === true ? options.fills : [];
+			const text = function( key ) { return Nino.adminUi.text( '/_admin/common/fills/'+ key ) };
+
+			// Whether this page has a clipboard it may write to. A page without one - http that is no localhost - is
+			// not asked: the older way of copying cannot reach from the open dialog to the page, and an answer of
+			// "copied" that copied nothing is worse than none
+			const clipboard = wn.navigator !== undefined && wn.navigator !== null ? wn.navigator.clipboard : undefined;
+			const copies = clipboard !== undefined && clipboard !== null && typeof clipboard.writeText === 'function' && wn.isSecureContext !== false && typeof Nino.clipboard === 'function';
+			let said = null;
+
+			const mark = function( row ) {
+
+				const code = row.querySelector('.nino-admin-pick-code');
+
+				if( code !== null && typeof dc.createRange === 'function' && typeof wn.getSelection === 'function' ) {
+					const range = dc.createRange();
+					range.selectNodeContents( code );
+					const selection = wn.getSelection();
+					selection.removeAllRanges();
+					selection.addRange( range );
+				}
+
+				// The sentence stands in the dialog, where it is read: no toast and no mark of success
+				if( said === null ) {
+					const root = row.closest('.nino-admin-pick');
+					said = Nino.adminUi.el( 'p', 'nino-admin-hint nino-admin-pick-marked', text('select') );
+					said.setAttribute( 'role', 'status' );
+					root.insertBefore( said, root.children[0] );
+				}
+			};
+
+			return Nino.adminUi.pickDialog( {
+				title			: options.title,
+				items			: fills.map( function( fill, at ) {
+					return {
+						value				: at,
+						label				: String( fill.name ?? fill.notation ),
+						code				: String( fill.notation ),
+						description	: fill.value === undefined || fill.value === null ? '' : String( fill.value ),
+					};
+				} ),
+				search		: text('search'),
+				searchFrom: 1,
+				empty			: text('empty'),
+				cancel		: Nino.adminUi.text('/_admin/common/label/close'),
+				opener		: options.opener,
+				onRow			: function( at, row, pick ) {
+
+					const notation = String( fills[at].notation );
+
+					if( copies === false ) {
+						mark( row );
+						return;
+					}
+
+					Promise.resolve( Nino.clipboard( notation ) ).then( function( copied ) {
+
+						if( copied !== true ) {
+							mark( row );
+							return;
+						}
+
+						Nino.adminUi.say( Nino.adminUi.format( text('copied'), notation ) );
+						pick();
+					} );
+				},
+				onChoose	: function() {},
 			} );
 		},
 
@@ -1172,7 +1640,7 @@
 		 *	The label stands at the left of the control where the dialog is wide
 		 *	enough and above it where it is not (style.css decides). Owns no strings
 		 *
-		 *	@param		{Array}			fields					[ { key, label, type, value, required, maxLength, autocomplete, options, validate } ] - type 'select' takes options [ { value, label } ], any other type is the type of an <input>; validate( value ) answers the sentence that is wrong with it, or ''
+		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view - type 'select' takes options [ { value, label } ], any other type is the type of an <input>; validate( value ) answers the sentence that is wrong with it, or ''
 		 *	@param		{Function}	[onInput]				onInput( key, value ) on every change of a field
 		 *
 		 *	@return		{Object}									{ el, controls, labels, values(), initial }
@@ -1192,12 +1660,14 @@
 				let label;
 
 				if( field.type === 'select' ) {
-					label = Nino.adminUi.selectField( { key : field.key, label : field.label, options : field.options, value : field.value ?? '', onChange : say } );
+					label = Nino.adminUi.selectField( { key : field.key, label : field.label, help : field.help, note : field.note, options : field.options, value : field.value ?? '', onChange : say } );
 					controls[field.key] = label.querySelector('select');
 				} else {
 					label = Nino.adminUi.textField( {
 						key				: field.key,
 						label			: field.label,
+						help			: field.help,
+						note			: field.note,
 						type			: field.type,
 						value			: field.value,
 						required	: field.required,
@@ -1450,8 +1920,10 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.title					What is picked, as a statement: "Insert block"
-		 *	@param		{Array}			options.items					[ { value, label, description } ]
+		 *	@param		{Array}			options.items					[ { value, label, description, code } ] - code is a notation that stands in front of the description, in the face of code
 		 *	@param		{string}		[options.search]			What the search field is called ("Search blocks"); none, no search however many items there are
+		 *	@param		{number}		[options.searchFrom]	From how many items there is a search, PICK_SEARCH_FROM by default
+		 *	@param		{Function}	[options.onRow]				onRow( value, row, pick ) in place of picking at once: the caller decides when the pick is made, by calling pick()
 		 *	@param		{string}		[options.empty]				What a search that finds nothing says
 		 *	@param		{string}		options.cancel				The label of Cancel
 		 *	@param		{string}		[options.size]				'wide' (the default), 'form' or 'narrow'
@@ -1466,7 +1938,7 @@
 			const root = dc.createElement('div');
 			root.className = 'nino-admin-pick';
 
-			const searchable = typeof options.search === 'string' && options.search !== '' && options.items.length >= Nino.adminUi.PICK_SEARCH_FROM;
+			const searchable = typeof options.search === 'string' && options.search !== '' && options.items.length >= ( options.searchFrom ?? Nino.adminUi.PICK_SEARCH_FROM );
 			let search = null;
 			let handle = null;
 			let picked = null;
@@ -1481,10 +1953,30 @@
 				row.className = 'nino-admin-pick-item';
 				row.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-name', item.label ) );
 
-				if( typeof item.description === 'string' && item.description !== '' )
-					row.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-line', item.description ) );
+				const hasCode = typeof item.code === 'string' && item.code !== '';
+				const hasLine = typeof item.description === 'string' && item.description !== '';
 
-				row.addEventListener( 'click', function() { picked = item.value; handle.close( 'pick' ) } );
+				if( hasCode === true || hasLine === true ) {
+					const line = Nino.adminUi.el( 'span', 'nino-admin-pick-line' );
+
+					if( hasCode === true )
+						line.appendChild( Nino.adminUi.el( 'code', 'nino-admin-pick-code', item.code ) );
+
+					if( hasLine === true )
+						line.appendChild( dc.createTextNode( ( hasCode === true ? ' \u00B7 ' : '' )+ item.description ) );
+
+					row.appendChild( line );
+				}
+
+				row.addEventListener( 'click', function() {
+
+					const pick = function() { picked = item.value; handle.close( 'pick' ) };
+
+					if( typeof options.onRow === 'function' )
+						options.onRow( item.value, row, pick );
+					else
+						pick();
+				} );
 				list.appendChild( row );
 
 				return { item : item, row : row };
@@ -1509,7 +2001,7 @@
 				search.addEventListener( 'input', function() {
 					const words = search.value.trim().toLowerCase();
 					rows.forEach( function( entry ) {
-						entry.row.hidden = words !== '' && ( entry.item.label+ ' '+ ( entry.item.description ?? '' ) ).toLowerCase().indexOf( words ) === -1;
+						entry.row.hidden = words !== '' && ( entry.item.label+ ' '+ ( entry.item.code ?? '' )+ ' '+ ( entry.item.description ?? '' ) ).toLowerCase().indexOf( words ) === -1;
 					} );
 					empty.hidden = visible().length > 0 || empty.textContent === '';
 				} );
@@ -2510,7 +3002,11 @@
 		 *	switchField() - the label, the note and every option's text come
 		 *	from the caller.
 		 *
-		 *	@param	{Object}	options		{ key, className, label, note, hint, options, value, onChange }
+		 *	What explains the setting is its help (help; hint is the same thing),
+		 *	behind the (?) at its name - see fieldHelp(). What has to stay in view
+		 *	is its note, a quiet line under the select.
+		 *
+		 *	@param	{Object}	options		{ key, id, className, label, help, hint, note, options, value, onChange }
 		 *
 		 *	@return	{Element}						The label; its select carries data-key, and is
 		 *													reachable as the label's own .control - so a caller
@@ -2524,28 +3020,14 @@
 			const name = dc.createElement('span');
 			name.textContent = options.label || options.key;
 
-			// The terse half of what a setting does, beside its name. The long
-			// half is the select's title - ten settings with a sentence each
-			// under them is a wall of text nobody reads.
-			//
-			// The trailing space belongs to the label rather than the note: the
-			// two are separate inline boxes, so without it the name and the note
-			// run together as one word
-			if( options.note ) {
-				name.textContent += ' ';
-				const note = dc.createElement('small');
-				note.textContent = options.note;
-				name.appendChild( note );
-			}
-
 			field.appendChild( name );
 
 			const select = dc.createElement('select');
 			select.className = 'nino-admin-input';
 			select.setAttribute( 'data-key', options.key );
 
-			if( options.hint )
-				select.setAttribute( 'title', options.hint );
+			if( options.id )
+				select.id = options.id;
 
 			( options.options || [] ).forEach( function( option ) {
 				const el = dc.createElement('option');
@@ -2563,7 +3045,32 @@
 
 			field.appendChild( select );
 
+			Nino.adminUi._tools( name, select, options, options.label || options.key );
+			Nino.adminUi._note( field, options.note );
+
 			return field;
+		},
+
+		/**
+		 *	The note of a field: what has to stay in view at the control - a counter, a limit, a conversion,
+		 *	the result of a check - as a quiet line after it. It is no help and is never put behind the (?)
+		 *
+		 *	@param		{Element}				field
+		 *	@param		{string|undefined}	note
+		 *
+		 *	@return		{Element|null}
+		 */
+		_note : function( field, note ) {
+
+			if( typeof note !== 'string' || note === '' )
+				return null;
+
+			const line = dc.createElement('small');
+			line.className = 'nino-admin-hint nino-admin-field-note';
+			line.textContent = note;
+			field.appendChild( line );
+
+			return line;
 		},
 
 		/**
@@ -2576,7 +3083,7 @@
 		 *	shows is a fill, so both the label and the two state words come
 		 *	from the caller.
 		 *
-		 *	@param	{Object}	options		{ key, checked, label, hint, on, off }
+		 *	@param	{Object}	options		{ key, checked, label, help, hint, note, on, off } - help (hint is the same) stands behind the (?) at the name, note stays in view under it
 		 *
 		 *	@return	{Element}						The label; its input carries data-key
 		 */
@@ -2598,14 +3105,19 @@
 
 			const copy = dc.createElement('span');
 			copy.className = 'nino-admin-switch-copy';
-			copy.appendChild( dc.createTextNode( options.label ) );
+			// The name and its (?) in a line of their own, the note under it
+			const name = dc.createElement('span');
+			name.appendChild( dc.createTextNode( options.label ) );
+			copy.appendChild( name );
 
-			if( options.hint ) {
-				const hint = dc.createElement('small');
-				hint.textContent = options.hint;
-				copy.appendChild( hint );
+			if( options.note ) {
+				const note = dc.createElement('small');
+				note.textContent = options.note;
+				copy.appendChild( note );
 			}
 			label.appendChild( copy );
+
+			Nino.adminUi._tools( name, input, options, options.label );
 
 			const on 		= options.on ?? ( Nino.content.getText('/_admin/common/label/on') || 'on' );
 			const off 	= options.off ?? ( Nino.content.getText('/_admin/common/label/off') || 'off' );
@@ -2630,7 +3142,7 @@
 		 *	panel's login-protection tab and a feature's settings in the
 		 *	Features panel render their numbers with it.
 		 *
-		 *	@param	{Object}	options		{ key, value, min, max, unit, label, hint }
+		 *	@param	{Object}	options		{ key, value, min, max, unit, label, help, hint, note } - help (hint is the same) stands behind the (?) at the name, note stays in view under the input
 		 *
 		 *	@return	{Element}						The label; its input carries data-key
 		 */
@@ -2657,12 +3169,8 @@
 			if( options.max !== undefined ) input.max = options.max;
 			label.appendChild( input );
 
-			if( options.hint ) {
-				const hint = dc.createElement('small');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = Nino.adminUi.text( options.hint );
-				label.appendChild( hint );
-			}
+			Nino.adminUi._tools( name, input, { help : options.help !== undefined || options.hint !== undefined ? Nino.adminUi.text( options.help ?? options.hint ) : undefined }, name.textContent );
+			Nino.adminUi._note( label, options.note === undefined ? undefined : Nino.adminUi.text( options.note ) );
 
 			if( options.unit === 'seconds' ) {
 				const human = dc.createElement('small');
@@ -2710,7 +3218,10 @@
 		 *	every one: the asterisk behind its name, drawn aria-hidden, and
 		 *	aria-required on the control. Owns no strings, the asterisk apart
 		 *
-		 *	@param	{Object}	options		{ key, type, value, placeholder, label, hint, required, maxLength, minLength, autocomplete, id, onInput, className }
+		 *	@param	{Object}	options		{ key, type, value, placeholder, label, help, hint, note, fills, required, maxLength, minLength, autocomplete, id, onInput, className }
+		 *													- help       what the value does, behind the (?) at the name (hint is the same thing)
+		 *													- note       what has to stay in view under the input
+		 *													- fills      the textfills the field takes, see textareaField(); drawn only where the caller asks for it
 		 *													- type       the input's type, text by default
 		 *													- key        written onto the input as data-key
 		 *													- onInput    called with the input's value on every input
@@ -2773,12 +3284,81 @@
 
 			field.appendChild( input );
 
-			if( options.hint ) {
-				const hint = dc.createElement('small');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = options.hint;
-				field.appendChild( hint );
+			Nino.adminUi._tools( name, input, options, options.label ?? '' );
+			Nino.adminUi._note( field, options.note );
+
+			return field;
+		},
+
+		/**
+		 *	Several lines of text as a labelled textarea, beside textField() and by its rule: the words are used as they
+		 *	are, a required field has its star and aria-required. The field a person writes a text in and the one where
+		 *	the textfills decide the work - so it is the one that takes the option fills: a "[ ]" at the name, in the
+		 *	size and the place of the (?), which opens the textfills the field takes (fillsDialog()). It is drawn only
+		 *	where the caller says that the account may edit the field, never for a field that is locked. Owns no
+		 *	strings, the asterisk apart
+		 *
+		 *	@param	{Object}	options		{ key, value, rows, placeholder, label, help, hint, note, fills, required, maxLength, spellcheck, id, onInput, className }
+		 *													- help       what the value does, behind the (?) at the name (hint is the same thing)
+		 *													- note       what has to stay in view under the textarea
+		 *													- fills      { editable, title, items | load } - editable true where the account may edit the field, else no icon; items [ { name, notation, value } ], or load( done ) answering them to done( list ) - null where they could not be had; title the dialog's, "Textfills for <label>" by default
+		 *													- rows       4 by default
+		 *													- spellcheck false by default: this is the field of lists and of technical values
+		 *
+		 *	@return	{Element}						The label; the control is its textarea
+		 */
+		textareaField : function( options ) {
+
+			const field = dc.createElement('label');
+			field.className = options.className || 'nino-admin-field';
+
+			const name = dc.createElement('span');
+			name.appendChild( dc.createTextNode( options.label ?? '' ) );
+
+			if( options.required === true ) {
+				const star = dc.createElement('span');
+				star.className = 'nino-admin-required';
+				star.setAttribute( 'aria-hidden', 'true' );
+				star.textContent = '*';
+				name.appendChild( star );
 			}
+
+			field.appendChild( name );
+
+			const area = dc.createElement('textarea');
+			area.className = 'nino-admin-input';
+			area.rows = Number.isInteger( options.rows ) === true && options.rows > 0 ? options.rows : 4;
+			area.spellcheck = options.spellcheck === true;
+
+			if( options.key )
+				area.dataset.key = options.key;
+
+			if( options.value !== undefined && options.value !== null )
+				area.value = options.value;
+
+			if( options.placeholder )
+				area.placeholder = options.placeholder;
+
+			if( typeof options.maxLength === 'number' )
+				area.maxLength = options.maxLength;
+
+			if( options.id )
+				area.id = options.id;
+
+			if( options.required === true ) {
+				area.required = true;
+				area.setAttribute( 'aria-required', 'true' );
+			}
+
+			area.addEventListener( 'input', function() {
+				if( typeof options.onInput === 'function' )
+					options.onInput( area.value );
+			} );
+
+			field.appendChild( area );
+
+			Nino.adminUi._tools( name, area, options, options.label ?? '' );
+			Nino.adminUi._note( field, options.note );
 
 			return field;
 		},

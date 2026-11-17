@@ -121,10 +121,8 @@
 			legend.textContent = Nino.content.getText('/_admin/nav/lockout');
 			fieldset.appendChild( legend );
 
-			const intro = dc.createElement('p');
-			intro.className = 'nino-admin-hint';
-			intro.textContent = Nino.content.getText('/_admin/lockout/intro');
-			fieldset.appendChild( intro );
+			// What the section is about stands behind the (?) at its title
+			Nino.adminUi.sectionHelp( legend, fieldset, Nino.content.getText('/_admin/lockout/intro') );
 
 			fields.forEach( function( field ) {
 				fieldset.appendChild( Nino.adminUi.numberField( field ) );

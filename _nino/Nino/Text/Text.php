@@ -552,6 +552,71 @@ namespace Nino {
 			return $found;
 		}
 
+		// The two ways a text puts a textfill: the fill of a template and of HTML+, the key in two pairs of
+		// brackets, and the placeholder of an element's text, the key between two hashes (see \Nino\Modules\Legal::placeholders()) - each with
+		// the namespaces a field written in it may name. The facts of the company and of the website are
+		// public anyway, and the words several templates share are no secret; the mailbox the forms deliver
+		// to, a technical value and the words of one template or feature are not offered - fills() lists
+		// no key outside these
+		public const array FILL_FORMS = [
+			'textfill' 		=> [ 'open' => '[[', 'close' => ']]', 'prefixes' => [ ...\Nino\Modules\Legal::PREFIXES, '/template/common/' ] ],
+			'placeholder' => [ 'open' => '#', 'close' => '#', 'prefixes' => \Nino\Modules\Legal::PREFIXES ],
+		];
+
+		// How long the value of a fill is in the list that offers it: a person recognises a fill by its start
+		private const int FILL_SHOWN = 120;
+
+		/**
+		 *	The textfills a field may take, each in the notation the field reads and with what it says today: the keys
+		 *	of one of FILL_FORMS' namespaces that follow the grammar and are not hidden from the workbench, with the
+		 *	value they have in a language - the text as plain words, cut where it is long, the fallback languages
+		 *	applied as a page applies them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$form					A name of FILL_FORMS; any other is a form that offers nothing
+		 *	@param		string		$locale				A language of the site; one that is none has no fills
+		 *
+		 *	@return 	array										[ { key, notation, value } ], by key
+		 */
+		public static function fills( array &$appData, string $form, string $locale ): array {
+
+			if( isset( self::FILL_FORMS[$form] ) === false )
+				return [];
+
+			$notation = self::FILL_FORMS[$form];
+			$hidden 	= self::blacklist( $appData );
+			$found 		= [];
+
+			foreach( \Nino\Html::getFills( $appData, $locale ) as $bracket => $value ) {
+
+				if( is_string( $bracket ) === false || is_scalar( $value ) === false || str_starts_with( $bracket, '[[' ) === false || str_ends_with( $bracket, ']]' ) === false )
+					continue;
+
+				$key = substr( $bracket, 2, -2 );
+
+				if( self::isGrammarKey( $key ) === false || isset( $hidden[$key] ) === true )
+					continue;
+
+				foreach( $notation['prefixes'] as $prefix )
+					if( str_starts_with( $key, $prefix ) === true ) {
+
+						$plain = trim( (string) preg_replace( '/\s+/u', ' ', html_entity_decode( strip_tags( \Nino\Html::breaksToNewlines( (string) $value ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+
+						$found[] = [
+							'key' 			=> $key,
+							'notation' 	=> $notation['open']. $key. $notation['close'],
+							'value' 		=> mb_strlen( $plain, 'UTF-8' ) > self::FILL_SHOWN ? mb_substr( $plain, 0, self::FILL_SHOWN, 'UTF-8' ). '…' : $plain,
+						];
+
+						break;
+					}
+			}
+
+			usort( $found, static fn( array $a, array $b ): int => strcmp( $a['key'], $b['key'] ) );
+
+			return $found;
+		}
+
 		/**
 		 *	The one value-normalization path shared by regular batch saves and
 		 *	_admin's JSON translation import. Keeping it here prevents import

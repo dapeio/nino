@@ -860,7 +860,7 @@
 				key 			: 'autoincrement',
 				checked 	: autoincrement === true,
 				label 		: Nino.content.getText('/_admin/types/label/numbering'),
-				hint 			: Nino.adminUi.format( Nino.content.getText('/_admin/types/hint/numbering'), '/'+ ( Nino.admin.types._currentUri ?? '<type>' )+ '/'+ ( next || '00001' ) ),
+				help 			: Nino.adminUi.format( Nino.content.getText('/_admin/types/hint/numbering'), '/'+ ( Nino.admin.types._currentUri ?? '<type>' )+ '/'+ ( next || '00001' ) ),
 			} );
 			autoSwitch.id = 'admin-form-autoincrement';
 			autoWrap.appendChild( autoSwitch );

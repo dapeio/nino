@@ -38,7 +38,7 @@ const Nino = {
 const sandbox = {
 	console : console,
 	document : {
-		createElement : element,
+		createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
 		getElementById : function( id ) { return mount.id === id ? mount : ( findAll( mount, function( el ) { return el.id === id } )[0] ?? null ) },
 		// The panel asks for every field of its form by the key it carries
 		querySelectorAll : function( selector ) { return selector === '#config-form [data-key]' ? findAll( mount, function( el ) { return el.attributes['data-key'] !== undefined } ) : [] },
@@ -103,6 +103,7 @@ check( 'a field of the type select is drawn as a select that carries its key, an
 check( '...with the options in the order the server sent them, each worded in the interface language from its fill key', select !== null
 	&& select.children.map( function( option ) { return option.value+ '='+ option.textContent } ).join() === 'production='+ words['/_admin/config/option/production']+ ',development='+ words['/_admin/config/option/development']
 	&& words['/_admin/config/option/production'] !== undefined && words['/_admin/config/option/production'] !== words['/_admin/config/option/development'] );
+check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( mount, function( el ) { return el.tagName === 'FIELDSET' } ).every( function( set ) { return set.children.every( function( child ) { return String( child.className ).indexOf('nino-admin-hint') === -1 || String( child.className ).indexOf('nino-admin-status') !== -1 } ) } ) && findAll( mount, function( el ) { return String( el.className ).indexOf('nino-admin-help-button') !== -1 } ).length > 0 );
 check( '...and the other fields are drawn beside it as they were', findAll( mount, function( el ) { return el.attributes['data-key'] === '/nino/cache/status' } ).length === 1 );
 
 // --- the save posts the string, and the shell is told what the server holds ---

@@ -133,12 +133,9 @@
 			legend.textContent = Nino.content.getText('/_admin/nav/languages');
 			fieldset.appendChild( legend );
 
-			if( Nino.admin.language._intro !== '' ) {
-				const intro = dc.createElement('p');
-				intro.className = 'nino-admin-hint';
-				intro.textContent = Nino.adminUi.text( Nino.admin.language._intro );
-				fieldset.appendChild( intro );
-			}
+			// What the section is about stands behind the (?) at its title
+			if( Nino.admin.language._intro !== '' )
+				Nino.adminUi.sectionHelp( legend, fieldset, Nino.adminUi.text( Nino.admin.language._intro ) );
 
 			Nino.admin.language._fields.forEach( function( field ) {
 				if( field.type === 'locales' )
@@ -269,16 +266,14 @@
 			span.textContent = Nino.adminUi.text( field.label );
 			wrap.appendChild( span );
 
-			if( field.hint ) {
-				const hint = dc.createElement('p');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = Nino.adminUi.text( field.hint );
-				wrap.appendChild( hint );
-			}
-
 			const list = dc.createElement('div');
 			list.id = 'language-locales';
 			list.className = 'nino-admin-checklist';
+
+			// What the list does stands behind the (?) at its name: the list is a group, named by the name and described by it
+			if( field.hint )
+				Nino.adminUi.sectionHelp( span, list, Nino.adminUi.text( field.hint ) );
+
 			wrap.appendChild( list );
 
 			// Adding one is a plain text field rather than a picker: the set of
@@ -287,18 +282,20 @@
 			const adder = dc.createElement('div');
 			adder.className = 'nino-admin-field';
 
+			const adderName = dc.createElement('span');
 			const adderLabel = dc.createElement('span');
 			adderLabel.id = 'language-locale-new-name';
 			adderLabel.textContent = Nino.content.getText('/_admin/language/label/add');
-			adder.appendChild( adderLabel );
+			adderName.appendChild( adderLabel );
+			adder.appendChild( adderName );
 
-			// Said before the button is pressed, because pressing it writes a
-			// file - an action that leaves something on disk should not be a
-			// surprise
-			const adderHint = dc.createElement('small');
-			adderHint.className = 'nino-admin-hint';
-			adderHint.textContent = Nino.content.getText('/_admin/language/hint/add');
-			adder.appendChild( adderHint );
+			// Said before the button is pressed, because pressing it writes a file: a warning with a consequence, which
+			// stays in view and is no help
+			const adderNote = dc.createElement('small');
+			adderNote.className = 'nino-admin-hint nino-admin-field-note';
+			adderNote.id = 'nino-admin-note-language-new';
+			adderNote.textContent = Nino.content.getText('/_admin/language/hint/add');
+			adder.appendChild( adderNote );
 
 			const adderRow = dc.createElement('div');
 			adderRow.className = 'admin-language-adder';
@@ -312,6 +309,8 @@
 			// Named by the words above it, not by the example in it
 			adderInput.setAttribute( 'aria-labelledby', adderLabel.id );
 			adderRow.appendChild( adderInput );
+
+			adderInput.setAttribute( 'aria-describedby', 'nino-admin-note-language-new' );
 
 			const adderBtn = dc.createElement('button');
 			adderBtn.type = 'button';
@@ -523,24 +522,14 @@
 		 */
 		_renderNative : function( field ) {
 
-			const label = dc.createElement('label');
-			label.className = 'nino-admin-field';
-
-			const span = dc.createElement('span');
-			span.textContent = Nino.adminUi.text( field.label );
-			label.appendChild( span );
-
-			const select = dc.createElement('select');
-			select.id = 'language-native';
-			select.dataset.key = field.key;
-			label.appendChild( select );
-
-			if( field.hint ) {
-				const hint = dc.createElement('small');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = Nino.adminUi.text( field.hint );
-				label.appendChild( hint );
-			}
+			const label = Nino.adminUi.selectField( {
+				key 		: field.key,
+				label 	: Nino.adminUi.text( field.label ),
+				help 		: field.hint ? Nino.adminUi.text( field.hint ) : undefined,
+				id 			: 'language-native',
+				options : [],
+				value 	: '',
+			} );
 
 			// Kept for _render() to apply once this select is in the document
 			Nino.admin.language._nativeValue = field.value;

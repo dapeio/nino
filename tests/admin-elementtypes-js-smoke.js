@@ -711,7 +711,7 @@ check( 'the danger zone is not rendered while creating a new type',
 	const box = {
 		console : console,
 		document : {
-			createElement : element,
+			createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
 			createTextNode : function( value ) { return Object.assign( element('#text'), { textContent : String( value ) } ) },
 			getElementById : function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null },
 			querySelectorAll : function( selector ) { return pane.querySelectorAll( selector ) },

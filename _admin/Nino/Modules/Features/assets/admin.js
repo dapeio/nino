@@ -2873,7 +2873,7 @@
 					key 		: field.name,
 					checked : field.value === true,
 					label 	: Nino.adminUi.text( field.label ),
-					hint 		: Nino.adminUi.text( field.hint ),
+					help 		: Nino.adminUi.text( field.hint ),
 				} );
 
 			if( field.type === 'int' )
@@ -2912,7 +2912,7 @@
 				max 	: field.max === null ? undefined : field.max,
 				unit 	: known === true ? unit : undefined,
 				label : known === true || unit === '' ? field.label : field.label+ ' ('+ unit+ ')',
-				hint 	: field.hint,
+				help 	: field.hint,
 			} );
 		},
 
@@ -2938,23 +2938,24 @@
 			return Nino.adminUi.selectField( {
 				key 		: field.name,
 				label 	: Nino.adminUi.text( field.label ),
-				hint 		: Nino.adminUi.text( field.hint ),
+				help 		: Nino.adminUi.text( field.hint ),
 				options : options,
 				value 	: field.value === null ? '' : field.value,
 			} );
 		},
 
 		/**
-		 *	A labelled field: the name, the control, the hint under it
+		 *	A labelled field: the name with its (?), the control, the note under it
 		 *
 		 *	@param		{Object}	field
 		 *	@param		{Element}	control			The input, textarea or select
-		 *	@param		{string}	extra				A second hint the type itself adds, '' for none
+		 *	@param		{string}	note				What has to stay in view under the control (whether a secret is set), '' for none
 		 *	@param		{boolean}	wide				Whether it opts out of the two-column desktop grid
+		 *	@param		{string}	[more]			A second sentence of help the type itself adds
 		 *
 		 *	@return		{Element}							<label>
 		 */
-		_wrap : function( field, control, extra, wide ) {
+		_wrap : function( field, control, note, wide, more ) {
 
 			const label = dc.createElement('label');
 			label.className = wide === true ? 'nino-admin-field nino-admin-field-wide' : 'nino-admin-field';
@@ -2966,14 +2967,11 @@
 			control.dataset.key = field.name;
 			label.appendChild( control );
 
-			[ Nino.adminUi.text( field.hint ), extra ].forEach( function( text ) {
-				if( text === '' )
-					return;
-				const hint = dc.createElement('small');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = text;
-				label.appendChild( hint );
-			} );
+			if( more !== undefined && more !== '' )
+				control.placeholder = Nino.content.getText('/_admin/features/example/lines');
+
+			Nino.adminUi._tools( span, control, { help : [ Nino.adminUi.text( field.hint ), more ?? '' ].filter( function( text ) { return text !== '' } ).join(' ') }, span.textContent );
+			Nino.adminUi._note( label, note );
 
 			return label;
 		},
@@ -3002,7 +3000,7 @@
 		/**
 		 *	A secret as a password input that is always empty: the value
 		 *	never reaches the browser, and posting the field empty keeps
-		 *	what is stored (see Features::validateSettings()). The hint says
+		 *	what is stored (see Features::validateSettings()). The note says
 		 *	whether there is one
 		 *
 		 *	@param		{Object}	field
@@ -3040,7 +3038,7 @@
 				? ( field.value || [] ).join( '\n' )
 				: ( field.value === null || field.value === undefined ? '' : String( field.value ) );
 
-			return Nino.admin.features._wrap( field, area, field.type === 'lines' ? Nino.content.getText('/_admin/features/hint/lines') : '', true );
+			return Nino.admin.features._wrap( field, area, '', true, field.type === 'lines' ? Nino.content.getText('/_admin/features/hint/lines') : '' );
 		},
 
 		/**

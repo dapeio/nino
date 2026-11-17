@@ -1237,6 +1237,19 @@ a {
 	font-size: var(--nino-admin-text-sm);
 }
 
+:where(.nino-admin) .nino-admin-pick-code {
+	color: var(--editor-text);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
+/* The sentence above the rows when the notation was marked and not copied: said in the dialog, where it is read */
+:where(.nino-admin) .nino-admin-pick-marked {
+	margin: 0;
+}
+
 :where(.nino-admin) .nino-admin-pick-empty {
 	margin: 0;
 	color: var(--editor-text-secondary);
@@ -1519,6 +1532,73 @@ a {
 	margin-left: var(--nino-admin-space-1);
 	color: var(--editor-red-ink);
 	font-weight: var(--nino-admin-weight-strong);
+}
+
+/* The name of a field that has a help or a textfill icon: the words, then the (?) and the "[ ]" in
+   a row, the buttons of the size of a small icon button (24px) and no taller than the line is.
+   The words stand in a span of their own (aria-labelledby names it), so that the sentence of the
+   help, which stands in the label as well, is no part of what the control is called. */
+:where(.nino-admin) .nino-admin-field-text {
+	display: inline;
+}
+
+:where(.nino-admin) .nino-admin-help {
+	display: inline-block;
+	margin-inline-start: var(--nino-admin-space-1);
+	vertical-align: middle;
+}
+
+:where(.nino-admin) :is(.nino-admin-help-button, .nino-admin-fills-button) {
+	margin-inline-start: var(--nino-admin-space-1);
+	vertical-align: middle;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-help > .nino-admin-help-button {
+	margin-inline-start: 0;
+}
+
+/* The sentence is in the page always: out of the eye's way and in the way of a screen reader (the
+   sr-only rule's own words), and as a bubble at the button while it is open. Fixed, so that no scroll
+   area the field stands in cuts it off; Nino.adminUi._helpPlace() sets where. */
+:where(.nino-admin) .nino-admin-help:not([data-open]) > .nino-admin-help-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-help[data-open] > .nino-admin-help-text {
+	position: fixed;
+	z-index: 40;
+	box-sizing: border-box;
+	display: block;
+	width: max-content;
+	max-width: min(22rem, calc(100vw - 1rem));
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-5);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	box-shadow: var(--editor-shadow);
+	color: var(--editor-text);
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-normal);
+	letter-spacing: normal;
+	line-height: 1.5;
+	text-transform: none;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+/* What stays in view at a field: a conversion, a limit, a counter - after the control, in the hint's type */
+:where(.nino-admin) .nino-admin-field-note {
+	display: block;
 }
 
 /* The sentence under a field a save was refused for. A class of its own: the

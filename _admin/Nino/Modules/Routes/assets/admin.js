@@ -637,7 +637,7 @@
 				key 		: 'one-address',
 				checked : Nino.admin.routes._addresses.one,
 				label 	: Nino.content.getText('/_admin/routes/label/one-address'),
-				hint 		: Nino.content.getText('/_admin/routes/hint/one-address'),
+				help 		: Nino.content.getText('/_admin/routes/hint/one-address'),
 			} );
 			oneSwitch.querySelector('input').addEventListener( 'change', function( ev ) { Nino.admin.routes._switchAddresses( ev.target.checked ) } );
 			pageFieldset.appendChild( oneSwitch );

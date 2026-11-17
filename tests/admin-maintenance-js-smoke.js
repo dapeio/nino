@@ -137,6 +137,7 @@ present( true );
 panel.init();
 check( 'the panel asks for the state', requests.length === 1 && requests[0].action === 'maintenance/status' );
 answer( 200, { status : false, retry : 3600 } );
+check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( content, function( el ) { return el.tagName === 'FIELDSET' } ).every( function( set ) { return set.children.every( function( child ) { return String( child.className ).indexOf('nino-admin-hint') === -1 || String( child.className ).indexOf('nino-admin-status') !== -1 } ) } ) );
 check( 'a site that is online has no notice', banners( content ).length === 0 );
 
 present( true );

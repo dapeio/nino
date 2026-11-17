@@ -70,6 +70,10 @@ namespace Nino\Modules {
 		// onto a public page. A constant of the kernel, deliberately no setting
 		public const array PREFIXES = [ '/project/company/', '/project/website/general/' ];
 
+		// The fields of the types the module ships whose text is read for placeholders - what the
+		// Elements panel offers the textfills of them for (apiFills()): type => fields
+		public const array PLACEHOLDER_FIELDS = [ 'legal' => [ 'text' ], 'privacy' => [ 'text' ] ];
+
 		// Where the pages are reached, per page and language - config.php's key,
 		// and what is used where it has none
 		public const string PATHS = '/nino/legal/paths';

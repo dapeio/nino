@@ -135,7 +135,7 @@ const sandbox = {
 	console : console,
 	document : {
 		get activeElement() { return focused() },
-		createElement : element,
+		createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
 		createTextNode : textNode,
 		getElementById : function( id ) {
 			if( id === 'features-list' )

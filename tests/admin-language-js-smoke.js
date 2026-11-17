@@ -47,7 +47,7 @@ function build() {
 	const sandbox = {
 		console : console,
 		document : {
-			createElement : element,
+			createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
 			createTextNode : function( value ) { return Object.assign( element('#text'), { textContent : String( value ) } ) },
 			getElementById : function( id ) { return id === 'language-form' ? mount : ( findAll( mount, function( el ) { return el.id === id } )[0] ?? null ) },
 			documentElement : null,
@@ -110,15 +110,20 @@ console.log('Admin Language');
 	const input = t.field('language-locale-new');
 	const line = t.field('language-locale-msg');
 
+check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( t.mount, function( el ) { return el.tagName === 'FIELDSET' } ).every( function( set ) { return set.children.every( function( child ) { return String( child.className ).indexOf('nino-admin-hint') === -1 || String( child.className ).indexOf('nino-admin-status') !== -1 } ) } ) && findAll( t.mount, function( el ) { return String( el.className ).indexOf('nino-admin-help-button') !== -1 } ).length > 0 );
 	check( 'the adder\'s field is named by the words above it, not by the example in it', input.attributes['aria-labelledby'] === 'language-locale-new-name' && t.field('language-locale-new-name').textContent === text('/_admin/language/label/add') );
 	check( 'its line is a status from the start: announced when it speaks, empty until it does', line.attributes.role === 'status' && line.attributes['aria-live'] === 'polite' && line.textContent === '' );
+
+	// What the adder's input is described by before anything is refused: the sentence of its help, in the document
+	const helpId = input.attributes['aria-describedby'];
+	check( 'the adder\'s input is described by the sentence of its help, which is in the document', typeof helpId === 'string' && t.field( helpId ) !== undefined && t.field( helpId ).textContent === text('/_admin/language/hint/add') );
 
 	input.value = 'xx';
 	t.panel._addLocale();
 
 	const error = t.field('language-locale-error');
 	check( 'a code that is none is refused before anything is sent', t.requests.length === 1 && t.requests[0].endpoint === 'list' );
-	check( '...the field is marked, and described by the sentence under it', input.attributes['aria-invalid'] === 'true' && input.attributes['aria-describedby'] === 'language-locale-error'
+	check( '...the field is marked, and described by the sentence under it', input.attributes['aria-invalid'] === 'true' && input.attributes['aria-describedby'].split(' ')[0] === 'language-locale-error' && input.attributes['aria-describedby'].split(' ').length === 2
 		&& error !== undefined && error.className === 'nino-admin-field-error' && error.textContent === text('/_admin/language/error/id') );
 	check( '...the sentence stands under the row of the field, not in it', error !== undefined && error.parentNode === input.parentNode.parentNode && error.parentNode.children.indexOf( error ) === error.parentNode.children.indexOf( input.parentNode ) + 1 );
 	check( '...the line under it announces that the value is not valid, as an alert - the sentence at the field says what a code looks like', line.attributes.role === 'alert' && line.attributes['aria-live'] === 'assertive' && line.textContent === text('/_admin/error/invalid_value') && line.textContent !== error.textContent );
@@ -130,7 +135,7 @@ console.log('Admin Language');
 
 	input.value = 'fr';
 	fire( input, 'input' );
-	check( 'typing the code again lets the refusal go: the mark, the sentence and the alert', input.attributes['aria-invalid'] === undefined && input.attributes['aria-describedby'] === undefined
+	check( 'typing the code again lets the refusal go: the mark, the sentence and the alert', input.attributes['aria-invalid'] === undefined && input.attributes['aria-describedby'] === helpId
 		&& t.field('language-locale-error') === undefined && line.attributes.role === 'status' && line.textContent === '' );
 }
 

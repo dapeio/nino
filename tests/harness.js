@@ -519,6 +519,8 @@ function element( tag ) {
 function documentOf( mount ) {
 	return {
 		createElement : element,
+		// An icon is an svg: the namespace is not drawn, the element is the tag's
+		createElementNS : function( space, tag ) { return element( tag ) },
 		createTextNode : function( text ) { return Object.assign( element('#text'), { textContent : String( text ) } ) },
 		getElementById : function( id ) {
 			return mount.id === id ? mount : ( findAll( mount, function( el ) { return el.id === id } )[0] ?? null );

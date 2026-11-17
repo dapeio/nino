@@ -71,7 +71,7 @@ const Nino = {
 const sandbox = {
 	console : console,
 	document : {
-		createElement : element,
+		createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
 		createTextNode : textNode,
 		getElementById : function( id ) { return mounts.filter( function( m ) { return m.id === id } )[0] ?? null },
 		querySelectorAll : function( selector ) { return selector === '[id^="feature-settings-"]' ? mounts : [] },

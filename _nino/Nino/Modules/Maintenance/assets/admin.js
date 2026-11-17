@@ -177,7 +177,8 @@
 				key 			: 'status',
 				checked 	: data.status === true,
 				label 		: Nino.content.getText('/_admin/maintenance/label/status'),
-				hint 			: Nino.content.getText('/_admin/maintenance/hint/status'),
+				help 			: Nino.content.getText('/_admin/maintenance/hint/status'),
+				note 			: Nino.content.getText('/_admin/maintenance/hint/signedin'),
 			} ) );
 
 			fieldset.appendChild( Nino.adminUi.numberField( {
@@ -187,13 +188,8 @@
 				max 	: data.max,
 				unit 	: 'seconds',
 				label	: '/_admin/maintenance/label/retry',
-				hint 	: '/_admin/maintenance/hint/retry',
+				help 	: '/_admin/maintenance/hint/retry',
 			} ) );
-
-			const note = dc.createElement('p');
-			note.className = 'nino-admin-hint';
-			note.textContent = Nino.content.getText('/_admin/maintenance/hint/signedin');
-			fieldset.appendChild( note );
 
 			form.appendChild( fieldset );
 

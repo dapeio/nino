@@ -55,6 +55,7 @@ namespace Nino\Modules\Elements {
 				'elements/get' 				=> [ self::class, 'apiGet' ],
 				'elements/uploadimage' => [ self::class, 'apiUploadImage' ],
 				'elements/removeimage' => [ self::class, 'apiRemoveImage' ],
+				'elements/fills' 			=> [ self::class, 'apiFills' ],
 				'elements/save' 			=> [ self::class, 'apiSave' ],
 				'elements/delete' 		=> [ self::class, 'apiDelete' ],
 			];
@@ -142,6 +143,8 @@ namespace Nino\Modules\Elements {
 					// What this account may do here - the form draws itself from
 					// it rather than offering controls the save would refuse
 					'rights' 				=> self::rights( $appData, $type, $typeData['model'] ?? [] ),
+					// The fields that have a textfill icon for this account, with the notation each takes
+					'fills' 				=> (object) self::fillFields( $appData, $type, $typeData['model'] ?? [] ),
 					'autoincrement' => $next !== null,
 					'nextUri' 			=> ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( max( $next, \Nino\Elements::autoincrementSeed( $typeData ) ) ),
 				];
@@ -311,6 +314,61 @@ namespace Nino\Modules\Elements {
 				'columns' 	=> $columns,
 				'elements' 	=> $elements,
 			] );
+		}
+
+		/**
+		 *	The fields of a type that take textfills and that this account may change, each with the form its text is
+		 *	read in (a name of \Nino\Text::FILL_FORMS). What a field takes is the code's to say - the model a type
+		 *	editor saves carries only what the editor knows - and a field nobody may change has no icon
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					Element type
+		 *	@param		array 		$model				That type's model
+		 *
+		 *	@return 	array										field => form
+		 */
+		public static function fillFields( array &$appData, string $type, array $model ): array {
+
+			$fields = [];
+
+			foreach( \Nino\Modules\Legal::PLACEHOLDER_FIELDS[$type] ?? [] as $field )
+				if( isset( $model[$field] ) === true && self::mayUpdate( $appData, $type, $field ) === true )
+					$fields[$field] = 'placeholder';
+
+			return $fields;
+		}
+
+		/**
+		 *	The textfills one field of a type takes, in the notation it reads, with what each says in the language
+		 *	being edited. Asked for a field that takes none, or that this account may not change, it refuses
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiFills( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data 	= \Nino\Admin\Admin::postData();
+			$type 	= \Nino\Admin\Admin::postString( $data, 'type' );
+			$field 	= \Nino\Admin\Admin::postString( $data, 'field' );
+
+			if( in_array( $type, self::types( $appData ), true ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown type' );
+				return;
+			}
+
+			$forms = self::fillFields( $appData, $type, self::typeData( $appData, $type )['model'] ?? [] );
+
+			if( isset( $forms[$field] ) === false ) {
+				\Nino\Http::fail( $request, 403, 'forbidden' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'fills' => \Nino\Text::fills( $appData, $forms[$field], \Nino\Admin\Admin::contentLocale( $appData, true ) ) ] );
 		}
 
 		/**

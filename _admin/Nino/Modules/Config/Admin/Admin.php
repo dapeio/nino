@@ -119,6 +119,7 @@ namespace Nino\Modules\Config {
 				'group'	=> 'diagnostics',
 				'label'	=> '/_admin/config/label/errordisplay',
 				'hint' 	=> '/_admin/config/hint/errordisplay',
+				'note' 	=> '/_admin/config/note/errordisplay',
 			],
 			'/nino/session/force-secure-cookie' => [
 				'type' 	=> 'bool',
@@ -136,6 +137,7 @@ namespace Nino\Modules\Config {
 				'group'	=> 'diagnostics',
 				'label'	=> '/_admin/config/label/proxies',
 				'hint' 	=> '/_admin/config/hint/proxies',
+				'example' => '/_admin/config/example/proxies',
 			],
 			// How many calls of \Nino\Mail::send() and sendAll() one client
 			// address may make in an hour. It sits beside the proxies because
@@ -166,6 +168,7 @@ namespace Nino\Modules\Config {
 				'unit' 	=> 'items',
 				'label'	=> '/_admin/config/label/backupsdaily',
 				'hint' 	=> '/_admin/config/hint/backupsdaily',
+				'note' 	=> '/_admin/config/note/backups',
 			],
 			'/nino/admin/backups-manual' => [
 				'type' 	=> 'int',
@@ -175,6 +178,7 @@ namespace Nino\Modules\Config {
 				'unit' 	=> 'items',
 				'label'	=> '/_admin/config/label/backupsmanual',
 				'hint' 	=> '/_admin/config/hint/backupsmanual',
+				'note' 	=> '/_admin/config/note/backups',
 			],
 			'/nino/admin/logs' => [
 				'type' 	=> 'bool',
@@ -202,6 +206,7 @@ namespace Nino\Modules\Config {
 				'group'	=> 'cache',
 				'label'	=> '/_admin/config/label/cacheblacklist',
 				'hint' 	=> '/_admin/config/hint/cacheblacklist',
+				'example' => '/_admin/config/example/cacheblacklist',
 			],
 		];
 

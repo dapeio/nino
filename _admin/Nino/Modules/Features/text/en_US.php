@@ -73,6 +73,8 @@ return [
 	'[[/_admin/features/hint/secret-set]]'		=> 'A value is stored. Leave the field empty to keep it, or type a new one to replace it.',
 	'[[/_admin/features/hint/secret-unset]]'	=> 'Nothing is stored yet.',
 	'[[/_admin/features/hint/lines]]'					=> 'One entry per line.',
+	'[[/_admin/features/example/lines]]'	=> 'Entry 1
+Entry 2',
 	'[[/_admin/features/msg/activating]]'			=> 'Activating …',
 	'[[/_admin/features/msg/activated]]'			=> 'Activated.',
 	'[[/_admin/features/msg/deactivating]]'		=> 'Deactivating …',

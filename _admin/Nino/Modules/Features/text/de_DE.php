@@ -73,6 +73,8 @@ return [
 	'[[/_admin/features/hint/secret-set]]'		=> 'Ein Wert ist gespeichert. Lass das Feld leer, um ihn zu behalten, oder gib einen neuen ein, um ihn zu ersetzen.',
 	'[[/_admin/features/hint/secret-unset]]'	=> 'Noch nichts gespeichert.',
 	'[[/_admin/features/hint/lines]]'					=> 'Ein Eintrag pro Zeile.',
+	'[[/_admin/features/example/lines]]'	=> 'Eintrag 1
+Eintrag 2',
 	'[[/_admin/features/msg/activating]]'			=> 'Wird aktiviert …',
 	'[[/_admin/features/msg/activated]]'			=> 'Aktiviert.',
 	'[[/_admin/features/msg/deactivating]]'		=> 'Wird deaktiviert …',

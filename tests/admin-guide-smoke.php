@@ -336,6 +336,37 @@ foreach( $converted as $script ) {
 check( 'the panels that have gone over to the blocks of the bar build neither the bar, its buttons by class, the way back nor the list bar by hand'. ( $byHand === [] ? '' : ' - '. implode( ', ', $byHand ) ), $byHand === [] );
 check( '...and use actionBar(), contextBar() and say()'. ( $lacking === [] ? '' : ' - not '. implode( ', ', $lacking ) ), $lacking === [] );
 
+// --- the forms drawn from a schema keep their help behind the (?) ------------------------------------------
+
+/*	The scripts that draw a form from a schema - the Config panel, Maintenance, the login protection, Language and the
+	settings of a feature. The sentence of a field is its help (behind the (?) at the name, see fieldHelp()), never a line
+	under the field: no script of the list names a hint for a field, builds a small hint line of its own for one, or writes the explanation of a section as a line under its title. The list
+	grows: the patch that brings another form over adds its script here	*/
+$schemaForms = [
+	'_admin/Nino/Modules/Config/assets/admin.js',
+	'_nino/Nino/Modules/Maintenance/assets/admin.js',
+	'_admin/Nino/Modules/Users/assets/lockout.js',
+	'_admin/Nino/Modules/Language/assets/admin.js',
+	'_admin/Nino/Modules/Features/assets/admin.js',
+];
+
+$underneath = [];
+
+foreach( $schemaForms as $script ) {
+
+	// Without the comments of both kinds: a comment may say the word
+	$source = (string) preg_replace( '~^\s*//.*$~m', '', $bare( $read( $script ) ) );
+
+	if( preg_match( '/\bhint\s*:|\bconst\s+hint\s*=\s*dc\.createElement\(\s*\'small\'/', $source ) === 1 )
+		$underneath[] = $script;
+
+	// The Features panel's own intro is the one of its list of applications, no section of a settings form
+	if( str_contains( $script, '/Features/' ) === false && preg_match( '/\bintro\.className\s*=\s*\'nino-admin-hint\'/', $source ) === 1 )
+		$underneath[] = $script;
+}
+
+check( 'no form drawn from a schema puts the sentence of a field, or the explanation of a section, under it'. ( $underneath === [] ? '' : ' - '. implode( ', ', $underneath ) ), $underneath === [] );
+
 // --- the chapter is linked and its links land ----------------------------------------------------------
 
 $chapter = $read( 'docs/admin-ui.md' );

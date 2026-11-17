@@ -547,7 +547,10 @@ check( '...named as the Http URI, and not drawn as a group', addressName( '' ) =
 	&& field('routes-form-addresses').attributes.role === undefined );
 
 const switchCopy = findAll( form, function( el ) { return el.className === 'nino-admin-switch-copy' } )[0];
-check( 'the switch says what it is for in the words of the panel, with a hint under it', switchCopy.children[0].textContent === text('/_admin/routes/label/one-address') && switchCopy.children[1].textContent === text('/_admin/routes/hint/one-address')
+const switchName = findAll( switchCopy, function( el ) { return el.tagName === 'SPAN' && el.className === 'nino-admin-field-text' } )[0];
+const switchSentence = findAll( switchCopy, function( el ) { return el.className === 'nino-admin-help-text' } )[0];
+check( 'the switch says what it is for in the words of the panel, and what it does behind its (?)', switchName !== undefined && switchName.children[0].textContent === text('/_admin/routes/label/one-address')
+	&& switchSentence !== undefined && switchSentence.textContent === text('/_admin/routes/hint/one-address') && oneBox().attributes['aria-describedby'] === switchSentence.id
 	&& text('/_admin/routes/label/one-address') !== '' && text('/_admin/routes/hint/one-address') !== '' );
 
 turnSwitch( false );

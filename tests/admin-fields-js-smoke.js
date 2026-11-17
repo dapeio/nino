@@ -57,7 +57,7 @@ check( '...the input is a text input in the design system\'s input class, with n
 check( '...and no star and no hint', findAll( plain, function( el ) { return el.className === 'nino-admin-required' } ).length === 0 && findAll( plain, function( el ) { return el.tagName === 'SMALL' } ).length === 0 );
 
 const full = ui.textField( {
-	key : 'title', type : 'search', value : 'Hello', placeholder : 'A title', label : '/_admin/words', hint : 'At most 60 letters',
+	key : 'title', type : 'search', value : 'Hello', placeholder : 'A title', label : '/_admin/words', note : 'At most 60 letters',
 	required : true, maxLength : 60, minLength : 2, autocomplete : 'off', id : 'hello-title', className : 'nino-admin-field nino-admin-field-wide',
 } );
 const fullInput = findAll( full, function( el ) { return el.tagName === 'INPUT' } )[0];
@@ -70,7 +70,7 @@ check( 'a required field has its star behind the name, hidden from a screen read
 	&& fullInput.required === true && fullInput.attributes['aria-required'] === 'true' );
 
 const note = full.children[full.children.length - 1];
-check( '...the hint is a small line of the design system\'s hint type, after the input', note.tagName === 'SMALL' && note.className === 'nino-admin-hint' && note.textContent === 'At most 60 letters' && full.children[1] === fullInput );
+check( '...the note is a small line of the design system\'s hint type, after the input, and stays in view', note.tagName === 'SMALL' && classes( note ).indexOf('nino-admin-hint') !== -1 && note.textContent === 'At most 60 letters' && full.children[1] === fullInput );
 
 const typed = [];
 const listening = ui.textField( { label : 'x', onInput : function( value ) { typed.push( value ) } } );

@@ -14,11 +14,11 @@ return [
 	'[[/_nino/webpage/legal/privacy/description]]'	=> 'How this website handles your data.',
 
 	'[[/_admin/elements/field/legal/title]]'	=> 'Heading',
-	'[[/_admin/elements/field/legal/text]]'	=> 'Text (details as #/project/company/contact/email#)',
+	'[[/_admin/elements/field/legal/text]]'	=> 'Text',
 	'[[/_admin/elements/field/legal/order]]'	=> 'Position (lower first, empty last)',
 	'[[/_admin/elements/field/legal/hidden]]'	=> 'Hide on the website',
 	'[[/_admin/elements/field/privacy/title]]'	=> 'Heading',
-	'[[/_admin/elements/field/privacy/text]]'	=> 'Text (details as #/project/company/contact/email#)',
+	'[[/_admin/elements/field/privacy/text]]'	=> 'Text',
 	'[[/_admin/elements/field/privacy/order]]'	=> 'Position (lower first, empty last)',
 	'[[/_admin/elements/field/privacy/hidden]]'	=> 'Hide on the website',
 

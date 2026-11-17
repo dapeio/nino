@@ -179,12 +179,9 @@
 			legend.textContent = Nino.adminUi.text( group[0] );
 			fieldset.appendChild( legend );
 
-			if( group[1] ) {
-				const intro = dc.createElement('p');
-				intro.className = 'nino-admin-hint';
-				intro.textContent = Nino.adminUi.text( group[1] );
-				fieldset.appendChild( intro );
-			}
+			// What the section is about stands behind the (?) at its title
+			if( group[1] )
+				Nino.adminUi.sectionHelp( legend, fieldset, Nino.adminUi.text( group[1] ) );
 
 			fields.forEach( function( field ) {
 				const el = Nino.admin.config._renderField( field );
@@ -234,7 +231,8 @@
 				key 			: field.key,
 				value 		: field.value,
 				label 		: Nino.adminUi.text( field.label ),
-				hint 			: Nino.adminUi.text( field.hint ),
+				help 			: Nino.adminUi.text( field.hint ),
+				note 			: field.note ? Nino.adminUi.text( field.note ) : undefined,
 				options 	: field.options.map( function( option ) { return { value : option.value, label : Nino.adminUi.text( option.label ) } } ),
 			} );
 		},
@@ -251,29 +249,15 @@
 		 *	@return		{Element}
 		 */
 		_renderLines : function( field ) {
-
-			const label = dc.createElement('label');
-			label.className = 'nino-admin-field nino-admin-field-wide';
-
-			const span = dc.createElement('span');
-			span.textContent = Nino.adminUi.text( field.label );
-			label.appendChild( span );
-
-			const area = dc.createElement('textarea');
-			area.rows = 4;
-			area.spellcheck = false;
-			area.dataset.key = field.key;
-			area.value = ( field.value || [] ).join( '\n' );
-			label.appendChild( area );
-
-			if( field.hint ) {
-				const hint = dc.createElement('small');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = Nino.adminUi.text( field.hint );
-				label.appendChild( hint );
-			}
-
-			return label;
+			return Nino.adminUi.textareaField( {
+				key 			: field.key,
+				value 		: ( field.value || [] ).join( '\n' ),
+				label 		: Nino.adminUi.text( field.label ),
+				help 			: Nino.adminUi.text( field.hint ),
+				note 			: field.note ? Nino.adminUi.text( field.note ) : undefined,
+				placeholder : field.example ? Nino.adminUi.text( field.example ) : undefined,
+				rows 			: 4,
+			} );
 		},
 
 		/**
@@ -290,7 +274,8 @@
 				key 			: field.key,
 				checked 	: field.value === true,
 				label 		: Nino.adminUi.text( field.label ),
-				hint 			: Nino.adminUi.text( field.hint ),
+				help 			: Nino.adminUi.text( field.hint ),
+				note 			: field.note ? Nino.adminUi.text( field.note ) : undefined,
 			} );
 		},
 

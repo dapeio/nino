@@ -885,7 +885,7 @@ The rest of the screen is built from `Nino.adminUi`'s small builders, which own 
 strings - every word is the caller's, and a caller that has a fill key runs it
 through `text()`. `hint( text, kind )` is a line of explanation (`'error'` for the
 error colour); `textField( options )` the labelled line of text beside
-`selectField()`, `switchField()` and `numberField()` - the label with the star
+`selectField()`, `switchField()`, `numberField()` and `textareaField()` - the label with the star
 and the `aria-required` of a required field, its `input` the control;
 `button( text, onClick, options )` a real button, whose `name` is the title and
 the `aria-label` of a glyph (its kind, size and icon are in
@@ -893,6 +893,58 @@ the `aria-label` of a glyph (its kind, size and icon are in
 and a text; and `localeSelect( options )` the switch of the translation a form
 shows, for the context bar - what a change does is the panel's. Their docblocks in
 `_admin/assets/Nino.admin.js` are the reference.
+
+### Help, notes and textfills at a field
+
+The fields of a form say what a value does behind the (?) at their name, never in a line
+under them. Every field block takes the sentence as its option `help` (`hint` draws the
+same thing), and what has to stay in view - a counter, a limit, a conversion, the result
+of a check, a warning with a consequence - as `note`, a quiet line after the control. A format ("one per line") is the
+`placeholder` of the empty field, as an example, and is in the help as well:
+
+```js
+const pause = Nino.adminUi.numberField( {
+	key  : 'pause', value : 120, unit : 'seconds',
+	label : t('/_admin/hello/label/pause'),
+	help  : t('/_admin/hello/hint/pause'),           // behind the (?)
+	note  : t('/_admin/hello/note/pause'),           // a warning with a consequence: stays under the input
+} );
+```
+
+The explanation of a whole section is the same (?) at its title: `sectionHelp( legend, fieldset, text )` takes the words of
+the title into a span, names the section by them (`aria-labelledby`, a `role="group"` where it is no fieldset) and describes it by the sentence.
+
+The (?) is `fieldHelp( text, { field, name } )`, a button of 24 px named "Help for
+<name>" whose `aria-expanded` follows the bubble; the sentence is always in the document and
+the control is described by it (`aria-describedby`), and named by its label alone
+(`aria-labelledby`). Escape and a press beside it close the bubble, at most one is open, and
+it stays inside the window or the dialog, never lies on the field it is about and never goes below the bar. The label points at
+the field (`for`), so a press on the name focuses the field. A field that is built by hand names the sentence the
+same way: `name.appendChild( Nino.adminUi.fieldHelp( text, { field : control, name : label } ) )`,
+with the words of the name in a span of their own that the control's `aria-labelledby` names.
+
+A field whose work textfills decide - a multi-line text, HTML+, a technical value - takes the
+option `fills` and draws the "[ ]" at its name, for an account that may edit it:
+
+```js
+const body = Nino.adminUi.textareaField( {
+	key : 'text', label : t('/_admin/hello/label/text'), rows : 8,
+	fills : {
+		editable : may.update,                        // no icon where the account may not edit the field
+		load : function( done ) {                     // asked at the press; items : [ ... ] for a list that is known
+			Nino.adminUi.api.call( 'elements/fills', { type : 'legal', field : 'text' }, function( status, response ) {
+				done( status === 200 ? response.fills.map( function( fill ) { return { name : fill.key, notation : fill.notation, value : fill.value } } ) : null );   // null: the list could not be had, said at the field
+			} );
+		},
+	},
+} );
+```
+
+A press opens `fillsDialog( { title, fills } )` - `[ { name, notation, value } ]` with a search - and
+a press on a row copies the notation. The list is the panel's action to answer; `\Nino\Text::fills()`
+makes it for the two notations a field can read, `textfill` (`[[/key]]`) and `placeholder` (`#/key#`),
+and offers no key outside the namespaces of the form. A field of an editor that is no textarea draws
+the icon with `Nino.adminUi.fillsButton( fills, control, label )` into the element that holds its name.
 
 ## Buttons and icons
 
@@ -995,10 +1047,12 @@ Nino.adminUi.formDialog( {
 } );
 ```
 
-`pickDialog( { title, items, search, empty, cancel, size, onChoose, onCancel, opener } )`
-draws `items` - `[ { value, label, description } ]` - as rows; a press picks one and
-closes. A search over the names and the lines is drawn from `Nino.adminUi.PICK_SEARCH_FROM`
-(8) items on, and only when `search` names it; the size is `--wide`.
+`pickDialog( { title, items, search, searchFrom, empty, cancel, size, onChoose, onRow, onCancel, opener } )`
+draws `items` - `[ { value, label, description, code } ]`, `code` a notation in the face of code
+before the line - as rows; a press picks one and closes, or, where `onRow( value, row, pick )` is
+given, hands the press to it: the caller calls `pick()` when the pick is made. A search over the
+names and the lines is drawn from `Nino.adminUi.PICK_SEARCH_FROM` (8) items on, or from
+`searchFrom`, and only when `search` names it; the size is `--wide`.
 
 `propertiesDialog( { title, sections, close, onChange, onClose, tools, open, opener } )`
 is a sheet at the right over the whole height, for what one part of a work surface has:
@@ -1438,7 +1492,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
 | The card a screen opens with, in lines of different weight | `.nino-admin-card` with a rule of the panel's own stylesheet for each line, scoped to the id of the card, in the shell's text colours so that both themes keep their contrast |
 | Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
-| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid), built with `Nino.adminUi.textField()`, `selectField()`, `switchField()` or `numberField()` |
+| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid), built with `Nino.adminUi.textField()`, `selectField()`, `switchField()`, `numberField()` or `textareaField()` |
 | Container whose fields share that grid | `.nino-admin-fieldgrid` |
 | Run of checkbox rows | `.nino-admin-checklist` |
 | Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |

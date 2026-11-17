@@ -27,6 +27,9 @@
 		// means unrestricted - the server is what enforces any of this, this
 		// only decides which controls are worth drawing
 		_rights					: {},
+		// The fields that take textfills, per type, as apiTypes() reported them for this account:
+		// { <type> : { <field> : form } } - only fields it may change are in it
+		_fills					: {},
 		// Type name -> the uri its next element would get, for the types that
 		// number their own elements (see Elements::AUTOINCREMENT_PAD). Filled
 		// from the same type list every form is built from, so the element form
@@ -573,12 +576,15 @@
 			// place that has to record which types number their own elements
 			Nino.admin.elements._numbered = {};
 			Nino.admin.elements._rights 	= {};
+			Nino.admin.elements._fills 		= {};
 			Nino.admin.elements._types		= types;
 			types.forEach( function( entry ) {
 				if( entry.autoincrement === true )
 					Nino.admin.elements._numbered[entry.type] = entry.nextUri || '';
 				if( entry.rights !== undefined )
 					Nino.admin.elements._rights[entry.type] = entry.rights;
+				if( entry.fills !== undefined )
+					Nino.admin.elements._fills[entry.type] = entry.fills;
 			} );
 
 
@@ -1188,6 +1194,11 @@
 				if( marked === true )
 					Nino.admin.elements._star( span );
 				label.appendChild( span );
+
+				// A text whose work textfills decide: the "[ ]" at its name, for an account that may change it
+				if( typeof ( Nino.admin.elements._fills[Nino.admin.elements._currentType] ?? {} )[key] === 'string' && Nino.admin.elements._mayUpdate( key ) === true )
+					span.appendChild( Nino.adminUi.fillsButton( { load : function( done ) { Nino.admin.elements._loadFills( key, done ) }, opener : function() { return Nino.admin.elements._htmlEditors[key] } }, null, displayName ) );
+
 				const mount = dc.createElement('div');
 				label.appendChild( mount );
 				Nino.admin.elements._htmlEditors[key] = Nino.admin.htmlEditor.create( mount, value ?? '', field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH, field.inputsize ?? 0, field.blocks === true ? 'blocks' : 'inline' );
@@ -1699,6 +1710,34 @@
 			hint.textContent = text;
 
 			return hint;
+		},
+
+		/**
+		 *	The textfills one field takes, as the rows fillsDialog() shows: the name of each is its key read as words,
+		 *	its notation the one the field reads, its value what it says in the language being edited
+		 *
+		 *	@param		{string}		key						Field key
+		 *	@param		{Function}	done					Called once with the rows, or with null where they could not be had
+		 *
+		 *	@return		void
+		 */
+		_loadFills : function( key, done ) {
+
+			Nino.admin.elements._apiCall( 'fills', { type : Nino.admin.elements._currentType, field : key }, function( status, response ) {
+
+				if( status !== 200 || response === null || Array.isArray( response.fills ) === false ) {
+					done( null );
+					return;
+				}
+
+				done( response.fills.map( function( fill ) {
+					return {
+						name 			: fill.key.split('/').slice( 2 ).map( function( part ) { return Nino.adminUi.slugLabel( part ) } ).join(' \u00B7 '),
+						notation 	: fill.notation,
+						value 		: fill.value,
+					};
+				} ) );
+			} );
 		},
 
 		/**

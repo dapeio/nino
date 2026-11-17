@@ -101,6 +101,7 @@ tab.init();
 check( 'the tab asks for the numbers and the locked accounts in one list', requests.length === 1 && requests[0].action === 'lockout/list' );
 
 answer( 200, { fields : FIELDS, locked : [ { mail : 'a@example.com', until : '2026-10-05 14:30' }, { mail : 'b@example.com', until : '2026-10-05 15:00' } ] } );
+check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( mount, function( el ) { return el.tagName === 'FIELDSET' } ).every( function( set ) { return set.children.every( function( child ) { return String( child.className ).indexOf('nino-admin-hint') === -1 || String( child.className ).indexOf('nino-admin-status') !== -1 } ) } ) && findAll( mount, function( el ) { return String( el.className ).indexOf('nino-admin-help-button') !== -1 } ).length > 0 );
 check( 'a fieldset below the numbers lists every locked account with its time', lockedBox() !== null && rows().length === 2
 	&& lockedText().includes( 'a@example.com' ) && lockedText().includes( 'locked until 2026-10-05 14:30' ) );
 check( '...with a Lift lock button on each row', rows().every( function( row ) {
