@@ -405,6 +405,154 @@ namespace Nino {
 		}
 
 		/**
+		 *	Create, set and remove keys in one step, for a tool that writes the words of a page together with the page - the
+		 *	Builder. A language file is changed by one mutate() however many keys it takes, so that two writers do not lose each
+		 *	other's keys, and the answer says what stood there before, which is what a tool that has to undo the step needs.
+		 *
+		 *	Only a key of the form a person may create (see isGrammarKey()) is written or removed, and the whole call is refused,
+		 *	before any file is touched, if one is not - or names a language that has no text file, or holds a text that is none, or
+		 *	sets and removes the same key, or sets a key that is global (a key of global.php has no language to be set in). A new
+		 *	key is written to the file of every language of the site, the texts named in theirs and an empty text in the others, as
+		 *	a key a person creates is (see the Text Keys tab); a key that is there is set in the languages named and in no other.
+		 *	A text goes through sanitizeValue() as saveBatch() sends it: by the format that was set for the key in meta.php - the Text Keys tab's decision, which
+		 *	a caller does not overrule -, else the one the caller names for it, else the one the key's texts hold. A key that is removed leaves every language file, global.php too, and the
+		 *	format and limit it had in meta.php
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$set					[ '/template/page-x/hero/title' => [ 'de_DE' => 'Titel', 'en_US' => 'Title' ] ]
+		 *	@param		array			$drop					[ '/template/page-x/hero/old' ]
+		 *	@param		array			$formats			[ key => plain, inline, lines or blocks ] - what the component that reads a key says of it
+		 *
+		 *	@return 	array|null								What stood there before, key => language => text - null where there was none, '*' for a global key that was removed - for every key set or removed; null where nothing was done or a file could not be written (a file written before it stays)
+		 */
+		public static function put( array &$appData, array $set, array $drop = [], array $formats = [] ): ?array {
+
+			$locales = \Nino\Locales::getTextLocales( $appData );
+
+			foreach( $set as $key => $texts ) {
+
+				if( is_string( $key ) === false || self::isGrammarKey( $key ) === false || is_array( $texts ) === false || in_array( $key, $drop, true ) === true )
+					return null;
+
+				foreach( $texts as $locale => $text )
+					if( is_string( $locale ) === false || in_array( $locale, $locales, true ) === false || is_string( $text ) === false )
+						return null;
+			}
+
+			foreach( $drop as $key )
+				if( is_string( $key ) === false || self::isGrammarKey( $key ) === false )
+					return null;
+
+			$entries = array_column( self::entries( $appData, true ), null, 'key' );
+			$meta = self::meta( $appData );
+
+			// The text of each file to write: file => [ '[[key]]' => text ]; and the keys each file loses
+			$changes = [];
+			$removals = [];
+
+			foreach( $set as $key => $texts ) {
+
+				if( ( $entries[$key]['global'] ?? false ) === true )
+					return null;
+
+				$format = isset( $meta[$key]['format'] ) === true ? $meta[$key]['format']
+					: ( in_array( $formats[$key] ?? null, \Nino\Html::FORMATS, true ) === true ? $formats[$key] : ( $entries[$key]['format'] ?? \Nino\Html::detectFormat( implode( ' ', $texts ) ) ) );
+				$named = isset( $entries[$key] ) === true ? array_keys( $texts ) : array_unique( array_merge( \Nino\Locales::getAvailableLocales( $appData ), array_keys( $texts ) ) );
+
+				foreach( $named as $locale )
+					$changes['/text/'. $locale. '.php']['[['. $key. ']]'] = self::sanitizeValue( $texts[$locale] ?? '', $format );
+			}
+
+			foreach( $drop as $key )
+				foreach( array_merge( array_map( static fn( string $locale ): string => '/text/'. $locale. '.php', $locales ), [ '/text/global.php' ] ) as $file )
+					$removals[$file][] = '[['. $key. ']]';
+
+			$before = [];
+
+			foreach( array_unique( array_merge( array_keys( $changes ), array_keys( $removals ) ) ) as $file ) {
+
+				$locale = basename( $file, '.php' ) === 'global' ? '*' : basename( $file, '.php' );
+				$put = $changes[$file] ?? [];
+				$gone = $removals[$file] ?? [];
+
+				$unchanged = false;
+
+				$written = \Nino\Filesystem::mutate( $appData, $file, static function( mixed $content ) use ( $put, $gone, $locale, &$before, &$unchanged ): ?array {
+
+					$content = is_array( $content ) === true ? $content : [];
+					$changed = false;
+
+					foreach( array_merge( array_keys( $put ), $gone ) as $bracket ) {
+
+						$was = is_scalar( $content[$bracket] ?? null ) === true ? (string) $content[$bracket] : null;
+
+						// A key that was not there and is not removed has no "before" to tell of in a file it does not have it in
+						if( $was !== null || isset( $put[$bracket] ) === true )
+							$before[substr( $bracket, 2, -2 )][$locale] = $was;
+					}
+
+					foreach( $put as $bracket => $text )
+						if( ( $content[$bracket] ?? null ) !== $text ) {
+							$content[$bracket] = $text;
+							$changed = true;
+						}
+
+					foreach( $gone as $bracket )
+						if( array_key_exists( $bracket, $content ) === true ) {
+							unset( $content[$bracket] );
+							$changed = true;
+						}
+
+					$unchanged = $changed === false;
+
+					return $changed === true ? $content : null;
+				} );
+
+				// A file the step has nothing to change in is an abort of the mutation, and as it should be
+				if( $written === false && $unchanged === false )
+					return null;
+			}
+
+			if( $drop !== [] ) {
+
+				\Nino\Filesystem::mutate( $appData, self::META_PATH, static function( mixed $meta ) use ( $drop ): ?array {
+
+					if( is_array( $meta ) === false || array_intersect_key( $meta, array_flip( $drop ) ) === [] )
+						return null;
+
+					return array_diff_key( $meta, array_flip( $drop ) );
+				} );
+			}
+
+			return $before;
+		}
+
+		/**
+		 *	Every text of a namespace, in every language: the keys that stand below a prefix with what each language says - the
+		 *	words of one page, for a tool that shows or stamps them together
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$prefix				A namespace with its slash in front, eg. '/template/page-home' - the keys below it, not a key that only begins alike
+		 *
+		 *	@return 	array											key => language => text, '*' for a global key; a language that has no text for the key is not in it. [] for a prefix that is none
+		 */
+		public static function values( array &$appData, string $prefix ): array {
+
+			$prefix = rtrim( $prefix, '/' );
+
+			if( preg_match( '#^(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$#D', $prefix ) !== 1 )
+				return [];
+
+			$found = [];
+
+			foreach( self::entries( $appData, true ) as $entry )
+				if( str_starts_with( $entry['key'], $prefix. '/' ) === true )
+					$found[$entry['key']] = array_filter( $entry['values'], static fn( mixed $text ): bool => is_string( $text ) === true );
+
+			return $found;
+		}
+
+		/**
 		 *	The one value-normalization path shared by regular batch saves and
 		 *	_admin's JSON translation import. Keeping it here prevents import
 		 *	from bypassing the hard length limit and HTML whitelist that the form

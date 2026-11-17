@@ -528,8 +528,44 @@ foreach( [ 'de_DE' => [ '/', '/contact', '/impressum', '/gibt-es-nicht', '/daten
 		$visits[$locale. ' '. $uri] = pagesVisit( $site, $locale, $uri );
 
 $noticed = ninoWarnings();
+
+// The same pages as a preview that asked for the trace: comments where the nodes are drawn, and none where a comment would be text
+$traced = [];
+
+foreach( [ '/', '/contact' ] as $uri ) {
+
+	$appData = pagesBoot( $site, 'de_DE' );
+	ninoUser( $appData, 'trace@example.com', [ '/_admin/builder/manage' ] );
+	$token = \Nino\Preview::issue( $appData, 'builder', '/_admin/builder/manage', [] );
+	\Nino\Callbacks::registerCallback( $appData, '/nino/http/request', static function( array &$appData, array &$request ): void {
+		\Nino\Preview::held( $appData, $request, 'builder', '/_admin/builder/manage' ) !== null && \Nino\Preview::trace( $appData );
+	} );
+	$request = \Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => $uri. '?nino-preview='. $token, 'REMOTE_ADDR' => '127.0.0.1', 'HTTP_HOST' => 'example.com', 'HTTPS' => 'on' ] );
+	$traced[$uri] = (string) ( $request['/nino/http/response']['body'] ?? '' );
+}
+
+$ignored = ninoWarnings();
 \Nino\Filesystem::removeDir( $site );
 \Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
+
+$misplaced = 0;
+$invalid = 0;
+
+foreach( $traced as $body ) {
+
+	// The comments the templates carry of their own are text of the template, which names a textarea in one
+	$body = (string) preg_replace( '/<!--(?!\/?nino:).*?-->/s', '', $body );
+	$misplaced += preg_match_all( '#<(script|style|title|textarea)\b[^>]*>(?:(?!</\1>).)*?<!--/?nino:#is', $body ) + preg_match_all( '#<[a-z][^<>]*<!--/?nino:#i', $body );
+
+	if( preg_match_all( '#<script type="application/ld\+json"[^>]*>(.*?)</script>#s', $body, $found ) > 0 )
+		foreach( $found[1] as $json )
+			$invalid += json_decode( $json, true ) === null ? 1 : 0;
+}
+
+check( 'the titles and the buttons of the start page, drawn by renderers, carry the mark of their source as the content of their element',
+	preg_match_all( '#<h[1-3] class="section-title[^>]*><!--nino:s [^>]*-->#', $traced['/'] ) >= 3 && preg_match_all( '#<(?:a|span) class="button[^>]*><!--nino:s [^>]*-->#', $traced['/'] ) >= 1 );
+check( 'the pages of a preview that asked for the trace carry it, and no comment stands in a script, a style, a title, a textarea or a tag, and the JSON-LD is JSON', $misplaced === 0 && $invalid === 0
+	&& substr_count( $traced['/'], '<!--nino:n' ) > 20 && substr_count( $traced['/'], 'application/ld+json' ) >= 1 );
 
 check( 'the start page, the contact page and the imprint answer 200 and an address that is not there 404, in both languages',
 	array_column( $visits, 0 ) === [ 200, 200, 200, 404, 200, 200, 200, 200, 404, 200 ] );

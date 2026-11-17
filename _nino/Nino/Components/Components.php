@@ -59,6 +59,18 @@ namespace Nino {
 	 *										fixed text of a component the text of the field - see _fills()) and how
 	 *										deep the nodes are.
 	 *
+	 *										Two more keys are the register's own, for a preview (\Nino\Preview), and are there only
+	 *										where the request holds a draft and asked for the trace (\Nino\Preview::trace()): 'trace', true where the drawing writes the comments that say
+	 *										which node drew what - a context that says false turns it off, and one that says true is not
+	 *										heard by a request that did not ask - and 'path', the position of the first node among
+	 *										those of its template: '' for the tree of a file, a source or
+	 *										a loop's round, null where the nodes are no part of a tree that has positions (what a shortcode
+	 *										draws of its own). The comment of a call is <!--nino:n 0.1.0-->...<!--/nino:n-->, with the
+	 *										template before the position where there is one (page-home:0.1.0), and the comment of the
+	 *										value of a text source <!--nino:s ~title-->...<!--/nino:s-->. What stands in a comment is the
+	 *										digits of a path, a word of a template and the source as it is written where that is a key
+	 *										- never a character that ends a comment
+	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
 	 *	@link							https://github.com/dapeio/nino
@@ -159,6 +171,12 @@ namespace Nino {
 		// How many things the log is told about in one request: a page of names nobody registered is a log of its
 		// own, and the names are an editor's
 		private const int NOTICES = 20;
+
+		// The longest label of a comment of the trace of a preview
+		private const int TRACE_LENGTH = 200;
+
+		// The value a renderer is handed, with its marked form, for fill() to write: [ name, value, marked ], while the renderer runs
+		private const string MARK = './nino/components/mark';
 
 		// The counter of the things said once in a window (/data/component-notices.php), and the window of a name that is no component: an hour
 		private const string NOTICE_COUNTER = 'component-notices';
@@ -1301,6 +1319,7 @@ namespace Nino {
 		public static function render( array &$appData, array $nodes, array $context = [] ): string {
 
 			$element = $context['element'] ?? null;
+			$given = $context;
 
 			$context = [
 				'template'	=> is_string( $context['template'] ?? null ) === true ? $context['template'] : '',
@@ -1310,6 +1329,14 @@ namespace Nino {
 				'fills'			=> is_array( $context['fills'] ?? null ) === true ? $context['fills'] : [],
 				'depth'			=> is_int( $context['depth'] ?? null ) === true ? max( 0, $context['depth'] ) : 0,
 			];
+
+			// The two keys of a preview are there for a request that holds a draft and asked for the trace, and are not there for any other
+			if( ( $given['trace'] ?? true ) === true && \Nino\Preview::tracing( $appData ) === true ) {
+
+				// '' for the tree of a file or a source, null where the nodes have no position, what a caller says where it counts on
+				$path = array_key_exists( 'path', $given ) === true ? $given['path'] : '';
+				$context += [ 'trace' => true, 'path' => is_string( $path ) === true ? $path : null ];
+			}
 
 			$run = [
 				'registry'	=> (array) ( $appData[self::REGISTRY] ?? [] ),
@@ -1384,6 +1411,12 @@ namespace Nino {
 			foreach( $tokens as $token => $markup )
 				if( is_scalar( $markup ) === true )
 					$own[(string) $token] = (string) $markup;
+
+			// For a preview: the value of the call that is being drawn, between the comments that say where it came from
+			$mark = $appData[self::MARK] ?? null;
+
+			if( is_array( $mark ) === true && $mark[0] === $name && $mark[1] === ( $args['value'] ?? null ) && isset( $own['[[value]]'] ) === false && self::_valueIsContent( $schema['template'] ) === true )
+				$own['[[value]]'] = $mark[2];
 
 			return strtr( $schema['template'], $own + self::_placeholders( $run, $name, $schema, $args, $content ) + self::_site( $appData, $run, $name ) );
 		}
@@ -1519,26 +1552,133 @@ namespace Nino {
 		 *
 		 *	@return 	string
 		 */
-		private static function _draw( array &$appData, array $nodes, array $context, array &$run ): string {
+		private static function _draw( array &$appData, array $nodes, array $context, array &$run, int $from = 0 ): string {
 
 			// A tree built by hand can be as deep as it likes; the parser stops at the same depth
 			if( $context['depth'] > Markup::MAX_DEPTH )
 				return '';
 
 			$html = '';
+			$trace = ( $context['trace'] ?? false ) === true && ( $context['path'] ?? null ) !== null;
 
-			foreach( $nodes as $node ) {
+			// Where the nodes stand in the text of their source: inside a script, a style, a title or a textarea, or inside a tag, no comment is one
+			$raw = '';
+			$tag = '';
+
+			foreach( $nodes as $at => $node ) {
 
 				// What is no node - a string, a number, nothing - has none of the keys, and is nothing
-				if( isset( $node['t'] ) === true )
+				if( isset( $node['t'] ) === true ) {
+
 					$html .= is_string( $node['t'] ) === true ? $node['t'] : '';
+
+					if( $trace === true && is_string( $node['t'] ) === true )
+						[ $raw, $tag ] = self::_stand( $node['t'], $raw, $tag );
+				}
 				else if( isset( $node['f'] ) === true )
 					$html .= is_string( $node['f'] ) === true ? self::_fill( $appData, $node['f'], $context, $run ) : '';
-				else if( isset( $node['n'] ) === true && is_string( $node['n'] ) === true )
-					$html .= self::_call( $appData, $node, $context, $run );
+				else if( isset( $node['n'] ) === true && is_string( $node['n'] ) === true ) {
+
+					// The position of the call, for a preview: its own number after the path of the nodes it stands among
+					$path = $trace === true && $raw === '' && $tag === '' && isset( $run['registry'][$node['n']] ) === true ? ( $context['path'] === '' ? '' : $context['path']. '.' ). ( $from + (int) $at ) : null;
+					$drawn = self::_call( $appData, $node, $context, $run, $path );
+
+					$html .= $path === null ? $drawn : self::_traced( 'n', ( $context['template'] === '' ? '' : $context['template']. ':' ). $path, $drawn );
+				}
 			}
 
 			return $html;
+		}
+
+		/**
+		 *	Where the end of a text leaves the reader of the html it is part of: inside the content of a script, a style, a title or a
+		 *	textarea, and whether inside a tag. A '<' that begins no tag is taken for one, which leaves a comment out and does no
+		 *	harm: in doubt nothing is traced
+		 *
+		 *	@param		string		$text
+		 *	@param		string		$raw					The element whose content it is, '' for none
+		 *	@param		string		$tag					'' outside a tag, '<' inside one, the quote where inside the quoted value of an attribute
+		 *
+		 *	@return 	array										[ $raw, $tag ]
+		 */
+		private static function _stand( string $text, string $raw, string $tag ): array {
+
+			preg_match_all( '#<(/?)(script|style|title|textarea)\b|[<>"\']#i', $text, $found, PREG_SET_ORDER );
+
+			foreach( $found as $hit ) {
+
+				// Inside the quotes of the value of an attribute a '>' ends nothing
+				if( $tag === '"' || $tag === "'" ) {
+
+					if( $hit[0] === $tag )
+						$tag = '<';
+
+					continue;
+				}
+
+				if( $hit[0] === '>' )
+					$tag = '';
+				else if( $hit[0] === '"' || $hit[0] === "'" )
+					$tag = $tag === '<' ? $hit[0] : $tag;
+				else {
+
+					$tag = '<';
+
+					if( isset( $hit[2] ) === true )
+						$raw = $hit[1] === '' ? strtolower( $hit[2] ) : ( strtolower( $hit[2] ) === $raw ? '' : $raw );
+				}
+			}
+
+			return [ $raw, $tag ];
+		}
+
+		/**
+		 *	Whether the template of a component writes its value as the content of an element and nowhere else: not in a tag, not in
+		 *	a script, a style, a title or a textarea - the only place the comments around a value are comments - and writes it at all
+		 *
+		 *	@param		string		$template
+		 *
+		 *	@return 	bool
+		 */
+		private static function _valueIsContent( string $template ): bool {
+
+			$parts = explode( '[[value]]', $template );
+
+			if( count( $parts ) < 2 )
+				return false;
+
+			$raw = '';
+			$tag = '';
+
+			for( $i = 0; $i < count( $parts ) - 1; $i++ ) {
+
+				[ $raw, $tag ] = self::_stand( $parts[$i], $raw, $tag );
+
+				if( $raw !== '' || $tag !== '' )
+					return false;
+			}
+
+			return true;
+		}
+
+		/**
+		 *	What a drawing wrote for a preview, in the comment that says who wrote it: a position or a source, which is the
+		 *	text of the comment and nothing else. A label that is not a position, a word of a template with one, or a source as
+		 *	a key is written - which has no character that ends a comment in it - is not traced: what is drawn is drawn without
+		 *
+		 *	@param		string		$kind					n for a call, s for the value of a source
+		 *	@param		string		$label
+		 *	@param		string		$html					What was drawn
+		 *
+		 *	@return 	string
+		 */
+		private static function _traced( string $kind, string $label, string $html ): string {
+
+			$fits = $kind === 'n'
+				? preg_match( '/^(?:[a-z0-9]+(?:-[a-z0-9]+)*:)?[0-9]+(?:\.[0-9]+)*$/D', $label ) === 1
+				: preg_match( '/^(?:text|[~\/.][a-z0-9\/._-]*)$/D', $label ) === 1 && str_contains( $label, '--' ) === false;
+
+			return $fits === true && strlen( $label ) <= self::TRACE_LENGTH ? '<!--nino:'. $kind. ' '. $label. '-->'. $html. '<!--/nino:'. $kind. '-->' : $html;
 		}
 
 		/**
@@ -1749,10 +1889,11 @@ namespace Nino {
 		 *	@param		array			$node					A call: n, s, a, c
 		 *	@param		array			$context
 		 *	@param		array			&$run					(reference)
+		 *	@param		string|null	$path					The position of the call where the drawing is traced, null for none
 		 *
 		 *	@return 	string
 		 */
-		private static function _call( array &$appData, array $node, array $context, array &$run ): string {
+		private static function _call( array &$appData, array $node, array $context, array &$run, ?string $path = null ): string {
 
 			$name = (string) $node['n'];
 			$schema = $run['registry'][$name] ?? null;
@@ -1872,6 +2013,7 @@ namespace Nino {
 			// 4. The source, and 5. nothing to say is nothing drawn
 			$value = '';
 			$lang = '';
+			$marked = '';
 
 			if( $schema['source'] !== 'none' ) {
 
@@ -1891,11 +2033,18 @@ namespace Nino {
 				if( $resolved === null || $resolved === '' )
 					return '';
 
-				$value = $resolved;
+				// For a preview: the value of a text between two comments that say where it came from - where the template writes it as the
+				// content of an element and no renderer is handed it. Not a link or a picture: their value stands in an attribute or is looked up
+				$value = $path !== null && $schema['source'] === 'text' && isset( $run['renderers'][$name] ) === false && ( $run['marks'][$name] ??= self::_valueIsContent( $schema['template'] ) ) === true
+					? self::_traced( 's', $fixed !== null ? 'text' : $source, $resolved ) : $resolved;
+
+				// A renderer is handed the value as it is; where it has the template of its component filled by fill(), fill() marks the value there
+				if( $path !== null && $schema['source'] === 'text' && isset( $run['renderers'][$name] ) === true )
+					$marked = self::_traced( 's', $fixed !== null ? 'text' : $source, $resolved );
 			}
 
 			// 7. The children - 6. an id gives them its scope
-			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'element' => $context['element'], 'fills' => $context['fills'], 'depth' => $context['depth'] + 1 ];
+			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'element' => $context['element'], 'fills' => $context['fills'], 'depth' => $context['depth'] + 1 ] + ( $path === null ? [] : [ 'trace' => true, 'path' => $path ] );
 			$content = '';
 			$slotted = [];
 
@@ -1914,9 +2063,9 @@ namespace Nino {
 					if( $slots === [] )
 						$content = self::_draw( $appData, $node['c'], $inner, $run );
 					else
-						foreach( $node['c'] as $child ) {
+						foreach( $node['c'] as $at => $child ) {
 
-							$html = self::_draw( $appData, [ $child ], $inner, $run );
+							$html = self::_draw( $appData, [ $child ], $inner, $run, (int) $at );
 
 							if( is_array( $child ) === true && in_array( $child['n'] ?? null, $slots, true ) === true )
 								$slotted['[[content:'. $child['n']. ']]'] .= $html;
@@ -1936,6 +2085,10 @@ namespace Nino {
 				foreach( $slotted as $token => $html )
 					$args['content:'. substr( $token, 10, -2 )] = $html;
 
+				// For a preview: what fill() puts in the place of the value, where the template writes it as the content of an element
+				if( $marked !== '' && $marked !== $value )
+					$appData[self::MARK] = [ $name, $value, $marked ];
+
 				try {
 					$html = $renderer( $appData, $args, $content, $context );
 				}
@@ -1947,6 +2100,8 @@ namespace Nino {
 					self::_notice( $appData, 'renderer '. $name, 'Components: the renderer of "'. $name. '" threw '. self::_class( $thrown ). ': '. self::_shown( $thrown->getMessage() ), E_USER_WARNING );
 					$html = '';
 				}
+
+				unset( $appData[self::MARK] );
 
 				// What it did to the fills is seen from the next node on
 				$run['fills'] = null;

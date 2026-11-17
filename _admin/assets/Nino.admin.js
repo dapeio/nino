@@ -3707,6 +3707,405 @@
 		},
 
 		/**
+		 *	The loop that keeps a preview in step with a draft that is not saved: the draft is sent once the hand has rested,
+		 *	one request at a time - what changes while one is out is sent in the next, once -, the token is asked for again
+		 *	before it runs out, and the frame of a split view (split()) is loaded with the page when an answer holds. A failure
+		 *	leaves the last picture where it is and is told to the caller; the draft is the person's, a failed request takes nothing
+		 *	of it. What the draft is and how it is sent is the caller's: send() does it, with the request of its own panel.
+		 *
+		 *	The answer of send() is { token, query, ttl } - the token, the query that makes a request for the page ask for it
+		 *	(\Nino\Preview::QUERY and the token) and how many seconds it holds. The token goes to the next call of send(), so that
+		 *	the server renews it instead of making a new one; it is counted from the answer on the clock of this page, so that a
+		 *	clock that is off cannot ask for ever. Owns no strings: what an error or a renewal says is the caller's
+		 *
+		 *	@param		{Object}		options					{ split, send, address, widths, quiet, grace, onError, onUnavailable, onRenew, onUpdate }
+		 *														- split         a split() with a page: reload( src ) and width( px ) are what is called
+		 *														- send          send( token, done ) asks the server for the draft; done( status, response ) is its answer
+		 *														- address       address( query ) is the address of the page the frame shows, with the query that asks for the draft
+		 *														- widths        { name : px } the widths of the preview, mobile, tablet and desktop by default
+		 *														- quiet         how long the hand rests before the draft is sent, in milliseconds, 150
+		 *														- grace         how long before a token runs out - in milliseconds - a new one is asked for, 5000
+		 *														- onError       called with ( status, response ) after a request that failed
+		 *														- onUnavailable called after an answer that is no draft: the last picture stays
+		 *														- onRenew       called when the token had run out and the draft is asked for again
+		 *														- onUpdate      called after an answer that held, the frame loaded
+		 *
+		 *	@return		{Object}										{ schedule( [quiet] ), flush( [then] ), reload(), width( name ), token(), stop() } - flush( then ) calls then( true ) after the last request of a run that held and then( false ) where one failed
+		 */
+		previewFrame : function( options ) {
+
+			const quiet		= Number.isInteger( options.quiet ) === true && options.quiet >= 0 ? options.quiet : 150;
+			const grace		= Number.isInteger( options.grace ) === true && options.grace >= 0 ? options.grace : 5000;
+			const widths	= options.widths ?? { mobile : 390, tablet : 768, desktop : 1280 };
+			const tell		= function( name, ...args ) {
+				if( typeof options[name] === 'function' )
+					options[name]( ...args );
+			};
+
+			let token = '';
+			let query = '';
+			let until = 0;
+			let timer = null;
+			let inFlight = false;
+			let again = false;
+			let stopped = false;
+			let waiting = [];
+			let width = '';
+
+			const finish = function( ok ) {
+				const calls = waiting;
+				waiting = [];
+				calls.forEach( function( call ) { call( ok ) } );
+			};
+
+			const load = function() {
+
+				if( stopped === true || query === '' )
+					return;
+
+				// A token that has run out draws the page as the website has it, and says nothing: the draft is asked for again, which gives a new one
+				if( until > 0 && Date.now() >= until ) {
+					tell('onRenew');
+					flush();
+					return;
+				}
+
+				options.split.reload( options.address( query ) );
+			};
+
+			const flush = function( then ) {
+
+				if( typeof then === 'function' )
+					waiting.push( then );
+
+				if( stopped === true ) {
+					finish( false );
+					return;
+				}
+
+				if( inFlight === true ) {
+					again = true;
+					return;
+				}
+
+				inFlight = true;
+				again = false;
+
+				options.send( token, function( status, response ) {
+
+					inFlight = false;
+
+					if( stopped === true ) {
+						finish( false );
+						return;
+					}
+
+					if( status !== 200 ) {
+						again = false;
+						tell( 'onError', status, response );
+						finish( false );
+						return;
+					}
+
+					// An answer that is no draft is no page to load: the last picture stays
+					if( response === null || typeof response !== 'object' || typeof response.token !== 'string' || typeof response.query !== 'string' || typeof response.ttl !== 'number' ) {
+						again = false;
+						tell('onUnavailable');
+						finish( false );
+						return;
+					}
+
+					token = response.token;
+					query = response.query;
+					until = Date.now() + response.ttl * 1000 - grace;
+
+					if( again === true ) {
+						flush();
+						return;
+					}
+
+					load();
+					tell( 'onUpdate', response );
+					finish( true );
+				} );
+			};
+
+			return {
+
+				// The hand has moved: the draft is sent when it rests - longer where the hand types a text
+				schedule : function( rest ) {
+					wn.clearTimeout( timer );
+					timer = wn.setTimeout( function() { flush() }, rest ?? quiet );
+				},
+
+				flush : flush,
+				reload : load,
+				token : function() { return token },
+
+				// The page is laid out at the width of that name and scaled into the pane; a name that is none gives the pane its own width back
+				width : function( name ) {
+					width = Object.prototype.hasOwnProperty.call( widths, name ) === true ? name : '';
+					return options.split.width( width === '' ? null : widths[width] );
+				},
+
+				// The panel is left: what is out is not answered, nothing is sent
+				stop : function() {
+					stopped = true;
+					wn.clearTimeout( timer );
+				},
+			};
+		},
+
+		/**
+		 *	The question a refused save asks - another tab or another person wrote what this one was about to write: Overwrite
+		 *	does it once more over what is there now, Reload drops the work of this tab and shows what is there - after a question of its
+		 *	own, since it cannot be taken back - and Cancel leaves everything as it is. Escape is Cancel, and the focus goes back
+		 *	to the opener. The words are /_admin/common/conflict/*, and the caller's where it gives them
+		 *
+		 *	@param		{Object}		options					{ message, onOverwrite, onReload, onCancel, opener, text }
+		 *														- message     what the server said of the refusal, usually Nino.adminUi.api.errorText( status, response )
+		 *														- onOverwrite called to write over what is there; the caller sends the save again with the state the refusal was about
+		 *														- onReload    called after the second question was answered with yes: the caller drops its work and loads what the server holds
+		 *														- onCancel    called when nothing is done: Cancel, Escape, or no to the second question
+		 *														- opener      what gets the focus back, see choiceDialog()
+		 *														- text        { title, overwrite, reload, reloadTitle, reloadMessage, cancel }
+		 *
+		 *	@return		{boolean}										false when a question is already open and this one was not asked
+		 */
+		conflict : function( options ) {
+
+			const text = options.text || {};
+			const word = function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
+			const call = function( name ) {
+				if( typeof options[name] === 'function' )
+					options[name]();
+			};
+
+			return Nino.adminUi.choiceDialog( {
+				title		: word( 'title', '/_admin/common/conflict/title' ),
+				message	: options.message,
+				opener	: options.opener,
+				choices	: [
+					{ value : 'overwrite', label : word( 'overwrite', '/_admin/common/conflict/overwrite' ), kind : 'danger' },
+					{ value : 'cancel', label : word( 'cancel', '/_admin/common/label/cancel' ), kind : 'secondary' },
+					{ value : 'reload', label : word( 'reload', '/_admin/common/conflict/reload' ), kind : 'secondary' },
+				],
+				onChoose : function( value ) {
+
+					if( value === 'overwrite' ) {
+						call('onOverwrite');
+						return;
+					}
+
+					if( value !== 'reload' ) {
+						call('onCancel');
+						return;
+					}
+
+					Nino.adminUi.confirm( 'destructive', {
+						title		: word( 'reloadTitle', '/_admin/common/conflict/reload-title' ),
+						message	: word( 'reloadMessage', '/_admin/common/conflict/reload-message' ),
+						yes			: word( 'reload', '/_admin/common/conflict/reload' ),
+						no			: word( 'cancel', '/_admin/common/label/cancel' ),
+						kind		: 'danger',
+						opener	: options.opener,
+						onChoose : function( ok ) { call( ok === true ? 'onReload' : 'onCancel' ) },
+					} );
+				},
+			} );
+		},
+
+		/**
+		 *	The bar at the foot of a screen that saves what is on it as a whole: the state - "● Changed" or "✓ Saved" -, the
+		 *	status line (status()) that says what the last action did, the buttons of the caller (undo, redo...), "Restore the
+		 *	last state" once there is one and nothing unsaved, and Save. Save is pressed once at a time: while the save is on its way
+		 *	it is disabled, and where the caller says what keeps it from being saved, the line says it and Save waits. The
+		 *	caller says what is the case, with set(); the bar draws it and does nothing of its own accord. The first change of a
+	 *	saved screen is said once on the line - a status, which a screen reader reads out - and not again while the changes stand. A save that
+	 *	ends with done( false ) leaves the line as the caller left it: where it still says "Saving" it is back to "unsaved
+	 *	changes", and a caller that has an error to say says it before it ends the save
+		 *
+		 *	press() is the Save of the keyboard - a panel hangs it on Ctrl+S through the shell's dirty registry (entry() gives
+		 *	the entry of that registry, with the bar as the one the marker is drawn in). Where the registry is there, set() tells it
+		 *	that the state changed. The words are /_admin/common/savebar/*, and the caller's where it gives them
+		 *
+		 *	@param		{Object}		options					{ id, text, buttons, restore, onSave, onRestore }
+		 *														- id          the beginning of the ids it makes
+		 *														- text        { changed, saved, save, restore, restoreHint } to say the words differently
+		 *														- buttons     [ { key, label, name, onPress } ] put between the line and Restore, in this order
+		 *														- restore     false for a bar that has no last state to go back to
+		 *														- onSave      onSave( done ) saves, and says with done( true ) or done( false ) how it ended - on every way it can end
+		 *														- onRestore   onRestore( opener ) is called by Restore, which is on the screen only where set() says there is a last state
+		 *
+		 *	@return		{Object}										{ el, line, state, save, restore, buttons, set( { dirty, blocked, restorable, calm } ), press( [done] ), entry( [extra] ) } - buttons is key => element, line the status() control. calm is a third, quiet state for a screen whose saved state is something else than "saved" ("Applied"): its word, shown with a check mark where nothing is changed; '' takes it back
+		 */
+		saveBar : function( options ) {
+
+			const prefix	= options.id || 'nino-admin-savebar-'+ ( ++serial );
+			const text		= options.text || {};
+			const word		= function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
+
+			const bar			= Nino.adminUi.actionBar( Nino.adminUi.el( 'div', 'nino-admin-savebar' ) );
+			bar.id				= prefix;
+
+			const state		= Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-savebar-state' );
+			const line		= Nino.adminUi.status( Nino.adminUi.el('p') );
+			const buttons	= {};
+
+			state.id = prefix+ '-state';
+			bar.appendChild( state );
+			bar.appendChild( line.element );
+
+			( Array.isArray( options.buttons ) === true ? options.buttons : [] ).forEach( function( given ) {
+
+				const button = Nino.adminUi.button( given.label, given.onPress, { name : given.name, id : prefix+ '-'+ given.key } );
+
+				buttons[given.key] = button;
+				bar.appendChild( button );
+			} );
+
+			const restore = Nino.adminUi.button( word( 'restore', '/_admin/common/savebar/restore' ), function() {
+				if( typeof options.onRestore === 'function' )
+					options.onRestore( restore );
+			}, { id : prefix+ '-restore' } );
+
+			const save = Nino.adminUi.button( word( 'save', '/_admin/common/savebar/save' ), function() { press() }, { className : 'nino-admin-btn-primary', id : prefix+ '-save' } );
+
+			restore.hidden = true;
+
+			if( options.restore !== false )
+				bar.appendChild( restore );
+
+			bar.appendChild( save );
+
+			let dirty = false;
+			let blocked = '';
+			let said = '';
+			let calm = '';
+			let restorable = false;
+			let busy = false;
+			let typed = false;
+
+			const paint = function() {
+
+				state.dataset.state = dirty === true ? 'warn' : ( calm !== '' ? 'muted' : 'ok' );
+				state.textContent = dirty === true ? '\u25CF '+ word( 'changed', '/_admin/common/savebar/changed' ) : '\u2713 '+ ( calm !== '' ? calm : word( 'saved', '/_admin/common/savebar/saved' ) );
+				save.disabled = busy === true || dirty === false || blocked !== '';
+				restore.hidden = restorable === false;
+				restore.disabled = busy === true || dirty === true;
+				restore.title = dirty === true ? word( 'restoreHint', '/_admin/common/savebar/restore-hint' ) : '';
+
+				// What keeps the draft from being saved is said where the person is looking; it goes when the cause does
+				if( blocked !== '' && said !== blocked ) {
+					said = blocked;
+					line.fail( blocked );
+				}
+				else if( blocked === '' && said !== '' ) {
+					said = '';
+
+					if( dirty === true )
+						line.dirty();
+					else
+						line.idle();
+				}
+			};
+
+			const refresh = function() {
+				if( typeof shell().dirty === 'object' && shell().dirty !== null && typeof shell().dirty.refresh === 'function' )
+					shell().dirty.refresh();
+			};
+
+			const press = function( done ) {
+
+				if( busy === true || dirty === false || blocked !== '' || typeof options.onSave !== 'function' ) {
+					if( typeof done === 'function' )
+						done( false );
+					return;
+				}
+
+				busy = true;
+				typed = false;
+				line.saving();
+				paint();
+
+				options.onSave( function( ok ) {
+
+					busy = false;
+
+					// What was changed while the save was on its way is not in what was sent: it stays a change
+					if( ok === true ) {
+						dirty = typed;
+
+						if( typed === true )
+							line.dirty();
+						else
+							line.saved();
+					}
+					else if( line.state === 'saving' )
+						line.dirty();
+
+					paint();
+					refresh();
+
+					if( typeof done === 'function' )
+						done( ok === true );
+				} );
+			};
+
+			paint();
+
+			return {
+
+				el : bar,
+				line : line,
+				state : state,
+				save : save,
+				restore : restore,
+				buttons : buttons,
+				press : press,
+
+				// What is the case now: the screen holds changes, something keeps it from being saved (a sentence, '' for nothing), there is a last state to go back to
+				set : function( now ) {
+
+					if( typeof now.dirty === 'boolean' ) {
+
+						// The first change of a saved screen is said, once: the line is a status that is read out
+						if( now.dirty === true && dirty === false && busy === false && blocked === '' && ( typeof now.blocked !== 'string' || now.blocked === '' ) && line.state !== 'error' )
+							line.dirty();
+
+						// What the line said of changes is not true of a screen that is back to what is saved
+						if( now.dirty === false && dirty === true && busy === false && line.state === 'dirty' )
+							line.idle();
+
+						dirty = now.dirty;
+						typed = busy === true && now.dirty === true ? true : typed;
+					}
+
+					if( typeof now.calm === 'string' )
+						calm = now.calm;
+
+					if( typeof now.blocked === 'string' )
+						blocked = now.blocked;
+
+					if( typeof now.restorable === 'boolean' )
+						restorable = now.restorable;
+
+					paint();
+					refresh();
+				},
+
+				// The entry of the shell's registry of unsaved input (Nino.admin.dirty.register()), with what else the caller adds to it
+				entry : function( extra ) {
+					return Object.assign( {
+						isDirty : function() { return dirty },
+						save : function( done ) { press( done ) },
+						bar : function() { return bar },
+					}, extra || {} );
+				},
+			};
+		},
+
+		/**
 		 *	A field for a colour: the hex code in a text field, the system's own
 		 *	colour picker beside it, a surface that shows the colour, and - where
 		 *	options.against names a second colour - the contrast between them as

@@ -1290,6 +1290,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Sections one under another, one open or several, the open one in the address | `.nino-admin-accordion` via `Nino.adminUi.accordion()` - see [Settings screens](#settings-screens-accordion-steps-split-view-and-colour-field) |
 | One choice among a few steps (-2 to +2, or named) | `.nino-admin-steps` via `Nino.adminUi.steps()`, a radiogroup |
 | Controls on one side, a preview on the other, a switch between them where it is narrow | `.nino-admin-split` via `Nino.adminUi.split()` |
+| A preview that follows a draft, the question of a refused save, the bar of a screen that is saved as a whole | `Nino.adminUi.previewFrame()`, `conflict()` and `.nino-admin-savebar` via `saveBar()` - see [the three builders](#workbench-screens-that-save-as-a-whole-the-preview-loop-the-conflict-and-the-save-bar) |
 | A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
@@ -1501,6 +1502,90 @@ mount.appendChild( brand.el );
   token, button, input, field, tile, card and rich-text rule this way. Delete
   the copy; if the shared version is genuinely wrong for every screen, fix it in
   the design-system half of `style.css`.
+
+### Workbench screens that save as a whole: the preview loop, the conflict and the save bar
+
+Three more builders, for a panel that edits a draft, shows it in a split view and saves it in one step - the
+Builder and the Themes panel. They own no strings of their own beyond the words of the question and of the bar
+(`/_admin/common/conflict/*`, `/_admin/common/savebar/*`, and `/_admin/common/label/cancel`), and a caller that
+says its own words passes `text`. In the examples `mount` is the element a panel draws into, `settings` the controls of
+the split view and `api( action, data, done )` the panel's own request to its action.
+
+**`Nino.adminUi.previewFrame( options )`** is the loop that keeps the preview in step with the draft. The panel
+says what changed with `schedule()` and the loop sends the draft when the hand has rested (150 ms), one request at
+a time: what changes while a request is out is sent in the next, once, and the frame is loaded only with the last
+answer. The answer of `send` is `{ token, query, ttl }` - the token of a [draft](../development.md#a-draft-for-a-preview),
+the query that makes a request for the page ask for it and the seconds it holds. The token goes with the next
+`send`, so that the server renews it, and is asked for again 5 seconds before it runs out (`grace`). A failed
+request, an answer that is no draft and a renewal are told to the panel (`onError`, `onUnavailable`, `onRenew`), and
+the frame stays as it was. `width( 'mobile' | 'tablet' | 'desktop' )` lays the page out at 390, 768 or 1280 px in
+the split view; `stop()` is for when the panel is left.
+
+```js
+const split = Nino.adminUi.split( { settings : settings, preview : { src : '/', title : 'The page' } } );
+const preview = Nino.adminUi.previewFrame( {
+	split : split,
+	send : function( token, done ) { api( 'preview', { draft : draft, token : token }, done ) },
+	address : function( query ) { return '/page?'+ query },
+	onError : function( status, response ) { bar.line.error( status, response ) },
+} );
+// every change of the draft: preview.schedule()
+// a change that has to be seen now, and then something: preview.flush( function( ok ) { ... } )
+```
+
+**`Nino.adminUi.conflict( options )`** is the question a refused save asks - the stamp the save carried is not the
+one the server holds, because another tab or another person wrote the same thing. Overwrite is the dangerous answer
+and calls `onOverwrite`, which sends the save again with the stamp the refusal was about; Reload asks once more
+before it calls `onReload`, since it drops what the person did; Cancel and the Escape key call `onCancel`. It is a
+`choiceDialog()`, so the keyboard, the focus (back to `opener`) and the screen reader are its own.
+
+```js
+function saved( status, response, send ) {
+	if( status === 409 )
+		Nino.adminUi.conflict( {
+			message : Nino.adminUi.api.errorText( status, response ),
+			onOverwrite : function() { send( { force : true } ) },
+			onReload : function() { load() },
+			onCancel : function() { bar.line.dirty() },
+			opener : bar.save,
+		} );
+}
+```
+
+**`Nino.adminUi.saveBar( options )`** is the bar at the foot of the screen: the state ("● Changed" or "✓ Saved"),
+the status line, the buttons of the panel (undo, redo - `buttons`), "Restore the last state" and Save. The panel says
+what is the case with `set( { dirty, blocked, restorable } )` and the bar draws it: Save is on where there is a
+change and nothing keeps it back, `blocked` is a sentence the line says as an error while it holds, and Restore is
+on the screen once there is a last state and waits while changes are unsaved. Save is pressed once at a time; the
+panel's `onSave( done )` ends with `done( true )` or `done( false )` on every way it can end - a failure says
+itself on `bar.line` before it ends the save, and where it says nothing the line is back to "unsaved changes" -, and what
+was changed while it was on its way stays a change. The first change of a saved screen is said once on the line, a status a
+screen reader reads out; `calm` is a third, quiet state with a word of its own ("Applied"). `entry()` is the entry for the shell's registry of unsaved input
+(`Nino.admin.dirty.register()`), so that Ctrl+S, leaving the panel and the question that is asked then are the
+bar's.
+
+```js
+const bar = Nino.adminUi.saveBar( {
+	id : 'pd-bar',
+	buttons : [ { key : 'undo', label : '\u21B6', name : 'Undo', onPress : undo } ],
+	onSave : function( done ) {
+		api( 'save', draft, function( status, response ) {
+			if( status !== 200 )
+				bar.line.error( status, response );
+			done( status === 200 );
+		} );
+	},
+	onRestore : function( opener ) { restore( opener ) },
+} );
+mount.appendChild( bar.el );
+Nino.admin.dirty.register( 'pd', bar.entry( { discard : drop } ) );
+// after every change: bar.set( { dirty : draft !== saved, restorable : hasLast } )
+// a screen whose saved state is another word: bar.set( { calm : 'Applied' } ) - shown with a check mark while nothing is changed
+```
+
+Each has a suite - `tests/nino-ui-previewframe-js-smoke.js`, `tests/nino-ui-conflict-js-smoke.js` and
+`tests/nino-ui-savebar-js-smoke.js` - and they are drawn in the browser by the same stylesheet as the other builders
+(`.nino-admin-savebar` is an action bar, and on a phone its line is a row of its own above the buttons).
 
 ## Panel tests
 

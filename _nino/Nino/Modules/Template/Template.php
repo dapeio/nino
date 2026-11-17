@@ -30,6 +30,9 @@ namespace Nino\Modules {
 		// A word of a text key: lower-case letters and digits, joined by hyphens
 		private const string SEGMENT = '#^[a-z0-9]+(?:-[a-z0-9]+)*$#D';
 
+		// The drafts of this request, category => html+: the templates that [template] draws from a preview in place of the file
+		private const string SWAPPED = './nino/template/swapped';
+
 		/**
 		 *	Module initiating
 		 *
@@ -68,6 +71,43 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	For this request, and only where it holds a draft (\Nino\Preview::held()): the template of a file is a source
+		 *	the caller hands over. A call of [template <file>] draws the source - as renderSource() draws one, with the context of
+		 *	the call and the words of the file - and not the file, and a template that is called for the file has what the
+		 *	source says of it. The file and the tree that is kept of it are not touched, and the page of a visitor, or of a
+		 *	request that holds no draft, has the file as it is: for such a request this does nothing. A file that is no template
+		 *	of the project's own - a name with a dot, a slash beyond the directory - and a source of more than MAX_BYTES are
+		 *	taken for nothing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$file					The template, as the shortcode names it (/templates/page-home) or by the file (page-home.tpl)
+		 *	@param		string		$source				html+
+		 *
+		 *	@return 	void
+		 */
+		public static function swap( array &$appData, string $file, string $source ): void {
+
+			$category = self::category( $file );
+
+			if( $category === null || \Nino\Preview::active( $appData ) === false || strlen( $source ) > self::MAX_BYTES )
+				return;
+
+			$appData[self::SWAPPED][$category] = $source;
+		}
+
+		/**
+		 *	The position a file that is drawn counts its nodes from, where the drawing is traced (see \Nino\Components::render()):
+		 *	its own beginning - the call it stands in is a call of the page that included it, and has its own position there
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ 'path' => '' ] for a call that is traced, [] for any other
+		 */
+		private static function _fresh( array &$appData ): array {
+			return ( \Nino\Html::context( $appData )['trace'] ?? false ) === true ? [ 'path' => '' ] : [];
+		}
+
+		/**
 		 *	Replace template shortcode: the file drawn where the call stands. It is a
 		 *	leaf, and the file is read as a document of its own - one tree for the
 		 *	request, from the tree kept of it where the file is as it was (see
@@ -88,6 +128,13 @@ namespace Nino\Modules {
 
 			$name = (string) ( $args[0] ?? '' );
 			$file = $name. '.tpl';
+			$category = self::category( $name );
+
+			// A draft of a preview takes the place of the file: drawn from the source, which is not kept, with the position
+			// of its nodes counted from its own beginning
+			if( $category !== null && $name === '/templates/'. $category && isset( $appData[self::SWAPPED][$category] ) === true )
+				return \Nino\Html::renderSource( $appData, $appData[self::SWAPPED][$category], [ 'template' => $category ] + self::_fresh( $appData ) + \Nino\Html::context( $appData ), false );
+
 			$path = \Nino\Filesystem::path( $appData, $file );
 
 			if( is_file( $path ) === true && (int) filesize( $path ) > self::MAX_BYTES ) {
@@ -98,7 +145,7 @@ namespace Nino\Modules {
 			}
 
 			// A name with no category has no words of its own, and reads none by ~name
-			return \Nino\Html::renderFile( $appData, $file, [ 'template' => self::category( $name ) ?? '' ] + \Nino\Html::context( $appData ) );
+			return \Nino\Html::renderFile( $appData, $file, [ 'template' => $category ?? '' ] + self::_fresh( $appData ) + \Nino\Html::context( $appData ) );
 		}
 	}
 

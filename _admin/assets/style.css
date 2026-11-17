@@ -3407,6 +3407,27 @@ a {
 	}
 }
 
+/* The bar of a screen that is saved as a whole (Nino.adminUi.saveBar()): the state first,
+   then the status line, then the buttons. The state is a badge, a word and a mark. On a phone
+   the line stays - it says what keeps Save from being done - and is a row of its own above
+   the buttons, which wrap where they do not fit */
+.nino-admin .nino-admin-actionbar > .nino-admin-savebar-state {
+	order: -2;
+}
+
+@media (max-width: 38rem) {
+
+	.nino-admin .nino-admin-savebar {
+		flex-wrap: wrap;
+	}
+
+	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status {
+		display: block;
+		flex: 1 0 100%;
+		text-align: left;
+	}
+}
+
 /* The colour field: the hex code, the picker and the surface in a row, the
    sentence of an error and the contrast under it (Nino.adminUi.color()). The
    rows are named, since fieldError() puts its sentence after the label, which

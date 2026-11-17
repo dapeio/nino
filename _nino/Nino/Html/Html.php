@@ -1190,8 +1190,10 @@ namespace Nino {
 			$outer = $appData[self::NODES] ?? null;
 			$appData[self::NODES] = isset( $args['content'] ) === true && is_array( $node['c'] ?? null ) === true ? [ $args['content'], $node['c'] ] : null;
 
+			// What the callback draws of its own is not a tree that has positions: its sources are not traced, unless it
+			// says where it draws a file (\Nino\Modules\Template does)
 			$previous = $appData[self::CONTEXT] ?? null;
-			$appData[self::CONTEXT] = $context;
+			$appData[self::CONTEXT] = ( $context['trace'] ?? false ) === true ? [ 'path' => null ] + $context : $context;
 
 			try {
 				$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $name, $args );

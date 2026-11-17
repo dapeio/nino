@@ -1049,6 +1049,101 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a string has the form of the address of an image slot: words of lower case letters, digits, hyphens and
+		 *	underscores, the first of each a letter, joined by slashes - '/template/page-home/hero/image'. The form a slot may be
+		 *	created in; a project may hold older ones, and they stay as they are
+		 *
+		 *	@param		string		$uri
+		 *
+		 *	@return 	bool
+		 */
+		public static function isSlotUri( string $uri ): bool {
+			return preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#D', $uri ) === 1 && strlen( $uri ) <= 200;
+		}
+
+		/**
+		 *	Create an image slot or set its label and its size - one mutation of config.php that changes this one entry, as
+		 *	setSlotFilename() does, so that a file or an alt text saved meanwhile is not put back. A slot that is there keeps its file
+		 *	and its alt texts, and its file is set only where the slot says 'filename'; a new one has none unless it says so. The
+		 *	file itself is no concern of this: nothing is read, written or removed below /images/
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri					The slot, see isSlotUri()
+		 *	@param		array			$slot					[ 'label' => string, 'width' => int, 'height' => int, 'filename' => string|null ] - the last is optional, and a name that is no file name below /images/ refuses the call
+		 *
+		 *	@return 	array|false								The slot as it was - [] for one that was not there; false where nothing was written: a uri, a label or a size that is none, a size larger than an upload can fill, a config.php that could not be written
+		 */
+		public static function putSlot( array &$appData, string $uri, array $slot ): array|false {
+
+			$label = is_string( $slot['label'] ?? null ) === true ? self::cleanAlt( $slot['label'] ) : false;
+			$width = $slot['width'] ?? null;
+			$height = $slot['height'] ?? null;
+			$named = array_key_exists( 'filename', $slot );
+
+			if( self::isSlotUri( $uri ) === false || $label === false || $label === '' || mb_strlen( $label, 'UTF-8' ) > 200
+				|| is_int( $width ) === false || is_int( $height ) === false || $width < 1 || $height < 1 || $width * $height > self::MAX_SOURCE_PIXELS
+				|| ( $named === true && $slot['filename'] !== null && ( is_string( $slot['filename'] ) === false || self::_named( $slot['filename'] ) === false ) ) )
+				return false;
+
+			$was = [];
+			$now = [];
+
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, $label, $width, $height, $named, $slot, &$was, &$now ): ?array {
+
+				if( is_array( $content ) === false )
+					return null;
+
+				if( is_array( $content['/nino/html/images'] ?? null ) === false )
+					$content['/nino/html/images'] = [];
+
+				$was = is_array( $content['/nino/html/images'][$uri] ?? null ) === true ? $content['/nino/html/images'][$uri] : [];
+				$now = [ 'label' => $label, 'width' => $width, 'height' => $height, 'filename' => $named === true ? $slot['filename'] : ( $was['filename'] ?? null ) ] + $was;
+				$content['/nino/html/images'][$uri] = $now;
+
+				return $content;
+			} );
+
+			if( $written === false )
+				return false;
+
+			$appData['/nino/html/images'][$uri] = $now;
+
+			return $was;
+		}
+
+		/**
+		 *	Remove an image slot from config.php, in one mutation of its own entry. Its file is not removed: the answer says which
+		 *	it was, and whoever drops the slot has proven the file is the slot's own before it deletes one (the Image Slots tab does)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri
+		 *
+		 *	@return 	array|false								The slot as it was; false for a uri that is no slot of config.php or a config.php that could not be written
+		 */
+		public static function dropSlot( array &$appData, string $uri ): array|false {
+
+			$was = false;
+
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, &$was ): ?array {
+
+				if( is_array( $content ) === false || is_array( $content['/nino/html/images'][$uri] ?? null ) === false )
+					return null;
+
+				$was = $content['/nino/html/images'][$uri];
+				unset( $content['/nino/html/images'][$uri] );
+
+				return $content;
+			} );
+
+			if( $written === false || $was === false )
+				return false;
+
+			unset( $appData['/nino/html/images'][$uri] );
+
+			return $was;
+		}
+
+		/**
 		 *	One alt text as it is stored: control characters (a line break
 		 *	among them) become spaces and the ends are trimmed - an alt text
 		 *	is one short line of plain text, and it ends up in an attribute.
