@@ -94,8 +94,13 @@ check( 'the source is the file, byte for byte: a PHP tag, a call and a fill in i
 $appData['/nino/http/routes']['GET://legal/imprint'] = [ 'uri' => '/legal/imprint', 'locale' => 'de_DE', 'body' => '[template /templates/page-legal-imprint]' ];
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', $de + [ '[[/_nino/webpage/legal/imprint/title]]' => 'Impressum' ] );
 $all = \Nino\Pages::all( $appData );
+// ...and holds its address: a page that asks for it is refused, at the field of that address, and nothing is written
+$held = md5( (string) file_get_contents( $sandbox. '/private/config.php' ) ). md5( (string) file_get_contents( $sandbox. '/private/text/de_DE.php' ) );
+$taken = \Nino\Pages::put( $appData, [ 'uri' => '/taker', 'httpUris' => [ '' => '/legal/imprint' ], 'template' => 'page-news', 'text' => $text( 'Taker' ), 'navs' => [] ] );
+$heldAfter = md5( (string) file_get_contents( $sandbox. '/private/config.php' ) ). md5( (string) file_get_contents( $sandbox. '/private/text/de_DE.php' ) );
 unset( $appData['/nino/http/routes']['GET://legal/imprint'] );
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', $de );
+check( 'an address a route of the run time holds is taken: a page that asks for it is refused with 409 at that field, and nothing is written', ( $taken['error']['status'] ?? null ) === 409 && ( $taken['error']['code'] ?? null ) === 'routes_http_uri_taken' && $held === $heldAfter );
 check( 'all() lists the page once, with its template, a name and an address for each language, the languages and the menus - and no route that is no page', count( $all ) === 2 && $all[0] === [
 	'uri' => '/site-news', 'template' => 'page-news', 'names' => [ 'de_DE' => 'News', 'en_US' => 'News', 'fr_FR' => 'News' ],
 	'addresses' => [ 'de_DE' => '/neuigkeiten', 'en_US' => '/news', 'fr_FR' => '/news' ], 'locales' => [ 'de_DE', 'en_US', 'fr_FR' ], 'navs' => [ 'main' ], 'runtime' => false,

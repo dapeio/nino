@@ -483,11 +483,16 @@ namespace Nino {
 
 				$routeKey = self::_routeKey( $entry['address'] );
 
-				if( isset( $routes[$routeKey] ) === false || in_array( $routeKey, $previousKeys, true ) === true )
-					continue;
-
 				// The field of the key the request posted this address with
 				$field = $fields[ $entry['address'] ];
+
+				// A route that is only there at run time - one a module makes for the request, like the pages of the legal
+				// module - holds its address as well: a page that took it would send the module's page to another address
+				if( isset( $routes[$routeKey] ) === false && isset( $appData['/nino/http/routes'][$routeKey] ) === true && in_array( $routeKey, $previousKeys, true ) === false )
+					return self::_refuse( 409, 'http uri already belongs to another route: "'. $entry['address']. '"', 'routes_http_uri_taken', [ $entry['address'] ], $field );
+
+				if( isset( $routes[$routeKey] ) === false || in_array( $routeKey, $previousKeys, true ) === true )
+					continue;
 
 				if( is_array( $routes[$routeKey] ) === true && self::isPageRoute( $routeKey, $routes[$routeKey] ) === true )
 					return self::_refuse( 400, 'duplicate http uri: "'. $entry['address']. '"', 'routes_duplicate_http_uri', [ $entry['address'] ], $field );
