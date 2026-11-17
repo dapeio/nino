@@ -68,8 +68,8 @@ namespace Nino {
 			if( function_exists( 'openssl_verify' ) === false )
 				$missing['openssl'] = 'the openssl extension, which checks the signature of the catalogue';
 
-			if( class_exists( 'PharData' ) === false || extension_loaded( 'zlib' ) === false )
-				$missing['unpack'] = 'the Phar and zlib extensions, which unpack what is downloaded';
+			if( \Nino\Archive::supported() === false )
+				$missing['unpack'] = 'the zlib extension, which unpacks what is downloaded';
 
 			if( function_exists( 'curl_init' ) === false && filter_var( ini_get( 'allow_url_fopen' ), FILTER_VALIDATE_BOOLEAN ) === false )
 				$missing['http'] = 'the curl extension or allow_url_fopen, which download the catalogue';
@@ -223,7 +223,7 @@ namespace Nino {
 		 */
 		private static function _place( array &$appData, array $catalogue, string $key ): array {
 
-			$offer	= \Nino\Catalogue::offers( $appData, $catalogue )[$key] ?? null;
+			$offer	= \Nino\Catalogue::offers( $appData, $catalogue, \Nino\Packages::FEATURE )[$key] ?? null;
 			$placed	= false;
 
 			if( $offer === null )
@@ -231,7 +231,7 @@ namespace Nino {
 
 			if( \Nino\Features::get( $appData, $key ) === null ) {
 
-				$result = \Nino\Catalogue::install( $appData, $key, $offer['version'] );
+				$result = \Nino\Catalogue::install( $appData, \Nino\Packages::FEATURE, $key, $offer['version'] );
 				if( $result !== true )
 					return [ 'placed' => false, 'activated' => false, 'reason' => $result, 'status' => 400 ];
 

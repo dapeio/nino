@@ -1083,7 +1083,7 @@ $appList = [
 $appPublish = static function( ?string $signWith = null, ?array $applications = null ) use ( &$appRemote, $appFeatureList, $appList, $appPrivateKey, $appArchives ): void {
 	foreach( $appFeatureList as $feature )
 		$appRemote[ $feature['archive'] ] = $appArchives[ $feature['key'] ];
-	$json = json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => $appFeatureList, 'applications' => $applications ?? $appList ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+	$json = ninoCatalogue( $appFeatureList, $applications ?? $appList );
 	openssl_sign( $json, $signature, $signWith ?? $appPrivateKey, OPENSSL_ALGO_SHA256 );
 	$appRemote[ \Nino\Catalogue::DEFAULT_URL ]					= $json;
 	$appRemote[ \Nino\Catalogue::DEFAULT_URL. '.sig' ]	= base64_encode( $signature );

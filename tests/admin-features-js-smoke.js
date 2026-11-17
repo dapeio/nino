@@ -280,7 +280,7 @@ check( 'the panel bundles a stylesheet of its own, in the workbench\'s layer, sp
 check( 'the head that carries the tabs and the filter stays at the top of the list pane, scoped to that pane',
 	/#features-list \.admin-features-head \{[^}]*position: sticky;/s.test( moduleCss )
 	&& /\.admin-panel-tabs \{[^}]*position: sticky;/s.test( source('_admin/assets/style.css') ) === false );
-check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 11 );
+check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 16 );
 check( 'the script posts those eleven actions and no other - the list is read once more where a set-up stops',
 	script.includes( "Nino.adminUi.api.call( 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
 	&& script.includes( "? 'deactivate' : 'activate'" ) && script.includes( "_apiCall( 'catalogue'" ) && script.includes( "_apiCall( 'install'" )

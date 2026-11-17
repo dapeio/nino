@@ -510,7 +510,9 @@ convenience: repeat it on the server.
   where the value can enter an `href` or `src`.
 - For outbound HTTP, allowlist destinations where possible and set time and size
   limits; a feature that needs the network goes through `\Nino\Fetch::get()`
-  (https only, no redirects), and never on a page request.
+  (https only, no redirects), and never on a page request. An address that
+  nobody typed - one a signed list names - is asked `\Nino\Fetch::isPublic()`
+  first.
 - A token a renderer gives `\Nino\Components::fill()` is markup the renderer made, and it escapes every
   value in it with `\Nino\Components::escape()`; the arguments of the call arrive escaped. What a token
   or an argument holds is never read again.

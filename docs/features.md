@@ -885,6 +885,25 @@ features by their keys, and what the hook `/nino/blocks` adds. A package is a ch
 blocks, and what the project wrote itself stands before it; `Blocks::forget()` makes the request read the folders again, which `place()` and `remove()` do. `private/` is never
 served and no reader includes a file of a package.
 
+### Where a package comes from
+
+`\Nino\Catalogue::install( $appData, $kind, $key, $version )` is the one way a package of any kind comes in from the signed catalogue (format 2, the fields of an entry are in
+[A catalogue of your own](_admin.md#a-catalogue-of-your-own)). It takes the lock of the features, fetches the catalogue again and works out the plan before it asks for a byte: the features the
+package asks for that the project does not have come first, deepest first, then the package - a theme and a package of blocks ask for the features of their parts and components, a
+feature for the ones it `requires`. For each entry it downloads the archive (the size and sha256 of the signed entry, over https, from a host of the public internet), reads it in
+memory with `\Nino\Archive` by the limits of the kind (`\Nino\Packages::LIMITS`), has `\Nino\Packages::check()` look at a theme and a package of blocks and compares the key and the
+version they say of themselves with the entry, and then `\Nino\Packages::place()` puts it in place - a feature too: `place( $appData, 'feature', $directory, $files, $verify )` takes a
+closure that is asked of the staging folder before the exchange, which is where the manifest of a feature is read (it is php that has to be included), compared with the entry
+and with this kernel. Nothing is switched on by the kernel; the panel that asked switches on the features that were placed. What was placed is under `./nino/catalogue/placed`
+for the caller, and what a package was refused for - as `check()` answers it, with the kind, key and version - under `./nino/catalogue/problem`. A feature placed in the same
+call as the theme that asks for it is not in the register of the components yet when the theme is checked: the parts of its groups are read against what the parts name, as of a group the project has not, and the one who reads the theme says the rest when the feature is on.
+
+`\Nino\Catalogue::offers( $appData, $catalogue, $kind )` answers per key of a kind the best version this kernel can run beside what is on disk (`\Nino\Packages::installed()` for a theme and a
+package of blocks), with a state, what it needs that is not there (`needs`: features, which come with it, and fonts, which do not) and what cannot be had (`blocked`: a feature that is neither
+on disk nor in the catalogue in a version that fits, which makes a theme or a package of blocks `incompatible`). `\Nino\Catalogue::remove()` takes a theme or a package of blocks
+away. `\Nino\Catalogue::preview()` fetches the picture of an entry when it is asked for (https, a host of the public internet, the size and sha256 of the entry, a webp by its head)
+and keeps it below `data/.catalogue/previews/` by its digest; it answers the bytes and the path, and the panel that asked answers the browser with the file.
+
 The packages are **not** in a backup. They come from the catalogue again and nothing of a site hangs on them: a theme that is applied is kept as a copy of the
 parts it uses, and a block that is put in a page is the page's. The blocks the project wrote itself (`private/blocks/`, with the pictures of their slots) and the
 fonts are.
@@ -898,7 +917,11 @@ fonts are.
 - It does not reach the network on a page request, and never but through
   `\Nino\Fetch`; Nino itself makes no outbound request unless someone presses
   **Refresh catalogue** or **Install** ([the workbench manual](_admin.md#features)),
-  or reaches the Application step of the setup wizard.
+  or reaches the Application step of the setup wizard. A feature that asks a host
+  a person did not type - the address of a list a catalogue names - asks
+  `\Nino\Fetch::isPublic()` first: https, a name and no address, no ending of a local
+  network, and every address the name has one of the public internet. The
+  catalogue asks it of its index, its archives and its pictures.
 - It does not write output (no `echo`, `header()`, `http_response_code()` or `exit`;
   the response is `Http::ok()`, `fail()` or `redirect()`) and does not build markup
   in PHP: a template, read by `\Nino\Feature::template()`, holds it (an icon and a

@@ -157,7 +157,7 @@ return [
 	'[[/_admin/features/error/application-apply]]'	=> 'Das Feature konnte nicht eingerichtet werden.',
 	// Was das Laden braucht und der Server nicht hat, unter dem Schlüssel, den \Nino\Applications::missing() vergibt
 	'[[/_admin/features/missing/openssl]]'	=> 'die openssl-Erweiterung, die die Signatur des Katalogs prüft',
-	'[[/_admin/features/missing/unpack]]'	=> 'die Erweiterungen Phar und zlib, die Heruntergeladenes entpacken',
+	'[[/_admin/features/missing/unpack]]'	=> 'die Erweiterung zlib, die Heruntergeladenes entpackt',
 	'[[/_admin/features/missing/http]]'	=> 'die curl-Erweiterung oder allow_url_fopen, die den Katalog herunterladen',
 	'[[/_admin/features/missing/features]]'	=> 'ein features/-Verzeichnis, in das der Webserver schreiben darf',
 	// Die Zurückweisungen, die ein Mensch verursachen kann (siehe \Nino\Http::fail()): der Code ist der Fill
@@ -168,6 +168,12 @@ return [
 	'[[/_admin/error/features_application_feature]]'	=> 'Dieses Feature gehört nicht zur Anwendung.',
 	'[[/_admin/error/features_application_failed]]'	=> 'Das Feature konnte nicht eingerichtet werden: %s',
 	'[[/_admin/error/features_busy]]'	=> 'Eine andere Änderung an den Features läuft gerade. Versuche es gleich noch einmal.',
+	'[[/_admin/error/features_package_invalid]]'	=> 'Die Anfrage nennt keine Sorte, keinen Schlüssel oder keine Version eines Pakets.',
+	'[[/_admin/error/features_package_installed]]'	=> 'Dieses Paket ist schon installiert. Aktualisiere es stattdessen.',
+	'[[/_admin/error/features_package_absent]]'	=> 'Dieses Paket ist nicht installiert.',
+	'[[/_admin/error/features_package_failed]]'	=> 'Das Paket konnte nicht installiert werden: %s',
+	'[[/_admin/error/features_package_remove_failed]]'	=> 'Das Paket konnte nicht entfernt werden: %s',
+	'[[/_admin/error/features_preview_failed]]'	=> 'Das Bild des Pakets ist nicht verfügbar: %s',
 	'[[/_admin/error/features_install_failed]]'	=> 'Das Feature konnte nicht installiert werden: %s',
 	'[[/_admin/error/features_remove_failed]]'	=> 'Das Verzeichnis konnte nicht entfernt werden: %s',
 	'[[/_admin/error/features_unknown]]'	=> 'Dieses Feature gibt es in diesem Projekt nicht.',

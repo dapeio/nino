@@ -85,6 +85,11 @@ namespace Nino\Modules\Features {
 				'features/install' 		=> [ self::class, 'apiInstall' ],
 				'features/application-plan' 	=> [ self::class, 'apiApplicationPlan' ],
 				'features/application-apply' 	=> [ self::class, 'apiApplicationApply' ],
+				'features/catalogue-offers'		=> [ self::class, 'apiPackages' ],
+				'features/package-install'		=> [ self::class, 'apiPackageInstall' ],
+				'features/package-update'			=> [ self::class, 'apiPackageUpdate' ],
+				'features/package-remove'			=> [ self::class, 'apiPackageRemove' ],
+				'features/package-preview'		=> [ self::class, 'apiPackagePreview' ],
 			];
 		}
 
@@ -156,6 +161,7 @@ namespace Nino\Modules\Features {
 			$application = \Nino\Admin\Admin::postString( $data, 'application' );
 			$feature = \Nino\Admin\Admin::postString( $data, 'feature' );
 			$dir		 = \Nino\Admin\Admin::postString( $data, 'dir' );
+			$kind		 = in_array( $data['kind'] ?? null, \Nino\Packages::KINDS, true ) === true ? $data['kind'] : 'package';
 
 			return match( $action ) {
 				'features/activate' 	=> 'Activate feature "'. $key. '"',
@@ -165,6 +171,9 @@ namespace Nino\Modules\Features {
 				'features/settings' 	=> 'Edit settings of feature "'. $key. '"',
 				'features/remove'			=> 'Remove the directory of feature "'. $key. '"',
 				'features/install' 		=> 'Install feature "'. $key. '" '. $version,
+				'features/package-install'	=> 'Install '. $kind. ' "'. $key. '" '. $version,
+				'features/package-update'		=> 'Update '. $kind. ' "'. $key. '" to '. $version,
+				'features/package-remove'		=> 'Remove '. $kind. ' "'. $key. '"',
 				'features/application-apply' 	=> 'Set up application "'. $application. '": feature "'. $feature. '"',
 				default 							=> '',
 			};
@@ -666,7 +675,7 @@ namespace Nino\Modules\Features {
 			// ones this switches on
 			$wasOn			= $isNew === true ? self::_activeKeys( $appData ) : [];
 
-			$result = \Nino\Catalogue::install( $appData, $key, $version );
+			$result = \Nino\Catalogue::install( $appData, \Nino\Packages::FEATURE, $key, $version );
 
 			if( $result !== true ) {
 				\Nino\Http::fail( $request, 400, $result, 'features_install_failed', [ $result ] );
@@ -730,7 +739,7 @@ namespace Nino\Modules\Features {
 			// The panel names them, because a project that pressed Install on
 			// one feature and got three has to be told which three
 			$installed = array_values( array_filter(
-				(array) ( $appData['./nino/catalogue/installed'] ?? [] ),
+				array_map( static fn( array $placed ): string => $placed['key'], (array) ( $appData['./nino/catalogue/placed'] ?? [] ) ),
 				static fn( string $installedKey ): bool => $installedKey !== $key
 			) );
 
@@ -746,6 +755,350 @@ namespace Nino\Modules\Features {
 				'switchedOn'	=> $isNew === true ? self::_switchedOn( $appData, $wasOn, $key ) : [],
 			] );
 		}
+
+		/**
+		 *	What the catalogue offers of one kind - features, themes or packages of blocks -, for a panel that shows them: from the catalogue that is kept on
+		 *	disk, or, where 'refresh' is true, from the one fetched now (two requests, believed with the signature, see \Nino\Catalogue::fetch()). The offers
+		 *	are recomputed against what is on disk now, so an install since the last fetch is reflected without a new one. The answer is
+		 *	{ kind, catalogue: null } where nothing is kept, else
+		 *	{ kind, fetched, writable, catalogueUrl, offers: [ ... ], unreadable: [ { key, reason } ] }: an offer has key, name, description, version,
+		 *	nino, ext, requires (the keys of the features it asks for), released, size, state ('available', 'current', 'upgrade', 'incompatible'), local,
+		 *	needs ({ features, fonts }: what it asks for that is not there), blocked (the features that cannot be had), preview (whether it has a picture to
+		 *	ask for with features/package-preview), blocks ({ key, category }) and, of a theme, fonts and parts ({ group, feature, contract }), of a feature
+		 *	category and maturity. 'unreadable' are the entries of the kind that were left out, with the reason
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiPackages( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data = \Nino\Admin\Admin::postData();
+			$kind = self::_kind( $data, \Nino\Packages::KINDS );
+
+			if( $kind === null ) {
+				\Nino\Http::fail( $request, 400, 'no kind of package posted', 'features_package_invalid' );
+				return;
+			}
+
+			if( ( $data['refresh'] ?? false ) === true ) {
+
+				if( \Nino\Catalogue::url( $appData ) === '' ) {
+					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-off', 'the catalogue is switched off' ) );
+					return;
+				}
+
+				$catalogue = \Nino\Catalogue::fetch( $appData );
+
+				if( is_string( $catalogue ) === true ) {
+					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-reason', $catalogue ) );
+					return;
+				}
+			}
+
+			$catalogue = \Nino\Catalogue::cached( $appData );
+
+			if( $catalogue === null ) {
+				\Nino\Http::ok( $request, [ 'kind' => $kind, 'catalogue' => null, 'catalogueUrl' => \Nino\Catalogue::url( $appData ) ] );
+				return;
+			}
+
+			$locale = \Nino\Admin\Admin::sessionLocale( $appData );
+			$offers = [];
+
+			foreach( \Nino\Catalogue::offers( $appData, $catalogue, $kind ) as $offer )
+				$offers[] = self::_package( $offer, $locale );
+
+			self::_byName( $offers );
+
+			\Nino\Http::ok( $request, [
+				'kind'					=> $kind,
+				'catalogue'			=> true,
+				'catalogueUrl'	=> \Nino\Catalogue::url( $appData ),
+				'fetched'				=> self::_fetched( $catalogue['fetched'] ),
+				'writable'			=> \Nino\Catalogue::writable(),
+				'offers'				=> $offers,
+				'unreadable'		=> array_values( array_map(
+					static fn( array $left ): array => [ 'key' => $left['key'], 'reason' => $left['reason'] ],
+					array_filter( (array) $catalogue['unreadable'], static fn( array $left ): bool => $left['kind'] === $kind )
+				) ),
+			] );
+		}
+
+		/**
+		 *	Install a theme or a package of blocks of the catalogue, with the features it asks for that the project does not have: the kernel downloads,
+		 *	verifies, checks that no code is in it and places it (see \Nino\Catalogue::install()), and this switches the features it placed on, as an
+		 *	install of a feature does. A package that is there is refused: that is an update. Answers the package as the list would show it now, what was
+		 *	placed - { kind, key, version } in the order it was - and what is on now that was not before
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiPackageInstall( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			self::_changing( $appData, $request, static function( array &$appData, array &$request ): void {
+				self::_packagePlace( $appData, $request, false );
+			} );
+		}
+
+		/**
+		 *	Update a theme or a package of blocks to the version the catalogue offers; what is installed in the version is replaced whole. A package that is not
+		 *	there is refused: that is an install. Answers as apiPackageInstall() does
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiPackageUpdate( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			self::_changing( $appData, $request, static function( array &$appData, array &$request ): void {
+				self::_packagePlace( $appData, $request, true );
+			} );
+		}
+
+		/**
+		 *	The step of apiPackageInstall() and apiPackageUpdate(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		bool			$update				Whether the package has to be there
+		 *
+		 *	@return 	void
+		 */
+		private static function _packagePlace( array &$appData, array &$request, bool $update ): void {
+
+			$data		= \Nino\Admin\Admin::postData();
+			$kind		= self::_kind( $data, [ \Nino\Packages::THEME, \Nino\Packages::BLOCKS ] );
+			$key		= self::_packageKey( $data );
+			$version	= self::_version( $data );
+
+			if( $kind === null || $key === null || $version === null ) {
+				\Nino\Http::fail( $request, 400, 'no kind, key and version of a package posted', 'features_package_invalid' );
+				return;
+			}
+
+			$local = \Nino\Packages::installed( $appData, $kind )[$key] ?? null;
+
+			if( $update === false && $local !== null ) {
+				\Nino\Http::fail( $request, 400, 'the package is installed already', 'features_package_installed' );
+				return;
+			}
+
+			if( $update === true && $local === null ) {
+				\Nino\Http::fail( $request, 400, 'the package is not installed', 'features_package_absent' );
+				return;
+			}
+
+			// What is on now, and which features are there: what the install places that was not is switched on after it, the way the install of a feature does
+			$wasOn	= self::_activeKeys( $appData );
+			$had		= array_keys( \Nino\Features::all( $appData ) );
+
+			$result = \Nino\Catalogue::install( $appData, $kind, $key, $version );
+
+			if( $result !== true ) {
+				\Nino\Http::fail( $request, 400, $result, 'features_package_failed', [ $result ] );
+				return;
+			}
+
+			foreach( (array) ( $appData['./nino/catalogue/placed'] ?? [] ) as $placed ) {
+
+				if( $placed['kind'] !== \Nino\Packages::FEATURE || in_array( $placed['key'], $had, true ) === true )
+					continue;
+
+				$activated = \Nino\Features::activate( $appData, $placed['key'] );
+
+				if( $activated !== true ) {
+
+					$actor = \Nino\Auth::getCurrentUser( $appData );
+					if( $actor !== false )
+						\Nino\Admin\Admin::record( $appData, $actor['mail'], self::log( $update === true ? 'features/package-update' : 'features/package-install', [ 'kind' => $kind, 'key' => $key, 'version' => $version ] ). ' (feature "'. $placed['key']. '" not activated: '. $activated. ')' );
+
+					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/activate-after-install', $activated ), 'features_install_inactive', [ $activated ] );
+					return;
+				}
+			}
+
+			$offer = \Nino\Catalogue::offers( $appData, \Nino\Catalogue::fetch( $appData ), $kind )[$key] ?? null;
+
+			\Nino\Http::ok( $request, [
+				'package'		=> $offer === null ? null : self::_package( $offer, \Nino\Admin\Admin::sessionLocale( $appData ) ),
+				'placed'		=> array_values( (array) ( $appData['./nino/catalogue/placed'] ?? [] ) ),
+				'switchedOn'	=> self::_switchedOn( $appData, $wasOn, $key ),
+			] );
+		}
+
+		/**
+		 *	Take a theme or a package of blocks away. What uses it is no reason to keep it - a site never hangs on a package -, and a panel that asks the
+		 *	person says what uses it before it posts this. Under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiPackageRemove( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			self::_changing( $appData, $request, static function( array &$appData, array &$request ): void {
+
+				$data		= \Nino\Admin\Admin::postData();
+				$kind		= self::_kind( $data, [ \Nino\Packages::THEME, \Nino\Packages::BLOCKS ] );
+				$key		= self::_packageKey( $data );
+
+				if( $kind === null || $key === null ) {
+					\Nino\Http::fail( $request, 400, 'no kind and key of a package posted', 'features_package_invalid' );
+					return;
+				}
+
+				if( ( \Nino\Packages::installed( $appData, $kind )[$key] ?? null ) === null ) {
+					\Nino\Http::fail( $request, 400, 'the package is not installed', 'features_package_absent' );
+					return;
+				}
+
+				$result = \Nino\Catalogue::remove( $appData, $kind, $key );
+
+				if( $result !== true ) {
+					\Nino\Http::fail( $request, 400, $result, 'features_package_remove_failed', [ $result ] );
+					return;
+				}
+
+				\Nino\Http::ok( $request, [ 'removed' => $key, 'kind' => $kind ] );
+			} );
+		}
+
+		/**
+		 *	The picture of a package, answered as a file: webp, kept below data/ by the kernel (see \Nino\Catalogue::preview(), which fetches it where it is
+		 *	not kept yet). The name of the file is the digest the signed catalogue names, and no part of the request is a path
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiPackagePreview( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data		= \Nino\Admin\Admin::postData();
+			$kind		= self::_kind( $data, \Nino\Packages::KINDS );
+			$key		= self::_packageKey( $data );
+
+			if( $kind === null || $key === null ) {
+				\Nino\Http::fail( $request, 400, 'no kind and key of a package posted', 'features_package_invalid' );
+				return;
+			}
+
+			$picture = \Nino\Catalogue::preview( $appData, $kind, $key );
+
+			if( is_string( $picture ) === true ) {
+				\Nino\Http::fail( $request, 400, $picture, 'features_preview_failed', [ $picture ] );
+				return;
+			}
+
+			$request['/nino/http/response']['body']		= '';
+			$request['/nino/http/response']['file']		= $picture['path'];
+			$request['/nino/http/response']['header']['Content-Type']		= 'image/webp';
+			$request['/nino/http/response']['header']['Content-Disposition']	= 'inline; filename="preview.webp"';
+			$request['/nino/http/response']['header']['Cache-Control']	= 'private, max-age=3600';
+			$request['/nino/http/response']['header']['X-Content-Type-Options']	= 'nosniff';
+		}
+
+		/**
+		 *	The posted kind of package, or null when it is none of the ones given
+		 *
+		 *	@param		array 		$data					The posted payload
+		 *	@param		array 		$allowed			Kinds
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _kind( array $data, array $allowed ): ?string {
+
+			$kind = $data['kind'] ?? null;
+
+			return is_string( $kind ) === true && in_array( $kind, $allowed, true ) === true ? $kind : null;
+		}
+
+		/**
+		 *	The posted key of a theme or of a package of blocks, or null when it is not one
+		 *
+		 *	@param		array 		$data					The posted payload
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _packageKey( array $data ): ?string {
+
+			$key = $data['key'] ?? null;
+
+			return is_string( $key ) === true && strlen( $key ) <= \Nino\Components::NAME_LENGTH && preg_match( \Nino\Components::NAME, $key ) === 1 ? $key : null;
+		}
+
+		/**
+		 *	An offer of the catalogue as the browser gets it: names and descriptions in the language of the interface, and not the addresses of the archive
+		 *	and of the picture
+		 *
+		 *	@param		array 		$offer				As \Nino\Catalogue::offers() answers it
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	array
+		 */
+		private static function _package( array $offer, string $locale ): array {
+
+			$package = [
+				'kind'				=> $offer['kind'],
+				'key'					=> $offer['key'],
+				'name'				=> \Nino\Features::localized( $offer['name'], $locale ),
+				'description'	=> \Nino\Features::localized( $offer['description'], $locale ),
+				'version'			=> $offer['version'],
+				'nino'				=> $offer['nino'],
+				'ext'					=> $offer['php']['ext'],
+				'requires'		=> $offer['requires'],
+				'released'		=> $offer['released'],
+				'size'				=> $offer['size'],
+				'state'				=> $offer['state'],
+				'local'				=> $offer['local'],
+				'needs'				=> $offer['needs'],
+				'blocked'			=> $offer['blocked'],
+				'preview'			=> $offer['preview'] !== null,
+			];
+
+			if( $offer['kind'] === \Nino\Packages::FEATURE ) {
+
+				$package['category'] = $offer['category'];
+				$package['maturity'] = \Nino\Features::localized( $offer['maturity'] ?? '', $locale );
+
+				return $package;
+			}
+
+			$package['blocks'] = $offer['blocks'];
+
+			if( $offer['kind'] === \Nino\Packages::THEME ) {
+
+				$package['fonts'] = $offer['fonts'];
+				$package['parts'] = [];
+
+				foreach( $offer['parts'] as $group => $part )
+					$package['parts'][] = [ 'group' => $group, 'feature' => $part['feature'], 'contract' => $part['contract'] ];
+			}
+
+			return $package;
+		}
+
 
 		/**
 		 *	What setting an application up comes to, before anything is loaded:
@@ -935,7 +1288,7 @@ namespace Nino\Modules\Features {
 		 */
 		private static function _applicationEntry( array &$appData, array $catalogue, array $application, string $locale ): array {
 
-			$offers		= \Nino\Catalogue::offers( $appData, $catalogue );
+			$offers		= \Nino\Catalogue::offers( $appData, $catalogue, \Nino\Packages::FEATURE );
 			$features	= [];
 			$on				= 0;
 
@@ -1295,7 +1648,7 @@ namespace Nino\Modules\Features {
 
 			$offers = [];
 
-			foreach( \Nino\Catalogue::offers( $appData, $catalogue ) as $offer )
+			foreach( \Nino\Catalogue::offers( $appData, $catalogue, \Nino\Packages::FEATURE ) as $offer )
 				$offers[] = [
 					'key'					=> $offer['key'],
 					'name'				=> \Nino\Features::localized( $offer['name'], $locale ),

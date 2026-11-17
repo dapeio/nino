@@ -135,12 +135,21 @@ $appData['./nino/fetch/stub'] = static function( string $url, array $options ) u
  *	Publish a catalogue - signed with the run's key unless told otherwise -
  *	under the default url, and forget what an earlier request had read
  */
-function publish( array &$appData, array &$remote, array $features, ?string $signWith, string $privateKey ): string {
-	$json = json_encode( [ 'format' => 1, 'generated' => '2026-09-07T12:00:00Z', 'features' => $features ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+function publish( array &$appData, array &$remote, array $features, ?string $signWith, string $privateKey, array $packages = [] ): string {
+	$json = ninoCatalogue( $features, [], $packages, '2026-09-07T12:00:00Z' );
 	$remote[ \Nino\Catalogue::DEFAULT_URL ]					= $json;
 	$remote[ \Nino\Catalogue::DEFAULT_URL. '.sig' ]	= $signWith === null ? sign( $json, $privateKey ) : $signWith;
 	unset( $appData['./nino/catalogue'] );
 	return $json;
+}
+
+/**
+ *	Publish a document as it is, signed with the run's key
+ */
+function publishRaw( array &$appData, array &$remote, string $json, string $privateKey ): void {
+	$remote[ \Nino\Catalogue::DEFAULT_URL ]					= $json;
+	$remote[ \Nino\Catalogue::DEFAULT_URL. '.sig' ]	= sign( $json, $privateKey );
+	unset( $appData['./nino/catalogue'] );
 }
 
 $appData['/nino/catalogue/key'] = $publicKey;
@@ -324,46 +333,79 @@ echo "\n";
 
 echo "Catalogue::parse - what a catalogue must say\n";
 
+/**
+ *	One entry of a feature as the catalogue has it, from one written flat the way the helpers of this suite do
+ */
+function flat2( array $flat ): array {
+	return json_decode( ninoCatalogue( [ $flat ] ), true )['packages'][0];
+}
+
+/**
+ *	A document of format 2 from entries that are written out in full
+ */
+function document( array $packages, array $more = [] ): string {
+	return (string) json_encode( [ 'format' => 2, 'generated' => 'now', 'packages' => $packages ] + $more, JSON_UNESCAPED_SLASHES );
+}
+
+/**
+ *	The entry of a theme and of a package of blocks
+ */
+function packageEntry( string $kind, string $key, string $version, string $bytes, array $more = [] ): array {
+	$preview = 'RIFF'. pack( 'V', 12 ). 'WEBPVP8 ';
+	return $more + [
+		'kind'				=> $kind,
+		'key'					=> $key,
+		'version'			=> $version,
+		'name'				=> [ 'en_US' => ucfirst( $key ), 'de_DE' => ucfirst( $key ) ],
+		'description'	=> [ 'en_US' => 'A '. $key ],
+		'requires'		=> [ 'nino' => '^2.0', 'features' => [] ],
+		'blocks'			=> [ [ 'key' => 'one', 'category' => 'offer' ] ],
+		'preview'			=> [ 'url' => 'https://catalogue.test/previews/'. $key. '.webp', 'sha256' => hash( 'sha256', $preview ), 'size' => strlen( $preview ) ],
+		'archive'			=> 'https://catalogue.test/'. $kind. '/'. $key. '-'. $version. '.tar.gz',
+		'sha256'			=> hash( 'sha256', $bytes ),
+		'size'				=> strlen( $bytes ),
+		'released'		=> '2026-11-17',
+	];
+}
+
 $good = entry( 'helper', '1.0.0', 'bytes' );
+$goodEntry = flat2( $good );
 
 check( 'not json', \Nino\Catalogue::parse( '{' ) === 'the catalogue is not valid json' );
-check( 'the wrong format is named with the one this kernel reads', \Nino\Catalogue::parse( '{"format":2,"features":[]}' ) === 'the catalogue has format 2, this kernel reads format 1'
-	&& \Nino\Catalogue::parse( '{"features":[]}' ) === 'the catalogue has format null, this kernel reads format 1' );
-check( 'no features list', \Nino\Catalogue::parse( '{"format":1}' ) === 'the catalogue lists no features' );
+check( 'FORMAT is 2', \Nino\Catalogue::FORMAT === 2 );
+check( 'a catalogue of format 1 is the sentence that says which format this kernel reads - and lists nothing',
+	\Nino\Catalogue::parse( '{"format":1,"features":[]}' ) === 'the catalogue has format 1, this kernel reads format 2'
+	&& \Nino\Catalogue::parse( '{"packages":[]}' ) === 'the catalogue has format null, this kernel reads format 2' );
+check( 'no list of packages', \Nino\Catalogue::parse( '{"format":2}' ) === 'the catalogue lists no packages' );
 
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'generated' => 'now', 'features' => [ $good ] ] ) );
-check( 'a valid document parses to format, generated and the entries', is_array( $parsed ) && $parsed['format'] === 1 && $parsed['generated'] === 'now' && count( $parsed['features'] ) === 1 );
-check( 'an entry is normalized: every key present, in order', array_keys( $parsed['features'][0] ) === [ 'key', 'name', 'description', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released' ] );
+$parsed = \Nino\Catalogue::parse( document( [ $goodEntry ] ) );
+check( 'a valid document parses to format, generated, the entries, the ones left out and the applications', is_array( $parsed ) && array_keys( $parsed ) === [ 'format', 'generated', 'packages', 'unreadable', 'applications' ]
+	&& $parsed['format'] === 2 && $parsed['generated'] === 'now' && count( $parsed['packages'] ) === 1 && $parsed['unreadable'] === [] );
+check( 'a feature is normalized: every key present, in order', array_keys( $parsed['packages'][0] ) === [ 'kind', 'key', 'name', 'description', 'version', 'nino', 'php', 'requires', 'archive', 'sha256', 'size', 'released', 'preview', 'category', 'maturity', 'directory' ]
+	&& $parsed['packages'][0]['kind'] === 'feature' && $parsed['packages'][0]['preview'] === null );
 
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ [ 'key' => 'x', 'name' => 'X', 'version' => '1.0.0', 'directory' => 'X', 'archive' => 'https://c.test/x.tar.gz', 'sha256' => strtoupper( str_repeat( 'ab', 32 ) ), 'size' => 1, 'php' => [ 'ext' => [ 'Mbstring' ] ], 'released' => str_repeat( 'd', 40 ) ] ] ] ) );
-check( 'what is missing gets its default, digests and extensions are lowercased, released is cut', is_array( $parsed )
-	&& $parsed['features'][0]['nino'] === '*' && $parsed['features'][0]['description'] === '' && $parsed['features'][0]['requires'] === []
-	&& $parsed['features'][0]['category'] === '' && $parsed['features'][0]['maturity'] === ''
-	&& $parsed['features'][0]['sha256'] === str_repeat( 'ab', 32 ) && $parsed['features'][0]['php']['ext'] === [ 'mbstring' ] && strlen( $parsed['features'][0]['released'] ) === 32 );
+$parsed = \Nino\Catalogue::parse( document( [ [ 'kind' => 'feature', 'key' => 'x', 'name' => 'X', 'version' => '1.0.0', 'directory' => 'X', 'archive' => 'https://c.test/x.tar.gz', 'sha256' => strtoupper( str_repeat( 'ab', 32 ) ), 'size' => 1,
+	'requires' => [ 'php' => [ 'Mbstring' ] ], 'released' => str_repeat( 'd', 40 ) ] ] ) );
+check( 'what is missing gets its default, digests and extensions are lowercased, released is cut', is_array( $parsed ) && count( $parsed['packages'] ) === 1
+	&& $parsed['packages'][0]['nino'] === '*' && $parsed['packages'][0]['description'] === '' && $parsed['packages'][0]['requires'] === []
+	&& $parsed['packages'][0]['category'] === '' && $parsed['packages'][0]['maturity'] === ''
+	&& $parsed['packages'][0]['sha256'] === str_repeat( 'ab', 32 ) && $parsed['packages'][0]['php']['ext'] === [ 'mbstring' ] && strlen( $parsed['packages'][0]['released'] ) === 32 );
 
 /*	A catalogue entry is a published manifest, so this reader and
-	Features::manifest() have to agree about the fields they both read.
-	"requires" had drifted: the manifest side drops a self-reference and a
-	duplicate, this side kept both, and the panel then showed a feature
-	requiring itself and the same requirement twice. The install walk survived
-	it - _plan() chains what it has already planned - so the list is what a
-	reader of it sees	*/
-$selfNeedy = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ [ 'key' => 'x', 'name' => 'X', 'version' => '1.0.0', 'directory' => 'X',
-	'archive' => 'https://c.test/x.tar.gz', 'sha256' => str_repeat( 'ab', 32 ), 'size' => 1, 'requires' => [ 'x', 'helper', 'helper', 'other' ] ] ] ] ) );
+	Features::manifest() have to agree about the fields they both read:
+	a feature that lists itself, or lists the same key twice, is the panel
+	showing a requirement on itself and a requirement twice	*/
+$selfNeedy = \Nino\Catalogue::parse( ninoCatalogue( [ [ 'key' => 'x', 'name' => 'X', 'version' => '1.0.0', 'directory' => 'X',
+	'archive' => 'https://c.test/x.tar.gz', 'sha256' => str_repeat( 'ab', 32 ), 'size' => 1, 'requires' => [ 'x', 'helper', 'helper', 'other' ] ] ] ) );
 check( 'a requirement on itself, and a requirement listed twice, are both dropped - the same two steps Features::manifest() takes', is_array( $selfNeedy )
-	&& $selfNeedy['features'][0]['requires'] === [ 'helper', 'other' ] );
+	&& $selfNeedy['packages'][0]['requires'] === [ 'helper', 'other' ] );
 
-// And the vocabulary itself is one definition rather than two. These three
-// were private copies here, identical to the manifest reader's, which is one
-// spelling too many of "what a feature key is"
+// And the vocabulary itself is one definition rather than two. A feature's directory, key, version, category and extension names are spelled once, as
+// \Nino\Features' public patterns; this class, the manifest reader and the Features panel name the constant
 $catalogueClass = new ReflectionClass( '\Nino\Catalogue' );
 check( 'a key, a version and a category are \Nino\Features\' vocabulary, not a second copy of it', array_filter( [ 'KEY_PATTERN', 'VERSION_PATTERN', 'CATEGORY_PATTERN' ],
 	static fn( string $name ): bool => $catalogueClass->getReflectionConstant( $name ) !== false ) === [] );
 
-// ...and nobody writes it out again. A feature's directory, key, version,
-// category and extension names are spelled once, as \Nino\Features'
-// public patterns; this class, the manifest reader and the Features panel
-// name the constant. Copies that had drifted apart once already (4dc04d7)
 $vocabulary = array_filter( ( new ReflectionClass( '\Nino\Features' ) )->getConstants( ReflectionClassConstant::IS_PUBLIC ),
 	static fn( mixed $value, string $name ): bool => str_ends_with( $name, '_PATTERN' ) === true && is_string( $value ) === true, ARRAY_FILTER_USE_BOTH );
 $respelled = [];
@@ -376,74 +418,103 @@ foreach( [ '_nino/Nino/Features/Features.php' => 1, '_nino/Nino/Catalogue/Catalo
 check( 'a feature\'s directory, key, version, category and extension names are spelled once, and every reader names the constant'. ( $respelled === [] ? '' : ' - written out again: '. implode( ', ', $respelled ) ),
 	isset( $vocabulary['DIRECTORY_PATTERN'], $vocabulary['EXTENSION_PATTERN'] ) === true && $respelled === [] );
 
-// The one field a bad value does not cost the catalogue. Everything else here
-// refuses the whole document (see the checks below) because everything else
-// is something the kernel acts on; a category is a heading in a list, and a
-// kernel that refused a signed catalogue over a category it had never heard
-// of would stop reading the catalogue the day a newer one publishes one
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [
+// The fields a bad value does not cost the entry: a category is a heading in a list, a maturity a word beside a name
+$parsed = \Nino\Catalogue::parse( ninoCatalogue( [
 	entry( 'named', '1.0.0', 'a', [ 'category' => 'security' ] ),
 	entry( 'later', '1.0.0', 'b', [ 'category' => 'somethingnewerthanthis' ] ),
 	entry( 'broken', '1.0.0', 'c', [ 'category' => [ 'not', 'a', 'slug' ] ] ),
-] ] ) );
-check( 'a category travels with the entry, one this kernel never heard of included - and one that is not a slug at all is dropped rather than costing the catalogue',
-	is_array( $parsed ) && count( $parsed['features'] ) === 3
-	&& $parsed['features'][0]['category'] === 'security' && $parsed['features'][1]['category'] === 'somethingnewerthanthis' && $parsed['features'][2]['category'] === '' );
-
-// ...and so is the maturity, a word beside a name: kept as the manifest has
-// it - a string or a locale map - and dropped where it is too long or not
-// one, never a reason to refuse the catalogue
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [
 	entry( 'tagged', '1.0.0', 'a', [ 'maturity' => 'Beta' ] ),
 	entry( 'tagmap', '1.0.0', 'b', [ 'maturity' => [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ] ] ),
 	entry( 'toolong', '1.0.0', 'c', [ 'maturity' => str_repeat( 'a', 25 ) ] ),
-	entry( 'badmap', '1.0.0', 'd', [ 'maturity' => [ 'en_US' => 'ok', 'de_DE' => str_repeat( 'a', 25 ) ] ] ),
 	entry( 'notstring', '1.0.0', 'e', [ 'maturity' => [ 'nested' => [ 'Beta' ] ] ] ),
-	entry( 'blank', '1.0.0', 'f', [ 'maturity' => '  ' ] ),
-] ] ) );
-check( 'a maturity travels with the entry as a string or a map, and an unusable one is dropped rather than costing the catalogue', is_array( $parsed ) && count( $parsed['features'] ) === 6
-	&& $parsed['features'][0]['maturity'] === 'Beta' && $parsed['features'][1]['maturity'] === [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ]
-	&& array_column( array_slice( $parsed['features'], 2 ), 'maturity' ) === [ '', '', '', '' ] );
+] ) );
+check( 'a category and a maturity travel with the entry, and an unusable one is dropped rather than costing the entry', is_array( $parsed ) && count( $parsed['packages'] ) === 7 && $parsed['unreadable'] === []
+	&& array_column( $parsed['packages'], 'category' ) === [ 'security', 'somethingnewerthanthis', '', '', '', '', '' ]
+	&& $parsed['packages'][3]['maturity'] === 'Beta' && $parsed['packages'][4]['maturity'] === [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ]
+	&& array_column( array_slice( $parsed['packages'], 5 ), 'maturity' ) === [ '', '' ] );
 
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ] ] ) );
+$parsed = \Nino\Catalogue::parse( document( [ $goodEntry, $goodEntry, flat2( entry( 'helper', '1.1.0', 'other' ) ) ] ) );
+check( 'the same kind, key and version twice counts once, another version counts', is_array( $parsed ) && count( $parsed['packages'] ) === 2 );
 
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good, $good, entry( 'helper', '1.1.0', 'other' ) ] ] ) );
-check( 'the same key and version twice counts once, another version counts', is_array( $parsed ) && count( $parsed['features'] ) === 2 );
+// What a kind this reader does not know is, and what an entry that is not what its kind says
+$parsed = \Nino\Catalogue::parse( document( [ $goodEntry, [ 'kind' => 'font', 'key' => 'lora', 'anything' => [ 'at', 'all' ] ], flat2( entry( 'other', '1.0.0', 'o' ) ) ] ) );
+check( 'a kind this kernel does not know is skipped: no entry, and not an entry that was left out', is_array( $parsed ) && array_column( $parsed['packages'], 'key' ) === [ 'helper', 'other' ] && $parsed['unreadable'] === [] );
 
 $refusals = [
-	'"key" must be a slug'																			=> [ 'key' => 'Helper' ],
-	'"name" must be a string or a locale => string map'						=> [ 'name' => '' ],
-	'"description" must be a string or a locale => string map'		=> [ 'description' => [ 'en_US' => 5 ] ],
-	'"version" must be major.minor.patch'													=> [ 'version' => '1.0' ],
-	'"nino" must be a version constraint'													=> [ 'nino' => 'latest' ],
-	'"php" => "ext" must list extension names'										=> [ 'php' => [ 'ext' => [ 'no such' ] ] ],
-	'"requires" must list feature keys'														=> [ 'requires' => [ 'Nope' ] ],
-	'"directory" must be a class name segment'										=> [ 'directory' => 'helper' ],
-	'"archive" must be an https url'															=> [ 'archive' => 'http://catalogue.test/x.tar.gz' ],
-	'"sha256" must be the hex digest of the archive'							=> [ 'sha256' => 'abc' ],
-	'"size" must be the archive size in bytes, at most 20971520'	=> [ 'size' => '5' ],
+	'"key" must be a slug'																								=> [ 'key' => 'Helper' ],
+	'"name" must be a string or a locale => string map'							=> [ 'name' => '' ],
+	'"description" must be a string or a locale => string map'			=> [ 'description' => [ 'en_US' => 5 ] ],
+	'"version" must be major.minor.patch'														=> [ 'version' => '1.0' ],
+	'"requires" => "nino" must be a version constraint'							=> [ 'requires' => [ 'nino' => 'latest' ] ],
+	'"requires" => "php" must list extension names'									=> [ 'requires' => [ 'php' => [ 'no such' ] ] ],
+	'"requires" => "features" must list feature keys'								=> [ 'requires' => [ 'features' => [ 'Nope' ] ] ],
+	'"requires" must be an object'																	=> [ 'requires' => [ 'nino', 'php' ] ],
+	'"directory" must be a class name segment'											=> [ 'directory' => 'helper' ],
+	'"archive" must be an https url'																=> [ 'archive' => 'http://catalogue.test/x.tar.gz' ],
+	'"sha256" must be the hex digest of the archive'								=> [ 'sha256' => 'abc' ],
+	'"size" must be the archive size in bytes, at most 8388608'			=> [ 'size' => 8 * 1024 * 1024 + 1 ],
 ];
 $allRefused = true;
 foreach( $refusals as $why => $wrong ) {
-	$result = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good, array_merge( $good, $wrong ) ] ] ) );
-	if( $result !== 'catalogue entry 1: '. $why ) {
+	$result = \Nino\Catalogue::parse( document( [ $goodEntry, array_merge( $goodEntry, $wrong ) ] ) );
+	$expectKey = isset( $wrong['key'] ) === true ? '' : 'helper';
+	if( is_array( $result ) === false || count( $result['packages'] ) !== 1 || $result['unreadable'] !== [ [ 'index' => 1, 'kind' => 'feature', 'key' => $expectKey, 'reason' => $why ] ] ) {
 		$allRefused = false;
-		echo "        got: ". json_encode( $result ). "\n";
+		echo "        got: ". json_encode( $result['unreadable'] ?? $result ). " for ". $why. "\n";
 	}
 }
-check( 'every wrong field refuses the whole catalogue, naming the entry and the field', $allRefused === true );
-check( 'an oversized archive is refused', is_string( \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ array_merge( $good, [ 'size' => 20 * 1024 * 1024 + 1 ] ) ] ] ) ) ) );
-check( 'an entry that is not an object is refused', \Nino\Catalogue::parse( '{"format":1,"features":["helper"]}' ) === 'catalogue entry 0: must be an object' );
+check( 'every wrong field leaves the entry out, with the entry, its kind and key, and the field it was left out for - and the entry beside it is read', $allRefused === true );
+$result = \Nino\Catalogue::parse( document( [ 'helper', array_merge( $goodEntry, [ 'kind' => 5 ] ), $goodEntry ] ) );
+check( 'an entry that is no object, or has no kind, is left out with that, and the rest is read', is_array( $result ) && count( $result['packages'] ) === 1
+	&& array_column( $result['unreadable'], 'reason' ) === [ 'must be an object', '"kind" must be one of feature, theme, blocks' ] && array_column( $result['unreadable'], 'kind' ) === [ '', '' ] );
+
+// A theme and a package of blocks: what they carry, and what is left out
+$theme = packageEntry( 'theme', 'craft', '1.1.0', 'bytes', [ 'blocks' => [ 'hero-soft' ], 'requires' => [ 'nino' => '^2.0', 'features' => [ 'themes' ], 'fonts' => [ 'lora', 'lora' ] ],
+	'parts' => [ 'page' => [ 'contract' => 'kernel@^2.0' ], 'section' => [ 'feature' => 'basis', 'contract' => '^2.0' ] ] ] );
+$pack = packageEntry( 'blocks', 'gastro', '1.0.0', 'bytes', [ 'requires' => [ 'features' => [ 'basis', 'cards' ] ] ] );
+$parsed = \Nino\Catalogue::parse( document( [ $theme, $pack ] ) );
+check( 'a theme is read with its parts, blocks, fonts, features and picture, and a package of blocks with its blocks and category', is_array( $parsed ) && $parsed['unreadable'] === [] && count( $parsed['packages'] ) === 2
+	&& $parsed['packages'][0]['kind'] === 'theme' && $parsed['packages'][0]['fonts'] === [ 'lora' ] && $parsed['packages'][0]['requires'] === [ 'themes' ]
+	&& $parsed['packages'][0]['parts'] === [ 'page' => [ 'feature' => '', 'contract' => 'kernel@^2.0' ], 'section' => [ 'feature' => 'basis', 'contract' => '^2.0' ] ]
+	&& $parsed['packages'][0]['blocks'] === [ [ 'key' => 'hero-soft', 'category' => '' ] ] && $parsed['packages'][0]['preview']['size'] === strlen( 'RIFF'. pack( 'V', 12 ). 'WEBPVP8 ' )
+	&& $parsed['packages'][1]['kind'] === 'blocks' && $parsed['packages'][1]['blocks'] === [ [ 'key' => 'one', 'category' => 'offer' ] ] && $parsed['packages'][1]['requires'] === [ 'basis', 'cards' ]
+	&& isset( $parsed['packages'][1]['fonts'] ) === false && isset( $parsed['packages'][1]['parts'] ) === false );
+
+$wrongPackages = [
+	'a theme with no picture'												=> [ $theme, [ 'preview' => null ] ],
+	'a picture of another address'									=> [ $theme, [ 'preview' => [ 'url' => 'http://c.test/x.webp' ] + $theme['preview'] ] ],
+	'a picture that is too large'										=> [ $theme, [ 'preview' => [ 'size' => \Nino\Packages::MAX_PREVIEW + 1 ] + $theme['preview'] ] ],
+	'a picture with a key it should not have'				=> [ $theme, [ 'preview' => $theme['preview'] + [ 'more' => 1 ] ] ],
+	'an archive of more than 2 MB'									=> [ $theme, [ 'size' => 2 * 1024 * 1024 + 1 ] ],
+	'a key of more than 40 characters'							=> [ $theme, [ 'key' => str_repeat( 'a', 41 ) ] ],
+	'a font that is no slug'												=> [ $theme, [ 'requires' => [ 'fonts' => [ 'Lora' ] ] ] ],
+	'a group that is no slug'												=> [ $theme, [ 'parts' => [ 'Section' => [ 'contract' => '^2.0' ] ] ] ],
+	'a part without a contract'											=> [ $theme, [ 'parts' => [ 'section' => [ 'feature' => 'basis' ] ] ] ],
+	'parts that are a list'													=> [ $theme, [ 'parts' => [ [ 'contract' => '^2.0' ] ] ] ],
+	'a block that is no slug'												=> [ $theme, [ 'blocks' => [ 'Hero' ] ] ],
+	'a block twice'																	=> [ $theme, [ 'blocks' => [ 'hero', 'hero' ] ] ],
+	'a package of blocks with no block'							=> [ $pack, [ 'blocks' => [] ] ],
+	'a package of blocks with no picture'						=> [ $pack, [ 'preview' => null ] ],
+];
+$allDropped = true;
+foreach( $wrongPackages as $what => [ $base, $wrong ] ) {
+	$result = \Nino\Catalogue::parse( document( [ array_merge( $base, $wrong ), $pack === $base ? $theme : $pack ] ) );
+	if( is_array( $result ) === false || count( $result['packages'] ) !== 1 || count( $result['unreadable'] ) !== 1 || $result['unreadable'][0]['kind'] !== $base['kind'] ) {
+		$allDropped = false;
+		echo "        not left out: ". $what. "\n";
+	}
+}
+check( 'an entry of a theme or a package of blocks that is not what its kind says is left out alone', $allDropped === true );
 
 /*	The applications of the index: an optional key above the features. A catalogue
 	without it has none; an application of the wrong shape is dropped on its own and
 	the rest of the document is read	*/
 $application = [ 'key' => 'site', 'name' => [ 'en_US' => 'Site', 'de_DE' => 'Seite' ], 'description' => [ 'en_US' => 'A site' ], 'features' => [ 'helper', 'sample' ], 'next' => '/_admin/#builder', 'start' => 'starter' ];
-$withApplications = static fn( mixed ...$applications ): array|string => \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ], 'applications' => $applications ] ) );
+$withApplications = static fn( mixed ...$applications ): array|string => \Nino\Catalogue::parse( json_encode( [ 'format' => 2, 'packages' => [ $goodEntry ], 'applications' => $applications ] ) );
 
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ] ] ) );
+$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 2, 'packages' => [ $goodEntry ] ] ) );
 check( 'an index without the key has no applications and is valid', is_array( $parsed ) && $parsed['applications'] === [] );
-$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ], 'applications' => 'site' ] ) );
+$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 2, 'packages' => [ $goodEntry ], 'applications' => 'site' ] ) );
 check( '...and so has one whose key is no list', is_array( $parsed ) && $parsed['applications'] === [] );
 $parsed = $withApplications( $application );
 check( 'an application is read with exactly the fields the wizard uses', is_array( $parsed ) && $parsed['applications'] === [ $application ] );
@@ -551,8 +622,8 @@ publish( $otherKey, $remote, $features, null, $privateKey );
 $otherKey['/nino/catalogue/key'] = $otherPublicKey;
 check( 'a signature by another key does not verify', \Nino\Catalogue::fetch( $otherKey ) === 'the catalogue signature does not verify' );
 
-publish( $appData, $remote, [ array_merge( $good, [ 'version' => 'one' ] ) ], null, $privateKey );
-check( 'a signed document that does not parse is refused with what parse() says', \Nino\Catalogue::fetch( $appData ) === 'catalogue entry 0: "version" must be major.minor.patch' );
+publishRaw( $appData, $remote, '{"format":1,"features":[]}', $privateKey );
+check( 'a signed document that does not parse is refused with what parse() says: a catalogue of format 1 lists nothing', \Nino\Catalogue::fetch( $appData ) === 'the catalogue has format 1, this kernel reads format 2' );
 
 publish( $appData, $remote, $features, null, $privateKey );
 $requests = [];
@@ -560,7 +631,7 @@ $catalogue = \Nino\Catalogue::fetch( $appData );
 check( 'a signed, valid catalogue is fetched with two requests: the document and the signature', is_array( $catalogue )
 	&& array_column( $requests, 'url' ) === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
 check( 'the signature is read with a small cap, the document with a larger one', $requests[0]['options']['maxBytes'] === 1024 * 1024 && $requests[1]['options']['maxBytes'] === 4096 );
-check( 'the catalogue carries its url and every entry', $catalogue['url'] === \Nino\Catalogue::DEFAULT_URL && count( $catalogue['features'] ) === 6 );
+check( 'the catalogue carries its url and every entry', $catalogue['url'] === \Nino\Catalogue::DEFAULT_URL && count( $catalogue['packages'] ) === 6 );
 
 $requests = [];
 check( 'read once per request', \Nino\Catalogue::fetch( $appData ) === $catalogue && $requests === [] );
@@ -583,9 +654,9 @@ check( 'the file holds when it was fetched, the configured url and the parsed do
 $requests = [];
 $cached = \Nino\Catalogue::cached( $appData );
 check( 'cached() answers it without any request', $requests === [] && is_array( $cached ) );
-check( 'the same shape fetch() returns, plus fetched', array_keys( $cached ) === [ 'format', 'generated', 'features', 'applications', 'url', 'fetched' ]
-	&& $cached['url'] === \Nino\Catalogue::DEFAULT_URL && $cached['fetched'] === $stored['fetched'] && count( $cached['features'] ) === 6
-	&& $cached['format'] === $catalogue['format'] && $cached['generated'] === $catalogue['generated'] && $cached['features'] === $catalogue['features'] && $cached['applications'] === [] );
+check( 'the same shape fetch() returns, plus fetched', array_keys( $cached ) === [ 'format', 'generated', 'packages', 'unreadable', 'applications', 'url', 'fetched' ]
+	&& $cached['url'] === \Nino\Catalogue::DEFAULT_URL && $cached['fetched'] === $stored['fetched'] && count( $cached['packages'] ) === 6
+	&& $cached['format'] === $catalogue['format'] && $cached['generated'] === $catalogue['generated'] && $cached['packages'] === $catalogue['packages'] && $cached['applications'] === [] );
 
 /*	A private catalogue behind a token: url() takes it (isHttpsUrl() has no
 	opinion on a query string), and the signature belongs beside the
@@ -632,14 +703,14 @@ echo "\n";
 
 echo "Catalogue::offers - what fits this kernel, beside what is on disk\n";
 
-$offers = \Nino\Catalogue::offers( $appData, $catalogue );
+$offers = \Nino\Catalogue::offers( $appData, $catalogue, 'feature' );
 
 check( 'one offer per key, sorted', array_keys( $offers ) === [ 'ancient', 'helper', 'needy', 'sample' ] );
 check( 'the highest version this kernel can run is offered, not the highest there is', $offers['helper']['version'] === '1.1.0' && $offers['helper']['fits'] === true );
 check( 'nothing on disk: available', $offers['helper']['state'] === 'available' && $offers['helper']['local'] === null && $offers['helper']['active'] === false && $offers['sample']['state'] === 'available' );
 check( 'a feature no version of which fits is incompatible, shown with its newest version and what it asks for', $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['fits'] === false && $offers['ancient']['nino'] === '^0.9'
 	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['php']['ext'] === [ 'no_such_extension' ] );
-check( 'the offer is the catalogue entry plus fits, local, active, shipped and state', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released', 'fits', 'local', 'active', 'shipped', 'state' ] );
+check( 'the offer is the catalogue entry plus fits, local, active, shipped, needs, blocked and state', array_keys( $offers['helper'] ) === [ 'kind', 'key', 'name', 'description', 'version', 'nino', 'php', 'requires', 'archive', 'sha256', 'size', 'released', 'preview', 'category', 'maturity', 'directory', 'fits', 'local', 'active', 'shipped', 'needs', 'blocked', 'state' ] );
 
 /*	An application is offered whole or not at all: every one of its features has a
 	version this kernel can run (the rule of offers()), or it stays out	*/
@@ -655,7 +726,7 @@ check( 'applications() keeps the ones whose features all fit, in the catalogue\'
 	array_column( \Nino\Catalogue::applications( $appData, $catalogueOfApplications ), 'key' ) === [ 'fine', 'last' ] );
 check( '...one with a feature no version of which fits, with a missing php extension, or that the catalogue does not list is left out',
 	array_diff( [ 'old', 'ext', 'ghost' ], array_column( \Nino\Catalogue::applications( $appData, $catalogueOfApplications ), 'key' ) ) === [ 'old', 'ext', 'ghost' ] );
-check( '...and a catalogue read before the key existed offers none', \Nino\Catalogue::applications( $appData, [ 'features' => $catalogue['features'] ] ) === [] );
+check( '...and a catalogue read before the key existed offers none', \Nino\Catalogue::applications( $appData, [ 'features' => $catalogue['packages'] ] ) === [] );
 
 echo "\n";
 
@@ -664,7 +735,7 @@ echo "\n";
 
 echo "Catalogue::install - from archive bytes to a directory below features/\n";
 
-$staging = \Nino\Filesystem::path( $appData, '/data/.features' );
+$staging = \Nino\Filesystem::path( $appData, '/data/.packages' );
 
 function stagingClean( string $staging ): bool {
 	return is_dir( $staging ) === false || ( scandir( $staging ) ?: [] ) === [ '.', '..' ];
@@ -672,19 +743,19 @@ function stagingClean( string $staging ): bool {
 
 check( 'the features directory is writable here', \Nino\Catalogue::writable() === true );
 
-check( 'a key the catalogue does not list', \Nino\Catalogue::install( $appData, 'nope', '1.0.0' ) === 'the catalogue does not list "nope" in version 1.0.0' );
-check( 'a version the catalogue does not list', \Nino\Catalogue::install( $appData, 'helper', '1.0.1' ) === 'the catalogue does not list "helper" in version 1.0.1' );
-check( 'a version that does not fit names what it asks for', \Nino\Catalogue::install( $appData, 'helper', '9.0.0' ) === '"helper" 9.0.0 requires Nino ^9.0'
-	&& \Nino\Catalogue::install( $appData, 'needy', '1.0.0' ) === '"needy" 1.0.0 requires Nino ^2.0 and the php extensions no_such_extension' );
+check( 'a key the catalogue does not list', \Nino\Catalogue::install( $appData, 'feature', 'nope', '1.0.0' ) === 'the catalogue does not list "nope" in version 1.0.0' );
+check( 'a version the catalogue does not list', \Nino\Catalogue::install( $appData, 'feature', 'helper', '1.0.1' ) === 'the catalogue does not list "helper" in version 1.0.1' );
+check( 'a version that does not fit names what it asks for', \Nino\Catalogue::install( $appData, 'feature', 'helper', '9.0.0' ) === '"helper" 9.0.0 requires Nino ^9.0'
+	&& \Nino\Catalogue::install( $appData, 'feature', 'needy', '1.0.0' ) === '"needy" 1.0.0 requires Nino ^2.0 and the php extensions no_such_extension' );
 
 rename( NINO_FEATURES_DIR, NINO_FEATURES_DIR. '.away' );
 $requests = [];
-$result = \Nino\Catalogue::install( $appData, 'helper', '1.0.0' );
+$result = \Nino\Catalogue::install( $appData, 'feature', 'helper', '1.0.0' );
 rename( NINO_FEATURES_DIR. '.away', NINO_FEATURES_DIR );
 check( 'without a writable features directory nothing is downloaded and the archive url is given for the manual way', $result === 'the features directory is not writable - download https://catalogue.test/features/helper-1.0.0.tar.gz and unpack it there by hand' && $requests === [] );
 
 $requests = [];
-$result = \Nino\Catalogue::install( $appData, 'helper', '1.0.0' );
+$result = \Nino\Catalogue::install( $appData, 'feature', 'helper', '1.0.0' );
 check( 'helper 1.0.0 installs', $result === true );
 check( 'the archive was fetched from the url the catalogue names, capped at its size', count( $requests ) === 1 && $requests[0]['url'] === 'https://catalogue.test/features/helper-1.0.0.tar.gz' && $requests[0]['options']['maxBytes'] === strlen( $helper100 ) && $requests[0]['options']['timeout'] === 60 );
 check( 'the feature directory is in place with every file', is_file( NINO_FEATURES_DIR. '/Helper/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Helper/Helper.php' ) && is_file( NINO_FEATURES_DIR. '/Helper/only-in-1.txt' ) );
@@ -694,7 +765,7 @@ $all = \Nino\Features::all( $appData );
 check( 'the registry sees it in the same request', isset( $all['helper'] ) && $all['helper']['version'] === '1.0.0' && $all['helper']['active'] === false && $all['helper']['problems'] === [] );
 
 unset( $appData['./nino/catalogue'] );
-$offers = \Nino\Catalogue::offers( $appData, \Nino\Catalogue::fetch( $appData ) );
+$offers = \Nino\Catalogue::offers( $appData, \Nino\Catalogue::fetch( $appData ), 'feature' );
 check( 'the offer now says upgrade, with the local version', $offers['helper']['state'] === 'upgrade' && $offers['helper']['local'] === '1.0.0' && $offers['helper']['version'] === '1.1.0' );
 
 check( 'the installed feature activates like one copied by hand', \Nino\Features::activate( $appData, 'helper' ) === true && \Nino\Features::get( $appData, 'helper' )['active'] === true );
@@ -707,14 +778,14 @@ echo "\n";
 
 echo "Catalogue::install - an update replaces the directory\n";
 
-$result = \Nino\Catalogue::install( $appData, 'helper', '1.1.0' );
+$result = \Nino\Catalogue::install( $appData, 'feature', 'helper', '1.1.0' );
 check( 'helper 1.1.0 installs over 1.0.0', $result === true );
 check( 'the new files are there, the file only 1.0.0 had is gone', is_file( NINO_FEATURES_DIR. '/Helper/Helper.php' ) && str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.1.0' ) && file_exists( NINO_FEATURES_DIR. '/Helper/only-in-1.txt' ) === false );
 check( 'the old directory did not stay behind in staging', stagingClean( $staging ) === true );
 $all = \Nino\Features::all( $appData );
 check( 'the registry sees the new version and, since 1.0.0 was recorded on activation, an update to apply', $all['helper']['version'] === '1.1.0' && $all['helper']['installed'] === '1.0.0' && $all['helper']['update'] === true && $all['helper']['active'] === true );
 unset( $appData['./nino/catalogue'] );
-$offers = \Nino\Catalogue::offers( $appData, \Nino\Catalogue::fetch( $appData ) );
+$offers = \Nino\Catalogue::offers( $appData, \Nino\Catalogue::fetch( $appData ), 'feature' );
 check( 'the offer says current', $offers['helper']['state'] === 'current' && $offers['helper']['local'] === '1.1.0' && $offers['helper']['active'] === true );
 
 echo "\n";
@@ -734,7 +805,7 @@ function tryInstall( array &$appData, array &$remote, array $features, string $p
 	if( $bytes !== null )
 		$remote[ $entry['archive'] ] = $bytes;
 	publish( $appData, $remote, array_merge( $features, [ $entry ] ), null, $privateKey );
-	$result = \Nino\Catalogue::install( $appData, $entry['key'], $entry['version'] );
+	$result = \Nino\Catalogue::install( $appData, 'feature', $entry['key'], $entry['version'] );
 	publish( $appData, $remote, $features, null, $privateKey );
 	return $result;
 }
@@ -754,23 +825,23 @@ ninoWarnings();
 $bytes = 'this is not a tar.gz';
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
 $logged = ninoWarnings();
-check( 'bytes that are not an archive', str_starts_with( (string) $result, 'the archive could not be read' ) === true );
-// What phar says names the staging file on this server: the log of the house gets it, the answer does not
-check( '...the answer holds no path of this server, and the log does - once, with what phar said',
+check( 'bytes that are not an archive are refused by what \Nino\Archive says of them', $result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::GZIP ] );
+// The archive is read in memory: no php function that names a path of this server is asked, and nothing is written for it
+check( '...the answer holds no path of this server, and nothing was logged or written for it',
 	is_string( $result ) === true && str_contains( $result, $sandbox ) === false && str_contains( $result, sys_get_temp_dir() ) === false && str_contains( $result, 'phar' ) === false
-	&& count( $logged ) === 1 && str_contains( $logged[0], $staging ) === true );
+	&& $logged === [] && stagingClean( $staging ) === true );
 
 $bytes = tarGz( [] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
-check( 'an empty archive', str_starts_with( (string) $result, 'the archive ' ) === true && $result !== true );
+check( 'an empty archive is a package of no file', $result === 'the package holds no file' );
 
 $bytes = tarGz( featureFiles( 'Helper', 'helper', '1.2.0' ) + [ 'Other/' => null, 'Other/x.php' => '<?php' ] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
-check( 'an archive holding something beside the feature directory', $result === 'the archive holds "Other" outside "Helper/"' );
+check( 'an archive holding something beside the feature directory', $result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::FOLDER ] );
 
 $bytes = tarGz( featureFiles( 'Helper', 'helper', '1.2.0' ) + [ '../evil.php' => '<?php' ] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
-check( 'an archive with a path that climbs out of it', $result === 'the archive unpacked to more than the directory "Helper"' && file_exists( $staging. '/evil.php' ) === false && file_exists( dirname( $staging ). '/evil.php' ) === false );
+check( 'an archive with a path that climbs out of it', $result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::PATH ] && file_exists( $staging. '/evil.php' ) === false && file_exists( dirname( $staging ). '/evil.php' ) === false );
 
 $bytes = tarGz( featureFiles( 'Helper', 'helper', '1.2.0' ) + [ 'Helper/link.php' => [ 'link' => '/etc/passwd' ] ] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
@@ -780,7 +851,7 @@ $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper'
 // file, and the look after the extraction found no link to object to
 // either. Inert, but not what docs/_admin.md promises ("plain files and
 // directories only"), and the archive got as far as being unpacked
-check( 'an archive with a symlink is refused, before anything is unpacked', $result === 'the archive holds "Helper/link.php", which is neither a file nor a directory' );
+check( 'an archive with a symlink is refused, before anything is written', $result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::TYPE ] );
 check( 'nothing of it reaches features/, and the staging directory is gone', file_exists( NINO_FEATURES_DIR. '/Helper/link.php' ) === false && stagingClean( $staging ) === true );
 check( 'the version that was installed before it is untouched', str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.1.0' ) === true );
 
@@ -791,7 +862,7 @@ check( 'the version that was installed before it is untouched', str_contains( (s
 $bytes = tarGz( [ 'Helper' => '<?php' ] );
 try { $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes ); }
 catch( \Throwable $e ) { $result = 'threw '. get_class( $e ); }
-check( 'an archive holding a file where the feature directory should be is refused, not thrown at', $result === 'the archive holds "Helper" as a file, not a directory' && stagingClean( $staging ) === true );
+check( 'an archive holding a file where the feature directory should be is refused, not thrown at', $result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::FOLDER ] && stagingClean( $staging ) === true );
 
 // PharData names every entry by the archive's canonical path, symlinks
 // resolved, while _unpack() cut the prefix by the length of the path it
@@ -805,7 +876,7 @@ foreach( [ 'configpath', 'contentpath' ] as $pathKey ) {
 	$realPaths[$pathKey] = $appData['./nino/filesystem/'. $pathKey];
 	$appData['./nino/filesystem/'. $pathKey] = $linkedPrivate;
 }
-$result = \Nino\Catalogue::install( $appData, 'helper', '1.1.0' );
+$result = \Nino\Catalogue::install( $appData, 'feature', 'helper', '1.1.0' );
 check( 'an install through a symlinked private root succeeds - the entries are cut by the archive\'s own path', $result === true && stagingClean( $staging ) === true && str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.1.0' ) === true );
 foreach( $realPaths as $pathKey => $realPath )
 	$appData['./nino/filesystem/'. $pathKey] = $realPath;
@@ -819,9 +890,10 @@ $bytes = tarGz( featureFiles( 'Helper', 'helper', '1.2.1' ) );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
 check( 'an archive holding another version than promised', $result === 'the archive holds "helper" 1.2.1, the catalogue promised "helper" 1.2.0' );
 
+ninoWarnings();
 $bytes = tarGz( [ 'Helper/' => null, 'Helper/feature.php' => '<?php return "nope";' ] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
-check( 'an archive whose manifest does not validate', $result === 'the archive does not hold a valid feature' && ninoWarnings() === [] );
+check( 'an archive whose manifest does not validate', $result === 'the archive does not hold a valid feature' && count( ninoWarnings() ) === 1 );
 
 // A manifest is php the archive brought, and php that does not parse throws
 // where an invalid one returns null. The throw left out of the include
@@ -835,6 +907,7 @@ check( 'an archive whose manifest does not validate', $result === 'the archive d
 $bytes = tarGz( [ 'Helper/' => null, 'Helper/feature.php' => '<?php return [ \'key\' => \'helper\',' ] );
 try { $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes ); }
 catch( \Throwable $e ) { $result = 'threw '. get_class( $e ); }
+ninoWarnings();
 trigger_error( 'the handler is back', E_USER_WARNING );
 check( 'an archive whose manifest does not parse is refused, not thrown at', $result === 'the archive does not hold a valid feature' );
 check( 'and it leaves no staging directory and no error handler of its own behind', stagingClean( $staging ) === true && ninoWarnings() === [ 'the handler is back' ] );
@@ -845,7 +918,7 @@ check( 'an archive whose manifest asks for more than the entry said, and does no
 
 $bytes = tarGz( featureFiles( 'Other', 'helper', '1.2.0' ) );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
-check( 'an archive whose directory is not the one the catalogue names', $result === 'the archive holds "Other" outside "Helper/"' );
+check( 'an archive whose directory is not the one the catalogue names', $result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::FOLDER ] );
 
 check( 'after all of that the installed feature is untouched', (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ) === $before && file_exists( NINO_FEATURES_DIR. '/Helper/link.php' ) === false );
 check( 'and staging is empty', stagingClean( $staging ) === true );
@@ -853,10 +926,10 @@ check( 'nothing but Helper below features/', ( scandir( NINO_FEATURES_DIR ) ?: [
 
 $requests = [];
 publish( $appData, $remote, $features, sign( 'tampered', $privateKey ), $privateKey );
-check( 'an install re-reads the catalogue and refuses one whose signature no longer holds', \Nino\Catalogue::install( $appData, 'sample', '3.0.0' ) === 'the catalogue signature does not verify' && count( $requests ) === 2 );
+check( 'an install re-reads the catalogue and refuses one whose signature no longer holds', \Nino\Catalogue::install( $appData, 'feature', 'sample', '3.0.0' ) === 'the catalogue signature does not verify' && count( $requests ) === 2 );
 
 publish( $appData, $remote, $features, null, $privateKey );
-check( 'a second feature installs beside the first', \Nino\Catalogue::install( $appData, 'sample', '3.0.0' ) === true && ( scandir( NINO_FEATURES_DIR ) ?: [] ) === [ '.', '..', 'Helper', 'Sample' ] );
+check( 'a second feature installs beside the first', \Nino\Catalogue::install( $appData, 'feature', 'sample', '3.0.0' ) === true && ( scandir( NINO_FEATURES_DIR ) ?: [] ) === [ '.', '..', 'Helper', 'Sample' ] );
 
 echo "\n";
 
@@ -956,8 +1029,8 @@ check( 'the maturity arrives localized like the name, empty for an offer that na
 // The cache is read back as it was written: one written before the key existed
 // carries none, and the panel has to answer rather than fail on the missing key
 $cacheFile = \Nino\Filesystem::getFileContent( $appData, '/data/catalogue.php', [] );
-foreach( $cacheFile['catalogue']['features'] as $i => $cachedEntry )
-	unset( $cacheFile['catalogue']['features'][$i]['maturity'] );
+foreach( $cacheFile['catalogue']['packages'] as $i => $cachedEntry )
+	unset( $cacheFile['catalogue']['packages'][$i]['maturity'] );
 \Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', $cacheFile );
 $requests = [];
 ninoWarnings();
@@ -1264,7 +1337,7 @@ publish( $appData, $remote, array_merge( $chained, [
 	entry( 'brokentop', '1.0.0', $brokentop. 'tampered', [ 'requires' => [ 'sidekick' ], 'directory' => 'Brokentop' ] ),
 ] ), null, $privateKey );
 
-check( 'a refusal on the feature asked for is its own, not a required feature\'s', \Nino\Catalogue::install( $appData, 'brokentop', '1.0.0' ) === 'the archive does not match what the catalogue promised'
+check( 'a refusal on the feature asked for is its own, not a required feature\'s', \Nino\Catalogue::install( $appData, 'feature', 'brokentop', '1.0.0' ) === 'the archive does not match what the catalogue promised'
 	&& is_dir( NINO_FEATURES_DIR. '/Brokentop' ) === false );
 
 echo "\n";
@@ -1337,6 +1410,636 @@ $appData['/nino/modules'][] = '\\Nino\\Modules\\Legal';
 check( 'with it on, removing the feature names the sections of the policy that still describe it, and they stay', $status === 200 && $body === [ 'removed' => 'described', 'privacy' => [ 'Beschrieben' ] ]
 	&& is_dir( $described ) === false && ( \Nino\Elements::getElement( $appData, '/privacy/described', 'de_DE' )['title'] ?? '' ) === 'Beschrieben' );
 $appData['/nino/modules'] = array_values( array_diff( $appData['/nino/modules'], [ '\\Nino\\Modules\\Legal' ] ) );
+
+echo "\n";
+
+// --- A host of the public internet --------------------------------------------
+
+echo "Fetch::isPublic and the catalogue - an address that is no host of the public internet is not asked\n";
+
+$spelled = $appData;
+unset( $spelled['./nino/fetch/stub'] );
+$spellings = [
+	'a name of the public internet'				=> [ 'https://catalogue.getnino.dev/catalogue.json', true ],
+	'a name with a port and a query'			=> [ 'https://files.example.org:8443/a/b.tar.gz?x=1', true ],
+	'localhost'														=> [ 'https://localhost/catalogue.json', false ],
+	'a name of a local network'						=> [ 'https://nas.local/catalogue.json', false ],
+	'another one'													=> [ 'https://files.intranet/x', false ],
+	'a name of one label'									=> [ 'https://catalogue/x', false ],
+	'an address in place of a name'				=> [ 'https://127.0.0.1/x', false ],
+	'a private one'												=> [ 'https://10.0.0.5/x', false ],
+	'a whole number'											=> [ 'https://2130706433/x', false ],
+	'a hexadecimal one'										=> [ 'https://0x7f000001/x', false ],
+	'an IPv6 one'													=> [ 'https://[::1]/x', false ],
+	'a name that ends in a number'				=> [ 'https://files.example.123/x', false ],
+	'http'																=> [ 'http://catalogue.getnino.dev/x', false ],
+];
+$wrong = [];
+foreach( $spellings as $what => [ $url, $expected ] )
+	if( \Nino\Fetch::isPublic( $spelled, $url, false ) !== $expected )
+		$wrong[] = $what;
+check( 'by its spelling: a name of two labels or more, no address, no ending of a local network, https'. ( $wrong === [] ? '' : ' - wrong for '. implode( ', ', $wrong ) ), $wrong === [] );
+
+$lookups = [];
+$resolved = [ '93.184.216.34' ];
+$spelled['./nino/fetch/resolve'] = static function( string $host ) use ( &$resolved, &$lookups ): array|false {
+	$lookups[] = $host;
+	return $resolved;
+};
+check( 'a name whose every address is public is public, and the lookup was asked of the host alone', \Nino\Fetch::isPublic( $spelled, 'https://files.example.org/x' ) === true && $lookups === [ 'files.example.org' ] );
+$wrong = [];
+foreach( [ [ '10.1.2.3' ], [ '127.0.0.1' ], [ '169.254.169.254' ], [ '100.64.0.1' ], [ '192.168.1.1' ], [ '::1' ], [ 'fe80::1' ], [ '::ffff:10.0.0.1' ], [ '93.184.216.34', '10.0.0.1' ], [], false ] as $answer ) {
+	$resolved = $answer;
+	if( \Nino\Fetch::isPublic( $spelled, 'https://files.example.org/x' ) !== false )
+		$wrong[] = json_encode( $answer );
+}
+check( 'a name that has one address that is not public - private, loopback, link local, shared, an IPv6 one, an IPv4 one in an IPv6 one - or none, is not'. ( $wrong === [] ? '' : ' - public for '. implode( ' ', $wrong ) ), $wrong === [] );
+$resolved = [ '2606:2800:220:1:248:1893:25c8:1946' ];
+check( 'a public IPv6 address is public', \Nino\Fetch::isPublic( $spelled, 'https://files.example.org/x' ) === true );
+
+// The catalogue: its index, its archives and its pictures, none of them asked of a host that is not public
+$nowhere = $appData;
+unset( $nowhere['./nino/catalogue'] );
+$nowhere['/nino/catalogue/url'] = 'https://nas.local/catalogue.json';
+$requests = [];
+check( 'a catalogue at a host of a local network is not fetched, and nothing is asked', \Nino\Catalogue::fetch( $nowhere ) === 'the catalogue could not be fetched: the address is no host of the public internet' && $requests === [] );
+
+$appData['./nino/fetch/resolve'] = static fn( string $name ): array => [ '10.0.0.5' ];
+unset( $appData['./nino/catalogue'] );
+$requests = [];
+check( 'nor one whose name the system gives a private address', str_contains( (string) \Nino\Catalogue::fetch( $appData ), 'public internet' ) === true && $requests === [] );
+
+// The request goes to the address that was checked: the index, its signature and an archive are asked for with it
+$appData['./nino/fetch/resolve'] = static fn( string $name ): array => [ '93.184.216.34' ];
+unset( $appData['./nino/catalogue'] );
+$requests = [];
+$fetched = \Nino\Catalogue::fetch( $appData );
+check( 'a name that was found public is asked for at the addresses that were found: the options of every request name them', is_array( $fetched ) === true && count( $requests ) === 2
+	&& array_column( array_column( $requests, 'options' ), 'addresses' ) === [ [ '93.184.216.34' ], [ '93.184.216.34' ] ] );
+
+$appData['./nino/fetch/resolve'] = static fn( string $name ): false => false;
+unset( $appData['./nino/catalogue'] );
+$requests = [];
+check( 'a name the server cannot resolve is said so, not called no public host, and nothing is asked', \Nino\Catalogue::fetch( $appData ) === 'the catalogue could not be fetched: this server cannot resolve the name of the host' && $requests === [] );
+unset( $appData['./nino/fetch/resolve'] );
+unset( $appData['./nino/catalogue'] );
+\Nino\Catalogue::fetch( $appData );
+
+// The ranges that are not global, one of each class, decided by this class and by no list of php: the same on every version
+$notGlobal = [ '192.0.0.1', '198.18.0.1', '198.19.255.1', '224.0.0.1', '255.255.255.255', '192.0.2.1', '198.51.100.1', '203.0.113.1', '192.88.99.1', '0.0.0.1', 'fec0::1', 'ff02::1', '2002:a00:1::1', '64:ff9b:1::a00:1',
+	'64:ff9b::a00:1', '::ffff:0:a00:1', '::ffff:10.0.0.1', '2001:db8::1', '2001:10::1', '2001::1', 'fc00::1', 'fe80::1', '::1', '::' ];
+$global = [ '93.184.216.34', '8.8.8.8', '2606:2800:220:1:248:1893:25c8:1946', '64:ff9b::5db8:d822', '2a00:1450:4001::1' ];
+$wrong = [];
+foreach( array_merge( $notGlobal, $global ) as $address ) {
+	$spelled['./nino/fetch/resolve'] = static fn( string $name ): array => [ $address ];
+	if( \Nino\Fetch::isPublic( $spelled, 'https://files.example.org/x' ) !== in_array( $address, $global, true ) )
+		$wrong[] = $address;
+}
+check( 'every range that is not global - the ones of the documentation, of benchmarks, of multicast, of site local, of 6to4 and of the NAT64 that is local, mapped and embedded - is refused, and a global address is not'. ( $wrong === [] ? '' : ' - wrong for '. implode( ' ', $wrong ) ), $wrong === [] );
+
+// What config.php can name is no closure: a string that is callable is not a stub of the network and not a lookup
+/**
+ *	A function that answers as a stub of the network and as a lookup, to be named by a string
+ */
+function ninoCallableString( string $first = '', array $second = [] ): array {
+	return $second === [] ? [ '93.184.216.34' ] : [ 'ok' => true, 'status' => 200, 'body' => 'stubbed', 'error' => '' ];
+}
+
+$config = [ './nino/fetch/stub' => 'strval', './nino/fetch/resolve' => 'strval' ];
+$closure = [ './nino/fetch/stub' => $appData['./nino/fetch/stub'] ];
+check( 'a stub and a lookup that are no closure are not taken for one: the name is looked up by the system, and the name that nobody has is not public',
+	\Nino\Fetch::isPublic( $config, 'https://nonexistent.invalid/x' ) === false
+	&& \Nino\Fetch::isPublic( $closure, 'https://nonexistent.invalid/x' ) === true );
+$config = [ './nino/fetch/resolve' => 'ninoCallableString' ];
+check( '...and a string that names a function is no lookup', \Nino\Fetch::isPublic( $config, 'https://nonexistent.invalid/x' ) === false );
+$config = [ './nino/fetch/stub' => 'ninoCallableString' ];
+check( '...nor a stub of the network: the string is not called', \Nino\Fetch::get( $config, 'https://nonexistent.invalid/x', [ 'timeout' => 1 ] )['body'] !== 'stubbed' );
+
+publish( $appData, $remote, array_merge( $features, [ entry( 'inner', '1.0.0', 'bytes', [ 'archive' => 'https://files.intranet/inner.tar.gz' ] ) ] ), null, $privateKey );
+$requests = [];
+check( 'an archive at a host that is not public is refused before it is asked for', \Nino\Catalogue::install( $appData, 'feature', 'inner', '1.0.0' ) === 'the archive could not be fetched: the address is no host of the public internet'
+	&& array_filter( $requests, static fn( array $request ): bool => str_contains( $request['url'], 'intranet' ) ) === [] );
+publish( $appData, $remote, $features, null, $privateKey );
+
+echo "\n";
+
+
+// --- Themes and packages of blocks -------------------------------------------
+
+echo "Catalogue::install - a theme and a package of blocks, from the catalogue to private/packages\n";
+
+$webp = (string) base64_decode( 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==' );
+$png = (string) base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' );
+$svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#f00"/></svg>';
+
+/**
+ *	A project with basis on, as \Nino\init() registers it, its own to put packages in
+ */
+function packageSite( string $name ): array {
+
+	$app = ninoSandbox( $name );
+	$app['./nino/filesystem/path'] = dirname( __DIR__ );
+	$app['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+	$app['/nino/html/navs'] = [ 'main', 'footer' ];
+
+	\Nino\Features::registerComponents( $app );
+
+	foreach( [ 'template', 'assets', 'jstext', 'legal', 'privacy', 'json', 'imagevalues', 'csrf' ] as $shortcode )
+		\Nino\Html::addShortcode( $app, $shortcode, static fn(): string => '', null );
+
+	return $app;
+}
+
+/**
+ *	The files of a good block, with a picture of a svg and one of a png
+ */
+function blockFiles( string $svg, string $png ): array {
+
+	$words = static fn( string $de, string $en ): array => [ 'de_DE' => $de, 'en_US' => $en ];
+	$slot = static fn( string $label ): array => [ 'placeholder' => '/nino/placeholder/landscape', 'width' => 800, 'height' => 600, 'label' => $words( $label, $label ) ];
+
+	return [
+		'block.json'				=> json_encode( [ 'name' => $words( 'Probe', 'Probe' ), 'description' => $words( 'Eine Probe', 'A probe' ), 'category' => 'content', 'rank' => 5,
+			'images' => [ 'background' => $slot( 'Hintergrund' ), '1-photo' => $slot( 'Foto' ) ] ] ),
+		'block.tpl'					=> "[section-wrap id=\"probe\" image=\"~background\"]\n\t[section-row]\n\t\t[section-col id=\"probe-1\"]\n\t\t\t[section-title ~title]\n\t\t\t[image ~photo alt=\"\"]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]\n",
+		'text/de_DE.json'		=> json_encode( [ '1-title' => 'Titel' ] ),
+		'text/en_US.json'		=> json_encode( [ '1-title' => 'Title' ] ),
+		'images/background.svg'	=> $svg,
+		'images/1-photo.png'		=> $png,
+	];
+}
+
+/**
+ *	The files of a good theme: the page, a button, with a block
+ */
+function themeFiles( string $key, string $version, array $block, string $preview ): array {
+
+	$words = static fn( string $de, string $en ): array => [ 'de_DE' => $de, 'en_US' => $en ];
+	$files = [
+		'theme.json'							=> json_encode( [ 'key' => $key, 'version' => $version, 'name' => $words( 'Craft', 'Craft' ), 'description' => $words( 'Weich', 'Soft' ), 'brand' => [] ] ),
+		'parts/page/part.json'		=> json_encode( [ 'contract' => 'kernel@^2.0', 'knobs' => [ 'radius' => [ 'label' => $words( 'Rundung', 'Radius' ), 'ladder' => [
+			[ '--page-radius' => '.375rem' ], [ '--page-radius' => '.625rem' ], [ '--page-radius' => '1rem' ], [ '--page-radius' => '1.5rem' ], [ '--page-radius' => '2rem' ] ] ] ] ] ),
+		'parts/button/part.json'	=> json_encode( [ 'contract' => 'basis@^1.0' ] ),
+		'parts/button/part.css'		=> "/*	buttons - a soft shadow	*/\n.button:not( .button--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
+		'preview.webp'						=> $preview,
+		'LICENSE.txt'							=> "Probe licence\n",
+	];
+
+	foreach( $block as $file => $bytes )
+		$files['blocks/probe/'. $file] = $bytes;
+
+	return $files;
+}
+
+/**
+ *	The files of a package of blocks
+ */
+function packFiles( string $key, string $version, array $block, string $preview ): array {
+
+	$files = [
+		'pack.json'			=> json_encode( [ 'key' => $key, 'version' => $version, 'name' => [ 'de_DE' => 'Probepaket', 'en_US' => 'Probe pack' ], 'description' => 'Probe' ] ),
+		'preview.webp'	=> $preview,
+		'LICENSE.txt'		=> "Probe licence\n",
+	];
+
+	foreach( $block as $file => $bytes )
+		$files['probe/'. $file] = $bytes;
+
+	return $files;
+}
+
+/**
+ *	The archive of a package: the files below the folder of its key
+ */
+function packageArchive( string $key, array $files ): string {
+
+	$entries = [ $key. '/' => null ];
+
+	foreach( $files as $path => $bytes )
+		$entries[ $key. '/'. $path ] = (string) $bytes;
+
+	return tarGz( $entries );
+}
+
+/**
+ *	The entry of a package for archive bytes, which are put in the remote with the picture
+ */
+function packageOffer( array &$remote, string $kind, string $key, string $version, string $bytes, string $preview, array $more = [] ): array {
+
+	$entry = packageEntry( $kind, $key, $version, $bytes, $more + [ 'preview' => [ 'url' => 'https://catalogue.test/previews/'. $key. '-'. $version. '.webp', 'sha256' => hash( 'sha256', $preview ), 'size' => strlen( $preview ) ] ] );
+	$remote[ $entry['archive'] ] = $bytes;
+	$remote[ $entry['preview']['url'] ] = $preview;
+
+	return $entry;
+}
+
+/**
+ *	Everything that lies below a folder, as the paths below it
+ */
+function packagesFound( string $dir ): array {
+
+	$found = [];
+
+	if( is_dir( $dir ) === false )
+		return $found;
+
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST ) as $entry )
+		$found[] = substr( $entry->getPathname(), strlen( $dir ) + 1 );
+
+	sort( $found );
+
+	return $found;
+}
+
+$site = packageSite( 'catalogue-packages' );
+$site['/nino/catalogue/key'] = $publicKey;
+$site['./nino/fetch/stub'] = $appData['./nino/fetch/stub'];
+$siteDir = ninoSandboxDir( $site );
+$siteStage = \Nino\Filesystem::path( $site, '/data/.packages' );
+$packages = $siteDir. '/private/packages';
+
+$block = blockFiles( $svg, $png );
+$looks100 = tarGz( featureFiles( 'Looks', 'looks', '1.0.0' ) );
+$remote['https://catalogue.test/features/looks-1.0.0.tar.gz'] = $looks100;
+$looksEntry = entry( 'looks', '1.0.0', $looks100 );
+
+$craft100 = packageArchive( 'craft-probe', themeFiles( 'craft-probe', '1.0.0', $block, $webp ) );
+$gastro100 = packageArchive( 'gastro', packFiles( 'gastro', '1.0.0', $block, $webp ) );
+$theme = packageOffer( $remote, 'theme', 'craft-probe', '1.0.0', $craft100, $webp, [ 'blocks' => [ 'probe' ], 'requires' => [ 'nino' => '^2.0', 'features' => [ 'looks' ], 'fonts' => [ 'lora' ] ] ] );
+$pack = packageOffer( $remote, 'blocks', 'gastro', '1.0.0', $gastro100, $webp, [ 'blocks' => [ [ 'key' => 'probe', 'category' => 'content' ] ] ] );
+$orphan = packageOffer( $remote, 'theme', 'orphan', '1.0.0', 'x', $webp, [ 'requires' => [ 'nino' => '^2.0', 'features' => [ 'unlisted' ] ] ] );
+$ancient = packageOffer( $remote, 'theme', 'ancient', '1.0.0', 'x', $webp, [ 'requires' => [ 'nino' => '^0.9' ] ] );
+$listed = [ $looksEntry ];
+
+publish( $site, $remote, $listed, null, $privateKey, [ $theme, $pack, $orphan, $ancient ] );
+$siteCatalogue = \Nino\Catalogue::fetch( $site );
+$siteOffers = \Nino\Catalogue::offers( $site, $siteCatalogue, 'theme' );
+
+check( 'the offers of a kind are those of the kind, sorted by key', array_keys( $siteOffers ) === [ 'ancient', 'craft-probe', 'orphan' ] && array_keys( \Nino\Catalogue::offers( $site, $siteCatalogue, 'blocks' ) ) === [ 'gastro' ]
+	&& array_keys( \Nino\Catalogue::offers( $site, $siteCatalogue, 'feature' ) ) === [ 'looks' ] );
+check( 'a theme is available, with what it asks for that is not there as a hint: the feature, which comes with it, and the font, which does not',
+	$siteOffers['craft-probe']['state'] === 'available' && $siteOffers['craft-probe']['local'] === null && $siteOffers['craft-probe']['needs'] === [ 'features' => [ 'looks' ], 'fonts' => [ 'lora' ] ] && $siteOffers['craft-probe']['blocked'] === [] );
+check( 'a theme that asks for a feature that is not there and not listed is incompatible, with the feature that cannot be had; so is one for a Nino that is not this one',
+	$siteOffers['orphan']['state'] === 'incompatible' && $siteOffers['orphan']['blocked'] === [ 'unlisted' ] && $siteOffers['ancient']['state'] === 'incompatible' && $siteOffers['ancient']['nino'] === '^0.9' && $siteOffers['ancient']['blocked'] === [] );
+
+$requests = [];
+check( 'a theme that cannot be had is refused with what is wrong, before a byte is asked for', \Nino\Catalogue::install( $site, 'theme', 'orphan', '1.0.0' ) === 'required feature "unlisted": the catalogue lists no "unlisted" this kernel can run'
+	&& \Nino\Catalogue::install( $site, 'theme', 'ancient', '1.0.0' ) === 'theme "ancient" 1.0.0 requires Nino ^0.9' && \Nino\Catalogue::install( $site, 'theme', 'none', '1.0.0' ) === 'the catalogue does not list theme "none" in version 1.0.0'
+	&& \Nino\Catalogue::install( $site, 'font', 'lora', '1.0.0' ) === 'there is no such kind of package' && array_filter( $requests, static fn( array $request ): bool => str_contains( $request['url'], '.tar.gz' ) ) === [] );
+
+$requests = [];
+$result = \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.0.0' );
+check( 'a theme installs, with the feature it asks for that the project has not - the feature first', $result === true
+	&& array_column( $site['./nino/catalogue/placed'], 'key' ) === [ 'looks', 'craft-probe' ] && array_column( $site['./nino/catalogue/placed'], 'kind' ) === [ 'feature', 'theme' ] );
+check( '...its files lie below private/packages/themes/<key> and the feature below features/, and the staging folder is empty',
+	is_file( $packages. '/themes/craft-probe/theme.json' ) === true && is_file( $packages. '/themes/craft-probe/blocks/probe/images/1-photo.png' ) === true && is_file( NINO_FEATURES_DIR. '/Looks/feature.php' ) === true && stagingClean( $siteStage ) === true );
+check( '...and what was asked for is two archives, each capped at the size of its entry', count( array_filter( $requests, static fn( array $request ): bool => str_ends_with( $request['url'], '.tar.gz' ) ) ) === 2
+	&& array_values( array_column( array_filter( $requests, static fn( array $request ): bool => str_contains( $request['url'], 'craft-probe' ) ), 'options' ) )[0]['maxBytes'] === strlen( $craft100 ) );
+check( 'a theme that was installed is current, and the hint of what it asks for is empty', \Nino\Catalogue::offers( $site, $siteCatalogue, 'theme' )['craft-probe']['state'] === 'current' && \Nino\Packages::installed( $site, 'theme' ) === [ 'craft-probe' => '1.0.0' ]
+	&& \Nino\Catalogue::offers( $site, $siteCatalogue, 'theme' )['craft-probe']['needs']['features'] === [] );
+
+$ignored = ninoWarnings();
+check( 'a package of blocks installs, and its block is among the blocks in the same request, with the key of the package as its origin',
+	\Nino\Catalogue::install( $site, 'blocks', 'gastro', '1.0.0' ) === true && ( \Nino\Blocks::all( $site )['probe']['origin'] ?? '' ) === 'pack:gastro' && is_file( $packages. '/blocks/gastro/pack.json' ) === true && stagingClean( $siteStage ) === true );
+
+// An update replaces the folder whole
+$craft110 = packageArchive( 'craft-probe', themeFiles( 'craft-probe', '1.1.0', $block, $webp ) + [ 'README.md' => "# new\n" ] );
+$theme110 = packageOffer( $remote, 'theme', 'craft-probe', '1.1.0', $craft110, $webp, [ 'blocks' => [ 'probe' ], 'requires' => [ 'nino' => '^2.0', 'features' => [ 'looks' ] ] ] );
+publish( $site, $remote, $listed, null, $privateKey, [ $theme, $theme110, $pack ] );
+$siteCatalogue = \Nino\Catalogue::fetch( $site );
+$siteOffers = \Nino\Catalogue::offers( $site, $siteCatalogue, 'theme' );
+check( 'a newer version is an upgrade, and the newer one is what is offered', $siteOffers['craft-probe']['state'] === 'upgrade' && $siteOffers['craft-probe']['version'] === '1.1.0' && $siteOffers['craft-probe']['local'] === '1.0.0' );
+
+// An exchange that fails puts the folder that was there back
+$site['./nino/packages/move'] = static fn( string $from, string $to ): bool => false;
+$ignored = ninoWarnings();
+check( 'an update whose exchange fails says so, and the version that was there is there', \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.1.0' ) === 'the folder of the package cannot be exchanged'
+	&& \Nino\Packages::installed( $site, 'theme' ) === [ 'craft-probe' => '1.0.0' ] && is_file( $packages. '/themes/craft-probe/README.md' ) === false && stagingClean( $siteStage ) === true );
+unset( $site['./nino/packages/move'] );
+
+check( 'it installs over the one that is there: the new files in, the folder whole', \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.1.0' ) === true && is_file( $packages. '/themes/craft-probe/README.md' ) === true
+	&& \Nino\Packages::installed( $site, 'theme' ) === [ 'craft-probe' => '1.1.0' ] && array_column( $site['./nino/catalogue/placed'], 'key' ) === [ 'craft-probe' ] && stagingClean( $siteStage ) === true );
+
+// One change at a time: another request holds the lock of the features
+$holder = $site;
+check( 'the lock of the features is taken by another request', \Nino\Features::lock( $holder ) === true );
+check( 'an install and a removal that find it taken say so and change nothing',
+	\Nino\Catalogue::install( $site, 'blocks', 'gastro', '1.0.0' ) === \Nino\Features::BUSY && \Nino\Catalogue::remove( $site, 'theme', 'craft-probe' ) === \Nino\Features::BUSY && \Nino\Packages::installed( $site, 'theme' ) === [ 'craft-probe' => '1.1.0' ] );
+\Nino\Features::unlock( $holder );
+
+// What is taken away: a theme and a package of blocks, and not a feature
+check( 'a theme is taken away, and so is a package of blocks - with its blocks, in the same request',
+	\Nino\Catalogue::remove( $site, 'theme', 'craft-probe' ) === true && is_dir( $packages. '/themes/craft-probe' ) === false && \Nino\Packages::installed( $site, 'theme' ) === []
+	&& \Nino\Catalogue::remove( $site, 'blocks', 'gastro' ) === true && isset( \Nino\Blocks::all( $site )['probe'] ) === false );
+check( 'one that is not there, a feature and a name that is none are refused with a sentence',
+	\Nino\Catalogue::remove( $site, 'theme', 'craft-probe' ) === 'the package is not installed' && str_contains( (string) \Nino\Catalogue::remove( $site, 'feature', 'looks' ), 'Features::remove()' ) === true
+	&& str_contains( (string) \Nino\Catalogue::remove( $site, 'theme', '../x' ), 'no key of a package' ) === true && is_dir( NINO_FEATURES_DIR. '/Looks' ) === true );
+
+echo "\n";
+
+
+// --- What a package may not be -----------------------------------------------
+
+echo "Catalogue::install - a theme that is signed and still no theme: nothing on the disk\n";
+
+$base = themeFiles( 'craft-probe', '1.0.0', $block, $webp );
+$bare = packagesFound( $packages );
+
+/**
+ *	Publish a package whose files are the good ones of a theme changed as told - signed, with the digest and the size of the archive it really is - and install it
+ *
+ *	@return 	true|string
+ */
+$tryTheme = static function( array $change, string $kind = 'theme', string $key = 'craft-probe' ) use ( &$site, &$remote, &$listed, $privateKey, $base, $webp ): true|string {
+
+	$bytes = packageArchive( $key, $change + $base );
+	$entry = packageOffer( $remote, $kind, $key, '1.0.0', $bytes, $webp );
+	publish( $site, $remote, $listed, null, $privateKey, [ $entry ] );
+
+	return \Nino\Catalogue::install( $site, $kind, $key, '1.0.0' );
+};
+
+$cases = [
+	'a php file'											=> [ [ 'evil.php' => '<?php echo 1;' ], 'evil.php: the file is no file of a theme' ],
+	'a php file below a part'					=> [ [ 'parts/button/x.php' => '<?php' ], 'parts/button/x.php: the file is no file of a theme' ],
+	'an .htaccess'										=> [ [ '.htaccess' => 'Options +ExecCGI' ], 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::PATH ] ],
+	'an @import'											=> [ [ 'parts/button/part.css' => "@import 'x.css';\n.button { color: red; }" ], 'parts/button/part.css: ' ],
+	'a token of another group, read'	=> [ [ 'parts/button/part.css' => '.button { color: var(--header-wrap-ink); }' ], 'parts/button/part.css: ' ],
+	'a token of another group, set'		=> [ [ 'parts/button/part.css' => ':root { --page-size: 1px; }' ], 'parts/button/part.css: ' ],
+	'a url()'													=> [ [ 'parts/button/part.css' => '.button { background: url(x.png); }' ], 'parts/button/part.css: ' ],
+	'a script of a block'							=> [ [ 'blocks/probe/block.tpl' => '[html]<script>alert(1)</script>[/html]' ], 'blocks/probe: ' ],
+	'a picture that is no webp'				=> [ [ 'preview.webp' => 'this is no picture' ], 'preview.webp: ' ],
+];
+$problems = [];
+foreach( $cases as $what => [ $change, $sentence ] ) {
+	$ignored = ninoWarnings();
+	$result = $tryTheme( $change );
+	if( is_string( $result ) === false || str_starts_with( $result, $sentence ) === false || packagesFound( $packages ) !== $bare || stagingClean( $siteStage ) === false )
+		$problems[] = $what. ' => '. json_encode( $result );
+}
+check( 'a theme with a php file, an @import, a token that is not its group\'s - read or set -, a url(), an .htaccess, a script in a block or a picture that is none is refused with the file and the rule, and nothing is on the disk'
+	. ( $problems === [] ? '' : ' - '. implode( '; ', $problems ) ), $problems === [] );
+check( '...the refusal is kept for a panel, as the code, the file and the words, with the kind, key and version of the entry', ( $site['./nino/catalogue/problem']['kind'] ?? '' ) === 'theme' && ( $site['./nino/catalogue/problem']['code'] ?? '' ) === 'preview'
+	&& $site['./nino/catalogue/problem']['path'] === 'preview.webp' && $site['./nino/catalogue/problem']['key'] === 'craft-probe' && $site['./nino/catalogue/problem']['version'] === '1.0.0' );
+
+$ignored = ninoWarnings();
+$result = $tryTheme( [ 'theme.json' => json_encode( [ 'key' => 'other', 'version' => '1.0.0', 'name' => 'x', 'description' => 'x' ] ) ] );
+check( 'a theme that says another key than the catalogue promised is refused - it is installed as the key of the entry -, and nothing is on the disk', $result === 'theme.json: "key" is "other" and the package is installed as "craft-probe"' && packagesFound( $packages ) === $bare && stagingClean( $siteStage ) === true );
+$result = $tryTheme( [ 'theme.json' => json_encode( [ 'key' => 'craft-probe', 'version' => '1.0.1', 'name' => 'x', 'description' => 'x' ] ) ] );
+check( '...and one that says another version', $result === 'the archive holds "craft-probe" 1.0.1, the catalogue promised "craft-probe" 1.0.0' && packagesFound( $packages ) === $bare && stagingClean( $siteStage ) === true );
+
+$bytes = packageArchive( 'craft-probe', $base );
+$entry = packageOffer( $remote, 'theme', 'craft-probe', '1.0.0', $bytes, $webp, [ 'sha256' => str_repeat( 'a', 64 ) ] );
+publish( $site, $remote, $listed, null, $privateKey, [ $entry ] );
+check( 'an archive whose digest is not the entry\'s is refused', \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.0.0' ) === 'the archive does not match what the catalogue promised' && packagesFound( $packages ) === $bare );
+$entry = packageOffer( $remote, 'theme', 'craft-probe', '1.0.0', $bytes, $webp, [ 'size' => strlen( $bytes ) + 1 ] );
+publish( $site, $remote, $listed, null, $privateKey, [ $entry ] );
+$longer = \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.0.0' );
+$entry = packageOffer( $remote, 'theme', 'craft-probe', '1.0.0', $bytes, $webp, [ 'size' => strlen( $bytes ) - 1 ] );
+publish( $site, $remote, $listed, null, $privateKey, [ $entry ] );
+check( '...and one whose size is not: more than the entry says is not read, less is not what was promised', $longer === 'the archive does not match what the catalogue promised'
+	&& \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.0.0' ) === 'the archive could not be fetched: the answer exceeds '. ( strlen( $bytes ) - 1 ). ' bytes' && packagesFound( $packages ) === $bare );
+
+$ignored = ninoWarnings();
+$result = $tryTheme( [ 'evil.php' => '<?php' ], 'blocks', 'gastro' );
+check( 'a package of blocks is checked as a package of blocks: the files of a theme are no files of it', is_string( $result ) === true && packagesFound( $packages ) === $bare );
+
+$link = tarGz( [ 'craft-probe/' => null, 'craft-probe/theme.json' => [ 'link' => '/etc/passwd' ] ] );
+$remote['https://catalogue.test/theme/link.tar.gz'] = $link;
+publish( $site, $remote, $listed, null, $privateKey, [ packageEntry( 'theme', 'craft-probe', '1.0.0', $link, [ 'archive' => 'https://catalogue.test/theme/link.tar.gz' ] ) ] );
+check( 'an archive with a link in it is refused for what it is, and nothing is on the disk', \Nino\Catalogue::install( $site, 'theme', 'craft-probe', '1.0.0' ) === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::TYPE ] && packagesFound( $packages ) === $bare );
+
+$many = [];
+for( $i = 0; $i < 401; $i++ )
+	$many['blocks/probe/images/f'. $i. '.png'] = $png;
+$result = $tryTheme( $many );
+$big = $tryTheme( [ 'preview.webp' => str_repeat( 'x', \Nino\Blocks::MAX_PICTURE + 1 ) ] );
+check( 'an archive of more entries than a theme may have, and one with a file that is larger than a picture of a block may be, are refused by the archive and nothing is on the disk',
+	$result === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::COUNT ] && $big === 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::FILE_SIZE ] && packagesFound( $packages ) === $bare && stagingClean( $siteStage ) === true );
+
+check( 'after all of that there is no theme, no package of blocks and no staging folder', \Nino\Packages::installed( $site, 'theme' ) === [] && \Nino\Packages::installed( $site, 'blocks' ) === [] && packagesFound( $packages ) === $bare && stagingClean( $siteStage ) === true );
+
+echo "\n";
+
+
+check( 'an archive is read by \Nino\Archive in memory: the catalogue names no phar, and the size of an archive of each kind is a constant of it',
+	str_contains( (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Catalogue/Catalogue.php' ), 'Phar' ) === false
+	&& \Nino\Catalogue::ARCHIVE_BYTES === [ 'feature' => 8388608, 'theme' => 2097152, 'blocks' => 2097152 ] );
+
+// A server without zlib is told so before anything is downloaded
+$childFile = $siteDir. '/nozlib.php';
+file_put_contents( $childFile, "<?php\ndefine( 'NINO_FEATURES_DIR', \$argv[1] );\nrequire \$argv[2];\n\$app = ninoSandbox( 'nozlib' );\n\$asked = 0;\n"
+	. "\$app['./nino/fetch/stub'] = static function() use ( &\$asked ): array { \$asked++; return [ 'ok' => false, 'status' => 404, 'error' => 'http 404' ]; };\n"
+	. "echo json_encode( [ \\Nino\\Catalogue::install( \$app, 'theme', 'craft-probe', '1.0.0' ), \$asked ] ), \"\\n\";\n\\Nino\\Filesystem::removeDir( ninoSandboxDir( \$app ) );\n" );
+$child = proc_open( [ PHP_BINARY, '-d', 'disable_functions=inflate_init,inflate_add', $childFile, NINO_FEATURES_DIR, __DIR__. '/harness.php' ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
+$said = json_decode( trim( (string) stream_get_contents( $pipes[1] ) ), true );
+proc_close( $child );
+check( 'without the functions of zlib an install is refused with the sentence for it, and nothing was asked of the network', $said === [ \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::UNSUPPORTED ], 0 ] );
+
+echo "\n";
+
+
+// --- The picture of a package ------------------------------------------------
+
+echo "Catalogue::preview - fetched when it is asked for, checked, and kept\n";
+
+$site2 = packageSite( 'catalogue-previews' );
+$site2['/nino/catalogue/key'] = $publicKey;
+$site2['./nino/fetch/stub'] = $appData['./nino/fetch/stub'];
+$kept = ninoSandboxDir( $site2 ). '/private/data/.catalogue/previews';
+
+$themeBare = packageOffer( $remote, 'theme', 'craft-probe', '1.0.0', $craft100, $webp );
+publish( $site2, $remote, $listed, null, $privateKey, [ $themeBare ] );
+
+$requests = [];
+check( 'before the catalogue is loaded there is nothing to ask for', \Nino\Catalogue::preview( $site2, 'theme', 'craft-probe' ) === 'the catalogue has not been loaded' && $requests === [] );
+
+\Nino\Catalogue::fetch( $site2 );
+$requests = [];
+$answer = \Nino\Catalogue::preview( $site2, 'theme', 'craft-probe' );
+check( 'the picture is the bytes of the entry, kept below data/.catalogue/previews/ by its digest', is_array( $answer ) === true && $answer['bytes'] === $webp && $answer['sha256'] === hash( 'sha256', $webp )
+	&& $answer['path'] === $kept. '/'. hash( 'sha256', $webp ). '.webp' && is_file( $answer['path'] ) === true );
+check( '...asked for once, at the address of the entry, with no more bytes than it says', count( $requests ) === 1 && $requests[0]['url'] === $themeBare['preview']['url'] && $requests[0]['options']['maxBytes'] === strlen( $webp ) );
+$requests = [];
+check( '...and from the disk after that, with no request', \Nino\Catalogue::preview( $site2, 'theme', 'craft-probe' )['bytes'] === $webp && $requests === [] );
+$requests = [];
+unset( $site2['./nino/catalogue'] );
+\Nino\Catalogue::fetch( $site2 );
+check( 'the fetch of the catalogue asks for no picture: two requests, the index and its signature', array_column( $requests, 'url' ) === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
+
+file_put_contents( $answer['path'], 'tampered' );
+$requests = [];
+check( 'a file that is kept and is no longer what the entry says is fetched again', \Nino\Catalogue::preview( $site2, 'theme', 'craft-probe' )['bytes'] === $webp && count( $requests ) === 1 && (string) file_get_contents( $answer['path'] ) === $webp );
+// The file of a request that is writing, and what no catalogue names
+file_put_contents( $kept. '/.aaaaaaaaaaaa.tmp', 'half a picture' );
+file_put_contents( $kept. '/'. str_repeat( 'b', 64 ). '.webp', 'a picture nobody names' );
+file_put_contents( $answer['path'], 'tampered' );
+\Nino\Catalogue::preview( $site2, 'theme', 'craft-probe' );
+check( 'a picture that is kept is pruned to what the catalogue names, and the file another request is writing is left as it lies', is_file( $kept. '/.aaaaaaaaaaaa.tmp' ) === true && is_file( $kept. '/'. str_repeat( 'b', 64 ). '.webp' ) === false );
+unlink( $kept. '/.aaaaaaaaaaaa.tmp' );
+
+check( 'a package that is not there, a kind that is none and a key that is none are refused', \Nino\Catalogue::preview( $site2, 'theme', 'nothing' ) === 'the catalogue has no picture of "nothing"'
+	&& is_string( \Nino\Catalogue::preview( $site2, 'font', 'craft-probe' ) ) === true && is_string( \Nino\Catalogue::preview( $site2, 'theme', '../x' ) ) === true );
+
+// What the picture may not be: the digest, the type by its head, the size, the address
+$tryPreview = static function( string $bytes, array $preview = [] ) use ( &$site2, &$remote, $privateKey, $craft100 ): array|string {
+
+	$entry = packageEntry( 'theme', 'wrong', '1.0.0', $craft100, [ 'preview' => $preview + [ 'url' => 'https://catalogue.test/previews/wrong.webp', 'sha256' => hash( 'sha256', $bytes ), 'size' => strlen( $bytes ) ] ] );
+	$remote[ $entry['preview']['url'] ] = $bytes;
+	publish( $site2, $remote, [], null, $privateKey, [ $entry ] );
+	\Nino\Catalogue::fetch( $site2 );
+
+	return \Nino\Catalogue::preview( $site2, 'theme', 'wrong' );
+};
+
+check( 'a picture whose digest is not the one the catalogue names is refused', $tryPreview( $webp, [ 'sha256' => str_repeat( 'a', 64 ) ] ) === 'the picture does not match what the catalogue promised' );
+check( 'a picture that has the digest and is a png, not a webp, is refused by its head', $tryPreview( $png ) === 'the picture does not match what the catalogue promised' );
+$wave = substr( $webp, 0, 8 ). 'WAVE'. substr( $webp, 12 );
+check( 'a RIFF that is no webp, with the length it says and the digest the entry names, is refused', $tryPreview( $wave ) === 'the picture does not match what the catalogue promised' );
+check( 'a webp whose head says another length than it has is refused', $tryPreview( substr( $webp, 0, -2 ) ) === 'the picture does not match what the catalogue promised' );
+check( 'a picture that is more than the entry says is not read to the end', $tryPreview( $webp, [ 'size' => 20 ] ) === 'the picture could not be fetched: the answer exceeds 20 bytes' );
+$other = substr( $webp, 0, 4 ). pack( 'V', strlen( $webp ) - 6 ). substr( $webp, 8 ). "\0\0";
+check( 'a picture at a host that is not public is not asked for', $tryPreview( $other, [ 'url' => 'https://files.intranet/wrong.webp' ] ) === 'the picture could not be fetched: the address is no host of the public internet' );
+check( 'nothing of what was refused is kept', array_values( array_diff( (array) scandir( $kept ), [ '.', '..', hash( 'sha256', $webp ). '.webp' ] ) ) === [] );
+
+echo "\n";
+
+
+// --- The actions of the panel for the packages --------------------------------
+
+echo "Features panel - the packages: offers of a kind, install, update, remove, the picture\n";
+
+// The feature the theme asks for was placed by the install above: this project starts without it
+\Nino\Filesystem::removeDir( NINO_FEATURES_DIR. '/Looks' );
+
+$site3 = packageSite( 'catalogue-actions' );
+$site3['/nino/catalogue/key'] = $publicKey;
+$site3['./nino/fetch/stub'] = $appData['./nino/fetch/stub'];
+$site3['/nino/admin/backups']	= false;
+$site3['/nino/admin/logs']		= false;
+$site3['/nino/auth/user']			= [];
+$site3['/nino/auth/roles']		= [];
+\Nino\Auth::insertUser( $site3, 'editor@example.com', 'correct horse battery staple', [ '/_admin/text/manage' ] );
+\Nino\Auth::insertUser( $site3, 'dev@example.com', 'correct horse battery staple', [ \Nino\Modules\Features\Admin::MANAGE_PERM ] );
+$site3Stage = \Nino\Filesystem::path( $site3, '/data/.packages' );
+$site3Packages = ninoSandboxDir( $site3 ). '/private/packages';
+
+// What the sections above put in the remote for these packages is what they are, again
+$theme = packageOffer( $remote, 'theme', 'craft-probe', '1.0.0', $craft100, $webp, [ 'blocks' => [ 'probe' ], 'requires' => [ 'nino' => '^2.0', 'features' => [ 'looks' ], 'fonts' => [ 'lora' ] ] ] );
+$pack = packageOffer( $remote, 'blocks', 'gastro', '1.0.0', $gastro100, $webp, [ 'blocks' => [ [ 'key' => 'probe', 'category' => 'content' ] ] ] );
+
+// A package in the catalogue that is no package: left out, and the panel says it
+$brokenTheme = [ 'kind' => 'theme', 'key' => 'broken', 'version' => '1.0.0', 'name' => '' ];
+$requests = [];
+publish( $site3, $remote, $listed, null, $privateKey, [ $theme, $pack, $brokenTheme ] );
+
+$packageActions = [
+	'apiPackages'				=> [ 'kind' => 'theme' ],
+	'apiPackageInstall'	=> [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.0.0' ],
+	'apiPackageUpdate'	=> [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.0.0' ],
+	'apiPackageRemove'	=> [ 'kind' => 'theme', 'key' => 'craft-probe' ],
+	'apiPackagePreview'	=> [ 'kind' => 'theme', 'key' => 'craft-probe' ],
+];
+
+foreach( $packageActions as $method => $data )
+	check( $method. ' is 401 without an account', callFeatures( $site3, $method, $data ) === [ 401, [ 'error' => 'not logged in', 'code' => 'session' ] ] );
+
+\Nino\Auth::loginUser( $site3, 'editor@example.com', 'correct horse battery staple' );
+foreach( $packageActions as $method => $data )
+	check( $method. ' is 403 without the permission', callFeatures( $site3, $method, $data ) === [ 403, [ 'error' => 'not allowed' ] ] );
+check( '...and nothing was asked of the catalogue, and nothing is on the disk', $requests === [] && packagesFound( $site3Packages ) === [] );
+
+\Nino\Auth::loginUser( $site3, 'dev@example.com', 'correct horse battery staple' );
+
+[ $status, $body ] = callFeatures( $site3, 'apiPackages', [ 'kind' => 'font' ] );
+check( 'a kind that is none is a 400 with its code', $status === 400 && ( $body['code'] ?? '' ) === 'features_package_invalid' && $requests === [] );
+[ $status, $body ] = callFeatures( $site3, 'apiPackages', [ 'kind' => 'theme' ] );
+check( 'before the catalogue was fetched there is none to show, and no request is made to show it', $status === 200 && $body['catalogue'] === null && $requests === [] );
+
+[ $status, $body ] = callFeatures( $site3, 'apiPackages', [ 'kind' => 'theme', 'refresh' => true ] );
+check( 'with refresh the catalogue is fetched - two requests - and the themes are answered: what the list reads, and not the address of the archive or the picture', $status === 200 && count( $requests ) === 2
+	&& array_keys( $body ) === [ 'kind', 'catalogue', 'catalogueUrl', 'fetched', 'writable', 'offers', 'unreadable' ] && array_column( $body['offers'], 'key' ) === [ 'craft-probe']
+	&& str_contains( (string) json_encode( $body ), 'tar.gz' ) === false && str_contains( (string) json_encode( $body ), 'previews' ) === false );
+check( '...an offer has its state, what it asks for that is not there, its parts, fonts and blocks, and whether it has a picture', ( $body['offers'][0]['state'] ?? '' ) === 'available' && $body['offers'][0]['needs'] === [ 'features' => [ 'looks' ], 'fonts' => [ 'lora' ] ]
+	&& $body['offers'][0]['blocks'] === [ [ 'key' => 'probe', 'category' => '' ] ] && $body['offers'][0]['fonts'] === [ 'lora' ] && $body['offers'][0]['parts'] === [] && $body['offers'][0]['preview'] === true
+	&& $body['offers'][0]['name'] === 'Craft-probe' );
+check( '...and the entry of a theme that is none is listed with the reason, the others of the kind are not', $body['unreadable'] === [ [ 'key' => 'broken', 'reason' => '"name" must be a string or a locale => string map' ] ]
+	&& callFeatures( $site3, 'apiPackages', [ 'kind' => 'blocks' ] )[1]['unreadable'] === [] );
+
+$requests = [];
+[ $status, $body ] = callFeatures( $site3, 'apiPackages', [ 'kind' => 'feature' ] );
+check( 'the features of the catalogue are answered the same way, with their category and maturity, from what was kept', $status === 200 && $requests === [] && array_column( $body['offers'], 'key' ) === [ 'looks' ] && array_key_exists( 'category', $body['offers'][0] ) === true );
+
+// The picture: a file of the response, the one the kernel keeps
+$requests = [];
+$response = ninoCall( $site3, [ \Nino\Modules\Features\Admin::class, 'apiPackagePreview' ], [ 'kind' => 'theme', 'key' => 'craft-probe' ] );
+$kept = ninoSandboxDir( $site3 ). '/private/data/.catalogue/previews/'. hash( 'sha256', $webp ). '.webp';
+check( 'the picture is answered as a file - the one kept below data/, webp, private - and the request has chosen no path', $response[0] === 200 && is_file( $kept ) === true && count( $requests ) === 1
+	&& ( $response[2]['/nino/http/response']['file'] ?? '' ) === $kept && ( $response[2]['/nino/http/response']['header']['Content-Type'] ?? '' ) === 'image/webp' && str_starts_with( (string) ( $response[2]['/nino/http/response']['header']['Cache-Control'] ?? '' ), 'private' ) === true );
+check( '...inline, under a name of its own and not one of the request', ( $response[2]['/nino/http/response']['header']['Content-Disposition'] ?? '' ) === 'inline; filename="preview.webp"' );
+$response = callFeatures( $site3, 'apiPackagePreview', [ 'kind' => 'theme', 'key' => '../x' ] );
+check( 'a key that is none, and a package the catalogue has no picture of, are a 400 with the code of the action - no 404, which is for a file that is not there', $response[0] === 400 && ( callFeatures( $site3, 'apiPackagePreview', [ 'kind' => 'theme', 'key' => 'nothing' ] )[1]['code'] ?? '' ) === 'features_preview_failed' && callFeatures( $site3, 'apiPackagePreview', [ 'kind' => 'theme', 'key' => 'nothing' ] )[0] === 400 );
+
+$requests = [];
+[ $status, $body ] = callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.0.0' ] );
+check( 'a theme is installed with the feature it asks for, which is switched on: the answer says what was placed, in order, and what is on now', $status === 200
+	&& array_column( $body['placed'], 'key' ) === [ 'looks', 'craft-probe' ] && array_column( $body['switchedOn'], 'key' ) === [ 'looks' ] && ( $body['package']['state'] ?? '' ) === 'current' && ( $body['package']['local'] ?? '' ) === '1.0.0'
+	&& is_file( $site3Packages. '/themes/craft-probe/theme.json' ) === true && \Nino\Features::get( $site3, 'looks' )['active'] === true && stagingClean( $site3Stage ) === true );
+[ $status, $body ] = callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.0.0' ] );
+check( 'a theme that is installed is not installed again: that is an update', $status === 400 && ( $body['code'] ?? '' ) === 'features_package_installed' );
+[ $status, $body ] = callFeatures( $site3, 'apiPackageUpdate', [ 'kind' => 'blocks', 'key' => 'gastro', 'version' => '1.0.0' ] );
+check( 'a package that is not installed is not updated: that is an install', $status === 400 && ( $body['code'] ?? '' ) === 'features_package_absent' );
+[ $status, $body ] = callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'feature', 'key' => 'looks', 'version' => '1.0.0' ] );
+check( 'a feature is not installed here: it has its own action', $status === 400 && ( $body['code'] ?? '' ) === 'features_package_invalid' );
+foreach( [ [ 'kind' => 'theme', 'key' => 'Craft', 'version' => '1.0.0' ], [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => 'latest' ], [ 'kind' => 'theme', 'key' => [ 'a' ], 'version' => '1.0.0' ], [ 'kind' => 'theme', 'key' => str_repeat( 'a', 41 ), 'version' => '1.0.0' ] ] as $posted )
+	$invalid[] = callFeatures( $site3, 'apiPackageInstall', $posted )[1]['code'] ?? '';
+check( 'a key that is no slug, a version that is none and a key that is no string are refused before the kernel is asked', array_unique( $invalid ) === [ 'features_package_invalid' ] );
+
+// A refused package: the sentence names the file, the rule is the kernel's, and nothing is on the disk
+$evil = packageArchive( 'evil-one', themeFiles( 'evil-one', '1.0.0', [], $webp ) + [ 'x.php' => '<?php' ] );
+$evilEntry = packageOffer( $remote, 'theme', 'evil-one', '1.0.0', $evil, $webp );
+publish( $site3, $remote, $listed, null, $privateKey, [ $theme, $pack, $evilEntry ] );
+\Nino\Catalogue::fetch( $site3 );
+$ignored = ninoWarnings();
+[ $status, $body ] = callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'theme', 'key' => 'evil-one', 'version' => '1.0.0' ] );
+check( 'a theme with a php file is a 400 with the code of it and the sentence of the kernel - the file and the rule - and nothing of it is on the disk', $status === 400 && ( $body['code'] ?? '' ) === 'features_package_failed'
+	&& $body['params'] === [ 'x.php: the file is no file of a theme' ] && is_dir( $site3Packages. '/themes/evil-one' ) === false && stagingClean( $site3Stage ) === true && str_contains( (string) json_encode( $body ), ninoSandboxDir( $site3 ) ) === false );
+
+// One change at a time
+$holder = $site3;
+\Nino\Features::lock( $holder );
+check( 'an install, an update and a removal that find the lock taken are a 409 with the code of it, and change nothing',
+	callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'blocks', 'key' => 'gastro', 'version' => '1.0.0' ] )[0] === 409 && callFeatures( $site3, 'apiPackageUpdate', [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.0.0' ] )[0] === 409
+	&& callFeatures( $site3, 'apiPackageRemove', [ 'kind' => 'theme', 'key' => 'craft-probe' ] ) === [ 409, [ 'error' => \Nino\Features::BUSY, 'code' => 'features_busy' ] ] && \Nino\Packages::installed( $site3, 'blocks' ) === [] && is_dir( $site3Packages. '/themes/craft-probe' ) === true );
+\Nino\Features::unlock( $holder );
+
+[ $status, $body ] = callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'blocks', 'key' => 'gastro', 'version' => '1.0.0' ] );
+check( 'a package of blocks is installed the same way, with nothing to switch on', $status === 200 && array_column( $body['placed'], 'key' ) === [ 'gastro' ] && $body['switchedOn'] === [] && is_file( $site3Packages. '/blocks/gastro/pack.json' ) === true );
+
+$craft110 = packageArchive( 'craft-probe', themeFiles( 'craft-probe', '1.1.0', blockFiles( $svg, $png ), $webp ) );
+$theme110 = packageOffer( $remote, 'theme', 'craft-probe', '1.1.0', $craft110, $webp, [ 'blocks' => [ 'probe' ] ] );
+publish( $site3, $remote, $listed, null, $privateKey, [ $theme110, $pack ] );
+[ $status, $body ] = callFeatures( $site3, 'apiPackages', [ 'kind' => 'theme', 'refresh' => true ] );
+check( 'the list says a theme that is installed in an older version has an update', $status === 200 && $body['offers'][0]['state'] === 'upgrade' && $body['offers'][0]['local'] === '1.0.0' && $body['offers'][0]['version'] === '1.1.0' );
+[ $status, $body ] = callFeatures( $site3, 'apiPackageUpdate', [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.1.0' ] );
+check( 'the update replaces it, and the answer says what it is now', $status === 200 && ( $body['package']['local'] ?? '' ) === '1.1.0' && ( $body['package']['state'] ?? '' ) === 'current' && \Nino\Packages::installed( $site3, 'theme' ) === [ 'craft-probe' => '1.1.0' ] );
+
+[ $status, $body ] = callFeatures( $site3, 'apiPackageRemove', [ 'kind' => 'theme', 'key' => 'craft-probe' ] );
+check( 'a theme is removed, and a package of blocks', $status === 200 && $body === [ 'removed' => 'craft-probe', 'kind' => 'theme' ] && is_dir( $site3Packages. '/themes/craft-probe' ) === false
+	&& callFeatures( $site3, 'apiPackageRemove', [ 'kind' => 'blocks', 'key' => 'gastro' ] )[0] === 200 && \Nino\Packages::installed( $site3, 'blocks' ) === [] );
+[ $status, $body ] = callFeatures( $site3, 'apiPackageRemove', [ 'kind' => 'theme', 'key' => 'craft-probe' ] );
+check( 'one that is not there is a 400, a feature is not removed here', $status === 400 && ( $body['code'] ?? '' ) === 'features_package_absent' && callFeatures( $site3, 'apiPackageRemove', [ 'kind' => 'feature', 'key' => 'looks' ] )[0] === 400
+	&& is_dir( NINO_FEATURES_DIR. '/Looks' ) === true );
+
+$missing = [];
+foreach( [ 'en_US', 'de_DE' ] as $locale )
+	foreach( [ 'features_package_invalid', 'features_package_installed', 'features_package_absent', 'features_package_failed', 'features_package_remove_failed', 'features_preview_failed' ] as $code )
+		if( panelWord( $locale, '/_admin/error/'. $code, 'x' ) === '' )
+			$missing[] = $locale. ' '. $code;
+check( 'the codes of these actions have a sentence in both interface languages', $missing === [] );
+
+foreach( [ $site, $site2, $site3 ] as $gone )
+	\Nino\Filesystem::removeDir( ninoSandboxDir( $gone ) );
 
 echo "\n";
 

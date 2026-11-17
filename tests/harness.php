@@ -29,6 +29,7 @@ declare(strict_types=1);
  *								ninoCall()			One workbench request, as a panel sees it
  *								ninoUser()			An account, inserted and signed in
  *								ninoVisit()			One request of the site, through Http::request()
+ *								ninoCatalogue()	The json of a catalogue of format 2, from entries of features written flat
  *								ninoDone()			The summary and its seconds, the sandbox removed
  *
  *	Usage: require it, build a sandbox with ninoSandbox(), check() away,
@@ -256,6 +257,37 @@ function ninoVisit( array &$appData, string $uri, string $method = 'GET', array 
 	\Nino\Http::request( $appData, $request );
 
 	return $request;
+}
+
+/**
+ *	The json of a catalogue in format 2. A feature is given the way a test writes it - key, version, nino, php => [ ext ],
+ *	requires => [ keys of features ] and the rest flat - and is put in the shape the catalogue has: kind, and what it asks
+ *	for under requires. An entry that has a kind already is taken as it is, and so is a field that is not one of those
+ *
+ *	@param		array 		$features			Entries of features, flat
+ *	@param		array 		$applications	Applications
+ *	@param		array 		$packages			Entries of themes and of packages of blocks, as the catalogue has them
+ *	@param		string		$generated
+ *
+ *	@return 	string
+ */
+function ninoCatalogue( array $features, array $applications = [], array $packages = [], string $generated = '2026-11-13T12:00:00Z' ): string {
+
+	$entries = [];
+
+	foreach( $features as $entry ) {
+
+		if( is_array( $entry ) === true && isset( $entry['kind'] ) === false ) {
+
+			$requires = [ 'nino' => $entry['nino'] ?? '*', 'php' => (array) ( $entry['php']['ext'] ?? [] ), 'features' => $entry['requires'] ?? [] ];
+			unset( $entry['nino'], $entry['php'], $entry['requires'] );
+			$entry = [ 'kind' => 'feature' ] + $entry + [ 'requires' => $requires ];
+		}
+
+		$entries[] = $entry;
+	}
+
+	return (string) json_encode( [ 'format' => 2, 'generated' => $generated, 'packages' => array_merge( $entries, $packages ), 'applications' => $applications ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 }
 
 /**

@@ -157,7 +157,7 @@ return [
 	'[[/_admin/features/error/application-apply]]'	=> 'The feature could not be set up.',
 	// What loading needs and the server lacks, by the key \Nino\Applications::missing() gives it
 	'[[/_admin/features/missing/openssl]]'	=> 'the openssl extension, which checks the signature of the catalogue',
-	'[[/_admin/features/missing/unpack]]'	=> 'the Phar and zlib extensions, which unpack what is downloaded',
+	'[[/_admin/features/missing/unpack]]'	=> 'the zlib extension, which unpacks what is downloaded',
 	'[[/_admin/features/missing/http]]'	=> 'the curl extension or allow_url_fopen, which download the catalogue',
 	'[[/_admin/features/missing/features]]'	=> 'a features/ directory the web server can write to',
 	// The refusals a person can cause (see \Nino\Http::fail()): the code is the fill
@@ -168,6 +168,12 @@ return [
 	'[[/_admin/error/features_application_feature]]'	=> 'This feature does not belong to the application.',
 	'[[/_admin/error/features_application_failed]]'	=> 'The feature could not be set up: %s',
 	'[[/_admin/error/features_busy]]'	=> 'Another change of the features is running. Try again in a moment.',
+	'[[/_admin/error/features_package_invalid]]'	=> 'The request names no kind, key or version of a package.',
+	'[[/_admin/error/features_package_installed]]'	=> 'This package is installed already. Update it instead.',
+	'[[/_admin/error/features_package_absent]]'	=> 'This package is not installed.',
+	'[[/_admin/error/features_package_failed]]'	=> 'The package could not be installed: %s',
+	'[[/_admin/error/features_package_remove_failed]]'	=> 'The package could not be removed: %s',
+	'[[/_admin/error/features_preview_failed]]'	=> 'The picture of the package is not available: %s',
 	'[[/_admin/error/features_install_failed]]'	=> 'The feature could not be installed: %s',
 	'[[/_admin/error/features_remove_failed]]'	=> 'The directory could not be removed: %s',
 	'[[/_admin/error/features_unknown]]'	=> 'There is no such feature in this project.',

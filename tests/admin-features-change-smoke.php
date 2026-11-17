@@ -105,7 +105,7 @@ $applications = [
  */
 $publish = static function( array &$app, ?string $signWith = null, ?string $url = null ) use ( &$remote, &$features, &$applications, $privateKey ): void {
 	$url = $url ?? \Nino\Catalogue::DEFAULT_URL;
-	$json = json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => array_values( $features ), 'applications' => $applications ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+	$json = ninoCatalogue( array_values( $features ), $applications );
 	openssl_sign( $json, $signature, $signWith ?? $privateKey, OPENSSL_ALGO_SHA256 );
 	$remote[$url]					= $json;
 	$remote[$url. '.sig']	= base64_encode( $signature );
@@ -224,7 +224,7 @@ $listed = static function( array &$app, string $class ): bool {
 };
 
 $place = static function( array &$app, string $key, bool $on = false ): void {
-	$result = \Nino\Catalogue::install( $app, $key, '1.0.0' );
+	$result = \Nino\Catalogue::install( $app, 'feature', $key, '1.0.0' );
 	unset( $app['./nino/features/all'] );
 	if( $result === true && $on === true )
 		$result = \Nino\Features::activate( $app, $key );
@@ -264,7 +264,7 @@ check( '...none of them changed config.php, a directory or asked for an archive'
 check( 'the kernel\'s steps refuse alike: switching on, off, removing, installing, saving settings', \Nino\Features::activate( $app, 'alpha' ) === \Nino\Features::BUSY
 	&& \Nino\Features::deactivate( $app, 'alpha' ) === \Nino\Features::BUSY
 	&& \Nino\Features::remove( $app, 'alpha' ) === \Nino\Features::BUSY
-	&& \Nino\Catalogue::install( $app, 'gamma', '1.0.0' ) === \Nino\Features::BUSY
+	&& \Nino\Catalogue::install( $app, 'feature', 'gamma', '1.0.0' ) === \Nino\Features::BUSY
 	&& \Nino\Features::saveSettings( $app, 'alpha', [] ) === [ '' => \Nino\Features::BUSY ] );
 $placed = \Nino\Applications::place( $app, $catalogue, 'alpha' );
 check( '...and so does the step both the panel and the wizard set an application up with: status 409, nothing placed', $placed['status'] === 409 && $placed['placed'] === false && $placed['activated'] === false );
@@ -442,7 +442,7 @@ ninoWarnings();
 [ $status, $body ] = $call( $app, 'apiActivate', [ 'key' => 'alpha' ] );
 check( 'a lock file that cannot be opened (a directory in its place) is a 500 with a code of its own, and nothing changes', $status === 500 && ( $body['code'] ?? '' ) === 'features_lock_failed' && $listed( $app, '\\Nino\\Modules\\Alpha' ) === false );
 $warnings = ninoWarnings();
-check( '...the kernel\'s steps say the same, and the log names where to look', \Nino\Features::activate( $app, 'alpha' ) === \Nino\Features::UNLOCKABLE && \Nino\Catalogue::install( $app, 'gamma', '1.0.0' ) === \Nino\Features::UNLOCKABLE
+check( '...the kernel\'s steps say the same, and the log names where to look', \Nino\Features::activate( $app, 'alpha' ) === \Nino\Features::UNLOCKABLE && \Nino\Catalogue::install( $app, 'feature', 'gamma', '1.0.0' ) === \Nino\Features::UNLOCKABLE
 	&& count( $warnings ) === 1 && str_contains( $warnings[0], '.locks' ) === true );
 rmdir( $lockFile );
 $holder = $elsewhere( $app );
@@ -462,7 +462,7 @@ unset( $app['./nino/features/all'] );
 $dies = [
 	'switching off'			=> static fn() => \Nino\Features::deactivate( $app, 'alpha' ),
 	'removing'					=> static fn() => \Nino\Features::remove( $app, 'alpha' ),
-	'installing'				=> static fn() => \Nino\Catalogue::install( $app, 'needs', '1.0.0' ),
+	'installing'				=> static fn() => \Nino\Catalogue::install( $app, 'feature', 'needs', '1.0.0' ),
 	'the panel\'s change'	=> function() use ( &$app, $call ) { return $call( $app, 'apiDeactivate', [ 'key' => 'alpha' ] ); },
 	'saving settings'		=> static fn() => \Nino\Features::saveSettings( $app, 'alpha', [] ),
 ];
@@ -556,21 +556,21 @@ for( $i = 0; $i < 5100; $i++ )
 
 // case => [ the bytes of the archive, fields of the entry that differ, what to do to the project first ]
 $cases = [
-	'bytes that are no archive'				=> [ str_repeat( 'not an archive at all ', 50 ), [], null, true ],
-	'an archive cut short'						=> [ substr( $tar( $tarFiles() ), 0, 60 ), [], null, true ],
-	'an empty archive'								=> [ $tar( [] ), [], null, false ],
-	'a digest that does not match'		=> [ $tar( $tarFiles() ), [ 'sha256' => str_repeat( 'a', 64 ) ], null, false ],
-	'a size that does not match'			=> [ $tar( $tarFiles() ), [ 'size' => 1234567 ], null, false ],
-	'an entry beside the directory'		=> [ $tar( $tarFiles( [ 'Other/x.txt' => 'x' ] ) ), [], null, false ],
-	'an entry that climbs out'				=> [ $tar( $tarFiles( [ 'Alpha/../evil.txt' => 'x' ] ) ), [], null, false ],
-	'more entries than allowed'				=> [ $tar( $tarFiles( $many ) ), [], null, false ],
-	'no manifest'											=> [ $tar( $tarFiles( [], [ 'Alpha/feature.php' ] ) ), [], null, false ],
-	'a manifest that does not parse'	=> [ $tar( $tarFiles( [ 'Alpha/feature.php' => '<?php return [ ;' ] ) ), [], null, false ],
-	'another feature than promised'		=> [ $tar( $tarFiles( [ 'Alpha/feature.php' => '<?php return [ \'key\' => \'zeta\', \'name\' => \'Z\', \'version\' => \'1.0.0\' ];' ] ) ), [], null, false ],
-	'a file where the directory goes'	=> [ $tar( [ 'Alpha' => 'x' ] ), [], null, false ],
-	'an archive that is not there'		=> [ 'x', [ 'archive' => 'https://catalogue.test/features/missing.tar.gz' ], null, false ],
-	'a staging directory that cannot be made' => [ $tar( $tarFiles() ), [], static function( string $dir ): void { mkdir( $dir. '/private/data', 0777, true ); file_put_contents( $dir. '/private/data/.features', 'a file where the directory goes' ); }, false ],
-	'a unit that cannot be copied'		=> [ $tar( $tarFiles( [ 'Alpha/install/' => null, 'Alpha/install/manifest.php' => '<?php return [ \'templates\' => [ \'page-x.tpl\' ] ];', 'Alpha/install/templates/page-x.tpl' => 'x' ] ) ), [], static function( string $dir ): void { mkdir( $dir. '/private/templates/page-x.tpl', 0777, true ); }, false ],
+	'bytes that are no archive'				=> [ str_repeat( 'not an archive at all ', 50 ), [], null ],
+	'an archive cut short'						=> [ substr( $tar( $tarFiles() ), 0, 60 ), [], null ],
+	'an empty archive'								=> [ $tar( [] ), [], null ],
+	'a digest that does not match'		=> [ $tar( $tarFiles() ), [ 'sha256' => str_repeat( 'a', 64 ) ], null ],
+	'a size that does not match'			=> [ $tar( $tarFiles() ), [ 'size' => 1234567 ], null ],
+	'an entry beside the directory'		=> [ $tar( $tarFiles( [ 'Other/x.txt' => 'x' ] ) ), [], null ],
+	'an entry that climbs out'				=> [ $tar( $tarFiles( [ 'Alpha/../evil.txt' => 'x' ] ) ), [], null ],
+	'more entries than allowed'				=> [ $tar( $tarFiles( $many ) ), [], null ],
+	'no manifest'											=> [ $tar( $tarFiles( [], [ 'Alpha/feature.php' ] ) ), [], null ],
+	'a manifest that does not parse'	=> [ $tar( $tarFiles( [ 'Alpha/feature.php' => '<?php return [ ;' ] ) ), [], null ],
+	'another feature than promised'		=> [ $tar( $tarFiles( [ 'Alpha/feature.php' => '<?php return [ \'key\' => \'zeta\', \'name\' => \'Z\', \'version\' => \'1.0.0\' ];' ] ) ), [], null ],
+	'a file where the directory goes'	=> [ $tar( [ 'Alpha' => 'x' ] ), [], null ],
+	'an archive that is not there'		=> [ 'x', [ 'archive' => 'https://catalogue.test/features/missing.tar.gz' ], null ],
+	'a staging directory that cannot be made' => [ $tar( $tarFiles() ), [], static function( string $dir ): void { mkdir( $dir. '/private/data', 0777, true ); file_put_contents( $dir. '/private/data/.packages', 'a file where the directory goes' ); } ],
+	'a unit that cannot be copied'		=> [ $tar( $tarFiles( [ 'Alpha/install/' => null, 'Alpha/install/manifest.php' => '<?php return [ \'templates\' => [ \'page-x.tpl\' ] ];', 'Alpha/install/templates/page-x.tpl' => 'x' ] ) ), [], static function( string $dir ): void { mkdir( $dir. '/private/templates/page-x.tpl', 0777, true ); } ],
 ];
 
 $leak = static function( mixed $body, string $sandbox ): bool {
@@ -585,9 +585,8 @@ foreach( [ 'apiInstall', 'apiApplicationApply' ] as $method ) {
 
 	$failures = [];
 	$leaks = [];
-	$logged = [];
 
-	foreach( $cases as $name => [ $bytes, $entry, $prepare, $names ] ) {
+	foreach( $cases as $name => [ $bytes, $entry, $prepare ] ) {
 
 		$reset();
 		$app = $project( 'change-answers' );
@@ -602,22 +601,18 @@ foreach( [ 'apiInstall', 'apiApplicationApply' ] as $method ) {
 		[ $status, $body ] = $method === 'apiInstall'
 			? $call( $app, 'apiInstall', [ 'key' => 'alpha', 'version' => '1.0.0' ] )
 			: $apply( $app, 'solo', 'alpha' );
-		$warnings = ninoWarnings();
+		ninoWarnings();
 
 		if( $status < 400 )
 			$failures[] = $name;
 		if( $leak( $body, $sandbox ) === true )
 			$leaks[] = $name;
-		// What php and phar said goes to the log, with the path: the two cases that have php speak
-		if( $names === true && ( count( $warnings ) !== 1 || str_contains( $warnings[0], $sandbox ) === false ) )
-			$logged[] = $name;
 
 		\Nino\Filesystem::removeDir( $sandbox );
 	}
 
 	check( $method. ': every one of '. count( $cases ). ' ways an archive or a download can fail is refused', $failures === [] );
 	check( '...and no answer holds the project directory, the features directory or the temp directory', $leaks === [] );
-	check( '...where php or phar spoke, the log of the house has it once, with the path', $logged === [] );
 }
 
 // A transport that names a file of this server (a certificate the php.ini points at)
@@ -664,13 +659,13 @@ file_put_contents( $sandbox. '/write.php', "<?php\ndefine( 'NINO_FEATURES_DIR', 
 	. "\$app['./nino/filesystem/path'] = \$dir;\n\$app['./nino/filesystem/configpath'] = \$dir. '/private';\n\$app['./nino/filesystem/contentpath'] = \$dir. '/private';\n\$app['./nino/filesystem/publicpath'] = \$dir. '/public';\n"
 	. "\$app['/nino/catalogue/key'] = file_get_contents( \$dir. '/key.pem' );\n\$remote = unserialize( file_get_contents( \$dir. '/remote.ser' ) );\n"
 	. "\$app['./nino/fetch/stub'] = static fn( string \$url, array \$o ): array => isset( \$remote[\$url] ) ? [ 'ok' => true, 'status' => 200, 'body' => \$remote[\$url] ] : [ 'ok' => false, 'status' => 404, 'error' => 'http 404' ];\n"
-	. "\$result = \\Nino\\Catalogue::install( \$app, 'alpha', '1.0.0' );\necho json_encode( [ \$result, ninoWarnings() ] ), \"\\n\";\n" );
+	. "\$result = \\Nino\\Catalogue::install( \$app, 'feature', 'alpha', '1.0.0' );\necho json_encode( [ \$result, ninoWarnings() ] ), \"\\n\";\n" );
 $child = proc_open( [ 'sh', '-c', 'trap "" XFSZ; ulimit -f 4; exec "$@"', 'sh', PHP_BINARY, $sandbox. '/write.php', NINO_FEATURES_DIR, __DIR__. '/harness.php', $sandbox ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
 $said = json_decode( trim( (string) stream_get_contents( $pipes[1] ) ), true );
 proc_close( $child );
-$staged = is_array( $said ) === true ? array_values( array_filter( (array) $said[1], static fn( string $w ): bool => str_contains( $w, $sandbox. '/private/data/.features/' ) ) ) : [];
+$staged = is_array( $said ) === true ? array_values( array_filter( (array) $said[1], static fn( string $w ): bool => str_contains( $w, 'was not changed' ) ) ) : [];
 check( 'an archive that cannot be written to the staging directory is the sentence, with no path', is_array( $said ) === true && is_string( $said[0] ) === true && str_contains( $said[0], $sandbox ) === false && str_contains( $said[0], 'staging' ) === true );
-check( '...and the log of the house names the file and what php said', count( $staged ) === 1 );
+check( '...and the log of the house says it once', count( $staged ) === 1 && str_contains( $staged[0], $sandbox ) === false );
 \Nino\Filesystem::removeDir( $sandbox );
 
 // A directory that cannot be removed

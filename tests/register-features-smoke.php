@@ -1296,7 +1296,7 @@ $entryOf = static fn( string $key, string $version, array $more = [] ): array =>
 	'key' => $key, 'name' => ucfirst( $key ), 'description' => [ 'en_US' => 'A '. $key, 'de_DE' => 'Ein '. $key ], 'version' => $version, 'nino' => '^2.0', 'php' => [ 'ext' => [] ], 'requires' => [],
 	'directory' => ucfirst( $key ), 'archive' => 'https://catalogue.test/features/'. $key. '-'. $version. '.tar.gz', 'sha256' => hash( 'sha256', $archive ), 'size' => strlen( $archive ), 'released' => '2026-11-13',
 ];
-$json = (string) json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'probe', '9.9.9' ), $entryOf( 'newcomer', '1.0.0' ) ] ], JSON_UNESCAPED_SLASHES );
+$json = ninoCatalogue( [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'probe', '9.9.9' ), $entryOf( 'newcomer', '1.0.0' ) ] );
 openssl_sign( $json, $signature, $privateKey, OPENSSL_ALGO_SHA256 );
 $remote = [ \Nino\Catalogue::DEFAULT_URL => $json, \Nino\Catalogue::DEFAULT_URL. '.sig' => base64_encode( $signature ) ];
 $requests = [];
@@ -1308,23 +1308,23 @@ $catalogueApp['./nino/fetch/stub'] = static function( string $url, array $option
 	return isset( $remote[$url] ) === true ? [ 'ok' => true, 'status' => 200, 'body' => $remote[$url] ] : [ 'ok' => false, 'status' => 404, 'error' => 'http 404' ];
 };
 $fetched = \Nino\Catalogue::fetch( $catalogueApp );
-$offers = \Nino\Catalogue::offers( $catalogueApp, is_array( $fetched ) === true ? $fetched : [ 'features' => [] ] );
+$offers = \Nino\Catalogue::offers( $catalogueApp, is_array( $fetched ) === true ? $fetched : [ 'packages' => [] ], 'feature' );
 check( 'the catalogue offers no update of a delivered feature: whatever version it lists, the offer is current and says it is delivered - and an installed feature is offered the update as it was',
 	is_array( $fetched ) === true && $offers['parcel']['state'] === 'current' && $offers['parcel']['shipped'] === true && $offers['parcel']['local'] === '1.0.0' && $offers['probe']['state'] === 'upgrade' && $offers['probe']['shipped'] === false && $offers['newcomer']['state'] === 'available' );
 $requests = [];
-$installed = \Nino\Catalogue::install( $catalogueApp, 'parcel', '9.9.9' );
+$installed = \Nino\Catalogue::install( $catalogueApp, 'feature', 'parcel', '9.9.9' );
 check( 'an install of a delivered feature is refused before a byte is downloaded, with the sentence for it - and the one of an installed feature goes on to the download',
 	$installed === 'the feature "parcel" is delivered with the kernel and is updated with it' && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, '.tar.gz' ) === true ) === []
-	&& str_contains( (string) \Nino\Catalogue::install( $catalogueApp, 'probe', '9.9.9' ), 'archive' ) === true && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'probe-9.9.9.tar.gz' ) === true ) !== [] );
+	&& str_contains( (string) \Nino\Catalogue::install( $catalogueApp, 'feature', 'probe', '9.9.9' ), 'archive' ) === true && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'probe-9.9.9.tar.gz' ) === true ) !== [] );
 check( '...nor does a feature that requires a delivered one place it: the requirement is there, and the feature itself goes to the download', ( static function() use ( $entryOf, &$remote, &$catalogueApp, &$requests, $privateKey ): bool {
 
-	$json = (string) json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'needy', '1.0.0', [ 'requires' => [ 'parcel' ] ] ) ] ], JSON_UNESCAPED_SLASHES );
+	$json = ninoCatalogue( [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'needy', '1.0.0', [ 'requires' => [ 'parcel' ] ] ) ] );
 	openssl_sign( $json, $signature, $privateKey, OPENSSL_ALGO_SHA256 );
 	$remote[\Nino\Catalogue::DEFAULT_URL] = $json;
 	$remote[\Nino\Catalogue::DEFAULT_URL. '.sig'] = base64_encode( $signature );
 	unset( $catalogueApp['./nino/catalogue'] );
 	$requests = [];
-	$plan = \Nino\Catalogue::install( $catalogueApp, 'needy', '1.0.0' );
+	$plan = \Nino\Catalogue::install( $catalogueApp, 'feature', 'needy', '1.0.0' );
 
 	return is_string( $plan ) === true && str_contains( $plan, 'archive' ) === true && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'parcel-9.9.9' ) === true ) === []
 		&& array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'needy-1.0.0' ) === true ) !== [];

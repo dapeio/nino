@@ -1407,7 +1407,7 @@ namespace Nino\Install {
 				return;
 
 			$locale	= \Nino\Applications::LOCALE;
-			$offers	= \Nino\Catalogue::offers( $appData, $plan['catalogue'] );
+			$offers	= \Nino\Catalogue::offers( $appData, $plan['catalogue'], \Nino\Packages::FEATURE );
 
 			\Nino\Http::ok( $request, [ 'features' => array_map(
 				static fn( string $key ): array => [ 'key' => $key, 'name' => \Nino\Features::localized( $offers[$key]['name'], $locale ) ],
@@ -1695,7 +1695,7 @@ namespace Nino\Install {
 		private static function _describe( array &$appData, array $catalogue, array $offered ): array {
 
 			$locale	= \Nino\Applications::LOCALE;
-			$offers	= \Nino\Catalogue::offers( $appData, $catalogue );
+			$offers	= \Nino\Catalogue::offers( $appData, $catalogue, \Nino\Packages::FEATURE );
 			$list		= [];
 
 			foreach( $offered as $application )

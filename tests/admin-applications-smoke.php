@@ -116,7 +116,7 @@ $offeredKeys = [ 'site', 'shop', 'card', 'blog', 'broken', 'wild-one', 'wild-two
  */
 $publish = static function( array &$app, ?string $signWith = null, ?string $url = null ) use ( &$remote, &$features, &$applications, $privateKey ): void {
 	$url = $url ?? \Nino\Catalogue::DEFAULT_URL;
-	$json = json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => array_values( $features ), 'applications' => $applications ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+	$json = ninoCatalogue( array_values( $features ), $applications );
 	openssl_sign( $json, $signature, $signWith ?? $privateKey, OPENSSL_ALGO_SHA256 );
 	$remote[$url]					= $json;
 	$remote[$url. '.sig']	= base64_encode( $signature );

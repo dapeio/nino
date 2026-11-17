@@ -95,6 +95,7 @@ namespace Nino {
 			'file-words'			=> '"%s" is a string or a locale => string map, with no empty text',
 			'file-map'				=> '"%s" is a map',
 			'identity'				=> '"key" is "%s" and the package is installed as "%s"',
+			'part-claims'			=> '"%s" is a component of the project: a part of a group the project does not have names components of its own',
 			'part-key'				=> '"%s" is no key of a part - there are %s',
 			'part-contract'		=> '"contract" names the feature and the versions of it the part is for, as basis@^1.0',
 			'page-contract'		=> 'the contract of the page is kernel@<constraint>',
@@ -111,6 +112,9 @@ namespace Nino {
 			'part-json'				=> 'the part has no part.json',
 			'block'						=> 'the block is refused: %s',
 			'preview'					=> 'the picture is no webp picture of at most %s bytes and %s pixels on a side',
+			'manifest'				=> 'the archive does not hold a valid feature',
+			'promised'				=> 'the archive holds "%s" %s, the catalogue promised "%s" %s',
+			'unfit'						=> 'the archive holds "%s" %s, which requires Nino %s%s',
 			'busy'						=> 'another change of the features is running',
 			'unlockable'			=> 'the packages cannot be locked for a change',
 			'stage'						=> 'the staging folder cannot be written',
@@ -174,6 +178,37 @@ namespace Nino {
 				return '';
 
 			return \Nino\Filesystem::path( $appData, self::ROOT. '/'. self::FOLDERS[$kind]. ( $key === '' ? '' : '/'. $key ) );
+		}
+
+		/**
+		 *	The themes or the packages of blocks that are installed: the folders of the kind whose theme.json or pack.json says the key of the folder and a version
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$kind					THEME or BLOCKS
+		 *
+		 *	@return 	array											key => version, sorted by key
+		 */
+		public static function installed( array &$appData, string $kind ): array {
+
+			$parent = in_array( $kind, [ self::THEME, self::BLOCKS ], true ) === true ? self::dir( $appData, $kind, '' ) : '';
+			$found = [];
+
+			foreach( $parent !== '' && is_dir( $parent ) === true ? (array) scandir( $parent ) : [] as $name ) {
+
+				if( is_string( $name ) === false || $name === '' || $name[0] === '.' || is_link( $parent. '/'. $name ) === true || is_dir( $parent. '/'. $name ) === false || self::dir( $appData, $kind, $name ) === '' )
+					continue;
+
+				$file = $parent. '/'. $name. '/'. ( $kind === self::THEME ? 'theme.json' : 'pack.json' );
+				$bytes = is_file( $file ) === true && is_link( $file ) === false && (int) filesize( $file ) <= self::MAX_JSON ? @file_get_contents( $file ) : false;
+				$says = $bytes === false ? null : self::identity( $kind, [ basename( $file ) => $bytes ] );
+
+				if( $says !== null && $says['key'] === $name )
+					$found[$name] = $says['version'];
+			}
+
+			ksort( $found );
+
+			return $found;
 		}
 
 		/**
@@ -344,10 +379,13 @@ namespace Nino {
 		 *	@param		string		$kind					One of KINDS
 		 *	@param		string		$key					The key of a theme or of a package of blocks - the key its files say - or the name of the folder of a feature
 		 *	@param		array			$files				As check() takes them
+		 *	@param		\Closure|null						$verify				function( string $folder ): ?array - asked of the staging folder with the files written, before the exchange, and answering null where the
+		 *																							package is good or what is wrong as check() does: what only the files on a disk can say, as the manifest of a feature, which is php that is
+		 *																							included to be read
 		 *
 		 *	@return 	true|array								true where the package is in place; else what is wrong, as check() answers: nothing is changed
 		 */
-		public static function place( array &$appData, string $kind, string $key, array $files ): true|array {
+		public static function place( array &$appData, string $kind, string $key, array $files, ?\Closure $verify = null ): true|array {
 
 			$target = self::dir( $appData, $kind, $key );
 
@@ -381,21 +419,29 @@ namespace Nino {
 				\Nino\Filesystem::forceDir( $appData, self::STAGING );
 				$stage = \Nino\Filesystem::path( $appData, self::STAGING ). '/'. $kind. '-'. $key. '-'. bin2hex( random_bytes( 6 ) );
 
-				if( @mkdir( $stage. '/new', 0755, true ) === false )
+				// Under the name the folder is to have: a manifest names the class of a feature by the name of its folder
+				$new = $stage. '/'. basename( $target );
+
+				if( @mkdir( $new, 0755, true ) === false )
 					return self::_failed( $kind, $key, self::_problem( 'stage' ) );
 
 				foreach( $files as $path => $bytes ) {
 
 					$path = (string) $path;
 					$content = $kind !== self::FEATURE && str_ends_with( $path, '.svg' ) === true ? \Nino\Images::cleanSvg( (string) $bytes ) : (string) $bytes;
-					$file = $stage. '/new/'. $path;
+					$file = $new. '/'. $path;
 
 					if( $content === null || ( is_dir( dirname( $file ) ) === false && @mkdir( dirname( $file ), 0755, true ) === false && is_dir( dirname( $file ) ) === false )
 						|| @file_put_contents( $file, $content ) !== strlen( $content ) )
 						return self::_failed( $kind, $key, self::_problem( 'stage', $path ) );
 				}
 
-				return self::_swap( $appData, $kind, $key, $target, $stage. '/new' );
+				$problem = $verify === null ? null : $verify( $new );
+
+				if( $problem !== null )
+					return self::_failed( $kind, $key, $problem );
+
+				return self::_swap( $appData, $kind, $key, $target, $new );
 			}
 			finally {
 
@@ -900,6 +946,17 @@ namespace Nino {
 
 			$claimed = array_values( array_unique( array_filter( $claimed, static fn( string $name ): bool => strlen( $name ) <= \Nino\Components::NAME_LENGTH && preg_match( \Nino\Components::NAME, $name ) === 1 ) ) );
 			$components = $declared !== null ? $declared['components'] : $claimed;
+
+			// A group the project does not have has no components yet, and the part says which are its own: not one that the register holds already, whichever
+			// group it belongs to - the part would read the tokens of that group's component
+			if( $declared === null && $claimed !== [] ) {
+
+				$held = array_keys( \Nino\Components::components( $appData ) );
+				$taken = array_values( array_intersect( $claimed, $held ) );
+
+				if( $taken !== [] )
+					return self::_problem( 'part-claims', $path, [ self::_shown( $taken[0] ) ] );
+			}
 
 			if( $declared !== null ) {
 

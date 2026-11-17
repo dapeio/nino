@@ -387,6 +387,44 @@ $rejected = \Nino\Blocks::rejected( $app );
 $ignored = ninoWarnings();
 check( 'a block whose images/ holds a php file, put there by hand, is not listed', isset( \Nino\Blocks::all( $app )['probe'] ) === false && isset( $rejected['pack:probe-pack/probe'] ) === true );
 
+echo "\nPackages - what the catalogue asks of it: what is installed, and a check of the files that only a disk can make\n";
+
+$app = packagesSite();
+$private = ninoSandboxDir( $app ). '/private';
+$ignored = ninoWarnings();
+$block = packagesBlock( $svg, $png );
+
+check( 'nothing is installed where nothing was placed', \Nino\Packages::installed( $app, 'theme' ) === [] && \Nino\Packages::installed( $app, 'blocks' ) === [] && \Nino\Packages::installed( $app, 'feature' ) === [] );
+\Nino\Packages::place( $app, 'theme', 'craft-probe', packagesTheme( '1.2.0', $block, $webp ) );
+\Nino\Packages::place( $app, 'blocks', 'probe-pack', packagesPack( 'probe-pack', $block, $webp ) );
+mkdir( $private. '/packages/themes/stray', 0755, true );
+file_put_contents( $private. '/packages/themes/stray/theme.json', json_encode( [ 'key' => 'other', 'version' => '1.0.0' ] ) );
+mkdir( $private. '/packages/themes/empty', 0755, true );
+check( 'the installed ones are the folders whose theme.json or pack.json says the key of the folder and a version - a folder that says another key, or nothing, is not one',
+	\Nino\Packages::installed( $app, 'theme' ) === [ 'craft-probe' => '1.2.0' ] && \Nino\Packages::installed( $app, 'blocks' ) === [ 'probe-pack' => '1.0.0' ] );
+
+// The closure is asked of the folder with the files written, named as the folder is to be, and what it answers stops the change
+$asked = new \ArrayObject();
+$answer = \Nino\Packages::place( $app, 'theme', 'later', [ 'theme.json' => json_encode( [ 'key' => 'later', 'version' => '1.0.0', 'name' => 'Later', 'description' => 'Later' ] ) ] + packagesTheme( '1.0.0', $block, $webp ),
+	static function( string $folder ) use ( $asked ): ?array {
+		$asked[] = [ basename( $folder ), is_file( $folder. '/theme.json' ), is_file( $folder. '/parts/page/part.json' ) ];
+		return [ 'code' => 'manifest', 'path' => '', 'params' => [] ];
+	} );
+$ignored = ninoWarnings();
+check( 'a closure is asked of the staging folder, which has the files and the name of the folder of the package, and its answer is the answer of place() with nothing exchanged',
+	$asked->getArrayCopy() === [ [ 'later', true, true ] ] && $answer['code'] === 'manifest' && is_dir( $private. '/packages/themes/later' ) === false && packagesTree( $private. '/data/.packages' ) === [] );
+$answer = \Nino\Packages::place( $app, 'theme', 'later', [ 'theme.json' => json_encode( [ 'key' => 'later', 'version' => '1.0.0', 'name' => 'Later', 'description' => 'Later' ] ) ] + packagesTheme( '1.0.0', $block, $webp ), static fn( string $folder ): ?array => null );
+check( '...and a closure that finds nothing wrong lets it through', $answer === true && is_file( $private. '/packages/themes/later/theme.json' ) === true );
+
+// A part of a group the project does not have says which components are its own: not one that the register holds, of whichever group
+$held = \Nino\Components::groups( $app )['header']['components'][0] ?? 'header-wrap';
+$borrow = static fn( string $name ): array => [ 'parts/cards/part.json' => json_encode( [ 'contract' => 'cards@^1.0', 'variants' => [ $name => [ 'soft' => 'Soft' ] ] ] ),
+	'parts/cards/part.css' => '.'. $name. ' { color: var(--'. $name. '-ink); }' ] + packagesTheme( '1.0.0', $block, $webp );
+$ignored = ninoWarnings();
+$answer = \Nino\Packages::check( $app, 'theme', $borrow( $held ) );
+check( 'a part of a group the project has not, that names a component of the header as its own, is refused with the name', $answer !== null && $answer['code'] === 'part-claims' && $answer['path'] === 'parts/cards/part.json' && $answer['params'] === [ $held ] );
+check( '...and one that names a component that nobody has is not', \Nino\Packages::check( $app, 'theme', $borrow( 'card-soft' ) ) === null );
+
 foreach( $GLOBALS['packagesSandboxes'] as $sandbox )
 	\Nino\Filesystem::removeDir( $sandbox );
 
