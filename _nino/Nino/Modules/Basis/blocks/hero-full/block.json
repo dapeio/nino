@@ -1,0 +1,23 @@
+{
+	"name": {
+		"de_DE": "Hero mit Vollbild",
+		"en_US": "Hero, full screen"
+	},
+	"description": {
+		"de_DE": "Große Überschrift mit Text und Button auf einem Bild über die ganze Höhe.",
+		"en_US": "A large headline with text and a button on a picture that fills the screen."
+	},
+	"category": "intro",
+	"rank": 10,
+	"images": {
+		"background": {
+			"placeholder": "/nino/placeholder/landscape",
+			"width": 1920,
+			"height": 1080,
+			"label": {
+				"de_DE": "Hintergrundbild",
+				"en_US": "Background picture"
+			}
+		}
+	}
+}

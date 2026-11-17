@@ -1440,7 +1440,7 @@ check( 'the six standard parts are 24 KB together at most ('. $total. ' bytes: '
 $listing = [];
 foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $basisDir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
 	$listing[] = $file->getExtension();
-check( 'the feature brings no script, and its parts no font or image: a file of css, php or a template, and nothing else', array_diff( array_unique( $listing ), [ 'php', 'tpl', 'css' ] ) === [] );
+check( 'the feature brings no script, and its parts no font or image: a file of css, php, json or a template, and nothing else', array_diff( array_unique( $listing ), [ 'php', 'tpl', 'css', 'json' ] ) === [] );
 
 // the table of docs/features.md is worked out of the schemas
 $docs = (string) file_get_contents( dirname( __DIR__ ). '/docs/features.md' );

@@ -1,0 +1,13 @@
+{
+	"name": {
+		"de_DE": "Seitenkopf klein",
+		"en_US": "Small page header"
+	},
+	"description": {
+		"de_DE": "Schmaler Kopf einer Unterseite mit Titel und Einleitung.",
+		"en_US": "A slim header for an inner page, with a title and an introduction."
+	},
+	"category": "intro",
+	"rank": 30,
+	"images": {}
+}

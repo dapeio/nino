@@ -1,0 +1,13 @@
+{
+	"name": {
+		"de_DE": "Drei Spalten mit Karten",
+		"en_US": "Three columns of cards"
+	},
+	"description": {
+		"de_DE": "Eine Überschrift mit Einleitung und darunter drei Karten nebeneinander.",
+		"en_US": "A headline with an introduction and three cards side by side below it."
+	},
+	"category": "content",
+	"rank": 30,
+	"images": {}
+}

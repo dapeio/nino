@@ -1,0 +1,7 @@
+[header-wrap id="header" sticky]
+	[header-logo]
+	[header-nav]
+	[header-actions]
+		[button ~button href="~link" size="s"]
+	[/header-actions]
+[/header-wrap]

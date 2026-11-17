@@ -1,0 +1,13 @@
+{
+	"name": {
+		"de_DE": "Footer mit Spalten",
+		"en_US": "Footer with columns"
+	},
+	"description": {
+		"de_DE": "Eine Spalte mit Kurztext, eine mit dem Menü, darunter Rechtliches und Sprachen.",
+		"en_US": "A column with a short text, one with the menu, and legal links and languages below."
+	},
+	"category": "frame",
+	"rank": 20,
+	"images": {}
+}

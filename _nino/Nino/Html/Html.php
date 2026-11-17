@@ -583,7 +583,7 @@ namespace Nino {
 
 		/**
 		 *	Forget every tree that is kept of a template file and every schema the register keeps of the components
-		 *	a feature brings (\Nino\Features::REGISTER): the folders are emptied and the files a request has looked
+		 *	a feature brings (\Nino\Features::REGISTER), and the file of the blocks (\Nino\Blocks::CACHE): the folders are emptied and the files a request has looked
 		 *	at are looked at again. Where the page cache is dropped and where a feature is switched on, off or updated.
 		 *	Nothing depends on it for being right - a tree that is out of date is not taken - it is the tidying
 		 *
@@ -595,6 +595,7 @@ namespace Nino {
 
 			\Nino\Filesystem::removeDir( \Nino\Filesystem::path( $appData, self::TREES ) );
 			\Nino\Filesystem::removeDir( \Nino\Filesystem::path( $appData, \Nino\Features::REGISTER ) );
+			@unlink( \Nino\Filesystem::path( $appData, \Nino\Blocks::CACHE ) );
 
 			if( isset( $appData[self::CACHE]['files'] ) === true )
 				$appData[self::CACHE]['files'] = [];
