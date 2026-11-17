@@ -36,6 +36,7 @@ return [
 	'[[/_admin/routes/placeholder/title]]'	=> 'HTML-Titel, z. B. „Über uns“',
 	'[[/_admin/routes/placeholder/description]]'	=> 'HTML-Beschreibung',
 	'[[/_admin/routes/confirm/delete-left]]'	=> 'Die Route unter „%s“ wirklich löschen? Es bleiben: %s.',
+	'[[/_admin/routes/confirm/delete-title]]'	=> 'Route löschen',
 	'[[/_admin/routes/confirm/stays-texts]]'	=> 'die Texte %s',
 	'[[/_admin/routes/confirm/stays-template]]'	=> 'das Template „%s“ (von keiner weiteren Route genutzt)',
 	'[[/_admin/routes/confirm/stays-template-one]]'	=> 'das Template „%s“ (von einer weiteren Route genutzt)',

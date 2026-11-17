@@ -1062,8 +1062,9 @@
 		 *	    the element count came with the type itself (see apiGet())
 		 *	  - a type another type's element field points at is not offered
 		 *	    at all, and says which field holds the reference
-		 *	  - the button stays disabled until the type's own uri is typed
-		 *	    into the input next to it, so no single click reaches it
+		 *	  - the button asks first, and the answer stays locked until the type's
+		 *	    own uri is typed (confirm() with `typed`), so no single click
+		 *	    reaches it
 		 *
 		 *	Every one of these is re-checked server-side in
 		 *	\Nino\Modules\Elements\Types::apiDelete() - this is the readable
@@ -1100,27 +1101,23 @@
 			const row = dc.createElement('div');
 			row.className = 'admin-type-danger-row';
 
-			const confirmInput = dc.createElement('input');
-			confirmInput.type = 'text';
-			confirmInput.id = 'admin-form-delete-confirm';
-			confirmInput.autocomplete = 'off';
-			// The uri typed to confirm a deletion is not an edit of the type
-			confirmInput.dataset.dirty = 'ignore';
-			confirmInput.placeholder = Nino.adminUi.format( Nino.content.getText('/_admin/types/placeholder/delete'), uri );
-			row.appendChild( confirmInput );
+			const delBtn = Nino.adminUi.button( Nino.content.getText('/_admin/types/label/delete'), function() {
 
-			const delBtn = dc.createElement('button');
-			delBtn.type = 'button';
-			delBtn.className = 'nino-admin-btn-danger';
-			delBtn.textContent = Nino.content.getText('/_admin/types/label/delete');
-			delBtn.disabled = true;
+				Nino.adminUi.confirm( 'destructive', {
+					title			: Nino.content.getText('/_admin/types/label/delete'),
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/types/hint/delete'), uri, Nino.admin.types._elementCount ),
+					yes				: Nino.content.getText('/_admin/types/label/delete'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					typed			: uri,
+					opener		: delBtn,
+					onChoose	: function( ok, word ) {
+						if( ok === true )
+							Nino.admin.types._delete( word );
+					},
+				} );
+			}, { kind : 'danger' } );
+
 			row.appendChild( delBtn );
-
-			confirmInput.addEventListener( 'input', function() {
-				delBtn.disabled = ( confirmInput.value.trim() !== uri );
-			} );
-
-			delBtn.addEventListener( 'click', function() { Nino.admin.types._delete() } );
 
 			wrap.appendChild( row );
 
@@ -1133,31 +1130,31 @@
 		},
 
 		/**
-		 *	Send the deletion the danger zone just unlocked, then go back to a
+		 *	Send the deletion the danger zone's question was answered with yes for, then go back to a
 		 *	freshly loaded list - the type the form was showing is gone, so
 		 *	there is nothing to stay on
 		 *
+		 *	@param		{string}	word					What was typed to confirm: the type's own uri, which the server checks again; anything else sends nothing
 		 *	@param		{boolean}	[guarded]			The unsaved input of an open element form was asked about already
 		 *
 		 *	@return		void
 		 */
-		_delete : function( guarded ) {
+		_delete : function( word, guarded ) {
 
 			const uri 	= Nino.admin.types._currentUri;
-			const input = dc.getElementById('admin-form-delete-confirm');
 			const msg 	= dc.getElementById('admin-form-delete-msg');
 
-			if( uri === null || input === null || input.value.trim() !== uri )
+			if( uri === null || word !== uri )
 				return;
 
 			if( guarded !== true ) {
-				Nino.admin.types._guardElements( function() { Nino.admin.types._delete( true ) } );
+				Nino.admin.types._guardElements( function() { Nino.admin.types._delete( word, true ) } );
 				return;
 			}
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
-			Nino.admin.types._apiCall( 'delete', { uri : uri, confirm : input.value.trim() }, function( status, response ) {
+			Nino.admin.types._apiCall( 'delete', { uri : uri, confirm : word }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
@@ -1347,8 +1344,9 @@
 				// Asked again from the top once answered: a question that was not
 				// asked (another is open) ends the Save like one that was refused
 				if( Nino.adminUi.confirm( 'big', {
+					title			: Nino.content.getText('/_admin/types/confirm/rename-title'),
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/types/confirm/rename'), pairs ),
-					yes				: Nino.content.getText('/_admin/common/label/rename'),
+					yes				: Nino.content.getText('/_admin/types/confirm/rename-title'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					onChoose	: function( ok ) {
 						if( ok === true )

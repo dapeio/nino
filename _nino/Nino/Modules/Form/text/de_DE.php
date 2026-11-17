@@ -14,6 +14,7 @@ return [
 	'[[/_admin/submissions/label/form-all]]'	=> 'Alle Formulare',
 	'[[/_admin/submissions/label/search]]'	=> 'Anfragen durchsuchen',
 	'[[/_admin/submissions/confirm/delete]]'	=> 'Die Anfrage vom %s löschen? Sie ist danach von diesem Server verschwunden; die verschickte Mail bleibt davon unberührt.',
+	'[[/_admin/submissions/confirm/delete-title]]'	=> 'Anfrage löschen',
 	'[[/_admin/submissions/label/filename]]'	=> 'anfragen.csv',
 	'[[/_admin/submissions/label/export]]'	=> 'Als CSV exportieren',
 	'[[/_admin/submissions/label/more]]'		=> 'Mehr anzeigen',

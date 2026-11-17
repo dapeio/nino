@@ -936,6 +936,89 @@ spells them, in the `ICONS` table of `_admin/assets/Nino.admin.js`. Another icon
 added to that table, as a string for a path and `[ tag, attributes ]` for any other
 shape, from the same version of Lucide.
 
+## Dialogs
+
+Every dialog of the workbench is `Nino.adminUi.choiceDialog()`, a native `<dialog>`
+opened with `showModal()`: its title and its answers stand where they are and what is
+between them scrolls, so it is never higher than the screen. The answers are one row
+at the right, never the full width, in one order in every dialog, the shell's own
+questions among them: the other ways on, then Cancel, and at the far right the one that
+goes on (*Discard, Cancel, Save*; *Reload, Cancel, Overwrite*). The focus is never on the
+answer that destroys. Its size is a class, `.nino-admin-dialog--narrow` (a
+question, 26 rem), `--form` (40 rem) or `--wide` (60 rem), each read from a token
+(`--nino-admin-dialog-narrow`, `-form`, `-wide`); at 390 px it fills the width less
+1 rem a side. A panel builds no `<dialog>` of its own and names no dialog class. The
+focus opens on the first field, or on the answer that does no harm where the way on
+is dangerous, and goes back to what asked. Four builders sit on it, and none of them
+owns a word.
+
+| What | Builder |
+|---|---|
+| A question before an action | `confirm( level, { title, message, yes, no, onChoose } )` |
+| Make or copy something from a name and at most four more fields (duplicate, save as) | `formDialog()` |
+| Pick one from a list (a block, a source, a component) | `pickDialog()` |
+| The properties of one part of a work surface, which stays in view | `propertiesDialog()` |
+| Text to be read | `manualDialog( title, content, opener )` |
+| Anything else - a form of a record of its own with more fields, anything with an address of its own | a screen of its own, not a dialog |
+
+`formDialog( { title, fields, submit, cancel, message, size, onSubmit, onCancel,
+opener } )` draws `fields` - `[ { key, label, type, value, required, maxLength,
+validate } ]`, `type : 'select'` with `options : [ { value, label } ]`, any other `type`
+that of an `<input>` - or a `body` element of your own. A required field that is empty
+and a `validate( value )` that answers a sentence are said at the field with
+`fieldError()` and the dialog stays open; so does a send that is on its way, until
+`onSubmit( values, ctl )` answers with `ctl.close()`, or says what the server refused with
+`ctl.fail( key, text )`. Enter sends; Escape and Cancel close at once where nothing was
+changed and ask once whether to discard where something was.
+
+```js
+Nino.adminUi.formDialog( {
+	title		: Nino.content.getText('/_admin/catalog/dialog/duplicate-title'),
+	fields	: [ { key : 'name', label : Nino.content.getText('/_admin/catalog/label/name'), required : true, value : theme.name } ],
+	submit	: Nino.content.getText('/_admin/catalog/dialog/duplicate-title'),
+	cancel	: Nino.content.getText('/_admin/common/label/cancel'),
+	opener	: button,
+	onSubmit : function( values, ctl ) {
+		Nino.admin.catalog.call( 'duplicate', { name : values.name }, function( status, response ) {
+			if( status === 200 )
+				ctl.close();
+			else
+				ctl.fail( 'name', Nino.adminUi.api.errorText( status, response ) );
+		} );
+	},
+} );
+```
+
+`pickDialog( { title, items, search, empty, cancel, size, onChoose, onCancel, opener } )`
+draws `items` - `[ { value, label, description } ]` - as rows; a press picks one and
+closes. A search over the names and the lines is drawn from `Nino.adminUi.PICK_SEARCH_FROM`
+(8) items on, and only when `search` names it; the size is `--wide`.
+
+`propertiesDialog( { title, sections, close, onChange, onClose, tools, open, opener } )`
+is a sheet at the right over the whole height, for what one part of a work surface has:
+`sections` are the sections of an `accordion()` with one open, each
+`{ key, label, summary, badge, fields | content }`. A value is the caller's the moment
+it changes - `onChange( key, value, section )` is called on the input - so the dialog has
+one button, Close, which Escape is also; what was changed is saved with the bar of the
+surface. From 38 rem on the sheet is not modal: no backdrop, no trap for the focus, the
+surface stays in view and in use, and while the sheet is open the workbench root carries
+the class `nino-admin-has-sheet`, which leaves the width of the sheet free on the root's
+right (`padding-inline-end: var(--nino-admin-dialog-sheet)`) so that a preview wraps
+beside it. A question the surface asks goes over it. Below 38 rem it is modal and the
+whole screen. The call answers a handle, `{ close(), set( key, value, [section] ) }`:
+`set()` puts a value the surface changed (an undo, a click on another part) into the
+fields without calling `onChange`.
+
+```js
+Nino.adminUi.propertiesDialog( {
+	title		: label,
+	close		: Nino.content.getText('/_admin/common/label/close'),
+	opener	: button,
+	onChange : function( key, value ) { draft.set( key, value ) },
+	sections : [ { key : 'content', label : Nino.content.getText('/_admin/catalog/label/content'), fields : [ { key : 'text', label : Nino.content.getText('/_admin/catalog/label/text'), value : draft.text } ] } ],
+} );
+```
+
 ## What one panel tells another
 
 A panel that writes data another panel shows says so, and the other panel finds
@@ -1063,7 +1146,7 @@ shell as `data-upload-bytes` and `data-upload-pixels`): put
 work in the server's own words without sending it.
 
 A question before an action is `Nino.adminUi.confirm( level, { title, message,
-yes, no, kind, visitors, opener, onChoose } )`, never `window.confirm()`: the project is in
+yes, no, kind, typed, visitors, opener, onChoose } )`, never `window.confirm()`: the project is in
 a mode (`Nino.admin.mode.current()`; the rail's chip says Development), and the mode decides
 how much the workbench asks. `level` says what the action is worth:
 
@@ -1077,14 +1160,17 @@ A level nobody named counts as `'destructive'`. The policy is the shell's
 (`Nino.admin.mode.policy( level )`, answering `{ ask, note }`): the design system
 owns no rule about when to ask, and asks every question where there is no shell
 or the shell has no policy - the setup wizard, a test, a shell older than the
-policy. `message` is the question; `yes` and `no` are what the two answers are
-called, in the interface language - the labels of `/_admin/common/label/*` serve
-for most - and `kind` is `'danger'` or `'primary'` for the answer that goes on,
+policy. `title` is not optional - a call without one throws a `TypeError`, also
+where the policy would not ask: it says what is done to what as a statement
+(*Delete element*), and `yes` carries the same words, never *Yes* or *OK*. `message`
+is the question; `no` is what the answer that does nothing is called
+(`/_admin/common/label/cancel`), and `kind` is `'danger'` or `'primary'` for the answer that goes on,
 `'danger'` for a destructive level and `'primary'` otherwise: say `'danger'`
 yourself where something is switched off or goes back to what the base has, whatever
 the level. A dialog whose way on is `'danger'` opens with the focus on the answer that
-does nothing, so Enter on a dialog that has just appeared is a No; any other keeps the
-focus on its first button. `visitors : false` says that the action does not touch what
+does nothing, so Enter on a dialog that has just appeared is a No; any other opens on its
+primary answer. The answers stand in one row at the right, Cancel at the left of the
+one that goes on. `visitors : false` says that the action does not touch what
 visitors see - an account, a role - and leaves out the line of a `'big'` level that
 the site is live. `onChoose( ok )` is
 called once with `true` or `false`, and **before `confirm()` returns** where
@@ -1094,8 +1180,9 @@ asked ends with `done( false )` then, as it does for a No.
 
 ```js
 Nino.adminUi.confirm( 'destructive', {
+	title			: Nino.content.getText('/_admin/catalog/confirm/delete-title'),
 	message		: Nino.adminUi.format( Nino.content.getText('/_admin/catalog/confirm/delete'), name ),
-	yes				: Nino.content.getText('/_admin/common/label/delete'),
+	yes				: Nino.content.getText('/_admin/catalog/confirm/delete-title'),
 	no				: Nino.content.getText('/_admin/common/label/cancel'),
 	onChoose	: function( ok ) {
 		if( ok === true )
@@ -1103,6 +1190,13 @@ Nino.adminUi.confirm( 'destructive', {
 	},
 } );
 ```
+
+`typed : 'legal'` is the highest weight: the answer that goes on stays locked until that
+word is typed into a field the dialog draws under the message (`typedLabel` words it,
+`/_admin/common/confirm/typed` by default), and the question is asked even where the
+policy would not. `onChoose( ok, word )` is given the word as it was typed, and a call
+that goes to the server sends that word, not the one the page knows. Use it where the thing
+takes many others with it - an element type with all of its elements - and nowhere else.
 
 A feature whose `nino` constraint still admits kernels before this one checks
 `typeof Nino.adminUi.confirm === 'function'` and asks with `window.confirm()`

@@ -1300,8 +1300,9 @@
 			const entry = Nino.admin.routes._currentEntry();
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/routes/confirm/delete-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), entry === undefined ? Nino.admin.routes._currentUri : Nino.admin.routes._paths( entry ), Nino.admin.routes._staysLine() ),
-				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				yes				: Nino.content.getText('/_admin/routes/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

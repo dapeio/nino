@@ -115,6 +115,11 @@
 	--nino-admin-head-height: 52px;
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
 	--nino-admin-control-height: 38px;
+	/* The widths of a dialog: a question, a form, a list to pick from, the sheet of properties */
+	--nino-admin-dialog-narrow: 26rem;
+	--nino-admin-dialog-form: 40rem;
+	--nino-admin-dialog-wide: 60rem;
+	--nino-admin-dialog-sheet: 28rem;
 	--nino-admin-row-height: 46px;
 	/* The chevron and its reserved space stay together. A single SVG stroke
 	   avoids the sub-pixel seam two touching gradient triangles can expose. */
@@ -993,13 +998,19 @@ a {
 	content: "\26A0" / "";
 }
 
-/* A modal question - the session that ended while a form was open. The
-   page behind keeps everything that was typed into it; closing the dialog
-   gives that page back, with the requests that waited told they failed. */
-:where(.nino-admin) .nino-admin-dialog {
-	width: min(26rem, calc(100vw - 2rem));
+/* The one dialog of the workbench (Nino.adminUi.choiceDialog()): a question, a
+   form, a list to pick from, a manual, the properties of a part. Its title and
+   its answers stand where they are and what is between them scrolls, so that
+   neither leaves the screen; it is never higher than the screen. The width is
+   the class of its size - narrow for a question, form, wide - and at 390 px it
+   fills the width less 1rem on each side. */
+:where(.nino-admin) :is(.nino-admin-dialog, .nino-admin-dialog--narrow) {
+	width: min(var(--nino-admin-dialog-narrow), calc(100vw - 2rem));
 	max-width: 100%;
+	max-height: calc(100vh - 2rem);
+	max-height: calc(100dvh - 2rem);
 	padding: 0;
+	overflow: hidden;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	background: var(--editor-bg-elevated);
@@ -1007,22 +1018,70 @@ a {
 	box-shadow: var(--editor-shadow);
 }
 
+:where(.nino-admin) .nino-admin-dialog[open] {
+	display: flex;
+	flex-direction: column;
+}
+
+:where(.nino-admin) .nino-admin-dialog--form {
+	width: min(var(--nino-admin-dialog-form), calc(100vw - 2rem));
+}
+
+:where(.nino-admin) .nino-admin-dialog--wide {
+	width: min(var(--nino-admin-dialog-wide), calc(100vw - 2rem));
+}
+
 :where(.nino-admin) .nino-admin-dialog::backdrop {
 	background: rgba(15,23,42,.5);
 }
 
 :where(.nino-admin) .nino-admin-dialog-body {
-	display: grid;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
 	gap: .75rem;
+	min-height: 0;
 	padding: 1.25rem;
 }
 
-:where(.nino-admin) .nino-admin-dialog-body > :is(p, h2, label) {
+:where(.nino-admin) .nino-admin-dialog-head {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+}
+
+:where(.nino-admin) .nino-admin-dialog-head > * {
 	margin: 0;
 }
 
 :where(.nino-admin) .nino-admin-dialog-title {
 	font-size: 1.05rem;
+	overflow-wrap: anywhere;
+}
+
+/* The session dialog of the shell is a form that is the body itself */
+:where(.nino-admin) .nino-admin-dialog-body > :is(p, h2, label) {
+	margin: 0;
+}
+
+/* What the dialog is about: the message, the fields, the list. It is what
+   scrolls. */
+:where(.nino-admin) .nino-admin-dialog-content {
+	display: grid;
+	flex: 1 1 auto;
+	align-content: start;
+	gap: .75rem;
+	min-height: 0;
+	/* Room for the ring of a field at the edge of what scrolls, which the box would cut off */
+	margin: -4px;
+	padding: 4px;
+	overflow-y: auto;
+}
+
+:where(.nino-admin) .nino-admin-dialog-content > p {
+	margin: 0;
 }
 
 /* A part the dialog hides - the login fields, when the only way on is a
@@ -1031,37 +1090,154 @@ a {
 	display: none;
 }
 
+/* The answers: one row at the right, never the full width. The one that goes
+   on is the last of the row, at the far right, Cancel at its left. */
 :where(.nino-admin) .nino-admin-dialog-actions {
 	display: flex;
+	flex: none;
 	flex-wrap: wrap;
 	justify-content: flex-end;
 	gap: .5rem;
 }
 
-/* A manual in a dialog (Nino.adminUi.manualDialog()): wider than a question,
-   and what stands between its title and its button scrolls, so that neither
-   leaves the screen however long the manual is. */
-:where(.nino-admin) .nino-admin-dialog--manual {
-	width: min(40rem, calc(100vw - 2rem));
-	max-height: calc(100vh - 2rem);
-	max-height: calc(100dvh - 2rem);
-	overflow: hidden;
+:where(.nino-admin) .nino-admin-dialog-actions > button {
+	width: auto;
 }
 
-:where(.nino-admin) .nino-admin-dialog--manual[open] {
-	display: flex;
-	flex-direction: column;
+/* The fields of a form in a dialog: the label at the left of the control where
+   the dialog is wide enough, above it where it is not. */
+:where(.nino-admin) .nino-admin-dialog-form,
+:where(.nino-admin) .nino-admin-dialog-fields,
+:where(.nino-admin) .nino-admin-dialog-typed {
+	display: grid;
+	gap: .75rem;
+	margin: 0;
 }
 
-:where(.nino-admin) .nino-admin-dialog--manual .nino-admin-dialog-body {
-	flex: 1 1 auto;
-	grid-template-rows: auto minmax(0, 1fr) auto;
-	min-height: 0;
+:where(.nino-admin) .nino-admin-dialog-form > p,
+:where(.nino-admin) .nino-admin-dialog-typed > p {
+	margin: 0;
 }
 
-:where(.nino-admin) .nino-admin-dialog-content {
-	min-height: 0;
-	overflow-y: auto;
+:where(.nino-admin) .nino-admin-dialog-fields > .nino-admin-field,
+:where(.nino-admin) .nino-admin-dialog-typed > .nino-admin-field {
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-dialog-fields > .nino-admin-field-error,
+:where(.nino-admin) .nino-admin-dialog-form > .nino-admin-field-error {
+	margin: -.4rem 0 0;
+}
+
+@media (min-width: 40rem) {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field {
+		display: grid;
+		grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
+		align-items: center;
+		gap: .75rem;
+	}
+
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field > span {
+		margin: 0;
+	}
+
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field-error {
+		margin-left: calc(min(max(7rem, 28%), 11rem) + .75rem);
+	}
+}
+
+/* A list to pick from (Nino.adminUi.pickDialog()): a row for each item, the
+   search stays at the top while the rows scroll under it. */
+:where(.nino-admin) .nino-admin-pick {
+	display: grid;
+	gap: .5rem;
+	align-content: start;
+}
+
+:where(.nino-admin) .nino-admin-pick-search {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+:where(.nino-admin) .nino-admin-pick-list {
+	display: grid;
+	gap: .5rem;
+}
+
+:where(.nino-admin) .nino-admin-pick-item {
+	display: grid;
+	gap: .15rem;
+	width: 100%;
+	min-height: var(--nino-admin-control-height);
+	padding: .5rem .75rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	text-align: left;
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-pick-item:hover {
+	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-pick-item:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+
+:where(.nino-admin) .nino-admin-pick-name {
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-pick-line {
+	color: var(--editor-text-secondary);
+	font-weight: 400;
+	font-size: max( .84rem, 12px );
+}
+
+:where(.nino-admin) .nino-admin-pick-empty {
+	margin: 0;
+	color: var(--editor-text-secondary);
+}
+
+/* The properties of one part (Nino.adminUi.propertiesDialog()): a sheet at
+   the right over the whole height. From 38 rem on it is no modal dialog: the
+   surface it is about stays in view and in use at its left - the root carries
+   nino-admin-has-sheet and leaves the room of the sheet on its right, so that
+   the surface wraps beside it. A narrow screen has no room for both and gets
+   the sheet as the whole screen, modal. */
+:where(.nino-admin) .nino-admin-dialog--sheet {
+	position: fixed;
+	inset-block: 0;
+	inset-inline: auto 0;
+	width: min(var(--nino-admin-dialog-sheet), 100vw);
+	height: 100vh;
+	height: 100dvh;
+	max-height: 100vh;
+	max-height: 100dvh;
+	margin: 0 0 0 auto;
+	border-width: 0 0 0 1px;
+	border-radius: 0;
+}
+
+:where(.nino-admin) .nino-admin-dialog--sheet::backdrop {
+	background: rgba(15,23,42,.2);
+}
+
+@media (min-width: 38.01rem) {
+	:where(.nino-admin).nino-admin-has-sheet {
+		padding-inline-end: var(--nino-admin-dialog-sheet);
+	}
+}
+
+@media (max-width: 38rem) {
+	:where(.nino-admin) .nino-admin-dialog--sheet {
+		width: 100vw;
+		border-width: 0;
+	}
 }
 
 /* What scrolls is a stop of the keyboard where the browser makes it one - a

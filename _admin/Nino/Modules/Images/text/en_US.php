@@ -11,6 +11,7 @@ return [
 	'[[/_admin/images/error/load]]'				=> 'Failed to load.',
 	'[[/_admin/images/label/remove]]'	=> 'Remove image',
 	'[[/_admin/images/confirm/remove]]'	=> 'Remove the image from “%s”? It is deleted, and the website shows no image there until you upload a new one.',
+	'[[/_admin/images/confirm/remove-title]]'	=> 'Remove image',
 	'[[/_admin/images/msg/removed]]'	=> 'Image removed.',
 	'[[/_admin/images/error/remove]]'	=> 'Removing failed.',
 	'[[/_admin/images/msg/below-target]]'	=> 'Saved – but your image is only %s, smaller than the target size, and was scaled up. It may look blurry.',
@@ -38,6 +39,7 @@ return [
 	'[[/_admin/slots/scan/created-failed]]'	=> '%d created. Failed: %s',
 	'[[/_admin/slots/error/size]]'			=> 'A slot needs a size: enter its width and its height in pixels.',
 	'[[/_admin/slots/confirm/delete]]'	=> 'Really delete image slot “%s”? Any uploaded image is lost with it.',
+	'[[/_admin/slots/confirm/delete-title]]'	=> 'Delete image slot',
 	'[[/_admin/dashboard/label/slots]]'	=> 'Missing image slots',
 
 	// Favicon tab
@@ -58,6 +60,7 @@ return [
 	'[[/_admin/favicon/hint/background]]'	=> 'A hex value like #1a2b3c. The touch icon (180 × 180) needs a surface, white without one. The other icons stay transparent. The value is also the background colour of the manifest.',
 	'[[/_admin/favicon/hint/theme]]'		=> 'A hex value like #1a2b3c for the colour of the browser bar (manifest). Empty leaves the value the manifest holds.',
 	'[[/_admin/favicon/confirm/reset]]'		=> 'Reset to the base set? The set that stands is kept once and can be brought back with Undo.',
+	'[[/_admin/favicon/confirm/reset-title]]'	=> 'Reset favicon',
 	'[[/_admin/favicon/msg/done]]'			=> 'Done. Browsers show the new icon once their cache runs out; a page that appends the stamp to the addresses shows it at once.',
 	'[[/_admin/favicon/msg/none]]'			=> 'There is no set yet.',
 	'[[/_admin/favicon/msg/date]]'			=> 'Last written: %s',

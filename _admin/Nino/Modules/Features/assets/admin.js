@@ -1102,8 +1102,9 @@
 		_deactivateRefused : function( entry, btn, msg ) {
 
 			Nino.adminUi.confirm( 'big', {
+				title			: Nino.content.getText('/_admin/features/confirm/deactivate-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate-refused'), entry.dir ),
-				yes				: Nino.content.getText('/_admin/features/label/deactivate'),
+				yes				: Nino.content.getText('/_admin/features/confirm/deactivate-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				kind			: 'danger',
 				opener		: btn,
@@ -1466,8 +1467,9 @@
 				}
 
 				Nino.adminUi.confirm( 'big', {
+					title			: Nino.content.getText('/_admin/features/confirm/application-title'),
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/application'), application.name, comes ),
-					yes				: Nino.content.getText('/_admin/features/label/application-setup'),
+					yes				: Nino.content.getText('/_admin/features/confirm/application-title'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					kind			: 'primary',
 					opener		: btn,
@@ -1846,8 +1848,9 @@
 		_remove : function( feature, btn, msg ) {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/features/confirm/remove-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/remove'), feature.name ),
-				yes				: Nino.content.getText('/_admin/features/label/remove'),
+				yes				: Nino.content.getText('/_admin/features/confirm/remove-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				opener		: btn,
 				onChoose	: function( ok ) {
@@ -2047,8 +2050,9 @@
 			// against it. Asked once, before the question about unsaved input
 			if( guarded !== true && what === 'deactivate' ) {
 				Nino.adminUi.confirm( 'big', {
+					title			: Nino.content.getText('/_admin/features/confirm/deactivate-title'),
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name )+ Nino.admin.features._calledText( feature ),
-					yes				: Nino.content.getText('/_admin/features/label/deactivate'),
+					yes				: Nino.content.getText('/_admin/features/confirm/deactivate-title'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					kind			: 'danger',
 					opener		: btn,

@@ -6,6 +6,7 @@ return [
 	'[[/_admin/nav/backups]]'						=> 'Backups',
 	'[[/_admin/backups/empty]]'					=> 'No backup available yet.',
 	'[[/_admin/backups/confirm/restore]]'	=> 'Restore the backup from %s? The current state is backed up automatically first. Afterwards you are logged out and land on the login page.',
+	'[[/_admin/backups/confirm/restore-title]]'	=> 'Restore backup',
 	'[[/_admin/backups/label/login]]'	=> 'To the login',
 	'[[/_admin/backups/msg/restored]]'	=> 'The backup from %s has been restored.',
 	'[[/_admin/backups/label/now]]'			=> 'Back up now',

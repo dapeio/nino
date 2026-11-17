@@ -788,8 +788,9 @@
 		_removeImage : function( slot, preview, msg, removeBtn ) {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/images/confirm/remove-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/images/confirm/remove'), slot.label ),
-				yes				: Nino.content.getText('/_admin/common/label/remove'),
+				yes				: Nino.content.getText('/_admin/images/confirm/remove-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				opener		: removeBtn,
 				onChoose	: function( ok ) {

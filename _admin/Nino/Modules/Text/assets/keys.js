@@ -841,13 +841,14 @@
 			// A format that holds less than the one it replaces drops what does not
 			// fit: said first, with what happens to the text
 			Nino.adminUi.confirm( 'big', {
+				title			: Nino.content.getText('/_admin/keys/confirm/format-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/format'),
 					entry.key,
 					Nino.content.getText('/_admin/keys/format/'+ entry.format ),
 					Nino.content.getText('/_admin/keys/format/'+ format ),
 					Nino.content.getText('/_admin/keys/convert/'+ format )
 				),
-				yes				: Nino.content.getText('/_admin/common/label/save'),
+				yes				: Nino.content.getText('/_admin/keys/confirm/format-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 					if( ok === true )
@@ -916,8 +917,9 @@
 		_deleteKey : function( key ) {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/keys/confirm/delete-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/delete'), key ),
-				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				yes				: Nino.content.getText('/_admin/keys/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

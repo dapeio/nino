@@ -223,8 +223,10 @@
 				}
 
 				Nino.adminUi.confirm( 'big', {
+					title			: Nino.content.getText('/_admin/translations/confirm/native-title'),
 					message		: Nino.content.getText('/_admin/translations/confirm/native'),
-					yes				: Nino.content.getText('/_admin/translations/label/importbtn'),
+					yes				: Nino.content.getText('/_admin/translations/confirm/native-title'),
+					kind			: 'danger',
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					opener		: importBtn,
 					onChoose	: function( ok ) {

@@ -579,9 +579,10 @@
 				}
 
 				if( Nino.adminUi.confirm( 'big', {
+					title			: Nino.content.getText('/_admin/roles/scope/leave-title'),
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning-leave'), Nino.adminUi.text( leaving[0].label ) ),
 					visitors	: false,
-					yes				: Nino.content.getText('/_admin/common/label/remove'),
+					yes				: Nino.content.getText('/_admin/roles/scope/leave-title'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					onChoose	: function( ok ) {
 						if( ok === true )
@@ -746,9 +747,10 @@
 				}
 
 				Nino.adminUi.confirm( 'big', {
+					title			: Nino.content.getText('/_admin/roles/scope/add-title'),
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning'), Nino.adminUi.text( entering[0].label ) ),
 					visitors	: false,
-					yes				: Nino.content.getText('/_admin/common/label/add'),
+					yes				: Nino.content.getText('/_admin/roles/scope/add-title'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
 					onChoose	: function( ok ) {
 						if( ok === true )
@@ -1154,8 +1156,9 @@
 		_delete : function() {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/roles/confirm/delete-title'),
 				message		: Nino.content.getText('/_admin/roles/confirm/delete'),
-				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				yes				: Nino.content.getText('/_admin/roles/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

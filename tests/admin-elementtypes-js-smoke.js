@@ -456,9 +456,9 @@ check( 'and says that existing elements keep their uris',
 // The one control in this module that destroys content: the type file, every
 // element in it and the images those elements hold. It is offered because
 // doing it by hand is the same removal with none of the checks - but it is
-// only ever reached by typing the type's own uri, and _delete() re-checks
-// that before it posts, so a caller that bypasses the disabled button still
-// gets nowhere.
+// only ever reached through the question that locks its answer until the
+// type's own uri is typed (confirm() with `typed`), and the server re-checks
+// that, so the request carries the uri.
 
 sandbox.Nino.content = { getText : function( key ) { return key } };
 
@@ -469,27 +469,29 @@ let posted = null;
 elementTypes._apiCall = function( endpoint, payload ) { posted = { endpoint : endpoint, payload : payload } };
 
 elementTypes._currentUri = 'services';
-deleteControls['admin-form-delete-confirm'] = { value : 'servces' };
 deleteControls['admin-form-delete-msg'] 		= { textContent : '' };
 
-elementTypes._delete();
-check( 'a mistyped confirmation posts nothing at all', posted === null );
+elementTypes._delete( 'servces' );
+check( 'a word that is not the uri posts nothing at all - the confirmation is what was typed, not what the client knows', posted === null );
 
-deleteControls['admin-form-delete-confirm'].value = ' services ';
 elementTypes._delete();
-check( 'the typed uri is what unlocks the request', posted !== null && posted.endpoint === 'delete' );
-check( '...and travels with it, so the server can re-check it', posted !== null && posted.payload.uri === 'services' && posted.payload.confirm === 'services' );
+check( '...and neither does a call with no word', posted === null );
+
+elementTypes._delete( 'services' );
+check( 'the uri, typed, is posted', posted !== null && posted.endpoint === 'delete' );
+check( '...and travels with it, as it was typed, so the server can re-check it', posted !== null && posted.payload.uri === 'services' && posted.payload.confirm === 'services' );
 
 // Nothing to post against once the uri is gone - the form is showing a type
 // that no longer exists, and the list is where it goes back to
 posted = null;
 elementTypes._currentUri = null;
-elementTypes._delete();
+elementTypes._delete( 'services' );
 check( 'a form with no type open cannot delete anything', posted === null );
 
-check( 'the delete button starts disabled and is unlocked by the input',
-	typesSource.includes( 'delBtn.disabled = true' )
-	&& /delBtn\.disabled = \( confirmInput\.value\.trim\(\) !== uri \)/.test( typesSource ) );
+check( 'the sentence names the word that is typed: the uri, as it is, not with a slash before it',
+	/message\s*:\s*Nino\.adminUi\.format\( Nino\.content\.getText\('\/_admin\/types\/hint\/delete'\), uri,/.test( typesSource ) );
+check( 'the delete button asks with the uri to be typed, and sends only on the answer yes',
+	/Nino\.adminUi\.confirm\( 'destructive', \{[\s\S]*?typed\s*:\s*uri,[\s\S]*?onChoose\s*:\s*function\( ok, word \) \{\s*if\( ok === true \)\s*Nino\.admin\.types\._delete\( word \);/.test( typesSource ) );
 // A type another type's element field points at is not offered the control at
 // all: the server refuses it (see Types::apiDelete()), so offering a button
 // that can only fail would be a lie about what is possible
@@ -604,8 +606,7 @@ check( 'the danger zone is not rendered while creating a new type',
 // a second time.
 {
 	const msg = { textContent : '' };
-	const confirm = { value : 'people' };
-	const nodes = { 'admin-form-msg' : msg, 'admin-form-delete-msg' : msg, 'admin-form-title' : { value : 'People' }, 'admin-form-uri' : { value : 'people' }, 'admin-form-delete-confirm' : confirm };
+	const nodes = { 'admin-form-msg' : msg, 'admin-form-delete-msg' : msg, 'admin-form-title' : { value : 'People' }, 'admin-form-uri' : { value : 'people' } };
 	sandbox.document.getElementById = id => nodes[id] ?? null;
 	sandbox.document.querySelector = () => ( { checked : false } );
 	sandbox.Nino.adminUi = { api : { errorText : status => 'error '+ status } };
@@ -650,21 +651,14 @@ check( 'the danger zone is not rendered while creating a new type',
 
 	asked.length = 0;
 	calls.length = 0;
-	elementTypes._delete();
+	elementTypes._delete( 'people' );
 	check( 'deleting a type asks first, too', asked.length === 1 && calls.length === 0 );
 	asked[0].proceed();
 	check( '...and sends the delete once answered', calls.length === 1 && calls[0].endpoint === 'delete' );
 
-	confirm.value = 'wrong';
-	asked.length = 0;
-	elementTypes._delete();
-	check( 'a delete whose confirmation does not match the uri asks nothing and does nothing', asked.length === 0 );
-	confirm.value = 'people';
-
 	const typesSource2 = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' );
 	check( 'the type form is watched by the shell under its name, behind a check that the shell has the registry',
 		/if\( typeof Nino\.admin\.dirty === 'object' \)\s*Nino\.admin\.dirty\.watchForm\( 'types', function\(\) \{ return dc\.getElementById\('types-form'\) \}/.test( typesSource2 ) === true );
-	check( 'the uri typed to confirm a deletion is no edit of the type', typesSource2.includes( "confirmInput.dataset.dirty = 'ignore'" ) );
 	delete sandbox.Nino.admin.dirty;
 }
 

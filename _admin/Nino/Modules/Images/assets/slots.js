@@ -348,8 +348,9 @@
 		_delete : function() {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/slots/confirm/delete-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/slots/confirm/delete'), Nino.admin.slots._currentUri ),
-				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				yes				: Nino.content.getText('/_admin/slots/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

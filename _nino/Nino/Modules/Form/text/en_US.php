@@ -14,6 +14,7 @@ return [
 	'[[/_admin/submissions/label/form-all]]'	=> 'All forms',
 	'[[/_admin/submissions/label/search]]'	=> 'Search submissions',
 	'[[/_admin/submissions/confirm/delete]]'	=> 'Delete the submission of %s? It is gone from this server; the mail it sent is not affected.',
+	'[[/_admin/submissions/confirm/delete-title]]'	=> 'Delete request',
 	'[[/_admin/submissions/label/filename]]'	=> 'submissions.csv',
 	'[[/_admin/submissions/label/export]]'	=> 'Export as CSV',
 	'[[/_admin/submissions/label/more]]'		=> 'Show more',

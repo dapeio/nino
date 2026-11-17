@@ -607,8 +607,9 @@
 		_confirmRestore : function( date ) {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/backups/confirm/restore-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/backups/confirm/restore'), date ),
-				yes				: Nino.content.getText('/_admin/common/label/restore'),
+				yes				: Nino.content.getText('/_admin/backups/confirm/restore-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

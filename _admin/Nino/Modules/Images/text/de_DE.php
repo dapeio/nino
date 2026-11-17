@@ -11,6 +11,7 @@ return [
 	'[[/_admin/images/error/load]]'				=> 'Laden fehlgeschlagen.',
 	'[[/_admin/images/label/remove]]'	=> 'Bild entfernen',
 	'[[/_admin/images/confirm/remove]]'	=> 'Bild aus „%s“ entfernen? Es wird gelöscht, und die Website zeigt dort kein Bild, bis Du ein neues hochlädst.',
+	'[[/_admin/images/confirm/remove-title]]'	=> 'Bild entfernen',
 	'[[/_admin/images/msg/removed]]'	=> 'Bild entfernt.',
 	'[[/_admin/images/error/remove]]'	=> 'Entfernen fehlgeschlagen.',
 	'[[/_admin/images/msg/below-target]]'	=> 'Gespeichert – aber Dein Bild ist nur %s groß, kleiner als die Soll-Maße, und wurde hochskaliert. Es kann unscharf wirken.',
@@ -38,6 +39,7 @@ return [
 	'[[/_admin/slots/scan/created-failed]]'	=> '%d angelegt. Fehlgeschlagen: %s',
 	'[[/_admin/slots/error/size]]'			=> 'Ein Bildplatz braucht eine Größe: Trag Breite und Höhe in Pixeln ein.',
 	'[[/_admin/slots/confirm/delete]]'	=> 'Bildplatz „%s“ wirklich löschen? Ein hochgeladenes Bild geht mit ihm verloren.',
+	'[[/_admin/slots/confirm/delete-title]]'	=> 'Bildplatz löschen',
 	'[[/_admin/dashboard/label/slots]]'	=> 'Fehlende Bildplätze',
 
 	// Favicon tab
@@ -58,6 +60,7 @@ return [
 	'[[/_admin/favicon/hint/background]]'	=> 'Hex-Wert wie #1a2b3c. Das Touch-Icon (180 × 180) braucht eine Fläche; ohne Angabe ist sie weiß. Die anderen Icons bleiben transparent. Der Wert steht auch als Hintergrundfarbe im Manifest.',
 	'[[/_admin/favicon/hint/theme]]'		=> 'Hex-Wert wie #1a2b3c für die Farbe der Browserleiste (Manifest). Leer lässt den Wert, der im Manifest steht.',
 	'[[/_admin/favicon/confirm/reset]]'		=> 'Den Satz der Basis zurücksetzen? Der jetzige Satz wird einmal aufgehoben und lässt sich mit „Rückgängig“ zurückholen.',
+	'[[/_admin/favicon/confirm/reset-title]]'	=> 'Favicon zurücksetzen',
 	'[[/_admin/favicon/msg/done]]'			=> 'Fertig. Browser zeigen das neue Icon, sobald ihr Zwischenspeicher abläuft; eine Seite, die den Zeitstempel an die Adressen hängt, zeigt es sofort.',
 	'[[/_admin/favicon/msg/none]]'			=> 'Es gibt noch keinen Satz.',
 	'[[/_admin/favicon/msg/date]]'			=> 'Zuletzt geschrieben: %s',

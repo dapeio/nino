@@ -36,6 +36,7 @@ return [
 	'[[/_admin/routes/placeholder/title]]'	=> 'HTML title, e.g. “About us”',
 	'[[/_admin/routes/placeholder/description]]'	=> 'HTML description',
 	'[[/_admin/routes/confirm/delete-left]]'	=> 'Really delete the route at “%s”? What stays: %s.',
+	'[[/_admin/routes/confirm/delete-title]]'	=> 'Delete route',
 	'[[/_admin/routes/confirm/stays-texts]]'	=> 'the texts %s',
 	'[[/_admin/routes/confirm/stays-template]]'	=> 'the template “%s” (used by no other route)',
 	'[[/_admin/routes/confirm/stays-template-one]]'	=> 'the template “%s” (used by one other route)',

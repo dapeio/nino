@@ -73,7 +73,7 @@ function ask( overrides ) {
 	const answers = [];
 	return {
 		answers : answers,
-		options : Object.assign( { message : 'Delete it?', yes : 'Delete', no : 'Cancel', onChoose : function( ok ) { answers.push( ok ) } }, overrides ),
+		options : Object.assign( { title : 'Delete item', message : 'Delete it?', yes : 'Delete', no : 'Cancel', onChoose : function( ok ) { answers.push( ok ) } }, overrides ),
 	};
 }
 
@@ -88,33 +88,33 @@ console.log('Nino.adminUi.confirm');
 	const returned = w.ui.confirm( 'destructive', a.options );
 	check( 'a page that has no shell asks, whatever the weight: a dialog opens and nobody has answered yet', returned === true && w.dialogs.length === 1 && w.dialogs[0].open === true && a.answers.length === 0 );
 	check( '...with the message in a paragraph, and the two answers in the words the caller gave, the one that goes on first', paragraphs( w.dialogs[0] ).length === 1 && paragraphs( w.dialogs[0] )[0].textContent === 'Delete it?'
-		&& buttons( w.dialogs[0] ).map( b => b.textContent ).join() === 'Delete,Cancel' );
-	check( '...a destructive question makes the way on the dangerous answer, and No the quiet one', buttons( w.dialogs[0] )[0].className === 'nino-admin-btn-danger' && buttons( w.dialogs[0] )[1].className === 'nino-admin-btn-secondary' );
-	fire( buttons( w.dialogs[0] )[0], 'click' );
+		&& buttons( w.dialogs[0] ).map( b => b.textContent ).join() === 'Cancel,Delete' );
+	check( '...a destructive question makes the way on the dangerous answer, and No the quiet one', buttons( w.dialogs[0] )[1].className === 'nino-admin-btn-danger' && buttons( w.dialogs[0] )[0].className === 'nino-admin-btn-secondary' );
+	fire( buttons( w.dialogs[0] )[1], 'click' );
 	check( '...Yes calls back once with true, and the dialog is gone', a.answers.join() === 'true' && w.dialogs[0].open === false && w.ui._choiceOpen === false );
 
 	const b = ask();
 	w.ui.confirm( 'big', b.options );
-	check( 'a question of any other weight makes the way on the primary answer', buttons( w.dialogs[1] )[0].className === 'nino-admin-btn-primary' );
-	fire( buttons( w.dialogs[1] )[1], 'click' );
+	check( 'a question of any other weight makes the way on the primary answer', buttons( w.dialogs[1] )[1].className === 'nino-admin-btn-primary' );
+	fire( buttons( w.dialogs[1] )[0], 'click' );
 	check( '...and No calls back once with false', b.answers.join() === 'false' );
 
 	const c = ask( { kind : 'danger' } );
 	w.ui.confirm( 'big', c.options );
 	const d = ask( { kind : 'primary' } );
-	fire( buttons( w.dialogs[2] )[1], 'click' );
+	fire( buttons( w.dialogs[2] )[0], 'click' );
 	w.ui.confirm( 'destructive', d.options );
-	check( 'the caller may say which kind the way on is, whatever the weight', buttons( w.dialogs[2] )[0].className === 'nino-admin-btn-danger' && buttons( w.dialogs[3] )[0].className === 'nino-admin-btn-primary' );
-	fire( buttons( w.dialogs[3] )[1], 'click' );
+	check( 'the caller may say which kind the way on is, whatever the weight', buttons( w.dialogs[2] )[1].className === 'nino-admin-btn-danger' && buttons( w.dialogs[3] )[1].className === 'nino-admin-btn-primary' );
+	fire( buttons( w.dialogs[3] )[0], 'click' );
 
 	const f = ask();
 	w.ui.confirm( 'nonsense', f.options );
-	check( 'a weight nobody named is asked as the heaviest is, and its way on is the dangerous answer', buttons( w.dialogs[4] )[0].className === 'nino-admin-btn-danger' );
-	fire( buttons( w.dialogs[4] )[1], 'click' );
+	check( 'a weight nobody named is asked as the heaviest is, and its way on is the dangerous answer', buttons( w.dialogs[4] )[1].className === 'nino-admin-btn-danger' );
+	fire( buttons( w.dialogs[4] )[0], 'click' );
 	const r = ask();
 	w.ui.confirm( 'routine', r.options );
-	check( 'a routine question makes the way on the primary answer', buttons( w.dialogs[5] )[0].className === 'nino-admin-btn-primary' );
-	fire( buttons( w.dialogs[5] )[1], 'click' );
+	check( 'a routine question makes the way on the primary answer', buttons( w.dialogs[5] )[1].className === 'nino-admin-btn-primary' );
+	fire( buttons( w.dialogs[5] )[0], 'click' );
 
 	const e = ask();
 	w.ui.confirm( 'destructive', e.options );
@@ -132,11 +132,11 @@ console.log('Nino.adminUi.confirm');
 	w.ui.confirm( 'destructive', first.options );
 	const returned = w.ui.confirm( 'destructive', second.options );
 	check( 'while a question is open a second one is not asked: confirm() answers false and calls nobody back', returned === false && w.dialogs.length === 1 && second.answers.length === 0 );
-	fire( buttons( w.dialogs[0] )[0], 'click' );
+	fire( buttons( w.dialogs[0] )[1], 'click' );
 	check( '...and the one that was open is answered as it was', first.answers.join() === 'true' && second.answers.length === 0 );
 	const third = ask();
 	check( '...and once it is, the next one is asked', w.ui.confirm( 'destructive', third.options ) === true && w.dialogs.length === 2 );
-	fire( buttons( w.dialogs[1] )[1], 'click' );
+	fire( buttons( w.dialogs[1] )[0], 'click' );
 
 	// A question that is not asked is not one that is open
 	const quiet = world( { mode : { policy : function( level ) { return { ask : level !== 'routine', note : '' } } } } );
@@ -164,15 +164,15 @@ console.log('Nino.adminUi.confirm');
 	w.ui.confirm( 'routine', b.options );
 	check( 'a policy that asks opens the dialog, and nothing is answered until it is', w.dialogs.length === 1 && b.answers.length === 0 && levels.join() === 'big,routine' );
 	check( '...an empty note is no paragraph', paragraphs( w.dialogs[0] ).length === 1 );
-	fire( buttons( w.dialogs[0] )[0], 'click' );
+	fire( buttons( w.dialogs[0] )[1], 'click' );
 
 	policy = { ask : true, note : 'Visitors see this at once.' };
 	const c = ask();
 	w.ui.confirm( 'big', c.options );
 	const text = paragraphs( w.dialogs[1] );
-	check( 'a note the policy adds is a paragraph of its own under the message, as text', text.length === 2 && text[0].textContent === 'Delete it?' && text[1].textContent === 'Visitors see this at once.' && w.dialogs[1].children[0].children.indexOf( text[1] ) > w.dialogs[1].children[0].children.indexOf( text[0] ) );
+	check( 'a note the policy adds is a paragraph of its own under the message, as text', text.length === 2 && text[0].textContent === 'Delete it?' && text[1].textContent === 'Visitors see this at once.' && text[0].parentNode.children.indexOf( text[1] ) > text[0].parentNode.children.indexOf( text[0] ) );
 	check( '...and the dialog is described by both, so that it is read out with the note', w.dialogs[1].attributes['aria-describedby'] === text[0].id+ ' '+ text[1].id );
-	fire( buttons( w.dialogs[1] )[1], 'click' );
+	fire( buttons( w.dialogs[1] )[0], 'click' );
 	check( '...whichever way it is answered, the answer is the caller\'s', c.answers.join() === 'false' );
 
 	// The note goes through the dialog as text, never as markup
@@ -180,7 +180,7 @@ console.log('Nino.adminUi.confirm');
 	const d = ask();
 	w.ui.confirm( 'big', d.options );
 	check( 'a note is set as text', paragraphs( w.dialogs[2] )[1].textContent === '<b>live</b>' && findAll( w.dialogs[2], el => el.tagName === 'B' ).length === 0 );
-	fire( buttons( w.dialogs[2] )[1], 'click' );
+	fire( buttons( w.dialogs[2] )[0], 'click' );
 }
 
 {
@@ -189,7 +189,7 @@ console.log('Nino.adminUi.confirm');
 	const a = ask();
 	w.ui.confirm( 'routine', a.options );
 	check( 'a shell with no policy asks', w.dialogs.length === 1 && a.answers.length === 0 );
-	fire( buttons( w.dialogs[0] )[1], 'click' );
+	fire( buttons( w.dialogs[0] )[0], 'click' );
 	const b = world( { dirty : {} } );
 	const asked = ask();
 	b.ui.confirm( 'routine', asked.options );
@@ -249,17 +249,17 @@ console.log('Nino.adminUi.confirm');
 	close();
 
 	btns = choose( [ { value : 'save', label : 'Save', kind : 'primary' }, { value : 'discard', label : 'Discard', kind : 'danger' }, { value : 'cancel', label : 'Cancel', kind : 'secondary' } ] );
-	check( 'a question that has a safe way on beside the dangerous one keeps the focus where it falls, on the first answer', btns.every( b => b.autofocus !== true ) );
+	check( 'a question that has a safe way on beside the dangerous one opens with the focus on the safe way on', btns.filter( b => b.autofocus === true ).length === 1 && btns[0].autofocus === true );
 	close();
 
 	btns = choose( [ { value : 'yes', label : 'Go', kind : 'primary' }, { value : 'no', label : 'Cancel', kind : 'secondary' } ] );
-	check( '...and so does a question that destroys nothing', btns.every( b => b.autofocus !== true ) );
+	check( '...and so does a question that destroys nothing', btns.filter( b => b.autofocus === true ).length === 1 && btns[0].autofocus === true );
 	close();
 
 	const a = ask();
 	w.ui.confirm( 'destructive', a.options );
 	btns = buttons( w.dialogs[w.dialogs.length - 1] );
-	check( 'confirm() of a destructive weight asks with the focus on the quiet answer: Enter on it is a No', btns[0].className === 'nino-admin-btn-danger' && btns[1].autofocus === true );
+	check( 'confirm() of a destructive weight asks with the focus on the quiet answer: Enter on it is a No', btns[1].className === 'nino-admin-btn-danger' && btns[0].autofocus === true );
 	close();
 	check( '...which is a No', a.answers.join() === 'false' );
 }
@@ -304,6 +304,7 @@ console.log('Nino.adminUi.confirm');
 	// site that is being built is asked, so the table is the contract and a change of it is a decision
 	const expected = {
 		'/_admin/types/confirm/rename' : 'big',
+		'/_admin/types/hint/delete' : 'destructive',
 		'/_admin/elements/confirm/image-remove' : 'destructive',
 		'/_admin/elements/confirm/delete' : 'destructive',
 		'/_admin/backups/confirm/restore' : 'destructive',
@@ -340,7 +341,7 @@ console.log('Nino.adminUi.confirm');
 	const said = {};
 	scripts.forEach( function( file ) {
 		for( const match of fs.readFileSync( file, 'utf8' ).matchAll( /Nino\.adminUi\.confirm\(\s*'(\w+)',\s*\{([\s\S]*?)onChoose/g ) ) {
-			const key = ( match[2].match( /getText\('(\/_admin\/[^']+)'\)/ ) ?? [] )[1];
+			const key = ( match[2].match( /message\s*:[^\n]*?getText\('(\/_admin\/[^']+)'\)/ ) ?? [] )[1];
 			if( key !== undefined )
 				said[key] = ( match[2].match( /\bkind\s*:\s*'(\w+)'/ ) ?? [ '', '' ] )[1]+ '/'+ ( /\bvisitors\s*:\s*false\b/.test( match[2] ) === true ? 'account' : 'site' );
 		}

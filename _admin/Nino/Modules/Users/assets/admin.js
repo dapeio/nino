@@ -1030,10 +1030,11 @@
 			}
 
 			Nino.adminUi.confirm( 'big', {
+				title			: Nino.content.getText('/_admin/users/confirm/deactivate-title'),
 				message		: Nino.content.getText('/_admin/users/confirm/deactivate'),
 				kind			: 'danger',
 				visitors	: false,
-				yes				: Nino.content.getText('/_admin/users/label/deactivate'),
+				yes				: Nino.content.getText('/_admin/users/confirm/deactivate-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 					if( ok === true )
@@ -1049,8 +1050,9 @@
 		 */
 		_delete : function() {
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/users/confirm/delete-title'),
 				message		: Nino.content.getText('/_admin/users/confirm/delete'),
-				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				yes				: Nino.content.getText('/_admin/users/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 
@@ -1078,9 +1080,10 @@
 		_logoutAll : function() {
 
 			Nino.adminUi.confirm( 'big', {
+				title			: Nino.content.getText('/_admin/users/confirm/logoutall-title'),
 				message		: Nino.content.getText('/_admin/users/confirm/logoutall'),
 				visitors	: false,
-				yes				: Nino.content.getText('/_admin/users/label/logoutall'),
+				yes				: Nino.content.getText('/_admin/users/confirm/logoutall-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

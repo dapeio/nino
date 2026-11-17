@@ -24,6 +24,7 @@ return [
 	'[[/_admin/navs/msg/unsaved]]'	=> 'Ungespeicherte Änderungen – Speichern schreibt die Reihenfolge.',
 	'[[/_admin/navs/confirm/discard]]'	=> 'Die Änderungen an dieser Navigation sind nicht gespeichert. Ohne Speichern verlassen?',
 	'[[/_admin/navs/confirm/delete]]'		=> 'Die Navigation „%s“ wirklich löschen? Ihre Routen bleiben, nur die Zugehörigkeit geht.',
+	'[[/_admin/navs/confirm/delete-title]]'	=> 'Navigation löschen',
 	'[[/_admin/error/navs_id_required]]'	=> 'Die Navigations-Kennung fehlt.',
 	'[[/_admin/error/navs_invalid_id]]'	=> 'Die Navigations-Kennung „%s“ ist ungültig. Beginne mit einem Kleinbuchstaben; danach sind Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche erlaubt.',
 	'[[/_admin/error/navs_id_taken]]'	=> 'Die Navigations-Kennung „%s“ ist schon vergeben.',

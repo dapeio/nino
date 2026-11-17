@@ -832,16 +832,18 @@
 				};
 
 				// An entry that cannot save offers nothing to save
-				const choices = [];
+				// Discard, Cancel, and at the far right Save - the order of every dialog of the workbench
+				const choices = [
+					{ value : 'discard', label : Nino.content.getText('/_admin/common/label/discard'), kind : 'danger' },
+					{ value : 'cancel', label : Nino.content.getText('/_admin/common/label/cancel'), kind : 'secondary' },
+				];
 				if( open.every( function( name ) { return typeof Nino.admin.dirty._entries[name].save === 'function' } ) === true )
 					choices.push( { value : 'save', label : Nino.content.getText('/_admin/common/label/save'), kind : 'primary' } );
-				choices.push( { value : 'discard', label : Nino.content.getText('/_admin/common/label/discard'), kind : 'danger' } );
-				choices.push( { value : 'cancel', label : Nino.content.getText('/_admin/common/label/cancel'), kind : 'secondary' } );
 
 				Nino.admin.dirty._asking = true;
 
 				const asked = Nino.adminUi.choiceDialog( {
-					title		: Nino.content.getText('/_admin/common/msg/dirty'),
+					title		: Nino.content.getText('/_admin/common/dirty/title'),
 					message	: Nino.content.getText('/_admin/common/confirm/unsaved'),
 					choices	: choices,
 					onChoose : function( value ) {

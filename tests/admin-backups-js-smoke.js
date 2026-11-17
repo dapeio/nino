@@ -49,7 +49,7 @@ function pressRestore( date ) {
 	if( dialogs.length === before )
 		return;
 	const question = dialogs.pop();
-	fire( findAll( question, function( el ) { return el.tagName === 'BUTTON' } )[confirmAnswer === true ? 0 : 1], 'click' );
+	fire( findAll( question, function( el ) { return el.tagName === 'BUTTON' } )[confirmAnswer === true ? 1 : 0], 'click' );
 }
 
 function messageLine() {

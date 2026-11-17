@@ -3392,8 +3392,9 @@
 		_removeImage : function( key, name, hiddenInput, preview, msg, removeBtn ) {
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/elements/confirm/image-remove-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/elements/confirm/image-remove'), name ),
-				yes				: Nino.content.getText('/_admin/common/label/remove'),
+				yes				: Nino.content.getText('/_admin/elements/confirm/image-remove-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				opener		: removeBtn,
 				onChoose	: function( ok ) {
@@ -3525,8 +3526,9 @@
 				return;
 
 			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/elements/confirm/delete-title'),
 				message		: Nino.content.getText('/_admin/elements/confirm/delete'),
-				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				yes				: Nino.content.getText('/_admin/elements/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				onChoose	: function( ok ) {
 

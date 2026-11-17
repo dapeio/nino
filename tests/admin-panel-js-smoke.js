@@ -794,11 +794,11 @@ function fireClose( el ) {
 
 	const dialog = d.opened[0];
 	const tags = function( root, tag ) { return findAll( root, function( el ) { return el.tagName === tag.toUpperCase() } ) };
-	check( 'it is a native dialog in the workbench\'s root, opened as a modal, wider than a question', dialog.parentNode === d.wrap && dialog.open === true && dialog.className === 'nino-admin-dialog nino-admin-dialog--manual' );
+	check( 'it is a native dialog in the workbench\'s root, opened as a modal, wider than a question', dialog.parentNode === d.wrap && dialog.open === true && dialog.className === 'nino-admin-dialog nino-admin-dialog--form nino-admin-dialog--manual' );
 	check( 'the panel\'s name is its heading, and names the dialog', tags( dialog, 'h2' )[0].textContent === 'Elements' && tags( dialog, 'h2' )[0].className === 'nino-admin-dialog-title'
 		&& dialog.attributes['aria-labelledby'] === tags( dialog, 'h2' )[0].id && tags( dialog, 'h2' )[0].id !== '' );
 	check( 'the manual stands between it and the button, in a box of its own that scrolls', findAll( dialog, el => el.className === 'nino-admin-dialog-content' )[0].children[0] === content
-		&& findAll( dialog, el => el.className === 'nino-admin-dialog-body' )[0].children.map( el => el.className ).join('|') === 'nino-admin-dialog-title|nino-admin-dialog-content|nino-admin-dialog-actions' );
+		&& findAll( dialog, el => el.className === 'nino-admin-dialog-body' )[0].children.map( el => el.className ).join('|') === 'nino-admin-dialog-head|nino-admin-dialog-content|nino-admin-dialog-actions' );
 	check( 'a manual is read when it is looked at: the dialog has no description to be read out with it', dialog.attributes['aria-describedby'] === undefined );
 	const close = tags( dialog, 'button' );
 	check( 'one button closes it, and it is the first control in the dialog - which is where the focus goes when it opens', close.length === 1 && close[0].textContent === 'Close' && close[0].focused === true );
@@ -842,8 +842,8 @@ function fireClose( el ) {
 	const answers = [];
 	ui.choiceDialog( { title : 'Unsaved', message : 'Save first?', choices : [ { value : 'save', label : 'Save', kind : 'primary' }, { value : 'cancel', label : 'Cancel', kind : 'secondary' } ], onChoose : v => answers.push( v ) } );
 	const question = d.opened[0];
-	check( 'a question is as it was: its message in a paragraph, described by it, no scrolling box, the class the design system gives it', question.className === 'nino-admin-dialog' && question.attributes['aria-describedby'] === 'nino-admin-choice-text'
-		&& findAll( question, el => el.id === 'nino-admin-choice-text' )[0].textContent === 'Save first?' && findAll( question, el => el.className === 'nino-admin-dialog-content' ).length === 0 );
+	check( 'a question is as it was: its message in a paragraph, described by it, the narrow class the design system gives it', question.className === 'nino-admin-dialog nino-admin-dialog--narrow' && question.attributes['aria-describedby'] === 'nino-admin-choice-text'
+		&& findAll( question, el => el.id === 'nino-admin-choice-text' )[0].textContent === 'Save first?' );
 	question.close();
 	check( '...and Escape is the answer that does nothing', answers.join() === 'cancel' );
 }

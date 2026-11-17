@@ -962,6 +962,7 @@ if( typeof elements._renderNav === 'function' ) {
 		'/_admin/elements/msg/saved' : 'Saved.',
 		'/_admin/elements/msg/image-below-target' : 'Saved - only %s, scaled up.',
 		'/_admin/elements/confirm/image-remove' : 'Remove from "%s"?',
+		'/_admin/elements/confirm/image-remove-title' : 'Remove image',
 		'/_admin/elements/msg/image-removed' : 'Removed.',
 		'/_admin/elements/error/image-remove' : 'Removing failed.',
 	};
@@ -2089,6 +2090,8 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		sent.length = 0;
 		touched.length = 0;
 
+		const wordsBefore = sandbox.Nino.content;
+		sandbox.Nino.content = { getText : key => key };
 		sandbox.window.confirm = () => false;
 		elements._delete();
 		check( 'a delete that is not confirmed sends nothing and writes nothing', sent.length === 0 && touched.length === 0 );
@@ -2103,6 +2106,7 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		sent[1].callback( 200, { ok : true } );
 		check( '...one that went through tells the other panels that elements were written, and goes back to the list of the type', touched.join() === 'elements' && selected !== null && selected[0] === 'post' );
 
+		sandbox.Nino.content = wordsBefore;
 		elements._selectType = originalSelect;
 	}
 }

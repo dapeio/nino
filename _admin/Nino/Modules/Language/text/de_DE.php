@@ -43,6 +43,7 @@ return [
 	'[[/_admin/translations/error/json]]'	=> 'Ungültiges JSON: %s',
 	'[[/_admin/translations/error/object]]'	=> 'Das Übersetzungsdokument muss ein JSON-Objekt sein.',
 	'[[/_admin/translations/confirm/native]]'	=> 'Ein Import hierhin überschreibt die nativen Quellinhalte. Fortfahren?',
+	'[[/_admin/translations/confirm/native-title]]'	=> 'Quellinhalte überschreiben',
 	'[[/_admin/translations/msg/importing]]'	=> 'Wird importiert …',
 	'[[/_admin/translations/error/import]]'	=> 'Import fehlgeschlagen.',
 	'[[/_admin/translations/msg/imported]]'	=> '%d Werte nach %s importiert, %n übersprungen.',

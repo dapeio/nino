@@ -53,11 +53,12 @@ console.log( 'Nino.adminUi.conflict - a save that was refused\n' );
 
 {
 	const a = ask();
-	check( 'the question has the message of the refusal and three answers: overwrite - the dangerous one -, cancel and reload', a.opened === true && a.dialog.open === true
+	check( 'the question has the message of the refusal and three answers in the order of every dialog: reload, cancel, and at the far right overwrite - the dangerous one', a.opened === true && a.dialog.open === true
 		&& findAll( a.dialog, el => el.tagName === 'P' )[0].textContent === 'Somebody saved it meanwhile.'
-		&& buttons( a.dialog ).map( b => b.textContent ).join() === 'Overwrite,Cancel,Reload' && buttons( a.dialog )[0].className === 'nino-admin-btn-danger' );
+		&& buttons( a.dialog ).map( b => b.textContent ).join() === 'Reload,Cancel,Overwrite' && buttons( a.dialog ).map( b => b.className ).join() === 'nino-admin-btn-secondary,nino-admin-btn-secondary,nino-admin-btn-danger' );
+	check( '...the focus does not open on the dangerous answer, but on Cancel, which is what Escape is', buttons( a.dialog )[1].autofocus === true && buttons( a.dialog )[2].autofocus !== true && buttons( a.dialog )[1].focused === true );
 	check( '...the dialog is named by a heading, and nothing has been done yet', a.dialog.attributes['aria-labelledby'] === 'nino-admin-choice-title' && a.calls.length === 0 );
-	fire( buttons( a.dialog )[0], 'click' );
+	fire( buttons( a.dialog )[2], 'click' );
 	check( 'Overwrite calls back once, and only for overwrite', a.calls.join() === 'overwrite' );
 }
 
@@ -73,16 +74,16 @@ console.log( 'Nino.adminUi.conflict - a save that was refused\n' );
 
 {
 	const a = ask();
-	fire( buttons( a.dialog )[2], 'click' );
+	fire( buttons( a.dialog )[0], 'click' );
 	const second = dialogs[dialogs.length - 1];
 	check( 'Reload is asked once more before it drops anything: a second question, its way on the dangerous answer, and nothing is called yet', second !== a.dialog && second.open === true && a.calls.length === 0
-		&& buttons( second ).map( b => b.textContent ).join() === 'Reload,Cancel' && buttons( second )[0].className === 'nino-admin-btn-danger' );
-	fire( buttons( second )[0], 'click' );
+		&& buttons( second ).map( b => b.textContent ).join() === 'Cancel,Discard changes' && buttons( second )[1].className === 'nino-admin-btn-danger' );
+	fire( buttons( second )[1], 'click' );
 	check( '...yes calls onReload', a.calls.join() === 'reload' );
 
 	const b = ask();
-	fire( buttons( b.dialog )[2], 'click' );
-	fire( buttons( dialogs[dialogs.length - 1] )[1], 'click' );
+	fire( buttons( b.dialog )[0], 'click' );
+	fire( buttons( dialogs[dialogs.length - 1] )[0], 'click' );
 	check( '...no calls onCancel: what the person did is kept', b.calls.join() === 'cancel' );
 }
 
@@ -93,12 +94,12 @@ console.log( 'Nino.adminUi.conflict - a save that was refused\n' );
 	fire( buttons( a.dialog )[1], 'click' );
 
 	const b = ask( { text : { title : 'Elsewhere', overwrite : 'Force', reload : 'Load', cancel : 'Leave' } } );
-	check( 'the words are the caller\'s where it gives them', findAll( b.dialog, el => el.tagName === 'H2' )[0].textContent === 'Elsewhere' && buttons( b.dialog ).map( x => x.textContent ).join() === 'Force,Leave,Load' );
+	check( 'the words are the caller\'s where it gives them', findAll( b.dialog, el => el.tagName === 'H2' )[0].textContent === 'Elsewhere' && buttons( b.dialog ).map( x => x.textContent ).join() === 'Load,Leave,Force' );
 	fire( buttons( b.dialog )[1], 'click' );
 
 	// Only what is called is asked for: a caller that has no way to reload is not made to have one
 	const c = adminUi.conflict( { message : 'x' } );
-	fire( buttons( dialogs[dialogs.length - 1] )[0], 'click' );
+	fire( buttons( dialogs[dialogs.length - 1] )[1], 'click' );
 	check( 'a caller that gives no callback is called nothing', c === true );
 }
 

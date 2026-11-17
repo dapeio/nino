@@ -764,7 +764,7 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	unsaved.users = true;
 	click( railLinks.dashboard );
 	check( 'a move through the rail with unsaved input asks - the question the back link asks, with the same three answers, about the panel on screen and the tabs of it', asked.length === 1
-		&& asked[0].title === '/_admin/common/msg/dirty' && asked[0].message === '/_admin/common/confirm/unsaved' && asked[0].choices.map( function( choice ) { return choice.value } ).join() === 'save,discard,cancel' );
+		&& asked[0].title === '/_admin/common/dirty/title' && asked[0].message === '/_admin/common/confirm/unsaved' && asked[0].choices.map( function( choice ) { return choice.value } ).join() === 'discard,cancel,save' );
 	check( '...and it has not moved: the panel stays, the link stays the current one, the form has its input', current() === 'users' && unsaved.users === true && happened.length === 0 );
 	asked[0].onChoose('cancel');
 	check( 'Cancel keeps the panel and the rail as it was', current() === 'users' && navSelect.value === 'users' && unsaved.users === true && happened.length === 0 && shell.location.hash === '#roles' );
@@ -1451,9 +1451,9 @@ check( '...and an entry outside the scope of a guard does not count', dirty.isDi
 let cancelled = 0;
 proceeded = 0;
 dirty.guard( [ 'keys' ], function() { proceeded++ }, function() { cancelled++ } );
-check( 'unsaved input is asked about: Save, Discard, Cancel, in the interface language',
-	dirtyAsked.length === 1 && dirtyAsked[0].message === '/_admin/common/confirm/unsaved' && dirtyAsked[0].title === '/_admin/common/msg/dirty'
-	&& dirtyAsked[0].choices.map( function( c ) { return c.value+ ':'+ c.kind+ ':'+ c.label } ).join() === 'save:primary:/_admin/common/label/save,discard:danger:/_admin/common/label/discard,cancel:secondary:/_admin/common/label/cancel' );
+check( 'unsaved input is asked about: Discard, Cancel and at the far right Save, in the interface language',
+	dirtyAsked.length === 1 && dirtyAsked[0].message === '/_admin/common/confirm/unsaved' && dirtyAsked[0].title === '/_admin/common/dirty/title'
+	&& dirtyAsked[0].choices.map( function( c ) { return c.value+ ':'+ c.kind+ ':'+ c.label } ).join() === 'discard:danger:/_admin/common/label/discard,cancel:secondary:/_admin/common/label/cancel,save:primary:/_admin/common/label/save' );
 dirty.guard( [ 'keys' ], function() { proceeded += 10 } );
 check( 'while a question stands a second call is ignored - it is the same click arriving twice', dirtyAsked.length === 1 && proceeded === 0 );
 answer('cancel');
@@ -1912,8 +1912,8 @@ const chosen = [];
 const opened = world.ctx.Nino.adminUi.choiceDialog( { title : 'Title', message : '<b>Question</b>', choices : choices, onChoose : function( value ) { chosen.push( value ) } } );
 const box = world.dialogs[0];
 const buttons = box.children[0].children[box.children[0].children.length - 1].children;
-check( 'the question is a native dialog in the workbench root, opened modally - not in the body, where the design system\'s rules do not reach', opened === true && box.open === true && world.root.children[0] === box && box.className === 'nino-admin-dialog' );
-check( '...its words are text, never markup', box.children[0].children.some( function( c ) { return c.textContent === '<b>Question</b>' } ) && box.children[0].children[0].textContent === 'Title' );
+check( 'the question is a native dialog in the workbench root, opened modally - not in the body, where the design system\'s rules do not reach', opened === true && box.open === true && world.root.children[0] === box && box.className === 'nino-admin-dialog nino-admin-dialog--narrow' );
+check( '...its words are text, never markup', findAll( box, function( c ) { return c.tagName === 'p' && c.textContent === '<b>Question</b>' } ).length === 1 && findAll( box, function( c ) { return c.tagName === 'h2' && c.textContent === 'Title' } ).length === 1 );
 check( '...it has one button per choice, in the three button kinds', buttons.map( function( b ) { return b.className+ ':'+ b.textContent } ).join() === 'nino-admin-btn-primary:Save,nino-admin-btn-danger:Discard,nino-admin-btn-secondary:Cancel' && buttons.every( function( b ) { return b.type === 'button' } ) );
 check( 'a second question while one stands is refused', world.ctx.Nino.adminUi.choiceDialog( { message : 'again', choices : choices, onChoose : function() { chosen.push('second') } } ) === false && world.dialogs.length === 1 );
 buttons[1].listeners.click();

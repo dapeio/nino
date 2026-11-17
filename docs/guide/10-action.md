@@ -85,8 +85,9 @@ Ersetze `features/Meetups/assets/admin.js`:
 	const remove = function( row, button ) {
 
 		Nino.adminUi.confirm( 'destructive', {
+			title			: word('confirm/remove-title'),
 			message		: Nino.adminUi.format( word('confirm/remove'), row.name ),
-			yes				: word('label/remove'),
+			yes				: word('confirm/remove-title'),
 			no				: word('label/keep'),
 			opener		: button,
 			onChoose	: function( yes ) {
@@ -136,7 +137,7 @@ Ersetze `features/Meetups/assets/admin.js`:
 } )(window);
 ```
 
-- `Nino.adminUi.confirm()` stellt eine Rückfrage. `'destructive'` heißt: Die Aktion lässt sich nicht zurücknehmen.
+- `Nino.adminUi.confirm()` stellt eine Rückfrage. `'destructive'` heißt: Die Aktion lässt sich nicht zurücknehmen. Der `title` ist Pflicht und sagt, was mit was geschieht; der Knopf, der weitergeht, trägt dieselben Worte.
 - `Nino.admin.meetups.call( 'remove', … )` ruft die Aktion `meetups/remove` auf.
 - `fail()` zeigt einen Fehler in der Fläche. Hat die Antwort einen Code, zeigt die Workbench den Satz zu diesem Code.
 - Eine Spalte mit `render` zeichnet ein eigenes Element in die Zelle, hier den Knopf.
@@ -149,6 +150,7 @@ Füge in `features/Meetups/text/en_US.php` vor der letzten Zeile `];` ein:
 	// The words of the action meetups/remove
 	'[[/_admin/meetups/label/remove]]'   => 'Remove',
 	'[[/_admin/meetups/label/keep]]'     => 'Keep',
+	'[[/_admin/meetups/confirm/remove-title]]' => 'Remove sign-up',
 	'[[/_admin/meetups/confirm/remove]]' => 'Remove the sign-up of %s?',
 	'[[/_admin/meetups/error/remove]]'   => 'The sign-up could not be removed.',
 	// The sentence of the code meetups_gone, see Admin::apiRemove()
@@ -161,6 +163,7 @@ Und in `text/de_DE.php`:
 	// The words of the action meetups/remove
 	'[[/_admin/meetups/label/remove]]'   => 'Entfernen',
 	'[[/_admin/meetups/label/keep]]'     => 'Behalten',
+	'[[/_admin/meetups/confirm/remove-title]]' => 'Anmeldung entfernen',
 	'[[/_admin/meetups/confirm/remove]]' => 'Die Anmeldung von %s entfernen?',
 	'[[/_admin/meetups/error/remove]]'   => 'Die Anmeldung konnte nicht entfernt werden.',
 	// The sentence of the code meetups_gone, see Admin::apiRemove()

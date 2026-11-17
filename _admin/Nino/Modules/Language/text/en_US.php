@@ -43,6 +43,7 @@ return [
 	'[[/_admin/translations/error/json]]'	=> 'Invalid JSON: %s',
 	'[[/_admin/translations/error/object]]'	=> 'Translation document must be a JSON object.',
 	'[[/_admin/translations/confirm/native]]'	=> 'Importing here overwrites native source content. Continue?',
+	'[[/_admin/translations/confirm/native-title]]'	=> 'Overwrite source content',
 	'[[/_admin/translations/msg/importing]]'	=> 'Importing …',
 	'[[/_admin/translations/error/import]]'	=> 'Import failed.',
 	'[[/_admin/translations/msg/imported]]'	=> '%d values imported into %s, %n skipped.',

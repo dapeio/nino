@@ -6,6 +6,7 @@ return [
 	'[[/_admin/nav/backups]]'						=> 'Backups',
 	'[[/_admin/backups/empty]]'					=> 'Noch kein Backup vorhanden.',
 	'[[/_admin/backups/confirm/restore]]'	=> 'Das Backup vom %s wiederherstellen? Der aktuelle Stand wird zuvor automatisch gesichert. Danach wirst Du abgemeldet und landest auf der Anmeldeseite.',
+	'[[/_admin/backups/confirm/restore-title]]'	=> 'Backup wiederherstellen',
 	'[[/_admin/backups/label/login]]'	=> 'Zur Anmeldung',
 	'[[/_admin/backups/msg/restored]]'	=> 'Das Backup vom %s wurde wiederhergestellt.',
 	'[[/_admin/backups/label/now]]'			=> 'Jetzt sichern',

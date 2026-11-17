@@ -462,9 +462,10 @@
 			const opener = dc.getElementById('favicon-reset');
 
 			Nino.adminUi.confirm( 'big', {
+				title			: Nino.content.getText('/_admin/favicon/confirm/reset-title'),
 				message		: Nino.content.getText('/_admin/favicon/confirm/reset'),
 				kind			: 'danger',
-				yes				: Nino.content.getText('/_admin/favicon/label/reset'),
+				yes				: Nino.content.getText('/_admin/favicon/confirm/reset-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
 				opener		: opener,
 				onChoose	: function( ok ) {

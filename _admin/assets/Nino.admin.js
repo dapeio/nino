@@ -460,18 +460,37 @@
 			} );
 		},
 
-		// Whether choiceDialog() has a question open - one at a time: a second
-		// call while it stands is the same click arriving twice
+		// The modal choiceDialog()s that are open, the one below first: one at a time, a second call while
+		// one stands is the same click arriving twice - except the question a dialog asks of itself
+		// (nested), which stands on top of it. _choiceOpen says whether there is one; a dialog that
+		// closes takes itself off the stack, whatever closes before or after it, so none is left
+		// standing for the next call to be refused by
+		_choiceStack : [],
 		_choiceOpen : false,
 
+		// The handle of the sheet that is open (propertiesDialog()), which is no modal dialog and is
+		// not one of the stack
+		_sheet : null,
+
 		/**
-		 *	A modal question with more than two answers (a confirm() has two):
-		 *	a native <dialog> in the workbench root, opened with showModal(),
-		 *	so the page behind keeps everything that was typed into it. Escape
-		 *	is the secondary choice, the one that does nothing; focus goes back
-		 *	to what had it when the question was asked. The focus opens on the
-		 *	first button, unless the question has a 'danger' answer and no
-		 *	'primary' one: then it opens on the secondary answer.
+		 *	The one dialog of the workbench: a native <dialog> in the workbench
+		 *	root, opened with showModal(), so the page behind keeps everything that
+		 *	was typed into it and the keyboard stays inside. Its head (the title)
+		 *	and its foot (the answers) stand where they are and what is between
+		 *	them scrolls, so that neither leaves the screen however much there is
+		 *	to read or fill in. confirm(), formDialog(), pickDialog(),
+		 *	propertiesDialog() and manualDialog() are this dialog with something
+		 *	in it; none of them builds a <dialog> of its own.
+		 *
+		 *	The answers stand in one row at the right, in the order they are given:
+		 *	the caller puts the one that goes on last, so that it is at the far
+		 *	right and Cancel at its left. Escape is the secondary answer, the one
+		 *	that does nothing; focus goes back to what had it when the question
+		 *	was asked. The focus opens on the first control of
+		 *	`focus`, else on the 'primary' answer, unless the question has a
+		 *	'danger' answer and no 'primary' one: then it opens on the secondary
+		 *	answer, so that Enter on a dialog that has just appeared is never the
+		 *	destroying one.
 		 *
 		 *	Owns no strings and names no Nino.admin member: the caller says
 		 *	what to ask and what the answers are called, in the interface
@@ -485,124 +504,241 @@
 		 *	confirm()); a browser without <dialog> is asked the two with a blank
 		 *	line between them
 		 *
-		 *	The same dialog holds a text that is read rather than answered, a
-		 *	manual (see manualDialog()): `content` is drawn in place of the
-		 *	message, and the dialog keeps its title and its answers in view while
-		 *	what is between them scrolls
+		 *	A `content` is drawn in place of the message: a text that is read
+		 *	rather than answered (manualDialog()), a form (formDialog()), a list
+		 *	to pick from (pickDialog())
+		 *
+		 *	A `guard` is asked before an answer closes the dialog, by a press or by
+		 *	Escape: it answers false to keep the dialog open - a form that is not
+		 *	valid, a question that is on its way to the server. What it keeps open
+		 *	it closes itself, with the handle's close()
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		[options.title]
 		 *	@param		{string}		options.message				The question - what a browser without <dialog> is asked, with a `content`
 		 *	@param		{Element}		[options.content]			Drawn in place of the message
+		 *	@param		{Element}		[options.tools]				Drawn at the right of the title
 		 *	@param		{string}		[options.className]		Added to the dialog's own class
+		 *	@param		{string}		[options.size]				'narrow' (a question, the default), 'form', 'wide' or 'sheet' - the class nino-admin-dialog--<size>; a sheet stands at the right over the whole height
 		 *	@param		{string}		[options.note]				A second paragraph under the message
 		 *	@param		{Element}		[options.opener]			What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari
+		 *	@param		{Element}		[options.focus]				What gets the focus when the dialog opens
+		 *	@param		{boolean}		[options.nested]			The dialog asks something of an open dialog and stands on it
+		 *	@param		{string}		[options.escape]			The value of the choice that Escape is, where it is not the first 'secondary' one
+		 *	@param		{string}		[options.describedBy]	The ids that describe a dialog that holds `content`
+		 *	@param		{boolean}		[options.modeless]		Not modal: no backdrop, no trap for the focus, the page behind stays in use; Escape closes it where the focus is in it or nobody else is asking. The workbench root carries nino-admin-has-sheet while it is open
+		 *	@param		{boolean}		[options.refuseWithoutDialog]	Where the browser has no <dialog>, the answer is the secondary one without asking (a word that has to be typed cannot be answered by OK)
 		 *	@param		{Array}			options.choices				[ { value, label, kind } ], kind 'primary', 'danger' or 'secondary'
+		 *	@param		{Function}	[options.guard]				guard( value, handle ) - false keeps the dialog open
+		 *	@param		{Function}	[options.onOpen]			onOpen( handle ) once the dialog is open
 		 *	@param		{Function}	options.onChoose			Called once with the chosen value
 		 *
 		 *	@return		{boolean}										false when a question is already open
 		 */
 		choiceDialog : function( options ) {
 
-			if( Nino.adminUi._choiceOpen === true )
+			const modeless = options.modeless === true;
+
+			if( modeless === true && Nino.adminUi._sheet !== null )
+				return false;
+
+			if( Nino.adminUi._choiceOpen === true && options.nested !== true )
 				return false;
 
 			const choices = options.choices;
-			const cancel 	= choices.find( function( choice ) { return choice.kind === 'secondary' } ) ?? choices[choices.length - 1];
+			const cancel 	= choices.find( function( choice ) { return choice.value === options.escape } ) ?? choices.find( function( choice ) { return choice.kind === 'secondary' } ) ?? choices[choices.length - 1];
 			const dialog 	= dc.createElement('dialog');
 			const hasNote = typeof options.note === 'string' && options.note !== '' && ( options.content === undefined || options.content === null );
 
 			if( typeof dialog.showModal !== 'function' ) {
+
+				if( options.refuseWithoutDialog === true ) {
+					options.onChoose( cancel.value );
+					return true;
+				}
+
 				const yes = choices.find( function( choice ) { return choice.kind === 'primary' } ) ?? choices.find( function( choice ) { return choice.kind === 'danger' } ) ?? cancel;
 				options.onChoose( wn.confirm( hasNote === true ? options.message+ '\n\n'+ options.note : options.message ) === true ? yes.value : cancel.value );
 				return true;
 			}
 
-			Nino.adminUi._choiceOpen = true;
+			// What a second dialog on top of the first says its title and its text by must not be the ids of the first
+			const sfx = modeless === false ? ( Nino.adminUi._choiceStack.length > 0 ? '-'+ Nino.adminUi._choiceStack.length : '' ) : '-sheet';
+
+			if( modeless === false ) {
+				Nino.adminUi._choiceStack.push( dialog );
+				Nino.adminUi._choiceOpen = true;
+			}
 
 			const opener = options.opener ?? dc.activeElement;
 			const hasContent = options.content !== undefined && options.content !== null;
 			let chosen = null;
 
-			dialog.className = 'nino-admin-dialog'+ ( typeof options.className === 'string' && options.className !== '' ? ' '+ options.className : '' );
+			// A dialog that brings a size of its own with a class of its own is not made narrow beside it
+			const hasClass = typeof options.className === 'string' && options.className !== '';
+
+			dialog.className = 'nino-admin-dialog'+ ( typeof options.size === 'string' && options.size !== '' ? ' nino-admin-dialog--'+ options.size : ( hasClass === false ? ' nino-admin-dialog--narrow' : '' ) )+ ( hasClass === true ? ' '+ options.className : '' );
 
 			// A message is what the dialog is about and is read out with it; a
 			// manual is as long as it is and is read when it is looked at
 			if( hasContent === false )
-				dialog.setAttribute( 'aria-describedby', hasNote === true ? 'nino-admin-choice-text nino-admin-choice-note' : 'nino-admin-choice-text' );
+				dialog.setAttribute( 'aria-describedby', hasNote === true ? 'nino-admin-choice-text'+ sfx+ ' nino-admin-choice-note'+ sfx : 'nino-admin-choice-text'+ sfx );
+			else if( typeof options.describedBy === 'string' )
+				dialog.setAttribute( 'aria-describedby', options.describedBy );
 
 			const body = dc.createElement('div');
 			body.className = 'nino-admin-dialog-body';
 
 			if( typeof options.title === 'string' && options.title !== '' ) {
+				const head = dc.createElement('div');
+				head.className = 'nino-admin-dialog-head';
+
 				const title = dc.createElement('h2');
-				title.id = 'nino-admin-choice-title';
+				title.id = 'nino-admin-choice-title'+ sfx;
 				title.className = 'nino-admin-dialog-title';
 				title.textContent = options.title;
-				body.appendChild( title );
-				dialog.setAttribute( 'aria-labelledby', 'nino-admin-choice-title' );
+				head.appendChild( title );
+
+				if( options.tools !== undefined && options.tools !== null )
+					head.appendChild( options.tools );
+
+				body.appendChild( head );
+				dialog.setAttribute( 'aria-labelledby', 'nino-admin-choice-title'+ sfx );
 			}
 
-			if( hasContent === true ) {
-				const scroll = dc.createElement('div');
-				scroll.className = 'nino-admin-dialog-content';
+			const scroll = dc.createElement('div');
+			scroll.className = 'nino-admin-dialog-content';
+
+			if( hasContent === true )
 				scroll.appendChild( options.content );
-				body.appendChild( scroll );
-			}
 			else {
 				const text = dc.createElement('p');
-				text.id = 'nino-admin-choice-text';
+				text.id = 'nino-admin-choice-text'+ sfx;
 				text.textContent = options.message;
-				body.appendChild( text );
+				scroll.appendChild( text );
 
 				if( hasNote === true ) {
 					const note = dc.createElement('p');
-					note.id = 'nino-admin-choice-note';
+					note.id = 'nino-admin-choice-note'+ sfx;
 					note.textContent = options.note;
-					body.appendChild( note );
+					scroll.appendChild( note );
 				}
 			}
+
+			body.appendChild( scroll );
 
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-dialog-actions';
 
 			// A question whose way on is a 'danger' one and has no 'primary' one - the
 			// one that destroys what is there, with nothing safe to press at its
-			// side - opens with the focus on the answer that does nothing: Enter
-			// on a dialog that has just appeared must not be the destroying
-			// answer. Any other question keeps what showModal() does, the first
-			// button; that is also where a Save stands beside a Discard
+			// side - opens with the focus on the answer that does nothing
 			const cautious = choices.some( function( choice ) { return choice.kind === 'danger' } ) === true && choices.some( function( choice ) { return choice.kind === 'primary' } ) === false;
+			const initial 	= cautious === true ? cancel : ( choices.find( function( choice ) { return choice.kind === 'primary' } ) ?? choices[0] );
+
+			const buttons = {};
 
 			choices.forEach( function( choice ) {
+
 				const btn = dc.createElement('button');
 				btn.type = 'button';
 				btn.className = 'nino-admin-btn-'+ ( choice.kind === 'primary' || choice.kind === 'danger' ? choice.kind : 'secondary' );
 				btn.textContent = choice.label;
-				btn.autofocus = cautious === true && choice === cancel;
-				btn.addEventListener( 'click', function() {
-					chosen = choice;
-					dialog.close();
-				} );
+				btn.autofocus = options.focus === undefined && choice === initial;
+				btn.addEventListener( 'click', function() { handle.close( choice.value, true ) } );
+				buttons[choice.value] = btn;
 				actions.appendChild( btn );
 			} );
 
 			body.appendChild( actions );
 			dialog.appendChild( body );
 
-			// The Escape key closes it too, and says no
+			// What the caller gets to open and close the dialog by
+			const handle = {
+				el : dialog,
+				buttons : buttons,
+				close : function( value, ask ) {
+
+					const choice = choices.find( function( one ) { return one.value === value } ) ?? { value : value };
+
+					if( ask === true && typeof options.guard === 'function' && options.guard( choice.value, handle ) === false )
+						return;
+
+					chosen = choice;
+					dialog.close();
+				},
+			};
+
+			// The Escape key closes it too, and says no - unless the guard has a reason to keep it. A dialog
+			// that has a guard takes the key itself: a browser lets a cancelled close pass the second time
+			// the key is pressed with nothing done in between, so cancel alone does not keep a form open
+			if( typeof options.guard === 'function' )
+				dialog.addEventListener( 'keydown', function( event ) {
+					if( event.key !== 'Escape' )
+						return;
+					event.preventDefault();
+					handle.close( cancel.value, true );
+				} );
+
+			dialog.addEventListener( 'cancel', function( event ) {
+				if( typeof options.guard === 'function' && options.guard( cancel.value, handle ) === false )
+					event.preventDefault();
+			} );
+
+			// A dialog that is not modal has no Escape of the browser's: the key closes it where the focus is in it, or
+			// where no modal dialog is open to take the key
+			const onKey = function( event ) {
+				if( event.key === 'Escape' && ( dialog.contains( dc.activeElement ) === true || Nino.adminUi._choiceOpen === false ) ) {
+					event.preventDefault();
+					handle.close( cancel.value, true );
+				}
+			};
+
+			if( modeless === true )
+				dc.addEventListener( 'keydown', onKey );
+
 			dialog.addEventListener( 'close', function() {
 				dialog.remove();
-				Nino.adminUi._choiceOpen = false;
+
+				if( modeless === true ) {
+					dc.removeEventListener( 'keydown', onKey );
+					Nino.adminUi._sheet = null;
+					( dc.getElementById('admin-page-wrap') ?? dc.body ).classList.remove('nino-admin-has-sheet');
+				} else {
+					const at = Nino.adminUi._choiceStack.indexOf( dialog );
+					if( at !== -1 )
+						Nino.adminUi._choiceStack.splice( at, 1 );
+					Nino.adminUi._choiceOpen = Nino.adminUi._choiceStack.length > 0;
+				}
+
 				if( opener !== null && typeof opener.focus === 'function' )
 					opener.focus();
 				options.onChoose( ( chosen ?? cancel ).value );
 			} );
 
+			if( options.focus !== undefined && options.focus !== null )
+				options.focus.autofocus = true;
+
 			// Inside the workbench root, not the body: the design system's rules
 			// are scoped to .nino-admin and would not reach it there
-			( dc.getElementById('admin-page-wrap') ?? dc.body ).appendChild( dialog );
-			dialog.showModal();
+			const root = dc.getElementById('admin-page-wrap') ?? dc.body;
+			root.appendChild( dialog );
+
+			if( modeless === true ) {
+				Nino.adminUi._sheet = handle;
+				root.classList.add('nino-admin-has-sheet');
+				dialog.show();
+			} else
+				dialog.showModal();
+
+			// The browser picks the first control of the dialog where nothing says otherwise; here something does
+			const first = options.focus ?? buttons[initial.value];
+
+			if( first !== undefined && first !== null && typeof first.focus === 'function' )
+				first.focus();
+
+			if( typeof options.onOpen === 'function' )
+				options.onOpen( handle );
 
 			return true;
 		},
@@ -620,44 +756,631 @@
 		 *	older than the policy - every question is asked, as confirm() always
 		 *	asked.
 		 *
-		 *	The question is choiceDialog()'s and owns no words: `yes` and `no`
-		 *	are what the answers are called, in the interface language. The note
-		 *	the policy adds is drawn under the message as a paragraph of its own.
+		 *	The question is choiceDialog()'s and owns no words: `title`, `yes` and
+		 *	`no` are what the dialog and the answers are called, in the interface
+		 *	language. The title is the act and the thing - "Delete element" - and
+		 *	the answer that goes on carries the same words, never "Yes" or "OK". A
+		 *	question without a title throws a TypeError, also where the policy
+		 *	would not ask it: the mistake is in the call and shows in development.
+		 *	The note the policy adds is drawn under the message as a paragraph of
+		 *	its own. The answers stand with Cancel at the left of the one that
+		 *	goes on.
+		 *
+		 *	`typed` is the highest weight of a question: the way on stays locked
+		 *	until the person has typed that word, which the dialog names under the
+		 *	message. It is for the thing that takes many others with it (an element
+		 *	type with all of its elements) and is asked even where the policy would
+		 *	not ask - a word that was asked for is not dropped by a mode. What was
+		 *	typed is handed to onChoose, for the caller to send as the proof of it;
+		 *	a browser with no <dialog> answers No, since OK is no word
 		 *
 		 *	@param		{string}		level									'routine', 'big' or 'destructive'; anything else is taken for the last
 		 *	@param		{Object}		options
-		 *	@param		{string}		[options.title]
+		 *	@param		{string}		options.title					What is done to what, as a statement: "Delete element"
 		 *	@param		{string}		options.message					The question
 		 *	@param		{string}		options.yes							The label of the answer that goes on
 		 *	@param		{string}		options.no							The label of the answer that does not
 		 *	@param		{string}		[options.kind]					'danger' or 'primary' for the answer that goes on: 'danger' for a destructive level, else 'primary'. Where something goes away or is switched off, the caller says 'danger' - what the level costs a visitor and what the action costs the person are two questions
+		 *	@param		{string}		[options.typed]					The word to type before the answer that goes on is open
+		 *	@param		{string}		[options.typedLabel]		What the field says, with %s for the word; /_admin/common/confirm/typed by default
 		 *	@param		{boolean}		[options.visitors]			false where the action does not touch what visitors see (an account, a role): the policy's note that visitors see the change at once is left out
 		 *	@param		{Element}		[options.opener]				See choiceDialog()
-		 *	@param		{Function}	options.onChoose				Called once with true or false - not at all when false is returned
+		 *	@param		{Function}	options.onChoose				Called once with true or false, and with `typed` the word that was typed as the second argument - not at all when false is returned
 		 *
 		 *	@return		{boolean}												false when another question is already open and this one was not asked, which is the same click arriving twice
 		 */
 		confirm : function( level, options ) {
 
+			if( typeof options.title !== 'string' || options.title.trim() === '' )
+				throw new TypeError( 'Nino.adminUi.confirm(): a question needs a title' );
+
+			const typed 	= typeof options.typed === 'string' && options.typed !== '' ? options.typed : null;
 			const mode 		= shell().mode;
 			const policy 	= typeof mode === 'object' && mode !== null && typeof mode.policy === 'function' ? mode.policy( level ) : { ask : true, note : '' };
 
-			if( policy.ask === false ) {
+			if( policy.ask === false && typed === null ) {
 				options.onChoose( true );
 				return true;
+			}
+
+			let field = null;
+
+			if( typed !== null ) {
+				field = dc.createElement('input');
+				field.type = 'text';
+				field.className = 'nino-admin-input';
+				field.autocomplete = 'off';
+				field.setAttribute( 'autocapitalize', 'off' );
+				field.setAttribute( 'spellcheck', 'false' );
+				field.dataset.dirty = 'ignore';
+			}
+
+			let body = null;
+			let ids = 'nino-admin-choice-text';
+
+			if( field !== null ) {
+				body = dc.createElement('div');
+				body.className = 'nino-admin-dialog-typed';
+
+				const message = dc.createElement('p');
+				message.id = 'nino-admin-choice-text';
+				message.textContent = options.message;
+				body.appendChild( message );
+
+				if( policy.note !== '' && options.visitors !== false ) {
+					ids += ' nino-admin-choice-note';
+					const note = dc.createElement('p');
+					note.id = 'nino-admin-choice-note';
+					note.textContent = policy.note;
+					body.appendChild( note );
+				}
+
+				const label = dc.createElement('label');
+				label.className = 'nino-admin-field';
+				label.appendChild( Nino.adminUi.el( 'span', '', Nino.adminUi.format( options.typedLabel ?? Nino.adminUi.text('/_admin/common/confirm/typed'), typed ) ) );
+				label.appendChild( field );
+				body.appendChild( label );
 			}
 
 			return Nino.adminUi.choiceDialog( {
 				title			: options.title,
 				message		: options.message,
+				content		: body ?? undefined,
 				note			: options.visitors === false ? '' : policy.note,
 				opener		: options.opener,
+				focus			: field ?? undefined,
+				describedBy : field === null ? undefined : ids,
+				refuseWithoutDialog : field !== null,
 				choices		: [
-					{ value : 'yes', label : options.yes, kind : options.kind ?? ( level === 'routine' || level === 'big' ? 'primary' : 'danger' ) },
 					{ value : 'no', label : options.no, kind : 'secondary' },
+					{ value : 'yes', label : options.yes, kind : options.kind ?? ( level === 'routine' || level === 'big' ? 'primary' : 'danger' ) },
 				],
-				onChoose	: function( value ) { options.onChoose( value === 'yes' ) },
+				guard			: field === null ? undefined : function( value ) { return value !== 'yes' || field.value.trim() === typed },
+				onOpen		: field === null ? undefined : function( handle ) {
+
+					const unlock = function() { handle.buttons.yes.disabled = field.value.trim() !== typed };
+
+					unlock();
+					field.addEventListener( 'input', unlock );
+					field.addEventListener( 'keydown', function( event ) {
+						if( event.key !== 'Enter' )
+							return;
+						event.preventDefault();
+						handle.close( 'yes', true );
+					} );
+				},
+				onChoose	: function( value ) { options.onChoose( value === 'yes', field === null ? undefined : field.value.trim() ) },
 			} );
+		},
+
+		/**
+		 *	The fields of a form in a dialog, drawn by the builders of the
+		 *	workbench: a text, a select, or whatever input type textField() takes.
+		 *	The label stands at the left of the control where the dialog is wide
+		 *	enough and above it where it is not (style.css decides). Owns no strings
+		 *
+		 *	@param		{Array}			fields					[ { key, label, type, value, required, maxLength, autocomplete, options, validate } ] - type 'select' takes options [ { value, label } ], any other type is the type of an <input>; validate( value ) answers the sentence that is wrong with it, or ''
+		 *	@param		{Function}	[onInput]				onInput( key, value ) on every change of a field
+		 *
+		 *	@return		{Object}									{ el, controls, labels, values(), initial }
+		 */
+		_dialogFields : function( fields, onInput ) {
+
+			const el = dc.createElement('div');
+			el.className = 'nino-admin-dialog-fields';
+
+			const controls = {};
+			const labels = {};
+			const initial = {};
+
+			fields.forEach( function( field ) {
+
+				const say = function( value ) { if( typeof onInput === 'function' ) onInput( field.key, value ) };
+				let label;
+
+				if( field.type === 'select' ) {
+					label = Nino.adminUi.selectField( { key : field.key, label : field.label, options : field.options, value : field.value ?? '', onChange : say } );
+					controls[field.key] = label.querySelector('select');
+				} else {
+					label = Nino.adminUi.textField( {
+						key				: field.key,
+						label			: field.label,
+						type			: field.type,
+						value			: field.value,
+						required	: field.required,
+						maxLength	: field.maxLength,
+						autocomplete : field.autocomplete ?? 'off',
+						onInput		: say,
+					} );
+					controls[field.key] = label.querySelector('input');
+				}
+
+				labels[field.key] = label;
+				initial[field.key] = controls[field.key].value;
+				el.appendChild( label );
+			} );
+
+			return {
+				el 				: el,
+				controls	: controls,
+				labels		: labels,
+				initial		: initial,
+				values		: function() {
+					const values = {};
+					fields.forEach( function( field ) { values[field.key] = controls[field.key].value } );
+					return values;
+				},
+			};
+		},
+
+		/**
+		 *	A form in a dialog: for something that is made or copied from a name
+		 *	and at most four more fields (a duplicate, a "save as"); a form of its
+		 *	own record, with more fields or an address, is a screen. The dialog is
+		 *	choiceDialog() with the fields as its content: the title and the
+		 *	answers stand, the fields scroll, the focus opens on the first field,
+		 *	Enter in a field sends, and Cancel goes back to what had the focus.
+		 *
+		 *	What is wrong with a field is said at the field (fieldError()) and the
+		 *	dialog stays open: a required field that is empty, a field's own
+		 *	validate(), then what the server refused (ctl.fail()). The dialog
+		 *	stays open until the caller says ctl.close() - it is the server that
+		 *	says yes. While the request is out the dialog does not close and does
+		 *	not send twice. Cancel, Escape and the dialog's own close ask once
+		 *	whether to throw away what was typed - and only when something was
+		 *	changed; an unchanged form closes without a word.
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{string}		options.title					What is made of what, as a statement: "Duplicate theme"
+		 *	@param		{Array}			[options.fields]			See _dialogFields()
+		 *	@param		{Element}		[options.body]				The content in place of the fields; the caller reads its controls itself, and a form of this kind counts as changed from its first input
+		 *	@param		{string}		[options.message]			A sentence above the fields
+		 *	@param		{string}		options.submit				The label of the answer that goes on, the title's words: "Duplicate theme"
+		 *	@param		{string}		options.cancel				The label of the answer that does not
+		 *	@param		{string}		[options.size]				'form' (the default), 'narrow' or 'wide'
+		 *	@param		{Object}		[options.text]				{ missing, discardTitle, discardMessage } - /_admin/common/error/missing (with %s for the field's label), /_admin/common/dialog/discard-title, /_admin/common/dialog/discard-message by default
+		 *	@param		{Element}		[options.opener]			See choiceDialog()
+		 *	@param		{Function}	options.onSubmit			onSubmit( values, ctl ) with ctl { close(), fail( key, text ), idle() }: close() closes the dialog, fail() says a sentence at a field (key null: at the foot of the form) and lets the form be sent again, idle() only the latter
+		 *	@param		{Function}	[options.onCancel]		Called when the dialog closed without a send
+		 *
+		 *	@return		{boolean}										false when a dialog is already open
+		 */
+		formDialog : function( options ) {
+
+			const word = function( key, fill ) { return ( options.text ?? {} )[key] ?? Nino.adminUi.text( fill ) };
+			const fields = Array.isArray( options.fields ) === true ? options.fields : [];
+			let changed = false;
+			let busy = false;
+			let errors = 0;
+
+			const made = Nino.adminUi._dialogFields( fields, function() { changed = true } );
+			const form = dc.createElement('form');
+			form.className = 'nino-admin-dialog-form';
+			form.noValidate = true;
+
+			if( typeof options.message === 'string' && options.message !== '' )
+				form.appendChild( Nino.adminUi.el( 'p', '', options.message ) );
+
+			form.appendChild( options.body ?? made.el );
+
+			// What is wrong is said to a screen reader once, as the first sentence of a send: the focus is on that
+			// field already where Enter was pressed in it, and a focus that does not move says nothing
+			const live = dc.createElement('p');
+			live.className = 'nino-admin-sr-only';
+			live.setAttribute( 'role', 'alert' );
+			form.appendChild( live );
+
+			if( options.body !== undefined && options.body !== null ) {
+				form.addEventListener( 'input', function() { changed = true } );
+				form.addEventListener( 'change', function() { changed = true } );
+			}
+
+			// A field says what is wrong with it, once: the sentences of the last send go first
+			const say = function( key, text ) {
+
+				const label = made.labels[key];
+
+				if( live.textContent === '' )
+					live.textContent = text;
+
+				if( label === undefined ) {
+					const p = dc.createElement('p');
+					p.className = 'nino-admin-field-error';
+					p.setAttribute( 'role', 'alert' );
+					p.textContent = text;
+					form.appendChild( p );
+					return null;
+				}
+
+				Nino.adminUi.fieldError( label, made.controls[key], 'nino-admin-dialog-error-'+ ( ++errors ), text );
+				return made.controls[key];
+			};
+
+			const differs = function() {
+				if( options.fields === undefined )
+					return changed;
+				const now = made.values();
+				return fields.some( function( field ) { return now[field.key] !== made.initial[field.key] } );
+			};
+
+			const send = function( handle ) {
+
+				if( busy === true )
+					return;
+
+				Nino.adminUi.clearFieldErrors( form );
+				live.textContent = '';
+
+				const values = made.values();
+				let firstBad = null;
+
+				fields.forEach( function( field ) {
+
+					const value = values[field.key];
+					let problem = '';
+
+					if( field.required === true && value.trim() === '' )
+						problem = Nino.adminUi.format( word( 'missing', '/_admin/common/error/missing' ), field.label );
+					else if( typeof field.validate === 'function' )
+						problem = field.validate( value ) ?? '';
+
+					if( problem !== '' ) {
+						const control = say( field.key, problem );
+						firstBad = firstBad ?? control;
+					}
+				} );
+
+				if( firstBad !== null ) {
+					firstBad.focus();
+					return;
+				}
+
+				busy = true;
+				handle.buttons.submit.disabled = true;
+				form.setAttribute( 'aria-busy', 'true' );
+
+				const idle = function() {
+					busy = false;
+					handle.buttons.submit.disabled = false;
+					form.removeAttribute('aria-busy');
+				};
+
+				options.onSubmit( values, {
+					close : function() { busy = false; handle.close( 'submit' ) },
+					idle : idle,
+					fail : function( key, text ) {
+						idle();
+						live.textContent = '';
+						const control = say( key, text );
+						if( control !== null )
+							control.focus();
+					},
+				} );
+			};
+
+			const first = made.controls[ fields.length > 0 ? fields[0].key : '' ] ?? form.querySelector('input, select, textarea');
+
+			return Nino.adminUi.choiceDialog( {
+				title			: options.title,
+				message		: options.title,
+				content		: form,
+				size			: options.size ?? 'form',
+				opener		: options.opener,
+				focus			: first ?? undefined,
+				choices		: [
+					{ value : 'cancel', label : options.cancel, kind : 'secondary' },
+					{ value : 'submit', label : options.submit, kind : 'primary' },
+				],
+				guard			: function( value, handle ) {
+
+					if( value === 'submit' ) {
+						send( handle );
+						return false;
+					}
+
+					// A send that is on its way is not taken back by closing the form
+					if( busy === true )
+						return false;
+
+					if( differs() === false )
+						return true;
+
+					Nino.adminUi.choiceDialog( {
+						title			: word( 'discardTitle', '/_admin/common/dialog/discard-title' ),
+						message		: word( 'discardMessage', '/_admin/common/dialog/discard-message' ),
+						nested		: true,
+						choices		: [
+							{ value : 'no', label : options.cancel, kind : 'secondary' },
+							{ value : 'yes', label : word( 'discardTitle', '/_admin/common/dialog/discard-title' ), kind : 'danger' },
+						],
+						onChoose	: function( answer ) {
+							if( answer === 'yes' ) {
+								changed = false;
+								handle.close( 'cancel' );
+							}
+						},
+					} );
+
+					return false;
+				},
+				onOpen		: function( handle ) {
+					form.addEventListener( 'submit', function( event ) {
+						event.preventDefault();
+						handle.close( 'submit', true );
+					} );
+					form.addEventListener( 'keydown', function( event ) {
+						if( event.key !== 'Enter' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'BUTTON' )
+							return;
+						event.preventDefault();
+						handle.close( 'submit', true );
+					} );
+				},
+				onChoose	: function( value ) {
+					if( value !== 'submit' && typeof options.onCancel === 'function' )
+						options.onCancel();
+				},
+			} );
+		},
+
+		// From how many items pickDialog() offers a search: fewer are found by looking
+		PICK_SEARCH_FROM : 8,
+
+		/**
+		 *	One thing picked from a list, in a dialog: a block, a source, a
+		 *	component. Each item is a button of a row - its name and, under it, a
+		 *	line of what it is - and a press on it picks it and closes the dialog.
+		 *	The only answer is Cancel. From PICK_SEARCH_FROM items on there is a
+		 *	search over the names and the lines, which has the focus; Enter in it
+		 *	picks the first that is left, and Down walks into the list; a list
+		 *	that is shorter is looked at, not searched, and the focus opens on its
+		 *	first item. The size is 'wide' unless the caller says otherwise
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{string}		options.title					What is picked, as a statement: "Insert block"
+		 *	@param		{Array}			options.items					[ { value, label, description } ]
+		 *	@param		{string}		[options.search]			What the search field is called ("Search blocks"); none, no search however many items there are
+		 *	@param		{string}		[options.empty]				What a search that finds nothing says
+		 *	@param		{string}		options.cancel				The label of Cancel
+		 *	@param		{string}		[options.size]				'wide' (the default), 'form' or 'narrow'
+		 *	@param		{Element}		[options.opener]			See choiceDialog()
+		 *	@param		{Function}	options.onChoose			Called once with the value of the picked item
+		 *	@param		{Function}	[options.onCancel]		Called when nothing was picked
+		 *
+		 *	@return		{boolean}										false when a dialog is already open
+		 */
+		pickDialog : function( options ) {
+
+			const root = dc.createElement('div');
+			root.className = 'nino-admin-pick';
+
+			const searchable = typeof options.search === 'string' && options.search !== '' && options.items.length >= Nino.adminUi.PICK_SEARCH_FROM;
+			let search = null;
+			let handle = null;
+			let picked = null;
+
+			const list = dc.createElement('div');
+			list.className = 'nino-admin-pick-list';
+
+			const rows = options.items.map( function( item ) {
+
+				const row = dc.createElement('button');
+				row.type = 'button';
+				row.className = 'nino-admin-pick-item';
+				row.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-name', item.label ) );
+
+				if( typeof item.description === 'string' && item.description !== '' )
+					row.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-line', item.description ) );
+
+				row.addEventListener( 'click', function() { picked = item.value; handle.close( 'pick' ) } );
+				list.appendChild( row );
+
+				return { item : item, row : row };
+			} );
+
+			const visible = function() { return rows.filter( function( entry ) { return entry.row.hidden === false } ) };
+
+			const empty = dc.createElement('p');
+			empty.className = 'nino-admin-pick-empty';
+			empty.setAttribute( 'role', 'status' );
+			empty.hidden = true;
+			empty.textContent = options.empty ?? '';
+
+			if( searchable === true ) {
+				search = dc.createElement('input');
+				search.type = 'search';
+				search.className = 'nino-admin-input nino-admin-pick-search';
+				search.setAttribute( 'aria-label', options.search );
+				search.placeholder = options.search;
+				search.autocomplete = 'off';
+
+				search.addEventListener( 'input', function() {
+					const words = search.value.trim().toLowerCase();
+					rows.forEach( function( entry ) {
+						entry.row.hidden = words !== '' && ( entry.item.label+ ' '+ ( entry.item.description ?? '' ) ).toLowerCase().indexOf( words ) === -1;
+					} );
+					empty.hidden = visible().length > 0 || empty.textContent === '';
+				} );
+
+				root.appendChild( search );
+			}
+
+			root.appendChild( list );
+			root.appendChild( empty );
+
+			// Up and Down walk the rows that are shown; Down from the search steps into them
+			root.addEventListener( 'keydown', function( event ) {
+
+				const shown = visible().map( function( entry ) { return entry.row } );
+
+				if( event.key === 'Enter' && event.target === search ) {
+					event.preventDefault();
+					if( shown.length > 0 )
+						shown[0].click();
+					return;
+				}
+
+				if( event.key !== 'ArrowDown' && event.key !== 'ArrowUp' )
+					return;
+
+				const at = shown.indexOf( event.target );
+				const next = event.key === 'ArrowDown' ? ( at === -1 ? 0 : at + 1 ) : at - 1;
+
+				if( next >= 0 && next < shown.length ) {
+					event.preventDefault();
+					shown[next].focus();
+				} else if( next < 0 && search !== null ) {
+					event.preventDefault();
+					search.focus();
+				}
+			} );
+
+			return Nino.adminUi.choiceDialog( {
+				title			: options.title,
+				message		: options.title,
+				content		: root,
+				size			: options.size ?? 'wide',
+				opener		: options.opener,
+				focus			: search ?? ( rows.length > 0 ? rows[0].row : undefined ),
+				choices		: [ { value : 'cancel', label : options.cancel, kind : 'secondary' } ],
+				onOpen		: function( opened ) { handle = opened },
+				onChoose	: function( value ) {
+					if( value === 'pick' )
+						options.onChoose( picked );
+					else if( typeof options.onCancel === 'function' )
+						options.onCancel();
+				},
+			} );
+		},
+
+		/**
+		 *	The properties of ONE part of a work surface, in a sheet at the right of
+		 *	the screen over its whole height, while the surface stays in view
+		 *	(a component, a logo, the menu of a frame). Where the screen is
+		 *	narrow the sheet is the whole screen. The sections are an accordion()
+		 *	with one open; a section is its fields, or a content of its own.
+		 *
+		 *	Nothing is sent and nothing is asked: a value is the caller's the
+		 *	moment it is changed - onChange( key, value ) is called at once, on the
+		 *	input of a field - and what was changed is saved with the bar of the
+		 *	surface, not here. So the sheet has one answer, Close, which is also
+		 *	Escape, and no Cancel. The focus opens on the first field of the open
+		 *	section, or on Close where it has none, and goes back to what asked.
+		 *
+		 *	From 38 rem on the sheet is not modal: no backdrop, no trap for the
+		 *	focus, the surface behind stays in use and in view, and the root of the
+		 *	workbench carries nino-admin-has-sheet while it is open, which gives the
+		 *	surface the room of the sheet on its right (padding-inline-end of the
+		 *	sheet's width), so that a preview wraps beside it and not under it. A
+		 *	question the surface asks goes over it. Below 38 rem it is modal and
+		 *	the whole screen
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{string}		options.title					What the part is and what it is called: "Button Contact"
+		 *	@param		{Array}			options.sections			[ { key, label, summary, badge, fields | content } ] - fields as _dialogFields(), content an Element or a function that answers one
+		 *	@param		{string}		[options.open]				The key of the section that is open, the first by default
+		 *	@param		{Element}		[options.tools]				Drawn at the right of the title (a steps() of widths)
+		 *	@param		{string}		options.close					The label of the one answer
+		 *	@param		{Function}	[options.onChange]		onChange( key, value, section ) for every change of a field of a section
+		 *	@param		{Function}	[options.onClose]			Called when the sheet closed
+		 *	@param		{Element}		[options.opener]			See choiceDialog()
+		 *
+		 *	@return		{Object|boolean}						{ close(), set( key, value, [section] ) } - set() puts a value into the fields of the sheet without calling onChange; false when a dialog is already open
+		 */
+		propertiesDialog : function( options ) {
+
+			const fields = {};
+			const pending = {};
+			let handle = null;
+
+			const accordion = Nino.adminUi.accordion( {
+				id			: 'nino-admin-properties',
+				open		: options.open ?? ( options.sections.length > 0 ? options.sections[0].key : undefined ),
+				sections	: options.sections.map( function( section ) {
+					return {
+						key			: section.key,
+						label		: section.label,
+						summary	: section.summary,
+						badge		: section.badge,
+						content	: Array.isArray( section.fields ) === false ? section.content : function() {
+							const made = Nino.adminUi._dialogFields( section.fields, function( key, value ) {
+								if( typeof options.onChange === 'function' )
+									options.onChange( key, value, section.key );
+							} );
+							fields[section.key] = made;
+
+							// A value the caller set while the section was closed
+							Object.keys( pending ).forEach( function( key ) {
+								if( made.controls[key] !== undefined )
+									made.controls[key].value = pending[key];
+							} );
+
+							return made.el;
+						},
+					};
+				} ),
+			} );
+
+			// Beside the surface where there is room for both, over it where there is not
+			const beside = typeof wn.matchMedia === 'function' && wn.matchMedia( '(min-width: 38.01rem)' ).matches === true;
+
+			const opened = Nino.adminUi.choiceDialog( {
+				title			: options.title,
+				message		: options.title,
+				content		: accordion.el,
+				tools			: options.tools,
+				size			: 'sheet',
+				modeless	: beside,
+				opener		: options.opener,
+				choices		: [ { value : 'close', label : options.close, kind : 'secondary' } ],
+				onOpen		: function( opening ) {
+					handle = opening;
+					const open = Object.keys( fields )[0];
+					const control = open === undefined ? null : Object.values( fields[open].controls )[0];
+					if( control !== undefined && control !== null )
+						control.focus();
+					else
+						handle.buttons.close.focus();
+				},
+				onChoose	: function() {
+					if( typeof options.onClose === 'function' )
+						options.onClose();
+				},
+			} );
+
+			if( opened === false || handle === null )
+				return opened;
+
+			return {
+				close : function() { handle.close( 'close' ) },
+				// Puts a value into a field of the sheet - the surface changed it (an undo, a click on another part) - without calling onChange; in every open section that has the key, or the one named
+				set : function( key, value, section ) {
+					pending[key] = String( value );
+					Object.keys( fields ).forEach( function( name ) {
+						if( ( section === undefined || section === name ) && fields[name].controls[key] !== undefined )
+							fields[name].controls[key].value = String( value );
+					} );
+				},
+			};
 		},
 
 		/**
@@ -845,6 +1568,7 @@
 				title			: title,
 				message		: content.textContent,
 				content		: content,
+				size			: 'form',
 				className	: 'nino-admin-dialog--manual',
 				opener		: opener,
 				choices		: [ { value : 'close', label : Nino.content.getText('/_admin/common/label/close'), kind : 'secondary' } ],
@@ -4044,8 +4768,9 @@
 		/**
 		 *	The question a refused save asks - another tab or another person wrote what this one was about to write: Overwrite
 		 *	does it once more over what is there now, Reload drops the work of this tab and shows what is there - after a question of its
-		 *	own, since it cannot be taken back - and Cancel leaves everything as it is. Escape is Cancel, and the focus goes back
-		 *	to the opener. The words are /_admin/common/conflict/*, and the caller's where it gives them
+		 *	own, since it cannot be taken back - and Cancel leaves everything as it is. The answers stand as every dialog's do: the other
+		 *	ways on, Cancel, and at the far right the one that goes on, which here is the dangerous one - so Reload, Cancel, Overwrite.
+		 *	Escape is Cancel, and the focus goes back to the opener. The words are /_admin/common/conflict/*, and the caller's where it gives them
 		 *
 		 *	@param		{Object}		options					{ message, onOverwrite, onReload, onCancel, opener, text }
 		 *														- message     what the server said of the refusal, usually Nino.adminUi.api.errorText( status, response )
@@ -4070,10 +4795,11 @@
 				title		: word( 'title', '/_admin/common/conflict/title' ),
 				message	: options.message,
 				opener	: options.opener,
+				escape	: 'cancel',
 				choices	: [
-					{ value : 'overwrite', label : word( 'overwrite', '/_admin/common/conflict/overwrite' ), kind : 'danger' },
-					{ value : 'cancel', label : word( 'cancel', '/_admin/common/label/cancel' ), kind : 'secondary' },
 					{ value : 'reload', label : word( 'reload', '/_admin/common/conflict/reload' ), kind : 'secondary' },
+					{ value : 'cancel', label : word( 'cancel', '/_admin/common/label/cancel' ), kind : 'secondary' },
+					{ value : 'overwrite', label : word( 'overwrite', '/_admin/common/conflict/overwrite' ), kind : 'danger' },
 				],
 				onChoose : function( value ) {
 
@@ -4090,7 +4816,7 @@
 					Nino.adminUi.confirm( 'destructive', {
 						title		: word( 'reloadTitle', '/_admin/common/conflict/reload-title' ),
 						message	: word( 'reloadMessage', '/_admin/common/conflict/reload-message' ),
-						yes			: word( 'reload', '/_admin/common/conflict/reload' ),
+						yes			: word( 'reloadTitle', '/_admin/common/conflict/reload-title' ),
 						no			: word( 'cancel', '/_admin/common/label/cancel' ),
 						kind		: 'danger',
 						opener	: options.opener,
