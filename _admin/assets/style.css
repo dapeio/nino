@@ -3434,6 +3434,211 @@ a {
 	}
 }
 
+/* The tree (Nino.adminUi.tree()): rows one under another, quiet - no box for a level, the
+   indent is the row's own padding (set by the script, which counts the levels). A row is
+   34 px high at least, its arrow and its buttons are 28 px; the label is cut with an
+   ellipsis where the row is narrow (it carries its text as a title), then the detail,
+   and the buttons stay. The chosen row is a tint and a bar at its edge and a heavier
+   word, the marked and the locked have a word at the end of the row, a hint a sign with a "!"
+   and its sentence under the label - none of them by colour alone. The ring of the focus is drawn inside the row,
+   on the entry that has it (the entry is the list item, whose own ring is transparent: it would
+   take in the entries under it) */
+:where(.nino-admin) .nino-admin-tree,
+:where(.nino-admin) .nino-admin-tree-group {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+:where(.nino-admin) .nino-admin-tree {
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-tree-group[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-tree-item {
+	margin: 0;
+	padding: 0;
+	outline: 2px solid transparent;
+}
+
+:where(.nino-admin) .nino-admin-tree-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: .3rem;
+	min-height: 34px;
+	padding-block: 2px;
+	padding-inline-end: .35rem;
+	border-radius: var(--editor-radius-sm);
+	color: var(--editor-text);
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-tree-row:hover {
+	background: color-mix(in srgb, var(--editor-blue) 6%, transparent);
+}
+
+:where(.nino-admin) .nino-admin-tree-row.is-selected {
+	background: color-mix(in srgb, var(--editor-blue) 16%, transparent);
+	box-shadow: inset 3px 0 0 var(--editor-blue);
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-tree-item:focus-visible > .nino-admin-tree-row {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
+}
+
+:where(.nino-admin) .nino-admin-tree-toggle {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	min-width: 28px;
+	height: 28px;
+	color: var(--editor-text-secondary);
+	user-select: none;
+}
+
+:where(.nino-admin) .nino-admin-tree-text {
+	display: flex;
+	flex: 0 1 auto;
+	flex-direction: column;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-tree-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The sentence of a hint, under the label: the sign carries the state, the words the colour of the quiet text */
+:where(.nino-admin) .nino-admin-tree-hint {
+	display: flex;
+	align-items: center;
+	gap: .3rem;
+	min-width: 0;
+	color: var(--editor-text-secondary);
+	font-size: max( .78rem, 12px );
+	font-weight: 400;
+	line-height: 1.3;
+}
+
+:where(.nino-admin) .nino-admin-tree-hint-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Marked and locked are words, quiet, at the end of the row; the dot before "marked" is the colour of the mark in the preview */
+:where(.nino-admin) .nino-admin-tree-state {
+	flex: 0 0 auto;
+	color: var(--editor-text-secondary);
+	font-size: max( .78rem, 12px );
+	font-weight: 400;
+}
+
+:where(.nino-admin) .nino-admin-tree-state[data-state="marked"]::before {
+	content: "● ";
+	color: var(--editor-blue);
+}
+
+
+:where(.nino-admin) .nino-admin-tree-detail {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: max( .78rem, 12px );
+	font-weight: 400;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Where there is no detail the buttons still go to the edge */
+:where(.nino-admin) .nino-admin-tree-actions {
+	display: inline-flex;
+	flex: 0 0 auto;
+	gap: 2px;
+	margin-inline-start: auto;
+}
+
+:where(.nino-admin) .nino-admin-tree-item[data-locked="true"] > .nino-admin-tree-row {
+	color: var(--editor-text-secondary);
+	cursor: default;
+}
+
+:where(.nino-admin) .nino-admin-tree-sign {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: 1.1rem;
+	height: 1.1rem;
+	border: 1.5px solid currentColor;
+	border-radius: 50%;
+	color: var(--editor-orange-ink);
+	font-size: max( .72rem, 12px );
+	font-weight: 700;
+	line-height: 1;
+}
+
+:where(.nino-admin) .nino-admin-tree-sign[data-state="error"] {
+	color: var(--editor-red-ink);
+}
+
+:where(.nino-admin) .nino-admin-tree-sign[data-state="muted"] {
+	color: var(--editor-text-secondary);
+}
+
+/* On a tinted row (hovered, chosen) the orange ink is a step toward the text colour, where it fell under 4.5 : 1 */
+:where(.nino-admin) .nino-admin-tree-row:is(:hover, .is-selected) .nino-admin-tree-sign[data-state="warn"] {
+	color: color-mix(in srgb, var(--editor-orange-ink) 60%, var(--editor-text));
+}
+
+/* A glyph button: a small square, no surface of its own until it is hovered */
+:where(.nino-admin) .nino-admin-tree-action {
+	min-width: 28px;
+	min-height: 28px;
+	height: 28px;
+	padding: 0 .3rem;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text-secondary);
+	font-size: max( .84rem, 12px );
+	line-height: 1;
+}
+
+:where(.nino-admin) .nino-admin-tree-action:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
+}
+
+:where(.nino-admin) .nino-admin-tree-action:not(:disabled):hover {
+	color: var(--editor-text);
+}
+
+:where(.nino-admin) .nino-admin-tree-action--danger:not(:disabled):hover {
+	color: var(--editor-red-ink);
+}
+
+@media (forced-colors: active) {
+
+	:where(.nino-admin) .nino-admin-tree-row.is-selected {
+		forced-color-adjust: none;
+		background: Highlight;
+		color: HighlightText;
+		box-shadow: none;
+	}
+}
+
 /* The colour field: the hex code, the picker and the surface in a row, the
    sentence of an error and the contrast under it (Nino.adminUi.color()). The
    rows are named, since fieldError() puts its sentence after the label, which

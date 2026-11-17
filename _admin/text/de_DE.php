@@ -85,7 +85,7 @@ return [
 	'[[/_admin/common/label/perpage]]'	=> 'Zeilen pro Seite',
 	// Die Wörter der Bausteine, die selbst welche zeichnen: Umschalter und
 	// Neuladen der geteilten Ansicht, Fehler und Urteil des Farbfelds, die
-	// Vorgabe der Stufenwahl (siehe Nino.adminUi.split(), color() und steps())
+	// Vorgabe der Stufenwahl (siehe Nino.adminUi.split(), color(), steps() und tree())
 	'[[/_admin/common/label/default]]'	=> 'Vorgabe',
 	'[[/_admin/common/split/view]]'	=> 'Ansicht',
 	'[[/_admin/common/split/settings]]'	=> 'Einstellungen',
@@ -101,6 +101,8 @@ return [
 	'[[/_admin/common/savebar/save]]'	=> 'Speichern',
 	'[[/_admin/common/savebar/restore]]'	=> 'Letzten Stand wiederherstellen',
 	'[[/_admin/common/savebar/restore-hint]]'	=> 'Zuerst die Änderungen speichern oder verwerfen.',
+	'[[/_admin/common/tree/locked]]'	=> 'Gesperrt',
+	'[[/_admin/common/tree/marked]]'	=> 'Markiert',
 	'[[/_admin/common/color/pick]]'	=> 'Farbe wählen',
 	'[[/_admin/common/color/invalid]]'	=> 'Gib eine Farbe als #rrggbb oder #rgb ein.',
 	'[[/_admin/common/color/contrast]]'	=> 'Kontrast %s : 1',

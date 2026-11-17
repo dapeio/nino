@@ -4106,6 +4106,539 @@
 		},
 
 		/**
+		 *	A tree: entries one under another, each a row with a label, a quiet second line of
+		 *	detail, a sign that carries a hint, and buttons of its own - the components of a page,
+		 *	the folders of a store. The caller gives the entries as data and draws nothing itself;
+		 *	the tree is the pattern of the same name: role tree, treeitem and group, aria-level,
+		 *	aria-expanded on the entries that have children, aria-selected, and exactly one entry
+		 *	in the tab order (the one that last had the focus, else the chosen one, else the first),
+		 *	the others reached by the keys.
+		 *
+		 *	Up and Down walk the entries that can be seen, Right opens a closed entry and goes to the
+		 *	first child of an open one, Left closes an open entry and goes to the parent of a closed
+		 *	one, Home and End go to the first and the last, Enter and Space choose, a letter goes to
+		 *	the next entry whose label begins with it (wrapping). A click on the arrow opens or closes,
+		 *	a click on the row chooses. The buttons of a row are in the tab order only while the row
+		 *	is the one that has the stop, so that a tree of fifty rows is one stop and not two hundred;
+		 *	Tab from the row reaches them, a mouse reaches all of them. A locked entry can be walked to,
+		 *	opened and closed but not chosen, and says so in a word, seen and in its description (not by
+		 *	aria-disabled, which would take its buttons from a screen reader too); what its buttons may do
+		 *	is the caller's, through disabled
+		 *
+		 *	The tree does not own the data and writes no address: the caller binds the chosen entry
+		 *	to its own address, as levels() and accordion() leave theirs to the panel. What it keeps
+		 *	is what the eye needs between two drawings - which entries are open, which is chosen,
+		 *	where the stop is - and update() gives them back where the ids stay: an id the tree has
+		 *	seen keeps its open state (item.open is read for an id it has not), the stop and the focus
+		 *	stay on their entry and, where the focus was on a button of it that is still there and can be
+		 *	pressed, on that button, else on the row. An id follows the component, not its place: where an
+		 *	entry is gone the stop and the focus go to its next sibling, else the previous one, else its
+		 *	parent. A person's move of the stop, and this one, is told through onFocus; select(), focus() and
+		 *	update() otherwise call nobody back. An update with no entries leaves the focus nowhere. Owns no strings: the labels,
+		 *	the details, the hints and the names of the buttons are the caller's, the words for a locked
+		 *	and a marked entry are fills
+		 *
+		 *	@param		{Object}		options					{ id, label, labelledby, items, selected, text, onSelect, onToggle, onAction, onFocus }
+		 *														- id          the beginning of the ids it makes, a token (a space in it becomes a hyphen)
+		 *														- label       the tree's name for a screen reader; or labelledby, the id of what names it
+		 *														- items       [ { id, label, detail, children, open, marked, locked, hint, actions } ] - id a string, unique in the tree; detail the quiet second line; children the same shape; open whether it is open when the tree first sees it; marked says that the entry is the one shown elsewhere (the preview); locked as above; hint { text, state } - a sign and its sentence under the label, state warn, error or muted; actions [ { key, label, name, disabled, danger } ] - label the glyph, name what a screen reader and a title say, danger draws it as one that destroys; locked and marked show as words beside the row
+		 *														- selected    the id chosen at the start
+		 *														- text        { locked, marked } to say the words differently
+		 *														- onSelect    called with the id and the item after a choice made by hand, also of the entry that is chosen already
+		 *														- onToggle    called with the id, whether it is open or closed after the move, and the item after a hand opened or closed it
+		 *														- onAction    called with the key of the button, the id and the item after a press
+		 *														- onFocus     called with the id and the item when the stop moves to another entry, by a hand or because its entry is gone
+		 *
+		 *	@return		{Object}										{ el, update( items ), select( id ), focus( [id] ), get() } - select() chooses an entry (not a locked one: it answers false), opens what is above it and scrolls it into view, null chooses none; focus() puts the focus on the entry (the one with the stop by default); both answer whether the id is there; get() is { selected, stop, open }
+		 */
+		tree : function( options ) {
+
+			// The id is the beginning of the ids it makes, which are listed in aria-labelledby: a token, with no space in it
+			const prefix	= typeof options.id === 'string' && options.id !== '' ? options.id.replace( /\s+/g, '-' ) : 'nino-admin-tree-'+ ( ++serial );
+			const text		= options.text || {};
+			const word		= function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
+
+			const root = Nino.adminUi.el( 'ul', 'nino-admin-tree' );
+			root.id = prefix;
+			root.setAttribute( 'role', 'tree' );
+
+			if( typeof options.labelledby === 'string' && options.labelledby !== '' )
+				root.setAttribute( 'aria-labelledby', options.labelledby );
+			else if( typeof options.label === 'string' )
+				root.setAttribute( 'aria-label', options.label );
+
+			let order = [];
+			let byId = new Map();
+			let parts = new Map();
+			let drawn = 0;
+
+			const open = new Set();
+			let selected = typeof options.selected === 'string' ? options.selected : null;
+			let stop = null;
+
+			// What stands for an element of the tree: the entry it is of, and which piece of the row it is
+			const locate = function( target ) {
+
+				for( let node = target; node !== null && node !== undefined; node = node.parentNode ) {
+
+					const found = parts.get( node );
+
+					if( found !== undefined )
+						return found;
+
+					if( node === root )
+						break;
+				}
+
+				return null;
+			};
+
+			const inside = function( node ) {
+
+				for( ; node !== null && node !== undefined; node = node.parentNode )
+					if( node === root )
+						return true;
+
+				return false;
+			};
+
+			const shown = function( entry ) {
+
+				for( let up = entry.parent; up !== null; up = up.parent )
+					if( open.has( up.id ) === false )
+						return false;
+
+				return true;
+			};
+
+			const visible = function() {
+				return order.filter( shown );
+			};
+
+			const paintOpen = function( entry ) {
+
+				if( entry.group === null )
+					return;
+
+				const on = open.has( entry.id );
+
+				entry.li.setAttribute( 'aria-expanded', on === true ? 'true' : 'false' );
+				entry.toggle.textContent = on === true ? '▾' : '▸';
+				entry.group.hidden = on === false;
+			};
+
+			const paintSelected = function() {
+				order.forEach( function( entry ) {
+					entry.li.setAttribute( 'aria-selected', entry.id === selected ? 'true' : 'false' );
+					entry.row.classList.toggle( 'is-selected', entry.id === selected );
+				} );
+			};
+
+			// The one entry in the tab order, and with it the buttons of its row
+			const setStop = function( entry, told ) {
+
+				const moved = stop !== entry;
+
+				if( stop !== null && stop !== entry ) {
+					stop.li.tabIndex = -1;
+					stop.buttons.forEach( function( button ) { button.tabIndex = -1 } );
+				}
+
+				stop = entry;
+
+				if( entry === null )
+					return;
+
+				entry.li.tabIndex = 0;
+				entry.buttons.forEach( function( button ) { button.tabIndex = 0 } );
+
+				if( moved === true && told === true && typeof options.onFocus === 'function' )
+					options.onFocus( entry.id, entry.item );
+			};
+
+			const setOpen = function( entry, on, told ) {
+
+				if( entry.group === null || open.has( entry.id ) === on )
+					return;
+
+				const held = inside( dc.activeElement );
+
+				if( on === true )
+					open.add( entry.id );
+				else
+					open.delete( entry.id );
+
+				paintOpen( entry );
+
+				// A closed entry hides what is under it: the stop, and the focus with it, stay with the entry
+				if( stop !== null && shown( stop ) === false ) {
+					setStop( entry );
+
+					if( held === true )
+						go( entry );
+				}
+
+				if( told === true && typeof options.onToggle === 'function' )
+					options.onToggle( entry.id, on, entry.item );
+			};
+
+			const choose = function( entry ) {
+
+				if( entry.item.locked === true )
+					return;
+
+				selected = entry.id;
+				paintSelected();
+
+				if( typeof options.onSelect === 'function' )
+					options.onSelect( entry.id, entry.item );
+			};
+
+			// What is above an entry is opened for it, without a word to the caller
+			const reveal = function( entry ) {
+				for( let up = entry.parent; up !== null; up = up.parent )
+					setOpen( up, true, false );
+			};
+
+			// The entry holds the whole open subtree, so a focus that scrolls would leave the row out of sight: the row is scrolled to
+			const show = function( entry, target ) {
+				target.focus( { preventScroll : true } );
+				entry.row.scrollIntoView( { block : 'nearest' } );
+			};
+
+			const go = function( entry ) {
+				setStop( entry, true );
+				show( entry, entry.li );
+			};
+
+			const make = function( list, parent, level, into ) {
+
+				list.forEach( function( item, at ) {
+
+					const id = String( item.id );
+					const n = ++drawn;
+					const kids = Array.isArray( item.children ) === true ? item.children : [];
+					const hint = typeof item.hint === 'object' && item.hint !== null && typeof item.hint.text === 'string' && item.hint.text !== '' ? item.hint : null;
+					const locked = item.locked === true;
+					const marked = item.marked === true;
+					const detail = typeof item.detail === 'string' ? item.detail : '';
+
+					const li = Nino.adminUi.el( 'li', 'nino-admin-tree-item' );
+					const row = Nino.adminUi.el( 'div', 'nino-admin-tree-row' );
+					const toggle = Nino.adminUi.el( 'span', 'nino-admin-tree-toggle' );
+					const label = Nino.adminUi.el( 'span', 'nino-admin-tree-label', String( item.label ?? '' ) );
+
+					const entry = { id : id, item : item, parent : parent, level : level, li : li, row : row, toggle : toggle, label : label, group : null, buttons : [], keyed : new Map() };
+
+					li.setAttribute( 'role', 'treeitem' );
+					li.setAttribute( 'aria-level', String( level ) );
+					li.setAttribute( 'aria-setsize', String( list.length ) );
+					li.setAttribute( 'aria-posinset', String( at + 1 ) );
+					li.setAttribute( 'aria-labelledby', prefix+ '-'+ n+ '-label' );
+					li.dataset.id = id;
+					li.tabIndex = -1;
+
+					li.dataset.locked = locked === true ? 'true' : 'false';
+					li.dataset.marked = marked === true ? 'true' : 'false';
+
+					// The indent is the level's: a rule of the stylesheet cannot count levels
+					row.style.paddingInlineStart = ( .3 + ( level - 1 ) * 1.1 ).toFixed(2)+ 'rem';
+
+					label.id = prefix+ '-'+ n+ '-label';
+					label.title = label.textContent;
+					toggle.setAttribute( 'aria-hidden', 'true' );
+					row.appendChild( toggle );
+
+					// The label, and under it - where there is one - the sentence of the hint
+					const column = Nino.adminUi.el( 'span', 'nino-admin-tree-text' );
+					column.appendChild( label );
+					row.appendChild( column );
+
+					const says = [];
+
+					if( detail !== '' ) {
+						const quiet = Nino.adminUi.el( 'span', 'nino-admin-tree-detail', detail );
+						quiet.title = detail;
+						quiet.setAttribute( 'aria-hidden', 'true' );
+						row.appendChild( quiet );
+						says.push( detail );
+					}
+
+					// Words, not signs: the state of an entry is said where the eye is, quietly, and also in the description
+					[ [ marked, 'marked' ], [ locked, 'locked' ] ].forEach( function( state ) {
+
+						if( state[0] !== true )
+							return;
+
+						const said = word( state[1], '/_admin/common/tree/'+ state[1] );
+						const chip = Nino.adminUi.el( 'span', 'nino-admin-tree-state', said );
+						chip.dataset.state = state[1];
+						chip.setAttribute( 'aria-hidden', 'true' );
+						row.appendChild( chip );
+						says.push( said );
+					} );
+
+					if( hint !== null ) {
+						const line = Nino.adminUi.el( 'span', 'nino-admin-tree-hint' );
+						const sign = Nino.adminUi.el( 'span', 'nino-admin-tree-sign', '!' );
+						sign.dataset.state = [ 'error', 'muted' ].indexOf( hint.state ) !== -1 ? hint.state : 'warn';
+						line.setAttribute( 'aria-hidden', 'true' );
+						line.appendChild( sign );
+						line.appendChild( Nino.adminUi.el( 'span', 'nino-admin-tree-hint-text', hint.text ) );
+						line.title = hint.text;
+						column.appendChild( line );
+						says.push( hint.text );
+					}
+
+					// A screen reader reads the name, then what the row says besides
+					if( says.length > 0 ) {
+						const info = Nino.adminUi.el( 'span', 'nino-admin-sr-only', says.join( ', ' ) );
+						info.id = prefix+ '-'+ n+ '-info';
+						li.setAttribute( 'aria-describedby', info.id );
+						row.appendChild( info );
+					}
+
+					const actions = Array.isArray( item.actions ) === true ? item.actions : [];
+
+					if( actions.length > 0 ) {
+
+						const bar = Nino.adminUi.el( 'span', 'nino-admin-tree-actions' );
+
+						actions.forEach( function( action ) {
+
+							const button = Nino.adminUi.button( String( action.label ?? '' ), function() {
+								if( typeof options.onAction === 'function' )
+									options.onAction( action.key, id, item );
+							}, { className : 'nino-admin-tree-action'+ ( action.danger === true ? ' nino-admin-tree-action--danger' : '' ), name : action.name, disabled : action.disabled === true } );
+
+							button.tabIndex = -1;
+							entry.buttons.push( button );
+							entry.keyed.set( action.key, button );
+							parts.set( button, { entry : entry, part : 'action' } );
+							bar.appendChild( button );
+						} );
+
+						parts.set( bar, { entry : entry, part : 'actions' } );
+						row.appendChild( bar );
+					}
+
+					li.appendChild( row );
+					into.appendChild( li );
+
+					parts.set( li, { entry : entry, part : 'item' } );
+					parts.set( toggle, { entry : entry, part : 'toggle' } );
+					order.push( entry );
+					byId.set( id, entry );
+
+					if( kids.length > 0 ) {
+						entry.group = Nino.adminUi.el( 'ul', 'nino-admin-tree-group' );
+						entry.group.setAttribute( 'role', 'group' );
+						li.appendChild( entry.group );
+						make( kids, entry, level + 1, entry.group );
+					}
+				} );
+			};
+
+			const draw = function( list ) {
+
+				const held = inside( dc.activeElement ) === true ? keyOf( dc.activeElement ) : null;
+				const known = new Set( byId.keys() );
+				const was = stop === null ? null : stop.id;
+
+				// Where the stop's entry is gone the stop goes to its next sibling, else the previous one, else its parent
+				const near = [];
+
+				if( stop !== null ) {
+					const siblings = order.filter( function( other ) { return other.parent === stop.parent } );
+					const at = siblings.indexOf( stop );
+					[ siblings[at + 1], siblings[at - 1], stop.parent ].forEach( function( other ) { if( other !== undefined && other !== null ) near.push( other.id ) } );
+				}
+
+				while( root.firstChild !== null )
+					root.removeChild( root.firstChild );
+
+				order = [];
+				byId = new Map();
+				parts = new Map();
+				stop = null;
+
+				make( list, null, 1, root );
+
+				// An id the tree has seen keeps what the hand did; one it has not takes what the item says
+				order.forEach( function( entry ) {
+					if( entry.group !== null && known.has( entry.id ) === false && entry.item.open === true )
+						open.add( entry.id );
+				} );
+
+				Array.from( open ).forEach( function( id ) {
+					if( byId.has( id ) === false || byId.get( id ).group === null )
+						open.delete( id );
+				} );
+
+				if( selected !== null && byId.has( selected ) === false )
+					selected = null;
+
+				order.forEach( paintOpen );
+				paintSelected();
+
+				const seen = visible();
+				const kept = was !== null && byId.has( was ) === true && shown( byId.get( was ) ) === true ? byId.get( was ) : null;
+				const chosen = selected !== null && shown( byId.get( selected ) ) === true ? byId.get( selected ) : null;
+
+				const neighbour = near.map( function( id ) { return byId.get( id ) } ).find( function( other ) { return other !== undefined && shown( other ) === true } ) ?? null;
+
+				setStop( kept ?? neighbour ?? chosen ?? seen[0] ?? null, held !== null && kept === null );
+
+				// The focus goes back where it was: on the button of the row where it stood on one, if it is still there and can be pressed
+				if( held !== null && stop !== null ) {
+
+					const back = held.part === 'action' && held.entry.id === stop.id && stop.keyed.has( held.key ) === true ? stop.keyed.get( held.key ) : null;
+
+					show( stop, back !== null && back.disabled === false ? back : stop.li );
+				}
+			};
+
+			const keyOf = function( node ) {
+
+				const found = locate( node );
+
+				if( found === null || found.part !== 'action' )
+					return found;
+
+				const key = Array.from( found.entry.keyed.keys() ).find( function( name ) { return found.entry.keyed.get( name ) === node } );
+
+				return { entry : found.entry, part : 'action', key : key };
+			};
+
+			root.addEventListener( 'keydown', function( ev ) {
+
+				const found = parts.get( ev.target );
+
+				if( found === undefined || found.part !== 'item' || ev.ctrlKey === true || ev.altKey === true || ev.metaKey === true )
+					return;
+
+				const entry = found.entry;
+				const seen = visible();
+				const at = seen.indexOf( entry );
+				let next = null;
+
+				if( ev.key === 'ArrowDown' )	next = seen[at + 1] ?? null;
+				else if( ev.key === 'ArrowUp' )	next = seen[at - 1] ?? null;
+				else if( ev.key === 'Home' )		next = seen[0];
+				else if( ev.key === 'End' )			next = seen[seen.length - 1];
+				else if( ev.key === 'ArrowRight' ) {
+
+					if( entry.group !== null && open.has( entry.id ) === false )
+						setOpen( entry, true, true );
+					else if( entry.group !== null )
+						next = order[order.indexOf( entry ) + 1] ?? null;
+				}
+				else if( ev.key === 'ArrowLeft' ) {
+
+					if( entry.group !== null && open.has( entry.id ) === true )
+						setOpen( entry, false, true );
+					else
+						next = entry.parent;
+				}
+				else if( ev.key === 'Enter' || ev.key === ' ' )
+					choose( entry );
+				else if( typeof ev.key === 'string' && ev.key.length === 1 ) {
+
+					const letter = ev.key.toLowerCase();
+					const ring = seen.slice( at + 1 ).concat( seen.slice( 0, at ) );
+
+					next = ring.find( function( other ) { return String( other.item.label ?? '' ).toLowerCase().indexOf( letter ) === 0 } ) ?? null;
+
+					if( next === null )
+						return;
+				}
+				else
+					return;
+
+				// The arrows and Space scroll the page otherwise
+				ev.preventDefault();
+
+				if( next !== null )
+					go( next );
+			} );
+
+			root.addEventListener( 'click', function( ev ) {
+
+				const found = locate( ev.target );
+
+				if( found === null || found.part === 'action' || found.part === 'actions' )
+					return;
+
+				if( found.part === 'toggle' ) {
+					setOpen( found.entry, open.has( found.entry.id ) === false, true );
+					return;
+				}
+
+				go( found.entry );
+				choose( found.entry );
+			} );
+
+			// The stop follows the hand: a click or a Tab that lands in a row makes it the row of the tab order
+			root.addEventListener( 'focusin', function( ev ) {
+
+				const found = locate( ev.target );
+
+				if( found !== null && found.entry !== stop )
+					setStop( found.entry, true );
+			} );
+
+			draw( Array.isArray( options.items ) === true ? options.items : [] );
+
+			return {
+
+				el : root,
+
+				update : function( items ) {
+					draw( Array.isArray( items ) === true ? items : [] );
+				},
+
+				select : function( id ) {
+
+					if( id === null ) {
+						selected = null;
+						paintSelected();
+						return true;
+					}
+
+					const entry = byId.get( String( id ) );
+
+					if( entry === undefined || entry.item.locked === true )
+						return false;
+
+					reveal( entry );
+					selected = entry.id;
+					paintSelected();
+					setStop( entry );
+					entry.row.scrollIntoView( { block : 'nearest' } );
+
+					return true;
+				},
+
+				focus : function( id ) {
+
+					const entry = id === undefined ? stop : byId.get( String( id ) );
+
+					if( entry === undefined || entry === null )
+						return false;
+
+					reveal( entry );
+					go( entry );
+
+					return true;
+				},
+
+				get : function() {
+					return { selected : selected, stop : stop === null ? null : stop.id, open : Array.from( open ) };
+				},
+			};
+		},
+
+		/**
 		 *	A field for a colour: the hex code in a text field, the system's own
 		 *	colour picker beside it, a surface that shows the colour, and - where
 		 *	options.against names a second colour - the contrast between them as

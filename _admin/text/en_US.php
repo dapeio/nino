@@ -84,7 +84,7 @@ return [
 	'[[/_admin/common/label/perpage]]'	=> 'Rows per page',
 	// The words of the building blocks that draw their own: the split view's switch
 	// and reload button, the colour field's error and verdict, the strip's default
-	// (see Nino.adminUi.split(), color() and steps())
+	// (see Nino.adminUi.split(), color(), steps() and tree())
 	'[[/_admin/common/label/default]]'	=> 'Default',
 	'[[/_admin/common/split/view]]'	=> 'View',
 	'[[/_admin/common/split/settings]]'	=> 'Settings',
@@ -100,6 +100,8 @@ return [
 	'[[/_admin/common/savebar/save]]'	=> 'Save',
 	'[[/_admin/common/savebar/restore]]'	=> 'Restore the last state',
 	'[[/_admin/common/savebar/restore-hint]]'	=> 'Save or discard the changes first.',
+	'[[/_admin/common/tree/locked]]'	=> 'Locked',
+	'[[/_admin/common/tree/marked]]'	=> 'Marked',
 	'[[/_admin/common/color/pick]]'	=> 'Choose a colour',
 	'[[/_admin/common/color/invalid]]'	=> 'Enter a colour as #rrggbb or #rgb.',
 	'[[/_admin/common/color/contrast]]'	=> 'Contrast %s : 1',

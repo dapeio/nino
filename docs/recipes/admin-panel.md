@@ -1291,6 +1291,7 @@ Reach for an existing class first; only invent one when no role fits.
 | One choice among a few steps (-2 to +2, or named) | `.nino-admin-steps` via `Nino.adminUi.steps()`, a radiogroup |
 | Controls on one side, a preview on the other, a switch between them where it is narrow | `.nino-admin-split` via `Nino.adminUi.split()` |
 | A preview that follows a draft, the question of a refused save, the bar of a screen that is saved as a whole | `Nino.adminUi.previewFrame()`, `conflict()` and `.nino-admin-savebar` via `saveBar()` - see [the three builders](#workbench-screens-that-save-as-a-whole-the-preview-loop-the-conflict-and-the-save-bar) |
+| Entries one under another with children, a second line, a hint and buttons of their own - the components of a page | `.nino-admin-tree` via `Nino.adminUi.tree()`, a `role="tree"` - see [A tree](#a-tree) |
 | A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
@@ -1586,6 +1587,60 @@ Nino.admin.dirty.register( 'pd', bar.entry( { discard : drop } ) );
 Each has a suite - `tests/nino-ui-previewframe-js-smoke.js`, `tests/nino-ui-conflict-js-smoke.js` and
 `tests/nino-ui-savebar-js-smoke.js` - and they are drawn in the browser by the same stylesheet as the other builders
 (`.nino-admin-savebar` is an action bar, and on a phone its line is a row of its own above the buttons).
+
+### A tree
+
+**`Nino.adminUi.tree( options )`** shows entries the caller gives as data, each with its children, as the
+ARIA pattern of the same name: `role="tree"`, `treeitem` and `group`, `aria-level`, `aria-expanded` on the
+entries that have children, `aria-selected`, and exactly one entry in the tab order. An entry is
+`{ id, label, detail, children, open, marked, locked, hint, actions }`: `detail` is the quiet second line,
+`marked` says that the entry is the one shown elsewhere (the preview), `locked` that it can be walked to
+and opened but not chosen, `hint` is `{ text, state }` - a sign and its sentence, shown under the label and read by a screen reader as
+part of the entry's description - and `actions` are the buttons of the row, `{ key, label, name, disabled, danger }`,
+the label a glyph (`+`, `↑`, `↓`, `×`), the name what a screen reader and a title say, `danger` drawing a
+button that destroys (the red it takes on hover). A marked and a locked entry carry a quiet word at the end of
+the row, never a sign alone. Ids are strings and
+unique in the tree, and an id follows the component, not its place: a panel that takes the path of a node
+as its id loses the open state and the focus of a node that moved. The tree's own `id` is a token. Labels, details and hints are set as text; the words for a locked and a marked entry
+are the fills `/_admin/common/tree/*`, or `text : { locked, marked }`.
+
+Up and Down walk the entries that can be seen, Right opens a closed entry and goes to the first child of
+an open one, Left closes an open entry and goes to the parent of a closed one, Home and End go to the ends,
+Enter and Space choose (also the entry that is chosen already: in a builder that is the way into it), and a
+letter goes to the next entry whose label begins with it. A click on the arrow opens or closes, a click on
+the row chooses. The buttons of a row are in the tab order only while its row is the one with the stop, so
+that Tab from the row reaches them and a tree of fifty rows is one stop; the mouse reaches every one.
+A locked entry carries no `aria-disabled` (that would take its buttons from a screen reader too) and
+`select()` refuses it. The tree writes no address - the caller binds the chosen entry to its own, as with `levels()`: `onSelect`
+is told the id and the item, `onToggle` the id and whether it is open after the move, `onAction` the key, the id and
+the item, each only after a hand did it; `onFocus` is told the id and the item when the stop moves to another entry, so that
+a panel can mark the component in its preview. `update( items )` draws new data and keeps, where the ids stay,
+what is open (an id the tree has not seen takes the item's `open`), what is chosen, the stop and the
+focus - on the button of the row where it stood on one, if that is still there and can be pressed, else on the row.
+Where the entry of the focus is gone, the focus goes to its next sibling, else the previous one, else the parent;
+`update( [] )` leaves it nowhere. `select( id )` chooses an entry, opens what is above
+it and scrolls it into view, `focus( [id] )` puts the focus on it, `get()` answers `{ selected, stop, open }`;
+none of them calls back, and they answer `false` for an id the tree has not.
+
+```js
+const tree = Nino.adminUi.tree( {
+	label : 'Components', selected : 'title',
+	items : [
+		{ id : 'wrap', label : 'Wrap', detail : 'Section', open : true, actions : [ { key : 'add', label : '+', name : 'Add inside Wrap' } ], children : [
+			{ id : 'title', label : 'Title', detail : 'Heading', actions : [ { key : 'up', label : '↑', name : 'Move Title up', disabled : true }, { key : 'remove', label : '×', name : 'Remove Title' } ] },
+			{ id : 'html', label : 'Free HTML', locked : true, hint : { text : 'Not editable here' } },
+		] },
+	],
+	onSelect : function( id ) { Nino.admin.router.set( 'builder', [ 'page', id ] ) },
+	onAction : function( key, id ) { if( key === 'remove' ) remove( id ) },
+} );
+mount.appendChild( tree.el );
+// after a change: tree.update( itemsNow ); after Back: tree.select( idOfTheAddress )
+```
+
+The rows are 34 px high (a row with a hint is two lines) with arrows and buttons of 28 px, a long label is cut with an ellipsis and keeps
+its text as a title, and nothing overflows at 390 px. It is drawn by the stylesheet in both schemes
+(`tests/nino-ui-tree-js-smoke.js` holds the keys and the ARIA).
 
 ## Panel tests
 
