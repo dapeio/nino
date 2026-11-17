@@ -808,15 +808,18 @@ check( 'creating a page in /_admin succeeds, beside the starter pages', $status 
 // second one dropped the first one's page. writeContentData() locks for its
 // own write, which is after the decision; these hold the lock across both
 $routesSource = (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Routes/Admin/Admin.php' );
+$pagesSource = (string) file_get_contents( __DIR__. '/../_nino/Nino/Pages/Pages.php' );
 $unlocked = [];
 
 foreach( [ 'apiSave', 'apiDelete', 'apiMove' ] as $action ) {
 
-	$body = substr( $routesSource, strpos( $routesSource, 'public static function '. $action. '(' ) ?: 0 );
+	// The save is the function of the kernel the panel calls: the lock is taken in put(), round the call that reads and writes
+	$from = $action === 'apiSave' ? $pagesSource : $routesSource;
+	$body = substr( $from, strpos( $from, 'public static function '. ( $action === 'apiSave' ? 'put' : $action ). '(' ) ?: 0 );
 	$body = substr( $body, 0, strpos( $body, "\n\t\t}" ) ?: strlen( $body ) );
 
 	// The read is the whole file or one key of it, AppData::stored()
-	$reads		= array_filter( [ strpos( $body, "getFileContent( \$appData, '/config.php'" ), strpos( $body, 'AppData::stored( $appData' ) ], static fn( $at ): bool => $at !== false );
+	$reads		= array_filter( [ strpos( $body, "getFileContent( \$appData, '/config.php'" ), strpos( $body, 'AppData::stored( $appData' ), strpos( $body, 'self::_put(' ) ], static fn( $at ): bool => $at !== false );
 	$lockAt		= strpos( $body, "lockFile( \$appData, '/config.php' )" );
 	$readAt		= $reads === [] ? false : min( $reads );
 	$unlockAt	= strpos( $body, "unlockFile( \$appData, '/config.php' )" );

@@ -52,6 +52,10 @@ return [
 	'[[/_admin/error/routes_reserved_uri]]'	=> 'The Element URI “%s” belongs to the Legal module, which keeps the imprint and the privacy policy. Choose another one.',
 	'[[/_admin/error/routes_http_uri_taken]]'	=> 'The Http URI “%s” already belongs to another route.',
 	'[[/_admin/error/routes_unknown_template]]'	=> 'The template “%s” does not exist.',
+	'[[/_admin/error/routes_invalid_template]]'	=> 'The template name “%s” is not one a page can have.',
+	'[[/_admin/error/routes_reserved_template]]'	=> 'The template name “%s” is one Nino reads itself.',
+	'[[/_admin/error/routes_template_exists]]'	=> 'The template “%s” exists already.',
+	'[[/_admin/error/routes_template_too_large]]'	=> 'The template is larger than %s bytes.',
 	'[[/_admin/error/routes_missing_name]]'	=> 'The name for “%s” is missing.',
 	'[[/_admin/error/routes_missing_title]]'	=> 'The title for “%s” is missing.',
 

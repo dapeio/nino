@@ -52,6 +52,10 @@ return [
 	'[[/_admin/error/routes_reserved_uri]]'	=> 'Die Element-URI „%s“ gehört dem Modul Legal, das Impressum und Datenschutzerklärung führt. Wähle eine andere.',
 	'[[/_admin/error/routes_http_uri_taken]]'	=> 'Die HTTP-URI „%s“ gehört schon zu einer anderen Route.',
 	'[[/_admin/error/routes_unknown_template]]'	=> 'Das Template „%s“ gibt es nicht.',
+	'[[/_admin/error/routes_invalid_template]]'	=> 'Der Templatename „%s“ ist für eine Seite nicht möglich.',
+	'[[/_admin/error/routes_reserved_template]]'	=> 'Den Templatenamen „%s“ liest Nino selbst.',
+	'[[/_admin/error/routes_template_exists]]'	=> 'Das Template „%s“ gibt es schon.',
+	'[[/_admin/error/routes_template_too_large]]'	=> 'Das Template ist größer als %s Bytes.',
 	'[[/_admin/error/routes_missing_name]]'	=> 'Der Name für „%s“ fehlt.',
 	'[[/_admin/error/routes_missing_title]]'	=> 'Der Titel für „%s“ fehlt.',
 

@@ -940,6 +940,32 @@ $check  = \Nino\Blocks::validate( $appData, 'my-block', [ 'json' => $json, 'tpl'
 
 **What is kept.** The blocks that were read are kept in `private/data/cache/blocks.php` - the blocks, the reasons of those that were refused, the kernel's version, the version of the register of components (`\Nino\Components::version()`), the components the features that are off bring, and the size and time of every file below the roots - and read again where any of it differs. A request that finds the file as it was reads and checks no file of a block and says nothing; it still lists the folders and looks at the size and time of each file, which is what the stamp is made of (about 2 ms for fifty blocks), and a file that changes to the same size within the same second is not seen until it changes again. The log hears of a block that is refused once, when it is read. `'/nino/markup/cache' => false` turns the file off; `\Nino\Html::dropTrees()`, which the page cache calls, removes it; a backup does not take it.
 
+### Pages
+
+A page is a route that draws a template of `templates/page-*.tpl`, with a name and a title in every language of the site, an address for each language and a place in the menus. `\Nino\Pages` makes one in one call and lists them; the Routes panel of the workbench calls the same function, so a tool that makes pages has the rules of the panel and no copy of them. Neither function knows an account: the caller checks the right of its own (`\Nino\Admin\Admin::guardPerm()` in a panel) before it calls.
+
+```php
+$made = \Nino\Pages::put( $appData, [
+	'uri'      => '/site-news',                                  // the Element-URI the texts of the page are filed under
+	'httpUris' => [ 'de_DE' => '/neuigkeiten', '' => '/news' ],   // a language => its address, '' => the address of the others
+	'template' => 'page-news',
+	'text'     => [ 'de_DE' => [ 'name' => 'Neuigkeiten', 'title' => 'Neuigkeiten' ], 'en_US' => [ 'name' => 'News', 'title' => 'News', 'description' => '' ] ],
+	'navs'     => [ 'main' ],
+	'source'   => '[template /templates/html-header]',            // optional: the new template, which is written with the page
+] );
+
+if( isset( $made['error'] ) === true )
+	\Nino\Http::fail( $request, $made['error']['status'], $made['error']['message'], $made['error']['code'], $made['error']['params'], $made['error']['field'] );
+
+$pages = \Nino\Pages::all( $appData ); // [ [ uri, template, names, addresses, locales, navs, runtime ], ... ]
+```
+
+`put()` makes the template (where there is a `source`), the name, the title and the address of each language in its text file, the blacklist entry of the address and, as the last of the writes, the routes of the languages and the entry in the menus - all under the one lock of `config.php`, which is held from the first check to the write of the routes. A write that fails gives back the ones before it: each text file has the bytes it had, or is no file where it was none, and the template file is removed, so nothing is left of a page that is refused - not even when the write of `config.php` itself fails, which is an answer like any other. It makes a new page, or saves the page named by `originalUri`, which keeps what its first route carries and the form does not edit. An address must be a plain path that is no reserved one (`/_admin`, `/_nino` and the like, `\Nino\Http::isReservedUri()`) and that no other route answers on; the Element-URI is the page's own; there is a name and a title in every language of the site; the template is one of `templates/page-*.tpl` that is there.
+
+With `source` the template is made, in the same step and as the one file of that name: the name is `page-` and words of lower case letters and digits joined by hyphens, at most `\Nino\Pages::MAX_NAME` long, and none the kernel draws by itself (`\Nino\Pages::reserved()`: the maintenance page and the pages of the legal module); the file is not there yet - a template that is there is never overwritten, nor one that differs from it in case only -, and the source is at most `\Nino\Modules\Template::MAX_BYTES`. **The source is not checked.** It is written as the bytes it is and never run or read by the call; it is drawn when the page is, with the rules of every template, so free html and a call without a schema in it are drawn for every visitor. Whoever hands over a source that an account wrote checks it first with the rules of the right that account has (a feature: `\Nino\Components::check()` and its own rule) and checks the right itself. Where a later write fails, the file is removed.
+
+The answer of a page that was written is `[ 'uri', 'routes', 'template', 'created' ]`, that of a refusal `[ 'error' => [ 'status', 'message', 'code', 'params', 'field' ] ]` - the arguments of `\Nino\Http::fail()`, so that a panel makes a sentence of the code in the language of the account; the refusals of a `source` have codes with words as well (`routes_invalid_template`, `routes_reserved_template`, `routes_template_exists`, `routes_template_too_large`). `all()` is one entry for each page (Element-URI), however many routes it has, so several entries may name one template: its template (`''` where the body picks the file at runtime), its name - the title where it has none - and its address for each language, the languages it has an address in and the menus it is in; the pages that a module routes at runtime and no `config.php` has, such as the imprint and the privacy policy, stand behind the stored ones with `runtime` set.
+
 ### Elements in Templates
 
 The shortcodes `[element]` and `[elements]` load structured content. Within their block, fields are addressed with `[[field]]`; `[[.id]]` contains the internal element ID, `[[.uri]]` the uri of the element, `/<type>/<name>`, and `[[.slug]]` the name alone - the last segment of the uri, which is what a link to a page of the element needs: `<a href="/blog/[[.slug]]">`. The type is in `[[.uri]]` and not in `[[.slug]]`; an element without a uri has a slug of nothing.

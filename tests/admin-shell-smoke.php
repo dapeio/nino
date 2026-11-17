@@ -1595,43 +1595,46 @@ foreach( $source as $file ) {
 	if( str_contains( $path, '/_admin/' ) === false && str_contains( $path, '/_nino/' ) === false )
 		continue;
 	$text = (string) file_get_contents( $path );
-	$offset = 0;
-	while( ( $at = strpos( $text, 'Http::fail(', $offset ) ) !== false ) {
-		// The arguments of the call, split where the commas are not inside a string or a bracket
-		$arguments = [ '' ];
-		$depth = 0;
-		$quote = '';
-		for( $i = $at + 11, $length = strlen( $text ); $i < $length; $i++ ) {
-			$char = $text[$i];
-			if( $quote !== '' ) {
-				$arguments[count( $arguments ) - 1] .= $char;
-				if( $char === '\\' ) {
-					$arguments[count( $arguments ) - 1] .= $text[++$i];
-				} elseif( $char === $quote ) {
-					$quote = '';
+	// \Nino\Http::fail() names the code as its fourth argument; \Nino\Pages answers a refusal that is turned into one, its code the third
+	foreach( [ [ 'Http::fail(', 3 ], [ '_refuse(', 2 ] ] as [ $needle, $codeAt ] ) {
+		$offset = 0;
+		while( ( $at = strpos( $text, $needle, $offset ) ) !== false ) {
+			// The arguments of the call, split where the commas are not inside a string or a bracket
+			$arguments = [ '' ];
+			$depth = 0;
+			$quote = '';
+			for( $i = $at + strlen( $needle ), $length = strlen( $text ); $i < $length; $i++ ) {
+				$char = $text[$i];
+				if( $quote !== '' ) {
+					$arguments[count( $arguments ) - 1] .= $char;
+					if( $char === '\\' ) {
+						$arguments[count( $arguments ) - 1] .= $text[++$i];
+					} elseif( $char === $quote ) {
+						$quote = '';
+					}
+					continue;
 				}
-				continue;
+				if( $char === "'" || $char === '"' ) {
+					$quote = $char;
+				} elseif( $char === '(' || $char === '[' ) {
+					$depth++;
+				} elseif( $char === ')' || $char === ']' ) {
+					if( $depth === 0 )
+						break;
+					$depth--;
+				} elseif( $char === ',' && $depth === 0 ) {
+					$arguments[] = '';
+					continue;
+				}
+				$arguments[count( $arguments ) - 1] .= $char;
 			}
-			if( $char === "'" || $char === '"' ) {
-				$quote = $char;
-			} elseif( $char === '(' || $char === '[' ) {
-				$depth++;
-			} elseif( $char === ')' || $char === ']' ) {
-				if( $depth === 0 )
-					break;
-				$depth--;
-			} elseif( $char === ',' && $depth === 0 ) {
-				$arguments[] = '';
-				continue;
-			}
-			$arguments[count( $arguments ) - 1] .= $char;
+			$offset = $at + strlen( $needle );
+			// The fourth argument is the code: a literal, or a choice between two
+			$fourth = trim( $arguments[$codeAt] ?? '' );
+			if( preg_match( "/^'([a-z][a-z0-9_]*)'\$/", $fourth, $found ) === 1 || preg_match( "/\\?\\s*'([a-z][a-z0-9_]*)'\\s*:\\s*'([a-z][a-z0-9_]*)'\$/", $fourth, $found ) === 1 )
+				foreach( array_slice( $found, 1 ) as $code )
+					$codes[$code] = true;
 		}
-		$offset = $at + 11;
-		// The fourth argument is the code: a literal, or a choice between two
-		$fourth = trim( $arguments[3] ?? '' );
-		if( preg_match( "/^'([a-z][a-z0-9_]*)'\$/", $fourth, $found ) === 1 || preg_match( "/\\?\\s*'([a-z][a-z0-9_]*)'\\s*:\\s*'([a-z][a-z0-9_]*)'\$/", $fourth, $found ) === 1 )
-			foreach( array_slice( $found, 1 ) as $code )
-				$codes[$code] = true;
 	}
 }
 // The ones Admin builds from the type of a field, from a failed upload and from
