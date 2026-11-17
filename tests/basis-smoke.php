@@ -380,6 +380,18 @@ foreach( $schemas as $name => $schema )
 
 check( 'every option of every choice of basis has a label in de_DE and en_US'. ( $unlabelled === [] ? '' : ' - '. implode( ', ', array_slice( $unlabelled, 0, 5 ) ) ), $unlabelled === [] );
 
+// ...and so does every variant a component of basis has beside the regular one, as the register answers it
+$unnamed = [];
+
+foreach( array_keys( $schemas ) as $name )
+	foreach( \Nino\Components::variants( $appData, $name )['variants'] as $variant => $label )
+		if( $variant !== 'regular' )
+			foreach( [ 'de_DE', 'en_US' ] as $language )
+				if( is_array( $label ) === false || is_string( $label[$language] ?? null ) === false || $label[$language] === '' )
+					$unnamed[] = $name. '.'. $variant. ' ('. $language. ')';
+
+check( 'every variant of basis but the regular one has a label in de_DE and en_US'. ( $unnamed === [] ? '' : ' - '. implode( ', ', $unnamed ) ), $unnamed === [] && array_key_exists( 'card', \Nino\Components::variants( $appData, 'section-col' )['variants'] ) === true );
+
 // what a tool offers where: the nine that hold something
 $holds = [
 	''							=> [ 'footer-wrap', 'header-wrap', 'html', 'section-wrap' ],
