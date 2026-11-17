@@ -3426,6 +3426,12 @@ a {
 		flex: 1 0 100%;
 		text-align: left;
 	}
+
+	/* Its line says "unsaved changes" here, so the registry's mark is not drawn
+	   a second time (above 38rem the :has() rule of the shell hides it) */
+	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-actionbar-dirty {
+		display: none;
+	}
 }
 
 /* The colour field: the hex code, the picker and the surface in a row, the

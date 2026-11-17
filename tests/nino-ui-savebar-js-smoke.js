@@ -11,6 +11,8 @@
 'use strict';
 
 const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
 const { check, done, load, documentOf, element, findAll, fire, fills } = require( './harness.js' );
 
 const sandbox = { console : console, document : documentOf( element('div') ) };
@@ -36,6 +38,11 @@ function build( extra ) {
 }
 
 const names = bar => findAll( bar.el, el => el.tagName === 'BUTTON' ).map( el => el.textContent );
+
+// The bar keeps its line on a phone, so the registry's mark is hidden there: the sentence is said once
+const stylesheet = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
+check( 'on a phone the bar of a saveBar shows its line and does not draw the registry\'s mark of unsaved changes beside it',
+	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-status \{\s*display: block;[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheet ) === true );
 
 console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whole\n' );
 

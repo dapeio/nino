@@ -197,7 +197,7 @@ namespace Nino\Modules\Images {
 			}
 
 			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
-				\Nino\Images::delete( $appData, $oldFilename );
+				\Nino\Images::deleteUnlessShared( $appData, $oldFilename );
 
 			$body = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ];
 
@@ -315,13 +315,8 @@ namespace Nino\Modules\Images {
 				return;
 			}
 
-			$shared = false;
-			foreach( \Nino\Images::getSlots( $appData ) as $other )
-				if( ( $other['filename'] ?? null ) === $old )
-					$shared = true;
-
-			if( $shared === false && str_starts_with( $old, ltrim( $uri, '/' ). '.' ) === true )
-				\Nino\Images::delete( $appData, $old );
+			if( str_starts_with( $old, ltrim( $uri, '/' ). '.' ) === true )
+				\Nino\Images::deleteUnlessShared( $appData, $old );
 
 			\Nino\Http::ok( $request, [ 'filename' => null ] );
 		}

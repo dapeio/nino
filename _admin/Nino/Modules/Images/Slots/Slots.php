@@ -399,8 +399,8 @@ namespace Nino\Modules\Images {
 
 			unset( $appData['/nino/html/images'][$uri] );
 
-			if( ( $slot['filename'] ?? null ) !== null )
-				\Nino\Images::delete( $appData, $slot['filename'] );
+			if( is_string( $slot['filename'] ?? null ) === true )
+				\Nino\Images::deleteUnlessShared( $appData, $slot['filename'] );
 
 			\Nino\Http::ok( $request );
 		}

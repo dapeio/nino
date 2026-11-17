@@ -888,6 +888,28 @@ namespace Nino {
 		}
 
 		/**
+		 *	Delete a stored image unless an image slot still names it. Two slots
+		 *	can point at the same file (a template copied with its slots keeps the
+		 *	filenames), so the file of a slot that was changed or deleted is only
+		 *	garbage once no record reads it. Call it after the slot's own record
+		 *	was written, so that this slot no longer counts.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/
+		 *
+		 *	@return 	bool							Whether the file was handed to delete(); false where a slot reads it
+		 */
+		public static function deleteUnlessShared( array &$appData, string $filename ): bool {
+
+			foreach( self::getSlots( $appData ) as $slot )
+				if( ( $slot['filename'] ?? null ) === $filename )
+					return false;
+
+			self::delete( $appData, $filename );
+			return true;
+		}
+
+		/**
 		 *	The address a stored image is served under: the filename below
 		 *	/images/ behind the public directory of the project (see
 		 *	\Nino\Filesystem::url()).

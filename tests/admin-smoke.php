@@ -1231,6 +1231,27 @@ $appData['/nino/html/images']['/twin2'] 	= [ 'label' => 'Twin 2', 'width' => 60,
 check( 'a file another slot still names stays', $status === 200 && $appData['/nino/html/images']['/twin']['filename'] === null && \Nino\Filesystem::fileExists( $appData, '/images/twin.60x40.jpg' ) === true
 	&& $appData['/nino/html/images']['/twin2']['filename'] === 'twin.60x40.jpg' );
 
+// A new picture for a slot, and the deletion of a slot, take the old file away only where no other slot reads it
+\Nino\Filesystem::putFileContent( $appData, '/images/kept.60x40.jpg', 'bytes two slots name' );
+\Nino\Filesystem::putFileContent( $appData, '/images/lone.60x40.jpg', 'bytes one slot names' );
+$appData['/nino/html/images']['/swap'] 		= [ 'label' => 'Swap', 'width' => 60, 'height' => 40, 'filename' => 'kept.60x40.jpg' ];
+$appData['/nino/html/images']['/swap2'] 	= [ 'label' => 'Swap 2', 'width' => 60, 'height' => 40, 'filename' => 'kept.60x40.jpg' ];
+$appData['/nino/html/images']['/swap3'] 	= [ 'label' => 'Swap 3', 'width' => 60, 'height' => 40, 'filename' => 'lone.60x40.jpg' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+[ $status ] = callUploadSlotImage( $appData, '/swap' );
+check( 'a new picture for a slot leaves the file another slot still names', $status === 200 && $appData['/nino/html/images']['/swap']['filename'] !== 'kept.60x40.jpg'
+	&& \Nino\Filesystem::fileExists( $appData, '/images/kept.60x40.jpg' ) === true );
+[ $status ] = callUploadSlotImage( $appData, '/swap3' );
+check( '...and takes away the file nobody names any more', $status === 200 && \Nino\Filesystem::fileExists( $appData, '/images/lone.60x40.jpg' ) === false );
+
+$appData['/nino/html/images']['/swap4'] = [ 'label' => 'Swap 4', 'width' => 60, 'height' => 40, 'filename' => 'kept.60x40.jpg' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Images\Slots::class, 'apiDelete' ], [ 'uri' => '/swap4' ] );
+check( 'deleting a slot leaves the file another slot still names', $status === 200 && isset( $appData['/nino/html/images']['/swap4'] ) === false
+	&& \Nino\Filesystem::fileExists( $appData, '/images/kept.60x40.jpg' ) === true );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Images\Slots::class, 'apiDelete' ], [ 'uri' => '/swap2' ] );
+check( '...and takes away the file of the last slot that names it', $status === 200 && \Nino\Filesystem::fileExists( $appData, '/images/kept.60x40.jpg' ) === false );
+
 // A write that cannot happen: the file and the filename are what they were
 \Nino\Filesystem::putFileContent( $appData, '/images/failing.60x40.jpg', 'bytes' );
 $appData['/nino/html/images']['/failing'] = [ 'label' => 'Failing', 'width' => 60, 'height' => 40, 'filename' => 'failing.60x40.jpg' ];
