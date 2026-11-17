@@ -416,7 +416,7 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 - [ ] Write permissions are limited to the required paths after setup.
 - [ ] The setup wizard was fully completed and `_admin/install/` subsequently removed from production.
 - [ ] Developer and editor accounts are tested, and the recovery password is stored safely.
-- [ ] The Builder is either removed from `features/` or consciously kept, and only developer accounts reach it.
+- [ ] The Builder is either removed from `features/` or consciously kept, and each role has the step of it that it needs and no more: content, design or development, beside the door to the panel.
 - [ ] Editor accounts only have the necessary permissions.
 - [ ] HTTPS and secure session cookies work at the final address.
 - [ ] Error display is disabled and error logging is checked.

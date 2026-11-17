@@ -339,7 +339,15 @@ check( 'apiList finds today\'s backup without reading config.php\'s own copy of 
 	replace it. Done before the restores below, which write snapshots of their
 	own into the same directory and would change what the checks above count	*/
 $nowDir			= $sandbox. '/private/.backups';
-$timedFiles	= static fn(): array => array_map( 'basename', glob( $nowDir. '/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]{,-manual}.php', GLOB_BRACE ) ?: [] );
+// Two patterns and no GLOB_BRACE: the constant is glibc's, and a php on musl has none
+$timedFiles	= static function() use ( $nowDir ): array {
+
+	$stamp = $nowDir. '/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]';
+	$found = array_map( 'basename', array_merge( glob( $stamp. '.php' ) ?: [], glob( $stamp. '-manual.php' ) ?: [] ) );
+	sort( $found );
+
+	return $found;
+};
 $dailyFile	= $nowDir. '/'. date( 'Y-m-d' ). '.php';
 $dailyBytes	= (string) file_get_contents( $dailyFile );
 
