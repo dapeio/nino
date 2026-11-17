@@ -158,6 +158,9 @@
 	--nino-admin-dialog-form: 40rem;
 	--nino-admin-dialog-wide: 60rem;
 	--nino-admin-dialog-sheet: 28rem;
+	/* The side column of a split view: open it is as wide as a column of an outline, folded it is the strip of icons */
+	--nino-admin-aside-width: 16rem;
+	--nino-admin-aside-rail: 48px;
 	/* The row of a list that is opened (the guide's 53px) and the row that only holds a line or a switch (46px) */
 	--nino-admin-row-height: 53px;
 	--nino-admin-row-dense: 46px;
@@ -3104,6 +3107,22 @@ a {
 	min-width: 0;
 }
 
+/* A bar that has the name of the panel is two lines high at the left: the name and the way back close together, so that the bar stays one bar's height */
+.nino-admin .nino-admin-contextbar[data-panel] {
+	padding-block: var(--nino-admin-space-1);
+}
+
+.nino-admin .nino-admin-contextbar[data-panel] .nino-admin-contextbar-lead .nino-admin-back-link {
+	min-height: var(--nino-admin-control-icon);
+	padding-block: var(--nino-admin-space-1);
+	white-space: nowrap;
+}
+
+/* The way back is never cut: the name of the panel and the link keep their size, the identifier gives way first and the title after it, with an ellipsis */
+.nino-admin .nino-admin-contextbar[data-panel] > .nino-admin-contextbar-lead {
+	flex: 0 0 auto;
+}
+
 .nino-admin .nino-admin-contextbar-panel {
 	padding: 0 var(--nino-admin-space-3);
 	color: var(--editor-text-secondary);
@@ -3115,8 +3134,128 @@ a {
 	flex: 0 0 auto;
 }
 
-.nino-admin .nino-admin-contextbar-title {
+/* The bar is the container of its own tools: "narrow" is the width the bar has, the pane beside the rail and not the window */
+.nino-admin .nino-admin-contextbar {
+	container: nino-contextbar / inline-size;
+}
+
+/* The name of the view, what is quietly beside it and the icons for what is rarely needed: one group that takes the room the tools leave */
+.nino-admin .nino-admin-contextbar-name {
+	display: flex;
 	flex: 1 1 auto;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	min-width: 0;
+}
+
+.nino-admin .nino-admin-contextbar-name > :is(.nino-admin-btn-icon, .nino-admin-badge) {
+	flex: 0 0 auto;
+}
+
+.nino-admin .nino-admin-contextbar-code {
+	flex: 0 100 auto;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The tools of the view: in a row at the right; where the bar is narrow a menu behind one icon button (the rule at the end of the bar's rules) */
+.nino-admin .nino-admin-contextbar-toolbox {
+	position: relative;
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	min-width: 0;
+}
+
+.nino-admin .nino-admin-contextbar-tools {
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-5);
+}
+
+.nino-admin .nino-admin-contextbar-tools-toggle {
+	display: none;
+}
+
+@container nino-contextbar (max-width: 56rem) {
+
+	.nino-admin .nino-admin-contextbar-tools-toggle {
+		display: inline-flex;
+	}
+
+	.nino-admin .nino-admin-contextbar-tools {
+		position: absolute;
+		top: calc(100% + var(--nino-admin-space-2));
+		right: 0;
+		z-index: 30;
+		display: none;
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--nino-admin-space-4);
+		min-width: 15rem;
+		padding: var(--nino-admin-space-5);
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius-sm);
+		background: var(--editor-bg-elevated);
+		box-shadow: var(--editor-shadow);
+	}
+
+	.nino-admin .nino-admin-contextbar[data-tools="open"] .nino-admin-contextbar-tools {
+		display: flex;
+	}
+}
+
+/* The tools of a preview (Nino.adminUi.previewTools()): the page it shows, the width it is laid out at, Reload. In a menu they stand one under the other */
+:where(.nino-admin) .nino-admin-previewtools {
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-5);
+	min-width: 0;
+}
+
+:where(.nino-admin) :is(.nino-admin-previewtools-page, .nino-admin-previewtools-width) {
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-strong);
+	white-space: nowrap;
+}
+
+/* What the page shows where the choice does not say it: quiet, after the choice, cut where there is no room */
+:where(.nino-admin) .nino-admin-previewtools-note {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@container nino-contextbar (max-width: 56rem) {
+
+	.nino-admin .nino-admin-contextbar-tools .nino-admin-previewtools {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.nino-admin .nino-admin-contextbar-tools :is(.nino-admin-previewtools-page, .nino-admin-previewtools-width) {
+		justify-content: space-between;
+	}
+
+	.nino-admin .nino-admin-contextbar-tools .nino-admin-previewtools-reload {
+		align-self: flex-end;
+	}
+}
+
+.nino-admin .nino-admin-contextbar-title {
+	flex: 0 1 auto;
 	min-width: 0;
 	margin: 0;
 	overflow: hidden;
@@ -3665,6 +3804,34 @@ a {
 		border-radius: 0;
 	}
 
+	/* A pane that holds a work surface that is on the screen (split() with fill; the script says so with --surface) does not scroll: it is a column
+	   as high as the window, with the room of the bar at the foot under it, and what holds the surface - every element on the way down - gives the surface
+	   what the context bar and the rest leave. The context bar stands at the top of it, flush, with no bleed through a padding that is not there */
+	.nino-admin .nino-admin-pane.nino-admin-pane--surface {
+		display: flex;
+		flex-direction: column;
+		padding: 0 0 var(--nino-admin-actionbar-height);
+		overflow: hidden;
+	}
+
+	.nino-admin .nino-admin-pane--surface :has(.nino-admin-split--fill):not([hidden]) {
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	.nino-admin .nino-admin-pane--surface .nino-admin-contextbar {
+		flex: none;
+		margin: 0;
+	}
+
+	.nino-admin .nino-admin-pane--surface .nino-admin-split--fill {
+		flex: 1 1 0;
+		height: auto;
+		min-height: 0;
+	}
+
 	/* Folded, the rail is a column of icons: the brand mark, the fold button
 	   and one icon per panel. Everything that needs words - the account row,
 	   the group headings, the labels - waits for the unfold */
@@ -4064,6 +4231,313 @@ a {
 	.nino-admin .nino-admin-split[data-view="preview"] > .nino-admin-split-grid > .nino-admin-split-settings {
 		display: none;
 	}
+}
+
+/* The side column of a split view (split() with an aside): open a column of a fixed width on the ground of the preview, folded the strip of
+   icons; the button at its top is the geometry of the rail's own (.nino-admin-rail-toggle) with the list icon before the double arrow */
+:where(.nino-admin) .nino-admin-split-aside {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	border-right: 1px solid var(--editor-separator);
+	background: var(--editor-bg-elevated);
+}
+
+:where(.nino-admin) .nino-admin-split-aside-head {
+	display: flex;
+	flex: none;
+	align-items: center;
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-3);
+}
+
+.nino-admin .nino-admin-aside-toggle {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	min-width: 1.75rem;
+	height: 1.75rem;
+	min-height: 0;
+	margin: 0;
+	padding: 0 var(--nino-admin-space-1);
+	border: 0;
+	border-radius: var(--editor-radius-sm);
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text-secondary);
+	cursor: pointer;
+}
+
+.nino-admin .nino-admin-aside-toggle:hover {
+	background: var(--editor-blue-soft);
+	color: var(--editor-text);
+}
+
+.nino-admin .nino-admin-aside-toggle svg {
+	width: 1rem;
+	height: 1rem;
+}
+
+.nino-admin .nino-admin-aside-toggle svg:last-child {
+	transition: transform .15s ease;
+}
+
+.nino-admin .nino-admin-aside-toggle[aria-expanded="false"] svg:last-child {
+	transform: rotate(180deg);
+}
+
+:where(.nino-admin) .nino-admin-split-aside-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-split-aside-rail {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--nino-admin-space-2);
+	min-height: 0;
+	overflow-y: auto;
+	padding: var(--nino-admin-space-3) 0;
+}
+
+:where(.nino-admin) :is(.nino-admin-split-aside-body, .nino-admin-split-aside-rail)[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-split[data-aside="folded"] .nino-admin-split-aside-head {
+	justify-content: center;
+	padding-inline: 0;
+}
+
+/* Three columns where the view has the room for them (the container's width, as everywhere here); narrower, one column with the switch */
+@container nino-split (min-width: 44.0625rem) {
+
+	.nino-admin .nino-admin-split[data-aside] > .nino-admin-split-grid {
+		grid-template-columns: var(--nino-admin-aside-width) minmax(14rem, 23rem) minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split[data-aside="folded"] > .nino-admin-split-grid {
+		grid-template-columns: var(--nino-admin-aside-rail) minmax(14rem, 23rem) minmax(0, 1fr);
+	}
+}
+
+/* Where the three columns just fit the preview keeps most of the room: the outline and the settings are as narrow as they can be read */
+@container nino-split (min-width: 44.0625rem) and (max-width: 64rem) {
+
+	.nino-admin .nino-admin-split[data-aside] > .nino-admin-split-grid {
+		grid-template-columns: 12rem minmax(14rem, 16rem) minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split[data-aside="folded"] > .nino-admin-split-grid {
+		grid-template-columns: var(--nino-admin-aside-rail) minmax(14rem, 16rem) minmax(0, 1fr);
+	}
+}
+
+/* A view without settings: the side column and the preview, the preview taking all the rest; or the preview alone */
+.nino-admin .nino-admin-split[data-bare]:not([data-aside]) > .nino-admin-split-grid {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+@container nino-split (min-width: 44.0625rem) {
+
+	.nino-admin .nino-admin-split[data-bare][data-aside="open"] > .nino-admin-split-grid {
+		grid-template-columns: var(--nino-admin-aside-width) minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split[data-bare][data-aside="folded"] > .nino-admin-split-grid {
+		grid-template-columns: var(--nino-admin-aside-rail) minmax(0, 1fr);
+	}
+}
+
+/* The work surface (split() with fill): the whole height between the context bar and the bar at the foot, no frame and no gap. Each column
+   scrolls for itself; the page does not (a pane that holds one that is on the screen is --surface, set by the script, see below) */
+.nino-admin .nino-admin-split--fill {
+	display: flex;
+	flex-direction: column;
+	height: calc(100dvh - 12rem);
+	min-height: 24rem;
+}
+
+.nino-admin .nino-admin-split--fill > .nino-admin-split-switch {
+	flex: none;
+	margin-bottom: 0;
+}
+
+.nino-admin .nino-admin-split--fill > .nino-admin-split-grid {
+	flex: 1 1 0;
+	grid-template-rows: minmax(0, 1fr);
+	gap: 0;
+	align-items: stretch;
+	min-height: 0;
+}
+
+.nino-admin .nino-admin-split--fill .nino-admin-split-settings {
+	min-height: 0;
+	overflow-y: auto;
+	padding: var(--nino-admin-space-6) var(--nino-admin-space-5);
+	border-right: 1px solid var(--editor-separator);
+}
+
+.nino-admin .nino-admin-split--fill .nino-admin-split-preview {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border: 0;
+	border-radius: 0;
+}
+
+.nino-admin .nino-admin-split--fill .nino-admin-split-port {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.nino-admin .nino-admin-split--fill .nino-admin-split-frame {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.nino-admin .nino-admin-split--fill .nino-admin-split-port--scaled {
+	height: auto;
+}
+
+@container nino-split (max-width: 44rem) {
+
+	.nino-admin .nino-admin-split[data-view="preview"] > .nino-admin-split-grid > .nino-admin-split-aside {
+		display: none;
+	}
+
+	.nino-admin .nino-admin-split--fill[data-aside] > .nino-admin-split-grid {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split--fill[data-view="preview"] > .nino-admin-split-grid {
+		grid-template-rows: minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split-aside {
+		max-height: 40dvh;
+		border-right: 0;
+		border-bottom: 1px solid var(--editor-separator);
+	}
+
+	.nino-admin .nino-admin-split-aside-rail {
+		display: none;
+	}
+
+	/* With no settings the side column is what the switch shows: all of the view, and open whatever it was left as - never a switch to nothing */
+	.nino-admin .nino-admin-split--fill[data-bare][data-aside] > .nino-admin-split-grid {
+		grid-template-rows: minmax(0, 1fr);
+	}
+
+	.nino-admin .nino-admin-split[data-bare] > .nino-admin-split-grid > .nino-admin-split-aside {
+		max-height: none;
+		border-bottom: 0;
+	}
+
+	.nino-admin .nino-admin-split[data-bare] .nino-admin-split-aside-body[hidden] {
+		display: block;
+	}
+
+	.nino-admin .nino-admin-split[data-bare] .nino-admin-split-aside-head {
+		display: none;
+	}
+}
+
+/* Cards (Nino.adminUi.cards()): a picture, the name and its badges in one line, small buttons in one line under it; every card as high as the highest */
+:where(.nino-admin) .nino-admin-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+	grid-auto-rows: 1fr;
+	gap: var(--nino-admin-space-5);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+:where(.nino-admin) .nino-admin-cards-item {
+	display: flex;
+	min-width: 0;
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-cards-card {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: var(--nino-admin-space-3);
+	padding: var(--nino-admin-space-5);
+	min-width: 0;
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-cards-picture {
+	position: relative;
+	overflow: hidden;
+	aspect-ratio: 16 / 10;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg);
+	pointer-events: none;
+}
+
+:where(.nino-admin) .nino-admin-cards-head {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-cards-title {
+	flex: 1 0 50%;
+	min-width: 50%;
+	margin: 0;
+	overflow: hidden;
+	font-size: var(--nino-admin-text-md);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The name has the half of the line at least; the badges are cut, or leave, before it is. The whole name shows while the pointer or the focus is in the card */
+:where(.nino-admin) .nino-admin-cards-head > .nino-admin-badge {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-cards-card:is(:hover, :focus-within) .nino-admin-cards-title {
+	overflow: visible;
+	white-space: normal;
+}
+
+:where(.nino-admin) .nino-admin-cards-actions {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	margin: auto 0 0;
+}
+
+/* The buttons share the width of the card and stay in it: a word that does not fit is cut, and whole in the title of its button */
+:where(.nino-admin) .nino-admin-cards-actions > button {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding-inline: var(--nino-admin-space-2);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* The bar of every screen that has a state (Nino.adminUi.actionBar() with a status, and saveBar(), which is built on it): the state first,

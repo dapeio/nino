@@ -93,8 +93,18 @@ namespace Nino {
 		}
 
 		public static function response( array &$appData, array &$request ): void {
-			if( is_string( $request['/nino/http/response']['body'] ) === true )
-				$request['/nino/http/response']['body'] = self::renderHtml( $appData, $request['/nino/http/response']['body'] );
+			if( is_string( $request['/nino/http/response']['body'] ) !== true )
+				return;
+
+			$body = self::renderHtml( $appData, $request['/nino/http/response']['body'] );
+
+			// The preview of the workbench asks for its page to be marked from the first picture on (see \Nino\Preview::mark()); only a request that holds a draft is
+			$mark = \Nino\Preview::mark( $appData, $request );
+
+			if( $mark !== '' )
+				$body = (string) preg_replace( '/<html(?=[\s>])/i', '<html data-nino-preview="'. $mark. '"', $body, 1 );
+
+			$request['/nino/http/response']['body'] = $body;
 		}
 
 		/**

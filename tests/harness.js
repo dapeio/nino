@@ -427,6 +427,13 @@ function element( tag ) {
 				return el.children.filter( function( child ) { return matches( child, selector.slice( 9 ) ) } );
 			return findAll( el, function( node ) { return matches( node, selector ) } );
 		},
+		// Whether a node is this element or below it
+		contains : function( node ) {
+			for( let held = node; held !== null && held !== undefined; held = held.parentNode )
+				if( held === el )
+					return true;
+			return false;
+		},
 		closest : function( selector ) {
 			for( let node = el; node !== null; node = node.parentNode )
 				if( matches( node, selector ) )

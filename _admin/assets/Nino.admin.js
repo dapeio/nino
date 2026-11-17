@@ -55,6 +55,11 @@
 	// The counter behind the ids the building blocks make when they are given none
 	let serial = 0;
 
+	// Whether the side column of a split view (split() with an aside) is folded, for each view that has an id: held for the session, so that a view that is
+	// drawn again - or the page, in a browser that has a sessionStorage - finds the column as it was left, as the rail does for the sidebar
+	const ASIDE_FOLDED = {};
+	const ASIDE_KEY = 'nino-admin-aside-';
+
 	// How long the line of a saveBar() holds the sentence "unsaved changes" before it goes: the badge says the state from then on
 	const SAID_FOR = 4000;
 
@@ -178,7 +183,12 @@
 		 *	            name of the level it leads to, or an element of the pane (a mount, a level) - then it is the name the pane's
 		 *	            head says (panelHead()); onClick( event ) is called with the default of the click already prevented
 		 *	  - title   the name of the view, shown after the link, a heading the focus goes to when the view opens
-		 *	  - tools   one element or a list of them, at the right
+		 *	  - code    a quiet identifier beside the title (a page's address, a theme's key); text, no heading
+		 *	  - icons   icon buttons beside the title, for what is rarely needed (the frame of a page): a list of
+		 *	            { icon, name, onClick, danger, className, id } made by iconButton(), or elements
+		 *	  - tools   one element or a list of them, at the right: the tools of the view (previewTools()). Where the bar is
+		 *	            narrow - less than 56 rem, the bar's own width - they stand in a menu behind ONE icon button, "Tools"
+		 *	            (aria-expanded; Esc, a click beside it, the focus leaving it and a click into the preview close the menu)
 		 *	  - panel   the name of the panel, small above the link, for a work surface that has no head of its own: the head of
 		 *	            the pane (.admin-panel-head) gives way while the level with this bar is on the screen - its heading stays for
 		 *	            a screen reader - and the "?" of its manual is an icon button at the right end of the bar, the same
@@ -227,10 +237,92 @@
 
 				bar.appendChild( lead );
 
-				if( typeof options.title === 'string' && options.title !== '' )
-					bar.appendChild( Nino.adminUi.el( 'h3', 'nino-admin-contextbar-title', options.title ) );
+				const icons = list( options.icons ).map( function( icon ) {
+					return isElement( icon ) ? icon : Nino.adminUi.iconButton( icon.icon, icon.name, icon.onClick, { danger : icon.danger, className : icon.className, id : icon.id } );
+				} );
+				const hasTitle = typeof options.title === 'string' && options.title !== '';
+				const hasCode = typeof options.code === 'string' && options.code !== '';
 
-				list( options.tools ).forEach( function( tool ) { bar.appendChild( tool ) } );
+				// The name of the view, what is quietly beside it and the icons for what is rarely needed: one group, which takes the room the tools leave
+				if( hasTitle === true || hasCode === true || icons.length > 0 ) {
+
+					const name = Nino.adminUi.el( 'div', 'nino-admin-contextbar-name' );
+
+					if( hasTitle === true )
+						name.appendChild( Object.assign( Nino.adminUi.el( 'h3', 'nino-admin-contextbar-title', options.title ), { title : options.title } ) );
+
+					if( hasCode === true )
+						name.appendChild( Object.assign( Nino.adminUi.el( 'span', 'nino-admin-contextbar-code', options.code ), { title : options.code } ) );
+
+					icons.forEach( function( icon ) { name.appendChild( icon ) } );
+					bar.appendChild( name );
+				}
+
+				const tools = list( options.tools );
+
+				if( tools.length > 0 ) {
+
+					const box = Nino.adminUi.el( 'div', 'nino-admin-contextbar-toolbox' );
+					const menu = Nino.adminUi.el( 'div', 'nino-admin-contextbar-tools' );
+					const toggle = Nino.adminUi.iconButton( 'sliders-horizontal', Nino.adminUi.text('/_admin/common/preview/tools'), null, { className : 'nino-admin-contextbar-tools-toggle' } );
+
+					menu.id = 'nino-admin-contextbar-tools-'+ ( ++serial );
+					toggle.setAttribute( 'aria-expanded', 'false' );
+					toggle.setAttribute( 'aria-controls', menu.id );
+					tools.forEach( function( tool ) { menu.appendChild( tool ) } );
+
+					const close = function( focus ) {
+
+						bar.dataset.tools = 'closed';
+						toggle.setAttribute( 'aria-expanded', 'false' );
+						dc.removeEventListener( 'click', beside );
+						wn.removeEventListener( 'blur', away );
+
+						if( focus === true )
+							toggle.focus();
+					};
+
+					// A click beside the menu closes it; the menu itself and its button are not beside it
+					const beside = function( ev ) {
+						if( box.contains( ev.target ) === false )
+							close( false );
+					};
+
+					// A click into the preview does not reach this page, but the page loses the focus to the frame
+					const away = function() { close( false ) };
+
+					box.addEventListener( 'focusout', function( ev ) {
+
+						// The focus went to something outside the menu and its button: the menu is done. Where it went to nothing (a click on a surface) the click says it
+						if( bar.dataset.tools === 'open' && ev.relatedTarget !== null && ev.relatedTarget !== undefined && box.contains( ev.relatedTarget ) === false )
+							close( false );
+					} );
+
+					toggle.addEventListener( 'click', function() {
+
+						if( bar.dataset.tools === 'open' ) {
+							close( false );
+							return;
+						}
+
+						bar.dataset.tools = 'open';
+						toggle.setAttribute( 'aria-expanded', 'true' );
+						dc.addEventListener( 'click', beside );
+						wn.addEventListener( 'blur', away );
+					} );
+
+					bar.addEventListener( 'keydown', function( ev ) {
+						if( ev.key === 'Escape' && bar.dataset.tools === 'open' ) {
+							ev.stopPropagation();
+							close( true );
+						}
+					} );
+
+					bar.dataset.tools = 'closed';
+					box.appendChild( toggle );
+					box.appendChild( menu );
+					bar.appendChild( box );
+				}
 
 				// The head of the pane gives way to this bar, and its "?" goes with it: the same trigger, the same name
 				const head = within !== null && typeof options.panel === 'string' && options.panel !== '' ? Nino.adminUi.panelHead( within ) : null;
@@ -3837,7 +3929,7 @@
 			if( old !== null && old !== undefined )
 				badge === null ? old.remove() : old.replaceWith( badge );
 			else if( hasBar === true && badge !== null )
-				bar.appendChild( badge );
+				( bar.querySelector('.nino-admin-contextbar-name') ?? bar ).appendChild( badge );
 
 			return badge;
 		},
@@ -5665,6 +5757,191 @@
 		},
 
 		/**
+		 *	The tools of a preview: the choice of the page it shows, the width it is laid out at and "Reload" - what Themes and the Builder
+		 *	each built for themselves. One group, for the context bar (contextBar( { tools } ), which folds it into a menu where it is narrow)
+		 *	or the place beside a preview. The widths are a strip of steps, so that the one that is chosen is the one that is filled; the
+		 *	choice of a page is a select named "Shows", drawn only where there is a page to choose from; Reload is an icon button.
+		 *	The group owns no state: it reports what was done by hand through onPage, onWidth and onReload, and takes a value from outside
+		 *	through setPage() and setWidth(), which report nothing
+		 *
+		 *	@param		{Object}		options					{ pages, page, widths, width, note, reload, text, onPage, onWidth, onReload }
+		 *														- pages       the pages to show, [ { value, label } ]; none, or an empty list, draws no choice
+		 *														- page        the value of the page that is shown
+		 *														- widths      the names of the widths the strip offers, 'mobile', 'tablet' and 'desktop' by default; the words are the fills /_admin/common/preview/<name>, or text[name]
+		 *														- width       the name of the width that is chosen; none is chosen where it is none of the names
+		 *														- note        a quiet line beside the choice of the page - text, or an element -, what the page shows where the choice does not say it ("Automatic")
+		 *														- reload      false leaves the button out, where the view has one of its own (a split() that is no surface has it in its bar)
+		 *														- text        { shows, width, reload } to say the three words differently
+		 *														- onPage      called with the value after a page was chosen by hand
+		 *														- onWidth     called with the name after a width was chosen by hand
+		 *														- onReload    called after a press on Reload
+		 *
+		 *	@return		{Object}										{ el, page(), width(), setPage( value ), setWidth( name ), setNote( text ), select, widths, reload, note } - select is null where there is no choice of a page, reload where the button is left out, note where there is no line
+		 */
+		previewTools : function( options ) {
+
+			const text = options.text || {};
+			const word = function( key ) { return text[key] ?? Nino.adminUi.text( '/_admin/common/preview/'+ key ) };
+			const pages = Array.isArray( options.pages ) === true ? options.pages : [];
+			const names = Array.isArray( options.widths ) === true ? options.widths : [ 'mobile', 'tablet', 'desktop' ];
+
+			const root = Nino.adminUi.el( 'div', 'nino-admin-previewtools' );
+			let select = null;
+
+			if( pages.length > 0 ) {
+
+				const label = Nino.adminUi.el( 'label', 'nino-admin-previewtools-page' );
+
+				select = Nino.adminUi.el( 'select', 'nino-admin-input' );
+				pages.forEach( function( page ) {
+					const option = Nino.adminUi.el( 'option', '', page.label );
+					option.value = page.value;
+					select.appendChild( option );
+				} );
+				select.value = options.page ?? pages[0].value;
+				select.addEventListener( 'change', function() {
+					if( typeof options.onPage === 'function' )
+						options.onPage( select.value );
+				} );
+
+				label.appendChild( Nino.adminUi.el( 'span', '', word('shows') ) );
+				label.appendChild( select );
+				root.appendChild( label );
+			}
+
+			let note = null;
+
+			if( options.note !== undefined && options.note !== null ) {
+				note = Nino.adminUi.el( 'span', 'nino-admin-previewtools-note' );
+				note.appendChild( isElement( options.note ) === true ? options.note : dc.createTextNode( String( options.note ) ) );
+				root.appendChild( note );
+			}
+
+			const group = Nino.adminUi.el( 'div', 'nino-admin-previewtools-width' );
+			const caption = Nino.adminUi.el( 'span', '', word('width') );
+
+			caption.id = 'nino-admin-previewtools-width-'+ ( ++serial );
+
+			const widths = Nino.adminUi.steps( {
+				labelledby	: caption.id,
+				steps				: names.map( function( name ) { return { value : name, label : text[name] ?? ( Nino.content.getText( '/_admin/common/preview/'+ name ) || name ) } } ),
+				value				: options.width,
+				onChange		: function( name ) {
+					if( typeof options.onWidth === 'function' )
+						options.onWidth( name );
+				},
+			} );
+
+			group.appendChild( caption );
+			group.appendChild( widths.el );
+			root.appendChild( group );
+
+			const reload = options.reload === false ? null : Nino.adminUi.iconButton( 'refresh-cw', text.reload ?? Nino.adminUi.text('/_admin/common/split/reload'), function() {
+				if( typeof options.onReload === 'function' )
+					options.onReload();
+			}, { className : 'nino-admin-previewtools-reload' } );
+
+			if( reload !== null )
+				root.appendChild( reload );
+
+			return {
+				el : root,
+				select : select,
+				widths : widths,
+				reload : reload,
+				note : note,
+				setNote : function( value ) { if( note !== null ) note.textContent = String( value ) },
+				page : function() { return select === null ? ( options.page ?? '' ) : select.value },
+				width : function() { return widths.get() },
+				setPage : function( value ) { if( select !== null ) select.value = value },
+				setWidth : function( name ) { widths.set( name ) },
+			};
+		},
+
+		/**
+		 *	The cards of things whose look is the content - a theme, a block: a preview picture, the name and its badges in ONE line that does not
+		 *	wrap, and a line of small buttons under it. The cards of a list are as high as one another, the buttons at the foot; a name that is too
+		 *	long is cut and whole in its title. No description stands on a card - the picture says it. Owns no strings
+		 *
+		 *	@param		{Array}			items						[ { key, title, picture, badges, actions } ]
+		 *														key the card's identity, written on it as data-key; picture an element, drawn as it comes (scaleFrame() makes one
+		 *														from a page); badges a list of short words, each a string or { text, state }; actions the small buttons of the line, made by
+		 *														button( ..., { small : true } ), at most three, with short words: they share the width of the card
+		 *	@param		{Object}		[options]				{ label } - the name of the list for a screen reader
+		 *
+		 *	@return		{Element}										<ul class="nino-admin-cards">, one <li><article class="nino-admin-card"> for each item
+		 */
+		cards : function( items, options ) {
+
+			options = options || {};
+
+			const list = Nino.adminUi.el( 'ul', 'nino-admin-cards' );
+
+			if( typeof options.label === 'string' && options.label !== '' )
+				list.setAttribute( 'aria-label', options.label );
+
+			items.forEach( function( item ) {
+
+				const given = Array.isArray( item.actions ) === true ? item.actions : [];
+
+				if( given.length > 3 )
+					throw new RangeError( 'Nino.adminUi.cards(): a card has at most three buttons, '+ given.length+ ' were given' );
+
+				const li = Nino.adminUi.el( 'li', 'nino-admin-cards-item' );
+				const card = Nino.adminUi.el( 'article', 'nino-admin-card nino-admin-cards-card' );
+
+				if( item.key !== undefined )
+					card.dataset.key = String( item.key );
+
+				if( isElement( item.picture ) === true ) {
+					const picture = Nino.adminUi.el( 'div', 'nino-admin-cards-picture' );
+					picture.appendChild( item.picture );
+					card.appendChild( picture );
+				}
+
+				const head = Nino.adminUi.el( 'div', 'nino-admin-cards-head' );
+				const title = Nino.adminUi.el( 'h3', 'nino-admin-cards-title', item.title );
+
+				// The whole name is the title of the heading: the line cuts a long one
+				title.title = item.title;
+				head.appendChild( title );
+
+				( Array.isArray( item.badges ) === true ? item.badges : [] ).forEach( function( badge ) {
+
+					const given = typeof badge === 'object' && badge !== null ? badge : { text : String( badge ) };
+					const mark = Nino.adminUi.el( 'span', 'nino-admin-badge', given.text );
+
+					if( given.state !== undefined )
+						mark.dataset.state = given.state;
+
+					head.appendChild( mark );
+				} );
+
+				card.appendChild( head );
+
+				if( given.length > 0 ) {
+
+					const actions = Nino.adminUi.el( 'div', 'nino-admin-cards-actions' );
+
+					// A word that is cut is whole in the title of its button
+					given.forEach( function( button ) {
+
+						if( button.title === '' )
+							button.title = button.textContent;
+
+						actions.appendChild( button );
+					} );
+					card.appendChild( actions );
+				}
+
+				li.appendChild( card );
+				list.appendChild( li );
+			} );
+
+			return list;
+		},
+
+		/**
 		 *	A split view: what a person sets on one side, the result on the
 		 *	other - a column of controls and a preview beside it. Where the
 		 *	view is too narrow for both (the container's, not the window's: the
@@ -5694,7 +5971,22 @@
 		 *	(see scaleFrame()), so that a page of 1280px is seen on a pane of 600
 		 *	with everything in proportion. With none the frame is as wide as the pane
 		 *
-		 *	@param		{Object}		options					{ id, settings, preview, view, sandbox, previewTitle, text, onView, onReload, onLoad }
+		 *	With fill the view is a work surface: it fills the height between the context bar and the bar at
+		 *	the foot of the page, which the page does not scroll beyond - each column has a scroll bar of its own, and the
+		 *	preview's is the one of its page. It stands directly under the context bar, has no frame and no gap, and has no bar
+		 *	over the preview: the tools of the preview stand in the context bar (previewTools()). Without it the view is a
+		 *	block in the page
+		 *
+		 *	With aside a third column stands at the left edge, which folds: open it is a column of a fixed width on the
+		 *	ground of the preview, folded a strip of 48 px that holds what the caller gives for it (rail - icons, say). The
+		 *	button at the top of it stays in both, shows the list icon and the double arrow of the rail's button, says
+		 *	aria-expanded and is named by the caller; whether the column is folded is held for the session for each view
+		 *	with an id. Where the view is too narrow for the columns the aside stands over the settings, in the same view
+		 *
+		 *	@param		{Object}		options					{ id, settings, preview, view, sandbox, previewTitle, text, fill, aside, onView, onReload, onLoad }
+		 *														- settings    the controls; without them there is no column for them - the view is the side column and the preview (the switch is then named by aside.label), or the preview alone
+		 *														- fill        true for a work surface
+		 *														- aside       { content, label, collapsed, rail } - content an element, label the name of the button (it says what the column holds: "Outline"), collapsed whether the column starts folded where the session holds nothing, rail an element drawn in the folded strip
 		 *														- settings    the controls, an Element (more can be put into split.settings later)
 		 *														- preview     { src, title, width } for a page, an Element for a preview the caller draws; width is the layout width of the page in px, 1 to 10000
 		 *														- view        'settings' (the default) or 'preview', which one the narrow view starts on
@@ -5705,7 +5997,7 @@
 		 *														- onReload    called when the preview is asked to load once more, by the button or by reload()
 		 *														- onLoad      called with the frame when the page in it has loaded
 		 *
-		 *	@return		{Object}										{ el, settings, preview, frame, tools, view(), show( view ), reload( [src] ), width( [px] ), words( { settings, preview } ) } - width( px ) lays the page out at px and scales it into the pane, width( null ) takes it back to the pane's own width, width() answers the one that is set (null for none); a number that is not 1 to 10000 is none. With no preview given the view is the settings alone: no switch, no bar, and preview, frame and tools are null
+		 *	@return		{Object}										{ el, settings (null without settings), preview, frame, tools, aside, view(), show( view ), reload( [src] ), width( [px] ), words( { settings, preview } ) } - aside is { el, body, rail, toggle, collapsed(), collapse( on ) } or null; width( px ) lays the page out at px and scales it into the pane, width( null ) takes it back to the pane's own width, width() answers the one that is set (null for none); a number that is not 1 to 10000 is none. With no preview given the view is the settings alone: no switch, no bar, and preview, frame and tools are null. tools is null for a work surface as well
 		 */
 		split : function( options ) {
 
@@ -5714,8 +6006,21 @@
 			const word		= function( key ) { return text[key] ?? Nino.adminUi.text( '/_admin/common/split/'+ key ) };
 
 			const root = dc.createElement('div');
-			root.className = 'nino-admin-split';
+			const fill = options.fill === true;
+
+			root.className = 'nino-admin-split'+ ( fill === true ? ' nino-admin-split--fill' : '' );
 			root.dataset.view = options.view === 'preview' ? 'preview' : 'settings';
+
+			// Without settings there is no column for them: the view is the side column and the preview, or the preview alone
+			const bare = options.settings === undefined || options.settings === null;
+			const sided = typeof options.aside === 'object' && options.aside !== null;
+			const single = bare === true && sided === false;
+
+			if( bare === true )
+				root.dataset.bare = 'true';
+
+			if( single === true )
+				root.dataset.view = 'preview';
 
 			const settings = dc.createElement('div');
 			settings.className = 'nino-admin-split-settings';
@@ -5819,7 +6124,10 @@
 			bar.appendChild( title );
 			bar.appendChild( tools );
 			bar.appendChild( refresh );
-			pane.appendChild( bar );
+
+			// A work surface has no bar over the preview: the tools stand in the context bar
+			if( fill === false )
+				pane.appendChild( bar );
 
 			if( isPage === true ) {
 
@@ -5862,14 +6170,15 @@
 			switchBar.setAttribute( 'aria-label', word('view') );
 
 			const buttons = {
-				settings	: Nino.adminUi.button( word('settings'), null, { className : 'nino-admin-steps-step' } ),
+				// Where the side column stands in for the settings the switch is named by it: the caller says what it holds
+				settings	: Nino.adminUi.button( bare === true && String( options.aside?.label ?? '' ) !== '' ? String( options.aside.label ) : word('settings'), null, { className : 'nino-admin-steps-step' } ),
 				preview		: Nino.adminUi.button( word('preview'), null, { className : 'nino-admin-steps-step' } ),
 			};
 
 			switchBar.appendChild( buttons.settings );
 			switchBar.appendChild( buttons.preview );
 
-			buttons.settings.setAttribute( 'aria-controls', settings.id );
+			buttons.settings.setAttribute( 'aria-controls', bare === true ? prefix+ '-aside' : settings.id );
 			buttons.preview.setAttribute( 'aria-controls', pane.id );
 
 			const paint = Nino.adminUi.buttonRow( buttons, root.dataset.view, function( view ) {
@@ -5882,7 +6191,94 @@
 			// narrow rules ask about, and a container's own box is not what they style
 			const grid = dc.createElement('div');
 			grid.className = 'nino-admin-split-grid';
-			grid.appendChild( settings );
+
+			// The side column: a button that stays and what it holds, open, or what stands for it, folded
+			let aside = null;
+
+			if( typeof options.aside === 'object' && options.aside !== null ) {
+
+				const given = options.aside;
+				const column = dc.createElement('div');
+				const body = dc.createElement('div');
+				const rail = dc.createElement('div');
+				const toggle = Nino.adminUi.button( '', null, { className : 'nino-admin-aside-toggle', name : String( given.label ?? '' ) } );
+				const held = typeof options.id === 'string' && options.id !== '' ? options.id : null;
+
+				column.className = 'nino-admin-split-aside';
+				column.id = prefix+ '-aside';
+				body.className = 'nino-admin-split-aside-body';
+				body.id = prefix+ '-aside-body';
+				rail.className = 'nino-admin-split-aside-rail';
+
+				if( isElement( given.content ) === true )
+					body.appendChild( given.content );
+
+				if( isElement( given.rail ) === true )
+					rail.appendChild( given.rail );
+
+				toggle.appendChild( Nino.adminUi.icon('list') );
+				toggle.appendChild( Nino.adminUi.icon('chevrons-left') );
+				toggle.setAttribute( 'aria-controls', body.id );
+
+				const stored = function() {
+
+					if( held === null )
+						return undefined;
+
+					if( Object.hasOwn( ASIDE_FOLDED, held ) === true )
+						return ASIDE_FOLDED[held];
+
+					try {
+						const value = wn.sessionStorage.getItem( ASIDE_KEY+ held );
+						return value === null ? undefined : value === 'folded';
+					} catch( e ) {
+						return undefined;
+					}
+				};
+
+				let folded = stored() ?? given.collapsed === true;
+
+				const paint = function() {
+
+					root.dataset.aside = folded === true ? 'folded' : 'open';
+					toggle.setAttribute( 'aria-expanded', String( folded === false ) );
+					body.hidden = folded;
+					rail.hidden = folded === false;
+				};
+
+				const set = function( on ) {
+
+					folded = on === true;
+					paint();
+
+					if( held !== null ) {
+
+						ASIDE_FOLDED[held] = folded;
+
+						try {
+							wn.sessionStorage.setItem( ASIDE_KEY+ held, folded === true ? 'folded' : 'open' );
+						} catch( e ) {}
+					}
+				};
+
+				toggle.addEventListener( 'click', function() { set( folded === false ) } );
+
+				const head = dc.createElement('div');
+				head.className = 'nino-admin-split-aside-head';
+				head.appendChild( toggle );
+
+				column.appendChild( head );
+				column.appendChild( body );
+				column.appendChild( rail );
+				grid.appendChild( column );
+				paint();
+
+				aside = { el : column, body : body, rail : rail, toggle : toggle, collapsed : function() { return folded }, collapse : set };
+			}
+
+			if( bare === false )
+				grid.appendChild( settings );
+
 			grid.appendChild( pane );
 
 			// The page at a layout width, scaled into the pane; none lets the frame be as wide as the pane
@@ -5919,19 +6315,70 @@
 				root.className += ' nino-admin-split--solo';
 				root.dataset.view = 'settings';
 				grid.removeChild( pane );
-			} else {
+			} else if( single === false ) {
 				root.appendChild( switchBar );
 			}
 
 			root.appendChild( grid );
 
+			// A work surface does not scroll the page: the pane that holds the one that is on the screen says so (--surface), and the stylesheet takes the
+			// padding and the scroll from it. Which one is on the screen is told by the size of the surface - a level that is hidden is none - so the mark
+			// follows the levels of a panel that are shown and hidden, and a surface that leaves the page
+			if( fill === true && typeof wn.ResizeObserver === 'function' ) {
+
+				let marked = null;
+				let seen = false;
+				let observer = null;
+
+				const release = function() {
+
+					if( marked === null )
+						return;
+
+					marked._ninoSurfaces.delete( root );
+
+					if( marked._ninoSurfaces.size === 0 )
+						marked.classList.remove('nino-admin-pane--surface');
+
+					marked = null;
+				};
+
+				observer = new wn.ResizeObserver( function() {
+
+					// A view that was in the page and is gone - drawn again by its panel - is not watched any longer
+					if( root.isConnected === true )
+						seen = true;
+					else if( seen === true ) {
+						release();
+						observer.disconnect();
+						return;
+					}
+
+					const pane = root.isConnected === true && root.getClientRects().length > 0 ? root.closest('.nino-admin-pane') : null;
+
+					if( pane === marked )
+						return;
+
+					release();
+
+					if( pane !== null ) {
+						pane._ninoSurfaces = pane._ninoSurfaces ?? new Set();
+						pane._ninoSurfaces.add( root );
+						pane.classList.add('nino-admin-pane--surface');
+						marked = pane;
+					}
+				} );
+				observer.observe( root );
+			}
+
 			return {
 
 				el : root,
-				settings : settings,
+				settings : bare === true ? null : settings,
 				preview : solo === true ? null : pane,
 				frame : frame,
-				tools : solo === true ? null : tools,
+				tools : solo === true || fill === true ? null : tools,
+				aside : aside,
 
 				// The words of the switch and of the bar, said after the build - the frame is not touched
 				words : function( given ) {
@@ -5951,7 +6398,7 @@
 
 				show : function( view ) {
 
-					if( solo === true )
+					if( solo === true || single === true )
 						return;
 
 					root.dataset.view = view === 'preview' ? 'preview' : 'settings';
@@ -5975,8 +6422,9 @@
 		 *	the server renews it instead of making a new one; it is counted from the answer on the clock of this page, so that a
 		 *	clock that is off cannot ask for ever. Owns no strings: what an error or a renewal says is the caller's
 		 *
-		 *	@param		{Object}		options					{ split, send, address, widths, quiet, grace, onError, onUnavailable, onRenew, onUpdate }
+		 *	@param		{Object}		options					{ split, send, address, widths, mark, quiet, grace, onError, onUnavailable, onRenew, onUpdate }
 		 *														- split         a split() with a page: reload( src ) and width( px ) are what is called
+		 *														- mark          a word (lower case letters, digits, hyphens) the document in the frame is marked with - data-nino-preview="<word>" on its <html> -, written by the kernel from the first byte of a page that asks for the draft (the query of the request says it, and only a request that holds a draft is believed) and by the script after every page the frame loads, so that a page can draw itself differently for the workbench and for nobody else: 'loose' lets the sticky header of Basis scroll away with the page. Nothing else is written in the page
 		 *														- send          send( token, done ) asks the server for the draft; done( status, response ) is its answer
 		 *														- address       address( query ) is the address of the page the frame shows, with the query that asks for the draft
 		 *														- widths        { name : px } the widths of the preview, mobile, tablet and desktop by default
@@ -5998,6 +6446,24 @@
 				if( typeof options[name] === 'function' )
 					options[name]( ...args );
 			};
+
+			const mark = options.mark === undefined ? '' : String( options.mark );
+
+			if( mark !== '' && /^[a-z][a-z0-9-]{0,31}$/.test( mark ) === false )
+				throw new TypeError( 'Nino.adminUi.previewFrame(): "'+ mark+ '" is no word to mark a page with' );
+
+			// A page of another origin or an error page has no document to mark: it is passed over, as frameMarks() does
+			const marked = function() {
+
+				try {
+					options.split.frame.contentDocument.documentElement.setAttribute( 'data-nino-preview', mark );
+				} catch( e ) {}
+			};
+
+			if( mark !== '' && options.split.frame !== null && options.split.frame !== undefined ) {
+				options.split.frame.addEventListener( 'load', marked );
+				marked();
+			}
 
 			let token = '';
 			let query = '';
@@ -6027,7 +6493,7 @@
 					return;
 				}
 
-				options.split.reload( options.address( query ) );
+				options.split.reload( options.address( mark === '' ? query : query+ '&nino-preview-mark='+ mark ) );
 			};
 
 			const flush = function( then ) {

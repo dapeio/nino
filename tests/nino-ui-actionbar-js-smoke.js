@@ -40,11 +40,19 @@ const sandbox = {
 		body : body,
 		documentElement : null,
 		querySelectorAll : function( selector ) { return body.querySelectorAll( selector ) },
+		// What the page listens to: a menu that closes by a click beside it listens only while it is open
+		listeners : { click : [] },
+		addEventListener : function( name, fn ) { sandbox.document.listeners[name].push( fn ) },
+		removeEventListener : function( name, fn ) { sandbox.document.listeners[name] = sandbox.document.listeners[name].filter( held => held !== fn ) },
 	},
 };
 sandbox.setTimeout = function( fn, ms ) { timers.push( { fn : fn, ms : ms, live : true } ); return timers.length - 1 };
 sandbox.clearTimeout = function( id ) { if( timers[id] !== undefined ) timers[id].live = false };
 sandbox.window = sandbox;
+// What the window is listened to for: a menu that closes where the page loses the focus to a frame listens only while it is open
+sandbox.listeners = { blur : [] };
+sandbox.addEventListener = function( name, fn ) { sandbox.listeners[name].push( fn ) };
+sandbox.removeEventListener = function( name, fn ) { sandbox.listeners[name] = sandbox.listeners[name].filter( held => held !== fn ) };
 sandbox.Nino = { content : { getText : function( key ) { return fills( '_admin/text/en_US.php' )[key] ?? '' } } };
 load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 const adminUi = sandbox.Nino.adminUi;
@@ -226,7 +234,95 @@ console.log( '\nNino.adminUi.contextBar - the way back\n' );
 	const lead = findAll( surface, el => classes( el ).includes('nino-admin-contextbar-lead') )[0];
 
 	check( 'the option panel puts the name of the panel small over the way back, and marks the bar for the stylesheet', small !== undefined && small.textContent === 'Themes' && lead.children[0] === small && lead.children[1].tagName === 'A' && surface.dataset.panel === 'Themes' );
-	check( '...then the title of the view as a heading, and the tools at the right', surface.children[1].tagName === 'H3' && surface.children[1].textContent === 'Brand' && surface.children.slice( 2 ).map( el => el.tagName ).join() === 'BUTTON,BUTTON' );
+	const name = surface.children[1];
+
+	check( '...then the title of the view as a heading in the group of the name, and the tools at the right', classes( name ).includes('nino-admin-contextbar-name') === true && name.children[0].tagName === 'H3' && name.children[0].textContent === 'Brand'
+		&& classes( surface.children[2] ).includes('nino-admin-contextbar-toolbox') === true );
+}
+
+console.log( '\nNino.adminUi.contextBar - the name of a surface and its tools\n' );
+
+{
+	const clicks = [];
+	const bar = adminUi.contextBar( { title : 'About us', code : 'about-us', icons : [ { icon : 'panels-top-left', name : 'Frame', onClick : function() { clicks.push('frame') } } ] } );
+	const group = bar.children.find( el => classes( el ).includes('nino-admin-contextbar-name') );
+	const icon = group.children[2];
+
+	check( 'a quiet identifier stands beside the title, and an icon button - made by iconButton(), so it has a name - beside that: one group',
+		classes( group ).includes('nino-admin-contextbar-name') === true && group.children[0].tagName === 'H3' && classes( group.children[1] ).includes('nino-admin-contextbar-code') === true && group.children[1].tagName !== 'H3' && group.children[1].textContent === 'about-us'
+		&& icon.tagName === 'BUTTON' && icon.getAttribute('aria-label') === 'Frame' && classes( icon ).includes('nino-admin-btn-icon') === true );
+
+	fire( icon, 'click' );
+	check( '...which does what it was given', clicks.join() === 'frame' );
+	check( 'an icon button without a name is refused, as iconButton() refuses it', thrown( () => adminUi.contextBar( { icons : [ { icon : 'x' } ] } ) ) );
+	check( 'the whole of the title and of the identifier is the title of what shows it, for the one that is cut', group.children[0].title === 'About us' && group.children[1].title === 'about-us' );
+
+	adminUi.locales = { native : 'de_DE', names : {} };
+	const badge = adminUi.localeBadge( 'en_US', bar );
+	check( 'the badge of the language stands in the group of the name, and so before the "?" at the end of the bar', badge !== null && badge.parentNode === group && bar.children[bar.children.length - 1] !== badge );
+
+	const sheet = stylesheet.replace( /\/\*[\s\S]*?\*\//g, '' );
+	const rule = ( selector ) => ( sheet.split('}').map( text => text.split('{') ).find( parts => parts.length === 2 && parts[0].trim() === selector ) ?? [ '', '' ] )[1];
+	const shrink = ( selector ) => Number( ( /flex:\s*0 (\d+) auto/.exec( rule( selector ) ) ?? [ 0, 0, 0 ] )[1] );
+
+	check( 'the way back is never cut: the lead of a bar with the name of the panel does not shrink and its link does not wrap', /flex:\s*0 0 auto/.test( rule('.nino-admin .nino-admin-contextbar[data-panel] > .nino-admin-contextbar-lead') )
+		&& /white-space:\s*nowrap/.test( rule('.nino-admin .nino-admin-contextbar[data-panel] .nino-admin-contextbar-lead .nino-admin-back-link') ) );
+	check( '...what gives way is the identifier first and the title after it, which is cut with an ellipsis', shrink('.nino-admin .nino-admin-contextbar-code') > 1 && /flex:\s*0 1 auto/.test( rule('.nino-admin .nino-admin-contextbar-title') ) && /text-overflow:\s*ellipsis/.test( rule('.nino-admin .nino-admin-contextbar-title') ) );
+	check( 'a bar with neither title, identifier nor icons has no group of the name', adminUi.contextBar( { back : { to : 'x' } } ).children.every( el => classes( el ).includes('nino-admin-contextbar-name') === false ) );
+}
+
+{
+	const document = sandbox.document;
+	const first = button('First');
+	const second = button('Second');
+	const bar = adminUi.contextBar( { title : 'View', tools : [ first, second ] } );
+	const box = bar.children.find( el => classes( el ).includes('nino-admin-contextbar-toolbox') );
+	const [ toggle, menu ] = box.children;
+
+	check( 'the tools stand in a group, behind ONE icon button that is named and says whether the menu is open and which menu it is',
+		toggle.tagName === 'BUTTON' && toggle.getAttribute('aria-label') === fills( '_admin/text/en_US.php' )['/_admin/common/preview/tools'] && toggle.getAttribute('aria-expanded') === 'false' && toggle.getAttribute('aria-controls') === menu.id && menu.id !== ''
+		&& menu.children.length === 2 && menu.children[0] === first && menu.children[1] === second );
+
+	fire( toggle, 'click' );
+	check( 'a press opens the menu - the bar says so for the stylesheet, the button says so for a screen reader - and the page is listened to for a click beside it',
+		bar.dataset.tools === 'open' && toggle.getAttribute('aria-expanded') === 'true' && document.listeners.click.length === 1 );
+
+	const beside = document.listeners.click[0];
+	beside( { target : first } );
+	check( 'a click in the menu leaves it open', bar.dataset.tools === 'open' );
+	beside( { target : element('div') } );
+	check( 'a click beside it closes it and stops listening', bar.dataset.tools === 'closed' && toggle.getAttribute('aria-expanded') === 'false' && document.listeners.click.length === 0 );
+
+	fire( toggle, 'click' );
+	let stopped = 0;
+	fire( bar, 'keydown', { key : 'Escape', stopPropagation : function() { stopped++ } } );
+	check( 'Esc closes it, keeps the key from closing anything else, and the focus is on the button', bar.dataset.tools === 'closed' && stopped === 1 && toggle.focused === true && document.listeners.click.length === 0 );
+
+	fire( bar, 'keydown', { key : 'Escape', stopPropagation : function() { stopped++ } } );
+	check( 'Esc with the menu closed is not taken', stopped === 1 );
+
+	fire( toggle, 'click' );
+	check( 'the window is listened to for the loss of the focus while the menu is open', sandbox.listeners.blur.length === 1 );
+	fire( box, 'focusout', { relatedTarget : first } );
+	check( 'the focus moving within the menu leaves it open', bar.dataset.tools === 'open' );
+	fire( box, 'focusout', { relatedTarget : null } );
+	check( '...and to nothing - a click on a surface - too: that click says it', bar.dataset.tools === 'open' );
+	fire( box, 'focusout', { relatedTarget : element('input') } );
+	check( 'the focus leaving it for something else closes it', bar.dataset.tools === 'closed' && sandbox.listeners.blur.length === 0 );
+	fire( toggle, 'click' );
+	sandbox.listeners.blur[0]();
+	check( 'the page losing the focus - a click into the preview - closes it', bar.dataset.tools === 'closed' && sandbox.listeners.blur.length === 0 );
+
+	check( 'a bar with no tools has no menu and no button for it', adminUi.contextBar( { title : 'View' } ).children.every( el => classes( el ).includes('nino-admin-contextbar-toolbox') === false ) );
+
+	const sheet = stylesheet.replace( /\/\*[\s\S]*?\*\//g, '' );
+	const at = sheet.indexOf('@container nino-contextbar (max-width: 56rem)');
+	const narrow = sheet.slice( at, sheet.indexOf( '\n}\n', at ) );
+
+	check( 'the bar is the container of its tools - its own width decides, not the window\'s - and wide the button is out of the way',
+		/\.nino-admin-contextbar\s*\{[^}]*container:\s*nino-contextbar\s*\/\s*inline-size/.test( sheet ) && /\.nino-admin-contextbar-tools-toggle\s*\{\s*display:\s*none/.test( sheet ) );
+	check( '...narrow the button is there and the tools are a menu that is out of the page until the bar says it is open',
+		at !== -1 && /contextbar-tools-toggle\s*\{\s*display:\s*inline-flex/.test( narrow ) && /contextbar-tools\s*\{[^}]*position:\s*absolute[^}]*display:\s*none/.test( narrow ) && /\[data-tools="open"\][^{]*contextbar-tools\s*\{\s*display:\s*flex/.test( narrow ) );
 }
 
 check( 'where a bar has the name of the panel the head of the pane gives way: out of the page and out of the tab order, its heading left for a screen reader',

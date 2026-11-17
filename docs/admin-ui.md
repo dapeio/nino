@@ -7,7 +7,7 @@ The words **MUST**, **MUST NOT** and **SHOULD** are normative, as in the [agent 
 ## Principles
 
 1. **One task, one block.** What the kernel has as a block (`Nino.adminUi.*`, a `.nino-admin-*` class) a panel does not build itself, not even "nearly the same". Where a block is missing it is added to the kernel, not to the panel.
-2. **Every view has the same build:** head, context bar, content, bar. Each part has one place for each thing - the way back at the top left, the main button at the bottom right, delete at the bottom left. A work surface has the same build without the head ([Anatomy](#anatomy-of-a-view)).
+2. **Every view has the same build:** head, context bar, content, bar - or, for a work surface, context bar, surface, bar. Each part has one place for each thing - the way back at the top left, the main button at the bottom right, delete at the bottom left ([Anatomy](#anatomy-of-a-view)).
 3. **One way of saving per view:** a form with Save in the bar, a work surface with its save bar, or an immediate action with its answer as a toast - never mixed ([Saving](#saving)).
 4. **Words from the list.** The same thing has the same name everywhere; a button says what it does; no raw key stands without a word before it ([Words](#words)).
 5. **Nothing is lost silently, nothing is asked twice.** Unsaved input reports to the shell; a question is asked by the table of levels; where there is an undo, it replaces the question ([Dialogs](#dialogs)).
@@ -15,25 +15,35 @@ The words **MUST**, **MUST NOT** and **SHOULD** are normative, as in the [agent 
 
 ## Anatomy of a view
 
+A view has one of two forms. A list or a form has a head and its content is one column; a work surface has no head and its content fills the height.
+
 ```
+A view with a head
 head ─────────── title · tabs (first level) ························ ? ┐  Nino.adminUi.panelHead()
 context bar ──── ‹ Back to …   [tools of the view]                      ┤  Nino.adminUi.contextBar()
 content          one column (at most 62 rem) or split()                 │
 bar ──────────── [Delete thing] [● Changed]   line  [Side] [Main]       ┤  actionBar() / listActions() / saveBar()
+
+A work surface
+context bar ──── Panel · ‹ Back to …  Name  code [icons]   [tools]  ?   ┐  contextBar( { panel, title, code, icons, tools } )
+surface          [outline] [settings] [preview]                         ┤  split( { fill, aside } ), one scroll bar for each column
+bar ──────────── [● Changed] line   [Undo] [Redo] [Save]               ┘  saveBar()
 ```
 
 | Part | Rule | Block |
 |---|---|---|
 | Head | A list or form view has the head with the panel's title and the "?" of its manual - the Dashboard too. The tabs of the first level stand in the head and nowhere else. A count at a tab is a badge, not a part of the word. | `panelHead()`, `tabBadge()` |
-| Work surface | A work surface - a draft with a preview that is saved as a whole - has no head: it uses the whole height. The panel's name stands small in the context bar above the way back (`contextBar( { panel } )`, which then gives the head of the pane way: its heading stays for a screen reader) and stays the heading of the view, which the focus goes to; the "?" of the manual is an icon button at the right of the context bar. The name of the thing and the tools of the view stand in the context bar, `split()` follows it directly and reaches down to the bar, and the preview is the one scroll area. What is rarely needed (the frame of a page, an identifier, markup) is behind an icon button beside the name. The list of the same panel keeps its head. | `contextBar()`, `split()` |
+| Work surface | A work surface - a draft with a preview that is saved as a whole - has no head: it uses the whole height. The panel's name stands small in the context bar above the way back (`contextBar( { panel } )`, which then gives the head of the pane way: its heading stays for a screen reader) and stays the heading of the view, which the focus goes to; the "?" of the manual is an icon button at the right of the context bar. The name of the thing, its quiet identifier (`code`) and the tools of the view stand in the context bar; `split( { fill : true } )` follows it directly - no gap, no frame - and reaches down to the bar. The page does not scroll: each column has a scroll bar of its own, and the preview's is the one of its page. What is rarely needed (the frame of a page, an identifier, markup) is behind an icon button beside the name (`icons`). The list of the same panel keeps its head. | `contextBar()`, `split( { fill } )` |
 | Address | Every view has an address: `#panel`, `#panel/<tab>`, `#panel/<tab>/<thing>`, `#panel/<thing>/new`. Reloading and the browser's back button keep it. | `Nino.admin.router`, `levels()` |
 | Way back | Exactly ONE back link, at the left of the context bar: "Back to <name of the level above>" - one wording, the name from the head of the pane or given. A deeper level replaces the link; it does not put a second one under it. | `contextBar( { back } )`, `levels()` |
-| Tools of the view | The width of a preview, the choice of a page and "Reload" stand at the right of the context bar or in the bar of the preview - never in the content. | `split()` |
+| Tools of the view | The page a preview shows ("Shows"), its width (Mobile, Tablet, Desktop as one strip) and "Reload" are one group, `previewTools()`. On a work surface the group stands at the right of the context bar (`contextBar( { tools } )`); where the bar is narrower than 56 rem they fold into a menu behind ONE icon button, "Tools", that closes with Esc, a click beside it, the focus leaving it and a click into the preview. On a split view that is no surface they stand in the bar over the preview. Never in the content. | `previewTools()`, `contextBar( { tools } )`, `split()` |
 | Working language | The language in which content is shown and edited is chosen once for the whole workbench, in the account area of the rail. No panel has a language switch of its own. A view with values that depend on the language shows the working language as a quiet badge in the context bar as soon as it is not the native one. The interface language ("Interface language", the picker in the settings menu) and the working language ("Edit content in") have two different names and two places. The rail shows it as a select under the account's icons; folded and on a phone it stands in the settings menu beside the interface language, and only a project of more than one language has it. A change asks before it throws unsaved input of a view that follows the language away (Save, Discard, Cancel), and the open view draws again in the new language. A panel reads and sets it, and a view that depends on it follows it. | `Nino.admin.workLocale`, `Nino.adminUi.localeBadge()` |
 | Introduction | At most one paragraph, directly under the context bar, before the content. | `hint( text, 'lead' )` |
 | Section | A group of a form is a `fieldset > legend`. A section of a view without a form has a title of its own. Nothing is larger than the panel's title under it. A section that opens and closes is an accordion, and only that. | `fieldset`, `accordion()` |
 | Surface | A card is `.nino-admin-card` (a `fieldset` is one). A panel draws no frames, radii or shadows of its own. | `.nino-admin-card` |
 | Two columns | Settings at the left, a preview at the right: only `split()`. At 390 px its switch says "Settings | Preview" unless the view has a better fixed name. | `split()`, `previewFrame()` |
+| Three columns | A column that lists the parts of the draft (an outline) stands at the left edge of the surface: `split( { aside : { content, label, collapsed, rail } } )`. It folds: open it is a column on the white ground of the preview, folded a strip of 48 px that holds what the caller gives for it (the icons of the parts). The button at its top - the list icon and the double arrow of the rail's button - stays in both, says `aria-expanded`, is named by what the column holds ("Outline"), and keeps the focus. Whether it is folded is held for the session for each view. At 390 px it stands over the settings. A work surface of the outline and the preview alone has no settings (`settings` is left out): two columns, the preview taking all the rest, and the switch at 390 px is named by the outline. | `split( { aside } )` |
+| The page in the preview | A page that is shown in the preview of the workbench is marked (`previewFrame( { mark : 'loose' } )`): the header of Basis that stays at the top of a page scrolls away there, so it takes none of the room of the page that is worked on. The kernel writes the mark on the page from the first byte, for a request that holds a draft and asks for it; a public page is never marked. | `previewFrame( { mark } )` |
 
 ```js
 // The level "thing" under "Routes": one back link that says where it leads, the tools of the level beside it
@@ -41,8 +51,11 @@ mount.appendChild( Nino.adminUi.contextBar( {
 	back  : { to : mount, onClick : function() { Nino.adminUi.backTo( 'routes-list', opener ) } },
 	tools : [ reload ],
 } ) );
-// A work surface with no head: the name of the panel stands small over the link
-Nino.adminUi.contextBar( { panel : 'Themes', title : theme.name, back : { to : 'Themes', onClick : leave } } );
+// A work surface with no head: the name of the panel stands small over the link, the tools of the preview at the right
+const tools = Nino.adminUi.previewTools( { pages, page, width : 'desktop', onPage, onWidth, onReload } );
+Nino.adminUi.contextBar( { panel : 'Themes', title : theme.name, code : theme.key, back : { to : 'Themes', onClick : leave },
+	icons : [ { icon : 'panels-top-left', name : frameName, onClick : openFrame } ], tools : tools.el } );
+mount.appendChild( Nino.adminUi.split( { id : 'themes-split', fill : true, settings, preview : { src } } ).el );
 ```
 
 ## Lists and tables
@@ -52,7 +65,7 @@ Nino.adminUi.contextBar( { panel : 'Themes', title : theme.name, back : { to : '
 | The directory of a panel - the things it manages, as soon as a row shows more than a name and one detail or has actions of its own (pages, elements, redirects, fonts) | A **table** in `.nino-admin-table-scroll`: a search field over the full width above it that searches in the browser ("Search <things>"), sortable columns, small buttons at the right of each row (open, duplicate, delete in red), page size and paging below, "New <thing>" at the bottom right of the bar. The whole set is loaded and filtered in the browser. | `Nino.adminUi.table()` |
 | Groups and short directories that are only opened (text groups, image groups, navigations, roles) | A **list**: a row of 53 px (the dense row of 46 px where it has no second line), the name in the strong weight, a quiet second line, a badge after the name, at the right at most three small actions and a "›" where the row opens. The whole row is the target, a real `a` (with an address) or `button`. A group has a title over its list. No chain of brackets in the first line: "Logo (/logo, 500x100, no image)" becomes a name and a second line. | `Nino.adminUi.list( rows, options )` |
 | Column heads of a table | Words, never the help text of the field; the column of the actions has no head. | `table()` |
-| Entries whose look is the content (a theme, a block) | **Cards** with a preview picture, all of the same height; a head line (name and badge) without a wrap, no description where the picture shows it, the actions as small buttons in ONE line at the bottom. Cards are used for nothing else. | `scaleFrame()` for the picture |
+| Entries whose look is the content (a theme, a block) | **Cards** with a preview picture, all of the same height; a head line (name and badges) without a wrap - the name has half of the line at least, the badges give way first -, no description where the picture shows it, at most three small buttons with short words in ONE line at the bottom that share the width of the card. Cards are used for nothing else. | `cards( items )`, `scaleFrame()` for the picture |
 | Entries that are only read | A dense list. | `.nino-admin-list-dense` |
 | Ordered rows in a draft | The row with icon buttons up, down and remove at the end. | `.nino-admin-move`, `iconButton()`, `tree()` |
 | Entries one under another with children - the components of a page, the outline of a template | A **tree**, the one form: a type icon before the kind (bold) and the content quietly after it, a guide line down every entry that holds others with a branch to each child, the chosen row a tint with a hairline of the accent colour and **no shadow**, the buttons of a row (insert, up, down, remove in red) only under the pointer, with the focus in the row and on the chosen row - on a touch screen on the chosen row alone -, a hint on a line of its own, a lock and the word on a locked row, the way to the chosen row as a line over the tree that chooses its rows, and a loop as its icon with its pattern "per element" on a dashed accent line, a field it reads as a tag that is never cut short. A panel draws no tree of its own. | `tree()`, `path : true` |

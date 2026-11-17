@@ -77,6 +77,24 @@ $request = $ask( $appData, $token );
 check( 'the request with the token has the draft, and is marked a preview that nobody stores and no engine reads', ( $GLOBALS['ninoHeld']['data'] ?? null ) === [ 'source' => 'draft' ] && \Nino\Preview::active( $appData ) === true
 	&& $request['/nino/http/response']['header']['Cache-Control'] === 'no-store' && $request['/nino/http/response']['header']['X-Robots-Tag'] === 'noindex' && $request['/nino/http/response']['header']['Referrer-Policy'] === 'no-referrer' );
 
+// The page of a preview that asks for the mark carries it on its <html> from the first byte - and a page of a request that holds no draft never does, whatever its query says
+$markWith = static function( array &$appData, string $query ): string {
+
+	$request = ninoVisit( $appData, '/x?'. $query );
+	$request['/nino/http/response']['body'] = '<!DOCTYPE html><html lang="de"><head></head><body><html></body></html>';
+	\Nino\Html::response( $appData, $request );
+
+	return (string) $request['/nino/http/response']['body'];
+};
+$asked = \Nino\Preview::MARK. '=loose';
+$marked = $markWith( $appData, 'nino-preview='. $token. '&'. $asked );
+check( 'a request that holds a draft and asks for the mark has it on the first <html> of its page, once, as the attribute the stylesheets ask for', str_contains( $marked, '<html data-nino-preview="loose" lang="de">' ) === true && substr_count( $marked, 'data-nino-preview' ) === 1 );
+check( '...and without the ask, or with a word that is no word, the page carries nothing', str_contains( $markWith( $appData, 'nino-preview='. $token ), 'data-nino-preview' ) === false
+	&& str_contains( $markWith( $appData, 'nino-preview='. $token. '&'. \Nino\Preview::MARK. '=x%22%20onload%3D1' ), 'data-nino-preview' ) === false );
+$bare = $appData;
+unset( $bare['./nino/preview/held'] );
+check( '...and a request that holds no draft never has it, whatever its query says: the page of the visitors is not marked', str_contains( $markWith( $bare, $asked ), 'data-nino-preview' ) === false && str_contains( $markWith( $bare, 'nino-preview='. str_repeat( 'a', 32 ). '&'. $asked ), 'data-nino-preview' ) === false );
+
 // The shape of a token is what keeps the folder of a draft from being any other: nothing that holds a slash, a dot or a letter of another case is one
 check( 'a token is 32 digits of hex and nothing else: no path, no other length, no other case',
 	preg_match( \Nino\Preview::TOKEN, $token ) === 1 && array_filter( [ str_repeat( 'a', 31 ), str_repeat( 'a', 33 ), '../'. str_repeat( 'a', 29 ), str_repeat( 'a', 31 ). "\n", str_repeat( 'A', 32 ), str_repeat( 'a', 31 ). '/' ],

@@ -810,6 +810,12 @@ check( 'the weight of a title and of the text are --page-weight-title (700) and 
 	&& preg_match( '/font-weight:\s*(?:700|400|normal|bold)\b/', $nino. $partOf( 'header' ). $imageCss. $partOf( 'text' ). $partOf( 'section' ). $partOf( 'button' ). str_replace( '.footer-nav a[aria-current], .footer-legal a[aria-current] { font-weight: 700; text-decoration: none; }', '', $partOf( 'footer' ) ). $formCss ) !== 1
 	&& str_contains( $partOf( 'footer' ), '.footer-legal a[aria-current] { font-weight: 700; text-decoration: none; }' ) === true
 	&& str_contains( basisBody( array_filter( basisRules( $partOf( 'section' ) ), static fn( array $rule ): bool => $rule['selector'] === '.section-title' ), '.section-title' ), 'font-family: var(--brand-font-title); font-size: var(--page-text-5); font-weight: var(--page-weight-title);' ) === true );
+// the header that stays lets go in the preview of the workbench: the mark that previewFrame() writes on the page, a rule after the one that makes it stay
+$headerSelectors = array_column( basisRules( $partOf( 'header' ) ), 'selector' );
+$looseAt = array_search( '[data-nino-preview="loose"] .header-wrap--sticky', $headerSelectors, true );
+check( 'the sticky header is static under the mark the preview of the workbench sets on its page, by a rule that stands after the one that sticks it - and nothing else of the part reads the mark'
+	, $looseAt !== false && $looseAt > array_search( '.header-wrap--sticky', $headerSelectors, true ) && trim( basisBody( basisRules( $partOf( 'header' ) ), '[data-nino-preview="loose"] .header-wrap--sticky' ) ) === 'position: static;'
+	&& substr_count( $partOf( 'header' ), 'data-nino-preview' ) === 1 );
 // the knobs of basis in the manual are the ones the group.php files hold: token and ladder, no knob left out or kept after it is gone
 $manual = (string) file_get_contents( dirname( __DIR__ ). '/docs/development.md' );
 $rows = [];

@@ -1523,7 +1523,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
 | Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
 | Scrolling content column | `.nino-admin-pane` |
-| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar( { back, title, tools, panel } )` (called with a link and its controls it takes them as they are); the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
+| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar( { back, title, code, icons, tools, panel } )` (called with a link and its controls it takes them as they are); the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
 | Back link inside that row | `.nino-admin-back-link`, drawn by `contextBar( { back : { to, onClick } } )` as "Back to <to>" |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar( { danger, status, secondary, primary } )`: the destructive action at the left, the state and its line, the side actions, ONE main button at the right edge |
 | The answer to an action that went well | `Nino.adminUi.say( text )`: the toast above the bar, one at a time, never for an error |
@@ -1553,7 +1553,9 @@ Reach for an existing class first; only invent one when no role fits.
 | List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
 | Sections one under another, one open or several, the open one in the address | `.nino-admin-accordion` via `Nino.adminUi.accordion()` - see [Settings screens](#settings-screens-accordion-steps-split-view-and-colour-field) |
 | One choice among a few steps (-2 to +2, or named) | `.nino-admin-steps` via `Nino.adminUi.steps()`, a radiogroup |
-| Controls on one side, a preview on the other, a switch between them where it is narrow | `.nino-admin-split` via `Nino.adminUi.split()` |
+| Controls on one side, a preview on the other, a switch between them where it is narrow | `.nino-admin-split` via `Nino.adminUi.split()`; as a work surface that fills the height, with an outline that folds: `split( { fill, aside } )` - see [A work surface](#a-work-surface) |
+| The page a preview shows, its width and Reload as one group | `.nino-admin-previewtools` via `Nino.adminUi.previewTools()` - in `contextBar( { tools } )` of a work surface |
+| Entries whose look is the content, each with a picture, a name, badges and a line of buttons | `.nino-admin-cards` via `Nino.adminUi.cards( items )` |
 | A preview that follows a draft, the question of a refused save, the bar of a screen that is saved as a whole | `Nino.adminUi.previewFrame()`, `conflict()` and `.nino-admin-savebar` via `saveBar()` - see [the three builders](#workbench-screens-that-save-as-a-whole-the-preview-loop-the-conflict-and-the-save-bar) |
 | Entries one under another with children, a type icon, a hint and buttons of their own - the components of a page, the outline of a template; the same marked in several views at once | `.nino-admin-tree` via `Nino.adminUi.tree()`, a `role="tree"`, with `hoverSync()` and `previewFrame().marks()` - see [A tree](#a-tree) |
 | A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
@@ -1829,6 +1831,61 @@ mount.appendChild( brand.el );
   token, button, input, field, tile, card and rich-text rule this way. Delete
   the copy; if the shared version is genuinely wrong for every screen, fix it in
   the design-system half of `style.css`.
+
+### A work surface
+
+A screen that edits a draft with a preview and saves it as a whole is a **work surface**: no head, one context bar, the
+split view over the whole height, the bar at the foot. Three blocks make it.
+
+`Nino.adminUi.split( { fill : true, ... } )` is the surface. It stands directly under the context bar and reaches down to the
+bar at the foot - no gap, no frame, no bar over the preview - and the page does not scroll: the settings, the outline and the
+preview each have a scroll bar of their own (the preview's is the one of its page). The pane that holds a surface that is on the
+screen is marked `.nino-admin-pane--surface` by the script, and the stylesheet takes its padding and its scroll; a surface in a
+level that is hidden does not mark it. A view without `fill` is the block in the page it always was. Below 44 rem of the view's own
+width the switch "Settings | Preview" is drawn, as in the other form.
+
+`settings` may be left out: with `aside` the view is the outline and the preview - two columns, the preview taking all the rest, the switch of a narrow view named by `aside.label` - and without it the preview alone. `aside : { content, label, collapsed, rail }` adds the third column at the left edge. `content` is what it holds when it is open,
+`rail` what stands in the strip of 48 px when it is folded, `label` names the button at its top (the list icon and the double arrow
+of the rail's button, `aria-expanded`, the focus stays on it), `collapsed` where it starts folded when the session holds nothing. A
+view with an `id` keeps whether its column is folded for the session. `split.aside` is `{ el, body, rail, toggle, collapsed(), collapse( on ) }`.
+
+`Nino.adminUi.previewTools( { pages, page, widths, width, text, onPage, onWidth, onReload } )` is the group of the tools of the
+preview: a select named "Shows" for the page (drawn where `pages` is a list, `[ { value, label } ]`), the widths as one strip of
+steps (`mobile`, `tablet`, `desktop` unless `widths` names others), a quiet line beside the choice (`note`, `setNote()`) and Reload as an icon button (`reload : false` leaves it out where the view has one). It reports what a hand did; `setPage()`
+and `setWidth()` move it from outside and report nothing. `contextBar( { tools : tools.el } )` puts it at the right of the context bar;
+where the bar is narrower than 56 rem (its own width) the group is a menu behind one icon button "Tools" - `aria-expanded`, Esc and a
+click beside it close it. The context bar also takes `code`, a quiet identifier after the title, and `icons`, icon buttons after that
+(`[ { icon, name, onClick } ]`, made by `iconButton()`).
+
+`previewFrame( { split, send, address, mark : 'loose' } )` marks the page in the frame with `data-nino-preview="loose"` on its
+`<html>`: the address it loads asks for the mark (`\Nino\Preview::MARK`), the kernel writes it from the first byte of a page of a request that holds a draft - never of a public one - and the script writes it again after every page the frame loads: the header of Basis that stays at the top of a page is static under that mark, so it
+takes no room of the page that is worked on. A style sheet of a theme or a feature may ask for the same mark.
+
+```js
+const tools = Nino.adminUi.previewTools( {
+	pages : [ { value : '/', label : 'Home' }, { value : '/contact', label : 'Contact' } ], page : '/', width : 'desktop',
+	onPage : function( page ) { split.reload( page ) },
+	onWidth : function( name ) { preview.width( name ) },
+	onReload : function() { split.reload() },
+} );
+const split = Nino.adminUi.split( {
+	id : 'notes-split', fill : true, settings : settings, preview : { src : '/', title : 'The page' },
+	aside : { content : outline, label : 'Outline', rail : icons },
+} );
+const preview = Nino.adminUi.previewFrame( { split : split, send : send, address : address, mark : 'loose' } );
+
+level.appendChild( Nino.adminUi.contextBar( {
+	panel : 'Notes', title : note.name, code : note.slug, back : { to : 'Notes', onClick : leave },
+	icons : [ { icon : 'panels-top-left', name : 'Edit the frame', onClick : openFrame } ], tools : tools.el, within : mount,
+} ) );
+level.appendChild( split.el );
+level.appendChild( bar.el );           // saveBar()
+```
+
+**`Nino.adminUi.cards( items, options )`** draws the entries whose look is the content - a theme, a block: `items` are
+`{ key, title, picture, badges, actions }`, the picture an element (`scaleFrame()` makes one from a page), the badges short words
+(a string or `{ text, state }`), the actions at most three small buttons with short words, which share the width of the card. The name and the badges stand in one line that does not wrap
+(a name that is too long is cut and whole in its title), the buttons in one line under it, every card as high as the highest.
 
 ### Workbench screens that save as a whole: the preview loop, the conflict and the save bar
 

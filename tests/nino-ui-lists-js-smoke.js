@@ -214,4 +214,41 @@ check( 'what is typed is told to the caller, so that a table drawn again can be 
 check( 'a row that opens has the chevron the screen reader skips, in the last cell',
 	all( body2()[0], 'span', 'nino-admin-row-chev' ).length === 1 && all( body2()[0], 'span', 'nino-admin-row-chev' )[0].getAttribute('aria-hidden') === 'true' );
 
+// --- cards() --------------------------------------------------------------------------------------------
+
+console.log( '\nNino.adminUi.cards - things whose look is the content\n' );
+
+{
+	const picture = element('div');
+	const open = adminUi.button( 'Edit', null, { small : true } );
+	const copy = adminUi.button( 'Duplicate', null, { small : true } );
+	const cards = adminUi.cards( [
+		{ key : 'nino', title : 'Nino with a name that is much too long for a line', picture : picture, badges : [ { text : 'Active', state : 'ok' }, 'Package' ], actions : [ open, copy ] },
+		{ key : 'plain', title : 'Plain' },
+	], { label : 'Themes' } );
+	const items = all( cards, 'li' );
+	const first = all( items[0], 'article' )[0];
+	const head = all( first, 'div', 'nino-admin-cards-head' )[0];
+
+	check( 'cards are a named list with one card for each item, a card of the system carrying its key', cards.tagName === 'UL' && cards.getAttribute('aria-label') === 'Themes' && items.length === 2 && first.className.split(/\s+/).includes('nino-admin-card') && first.dataset.key === 'nino' );
+	check( 'a card is the picture, then ONE line of the name and its badges, then the line of buttons',
+		first.children.map( el => el.className ).join() === 'nino-admin-cards-picture,nino-admin-cards-head,nino-admin-cards-actions' && first.children[0].children[0] === picture
+		&& head.children[0].tagName === 'H3' && head.children.slice( 1 ).map( el => el.textContent ).join() === 'Active,Package' && head.children[1].dataset.state === 'ok' && first.children[2].children.join() === [ open, copy ].join() );
+	check( '...the whole name is in the title of the heading, which the line cuts', head.children[0].title === 'Nino with a name that is much too long for a line' );
+	check( 'a card without a picture, badges or buttons has none of those parts', all( items[1], 'article' )[0].children.map( el => el.className ).join() === 'nino-admin-cards-head' );
+	check( 'a card with more than three buttons is refused, and a button that is cut is whole in its own title', thrown( () => adminUi.cards( [ { title : 'x', actions : [ 1, 2, 3, 4 ].map( () => adminUi.button( 'x' ) ) } ] ), 'RangeError' ) && open.title === 'Edit' );
+
+	const sheet = source( '_admin/assets/style.css' ).replace( /\/\*[\s\S]*?\*\//g, '' );
+	const rule = ( selector ) => ( sheet.split('}').map( text => text.split('{') ).find( parts => parts.length === 2 && parts[0].trim() === selector ) ?? [ '', '' ] )[1];
+
+	check( 'the head of a card does not wrap: the name has the half of the line at least and is cut, the badges give way first - cut or gone, never the name',
+		/flex-wrap:\s*nowrap/.test( rule(':where(.nino-admin) .nino-admin-cards-head') ) && /white-space:\s*nowrap/.test( rule(':where(.nino-admin) .nino-admin-cards-title') ) && /text-overflow:\s*ellipsis/.test( rule(':where(.nino-admin) .nino-admin-cards-title') )
+		&& /min-width:\s*50%/.test( rule(':where(.nino-admin) .nino-admin-cards-title') ) && /flex:\s*0 1 auto/.test( rule(':where(.nino-admin) .nino-admin-cards-head > .nino-admin-badge') ) && /min-width:\s*0/.test( rule(':where(.nino-admin) .nino-admin-cards-head > .nino-admin-badge') ) );
+	check( '...the whole name shows while the pointer or the focus is in the card, which the keyboard reaches by its buttons',
+		/white-space:\s*normal/.test( rule(':where(.nino-admin) .nino-admin-cards-card:is(:hover, :focus-within) .nino-admin-cards-title') ) );
+	check( 'the buttons stand in one line that stays in the card: they share its width and shrink, none is wider than its room; every card is as high as the highest',
+		/flex-wrap:\s*nowrap/.test( rule(':where(.nino-admin) .nino-admin-cards-actions') ) && /flex:\s*1 1 auto/.test( rule(':where(.nino-admin) .nino-admin-cards-actions > button') ) && /min-width:\s*0/.test( rule(':where(.nino-admin) .nino-admin-cards-actions > button') )
+		&& /grid-auto-rows:\s*1fr/.test( rule(':where(.nino-admin) .nino-admin-cards') ) );
+}
+
 done();

@@ -17,6 +17,9 @@ const { check, done, load, element, findAll, fire, fills, source, documentOf } =
 
 const sandbox = { console : console, document : documentOf( element('div') ), location : { host : 'localhost:8080', origin : 'http://localhost:8080', href : 'http://localhost:8080/_admin/' }, URL : URL };
 sandbox.window = sandbox;
+// The observers of the suite: what a work surface asks to be told about its size, and the way to tell it
+const observed = [];
+sandbox.ResizeObserver = class { constructor( fn ) { this.fn = fn } observe( el ) { this.entry = { el : el, fn : this.fn, live : true }; observed.push( this.entry ) } disconnect() { this.entry.live = false } };
 sandbox.Nino = { content : { getText : function( key ) { return fills( '_admin/text/en_US.php' )[key] ?? '' } } };
 load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 const adminUi = sandbox.Nino.adminUi;
@@ -315,7 +318,131 @@ check( '{ slot } is the same', build( { preview : { slot : slot } } ).preview.ch
 const worded = build( { text : { settings : 'Controls', preview : 'Result', reload : 'Again', view : 'Show' } } );
 check( 'the words can be said differently', switchButtons( worded )[0].textContent === 'Controls' && switchButtons( worded )[1].textContent === 'Result' && byClass( worded.el, 'nino-admin-split-switch' )[0].getAttribute('aria-label') === 'Show' );
 
+// --- a view in the form it always had ----------------------------------------------------
+
+{
+	const plain = build();
+
+	check( 'without options the view is the block it was: no work surface, no side column, a bar over the preview with its place for tools',
+		plain.el.className === 'nino-admin-split' && plain.aside === null && plain.el.dataset.aside === undefined && byClass( plain.preview, 'nino-admin-split-bar' ).length === 1 && plain.tools !== null
+		&& observed.every( entry => entry.el !== plain.el ) );
+}
+
+// --- the work surface -----------------------------------------------------------------
+
+{
+	const surface = build( { fill : true } );
+	const pane = element('main');
+	pane.className = 'nino-admin-pane';
+	pane.appendChild( surface.el );
+	const told = observed.find( entry => entry.el === surface.el );
+	const shown = ( on ) => { surface.el.getClientRects = () => on ? [ {} ] : []; told.fn() };
+
+	check( 'fill makes the form of a work surface: a class for the stylesheet, and no bar over the preview - its tools stand in the context bar',
+		surface.el.className.split(' ').includes('nino-admin-split--fill') === true && byClass( surface.preview, 'nino-admin-split-bar' ).length === 0 && surface.tools === null && surface.frame.tagName === 'IFRAME' );
+
+	shown( true );
+	check( 'a surface that is on the screen marks the pane it stands in, which the stylesheet takes the scroll of the page from', pane.classList.contains('nino-admin-pane--surface') === true );
+
+	const other = build( { fill : true } );
+	pane.appendChild( other.el );
+	const second = observed.find( entry => entry.el === other.el );
+	other.el.getClientRects = () => [ {} ];
+	second.fn();
+	shown( false );
+	check( '...a surface that is hidden - a level that was left - lets go of it, unless another one in the pane is still on the screen', pane.classList.contains('nino-admin-pane--surface') === true );
+	other.el.getClientRects = () => [];
+	second.fn();
+	check( '...and the pane is a page again when none is', pane.classList.contains('nino-admin-pane--surface') === false );
+
+	shown( true );
+	pane.removeChild( surface.el );
+	told.fn();
+	check( 'a surface that leaves the page lets go of the pane', pane.classList.contains('nino-admin-pane--surface') === false );
+	check( '...and its observer is let go of with it, once it was in the page', observed.find( entry => entry.el === surface.el ).live === false );
+
+	const early = build( { fill : true } );
+	early.el.removed = true;
+	observed.find( entry => entry.el === early.el ).fn();
+	check( 'a surface that is not in the page yet - the first call of the observer comes before it is put there - is watched still', observed.find( entry => entry.el === early.el ).live === true );
+}
+
+// --- no settings ------------------------------------------------------------------------
+
+{
+	const outline = element('div');
+	const bare = adminUi.split( { id : 'bare-a', preview : { src : '/preview', title : 'The site' }, aside : { content : outline, label : 'Outline' } } );
+	const grid = bare.el.children.find( el => el.className === 'nino-admin-split-grid' );
+	const [ first, second ] = switchButtons( bare );
+
+	check( 'a view without settings has no column for them: the grid is the side column and the preview, and there are no settings to hand out',
+		bare.settings === null && bare.el.dataset.bare === 'true' && grid.children.length === 2 && grid.children[0] === bare.aside.el && grid.children[1] === bare.preview );
+	check( '...the switch of a narrow view is then between the side column and the preview, named by what the caller says the column holds, and controls those',
+		first.textContent === 'Outline' && first.getAttribute('aria-controls') === bare.aside.el.id && second.getAttribute('aria-controls') === bare.preview.id );
+	check( 'a view with settings keeps its three columns and the word for them', build( { aside : { content : element('div'), label : 'Outline' } } ).el.dataset.bare === undefined
+		&& switchButtons( build( { aside : { content : element('div'), label : 'Outline' } } ) )[0].textContent === 'Settings' );
+
+	const alone = adminUi.split( { preview : { src : '/preview' } } );
+	check( 'with neither settings nor a side column the view is the preview alone - on the preview, with no switch that leads to nothing',
+		alone.settings === null && alone.view() === 'preview' && byClass( alone.el, 'nino-admin-split-switch' ).length === 0 && ( alone.show( 'settings' ), alone.view() === 'preview' ) );
+
+	const sheet = source( '_admin/assets/style.css' ).replace( /\/\*[\s\S]*?\*\//g, '' );
+
+	check( 'the stylesheet gives such a view two tracks, the preview taking all the rest of the width, and never a switch to an empty view',
+		/\[data-bare\]\[data-aside="open"\]\s*>\s*\.nino-admin-split-grid\s*\{\s*grid-template-columns:\s*var\(--nino-admin-aside-width\) minmax\(0, 1fr\)/.test( sheet )
+		&& /\[data-bare\]\[data-aside="folded"\]\s*>\s*\.nino-admin-split-grid\s*\{\s*grid-template-columns:\s*var\(--nino-admin-aside-rail\) minmax\(0, 1fr\)/.test( sheet )
+		&& /\[data-bare\] \.nino-admin-split-aside-body\[hidden\]\s*\{\s*display:\s*block/.test( sheet ) );
+}
+
+// --- the side column ------------------------------------------------------------------
+
+{
+	const content = element('div');
+	const rail = element('div');
+	const side = build( { id : 'aside-a', aside : { content : content, label : 'Outline', rail : rail } } );
+	const column = side.aside;
+	const grid = side.el.children.find( el => byClass( el, 'nino-admin-split-grid' ).length > 0 || el.className === 'nino-admin-split-grid' );
+
+	check( 'the side column is the first of the columns, and holds what it was given in its body and the folded strip\'s content in its rail',
+		grid.children[0] === column.el && grid.children[1] === side.settings && column.body.children[0] === content && column.rail.children[0] === rail );
+	check( 'its button is named by the caller, tells whether the column is open, and controls the body',
+		column.toggle.tagName === 'BUTTON' && column.toggle.getAttribute('aria-label') === 'Outline' && column.toggle.getAttribute('aria-expanded') === 'true' && column.toggle.getAttribute('aria-controls') === column.body.id && column.body.id !== ''
+		&& findAll( column.toggle, el => el.tagName === 'SVG' ).length === 2 );
+	check( '...open the body is shown and the strip is not', column.collapsed() === false && column.body.hidden === false && column.rail.hidden === true && side.el.dataset.aside === 'open' );
+
+	column.toggle.focus();
+	fire( column.toggle, 'click' );
+	check( 'a press folds it: the strip is shown, the body is not, the button says so - and it is the same button, with the focus on it',
+		column.collapsed() === true && column.body.hidden === true && column.rail.hidden === false && side.el.dataset.aside === 'folded' && column.toggle.getAttribute('aria-expanded') === 'false'
+		&& column.toggle.focused === true && column.el.children[0].children[0] === column.toggle );
+
+	column.collapse( false );
+	check( 'collapse() does it from outside', column.collapsed() === false && column.toggle.getAttribute('aria-expanded') === 'true' );
+
+	column.collapse( true );
+	check( 'a view with the same id finds the column as it was left - held for the session, for each view - and another view does not',
+		build( { id : 'aside-a', aside : { content : element('div'), label : 'Outline' } } ).aside.collapsed() === true && build( { id : 'aside-b', aside : { content : element('div'), label : 'Outline' } } ).aside.collapsed() === false );
+	check( 'where nothing is held it starts as it is asked to', build( { id : 'aside-c', aside : { content : element('div'), label : 'Outline', collapsed : true } } ).aside.collapsed() === true && build( { aside : { content : element('div'), label : 'Outline' } } ).aside.collapsed() === false );
+	check( 'a view without an id holds nothing: the next one starts as it is asked to', ( build( { aside : { content : element('div'), label : 'Outline' } } ).aside.collapse( true ), build( { aside : { content : element('div'), label : 'Outline' } } ).aside.collapsed() === false ) );
+}
+
 const css = source( '_admin/assets/style.css' );
+
+{
+	const sheet = css.replace( /\/\*[\s\S]*?\*\//g, '' );
+	const rule = ( selector ) => ( sheet.split('}').map( text => text.split('{') ).find( parts => parts.length === 2 && parts[0].trim() === selector ) ?? [ '', '' ] )[1];
+
+	check( 'in the form of a work surface the page does not scroll - the pane that holds one is a column with no overflow - and the surface takes what the context bar leaves',
+		/overflow:\s*hidden/.test( rule('.nino-admin .nino-admin-pane.nino-admin-pane--surface') ) && /flex-direction:\s*column/.test( rule('.nino-admin .nino-admin-pane.nino-admin-pane--surface') )
+		&& /flex:\s*1 1 0/.test( rule('.nino-admin .nino-admin-pane--surface .nino-admin-split--fill') ) );
+	check( '...and what scrolls are the columns: the settings, the body of the side column, each for itself',
+		/overflow-y:\s*auto/.test( rule('.nino-admin .nino-admin-split--fill .nino-admin-split-settings') ) && /overflow-y:\s*auto/.test( rule(':where(.nino-admin) .nino-admin-split-aside-body') ) );
+	check( 'a block of a level that is hidden is not made a column by the rule that gives the surface its height', /pane--surface :has\(\.nino-admin-split--fill\):not\(\[hidden\]\)\s*\{/.test( sheet ) );
+	check( '...with no frame of the card and no gap between the columns',
+		/border:\s*0/.test( rule('.nino-admin .nino-admin-split--fill .nino-admin-split-preview') ) && /gap:\s*0/.test( rule('.nino-admin .nino-admin-split--fill > .nino-admin-split-grid') ) );
+	check( 'the folded column is the strip of 48 px, a token, and the open one a column of a fixed width',
+		/--nino-admin-aside-rail:\s*48px/.test( sheet ) && /grid-template-columns:\s*var\(--nino-admin-aside-rail\)/.test( sheet ) && /grid-template-columns:\s*var\(--nino-admin-aside-width\)/.test( sheet ) );
+}
 check( 'the switch is for the width the view has, not the window\'s: the root is the container the narrow rules ask',
 	/\.nino-admin-split\s*\{[^}]*container:\s*nino-split\s*\/\s*inline-size/.test( css ) && /@container\s+nino-split\s*\(max-width/.test( css ) );
 const block = css.slice( css.indexOf('@container nino-split') );

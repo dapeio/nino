@@ -42,6 +42,9 @@ namespace Nino {
 		public const string TOKEN = '/^[0-9a-f]{32}$/D';
 		public const string KIND = '/^[a-z][a-z0-9-]{0,31}$/D';
 
+		// The query word that asks for the page to carry a mark on its <html> (see mark()): a word of KIND's form, read only by a request that holds a draft
+		public const string MARK = 'nino-preview-mark';
+
 		// How many tokens of a kind a session holds - the newest - and the largest draft, in bytes of its json
 		public const int MAX = 24;
 		public const int LIMIT = 200;
@@ -156,6 +159,23 @@ namespace Nino {
 		 */
 		public static function active( array &$appData ): bool {
 			return is_array( $appData[self::HELD] ?? null ) === true;
+		}
+
+		/**
+		 *	The mark a request that holds a draft asks its page to carry on its <html> (data-nino-preview): the word of the query MARK, where it
+		 *	is a word of the form of a kind. A request that holds no draft has none, whatever its query says - so nothing of a public answer
+		 *	ever carries it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$request			The request
+		 *
+		 *	@return 	string										The word; '' for none
+		 */
+		public static function mark( array &$appData, array $request ): string {
+
+			$word = $request['/nino/http/request']['query'][self::MARK] ?? null;
+
+			return self::active( $appData ) === true && is_string( $word ) === true && preg_match( self::KIND, $word ) === 1 ? $word : '';
 		}
 
 		/**
