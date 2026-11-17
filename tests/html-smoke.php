@@ -706,6 +706,16 @@ absoluteUrlHook();
 echo "\n";
 
 
+// A control character reaches the parser neither as the byte nor as a numeric reference, in any spelling: what a parser
+// makes of one differs from one version of the library to the next, and the value is the same on each of them
+$controls = [ 'a&#1;b', 'a&#1b', 'a&#0;b', 'a&#0b', 'a&#0000001;b', 'a&#X7f;b', 'a&#x7F;b', 'a&#x00001F;b', 'a&#8;b', 'a&#11;b', 'a&#12;b', 'a&#14;b', 'a&#31;b', 'a&#127;b', "a\x01b", "a\x7Fb", "a\0b" ];
+check( 'a control character and every spelling of a reference to one are taken out before the text is read: decimal, hex, with zeros in front, without the semicolon',
+	array_values( array_unique( array_map( static fn( string $html ): string => \Nino\Html::sanitizeHtml( $html, 'inline' ), $controls ) ) ) === [ 'ab' ] );
+check( '...and nothing else: the tab, the line feed, the carriage return, a reference to a letter, to a character above the controls, and a hex reference that only begins like one',
+	\Nino\Html::sanitizeHtml( 'a&#9;b&#10;c&#13;d&#100;e&#x1F600;f&#x7Fb;g&#1270;h', 'inline' ) === "a\tb\nc\rdde\u{1F600}f\u{7FB}g\u{4F6}h" );
+check( '...in the value of an attribute as in a text, where the value is whole and is checked as what it is then: an address stays an address, and one that is a script once the reference is gone is none',
+	\Nino\Html::sanitizeHtml( '<a href="/x&#1;y">t</a>', 'inline' ) === '<a href="/xy">t</a>' && str_contains( \Nino\Html::sanitizeHtml( '<a href="java&#1;script:alert(1)">t</a>', 'inline' ), 'script' ) === false );
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

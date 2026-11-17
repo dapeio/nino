@@ -1513,6 +1513,12 @@ namespace Nino {
 
 			$html = self::_utf8( $html );
 
+			// A control character has no place in what is written, and what a parser makes of one that is spelled as a
+			// numeric reference - &#1;, &#x7f, &#0; - is the parser's: one version of the library drops it, one ends the
+			// value of an attribute at it, one writes U+FFFD for it. So none reaches the parser, neither as the byte nor
+			// as the reference; the tab, the line feed and the carriage return are none of them
+			$html = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|&#(?:0*(?:[0-8]|1[124-9]|2[0-9]|3[01]|127)(?![0-9])|[xX]0*(?:[0-8bcefBCEF]|1[0-9a-fA-F]|7[fF])(?![0-9a-fA-F]));?/', '', $html ) ?? '';
+
 			if( $literalBrackets === true ) {
 
 				// While the parser runs, the brackets of the source are two tokens
