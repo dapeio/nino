@@ -872,10 +872,10 @@ if( typeof elements._renderNav === 'function' ) {
 	], [ 'title', 'price', 'uri' ] );
 
 	const table = dom.find( listNode, n => n.tagName === 'table' )[0];
-	const heads = table ? dom.find( table, n => n.tagName === 'th' ).map( th => th.dataset.key ) : [];
+	const heads = table ? dom.find( table, n => n.tagName === 'th' ).map( th => th.dataset.key ).filter( key => key !== undefined ) : [];
 	check( 'the list is the shared table, the uri first and then the columns the server named', table !== undefined && table.className === 'nino-admin-table' && heads.join() === '.uri,title,price,uri' );
 	const rows = table ? dom.find( table, n => n.tagName === 'tr' && n.parentNode.tagName === 'tbody' ) : [];
-	const cells = rows.map( tr => dom.find( tr, n => n.tagName === 'td' ).map( td => td.textContent ) );
+	const cells = rows.map( tr => dom.find( tr, n => n.tagName === 'td' && ( n.className || '' ).includes( 'nino-admin-table-actions' ) === false ).map( td => td.textContent ) );
 	check( 'one row per element, the cells its values - a field called uri stays a field', JSON.stringify( cells ) === '[["ada","Ada","9.5","a field called uri"],["bob","","3",""]]' );
 	check( 'the plain list is not drawn beside it', dom.find( listNode, n => n.tagName === 'ul' ).length === 0 );
 	if( rows[1] !== undefined )

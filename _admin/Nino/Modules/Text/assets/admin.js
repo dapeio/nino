@@ -317,7 +317,8 @@
 		 *	@return		{Element|null}
 		 */
 		_rowOf : function( group ) {
-			return Array.from( dc.getElementById('text-list').querySelectorAll('button') ).find( function( button ) { return button.dataset.group === group } ) ?? null;
+			const row = Array.from( dc.getElementById('text-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === group } );
+			return row === undefined ? null : row.querySelector('button');
 		},
 
 		/**
@@ -464,21 +465,10 @@
 			model.blocks.forEach( function( block ) {
 
 				const section = dc.createElement('section');
-				section.className = 'admin-text-block';
-
-				const heading = dc.createElement('h2');
-				heading.textContent = Nino.content.getText( '/_admin/text/group/'+ block.id );
-				section.appendChild( heading );
+				section.appendChild( Nino.adminUi.sectionTitle( Nino.content.getText( '/_admin/text/group/'+ block.id ) ) );
 
 				( block.rows !== undefined ? [ { id : block.id, rows : block.rows } ] : block.groups ).forEach( function( group ) {
-
-					if( block.rows === undefined && group.id !== 'common' ) {
-						const title = dc.createElement('h3');
-						title.textContent = Nino.content.getText( '/_admin/text/group/'+ group.id );
-						section.appendChild( title );
-					}
-
-					section.appendChild( Nino.admin.text._renderRowList( group.rows ) );
+					section.appendChild( Nino.admin.text._renderRowList( group.rows, block.rows === undefined && group.id !== 'common' ? Nino.content.getText( '/_admin/text/group/'+ group.id ) : '' ) );
 				} );
 
 				body.appendChild( section );
@@ -486,56 +476,34 @@
 		},
 
 		/**
-		 *	One list of rows, each a button that opens the row's form - styled the
-		 *	same as the Elements type list
+		 *	One group of rows, each a row of the workbench's list that opens the row's
+		 *	form
 		 *
 		 *	@param		{Array}		ids						Row ids
+		 *	@param		{string}	[title]				The name of the group, where it has one
 		 *
 		 *	@return		{Element}
 		 */
-		_renderRowList : function( ids ) {
+		_renderRowList : function( ids, title ) {
 
 			const model 	= Nino.admin.text._model;
 			const locale 	= Nino.admin.text._locale();
-			const list 		= dc.createElement('div');
-			list.className = 'nino-admin-list nino-admin-list-buttons';
 
-			ids.forEach( function( id ) {
+			return Nino.adminUi.list( ids.map( function( id ) {
 
 				const row = model.rows[id];
 
-				const btn = dc.createElement('button');
-				btn.type = 'button';
-				btn.className = 'admin-type-btn';
-				btn.dataset.group = id;
-
-				if( Nino.admin.textKeys.rowDepth( row ) > 0 )
-					btn.classList.add('is-sub');
-
-				const titleWrap = dc.createElement('div');
-				titleWrap.textContent = Nino.admin.textKeys.rowLabel( model, row, locale );
-
-				const descr = dc.createElement('div');
-				descr.className = 'admin-type-btn-descr';
-				descr.textContent = Nino.admin.textKeys.rowSummary( row, locale );
-				titleWrap.appendChild( descr );
-
-				const chev = dc.createElement('span');
-				chev.className = 'admin-view-button-chev';
-				chev.setAttribute( 'aria-hidden', 'true' );
-				chev.textContent = '›';
-
-				btn.appendChild( titleWrap );
-				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() {
-					Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( id ) );
-					Nino.admin.text._openGroup( id, null, true );
-				} );
-
-				list.appendChild( btn );
-			} );
-
-			return list;
+				return {
+					key : id,
+					title : Nino.admin.textKeys.rowLabel( model, row, locale ),
+					detail : Nino.admin.textKeys.rowSummary( row, locale ),
+					sub : Nino.admin.textKeys.rowDepth( row ) > 0,
+					onOpen : function() {
+						Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( id ) );
+						Nino.admin.text._openGroup( id, null, true );
+					},
+				};
+			} ), { title : title, level : 3 } );
 		},
 
 		/**

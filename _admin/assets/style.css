@@ -626,6 +626,10 @@ a {
    A quiet dashed frame rather than a bare line or a red note: an empty
    collection is a state, not an error, and it should look the same on the
    dashboard, in a panel and on a tab. */
+:where(.nino-admin) .nino-admin-empty--action > p {
+	margin: 0 0 var(--nino-admin-space-5);
+}
+
 :where(.nino-admin) .nino-admin-empty {
 	margin: var(--nino-admin-space-3) 0 var(--nino-admin-space-6);
 	padding: var(--nino-admin-space-6) var(--nino-admin-space-6);
@@ -2165,6 +2169,10 @@ a {
 	border-bottom: 1px solid var(--editor-separator);
 }
 
+:where(.nino-admin) .nino-admin-tabs--wrap {
+	flex-wrap: wrap;
+}
+
 :where(.nino-admin) .nino-admin-tabs--bar .nino-admin-tab {
 	flex: 0 0 auto;
 	padding: var(--nino-admin-space-3) var(--nino-admin-space-7) var(--nino-admin-space-4);
@@ -2461,6 +2469,132 @@ a {
 	white-space: nowrap;
 }
 
+/* The title of a group of rows (Nino.adminUi.sectionTitle(), the heading of list()):
+   the small line over a list, the group within a group a step quieter */
+:where(.nino-admin) .nino-admin-section-title {
+	margin: var(--nino-admin-space-7) 0 var(--nino-admin-space-3);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-heavy);
+	letter-spacing: .065em;
+	text-transform: uppercase;
+}
+
+:where(.nino-admin) .nino-admin-section-title--sub {
+	margin-top: var(--nino-admin-space-6);
+	margin-bottom: var(--nino-admin-space-2);
+	font-weight: var(--nino-admin-weight-strong);
+	letter-spacing: normal;
+	text-transform: none;
+}
+
+:where(.nino-admin) .nino-admin-list-group:first-child > .nino-admin-section-title:first-child {
+	margin-top: var(--nino-admin-space-4);
+}
+
+/* A row of Nino.adminUi.list(): one line of the height of a row - 53px with a second line, the dense row
+   without - holding the title, the actions and the chevron. The target that opens the row is stretched over
+   the whole row by its own ::before, and the actions stand above it, so the row is the link and a press on
+   a button in it is the button's alone */
+:where(.nino-admin) .nino-admin-list-row > .nino-admin-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-5);
+	min-height: var(--nino-admin-row-height);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
+	color: var(--editor-text);
+	font-size: var(--nino-admin-text-sm);
+}
+
+:where(.nino-admin) .nino-admin-list-row.is-dense > .nino-admin-row {
+	min-height: var(--nino-admin-row-dense);
+}
+
+:where(.nino-admin) .nino-admin-list-row.is-sub > .nino-admin-row {
+	padding-left: calc( var(--nino-admin-space-5) + var(--nino-admin-space-8) );
+}
+
+:where(.nino-admin) .nino-admin-list-row:hover {
+	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-list-row:has( .nino-admin-row-open:focus-visible ) {
+	box-shadow: inset 0 0 0 2px var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-row > .nino-admin-list-copy,
+:where(.nino-admin) .nino-admin-row-open {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-row-open {
+	display: flex;
+	align-self: stretch;
+	align-items: center;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	text-decoration: none;
+}
+
+/* The ring of the target is the ring of the row it covers: it is drawn by the rule over the row, inside it */
+:where(.nino-admin) .nino-admin-row-open:focus-visible {
+	outline-style: none;
+}
+
+:where(.nino-admin) .nino-admin-row-open::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+}
+
+:where(.nino-admin) .nino-admin-row-open .nino-admin-list-copy {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-list-copy strong .nino-admin-badge {
+	margin-left: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-row-actions {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--nino-admin-space-2);
+}
+
+:where(.nino-admin) .nino-admin-row-chev {
+	flex: 0 0 auto;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-lg);
+	line-height: 1;
+	pointer-events: none;
+}
+
+@media (max-width: 30rem) {
+	:where(.nino-admin) .nino-admin-list-row > .nino-admin-row:has( .nino-admin-row-actions ) {
+		flex-wrap: wrap;
+	}
+
+	:where(.nino-admin) .nino-admin-list-row .nino-admin-row-actions {
+		order: 3;
+		flex: 1 0 100%;
+		justify-content: flex-start;
+	}
+}
+
 /* Rows that are read, not drilled into (log lines, submissions, subscribers):
    the same grouped surface, without the chevron affordance. */
 :where(.nino-admin) .nino-admin-list-dense > li {
@@ -2519,6 +2653,45 @@ a {
 	box-shadow: inset 0 0 0 2px var(--editor-blue);
 }
 
+/* ------------------------------------------------------------ Filter above a list */
+
+/* The search over a list, and what narrows it beside it: chips, a select. It wraps where there is no room */
+:where(.nino-admin) .nino-admin-filterbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	margin: 0 0 var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-filterbar-input {
+	flex: 1 1 16rem;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-filterbar .nino-admin-locale-select {
+	flex: 0 0 auto;
+	width: auto;
+}
+
+/* A filter that is on or off: aria-pressed says so, the fill and the ring say it to the eye too */
+:where(.nino-admin) .nino-admin-chip {
+	flex: 0 0 auto;
+	min-height: var(--nino-admin-control-small);
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-5);
+	border-radius: var(--nino-admin-radius-pill);
+	background: transparent;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+:where(.nino-admin) .nino-admin-chip[aria-pressed="true"] {
+	background: var(--editor-blue-soft);
+	box-shadow: inset 0 0 0 1px var(--editor-blue);
+	color: var(--editor-text);
+}
+
 /* ------------------------------------------------------------ Data table */
 
 /* A table of records - the shape any "many rows of the same thing" screen
@@ -2568,6 +2741,41 @@ a {
 :where(.nino-admin) .nino-admin-table-search {
 	flex: 1 1 auto;
 	max-width: 22rem;
+}
+
+/* The search of a directory (table( { search : true } )): the whole width over the table */
+:where(.nino-admin) .nino-admin-table-toolbar--wide .nino-admin-table-search {
+	max-width: none;
+}
+
+/* The buttons at the end of a row: a column with no head, at the right, in one line */
+:where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-actions {
+	width: 1%;
+	text-align: right;
+}
+
+/* Where the table is wider than the screen and scrolls in its frame, the buttons of a row stay at the right edge: an action is never behind the scroll */
+@media (max-width: 40rem) {
+	:where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-actions {
+		position: sticky;
+		right: 0;
+		background: var(--editor-bg-grouped);
+	}
+
+	:where(.nino-admin) .nino-admin-table thead th.nino-admin-table-actions {
+		background: var(--nino-admin-surface-muted);
+	}
+}
+
+:where(.nino-admin) .nino-admin-table td .nino-admin-row-chev {
+	margin-left: var(--nino-admin-space-3);
+	vertical-align: middle;
+}
+
+/* A cell that holds a sentence breaks its lines */
+:where(.nino-admin) .nino-admin-table td.is-wrap {
+	min-width: 14rem;
+	white-space: normal;
 }
 
 /* The table sets its own width from its content and scrolls inside this box,

@@ -39,14 +39,12 @@ function hasClass( el, name ) {
 	return String( el.className ).split(' ').indexOf( name ) !== -1 || el.classList.contains( name );
 }
 
-/** One row by the key it carries - a <li> on Inactive and Available, the drill-down <button> on Active */
+/** One row of a table by the key it carries: the <tr> of a feature, an offer or a refused directory */
 function row( root, key ) {
-	return findAll( root, function( el ) { return el.dataset.feature === key } )[0];
+	return findAll( root, function( el ) { return el.tagName === 'TR' && el.dataset.row === key } )[0];
 }
 
-function offer( root, key ) {
-	return findAll( root, function( el ) { return el.dataset.offer === key } )[0];
-}
+const offer = row;
 
 /** The button an offer carries - its message goes into the dialog now, not
     onto the row: the offers are recomputed against what is on disk on every
@@ -56,14 +54,24 @@ function offerButton( root, key ) {
 	return byTag( offer( root, key ), 'button' )[0];
 }
 
-/** Every row's key, in the order they are drawn */
-function rowKeys( root, attr ) {
-	return findAll( root, function( el ) { return typeof el.dataset[attr] === 'string' } ).map( function( el ) { return el.dataset[attr] } ).join(',');
+/** The key of every application drawn, in order: a row of the list of applications, not of a table */
+function appKeys() {
+	return findAll( mount, function( el ) { return typeof el.dataset.application === 'string' } ).map( function( el ) { return el.dataset.application } ).join(',');
 }
 
-/** The one line under a row's name: joined by the script, so these are read for what they contain */
+/** Every row's key, in the order they are drawn */
+function rowKeys( root ) {
+	return findAll( root, function( el ) { return el.tagName === 'TR' && typeof el.dataset.row === 'string' } ).map( function( el ) { return el.dataset.row } ).join(',');
+}
+
+/** The cells of a row, as text: name, category, version, state */
+function cells( el ) {
+	return byTag( el, 'td' ).map( textOf );
+}
+
+/** The one line under a row's name: what the feature is for */
 function meta( el ) {
-	return el === undefined ? '' : ( byTag( el, 'small' )[0] || byTag( el, 'div' ).filter( function( n ) { return hasClass( n, 'admin-type-btn-descr' ) } )[0] || { textContent : '' } ).textContent;
+	return el === undefined ? '' : ( byTag( el, 'small' ).filter( function( n ) { return hasClass( n, 'admin-features-note' ) === false } )[0] || { textContent : '' } ).textContent;
 }
 
 /** The text of a node the script built out of pieces - the stand-in keeps them as children */
@@ -349,20 +357,17 @@ check( 'there is no intro line and no eyebrow badge - just the head, the action 
 	&& hasClass( mount.children[0], 'admin-features-head' )
 	&& findAll( mount, function( el ) { return hasClass( el, 'nino-admin-hint-lead' ) } ).length === 0 && findAll( mount, function( el ) { return hasClass( el, 'nino-admin-eyebrow' ) } ).length === 0 );
 
-// --- the head: the tab strip beside the panel's name, the filter in the module's own row
+// --- the head: the tab strip beside the panel's name, the category in the module's own row
 
 const head 	 = mount.children[0];
 // The panel is the head, the content of the tab and - while the catalogue is on - the bar, in the order of the screen: the Tab key follows the markup
 const tabContent = function() { return mount.children[1] };
 const catalogueBar = function() { return mount.children[2] };
 const strip	 = paneHead.children[1];
-const filter = head.children[0];
-check( 'the strip stands in the pane\'s head beside the name, and the module\'s own row holds the filter and the category - neither inside the tablist', paneHead.children.length === 3
+check( 'the strip stands in the pane\'s head beside the name, and the module\'s own row holds the category - not inside the tablist', paneHead.children.length === 3
 	&& paneHead.children[0] === paneTitle && paneHead.children[2] === paneActions
 	&& hasClass( strip, 'nino-admin-tabs' ) && hasClass( strip, 'nino-admin-tabs--bar' ) && hasClass( strip, 'admin-panel-tabs' ) && strip.attributes.role === 'tablist'
-	&& head.children.length === 2 && filter.tagName === 'INPUT' && filter.type === 'search' && filter.id === 'features-filter' );
-check( 'the filter is labelled and placeheld from the text system, and reuses the shared search control', hasClass( filter, 'nino-admin-table-search' )
-	&& filter.placeholder === text('/_admin/features/label/filter') && filter.attributes['aria-label'] === text('/_admin/features/label/filter') );
+	&& head.children.length === 1 && head.children[0].tagName === 'SELECT' && head.children[0].id === 'features-category' );
 
 const tabs = byTag( strip, 'button' );
 check( 'four tabs, Active first and Applications last, each labelled with its count - Active 2 (plain, sample), Inactive 2 (old, fresh)', tabs.length === 4
@@ -371,19 +376,14 @@ check( 'four tabs, Active first and Applications last, each labelled with its co
 check( 'Active is the tab a panel opens on, role=tab/tablist throughout, aria-selected in step with it', tabs.every( function( t ) { return t.attributes.role === 'tab' } )
 	&& hasClass( tabs[0], 'is-active' ) && tabs[0].attributes['aria-selected'] === 'true' && hasClass( tabs[1], 'is-active' ) === false && tabs[1].attributes['aria-selected'] === 'false' );
 
-// A maturity is a badge after the name, drawn from a word the panel already
-// localized - in a row of every tab and on the feature's own screen, and not in
-// the line under the name, where it would be one more thing to read past
+// A maturity is the state of a row, drawn from a word the panel already localized - in a row of every
+// tab, and not in the name beside it. On the feature's own screen it is a badge after the name
 const badgeOf = function( el ) { return findAll( el, function( n ) { return hasClass( n, 'admin-features-badge' ) } ).map( function( n ) { return n.textContent } ) };
-// The element the badge stands in. In the grouped list the copy is a grid, so a
-// badge placed beside the name there becomes a row of its own under it: it has
-// to stand inside the element that holds the name
-const badgeParents = function( el ) { return findAll( el, function( n ) { return hasClass( n, 'admin-features-badge' ) } ).map( function( n ) { return n.parentNode } ) };
-check( 'an active feature that carries a maturity shows it as a badge after the name, one that carries none shows nothing, and the line under the name does not mention it',
-	badgeOf( row( mount, 'sample' ) ).join('|') === 'Beispiel' && badgeOf( row( mount, 'plain' ) ).length === 0 && byTag( row( mount, 'sample' ), 'span' ).filter( function( n ) { return hasClass( n, 'admin-features-badge' ) } )[0].tagName === 'SPAN'
+check( 'an active feature that carries a maturity shows it as its state, one that carries none has an empty state, and the line under the name does not mention it',
+	cells( row( mount, 'sample' ) )[3] === 'Beispiel' && cells( row( mount, 'plain' ) )[3] === '' && badgeOf( row( mount, 'sample' ) ).length === 0
 	&& meta( row( mount, 'sample' ) ).indexOf( 'Beispiel' ) === -1 );
-// The badge itself: what the server sends for a feature without a maturity is '',
-// not a missing key, and a value is text whatever it contains
+// The badge itself, which the feature's own screen and the applications still draw: what the server sends for a feature
+// without a maturity is '', not a missing key, and a value is text whatever it contains
 const holder = element('strong');
 panel._badge( holder, '' );
 panel._badge( holder, '  ' );
@@ -408,21 +408,25 @@ check( 'the Available tab explains there is nothing cached yet', findAll( tabCon
 
 // --- Inactive and Active
 
+/** The table a tab draws: its search over the full width, its columns, its rows */
+const tableOf = function() { return findAll( tabContent(), function( el ) { return el.tagName === 'TABLE' } )[0] };
+
 fire( tabs[1], 'click' );
-check( 'an inactive row carries the badge after its name too, in the shared copy, and the line under it does not', badgeOf( row( mount, 'fresh' ) ).join('|') === 'Alpha' && badgeOf( row( mount, 'old' ) ).length === 0
-	&& badgeOf( row( mount, 'fresh' ).children[0] ).length === 1 && meta( row( mount, 'fresh' ) ).indexOf( 'Alpha' ) === -1 );
-check( '...and in the element that holds the name - the <strong> of the shared copy, which is a grid - not beside it',
-	badgeParents( row( mount, 'fresh' ) ).length === 1 && badgeParents( row( mount, 'fresh' ) )[0].tagName === 'STRONG' && badgeParents( row( mount, 'fresh' ) )[0].textContent === 'Fresh' );
-check( 'Inactive is the grouped list, one row per feature that is off, in the backend\'s order', rowKeys( mount, 'feature' ) === 'old,fresh'
-	&& hasClass( byTag( tabContent(), 'ul' )[0], 'nino-admin-list' ) && row( mount, 'old' ).tagName === 'LI' );
-check( 'a row is the shared name-over-line copy, and carries no status badge', hasClass( row( mount, 'fresh' ).children[0], 'nino-admin-list-copy' )
-	&& row( mount, 'fresh' ).children[0].children[0].tagName === 'STRONG' && row( mount, 'fresh' ).children[0].children[0].textContent === 'Fresh' );
-check( 'the line under the name says which version this is and what the feature does', meta( row( mount, 'fresh' ) ) === text('/_admin/features/label/version').replace( '%s', '0.1.0' )+ ' · Not switched on yet.' );
-check( 'a feature that names no category writes nothing about one - "uncategorized" on every line of an older project is noise, not information',
-	meta( row( mount, 'fresh' ) ).indexOf( text('/_admin/features/category/none') ) === -1
-	&& meta( row( mount, 'old' ) ) === text('/_admin/features/category/system')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '3.0.0' ) );
-check( 'an inactive feature without problems offers Remove and Activate', byTag( row( mount, 'fresh' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')+ '|'+ text('/_admin/features/label/activate')
-	&& hasClass( byTag( row( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-danger' ) && hasClass( byTag( row( mount, 'fresh' ), 'button' )[1], 'nino-admin-btn-primary' ) );
+check( 'an inactive row carries its maturity as its state, and the name beside it says nothing of it', cells( row( mount, 'fresh' ) )[3] === 'Alpha' && cells( row( mount, 'old' ) )[3] === ''
+	&& badgeOf( row( mount, 'fresh' ) ).length === 0 && meta( row( mount, 'fresh' ) ).indexOf( 'Alpha' ) === -1 );
+check( 'Inactive is a table of the workbench with a search over its full width, one row per feature that is off, in the backend\'s order, and the four columns by their heads', rowKeys( mount ) === 'old,fresh'
+	&& tableOf() !== undefined && row( mount, 'old' ).tagName === 'TR' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-table-toolbar--wide' ) } ).length === 1
+	&& byTag( tableOf(), 'th' ).map( textOf ).join('|') === [ '/_admin/features/col/name', '/_admin/features/label/category', '/_admin/features/col/version', '/_admin/features/col/state', '' ].map( function( key ) { return key === '' ? '' : text( key ) } ).join('|') );
+check( 'the search is named from the text system', findAll( tabContent(), function( el ) { return el.tagName === 'INPUT' } )[0].attributes['aria-label'] === text('/_admin/features/label/search') );
+check( 'the name is the shared name-over-line copy', hasClass( byTag( row( mount, 'fresh' ), 'td' )[0].children[0], 'nino-admin-list-copy' )
+	&& byTag( row( mount, 'fresh' ), 'strong' )[0].textContent === 'Fresh' );
+check( 'the version and what the feature does are cells and a line of their own', cells( row( mount, 'fresh' ) )[2] === '0.1.0' && meta( row( mount, 'fresh' ) ) === 'Not switched on yet.' );
+check( 'a feature that names no category has an empty category cell - "uncategorized" on every line of an older project is noise, not information',
+	cells( row( mount, 'fresh' ) )[1] === '' && cells( row( mount, 'old' ) )[1] === text('/_admin/features/category/system') && cells( row( mount, 'old' ) )[2] === '3.0.0' );
+check( 'an inactive feature without problems offers Activate and Remove, the one that takes something away last and in red',
+	byTag( row( mount, 'fresh' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate')+ '|'+ text('/_admin/features/label/remove')
+	&& hasClass( byTag( row( mount, 'fresh' ), 'button' )[1], 'nino-admin-btn-danger' ) && hasClass( byTag( row( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-primary' )
+	&& byTag( row( mount, 'fresh' ), 'button' ).every( function( el ) { return hasClass( el, 'nino-admin-btn--small' ) } ) );
 // A feature that cannot be switched on is exactly the one somebody wants rid
 // of, so Remove is there whether or not Activate is
 check( 'one with problems offers Remove alone, and its requirements and every refusal are read whole rather than ellipsized', byTag( row( mount, 'old' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')
@@ -430,47 +434,48 @@ check( 'one with problems offers Remove alone, and its requirements and every re
 	&& byTag( row( mount, 'old' ), 'small' ).filter( function( el ) { return hasClass( el, 'nino-admin-error' ) } ).map( function( el ) { return el.textContent } ).join('|') === FEATURES[0].problems.join('|') );
 
 // A feature that comes with Nino is a module of the kernel: there is no directory of the project's to delete, so no Remove, and the row says where it comes from
-const shippedRow = panel._renderFeature( Object.assign( {}, FEATURES[3], { key : 'bundled', name : 'Bundled', shipped : true } ) );
+const shippedRow = panel._featureRow( Object.assign( {}, FEATURES[3], { key : 'bundled', name : 'Bundled', shipped : true } ) );
 check( 'a feature that comes with Nino offers Activate alone and says that it comes with Nino; one that does not carries no such line',
-	byTag( shippedRow, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && notes( shippedRow ).join('|') === text('/_admin/features/label/shipped')
+	panel._rowButtons( shippedRow, element('p') ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate') && notes( panel._nameCell( shippedRow ) ).join('|') === text('/_admin/features/label/shipped')
 	&& notes( row( mount, 'fresh' ) ).indexOf( text('/_admin/features/label/shipped') ) === -1 );
 
 // A directory whose manifest the kernel refused is not a feature: it is a row of the Inactive tab, by its directory, with
-// the reason as text - no markup, no action - and it is counted and filtered with the rest
+// the reason as text - no markup, no action - and it is counted with the rest
 panel._rejected = [ { dir : 'Meetups', reason : '"version" must be <img src=x onerror=boom()> major.minor.patch' } ];
 panel._renderPanel();
 check( 'a refused manifest is a row of Inactive with its directory and the reason beside it, and the features that are off stay as they were',
-	rowKeys( mount, 'rejected' ) === 'Meetups' && rowKeys( mount, 'feature' ) === 'old,fresh'
-	&& row( mount, 'Meetups' ) === undefined && findAll( mount, function( el ) { return el.dataset.rejected === 'Meetups' } )[0].tagName === 'LI' );
-const refusedRow = findAll( mount, function( el ) { return el.dataset.rejected === 'Meetups' } )[0];
-check( '...it says that it is not loaded, gives the reason as a line read whole and written as text, and offers no button', notes( refusedRow )[0] === text('/_admin/features/label/rejected')
-	&& notes( refusedRow ).slice( 1 ).join('|') === '"version" must be <img src=x onerror=boom()> major.minor.patch' && byTag( refusedRow, 'img' ).length === 0 && byTag( refusedRow, 'button' ).length === 0
-	&& hasClass( byTag( refusedRow, 'small' ).filter( function( el ) { return hasClass( el, 'admin-features-note' ) } )[1], 'nino-admin-error' ) && hasClass( byTag( refusedRow, 'small' )[0], 'nino-admin-error' ) === false );
+	rowKeys( mount ) === 'old,fresh,Meetups' && row( mount, 'Meetups' ).tagName === 'TR' && cells( row( mount, 'Meetups' ) )[0].indexOf( 'Meetups' ) === 0 );
+const refusedRow = row( mount, 'Meetups' );
+check( '...it says that it is not loaded, gives the reason as a line read whole and written as text, and offers no button', cells( refusedRow )[3] === text('/_admin/features/label/rejected')
+	&& notes( refusedRow ).join('|') === '"version" must be <img src=x onerror=boom()> major.minor.patch' && byTag( refusedRow, 'img' ).length === 0 && byTag( refusedRow, 'button' ).length === 0
+	&& hasClass( byTag( refusedRow, 'small' )[0], 'nino-admin-error' ) );
 check( '...and the tab counts it', byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (3)' );
-panel._filter = 'onerror';
-panel._renderPanel();
-check( '...the filter reads its reason too, and a filter that matches nothing of it hides it', rowKeys( mount, 'rejected' ) === 'Meetups' && rowKeys( mount, 'feature' ) === '' );
-panel._filter = 'nomatchatall';
-panel._renderPanel();
-check( '...a filter that matches neither says so', rowKeys( mount, 'rejected' ) === '' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 1 );
-panel._filter = '';
+let searchField = function() { return findAll( tabContent(), function( el ) { return el.tagName === 'INPUT' } )[0] };
+searchField().value = 'meetups';
+fire( searchField(), 'input' );
+check( '...the search of the table finds it by its directory, and one that matches nothing says so', rowKeys( mount ) === 'Meetups' );
+searchField().value = 'nomatchatall';
+fire( searchField(), 'input' );
+check( '...a search that matches nothing says so, in the empty state of the table', rowKeys( mount ) === '' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) && hasClass( el, 'nino-admin-hidden' ) === false } ).length === 1 );
+searchField().value = '';
+fire( searchField(), 'input' );
 panel._rejected = [];
 panel._renderPanel();
-check( 'with none refused the tab is what it was', rowKeys( mount, 'rejected' ) === '' && rowKeys( mount, 'feature' ) === 'old,fresh' );
-// The refused manifests are not features: the Active tab never lists them, and a category - which they have none of - hides them
+check( 'with none refused the tab is what it was', rowKeys( mount ) === 'old,fresh' );
+// The refused manifests are not features: the Active tab never lists the ones that are off, and a category - which they have none of - hides them
 panel._rejected = [ { dir : 'Meetups', reason : 'x' } ];
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
-check( 'the Active tab lists no refused manifest, and its count is the features alone', rowKeys( mount, 'rejected' ) === '' && byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (2)' );
+check( 'the Active tab lists no refused manifest that is off, and its count is the features alone', rowKeys( mount ) === 'plain,sample' && byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (2)' );
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
 panel._category = 'system';
 panel._renderPanel();
-check( 'a category filter hides the refused manifests, which have no category', rowKeys( mount, 'rejected' ) === '' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (1)' );
+check( 'a category filter hides the refused manifests, which have no category', rowKeys( mount ) === 'old' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (1)' );
 panel._category = '';
 // A tab that holds nothing but refused manifests shows them and not the empty hint
 const wasFeatures = panel._features;
 panel._features = [];
 panel._renderPanel();
-check( 'an Inactive tab with only refused manifests lists them, with no empty hint', rowKeys( mount, 'rejected' ) === 'Meetups' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 0 );
+check( 'an Inactive tab with only refused manifests lists them, with no empty hint', rowKeys( mount ) === 'Meetups' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) && hasClass( el, 'nino-admin-hidden' ) === false } ).length === 0 );
 panel._features = wasFeatures;
 panel._rejected = [];
 panel._renderPanel();
@@ -478,84 +483,82 @@ panel._renderPanel();
 // a sentence of its own and the reason; the ones that are off stay under Inactive and are never listed under Active
 panel._rejected = [ { dir : 'Running', reason : 'why', active : true }, { dir : 'Idle', reason : 'other', active : false } ];
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
-const runningRow = findAll( mount, function( el ) { return el.dataset.rejected === 'Running' } )[0];
+const runningRow = row( mount, 'Running' );
 check( 'under Active a refused manifest of a feature that is on stands with its own sentence and the reason, and the one that is off is not there',
-	rowKeys( mount, 'rejected' ) === 'Running' && runningRow !== undefined && notes( runningRow )[0] === text('/_admin/features/label/rejected-active') && notes( runningRow ).slice( 1 ).join('|') === 'why' && byTag( runningRow, 'small' ).length === 2
+	rowKeys( mount ) === 'plain,sample,Running' && runningRow !== undefined && cells( runningRow )[3] === text('/_admin/features/label/rejected-active') && notes( runningRow ).join('|') === 'why'
 	&& text('/_admin/features/label/rejected-active') !== text('/_admin/features/label/rejected') );
+check( '...it has the one button that takes its class out of the modules, and that one is not red - switching off takes nothing away',
+	byTag( runningRow, 'button' ).length === 1 && byTag( runningRow, 'button' )[0].textContent === text('/_admin/features/label/deactivate') && hasClass( byTag( runningRow, 'button' )[0], 'nino-admin-btn-danger' ) === false );
 check( '...and Active counts it', byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (3)' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (3)' );
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
-check( '...under Inactive the one that is off is listed and the one that runs is not', rowKeys( mount, 'rejected' ) === 'Idle'
-	&& notes( findAll( mount, function( el ) { return el.dataset.rejected === 'Idle' } )[0] )[0] === text('/_admin/features/label/rejected') );
+check( '...under Inactive the one that is off is listed and the one that runs is not', rowKeys( mount ) === 'old,fresh,Idle'
+	&& cells( row( mount, 'Idle' ) )[3] === text('/_admin/features/label/rejected') );
 panel._features = [];
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
-check( 'an Active tab with only a refused manifest lists it with no empty hint', rowKeys( mount, 'rejected' ) === 'Running' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } ).length === 0 );
+check( 'an Active tab with only a refused manifest lists it with no empty hint', rowKeys( mount ) === 'Running' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) && hasClass( el, 'nino-admin-hidden' ) === false } ).length === 0 );
 panel._features = FEATURES;
 panel._rejected = [];
 panel._renderPanel();
 
 fire( tabs[0], 'click' );
-check( 'Active lists the features that are on', rowKeys( mount, 'feature' ) === 'plain,sample' );
-check( 'an active feature is the shared drill-down row - a button with a chevron, and no action of its own in the list', row( mount, 'plain' ).tagName === 'BUTTON'
-	&& hasClass( row( mount, 'plain' ), 'admin-type-btn' ) && row( mount, 'plain' ).type === 'button'
-	&& byTag( row( mount, 'plain' ), 'span' ).filter( function( el ) { return hasClass( el, 'admin-view-button-chev' ) } ).length === 1
-	&& findAll( row( mount, 'plain' ), function( el ) { return el.tagName === 'BUTTON' } ).length === 0 );
-check( 'its line leads with the category, then names the version and, where an update waits, the one on disk', meta( row( mount, 'plain' ) ) === text('/_admin/features/category/ui')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' )+ ' · Nothing to set.' );
+check( 'Active lists the features that are on', rowKeys( mount ) === 'plain,sample' );
+check( 'an active feature is a row of the table that opens on a press and on the keyboard - and has no button of its own in the list', row( mount, 'plain' ).tagName === 'TR'
+	&& hasClass( row( mount, 'plain' ), 'is-clickable' ) && row( mount, 'plain' ).tabIndex === 0 && findAll( row( mount, 'plain' ), function( el ) { return el.tagName === 'BUTTON' } ).length === 0 );
+check( 'its cells lead with the name, then name the category, the version and, where an update waits, the one on disk, and the line under the name says what it does',
+	cells( row( mount, 'plain' ) )[1] === text('/_admin/features/category/ui') && cells( row( mount, 'plain' ) )[2] === '1.0.0 – '+ text('/_admin/features/label/installed').replace( '%s', '0.9.0' ) && meta( row( mount, 'plain' ) ) === 'Nothing to set.' );
 
-// --- the filter over everything the tabs hold
+// --- the search over the rows of a tab: the table's own, in the browser
 
-/** The filter as it stands after the last redraw - the panel builds a new one every time */
-function filterNow() {
-	return mount.children[0].children[0];
+/** The search as it stands after the last redraw of the tab - the panel builds a new table every time */
+function searchNow() {
+	return findAll( tabContent(), function( el ) { return el.tagName === 'INPUT' } )[0];
 }
 
-filterNow().value = 'beispiel';
-fire( filterNow(), 'input' );
-const narrowed = byTag( paneHead.children[1], 'button' );
-check( 'a filter narrows every tab\'s count to what matches, so the counts say where the match is', narrowed[0].textContent === text('/_admin/features/tab/active')+ ' (1)'
-	&& narrowed[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && narrowed[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
-check( 'and the tab on screen shows the match alone', rowKeys( mount, 'feature' ) === 'sample' );
-check( 'the filter survives the redraw it triggers, with what was typed', filterNow().value === 'beispiel' );
+const askedBeforeSearch = requests.length;
+searchNow().value = 'beispiel';
+fire( searchNow(), 'input' );
+check( 'the search keeps the rows that match and draws only those, and asks the backend for nothing', rowKeys( mount ) === 'sample' && requests.length === askedBeforeSearch );
+check( 'the counts of the tabs follow the search, in place: they say where the match is, and the field that has the focus is not built anew',
+	byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (1)' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && searchNow().value === 'beispiel' );
 
-/*	...and so does the caret. The panel is drawn again per keystroke and the
-	focus put back by hand, which used to mean "at the end of the value": an
-	edit in the middle of a word sent the next character to the end instead,
-	and a Backspace after a click mid-string deleted the last character
-	rather than the one before the click	*/
-const editing = filterNow();
-editing.value = 'beispieX';
-editing.setSelectionRange( 7, 7 );
-fire( editing, 'input' );
-check( 'the caret comes back where it was, not at the end of what was typed', filterNow().selectionStart === 7 && filterNow().selectionEnd === 7 );
-check( '...and the focus is on the filter that replaced it', filterNow().focused === true );
+searchNow().value = text('/_admin/features/category/ui').toUpperCase();
+fire( searchNow(), 'input' );
+check( 'it reads the category too, and ignores case', rowKeys( mount ) === 'plain' );
 
-filterNow().value = 'beispiel';
-fire( filterNow(), 'input' );
+searchNow().value = 'NOTHING TO SET';
+fire( searchNow(), 'input' );
+check( 'it reads the description too, which is no column', rowKeys( mount ) === 'plain' );
 
-filterNow().value = 'NOTHING TO SET';
-fire( filterNow(), 'input' );
-check( 'it reads the description too, and ignores case', rowKeys( mount, 'feature' ) === 'plain' );
+searchNow().value = 'sampl';
+fire( searchNow(), 'input' );
+check( 'it reads the key too, which is no column', rowKeys( mount ) === 'sample' );
 
-filterNow().value = 'fre';
-fire( filterNow(), 'input' );
+searchNow().value = 'fre';
+fire( searchNow(), 'input' );
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
-check( 'switching tabs keeps the filter, and it reads the key as well as the name', rowKeys( mount, 'feature' ) === 'fresh'
-	&& filterNow().value === 'fre' );
-
-filterNow().value = 'zzz';
-fire( filterNow(), 'input' );
-check( 'a filter that matches nothing says so - not the tab\'s own empty state, which would explain a features directory nobody asked about',
-	findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
-
-filterNow().value = '';
-fire( filterNow(), 'input' );
+check( 'the search stays where it was when the tab changes: the other tab is searched for the same word', searchNow().value === 'fre' && rowKeys( mount ) === 'fresh' );
+panel._renderPanel();
+check( '...and when the panel is drawn again', searchNow().value === 'fre' && rowKeys( mount ) === 'fresh' );
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
-check( 'cleared, every card is back', rowKeys( mount, 'feature' ) === 'plain,sample' );
 
-// --- the category beside it
+searchNow().value = 'zzz';
+fire( searchNow(), 'input' );
+check( 'a search that matches nothing says so - not the tab\'s own empty state, which would explain a features directory nobody asked about',
+	findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) && hasClass( el, 'nino-admin-hidden' ) === false } )[0].textContent === text('/_admin/features/hint/nomatch') );
+
+searchNow().value = '';
+fire( searchNow(), 'input' );
+check( 'cleared, every row is back', rowKeys( mount ) === 'plain,sample' );
+
+// A row that opens says so
+check( 'a row that opens has the "›" that says so, which a screen reader skips, and one that does not open has none',
+	findAll( row( mount, 'plain' ), function( el ) { return hasClass( el, 'nino-admin-row-chev' ) && el.attributes['aria-hidden'] === 'true' } ).length === 1 );
+
+// --- the category above it
 
 /** The category select as it stands after the last redraw - rebuilt like everything else in the head */
 function categoryNow() {
-	return mount.children[0].children[1];
+	return mount.children[0].children[0];
 }
 
 check( 'the category is a select of its own, labelled from the text system and reusing the shared input control',
@@ -572,27 +575,21 @@ check( 'so a category nothing is filed under is not offered - the catalogue is n
 categoryNow().value = 'content';
 fire( categoryNow(), 'change' );
 const byCategory = byTag( paneHead.children[1], 'button' );
-check( 'picking one narrows every tab\'s count the way the search box does', byCategory[0].textContent === text('/_admin/features/tab/active')+ ' (1)'
+check( 'picking one narrows every tab\'s count', byCategory[0].textContent === text('/_admin/features/tab/active')+ ' (1)'
 	&& byCategory[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' && byCategory[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
-check( 'and the tab on screen shows what is filed under it', rowKeys( mount, 'feature' ) === 'sample' );
+check( 'and the tab on screen shows what is filed under it', rowKeys( mount ) === 'sample' );
 check( 'the pick survives the redraw it triggers', categoryNow().value === 'content' );
 
-filterNow().value = 'plain';
-fire( filterNow(), 'input' );
+searchNow().value = 'plain';
+fire( searchNow(), 'input' );
 check( 'the two narrow together rather than one replacing the other - Plain is not filed under Content',
-	findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
+	findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) && hasClass( el, 'nino-admin-hidden' ) === false } )[0].textContent === text('/_admin/features/hint/nomatch') );
 
-filterNow().value = '';
-fire( filterNow(), 'input' );
+searchNow().value = '';
+fire( searchNow(), 'input' );
 categoryNow().value = '';
 fire( categoryNow(), 'change' );
-check( 'cleared, every feature is back', rowKeys( mount, 'feature' ) === 'plain,sample' );
-
-filterNow().value = text('/_admin/features/category/ui').toLowerCase();
-fire( filterNow(), 'input' );
-check( 'typing a category name into the search box finds the same rows, for anyone who never noticed the select', rowKeys( mount, 'feature' ) === 'plain' );
-filterNow().value = '';
-fire( filterNow(), 'input' );
+check( 'cleared, every feature is back', rowKeys( mount ) === 'plain,sample' );
 
 // A pick that no longer names anything on screen would hide every row with
 // nothing on the page saying why - so a reload that drops the last feature
@@ -601,11 +598,11 @@ categoryNow().value = 'ui';
 fire( categoryNow(), 'change' );
 panel.init();
 answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.filter( function( f ) { return f.category !== 'ui' } ) ) );
-check( 'a category gone after a reload stops narrowing instead of emptying the list for good', rowKeys( mount, 'feature' ) === 'sample' && categoryNow().value === '' );
+check( 'a category gone after a reload stops narrowing instead of emptying the list for good', rowKeys( mount ) === 'sample' && categoryNow().value === '' );
 
 panel.init();
 answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
-check( 'and the whole list is back with the feature', rowKeys( mount, 'feature' ) === 'plain,sample' );
+check( 'and the whole list is back with the feature', rowKeys( mount ) === 'plain,sample' );
 
 // --- one feature's own screen (from the Active tab)
 
@@ -779,7 +776,7 @@ check( '...and on the tab it was saved from: a save is not a reason to be put ba
 
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
 check( 'the back link returns to the list on the tab it was left on, and empties the pane behind it', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true
-	&& screen.children.length === 0 && rowKeys( mount, 'feature' ) === 'plain,sample' );
+	&& screen.children.length === 0 && rowKeys( mount ) === 'plain,sample' );
 
 // A feature switched off somewhere else - another tab, another account -
 // must not leave a screen standing for something that is no longer on
@@ -879,7 +876,7 @@ answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 // --- switching on and off (from the tab the feature is on)
 
 fire( tabs[1], 'click' );
-const activate = byTag( row( mount, 'fresh' ), 'button' )[1];
+const activate = byTag( row( mount, 'fresh' ), 'button' )[0];
 const freshMsg = byTag( row( mount, 'fresh' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
 fire( activate, 'click' );
 check( 'Activate posts features/activate with the key', requests[requests.length - 1].action === 'features/activate' && requests[requests.length - 1].payload.key === 'fresh' && activate.disabled === true && freshMsg.textContent === text('/_admin/features/msg/activating') );
@@ -920,7 +917,7 @@ check( 'a removal that leaves sections of the privacy policy behind says which, 
 	&& panel._said === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Old, Old, too' ) );
 check( 'a removal reads the whole list again - what it took away may be what another row was waiting for', requests[requests.length - 1].action === 'features/list' );
 answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.filter( function( f ) { return f.key !== 'old' } ) ) );
-check( '...and the row is gone with no page reload: no rail entry changes when an inactive feature leaves', rowKeys( mount, 'feature' ) === 'fresh' && reloads === 1 );
+check( '...and the row is gone with no page reload: no rail entry changes when an inactive feature leaves', rowKeys( mount ) === 'fresh' && reloads === 1 );
 check( '...and the line stands above the list, as text, until the next tab press says something else', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 1
 	&& findAll( mount, function( el ) { return el.id === 'features-note' } )[0].attributes.role === 'status' );
 fire( tabs[1], 'click' );
@@ -988,22 +985,24 @@ const availableTabs = byTag( paneHead.children[1], 'button' );
 check( 'Available\'s count is the offers that are not already current: ancient, extra, helper, needy - not sample', availableTabs[2].textContent === text('/_admin/features/tab/available')+ ' (4)' );
 check( 'the status line reads the cache\'s own stamp', byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', CACHE.fetched ) );
 check( 'and the category now offers what the catalogue brought as well - it is built from what is on screen, installed or not',
-	byTag( mount.children[0].children[1], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
+	byTag( mount.children[0].children[0], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
 
-check( 'the Available tab is one card per offer that is not current, ancient/extra/helper/needy but not sample', rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
-check( 'an offer carries its maturity as a badge after its name, and the one that names none does not', badgeOf( offer( mount, 'extra' ) ).join('|') === 'Beta' && badgeOf( offer( mount, 'needy' ) ).length === 0 );
-check( '...in the <strong> that holds the name there too', badgeParents( offer( mount, 'extra' ) ).length === 1 && badgeParents( offer( mount, 'extra' ) )[0].tagName === 'STRONG' && badgeParents( offer( mount, 'extra' ) )[0].textContent === 'Zusatz' );
-check( 'an offer is a row of the same grouped list, its name in the shared copy, no status badge', offer( mount, 'extra' ).tagName === 'LI'
-	&& hasClass( offer( mount, 'extra' ).children[0], 'nino-admin-list-copy' ) && offer( mount, 'extra' ).children[0].children[0].textContent === 'Zusatz' );
-check( 'an available offer has Install as the primary action, and one line naming its version, its release date and what it is', byTag( offer( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/install') && hasClass( byTag( offer( mount, 'extra' ), 'button' )[0], 'nino-admin-btn-primary' )
-	&& meta( offer( mount, 'extra' ) ) === text('/_admin/features/category/marketing')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.0.0' )+ ' – '+ text('/_admin/features/label/released').replace( '%s', '2026-09-07' )+ ' · Ein extra'
+const dimmed = function( key ) { return findAll( offer( mount, key ), function( el ) { return el.attributes['aria-disabled'] === 'true' } ).length === 1 };
+
+check( 'the Available tab is one row per offer that is not current, ancient/extra/helper/needy but not sample', rowKeys( mount ) === 'ancient,extra,helper,needy' );
+check( 'an offer carries its maturity as its state, and the one that names none has an empty one', cells( offer( mount, 'extra' ) )[3] === 'Beta' && cells( offer( mount, 'needy' ) )[3] === '' && badgeOf( offer( mount, 'extra' ) ).length === 0 );
+check( 'an offer is a row of the same table, its name in the shared copy', offer( mount, 'extra' ).tagName === 'TR'
+	&& hasClass( byTag( offer( mount, 'extra' ), 'td' )[0].children[0], 'nino-admin-list-copy' ) && byTag( offer( mount, 'extra' ), 'strong' )[0].textContent === 'Zusatz' );
+check( 'an available offer has Install as the primary action, a small one, and cells naming its category, its version with its release date, and the line says what it is', byTag( offer( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/install') && hasClass( byTag( offer( mount, 'extra' ), 'button' )[0], 'nino-admin-btn-primary' )
+	&& hasClass( byTag( offer( mount, 'extra' ), 'button' )[0], 'nino-admin-btn--small' )
+	&& cells( offer( mount, 'extra' ) )[1] === text('/_admin/features/category/marketing') && cells( offer( mount, 'extra' ) )[2] === '1.0.0 – '+ text('/_admin/features/label/released').replace( '%s', '2026-09-07' ) && meta( offer( mount, 'extra' ) ) === 'Ein extra'
 	&& notes( offer( mount, 'extra' ) ).join('|') === text('/_admin/features/label/requires').replace( '%s', 'helper' ) );
 check( 'an upgrade offers Update to the new version and names the one on disk', byTag( offer( mount, 'helper' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/update').replace( '%s', '1.2.0' )
-	&& meta( offer( mount, 'helper' ) ) === text('/_admin/features/category/system')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' )+ ' – '+ text('/_admin/features/label/installed').replace( '%s', '1.1.0' ) );
-check( 'an incompatible one is greyed, offers nothing, and says what it asks for: the Nino constraint, and the extensions where it names some', byTag( offer( mount, 'needy' ), 'button' ).length === 0 && offer( mount, 'needy' ).attributes['aria-disabled'] === 'true'
+	&& cells( offer( mount, 'helper' ) )[2] === '1.2.0 – '+ text('/_admin/features/label/installed').replace( '%s', '1.1.0' ) );
+check( 'an incompatible one is greyed, offers nothing, and says what it asks for: the Nino constraint, and the extensions where it names some', byTag( offer( mount, 'needy' ), 'button' ).length === 0 && dimmed( 'needy' )
 	&& notes( offer( mount, 'needy' ) ).join('|') === text('/_admin/features/label/nino').replace( '%s', '^1.0' )+ '|'+ text('/_admin/features/label/extensions').replace( '%s', 'no_such_extension, other' )
 	&& notes( offer( mount, 'ancient' ) ).join('|') === text('/_admin/features/label/nino').replace( '%s', '^0.9' )
-	&& offer( mount, 'extra' ).attributes['aria-disabled'] === undefined );
+	&& dimmed( 'extra' ) === false );
 check( 'a current offer (sample) is excluded from Available entirely', offer( mount, 'sample' ) === undefined );
 
 // --- installing from it
@@ -1090,7 +1089,7 @@ answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE, { offers
 check( 'the installed feature now shows on Inactive, off, with Activate - and Available lost it, straight from the cache', byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (3)' );
 
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
-check( 'the just-installed feature is on Inactive now, with Remove and Activate', row( mount, 'extra' ) !== undefined && byTag( row( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/remove')+ '|'+ text('/_admin/features/label/activate') );
+check( 'the just-installed feature is on Inactive now, with Remove and Activate', row( mount, 'extra' ) !== undefined && byTag( row( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/activate')+ '|'+ text('/_admin/features/label/remove') );
 
 fire( byTag( paneHead.children[1], 'button' )[2], 'click' );
 check( 'and the offer itself is gone from Available - excluded as current, not shown with a disabled button', offer( mount, 'extra' ) === undefined );
@@ -1156,8 +1155,8 @@ answer( 200, catalogueAnswer( true, OFFERS, '2026-09-08 09:00' ) );
 check( 'a successful refresh clears the error, frees the button and the status now names when it was fetched', hasClass( byTag( catalogueBar(), 'p' )[0], 'nino-admin-error' ) === false && byTag( catalogueBar(), 'button' )[0].disabled === false
 	&& byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-08 09:00' ) );
 check( 'the Available tab now shows the refreshed offers, count 4', byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (4)'
-	&& rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
-check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( paneHead.children[1], 'button' )[0], 'click' ), fire( byTag( paneHead.children[1], 'button' )[2], 'click' ), rowKeys( mount, 'offer' ).split(',').filter( Boolean ).length === 4 ) );
+	&& rowKeys( mount ) === 'ancient,extra,helper,needy' );
+check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( paneHead.children[1], 'button' )[0], 'click' ), fire( byTag( paneHead.children[1], 'button' )[2], 'click' ), rowKeys( mount ).split(',').filter( Boolean ).length === 4 ) );
 check( '...and every redraw put one strip into the head, in the place after the name, rather than stacking them', paneHead.children.length === 3 && hasClass( paneHead.children[1], 'admin-panel-tabs' ) && paneHead.children[0] === paneTitle );
 
 // --- a refresh does not draw the open feature's screen over settings somebody typed
@@ -1239,7 +1238,7 @@ check( '...and Active, empty, with one installed and off, says no feature is on'
 panel._features = [];
 panel._renderPanel();
 check( 'and with nothing to narrow the category is not drawn at all - a select with one option is a control that cannot be used',
-	mount.children[0].children.length === 1 && byTag( mount.children[0], 'select' ).length === 0 );
+	mount.children[0].children.length === 0 && byTag( mount.children[0], 'select' ).length === 0 );
 
 panel.init();
 answer( 500, null );
@@ -1278,9 +1277,9 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	fire( strip4()[3], 'click' );
 	check( 'pressing it opens it in the shared tabpanel, named by the tab, and leaves the other tabs\' counts as they were', hasClass( strip4()[3], 'is-active' ) && strip4()[3].attributes['aria-selected'] === 'true'
 		&& tabContent().id === 'features-tabpanel' && tabContent().attributes['aria-labelledby'] === 'features-tabbutton-applications' && strip4()[0].textContent === text('/_admin/features/tab/active')+ ' (2)' );
-	check( 'one row per application, in the order the catalogue gives them, none of the rows of the other tabs', rowKeys( mount, 'application' ) === 'site,vcard,blog,crm,wild,wild2,wild3' && rowKeys( mount, 'feature' ) === '' && rowKeys( mount, 'offer' ) === '' );
+	check( 'one row per application, in the order the catalogue gives them, none of the rows of the other tabs', appKeys() === 'site,vcard,blog,crm,wild,wild2,wild3' && rowKeys( mount ) === '' );
 	check( 'the tab says what an application is and what setting one up leaves alone, once', byTag( tabContent(), 'p' ).filter( function( el ) { return el.textContent === text('/_admin/features/hint/applications') } ).length === 1 );
-	check( 'there is no category to narrow by on this tab: an application has none', byTag( mount.children[0], 'select' ).length === 0 && mount.children[0].children.length === 1 );
+	check( 'there is no category to narrow by on this tab: an application has none', byTag( mount.children[0], 'select' ).length === 0 && mount.children[0].children.length === 0 );
 
 	const states = function( key ) { return findAll( appRow( key ), function( el ) { return hasClass( el, 'admin-features-badge' ) } ).map( function( el ) { return el.textContent } ).join('|') };
 	check( 'how far each is set up is a word after its name: set up, partly set up, not set up', states( 'blog' ) === text('/_admin/features/state/applied') && states( 'site' ) === text('/_admin/features/state/partial') && states( 'vcard' ) === text('/_admin/features/state/none')
@@ -1302,18 +1301,17 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 		/#features-list \.admin-features-actions > a\.nino-admin-btn-primary \{[^}]*min-height: var\(--nino-admin-control-height\);[^}]*padding:/s.test( moduleCss ) );
 	check( 'the row carries no handler in its markup and names itself to the keyboard: real buttons and links only', findAll( mount, function( el ) { return el.attributes !== undefined && Object.keys( el.attributes ).some( function( name ) { return /^on/i.test( name ) } ) } ).length === 0 );
 
-	// The search box finds an application by what it is called or says
-	const search = findAll( mount, function( el ) { return el.id === 'features-filter' } )[0];
-	search.value = 'kontakte';
-	fire( search, 'input' );
-	check( 'the search box narrows the applications by name, key or description, and the count with it', rowKeys( mount, 'application' ) === 'crm' && strip4()[3].textContent === text('/_admin/features/tab/applications')+ ' (1)' );
-	const search1 = findAll( mount, function( el ) { return el.id === 'features-filter' } )[0];
-	search1.value = 'zzz';
-	fire( search1, 'input' );
-	check( 'and says so when it finds none', rowKeys( mount, 'application' ) === '' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
-	const search2 = findAll( mount, function( el ) { return el.id === 'features-filter' } )[0];
-	search2.value = '';
-	fire( search2, 'input' );
+	// The search of the other tabs, in the same form: a field over the list, the one value of the panel
+	const appSearch = function() { return findAll( tabContent(), function( el ) { return el.tagName === 'INPUT' && el.type === 'search' } )[0] };
+	check( 'the tab has a search of the same form, named from the text system, and no table', appSearch() !== undefined && appSearch().attributes['aria-label'] === text('/_admin/features/label/search') && findAll( tabContent(), function( el ) { return el.tagName === 'TABLE' } ).length === 0 );
+	appSearch().value = 'kontakte';
+	fire( appSearch(), 'input' );
+	check( 'it narrows the applications by name, key or description, and the count with it', appKeys() === 'crm' && strip4()[3].textContent === text('/_admin/features/tab/applications')+ ' (1)' && appSearch().value === 'kontakte' );
+	appSearch().value = 'zzz';
+	fire( appSearch(), 'input' );
+	check( 'and says so when it finds none', appKeys() === '' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) && el.hidden !== true } )[0].textContent === text('/_admin/features/hint/nomatch') );
+	appSearch().value = '';
+	fire( appSearch(), 'input' );
 
 	// --- every way there is nothing to show
 
@@ -1343,7 +1341,7 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	panel._tab = 'applications';
 	fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-09 10:00', APPLICATIONS ) );
-	check( 'a refresh fills the Applications tab from its own answer, without a list read', rowKeys( mount, 'application' ) === 'site,vcard,blog,crm,wild,wild2,wild3' && requests[requests.length - 1].action === 'features/catalogue' );
+	check( 'a refresh fills the Applications tab from its own answer, without a list read', appKeys() === 'site,vcard,blog,crm,wild,wild2,wild3' && requests[requests.length - 1].action === 'features/catalogue' );
 	panel._tab = 'applications';
 
 	// --- setting one up
@@ -1662,11 +1660,11 @@ panel._tab = 'active';
 panel._renderPanel();
 // The one that runs has the one action nothing else of the panel reaches: it takes the class out of the modules
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
-const runningRow2 = findAll( mount, function( el ) { return el.dataset.rejected === 'Running' } )[0];
+const runningRow2 = row( mount, 'Running' );
 const runningOff = byTag( runningRow2, 'button' );
-check( 'a refused manifest of a feature that runs has one button, Deactivate, in the danger class - the one that is off has none', runningOff.length === 1
-	&& runningOff[0].textContent === text('/_admin/features/label/deactivate') && hasClass( runningOff[0], 'nino-admin-btn-danger' )
-	&& byTag( findAll( mount, function( el ) { return el.dataset.rejected === 'Idle' } )[0] || runningRow2, 'button' ).length === ( findAll( mount, function( el ) { return el.dataset.rejected === 'Idle' } )[0] ? 0 : 1 ) );
+check( 'a refused manifest of a feature that runs has one button, Deactivate, in the quiet class and not the red one - the one that is off is not on this tab', runningOff.length === 1
+	&& runningOff[0].textContent === text('/_admin/features/label/deactivate') && hasClass( runningOff[0], 'nino-admin-btn-secondary' ) && hasClass( runningOff[0], 'nino-admin-btn-danger' ) === false
+	&& row( mount, 'Idle' ) === undefined );
 const confirmsBeforeRefused = confirms.length;
 const reloadsAtRefused = reloads;
 const requestsBeforeRefused = requests.length;
@@ -1698,7 +1696,6 @@ check( 'answered, it builds the workbench again - the panel it brought leaves th
 	panel._rejected = [];
 	panel._features = FEATURES;
 	panel._said = '';
-	panel._filter = '';
 	panel._category = '';
 	panel._tab = 'inactive';
 	panel._renderPanel();
@@ -1709,31 +1706,46 @@ check( 'answered, it builds the workbench again - the panel it brought leaves th
 	panel._tab = 'inactive';
 
 	// What a switch keeps for the page that is built next
-	panel._filter = 'fre';
 	panel._reload( 'Switched on: Fresh.\nTwo lines.', 'fresh' );
 	const kept = JSON.parse( stored[KEY] );
-	check( 'a switch keeps the sentence, the filters and the row the focus goes to in the session, and lands on its tab', kept.text === 'Switched on: Fresh.\nTwo lines.' && kept.filter === 'fre' && kept.category === '' && kept.focus === 'fresh'
+	check( 'a switch keeps the sentence and the row the focus goes to in the session, and lands on its tab', kept.text === 'Switched on: Fresh.\nTwo lines.' && kept.focus === 'fresh'
 		&& sandbox.window.location.hash === '#features/inactive' );
 
 	// The page that is built: first list, first drawing
 	panel._ready = false;
-	panel._filter = '';
+	panel._category = '';
 	panel._said = '';
 	panel._tab = 'active';
 	panel.init();
 	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
-	check( 'it opens on the tab the address names, with the filter it had, and takes what was kept out of the session', panel._tab === 'inactive' && panel._filter === 'fre' && stored[KEY] === undefined );
+	check( 'it opens on the tab the address names and takes what was kept out of the session', panel._tab === 'inactive' && stored[KEY] === undefined );
 	const noteLine = findAll( mount, function( el ) { return el.id === 'features-note' } )[0];
 	check( '...the sentence stands above the list as a status line, the browser\'s dialog being none', noteLine !== undefined && noteLine.attributes.role === 'status' && mount.children[1] === noteLine && panel._said === 'Switched on: Fresh.\nTwo lines.' );
-	check( '...and the focus is on the Activate of the row it was sent to', focused() !== null && focused().textContent === text('/_admin/features/label/activate') && focused().parentNode.parentNode.dataset.feature === 'fresh' );
+	check( '...and the focus is on the Activate of the row it was sent to', focused() !== null && focused().textContent === text('/_admin/features/label/activate') && focused().closest('tr').dataset.row === 'fresh' );
+
+	// What the search held is kept with it, as the category is
+	panel._query = 'needle';
+	panel._reload( 'Said.' );
+	panel._query = '';
+	panel._restore();
+	check( 'the search comes back with the page that an action ends in', panel._query === 'needle' && JSON.parse( stored[KEY] ?? '{}' ).filter === undefined );
+	panel._query = '';
+
+	// The category the list was narrowed to is kept with it
+	panel._category = 'system';
+	panel._reload( 'Said.' );
+	panel._category = '';
+	panel._restore();
+	check( 'the category the list was narrowed to comes back with the page', panel._category === 'system' );
+	panel._category = '';
 
 	// A page that has nothing kept says nothing and keeps nothing
 	panel._ready = false;
 	panel._said = '';
-	panel._filter = '';
+	panel._category = '';
 	panel.init();
 	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
-	check( 'without anything kept the page opens with no line and the filter empty', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 0 && panel._filter === '' );
+	check( 'without anything kept the page opens with no line and the category empty', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 0 && panel._category === '' );
 
 	// ...and a session that holds something that is not ours
 	stored[KEY] = 'not json';
@@ -1837,12 +1849,12 @@ check( 'answered, it builds the workbench again - the panel it brought leaves th
 	const removeWas = mount.removeChild;
 	mount.removeChild = function( child ) { takenOut.push( child ); return removeWas.call( mount, child ) };
 	panel._renderPanel();
-	panel._filter = 'o';
+	panel._category = 'system';
 	panel._renderPanel();
-	panel._filter = '';
+	panel._category = '';
 	panel._renderPanel();
 	mount.removeChild = removeWas;
-	check( 'drawn again with every keystroke of the filter, it is the same line and it is not taken out of the page: one that is built anew, or put back, is announced anew', findAll( mount, function( el ) { return el.id === 'features-note' } )[0] === first
+	check( 'drawn again with every change of the category, it is the same line and it is not taken out of the page: one that is built anew, or put back, is announced anew', findAll( mount, function( el ) { return el.id === 'features-note' } )[0] === first
 		&& takenOut.indexOf( first ) === -1 && takenOut.length > 0 && mount.children[1] === first );
 	panel._say( 'Another.' );
 	panel._renderPanel();

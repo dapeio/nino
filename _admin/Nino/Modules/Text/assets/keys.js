@@ -306,7 +306,8 @@
 			if( Nino.admin.keys._view !== 'group' )
 				return Nino.admin.keys._opener;
 
-			return Array.from( dc.getElementById('keys-list').querySelectorAll('a') ).find( function( link ) { return link.dataset.group === Nino.admin.keys._currentGroup } ) ?? null;
+			const row = Array.from( dc.getElementById('keys-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === Nino.admin.keys._currentGroup } );
+			return row === undefined ? null : row.querySelector('a');
 		},
 
 		/**
@@ -536,54 +537,26 @@
 			model.blocks.forEach( function( block ) {
 
 				const part = dc.createElement('section');
-				part.className = 'admin-text-block';
-
-				const heading = dc.createElement('h2');
-				heading.textContent = Nino.content.getText( '/_admin/text/group/'+ block.id );
-				part.appendChild( heading );
+				part.appendChild( Nino.adminUi.sectionTitle( Nino.content.getText( '/_admin/text/group/'+ block.id ) ) );
 
 				( block.rows !== undefined ? [ { id : block.id, rows : block.rows } ] : block.groups ).forEach( function( group ) {
 
-					if( block.rows === undefined && group.id !== 'common' ) {
-						const title = dc.createElement('h3');
-						title.textContent = Nino.content.getText( '/_admin/text/group/'+ group.id );
-						part.appendChild( title );
-					}
-
-					const ul = dc.createElement('ul');
-					ul.className = 'nino-admin-list';
-
-					group.rows.forEach( function( id ) {
+					// A row opens a form and writes its address: a link, with that address
+					part.appendChild( Nino.adminUi.list( group.rows.map( function( id ) {
 
 						const row = model.rows[id];
 
-						// A row opens a form and writes its address: a link, with that address
-						const li = dc.createElement('li');
-						const link = dc.createElement('a');
-						link.href = Nino.admin.router.href( 'keys', Nino.admin.textKeys.hashParts( id ) );
-						link.dataset.group = id;
-
-						const copy = dc.createElement('span');
-						copy.className = 'nino-admin-list-copy';
-						const title = dc.createElement('strong');
-						title.textContent = Nino.admin.textKeys.rowLabel( model, row, locale );
-
-						const descr = dc.createElement('small');
-						descr.textContent = Nino.admin.textKeys.rowSummary( row, locale );
-						copy.appendChild( title );
-						copy.appendChild( descr );
-						link.appendChild( copy );
-
-						link.addEventListener( 'click', function( ev ) {
-							ev.preventDefault();
-							Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( id ) );
-							Nino.admin.keys._openGroup( id, null, true );
-						} );
-						li.appendChild( link );
-						ul.appendChild( li );
-					} );
-
-					part.appendChild( ul );
+						return {
+							key : id,
+							title : Nino.admin.textKeys.rowLabel( model, row, locale ),
+							detail : Nino.admin.textKeys.rowSummary( row, locale ),
+							href : Nino.admin.router.href( 'keys', Nino.admin.textKeys.hashParts( id ) ),
+							onOpen : function() {
+								Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( id ) );
+								Nino.admin.keys._openGroup( id, null, true );
+							},
+						};
+					} ), { title : block.rows === undefined && group.id !== 'common' ? Nino.content.getText( '/_admin/text/group/'+ group.id ) : '', level : 3 } ) );
 				} );
 
 				body.appendChild( part );

@@ -9,7 +9,10 @@ return [
 	'[[/_admin/nav/features]]'								=> 'Features',
 	'[[/_admin/features/label/active]]'				=> 'Active features',
 	'[[/_admin/features/tab/available]]'			=> 'Available',
-	'[[/_admin/features/label/filter]]'			=> 'Filter by name',
+	'[[/_admin/features/label/search]]'			=> 'Search features',
+	'[[/_admin/features/col/name]]'			=> 'Name',
+	'[[/_admin/features/col/version]]'		=> 'Version',
+	'[[/_admin/features/col/state]]'			=> 'State',
 	'[[/_admin/features/label/category]]'			=> 'Category',
 	'[[/_admin/features/label/category-all]]'	=> 'All categories',
 	// One per \Nino\Features::CATEGORIES, and one for a feature that names

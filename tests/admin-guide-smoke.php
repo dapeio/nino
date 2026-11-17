@@ -336,6 +336,43 @@ foreach( $converted as $script ) {
 check( 'the panels that have gone over to the blocks of the bar build neither the bar, its buttons by class, the way back nor the list bar by hand'. ( $byHand === [] ? '' : ' - '. implode( ', ', $byHand ) ), $byHand === [] );
 check( '...and use actionBar(), contextBar() and say()'. ( $lacking === [] ? '' : ' - not '. implode( ', ', $lacking ) ), $lacking === [] );
 
+// --- the panels that have gone over to the blocks of a list ------------------------------------------------
+
+/*	The panels whose lists are drawn by the blocks: the groups of Text and Keys by list(), their filter by filterBar() and
+	chip(), the three tabs of Features by table(). Each script names the block it draws with, and no script or stylesheet of
+	them names a class of a list row, a chip, a search bar or a group of a panel's own. The list grows: the patch that brings
+	another panel over adds its script here	*/
+$listed = [
+	'_admin/Nino/Modules/Text/assets/admin.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Text/assets/keys.js'			=> 'adminUi.list(',
+	'_admin/Nino/Modules/Text/assets/textkeys.js'	=> 'adminUi.filterBar(',
+	'_admin/Nino/Modules/Features/assets/admin.js'	=> 'adminUi.table(',
+];
+
+$ownClass = '/admin-type-btn|admin-view-button-chev|admin-text-chip|admin-text-search|admin-text-block|nino-admin-list-buttons/';
+$unlisted = [];
+$ownLists = [];
+
+foreach( $listed as $script => $block ) {
+
+	$source = $bare( $read( $script ) );
+
+	if( str_contains( $source, $block ) === false )
+		$unlisted[] = $script;
+
+	if( preg_match( $ownClass, $source ) === 1 )
+		$ownLists[] = $script;
+}
+
+foreach( [ '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ] as $sheet ) {
+	if( preg_match( $ownClass, $bare( $read( $sheet ) ) ) === 1 )
+		$ownLists[] = $sheet;
+}
+
+check( 'the panels that have gone over to the blocks of a list draw with them'. ( $unlisted === [] ? '' : ' - not '. implode( ', ', $unlisted ) ), $unlisted === [] );
+check( '...and name no list row, chip, search bar or group of their own, in script or stylesheet'. ( $ownLists === [] ? '' : ' - '. implode( ', ', $ownLists ) ), $ownLists === [] );
+check( 'the chip and the search bar of the Text panel are the blocks', str_contains( $bare( $read( '_admin/Nino/Modules/Text/assets/textkeys.js' ) ), 'adminUi.chip(' ) === true );
+
 // --- the forms drawn from a schema keep their help behind the (?) ------------------------------------------
 
 /*	The scripts that draw a form from a schema - the Config panel, Maintenance, the login protection, Language and the

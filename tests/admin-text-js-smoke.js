@@ -503,6 +503,15 @@ check( 'the Keys tab registers with the shell behind a check that the shell has 
 
 // The words of the workbench in one language, as the fills the panels ask for -
 // read from the files themselves, so what is checked is what ships
+// The rows of a list are the targets that open them; a row's key is on the <li> two levels above its target
+function opens( list ) {
+	return list.querySelectorAll('.nino-admin-row-open');
+}
+
+function keyOf( target ) {
+	return target.parentNode.parentNode.dataset.row;
+}
+
 function workbenchWords( locale ) {
 	const out = {};
 	for( const file of [ '_admin/text/', '_admin/Nino/Modules/Text/text/' ] )
@@ -893,22 +902,22 @@ function openedText( response, hash, locale ) {
 
 {
 	const t = openedText( textResponse() );
-	const rows = t.list.querySelectorAll('.admin-type-btn');
+	const rows = opens( t.list );
 
 	check( 'the list is two blocks: the pages, and the rest in groups - each with its heading', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Seiten,Allgemein'
 		&& t.list.querySelectorAll('h3').map( h => h.textContent ).join() === 'Projekt,Bausteine,Module,Features,System,Weitere' );
-	check( '...a row for each page, named after the route, and one for each group of the others', rows.length === Object.keys( t.text._model.rows ).length && rows[0].dataset.group === 'template/page-services'
-		&& rows[0].children[0].children[0] === undefined === false && rows.map( r => r.children[0]._text ).slice( 0, 2 ).join() === 'Leistungen,Rechtliches' );
-	check( '...with what it holds as its line: how many keys and the beginning of their texts', rows[0].querySelector('.admin-type-btn-descr').textContent.startsWith( '(9) ' ) );
+	check( '...a row for each page, named after the route, and one for each group of the others', rows.length === Object.keys( t.text._model.rows ).length && keyOf( rows[0] ) === 'template/page-services'
+		&& rows.map( r => r.querySelector('strong').textContent ).slice( 0, 2 ).join() === 'Leistungen,Rechtliches' );
+	check( '...with what it holds as its line: how many keys and the beginning of their texts', rows[0].querySelector('small').textContent.startsWith( '(9) ' ) );
 	check( 'the search, the language and the filter are above the rows, each named', t.list.querySelector('#text-search').getAttribute('aria-label') === 'Texte durchsuchen' && t.list.querySelector('#text-list-locale').getAttribute('aria-label') === 'Sprache'
 		&& t.list.querySelector('#text-list-empty').textContent === 'Leer in de_DE' && t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'false' );
-	check( 'the words of the workbench are not among the rows', t.list.querySelectorAll('.admin-type-btn').every( r => r.dataset.group !== '_admin' ) );
+	check( 'the words of the workbench are not among the rows', opens( t.list ).every( r => keyOf( r ) !== '_admin' ) );
 
 	// the search
 	const box = t.list.querySelector('#text-search');
 	box.value = 'beraten';
 	box.fire('input');
-	check( 'a search replaces the rows by hits: the path, the piece of text with the word marked, the key', t.list.querySelectorAll('.admin-type-btn').length === 0 && t.list.querySelectorAll('.admin-text-hit').length === 1
+	check( 'a search replaces the rows by hits: the path, the piece of text with the word marked, the key', opens( t.list ).length === 0 && t.list.querySelectorAll('.admin-text-hit').length === 1
 		&& t.list.querySelector('.admin-text-hit strong').textContent === 'Leistungen › Eintrag 1 › Text' && t.list.querySelector('mark').textContent === 'beraten' && t.list.querySelector('.admin-text-hit-key').textContent === '/template/page-services/item-1/text' );
 	check( '...and says how many there are, where a screen reader hears it', t.list.querySelector('#text-list-status').textContent === '1 Treffer' && t.list.querySelector('#text-list-status').getAttribute('aria-live') === 'polite' );
 	check( 'a hit in the language on screen has no code of a language', t.list.querySelectorAll('.admin-text-hit-lang').length === 0 );
@@ -917,7 +926,7 @@ function openedText( response, hash, locale ) {
 	check( 'nothing found says so, with the empty state of the workbench', t.list.querySelectorAll('.admin-text-hit').length === 0 && t.list.querySelector('.nino-admin-empty').textContent === 'Nichts gefunden.' && t.list.querySelector('#text-list-status').textContent === '0 Treffer' );
 	box.value = '';
 	box.fire('input');
-	check( 'an empty box is the rows again', t.list.querySelectorAll('.admin-type-btn').length === rows.length && t.list.querySelector('#text-list-status').textContent === '' );
+	check( 'an empty box is the rows again', opens( t.list ).length === rows.length && t.list.querySelector('#text-list-status').textContent === '' );
 
 	// a hit in another language: its code switches the language and nothing else
 	box.value = 'consulting';
@@ -929,7 +938,7 @@ function openedText( response, hash, locale ) {
 		&& t.list.querySelectorAll('.admin-text-hit-lang').length === 0 && t.list.querySelectorAll('.admin-text-hit').length === 1 );
 	box.value = '';
 	box.fire('input');
-	check( 'in the other language the pages are named by what their routes are called there', t.list.querySelectorAll('.admin-type-btn').slice( 0, 2 ).map( r => r.children[0]._text ).join() === 'Services,Legal' );
+	check( 'in the other language the pages are named by what their routes are called there', opens( t.list ).slice( 0, 2 ).map( r => r.querySelector('strong').textContent ).join() === 'Services,Legal' );
 	t.list.querySelector('#text-list-empty').click();
 	check( 'the filter for the keys with no text in the language shows them as hits, and says it is on', t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'true'
 		&& t.list.querySelectorAll('.admin-text-hit').map( h => h.querySelector('.admin-text-hit-key').textContent ).join() === '/template/page-services/intro/text' );
@@ -1013,7 +1022,7 @@ function openedText( response, hash, locale ) {
 	const asked = () => t.sent.filter( c => c.endpoint === 'keys' ).length;
 	const fresh = '/template/frame-footer/navigation/label';
 	const rowOf = key => t.text._model.rowOf[key];
-	const listed = group => t.list.querySelectorAll('.admin-type-btn').some( r => r.dataset.group === group );
+	const listed = group => opens( t.list ).some( r => keyOf( r ) === group );
 
 	check( 'the panel asks for the keys once when it opens, and keeps the stamp of the templates it asked at', asked() === 1 && t.text._stamp === 0 && rowOf( fresh ) === undefined && listed( 'template/frame-footer' ) === false );
 	t.text.showCurrent();
@@ -1030,7 +1039,7 @@ function openedText( response, hash, locale ) {
 	check( '...once: what it holds now is the stamp it asked at', asked() === 2 );
 
 	// a row is open: the list is not drawn over it
-	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'template/page-services' ).click();
+	opens( t.list ).find( r => keyOf( r ) === 'template/page-services' ).click();
 	t.Nino.admin.touch( 'templates' );
 	t.text.showCurrent();
 	check( 'a row that is open is not drawn over: shown again, the panel asks for nothing and the form stays', asked() === 2 && t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false );
@@ -1060,14 +1069,14 @@ function openedText( response, hash, locale ) {
 	check( 'the search over keys with a part named constructor answers, in the Text panel', t.list.querySelectorAll('.admin-text-hit').length === 1 );
 	box.value = '';
 	box.fire('input');
-	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'project/shop' ).click();
+	opens( t.list ).find( r => keyOf( r ) === 'project/shop' ).click();
 	check( '...and the form of its row opens, with the section named by the part', t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === 'constructor' && t.text._fieldEls['/project/shop/constructor/name'].value === 'Konstrukteur' );
 }
 
 {
 	// the project: fields that are the same in every language carry the mark, and come first in their section
 	const t = openedText( textResponse() );
-	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'project/company' ).click();
+	opens( t.list ).find( r => keyOf( r ) === 'project/company' ).click();
 	const general = t.form.querySelector('fieldset[data-section="general"]') ?? t.form.querySelectorAll('fieldset.admin-text-section').find( f => f.dataset.section === 'general' );
 	check( 'a row of the project has "general" first, its fields that are the same in every language first - marked "Alle Sprachen"',
 		t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === 'general,contact'
@@ -1090,7 +1099,7 @@ function openedText( response, hash, locale ) {
 	// keys this account may not write are read, in place
 	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => e.key.indexOf( '/project/company/' ) === 0 ? Object.assign( {}, e, { writable : e.key.endsWith( 'email' ) } ) : e ) } );
 	const t = openedText( response );
-	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'project/company' ).click();
+	opens( t.list ).find( r => keyOf( r ) === 'project/company' ).click();
 	const view = t.form.querySelector('[data-key="/project/company/general/name"] .admin-text-readonly');
 	check( 'a key the account may not write is shown as text - named and described like the others - and has no field', view !== null && view.textContent === 'Acme' && t.text._fieldEls['/project/company/general/name'] === undefined
 		&& view.getAttribute('aria-labelledby') === view.parentNode.querySelector('.nino-admin-field-name').id && view.parentNode.querySelector('.admin-text-meta code').textContent === '/project/company/general/name' );
@@ -1121,7 +1130,7 @@ function openedText( response, hash, locale ) {
 {
 	// the focus of a drill-down: into the form that a row or a hit opens, back to the row, and left where it stands when a level is only shown again
 	const t = openedText( textResponse() );
-	const row = group => t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === group );
+	const row = group => opens( t.list ).find( r => keyOf( r ) === group );
 	const pressed = row('template/page-services');
 
 	pressed.click();
@@ -1175,7 +1184,7 @@ function openedText( response, hash, locale ) {
 	// without the Routes module there are no pages, and the list has no block of them
 	const t = openedText( textResponse( { pages : null } ) );
 	check( 'without pages the list has the one block, and the details of a page are among the system\'s rows', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Allgemein'
-		&& t.list.querySelectorAll('.admin-type-btn').some( r => r.dataset.group === '_nino/webpage' ) );
+		&& opens( t.list ).some( r => keyOf( r ) === '_nino/webpage' ) );
 }
 
 // --- the Keys tab: the list, the search, the form that creates and renames --------------
@@ -1204,13 +1213,13 @@ function openedKeys( response, hash ) {
 	const k = openedKeys( keysResponse() );
 
 	check( 'the Keys tab has the rows of the Text panel - with the hidden keys and the words of the workbench, which it exists to show - as a list of links', k.list.querySelectorAll('ul.nino-admin-list').length > 0
-		&& k.list.querySelectorAll('ul.nino-admin-list a').some( a => a.dataset.group === '_admin' ) && k.list.querySelectorAll('ul.nino-admin-list a').some( a => a.dataset.group === 'project/mail' )
+		&& k.list.querySelectorAll('.nino-admin-list a').some( a => keyOf( a ) === '_admin' ) && k.list.querySelectorAll('.nino-admin-list a').some( a => keyOf( a ) === 'project/mail' )
 		&& k.list.querySelector('#keys-list-body').tagName === 'section' );
-	check( '...each a link with the address of its row, because opening it writes that address - none to nowhere', k.list.querySelectorAll('ul.nino-admin-list a').every( a => a.href.indexOf('#keys/') === 0 )
-		&& k.list.querySelectorAll('a').find( a => a.dataset.group === 'project/mail' ).href === '#keys/project/mail' && k.list.querySelectorAll('a').find( a => a.dataset.group === '_admin' ).href === '#keys/_admin' );
+	check( '...each a link with the address of its row, because opening it writes that address - none to nowhere', k.list.querySelectorAll('.nino-admin-list a').every( a => a.href.indexOf('#keys/') === 0 )
+		&& k.list.querySelectorAll('a').find( a => keyOf( a ) === 'project/mail' ).href === '#keys/project/mail' && k.list.querySelectorAll('a').find( a => keyOf( a ) === '_admin' ).href === '#keys/_admin' );
 	check( '...the page rows are blocks, as there is no route list here, and have their names from the vocabulary', k.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Allgemein'
-		&& k.list.querySelectorAll('a').find( a => a.dataset.group === 'template/frame-header' ).querySelector('strong').textContent === 'Kopfrahmen' );
-	check( 'the session language is the one the tab opens in - the previews are English where the session is', k.keys._locale() === 'en_US' && k.list.querySelectorAll('a').find( a => a.dataset.group === 'project/company' ).querySelector('small').textContent.includes( 'We build things' ) );
+		&& k.list.querySelectorAll('a').find( a => keyOf( a ) === 'template/frame-header' ).querySelector('strong').textContent === 'Kopfrahmen' );
+	check( 'the session language is the one the tab opens in - the previews are English where the session is', k.keys._locale() === 'en_US' && k.list.querySelectorAll('a').find( a => keyOf( a ) === 'project/company' ).querySelector('small').textContent.includes( 'We build things' ) );
 	check( 'the scan and the new key sit in the action bar, below the list', k.list.querySelector('.nino-admin-list-actions') !== null || k.list.children[k.list.children.length - 1].querySelectorAll('button').length === 2 );
 
 	// the search: with the hidden keys, and a filter for them alone
@@ -1505,7 +1514,7 @@ function openedKeys( response, hash ) {
 {
 	// the focus of a drill-down in the Keys tab: into the form of a row, the new key or the scan, and back to the control that opened it
 	const k = openedKeys( keysResponse() );
-	const link = group => k.list.querySelectorAll('a').find( a => a.dataset.group === group );
+	const link = group => k.list.querySelectorAll('a').find( a => keyOf( a ) === group );
 	const back = () => k.form.querySelector('.nino-admin-back-link');
 
 	link('project/company').click();
@@ -1558,7 +1567,7 @@ function openedKeys( response, hash ) {
 {
 	// the tab has no list of pages, so it cannot say of a page's details that they have no page
 	const k = openedKeys( keysResponse() );
-	check( 'the row of the details of pages is called by the neutral "Seitenangaben" in the Keys tab', k.list.querySelectorAll('a').find( a => a.dataset.group === '_nino/webpage' ).querySelector('strong').textContent === 'Seitenangaben' );
+	check( 'the row of the details of pages is called by the neutral "Seitenangaben" in the Keys tab', k.list.querySelectorAll('a').find( a => keyOf( a ) === '_nino/webpage' ).querySelector('strong').textContent === 'Seitenangaben' );
 }
 
 // --- a language that has a text file and is not served: the selects say so ----------------
@@ -1572,13 +1581,13 @@ function openedKeys( response, hash ) {
 	check( 'the Text panel offers every language the answer names, and the one the website does not serve says so - the word of the workbench for it, in parentheses behind the code', word !== undefined && word !== ''
 		&& t.text._locales.join() === 'de_DE,en_US,it_IT' && t.text._inactive.join() === 'it_IT'
 		&& optionTexts( t.list.querySelector('#text-list-locale') ) === 'de_DE|en_US|it_IT ('+ word+ ')' && t.list.querySelector('#text-list-locale').children.map( o => o.value ).join() === 'de_DE,en_US,it_IT' );
-	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'template/page-services' ).click();
+	opens( t.list ).find( r => keyOf( r ) === 'template/page-services' ).click();
 	check( '...in the form of a row too, whose select keeps the code as its value', optionTexts( t.form.querySelector('#text-form-locale-select') ) === 'de_DE|en_US|it_IT ('+ word+ ')' );
 	const every = openedText( textResponse() );
 	check( '...and a site whose languages are all served marks none', every.text._inactive.length === 0 && optionTexts( every.list.querySelector('#text-list-locale') ) === 'de_DE|en_US' );
 
 	const k = openedKeys( keysResponse( { locales : withOff } ) );
-	k.list.querySelectorAll('a').find( a => a.dataset.group === 'project/company' ).click();
+	k.list.querySelectorAll('a').find( a => keyOf( a ) === 'project/company' ).click();
 	check( 'the Keys tab does the same in the form of a row', k.keys._locales.join() === 'de_DE,en_US,it_IT' && k.keys._inactive.join() === 'it_IT'
 		&& optionTexts( k.form.querySelector('#keys-form-locale-select') ) === 'de_DE|en_US|it_IT ('+ word+ ')' );
 }

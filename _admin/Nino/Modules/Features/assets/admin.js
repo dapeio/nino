@@ -34,7 +34,7 @@
  *													again, and so are its assets and its words. The hash
  *													names the tab it was pressed on, so the workbench
  *													comes back where it was - on that tab, with the
- *													filters it had and the focus on the row that took
+ *													category it had and the focus on the row that took
  *													the place of the one that left. An install says what
  *													it did in a line above the list: the offer it was
  *													pressed on is not an offer afterwards, so there is no
@@ -117,11 +117,11 @@
 		// opens: what this installation is running is the answer to the
 		// question that brought someone here
 		_tab 				: 'active',
-		// What the filter above the tabs holds - kept across a re-render too,
-		// so switching tabs while searching keeps searching
-		_filter 		: '',
+		// What the search over the rows of a tab holds - one value for the panel, kept across a tab and a
+		// drawing and, through _reload(), across the reload an action ends in
+		_query 			: '',
 		// Which category the list is narrowed to, '' for all of them. Kept
-		// across a re-render for the same reason, and dropped by _renderHead()
+		// across a re-render, so that an action does not widen it, and dropped by _renderHead()
 		// when the category it names is no longer among the ones on offer
 		_category 	: '',
 		// application key => { text, error }: what the last set-up of each said, kept
@@ -142,6 +142,9 @@
 		// somebody who already knows the feature is one click from its
 		// settings, somebody who does not needs the sentence first
 		_detailTab : 'about',
+		// The answer line and the buttons of a row, by the row's key: the table draws its rows again with
+		// every sort, page and search, and a line that says what is going on must be the same element after it
+		_rowParts : new Map(),
 		// The panes of the screen that is open, key -> element, and the shared
 		// button row's paint function - so Save can bring the settings forward
 		// before the browser validates a control the other tab is covering.
@@ -263,7 +266,7 @@
 
 		/**
 		 *	The whole panel, from state: the head that holds the tab strip and
-		 *	the filter, the current tab's content and the action bar (only while
+		 *	the category, the current tab's content and the action bar (only while
 		 *	the catalogue is switched on), which stands last in the markup as it
 		 *	does on the screen, and the open feature's screen unless it is left
 		 *	as it is
@@ -276,9 +279,11 @@
 
 			const wrap = dc.getElementById('features-list');
 
+			Nino.admin.features._rowParts = new Map();
+
 			// The line that says what the last action did stays in the page while the rest
 			// is drawn again: taken out and put back, a status line is announced as often
-			// as the filter is typed into
+			// as the panel is drawn
 			const held = Nino.admin.features._noteLine !== null && Nino.admin.features._noteLine.parentNode === wrap && Nino.admin.features._noteFor === Nino.admin.features._said
 				? Nino.admin.features._noteLine : null;
 
@@ -331,7 +336,7 @@
 			}
 
 			// The same element for the same sentence, drawn again with every
-			// keystroke of the filter: a status line that is built anew is
+			// change of the category: a status line that is built anew is
 			// announced anew, and the words are only added to a line the screen
 			// reader already knows the first time
 			if( Nino.admin.features._noteLine !== null && Nino.admin.features._noteFor === Nino.admin.features._said )
@@ -364,26 +369,86 @@
 
 		/**
 		 *	How many features/offers each tab holds, for its label - of what
-		 *	the filter lets through, so a search says which tab the match is
-		 *	on rather than how much is being hidden
+		 *	the category lets through, so that a category says which tab its
+		 *	features are on rather than how much is being hidden
 		 *
 		 *	@return		{Object}							{ active, inactive, available, applications }
 		 */
 		_counts : function() {
-			const matches = Nino.admin.features._matches;
+
+			const f = Nino.admin.features;
+			const hit = function( row ) { return f._hit( row ) };
+
 			return {
-				active		: Nino.admin.features._features.filter( function( f ) { return f.active === true && matches( f ) } ).length
-					+ Nino.admin.features._rejectedShown( true ).length,
-				inactive	: Nino.admin.features._features.filter( function( f ) { return f.active === false && matches( f ) } ).length
-					+ Nino.admin.features._rejectedShown( false ).length,
-				available	: Nino.admin.features._availableOffers().filter( matches ).length,
-				applications	: Nino.admin.features._applications().filter( Nino.admin.features._matchesApplication ).length,
+				active		: f._features.filter( function( x ) { return x.active === true && f._matches( x ) } ).map( f._featureRow ).filter( hit ).length
+					+ f._rejectedShown( true ).map( f._rejectedRow ).filter( hit ).length,
+				inactive	: f._features.filter( function( x ) { return x.active === false && f._matches( x ) } ).map( f._featureRow ).filter( hit ).length
+					+ f._rejectedShown( false ).map( f._rejectedRow ).filter( hit ).length,
+				available	: f._availableOffers().filter( f._matches ).map( f._offerRow ).filter( hit ).length,
+				applications	: f._applications().filter( f._matchesApplication ).length,
 			};
 		},
 
 		/**
-		 *	The refused manifests the filter lets through: by directory and by reason, in the
-		 *	query's terms; the category select, which a refused manifest has none of, hides them.
+		 *	Whether a row is what the search is looking for: the text of its columns and its key and
+		 *	description, case ignored - the same text the table's own search reads
+		 *
+		 *	@param		{Object}	row					A row of _featureRow(), _rejectedRow() or _offerRow()
+		 *
+		 *	@return		{boolean}
+		 */
+		_hit : function( row ) {
+
+			const query = Nino.admin.features._query.trim().toLowerCase();
+
+			return query === '' || [ row.name, row.category, row.version, row.state, Nino.admin.features._searchText( row ) ].join(' ').toLowerCase().indexOf( query ) !== -1;
+		},
+
+		/**
+		 *	What the search reads of a row besides its columns
+		 *
+		 *	@param		{Object}	row
+		 *
+		 *	@return		{string}
+		 */
+		_searchText : function( row ) {
+			return row.key+ ' '+ ( row.description || '' );
+		},
+
+		/**
+		 *	Whether one application is what the search is looking for: its name, its key or its
+		 *	description. The category narrows features and offers, and an application has none
+		 *
+		 *	@param		{Object}	application
+		 *
+		 *	@return		{boolean}
+		 */
+		_matchesApplication : function( application ) {
+
+			const query = Nino.admin.features._query.trim().toLowerCase();
+
+			return query === '' || [ application.name, application.key, application.description ].join( ' ' ).toLowerCase().indexOf( query ) !== -1;
+		},
+
+		/**
+		 *	Say the counts of the tabs again, in place: a search narrows them while the panel stays
+		 *	as it is drawn, so that the table that holds the focus is not built anew
+		 *
+		 *	@return		void
+		 */
+		_refreshCounts : function() {
+
+			const counts = Nino.admin.features._counts();
+
+			[ 'active', 'inactive', 'available', 'applications' ].forEach( function( key ) {
+				const tab = dc.getElementById( 'features-tabbutton-'+ key );
+				if( tab !== null )
+					tab.textContent = Nino.content.getText( '/_admin/features/tab/'+ key )+ ' ('+ counts[key]+ ')';
+			} );
+		},
+
+		/**
+		 *	The refused manifests of one tab; the category select, which a refused manifest has none of, hides them.
 		 *	Those whose class is listed in the modules all the same belong to Active, the others to Inactive
 		 *
 		 *	@param		{boolean}	active			Of the Active tab or of the Inactive one
@@ -392,25 +457,17 @@
 		 */
 		_rejectedShown : function( active ) {
 
-			const query = Nino.admin.features._filter.trim().toLowerCase();
-
+			// A refused manifest has no category: the select, set to one, hides them
 			if( Nino.admin.features._category !== '' )
 				return [];
 
-			return Nino.admin.features._rejected.filter( function( entry ) {
-				return ( entry.active === true ) === active && ( query === '' || ( entry.dir+ ' '+ entry.reason ).toLowerCase().indexOf( query ) !== -1 );
-			} );
+			return Nino.admin.features._rejected.filter( function( entry ) { return ( entry.active === true ) === active } );
 		},
 
 		/**
-		 *	Whether one feature or offer is what the filter is looking for -
-		 *	its name, its key, its description or the name of its category,
-		 *	case ignored, and inside the category the select narrows to. Both
-		 *	empty matches everything, which is the state the panel opens in
-		 *
-		 *	The category is searchable as well as selectable on purpose:
-		 *	typing "security" is what someone who has not noticed the select
-		 *	does, and it should find the same rows
+		 *	Whether one feature or offer is in the category the select narrows to; with
+		 *	none chosen, all of them are. The search over what the tab shows is the
+		 *	table's own
 		 *
 		 *	@param		{Object}	entry				A feature of features/list or a cached offer
 		 *
@@ -418,15 +475,9 @@
 		 */
 		_matches : function( entry ) {
 
-			const query		= Nino.admin.features._filter.trim().toLowerCase();
-			const category	= Nino.admin.features._category;
+			const category = Nino.admin.features._category;
 
-			if( category !== '' && ( entry.category || '' ) !== category )
-				return false;
-
-			return query === ''
-				|| [ entry.name, entry.key, entry.description, Nino.admin.features._categoryLabel( entry.category ) ]
-					.join( ' ' ).toLowerCase().indexOf( query ) !== -1;
+			return category === '' || ( entry.category || '' ) === category;
 		},
 
 		/**
@@ -503,22 +554,6 @@
 		},
 
 		/**
-		 *	Whether one application is what the search box is looking for: its
-		 *	name, its key or its description. The category narrows features and
-		 *	offers, and an application has none
-		 *
-		 *	@param		{Object}	application
-		 *
-		 *	@return		{boolean}
-		 */
-		_matchesApplication : function( application ) {
-
-			const query = Nino.admin.features._filter.trim().toLowerCase();
-
-			return query === '' || [ application.name, application.key, application.description ].join( ' ' ).toLowerCase().indexOf( query ) !== -1;
-		},
-
-		/**
 		 *	The tab the address names: #features/inactive opens the Inactive
 		 *	tab, #features/applications the Applications tab, and so on, which
 		 *	is where the reload an action ends in comes back to. Active is
@@ -551,7 +586,7 @@
 		 *	there. Every switch ends this way: the rail is rendered by the
 		 *	server, so the panel a feature brings, or takes away, is only
 		 *	there once the page is built again. The sentence, and where the
-		 *	person was - the filters, and the row the focus goes to now that
+		 *	person was - the category, and the row the focus goes to now that
 		 *	the one it was on has left the tab - are kept in the session for
 		 *	the page that is coming, which shows the sentence in the panel's
 		 *	line and not in a dialog of the browser that would hold the reload
@@ -566,7 +601,7 @@
 			try {
 				wn.sessionStorage.setItem( Nino.admin.features._afterKey, JSON.stringify( {
 					text			: text,
-					filter		: Nino.admin.features._filter,
+					filter		: Nino.admin.features._query,
 					category	: Nino.admin.features._category,
 					focus			: focus || '',
 					// Whose it is and when: a session that outlives a sign-out holds it for the next account
@@ -596,7 +631,7 @@
 
 		/**
 		 *	What _reload() kept, taken out of the session: the sentence and
-		 *	the filters are set before the first drawing, and the focus is
+		 *	the category are set before the first drawing, and the focus is
 		 *	asked for after it - see _restored()
 		 *
 		 *	@return		void
@@ -622,7 +657,7 @@
 				return;
 
 			Nino.admin.features._said				= typeof kept.text === 'string' ? kept.text : '';
-			Nino.admin.features._filter			= typeof kept.filter === 'string' ? kept.filter : '';
+			Nino.admin.features._query			= typeof kept.filter === 'string' ? kept.filter : '';
 			Nino.admin.features._category		= typeof kept.category === 'string' ? kept.category : '';
 			Nino.admin.features._focusAfter	= typeof kept.focus === 'string' ? kept.focus : '';
 		},
@@ -643,7 +678,7 @@
 			if( Nino.admin.features._said === '' && key === '' )
 				return;
 
-			const item = key === '' ? undefined : Array.prototype.filter.call( dc.getElementById('features-list').querySelectorAll('li'), function( li ) { return li.dataset.feature === key } )[0];
+			const item = key === '' ? undefined : Array.prototype.filter.call( dc.getElementById('features-list').querySelectorAll('tr'), function( tr ) { return tr.dataset.row === key } )[0];
 			const row = item === undefined ? null : item.querySelector('button.nino-admin-btn-primary');
 			const tab = dc.getElementById( 'features-tabbutton-'+ Nino.admin.features._tab );
 			const target = row !== null ? row : tab;
@@ -671,15 +706,14 @@
 		},
 
 		/**
-		 *	The head of the list: the two filters over everything the tabs
-		 *	hold - the search box and the category - in a row that stays at
-		 *	the top of a long list (see assets/admin.css). The tab strip
-		 *	itself goes into the pane's head beside the panel's name, the row
-		 *	the shell renders over every panel (Nino.adminUi.panelHead()),
-		 *	and only where there is none - the script rendered somewhere
-		 *	other than its pane - opens this row instead. Neither filter is
-		 *	inside the tablist: a tablist holds tabs, and a control in it
-		 *	would be read out as one
+		 *	The head of the list: the category over everything the tabs hold,
+		 *	in a row that stays at the top of a long list (see assets/admin.css).
+		 *	The tab strip itself goes into the pane's head beside the panel's name,
+		 *	the row the shell renders over every panel (Nino.adminUi.panelHead()),
+		 *	and only where there is none - the script rendered somewhere other than
+		 *	its pane - opens this row instead. The select is not inside the tablist:
+		 *	a tablist holds tabs, and a control in it would be read out as one. The
+		 *	search over a tab's rows is the table's own
 		 *
 		 *	@return		{Element}							<div class="admin-features-head">
 		 */
@@ -703,43 +737,6 @@
 				head.appendChild( strip );
 			else
 				paneHead.tabs( strip );
-
-			const filter = dc.createElement('input');
-			filter.type = 'search';
-			filter.className = 'nino-admin-table-search';
-			filter.value = Nino.admin.features._filter;
-			filter.placeholder = Nino.content.getText('/_admin/features/label/filter');
-			filter.setAttribute( 'aria-label', Nino.content.getText('/_admin/features/label/filter') );
-
-			// The whole panel is drawn again per keystroke, so the counts on the
-			// tabs follow along - and the focus put back where it was, since the
-			// element that had it is gone by then.
-			//
-			// Where it was, including the caret: it used to be put at the end
-			// of the value, so typing into the middle of a word ("newsletter",
-			// Home, "s") sent the next character to the end instead, and a
-			// Backspace after clicking mid-string deleted the last character
-			// rather than the one before the click
-			filter.addEventListener( 'input', function() {
-				const start	= filter.selectionStart;
-				const end		= filter.selectionEnd;
-
-				Nino.admin.features._filter = filter.value;
-				Nino.admin.features._renderPanel();
-
-				const next = dc.getElementById('features-filter');
-				if( next !== null ) {
-					next.focus();
-					if( typeof next.setSelectionRange === 'function' )
-						next.setSelectionRange(
-							typeof start === 'number' ? start : next.value.length,
-							typeof end === 'number' ? end : next.value.length
-						);
-				}
-			} );
-
-			filter.id = 'features-filter';
-			head.appendChild( filter );
 
 			// Nothing to narrow when everything on screen shares one category -
 			// a select with a single option is a control that cannot be used
@@ -999,7 +996,7 @@
 			const list	= all.filter( Nino.admin.features._matches );
 			const refused	= Nino.admin.features._rejectedShown( active );
 
-			// The tab is empty, or the filter emptied it - two different things to
+			// The tab is empty, or the category emptied it - two different things to
 			// be told, and the second one is not a reason to explain what a
 			// feature directory is
 			if( all.length === 0 && Nino.admin.features._rejected.filter( function( entry ) { return ( entry.active === true ) === active } ).length === 0 ) {
@@ -1014,75 +1011,287 @@
 				return;
 			}
 
-			if( active === true ) {
-				const rows = dc.createElement('div');
-				rows.className = 'nino-admin-list nino-admin-list-buttons';
-				list.forEach( function( feature ) { rows.appendChild( Nino.admin.features._renderActiveRow( feature ) ) } );
-				panel.appendChild( rows );
+			const rows = list.map( Nino.admin.features._featureRow ).concat( refused.map( Nino.admin.features._rejectedRow ) );
 
-				if( refused.length > 0 ) {
-					const running = dc.createElement('ul');
-					running.className = 'nino-admin-list';
-					refused.forEach( function( entry ) { running.appendChild( Nino.admin.features._renderRejected( entry ) ) } );
-					panel.appendChild( running );
-				}
-
-				return;
-			}
-
-			const rows = dc.createElement('ul');
-			rows.className = 'nino-admin-list';
-			list.forEach( function( feature ) { rows.appendChild( Nino.admin.features._renderFeature( feature ) ) } );
-			refused.forEach( function( entry ) { rows.appendChild( Nino.admin.features._renderRejected( entry ) ) } );
-			panel.appendChild( rows );
+			// An active feature is a row you step into: everything there is to do with it lives on its own screen
+			panel.appendChild( Nino.admin.features._renderTable( rows, active === true ? function( row ) {
+				if( row.feature !== undefined )
+					Nino.admin.features._showDetail( row.feature );
+			} : null ) );
 		},
 
 		/**
-		 *	One directory whose manifest the kernel refused: its name, the line that says it is
+		 *	The rows of a tab as the table takes them: the plain values it sorts and
+		 *	searches by - name, category, version and state - and what the cells and
+		 *	the buttons are made from
+		 *
+		 *	@param		{Object}	feature			An entry of features/list
+		 *
+		 *	@return		{Object}
+		 */
+		_featureRow : function( feature ) {
+
+			const notes = [];
+
+			if( feature.requires.length > 0 )
+				notes.push( { text : Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) ), bad : false } );
+
+			if( feature.shipped === true )
+				notes.push( { text : Nino.content.getText('/_admin/features/label/shipped'), bad : false } );
+
+			// What stands in the way of switching it on, one line each - the
+			// kernel's own words, which is where the check lives
+			feature.problems.forEach( function( problem ) { notes.push( { text : problem, bad : true } ) } );
+
+			return {
+				key				: feature.key,
+				name			: feature.name,
+				category	: feature.category ? Nino.admin.features._categoryLabel( feature.category ) : '',
+				version		: Nino.admin.features._versionText( feature.version, feature.installed, '' ),
+				state			: typeof feature.maturity === 'string' ? feature.maturity : '',
+				description	: feature.description,
+				notes			: notes,
+				feature		: feature,
+			};
+		},
+
+		/**
+		 *	One directory whose manifest the kernel refused as a row: its name, the line that says it is
 		 *	not loaded - or, for a feature that is switched on all the same, that it runs
-		 *	unfinished - and the reason as the kernel worded it - text, never markup. One that is not
-		 *	loaded has no action: there is no feature to switch on, the manifest is to be mended. One that runs
-		 *	has the one that takes its class out of the modules, which is the way out of a state
-		 *	nothing else in the panel can reach
+		 *	unfinished - as its state, and the reason as the kernel worded it - text, never markup
 		 *
 		 *	@param		{Object}	entry				An entry of 'rejected' in features/list
 		 *
-		 *	@return		{Element}							<li>
+		 *	@return		{Object}
 		 */
-		_renderRejected : function( entry ) {
+		_rejectedRow : function( entry ) {
 
-			const row = dc.createElement('li');
-			row.dataset.rejected = entry.dir;
+			return {
+				key				: entry.dir,
+				name			: entry.dir,
+				category	: '',
+				version		: '',
+				state			: Nino.content.getText( entry.active === true ? '/_admin/features/label/rejected-active' : '/_admin/features/label/rejected' ),
+				description	: '',
+				notes			: [ { text : entry.reason, bad : true } ],
+				entry			: entry,
+			};
+		},
 
-			// The sentence and the reason are notes, which wrap: the one line under a name is cut off with an ellipsis
-			// and a sentence cut in the middle says nothing
-			const copy = Nino.admin.features._copy( entry.dir, '', '' );
-			copy.removeChild( copy.children[ copy.children.length - 1 ] );
-			copy.appendChild( Nino.admin.features._note( Nino.content.getText( entry.active === true ? '/_admin/features/label/rejected-active' : '/_admin/features/label/rejected' ), false ) );
-			copy.appendChild( Nino.admin.features._note( entry.reason, true ) );
-			row.appendChild( copy );
+		/**
+		 *	One offer of the catalogue as a row of the Available tab
+		 *
+		 *	@param		{Object}	offer				A cached offer
+		 *
+		 *	@return		{Object}
+		 */
+		_offerRow : function( offer ) {
 
-			if( entry.active === true ) {
+			const notes = [];
 
-				const actions = dc.createElement('div');
-				actions.className = 'admin-features-actions';
+			if( offer.requires.length > 0 )
+				notes.push( { text : Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), offer.requires.join( ', ' ) ), bad : false } );
 
-				const off = dc.createElement('button');
-				off.type = 'button';
-				off.className = 'nino-admin-btn-danger';
-				off.textContent = Nino.content.getText('/_admin/features/label/deactivate');
-				actions.appendChild( off );
+			// What it asks of this kernel, for one no version of which fits -
+			// the only thing that makes such a row worth showing at all
+			if( offer.state === 'incompatible' ) {
+				notes.push( { text : Nino.adminUi.format( Nino.content.getText('/_admin/features/label/nino'), offer.nino ), bad : false } );
+
+				if( offer.ext.length > 0 )
+					notes.push( { text : Nino.adminUi.format( Nino.content.getText('/_admin/features/label/extensions'), offer.ext.join( ', ' ) ), bad : false } );
+			}
+
+			return {
+				key				: offer.key,
+				name			: offer.name,
+				category	: offer.category ? Nino.admin.features._categoryLabel( offer.category ) : '',
+				version		: Nino.admin.features._versionText( offer.version, offer.local, offer.released ),
+				state			: typeof offer.maturity === 'string' ? offer.maturity : '',
+				description	: offer.description,
+				notes			: notes,
+				disabled	: offer.state === 'incompatible',
+				offer			: offer,
+			};
+		},
+
+		/**
+		 *	The version of a row: the one it is, the one on disk where that differs - which is
+		 *	what an update is - and the day it was released, where the catalogue named one
+		 *
+		 *	@param		{string}			version
+		 *	@param		{string|null}	installed		The version on disk, null when there is none
+		 *	@param		{string}			released		'' when nothing was released
+		 *
+		 *	@return		{string}
+		 */
+		_versionText : function( version, installed, released ) {
+
+			return version
+				+ ( installed !== null && installed !== undefined && installed !== version
+					? ' \u2013 '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/label/installed'), installed )
+					: '' )
+				+ ( released !== undefined && released !== '' ? ' \u2013 '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/label/released'), released ) : '' );
+		},
+
+		/**
+		 *	The rows of a tab as a table of the workbench: a search over its full width, the
+		 *	columns name, category, version and state, each sorted by its head, and the small
+		 *	buttons of a row at its end. A row that opens - the Active tab's - opens on a click
+		 *	and on Enter
+		 *
+		 *	@param		{Array}				rows
+		 *	@param		{Function|null}	onOpen		Called with the row that was pressed
+		 *
+		 *	@return		{Element}								<div>
+		 */
+		_renderTable : function( rows, onOpen ) {
+
+			const mount = dc.createElement('div');
+			const parts = Nino.admin.features._rowParts;
+
+			rows.forEach( function( row ) {
+
+				if( parts.has( row.key ) === true )
+					return;
 
 				const msg = dc.createElement('p');
 				msg.className = 'nino-admin-hint';
 				msg.setAttribute( 'aria-live', 'polite' );
-				actions.appendChild( msg );
 
-				off.addEventListener( 'click', function() { Nino.admin.features._deactivateRefused( entry, off, msg ) } );
-				row.appendChild( actions );
+				parts.set( row.key, { msg : msg, buttons : Nino.admin.features._rowButtons( row, msg ) } );
+			} );
+
+			const acts = rows.some( function( row ) { return parts.get( row.key ).buttons.length > 0 } );
+
+			Nino.adminUi.table( {
+				mount		: mount,
+				rows		: rows,
+				rowKey	: 'key',
+				search	: true,
+				query		: Nino.admin.features._query,
+				onQuery	: function( query ) {
+					Nino.admin.features._query = query;
+					Nino.admin.features._refreshCounts();
+				},
+				searchText : Nino.admin.features._searchText,
+				columns	: [
+					{ key : 'name', label : Nino.content.getText('/_admin/features/col/name'), render : function( value, row ) { return Nino.admin.features._nameCell( row ) } },
+					{ key : 'category', label : Nino.content.getText('/_admin/features/label/category') },
+					{ key : 'version', label : Nino.content.getText('/_admin/features/col/version') },
+					{ key : 'state', label : Nino.content.getText('/_admin/features/col/state'), wrap : true },
+				],
+				labels	: {
+					search	: Nino.content.getText('/_admin/features/label/search'),
+					empty		: Nino.content.getText('/_admin/features/hint/nomatch'),
+					noMatch	: Nino.content.getText('/_admin/features/hint/nomatch'),
+				},
+				actions	: acts === true ? function( row ) { return parts.get( row.key ).buttons } : undefined,
+				onRowClick : onOpen === null ? undefined : onOpen,
+			} );
+
+			return mount;
+		},
+
+		/**
+		 *	The name of a row: the name over the line that says what the feature is for, the
+		 *	notes that have to be read whole - a requirement, a reason an activation is
+		 *	refused, what an offer asks of this kernel - and the line its buttons report into
+		 *
+		 *	@param		{Object}	row					A row of _featureRow(), _rejectedRow() or _offerRow()
+		 *
+		 *	@return		{Element}
+		 */
+		_nameCell : function( row ) {
+
+			const copy = dc.createElement('div');
+			copy.className = 'nino-admin-list-copy';
+
+			if( row.disabled === true )
+				copy.setAttribute( 'aria-disabled', 'true' );
+
+			const title = dc.createElement('strong');
+			title.textContent = row.name;
+			copy.appendChild( title );
+
+			if( row.description )
+				copy.appendChild( Nino.adminUi.el( 'small', '', row.description ) );
+
+			row.notes.forEach( function( note ) { copy.appendChild( Nino.admin.features._note( note.text, note.bad ) ) } );
+
+			const parts = Nino.admin.features._rowParts.get( row.key );
+
+			if( parts !== undefined && parts.buttons.length > 0 )
+				copy.appendChild( parts.msg );
+
+			return copy;
+		},
+
+		/**
+		 *	What a row offers: Activate and Remove on an inactive feature - Activate while
+		 *	nothing stands in the way, and Remove not for one that comes with Nino -, Install
+		 *	or Update on an offer, the archive to unpack by hand where nothing can be written,
+		 *	and Deactivate on a refused manifest that runs. An active feature has none: it is
+		 *	opened, and what there is to do with it is on its screen
+		 *
+		 *	@param		{Object}	row
+		 *	@param		{Element}	msg					The line the buttons report into
+		 *
+		 *	@return		{Array}
+		 */
+		_rowButtons : function( row, msg ) {
+
+			const buttons = [];
+
+			if( row.feature !== undefined && row.feature.active === false ) {
+
+				const feature = row.feature;
+
+				if( feature.problems.length === 0 ) {
+					const activate = Nino.adminUi.button( Nino.content.getText('/_admin/features/label/activate'), function() { Nino.admin.features._switch( feature, 'activate', activate, msg ) }, { kind : 'primary', small : true } );
+					buttons.push( activate );
+				}
+
+				// The one destructive control in the list, and it is only ever on an
+				// inactive row: an active feature's class is listed in
+				// /nino/modules, so its directory is not something to delete from
+				// under the autoloader. Switching it off first is one click and
+				// says what it is doing
+				// ...except for a feature that comes with Nino: it is a module of the kernel, there is no directory of the project's to delete
+				if( feature.shipped !== true ) {
+					const remove = Nino.adminUi.button( Nino.content.getText('/_admin/features/label/remove'), function() { Nino.admin.features._remove( feature, remove, msg ) }, { kind : 'danger', small : true } );
+					buttons.push( remove );
+				}
 			}
 
-			return row;
+			// Deactivating is not taking something away: its button is the quiet one, the removal's the red
+			if( row.entry !== undefined && row.entry.active === true ) {
+				const entry = row.entry;
+				const off = Nino.adminUi.button( Nino.content.getText('/_admin/features/label/deactivate'), function() { Nino.admin.features._deactivateRefused( entry, off, msg ) }, { kind : 'secondary', small : true } );
+				buttons.push( off );
+			}
+
+			if( row.offer !== undefined ) {
+
+				const offer = row.offer;
+				const wanted = offer.state === 'available' || offer.state === 'upgrade';
+
+				if( wanted === true && Nino.admin.features._writable === true ) {
+					const install = Nino.adminUi.button(
+						offer.state === 'upgrade' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/label/update'), offer.version ) : Nino.content.getText('/_admin/features/label/install'),
+						function() { Nino.admin.features._install( offer, install, msg ) },
+						{ kind : 'primary', small : true }
+					);
+					buttons.push( install );
+				}
+				else if( wanted === true ) {
+					const archive = dc.createElement('a');
+					archive.href = offer.archive;
+					archive.textContent = Nino.content.getText('/_admin/features/label/archive');
+					buttons.push( archive );
+				}
+			}
+
+			return buttons;
 		},
 
 		/**
@@ -1139,7 +1348,7 @@
 		/**
 		 *	The Available tab: why there is nothing to show, in order - the
 		 *	catalogue is off, it was never loaded, it lists nothing at all,
-		 *	everything it lists is already current, or the filter matched none
+		 *	everything it lists is already current, or the category matched none
 		 *	of it - else the readonly notice where it applies, then one row per
 		 *	offer
 		 *
@@ -1187,10 +1396,7 @@
 				panel.appendChild( readonly );
 			}
 
-			const rows = dc.createElement('ul');
-			rows.className = 'nino-admin-list';
-			shown.forEach( function( offer ) { rows.appendChild( Nino.admin.features._renderOffer( offer, Nino.admin.features._writable === true ) ) } );
-			panel.appendChild( rows );
+			panel.appendChild( Nino.admin.features._renderTable( shown.map( Nino.admin.features._offerRow ), null ) );
 		},
 
 		/**
@@ -1238,13 +1444,6 @@
 				return;
 			}
 
-			const shown = all.filter( Nino.admin.features._matchesApplication );
-
-			if( shown.length === 0 ) {
-				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/nomatch') ) );
-				return;
-			}
-
 			const intro = dc.createElement('p');
 			intro.className = 'nino-admin-hint';
 			intro.textContent = Nino.content.getText('/_admin/features/hint/applications');
@@ -1257,10 +1456,29 @@
 				panel.appendChild( readonly );
 			}
 
+			// The search is the form of the other tabs': a field over the full width, in the browser
 			const rows = dc.createElement('ul');
 			rows.className = 'nino-admin-list';
-			shown.forEach( function( application ) { rows.appendChild( Nino.admin.features._renderApplication( application, Nino.admin.features._writable === true ) ) } );
+			const none = Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/nomatch') );
+
+			const draw = function() {
+				const shown = all.filter( Nino.admin.features._matchesApplication );
+				rows.innerHTML = '';
+				shown.forEach( function( application ) { rows.appendChild( Nino.admin.features._renderApplication( application, Nino.admin.features._writable === true ) ) } );
+				rows.hidden = shown.length === 0;
+				none.hidden = shown.length !== 0;
+			};
+
+			const bar = Nino.adminUi.filterBar( { search : { value : Nino.admin.features._query, label : Nino.content.getText('/_admin/features/label/search'), onInput : function( query ) {
+				Nino.admin.features._query = query;
+				Nino.admin.features._refreshCounts();
+				draw();
+			} } } );
+
+			panel.appendChild( bar.el );
 			panel.appendChild( rows );
+			panel.appendChild( none );
+			draw();
 		},
 
 		/**
@@ -1609,81 +1827,6 @@
 		},
 
 		/**
-		 *	One active feature as a row that is stepped into - the shared
-		 *	drill-down row the Elements, Images and Text panels use: the name,
-		 *	the line under it, and the chevron that says there is more behind
-		 *	it. It carries no buttons of its own, which is the point: Update,
-		 *	Deactivate and the settings are all on the screen it opens
-		 *
-		 *	@param		{Object}	feature			An entry of features/list
-		 *
-		 *	@return		{Element}							<button>
-		 */
-		_renderActiveRow : function( feature ) {
-
-			const row = dc.createElement('button');
-			row.type = 'button';
-			row.className = 'admin-type-btn';
-			row.dataset.feature = feature.key;
-
-			const copy = dc.createElement('div');
-			copy.textContent = feature.name;
-			Nino.admin.features._badge( copy, feature.maturity );
-
-			const meta = dc.createElement('div');
-			meta.className = 'admin-type-btn-descr';
-			meta.textContent = Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description );
-			copy.appendChild( meta );
-
-			const chev = dc.createElement('span');
-			chev.className = 'admin-view-button-chev';
-			chev.setAttribute( 'aria-hidden', 'true' );
-			chev.textContent = '\u203a';
-
-			row.appendChild( copy );
-			row.appendChild( chev );
-			row.addEventListener( 'click', function() { Nino.admin.features._showDetail( feature ) } );
-
-			return row;
-		},
-
-		/**
-		 *	One inactive feature as a row of the grouped list: its name, the
-		 *	one line that says which version this is and what it does, whatever
-		 *	stands in the way of switching it on, and Activate where nothing
-		 *	does. No status badge: which tab it is in already says that
-		 *
-		 *	@param		{Object}	feature			An entry of features/list
-		 *
-		 *	@return		{Element}							<li>
-		 */
-		_renderFeature : function( feature ) {
-
-			const row = dc.createElement('li');
-			row.dataset.feature = feature.key;
-
-			const copy = Nino.admin.features._copy( feature.name, Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description ), feature.maturity );
-
-			if( feature.requires.length > 0 )
-				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) ), false ) );
-
-			if( feature.shipped === true )
-				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/shipped'), false ) );
-
-			// What stands in the way of switching it on, one line each - the
-			// kernel's own words, which is where the check lives. These wrap
-			// rather than ellipsize: a reason cut off in the middle is no reason
-			feature.problems.forEach( function( problem ) {
-				copy.appendChild( Nino.admin.features._note( problem, true ) );
-			} );
-
-			row.appendChild( copy );
-			row.appendChild( Nino.admin.features._renderActions( feature ) );
-
-			return row;
-		},
-
-		/**
 		 *	The one line under a name: what the feature is for, which version
 		 *	this is, the one on disk where that differs - which is what an
 		 *	update is - when the catalogue named a release date, and what the
@@ -1715,33 +1858,6 @@
 					+ ( released !== '' ? ' \u2013 '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/label/released'), released ) : '' ),
 				description,
 			].filter( Boolean ).join( ' \u00b7 ' );
-		},
-
-		/**
-		 *	The left half of a row: the name, and under it the one line the
-		 *	shared list component ellipsizes when it does not fit
-		 *
-		 *	@param		{string}	name
-		 *	@param		{string}	meta
-		 *	@param		{string}	[maturity]	Drawn as a badge after the name, in the element that holds it, where there is one
-		 *
-		 *	@return		{Element}							<div class="nino-admin-list-copy">
-		 */
-		_copy : function( name, meta, maturity ) {
-
-			const copy = dc.createElement('div');
-			copy.className = 'nino-admin-list-copy';
-
-			const title = dc.createElement('strong');
-			title.textContent = name;
-			copy.appendChild( title );
-			Nino.admin.features._badge( title, maturity );
-
-			const line = dc.createElement('small');
-			line.textContent = meta;
-			copy.appendChild( line );
-
-			return copy;
 		},
 
 		/**
@@ -1783,54 +1899,6 @@
 			note.textContent = text;
 
 			return note;
-		},
-
-		/**
-		 *	What an inactive feature offers: Activate, while nothing stands in
-		 *	the way - and the line it reports into. An update is not offered
-		 *	here: activating applies whatever version is on disk anyway, so a
-		 *	second button for it would be the same button twice
-		 *
-		 *	@param		{Object}	feature
-		 *
-		 *	@return		{Element}							<div>
-		 */
-		_renderActions : function( feature ) {
-
-			const actions = dc.createElement('div');
-			actions.className = 'admin-features-actions';
-
-			const msg = dc.createElement('p');
-			msg.className = 'nino-admin-hint';
-			msg.setAttribute( 'aria-live', 'polite' );
-
-			// The one destructive control in the list, and it is only ever on an
-			// inactive row: an active feature's class is listed in
-			// /nino/modules, so its directory is not something to delete from
-			// under the autoloader. Switching it off first is one click and
-			// says what it is doing
-			// ...except for a feature that comes with Nino: it is a module of the kernel, there is no directory of the project's to delete
-			if( feature.shipped !== true ) {
-				const remove = dc.createElement('button');
-				remove.type = 'button';
-				remove.className = 'nino-admin-btn-danger';
-				remove.textContent = Nino.content.getText('/_admin/features/label/remove');
-				remove.addEventListener( 'click', function() { Nino.admin.features._remove( feature, remove, msg ) } );
-				actions.appendChild( remove );
-			}
-
-			if( feature.problems.length === 0 ) {
-				const activate = dc.createElement('button');
-				activate.type = 'button';
-				activate.className = 'nino-admin-btn-primary';
-				activate.textContent = Nino.content.getText('/_admin/features/label/activate');
-				activate.addEventListener( 'click', function() { Nino.admin.features._switch( feature, 'activate', activate, msg ) } );
-				actions.appendChild( activate );
-			}
-
-			actions.appendChild( msg );
-
-			return actions;
 		},
 
 		/**
@@ -2000,7 +2068,7 @@
 		 *	The inactive feature the focus goes to once this one has left the
 		 *	Inactive tab: the next row under it that offers Activate, else the
 		 *	nearest one above it. The rows are the ones the tab shows now, the
-		 *	filters included. Nothing from another tab
+		 *	category included. Nothing from another tab
 		 *
 		 *	@param		{string}	key					The feature that is being switched on
 		 *
@@ -2112,90 +2180,6 @@
 				// shell is built again, on the tab it was pressed on
 				Nino.admin.features._reload( said, what === 'activate' ? Nino.admin.features._nextToActivate( feature.key ) : '' );
 			} );
-		},
-
-		/**
-		 *	One offer as a row: name, the version the catalogue offers beside
-		 *	the one on disk - which is what an update is - the release date it
-		 *	names, and the button its state allows, or the archive link where
-		 *	nothing can be placed. Greyed rather than left out where it is
-		 *	incompatible: what it asks for is the useful part
-		 *
-		 *	@param		{Object}	offer				An entry of the cached catalogue
-		 *	@param		{boolean}	writable		Whether the features directory can be written
-		 *
-		 *	@return		{Element}							<li>
-		 */
-		_renderOffer : function( offer, writable ) {
-
-			const row = dc.createElement('li');
-			row.dataset.offer = offer.key;
-
-			if( offer.state === 'incompatible' )
-				row.setAttribute( 'aria-disabled', 'true' );
-
-			const copy = Nino.admin.features._copy( offer.name, Nino.admin.features._meta( offer.category, offer.version, offer.local, offer.released, offer.description ), offer.maturity );
-
-			if( offer.requires.length > 0 )
-				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), offer.requires.join( ', ' ) ), false ) );
-
-			// What it asks of this kernel, for one no version of which fits -
-			// the only thing that makes such a row worth showing at all
-			if( offer.state === 'incompatible' ) {
-				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/nino'), offer.nino ), false ) );
-
-				if( offer.ext.length > 0 )
-					copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/extensions'), offer.ext.join( ', ' ) ), false ) );
-			}
-
-			row.appendChild( copy );
-			row.appendChild( Nino.admin.features._renderOfferActions( offer, writable ) );
-
-			return row;
-		},
-
-		/**
-		 *	The button an offer's state allows: Install for one that is not on
-		 *	disk, Update for one there in an older version, nothing for one
-		 *	already current or one that does not fit - and, where nothing can
-		 *	be written, the archive to unpack by hand instead
-		 *
-		 *	@param		{Object}	offer
-		 *	@param		{boolean}	writable
-		 *
-		 *	@return		{Element}							<div>
-		 */
-		_renderOfferActions : function( offer, writable ) {
-
-			const actions = dc.createElement('div');
-			actions.className = 'admin-features-actions';
-
-			const msg = dc.createElement('p');
-			msg.className = 'nino-admin-hint';
-			msg.setAttribute( 'aria-live', 'polite' );
-
-			const wanted = offer.state === 'available' || offer.state === 'upgrade';
-
-			if( wanted === true && writable === true ) {
-				const install = dc.createElement('button');
-				install.type = 'button';
-				install.className = 'nino-admin-btn-primary';
-				install.textContent = offer.state === 'upgrade'
-					? Nino.adminUi.format( Nino.content.getText('/_admin/features/label/update'), offer.version )
-					: Nino.content.getText('/_admin/features/label/install');
-				install.addEventListener( 'click', function() { Nino.admin.features._install( offer, install, msg ) } );
-				actions.appendChild( install );
-			}
-			else if( wanted === true ) {
-				const archive = dc.createElement('a');
-				archive.href = offer.archive;
-				archive.textContent = Nino.content.getText('/_admin/features/label/archive');
-				actions.appendChild( archive );
-			}
-
-			actions.appendChild( msg );
-
-			return actions;
 		},
 
 		/**
@@ -2815,7 +2799,7 @@
 
 		/**
 		 *	The row of a feature as the list is drawn now - the list is drawn
-		 *	again with every change of the filter and the tab, and the row that
+		 *	again with every change of the category and the tab, and the row that
 		 *	was pressed is gone with the old drawing
 		 *
 		 *	@param		{string}		key
@@ -2823,7 +2807,7 @@
 		 *	@return		{Element|null}
 		 */
 		_rowOf : function( key ) {
-			return Array.from( dc.getElementById('features-list').querySelectorAll('button') ).find( function( button ) { return button.dataset.feature === key } ) ?? null;
+			return Array.from( dc.getElementById('features-list').querySelectorAll('tr') ).find( function( tr ) { return tr.dataset.row === key } ) ?? null;
 		},
 
 		/**

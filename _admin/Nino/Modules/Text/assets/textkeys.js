@@ -694,23 +694,9 @@
 		 */
 		searchBar : function( config ) {
 
-			const bar = dc.createElement('div');
-			bar.className = 'admin-text-search';
-			bar.setAttribute( 'role', 'search' );
-
-			const input = dc.createElement('input');
-			input.type = 'search';
-			input.className = 'nino-admin-input admin-text-search-input';
-			input.autocomplete = 'off';
-			input.placeholder = Nino.content.getText('/_admin/text/placeholder/search');
-			input.setAttribute( 'aria-label', Nino.content.getText('/_admin/text/label/search') );
-			input.value = config.query ?? '';
-			input.addEventListener( 'input', function() { config.onQuery( input.value ) } );
-			bar.appendChild( input );
-
 			let select = null;
 
-			if( config.select !== null && config.select !== undefined ) {
+			if( config.select !== null && config.select !== undefined )
 				select = Nino.adminUi.localeSelect( {
 					label : Nino.content.getText('/_admin/text/label/language'),
 					locales : config.select.locales,
@@ -718,22 +704,24 @@
 					current : config.select.value,
 					onChange : function( locale ) { config.select.onChange( locale ) },
 				} );
-				bar.appendChild( select );
-			}
 
 			const chips = Object.create( null );
 
 			( config.chips ?? [] ).forEach( function( chip ) {
-				const button = dc.createElement('button');
-				button.type = 'button';
-				button.className = 'admin-text-chip';
-				button.setAttribute( 'aria-pressed', 'false' );
-				button.addEventListener( 'click', chip.onToggle );
-				bar.appendChild( button );
-				chips[chip.id] = button;
+				chips[chip.id] = Nino.adminUi.chip( '', { onToggle : chip.onToggle } );
 			} );
 
-			return { bar : bar, input : input, select : select, chips : chips };
+			const bar = Nino.adminUi.filterBar( {
+				search : {
+					value : config.query ?? '',
+					label : Nino.content.getText('/_admin/text/label/search'),
+					placeholder : Nino.content.getText('/_admin/text/placeholder/search'),
+					onInput : config.onQuery,
+				},
+				items : ( select === null ? [] : [ select ] ).concat( Object.keys( chips ).map( function( id ) { return chips[id] } ) ),
+			} );
+
+			return { bar : bar.el, input : bar.input, select : select, chips : chips };
 		},
 
 		/**

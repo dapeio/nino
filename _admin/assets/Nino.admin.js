@@ -126,6 +126,8 @@
 
 	// The names icon() has warned about, so that a name that is wrong warns once and not at every row it is drawn in
 	const UNKNOWN_ICONS = new Set();
+	// How many strips tabs() has drawn: the stem of the ids of one that was given none
+	let TAB_STRIPS = 0;
 
 	// The classes of a button's kind: what button() puts on it for `kind`. A button without a kind has none and
 	// looks as the base rule of style.css draws a button
@@ -633,18 +635,344 @@
 
 		/**
 		 *	The one way a panel says "nothing here yet": a list without entries,
-		 *	a table without rows, a scan that found nothing. Owns no strings -
-		 *	the caller says what is missing, in the interface language
+		 *	a table without rows, a scan that found nothing. One sentence and,
+		 *	where there is a next step, the button that takes it - the one that
+		 *	makes the first entry. Owns no strings - the caller says what is
+		 *	missing, in the interface language
 		 *
-		 *	@param		{string}	message
+		 *	@param		{string}		message
+		 *	@param		{Element}		[action]				The button that creates the first entry, made by button()
 		 *
-		 *	@return		{Element}
+		 *	@return		{Element}										A <p> for the sentence alone, a <div> that holds the sentence and the button
 		 */
-		emptyState : function( message ) {
-			const empty = dc.createElement('p');
-			empty.className = 'nino-admin-empty';
-			empty.textContent = message;
-			return empty;
+		emptyState : function( message, action ) {
+
+			if( action === undefined || action === null ) {
+				const empty = dc.createElement('p');
+				empty.className = 'nino-admin-empty';
+				empty.textContent = message;
+				return empty;
+			}
+
+			const box = dc.createElement('div');
+			box.className = 'nino-admin-empty nino-admin-empty--action';
+			box.appendChild( Nino.adminUi.el( 'p', '', message ) );
+			box.appendChild( action );
+			return box;
+		},
+
+		/**
+		 *	The buttons at the end of a row - of a list() row and of a table() row:
+		 *	at most three, small ones, and whatever takes something away goes last
+		 *	(kept in the order it was given otherwise). A fourth is refused with a
+		 *	RangeError: a row with that many actions is a screen of its own. Owns no
+		 *	strings
+		 *
+		 *	@param		{Array}		buttons					Elements made by button( ..., { small : true } ) or iconButton( ..., { small : true } )
+		 *
+		 *	@return		{Element}									<span class="nino-admin-row-actions">
+		 */
+		rowActions : function( buttons ) {
+
+			const given = ( buttons || [] ).filter( function( button ) { return button !== null && button !== undefined } );
+
+			if( given.length > 3 )
+				throw new RangeError( 'Nino.adminUi.rowActions(): a row has at most three actions, '+ given.length+ ' were given' );
+
+			const dangerous = function( button ) { return button.classList.contains('nino-admin-btn-danger') };
+			const actions = Nino.adminUi.el( 'span', 'nino-admin-row-actions' );
+
+			given.filter( function( button ) { return dangerous( button ) === false } )
+				.concat( given.filter( dangerous ) )
+				.forEach( function( button ) { actions.appendChild( button ) } );
+
+			return actions;
+		},
+
+		/**
+		 *	A heading over a group of rows: the small caps line of a list that has
+		 *	groups. Owns no strings
+		 *
+		 *	@param		{string}		text
+		 *	@param		{number}		[level]					2 for a group, 3 for a group within one (the default is 2)
+		 *
+		 *	@return		{Element}										<h2> or <h3 class="nino-admin-section-title">
+		 */
+		sectionTitle : function( text, level ) {
+			return Nino.adminUi.el( level === 3 ? 'h3' : 'h2', 'nino-admin-section-title'+ ( level === 3 ? ' nino-admin-section-title--sub' : '' ), text );
+		},
+
+		/**
+		 *	The one row of a list of things that are opened: a short directory, the
+		 *	groups of a panel. A row is as high as --nino-admin-row-height where it has
+		 *	a second line and --nino-admin-row-dense where it has none; it shows a
+		 *	title in the strong weight, a quiet second line and a badge after the
+		 *	title, at the right at most three small actions (see rowActions()) and a
+		 *	"›" where the row opens. A row that opens is opened by its whole width: the
+		 *	target is a real link (with an `href`) or button, so the keyboard reaches it
+		 *	and Enter or Space press it, and the actions stand above it, each with
+		 *	a press of its own. Owns no strings
+		 *
+		 *	@param		{Array}			rows								[ { key, title, detail, badge, sub, href, onOpen, actions } ]
+		 *																					key the row's identity, written on the row as data-row; detail the
+		 *																					second line, badge a short word as a pill after the title (a string
+		 *																					or { text, state }), sub a row that is below another one,
+		 *																					href the address a row that opens is a link to, onOpen( row, event )
+		 *																					called by a press on it - with an href the event's default is
+		 *																					prevented, so the address is written by the caller, actions an
+		 *																					array of small buttons
+		 *	@param		{Object}		[options]						{ title, level, label } - title the heading of the group (level 2, or 3
+		 *																					for a group within a group), label the name of the list for a screen reader
+		 *
+		 *	@return		{Element}											<section class="nino-admin-list-group"> with the heading, where there is one, and the <ul class="nino-admin-list">
+		 */
+		list : function( rows, options ) {
+
+			options = options || {};
+
+			const group = Nino.adminUi.el( 'section', 'nino-admin-list-group' );
+
+			if( typeof options.title === 'string' && options.title !== '' )
+				group.appendChild( Nino.adminUi.sectionTitle( options.title, options.level ) );
+
+			const ul = Nino.adminUi.el( 'ul', 'nino-admin-list' );
+
+			if( typeof options.label === 'string' && options.label !== '' )
+				ul.setAttribute( 'aria-label', options.label );
+
+			( rows || [] ).forEach( function( row ) {
+
+				const opens = typeof row.onOpen === 'function' || typeof row.href === 'string';
+				const detail = typeof row.detail === 'string' && row.detail !== '';
+
+				const li = Nino.adminUi.el( 'li', 'nino-admin-list-row'+ ( detail === false ? ' is-dense' : '' )+ ( row.sub === true ? ' is-sub' : '' ) );
+
+				if( row.key !== undefined && row.key !== null )
+					li.dataset.row = String( row.key );
+
+				const line = Nino.adminUi.el( 'div', 'nino-admin-row' );
+
+				const copy = Nino.adminUi.el( 'span', 'nino-admin-list-copy' );
+				const title = Nino.adminUi.el( 'strong', '', row.title );
+
+				if( row.badge !== undefined && row.badge !== null && row.badge !== '' ) {
+					const badge = typeof row.badge === 'object' ? row.badge : { text : row.badge };
+					const pill = Nino.adminUi.el( 'span', 'nino-admin-badge', badge.text );
+
+					if( badge.state !== undefined )
+						pill.setAttribute( 'data-state', badge.state );
+
+					title.appendChild( pill );
+				}
+
+				copy.appendChild( title );
+
+				if( detail === true )
+					copy.appendChild( Nino.adminUi.el( 'small', '', row.detail ) );
+
+				let target = null;
+
+				if( opens === true ) {
+
+					if( typeof row.href === 'string' ) {
+						target = dc.createElement('a');
+						target.href = row.href;
+					}
+					else {
+						target = dc.createElement('button');
+						target.type = 'button';
+					}
+
+					target.className = 'nino-admin-row-open';
+					target.appendChild( copy );
+
+					target.addEventListener( 'click', function( ev ) {
+
+						if( typeof row.onOpen !== 'function' )
+							return;
+
+						if( typeof row.href === 'string' && ev && typeof ev.preventDefault === 'function' )
+							ev.preventDefault();
+
+						row.onOpen( row, ev );
+					} );
+
+					line.appendChild( target );
+				}
+				else
+					line.appendChild( copy );
+
+				if( Array.isArray( row.actions ) === true && row.actions.length > 0 )
+					line.appendChild( Nino.adminUi.rowActions( row.actions ) );
+
+				if( opens === true ) {
+					const chev = Nino.adminUi.el( 'span', 'nino-admin-row-chev', '\u203a' );
+					chev.setAttribute( 'aria-hidden', 'true' );
+					line.appendChild( chev );
+				}
+
+				li.appendChild( line );
+				ul.appendChild( li );
+			} );
+
+			group.appendChild( ul );
+
+			return group;
+		},
+
+		/**
+		 *	A filter that is on or off: a pill button that says so by aria-pressed,
+		 *	and by its look as well. A press turns it over and tells the caller, who
+		 *	draws what it filters. Owns no strings
+		 *
+		 *	@param		{string}		text
+		 *	@param		{Object}		[options]				{ pressed, onToggle, id } - onToggle( pressed ) is called after the press with the new state
+		 *
+		 *	@return		{Element}										<button class="nino-admin-chip" aria-pressed>
+		 */
+		chip : function( text, options ) {
+
+			options = options || {};
+
+			const chip = Nino.adminUi.el( 'button', 'nino-admin-chip', text );
+			chip.type = 'button';
+			chip.setAttribute( 'aria-pressed', options.pressed === true ? 'true' : 'false' );
+
+			if( options.id )
+				chip.id = options.id;
+
+			chip.addEventListener( 'click', function() {
+
+				const pressed = chip.getAttribute('aria-pressed') !== 'true';
+				chip.setAttribute( 'aria-pressed', pressed === true ? 'true' : 'false' );
+
+				if( typeof options.onToggle === 'function' )
+					options.onToggle( pressed );
+			} );
+
+			return chip;
+		},
+
+		/**
+		 *	What narrows a list: one bar over it with a search field and, beside it,
+		 *	whatever else narrows it - chips, a select. It wraps where there is no room.
+		 *	The search says its name in the label and the placeholder, which the caller
+		 *	gives. Owns no strings
+		 *
+		 *	@param		{Object}		options					{ search, items }
+		 *																			search { value, label, placeholder, onInput( value ), id } - left out, the bar has no field
+		 *																			items an array of elements that stand after the field: chip(), a select
+		 *
+		 *	@return		{Object}										{ el, input } - el <div class="nino-admin-filterbar" role="search">, input the search field or null
+		 */
+		filterBar : function( options ) {
+
+			options = options || {};
+
+			const bar = Nino.adminUi.el( 'div', 'nino-admin-filterbar' );
+			bar.setAttribute( 'role', 'search' );
+
+			let input = null;
+
+			if( options.search !== undefined && options.search !== null ) {
+				const search = options.search;
+
+				input = dc.createElement('input');
+				input.type = 'search';
+				input.className = 'nino-admin-input nino-admin-filterbar-input';
+				input.autocomplete = 'off';
+				input.placeholder = search.placeholder ?? search.label ?? '';
+				input.setAttribute( 'aria-label', search.label ?? search.placeholder ?? '' );
+				input.value = search.value ?? '';
+
+				if( search.id )
+					input.id = search.id;
+
+				input.addEventListener( 'input', function() {
+					if( typeof search.onInput === 'function' )
+						search.onInput( input.value );
+				} );
+
+				bar.appendChild( input );
+			}
+
+			( options.items || [] ).forEach( function( item ) { bar.appendChild( item ) } );
+
+			return { el : bar, input : input };
+		},
+
+		/**
+		 *	Tabs of the second level: the strip of a view that has parts, under the head
+		 *	whose own tabs it does not replace. A tablist with one tab stop and the arrow
+		 *	keys (Left and Right walk it and wrap, Home and End go to its ends), which
+		 *	wraps into a second row where it does not fit - it never scrolls sideways.
+		 *	A tab may bring its pane: that one is shown with the tab and the others are
+		 *	hidden, each named by its tab. Owns no strings
+		 *
+		 *	@param		{Array}			items						[ { key, label, panel } ] - panel an Element, optional
+		 *	@param		{Object}		[options]				{ active, onSelect( key ), label, id } - active the key to start on (the first tab), label the name of the strip for a screen reader, id the stem of the ids of the tabs
+		 *
+		 *	@return		{Object}										{ el, tabs, select( key ) } - el <div role="tablist">, tabs key => button
+		 */
+		tabs : function( items, options ) {
+
+			options = options || {};
+
+			const stem = options.id || 'nino-admin-tabs-'+ ( ++TAB_STRIPS );
+			const bar = Nino.adminUi.el( 'div', 'nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--wrap' );
+			bar.setAttribute( 'role', 'tablist' );
+
+			if( options.label )
+				bar.setAttribute( 'aria-label', options.label );
+
+			const buttons = {};
+
+			( items || [] ).forEach( function( item ) {
+
+				const button = Nino.adminUi.el( 'button', 'nino-admin-tab', item.label );
+				button.type = 'button';
+				button.id = stem+ '-'+ item.key;
+				button.setAttribute( 'role', 'tab' );
+
+				if( item.panel ) {
+					item.panel.id = item.panel.id || stem+ '-pane-'+ item.key;
+					item.panel.setAttribute( 'role', 'tabpanel' );
+					item.panel.setAttribute( 'aria-labelledby', button.id );
+					button.setAttribute( 'aria-controls', item.panel.id );
+				}
+
+				bar.appendChild( button );
+				buttons[item.key] = button;
+			} );
+
+			const show = function( key ) {
+				( items || [] ).forEach( function( item ) {
+					if( item.panel )
+						item.panel.hidden = item.key !== key;
+				} );
+			};
+
+			const first = items && items.length > 0 ? items[0].key : '';
+			const start = options.active !== undefined && Object.hasOwn( buttons, options.active ) === true ? options.active : first;
+
+			const paint = Nino.adminUi.buttonRow( buttons, start, function( key ) {
+				show( key );
+				if( typeof options.onSelect === 'function' )
+					options.onSelect( key );
+			}, 'aria-selected' );
+
+			show( start );
+
+			return {
+				el : bar,
+				tabs : buttons,
+				select : function( key ) {
+					if( Object.hasOwn( buttons, key ) === false )
+						return;
+					paint( key );
+					show( key );
+				},
+			};
 		},
 
 		/**
@@ -4047,10 +4375,11 @@
 			 *	@param		{Array}		rows
 			 *	@param		{Array}		columns		[ { key, type }, ... ]
 			 *	@param		{string}	query
+			 *	@param		{Function}	[extra]		extra( row ) answers more text of a row the search reads, beyond its columns
 			 *
 			 *	@return		{Array}
 			 */
-			filter : function( rows, columns, query ) {
+			filter : function( rows, columns, query, extra ) {
 
 				const needle = String( query || '' ).trim().toLowerCase();
 				if( needle === '' )
@@ -4062,7 +4391,7 @@
 							.format( row[column.key], column.type )
 							.toLowerCase()
 							.indexOf( needle ) !== -1;
-					} );
+					} ) || ( typeof extra === 'function' && String( extra( row ) ?? '' ).toLowerCase().indexOf( needle ) !== -1 );
 				} );
 			},
 
@@ -4146,13 +4475,22 @@
 		 *																					holding a mailto link or a per-row action needs.
 		 *																					Such a column is still searched and sorted on its
 		 *																					plain value, so behaviour does not depend on how
-		 *																					a cell happens to be drawn.
+		 *																					a cell happens to be drawn. `wrap` lets the cell
+		 *																					break its lines, where a cell holds a sentence.
 		 *	@param		{Array}			options.rows					The complete set
 		 *	@param		{Object}		options.labels				{ search, empty, noMatch } - and optionally
 		 *																					{ prev, next, pageSize }, the three names the
 		 *																					pager's glyphs carry; each falls back to
 		 *																					/_admin/common/label/prevpage, -/nextpage and
 		 *																					-/perpage
+		 *	@param		{boolean}		[options.search]			True for the search of a directory: the field takes the full width over the table
+		 *																					and filters the rows that are drawn, in the browser, with no request. Left out,
+		 *																					the field is the short one it always was. Either way it reads the columns' values
+		 *	@param		{Function}	[options.searchText]	searchText( row ) answers more text of a row that the search reads beside the columns' values - a key, a description
+		 *	@param		{string}		[options.query]				What the search holds to begin with, for a table that is drawn again
+		 *	@param		{Function}	[options.onQuery]			Called with what was typed in the search
+		 *	@param		{Function}	[options.actions]			actions( row ) answers the small buttons of a row (at most three, the one that takes something
+		 *																					away last, see rowActions()), drawn in a last column that has no head and stands at the right
 		 *	@param		{number}		[options.pageSize]		Initial rows per page (default 50)
 		 *	@param		{Array}			[options.pageSizes]		Offered sizes (default [50,100,150])
 		 *	@param		{Function}	[options.onRowClick]	Called with the row object, on a click of the row and on Enter or Space
@@ -4177,7 +4515,7 @@
 			let page 			= 1;
 			let sortKey 	= '';
 			let sortDir 	= 1;
-			let query 		= '';
+			let query 		= typeof options.query === 'string' ? options.query : '';
 
 			const model = Nino.adminUi.tableModel;
 
@@ -4196,7 +4534,7 @@
 
 			// --- search -----------------------------------------------
 			const toolbar = dc.createElement('div');
-			toolbar.className = 'nino-admin-table-toolbar';
+			toolbar.className = 'nino-admin-table-toolbar'+ ( options.search === true ? ' nino-admin-table-toolbar--wide' : '' );
 
 			const search = dc.createElement('input');
 			search.type = 'search';
@@ -4207,7 +4545,14 @@
 			// no room for a visible label, so the box carries the same word the
 			// placeholder shows
 			search.setAttribute( 'aria-label', labels.search || '' );
-			search.addEventListener( 'input', function() { query = search.value; page = 1; draw() } );
+			search.value = query;
+			search.addEventListener( 'input', function() {
+				query = search.value;
+				page = 1;
+				draw();
+				if( typeof options.onQuery === 'function' )
+					options.onQuery( query );
+			} );
 			toolbar.appendChild( search );
 			mount.appendChild( toolbar );
 
@@ -4251,6 +4596,14 @@
 				headRow.appendChild( th );
 			} );
 
+			// The column of a row's buttons has no head: a head with no word is announced as nothing. A table whose rows open
+			// has the column too, for the "\u203a" that says so
+			if( typeof options.actions === 'function' || typeof options.onRowClick === 'function' ) {
+				const th = dc.createElement('th');
+				th.className = 'nino-admin-table-actions';
+				headRow.appendChild( th );
+			}
+
 			thead.appendChild( headRow );
 			table.appendChild( thead );
 
@@ -4259,9 +4612,7 @@
 			scroller.appendChild( table );
 			mount.appendChild( scroller );
 
-			const empty = dc.createElement('p');
-			empty.className = 'nino-admin-empty';
-			empty.textContent = labels.empty || '';
+			const empty = Nino.adminUi.emptyState( labels.empty || '' );
 			mount.appendChild( empty );
 
 			// --- pager ------------------------------------------------
@@ -4314,7 +4665,7 @@
 
 			function draw() {
 
-				const matched = model.filter( rows, columns, query );
+				const matched = model.filter( rows, columns, query, options.searchText );
 				const sortColumn = columns.find( function( c ) { return c.key === sortKey } ) || {};
 				const sorted 	= model.sort( matched, sortKey, sortColumn.type, sortDir, sortColumn.absent );
 				const view 		= model.page( sorted, pageSize, page );
@@ -4349,7 +4700,12 @@
 						tr.dataset.row = String( row[rowKey] );
 					if( typeof options.onRowClick === 'function' ) {
 						tr.classList.add('is-clickable');
-						tr.addEventListener( 'click', function() { options.onRowClick( row ) } );
+						tr.addEventListener( 'click', function( ev ) {
+							// A press on a button or a link in the row is the control's, not the row's
+							if( ev && ev.target && ev.target !== tr && typeof ev.target.closest === 'function' && ev.target.closest('a, button, input, select, textarea') !== null )
+								return;
+							options.onRowClick( row );
+						} );
 						tr.addEventListener( 'keydown', function( ev ) {
 							// A key pressed on a button in the row is the button's, not the row's
 							if( ev.target === tr && ( ev.key === 'Enter' || ev.key === ' ' ) ) { ev.preventDefault(); options.onRowClick( row ) }
@@ -4365,7 +4721,7 @@
 							const cell = column.render( row[column.key], row );
 							// A returned node goes in as-is; anything else is
 							// still treated as text, never as markup
-							if( cell instanceof Object && cell.nodeType )
+							if( typeof cell === 'object' && cell !== null && cell.nodeType )
 								td.appendChild( cell );
 							else
 								td.textContent = cell === undefined ? text : String( cell );
@@ -4378,10 +4734,29 @@
 							td.classList.add('nino-admin-table-num');
 						if( column.type === 'element' || column.key === rowKey )
 							td.classList.add('nino-admin-table-uri');
+						if( column.wrap === true )
+							td.classList.add('is-wrap');
 						if( text === '' )
 							td.classList.add('is-empty');
 						tr.appendChild( td );
 					} );
+
+					if( typeof options.actions === 'function' || typeof options.onRowClick === 'function' ) {
+						const td = dc.createElement('td');
+						td.className = 'nino-admin-table-actions';
+
+						if( typeof options.actions === 'function' )
+							td.appendChild( Nino.adminUi.rowActions( options.actions( row ) ) );
+
+						// A row that opens says so
+						if( typeof options.onRowClick === 'function' ) {
+							const chev = Nino.adminUi.el( 'span', 'nino-admin-row-chev', '\u203a' );
+							chev.setAttribute( 'aria-hidden', 'true' );
+							td.appendChild( chev );
+						}
+
+						tr.appendChild( td );
+					}
 
 					// Its own stop of the Tab key only where nothing inside it is one: a
 					// row that holds its buttons or links is reached through them, and

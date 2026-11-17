@@ -1541,7 +1541,7 @@ Reach for an existing class first; only invent one when no role fits.
 | A short word as a pill beside a name - a state, a kind, a count | `.nino-admin-badge`; `data-state="ok"`, `"warn"`, `"error"` or `"muted"` colours it like the status line's saved, unsaved, failed and quiet text, and the word says it too. On the button of a tab it is drawn by `Nino.adminUi.tabBadge( tab, text, state )` |
 | Up, down and remove at the end of a row of an ordered list | `.nino-admin-move` around the square buttons (inside a `.nino-admin-list` row it keeps off the row's edge) |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
-| Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row); a row that writes no address is a `button.nino-admin-list-link`, one that writes an address a link with the `href` of `Nino.admin.router.href()` |
+| Clickable drill-down list | `Nino.adminUi.list( rows, options )` - see [Lists, filters and tabs](#lists-filters-and-tabs); a row that writes an address is a link with the `href` of `Nino.admin.router.href()` |
 | The first stop of a page, a way past the rail to the pane | `.nino-admin-skip`, a link to the id of the pane; it waits above the screen until it has the focus. The shell's script makes the pane a target of the focus (`tabindex="-1"`) for the jump and takes that off as the focus leaves it - one that always had it would take the focus from a click on any text in it |
 | Many rows of the same record, with search/sort/paging | `Nino.adminUi.table()` — see below |
 | List of rows that are read, not opened | `.nino-admin-list-dense` |
@@ -1562,7 +1562,7 @@ Reach for an existing class first; only invent one when no role fits.
 | A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
-| Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
+| Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState( text, action )` |
 | Error text | `.nino-admin-error` |
 
 The bar, the toast and the way back of a form, in the three calls the Routes and Navigations panels make:
@@ -1647,6 +1647,49 @@ A column may also carry `absent(row)`: a row for which it answers true counts as
 The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.
 `tests/nino-ui-table-js-smoke.js` covers it.
+
+### Lists, filters and tabs
+
+`list()` draws the groups and short directories of a panel, `table()` its directories, `filterBar()` and `chip()` what narrows a list, `emptyState()` the box of an empty one and `tabs()` the second level of tabs of a view. None of them owns a word.
+
+```js
+// A group of rows: the title of the group, rows that open, at most three small actions at the end of a row
+mount.appendChild( Nino.adminUi.list( [
+	{ key : 'home', title : 'Home', detail : '3 texts', badge : 'new', onOpen : function( row ) { open( row.key ) } },
+	{ key : 'about', title : 'About', detail : '7 texts', href : Nino.admin.router.href( 'text', [ 'about' ] ), onOpen : function( row ) { open( row.key ) },
+		actions : [ Nino.adminUi.button( 'Copy', copy, { small : true } ), Nino.adminUi.button( 'Delete', remove, { kind : 'danger', small : true } ) ] },
+], { title : 'Pages' } ) );
+```
+
+A row with an `href` is a link, one without a button; the press of either is `onOpen( row, event )`, and a row that has neither is read only. The row is as high as `--nino-admin-row-height` where it has a `detail` and as `--nino-admin-row-dense` where it has none. `sub : true` sets a row in under the one above it. An action that takes something away is a button of the kind `danger`; `rowActions()` puts it last, and refuses a fourth button with a `RangeError`.
+
+```js
+// A directory: the search over the full width, sortable columns, the small buttons of a row at its end
+Nino.adminUi.table( {
+	mount, rows, rowKey : 'key', search : true,
+	columns : [ { key : 'name', label : 'Name' }, { key : 'version', label : 'Version' } ],
+	labels  : { search : 'Search features', empty : 'No features.', noMatch : 'Nothing found.' },
+	actions : function( row ) { return [ Nino.adminUi.button( 'Activate', function() { activate( row ) }, { kind : 'primary', small : true } ) ] },
+	onRowClick : open,
+} );
+```
+
+`search : true` is the search of a directory; the field filters the rows that are drawn, over the values of the columns and, where `searchText( row )` answers one, over more text of a row (a key, a description), and a search that finds nothing shows `labels.noMatch` in the empty state of the table. A panel that draws the table again gives the search back with `query` and hears it with `onQuery( query )`. A row that opens (`onRowClick`) draws a "›" at its end, in the column of the actions. A column that holds a sentence says `wrap : true`. A press on a button of a row does not open the row.
+
+```js
+// What narrows a list: one bar with a search and chips
+const empty = Nino.adminUi.chip( 'Empty in de_DE', { onToggle : function( on ) { onlyEmpty = on; draw() } } );
+mount.appendChild( Nino.adminUi.filterBar( { search : { label : 'Search texts', onInput : function( query ) { find( query ) } }, items : [ empty ] } ).el );
+
+// A box for what is not there yet, with the button that makes the first
+mount.appendChild( Nino.adminUi.emptyState( 'No redirects yet.', Nino.adminUi.button( 'New redirect', create, { kind : 'primary' } ) ) );
+
+// The second level of tabs: arrow keys, Home and End, one tab stop; a tab may bring its pane
+const strip = Nino.adminUi.tabs( [ { key : 'one', label : 'Description', panel : about }, { key : 'two', label : 'Settings', panel : settings } ], { onSelect : function( key ) { remember( key ) } } );
+mount.appendChild( strip.el );
+```
+
+A chip turns its `aria-pressed` over on a press and then calls `onToggle( pressed )`; the caller draws what it filters. `tabs()` is the block for the tabs of the second level of a view; the tabs of the first level stand in the head of the pane and are not made with it.
 
 ### Settings screens: accordion, steps, split view and colour field
 

@@ -19,8 +19,7 @@
 
 @layer nino.tool {
 
-/*	The head of the list: the two filters over what the tabs hold - the
-	search box and the category; the tab strip stands in the pane's own head
+/*	The head of the list: the category over what the tabs hold; the tab strip stands in the pane's own head
 	beside the panel's name (see _admin/assets/style.css), and only comes
 	here where there is none. The row stays at the top while the rows scroll
 	under it - a catalogue of any size is a long page, and what you have
@@ -68,19 +67,15 @@
 	border-bottom: 0;
 }
 
-/*	The filter takes the rest of the row, and a whole row of its own once
-	the tabs need the width - a search box squeezed to three characters is
-	worse than one on a second line. */
-#features-list .admin-features-head > .nino-admin-table-search {
-	flex: 0 1 16rem;
-	min-width: 9rem;
-	margin: 0 0 .35rem;
+/*	The head has nothing to hold on a tab that has no category to choose */
+#features-list .admin-features-head:empty {
+	display: none;
 }
 
-/*	The category beside it. It shrinks before the search box does and never
-	past the width of its longest option, because a select whose text is cut
-	off says nothing about what is currently selected - which is the one
-	thing it has to say while a filtered list is being read. */
+/*	The category. It never shrinks past the width of its longest option,
+	because a select whose text is cut off says nothing about what is
+	currently selected - which is the one thing it has to say while a
+	filtered list is being read. */
 #features-list .admin-features-head > .admin-features-category {
 	flex: 0 0 auto;
 	width: auto;
@@ -102,10 +97,26 @@
 	padding: .58rem .78rem;
 }
 
+/*	The name of a row of a table: the line under it is one line, cut where it does not fit, and
+	what has to be read whole wraps (below) */
+#features-list .nino-admin-table .nino-admin-list-copy {
+	max-width: 30rem;
+}
+
 /*	An offer no version of which fits this kernel: readable, and visibly not
 	something to act on. */
-#features-list .nino-admin-list > li[aria-disabled="true"] {
+#features-list .nino-admin-list-copy[aria-disabled="true"] {
 	opacity: .6;
+}
+
+/*	What a button of a row says it is doing: a short line under the notes, and nothing where there is none */
+#features-list .nino-admin-table td .nino-admin-hint {
+	margin: 0;
+	white-space: normal;
+}
+
+#features-list .nino-admin-table td .nino-admin-hint:empty {
+	display: none;
 }
 
 /*	How far along a feature is - "Beta", "Example" - after its name, in the

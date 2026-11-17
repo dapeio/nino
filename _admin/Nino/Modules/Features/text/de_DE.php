@@ -9,7 +9,10 @@ return [
 	'[[/_admin/nav/features]]'								=> 'Features',
 	'[[/_admin/features/label/active]]'				=> 'Aktive Features',
 	'[[/_admin/features/tab/available]]'			=> 'Verfügbar',
-	'[[/_admin/features/label/filter]]'			=> 'Nach Namen filtern',
+	'[[/_admin/features/label/search]]'			=> 'Features durchsuchen',
+	'[[/_admin/features/col/name]]'			=> 'Name',
+	'[[/_admin/features/col/version]]'		=> 'Version',
+	'[[/_admin/features/col/state]]'			=> 'Zustand',
 	'[[/_admin/features/label/category]]'			=> 'Kategorie',
 	'[[/_admin/features/label/category-all]]'	=> 'Alle Kategorien',
 	// Je eine pro \Nino\Features::CATEGORIES, dazu eine für ein Feature ohne
