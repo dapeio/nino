@@ -1430,7 +1430,8 @@
 
 					Nino.admin.keys._saving = false;
 					Nino.admin.keys._setFormPending( false );
-					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+					msg.textContent = '';
+					Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 					Nino.admin.keys._renderCategoryList();
 
 					// What the controls hold is what is stored now

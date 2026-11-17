@@ -52,11 +52,10 @@
 		 *	Save and the line that says how it went
 		 *
 		 *	@param		{Object}	feature				An entry of features/list
-		 *	@param		{string}	[message]			What the line says at first
 		 *
 		 *	@return		void
 		 */
-		const render = function( feature, message ) {
+		const render = function( feature ) {
 
 			mount.innerHTML = '';
 
@@ -74,7 +73,6 @@
 
 			const msg = dc.createElement('p');
 			msg.setAttribute( 'aria-live', 'polite' );
-			msg.textContent = message || '';
 			bar.appendChild( msg );
 
 			form.appendChild( bar );
@@ -125,7 +123,8 @@
 					return;
 				}
 
-				render( response.feature, Nino.content.getText('/_admin/common/msg/saved') );
+				render( response.feature );
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				report( true );
 			} );
 		};
@@ -153,7 +152,7 @@
 					return;
 				}
 
-				render( feature, '' );
+				render( feature );
 			} );
 		};
 

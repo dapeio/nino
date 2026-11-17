@@ -1372,7 +1372,8 @@
 					}
 					Nino.admin.types._isNew 			= false;
 					Nino.admin.types._currentUri = response.uri;
-					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+					msg.textContent = '';
+					Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 					Nino.admin.types._saved();
 					Nino.admin.types.init();
 					Nino.admin.types._invalidateElements();
@@ -1387,7 +1388,8 @@
 					report( false );
 					return;
 				}
-				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				msg.textContent = '';
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				Nino.admin.types._notice = Nino.admin.types._referenceNotice( response.references );
 				Nino.admin.types._saved();
 				Nino.admin.types.init();

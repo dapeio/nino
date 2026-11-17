@@ -36,7 +36,6 @@
 
 		_ready 		: false,
 		// Survives the re-render a successful save triggers - see _save()
-		_pendingMsg : '',
 		_groups 	: {},
 		_fields 	: [],
 
@@ -147,14 +146,6 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.config._save() } );
 
 			wrap.appendChild( form );
-
-			// Re-shown after the reload that follows a save, which builds this
-			// element fresh and would otherwise wipe the confirmation the moment
-			// it appeared
-			if( Nino.admin.config._pendingMsg !== '' ) {
-				msg.textContent = Nino.admin.config._pendingMsg;
-				Nino.admin.config._pendingMsg = '';
-			}
 
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
@@ -337,10 +328,7 @@
 					return;
 				}
 
-				// Held rather than written straight to this element: the reload
-				// below replaces it, so assigning here shows the confirmation for
-				// exactly as long as the request that follows takes
-				Nino.admin.config._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'config' );
 

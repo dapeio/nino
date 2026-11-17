@@ -284,4 +284,28 @@ check( '...Enter on a button inside the row is the button\'s and does not open t
 fire( bodyRows[0], 'click' );
 check( 'a click on a row opens it as before', opened.join() === '/plain,/button' );
 
+/*	The search reads what a cell shows: a column with a drawing function is
+	found by the text it draws, and no longer by the raw value behind it	*/
+const found = element('div');
+ctx.Nino.adminUi.table( {
+	mount 	: found,
+	columns	: [
+		{ key : 'uri', label : 'Uri', type : 'string' },
+		{ key : 'state', label : 'State', type : 'string', render : function( value ) { return value === 1 ? 'Active' : 'Inactive' } },
+	],
+	rows 		: [ { uri : '/one', state : 1 }, { uri : '/two', state : 0 } ],
+	labels 	: { search : 'Search', empty : '', noMatch : '' },
+} );
+const foundBox = descendants( found ).filter( el => el.type === 'search' )[0];
+const foundRows = () => descendants( found ).filter( el => el.tagName === 'TR' && el.dataset !== undefined && el.dataset.row !== undefined ).map( el => el.dataset.row ).join();
+foundBox.value = 'Active';
+fire( foundBox, 'input' );
+const byShown = foundRows();
+foundBox.value = '1';
+fire( foundBox, 'input' );
+check( 'the search reads the text a cell shows: what a drawing function makes is found, the raw value behind it is not', byShown === '/one,/two' && foundRows() === '' );
+foundBox.value = 'Inactive';
+fire( foundBox, 'input' );
+check( '...and a part of the shown text narrows to the rows that show it', foundRows() === '/two' );
+
 done();

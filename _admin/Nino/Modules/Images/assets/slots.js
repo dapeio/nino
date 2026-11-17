@@ -405,7 +405,8 @@
 						return;
 					}
 					Nino.admin.touch( 'slots' );
-					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+					msg.textContent = '';
+					Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 					Nino.admin.slots._snapshot();
 					Nino.admin.slots.init();
 					report( true );
@@ -420,7 +421,8 @@
 					return;
 				}
 				Nino.admin.touch( 'slots' );
-				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				msg.textContent = '';
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				Nino.admin.slots._snapshot();
 				Nino.admin.slots.init();
 				report( true );

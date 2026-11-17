@@ -906,6 +906,7 @@ a {
 	input[type="password"],
 	input[type="number"],
 	input[type="date"],
+	input[type="time"],
 	input[type="url"],
 	input[type="datetime-local"],
 	textarea
@@ -1045,6 +1046,11 @@ a {
 :where(.nino-admin) .nino-admin-status[data-state="error"]::before {
 	content: "\26A0";
 	content: "\26A0" / "";
+}
+
+/* A line that was emptied - what a save that went well leaves: the toast and the badge of the bar say it - draws no mark before nothing */
+:where(.nino-admin) .nino-admin-status:empty::before {
+	content: none;
 }
 
 /* The one dialog of the workbench (Nino.adminUi.choiceDialog()): a question, a
@@ -2059,9 +2065,9 @@ a {
 	line-height: 1.4;
 }
 
-/* The written condition. Tabular figures are pointless here, but a fixed
-   min-width is not: without it the row's copy shifts sideways every time the
-   word changes length as the switch is toggled */
+/* The written condition, in the spelling of the word - "On", "Aus" - and not in capitals made by the stylesheet. Tabular figures are
+   pointless here, but a fixed min-width is not: without it the row's copy shifts sideways every time the word changes length as the
+   switch is toggled */
 :where(.nino-admin) .nino-admin-switch-state {
 	flex: none;
 	min-width: 2.4rem;
@@ -2069,8 +2075,6 @@ a {
 	color: var(--editor-text-secondary);
 	font-size: var(--nino-admin-text-xs);
 	font-weight: var(--nino-admin-weight-strong);
-	letter-spacing: .04em;
-	text-transform: uppercase;
 	text-align: right;
 }
 
@@ -2241,6 +2245,191 @@ a {
 	font-size: var(--nino-admin-text-xs);
 	text-align: right;
 }
+
+/* ------------------------------------------- The fields of the second part */
+
+/* One tick with its name: the box keeps its own size at the start of the field's column */
+:where(.nino-admin) .nino-admin-field-check > input[type="checkbox"] {
+	justify-self: start;
+}
+
+/* A list of ticks as a field of a form is a fieldset - a group with a legend for its name - and no card: no frame, no ground, no
+   room for a legend of its own. The legend is the name of the field, in the type of every name */
+:where(.nino-admin) fieldset.nino-admin-checklist-field {
+	margin: 0 0 var(--nino-admin-space-5);
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+:where(.nino-admin) fieldset.nino-admin-checklist-field > legend {
+	position: static;
+	display: block;
+	margin: 0 0 var(--nino-admin-space-1);
+	padding: 0;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
+	letter-spacing: normal;
+	text-transform: none;
+}
+
+/* Where the name stands at the left (a form from 48 rem, a dialog from 40 rem) the legend is taken out of the flow into the column of the names,
+   which is what a grid cannot do with a rendered legend */
+@media (min-width: 48rem) {
+	/* The class is named twice for the weight of the rule that puts every child of a field but its name into the second column */
+	.nino-admin fieldset > .nino-admin-checklist-field.nino-admin-checklist-field.nino-admin-field:not(.nino-admin-field-wide) > legend,
+	.nino-admin fieldset > .nino-admin-fieldgrid > .nino-admin-checklist-field.nino-admin-checklist-field.nino-admin-field:not(.nino-admin-field-wide) > legend {
+		position: absolute;
+		top: calc( var(--nino-admin-space-3) + var(--nino-admin-space-1) );
+		left: 0;
+		grid-column: 1;
+		box-sizing: border-box;
+		width: max( 9rem, 22% );
+		padding-right: var(--nino-admin-space-5);
+		margin: 0;
+	}
+}
+
+@media (min-width: 40rem) {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > fieldset.nino-admin-checklist-field {
+		position: relative;
+		display: grid;
+		grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
+		gap: var(--nino-admin-space-5);
+	}
+
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > fieldset.nino-admin-checklist-field > legend {
+		position: absolute;
+		top: 0;
+		left: 0;
+		box-sizing: border-box;
+		width: min( 11rem, 40% );
+		padding-right: var(--nino-admin-space-5);
+	}
+
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field > :is(.nino-admin-field-note, .nino-admin-field-error, .nino-admin-checklist, .nino-admin-localerows-list, .nino-admin-filefield-body, .nino-admin-datetime) {
+		grid-column: 2;
+	}
+}
+
+/* The languages one under the other: the badge at the left, the field at the right, the working language first and in the colour of the
+   accent - the order says it too */
+:where(.nino-admin) .nino-admin-localerows-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--nino-admin-space-3);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-localerow {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--nino-admin-space-4);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-localerow > .nino-admin-locale-badge {
+	flex: 0 0 7rem;
+	box-sizing: border-box;
+	margin-top: var(--nino-admin-space-3);
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	text-align: center;
+	text-overflow: ellipsis;
+}
+
+:where(.nino-admin) .nino-admin-localerow.is-work > .nino-admin-locale-badge {
+	color: var(--editor-blue);
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+:where(.nino-admin) .nino-admin-localerow-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-localerow-body > .nino-admin-field-error {
+	margin-bottom: 0;
+}
+
+/* The choice of a file: the button, the name of what was chosen and its size, Remove - in one line that breaks where it must */
+:where(.nino-admin) .nino-admin-filefield-body {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--nino-admin-space-3) var(--nino-admin-space-5);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-filefield-name {
+	min-width: 0;
+	font-size: var(--nino-admin-text-sm);
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-filefield-name[data-state="none"],
+:where(.nino-admin) .nino-admin-filefield-size {
+	color: var(--editor-text-secondary);
+}
+
+:where(.nino-admin) .nino-admin-filefield-size {
+	font-size: var(--nino-admin-text-xs);
+}
+
+/* The field of code takes the whole width of its column - a technical value is never short */
+:where(.nino-admin) .nino-admin-field-code > textarea {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* A field of code: the face of code at the size of the smallest type, a scroll bar of its own for the line that is longer than the field */
+:where(.nino-admin) textarea.nino-admin-code {
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+	line-height: 1.5;
+	overflow: auto;
+	tab-size: 2;
+	white-space: pre;
+}
+
+/* A moment: the date and the time side by side, each as short as a date and a time are (12 rem and 8 rem), and under one another where there is no room */
+:where(.nino-admin) .nino-admin-datetime {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--nino-admin-space-3);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-datetime > input {
+	flex: 0 1 12rem;
+	width: auto;
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-datetime > input[type="time"] {
+	flex-basis: 8rem;
+}
+
+/* What a question is about: the lines under its message, the lines of a group under the title of the group */
+:where(.nino-admin) .nino-admin-dialog-details {
+	margin-top: 0;
+	font-size: var(--nino-admin-text-sm);
+}
+
+:where(.nino-admin) .nino-admin-dialog-details-title {
+	margin: var(--nino-admin-space-5) 0 var(--nino-admin-space-1);
+	color: var(--editor-text);
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+:where(.nino-admin) .nino-admin-dialog-details-list {
+	margin: 0;
+	padding-inline-start: var(--nino-admin-space-7);
+}
+
 
 :where(.nino-admin) .nino-admin-richtext {
 	margin-bottom: var(--nino-admin-space-5);
@@ -2754,22 +2943,34 @@ a {
 	max-width: none;
 }
 
-/* The buttons at the end of a row: a column with no head, at the right, in one line */
+/* The buttons at the end of a row: a column with no head, at the right, in one line. It sticks to the right edge of the frame at every width:
+   where the table is wider than the frame and scrolls in it, an action is never behind the scroll. The cell is opaque - what scrolls
+   under it is covered - and a hairline at its left edge shows that something goes on under it */
 :where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-actions {
+	position: sticky;
+	right: 0;
 	width: 1%;
+	background: var(--editor-bg-grouped);
+	box-shadow: inset 1px 0 0 var(--editor-separator);
 	text-align: right;
 }
 
-/* Where the table is wider than the screen and scrolls in its frame, the buttons of a row stay at the right edge: an action is never behind the scroll */
-@media (max-width: 40rem) {
-	:where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-actions {
-		position: sticky;
-		right: 0;
-		background: var(--editor-bg-grouped);
-	}
+:where(.nino-admin) .nino-admin-table thead th.nino-admin-table-actions {
+	z-index: 2;
+	background: var(--nino-admin-surface-muted);
+}
 
-	:where(.nino-admin) .nino-admin-table thead th.nino-admin-table-actions {
-		background: var(--nino-admin-surface-muted);
+/* The tint of a row under the pointer or the focus is laid over the opaque ground of the sticky cell */
+:where(.nino-admin) .nino-admin-table tbody tr:is(:hover, :focus-visible) td.nino-admin-table-actions {
+	background: linear-gradient( var(--editor-blue-soft), var(--editor-blue-soft) ), var(--editor-bg-grouped);
+}
+
+/* On a phone a cell that is cut by the frame ends in an ellipsis and not in a hard edge; a cell that holds a sentence breaks its lines instead */
+@media (max-width: 40rem) {
+	:where(.nino-admin) .nino-admin-table td:not(.nino-admin-table-actions, .is-wrap) {
+		max-width: 12rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 }
 
@@ -2839,7 +3040,7 @@ a {
 
 :where(.nino-admin) .nino-admin-table-sort:hover:not(:disabled) {
 	background: var(--editor-blue-soft);
-	color: var(--editor-blue);
+	color: var(--editor-text);
 }
 
 /* The sort marker is generated, so no caller has to ship an arrow glyph */
@@ -3118,7 +3319,7 @@ a {
 	white-space: nowrap;
 }
 
-/* The way back is never cut: the name of the panel and the link keep their size, the identifier gives way first and the title after it, with an ellipsis */
+/* The way back is never cut: the name of the panel and the link keep their size, and a title that is too long gives way with an ellipsis - the identifier beside it stays */
 .nino-admin .nino-admin-contextbar[data-panel] > .nino-admin-contextbar-lead {
 	flex: 0 0 auto;
 }
@@ -3153,8 +3354,9 @@ a {
 }
 
 .nino-admin .nino-admin-contextbar-code {
-	flex: 0 100 auto;
+	flex: 0 0 auto;
 	min-width: 0;
+	max-width: 50%;
 	overflow: hidden;
 	color: var(--editor-text-secondary);
 	font-family: var(--nino-admin-mono);

@@ -267,7 +267,7 @@ console.log( '\nNino.adminUi.contextBar - the name of a surface and its tools\n'
 
 	check( 'the way back is never cut: the lead of a bar with the name of the panel does not shrink and its link does not wrap', /flex:\s*0 0 auto/.test( rule('.nino-admin .nino-admin-contextbar[data-panel] > .nino-admin-contextbar-lead') )
 		&& /white-space:\s*nowrap/.test( rule('.nino-admin .nino-admin-contextbar[data-panel] .nino-admin-contextbar-lead .nino-admin-back-link') ) );
-	check( '...what gives way is the identifier first and the title after it, which is cut with an ellipsis', shrink('.nino-admin .nino-admin-contextbar-code') > 1 && /flex:\s*0 1 auto/.test( rule('.nino-admin .nino-admin-contextbar-title') ) && /text-overflow:\s*ellipsis/.test( rule('.nino-admin .nino-admin-contextbar-title') ) );
+	check( '...a long title gives way and is cut with an ellipsis, the identifier beside it keeps its size', /flex:\s*0 0 auto/.test( rule('.nino-admin .nino-admin-contextbar-code') ) && shrink('.nino-admin .nino-admin-contextbar-title') === 1 && /flex:\s*0 1 auto/.test( rule('.nino-admin .nino-admin-contextbar-title') ) && /text-overflow:\s*ellipsis/.test( rule('.nino-admin .nino-admin-contextbar-title') ) );
 	check( 'a bar with neither title, identifier nor icons has no group of the name', adminUi.contextBar( { back : { to : 'x' } } ).children.every( el => classes( el ).includes('nino-admin-contextbar-name') === false ) );
 }
 

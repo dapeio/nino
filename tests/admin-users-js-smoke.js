@@ -148,7 +148,7 @@ check( 'one save sends address, password and the changed role in one users/save'
 check( '...and no second request carries the role', requests.filter( function( r ) { return r.action === 'users/role' } ).length === 0 );
 
 answer( 200, { mail : 'c@example.com', role : 'dev' } );
-check( 'the saved text is shown in the action bar line', byId('users-form-msg').dataset.state === 'saved' && byId('users-form-msg').textContent !== '' );
+check( 'a save leaves the line of the action bar empty in its saved state', byId('users-form-msg').dataset.state === 'saved' && byId('users-form-msg').textContent === '' );
 check( '...the password field is emptied and the account follows its new address and role', byId('users-form-pw').value === ''
 	&& panel._currentUser.mail === 'c@example.com' && panel._currentUser.role === 'dev' && byId('users-form-role-select').dataset.saved === 'dev' );
 check( '...and the list is fetched again', requests.length === 3 && requests[2].action === 'users/list' );

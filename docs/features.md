@@ -71,19 +71,48 @@ second directory that claims a key an earlier one holds; `\Nino\Features::reject
 return [
 	'key'					=> 'hello',
 	'name'				=> [ 'en_US' => 'Hello World', 'de_DE' => 'Hallo Welt' ],
-	'description'	=> [ 'en_US' => 'Greets the name its panel stores.', 'de_DE' => 'Grüßt den Namen, den sein Panel speichert.' ],
+	'description'	=> [
+		'en_US' => 'Hello World lets you greet a name that its panel stores. It is the example a new feature takes its shape from.',
+		'de_DE' => 'Hallo Welt ermöglicht es, einen Namen zu grüßen, den sein Panel speichert. Es ist das Beispiel, an dem sich ein neues Feature in der Form orientiert.',
+	],
 	// What the Description tab shows: all six sections, the empty ones too
 	'manual'			=> [
-		'shortcodes' => [ '[hello name="Ada" shout="yes"]' => 'Greets Ada, in capitals.' ], 'markup' => [],
-		'routes' => [ '/hello' => 'The page of the greeting.' ], 'panel' => [ 'Hello World' => 'Who the shortcode greets.' ],
-		'callbacks' => [], 'install' => [ 'templates/page-hello.tpl' => 'The page /hello renders.', 'elements/privacy.php' => 'Its section of the privacy policy.' ],
+		'shortcodes' => [
+			'[hello name="Ada" shout]' => [
+				'en_US' => 'Greets Ada, in capitals.',
+				'de_DE' => 'Grüßt Ada, in Großbuchstaben.',
+			],
+		],
+		'markup' => [],
+		'routes' => [
+			'/hello' => [
+				'en_US' => 'The page of the greeting.',
+				'de_DE' => 'Die Seite des Grußes.',
+			],
+		],
+		'panel' => [
+			'Hello World' => [
+				'en_US' => 'Sets who the shortcode greets.',
+				'de_DE' => 'Legt fest, wen der Shortcode grüßt.',
+			],
+		],
+		'callbacks' => [],
+		'install' => [
+			'templates/page-hello.tpl' => [
+				'en_US' => 'The template the page /hello renders.',
+				'de_DE' => 'Das Template der Seite /hello.',
+			],
+			'elements/privacy.php' => [
+				'en_US' => 'Brings its section of the privacy policy.',
+				'de_DE' => 'Bringt den Abschnitt der Datenschutzerklärung mit.',
+			],
+		],
 	],
 	'category'		=> 'system',				// one of \Nino\Features::CATEGORIES
 	'maturity'		=> 'Example',				// the badge beside the name, 24 characters at most
-	'version'			=> '1.1.0',
+	'version'			=> '2.0.0',
 	'nino'				=> '^2.0',					// the kernel whose vocabulary it uses
 	'data'				=> [ '/data/hello.php' ],					// what a backup carries
-	'assets'			=> [ '/features/Hello/assets/hello.css' ],	// into the site's style bundle
 	'settings'		=> [
 		'greeting'	=> [ 'type' => 'string', 'label' => 'Greeting', 'default' => 'Hello', 'maxlength' => 24 ],
 		'longest'		=> [ 'type' => 'int', 'label' => 'Longest name', 'min' => 1, 'max' => 60, 'unit' => 'characters', 'default' => 40 ],
@@ -302,7 +331,8 @@ What a feature may read where it draws the head of the Dashboard: `\Nino\Runtime
 There is no install, activate, deactivate or uninstall hook: a feature lies in the
 directory, an activation applies its unit and lists its class, and nothing runs on
 the way out. The class of `Hello` is `features/Hello/Hello.php`; its markup is the
-template `templates/hello.tpl`, `<p class="nino-hello[[classes]]">[[text]]</p>`:
+template of its component, `components/hello/template.tpl`, `<p class="[[class]]">[[text]]</p>`,
+and the class draws it through `componentHello()`:
 
 ```php features/Hello/Hello.php
 <?php
@@ -310,50 +340,69 @@ declare(strict_types=1);
 
 namespace Nino\Modules {
 
+	/**
+	 *	Hello World - the example a feature takes its shape from: a component
+	 *	(components/hello/, drawn by componentHello()), a route and a page made of
+	 *	components (install/templates/page-hello.tpl), a file of data a backup carries
+	 *	(STORAGE), and a panel of the workbench (Admin/Admin.php, assets/admin.js)
+	 */
 	class Hello {
 
+		/**	The name the panel stores, with a format key of its own	*/
 		public const string STORAGE = '/data/hello.php';
 
+		/**
+		 *	Registers the route /hello where the project has not written one of its own
+		 *
+		 *	@param		array 		&$appData
+		 *
+		 *	@return 	void
+		 */
 		public static function init( array &$appData ): void {
-
-			// A plain shortcode: it has no schema, so the register owns no such name
-			\Nino\Feature::shortcode( $appData, 'hello', [ self::class, 'doShortcode' ] );
 
 			// A route of the feature's own, only where the address is free
 			if( isset( $appData['/nino/http/routes']['GET://hello'] ) === false )
 				$appData['/nino/http/routes']['GET://hello'] = [ 'uri' => '/hello', 'body' => '[template /templates/page-hello]' ];
 		}
 
+		/**
+		 *	The panels this module answers; the workbench reads them while the feature is on
+		 *
+		 *	@param		array 		&$appData
+		 *
+		 *	@return 	array						The classes of the panels
+		 */
 		public static function adminPanels( array &$appData ): array {
 			return [ \Nino\Modules\Hello\Admin::class ];
 		}
 
-		// 1.0.0 stored the name alone; from 1.1.0 the file carries a format key
-		public static function upgrade( array &$appData, string $fromVersion ): bool {
+		/**
+		 *	The renderer of the component hello, [hello name="Ada" shout]: the register
+		 *	has made the attributes ready, so the name arrives escaped - it is decoded
+		 *	to be put into a sentence and escaped again where it is written
+		 *
+		 *	@param		array 		&$appData
+		 *	@param		array 		$args					The attributes of the call
+		 *	@param		string		$content			What stands between its tags (nothing: it is a leaf)
+		 *	@param		array 		$context			Where the call stands
+		 *
+		 *	@return 	string									Finished markup
+		 */
+		public static function componentHello( array &$appData, array $args, string $content, array $context ): string {
 
-			if( version_compare( $fromVersion, '1.1.0', '>=' ) === true || \Nino\Filesystem::fileExists( $appData, self::STORAGE ) === false )
-				return true;
+			$name = trim( html_entity_decode( $args['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			$text = (string) \Nino\Features::setting( $appData, 'hello', 'greeting', 'Hello' ). ', '. ( $name === '' ? self::name( $appData ) : $name ). '!';
 
-			return \Nino\Filesystem::mutate( $appData, self::STORAGE, static function( mixed $state ): array {
-
-				$state = is_array( $state ) === true ? $state : [];
-
-				return [ 'format' => 1, 'name' => (string) ( $state['name'] ?? '' ) ];
-			} );
+			return \Nino\Components::fill( $appData, 'hello', $args, $content, [ '[[text]]' => \Nino\Components::escape( $args['shout'] === '1' ? mb_strtoupper( $text ) : $text ) ] );
 		}
 
-		public static function doShortcode( array &$appData, array $args ): string {
-
-			$name = trim( (string) ( $args['name'] ?? '' ) );
-			$text = \Nino\Features::setting( $appData, 'hello', 'greeting', 'Hello' ). ', '. ( $name === '' ? self::name( $appData ) : $name ). '!';
-
-			return str_replace(
-				[ '[[classes]]', '[[text]]' ],
-				[ \Nino\Feature::classes( $args ), \Nino\Components::escape( \Nino\Feature::flag( $args, 'shout' ) === true ? mb_strtoupper( $text ) : $text ) ],
-				\Nino\Feature::template( $appData, '/features/Hello/templates', 'hello' )
-			);
-		}
-
+		/**
+		 *	The name the panel stored, or World
+		 *
+		 *	@param		array 		&$appData
+		 *
+		 *	@return 	string
+		 */
 		public static function name( array &$appData ): string {
 
 			$stored = \Nino\Filesystem::getFileContent( $appData, self::STORAGE, [] );
@@ -364,10 +413,10 @@ namespace Nino\Modules {
 }
 ```
 
-`init()` registers `[hello]` through `\Nino\Feature::shortcode()`, which registers
-nothing where the register of components has the name - a component of a feature -
-and answers `false`; `[hello]` has no schema, so it is a plain shortcode and `doShortcode()` is its callback.
-The route is registered only where the address is free: a route in `config.php` is a
+`[hello]` is a component of the feature, which the folders `components/hello/` and `groups/hello/` declare
+([Components in folders](#components-in-folders)); the register calls `componentHello()` for it with the
+attributes made ready, which is why `name` arrives escaped and is decoded before it is put into a sentence.
+`init()` registers no shortcode of its own. The route is registered only where the address is free: a route in `config.php` is a
 page somebody made. It goes with the feature; a menu shows it once the Navigations
 panel has put it into one and it has a name (`/_nino/webpage<uri>/name`, written in
 the Routes panel under *Routes of features and modules*).
@@ -453,6 +502,11 @@ namespace Nino\Modules\Hello {
 			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
 		}
 
+		// The sign of the rail entry: Lucide hand, geometry and no view
+		public static function icon(): string {
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>';
+		}
+
 		public static function text(): string {
 			return \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' );
 		}
@@ -517,24 +571,31 @@ throws away what the field holds, and `save( done )` ends in `done( true )` or
 
 	wn.Nino.admin = wn.Nino.admin || {};
 
+	const t = function( key ) { return Nino.content.getText( key ) };
+
+	let form = null;
 	let input = null;
-	let line = null;
+	let bar = null;
 	let saved = '';
 
+	// Saving model A of the guide: a form, Save in the bar, the answer as the badge and a toast
 	const save = function( done ) {
 
-		line.saving();
+		Nino.adminUi.clearFieldErrors( form );
+		bar.line.saving();
 
 		Nino.admin.hello.call( 'save', { name : input.value }, function( status, response ) {
 
 			if( status !== 200 ) {
-				line.error( status, response, '/_admin/hello/error/save' );
+				bar.line.error( status, response, '/_admin/hello/error/save' );
+				input.focus();
 				done( false );
 				return;
 			}
 
 			saved = input.value = response.name;
-			line.saved();
+			bar.line.saved();
+			Nino.adminUi.say( t('/_admin/common/msg/saved') );
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.refresh();
 			done( true );
@@ -542,28 +603,38 @@ throws away what the field holds, and `save( done )` ends in `done( true )` or
 	};
 
 	Nino.admin.hello = Nino.adminUi.panel( {
-		uri		: 'hello',
-		mount	: 'hello-list',
-		dirty	: { isDirty : function() { return input !== null && input.value !== saved }, save : save, discard : function() { input.value = saved } },
-		render	: function( data, panel ) {
+		uri    : 'hello',
+		mount  : 'hello-list',
+		dirty  : { isDirty : function() { return input !== null && input.value !== saved }, save : save, discard : function() { input.value = saved } },
+		render : function( data, panel ) {
 
 			const mount = panel.mount();
-			const field = Nino.adminUi.textField( { label : Nino.content.getText('/_admin/hello/label/name'), value : data.name, maxLength : data.longest } );
-			const bar = Nino.adminUi.actionBar( Nino.adminUi.el( 'div' ) );
+			const field = Nino.adminUi.textField( { label : t('/_admin/hello/label/name'), help : t('/_admin/hello/hint/name'), value : data.name, maxLength : data.longest, id : 'hello-name' } );
+
+			// The one shape of a form: a fieldset with its legend, the grid in it that puts the label at the left of the field
+			const set = Nino.adminUi.el( 'fieldset' );
+			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+
+			set.appendChild( Nino.adminUi.el( 'legend', '', t('/_admin/hello/label/greeting') ) );
+			set.appendChild( grid );
+
+			form = Nino.adminUi.el( 'form' );
+			form.noValidate = true;
+			form.addEventListener( 'submit', function( event ) { event.preventDefault(); save( function() {} ) } );
 
 			input = field.querySelector('input');
 			input.name = 'name';
 			saved = input.value;
 
-			line = Nino.adminUi.status( Nino.adminUi.el( 'span' ) );
-			line.bind( mount );
+			bar = Nino.adminUi.actionBar( { status : true, primary : Nino.adminUi.button( t('/_admin/common/label/save'), null, { type : 'submit' } ) } );
 
-			bar.appendChild( line.element );
-			bar.appendChild( Nino.adminUi.button( Nino.content.getText('/_admin/hello/label/save'), function() { save( function() {} ) }, { className : 'nino-admin-btn-primary' } ) );
+			grid.appendChild( field );
+			form.appendChild( set );
+			form.appendChild( bar.el );
+			bar.line.bind( form );
 
 			mount.innerHTML = '';
-			mount.appendChild( field );
-			mount.appendChild( bar );
+			mount.appendChild( form );
 		},
 	} );
 
@@ -656,6 +727,10 @@ and the Dashboard say so, and the editor may hide it. The file of `Hello` is
 		'title' => 'Hello World',
 		'text'  => '<p>The Hello World feature stores one name, the one its panel saves. Nothing about a visitor is stored. Questions: #/project/company/contact/email#</p>',
 	] ],
+	'de_DE' => [ 'hello' => [
+		'title' => 'Hallo Welt',
+		'text'  => '<p>Das Feature Hallo Welt speichert genau einen Namen: den, der in seinem Panel eingetragen wird. Über Besucher wird nichts gespeichert. Fragen: #/project/company/contact/email#</p>',
+	] ],
 ];
 ```
 
@@ -691,7 +766,7 @@ values live under `/nino/features` in `config.php`, per feature as
 `key => { version, settings }`:
 
 ```php
-'/nino/features' => [ 'hello' => [ 'version' => '1.1.0', 'settings' => [ 'greeting' => 'Hi', 'longest' => 24 ] ] ],
+'/nino/features' => [ 'hello' => [ 'version' => '2.0.0', 'settings' => [ 'greeting' => 'Hi', 'longest' => 24 ] ] ],
 ```
 
 The form is on the feature's screen in the Features panel; a feature that also has a
@@ -701,6 +776,11 @@ real types back. `saveSettings( $appData, $key, $posted )` validates every setti
 before any is written and answers `name => message` for each one it rejected, `[]`
 when it saved; a setting the form did not send keeps its value, a `secret` posted as
 `''` keeps the stored one and as `null` clears it.
+
+A `string` is one line: a line break or a control character in it - a tab, a null byte,
+U+0085, U+2028, U+2029 - is refused when it is saved, and a stored value that has one is
+read as a value that does not validate, so `settings()` answers the default. A `text`
+keeps its line breaks.
 
 ## Updates and the upgrade hook
 
@@ -728,7 +808,7 @@ for): a change that finds it taken answers `\Nino\Features::BUSY` (or `UNLOCKABL
 nothing; what they write to `config.php` they read from it first.
 
 - Migrate only what the feature owns: its `data/` files and its own config keys,
-  through `\Nino\Filesystem::mutate()` as `Hello`'s hook does, returning its result:
+  through `\Nino\Filesystem::mutate()`, returning its result:
   a callback that aborts answers `false`, which refuses. The activation writes its
   own keys as differences against `config.php` as it stands, so a hook that migrates
   `config.php` with `mutate()` is not undone.
@@ -777,50 +857,104 @@ The test of `Hello` is `features/Hello/tests/hello-smoke.php`:
 <?php
 declare(strict_types=1);
 
-// The Hello feature's contract test. Runs against the checkout three levels up,
-// or the one NINO_ROOT names
+// The test of the feature Hello: the component, the page, the panel's actions, the data. php features/Hello/tests/hello-smoke.php
 $root = getenv( 'NINO_ROOT' ) ?: dirname( __DIR__, 3 );
 defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', dirname( __DIR__, 2 ) );
 require $root. '/tests/harness.php';
 
+$dir = dirname( __DIR__ );
 $appData = ninoSandbox( 'hello' );
-\Nino\AppData::writeContentData( $appData, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native' ] );
+$appData['./nino/filesystem/path'] = $root;
+$manifest = \Nino\Features::manifest( $dir );
+check( 'the manifest validates and is written for this kernel', is_array( $manifest ) === true && \Nino\Features::satisfies( (string) $manifest['nino'] ) === true && isset( $manifest['components'] ) === false );
+check( 'Basis and the feature are switched on', \Nino\Features::activate( $appData, 'basis' ) === true && \Nino\Features::activate( $appData, 'hello' ) === true );
+check( 'the unit brought the page, its words and the section of the privacy policy', \Nino\Filesystem::fileExists( $appData, '/templates/page-hello.tpl' ) === true );
 
-check( 'the manifest validates without a warning', is_array( \Nino\Features::manifest( dirname( __DIR__ ) ) ) && ninoWarnings() === [] );
-check( 'activation lists the class, records the version and applies the unit', \Nino\Features::activate( $appData, 'hello' ) === true
-	&& \Nino\Features::get( $appData, 'hello' )['installed'] === '1.1.0' && is_file( \Nino\Filesystem::path( $appData, '/templates/page-hello.tpl' ) ) === true );
-
+$appData['/nino/modules'] = (array) ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] ?? [] );
 \Nino\Html::init( $appData );
+\Nino\Features::registerComponents( $appData );
 \Nino\Modules::callModules( $appData, 'init' );
-check( 'the shortcode renders through the template', \Nino\Html::renderHtml( $appData, '[hello name="Ada" shout="yes" class="wide"]' ) === '<p class="nino-hello wide">HELLO, ADA!</p>' );
+\Nino\Features::registerParts( $appData );
+$draw = static fn( string $source ): string => trim( \Nino\Html::renderSource( $appData, $source, [ 'template' => 'page-hello' ] + \Nino\Html::context( $appData ) ) );
+$ignored = ninoWarnings();
 
-ninoUser( $appData, 'dev@example.com' );
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'name' => 'Grace' ], 'hello/save' );
-check( 'hello/save stores the name and hello/list answers it', $status === 200 && $body['name'] === 'Grace'
-	&& ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'hello/list' )[1] === [ 'name' => 'Grace', 'longest' => 40 ] );
+check( 'the folders are read without a reason', \Nino\Features::componentProblems( $appData, 'hello' ) === [] );
+$schema = \Nino\Components::components( $appData )['hello'] ?? [];
+check( 'the component is in its group, labelled in both languages, with an icon of the table', ( $schema['group'] ?? '' ) === 'hello' && isset( $schema['label']['de_DE'], $schema['label']['en_US'] ) === true && in_array( $schema['icon'] ?? '', \Nino\Components::ICONS, true ) === true );
+check( 'the standard part keeps the rule of mixing', \Nino\Components::partProblems( (string) file_get_contents( $dir. '/groups/hello/part/part.css' ), [ 'hello' ] ) === [] );
+check( 'a tool offers it in a column', in_array( 'hello', \Nino\Components::allowed( $appData, 'section-col' ), true ) === true );
+check( 'it greets the stored name, a name of the call, and in capitals', $draw( '[hello]' ) === '<p class="hello">Hello, World!</p>' && $draw( '[hello name="Ada" shout]' ) === '<p class="hello">HELLO, ADA!</p>' );
+check( 'a name that spells a tag or a call is text, escaped once', $draw( '[hello name="<b> & [csrf]"]' ) === '<p class="hello">Hello, &lt;b&gt; &amp; [csrf]!</p>' );
 
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'name' => str_repeat( 'x', 41 ) ], 'hello/save' );
-check( 'a name too long is refused with the code, its limit and the field', $status === 400 && $body['code'] === 'hello_long' && $body['params'] === [ 40 ] && $body['field'] === 'name' );
-foreach( [ 'en_US', 'de_DE' ] as $locale )
-	check( "...and the code has its sentence in $locale", str_contains( \Nino\Admin\Admin::textFills( $appData, '/features/Hello/text', $locale )['[[/_admin/error/'. $body['code']. ']]'] ?? '', '%s' ) );
+// The unit brings its section of the privacy policy, the same one in every language and listed in the manifest of the unit
+$unit = (array) include $dir. '/install/manifest.php';
+$privacy = (array) include $dir. '/install/elements/privacy.php';
+check( 'the section of the privacy policy is in the unit, in both languages, under the id of the feature', ( $unit['elements']['privacy'] ?? '' ) === 'elements/privacy.php'
+	&& isset( $privacy['*']['hello'], $privacy['de_DE']['hello']['text'], $privacy['en_US']['hello']['text'] ) === true );
 
-// The project as 1.0.0 left it; all() keeps its answer for the request, so it is dropped to be asked again
-\Nino\Filesystem::putFileContent( $appData, '/data/hello.php', [ 'name' => 'Ada' ] );
-$appData['/nino/features']['hello']['version'] = '1.0.0';
-\Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
-unset( $appData['./nino/features/all'] );
-check( 'a recorded version behind the manifest runs the upgrade hook, which adds the format key', \Nino\Features::activate( $appData, 'hello' ) === true
-	&& \Nino\Filesystem::getFileContent( $appData, '/data/hello.php', [] ) === [ 'format' => 1, 'name' => 'Ada' ] );
-check( 'deactivation takes the panel away and keeps the data', \Nino\Features::deactivate( $appData, 'hello' ) === true
-	&& isset( \Nino\Admin\Admin::panels( $appData )['hello'] ) === false && \Nino\Modules\Hello::name( $appData ) === 'Ada' );
+// The page the route answers is named in every language the unit speaks: what the Builder lists it by and what the page's title reads
+$named = [];
+foreach( [ 'de_DE', 'en_US' ] as $locale )
+	$named[] = array_keys( array_filter( (array) include $dir. '/install/text/'. $locale. '.php', static fn( string $key ): bool => str_starts_with( $key, '[[/_nino/webpage/hello/' ), ARRAY_FILTER_USE_KEY ) );
+check( 'the page is named, titled and described in both languages', $named[0] === $named[1] && count( $named[0] ) === 3 );
+
+// The page of the unit is made of components: a tool reads it as blocks, with nothing it has to keep as free html
+$page = (string) file_get_contents( ninoSandboxDir( $appData ). '/private/templates/page-hello.tpl' );
+$tree = \Nino\Markup::parse( $page, \Nino\Components::containers( $appData ) );
+// What a tool finds against the page: the name comment and the two includes of the frame, and nothing between them
+$found = [];
+foreach( \Nino\Components::check( $appData, $tree ) as $at => $problems )
+	foreach( $problems as $problem )
+		if( ( $problem['code'] === 'unknown' && $problem['detail'] === 'template' ) === false && ( $problem['code'] === 'free' && $at === 0 ) === false )
+			$found[] = $problem['code'];
+check( 'the page of the unit is made of components: no class of Nino 1, no element of its own, nothing a tool keeps as free html', preg_match( '/nino-|<section|<div|<h1/', $page ) === 0 && $found === [] );
+check( 'the route of the page is registered and its template draws the greeting', ( $appData['/nino/http/routes']['GET://hello']['uri'] ?? '' ) === '/hello'
+	&& str_contains( $draw( '[section-wrap id="intro"][section-row][section-col][hello][/section-col][/section-row][/section-wrap]' ), '<p class="hello">Hello, World!</p>' ) === true );
+
+// The panel: both actions ask for the right, the save keeps the name and refuses one that is too long
+ninoUser( $appData, 'editor@example.org', [] );
+$denied = ninoCall( $appData, [ \Nino\Modules\Hello\Admin::class, 'apiSave' ], [ 'name' => 'Eve' ] );
+check( 'an account without the right saves nothing', $denied[0] === 403 && \Nino\Modules\Hello::name( $appData ) === 'World' );
+ninoUser( $appData, 'admin@example.org', [ '/_admin/hello/manage' ] );
+$saved = ninoCall( $appData, [ \Nino\Modules\Hello\Admin::class, 'apiSave' ], [ 'name' => 'Ada' ] );
+check( 'the save keeps the name in the file a backup carries', $saved[0] === 200 && \Nino\Modules\Hello::name( $appData ) === 'Ada' && in_array( \Nino\Modules\Hello::STORAGE, $manifest['data'], true ) === true );
+check( 'a name that is too long is refused at its field', ( ninoCall( $appData, [ \Nino\Modules\Hello\Admin::class, 'apiSave' ], [ 'name' => str_repeat( 'a', 61 ) ] )[0] ) === 400 );
+
+// The script of the panel builds nothing itself (the guide, "What a panel does not build itself")
+$script = (string) file_get_contents( $dir. '/assets/admin.js' );
+check( 'the rail entry has a sign of its own: an svg that draws, no script in it', preg_match( '/^<svg [^>]*>(<path d="[^"]+"\/>)+<\/svg>$/', \Nino\Modules\Hello\Admin::icon() ) === 1 );
+check( 'the panel script takes its bar, button and field from the workbench', preg_match( '/createElement\(\s*.button|window\.confirm|\balert\(|nino-admin-btn-|type\s*[:=]\s*.file/', $script ) === 0 && str_contains( $script, 'Nino.adminUi.actionBar( {' ) === true );
+check( 'the form is the shape of the guide: novalidate, a fieldset with its fieldgrid, one main button, the answer as a toast, unsaved input reported', str_contains( $script, 'noValidate = true' ) === true
+	&& str_contains( $script, "'fieldset'" ) === true && str_contains( $script, 'nino-admin-fieldgrid' ) === true && substr_count( $script, 'primary :' ) === 1
+	&& str_contains( $script, 'Nino.adminUi.say(' ) === true && str_contains( $script, 'dirty' ) === true );
+$words = [ 'de_DE' => include $dir. '/text/de_DE.php', 'en_US' => include $dir. '/text/en_US.php' ];
+check( 'both languages of the panel have the same keys', array_keys( $words['de_DE'] ) === array_keys( $words['en_US'] ) );
+// A word the script reads is a fill of the panel or of the workbench's common list: never one the panel forgot
+preg_match_all( "~'(/_admin/(?!common/)[a-z/_-]+)'~", $script, $read );
+$own = array_map( static fn( string $key ): string => trim( $key, '[]' ), array_keys( $words['en_US'] ) );
+check( 'every word the script reads is one the panel brings in both languages', array_diff( array_unique( $read[1] ), $own ) === [] );
+
+$block = \Nino\Blocks::get( $appData, 'hello-greeting' );
+check( 'the block is valid and names the feature', is_array( $block ) === true && in_array( 'hello', $block['features'] ?? [], true ) === true && ( $block['missing'] ?? [] ) === [] );
+check( 'the demo of the group draws', substr_count( $draw( (string) ( \Nino\Components::groups( $appData )['hello']['demo'] ?? '' ) ), 'class="hello"' ) === 2 );
+
+check( 'switched off, the call draws nothing and the name stays', \Nino\Features::deactivate( $appData, 'hello' ) === true && \Nino\Filesystem::fileExists( $appData, \Nino\Modules\Hello::STORAGE ) === true );
+$ignored = ninoWarnings();
+
+// Nothing of the old components API or the old stylesheet vocabulary is left in the folder
+$oldWorld = [];
+foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+	if( str_contains( (string) $file, '/tests/' ) === false && preg_match( '/Feature::shortcode|Modules\\\\Components|\bnino-(?!admin-fieldgrid)[a-z]|--(?:space|color|radius|fontsize)-|Nino\.ui\./', (string) file_get_contents( (string) $file ) ) === 1 )
+		$oldWorld[] = (string) $file;
+check( 'no file of the feature names the vocabulary of Nino 1', $oldWorld === [] );
 
 ninoDone( $appData );
 ```
 
 Test what a caller can see, as `Hello`'s test does: the manifest, the activation and
-its unit, the shortcode and the endpoints, a refusal with its code and its
-sentences, the panel there while the feature is active and gone after, the upgrade
-hook, the data that deactivation keeps. `php features/Hello/tests/hello-smoke.php`
+its unit, the component drawn through the register, the endpoints, a refusal with its
+code and its sentences, the panel there while the feature is active and gone after,
+the data that deactivation keeps. `php features/Hello/tests/hello-smoke.php`
 runs it (`NINO_ROOT=...` before it for another Nino), `php tests/features-smoke.php`
 is the kernel's contract test beside it. `ninoErrors()`, `ninoCall()`, `ninoUser()`
 and `ninoVisit()` are 1.8.

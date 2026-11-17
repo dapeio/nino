@@ -225,12 +225,14 @@ namespace Nino {
 
 		// The icons a component may name: the table of Nino.adminUi.icon() in _admin/assets/Nino.admin.js, name for name
 		public const array ICONS = [
-			'arrow-down', 'arrow-up', 'brackets', 'check', 'chevron-down', 'chevron-left', 'chevron-right',
-			'chevron-up', 'chevrons-left', 'chevrons-right', 'circle-help', 'code', 'columns-3', 'copy',
-			'database', 'ellipsis', 'external-link', 'eye', 'eye-off', 'heading', 'image', 'list', 'lock',
-			'menu', 'mouse-pointer-click', 'panel-bottom', 'panel-top', 'panels-top-left', 'pencil', 'plus',
-			'rectangle-horizontal', 'redo-2', 'refresh-cw', 'repeat', 'rows-2', 'search', 'settings-2',
-			'sliders-horizontal', 'square', 'table', 'text', 'trash-2', 'triangle-alert', 'undo-2', 'x',
+			'arrow-down', 'arrow-up', 'brackets', 'check', 'chevron-down', 'chevron-left', 'chevron-right', 'chevron-up',
+			'chevrons-left', 'chevrons-right', 'circle-help', 'clock', 'code', 'columns-3', 'contact', 'cookie',
+			'copy', 'database', 'ellipsis', 'external-link', 'eye', 'eye-off', 'gauge', 'hand', 'heading', 'image',
+			'images', 'list', 'lock', 'mail', 'menu', 'mouse-pointer-click', 'move-horizontal', 'newspaper', 'panel-bottom',
+			'panel-top', 'panels-top-left', 'pencil', 'play', 'plus', 'rectangle-horizontal', 'redo-2', 'refresh-cw',
+			'repeat', 'rows-2', 'search', 'settings-2', 'share-2', 'sliders-horizontal', 'square', 'square-split-horizontal',
+			'sun-moon', 'table', 'text', 'text-cursor-input', 'timer', 'trash-2', 'triangle-alert', 'undo-2',
+			'x',
 		];
 
 		// The longest label of a variant, in bytes: of the text, or of each text of a locale map

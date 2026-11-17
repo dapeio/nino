@@ -28,7 +28,6 @@
 	Nino.admin.language = {
 
 		// Survives the re-render a successful save triggers - see _save()
-		_pendingMsg : '',
 		// Set once the first answer has rendered the form; showCurrent() builds
 		// nothing while it is set - see there
 		_ready 		: false,
@@ -171,14 +170,6 @@
 			// subtree is not findable that way
 			Nino.admin.language._renderLocaleRows();
 			Nino.admin.language._refreshNative( Nino.admin.language._nativeValue );
-
-			// Re-shown after the reload that follows a save, which builds this
-			// element fresh and would otherwise wipe the confirmation the moment
-			// it appeared
-			if( Nino.admin.language._pendingMsg !== '' ) {
-				msg.textContent = Nino.admin.language._pendingMsg;
-				Nino.admin.language._pendingMsg = '';
-			}
 
 			Nino.admin.language._capture();
 		},
@@ -610,10 +601,7 @@
 					return;
 				}
 
-				// Held rather than written straight to this element: the reload
-				// below replaces it, so assigning here shows the confirmation for
-				// exactly as long as the request that follows takes
-				Nino.admin.language._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				Nino.admin.language._capture();
 
 				// Reloaded rather than left as typed: a saved language list

@@ -820,7 +820,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 			form.appendChild( message );
 			form.appendChild( actions );
 
-			// "Saving", "Saved at 09:41", "Unsaved changes" - or why it failed,
+			// "Saving", "Unsaved changes" - or why it failed,
 			// with the field the server named marked and focused (see
 			// "Saying what happened")
 			const line = Nino.adminUi.status( message );
@@ -896,6 +896,65 @@ shows, for the context bar - what a change does is the panel's (it calls
 the name of a language, and `localeBadge( locale, bar )` the pill of the context bar that names
 the content language where it is not the native one. Their docblocks in
 `_admin/assets/Nino.admin.js` are the reference.
+
+### The fields of a form: ticks, languages, files, code and moments
+
+Beside `textField()`, `selectField()`, `switchField()`, `numberField()` and `textareaField()` the form blocks have six
+more, each with the help behind the (?) and the note under the control that every field has
+([Help, notes and textfills at a field](#help-notes-and-textfills-at-a-field)), each with what is wrong said at the field
+(`fieldError()`). The ones that are one control answer the element - the label, with the control as its `.control` where it
+is no `input` - and the ones that are a group answer a handle, `{ el, value(), set(), error( text ), clear(), focus() }`,
+which a form reads its value from.
+
+`Nino.adminUi.checkField( { key, label, checked, required, help, note, onChange } )` is one tick with its name, the label at
+the left of the box as at every field; a yes or no that is a setting is `switchField()`.
+`Nino.adminUi.checklist( { key, label, options : [ { value, label, state } ], value, help, onChange } )` is several of a set:
+a `fieldset` with a legend for its name, one row for each option, a quiet `state` at the end of a row, and a value that is
+the list of the ticked ones in the order of the options (`value()`, `set( list )`).
+
+`Nino.adminUi.localeRows( { key, label, locales, values, multiline, onChange } )` is the value of each language under the
+other - the badge of the language at the left (`localeName()`), the field at the right, the working language of the workbench
+(`Nino.admin.workLocale.current`, or `work`) first and marked. It is for the short values that are required in every language
+and for nothing else: whatever is longer is edited in the working language. `value()` answers the map `code => text`,
+`value( code )` one text, `set( map )` or `set( code, text )` writes, and `error( code, text )` says what is wrong at that row
+and at no other.
+
+```js
+const title = Nino.adminUi.localeRows( {
+	key : 'title', label : t('/_admin/catalog/label/title'), required : true,
+	locales : locales, values : item.title, help : t('/_admin/catalog/hint/title'),
+	onChange : function( code, text ) { draft.title[code] = text },
+} );
+form.appendChild( title.el );
+// when saving
+const values = title.value();
+Object.keys( values ).forEach( function( code ) {
+	if( values[code].trim() === '' )
+		title.error( code, Nino.adminUi.format( t('/_admin/common/error/missing'), Nino.adminUi.localeName( code ) ) );
+} );
+```
+
+`Nino.adminUi.fileField( { key, label, accept, maxBytes, note, button, onChange } )` is the choice of a file as the guide has
+it: a button of the second kind, the name and the size of the chosen file beside it, "Remove", the limits as the `note`. A
+file that is larger than `maxBytes`, or of a type `accept` does not name, is not taken and is said at the field. It uploads
+nothing: `onChange( file )` hands the `File` over (`null` once it was removed), `value()` answers it, and the view sends it
+the way its model of saving says - at once, with the form, through `Nino.adminUi.api.call()` - and reports it to
+`Nino.admin.dirty`, which does not follow a file by itself.
+
+`Nino.adminUi.codeField( { key, label, value, rows, fills, ... } )` is a `textareaField()` for technical values: the face of
+code, a scroll bar of its own, no spell checking, completing or wrapping, and the Tab key left to the browser. There is no
+editor and no highlighting.
+
+`Nino.adminUi.dateTime( { key, label, value, min, max, zone, required, onChange } )` is a date and a time as two native fields
+with one value, an ISO string of the clock of the site without a zone - `'2026-11-17T06:02'`; nothing is converted to or from
+the browser's zone, and `zone` names the site's under the field. `value()` answers `''` for no moment, a date alone is
+midnight and a time without a date is no value; `valid()` answers `''`, `'incomplete'`, `'min'` or `'max'`, which the
+caller words (`error( text )`).
+
+`formDialog()` draws every one of them: a field of its `fields` is `type : 'check'`, `'checklist'` (`options`), `'locales'`
+(`locales`, `multiline`), `'file'` (`accept`, `maxBytes`), `'code'` or `'datetime'`, and `onSubmit( values )` gets a boolean,
+a list, a map of the languages, a `File` or `null`, a text and an ISO string for them. A required field is empty where a tick
+is not ticked, a list has none, a language has no text or there is no file.
 
 ### Help, notes and textfills at a field
 
@@ -988,7 +1047,7 @@ when `small`) with the focus ring of every button, and `danger` gives it the col
 const up = Nino.adminUi.iconButton( 'arrow-up', Nino.content.getText('/_admin/catalog/label/up'), function() { move( index, -1 ) }, { disabled : index === 0 } );
 ```
 
-The names of the set are `arrow-down`, `arrow-up`, `brackets`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `code`, `columns-3`, `copy`, `database`, `ellipsis`, `external-link`, `eye`, `eye-off`, `heading`, `image`, `list`, `lock`, `menu`, `mouse-pointer-click`, `panel-bottom`, `panel-top`, `panels-top-left`, `pencil`, `plus`, `rectangle-horizontal`, `redo-2`, `refresh-cw`, `repeat`, `rows-2`, `search`, `settings-2`, `sliders-horizontal`, `square`, `table`, `text`, `trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
+The names of the set are `arrow-down`, `arrow-up`, `brackets`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `clock`, `code`, `columns-3`, `contact`, `cookie`, `copy`, `database`, `ellipsis`, `external-link`, `eye`, `eye-off`, `gauge`, `hand`, `heading`, `image`, `images`, `list`, `lock`, `mail`, `menu`, `mouse-pointer-click`, `move-horizontal`, `newspaper`, `panel-bottom`, `panel-top`, `panels-top-left`, `pencil`, `play`, `plus`, `rectangle-horizontal`, `redo-2`, `refresh-cw`, `repeat`, `rows-2`, `search`, `settings-2`, `share-2`, `sliders-horizontal`, `square`, `square-split-horizontal`, `sun-moon`, `table`, `text`, `text-cursor-input`, `timer`, `trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
 spells them, in the `ICONS` table of `_admin/assets/Nino.admin.js`; `\Nino\Components::ICONS`
 is the same list for the schema of a component, and a test holds the two together. Another icon is
 added to both, to the table as a string for a path and `[ tag, attributes ]` for any other
@@ -1012,16 +1071,23 @@ owns a word.
 
 | What | Builder |
 |---|---|
-| A question before an action | `confirm( level, { title, message, yes, no, onChoose } )` |
+| A question before an action | `confirm( level, { title, message, details, yes, no, onChoose } )` |
 | Make or copy something from a name and at most four more fields (duplicate, save as) | `formDialog()` |
 | Pick one from a list (a block, a source, a component) | `pickDialog()` |
 | The properties of one part of a work surface, which stays in view | `propertiesDialog()` |
 | Text to be read | `manualDialog( title, content, opener )` |
 | Anything else - a form of a record of its own with more fields, anything with an address of its own | a screen of its own, not a dialog |
 
+`confirm()` takes `details` beside its `message` for a question that is about things: a list of lines of text, and groups
+`{ title, lines }` where the lines have a heading each - what a deletion takes, what it keeps. They are drawn as `<ul>` under
+the message with `textContent`, never as markup, and the caller cuts a long list short with a line of its own ("and 3
+more"). A modal dialog keeps the Tab key in itself: the rest of the page is inert while it is open, and Tab at the last
+control goes to the first, Shift+Tab at the first to the last.
+
 `formDialog( { title, fields, submit, cancel, message, size, onSubmit, onCancel,
 opener } )` draws `fields` - `[ { key, label, type, value, required, maxLength,
-validate } ]`, `type : 'select'` with `options : [ { value, label } ]`, any other `type`
+validate } ]`, `type : 'select'` with `options : [ { value, label } ]`, the types of
+[the fields of a form](#the-fields-of-a-form-ticks-languages-files-code-and-moments), any other `type`
 that of an `<input>` - or a `body` element of your own. A required field that is empty
 and a `validate( value )` that answers a sentence are said at the field with
 `fieldError()` and the dialog stays open; so does a send that is on its way, until
@@ -1529,7 +1595,7 @@ Reach for an existing class first; only invent one when no role fits.
 | The answer to an action that went well | `Nino.adminUi.say( text )`: the toast above the bar, one at a time, never for an error |
 | The manual of a screen - sections of a handle and what it does, or running text - in a dialog or on the screen | `.nino-admin-manual` via `Nino.adminUi.manual( content, options )`: `[ { heading, entries : [ { handle, text } ] } ]` or a text, `options.named` to name a handle in words instead of code, `options.none` for the sentence of an empty section, `options.level` for the headings; `Nino.adminUi.manualDialog()` shows it in `.nino-admin-dialog--manual` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.actionBar( { list : true, primary } )` for "New <thing>"; `Nino.adminUi.listActions( buttons )` for a list bar with more than one button (a scan and a new one, an export) |
-| Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
+| Status text in a bottom bar - saving, unsaved changes, why it failed (a save that went well empties it: the toast and the badge say it) | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
 | Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
 | "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again - except in a bar that has the badge of `Nino.adminUi.actionBar()` or `saveBar()`: there the registry paints the badge and draws no mark of its own) - not a `p`, not `role="status"` |
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger`, built with `Nino.adminUi.button()` |
@@ -1546,9 +1612,9 @@ Reach for an existing class first; only invent one when no role fits.
 | Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
 | The card a screen opens with, in lines of different weight | `.nino-admin-card` with a rule of the panel's own stylesheet for each line, scoped to the id of the card, in the shell's text colours so that both themes keep their contrast |
 | Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
-| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid), built with `Nino.adminUi.textField()`, `selectField()`, `switchField()`, `numberField()` or `textareaField()` |
+| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid), built with `Nino.adminUi.textField()`, `selectField()`, `switchField()`, `numberField()`, `textareaField()`, `checkField()` or `codeField()` |
 | Container whose fields share that grid | `.nino-admin-fieldgrid` |
-| Run of checkbox rows | `.nino-admin-checklist` |
+| Run of checkbox rows, a group of ticks as a field | `.nino-admin-checklist`, `Nino.adminUi.checklist()` |
 | Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
 | List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
 | Sections one under another, one open or several, the open one in the address | `.nino-admin-accordion` via `Nino.adminUi.accordion()` - see [Settings screens](#settings-screens-accordion-steps-split-view-and-colour-field) |
@@ -1559,7 +1625,7 @@ Reach for an existing class first; only invent one when no role fits.
 | A preview that follows a draft, the question of a refused save, the bar of a screen that is saved as a whole | `Nino.adminUi.previewFrame()`, `conflict()` and `.nino-admin-savebar` via `saveBar()` - see [the three builders](#workbench-screens-that-save-as-a-whole-the-preview-loop-the-conflict-and-the-save-bar) |
 | Entries one under another with children, a type icon, a hint and buttons of their own - the components of a page, the outline of a template; the same marked in several views at once | `.nino-admin-tree` via `Nino.adminUi.tree()`, a `role="tree"`, with `hoverSync()` and `previewFrame().marks()` - see [A tree](#a-tree) |
 | A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
-| Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
+| Explanatory text beside a thing; the lead of a step of the setup wizard | `.nino-admin-hint`, `.nino-admin-hint-lead` (for the wizard alone); `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
 | Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState( text, action )` |
 | Error text | `.nino-admin-error` |
@@ -1919,8 +1985,9 @@ const preview = Nino.adminUi.previewFrame( {
 
 **`Nino.adminUi.conflict( options )`** is the question a refused save asks - the stamp the save carried is not the
 one the server holds, because another tab or another person wrote the same thing. Overwrite is the dangerous answer
-and calls `onOverwrite`, which sends the save again with the stamp the refusal was about; Reload asks once more
-before it calls `onReload`, since it drops what the person did; Cancel and the Escape key call `onCancel`. It is a
+and calls `onOverwrite`, which sends the save again with the stamp the refusal was about; Reload calls `onReload`
+at once - the question says in a sentence under its message that it drops what the person did, and a second
+question after the answer would ask the same thing twice; Cancel and the Escape key call `onCancel`. It is a
 `choiceDialog()`, so the keyboard, the focus (back to `opener`) and the screen reader are its own.
 
 ```js
@@ -2061,8 +2128,9 @@ at the top. It is one line - a long way scrolls inside it, the end, the place, i
 **Pointed at, in every view.** `onHover( id )` is told when the pointer or the focus comes over an entry - and `null`
 when it leaves them all - once for each change; a redrawing that leaves them where they were tells nobody.
 `tree.highlight( id | ids | null, [{ scroll }] )` marks entries the way the pointer does - the tint, not the buttons - from
-outside, without moving the focus or the page and without telling anybody; with `scroll : true` it opens what is above
-the first and rolls it into view. What is marked outlives `update()`. The ids are the keys of the sync.
+outside, without moving the focus and without telling anybody; it opens what is above the first and rolls it into
+view where it lies outside the window of the tree (`scrollIntoView( { block : 'nearest' } )`), and `scroll : false` leaves
+the tree where it is. What is marked outlives `update()`. The ids are the keys of the sync.
 
 `Nino.adminUi.hoverSync()` is the switchboard between views that show the same things: `join( on )` gives a
 member `{ set( key ), leave() }`, and `on( key )` is called with what another member reported - a string, a list of

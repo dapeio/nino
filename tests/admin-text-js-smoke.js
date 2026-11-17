@@ -261,7 +261,9 @@ keysSandbox.confirm = function() { return true };
 keysSandbox.Nino.content.getText = function( key ) { return key === '/_admin/keys/error/save-partial' ? 'partial: %s' : key };
 // The question of the design system, with the browser's confirm as its answer, and the weights it was asked with
 const askedLevels = [];
+const toasts = [];
 keysSandbox.Nino.adminUi = {
+	say : function( text ) { toasts.push( text ) },
 	api : { errorText : function( status ) { return 'error '+ status } },
 	format : function( text, ...params ) { let at = 0; return String( text ).replace( /%[sdn]/g, function( token ) { return at < params.length ? String( params[at++] ) : token } ) },
 	confirm : function( level, options ) { askedLevels.push( level ); options.onChoose( keysSandbox.window.confirm( options.message ) === true ); return true },
@@ -321,7 +323,7 @@ check( 'the next translation follows once the first is written - without the glo
 	&& msg.textContent === '/_admin/common/msg/saving' && ended.length === 0 && JSON.stringify( keys._dirtyLocales ) === '["en_US"]' );
 answers( requests[1] );
 check( 'the confirmation comes once, after the last translation, with the form given back and the list redrawn',
-	msg.textContent === '/_admin/common/msg/saved' && ended.join() === 'true' && keys._saving === false && keys._dirtyLocales.length === 0
+	msg.textContent === '' && toasts.join() === '/_admin/common/msg/saved' && ended.join() === 'true' && keys._saving === false && keys._dirtyLocales.length === 0
 	&& pendingControls.every( function( c ) { return c.disabled === false } ) && keysSandbox.listDrawn === 1 );
 check( '...what the server answered is what the model holds now', keys._groups.g[1].values.de_DE === 'Text!.' && keys._groups.g[1].values.en_US === 'Body!.' && keys._localeValues.de_DE['/g/body'] === 'Text!.' );
 check( '...and the controls count as saved', keys.isDirty() === false );
@@ -887,6 +889,8 @@ function openedText( response, hash, locale ) {
 	const { title, levels : [ list, form ] } = w.pane( 'text', 'text-list', 'text-form' );
 	form.classList.add('admin-hidden');
 	const sent = [];
+	const told = [];
+	w.Nino.adminUi.say = sentence => told.push( sentence );
 	const text = w.Nino.admin.text;
 	text._apiCall = ( endpoint, payload, callback ) => {
 		sent.push( { endpoint : endpoint, payload : payload } );
@@ -897,7 +901,7 @@ function openedText( response, hash, locale ) {
 		callback( 200, { results : results } );
 	};
 	text.init();
-	return Object.assign( w, { list, form, title, sent, text } );
+	return Object.assign( w, { list, form, title, sent, text, told } );
 }
 
 {
@@ -1010,7 +1014,7 @@ function openedText( response, hash, locale ) {
 	check( 'a save of a page sends the keys of its template and the details of its route in one request', batch !== undefined && t.sent.filter( c => c.endpoint === 'savebatch' ).length === 1
 		&& batch.payload.items.some( i => i.key === '/template/page-services/intro/title' && i.value === 'Leistungen neu' && i.locale === 'de_DE' )
 		&& batch.payload.items.some( i => i.key === '/_nino/webpage/services/title' && i.value === 'Neuer Seitentitel' && i.locale === 'de_DE' ) );
-	check( '...and says it is saved', t.form.querySelector('#text-form-msg').textContent === 'Gespeichert.' && t.text._dirtyLocales.length === 0 );
+	check( '...and says it is saved with a toast, the line of the form left empty', t.form.querySelector('#text-form-msg').textContent === '' && t.told.length === 1 && t.text._dirtyLocales.length === 0 );
 	check( 'a save is a write of texts: the shell is told so, once - and of no template, which this panel does not write', t.touched.join() === 'texts' );
 }
 

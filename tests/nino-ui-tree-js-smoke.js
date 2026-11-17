@@ -469,14 +469,14 @@ check( 'a redrawing that leaves the pointer and the focus where they were tells 
 
 scrolled.length = 0;
 const keptFocus = focused( hover );
-hover.highlight( [ 'title', 'foot' ] );
+hover.highlight( [ 'title', 'foot' ], { scroll : false } );
 const lit = function( tree ) { return entries( tree ).filter( function( el ) { return el.children[0].className.split( ' ' ).indexOf( 'is-lit' ) !== -1 } ).map( function( el ) { return el.dataset.id } ).join(); };
-check( 'highlight() marks the entries it is given, and only those, moves neither the focus nor the page, and answers whether one is there',
-	lit( hover ) === 'title,foot' && focused( hover ) === keptFocus && scrolled.length === 0 && hover.highlight( 'nothing' ) === false && lit( hover ) === '' && hover.highlight( 'text' ) === true );
+check( 'highlight() marks the entries it is given, and only those, moves nothing with scroll false and not the focus at all, and answers whether one is there',
+	lit( hover ) === 'title,foot' && focused( hover ) === keptFocus && scrolled.length === 0 && hover.highlight( 'nothing', { scroll : false } ) === false && lit( hover ) === '' && hover.highlight( 'text', { scroll : false } ) === true );
 hover.highlight( null );
 const closedBefore = entry( hover, 'b' ).getAttribute( 'aria-expanded' );
-hover.highlight( 'button', { scroll : true } );
-check( 'with scroll it opens what is above the first one and rolls it into view, and null takes every mark away',
+hover.highlight( 'button' );
+check( 'by default it opens what is above the first one and rolls it into view once, and null takes every mark away',
 	closedBefore === 'false' && entry( hover, 'b' ).getAttribute( 'aria-expanded' ) === 'true' && scrolled.length === 1 && lit( hover ) === 'button' && ( hover.highlight( null ), lit( hover ) === '' ) );
 hover.highlight( 'text' );
 hover.update( data() );

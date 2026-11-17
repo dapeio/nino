@@ -92,8 +92,6 @@
 
 		// A list request is in flight - see init()
 		_loading		: false,
-		// key => message: survives the re-render a successful save triggers - see _save()
-		_pendingMsg : {},
 		_dir 				: '',
 		_features 	: [],
 		// The directories whose manifest the kernel refused, { dir, reason } - shown with the
@@ -2542,14 +2540,6 @@
 			if( settings === true )
 				form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.features._save( feature, form, save, msg ) } );
 
-			// Re-shown after the reload that follows a save, which builds this
-			// element fresh and would otherwise wipe the confirmation the moment
-			// it appeared
-			if( Nino.admin.features._pendingMsg[feature.key] ) {
-				msg.textContent = Nino.admin.features._pendingMsg[feature.key];
-				delete Nino.admin.features._pendingMsg[feature.key];
-			}
-
 			wrap.appendChild( form );
 
 			Nino.adminUi.showLevel( wrap, opened === true ? {} : { focus : false } );
@@ -3087,10 +3077,7 @@
 					return;
 				}
 
-				// Held rather than written straight to this element: the reload
-				// below replaces it, so assigning here shows the confirmation for
-				// exactly as long as the request that follows takes
-				Nino.admin.features._pendingMsg[feature.key] = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'features' );

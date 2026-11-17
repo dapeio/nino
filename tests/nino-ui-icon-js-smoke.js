@@ -43,6 +43,9 @@ const adminUi = sandbox.Nino.adminUi;
 // The names that the guide and the plan ask for
 const NAMES = [ 'trash-2', 'copy', 'arrow-up', 'arrow-down', 'plus', 'x', 'code', 'brackets', 'repeat', 'database', 'settings-2', 'sliders-horizontal', 'undo-2', 'redo-2', 'refresh-cw', 'search', 'chevron-left', 'chevron-right', 'chevron-down', 'external-link', 'pencil', 'check', 'triangle-alert', 'eye', 'eye-off', 'panels-top-left', 'panel-top', 'list' ];
 
+// The ones the components of the catalogue name: a component whose icon the table lacks draws the neutral square
+const CATALOGUE = [ 'square-split-horizontal', 'timer', 'play', 'text-cursor-input', 'images', 'clock', 'sun-moon', 'mail', 'newspaper', 'share-2', 'move-horizontal', 'contact', 'hand', 'cookie', 'gauge' ];
+
 function classes( el ) {
 	return String( el.className ).split(/\s+/).filter( Boolean );
 }
@@ -83,12 +86,12 @@ check( 'a name that is a property of every object is no icon either', thrown( fu
 
 const asked = warnings.length;
 
-const drawn = NAMES.every( function( name ) {
+const drawn = NAMES.concat( CATALOGUE ).every( function( name ) {
 	const svg = adminUi.icon( name );
 	return svg.children.length > 0 && svg.children.every( function( part ) { return [ 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon' ].indexOf( part.tagName.toLowerCase() ) !== -1 && Object.keys( part.attributes ).length > 0 } );
 } );
 
-check( 'every icon that the guide names has a drawing', drawn === true );
+check( 'every icon that the guide names and every icon the catalogue names has a drawing', drawn === true );
 check( 'the drawing of a known name raised no warning', warnings.length === asked );
 
 // --- button() ---------------------------------------------------------------

@@ -503,6 +503,17 @@ check( 'a stored value that no longer validates falls back to the default', ( st
 	return \Nino\Features::settings( $appData, 'sample' )['limit'] === 10;
 } )() );
 
+// A one-line value holds no control character and no line break; a multi-line type keeps its breaks
+$lined = [ "a\nb", "a\rb", "a\tb", "a\0b", "a\u{2028}b", "a\u{0085}b", "a\x80b" ];
+$refused = array_filter( $lined, static fn( string $value ): bool => isset( $v( [ 'title' => $value ] )['errors']['title'] ) );
+check( 'a string setting refuses a line break and a control character - and bytes that are no text', count( $refused ) === count( $lined ) );
+check( '...a text setting keeps its breaks', $v( [ 'notes' => "a\nb\tc" ] )['values']['notes'] === "a\nb\tc" );
+check( 'a stored string with a line break is read as an invalid value: the default is answered', ( static function() use ( $appData ): bool {
+	$appData['/nino/features']['sample']['settings']['title'] = "two\nlines";
+	unset( $appData['./nino/features/all'] );
+	return \Nino\Features::settings( $appData, 'sample' )['title'] === 'Hello';
+} )() );
+
 echo "\n";
 
 

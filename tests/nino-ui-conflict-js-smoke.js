@@ -1,7 +1,7 @@
 /**
  *	Nino								A compact filesystembased php framework
  *	nino-ui-conflict-js-smoke.js	Nino.adminUi.conflict(): the question a refused save asks - overwrite, cancel or reload, and
- *												the second question the reload is asked before it drops what a person did. The keyboard
+ *												the sentence that says what the reload drops, asked once. The keyboard
  *												and the screen reader are choiceDialog()'s, which this stands on: Escape is Cancel, and
  *												the focus goes back to the opener.
  *
@@ -74,17 +74,10 @@ console.log( 'Nino.adminUi.conflict - a save that was refused\n' );
 
 {
 	const a = ask();
+	const before = dialogs.length;
 	fire( buttons( a.dialog )[0], 'click' );
-	const second = dialogs[dialogs.length - 1];
-	check( 'Reload is asked once more before it drops anything: a second question, its way on the dangerous answer, and nothing is called yet', second !== a.dialog && second.open === true && a.calls.length === 0
-		&& buttons( second ).map( b => b.textContent ).join() === 'Cancel,Discard changes' && buttons( second )[1].className === 'nino-admin-btn-danger' );
-	fire( buttons( second )[1], 'click' );
-	check( '...yes calls onReload', a.calls.join() === 'reload' );
-
-	const b = ask();
-	fire( buttons( b.dialog )[0], 'click' );
-	fire( buttons( dialogs[dialogs.length - 1] )[0], 'click' );
-	check( '...no calls onCancel: what the person did is kept', b.calls.join() === 'cancel' );
+	check( 'Reload is asked once: the question that has it says what it drops, a press calls onReload at once, and no second dialog is opened', findAll( a.dialog, el => el.tagName === 'P' ).length === 2
+		&& a.calls.join() === 'reload' && dialogs.length === before );
 }
 
 {

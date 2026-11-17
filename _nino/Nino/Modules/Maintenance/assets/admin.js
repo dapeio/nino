@@ -22,7 +22,6 @@
 
 		_ready 			: false,
 		// Survives the re-render a successful save triggers - see _save()
-		_pendingMsg	: '',
 
 		/**
 		 *	Load the current state and render the form
@@ -213,14 +212,6 @@
 
 			wrap.appendChild( form );
 
-			// Re-shown after the reload that follows a save, which builds this
-			// element fresh and would otherwise wipe the confirmation the moment
-			// it appeared
-			if( Nino.admin.maintenance._pendingMsg !== '' ) {
-				msg.textContent = Nino.admin.maintenance._pendingMsg;
-				Nino.admin.maintenance._pendingMsg = '';
-			}
-
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'maintenance' );
@@ -261,7 +252,7 @@
 					return;
 				}
 
-				Nino.admin.maintenance._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 
 				// Re-rendered from the answer rather than left as typed: it
 				// carries the state config.php now actually holds, and the

@@ -1884,6 +1884,7 @@ function fakeElement( tag, noModal ) {
 	el.setAttribute = function( name, value ) { el.attributes[name] = String( value ) };
 	el.appendChild = function( child ) { el.children.push( child ); child.parent = el; return child };
 	el.addEventListener = function( type, fn ) { el.listeners[type] = fn };
+	el.removeEventListener = function( type, fn ) { if( el.listeners[type] === fn ) delete el.listeners[type] };
 	el.remove = function() { el.removed = true };
 	el.focus = function() { el.focused = true };
 	if( tag === 'dialog' && noModal !== true ) {

@@ -68,6 +68,8 @@ const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
 load( '_admin/Nino/Modules/Images/assets/admin.js', context );
 load( '_admin/Nino/Modules/Images/assets/slots.js', context );
+const toasts = [];
+Nino.adminUi.say = function( sentence ) { toasts.push( sentence ) };
 
 const panel = Nino.admin.images;
 panel._locales = [ 'de_DE', 'en_US' ];
@@ -134,7 +136,7 @@ check( 'an upload that went through tells the other panels that slots were writt
 
 fire( fileInput, 'change' );
 answer( 200, { filename : 'b.jpg', url : '/public/images/b.jpg', belowTarget : false, source : { width : 3000, height : 2000 } } );
-check( 'a picture that is large enough is just saved', messageOf( upload ).className === 'nino-admin-field-image-msg' && messageOf( upload ).textContent === 'Saved.' );
+check( 'a picture that is large enough is just saved: the message stays empty and a toast says it', messageOf( upload ).className === 'nino-admin-field-image-msg' && messageOf( upload ).textContent === '' && toasts.length === 1 );
 
 
 // --- where a slot is used --------------------------------------------------

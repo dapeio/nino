@@ -1142,7 +1142,7 @@
 					Nino.admin.roles._scopes = listResponse.scopes || [];
 					Nino.admin.roles._renderList();
 					Nino.admin.roles._openRole( response.id, true );
-					dc.getElementById('roles-form-msg').textContent = Nino.content.getText('/_admin/roles/msg/saved');
+					Nino.adminUi.say( Nino.content.getText('/_admin/roles/msg/saved') );
 					report( true );
 				} );
 			} );

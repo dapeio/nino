@@ -1006,7 +1006,7 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'a file within it goes to the server as before, with the file as the extra field', sent.length === 1 && sent[0].endpoint === 'uploadimage' && sent[0].extra.file.size === 1000 && msg.textContent === 'Saving' );
 	check( 'nothing was written yet, so nothing is told to the other panels', touched.length === 0 );
 	sent[0].callback( 200, { filename : 'a.jpg', url : '/images/a.jpg' } );
-	check( '...and the answer lands in the field and the preview', hidden.value === 'a.jpg' && preview.src === '/images/a.jpg' && msg.textContent === 'Saved.' );
+	check( '...and the answer lands in the field and the preview', hidden.value === 'a.jpg' && preview.src === '/images/a.jpg' && msg.textContent === '' );
 	check( '...and the Remove button is there from then on', removeBtn.hidden === false );
 	check( 'an image that was written tells the other panels that elements were', touched.join() === 'elements' );
 
@@ -1077,9 +1077,10 @@ if( typeof elements._renderNav === 'function' ) {
 	const form = dom.make('form');
 	const status = sandbox.Nino.adminUi.status( line );
 	status.bind( form );
-	sandbox.Nino.content = { getText : key => ( { '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/dirty' : 'Unsaved changes' } )[key] || '' };
-	status.saved( new Date( 2026, 8, 3, 7, 5 ) );
-	check( 'a saved form says when', line.dataset.state === 'saved' && line.textContent === 'Saved at 07:05.' );
+	sandbox.Nino.content = { getText : key => ( { '/_admin/common/msg/dirty' : 'Unsaved changes' } )[key] || '' };
+	sandbox.Nino.adminUi.say = () => null;
+	status.saved();
+	check( 'a saved form is in its saved state with the line empty', line.dataset.state === 'saved' && line.textContent === '' );
 	form.listeners.input();
 	check( 'and turns to "unsaved changes" with the first thing typed', line.dataset.state === 'dirty' && line.textContent === 'Unsaved changes' );
 }
@@ -1193,7 +1194,7 @@ function fakeDom() {
 		'/_admin/elements/error/required' : 'REQ', '/_admin/common/error/required' : 'FIELD', '/_admin/elements/error/json' : 'JSON', '/_admin/elements/error/number' : 'NUMBER',
 		'/_admin/elements/error/uri' : 'URI', '/_admin/elements/error/save' : 'SAVEFAIL', '/_admin/elements/label/locale-open' : '%s - %d open',
 		'/_admin/elements/label/uri' : 'Uri', '/_admin/elements/msg/duplicated' : 'COPY',
-		'/_admin/common/msg/dirty' : 'Unsaved changes', '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/saving' : 'Saving',
+		'/_admin/common/msg/dirty' : 'Unsaved changes', '/_admin/common/msg/saving' : 'Saving',
 	};
 	sandbox.Nino.content = { getText : key => texts[key] ?? ( key.indexOf('/field/') !== -1 || key.indexOf('/common/word/') !== -1 ? '' : key ) };
 	sandbox.Nino.admin.formToolbar = backLink => { const bar = d.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
@@ -1941,7 +1942,7 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		sent[1].callback( 200, { element : { '.uri' : '/post/newone', slug : 'fresh', name : 'Name' } } );
 		check( 'saved, a blank form of the same type opens: a new element with no uri and nothing in it', elements._isNew === true && elements._currentUri === null && elements._currentType === 'post'
 			&& d.doc.getElementById('elements-form-uri').value === '' && d.doc.getElementById('elements-form-uri').disabled !== true && field('slug').value === '' && again() !== null );
-		check( '...the status line of that form says what was saved, and holds nothing unsaved', elements._status.state === 'saved' && d.doc.getElementById('elements-form-msg').textContent.indexOf( 'Saved at' ) === 0 && elements.isDirty() === false );
+		check( '...the status line of that form is saved and empty, and holds nothing unsaved', elements._status.state === 'saved' && d.doc.getElementById('elements-form-msg').textContent === '' && elements.isDirty() === false );
 		check( '...and the other panels were told that elements were written, once', touched.join() === 'elements' );
 		check( '...it is shown the way a new element is, as the level of the pane', d.doc.getElementById('elements-form').classList.contains('admin-hidden') === false );
 		check( '...and the focus is in its first field, where the next element is typed, and not on the way back', d.doc.activeElement === d.doc.getElementById('elements-form-uri') && d.doc.activeElement.closest('.nino-admin-back-link') === null );

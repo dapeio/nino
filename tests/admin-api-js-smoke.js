@@ -277,9 +277,8 @@ check( 'showError() replaces the container\'s content with one error paragraph',
 
 const model = ui.statusModel;
 check( 'the model knows idle, dirty, saving, saved and error', [ 'idle', 'dirty', 'saving', 'saved', 'error' ].every( s => model( s ).state === s ) && model( 'whatever' ).state === 'idle' );
-check( 'saved carries the zero-padded 24-hour time of the date it is given', model( 'saved', new Date( 2026, 0, 5, 9, 4 ) ).params[0] === '09:04' && model( 'saved', new Date( 2026, 0, 5, 17, 30 ) ).params[0] === '17:30' );
-check( '...and the keys are fills of the shared text, in both languages', [ 'saving', 'dirty', 'saved' ].every( s => [ 'en_US', 'de_DE' ].every( l => TEXT[l][ model( s, new Date() ).key ] !== undefined ) ) );
-check( 'saved says "Saved at %s." / "Gespeichert um %s."', TEXT.en_US['/_admin/common/msg/savedat'] === 'Saved at %s.' && TEXT.de_DE['/_admin/common/msg/savedat'] === 'Gespeichert um %s.' );
+check( 'saved has no words of its own: the line stays empty, the toast and the badge say it', model( 'saved' ).key === '' && model( 'saved' ).params.length === 0 );
+check( '...and the keys of the other states are fills of the shared text, in both languages', [ 'saving', 'dirty' ].every( s => [ 'en_US', 'de_DE' ].every( l => TEXT[l][ model( s ).key ] !== undefined ) ) && [ 'en_US', 'de_DE' ].every( l => TEXT[l]['/_admin/common/msg/saved'] !== undefined ) );
 
 const line = element('p');
 const form = element('form');
@@ -292,7 +291,7 @@ form.appendChild( pw );
 const status = ui.status( line );
 status.bind( form );
 status.saved( new Date( 2026, 0, 5, 9, 4 ) );
-check( 'saved: the text, data-state and a polite status role', line.textContent === 'Saved at 09:04.' && line.dataset.state === 'saved' && line.attributes.role === 'status' && line.attributes['aria-live'] === 'polite' && line.classList.contains('nino-admin-status') );
+check( 'saved: an empty line with its data-state and a polite status role', line.textContent === '' && line.dataset.state === 'saved' && line.attributes.role === 'status' && line.attributes['aria-live'] === 'polite' && line.classList.contains('nino-admin-status') );
 fire( form, 'input' );
 check( 'typing into the form turns saved into unsaved changes', line.dataset.state === 'dirty' && line.textContent === 'Unsaved changes' );
 const upload = element('input');
@@ -344,7 +343,7 @@ status.saved( new Date( 2026, 0, 5, 9, 5 ) );
 check( '...but what was typed meanwhile is not in what was saved: the line ends in unsaved changes', line.dataset.state === 'dirty' && line.textContent === 'Unsaved changes' );
 status.saving();
 status.saved( new Date( 2026, 0, 5, 9, 6 ) );
-check( 'a save nothing was typed during ends in saved, as before', line.dataset.state === 'saved' && line.textContent === 'Saved at 09:06.' );
+check( 'a save nothing was typed during ends in saved, as before', line.dataset.state === 'saved' && line.textContent === '' );
 status.saving();
 fire( form, 'input' );
 status.saving();
@@ -378,9 +377,21 @@ check( 'unsaved can carry the panel\'s own words', line.textContent === 'A copy 
 status.idle();
 check( 'idle is empty', line.textContent === '' && line.dataset.state === 'idle' );
 
-const labelled = ui.status( element('p'), { saved : 'Stored at %s', dirty : 'Changed' } );
-labelled.saved( new Date( 2026, 0, 5, 1, 2 ) );
-check( 'a caller\'s labels replace the shared words', labelled.element.textContent === 'Stored at 01:02' );
+const told = [];
+const say = ui.say;
+ui.say = function( text ) { told.push( text ) };
+const labelled = ui.status( element('p'), { saved : 'Stored', dirty : 'Changed' } );
+labelled.saved();
+check( 'a caller\'s label for saved is the sentence of the toast, and the line is empty', told.length === 1 && told[0] === 'Stored' && labelled.element.textContent === '' );
+status.saving();
+status.saved();
+check( 'a save that went well says the shared sentence as a toast', told.length === 2 && told[1] === TEXT.en_US['/_admin/common/msg/saved'] );
+fire( form, 'input' );
+status.saving();
+fire( form, 'input' );
+status.saved();
+check( 'a save that had input typed meanwhile says nothing: it is no success', told.length === 2 && line.dataset.state === 'dirty' );
+ui.say = say;
 labelled.dirty();
 check( '...for every state they name', labelled.element.textContent === 'Changed' );
 

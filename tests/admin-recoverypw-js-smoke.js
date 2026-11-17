@@ -67,6 +67,9 @@ sandbox.window = { Nino : Nino };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
+
+const toasts = [];
+Nino.adminUi.say = function( text ) { toasts.push( text ) };
 load( '_admin/Nino/Modules/Users/assets/recoverypw.js', context );
 
 const tab = Nino.admin.recoverypw;
@@ -155,7 +158,7 @@ const snapshots = dirty.snapshots.length;
 answer( 200, { ok : true } );
 check( 'a success is the new baseline of the registry', dirty.snapshots.length === snapshots + 1 && dirty.snapshots[snapshots] === 'recoverypw' );
 check( 'a success empties all three fields', field('current').value === '' && field('new').value === '' && field('repeat').value === '' );
-check( '...says it is saved', message() === text('/_admin/recoverypw/msg/saved') && text('/_admin/recoverypw/msg/saved') !== '' );
+check( '...says it is saved as a toast, the line empty', message() === '' && toasts.length === 1 && toasts[0] === text('/_admin/recoverypw/msg/saved') && text('/_admin/recoverypw/msg/saved') !== '' );
 
 // A save asked for by the registry (Save in the question before leaving) reports how it ended
 type( 'old secret', 'brand new secret', 'brand new secret' );

@@ -30,7 +30,9 @@
 	list-style: none;
 }
 #admin-dashboard-elements a {
-	display: block;
+	display: flex;
+	align-items: center;
+	min-height: var(--nino-admin-control-icon-small);
 	color: inherit;
 }
 #admin-dashboard-activity {
@@ -45,7 +47,9 @@
 /* The "all of them" link under the activity list, appended as its next
    sibling - see _activitySection() in admin.js */
 #admin-dashboard-activity + .admin-dashboard-more {
-	display: inline-block;
+	display: inline-flex;
+	align-items: center;
+	min-height: var(--nino-admin-control-icon-small);
 	margin-top: .5rem;
 	font-size: .8rem;
 }

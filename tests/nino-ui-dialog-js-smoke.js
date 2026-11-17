@@ -16,7 +16,11 @@
  *															change to its caller at once, that the focus goes back to
  *															what asked, that the sizes are classes made of tokens,
  *															and, in the source of every panel, that each question
- *															that is asked has a title.
+ *															that is asked has a title; that a form takes every field
+ *															of the family (a tick, a list of ticks, the languages, a
+ *															file, code, a moment), that a question lists what it is
+ *															about as text, and that a modal dialog keeps the Tab key
+ *															and makes the rest of the page inert.
  *
  *	Usage: node tests/nino-ui-dialog-js-smoke.js
  */
@@ -74,10 +78,10 @@ function world( shell, options ) {
 	doc.removeEventListener = function( name, fn ) { const at = keys.indexOf( fn ); if( at !== -1 ) keys.splice( at, 1 ) };
 
 	const sandbox = { console : console, document : doc, Nino : Nino };
-	sandbox.window = { Nino : Nino, matchMedia : function() { return { matches : options.wide === true } }, confirm : function() { throw new Error('a dialog of the design system is not the browser\'s confirm') } };
+	sandbox.window = { Nino : Nino, matchMedia : function() { return { matches : options.wide === true } }, confirm : options.confirm ?? function() { throw new Error('a dialog of the design system is not the browser\'s confirm') } };
 	load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
-	return { ui : Nino.adminUi, dialogs : dialogs, doc : doc, keys : keys, body : doc.body };
+	return { ui : Nino.adminUi, dialogs : dialogs, doc : doc, keys : keys, body : doc.body, sandbox : sandbox };
 }
 
 const buttons = dialog => findAll( dialog, el => el.tagName === 'BUTTON' );
@@ -551,5 +555,137 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 	console.log( '  ('+ calls+ ' questions asked in the sources of the panels)' );
 	check( 'every confirm() of the workbench\'s scripts gives a title'+ ( without.length > 0 ? ': '+ without.join(', ') : '' ), calls > 20 && without.length === 0 );
 }
+
+// --- formDialog(): every field of the family ----------------------------------------
+
+{
+	const w = world();
+	const sent = [];
+	const file = { name : 'logo.png', size : 40, type : 'image/png', lastModified : 1 };
+	w.ui.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English (US)' } };
+	w.ui.formDialog( {
+		title : 'Add item',
+		submit : 'Add item',
+		cancel : 'Cancel',
+		fields : [
+			{ key : 'agree', type : 'check', label : 'Agree', required : true },
+			{ key : 'parts', type : 'checklist', label : 'Parts', required : true, options : [ { value : 'a', label : 'A' }, { value : 'b', label : 'B' } ] },
+			{ key : 'title', type : 'locales', label : 'Title', required : true, locales : [ 'de_DE', 'en_US' ], work : 'de_DE' },
+			{ key : 'logo', type : 'file', label : 'Logo', required : true, accept : 'image/*' },
+			{ key : 'css', type : 'code', label : 'CSS', value : 'a {}' },
+			{ key : 'when', type : 'datetime', label : 'When', value : '2026-11-17T06:02' },
+		],
+		onSubmit : ( values, ctl ) => sent.push( { values : values, ctl : ctl } ),
+	} );
+
+	const dialog = w.dialogs[0];
+	const row = findAll( dialog, el => el.className === 'nino-admin-dialog-actions' )[0].children;
+	const boxes = tag( dialog, 'input' ).filter( el => el.type === 'checkbox' );
+	const inputs = tag( dialog, 'input' );
+
+	fire( row[1], 'click' );
+	const refused = tag( dialog, 'p' ).filter( p => p.className === 'nino-admin-field-error' );
+	check( 'a form takes a tick, a list of ticks, the languages, a file, code and a moment: with every required one empty it sends nothing and says it at four fields', sent.length === 0 && refused.length === 4 && dialog.open === true );
+
+	boxes[0].checked = true;
+	boxes[1].checked = true;
+	boxes[2].checked = false;
+	inputs.filter( el => el.dataset.locale === 'de_DE' )[0].value = 'Titel';
+	fire( boxes[0], 'change' );
+	fire( row[1], 'click' );
+	check( '...a language that is left empty keeps a required row of the languages open as well', sent.length === 0 && tag( dialog, 'p' ).filter( p => p.className === 'nino-admin-field-error' ).length === 2 );
+
+	inputs.filter( el => el.dataset.locale === 'en_US' )[0].value = 'Title';
+	const picker = inputs.filter( el => el.type === 'file' )[0];
+	picker.files = [ file ];
+	fire( picker, 'change' );
+	fire( row[1], 'click' );
+	check( '...and with all of them filled it sends one value for each, of the kind the field gives', sent.length === 1 && sent[0].values.agree === true && sent[0].values.parts.join() === 'a' && sent[0].values.title.de_DE === 'Titel' && sent[0].values.title.en_US === 'Title'
+		&& sent[0].values.logo === file && sent[0].values.css === 'a {}' && sent[0].values.when === '2026-11-17T06:02' );
+	sent[0].ctl.close();
+}
+
+{
+	const w = world();
+	w.ui.formDialog( { title : 'Pick', submit : 'Pick', cancel : 'Cancel', fields : [ { key : 'parts', type : 'checklist', label : 'Parts', options : [ { value : 'a', label : 'A' } ], value : [] } ], onSubmit : function() {} } );
+	const dialog = w.dialogs[0];
+	const box = tag( dialog, 'input' ).filter( el => el.type === 'checkbox' )[0];
+	box.checked = true;
+	fire( box, 'change' );
+	check( 'a change in a list of ticks is a change of the form: Escape asks before it throws it away', escape( dialog ) === true && w.dialogs.length === 2 );
+	w.dialogs[1].close();
+	box.checked = false;
+	fire( box, 'change' );
+	check( '...and ticked back it is none', escape( dialog ) === false );
+}
+
+
+// --- confirm(): what the question is about ------------------------------------------
+
+{
+	const w = world();
+	w.ui.confirm( 'destructive', asked( { details : [ 'Page /about', 'Page <b>/team</b>', { title : 'Kept', lines : [ 'Its texts', 'and 3 more' ] }, '', { title : 'Empty', lines : [] } ] } ) );
+	const dialog = w.dialogs[0];
+	const lists = tag( dialog, 'ul' );
+	const items = tag( dialog, 'li' );
+
+	check( 'a question that names what it is about draws it as lists under the message: the lines that stand alone are one list, a group has a title and a list of its own', lists.length === 2 && items.map( li => li.textContent ).join('|') === 'Page /about|Page <b>/team</b>|Its texts|and 3 more'
+		&& findAll( dialog, el => el.className === 'nino-admin-dialog-details-title' ).map( el => el.textContent ).join() === 'Kept' );
+	check( '...every line is text, a line that spells markup is no element, and an empty line or group is not drawn', items.every( li => li.children.length === 0 ) && tag( dialog, 'b' ).length === 0 );
+	check( '...the dialog is described by it as it is by the message', String( dialog.attributes['aria-describedby'] ).indexOf( findAll( dialog, el => el.className === 'nino-admin-dialog-details' )[0].id ) !== -1 );
+	dialog.close();
+
+	const plain = world();
+	plain.ui.confirm( 'destructive', asked() );
+	check( 'a question that names nothing has no list', tag( plain.dialogs[0], 'ul' ).length === 0 );
+
+	const typed = world();
+	typed.ui.confirm( 'destructive', asked( { typed : 'legal', details : [ 'Page /about' ] } ) );
+	check( 'a question with a word to type has the list too', tag( typed.dialogs[0], 'li' ).length === 1 );
+
+	// A browser without <dialog> asks with its own question: the lines are part of it
+	let said = '';
+	const old = world( undefined, { noDialog : true, confirm : function( text ) { said = text; return true } } );
+	old.ui.confirm( 'destructive', asked( { details : [ 'Page /about' ] } ) );
+	check( 'where there is no <dialog> the browser\'s own question carries the lines', said.indexOf('Page /about') !== -1 );
+}
+
+
+// --- choiceDialog(): the Tab key stays in a modal ----------------------------------
+
+{
+	const w = world();
+	const behind = element('main');
+	const toasts = element('div');
+	toasts.className = 'nino-admin-toasts';
+	w.body.appendChild( behind );
+	w.body.appendChild( toasts );
+
+	Object.defineProperty( w.doc, 'activeElement', { get : () => findAll( w.body, el => el.focused === true )[0] ?? null, configurable : true } );
+
+	w.ui.confirm( 'big', asked() );
+	const dialog = w.dialogs[0];
+	const row = buttons( dialog );
+	const tab = ( shift ) => {
+		let prevented = false;
+		fire( dialog, 'keydown', { key : 'Tab', shiftKey : shift, preventDefault : function() { prevented = true } } );
+		return prevented;
+	};
+
+	check( 'while a modal dialog is open the rest of the page is inert, apart from the toast, which is heard', behind.inert === true && toasts.inert !== true && dialog.inert !== true );
+
+	row[1].focus();
+	check( 'Tab at the last control goes to the first, and the browser is not left to move it out', tab( false ) === true && row[0].focused === true );
+	check( '...Shift+Tab at the first goes to the last', tab( true ) === true && row[1].focused === true );
+	row[0].focus();
+	check( '...Tab in between is the browser\'s, which moves on by itself', tab( false ) === false && tab( true ) === true );
+
+	w.ui.choiceDialog( { title : 'Second', message : 'Sure?', nested : true, choices : [ { value : 'no', label : 'No', kind : 'secondary' } ], onChoose : function() {} } );
+	check( 'a dialog on a dialog makes the one below inert, and gives it back when it closes', w.dialogs[0].inert === true && ( w.dialogs[1].close(), w.dialogs[0].inert === false ) && behind.inert === true );
+
+	dialog.close();
+	check( 'the page is given back when the dialog closes', behind.inert === false );
+}
+
 
 done();

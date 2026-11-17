@@ -1260,7 +1260,8 @@
 
 					Nino.admin.text._saving = false;
 					Nino.admin.text._setFormPending( false );
-					msg.textContent = Nino.content.getText('/_admin/text/msg/saved');
+					msg.textContent = '';
+					Nino.adminUi.say( Nino.content.getText('/_admin/text/msg/saved') );
 					Nino.admin.text._renderCategoryList();
 
 					// What the controls hold is what is stored now

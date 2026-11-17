@@ -200,6 +200,9 @@ sandbox.window = {
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
+
+const toasts = [];
+Nino.adminUi.say = function( text ) { toasts.push( text ) };
 load( '_admin/Nino/Modules/Features/assets/admin.js', context );
 
 /** Answer the last request the panel made, the way Nino.http.sendRequest() calls back */
@@ -770,7 +773,7 @@ check( 'a saved form reloads the list rather than trusting what was typed', requ
 answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 check( 'the reload comes back to the feature\'s screen rather than dropping to the list', screen.classList.contains('admin-hidden') === false && mount.classList.contains('admin-hidden') === true );
 const rebuilt = byTag( screen, 'form' )[0];
-check( '...on the rebuilt form, where the confirmation survives the re-render', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
+check( '...on the rebuilt form, the confirmation is the toast, which the re-render does not take away', rebuilt !== form && toasts.length === 1 && toasts[0] === text('/_admin/common/msg/saved') );
 check( '...and on the tab it was saved from: a save is not a reason to be put back at the beginning of a screen', byTag( findAll( screen, function( el ) { return hasClass( el, 'features-detail-tabs' ) } )[0], 'button' )[1].attributes['aria-selected'] === 'true'
 	&& findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0].hidden === true );
 

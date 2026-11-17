@@ -84,6 +84,9 @@ sandbox.window = { Nino : Nino, location : { hash : '' } };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
+
+const toasts = [];
+Nino.adminUi.say = function( text ) { toasts.push( text ) };
 load( '_admin/Nino/Modules/Features/assets/admin.js', context );
 
 /** Answer the last request the script made, the way Nino.http.sendRequest() calls back */
@@ -173,7 +176,7 @@ answer( 200, { feature : savedEntry } );
 const rebuilt = byTag( sampleTab.mount, 'form' )[0];
 check( 'a saved form is drawn again from the entry the answer carries, without asking features/list again', rebuilt !== form && requests[requests.length - 1].action === 'features/settings'
 	&& rebuilt.querySelectorAll('[data-key]').filter( function( el ) { return el.dataset.key === 'title' } )[0].value === 'Typed' );
-check( '...says it was saved, and takes the new form as saved', byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } )
+check( '...says it was saved with a toast, and takes the new form as saved', toasts.length === 1 && toasts[0] === text('/_admin/common/msg/saved')
 	&& dirty.snapshots.length === 2 && dirty.watched['sample-settings'].getter() === rebuilt );
 
 // The shell's question about unsaved input saves through the same request

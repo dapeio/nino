@@ -108,24 +108,34 @@
 		'chevrons-left' : [ 'm11 17-5-5 5-5', 'm18 17-5-5 5-5' ],
 		'chevrons-right' : [ 'm6 17 5-5-5-5', 'm13 17 5-5-5-5' ],
 		'circle-help' : [ [ 'circle', { cx : '12', cy : '12', r : '10' } ], 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3', 'M12 17h.01' ],
+		clock : [ [ 'circle', { cx : '12', cy : '12', r : '10' } ], 'M12 6v6l4 2' ],
 		code : [ 'm16 18 6-6-6-6', 'm8 6-6 6 6 6' ],
 		'columns-3' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M9 3v18', 'M15 3v18' ],
+		contact : [ 'M16 2v2', 'M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2', 'M8 2v2', [ 'circle', { cx : '12', cy : '11', r : '3' } ], [ 'rect', { x : '3', y : '4', width : '18', height : '18', rx : '2' } ] ],
+		cookie : [ 'M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5', 'M8.5 8.5v.01', 'M16 15.5v.01', 'M12 12v.01', 'M11 17v.01', 'M7 14v.01' ],
 		copy : [ [ 'rect', { width : '14', height : '14', x : '8', y : '8', rx : '2', ry : '2' } ], 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' ],
 		database : [ [ 'ellipse', { cx : '12', cy : '5', rx : '9', ry : '3' } ], 'M3 5V19A9 3 0 0 0 21 19V5', 'M3 12A9 3 0 0 0 21 12' ],
 		ellipsis : [ [ 'circle', { cx : '12', cy : '12', r : '1' } ], [ 'circle', { cx : '19', cy : '12', r : '1' } ], [ 'circle', { cx : '5', cy : '12', r : '1' } ] ],
 		'external-link' : [ 'M15 3h6v6', 'M10 14 21 3', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' ],
 		eye : [ 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0', [ 'circle', { cx : '12', cy : '12', r : '3' } ] ],
 		'eye-off' : [ 'M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49', 'M14.084 14.158a3 3 0 0 1-4.242-4.242', 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143', 'm2 2 20 20' ],
+		gauge : [ 'm12 14 4-4', 'M3.34 19a10 10 0 1 1 17.32 0' ],
+		hand : [ 'M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2', 'M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2', 'M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8', 'M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15' ],
 		heading : [ 'M6 12h12', 'M6 20V4', 'M18 20V4' ],
 		image : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2', ry : '2' } ], [ 'circle', { cx : '9', cy : '9', r : '2' } ], 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' ],
+		images : [ 'm22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16', 'M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2', [ 'circle', { cx : '13', cy : '7', r : '1', fill : 'currentColor' } ], [ 'rect', { x : '8', y : '2', width : '14', height : '14', rx : '2' } ] ],
 		list : [ 'M3 5h.01', 'M3 12h.01', 'M3 19h.01', 'M8 5h13', 'M8 12h13', 'M8 19h13' ],
 		lock : [ [ 'rect', { width : '18', height : '11', x : '3', y : '11', rx : '2', ry : '2' } ], 'M7 11V7a5 5 0 0 1 10 0v4' ],
+		mail : [ 'm22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7', [ 'rect', { x : '2', y : '4', width : '20', height : '16', rx : '2' } ] ],
 		menu : [ 'M4 5h16', 'M4 12h16', 'M4 19h16' ],
 		'mouse-pointer-click' : [ 'M14 4.1 12 6', 'm5.1 8-2.9-.8', 'm6 12-1.9 2', 'M7.2 2.2 8 5.1', 'M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z' ],
+		'move-horizontal' : [ 'm18 8 4 4-4 4', 'M2 12h20', 'm6 8-4 4 4 4' ],
+		newspaper : [ 'M15 18h-5', 'M18 14h-8', 'M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2', [ 'rect', { width : '8', height : '4', x : '10', y : '6', rx : '1' } ] ],
 		'panel-bottom' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 15h18' ],
 		'panel-top' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18' ],
 		'panels-top-left' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18', 'M9 21V9' ],
 		pencil : [ 'M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z', 'm15 5 4 4' ],
+		play : [ 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z' ],
 		plus : [ 'M5 12h14', 'M12 5v14' ],
 		'rectangle-horizontal' : [ [ 'rect', { width : '20', height : '12', x : '2', y : '6', rx : '2' } ] ],
 		'redo-2' : [ 'm15 14 5-5-5-5', 'M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13' ],
@@ -134,10 +144,15 @@
 		'rows-2' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 12h18' ],
 		search : [ 'm21 21-4.34-4.34', [ 'circle', { cx : '11', cy : '11', r : '8' } ] ],
 		'settings-2' : [ 'M14 17H5', 'M19 7h-9', [ 'circle', { cx : '17', cy : '17', r : '3' } ], [ 'circle', { cx : '7', cy : '7', r : '3' } ] ],
+		'share-2' : [ [ 'circle', { cx : '18', cy : '5', r : '3' } ], [ 'circle', { cx : '6', cy : '12', r : '3' } ], [ 'circle', { cx : '18', cy : '19', r : '3' } ], [ 'line', { x1 : '8.59', x2 : '15.42', y1 : '13.51', y2 : '17.49' } ], [ 'line', { x1 : '15.41', x2 : '8.59', y1 : '6.51', y2 : '10.49' } ] ],
 		'sliders-horizontal' : [ 'M10 5H3', 'M12 19H3', 'M14 3v4', 'M16 17v4', 'M21 12h-9', 'M21 19h-5', 'M21 5h-7', 'M8 10v4', 'M8 12H3' ],
 		square : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ] ],
+		'square-split-horizontal' : [ 'M8 19H5c-1 0-2-1-2-2V7c0-1 1-2 2-2h3', 'M16 5h3c1 0 2 1 2 2v10c0 1-1 2-2 2h-3', [ 'line', { x1 : '12', x2 : '12', y1 : '4', y2 : '20' } ] ],
+		'sun-moon' : [ 'M12 2v2', 'M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715', 'M16 12a4 4 0 0 0-4-4', 'm19 5-1.256 1.256', 'M20 12h2' ],
 		table : [ 'M12 3v18', [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18', 'M3 15h18' ],
 		text : [ 'M21 5H3', 'M15 12H3', 'M17 19H3' ],
+		'text-cursor-input' : [ 'M12 20h-1a2 2 0 0 1-2-2 2 2 0 0 1-2 2H6', 'M13 8h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-7', 'M5 16H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h1', 'M6 4h1a2 2 0 0 1 2 2 2 2 0 0 1 2-2h1', 'M9 6v12' ],
+		timer : [ [ 'line', { x1 : '10', x2 : '14', y1 : '2', y2 : '2' } ], [ 'line', { x1 : '12', x2 : '15', y1 : '14', y2 : '11' } ], [ 'circle', { cx : '12', cy : '14', r : '8' } ] ],
 		'trash-2' : [ 'M10 11v6', 'M14 11v6', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M3 6h18', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' ],
 		'triangle-alert' : [ 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01' ],
 		'undo-2' : [ 'M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11' ],
@@ -574,7 +589,7 @@
 		 *	or the focus is in it. It is a status, which a screen reader reads out, and it moves only where the person
 		 *	allows motion. It is for success alone: an error stays where it happened - at the field, in the line of the bar, in
 		 *	showError() - and a kind that says so is a TypeError. Owns no strings: the sentence is the caller's
-		 *	(/_admin/common/msg/saved is the shared one for a save)
+		 *	(/_admin/common/msg/saved is the shared one for a save, and what status().saved() says)
 		 *
 		 *	@param		{string}		text						The sentence
 		 *	@param		{Object}		[options]				{ kind } - 'success' (the default) or 'info'
@@ -1183,7 +1198,13 @@
 		clearFieldErrors : function( root ) {
 
 			root.querySelectorAll('.nino-admin-field-error').forEach( function( el ) { el.remove() } );
-			root.querySelectorAll('[aria-invalid]').forEach( function( el ) {
+			// A group that was marked itself (the ticks of a list, the fields of a date) is one of them
+			const marked = Array.from( root.querySelectorAll('[aria-invalid]') );
+
+			if( root.hasAttribute('aria-invalid') === true )
+				marked.unshift( root );
+
+			marked.forEach( function( el ) {
 
 				el.removeAttribute('aria-invalid');
 
@@ -1717,6 +1738,7 @@
 		 *	@param		{string}		[options.className]		Added to the dialog's own class
 		 *	@param		{string}		[options.size]				'narrow' (a question, the default), 'form', 'wide' or 'sheet' - the class nino-admin-dialog--<size>; a sheet stands at the right over the whole height
 		 *	@param		{string}		[options.note]				A second paragraph under the message
+		 *	@param		{Array}			[options.details]			What the question is about, as a list under the message: lines of text, and groups { title, lines } where the lines have a heading each (what a deletion takes and what it keeps). Drawn as <ul>, every line as text and never as markup; the caller has cut a long list short with a line of its own ("and 3 more")
 		 *	@param		{Element}		[options.opener]			What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari
 		 *	@param		{Element}		[options.focus]				What gets the focus when the dialog opens
 		 *	@param		{boolean}		[options.nested]			The dialog asks something of an open dialog and stands on it
@@ -1754,7 +1776,8 @@
 				}
 
 				const yes = choices.find( function( choice ) { return choice.kind === 'primary' } ) ?? choices.find( function( choice ) { return choice.kind === 'danger' } ) ?? cancel;
-				options.onChoose( wn.confirm( hasNote === true ? options.message+ '\n\n'+ options.note : options.message ) === true ? yes.value : cancel.value );
+				const listed = Nino.adminUi._detailLines( options.details );
+				options.onChoose( wn.confirm( options.message+ ( hasNote === true ? '\n\n'+ options.note : '' )+ ( listed.length > 0 ? '\n\n'+ listed.join('\n') : '' ) ) === true ? yes.value : cancel.value );
 				return true;
 			}
 
@@ -1775,10 +1798,12 @@
 
 			dialog.className = 'nino-admin-dialog'+ ( typeof options.size === 'string' && options.size !== '' ? ' nino-admin-dialog--'+ options.size : ( hasClass === false ? ' nino-admin-dialog--narrow' : '' ) )+ ( hasClass === true ? ' '+ options.className : '' );
 
+			const detailList = hasContent === false ? Nino.adminUi._details( options.details ) : null;
+
 			// A message is what the dialog is about and is read out with it; a
 			// manual is as long as it is and is read when it is looked at
 			if( hasContent === false )
-				dialog.setAttribute( 'aria-describedby', hasNote === true ? 'nino-admin-choice-text'+ sfx+ ' nino-admin-choice-note'+ sfx : 'nino-admin-choice-text'+ sfx );
+				dialog.setAttribute( 'aria-describedby', 'nino-admin-choice-text'+ sfx+ ( hasNote === true ? ' nino-admin-choice-note'+ sfx : '' )+ ( detailList !== null ? ' nino-admin-choice-details'+ sfx : '' ) );
 			else if( typeof options.describedBy === 'string' )
 				dialog.setAttribute( 'aria-describedby', options.describedBy );
 
@@ -1818,6 +1843,11 @@
 					note.id = 'nino-admin-choice-note'+ sfx;
 					note.textContent = options.note;
 					scroll.appendChild( note );
+				}
+
+				if( detailList !== null ) {
+					detailList.id = 'nino-admin-choice-details'+ sfx;
+					scroll.appendChild( detailList );
 				}
 			}
 
@@ -1905,6 +1935,7 @@
 					if( at !== -1 )
 						Nino.adminUi._choiceStack.splice( at, 1 );
 					Nino.adminUi._choiceOpen = Nino.adminUi._choiceStack.length > 0;
+					release();
 				}
 
 				if( opener !== null && typeof opener.focus === 'function' )
@@ -1919,6 +1950,9 @@
 			// are scoped to .nino-admin and would not reach it there
 			const root = dc.getElementById('admin-page-wrap') ?? dc.body;
 			root.appendChild( dialog );
+
+			// A modal dialog keeps the Tab key inside it: the rest of the page is inert and Tab and Shift+Tab walk round the dialog
+			const release = modeless === true ? null : Nino.adminUi._trap( dialog );
 
 			if( modeless === true ) {
 				Nino.adminUi._sheet = handle;
@@ -1937,6 +1971,179 @@
 				options.onOpen( handle );
 
 			return true;
+		},
+
+		/**
+		 *	What a question is about, read into groups: a list of lines of text, and of groups { title, lines } - the
+		 *	lines that stand one after the other without a group are one group with no title. Anything else is left
+		 *	out, and so is a line that is empty
+		 *
+		 *	@param		{*}				details
+		 *
+		 *	@return		{Array}									[ { title, lines } ]
+		 */
+		_detailGroups : function( details ) {
+
+			const groups = [];
+			let plain = null;
+
+			( Array.isArray( details ) === true ? details : [] ).forEach( function( item ) {
+
+				if( typeof item === 'string' ) {
+
+					if( item === '' )
+						return;
+
+					if( plain === null ) {
+						plain = { title : '', lines : [] };
+						groups.push( plain );
+					}
+
+					plain.lines.push( item );
+					return;
+				}
+
+				plain = null;
+
+				if( item === null || typeof item !== 'object' || Array.isArray( item.lines ) === false )
+					return;
+
+				const lines = item.lines.map( String ).filter( function( line ) { return line !== '' } );
+
+				if( lines.length > 0 )
+					groups.push( { title : typeof item.title === 'string' ? item.title : '', lines : lines } );
+			} );
+
+			return groups;
+		},
+
+		/**
+		 *	The details of a question as lines of plain text, for a browser that has no <dialog> and asks with its own
+		 *
+		 *	@param		{*}				details
+		 *
+		 *	@return		{Array<string>}
+		 */
+		_detailLines : function( details ) {
+
+			const lines = [];
+
+			Nino.adminUi._detailGroups( details ).forEach( function( group ) {
+
+				if( group.title !== '' )
+					lines.push( group.title );
+
+				group.lines.forEach( function( line ) { lines.push( '- '+ line ) } );
+			} );
+
+			return lines;
+		},
+
+		/**
+		 *	The details of a question as a list: for each group its title, if it has one, and its lines as a <ul>. Every
+		 *	line is set as text - a line that spells markup is shown as the letters it is
+		 *
+		 *	@param		{*}				details			See choiceDialog()
+		 *
+		 *	@return		{Element|null}							null where there is nothing to list
+		 */
+		_details : function( details ) {
+
+			const groups = Nino.adminUi._detailGroups( details );
+
+			if( groups.length === 0 )
+				return null;
+
+			const root = dc.createElement('div');
+			root.className = 'nino-admin-dialog-details';
+
+			groups.forEach( function( group ) {
+
+				if( group.title !== '' )
+					root.appendChild( Nino.adminUi.el( 'p', 'nino-admin-dialog-details-title', group.title ) );
+
+				const list = dc.createElement('ul');
+				list.className = 'nino-admin-dialog-details-list';
+
+				group.lines.forEach( function( line ) { list.appendChild( Nino.adminUi.el( 'li', '', line ) ) } );
+				root.appendChild( list );
+			} );
+
+			return root;
+		},
+
+		/**
+		 *	Keep the Tab key inside a modal dialog: everything of the page that is not the dialog is made inert - what was
+		 *	not inert already - and Tab at the last control goes to the first, Shift+Tab at the first to the last. The
+		 *	browser's own modal does the first; the second is what a browser leaves to the person's browser chrome, and
+		 *	what a dialog on top of a dialog needs, whose lower one stands beside it in the page
+		 *
+		 *	@param		{Element}		dialog
+		 *
+		 *	@return		{Function}								Lets the page go again: call it when the dialog has closed
+		 */
+		_trap : function( dialog ) {
+
+			const held = [];
+			const skip = [ 'SCRIPT', 'STYLE', 'LINK', 'META', 'TITLE', 'HEAD' ];
+
+			for( let node = dialog; node !== null && node !== undefined && node !== dc.body && node.parentNode !== null && node.parentNode !== undefined; node = node.parentNode )
+				Array.from( node.parentNode.children ).forEach( function( sibling ) {
+
+					if( sibling === node || sibling.inert === true || skip.indexOf( String( sibling.tagName ).toUpperCase() ) !== -1 )
+						return;
+
+					// The toast is a live region the person has to hear while a dialog is open
+					if( sibling.classList !== undefined && sibling.classList.contains('nino-admin-toasts') === true )
+						return;
+
+					sibling.inert = true;
+					held.push( sibling );
+				} );
+
+			const stops = function() {
+
+				return Array.from( dialog.querySelectorAll('a[href], button, input, select, textarea, summary, [tabindex]') ).filter( function( el ) {
+
+					if( el.disabled === true || el.hidden === true || el.type === 'hidden' || el.inert === true || el.tabIndex < 0 )
+						return false;
+
+					if( typeof el.closest === 'function' && el.closest('[hidden]') !== null )
+						return false;
+
+					return typeof el.getClientRects !== 'function' || el.getClientRects().length > 0;
+				} );
+			};
+
+			const onKey = function( event ) {
+
+				if( event.key !== 'Tab' )
+					return;
+
+				const all = stops();
+
+				if( all.length === 0 ) {
+					event.preventDefault();
+					return;
+				}
+
+				const at = all.indexOf( dc.activeElement );
+
+				if( event.shiftKey === true && at <= 0 ) {
+					event.preventDefault();
+					all[all.length - 1].focus();
+				} else if( event.shiftKey !== true && ( at === -1 || at === all.length - 1 ) ) {
+					event.preventDefault();
+					all[0].focus();
+				}
+			};
+
+			dialog.addEventListener( 'keydown', onKey );
+
+			return function() {
+				dialog.removeEventListener( 'keydown', onKey );
+				held.forEach( function( el ) { el.inert = false } );
+			};
 		},
 
 		/**
@@ -1974,6 +2181,7 @@
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.title					What is done to what, as a statement: "Delete element"
 		 *	@param		{string}		options.message					The question
+		 *	@param		{Array}			[options.details]				What it is about, as a list under the message - lines, and groups { title, lines }; see choiceDialog(). A deletion says here what it takes and what it keeps; the caller cuts a long list short with a line of its own ("and 3 more")
 		 *	@param		{string}		options.yes							The label of the answer that goes on
 		 *	@param		{string}		options.no							The label of the answer that does not
 		 *	@param		{string}		[options.kind]					'danger' or 'primary' for the answer that goes on: 'danger' for a destructive level, else 'primary'. Where something goes away or is switched off, the caller says 'danger' - what the level costs a visitor and what the action costs the person are two questions
@@ -2031,6 +2239,14 @@
 					body.appendChild( note );
 				}
 
+				const listed = Nino.adminUi._details( options.details );
+
+				if( listed !== null ) {
+					ids += ' nino-admin-choice-details';
+					listed.id = 'nino-admin-choice-details';
+					body.appendChild( listed );
+				}
+
 				const label = dc.createElement('label');
 				label.className = 'nino-admin-field';
 				label.appendChild( Nino.adminUi.el( 'span', '', Nino.adminUi.format( options.typedLabel ?? Nino.adminUi.text('/_admin/common/confirm/typed'), typed ) ) );
@@ -2042,6 +2258,7 @@
 				title			: options.title,
 				message		: options.message,
 				content		: body ?? undefined,
+				details		: field === null ? options.details : undefined,
 				note			: options.visitors === false ? '' : policy.note,
 				opener		: options.opener,
 				focus			: field ?? undefined,
@@ -2071,14 +2288,19 @@
 
 		/**
 		 *	The fields of a form in a dialog, drawn by the builders of the
-		 *	workbench: a text, a select, or whatever input type textField() takes.
-		 *	The label stands at the left of the control where the dialog is wide
-		 *	enough and above it where it is not (style.css decides). Owns no strings
+		 *	workbench - the same family a screen's form is made of: a text, a
+		 *	select, whatever input type textField() takes, and the fields of the
+		 *	second part - a tick, a list of ticks, the languages one under the
+		 *	other, a file, code, a date with a time. The label stands at the left
+		 *	of the control where the dialog is wide enough and above it where it
+		 *	is not (style.css decides). Owns no strings
 		 *
-		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view - type 'select' takes options [ { value, label } ], any other type is the type of an <input>; validate( value ) answers the sentence that is wrong with it, or ''
+		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view.
+		 *																	type 'select' takes options [ { value, label } ]; 'check' a tick (value true or false); 'checklist' ticks (options [ { value, label } ], value the list of the ticked); 'locales' a row for each language (locales, values a map, multiline); 'file' (accept, maxBytes); 'code' (rows); 'datetime' (min, max, zone, value an ISO string);
+		 *																	any other type is the type of an <input>. validate( value ) answers the sentence that is wrong with it, or ''; a required field is wrong when it is empty - a tick not ticked, a list with none, a language with no text, no file
 		 *	@param		{Function}	[onInput]				onInput( key, value ) on every change of a field
 		 *
-		 *	@return		{Object}									{ el, controls, labels, values(), initial }
+		 *	@return		{Object}									{ el, controls, labels, handles, values(), initial, serial( value ), empty( field, value ) } - controls is key => the control that gets the focus, labels key => the element of the field, values() key => the value as the field gives it (a string, true or false, a list, a map of the languages, a File or null), serial() what two values are compared by
 		 */
 		_dialogFields : function( fields, onInput ) {
 
@@ -2087,16 +2309,60 @@
 
 			const controls = {};
 			const labels = {};
+			const handles = {};
+			const readers = {};
 			const initial = {};
+
+			// What two values are compared by, to know whether a form changed: a text as it is, anything else as its json - a file by what names it
+			const serial = function( value ) {
+
+				if( typeof value === 'string' )
+					return value;
+
+				if( value !== null && typeof value === 'object' && typeof value.name === 'string' && typeof value.size === 'number' )
+					return 'file:'+ value.name+ ':'+ value.size+ ':'+ String( value.lastModified ?? '' );
+
+				return JSON.stringify( value ?? null );
+			};
 
 			fields.forEach( function( field ) {
 
 				const say = function( value ) { if( typeof onInput === 'function' ) onInput( field.key, value ) };
+				const shared = { key : field.key, label : field.label, help : field.help, note : field.note, required : field.required };
 				let label;
 
 				if( field.type === 'select' ) {
 					label = Nino.adminUi.selectField( { key : field.key, label : field.label, help : field.help, note : field.note, options : field.options, value : field.value ?? '', onChange : say } );
 					controls[field.key] = label.querySelector('select');
+					readers[field.key] = function() { return controls[field.key].value };
+				} else if( field.type === 'check' ) {
+					label = Nino.adminUi.checkField( Object.assign( shared, { checked : field.value === true, onChange : say } ) );
+					controls[field.key] = label.control;
+					readers[field.key] = function() { return label.control.checked === true };
+				} else if( field.type === 'checklist' ) {
+					handles[field.key] = Nino.adminUi.checklist( Object.assign( shared, { options : field.options, value : field.value, onChange : say } ) );
+					label = handles[field.key].el;
+					controls[field.key] = handles[field.key].controls[0] ?? label;
+					readers[field.key] = function() { return handles[field.key].value() };
+				} else if( field.type === 'locales' ) {
+					handles[field.key] = Nino.adminUi.localeRows( Object.assign( shared, { locales : field.locales, work : field.work, values : field.values ?? field.value, multiline : field.multiline, rows : field.rows, maxLength : field.maxLength, onChange : function() { say( handles[field.key].value() ) } } ) );
+					label = handles[field.key].el;
+					controls[field.key] = handles[field.key].controls[handles[field.key].locales[0]] ?? label;
+					readers[field.key] = function() { return handles[field.key].value() };
+				} else if( field.type === 'file' ) {
+					handles[field.key] = Nino.adminUi.fileField( Object.assign( shared, { accept : field.accept, maxBytes : field.maxBytes, onChange : say } ) );
+					label = handles[field.key].el;
+					controls[field.key] = handles[field.key].button;
+					readers[field.key] = function() { return handles[field.key].value() };
+				} else if( field.type === 'code' ) {
+					label = Nino.adminUi.codeField( Object.assign( shared, { value : field.value, rows : field.rows, maxLength : field.maxLength, onInput : say } ) );
+					controls[field.key] = label.control;
+					readers[field.key] = function() { return label.control.value };
+				} else if( field.type === 'datetime' ) {
+					handles[field.key] = Nino.adminUi.dateTime( Object.assign( shared, { value : field.value, min : field.min, max : field.max, zone : field.zone, onChange : say } ) );
+					label = handles[field.key].el;
+					controls[field.key] = handles[field.key].date;
+					readers[field.key] = function() { return handles[field.key].value() };
 				} else {
 					label = Nino.adminUi.textField( {
 						key				: field.key,
@@ -2111,10 +2377,11 @@
 						onInput		: say,
 					} );
 					controls[field.key] = label.querySelector('input');
+					readers[field.key] = function() { return controls[field.key].value };
 				}
 
 				labels[field.key] = label;
-				initial[field.key] = controls[field.key].value;
+				initial[field.key] = serial( readers[field.key]() );
 				el.appendChild( label );
 			} );
 
@@ -2122,11 +2389,30 @@
 				el 				: el,
 				controls	: controls,
 				labels		: labels,
+				handles		: handles,
 				initial		: initial,
+				serial		: serial,
 				values		: function() {
 					const values = {};
-					fields.forEach( function( field ) { values[field.key] = controls[field.key].value } );
+					fields.forEach( function( field ) { values[field.key] = readers[field.key]() } );
 					return values;
+				},
+				// Whether a required field has nothing in it: a text of blanks, a tick that is not ticked, a list with none, a language with no text, no file
+				empty			: function( field, value ) {
+
+					if( typeof value === 'string' )
+						return value.trim() === '';
+
+					if( typeof value === 'boolean' )
+						return value === false;
+
+					if( Array.isArray( value ) === true )
+						return value.length === 0;
+
+					if( value !== null && typeof value === 'object' && typeof value.size !== 'number' )
+						return Object.keys( value ).length === 0 || Object.keys( value ).some( function( code ) { return String( value[code] ?? '' ).trim() === '' } );
+
+					return value === null || value === undefined;
 				},
 			};
 		},
@@ -2150,7 +2436,7 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.title					What is made of what, as a statement: "Duplicate theme"
-		 *	@param		{Array}			[options.fields]			See _dialogFields()
+		 *	@param		{Array}			[options.fields]			See _dialogFields(): every field of the family, not only a text and a select
 		 *	@param		{Element}		[options.body]				The content in place of the fields; the caller reads its controls itself, and a form of this kind counts as changed from its first input
 		 *	@param		{string}		[options.message]			A sentence above the fields
 		 *	@param		{string}		options.submit				The label of the answer that goes on, the title's words: "Duplicate theme"
@@ -2218,7 +2504,7 @@
 				if( options.fields === undefined )
 					return changed;
 				const now = made.values();
-				return fields.some( function( field ) { return now[field.key] !== made.initial[field.key] } );
+				return fields.some( function( field ) { return made.serial( now[field.key] ) !== made.initial[field.key] } );
 			};
 
 			const send = function( handle ) {
@@ -2237,7 +2523,7 @@
 					const value = values[field.key];
 					let problem = '';
 
-					if( field.required === true && value.trim() === '' )
+					if( field.required === true && made.empty( field, value ) === true )
 						problem = Nino.adminUi.format( word( 'missing', '/_admin/common/error/missing' ), field.label );
 					else if( typeof field.validate === 'function' )
 						problem = field.validate( value ) ?? '';
@@ -3554,8 +3840,8 @@
 
 			Nino.adminUi._tools( name, input, options, options.label );
 
-			const on 		= options.on ?? ( Nino.content.getText('/_admin/common/label/on') || 'on' );
-			const off 	= options.off ?? ( Nino.content.getText('/_admin/common/label/off') || 'off' );
+			const on 		= options.on ?? ( Nino.content.getText('/_admin/common/label/on') || 'On' );
+			const off 	= options.off ?? ( Nino.content.getText('/_admin/common/label/off') || 'Off' );
 			const state = dc.createElement('span');
 			state.className = 'nino-admin-switch-state';
 			state.textContent = input.checked ? on : off;
@@ -3796,6 +4082,696 @@
 			Nino.adminUi._note( field, options.note );
 
 			return field;
+		},
+
+		/**
+		 *	The name of a field that is no <label>: a group (the rows of the languages, a list of checkboxes) or a
+		 *	field with a button in it (a file). The words - with the star of a required field - are the first child of the
+		 *	field and name the group (aria-labelledby), the (?) and the "[ ]" stand behind them as at any field
+		 *
+		 *	@param		{Element}		field			The field's own element
+		 *	@param		{Element}		group			What the words name: the element a screen reader enters
+		 *	@param		{Object}		options		The builder's options: label, required, help, fills
+		 *
+		 *	@return		{Element}									The element that holds the name
+		 */
+		_groupName : function( field, group, options ) {
+
+			const label = String( options.label ?? options.key ?? '' );
+			const name = dc.createElement('span');
+			name.appendChild( dc.createTextNode( label ) );
+
+			if( options.required === true ) {
+				const star = dc.createElement('span');
+				star.className = 'nino-admin-required';
+				star.setAttribute( 'aria-hidden', 'true' );
+				star.textContent = '*';
+				name.appendChild( star );
+				group.setAttribute( 'aria-required', 'true' );
+			}
+
+			field.appendChild( name );
+
+			Nino.adminUi._tools( name, group, options, label );
+
+			if( group.hasAttribute('aria-labelledby') === false ) {
+				name.id = 'nino-admin-name-'+ ( ++serial );
+				group.setAttribute( 'aria-labelledby', name.id );
+			}
+
+			return name;
+		},
+
+		/**
+		 *	One tick with its name, the label at the left of the box as at every field: a consent, a "this is
+		 *	the main one". For a yes or no that is a setting there is the switch (switchField()); for several of
+		 *	a set there is checklist(). A required tick has its star and aria-required. Owns no strings
+		 *
+		 *	@param		{Object}		options		{ key, id, label, checked, disabled, required, help, hint, note, onChange, className }
+		 *														- help       what the tick does, behind the (?) at the name (hint is the same thing)
+		 *														- note       what has to stay in view under the box
+		 *														- onChange   called with true or false on every change
+		 *														- className  the label's class instead of nino-admin-field
+		 *
+		 *	@return		{Element}									The label; its input is the label's own .control
+		 */
+		checkField : function( options ) {
+
+			const field = dc.createElement('label');
+			field.className = ( options.className || 'nino-admin-field' )+ ' nino-admin-field-check';
+
+			const name = dc.createElement('span');
+			name.appendChild( dc.createTextNode( options.label ?? '' ) );
+
+			if( options.required === true ) {
+				const star = dc.createElement('span');
+				star.className = 'nino-admin-required';
+				star.setAttribute( 'aria-hidden', 'true' );
+				star.textContent = '*';
+				name.appendChild( star );
+			}
+
+			field.appendChild( name );
+
+			const input = dc.createElement('input');
+			input.type = 'checkbox';
+			input.checked = options.checked === true;
+			input.disabled = options.disabled === true;
+
+			if( options.key )
+				input.dataset.key = options.key;
+
+			if( options.id )
+				input.id = options.id;
+
+			if( options.required === true )
+				input.setAttribute( 'aria-required', 'true' );
+
+			input.addEventListener( 'change', function() {
+				if( typeof options.onChange === 'function' )
+					options.onChange( input.checked );
+			} );
+
+			field.appendChild( input );
+			field.control = input;
+
+			Nino.adminUi._tools( name, input, options, options.label ?? '' );
+			Nino.adminUi._note( field, options.note );
+
+			return field;
+		},
+
+		/**
+		 *	Several of a set, as one group of ticks: the name of the group is its legend, with the (?) of its help
+		 *	behind the words, the values are a list - the values of the ticked boxes, in the order of the options.
+		 *	A row may carry a state of its own at the far end ("12 text keys"). It is the field of "which of these",
+		 *	for a short list; a long one is searched (elementList()). Owns no strings
+		 *
+		 *	@param		{Object}		options		{ key, label, help, hint, note, required, options, value, disabled, onChange, className }
+		 *														- options    [ { value, label, state, disabled } ] - state is a quiet word at the end of the row
+		 *														- value      the values that are ticked
+		 *														- onChange   called with the list of the ticked values on every change
+		 *
+		 *	@return		{Object}									{ el, controls, value(), set( list ), error( text ), clear(), focus() } - el is the group (a fieldset with a legend), controls the boxes in the order of the options
+		 */
+		checklist : function( options ) {
+
+			const set = dc.createElement('fieldset');
+			set.className = ( options.className || 'nino-admin-field' )+ ' nino-admin-checklist-field';
+
+			const legend = dc.createElement('legend');
+			legend.appendChild( dc.createTextNode( options.label ?? '' ) );
+
+			if( options.required === true ) {
+				const star = dc.createElement('span');
+				star.className = 'nino-admin-required';
+				star.setAttribute( 'aria-hidden', 'true' );
+				star.textContent = '*';
+				legend.appendChild( star );
+				set.setAttribute( 'aria-required', 'true' );
+			}
+
+			set.appendChild( legend );
+
+			const sentence = typeof ( options.help ?? options.hint ) === 'string' ? String( options.help ?? options.hint ) : '';
+
+			if( sentence !== '' )
+				Nino.adminUi.sectionHelp( legend, set, sentence );
+
+			const list = dc.createElement('div');
+			list.className = 'nino-admin-checklist';
+
+			const controls = [];
+			const chosen = new Set( Array.isArray( options.value ) === true ? options.value.map( String ) : [] );
+
+			( Array.isArray( options.options ) === true ? options.options : [] ).forEach( function( option ) {
+
+				const row = dc.createElement('label');
+				const input = dc.createElement('input');
+
+				input.type = 'checkbox';
+				input.value = String( option.value );
+				input.checked = chosen.has( String( option.value ) );
+				input.disabled = options.disabled === true || option.disabled === true;
+
+				if( options.key )
+					input.dataset.key = options.key;
+
+				row.appendChild( input );
+				row.appendChild( Nino.adminUi.el( 'span', '', String( option.label ?? option.value ) ) );
+
+				if( typeof option.state === 'string' && option.state !== '' )
+					row.appendChild( Nino.adminUi.el( 'span', 'nino-admin-checklist-state', option.state ) );
+
+				input.addEventListener( 'change', function() {
+					if( typeof options.onChange === 'function' )
+						options.onChange( handle.value() );
+				} );
+
+				controls.push( input );
+				list.appendChild( row );
+			} );
+
+			set.appendChild( list );
+			Nino.adminUi._note( set, options.note );
+
+			const handle = {
+				el : set,
+				controls : controls,
+				value : function() {
+					return controls.filter( function( input ) { return input.checked === true } ).map( function( input ) { return input.value } );
+				},
+				set : function( values ) {
+					const wanted = new Set( ( Array.isArray( values ) === true ? values : [] ).map( String ) );
+					controls.forEach( function( input ) { input.checked = wanted.has( input.value ) } );
+				},
+				error : function( text ) {
+					handle.clear();
+					return Nino.adminUi.fieldError( set, set, 'nino-admin-error-'+ ( ++serial ), text );
+				},
+				clear : function() { Nino.adminUi.clearFieldErrors( set ) },
+				focus : function() { if( controls.length > 0 ) controls[0].focus() },
+			};
+
+			return handle;
+		},
+
+		/**
+		 *	The value of each language, one row for each under the other: the badge of the language at the left, the
+		 *	field at the right, the working language of the workbench first and marked. For the short values that are
+		 *	required in EVERY language - the name and the address of a page, an alt text -; anything else is edited in
+		 *	the working language alone. A row is one line, or several with options.multiline. What is wrong is said
+		 *	at the row it is wrong in. Owns no strings
+		 *
+		 *	@param		{Object}		options		{ key, label, help, hint, note, required, locales, work, values, multiline, rows, maxLength, placeholder, autocomplete, onChange, className }
+		 *														- locales    the codes of the languages, in the order of the site
+		 *														- work       the working language, which goes first; Nino.admin.workLocale.current by default
+		 *														- values     { code: text }
+		 *														- multiline  a textarea in each row, options.rows (3) lines high
+		 *														- onChange   onChange( code, text ) on every change
+		 *
+		 *	@return		{Object}									{ el, locales, controls, value( [code] ), set( code, text | map ), error( code, text ), clear(), focus( [code] ) } - value() is the map code => text, value( code ) one text; set( map ) sets several; controls is code => control
+		 */
+		localeRows : function( options ) {
+
+			const codes = ( Array.isArray( options.locales ) === true ? options.locales : [] ).map( String );
+			const work = String( options.work ?? ( shell().workLocale ?? {} ).current ?? Nino.adminUi.locales.native ?? '' );
+			const ordered = codes.indexOf( work ) === -1 ? codes.slice() : [ work ].concat( codes.filter( function( code ) { return code !== work } ) );
+			const given = options.values !== null && typeof options.values === 'object' ? options.values : {};
+
+			const field = dc.createElement('div');
+			field.className = ( options.className || 'nino-admin-field' )+ ' nino-admin-localerows';
+
+			const list = dc.createElement('div');
+			list.className = 'nino-admin-localerows-list';
+
+			Nino.adminUi._groupName( field, list, options );
+			list.setAttribute( 'role', 'group' );
+
+			const controls = {};
+			const names = {};
+
+			ordered.forEach( function( code ) {
+
+				const row = dc.createElement('div');
+				row.className = 'nino-admin-localerow'+ ( code === work ? ' is-work' : '' );
+				row.dataset.locale = code;
+
+				const control = dc.createElement( options.multiline === true ? 'textarea' : 'input' );
+				control.className = 'nino-admin-input';
+				control.id = 'nino-admin-control-'+ ( ++serial );
+				control.lang = code.replace( '_', '-' );
+
+				if( options.multiline === true )
+					control.rows = Number.isInteger( options.rows ) === true && options.rows > 0 ? options.rows : 3;
+				else
+					control.type = 'text';
+
+				if( typeof options.maxLength === 'number' )
+					control.maxLength = options.maxLength;
+
+				if( options.placeholder )
+					control.placeholder = options.placeholder;
+
+				if( options.autocomplete )
+					control.autocomplete = options.autocomplete;
+
+				if( options.key )
+					control.dataset.key = options.key;
+
+				control.dataset.locale = code;
+				control.value = typeof given[code] === 'string' ? given[code] : '';
+
+				// The badge is the label of the row: a press on it focuses the field, and it names the field for a screen reader with the name of the group
+				const badge = dc.createElement('label');
+				badge.className = 'nino-admin-badge nino-admin-locale-badge';
+				badge.id = 'nino-admin-badge-'+ ( ++serial );
+				badge.setAttribute( 'for', control.id );
+				badge.textContent = Nino.adminUi.localeName( code, ordered );
+
+				control.setAttribute( 'aria-labelledby', ( list.getAttribute('aria-labelledby') ?? '' )+ ' '+ badge.id );
+
+				control.addEventListener( 'input', function() {
+					if( typeof options.onChange === 'function' )
+						options.onChange( code, control.value );
+				} );
+
+				const body = dc.createElement('div');
+				body.className = 'nino-admin-localerow-body';
+				body.appendChild( control );
+
+				row.appendChild( badge );
+				row.appendChild( body );
+				list.appendChild( row );
+
+				controls[code] = control;
+				names[code] = body;
+			} );
+
+			field.appendChild( list );
+			Nino.adminUi._note( field, options.note );
+
+			const handle = {
+				el : field,
+				locales : ordered,
+				controls : controls,
+				value : function( code ) {
+
+					if( code !== undefined )
+						return Object.hasOwn( controls, code ) === true ? controls[code].value : '';
+
+					const values = {};
+					ordered.forEach( function( each ) { values[each] = controls[each].value } );
+					return values;
+				},
+				set : function( code, text ) {
+
+					const map = code !== null && typeof code === 'object' ? code : { [ code ] : text };
+
+					Object.keys( map ).forEach( function( each ) {
+						if( Object.hasOwn( controls, each ) === true )
+							controls[each].value = String( map[each] ?? '' );
+					} );
+				},
+				error : function( code, text ) {
+
+					if( Object.hasOwn( controls, code ) === false )
+						return null;
+
+					Nino.adminUi.clearFieldErrors( names[code] );
+					return Nino.adminUi.fieldError( names[code], controls[code], 'nino-admin-error-'+ ( ++serial ), text );
+				},
+				clear : function() { Nino.adminUi.clearFieldErrors( field ) },
+				focus : function( code ) {
+
+					const control = controls[code ?? work] ?? controls[ordered[0]];
+
+					if( control !== undefined )
+						control.focus();
+				},
+			};
+
+			return handle;
+		},
+
+		/**
+		 *	A choice of one file, as the guide has it: a button of the second kind, the name of the chosen file beside
+		 *	it with its size, "Remove" once there is one, the limits as a note under it, and what is wrong with the
+		 *	file at the field. It does not upload: the caller gets the File (onChange) and sends it when the guide's
+		 *	model of the view says so. A file that is too large or of a type that `accept` does not name is refused
+		 *	at once, said at the field, and not taken. Owns no strings
+		 *
+		 *	@param		{Object}		options		{ key, id, label, help, hint, note, required, accept, maxBytes, button, onChange, className }
+		 *														- accept     the input's accept: a list of .ext and type/* or type/sub, which is also what the chosen file is held to
+		 *														- maxBytes   the largest file taken; 0 or left out, no limit
+		 *														- button     the words of the button instead of /_admin/common/label/file-choose
+		 *														- note       the limits of the upload, which stay in view
+		 *														- onChange   onChange( file | null ) when a file was chosen or taken away
+		 *
+		 *	@return		{Object}									{ el, input, button, value(), clear(), error( text ) } - value() is the File, or null
+		 */
+		fileField : function( options ) {
+
+			const field = dc.createElement('div');
+			field.className = ( options.className || 'nino-admin-field' )+ ' nino-admin-filefield';
+
+			const body = dc.createElement('div');
+			body.className = 'nino-admin-filefield-body';
+			body.setAttribute( 'role', 'group' );
+
+			Nino.adminUi._groupName( field, body, options );
+
+			const input = dc.createElement('input');
+			input.type = 'file';
+			input.hidden = true;
+			input.tabIndex = -1;
+
+			if( typeof options.accept === 'string' && options.accept !== '' )
+				input.accept = options.accept;
+
+			if( options.key )
+				input.dataset.key = options.key;
+
+
+			const button = Nino.adminUi.button( options.button ?? Nino.adminUi.text('/_admin/common/label/file-choose'), function() { input.click() }, { kind : 'secondary', id : options.id } );
+			const chosen = Nino.adminUi.el( 'span', 'nino-admin-filefield-name', Nino.adminUi.text('/_admin/common/label/file-none') );
+			const size = Nino.adminUi.el( 'span', 'nino-admin-filefield-size' );
+			const remove = Nino.adminUi.button( Nino.adminUi.text('/_admin/common/label/remove'), function() { handle.clear( true ) }, { kind : 'secondary', small : true } );
+
+			chosen.id = 'nino-admin-filename-'+ ( ++serial );
+			button.setAttribute( 'aria-describedby', chosen.id );
+			remove.hidden = true;
+			size.hidden = true;
+
+			body.appendChild( input );
+			body.appendChild( button );
+			body.appendChild( chosen );
+			body.appendChild( size );
+			body.appendChild( remove );
+			field.appendChild( body );
+			Nino.adminUi._note( field, options.note );
+
+			let file = null;
+
+			const paint = function() {
+				chosen.textContent = file === null ? Nino.adminUi.text('/_admin/common/label/file-none') : file.name;
+				chosen.dataset.state = file === null ? 'none' : 'chosen';
+				size.textContent = file === null ? '' : Nino.adminUi._bytes( file.size );
+				size.hidden = file === null;
+				remove.hidden = file === null;
+			};
+
+			paint();
+
+			const handle = {
+				el : field,
+				input : input,
+				button : button,
+				value : function() { return file },
+				clear : function( tell ) {
+
+					file = null;
+					input.value = '';
+					handle.clearError();
+					paint();
+
+					if( tell === true && typeof options.onChange === 'function' )
+						options.onChange( null );
+				},
+				clearError : function() { Nino.adminUi.clearFieldErrors( field ) },
+				error : function( text ) {
+					handle.clearError();
+					return Nino.adminUi.fieldError( field, button, 'nino-admin-error-'+ ( ++serial ), text );
+				},
+			};
+
+			input.addEventListener( 'change', function() {
+
+				const picked = input.files !== null && input.files !== undefined && input.files.length > 0 ? input.files[0] : null;
+
+				// Nothing chosen - the picker was cancelled: what was chosen before stays
+				if( picked === null )
+					return;
+
+				handle.clearError();
+
+				if( Number.isFinite( options.maxBytes ) === true && options.maxBytes > 0 && picked.size > options.maxBytes ) {
+					input.value = '';
+					handle.error( Nino.adminUi.format( Nino.adminUi.text('/_admin/common/error/file-too-large'), Nino.adminUi.megabytes( options.maxBytes ) ) );
+					return;
+				}
+
+				if( typeof options.accept === 'string' && options.accept !== '' && Nino.adminUi._accepts( picked, options.accept ) === false ) {
+					input.value = '';
+					handle.error( Nino.adminUi.format( Nino.adminUi.text('/_admin/common/error/file-type'), options.accept ) );
+					return;
+				}
+
+				file = picked;
+				paint();
+
+				if( typeof options.onChange === 'function' )
+					options.onChange( file );
+			} );
+
+			return handle;
+		},
+
+		/**
+		 *	Whether a file is of what an `accept` names, as the browser's own file picker reads it: a list of
+		 *	.extension, type/subtype and type/* , any case. The picker only offers; a file dropped on a page or
+		 *	named by hand is held to it here
+		 *
+		 *	@param		{File}			file
+		 *	@param		{string}		accept
+		 *
+		 *	@return		{boolean}
+		 */
+		_accepts : function( file, accept ) {
+
+			const name = String( file.name ?? '' ).toLowerCase();
+			const type = String( file.type ?? '' ).toLowerCase();
+
+			return String( accept ).toLowerCase().split(',').map( function( part ) { return part.trim() } ).filter( function( part ) { return part !== '' } ).some( function( part ) {
+
+				if( part.charAt(0) === '.' )
+					return name.length > part.length && name.slice( -part.length ) === part;
+
+				if( part.slice( -2 ) === '/*' )
+					return type.indexOf( part.slice( 0, -1 ) ) === 0;
+
+				return type === part;
+			} );
+		},
+
+		/**
+		 *	A size in bytes as a person reads it: B, KB or MB with a decimal. The units are the same in every language
+		 *
+		 *	@param		{number}		bytes
+		 *
+		 *	@return		{string}
+		 */
+		_bytes : function( bytes ) {
+
+			const number = Number( bytes );
+
+			if( Number.isFinite( number ) === false || number < 0 )
+				return '';
+
+			if( number < 1024 )
+				return Math.round( number )+ ' B';
+
+			if( number < 1048576 )
+				return Nino.adminUi.format( '%s KB', Math.round( number / 102.4 ) / 10 );
+
+			return Nino.adminUi.format( '%s MB', Math.round( number / 104857.6 ) / 10 );
+		},
+
+		/**
+		 *	A field for a technical value - markup, css, json, a template - of several lines in the face of code and
+		 *	nothing else: no editor, no highlighting, no help from the keys. The Tab key is the browser's, it moves
+		 *	the focus on (a field that took the Tab key for itself would be a trap for the keyboard); the browser does
+		 *	not check the spelling or capitalise or complete what is typed. Where the account may edit the textfills
+		 *	of the field it has the "[ ]" like any text field (fills). Owns no strings
+		 *
+		 *	@param		{Object}		options		As textareaField(): { key, value, rows, placeholder, label, help, hint, note, fills, required, maxLength, id, onInput, className }, rows 8 by default
+		 *
+		 *	@return		{Element}									The label; the control is its textarea
+		 */
+		codeField : function( options ) {
+
+			const field = Nino.adminUi.textareaField( Object.assign( { rows : 8 }, options, { spellcheck : false } ) );
+			const area = field.querySelector('textarea');
+
+			field.classList.add('nino-admin-field-code');
+			area.classList.add('nino-admin-code');
+			area.setAttribute( 'wrap', 'off' );
+			area.setAttribute( 'autocomplete', 'off' );
+			area.setAttribute( 'autocapitalize', 'off' );
+			area.setAttribute( 'autocorrect', 'off' );
+			field.control = area;
+
+			return field;
+		},
+
+		/**
+		 *	A moment as two native fields, a date and a time of day, with ONE value: an ISO string without a zone,
+		 *	"2026-11-17T06:02", which is the time of the clock of the site - the zone of the site, not the one of the
+		 *	browser, so nothing is converted. Empty is allowed (both empty, the value ''); a date without a time
+		 *	is midnight, a time without a date is no value. min and max are ISO strings too. The zone the site's clock
+		 *	runs in is named under the field where the caller says it. Owns no strings
+		 *
+		 *	@param		{Object}		options		{ key, id, label, help, hint, note, required, value, min, max, zone, disabled, onChange, className }
+		 *														- value      '' or an ISO date with or without a time: 2026-11-17, 2026-11-17T06:02, 2026-11-17 06:02:30
+		 *														- min, max   the earliest and the latest moment, ISO as the value; the date field has them as its limits, and valid() says which was broken
+		 *														- zone       the name of the site's zone, "Europe/Berlin": said as /_admin/common/label/timezone under the field
+		 *														- onChange   onChange( value ) on every change
+		 *
+		 *	@return		{Object}									{ el, date, time, controls, value(), set( iso ), valid(), error( text ), clear(), focus() } - valid() answers '' or what is wrong: 'incomplete' (a time without a date), 'min' or 'max'
+		 */
+		dateTime : function( options ) {
+
+			const parse = Nino.adminUi._moment;
+			const field = dc.createElement('div');
+			field.className = ( options.className || 'nino-admin-field' )+ ' nino-admin-datetime-field';
+
+			const body = dc.createElement('div');
+			body.className = 'nino-admin-datetime';
+			body.setAttribute( 'role', 'group' );
+
+			Nino.adminUi._groupName( field, body, options );
+
+			const part = function( type, fill ) {
+
+				const control = dc.createElement('input');
+				control.type = type;
+				control.className = 'nino-admin-input';
+				control.disabled = options.disabled === true;
+				control.dataset.part = type;
+
+				// Each field is named by the name of the group and by its own word: "Start - Date"
+				const word = dc.createElement('span');
+				word.className = 'nino-admin-sr-only';
+				word.id = 'nino-admin-part-'+ ( ++serial );
+				word.textContent = Nino.adminUi.text( fill );
+				control.setAttribute( 'aria-labelledby', ( body.getAttribute('aria-labelledby') ?? '' )+ ' '+ word.id );
+				body.appendChild( word );
+				body.appendChild( control );
+
+				return control;
+			};
+
+			const date = part( 'date', '/_admin/common/label/date' );
+			const time = part( 'time', '/_admin/common/label/time' );
+
+			if( options.key )
+				date.dataset.key = options.key;
+
+			if( options.id )
+				date.id = options.id;
+
+			if( options.required === true )
+				date.setAttribute( 'aria-required', 'true' );
+
+			const min = parse( options.min );
+			const max = parse( options.max );
+
+			if( min !== null )
+				date.min = min.date;
+
+			if( max !== null )
+				date.max = max.date;
+
+			field.appendChild( body );
+
+			if( typeof options.zone === 'string' && options.zone !== '' )
+				Nino.adminUi._note( field, Nino.adminUi.format( Nino.adminUi.text('/_admin/common/label/timezone'), options.zone ) );
+
+			Nino.adminUi._note( field, options.note );
+
+			const handle = {
+				el : field,
+				date : date,
+				time : time,
+				controls : [ date, time ],
+				value : function() {
+
+					if( date.value === '' )
+						return '';
+
+					return date.value+ 'T'+ ( time.value === '' ? '00:00' : time.value.slice( 0, 5 ) );
+				},
+				set : function( iso ) {
+
+					const moment = parse( iso );
+
+					date.value = moment === null ? '' : moment.date;
+					time.value = moment === null || moment.time === '' ? '' : moment.time;
+				},
+				valid : function() {
+
+					if( date.value === '' )
+						return time.value === '' ? '' : 'incomplete';
+
+					const now = handle.value();
+
+					if( min !== null && now < min.date+ 'T'+ ( min.time === '' ? '00:00' : min.time ) )
+						return 'min';
+
+					if( max !== null && now > max.date+ 'T'+ ( max.time === '' ? '23:59' : max.time ) )
+						return 'max';
+
+					return '';
+				},
+				error : function( text ) {
+					handle.clear();
+					return Nino.adminUi.fieldError( field, date, 'nino-admin-error-'+ ( ++serial ), text );
+				},
+				clear : function() { Nino.adminUi.clearFieldErrors( field ) },
+				focus : function() { date.focus() },
+			};
+
+			const tell = function() {
+				if( typeof options.onChange === 'function' )
+					options.onChange( handle.value() );
+			};
+
+			date.addEventListener( 'input', tell );
+			time.addEventListener( 'input', tell );
+			date.addEventListener( 'change', tell );
+			time.addEventListener( 'change', tell );
+
+			handle.set( options.value );
+
+			return handle;
+		},
+
+		/**
+		 *	An ISO moment cut into its date and its time of day: { date : 'YYYY-MM-DD', time : 'HH:MM' | '' } - the seconds,
+		 *	a zone and the fraction are dropped, T or a space may part the two. What is no date of the calendar - the 30th
+		 *	of February - is none
+		 *
+		 *	@param		{*}				value
+		 *
+		 *	@return		{Object|null}
+		 */
+		_moment : function( value ) {
+
+			const found = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec( String( value ?? '' ).trim() );
+
+			if( found === null )
+				return null;
+
+			const day = new Date( Date.UTC( Number( found[1] ), Number( found[2] ) - 1, Number( found[3] ) ) );
+
+			// A day the month does not have rolls over into the next month (or year), which is how it is told
+			if( day.getUTCFullYear() !== Number( found[1] ) || day.getUTCMonth() !== Number( found[2] ) - 1 )
+				return null;
+
+			if( found[4] !== undefined && ( Number( found[4] ) > 23 || Number( found[5] ) > 59 ) )
+				return null;
+
+			return { date : found[1]+ '-'+ found[2]+ '-'+ found[3], time : found[4] === undefined ? '' : found[4]+ ':'+ found[5] };
 		},
 
 		/**
@@ -4477,16 +5453,20 @@
 			 *	Substring match across the given columns, case-insensitive.
 			 *	One box over every visible column rather than a filter per
 			 *	column: this is the "where is that entry" case, not a query
-			 *	builder.
+			 *	builder. A column reads as what the cell shows: shown( row, column )
+			 *	answers that text where the caller has it (a column with a drawing
+			 *	function shows something else than its value), and without it
+			 *	the value is read as format() writes it
 			 *
 			 *	@param		{Array}		rows
 			 *	@param		{Array}		columns		[ { key, type }, ... ]
 			 *	@param		{string}	query
 			 *	@param		{Function}	[extra]		extra( row ) answers more text of a row the search reads, beyond its columns
+			 *	@param		{Function}	[shown]		shown( row, column ) answers the text the cell of that column shows
 			 *
 			 *	@return		{Array}
 			 */
-			filter : function( rows, columns, query, extra ) {
+			filter : function( rows, columns, query, extra, shown ) {
 
 				const needle = String( query || '' ).trim().toLowerCase();
 				if( needle === '' )
@@ -4494,10 +5474,8 @@
 
 				return rows.filter( function( row ) {
 					return columns.some( function( column ) {
-						return Nino.adminUi.tableModel
-							.format( row[column.key], column.type )
-							.toLowerCase()
-							.indexOf( needle ) !== -1;
+						const text = typeof shown === 'function' ? shown( row, column ) : Nino.adminUi.tableModel.format( row[column.key], column.type );
+						return String( text ).toLowerCase().indexOf( needle ) !== -1;
 					} ) || ( typeof extra === 'function' && String( extra( row ) ?? '' ).toLowerCase().indexOf( needle ) !== -1 );
 				} );
 			},
@@ -4580,9 +5558,9 @@
 		 *																					`render(value, row)` may return an Element to
 		 *																					put in the cell instead of text - what a column
 		 *																					holding a mailto link or a per-row action needs.
-		 *																					Such a column is still searched and sorted on its
-		 *																					plain value, so behaviour does not depend on how
-		 *																					a cell happens to be drawn. `wrap` lets the cell
+		 *																					Such a column is sorted on its plain value and
+		 *																					searched on the text its cell shows, so a search
+		 *																					finds what a person sees. `wrap` lets the cell
 		 *																					break its lines, where a cell holds a sentence.
 		 *	@param		{Array}			options.rows					The complete set
 		 *	@param		{Object}		options.labels				{ search, empty, noMatch } - and optionally
@@ -4625,6 +5603,32 @@
 			let query 		= typeof options.query === 'string' ? options.query : '';
 
 			const model = Nino.adminUi.tableModel;
+
+			// What a cell shows is what the search reads. The text of a column that has a drawing function is
+			// what the drawing makes, found once for each row and column and kept until the rows change
+			let shownText = new Map();
+
+			const shown = function( row, column ) {
+
+				if( typeof column.render !== 'function' )
+					return model.format( row[column.key], column.type );
+
+				let cells = shownText.get( row );
+
+				if( cells === undefined ) {
+					cells = new Map();
+					shownText.set( row, cells );
+				}
+
+				if( cells.has( column.key ) === false ) {
+
+					const cell = column.render( row[column.key], row );
+
+					cells.set( column.key, typeof cell === 'object' && cell !== null && cell.nodeType ? String( cell.textContent ?? '' ) : ( cell === undefined ? model.format( row[column.key], column.type ) : String( cell ) ) );
+				}
+
+				return cells.get( column.key );
+			};
 
 			/*	The three names the pager's glyphs carry: the caller's word where
 				it has one, the workbench's shared fill where it has not, English
@@ -4772,7 +5776,7 @@
 
 			function draw() {
 
-				const matched = model.filter( rows, columns, query, options.searchText );
+				const matched = model.filter( rows, columns, query, options.searchText, shown );
 				const sortColumn = columns.find( function( c ) { return c.key === sortKey } ) || {};
 				const sorted 	= model.sort( matched, sortKey, sortColumn.type, sortDir, sortColumn.absent );
 				const view 		= model.page( sorted, pageSize, page );
@@ -4904,7 +5908,7 @@
 			draw();
 
 			return {
-				setRows : function( next ) { rows = next || []; page = 1; draw() },
+				setRows : function( next ) { rows = next || []; shownText = new Map(); page = 1; draw() },
 				destroy : function() { mount.innerHTML = ''; mount.classList.remove('nino-admin-table-wrap') },
 			};
 		},
@@ -5097,23 +6101,19 @@
 		 *	own - what failed is errorText()'s to say
 		 *
 		 *	@param		{string}	state					idle, dirty, saving, saved or error
-		 *	@param		{Date}		[date]				When it was saved, for 'saved'
 		 *
 		 *	@return		{Object}									{ state, key, params }
 		 */
-		statusModel : function( state, date ) {
-
-			const pad = function( number ) { return String( number ).padStart( 2, '0' ) };
+		statusModel : function( state ) {
 
 			switch( state ) {
 				case 'saving':
 					return { state : 'saving', key : '/_admin/common/msg/saving', params : [] };
 				case 'dirty':
 					return { state : 'dirty', key : '/_admin/common/msg/dirty', params : [] };
-				case 'saved': {
-					const at = date !== null && typeof date === 'object' && typeof date.getHours === 'function' ? date : new Date();
-					return { state : 'saved', key : '/_admin/common/msg/savedat', params : [ pad( at.getHours() )+ ':'+ pad( at.getMinutes() ) ] };
-				}
+				case 'saved':
+					// The words of a success are the toast's and the badge of the bar's: the line itself stays empty
+					return { state : 'saved', key : '', params : [] };
 				case 'error':
 					return { state : 'error', key : '', params : [] };
 				default:
@@ -5123,9 +6123,12 @@
 
 		/**
 		 *	A panel's status line: one element that says whether what is on
-		 *	screen is saved - "saving", "saved at hh:mm", "unsaved changes", or
-		 *	why it failed - instead of each panel keeping its own "Saved."
-		 *	that stayed on screen long after the next keystroke made it a lie.
+		 *	screen is saved - "saving", "unsaved changes", or why it failed -
+		 *	instead of each panel keeping its own "Saved." that stayed on screen
+		 *	long after the next keystroke made it a lie. A save that went well
+		 *	leaves the line empty: it is said by the toast (say()) and by the badge
+		 *	of the bar (barState()), and a line that kept the time would be one
+		 *	more place that goes stale.
 		 *
 		 *	The state is on the element as data-state, for the stylesheet,
 		 *	which gives each one a prefix of its own so the meaning does not
@@ -5134,9 +6137,9 @@
 		 *	fills, and a caller that needs others passes them in labels
 		 *
 		 *	@param		{Element}		el							The line itself - the panel's own, usually in its action bar
-		 *	@param		{Object}		[labels]				Text for a state instead of the fill: { saving, saved, dirty }, 'saved' with a %s for the time
+		 *	@param		{Object}		[labels]				Text for a state instead of the fill: { saving, saved, dirty } - 'saved' is the sentence of the toast
 		 *
-		 *	@return		{Object}										{ element, state, idle( [text] ), saving(), saved( date ), dirty( [text] ), fail( text ), error( status, response, fallbackKey ), bind( form, isDirty ) }
+		 *	@return		{Object}										{ element, state, idle( [text] ), saving(), saved(), dirty( [text] ), fail( text ), error( status, response, fallbackKey ), bind( form, isDirty ) }
 		 */
 		status : function( el, labels ) {
 
@@ -5187,15 +6190,17 @@
 
 				/**
 				 *	Saved - unless something was typed while the save was on its
-				 *	way: that is not in what was sent, and the line says so
+				 *	way: that is not in what was sent, and the line says so. The line
+				 *	is emptied and the toast says it
 				 */
-				saved	 : function( date ) {
+				saved	 : function() {
 					if( typed === true ) {
 						typed = false;
 						control.dirty();
 						return;
 					}
-					show( Nino.adminUi.statusModel( 'saved', date ) );
+					show( Nino.adminUi.statusModel('saved'), '' );
+					Nino.adminUi.say( typeof labels.saved === 'string' ? labels.saved : Nino.content.getText('/_admin/common/msg/saved') );
 				},
 
 				/**
@@ -6767,18 +7772,19 @@
 
 		/**
 		 *	The question a refused save asks - another tab or another person wrote what this one was about to write: Overwrite
-		 *	does it once more over what is there now, Reload drops the work of this tab and shows what is there - after a question of its
-		 *	own, since it cannot be taken back - and Cancel leaves everything as it is. The answers stand as every dialog's do: the other
+		 *	does it once more over what is there now, Reload drops the work of this tab and shows what is there - the question says so in a
+		 *	sentence of its own under the message, since it cannot be taken back, and is asked once: a second question after the answer
+		 *	would ask the same thing twice - and Cancel leaves everything as it is. The answers stand as every dialog's do: the other
 		 *	ways on, Cancel, and at the far right the one that goes on, which here is the dangerous one - so Reload, Cancel, Overwrite.
 		 *	Escape is Cancel, and the focus goes back to the opener. The words are /_admin/common/conflict/*, and the caller's where it gives them
 		 *
 		 *	@param		{Object}		options					{ message, onOverwrite, onReload, onCancel, opener, text }
 		 *														- message     what the server said of the refusal, usually Nino.adminUi.api.errorText( status, response )
 		 *														- onOverwrite called to write over what is there; the caller sends the save again with the state the refusal was about
-		 *														- onReload    called after the second question was answered with yes: the caller drops its work and loads what the server holds
-		 *														- onCancel    called when nothing is done: Cancel, Escape, or no to the second question
+		 *														- onReload    called when Reload is pressed: the caller drops its work and loads what the server holds
+		 *														- onCancel    called when nothing is done: Cancel or Escape
 		 *														- opener      what gets the focus back, see choiceDialog()
-		 *														- text        { title, overwrite, reload, reloadTitle, reloadMessage, cancel }
+		 *														- text        { title, overwrite, reload, reloadMessage, cancel } - reloadMessage is the sentence under the message that says what Reload drops
 		 *
 		 *	@return		{boolean}										false when a question is already open and this one was not asked
 		 */
@@ -6794,6 +7800,7 @@
 			return Nino.adminUi.choiceDialog( {
 				title		: word( 'title', '/_admin/common/conflict/title' ),
 				message	: options.message,
+				note		: word( 'reloadMessage', '/_admin/common/conflict/reload-message' ),
 				opener	: options.opener,
 				escape	: 'cancel',
 				choices	: [
@@ -6808,20 +7815,7 @@
 						return;
 					}
 
-					if( value !== 'reload' ) {
-						call('onCancel');
-						return;
-					}
-
-					Nino.adminUi.confirm( 'destructive', {
-						title		: word( 'reloadTitle', '/_admin/common/conflict/reload-title' ),
-						message	: word( 'reloadMessage', '/_admin/common/conflict/reload-message' ),
-						yes			: word( 'reloadTitle', '/_admin/common/conflict/reload-title' ),
-						no			: word( 'cancel', '/_admin/common/label/cancel' ),
-						kind		: 'danger',
-						opener	: options.opener,
-						onChoose : function( ok ) { call( ok === true ? 'onReload' : 'onCancel' ) },
-					} );
+					call( value === 'reload' ? 'onReload' : 'onCancel' );
 				},
 			} );
 		},
@@ -7195,7 +8189,7 @@
 		 *														- onFocus     called with the id and the item when the stop moves to another entry, by a hand or because its entry is gone
 		 *														- onHover     called with the id when the pointer or the focus comes over an entry, and with null when it leaves them; not for a redrawing that leaves it where it was
 		 *
-		 *	@return		{Object}										{ el, path, update( items ), select( id ), focus( [id], [key] ), highlight( ids, [options] ), get() } - select() chooses an entry (not a locked one: it answers false), opens what is above it and scrolls it into view, null chooses none; focus() puts the focus on the entry (the one with the stop by default), on its button with the key where there is one that can be pressed; both answer whether the id is there, and focus() of an id that is not there yet - the row a caller is about to draw - is kept for the next update(), which puts the focus there once; highlight() takes an id, a list of them or null, marks those and no others, tells nobody, and with { scroll : true } opens what is above the first of them and scrolls it into view - without it the page stays where it is; it answers whether one of them is there; path is the line of the way, or null; get() is { selected, stop, open }
+		 *	@return		{Object}										{ el, path, update( items ), select( id ), focus( [id], [key] ), highlight( ids, [options] ), get() } - select() chooses an entry (not a locked one: it answers false), opens what is above it and scrolls it into view, null chooses none; focus() puts the focus on the entry (the one with the stop by default), on its button with the key where there is one that can be pressed; both answer whether the id is there, and focus() of an id that is not there yet - the row a caller is about to draw - is kept for the next update(), which puts the focus there once; highlight() takes an id, a list of them or null, marks those and no others, tells nobody, opens what is above the first of them and rolls it into view where it lies outside the window of the tree (scrollIntoView with block 'nearest') - { scroll : false } leaves the tree where it is; it answers whether one of them is there; path is the line of the way, or null; get() is { selected, stop, open }
 		 */
 		tree : function( options ) {
 
@@ -7983,7 +8977,8 @@
 
 					const first = list.map( function( id ) { return byId.get( id ) } ).find( function( entry ) { return entry !== undefined } );
 
-					if( first !== undefined && how !== undefined && how.scroll === true ) {
+					// The marked row is brought into view where it lies outside the tree's window: 'nearest' leaves a row that is in view where it is
+					if( first !== undefined && ( how === undefined || how === null || how.scroll !== false ) ) {
 						reveal( first );
 						first.row.scrollIntoView( { block : 'nearest' } );
 					}

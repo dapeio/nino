@@ -310,6 +310,107 @@ foreach( [ 'light' => [ $light, [ $light ] ], 'dark (system)' => [ $system, [ $s
 		check( "$name: the word of a danger button holds 4.5 : 1 on its pale red over $ground", $contrast( $ink, $over( $soft, $rgb ) ) >= 4.5 );
 }
 
+// --- the heads of a table hold 4.5 : 1, in every scheme and in every state -------------------------------
+
+/*	The surface of the column heads is a mix of two tokens: color-mix( in srgb, A p%, B ), as the scheme writes it	*/
+$mixed = static function( string $value, array $own, array $schemes ) use ( $colour ): ?array {
+
+	if( preg_match( '/^color-mix\(in srgb, var\((--[a-z0-9-]+)\) (\d+)%, var\((--[a-z0-9-]+)\)\)$/', $value, $mix ) !== 1 )
+		return null;
+
+	$a = $colour( $own[$mix[1]] ?? ( $schemes[0][$mix[1]] ?? ( $schemes[1][$mix[1]] ?? '' ) ), $schemes );
+	$b = $colour( $own[$mix[3]] ?? ( $schemes[0][$mix[3]] ?? ( $schemes[1][$mix[3]] ?? '' ) ), $schemes );
+
+	if( $a === null || $b === null )
+		return null;
+
+	$share = (int) $mix[2] / 100;
+
+	return array_map( static fn( int $i ): int => (int) round( $a[$i] * $share + $b[$i] * ( 1 - $share ) ), [ 0, 1, 2 ] );
+};
+
+$sortRule	= static function( string $selector ) use ( $style ): string {
+	return preg_match( '/'. preg_quote( $selector, '/' ). ' \{([^}]*)\}/', $style, $found ) === 1 ? $found[1] : '';
+};
+
+check( 'a head of a column is the word in the secondary colour, a sorted one in the blue, one under the pointer in the colour of text', str_contains( $sortRule( ':where(.nino-admin) .nino-admin-table-sort' ), 'color: var(--editor-text-secondary)' )
+	&& str_contains( $sortRule( ':where(.nino-admin) .nino-admin-table th.is-sorted .nino-admin-table-sort' ), 'color: var(--editor-blue)' )
+	&& str_contains( $sortRule( ':where(.nino-admin) .nino-admin-table-sort:hover:not(:disabled)' ), 'color: var(--editor-text)' )
+	&& str_contains( $sortRule( ':where(.nino-admin) .nino-admin-table thead th' ), 'background: var(--nino-admin-surface-muted)' ) );
+
+foreach( [ 'light' => [ $light, [ $light ] ], 'dark (system)' => [ $system, [ $system, $light ] ], 'dark (chosen)' => [ $chosen, [ $chosen, $light ] ] ] as $name => [ $own, $schemes ] ) {
+
+	$ground	= $mixed( (string) ( $own['--nino-admin-surface-muted'] ?? $light['--nino-admin-surface-muted'] ?? '' ), $own, $schemes );
+	$tint		= $colour( $own['--editor-blue-soft'] ?? $light['--editor-blue-soft'], $schemes );
+	$words	= [];
+
+	foreach( [ 'secondary' => '--editor-text-secondary', 'blue' => '--editor-blue', 'text' => '--editor-text' ] as $label => $token )
+		$words[$label] = $colour( $own[$token] ?? $light[$token], $schemes );
+
+	check( "$name: the surface of a head and its words are colours", $ground !== null && $tint !== null && $words['secondary'] !== null && $words['blue'] !== null && $words['text'] !== null );
+
+	if( $ground === null || $tint === null || $words['secondary'] === null || $words['blue'] === null || $words['text'] === null )
+		continue;
+
+	check( "$name: the words of a head of a column hold 4.5 : 1 on its surface (". round( $contrast( $words['secondary'], $ground ), 2 ). ")", $contrast( $words['secondary'], $ground ) >= 4.5 );
+	check( "$name: so does a sorted one, in the blue (". round( $contrast( $words['blue'], $ground ), 2 ). ")", $contrast( $words['blue'], $ground ) >= 4.5 );
+	check( "$name: and one under the pointer, on the tint over the surface (". round( $contrast( $words['text'], $over( $tint, $ground ) ), 2 ). ")", $contrast( $words['text'], $over( $tint, $ground ) ) >= 4.5 );
+}
+
+// --- a table keeps its actions in reach, a switch its words in the spelling of the words, a link its size ---
+
+check( 'the column of the actions of a table sticks to the right edge at every width: its rule stands outside a media query', preg_match( '/\n:where\(\.nino-admin\) \.nino-admin-table :is\(th, td\)\.nino-admin-table-actions \{[^}]*position: sticky;[^}]*right: 0;/', "\n". $style ) === 1 );
+check( '...and on a phone a cell the frame cuts ends in an ellipsis, a cell with a sentence breaks its lines instead', preg_match( '/@media \(max-width: 40rem\) \{\s*:where\(\.nino-admin\) \.nino-admin-table td:not\([^)]*\.is-wrap[^)]*\) \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/', $style ) === 1 );
+check( 'the written state of a switch is not turned into capitals by the stylesheet', $sortRule( ':where(.nino-admin) .nino-admin-switch-state' ) !== '' && str_contains( $sortRule( ':where(.nino-admin) .nino-admin-switch-state' ), 'text-transform' ) === false );
+
+$dashboard = $bare( $read( '_admin/Nino/Modules/Dashboard/assets/admin.css' ) );
+$smallest = $light['--nino-admin-control-icon-small'] ?? '';
+
+check( 'a link of the Dashboard is a target of 24 px at least: the token it reads for its height is 24 px or more', preg_match( '/^(\d+)px$/', $smallest, $px ) === 1 && (int) $px[1] >= 24
+	&& preg_match( '/#admin-dashboard-elements a \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1
+	&& preg_match( '/\.admin-dashboard-more \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1 );
+
+// --- a save that went well is said by the toast and the badge, in no line --------------------------------------
+
+$spoken = [];
+
+foreach( array_merge( $files( '_admin/Nino/Modules', [ 'js' ] ), $files( '_nino/Nino/Modules', [ 'js' ] ) ) as $script ) {
+
+	if( str_contains( $script, '/assets/' ) === false )
+		continue;
+
+	// The success sentence set as the text of a line: the status of a bar, the line of a form, an element of its own
+	if( preg_match( '/\.textContent\s*=\s*Nino\.content\.getText\(\s*\'[^\']*\/msg\/saved\'\s*\)|_pendingMsg/', $bare( $read( $script ) ) ) === 1 )
+		$spoken[] = $script;
+}
+
+check( 'no script of a panel writes "Saved." as the text of a line, or keeps one to write after a reload'. ( $spoken === [] ? '' : ' - '. implode( ', ', $spoken ) ), $spoken === [] );
+$leading = [];
+
+foreach( array_merge( $files( '_admin/Nino/Modules', [ 'js' ] ), $files( '_nino/Nino/Modules', [ 'js' ] ) ) as $script ) {
+	if( str_contains( $script, '/assets/' ) === true && preg_match( '/adminUi\.hint\([^)]*,\s*\'lead\'\s*\)/', $bare( $read( $script ) ) ) === 1 )
+		$leading[] = $script;
+}
+
+check( 'no panel opens a view with a paragraph of its own: the lead of hint() is the setup wizard\'s alone'. ( $leading === [] ? '' : ' - '. implode( ', ', $leading ) ), $leading === [] );
+check( 'a status line that was saved has no words of its own in the shared fills: there is no "saved at" fill', str_contains( $read( '_admin/text/en_US.php' ), 'msg/savedat' ) === false && str_contains( $read( '_admin/text/de_DE.php' ), 'msg/savedat' ) === false );
+
+// --- every block of the second part of the forms is built, guided, put into a recipe and tested ---------------------
+
+$blocks = [ 'localeRows', 'checkField', 'checklist', 'fileField', 'codeField', 'dateTime' ];
+$script = $bare( $read( '_admin/assets/Nino.admin.js' ) );
+$recipe = $read( 'docs/recipes/admin-panel.md' );
+$suites = $read( 'tests/nino-ui-fields-js-smoke.js'). $read( 'tests/nino-ui-dialog-js-smoke.js' );
+$unbuilt = [];
+
+foreach( $blocks as $block ) {
+	if( preg_match( '/^\t\t'. $block. ' : function\(/m', $script ) !== 1 || str_contains( $read( 'docs/admin-ui.md' ), '`'. $block. '(' ) === false || str_contains( $recipe, 'Nino.adminUi.'. $block. '(' ) === false || str_contains( $suites, 'ui.'. $block. '(' ) === false )
+		$unbuilt[] = $block;
+}
+
+check( 'localeRows, checkField, checklist, fileField, codeField and dateTime are in the script, in the chapter, in the recipe and in a suite'. ( $unbuilt === [] ? '' : ' - not '. implode( ', ', $unbuilt ) ), $unbuilt === [] );
+check( 'a dialog of a form takes each of them as a type of field, and a question takes the list of what it is about', preg_match( '/field\.type === \'locales\'/', $script ) === 1 && preg_match( '/field\.type === \'datetime\'/', $script ) === 1 && str_contains( $script, 'options.details' ) === true && str_contains( $read( 'docs/admin-ui.md' ), 'details' ) === true );
+
 // --- the panels that have gone over to the blocks of the bar ------------------------------------------
 
 /*	The panels that draw their bar and their way back with actionBar() and contextBar() and not by hand. The list grows: the

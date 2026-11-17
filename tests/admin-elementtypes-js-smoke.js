@@ -262,11 +262,13 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 	sandbox.document.querySelector = () => ( { checked : false } );
 	sandbox.Nino.content = { getText : key => key === '/_admin/types/confirm/rename' ? 'Rename %s?' : ( key === '/_admin/types/notice/references' ? 'Still using the old name: %s' : ( key === '/_admin/types/reference/template' ? 'template %s (%s)' : key ) ) };
 	const questions = [];
+	const toasts = [];
 	const levels = [];
 	let answer = true;
 	// Another question open: the design system answers false and calls nothing back
 	let busy = false;
 	sandbox.Nino.adminUi = {
+		say : text => toasts.push( text ),
 		api : { errorText : status => 'error '+ status },
 		format : ( text, ...params ) => { let at = 0; return String( text ).replace( /%[sdn]/g, token => at < params.length ? String( params[at++] ) : token ) },
 		confirm : ( level, options ) => {
@@ -609,7 +611,7 @@ check( 'the danger zone is not rendered while creating a new type',
 	const nodes = { 'admin-form-msg' : msg, 'admin-form-delete-msg' : msg, 'admin-form-title' : { value : 'People' }, 'admin-form-uri' : { value : 'people' } };
 	sandbox.document.getElementById = id => nodes[id] ?? null;
 	sandbox.document.querySelector = () => ( { checked : false } );
-	sandbox.Nino.adminUi = { api : { errorText : status => 'error '+ status } };
+	sandbox.Nino.adminUi = { say : () => null, api : { errorText : status => 'error '+ status } };
 	const calls = [];
 	elementTypes._buildModel = () => ( {} );
 	elementTypes._apiCall = ( endpoint, payload, callback ) => calls.push( { endpoint : endpoint, callback : callback } );

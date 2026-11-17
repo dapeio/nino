@@ -2812,6 +2812,11 @@ namespace Nino {
 						return [ false, 'must be at most '. $schema['maxlength']. ' characters' ];
 					if( $value === '' )
 						return $required === true ? [ false, 'is required' ] : [ true, '' ];
+					// A one-line value holds no control character and no line break - not a tab, a null byte or an escape, not U+0085, U+2028 or U+2029. A multi-line
+					// type ('text') keeps its breaks. Read from config.php the same rule applies (see settings()), so a hand edit cannot give a feature a line it
+					// believes is one. Bytes that are no UTF-8 fail the pattern as well
+					if( $schema['type'] === 'string' && preg_match( '/[\x00-\x1F\x7F\x{0080}-\x{009F}\x{2028}\x{2029}]/u', $value ) !== 0 )
+						return [ false, 'must be one line without control characters' ];
 					if( $schema['type'] === 'email' && filter_var( $value, FILTER_VALIDATE_EMAIL ) === false )
 						return [ false, 'must be an email address' ];
 					if( $schema['type'] === 'url' && ( filter_var( $value, FILTER_VALIDATE_URL ) === false || preg_match( '#^https?://#i', $value ) !== 1 ) )

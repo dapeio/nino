@@ -889,7 +889,8 @@
 						return;
 					}
 
-					msg.textContent = Nino.content.getText('/_admin/images/msg/saved');
+					msg.textContent = '';
+					Nino.adminUi.say( Nino.content.getText('/_admin/images/msg/saved') );
 				}, { file : file } );
 			} );
 		},

@@ -23,7 +23,6 @@
 	Nino.admin.lockout = {
 
 		// Survives the re-render a successful save triggers - see _save()
-		_pendingMsg : '',
 
 		// Whether the form has been built once - see showCurrent()
 		_ready : false,
@@ -155,11 +154,6 @@
 			wrap.appendChild( form );
 
 			Nino.admin.lockout._renderLocked( locked, '' );
-
-			if( Nino.admin.lockout._pendingMsg !== '' ) {
-				msg.textContent = Nino.admin.lockout._pendingMsg;
-				Nino.admin.lockout._pendingMsg = '';
-			}
 
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
@@ -304,7 +298,7 @@
 					return;
 				}
 
-				Nino.admin.lockout._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'lockout' );
 				Nino.admin.lockout.init();
