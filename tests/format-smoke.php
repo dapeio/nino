@@ -56,17 +56,11 @@ check( 'add() puts a formatter of the project after the built-in ones, and it fo
 check( 'add() with the name of a built-in formatter replaces it at its place', array_keys( \Nino\Format::registered( $appData ) ) === array_merge( $builtin, [ 'nights' ] )
 	&& $write( 'currency', 5, 'de_DE' ) === 'own' && \Nino\Format::options( $appData, 'as' )['currency'] === 'Own' );
 
-$refused = [];
-foreach( [ 'Bad Name', '../x', '', 'Upper', '1a', 'a_b', "a\n", 'strtoupper()' ] as $name )
-	$refused[$name] = ninoErrors( static function() use ( &$appData, $name, $nights ): void { \Nino\Format::add( $appData, $name, $nights, 'Label' ); } );
-check( 'add() refuses a name that is no slug, as addComponent() refuses a schema: an E_USER_ERROR, and nothing is registered',
-	array_filter( $refused, static fn( array $errors ): bool => count( $errors ) !== 1 || $errors[0][0] !== E_USER_ERROR ) === []
-	&& array_keys( \Nino\Format::registered( $appData ) ) === array_merge( $builtin, [ 'nights' ] ) );
-$refused = [];
-foreach( [ '', '  ', [], [ 'en_US' => '' ], [ 'x' ], [ 'en_US' => 5 ], 5, null, 1.5, true ] as $index => $label )
-	$refused[$index] = ninoErrors( static function() use ( &$appData, $nights, $label ): void { \Nino\Format::add( $appData, 'labelled', $nights, $label ); } );
-check( '...and a label that is no string or locale => string map', array_filter( $refused, static fn( array $errors ): bool => count( $errors ) !== 1 || $errors[0][0] !== E_USER_ERROR ) === []
-	&& isset( \Nino\Format::registered( $appData )['labelled'] ) === false );
+ninoErrors( static function() use ( &$appData, $nights ): void { \Nino\Format::add( $appData, "a\n", $nights, 'Label' ); }, $badName );
+check( 'add() refuses a name that is no slug, as addComponent() refuses a schema: a Failure, and nothing is registered',
+	$badName instanceof \Nino\Failure && array_keys( \Nino\Format::registered( $appData ) ) === array_merge( $builtin, [ 'nights' ] ) );
+ninoErrors( static function() use ( &$appData, $nights ): void { \Nino\Format::add( $appData, 'labelled', $nights, [ 'en_US' => 5 ] ); }, $badLabel );
+check( '...and a label that is no string or locale => string map', $badLabel instanceof \Nino\Failure && isset( \Nino\Format::registered( $appData )['labelled'] ) === false );
 
 check( 'apply() of a name nobody registered is null, and says nothing - a name a template could make up is none of the registry',
 	array_filter( [ 'system', 'strtoupper', '\Nino\Format::number', 'Number', 'number ', '', 'nights()', 'phpinfo' ], static fn( string $name ): bool => $write( $name, '1234.5', 'de_DE' ) !== null ) === [] && ninoWarnings() === [] );

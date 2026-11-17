@@ -240,8 +240,8 @@ namespace Nino {
 		private const int LABEL_LENGTH = 200;
 
 		/**
-		 *	Register a component. The schema is checked by validate(), and a schema that is none is an
-		 *	E_USER_ERROR, nothing registered. A
+		 *	Register a component. The schema is checked by validate(), and a schema that is none ends the
+		 *	request with Runtime::fail(), nothing registered. A
 		 *	component that is registered again under its name takes the place of the first, which keeps its
 		 *	position in the list - nothing is said
 		 *
@@ -265,13 +265,15 @@ namespace Nino {
 			$clean = self::validate( $name, $schema );
 
 			if( is_string( $clean ) === true )
-				trigger_error( 'Components::addComponent(): '. $clean, E_USER_ERROR );
-			else if( $renderer === null && $clean['template'] === '' )
-				trigger_error( 'Components::addComponent(): component "'. $name. '": a component without a renderer needs a "template"', E_USER_ERROR );
-			else if( $renderer === null && isset( $clean['children'] ) === true )
-				trigger_error( 'Components::addComponent(): component "'. $name. '": a component whose "children" are "nodes" needs a renderer, which draws them', E_USER_ERROR );
-			else
-				self::_store( $appData, $name, $clean, $renderer );
+				\Nino\Runtime::fail( 'Components::addComponent(): '. $clean );
+
+			if( $renderer === null && $clean['template'] === '' )
+				\Nino\Runtime::fail( 'Components::addComponent(): component "'. $name. '": a component without a renderer needs a "template"' );
+
+			if( $renderer === null && isset( $clean['children'] ) === true )
+				\Nino\Runtime::fail( 'Components::addComponent(): component "'. $name. '": a component whose "children" are "nodes" needs a renderer, which draws them' );
+
+			self::_store( $appData, $name, $clean, $renderer );
 		}
 
 		/**
@@ -3515,6 +3517,10 @@ namespace Nino {
 					return $why;
 
 				$answer = call_user_func_array( $method, [ &$appData, $attribute ] );
+			}
+			// The method is code of a feature: what ends a request ends this one, it is no answer of the method
+			catch( \Nino\Failure $failure ) {
+				throw $failure;
 			}
 			catch( \Throwable $thrown ) {
 				return $method. '() threw '. self::_class( $thrown ). ': '. self::_shown( $thrown->getMessage() );

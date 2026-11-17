@@ -554,12 +554,12 @@ $writeFailAppData['./nino/filesystem/path']				= $writeFailDir;
 $writeFailAppData['./nino/filesystem/configpath']	= $brokenConfigBase;
 $writeFailAppData['/nino/auth/user'] = [ 'someone@example.com' => [] ];
 
-$capturedErrors = ninoErrors( function() use ( &$writeFailAppData ) {
+ninoErrors( function() use ( &$writeFailAppData ) {
 	\Nino\AppData::writeContentData( $writeFailAppData, [ '/nino/auth/user' ] );
-} );
+}, $writeFailure );
 
-$sawWriteFailure = count( array_filter( $capturedErrors, fn( $e ) => $e[0] === E_USER_ERROR && str_contains( $e[1], 'failed to write config.php' ) ) ) === 1;
-check( 'writeContentData() surfaces a failed config.php write via trigger_error(E_USER_ERROR)', $sawWriteFailure );
+check( 'writeContentData() ends the request with a Failure for a failed config.php write', $writeFailure instanceof \Nino\Failure
+	&& str_contains( $writeFailure->getMessage(), 'failed to write config.php' ) === true );
 
 \Nino\Filesystem::removeDir( $writeFailDir );
 
@@ -890,6 +890,29 @@ function runIsolated( string $body, string $beforeRequire = '' ): array {
 	return [ 'stdout' => $stdout, 'exitCode' => $exitCode ];
 }
 
+/**
+ *	The same as runIsolated(), but the body is a script file and not php -r: with -r php does not call the exception handler
+ *	for what is thrown at the top of the code, so a handler that answers a thrown Failure is only reached by a file
+ *
+ *	@param		string		$body					The code, after the kernel is loaded
+ *
+ *	@return		array										[ 'stdout' => ..., 'exitCode' => ... ]
+ */
+function runScript( string $body ): array {
+
+	$file = sys_get_temp_dir(). '/nino-runscript-'. bin2hex( random_bytes( 4 ) ). '.php';
+	file_put_contents( $file, '<?php require '. var_export( __DIR__. '/../_nino/Nino.php', true ). ';'. "\n". $body );
+
+	$process = proc_open( [ PHP_BINARY, '-d', 'display_errors=stderr', $file ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
+	$stdout = stream_get_contents( $pipes[1] );
+	fclose( $pipes[1] );
+	fclose( $pipes[2] );
+	$exitCode = proc_close( $process );
+	@unlink( $file );
+
+	return [ 'stdout' => $stdout, 'exitCode' => $exitCode ];
+}
+
 $invalidContentDir = runIsolated( '
 	define( "NINO_PRIVATE_DIR", "/definitely/not/a/nino-private-directory" );
 	echo "before\n";
@@ -1054,12 +1077,71 @@ $warning = runIsolated( $bootstrap. '
 ' );
 check( 'an E_USER_WARNING trigger_error() also lets execution continue past it', trim( $warning['stdout'] ) === "before\nafter" );
 
-$fatal = runIsolated( $bootstrap. '
+$fatal = runScript( $bootstrap. '
 	echo "before\n";
-	trigger_error( "a real failure", E_USER_ERROR );
+	\Nino\Runtime::fail( "a real failure" );
 	echo "after\n";
 ' );
-check( 'an E_USER_ERROR trigger_error() still terminates the request', trim( $fatal['stdout'] ) === 'before' );
+check( 'Runtime::fail() terminates the request', trim( $fatal['stdout'] ) === 'before' );
+
+/*	The display of an install that asked for it shows the stack the exception was thrown on: the function that called fail() is in it	*/
+$shown = runScript( str_replace( '"/nino/error/display"] = false', '"/nino/error/display"] = true', $bootstrap ). '
+	function nino_function_that_fails() { \Nino\Runtime::fail( "a real failure" ); }
+	function nino_function_that_calls() { nino_function_that_fails(); }
+	nino_function_that_calls();
+' );
+check( 'the display shows the call path of a Failure, the function that called fail() and its caller, and no arguments', str_contains( $shown['stdout'], '"nino_function_that_fails"' ) === true
+	&& str_contains( $shown['stdout'], '"nino_function_that_calls"' ) === true && str_contains( $shown['stdout'], '"args"' ) === false );
+
+/*	ninoErrors() hands a Failure to a caller that asks for it and throws it on for one that does not	*/
+$thrownOn = false;
+try {
+	ninoErrors( static function(): void { \Nino\Runtime::fail( 'ends the call' ); } );
+}
+catch( \Nino\Failure ) {
+	$thrownOn = true;
+}
+check( 'ninoErrors() throws a Failure on where the caller does not ask for it', $thrownOn === true );
+
+$notCaught = false;
+try {
+	try {
+		\Nino\Runtime::fail( 'a real failure' );
+	}
+	catch( \Exception ) {
+		$notCaught = false;
+	}
+}
+catch( \Nino\Failure ) {
+	$notCaught = true;
+}
+check( 'a catch( \\Exception ) does not catch what fail() throws', $notCaught === true );
+
+/*	No call of the kernel or the workbench asks php for a fatal error of the user level: the tokens of every file, a trigger_error()
+	whose arguments name E_USER_ERROR. The constant as a mask of error_get_last() is no such call	*/
+$ofUserLevel = [];
+foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__ ), \FilesystemIterator::SKIP_DOTS ) ) as $file ) {
+
+	if( $file->getExtension() !== 'php' || preg_match( '#/(_nino|_admin)/#', $file->getPathname() ) !== 1 )
+		continue;
+
+	$tokens = array_values( array_filter( token_get_all( (string) file_get_contents( $file->getPathname() ) ), static fn( mixed $token ): bool => is_array( $token ) === false || in_array( $token[0], [ T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ], true ) === false ) );
+
+	foreach( $tokens as $index => $token ) {
+
+		if( is_array( $token ) === false || ltrim( $token[1], '\\' ) !== 'trigger_error' || ( $tokens[$index + 1] ?? null ) !== '(' )
+			continue;
+
+		for( $depth = 0, $at = $index + 1; $at < count( $tokens ); $at++ ) {
+			$depth += $tokens[$at] === '(' ? 1 : ( $tokens[$at] === ')' ? -1 : 0 );
+			if( $depth === 0 )
+				break;
+			if( is_array( $tokens[$at] ) === true && ltrim( $tokens[$at][1], '\\' ) === 'E_USER_ERROR' )
+				$ofUserLevel[] = $file->getPathname();
+		}
+	}
+}
+check( 'no trigger_error() of the level E_USER_ERROR is left in the kernel or the workbench', $ofUserLevel === [] );
 
 $engineWarning = runIsolated( $bootstrap. '
 	echo "before\n";
@@ -1490,13 +1572,24 @@ check( 'a compile-time fatal (a redeclared class) is written to the log', count(
 // functions too, so both handlers are reached by the same failure. The
 // outcome is what is pinned here - $_reported is what guarantees it, but
 // not the only reason it holds today (see the property's own note)
-$handledFatal = runIsolated( $shutdownBootstrap( true, false ). '
-	trigger_error( "a real failure", E_USER_ERROR );
+$handledFatal = runScript( $shutdownBootstrap( true, false ). '
+	\Nino\Runtime::fail( "a real failure" );
 ' );
 $handledEntries = shutdownLogEntries( $handledFatal );
 
-check( 'a fatal the error handler does see is logged once, not once per handler', count( $handledEntries ) === 1
-	&& ( $handledEntries[0]['type'] ?? null ) === E_USER_ERROR );
+check( 'a fatal the error handler does see is logged once, not once per handler', count( $handledEntries ) === 1 );
+
+/*	What fail() leaves behind: one entry in the log that names the file and line of the call, not the file of Runtime, and the status 500. The
+	output is buffered, so that the status is still ours to set when the handler runs	*/
+$failed = runScript( 'ob_start();'. $shutdownBootstrap( true, false ). '
+	register_shutdown_function( static function(): void { echo "status:". http_response_code(). "\n"; } );
+	echo "caller:". __FILE__. ":". __LINE__. "\n"; \Nino\Runtime::fail( "a real failure" );
+' );
+preg_match( '/^caller:(.+)$/m', $failed['stdout'], $caller );
+preg_match( '/^status:(\d+)$/m', $failed['stdout'], $status );
+$failedEntries = shutdownLogEntries( $failed );
+check( 'fail() answers 500 and logs one entry, through the handler of exceptions, with the file and line of its caller', count( $failedEntries ) === 1
+	&& ( $failedEntries[0]['type'] ?? null ) === 'Exception' && ( $failedEntries[0]['file']. ':'. $failedEntries[0]['line'] ) === ( $caller[1] ?? '' ) && ( $status[1] ?? '' ) === '500' );
 
 // The same outcome where two handlers really are registered: a second
 // Runtime::init() in one process adds a second handleShutdown(), and both

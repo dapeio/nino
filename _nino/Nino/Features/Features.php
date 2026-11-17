@@ -1829,16 +1829,12 @@ namespace Nino {
 			$live = (array) ( $appData['/nino/http/routes'] ?? [] );
 			$version = $feature['version'];
 
-			/*	E_USER_ERROR, the level writeContentData() raises for the same
+			/*	Runtime::fail(), as writeContentData() does for the same
 				thing: a config.php write that is dropped rather than made has
 				to be loud, because what is lost is a route, a module list or a
-				version record. The refusal below it is for a handler that
-				decides to carry on - the same shape AppData and Elements use,
-				and the same phpstan-baseline entry	*/
-			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
-				trigger_error( 'Features::activate(): could not lock config.php for writing.', E_USER_ERROR );
-				return 'could not write config.php';
-			}
+				version record	*/
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+				\Nino\Runtime::fail( 'Features::activate(): could not lock config.php for writing.' );
 
 			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $class, $key, $version, $added, $config ): array {
 
@@ -1884,10 +1880,8 @@ namespace Nino {
 			// request goes on with everything it booted with
 			$appData['/nino/http/routes'] = $live + $routes;
 
-			if( $written === false ) {
-				trigger_error( 'Features::activate(): failed to write config.php.', E_USER_ERROR );
-				return 'could not write config.php';
-			}
+			if( $written === false )
+				\Nino\Runtime::fail( 'Features::activate(): failed to write config.php.' );
 
 			// What was written, read back into this request: the file is the
 			// decision now, not the copy this request booted with

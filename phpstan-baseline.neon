@@ -19,18 +19,6 @@ parameters:
 			path: _admin/install/Install.php
 
 		-
-			message: '#^Strict comparison using \!\=\= between true and false will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: _nino/Nino/AppData/AppData.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
-			path: _nino/Nino/AppData/AppData.php
-
-		-
 			message: '#^Comparison operation "\<\=" between int\<min, 0\> and int\<1, max\> is always true\.$#'
 			identifier: smallerOrEqual.alwaysTrue
 			count: 1
@@ -47,12 +35,6 @@ parameters:
 			identifier: booleanNot.alwaysFalse
 			count: 10
 			path: _nino/Nino/Elements/Elements.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 2
-			path: _nino/Nino/Features/Features.php
 
 		-
 			message: '#^Call to an undefined method DOMNode\:\:getAttribute\(\)\.$#'

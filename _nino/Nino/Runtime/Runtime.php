@@ -26,8 +26,8 @@ namespace Nino {
 		// Engine-raised levels are deliberately absent: an undefined array key
 		// or a division by zero is a bug in here, and a handler that swallows
 		// those hides exactly what it exists to surface. Anything that really
-		// must stop the request says so explicitly with E_USER_ERROR (see
-		// AppData::init(), Filesystem::init()).
+		// must stop the request says so explicitly with fail() (see
+		// AppData::init(), Components::addComponent()).
 		// E_DEPRECATED is the one engine level in here, and the reason is that
 		// it is not a statement about this request: it says a future php will
 		// do something differently, not that anything went wrong now. Stopping
@@ -253,6 +253,25 @@ namespace Nino {
 		}
 
 
+		/**
+		 *	End the request with an error: the one way for code that cannot go
+		 *	on to say so. Throws \Nino\Failure, which handleException() answers
+		 *	with a log entry and a 500. It is an \Error, so catch( \Exception )
+		 *	does not take it, and a caller that catches \Throwable lets it
+		 *	through by catching \Nino\Failure first and throwing it again. The
+		 *	entry names the file and line of the call of fail().
+		 *
+		 *	@param		string		$message			What went wrong
+		 *
+		 *	@return 	never
+		 */
+		public static function fail( string $message ): never {
+
+			$caller = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 1 )[0] ?? [];
+
+			throw new \Nino\Failure( $message, (string) ( $caller['file'] ?? __FILE__ ), (int) ( $caller['line'] ?? __LINE__ ) );
+		}
+
 		// Uncaught exceptions take the same path as a fatal error - handleError()
 		// tells the two apart by its first argument being an object. Declared
 		// separately so set_exception_handler() gets the (Throwable): void
@@ -262,7 +281,7 @@ namespace Nino {
 		}
 
 		// Global error/exception handler. Terminates the request with a 500 for
-		// exceptions, for E_USER_ERROR and for every engine-raised level;
+		// exceptions and for every engine-raised level;
 		// returns (script continues on the next statement) for a level in
 		// NON_FATAL_LEVELS and for one filtered out by error_reporting().
 		public static function handleError(): bool {
@@ -314,7 +333,7 @@ namespace Nino {
 			// The status the failure earned, before anything is printed. The
 			// display branch below echoes its dump and exit()s, so the
 			// header() that used to sit at the end of this method never ran
-			// on a development install: an exception or an E_USER_ERROR with
+			// on a development install: an exception with
 			// '/nino/error/display' on answered 200 with a stack trace in the
 			// body, where this method's own docblock and docs/development.md
 			// both promise 500 - and a uptime check, a devtools filter or a
@@ -348,7 +367,12 @@ namespace Nino {
 				// survives would be the two behaving differently, which is the one
 				// thing a debug switch must never do
 				echo '<pre>';
-				var_dump( $errorArray, debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
+				// An exception carries the stack it was thrown on, which is gone
+				// by the time this runs: that is what is shown for it, and the
+				// stack of this handler for an error php raised
+				var_dump( $errorArray, is_object( $args[0] ) === true
+					? array_map( static fn( array $frame ): array => array_diff_key( $frame, [ 'args' => true ] ), $args[0]->getTrace() )
+					: debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ) );
 				echo '</pre>';
 
 				if( $fatal === true )

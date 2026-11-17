@@ -667,15 +667,12 @@ if( $csrfRoutesBefore === null )
 else
 	$appData['/nino/http/routes'] = $csrfRoutesBefore;
 
-// Regression: Auth::callbackLoginResponse()/callbackLogoutResponse() used
-// to hard-refuse (trigger_error(E_USER_ERROR)) unless the Csrf module was
-// listed in '/nino/modules' - protection is now the required \Nino\Csrf
-// kernel class instead, always active, so that refusal is gone. This
-// sandbox's $appData never lists Csrf under '/nino/modules' anywhere in
-// this file, which used to make every login/logout POST here
-// a 500 - the two callbacks cooperating correctly via the shared
-// './nino/csrf/blocked' flag, with no module in the loop at all, is
-// exactly the property this split is for.
+// Protection is the required \Nino\Csrf kernel class, always active, not a
+// module: Auth::callbackLoginResponse()/callbackLogoutResponse() refuse
+// nothing for want of the Csrf module in '/nino/modules'. This sandbox's
+// $appData never lists it anywhere in this file, and a login or logout POST
+// here is answered by the two callbacks cooperating through the shared
+// './nino/csrf/blocked' flag, with no module in the loop at all.
 $csrfUser = 'csrfpipeline@example.com';
 \Nino\Auth::insertUser( $appData, $csrfUser, 'correct horse battery staple' );
 

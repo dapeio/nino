@@ -28,12 +28,15 @@ namespace Nino {
 
 		// These paths are needed before Runtime installs Nino's error handler:
 		// AppData::prepareSession() already reads config.php from them. Validate
-		// them before any path concatenation can obscure the real problem.
+		// them before any path concatenation can obscure the real problem. No
+		// handler is there yet, so a failure here is an uncaught \Nino\Failure:
+		// php's own fatal error - a 500 where php does not display errors, and with
+		// display_errors on the message and the frames of the call
 		if( defined( 'NINO_PRIVATE_DIR' ) === true && ( is_string( NINO_PRIVATE_DIR ) === false || NINO_PRIVATE_DIR === '' || is_dir( NINO_PRIVATE_DIR ) === false || is_writable( NINO_PRIVATE_DIR ) === false ) )
-			trigger_error( 'NINO_PRIVATE_DIR must point to an existing, writable directory.', E_USER_ERROR );
+			\Nino\Runtime::fail( 'NINO_PRIVATE_DIR must point to an existing, writable directory.' );
 
 		if( defined( 'NINO_CONFIG_DIR' ) === true && ( is_string( NINO_CONFIG_DIR ) === false || NINO_CONFIG_DIR === '' || is_dir( NINO_CONFIG_DIR ) === false || is_writable( NINO_CONFIG_DIR ) === false ) )
-			trigger_error( 'NINO_CONFIG_DIR must point to an existing, writable directory.', E_USER_ERROR );
+			\Nino\Runtime::fail( 'NINO_CONFIG_DIR must point to an existing, writable directory.' );
 
 		// The name this had before 1.1, and the one thing worse than not
 		// honouring it is not saying so: a deployment written against it meant
@@ -41,7 +44,7 @@ namespace Nino {
 		// the constant leaves the password hashes, the sessions and the data
 		// under the document root while the operator believes otherwise
 		if( defined( 'NINO_CONTENT_DIR' ) === true )
-			trigger_error( 'NINO_CONTENT_DIR is not read any more - the private tree is moved with NINO_PRIVATE_DIR.', E_USER_ERROR );
+			\Nino\Runtime::fail( 'NINO_CONTENT_DIR is not read any more - the private tree is moved with NINO_PRIVATE_DIR.' );
 
 		// Everything this project *is*, as opposed to the code that runs it:
 		// configuration, templates, content and management state all live in
@@ -186,7 +189,7 @@ namespace Nino {
 	}
 
 	// The kernel classes - AppData, Auth, Callbacks, Catalogue, Csrf,
-	// Feature, Features, Fetch, Filesystem, Form, Backup, RotatingLog, Elements, Html, Http, Markup,
+	// Failure, Feature, Features, Fetch, Filesystem, Form, Backup, RotatingLog, Elements, Html, Http, Markup,
 	// Images, Locales, Text, Mail, Modules and Runtime - each live in their own file under
 	// _nino/Nino/<Class>/<Class>.php and are autoloaded on first use by
 	// the spl_autoload_register() call at the bottom of this file, from

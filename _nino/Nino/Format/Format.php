@@ -125,7 +125,8 @@ namespace Nino {
 		 *	( array &$appData, mixed $value ): ?string and answers plain text, or
 		 *	null for a value it cannot read; the caller escapes the answer. A name
 		 *	that is no slug or a label that is no string or locale => string map is
-		 *	refused as addComponent() refuses a schema
+		 *	refused as addComponent() refuses a schema: the request ends with
+		 *	Runtime::fail(), nothing registered
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$name					A slug: lower case letters, digits and hyphens, a letter first
@@ -137,13 +138,13 @@ namespace Nino {
 		public static function add( array &$appData, string $name, callable $callback, mixed $label ): void {
 
 			if( preg_match( '/^[a-z][a-z0-9-]*$/D', $name ) !== 1 )
-				trigger_error( 'Format::add(): a name is a slug of lower case letters, digits and hyphens, a letter first', E_USER_ERROR );
-			elseif( \Nino\Features::localizedValid( $label ) === false )
-				trigger_error( 'Format::add(): formatter "'. $name. '": "label" must be a string or a locale => string map', E_USER_ERROR );
-			else {
-				$appData[self::REGISTRY][$name] = [ 'callback' => $callback, 'label' => $label ];
-				unset( $appData[self::WARNED][$name] );
-			}
+				\Nino\Runtime::fail( 'Format::add(): a name is a slug of lower case letters, digits and hyphens, a letter first' );
+
+			if( \Nino\Features::localizedValid( $label ) === false )
+				\Nino\Runtime::fail( 'Format::add(): formatter "'. $name. '": "label" must be a string or a locale => string map' );
+
+			$appData[self::REGISTRY][$name] = [ 'callback' => $callback, 'label' => $label ];
+			unset( $appData[self::WARNED][$name] );
 		}
 
 		/**

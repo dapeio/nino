@@ -295,17 +295,13 @@ namespace Nino\Modules\Navigation {
 				if( $originalKey === '' && $order === null ) {
 
 					// Nothing but the registry changed
-					if( \Nino\AppData::writeContentData( $appData, [ '/nino/html/navs' ] ) === false ) {
-						\Nino\Http::fail( $request, 500, 'could not write config.php' );
-						return;
-					}
+					\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs' ] );
 
 					\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
 					return;
 				}
 
-				if( self::_persist( $appData, $request, $routes, $navroutes, $live ) === false )
-					return;
+				self::_persist( $appData, $routes, $navroutes, $live );
 
 				\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
 			} finally {
@@ -381,8 +377,7 @@ namespace Nino\Modules\Navigation {
 
 				$appData['/nino/html/navs'] = array_values( $registry );
 
-				if( self::_persist( $appData, $request, $routes, $navroutes, $live ) === false )
-					return;
+				self::_persist( $appData, $routes, $navroutes, $live );
 
 				\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
 			} finally {
@@ -683,14 +678,13 @@ namespace Nino\Modules\Navigation {
 		 *	the runtime routes
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
 		 *	@param		array 		$routes				The persisted route array to write
 		 *	@param		array 		$navroutes		The runtime-only memberships to write
 		 *	@param		array 		$live					The live route array from before
 		 *
-		 *	@return 	bool										False when config.php could not be written, the response says so
+		 *	@return 	void
 		 */
-		private static function _persist( array &$appData, array &$request, array $routes, array $navroutes, array $live ): bool {
+		private static function _persist( array &$appData, array $routes, array $navroutes, array $live ): void {
 
 			$appData['/nino/http/routes'] = $routes;
 
@@ -701,14 +695,9 @@ namespace Nino\Modules\Navigation {
 			else
 				$appData['/nino/html/navroutes'] = $navroutes;
 
-			$written = \Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes', '/nino/html/navroutes' ] );
+			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes', '/nino/html/navroutes' ] );
 
 			$appData['/nino/http/routes'] = array_merge( $live, $routes );
-
-			if( $written === false )
-				\Nino\Http::fail( $request, 500, 'could not write config.php' );
-
-			return $written;
 		}
 
 		/**

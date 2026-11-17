@@ -25,7 +25,7 @@ declare(strict_types=1);
  *								ninoSandbox()		A fresh, isolated project directory
  *								ninoSandboxDir()	The directory of a sandbox
  *								ninoWarnings()		The warnings raised since the last call
- *								ninoErrors()		Every error one call raises, with its level
+ *								ninoErrors()		Every error one call raises, with its level, and the Failure that ended it
  *								ninoCall()			One workbench request, as a panel sees it
  *								ninoUser()			An account, inserted and signed in
  *								ninoVisit()			One request of the site, through Http::request()
@@ -133,22 +133,28 @@ function ninoWarnings(): array {
 
 /**
  *	Every error one call raises, the level with it: the call runs under a
- *	handler of its own that records [ level, message ] and swallows the error
- *	- E_USER_ERROR too, which the handler below hands on to php as the fatal
- *	it is. What the code silenced with @ is not recorded. The handler in
- *	force before is back when this returns. A test that needs the result of
- *	the call sets it inside the closure:
+ *	handler of its own that records [ level, message ] and swallows the error.
+ *	What the code silenced with @ is not recorded. The handler in force before
+ *	is back when this returns. A \Nino\Failure the call throws (see
+ *	\Nino\Runtime::fail()) ends the call and is no error of the list: it is
+ *	handed back in $failure, null where the call raised none; a caller that
+ *	passes no $failure gets the Failure thrown on. A test that needs
+ *	the result of the call sets it inside the closure:
  *
  *		$result = null;
  *		$errors = ninoErrors( function() use ( &$appData, &$result ) { $result = \Nino\Foo::bar( $appData ); } );
+ *		$errors = ninoErrors( function() use ( &$appData ) { \Nino\Foo::bar( $appData ); }, $failure );
  *
  *	@param		callable	$run						The call to watch
+ *	@param		\Nino\Failure|null	&$failure	(reference) The failure that ended the call
  *
  *	@return 	array										[ level, message ] per error, oldest first
  */
-function ninoErrors( callable $run ): array {
+function ninoErrors( callable $run, ?\Nino\Failure &$failure = null ): array {
 
+	$asked = func_num_args() >= 2;
 	$errors = [];
+	$failure = null;
 
 	set_error_handler( static function( int $level, string $message ) use ( &$errors ): bool {
 
@@ -163,6 +169,14 @@ function ninoErrors( callable $run ): array {
 
 	try {
 		$run();
+	}
+	catch( \Nino\Failure $caught ) {
+
+		// Only a caller that asks for it takes the Failure: one that does not would see a call that ended midway as one that raised nothing
+		if( $asked === false )
+			throw $caught;
+
+		$failure = $caught;
 	}
 	finally {
 		restore_error_handler();

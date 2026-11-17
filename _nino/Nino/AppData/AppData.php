@@ -255,7 +255,7 @@ namespace Nino {
 					who *is* installing came to /_admin on purpose and never
 					sees this.	*/
 				if( $installing !== true )
-					trigger_error( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - run the setup wizard at /_admin, or check NINO_CONFIG_DIR if it is set.', E_USER_ERROR );
+					\Nino\Runtime::fail( 'AppData::init(): config.php was not found under \''. ( $appData['./nino/filesystem/configpath'] ?? $appData['./nino/filesystem/path'] ). '\' - run the setup wizard at /_admin, or check NINO_CONFIG_DIR if it is set.' );
 
 				$appData = self::_merge( $appData, self::DEFAULTS );
 				return;
@@ -264,7 +264,7 @@ namespace Nino {
 			$staticAppData = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 			if( is_array( $staticAppData ) === false )
-				trigger_error( 'AppData::init(): config.php exists but did not return an array.', E_USER_ERROR );
+				\Nino\Runtime::fail( 'AppData::init(): config.php exists but did not return an array.' );
 
 			/*	Defaults first, the project's own file over them: a key the file
 				does not carry is one this site never decided, not one it lost.
@@ -319,14 +319,10 @@ namespace Nino {
 		 *
 		 *	A failed lock here means a deployment problem (no /data/.locks, no
 		 *	free handles), not contention - unlike every other mutate() caller,
-		 *	this trigger_error()s instead of failing silently, since a dropped
-		 *	config.php write can mean a route, permission, or login never
-		 *	actually saved.
-		 *
-		 *	Returns whether the write happened - under Nino's own error handler the
-		 *	E_USER_ERROR of a lock that cannot be taken already ended the request,
-		 *	so the false only ever reaches a caller running with a handler that
-		 *	continues (the tests).
+		 *	this ends the request with Runtime::fail() instead of failing
+		 *	silently, since a dropped config.php write can mean a route,
+		 *	permission, or login never actually saved. So does a write that
+		 *	fails: what comes back is always true.
 		 *
 		 *	A named key the given appData does not carry is taken out of
 		 *	config.php rather than written into it, so that the framework default
@@ -335,14 +331,12 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$keys				The top-level keys of config.php to persist, spelled as it spells them: '/nino/modules', '/project/catalog'
 		 *
-		 *	@return 	bool							Whether config.php was written
+		 *	@return 	true							config.php was written
 		 */
-		public static function writeContentData( array &$appData, array $keys ): bool {
+		public static function writeContentData( array &$appData, array $keys ): true {
 
-			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
-				trigger_error( 'AppData::writeContentData(): could not lock config.php for writing - refusing to write unserialized.', E_USER_ERROR );
-				return false;
-			}
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+				\Nino\Runtime::fail( 'AppData::writeContentData(): could not lock config.php for writing - refusing to write unserialized.' );
 
 			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content, array &$appData ) use ( $keys ): array {
 
@@ -379,9 +373,9 @@ namespace Nino {
 			} );
 
 			if( $written === false )
-				trigger_error( 'AppData::writeContentData(): failed to write config.php.', E_USER_ERROR );
+				\Nino\Runtime::fail( 'AppData::writeContentData(): failed to write config.php.' );
 
-			return $written !== false;
+			return true;
 		}
 
 		/**

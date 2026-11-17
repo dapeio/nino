@@ -765,7 +765,7 @@ before the test was included - and `tests/harness.php` gives nine helpers:
 |---|---|
 | `check( $label, $condition )` | one assertion, one line of output |
 | `ninoSandbox( $name )`, `ninoSandboxDir( $appData )` | a fresh, isolated project directory - `$appData` with every path in it, the directory it is served from (`/nino/dir`, empty: the domain root), the locales `de_DE` and `en_US`, no modules, the test switches on what it tests - and its path |
-| `ninoWarnings()`, `ninoErrors( $run )` | the warnings raised since the last call, cleared as they are read - assert on the one you expect; every error one call raises, the level with it |
+| `ninoWarnings()`, `ninoErrors( $run, &$failure )` | the warnings raised since the last call, cleared as they are read - assert on the one you expect; every error one call raises, the level with it - and, where `$failure` is passed, the `\Nino\Failure` that ended the call (not in the list); without it a Failure is thrown on |
 | `ninoCall( $appData, $target, $data, $action )` | one workbench request as a panel method sees it: `$_POST['data']` is the json of `$data`; answers `[ status, body, request ]` |
 | `ninoUser( $appData, $mail, $perms )` | an account that exists and is signed in, full access unless `$perms` says otherwise |
 | `ninoVisit( $appData, $uri, $method, $server )` | one request of the site through `Http::request()`: the request built, the response seeded with the default headers, the callbacks of `/nino/http/request` run - no route resolved, nothing rendered |

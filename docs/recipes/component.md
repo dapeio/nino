@@ -280,7 +280,7 @@ module of its own - `app/Project/DaysLeft/DaysLeft/DaysLeft.php`, listed in
 `/nino/modules` - with `\Nino\Components::addComponent( $appData, $name, $schema,
 $renderer )`. The schema is the same array, with the template in it (`'template'`)
 since no folder holds one, and `group` is optional. It is checked by
-`\Nino\Components::validate()`, and a schema that is none is an `E_USER_ERROR` at
+`\Nino\Components::validate()`, and a schema that is none ends the request with `\Nino\Runtime::fail()` at
 registration, nothing registered:
 
 ```php

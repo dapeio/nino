@@ -414,7 +414,13 @@ namespace Nino {
 
 				try {
 					$work();
-				} catch( \Throwable $error ) {
+				}
+				// What ends a request ends this one too: the work is code of a module, and a Failure
+				// of it is not one of the throwables the line below only reports
+				catch( \Nino\Failure $failure ) {
+					throw $failure;
+				}
+				catch( \Throwable $error ) {
 					trigger_error( 'Work after the response: '. get_class( $error ). ' - '. $error->getMessage(), E_USER_WARNING );
 				}
 			}

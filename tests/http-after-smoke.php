@@ -42,6 +42,8 @@ if( $case === "empty" ) { $response["statusCode"] = 304; $response["body"] = "";
 $request = [ "/nino/http/request" => [ "method" => "GET", "rawMethod" => $method ], "/nino/http/response" => $response ];
 if( $case === "throw" )
 	\Nino\Http::afterResponse( $appData, static function(): void { throw new \RuntimeException( "first work" ); } );
+if( $case === "fail" )
+	\Nino\Http::afterResponse( $appData, static function(): void { \Nino\Runtime::fail( "first work" ); } );
 if( $ask )
 	\Nino\Http::afterResponse( $appData, static function() use ( $sandbox, &$request ): void { file_put_contents( $sandbox . "/work.txt", json_encode( [ "Content-Length: " . ( $request["/nino/http/response"]["header"]["Content-Length"] ?? "none" ), "session: " . session_status() ] ) ); } );
 \Nino\Callbacks::doCallbacks( $appData, "/nino/http/output", $request );
@@ -104,6 +106,9 @@ $buffer = $run( 'buffer', true );
 check( '...a buffer without one is flushed, and the length is the body\'s', $length( $buffer['work'] ) === '14' && $buffer['out'] === '<p>Grüße</p>' );
 $throw = $run( 'throw', true );
 check( 'work that throws does not end the work that comes after it, and says so in the log', $length( $throw['work'] ) === '14' && str_contains( $throw['out'], 'first work' ) === true );
+
+$fail = $run( 'fail', true );
+check( 'work that ends the request with Runtime::fail() ends it: the work after it does not run', $fail['work'] === null && str_contains( $fail['out'], 'first work' ) === true );
 
 // A real server that compresses every page, and a client that takes what is compressed
 $router = $sandbox. '/router.php';

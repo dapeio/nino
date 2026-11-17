@@ -274,7 +274,12 @@ namespace Nino\Modules\Dashboard {
 
 				try {
 					$answer = call_user_func_array( $callback, [ &$appData, &$handed ] ) ?? $handed;
-				} catch( \Throwable $error ) {
+				}
+				// What ends a request ends this one: a callback that drops its areas is no callback that ends it
+				catch( \Nino\Failure $failure ) {
+					throw $failure;
+				}
+				catch( \Throwable $error ) {
 					trigger_error( 'Dashboard head: a callback threw '. get_class( $error ). ' and its areas are dropped', E_USER_WARNING );
 					continue;
 				}

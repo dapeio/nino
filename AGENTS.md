@@ -551,6 +551,9 @@ convenience: repeat it on the server.
 - Do not report success before persistence succeeds, do not turn a recoverable
   logging failure into loss of a successfully handled public request, and do not
   swallow programming errors under a broad `catch(Throwable)`.
+- Code that cannot go on ends the request with `\Nino\Runtime::fail( $message )`, never with `trigger_error( ..., E_USER_ERROR )`: it throws
+  `\Nino\Failure`, an `\Error`, which the handler logs and answers with a `500`. A `catch( \Throwable )` around code that may call it
+  (a callback, a module's method, a write of `config.php`) catches `\Nino\Failure` first and throws it again.
 - A failure a person can cause carries a code with text in both interface
   languages, and only a `401` for an ended session carries the code `session`;
   see `\Nino\Http::fail()` and the [panel recipe](docs/recipes/admin-panel.md#saying-what-happened).

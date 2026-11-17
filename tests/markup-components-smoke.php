@@ -229,9 +229,6 @@ foreach( $renderers as $name => [ $schema, $renderer ] )
 
 $page = [ 'template' => 'page-x' ];
 
-/*	The errors of one call, but for the deprecation php 8.4 adds to every E_USER_ERROR: not what is asked about here	*/
-$errorsOf = static fn( callable $run ): array => array_values( array_filter( ninoErrors( $run ), static fn( array $error ): bool => $error[0] !== E_DEPRECATED ) );
-
 /*	A source read and drawn: the document, the context it is drawn in; the notes of the read are the third argument	*/
 $draw = static function( string $source, array $context = [ 'template' => 'page-x' ], ?array &$notes = null ) use ( &$appData ): string {
 	$notes = [];
@@ -314,19 +311,31 @@ check( 'a renderer is no part of it: the schemas are', ( static function() use (
 
 $countBefore = count( \Nino\Components::components( $other ) );
 $order = array_keys( \Nino\Components::components( $other ) );
-$errors = $errorsOf( static function() use ( &$other ): void {
+$errors = ninoErrors( static function() use ( &$other ): void {
 	\Nino\Components::addComponent( $other, 'card', [ 'label' => 'Card', 'in' => 'flow', 'template' => '<x></x>' ] );
-} );
-check( 'a schema that is none is an E_USER_ERROR that names the component and the key - what the register of the modules does - and nothing is registered or changed',
-	count( $errors ) === 1 && $errors[0][0] === E_USER_ERROR && str_contains( $errors[0][1], 'Components::addComponent()' ) === true && str_contains( $errors[0][1], '"card"' ) === true && str_contains( $errors[0][1], '"in"' ) === true
+}, $failure );
+check( 'a schema that is none ends the call with a Failure that names the component and the key - what the register of the modules does - and nothing is registered or changed',
+	$errors === [] && $failure instanceof \Nino\Failure && str_contains( $failure->getMessage(), 'Components::addComponent()' ) === true && str_contains( $failure->getMessage(), '"card"' ) === true && str_contains( $failure->getMessage(), '"in"' ) === true
 	&& \Nino\Components::components( $other )['card'] === $registered['card'] && \Nino\Components::version( $other ) === $versionExtra );
-$errors = $errorsOf( static function() use ( &$other ): void {
+ninoErrors( static function() use ( &$other ): void {
 	\Nino\Components::addComponent( $other, 'fresh', [ 'label' => 'Fresh', 'in' => [ 'Bad Place' ] ] );
+}, $badSchema );
+ninoErrors( static function() use ( &$other ): void {
 	\Nino\Components::addComponent( $other, 'fresh', [ 'label' => 'Fresh' ] );
-} );
+}, $bare );
 check( 'a name that is registered by a schema that is none is not registered; a component with neither a template nor a renderer is refused as well',
-	count( $errors ) === 2 && $errors[0][0] === E_USER_ERROR && $errors[1][0] === E_USER_ERROR && str_contains( $errors[1][1], '"template"' ) === true
+	$badSchema instanceof \Nino\Failure && $bare instanceof \Nino\Failure && str_contains( $bare->getMessage(), '"template"' ) === true
 	&& isset( \Nino\Components::components( $other )['fresh'] ) === false && count( \Nino\Components::components( $other ) ) === $countBefore );
+
+/*	The method that answers the options of a choice is code of a feature: what it ends the request with is no answer	*/
+final class EndsTheRequest {
+	public static function options( array &$appData, string $attribute ): array { \Nino\Runtime::fail( 'ends the request' ); }
+}
+ninoErrors( static function() use ( &$other ): void {
+	\Nino\Components::addComponent( $other, 'asks', [ 'label' => 'Asks', 'template' => '<a></a>', 'attributes' => [ 'as' => [ 'type' => 'choice', 'options' => '\EndsTheRequest::options', 'default' => '' ] ] ] );
+	\Nino\Components::components( $other );
+}, $asked );
+check( 'a method of the options that ends the request with Runtime::fail() ends it: the Failure comes through, no refusal of the schema', $asked instanceof \Nino\Failure && $asked->getMessage() === 'ends the request' );
 
 \Nino\Components::addComponent( $other, 'twice', [ 'label' => 'First', 'in' => [ 'flow' ], 'template' => '<one></one>' ] );
 \Nino\Components::addComponent( $other, 'after', [ 'label' => 'After', 'template' => '<a></a>' ] );
@@ -451,10 +460,10 @@ $said = $logged( static function() use ( $draw ): void {
 	$draw( '[gallery][slider][/slider][other]' );
 } );
 check( 'F1: one line for each name', count( $said ) === 3 );
-check( 'F1: the line is a notice, the level the kernel logs and goes on from', ( static function() use ( &$appData, $draw, $errorsOf ): bool {
+check( 'F1: the line is a notice, the level the kernel logs and goes on from', ( static function() use ( &$appData, $draw ): bool {
 	unset( $appData[\Nino\Components::NOTICED] );
 	@unlink( \Nino\Filesystem::path( $appData, '/data/component-notices.php' ) );
-	$errors = $errorsOf( static function() use ( $draw ): void { $draw( '[gallery]' ); } );
+	$errors = ninoErrors( static function() use ( $draw ): void { $draw( '[gallery]' ); } );
 	return count( $errors ) === 1 && $errors[0][0] === E_USER_NOTICE;
 } )() );
 
@@ -805,7 +814,7 @@ $said = $logged( static function() use ( $draw, &$out ): void {
 } );
 check( 'a renderer that throws an exception of an anonymous class is a line of a name and no path or null byte, and one line for each renderer', $out === 'abc' && count( $said ) === 2 && !str_contains( $said[0], "\0" ) && !str_contains( $said[0], '/' ) && str_contains( $said[0], 'Exception' ) === true && strlen( $said[0] ) < 200 );
 unset( $appData[\Nino\Components::NOTICED] );
-$levels = $errorsOf( static function() use ( $draw ): void { $draw( '[boom /]' ); } );
+$levels = ninoErrors( static function() use ( $draw ): void { $draw( '[boom /]' ); } );
 check( 'the line about a renderer is a warning, the level of what is broken, where an unknown name is a notice', count( $levels ) === 1 && $levels[0][0] === E_USER_WARNING );
 check( 'a renderer that fails with an error - a type that is wrong - is no exception: the error goes on up', ( static function() use ( $draw ): bool {
 	try {
@@ -1684,8 +1693,8 @@ check( 'validate() accepts children => nodes and answers it, which it accepts as
 	&& isset( \Nino\Components::validate( 'loop', [ 'children' => null ] + $loop )['children'] ) === false
 	&& str_contains( $whyNot( [ 'children' => 'draw' ] + $loop ), '"children"' ) === true && str_contains( $whyNot( [ 'children' => true ] + $loop ), '"children"' ) === true && str_contains( $whyNot( [ 'children' => [ 'nodes' ] ] + $loop ), '"children"' ) === true
 	&& str_contains( $whyNot( [ 'children' => 'Nodes' ] + $loop ), '"children"' ) === true && str_contains( $whyNot( [ 'children' => '' ] + $loop ), '"children"' ) === true );
-$errors = $errorsOf( function() use ( &$appData, $loop ) { \Nino\Components::addComponent( $appData, 'loop', $loop ); } );
-check( 'addComponent() refuses it without a renderer: the nodes are for it to draw - one error, nothing registered', count( $errors ) === 1 && $errors[0][0] === E_USER_ERROR && str_contains( $errors[0][1], 'renderer' ) === true && isset( \Nino\Components::components( $appData )['loop'] ) === false );
+ninoErrors( function() use ( &$appData, $loop ) { \Nino\Components::addComponent( $appData, 'loop', $loop ); }, $failure );
+check( 'addComponent() refuses it without a renderer: the nodes are for it to draw - a Failure, nothing registered', $failure instanceof \Nino\Failure && str_contains( $failure->getMessage(), 'renderer' ) === true && isset( \Nino\Components::components( $appData )['loop'] ) === false );
 \Nino\Components::addComponent( $appData, 'loop', $loop, $loopRenderer );
 check( '...and registers it with one', ( \Nino\Components::components( $appData )['loop']['children'] ?? '' ) === 'nodes' );
 

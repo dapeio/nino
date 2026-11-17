@@ -2273,6 +2273,13 @@ function pinDashboardHead( array &$appData ): void {
 			&& ( $body['head']['last'] ?? null ) === [ 'by' => 'third' ] && array_key_exists( 'tiles', $body ) === true );
 	}
 	\Nino\Callbacks::removeCallbacks( $appData, \Nino\Modules\Dashboard\Admin::HEAD );
+
+	// ...but one that ends the request with Runtime::fail() ends it, and does not lose its areas
+	\Nino\Callbacks::registerCallback( $appData, \Nino\Modules\Dashboard\Admin::HEAD, static function( array &$appData, array &$head ): array { \Nino\Runtime::fail( 'ends the request' ); }, 5 );
+	$failure = null;
+	ninoErrors( static function() use ( &$appData ): void { callAdminPost( $appData, 'dashboard/summary' ); }, $failure );
+	check( 'a callback that ends the request with Runtime::fail() is not one that is named in a warning: the Failure comes through', $failure instanceof \Nino\Failure );
+	\Nino\Callbacks::removeCallbacks( $appData, \Nino\Modules\Dashboard\Admin::HEAD );
 }
 
 /** The login before this one is kept for the session that opens now, and stays what it was for the whole session: 0 for the first login of an account */
