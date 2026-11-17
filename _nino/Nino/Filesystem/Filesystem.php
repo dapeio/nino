@@ -308,6 +308,11 @@ namespace Nino {
 			// Locks live in their own map for that reason.
 			$appData['./nino/filesystem/locks'][$lockKey] = $handle;
 
+			// What this request read of the file before it had the lock may be older than the file: another writer had the lock
+			// and changed it, and the fingerprint (mtime in seconds, size) cannot tell a change that left the size and the second
+			// as they were. The first read under the lock is a read of the disk, as mutate() makes it
+			$appData['./nino/filesystem/cache'][$filename]['fstat'] = [];
+
 			return true;
 		}
 

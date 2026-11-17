@@ -103,6 +103,171 @@ namespace Nino {
 		}
 
 		/**
+		 *	Take a page away whole: its routes in every language - and with them its entries in every menu -, its template, its
+		 *	texts (the keys /template/<template>/... of every language and of global.php, with their format and limit in meta.php,
+		 *	and the details of the page, /_nino/webpage<uri>/{name,title,description,uri}), its picture slots and the files of those
+		 *	slots that no other slot reads. All of it or none of it, under the one lock of config.php, which is held from the first
+		 *	check to the last write: config.php is written under it and does not let it go. What anything else reads of the page - a
+		 *	text, a slot, a detail named in a template, a route or the value of a text - stays and is named in the answer under
+		 *	'kept'; what links to it - with page:<uri>, or by reading its address, the detail .../uri - is named under 'linked' and holds
+		 *	nothing. A template that no page draws but that
+		 *	has its words, its slots or pictures below its folder, or is a file with no route, is a leftover and is taken as a page with
+		 *	no routes ('remnant' => true). uses() asks all this without the act.
+		 *
+		 *	The order is what keeps the site whole at every step: the routes and the slots go first, in the one write of
+		 *	config.php, so that no visitor is sent to a page that is half gone; then the texts, meta.php and the blacklist; the
+		 *	template is the last of the writes that can be given back - a route never points at a template that is not there -,
+		 *	and the files of the pictures are removed after it, when nothing can fail any more that would need them. Every file
+		 *	that is written is given back byte for byte where a later step fails (see _undo()): the bytes it had are written
+		 *	again where it still holds what this call wrote, and where somebody changed it meanwhile only what this call took out
+		 *	is put in again, and nothing of theirs is touched. The files of the pictures are the last step and stay as they are
+		 *	where one of them cannot be removed - the page is gone then, and what is left is named in the answer.
+		 *
+		 *	A page is taken by the name of its template - page- and lower case words, and no other template, as a leftover too - and
+		 *	only the page whose template it is: a name no page draws and nothing is left of is refused (routes_unknown_page, 404). Refused as well, with 409 and nothing written:
+		 *		routes_remove_home			the page that has the address '/'
+		 *		routes_remove_not_found	the page of the status 404 - the route GET://404, or the Element-URI /404 -, which every
+		 *														address that has no page is answered with
+		 *		routes_remove_runtime		a page that a module or a feature routes by itself and no config.php has - the
+		 *														imprint and the privacy policy among them -, and a template the kernel draws by
+		 *														itself (reserved()): the code that routes it asks for it at every request
+		 *		routes_remove_shared		a template that more than one page draws: the call takes one page and the template
+		 *														would be gone from the others - the pages are named, and the caller takes the
+		 *														others' routes away first
+		 *		routes_remove_included	a template that another template or another route names in a [template ...] call:
+		 *														that page would draw nothing where this one stood
+		 *	The rule in one sentence: a page may go when the site does not ask for it at every request, nobody else draws or
+		 *	includes its template, and it is not the page that answers '/' or '404'.
+		 *
+		 *	The picture files that go are the ones whose name is the slot's own - the uri of the slot without its first slash, a
+		 *	dot and the rest, the name \Nino\Images::process() gives - and every file below images/template/<template>/, the folder
+		 *	of the page, that no remaining slot names (\Nino\Images::deleteUnlessShared()): a file that stands under another name
+		 *	outside that folder is nobody's to delete here.
+		 *
+		 *	When it is done, the hook '/nino/pages/removed' is fired once, after the lock is released, with the answer as its argument:
+		 *	a feature that keeps state of its own for a page removes it there (the Builder: its last state below data/builder). A
+		 *	callback cannot veto or change the answer, and one that throws is caught and logged and keeps no other from running (a
+		 *	\Nino\Failure is thrown on) - the page is gone when it runs.
+		 *
+		 *	The answer of a page that was removed is [ 'template' => its name, 'uri' => the Element-URI, 'routes' => the route keys
+		 *	it had, 'texts' => how many keys of the texts, counted once whatever the languages, 'slots' => the uris of the slots,
+		 *	'files' => the names of the picture files that were removed, 'kept' => [ [ 'key' => a text, a slot or a detail that stays because
+		 *	something else reads it, 'by' => [ who ] ] ], 'linked' => [ [ 'by' => who links to the page, 'key' => the text that holds
+		 *	the link or '' ] ], 'remnant' => whether it was a leftover with no route ], that of a refusal is put()'s [ 'error' => ... ].
+		 *	The functions know no account: whoever calls this has decided that the account may.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			The name of the template of the page, eg. 'page-news'
+		 *
+		 *	@return 	array										What was removed, or its error
+		 */
+		public static function remove( array &$appData, string $template ): array {
+
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+				return self::_refuse( 500, 'could not lock config.php for writing' );
+
+			try {
+				$done = self::_remove( $appData, $template );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
+
+			if( isset( $done['error'] ) === false )
+				foreach( \Nino\Callbacks::registered( $appData, '/nino/pages/removed' ) as $callback ) {
+
+					$event = $done;
+
+					// The page is gone: a callback that throws does not undo it and does not keep the others from hearing of it. A
+					// \Nino\Failure ends the request, as it does everywhere
+					try {
+						call_user_func_array( $callback, [ &$appData, &$event ] );
+					} catch( \Nino\Failure $failure ) {
+						throw $failure;
+					} catch( \Throwable $error ) {
+						trigger_error( 'Pages: a callback of "/nino/pages/removed" threw '. $error::class. ': '. $error->getMessage(), E_USER_WARNING );
+					}
+				}
+
+			return $done;
+		}
+
+		/**
+		 *	What remove() would do, asked and not done: whether the page of a template may go at all - the refusals are remove()'s,
+		 *	with the same codes - and, where it may, what it would keep and what links to it. A panel asks it before it asks a person
+		 *	whether the page is to go. Nothing is written and no lock is taken: the answer is the state of the files as it is read,
+		 *	and remove() decides again under the lock.
+		 *
+		 *	The answer is [ 'template' => its name, 'uri' => the Element-URI, '' for a leftover, 'routes' => the route keys, 'remnant'
+		 *	=> whether it is a leftover, 'kept' => [ [ 'key' => a text, a slot or a detail of the page that something else reads and
+		 *	that stays, 'by' => [ who reads it ] ], ... ], 'linked' => [ [ 'by' => who links to the page with page:<uri>, 'key' => the
+		 *	key of the text that holds the link, '' where a template or a route does ], ... ], 'removable' => true ] - or [ 'error' =>
+		 *	... ] as remove() answers a refusal.
+		 *
+		 *	Who reads a key: a fill, a source or the value of an attribute of a call in a template of templates/ or in the body of a
+		 *	route, as \Nino\Markup reads it - a comment and the free text of a template read nothing -, and the value of a text of any
+		 *	language or of global.php, where a pattern finds the key. A link is the same: page:<uri>, followed by nothing that goes on a
+		 *	path.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			The name of the template of the page, eg. 'page-news'
+		 *
+		 *	@return 	array										See above
+		 */
+		public static function uses( array &$appData, string $template ): array {
+
+			$plan = self::_uses( $appData, $template );
+
+			if( isset( $plan['error'] ) === true )
+				return $plan;
+
+			return [ 'template' => $plan['template'], 'uri' => $plan['uri'], 'routes' => $plan['keys'], 'remnant' => $plan['remnant'], 'kept' => $plan['kept'], 'linked' => $plan['linked'], 'removable' => true ];
+		}
+
+		/**
+		 *	Make a new page whose template is a copy of the one of another: put() with the source of the copy, and in the same
+		 *	step, under the same lock and with the same giving back, the words and the pictures that go with it. $page is the page
+		 *	as put() takes it - the Element-URI, the addresses, the name and the title of each language, the menus - with the name
+		 *	of the new template in 'template'; a 'source' and an 'originalUri' in it are not read. The refusals are put()'s, and the
+		 *	new template's name is held to the same rules as the name of one put() makes.
+		 *
+		 *	What is copied. The source of the template, with every key of the namespace of the original - the text
+		 *	/template/<template>/... of an absolute source, a fill or a fixed attribute - written for the new template. The ids stay
+		 *	as they are: a key of a call that is written ~name is the key of the template it stands in, so the copy reads its own
+		 *	words with no change, and an id is the scope of one template and nobody's else. Every text of that namespace in every
+		 *	language, of global.php too, as the text of the copy - with its format and limit from meta.php. Every picture slot of the
+		 *	namespace as a slot of the copy, with its label, size and alt texts, and its file as a file of its own under the name of
+		 *	the new slot, so that removing the one never touches the other; a slot whose file is gone has none in the copy, and a
+		 *	slot that stands for a picture of the kernel (a placeholder) is that placeholder again.
+		 *
+		 *	What is not copied. A source that is not in the namespace stays what it is, a reference: a text of /template/common or of
+		 *	/project, a slot of another page, an element or a list of elements ([elements /services]) - the copy shows the same
+		 *	ones. The name, title, description and address of the page are the caller's, and so are the menus. A fill or a link in
+		 *	free html that names the original page by its address stays as written, and so does the text of a key outside the
+		 *	namespace that the source reads. The entries of the blacklist and the last state a feature keeps of the original
+		 *	(the Builder's) are not copied. A namespace that has a text, a meta entry, a slot or a picture file under the new name
+		 *	already is refused (routes_namespace_taken, 409): what is there is nobody's to overwrite.
+		 *
+		 *	The answer is that of put() with 'copied' => [ 'texts' => the keys, 'slots' => the slots, 'files' => the picture files ].
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			The template to copy, eg. 'page-news'
+		 *	@param		array 		$page					The new page, see put()
+		 *
+		 *	@return 	array										The page that was written, or its error
+		 */
+		public static function duplicate( array &$appData, string $template, array $page ): array {
+
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+				return self::_refuse( 500, 'could not lock config.php for writing' );
+
+			try {
+				return self::_duplicate( $appData, $template, $page );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
+		}
+
+		/**
 		 *	The pages of the site, one entry for each Element-URI: the routes of one page are one entry, whatever their number,
 		 *	and several pages may draw the same template - a caller that wants a template once groups the entries by 'template'.
 		 *	The pages a module or feature routes at runtime and no config.php has (the imprint and the privacy policy of
@@ -431,10 +596,11 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$page					See put()
+		 *	@param		array 		$extra				What duplicate() writes in the same step: 'texts' => file => the keys to merge into it, 'slots' => uri => slot, 'files' => filename below /images/ => bytes
 		 *
 		 *	@return 	array
 		 */
-		private static function _put( array &$appData, array $page ): array {
+		private static function _put( array &$appData, array $page, array $extra = [] ): array {
 
 			$rawUri 			= is_string( $page['uri'] ?? null ) === true ? $page['uri'] : '';
 			$originalUri 	= is_string( $page['originalUri'] ?? null ) === true ? $page['originalUri'] : '';
@@ -532,6 +698,10 @@ namespace Nino {
 				if( \Nino\Filesystem::fileExists( $appData, '/templates/'. $template. '.tpl' ) === true || in_array( $template, array_map( 'strtolower', self::templates( $appData ) ), true ) === true )
 					return self::_refuse( 409, 'template already exists: "'. $template. '"', 'routes_template_exists', [ $template ], 'template' );
 
+				// A page that was taken away leaves nothing a new one of that name would find
+				if( self::_leftovers( $appData, $template ) === true )
+					return self::_refuse( 409, 'there is something of an earlier page under "/template/'. $template. '/" already', 'routes_namespace_taken', [ $template ], 'template' );
+
 				if( strlen( $source ) > \Nino\Modules\Template::MAX_BYTES )
 					return self::_refuse( 400, 'template source is larger than '. \Nino\Modules\Template::MAX_BYTES. ' bytes', 'routes_template_too_large', [ \Nino\Modules\Template::MAX_BYTES ], 'source' );
 
@@ -603,9 +773,12 @@ namespace Nino {
 
 			$fragments['/text/global.php'] = [ '[[/_nino/webpage'. $uri. '/uri]]' => $global ];
 
+			foreach( $extra['texts'] ?? [] as $path => $keys )
+				$fragments[$path] = array_merge( $fragments[$path] ?? [], $keys );
+
 			$routes = self::_putRoute( $routes, $previousKeys, $put );
 
-			return self::_write( $appData, $routes, $fragments, $uri, $template, $source, array_keys( $put ) );
+			return self::_write( $appData, $routes, $fragments, $uri, $template, $source, array_keys( $put ), $extra['slots'] ?? [], $extra['files'] ?? [] );
 		}
 
 		/**
@@ -624,10 +797,12 @@ namespace Nino {
 		 *	@param		string		$template			The name of the template of the page, '' where its body is a hand-written one
 		 *	@param		string|null	$source			The source of the template to make, null for none
 		 *	@param		array 		$keys					The route keys of the page
+		 *	@param		array 		$slots				Uri => slot: the picture slots that are written into config.php with the routes, in the one write
+		 *	@param		array 		$files				Filename below /images/ => bytes: the files of those slots, made before the routes and removed again where a write fails
 		 *
 		 *	@return 	array										See put()
 		 */
-		private static function _write( array &$appData, array $routes, array $fragments, string $uri, string $template, ?string $source, array $keys ): array {
+		private static function _write( array &$appData, array $routes, array $fragments, string $uri, string $template, ?string $source, array $keys, array $slots = [], array $files = [] ): array {
 
 			$file 		= '/templates/'. $template. '.tpl';
 			$listed 	= '/_nino/webpage'. $uri. '/uri';
@@ -635,6 +810,7 @@ namespace Nino {
 			$changed 	= [];
 			$made 		= false;
 			$fail 		= null;
+			$pictures = [];
 
 			if( $source !== null ) {
 
@@ -690,29 +866,1133 @@ namespace Nino {
 					$changed[$blacklist] = $seen;
 			}
 
+			// The files of the pictures a copy has, new names that nobody holds: they are there before the slots that name them
+			if( $fail === null )
+				foreach( $files as $name => $bytes ) {
+
+					if( \Nino\Images::restore( $appData, (string) $name, (string) $bytes ) === false ) {
+						$fail = 'could not write the picture '. $name;
+						break;
+					}
+
+					$pictures[] = (string) $name;
+				}
+
 			if( $fail === null ) {
 
-				if( \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $routes ): array {
+				if( \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $routes, $slots ): array {
+
 					$content['/nino/http/routes'] = $routes;
+
+					if( $slots !== [] )
+						$content['/nino/html/images'] = array_merge( is_array( $content['/nino/html/images'] ?? null ) === true ? $content['/nino/html/images'] : [], $slots );
+
 					return $content;
 				} ) === false )
 					$fail = 'could not write config.php';
-				else
+				else {
 					$appData['/nino/http/routes'] = $routes;
+
+					if( $slots !== [] )
+						$appData['/nino/html/images'] = array_merge( is_array( $appData['/nino/html/images'] ?? null ) === true ? $appData['/nino/html/images'] : [], $slots );
+				}
 			}
 
 			if( $fail === null )
 				return [ 'uri' => $uri, 'routes' => $keys, 'template' => $template, 'created' => $source !== null ];
 
+			foreach( $pictures as $name ) {
+				\Nino\Images::delete( $appData, $name );
+				self::_prune( $appData, $name );
+			}
+
+			$lost = [];
+
 			foreach( $changed as $path => $seen )
-				self::_giveBack( $appData, $path, $seen, $fragments[$path] ?? [ $listed ], $path === $blacklist );
+				if( self::_giveBack( $appData, $path, $seen, $fragments[$path] ?? [ $listed ], $path === $blacklist ) === false )
+					$lost[] = $path;
 
 			if( $made === true && self::_bytes( $appData, $file ) === $source ) {
-				@unlink( \Nino\Filesystem::path( $appData, $file ) );
+
+				if( @unlink( \Nino\Filesystem::path( $appData, $file ) ) === false )
+					$lost[] = $file;
+
 				unset( $appData['./nino/filesystem/cache'][$file] );
 			}
 
+			// What could not be given back is said: the answer names it, and the log does
+			if( $lost !== [] ) {
+
+				trigger_error( 'Pages: writing the page "'. $uri. '" failed ('. $fail. ') and '. implode( ', ', $lost ). ' could not be given back', E_USER_WARNING );
+				$answer = self::_refuse( 500, $fail, 'routes_unrestored', [ implode( ', ', $lost ) ] );
+				$answer['error']['unrestored'] = $lost;
+
+				return $answer;
+			}
+
 			return self::_refuse( 500, $fail );
+		}
+
+		/**
+		 *	What removing a template would take, keep and leave a link to, and whether it may go at all: the checks of remove() and
+		 *	the plan it follows, with nothing written
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			See remove()
+		 *
+		 *	@return 	array										The plan, or [ 'error' => ... ]
+		 */
+		private static function _uses( array &$appData, string $template ): array {
+
+			if( strlen( $template ) > self::MAX_NAME || preg_match( self::TEMPLATE, $template ) !== 1 )
+				return self::_refuse( 400, 'invalid template: "'. $template. '"', 'routes_invalid_template', [ $template ], 'template' );
+
+			// What the request read of the files before the lock may be older than the files
+			unset( $appData['./nino/filesystem/cache'] );
+
+			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$routes = is_array( $config['/nino/http/routes'] ?? null ) === true ? $config['/nino/http/routes'] : [];
+			$images = is_array( $config['/nino/html/images'] ?? null ) === true ? $config['/nino/html/images'] : [];
+			$pages 	= [];
+
+			foreach( self::blocks( $routes ) as $block )
+				if( self::templateOf( (string) ( $routes[ $block['keys'][0] ]['body'] ?? '' ) ) === $template )
+					$pages[] = $block;
+
+			// A page the site asks for at every request: a template the kernel draws, or a route a module or a feature makes that
+			// draws this one
+			$asked = in_array( $template, self::reserved(), true ) === true;
+
+			foreach( self::runtime( $appData ) as $route )
+				if( preg_match( '#^\[template /templates/'. preg_quote( $template, '#' ). '(?![A-Za-z0-9-])#i', trim( (string) ( $route['body'] ?? '' ) ) ) === 1 )
+					$asked = true;
+
+			if( $asked === true )
+				return self::_refuse( 409, 'the page of the template "'. $template. '" is one the site asks for by itself', 'routes_remove_runtime', [ $template ], 'template' );
+
+			if( self::_alias( $appData, $template ) === true )
+				return self::_refuse( 409, 'the template "'. $template. '" is a link or has a twin that differs in case only', 'routes_template_alias', [ $template ], 'template' );
+
+			$namespace = '/template/'. $template. '/';
+			$locales 	 = \Nino\Locales::getTextLocales( $appData );
+			$remnant 	 = false;
+			$dir 			 = \Nino\Filesystem::path( $appData, '/images/template/'. $template );
+			$dirFiles  = [];
+
+			// The files below the folder of the namespace: they are the page's by their path
+			if( is_dir( $dir ) === true )
+				foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+					if( $file->isFile() === true && $file->isLink() === false )
+						$dirFiles[] = 'template/'. $template. substr( $file->getPathname(), strlen( $dir ) );
+
+			// No page draws it: what is left of one - a template, words, slots or pictures under its name, after a run that was cut off
+			// - is taken away like a page, with no routes
+			if( $pages === [] ) {
+
+				$remnant = \Nino\Filesystem::fileExists( $appData, '/templates/'. $template. '.tpl' ) === true || $dirFiles !== []
+					|| array_filter( array_keys( $images ), static fn( mixed $slot ): bool => is_string( $slot ) === true && str_starts_with( $slot, $namespace ) === true ) !== []
+					|| \Nino\Text::values( $appData, '/template/'. $template ) !== [];
+
+				if( $remnant === false )
+					return self::_refuse( 404, 'no page draws the template "'. $template. '"', 'routes_unknown_page', [ $template ], 'template' );
+			}
+
+			foreach( $pages as $block ) {
+
+				if( in_array( 'GET://', $block['keys'], true ) === true )
+					return self::_refuse( 409, 'the page "'. $block['uri']. '" answers the address "/"', 'routes_remove_home', [ $block['uri'] ], 'template' );
+
+				if( in_array( 'GET://404', $block['keys'], true ) === true || $block['uri'] === '/404' )
+					return self::_refuse( 409, 'the page "'. $block['uri']. '" answers the addresses that have no page', 'routes_remove_not_found', [ $block['uri'] ], 'template' );
+			}
+
+			if( count( $pages ) > 1 )
+				return self::_refuse( 409, 'more than one page draws the template "'. $template. '"', 'routes_remove_shared', [ $template, implode( ', ', array_column( $pages, 'uri' ) ) ], 'template' );
+
+			$uri 	= $pages[0]['uri'] ?? '';
+			$keys = $pages[0]['keys'] ?? [];
+			$read = self::_sources( $appData, $template, $keys, $routes );
+			$by 	= self::_readers( $read, '#/templates/'. preg_quote( $template, '#' ). '(?![A-Za-z0-9-])#i' );
+
+			if( $by !== [] )
+				return self::_refuse( 409, 'the template "'. $template. '" is named by '. $by[0], 'routes_remove_included', [ $template, $by[0] ], 'template' );
+
+			// What is the page's: its namespace, and the four details of its Element-URI unless a route that runs only at runtime has
+			// the same one. The details of a leftover whose page nobody knows are those of the two Element-URIs a page of that name
+			// has by the rule of the pages the workbench makes, where no route answers for it
+			$details = [];
+			$uris 	 = [];
+
+			if( $uri !== '' )
+				$uris[] = $uri;
+			else if( $remnant === true )
+				foreach( [ '/'. substr( $template, 5 ), '/site-'. substr( $template, 5 ) ] as $guess )
+					if( self::keys( $routes, $guess ) === [] && self::keys( $appData['/nino/http/routes'] ?? [], $guess ) === [] )
+						$uris[] = $guess;
+
+			foreach( $uris as $one )
+				if( in_array( $one, array_column( self::blocks( self::runtime( $appData ) ), 'uri' ), true ) === false )
+					foreach( [ 'name', 'title', 'description', 'uri' ] as $field )
+						$details['/_nino/webpage'. $one. '/'. $field] = true;
+
+			$own = static fn( string $key ): bool => str_starts_with( $key, $namespace ) === true || isset( $details[$key] ) === true;
+
+			// What is read: the keys of the page and its details that a template, a route or the value of a text names - in a fill, a
+			// source or an attribute of a call, where the source is a template, and by a pattern in a text - stay, and who reads them is
+			// told. What links to the page with page:<uri> is told as well and does not hold it: a link to a page that is gone is drawn
+			// without a target
+			$readKeys = [];
+			$linked 	= [];
+			$keyPattern 	= '#(?<![A-Za-z0-9_./-])(/template/'. preg_quote( $template, '#' ). '(?:/[a-z0-9][a-z0-9_-]*)+)#';
+			$pagePattern = $uri === '' ? null : '#(?<![A-Za-z0-9_-])page:'. preg_quote( $uri, '#' ). '(?![A-Za-z0-9_./-])#';
+			$detailPattern = $details === [] ? null : '#(?<![A-Za-z0-9_./-])('. implode( '|', array_map( static fn( string $key ): string => preg_quote( $key, '#' ), array_keys( $details ) ) ). ')(?![A-Za-z0-9_-])#';
+			$address = '/_nino/webpage'. $uri. '/uri';
+			$scan = static function( string $name, string $key, array $strings ) use ( $keyPattern, $pagePattern, $detailPattern, $address, &$readKeys, &$linked ): void {
+
+				foreach( $strings as $string ) {
+
+					foreach( array_filter( [ $keyPattern, $detailPattern ] ) as $pattern )
+						if( preg_match_all( $pattern, $string, $found ) > 0 )
+							foreach( $found[1] as $read ) {
+
+								$readKeys[$read][$name] = true;
+
+								// The address of the page stays as a text and leads to no page: whoever reads it links to the page
+								if( $read === $address )
+									$linked[$name. "\0". $key] = [ 'by' => $name, 'key' => $key ];
+							}
+
+					if( $pagePattern !== null && preg_match( $pagePattern, $string ) === 1 )
+						$linked[$name. "\0". $key] = [ 'by' => $name, 'key' => $key ];
+				}
+			};
+
+			foreach( $read as $name => $bytes )
+				$scan( (string) $name, '', self::_marks( $appData, (string) $bytes ) );
+
+			$contents = [];
+
+			foreach( array_merge( array_map( static fn( string $locale ): string => '/text/'. $locale. '.php', $locales ), [ '/text/global.php' ] ) as $path ) {
+
+				$contents[$path] = \Nino\Filesystem::getFileContent( $appData, $path, [] );
+				$label 					 = basename( $path, '.php' );
+
+				foreach( is_array( $contents[$path] ) === true ? $contents[$path] : [] as $key => $value )
+					if( is_string( $key ) === true && is_string( $value ) === true && str_starts_with( $key, '[[' ) === true && str_ends_with( $key, ']]' ) === true && $own( substr( $key, 2, -2 ) ) === false )
+						$scan( substr( $key, 2, -2 ). ' ('. $label. ')', substr( $key, 2, -2 ), [ $value ] );
+			}
+
+			// A text of the page that stays because it is read is a reader itself: what it names of the page stays with it, and
+			// so on until nothing more is found - a text that is kept never shows a key that went
+			$followed = [];
+
+			do {
+
+				$more = false;
+
+				foreach( $contents as $path => $content )
+					foreach( is_array( $content ) === true ? $content : [] as $key => $value ) {
+
+						if( is_string( $key ) !== true || is_string( $value ) !== true || str_starts_with( $key, '[[' ) !== true || str_ends_with( $key, ']]' ) !== true )
+							continue;
+
+						$bare = substr( $key, 2, -2 );
+
+						if( $own( $bare ) !== true || isset( $readKeys[$bare] ) !== true || isset( $followed[$path. "\0". $bare] ) === true )
+							continue;
+
+						$followed[$path. "\0". $bare] = true;
+						$more = true;
+						$scan( $bare. ' ('. basename( $path, '.php' ). ')', $bare, [ $value ] );
+					}
+
+			} while( $more === true );
+
+			$owns  = static fn( string $key ): bool => $own( $key ) === true && isset( $readKeys[$key] ) === false;
+			$slots = array_values( array_filter( array_keys( $images ), static fn( mixed $slot ): bool => is_string( $slot ) === true && $owns( $slot ) === true ) );
+			$files = [];
+
+			foreach( $slots as $slot )
+				if( is_string( $images[$slot]['filename'] ?? null ) === true && str_starts_with( $images[$slot]['filename'], ltrim( $slot, '/' ). '.' ) === true
+					&& str_contains( $images[$slot]['filename'], '..' ) === false && preg_match( '/[\x00-\x1F\x7F]/', $images[$slot]['filename'] ) !== 1 )
+					$files[ $images[$slot]['filename'] ] = $slot;
+
+			foreach( $dirFiles as $name )
+				$files[$name] ??= '';
+
+			// The keys that go, counted once whatever the languages; the ones that stay because they are read
+			$texts = [];
+			$kept  = [];
+			$paths = [];
+
+			foreach( $contents as $path => $content )
+				foreach( is_array( $content ) === true ? array_keys( $content ) : [] as $key )
+					if( is_string( $key ) === true && str_starts_with( $key, '[[' ) === true && str_ends_with( $key, ']]' ) === true && $own( substr( $key, 2, -2 ) ) === true ) {
+
+						if( $owns( substr( $key, 2, -2 ) ) === true ) {
+							$texts[ substr( $key, 2, -2 ) ] = true;
+							$paths[$path] = true;
+						} else
+							$kept[ substr( $key, 2, -2 ) ] = true;
+					}
+
+			foreach( array_keys( $images ) as $slot )
+				if( is_string( $slot ) === true && $own( $slot ) === true && $owns( $slot ) === false )
+					$kept[$slot] = true;
+
+			ksort( $kept );
+			ksort( $linked );
+
+			return [
+				'template' => $template, 'uri' => $uri, 'keys' => $keys, 'slots' => $slots, 'files' => $files, 'owns' => $owns, 'paths' => array_keys( $paths ), 'texts' => count( $texts ), 'remnant' => $remnant,
+				'kept' => array_map( static fn( string $key ): array => [ 'key' => $key, 'by' => array_keys( $readKeys[$key] ) ], array_keys( $kept ) ), 'linked' => array_values( $linked ),
+			];
+		}
+
+		/**
+		 *	remove() under the lock: the plan, then the writes, each given back where a later one fails
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			See remove()
+		 *
+		 *	@return 	array										See remove()
+		 */
+		private static function _remove( array &$appData, string $template ): array {
+
+			$plan = self::_uses( $appData, $template );
+
+			if( isset( $plan['error'] ) === true )
+				return $plan;
+
+			[ 'uri' => $uri, 'keys' => $keys, 'slots' => $slots, 'files' => $files, 'owns' => $owns, 'paths' => $paths, 'remnant' => $remnant ] = $plan;
+
+			$journal = [];
+			$fail 	= null;
+
+			try {
+
+				// The routes and the slots, with the page's own memberships: one write, the first - from then on no visitor is sent to
+				// the page. The lock of config.php is held through it and to the end, so nobody can put a route on the template meanwhile
+				if( self::_edit( $appData, $journal, '/config.php', static function( array $state ) use ( $keys, $slots, $uri ): array {
+
+					foreach( $keys as $routeKey )
+						unset( $state['/nino/http/routes'][$routeKey] );
+
+					foreach( $slots as $slot )
+						unset( $state['/nino/html/images'][$slot] );
+
+					if( $uri !== '' )
+						unset( $state['/nino/html/navroutes'][$uri] );
+
+					// A key that holds nothing is what the kernel has without it (AppData::DEFAULTS): config.php keeps what the
+					// project decided
+					foreach( [ '/nino/http/routes', '/nino/html/images', '/nino/html/navroutes' ] as $key )
+						if( ( $state[$key] ?? null ) === [] )
+							unset( $state[$key] );
+
+					return $state;
+				} ) === false )
+					$fail = 'could not write config.php';
+
+				foreach( $fail === null ? $paths : [] as $path )
+					if( self::_edit( $appData, $journal, $path, static function( array $state ) use ( $owns ): ?array {
+
+						$out = array_filter( $state, static fn( mixed $key ): bool => is_string( $key ) === false || str_starts_with( $key, '[[' ) === false || str_ends_with( $key, ']]' ) === false || $owns( substr( $key, 2, -2 ) ) === false, ARRAY_FILTER_USE_KEY );
+
+						return count( $out ) === count( $state ) ? null : $out;
+					}, $path === '/text/global.php' ) === false ) {
+						$fail = 'could not write '. $path;
+						break;
+					}
+
+				// What the keys had in meta.php, and the blacklist's entries for them
+				foreach( $fail === null ? [ \Nino\Text::META_PATH, '/text/blacklist.php' ] : [] as $path )
+					if( self::_edit( $appData, $journal, $path, static function( array $state ) use ( $owns, $path ): ?array {
+
+						$list = $path !== \Nino\Text::META_PATH;
+						$out 	= array_filter( $state, static fn( mixed $value, mixed $key ): bool => $owns( (string) ( $list === true ? $value : $key ) ) === false, ARRAY_FILTER_USE_BOTH );
+
+						return count( $out ) === count( $state ) ? null : ( $list === true ? array_values( $out ) : $out );
+					}, true ) === false ) {
+						$fail = 'could not write '. $path;
+						break;
+					}
+
+				// The template: the last that can be given back, and the one that is given back from its bytes
+				if( $fail === null ) {
+
+					$file = '/templates/'. $template. '.tpl';
+					$real = \Nino\Filesystem::path( $appData, $file );
+
+					if( file_exists( $real ) === true || is_link( $real ) === true ) {
+
+						$entry = [ 'before' => self::_fileBytes( $real ), 'after' => null, 'mode' => @fileperms( $real ) ];
+
+						if( @unlink( $real ) === false )
+							$fail = 'could not remove '. $file;
+						else
+							$journal[$file] = $entry;
+
+						self::_forget( $appData, $file );
+					}
+				}
+			} catch( \Throwable $e ) {
+
+				self::_undo( $appData, $journal );
+
+				throw $e;
+			}
+
+			if( $fail !== null ) {
+
+				$lost 	= self::_undo( $appData, $journal );
+				$answer = self::_refuse( 500, $fail );
+
+				if( $lost !== [] ) {
+
+					trigger_error( 'Pages: removing the template "'. $template. '" failed and could not give back '. implode( ', ', $lost ), E_USER_WARNING );
+					$answer = self::_refuse( 500, $fail, 'routes_unrestored', [ implode( ', ', $lost ) ] );
+					$answer['error']['unrestored'] = $lost;
+				}
+
+				return $answer;
+			}
+
+			foreach( $keys as $routeKey )
+				unset( $appData['/nino/http/routes'][$routeKey] );
+
+			foreach( $slots as $slot )
+				unset( $appData['/nino/html/images'][$slot] );
+
+			if( $uri !== '' )
+				unset( $appData['/nino/html/navroutes'][$uri] );
+
+			// The files of the pictures, last: the slots are written without them, and what a slot that is left names stays. The
+			// check reads config.php as it is now, which says more than the app data of a request that began before the write
+			$held = [];
+
+			foreach( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] as $slot )
+				if( is_array( $slot ) === true && is_string( $slot['filename'] ?? null ) === true )
+					$held[ $slot['filename'] ] = true;
+
+			$removed = [];
+
+			foreach( array_keys( $files ) as $name )
+				if( isset( $held[$name] ) === false && \Nino\Images::deleteUnlessShared( $appData, $name ) === true && is_file( \Nino\Filesystem::path( $appData, '/images/'. $name ) ) === false ) {
+					$removed[] = $name;
+					self::_prune( $appData, $name );
+				}
+
+			return [ 'template' => $template, 'uri' => $uri, 'routes' => $keys, 'texts' => $plan['texts'], 'slots' => $slots, 'files' => $removed, 'kept' => $plan['kept'], 'linked' => $plan['linked'], 'remnant' => $remnant ];
+		}
+
+		/**
+		 *	Whether a template is no file of its own name: a link to another file, or one of two whose names differ in case only,
+		 *	which a file system that folds case holds as one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			The name of the template
+		 *
+		 *	@return 	bool
+		 */
+		private static function _alias( array &$appData, string $template ): bool {
+
+			if( is_link( \Nino\Filesystem::path( $appData, '/templates/'. $template. '.tpl' ) ) === true )
+				return true;
+
+			foreach( self::templates( $appData ) as $name )
+				if( $name !== $template && strtolower( $name ) === strtolower( $template ) )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	What else draws or reads in the project: the bodies of the routes that are not the page's own, and every template below
+		 *	templates/ but its own file. A link that leads to the file of the template is named as the template it is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$template			The name of the template, eg. 'page-news'
+		 *	@param		array 		$own					The route keys that are the page's own
+		 *	@param		array 		$stored				The stored routes
+		 *
+		 *	@return 	array										Name (a route key or a file of templates/) => its bytes; a link to the template itself holds its name as the bytes
+		 */
+		private static function _sources( array &$appData, string $template, array $own, array $stored ): array {
+
+			$found = [];
+
+			foreach( [ $stored, $appData['/nino/http/routes'] ?? [] ] as $routes )
+				foreach( $routes as $routeKey => $route )
+					if( in_array( (string) $routeKey, $own, true ) === false && is_array( $route ) === true && is_string( $route['body'] ?? null ) === true )
+						$found[(string) $routeKey] = $route['body'];
+
+			$root = \Nino\Filesystem::path( $appData, '/templates' );
+
+			if( is_dir( $root ) === false )
+				return $found;
+
+			$self = realpath( $root. '/'. $template. '.tpl' );
+
+			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ) ) as $file ) {
+
+				if( $file->isFile() === false || $file->getExtension() !== 'tpl' || $file->getPathname() === $root. '/'. $template. '.tpl' )
+					continue;
+
+				$name = substr( $file->getPathname(), strlen( $root ) + 1 );
+
+				// A link to the file is the template under another name
+				if( $self !== false && $file->isLink() === true && realpath( $file->getPathname() ) === $self ) {
+					$found[$name] = '/templates/'. $template;
+					continue;
+				}
+
+				$bytes = @file_get_contents( $file->getPathname() );
+
+				if( $bytes !== false )
+					$found[$name] = $bytes;
+			}
+
+			return $found;
+		}
+
+		/**
+		 *	Which of the sources match a pattern
+		 *
+		 *	@param		array 		$sources			See _sources()
+		 *	@param		string		$pattern
+		 *
+		 *	@return 	array										The names
+		 */
+		private static function _readers( array $sources, string $pattern ): array {
+
+			$names = [];
+
+			foreach( $sources as $name => $bytes )
+				if( preg_match( $pattern, (string) $bytes ) === 1 )
+					$names[] = (string) $name;
+
+			return $names;
+		}
+
+		/**
+		 *	One write of remove(): a file of the project changed under its own lock, with what is needed to give it back noted - what
+		 *	this call took out and where it stood, and nothing else. config.php is written under the lock the caller holds and keeps
+		 *	it: Filesystem::mutate() lets the lock go with the write, and a window there is where another page could be put on the
+		 *	template that is about to go
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$journal			(reference) Virtual path => what _undo() needs: 'before' and 'after' (the bytes, null for no file), 'mode', 'removed' and 'order'
+		 *	@param		string		$path					A virtual path of a .php file
+		 *	@param		callable	$change				function( array $state ): ?array - the new content, null where there is nothing to change
+		 *	@param		bool			$dropEmpty		Whether a file that holds nothing after the change is no file: global.php, meta.php and the blacklist are none while they are empty, a file of a language is a language
+		 *
+		 *	@return 	bool										False where the file could not be written - a file with nothing to change is none
+		 */
+		private static function _edit( array &$appData, array &$journal, string $path, callable $change, bool $dropEmpty = false ): bool {
+
+			$real 		= \Nino\Filesystem::path( $appData, $path );
+			$entry 		= null;
+			$nothing 	= false;
+			$held 		= $path === '/config.php';
+
+			$apply = function( mixed $state ) use ( $change, $real, &$entry, &$nothing ): ?array {
+
+				$state = is_array( $state ) === true ? $state : [];
+				$new 	 = $change( $state );
+
+				if( $new === null ) {
+					$nothing = true;
+					return null;
+				}
+
+				// The bytes putFileContent() writes of an array: what the file holds when this is written, and what is compared to it
+				$entry = [ 'before' => self::_fileBytes( $real ), 'after' => '<?php return '. var_export( $new, true ). ';', 'mode' => @fileperms( $real ) ] + self::_taken( $state, $new );
+
+				return $new;
+			};
+
+			if( $held === true ) {
+
+				unset( $appData['./nino/filesystem/cache'][$path] );
+
+				$new = $apply( \Nino\Filesystem::getFileContent( $appData, $path, [] ) );
+
+				if( $new === null )
+					return true;
+
+				$written = self::_replace( $real, $entry['after'], $entry['mode'] );
+
+				self::_forget( $appData, $path );
+
+			} else
+				$written = \Nino\Filesystem::mutate( $appData, $path, $apply );
+
+			if( $written === true ) {
+
+				// Taken away only while it holds what was written: a writer that came in between has put its own in
+				if( $dropEmpty === true && $entry['after'] === '<?php return '. var_export( [], true ). ';' && self::_fileBytes( $real ) === $entry['after'] && @unlink( $real ) === true ) {
+					$entry['after'] = null;
+					self::_forget( $appData, $path );
+				}
+
+				$journal[$path] = $entry;
+			}
+
+			return $written === true || $nothing === true;
+		}
+
+		/**
+		 *	What a change took out of a file's content, and the order the content stood in: all that giving it back may put in again
+		 *
+		 *	@param		array 		$state				The content before
+		 *	@param		array 		$new					The content after
+		 *
+		 *	@return 	array										[ 'removed' => ..., 'order' => ... ]: a list, a map or - for config.php - a map of the three keys that are written
+		 */
+		private static function _taken( array $state, array $new ): array {
+
+			if( array_key_exists( '/nino/http/routes', $state ) === true || array_key_exists( '/nino/html/images', $state ) === true ) {
+
+				$removed = [];
+				$order 	 = [];
+
+				foreach( [ '/nino/http/routes', '/nino/html/images', '/nino/html/navroutes' ] as $key ) {
+
+					$was = is_array( $state[$key] ?? null ) === true ? $state[$key] : [];
+					$now = is_array( $new[$key] ?? null ) === true ? $new[$key] : [];
+
+					$removed[$key] = array_diff_key( $was, $now );
+					$order[$key] 	 = array_keys( $was );
+				}
+
+				return [ 'removed' => $removed, 'order' => $order, 'kind' => 'config' ];
+			}
+
+			if( array_is_list( $state ) === true )
+				return [ 'removed' => array_values( array_filter( $state, static fn( mixed $value ): bool => in_array( $value, $new, true ) === false ) ), 'order' => $state, 'kind' => 'list' ];
+
+			return [ 'removed' => array_diff_key( $state, $new ), 'order' => array_keys( $state ), 'kind' => 'map' ];
+		}
+
+		/**
+		 *	The content of a file that somebody else changed meanwhile, with what this call took out of it put in again where it
+		 *	stood - and nothing else: what the other writer took out stays out
+		 *
+		 *	@param		array 		$now					What the file holds
+		 *	@param		array 		$entry				See _edit()
+		 *
+		 *	@return 	array
+		 */
+		private static function _putBack( array $now, array $entry ): array {
+
+			$merge = static function( array $now, array $removed, array $order ): array {
+
+				$out = [];
+
+				foreach( $order as $key )
+					if( array_key_exists( $key, $now ) === true )
+						$out[$key] = $now[$key];
+					else if( array_key_exists( $key, $removed ) === true )
+						$out[$key] = $removed[$key];
+
+				return $out + $now;
+			};
+
+			if( $entry['kind'] === 'config' ) {
+
+				foreach( $entry['removed'] as $key => $removed )
+					if( $removed !== [] )
+						$now[$key] = $merge( is_array( $now[$key] ?? null ) === true ? $now[$key] : [], $removed, $entry['order'][$key] );
+
+				return $now;
+			}
+
+			if( $entry['kind'] === 'list' ) {
+
+				$out = [];
+
+				foreach( $entry['order'] as $value )
+					if( in_array( $value, $now, true ) === true || in_array( $value, $entry['removed'], true ) === true )
+						$out[] = $value;
+
+				return array_values( array_unique( array_merge( $out, $now ), SORT_REGULAR ) );
+			}
+
+			return $merge( $now, $entry['removed'], $entry['order'] );
+		}
+
+		/**
+		 *	Give back what remove() wrote, the last first
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$journal			See _edit()
+		 *
+		 *	@return 	array										The virtual paths that could not be given back
+		 */
+		private static function _undo( array &$appData, array $journal ): array {
+
+			$lost = [];
+
+			foreach( array_reverse( $journal, true ) as $path => $entry ) {
+
+				$path = (string) $path;
+				$real = \Nino\Filesystem::path( $appData, $path );
+
+				if( \Nino\Filesystem::lockFile( $appData, $path ) === false ) {
+					$lost[] = $path;
+					continue;
+				}
+
+				try {
+
+					// What this call wrote is still there: the file has the bytes it had. Anything else was written by another
+					// writer since, whose keys stay, and only what this call took out is put in again
+					if( self::_fileBytes( $real ) === $entry['after'] ) {
+
+						if( $entry['before'] === null )
+							$done = @unlink( $real );
+						else
+							$done = self::_replace( $real, $entry['before'], $entry['mode'] );
+
+					} else if( isset( $entry['kind'] ) === true ) {
+
+						$done = \Nino\Filesystem::mutate( $appData, $path, static function( mixed $now ) use ( $entry ): array {
+							return self::_putBack( is_array( $now ) === true ? $now : [], $entry );
+						} );
+					} else
+						$done = false;
+
+					if( $done === false )
+						$lost[] = $path;
+				} finally {
+
+					// config.php is the caller's lock to let go
+					if( $path !== '/config.php' )
+						\Nino\Filesystem::unlockFile( $appData, $path );
+				}
+
+				self::_forget( $appData, $path );
+			}
+
+			return $lost;
+		}
+
+		/**
+		 *	The bytes of a file at its real path, null for none
+		 *
+		 *	@param		string		$real
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _fileBytes( string $real ): ?string {
+
+			clearstatcache( true, $real );
+			$read = is_file( $real ) === true ? @file_get_contents( $real ) : false;
+
+			return $read === false ? null : $read;
+		}
+
+		/**
+		 *	A file put back as the bytes it had, beside it and renamed over: whole or not there, with the mode it had
+		 *
+		 *	@param		string		$real
+		 *	@param		string		$bytes
+		 *	@param		int|false	$mode
+		 *
+		 *	@return 	bool
+		 */
+		private static function _replace( string $real, string $bytes, int|false $mode ): bool {
+
+			$temp = $real. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+
+			if( @file_put_contents( $temp, $bytes ) !== strlen( $bytes ) ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			if( $mode !== false )
+				@chmod( $temp, $mode & 0777 );
+
+			if( @rename( $temp, $real ) === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			return true;
+		}
+
+		/**
+		 *	What the request has read of a file that was written outside of Filesystem, forgotten
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$path					A virtual path
+		 *
+		 *	@return 	void
+		 */
+		private static function _forget( array &$appData, string $path ): void {
+
+			unset( $appData['./nino/filesystem/cache'][$path], $appData['./nino/html/filecache'], $appData['./nino/locales/text'] );
+
+			$real = \Nino\Filesystem::path( $appData, $path );
+
+			if( function_exists( 'opcache_invalidate' ) === true && is_file( $real ) === true )
+				opcache_invalidate( $real, true );
+		}
+
+		/**
+		 *	The directories a picture file was in, taken away while they are empty and below /images/: a slot has a directory of its
+		 *	own, which holds nothing once its file is gone. rmdir() takes an empty one and nothing else
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/
+		 *
+		 *	@return 	void
+		 */
+		private static function _prune( array &$appData, string $filename ): void {
+
+			$dir = dirname( $filename );
+
+			while( $dir !== '.' && $dir !== '/' && $dir !== '' && str_contains( $dir, '..' ) === false && @rmdir( \Nino\Filesystem::path( $appData, '/images/'. $dir ) ) === true )
+				$dir = dirname( $dir );
+		}
+
+		/**
+		 *	duplicate() under the lock: what the copy reads is worked out first and handed to the one path that makes a page
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$from					The template to copy
+		 *	@param		array 		$page					See duplicate()
+		 *
+		 *	@return 	array										See duplicate()
+		 */
+		private static function _duplicate( array &$appData, string $from, array $page ): array {
+
+			$new = is_string( $page['template'] ?? null ) === true ? $page['template'] : '';
+			$is  = '/template/'. $new. '/';
+
+			if( strlen( $new ) > self::MAX_NAME || preg_match( self::TEMPLATE, $new ) !== 1 )
+				return self::_refuse( 400, 'invalid template: "'. $new. '"', 'routes_invalid_template', [ $new ], 'template' );
+
+			if( $new === $from )
+				return self::_refuse( 409, 'template already exists: "'. $new. '"', 'routes_template_exists', [ $new ], 'template' );
+
+			// What the request read of the files before the lock may be older than the files
+			unset( $appData['./nino/filesystem/cache'] );
+
+			$source = strlen( $from ) <= self::MAX_NAME && preg_match( self::TEMPLATE, $from ) === 1 && in_array( $from, self::templates( $appData ), true ) === true ? self::_bytes( $appData, '/templates/'. $from. '.tpl' ) : null;
+
+			if( $source === null )
+				return self::_refuse( 404, 'unknown template: "'. $from. '"', 'routes_unknown_template', [ $from ] );
+
+			// A link to another file, or a twin that differs in case only, is two names for one file on some file systems: not a
+			// template to copy from or to
+			if( self::_alias( $appData, $from ) === true || self::_alias( $appData, $new ) === true )
+				return self::_refuse( 409, 'the template "'. $from. '" is a link or has a twin that differs in case', 'routes_template_alias', [ $from ], 'template' );
+
+			// Pictures under the new name that no slot names - what a feature kept of a page that was removed - are in the way too
+			$leftover = \Nino\Filesystem::path( $appData, '/images/template/'. $new );
+
+			if( is_dir( $leftover ) === true && count( scandir( $leftover ) ?: [] ) > 2 )
+				return self::_refuse( 409, 'there are pictures under "'. $is. '" already', 'routes_namespace_taken', [ $new ], 'template' );
+
+			$was 		= '/template/'. $from. '/';
+			$meta 	= \Nino\Text::meta( $appData );
+			$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$images = is_array( $config['/nino/html/images'] ?? null ) === true ? $config['/nino/html/images'] : [];
+
+			// The words, in every language that has a file and in global.php: each key of the namespace as a key of the copy, with the
+			// text it has. Under the new namespace there is nothing yet, whatever a leftover of an earlier page is - it is not ours to
+			// overwrite
+			$texts = [];
+			$keys 	= [];
+
+			foreach( array_merge( array_map( static fn( string $locale ): string => '/text/'. $locale. '.php', \Nino\Locales::getTextLocales( $appData ) ), [ '/text/global.php' ] ) as $path ) {
+
+				$content = \Nino\Filesystem::getFileContent( $appData, $path, [] );
+
+				foreach( is_array( $content ) === true ? $content : [] as $key => $text ) {
+
+					if( is_string( $key ) === false || str_starts_with( $key, '[[' ) === false || str_ends_with( $key, ']]' ) === false )
+						continue;
+
+					$plain = substr( $key, 2, -2 );
+
+					if( str_starts_with( $plain, $is ) === true )
+						return self::_refuse( 409, 'the namespace "'. $is. '" is in use', 'routes_namespace_taken', [ $new ], 'template' );
+
+					if( str_starts_with( $plain, $was ) === true ) {
+						$texts[$path]['[['. $is. substr( $plain, strlen( $was ) ). ']]'] = $text;
+						$keys[$is. substr( $plain, strlen( $was ) )] = true;
+					}
+				}
+			}
+
+			foreach( $meta as $key => $entry ) {
+
+				if( str_starts_with( (string) $key, $is ) === true )
+					return self::_refuse( 409, 'the namespace "'. $is. '" is in use', 'routes_namespace_taken', [ $new ], 'template' );
+
+				if( str_starts_with( (string) $key, $was ) === true )
+					$texts[\Nino\Text::META_PATH][$is. substr( (string) $key, strlen( $was ) )] = $entry;
+			}
+
+			// The slots, and a file of its own for each of them
+			$slots = [];
+			$files = [];
+
+			foreach( $images as $uri => $slot ) {
+
+				if( is_string( $uri ) === false || is_array( $slot ) === false )
+					continue;
+
+				if( str_starts_with( $uri, $is ) === true )
+					return self::_refuse( 409, 'the namespace "'. $is. '" is in use', 'routes_namespace_taken', [ $new ], 'template' );
+
+				if( str_starts_with( $uri, $was ) === false )
+					continue;
+
+				$copy 	= $is. substr( $uri, strlen( $was ) );
+				$file 	= $slot['filename'] ?? null;
+
+				// A file below /images/ is made again under the name of the new slot - the old name with the path of the slot
+				// replaced - and a slot that has none, or none that can be read, has none; the reference of a picture of the kernel
+				// is the slot's file in the copy as well
+				if( is_string( $file ) === true && $file !== '' && str_starts_with( $file, '/' ) === false ) {
+
+					$bytes = \Nino\Images::read( $appData, $file );
+
+					if( $bytes === false )
+						$slot['filename'] = null;
+					else {
+
+						$name = ltrim( $copy, '/' ). ( str_starts_with( $file, ltrim( $uri, '/' ). '.' ) === true ? substr( $file, strlen( ltrim( $uri, '/' ) ) ) : '.'. preg_replace( '/[^A-Za-z0-9]/', '', pathinfo( $file, PATHINFO_EXTENSION ) ) );
+
+						if( is_file( \Nino\Filesystem::path( $appData, '/images/'. $name ) ) === true )
+							return self::_refuse( 409, 'the picture "'. $name. '" is there', 'routes_namespace_taken', [ $new ], 'template' );
+
+						$slot['filename'] = $name;
+						$files[$name] = $bytes;
+					}
+				}
+
+				$slots[$copy] = $slot;
+			}
+
+			// The source of the copy: what the parser reads as a fill, a source or the value of an attribute of a call and that names a
+			// key of the original's namespace names the copy's - free text, a comment and the attributes of html stay as they are.
+			// Where one page draws the original, its four details (and no detail of a page below it) and a link to it with page:<uri>
+			// are the new page's: the copy shows and links to itself
+			$old 	 = [];
+			$routes = is_array( $config['/nino/http/routes'] ?? null ) === true ? $config['/nino/http/routes'] : [];
+
+			foreach( self::blocks( $routes ) as $block )
+				if( self::templateOf( (string) ( $routes[ $block['keys'][0] ]['body'] ?? '' ) ) === $from )
+					$old[] = $block['uri'];
+
+			$uri 	 = self::normalizeUri( is_string( $page['uri'] ?? null ) === true ? $page['uri'] : '' );
+			$was_ 	= count( $old ) === 1 && $uri !== null ? $old[0] : null;
+			$change = static function( string $value ) use ( $was, $is, $was_, $uri ): string {
+
+				if( str_starts_with( $value, $was ) === true )
+					return $is. substr( $value, strlen( $was ) );
+
+				if( $was_ !== null && preg_match( '#^/_nino/webpage'. preg_quote( $was_, '#' ). '/(name|title|description|uri)$#D', $value, $field ) === 1 )
+					return '/_nino/webpage'. $uri. '/'. $field[1];
+
+				if( $was_ !== null && preg_match( '#^page:'. preg_quote( $was_, '#' ). '(?=$|[\#?])#', $value ) === 1 )
+					return 'page:'. $uri. substr( $value, 5 + strlen( $was_ ) );
+
+				return $value;
+			};
+
+			// The same in the words that are copied: a fill or a link in a text
+			$words = static function( string $text ) use ( $was, $is, $was_, $uri ): string {
+
+				$text = (string) preg_replace( '#(\[\[)'. preg_quote( $was, '#' ). '#', '$1'. $is, $text );
+
+				if( $was_ !== null ) {
+					$text = (string) preg_replace( '#\[\[/_nino/webpage'. preg_quote( $was_, '#' ). '/(name|title|description|uri)\]\]#', '[[/_nino/webpage'. addcslashes( (string) $uri, '\\$' ). '/$1]]', $text );
+					$text = (string) preg_replace( '#(?<![A-Za-z0-9_-])page:'. preg_quote( $was_, '#' ). '(?=$|[\#?"\'\s])#', 'page:'. addcslashes( (string) $uri, '\\$' ), $text );
+				}
+
+				return $text;
+			};
+
+			foreach( $texts as $path => $entries )
+				if( $path !== \Nino\Text::META_PATH )
+					foreach( $entries as $key => $text )
+						$texts[$path][$key] = is_string( $text ) === true ? $words( $text ) : $text;
+
+			$containers = \Nino\Components::containers( $appData );
+			$nodes 			= \Nino\Markup::parse( $source, $containers );
+
+			if( \Nino\Markup::write( $nodes, $containers ) !== $source )
+				return self::_refuse( 409, 'the source of "'. $from. '" is not one the parser writes back as it is', 'routes_source_unreadable', [ $from ], 'template' );
+
+			$source = \Nino\Markup::write( self::_rewrite( $nodes, $change ), $containers );
+
+			// The name the template has in the lists of the workbench is the new page's, in the language of the site
+			$name = $page['text'][ \Nino\Locales::getNativeLocale( $appData ) ]['name'] ?? null;
+
+			if( is_string( $name ) === true && trim( $name ) !== '' )
+				$source = (string) preg_replace_callback( '~\A<!--[\t ]*nino:template-name[\t ]+[^\r\n<>]+?[\t ]*-->~', static fn(): string => '<!-- nino:template-name '. trim( (string) preg_replace( '/[\r\n<>]+/', ' ', $name ) ). ' -->', $source, 1 );
+
+			$answer = self::_put( $appData, [ 'originalUri' => '', 'source' => $source ] + $page, [ 'texts' => $texts, 'slots' => $slots, 'files' => $files ] );
+
+			if( isset( $answer['error'] ) === false )
+				$answer['copied'] = [ 'texts' => count( $keys ), 'slots' => count( $slots ), 'files' => count( $files ) ];
+
+			return $answer;
+		}
+
+		/**
+		 *	The strings in a template that name something: the textfills, the sources of the calls and the values of their attributes, as
+		 *	\Nino\Markup reads them. A comment, a script and the text between the tags are none of them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$bytes				html+
+		 *
+		 *	@return 	array										The strings
+		 */
+		private static function _marks( array &$appData, string $bytes ): array {
+
+			$out 	= [];
+			$walk = null;
+			$walk = static function( array $nodes ) use ( &$walk, &$out ): void {
+
+				foreach( $nodes as $node ) {
+
+					if( isset( $node['f'] ) === true )
+						$out[] = (string) $node['f'];
+
+					if( isset( $node['n'] ) === false )
+						continue;
+
+					if( is_string( $node['s'] ?? null ) === true )
+						$out[] = $node['s'];
+
+					foreach( is_array( $node['a'] ?? null ) === true ? $node['a'] : [] as $value )
+						if( is_string( $value ) === true )
+							$out[] = $value;
+
+					if( is_array( $node['c'] ?? null ) === true )
+						$walk( $node['c'] );
+				}
+			};
+
+			$walk( \Nino\Markup::parse( $bytes, \Nino\Components::containers( $appData ) ) );
+
+			return $out;
+		}
+
+		/**
+		 *	Whether something stands under the name of a page template already: the template itself, a text of the namespace
+		 *	/template/<name>/ in any language or in global.php, an entry of meta.php, a picture slot or a picture file below
+		 *	images/template/<name>/. A page that was removed may have left what others read ('kept'), and a tool that writes the words
+		 *	of a new page before it asks put() for the page would write over them: it asks here first and takes another name.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The name of a template, eg. 'page-news'
+		 *
+		 *	@return 	bool
+		 */
+		public static function taken( array &$appData, string $name ): bool {
+
+			if( strlen( $name ) > self::MAX_NAME || preg_match( self::TEMPLATE, $name ) !== 1 )
+				return true;
+
+			if( in_array( $name, array_map( 'strtolower', self::templates( $appData ) ), true ) === true || in_array( $name, self::reserved(), true ) === true )
+				return true;
+
+			$namespace = '/template/'. $name. '/';
+
+			foreach( array_merge( array_map( static fn( string $locale ): string => '/text/'. $locale. '.php', \Nino\Locales::getTextLocales( $appData ) ), [ '/text/global.php' ] ) as $path ) {
+
+				$content = \Nino\Filesystem::getFileContent( $appData, $path, [] );
+
+				foreach( is_array( $content ) === true ? array_keys( $content ) : [] as $key )
+					if( is_string( $key ) === true && str_starts_with( $key, '[['. $namespace ) === true )
+						return true;
+			}
+
+			foreach( array_keys( \Nino\Text::meta( $appData ) ) as $key )
+				if( str_starts_with( (string) $key, $namespace ) === true )
+					return true;
+
+			foreach( array_keys( (array) ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) ) as $slot )
+				if( str_starts_with( (string) $slot, $namespace ) === true )
+					return true;
+
+			$dir = \Nino\Filesystem::path( $appData, '/images/template/'. $name );
+
+			if( is_dir( $dir ) === true )
+				foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+					if( $file->isFile() === true )
+						return true;
+
+			return false;
+		}
+
+		/**
+		 *	Whether a picture of an earlier page is left under a name: a file below images/template/<name>/ that no slot names. A tool
+		 *	that makes a page writes its words and slots before it asks put() for the page, so these are no leftover here - a copy,
+		 *	which writes all of what it has itself, asks for them as well (see _duplicate()). What a feature kept of its own is not
+		 *	the kernel's to know
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The name of a template
+		 *
+		 *	@return 	bool
+		 */
+		private static function _leftovers( array &$appData, string $name ): bool {
+
+			$dir 	= \Nino\Filesystem::path( $appData, '/images/template/'. $name );
+			$held = [];
+
+			foreach( (array) ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) as $slot )
+				if( is_array( $slot ) === true && is_string( $slot['filename'] ?? null ) === true )
+					$held[ $slot['filename'] ] = true;
+
+			if( is_dir( $dir ) === true )
+				foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+					if( $file->isFile() === true && isset( $held[ 'template/'. $name. substr( $file->getPathname(), strlen( $dir ) ) ] ) === false )
+						return true;
+
+			return false;
+		}
+
+		/**
+		 *	The nodes of a template with the keys that begin with one prefix begin with another: the textfills, the sources of the
+		 *	calls and the values of their attributes - nothing the parser reads as text
+		 *
+		 *	@param		array 		$nodes
+		 *	@param		callable	$change				function( string $value ): string - what a name is made
+		 *
+		 *	@return 	array
+		 */
+		private static function _rewrite( array $nodes, callable $change ): array {
+
+			foreach( $nodes as $at => $node ) {
+
+				if( isset( $node['f'] ) === true )
+					$nodes[$at]['f'] = $change( (string) $node['f'] );
+
+				if( isset( $node['n'] ) === false )
+					continue;
+
+				if( is_string( $node['s'] ?? null ) === true )
+					$nodes[$at]['s'] = $change( $node['s'] );
+
+				foreach( is_array( $node['a'] ?? null ) === true ? $node['a'] : [] as $name => $value )
+					if( is_string( $value ) === true )
+						$nodes[$at]['a'][$name] = $change( $value );
+
+				if( is_array( $node['c'] ?? null ) === true )
+					$nodes[$at]['c'] = self::_rewrite( $node['c'], $change );
+			}
+
+			return $nodes;
 		}
 
 		/**
@@ -795,11 +2075,11 @@ namespace Nino {
 		 *	@param		array 		$fragment			The keys the page merged into the file, or the one entry of the blacklist
 		 *	@param		bool			$list					Whether the file is the blacklist, a list of keys and no map
 		 *
-		 *	@return 	void
+		 *	@return 	bool
 		 */
-		private static function _giveBack( array &$appData, string $path, array $seen, array $fragment, bool $list ): void {
+		private static function _giveBack( array &$appData, string $path, array $seen, array $fragment, bool $list ): bool {
 
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $seen, $fragment, $list ): array {
+			$given = \Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $seen, $fragment, $list ): array {
 
 				if( $list === true )
 					return array_values( array_diff( $content, $fragment ) );
@@ -819,6 +2099,8 @@ namespace Nino {
 				@unlink( \Nino\Filesystem::path( $appData, $path ) );
 				unset( $appData['./nino/filesystem/cache'][$path], $appData['./nino/html/filecache'], $appData['./nino/locales/text'] );
 			}
+
+			return $given;
 		}
 
 		/**

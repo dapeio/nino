@@ -59,6 +59,16 @@ return [
 	'[[/_admin/error/routes_template_too_large]]'	=> 'The template is larger than %s bytes.',
 	'[[/_admin/error/routes_missing_name]]'	=> 'The name for “%s” is missing.',
 	'[[/_admin/error/routes_missing_title]]'	=> 'The title for “%s” is missing.',
+	'[[/_admin/error/routes_unknown_page]]'	=> 'No page draws the template “%s”.',
+	'[[/_admin/error/routes_remove_home]]'	=> 'The page “%s” is the start page, at the address “/”. It cannot be removed.',
+	'[[/_admin/error/routes_remove_not_found]]'	=> 'The page “%s” is the one every address without a page is answered with. It cannot be removed.',
+	'[[/_admin/error/routes_remove_runtime]]'	=> 'The page of the template “%s” is one Nino or a feature serves by itself. It cannot be removed.',
+	'[[/_admin/error/routes_remove_shared]]'	=> 'More than one page draws the template “%s”: %s. Remove the other pages first.',
+	'[[/_admin/error/routes_remove_included]]'	=> 'The template “%s” is named by “%s”, which would draw nothing without it.',
+	'[[/_admin/error/routes_namespace_taken]]'	=> 'There are words, pictures or slots under the name “%s” already.',
+	'[[/_admin/error/routes_unrestored]]'	=> 'The change failed and could not be taken back everywhere: %s. Check those files.',
+	'[[/_admin/error/routes_template_alias]]'	=> 'The template “%s” is a link or has a twin that differs in upper and lower case only.',
+	'[[/_admin/error/routes_source_unreadable]]'	=> 'The source of the template “%s” cannot be copied: it is not written back as it was read.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/routes/manual/intro]]'	=> 'A route gives a template an address. Template and route together are a page: the template is the plan, the route makes it reachable.',
