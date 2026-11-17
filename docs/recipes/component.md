@@ -219,7 +219,10 @@ What the register does for the renderer, and what it leaves to it:
 - `variants` is the list of words of the one open axis of a component:
   `'variants' => [ 'card' ]` is `variant="card"`, the class `<name>--variant-card`
   (`regular` is always there and writes none). A theme may add words through the
-  hook `/nino/components/variants`.
+  hook `/nino/components/variants`. `'labels' => [ 'card' => 'Card' ]` beside it
+  says what a tool shows for a variant (a text or a locale => text map), a
+  callback's answer may carry the same, and `\Nino\Components::variants( $appData,
+  $name )` answers `[ 'standard' => ..., 'variants' => word => label or null ]`.
 - A `ground` is the one attribute the kernel names itself: a choice among `none`,
   `base`, `alt`, `tint`, `primary` and `dark`, written as `<name>--ground-<word>`,
   which `Nino.css` answers for every component alike.

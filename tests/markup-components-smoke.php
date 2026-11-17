@@ -498,6 +498,27 @@ check( 'F2: ...and a map of words is no list of words, while a word named twice 
 $out = $draw( '[section-wrap variant="band"][/section-wrap]' );
 check( 'F2/V4: the variants of the schema are in the list whatever a callback answers - one that names only regular leaves band a variant', $out === '<section class="section-wrap section-wrap--variant-band"></section>' );
 unset( $appData['./nino/callbacks'][\Nino\Components::VARIANTS] );
+
+// The labels of the variants: what a tool shows
+\Nino\Callbacks::registerCallback( $appData, \Nino\Components::VARIANTS, static function( array &$appData, mixed &$args ): ?array {
+	if( $args['name'] === 'card' )
+		return [ 'name' => 'card', 'variants' => [ 'regular', 'poster' ], 'standard' => 'poster', 'labels' => [ 'poster' => 'Poster', 'regular' => [ 'de_DE' => 'Normal' ], 'ghost' => 'Nobody' ] ];
+	if( $args['name'] === 'card-title' )
+		return [ 'name' => 'card-title', 'variants' => [ 'regular', 'soft' ], 'standard' => 'regular', 'labels' => [ 'soft' => "a\0b", 'regular' => str_repeat( 'x', 201 ), 'x' => [ 1 ] ] ];
+	return null;
+} );
+$variants = \Nino\Components::variants( $appData, 'card' );
+check( 'labels of the answer of a callback come with the variants, as text or as a locale map, regular first, and the standard the callback chose',
+	$variants === [ 'standard' => 'poster', 'variants' => [ 'regular' => [ 'de_DE' => 'Normal' ], 'poster' => 'Poster' ] ] );
+check( 'a label that is no label falls away and its variant stays; a label of a word the answer does not name is not taken',
+	\Nino\Components::variants( $appData, 'card-title' ) === [ 'standard' => 'regular', 'variants' => [ 'regular' => null, 'soft' => null ] ] && isset( $variants['variants']['ghost'] ) === false );
+check( 'a component whose answer carries no labels has the words of its schema with none, and a name that is no component has no variants',
+	\Nino\Components::variants( $appData, 'section-wrap' ) === [ 'standard' => 'regular', 'variants' => [ 'regular' => null, 'band' => null ] ]
+	&& \Nino\Components::variants( $appData, 'nobody-here' ) === [ 'standard' => 'regular', 'variants' => [] ] );
+unset( $appData['./nino/callbacks'][\Nino\Components::VARIANTS] );
+$withLabels = \Nino\Components::validate( 'v-labels', [ 'label' => 'V', 'variants' => [ 'soft' ], 'labels' => [ 'soft' => 'Soft surface', 'gone' => 'Gone', 'regular' => [ 'de_DE' => '' ] ] ] );
+check( 'a schema may label its own variants: those that are labels of words it names are kept, and a schema without labels has no key for them',
+	is_array( $withLabels ) === true && $withLabels['labels'] === [ 'soft' => 'Soft surface' ] && array_key_exists( 'labels', \Nino\Components::validate( 'v-plain', [ 'label' => 'V', 'variants' => [ 'soft' ] ] ) ) === false );
 $out = $draw( '[card variant="poster"][/card]' );
 check( 'F2/V3: no callback, no variant of it - the call keeps what it wrote in the document, and it is drawn without it', $out === '<article class="card"></article>' );
 

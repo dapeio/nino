@@ -738,6 +738,8 @@ $found = \Nino\Components::check( $appData, \Nino\Markup::parse( $source, \Nino\
 
 A variant that the call names and the list does not hold is the standard, and so is none; the standard is `regular` unless a callback says another. An answer that is no list of words with `regular` in it and a standard among them is a notice in the log (`E_USER_NOTICE`, once for the name in a request), and the schema's variants stand. The callbacks are asked once for a name in a drawing.
 
+An answer may also carry `labels`, a map of variant => label - a text, or a locale => text map, as the `label` of a component is - for a tool that shows a variant and wants more than the word: `'labels' => [ 'dark' => 'Dark surface' ]`. A label is taken for a word the answer names, when it is at most 200 bytes and holds nothing empty and no control character but the line break and the tab; one that is not is left out and its variant stays. A schema says the same for its own variants with a `labels` key beside `variants`. `\Nino\Components::variants( $appData, 'callout' )` answers what `render()` sees, the callbacks included: `[ 'standard' => 'dark', 'variants' => [ 'regular' => null, 'quiet' => null, 'dark' => 'Dark surface' ] ]` - the label of a word that has none is `null`, and a name that is no component has no variants.
+
 **Sources.** What the first word of a call - or the value of an attribute of the type `link` or `image` - names, and what comes of it:
 
 | Written | Is |

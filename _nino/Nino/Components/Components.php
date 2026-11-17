@@ -35,6 +35,8 @@ namespace Nino {
 	 *											'children'	'nodes': the register does not draw what the component holds, its renderer does
 	 *											'attributes'	name => [ 'type' => choice|bool|int|string|text|image|link|id, 'default' => ..., ... ]
 	 *											'variants'	the words of the one open axis; regular is always there, first
+	 *											'labels'		variant => text, or a locale => text map: what a tool shows for a variant the
+	 *																	schema names; a label of a word that is no variant, or one that is no label, is left out
 	 *											'template'	the markup, or the name of a *.tpl file in the directory a feature gives
 	 *											'icon', 'preview'	for a tool
 	 *
@@ -159,7 +161,7 @@ namespace Nino {
 		public const array RESERVED = [ 'value', 'source', 'content', 'class', 'text', 'variant', 'lang' ];
 
 		// The keys of a schema and of an attribute, which is all validate() accepts
-		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'source', 'format', 'children', 'attributes', 'variants', 'template', 'icon', 'preview' ];
+		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
@@ -231,6 +233,9 @@ namespace Nino {
 		];
 		private const int ICON_PARTS = 12;
 		private const int ICON_LENGTH = 2048;
+
+		// The longest label of a variant, in bytes: of the text, or of each text of a locale map
+		private const int LABEL_LENGTH = 200;
 
 		/**
 		 *	Register a component. The schema is checked by validate(), and a schema that is none is an
@@ -1135,6 +1140,14 @@ namespace Nino {
 					return $what. ': a variant is a word of lower case letters, digits and hyphens';
 				else if( in_array( $variant, $clean['variants'], true ) === false )
 					$clean['variants'][] = $variant;
+
+			if( isset( $schema['labels'] ) === true && is_array( $schema['labels'] ) === false )
+				return $what. ': "labels" must be a map of variant => label';
+
+			$labels = self::_labels( (array) ( $schema['labels'] ?? [] ), $clean['variants'] );
+
+			if( $labels !== [] )
+				$clean['labels'] = $labels;
 
 			if( is_array( $schema['attributes'] ?? [] ) === false )
 				return $what. ': "attributes" must be a map of attribute => schema';
@@ -2948,14 +2961,16 @@ namespace Nino {
 		 *	'/nino/components/variants' add to it, of [ 'name' => ..., 'variants' => [...], 'standard' => 'regular' ]: the list is
 		 *	the schema's and then the callback's words, the standard one of them.
 		 *	An answer that is not that shape - a list of words, a standard of the united list - is a notice
-		 *	(E_USER_NOTICE, once for the name in a request), and the schema stands. Asked once for a name in a drawing
+		 *	(E_USER_NOTICE, once for the name in a request), and the schema stands. Asked once for a name in a drawing.
+		 *	An answer may carry 'labels', variant => label: those of the words the list holds that are labels
+		 *	(see _labels()) are taken, over the schema's; the rest falls away and the variants stay
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			&$run					(reference)
 		 *	@param		string		$name
 		 *	@param		array			$schema
 		 *
-		 *	@return 	array										[ the variants, the standard ]
+		 *	@return 	array										[ the variants, the standard, the labels: variant => label ]
 		 */
 		private static function _variants( array &$appData, array &$run, string $name, array $schema ): array {
 
@@ -2984,10 +2999,68 @@ namespace Nino {
 
 				self::_notice( $appData, 'variants '. $name, 'Components: the variants a callback answered for "'. $name. '" are no list of words that holds regular with a standard in it; the schema\'s stand' );
 
-				return $run['variants'][$name] = [ $schema['variants'], 'regular' ];
+				return $run['variants'][$name] = [ $schema['variants'], 'regular', $schema['labels'] ?? [] ];
 			}
 
-			return $run['variants'][$name] = [ $list, $standard ];
+			$labels = self::_labels( is_array( $answer['labels'] ?? null ) === true ? $answer['labels'] : [], $list ) + ( $schema['labels'] ?? [] );
+
+			return $run['variants'][$name] = [ $list, $standard, $labels ];
+		}
+
+		/**
+		 *	The labels of variants that are labels: of a map of variant => text or locale => text, those whose variant is
+		 *	one of the words and whose text has nothing empty, no control character but the line break and the tab and no
+		 *	more than LABEL_LENGTH bytes (each, for a locale map). The rest is left out
+		 *
+		 *	@param		array			$given
+		 *	@param		array			$words
+		 *
+		 *	@return 	array										variant => label
+		 */
+		private static function _labels( array $given, array $words ): array {
+
+			$labels = [];
+
+			foreach( $given as $word => $label ) {
+
+				if( is_string( $word ) === false || in_array( $word, $words, true ) === false || self::_words( $label ) === false )
+					continue;
+
+				foreach( (array) $label as $text )
+					if( strlen( (string) $text ) > self::LABEL_LENGTH )
+						continue 2;
+
+				$labels[$word] = $label;
+			}
+
+			return $labels;
+		}
+
+		/**
+		 *	The variants of a component as render() sees them: the schema's and what the callbacks of
+		 *	'/nino/components/variants' add, the standard, and the label of each that has one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					A component
+		 *
+		 *	@return 	array										[ 'standard' => word, 'variants' => word => label (text or locale => text map) or null ], regular first;
+		 *																[ 'standard' => 'regular', 'variants' => [] ] for a name that is no component
+		 */
+		public static function variants( array &$appData, string $name ): array {
+
+			$schema = $appData[self::REGISTRY][$name] ?? null;
+
+			if( is_array( $schema ) === false )
+				return [ 'standard' => 'regular', 'variants' => [] ];
+
+			$run = [ 'variants' => [] ];
+			[ $words, $standard, $labels ] = self::_variants( $appData, $run, $name, $schema );
+			$variants = [];
+
+			foreach( $words as $word )
+				$variants[$word] = $labels[$word] ?? null;
+
+			return [ 'standard' => $standard, 'variants' => $variants ];
 		}
 
 		/**
