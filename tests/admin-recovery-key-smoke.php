@@ -316,6 +316,11 @@ $goodFiles = [
 	'elements/typed.php' => "<?php\ndeclare(strict_types=1);\n\n// a type of its own\n# and a note\n/* and a block\n   of notes */\nreturn [ // inline\n\t'a' => 1, /* here */ 'b' => [ 'c' => 'd' ], # there\n];\n// last words\n",
 	'assets/theme.css' => ':root{--a:1}',
 	'templates/page-x.tpl' => '<h1>x</h1>',
+	'blocks/hero/block.json' => '{"category":"intro"}',
+	'blocks/hero/text/en_US.json' => '{"title":"Hero"}',
+	'fonts/inter/400.woff2' => 'wOF2',
+	'fonts/inter/font.json' => '{"family":"Inter"}',
+	'fonts/inter/LICENSE.txt' => 'SIL Open Font License',
 ];
 $crafted = static fn( array $extra = [], array $without = [] ): string => recoveryKeyArchive( array_diff_key( $extra + $goodFiles, array_flip( $without ) ), $oldRaw );
 
@@ -328,6 +333,9 @@ $project = static function( string $name ) use ( $call ): array {
 recoveryKeyFile( $fifth, $crafted() );
 [ $status, $body ] = $call( $fifth, 'recovery/restore-file', [ 'key' => $oldKey ] );
 check( 'a crafted archive of nothing but data and pictures - strings with quotes, NUL bytes, umlauts, numbers of every shape, null, nesting, a negative key - is restored: the check is not in the way of what Nino writes', $status === 200 && ( \Nino\Filesystem::getFileContent( $fifth, '/text/global.php', [] )['odd'] ?? '' ) === "quote ' backslash \\ nul \0 line\nbreak umlaut ä emoji 😀" );
+check( '...with the blocks of the project and the installed fonts in it: they come back where the project keeps them, private/blocks/ and public/fonts/,',
+	is_file( $fifthDir. '/private/blocks/hero/text/en_US.json' ) === true && file_get_contents( $fifthDir. '/private/blocks/hero/block.json' ) === '{"category":"intro"}'
+	&& file_get_contents( $fifthDir. '/public/fonts/inter/400.woff2' ) === 'wOF2' && file_get_contents( $fifthDir. '/public/fonts/inter/LICENSE.txt' ) === 'SIL Open Font License' && is_dir( $fifthDir. '/blocks' ) === false );
 
 $marker = sys_get_temp_dir(). '/nino-recovery-key-ran-'. bin2hex( random_bytes( 4 ) );
 $code = "<?php file_put_contents( '$marker', 'ran' ); return [];";
@@ -387,6 +395,10 @@ $refused = [
 	'a file named svg that is no svg' 										=> [ [ 'images/x.svg' => 'plain text' ], 'drawing' ],
 	'a picture without an extension' 											=> [ [ 'images/x' => 'x' ], 'no picture' ],
 	'a php file below a picture directory' 								=> [ [ 'images/elements/a/shell.phar' => $code ], 'no picture' ],
+	'a php file among the blocks' 												=> [ [ 'blocks/hero/shell.php' => $code ], 'no part of a block' ],
+	'a php file among the fonts' 													=> [ [ 'fonts/inter/shell.php' => $code ], 'no part of a font' ],
+	'a script name behind the extension of a font' 			=> [ [ 'fonts/inter/shell.php.woff2' => $code, 'fonts/inter/x.phtml.txt' => $code, 'fonts/inter/x.php5.ttf' => $code ], 'no part of a font' ],
+	'a file of the webserver among the fonts' 						=> [ [ 'fonts/.htaccess' => 'AddType application/x-httpd-php .woff2' ], 'no part of a font' ],
 ];
 $notRefused = [];
 foreach( $refused as $what => [ $extra, $says ] ) {
@@ -399,7 +411,7 @@ foreach( $refused as $what => [ $extra, $says ] ) {
 		$notRefused[] = $what. ' ('. $status. ' '. ( $body['error'] ?? '' ). ( $intact === true ? '' : ', project changed' ). ')';
 	\Nino\Filesystem::removeDir( $dir );
 }
-check( 'an archive that holds code - in nino.php or config.php, a call, a name, a variable, interpolation, a heredoc, a statement around the return, a closing tag, a comment, a php file in any spelling, a file that a webserver runs or reads among the pictures - is refused with a 422 that names the file, before a snapshot, before nino.php is read and before anything is copied'. ( $notRefused === [] ? '' : ' - not: '. implode( '; ', $notRefused ) ), $notRefused === [] );
+check( 'an archive that holds code - in nino.php or config.php, a call, a name, a variable, interpolation, a heredoc, a statement around the return, a closing tag, a comment, a php file in any spelling, a file that a webserver runs or reads among the pictures, the blocks or the fonts - is refused with a 422 that names the file, before a snapshot, before nino.php is read and before anything is copied'. ( $notRefused === [] ? '' : ' - not: '. implode( '; ', $notRefused ) ), $notRefused === [] );
 check( '...and nothing of it ran', is_file( $marker ) === false );
 
 // The same code in the list: an archive that was put there by SFTP and opened with a typed key is judged the same

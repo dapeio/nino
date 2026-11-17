@@ -30,10 +30,6 @@ namespace Nino\Modules\Images {
 		// The edge of the master the sizes are made from, and the least a raster upload has to bring
 		public const int MIN_SIDE = 512;
 
-		// A vector icon is a few paths: more than this is not one
-		public const int MAX_SVG_BYTES = 262144;
-
-		private const string SVG_NS 			= 'http://www.w3.org/2000/svg';
 		private const string BACKUP_DIR 	= '/data/favicon-previous';
 		private const string BACKUP_NEXT 	= '/data/favicon-previous-next';
 		private const string BACKUP_OLD 	= '/data/favicon-previous-old';
@@ -41,18 +37,6 @@ namespace Nino\Modules\Images {
 
 		// The rows of the preview, in the order they are shown
 		private const array PREVIEW = [ 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'favicon-192x192.png', 'favicon-512x512.png', 'favicon.ico', 'favicon.svg' ];
-
-		// What a vector icon may be made of - shapes, groups and gradients, nothing that runs, styles
-		// or fetches. An element or an attribute that is not here is dropped with what is below it
-		private const array SVG_ELEMENTS = [ 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon', 'defs', 'linearGradient', 'radialGradient', 'stop', 'clipPath' ];
-		private const array SVG_ATTRIBUTES = [
-			'id', 'viewBox', 'width', 'height', 'x', 'y', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'fx', 'fy', 'points', 'd', 'transform',
-			'fill', 'fill-opacity', 'fill-rule', 'clip-rule', 'clip-path', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
-			'stroke-dasharray', 'stroke-dashoffset', 'stroke-opacity', 'opacity', 'offset', 'stop-color', 'stop-opacity',
-			'gradientUnits', 'gradientTransform', 'spreadMethod', 'clipPathUnits', 'preserveAspectRatio',
-		];
-		// The only functions a value of those attributes may call
-		private const array SVG_FUNCTIONS = [ 'url', 'rgb', 'rgba', 'hsl', 'hsla', 'translate', 'rotate', 'scale', 'matrix', 'skewx', 'skewy' ];
 
 		public static function perm(): string {
 			return Admin::MANAGE_PERM;
@@ -195,8 +179,8 @@ namespace Nino\Modules\Images {
 				}
 
 				$source = file_get_contents( $_FILES['svg']['tmp_name'] );
-				$svg 		= $source === false ? false : self::cleanSvg( $source );
-				if( $svg === false ) {
+				$svg 		= $source === false ? null : \Nino\Images::cleanSvg( $source );
+				if( $svg === null ) {
 					\Nino\Http::fail( $request, 400, 'the svg could not be read as a plain vector picture', 'favicon_svg' );
 					return;
 				}
@@ -322,128 +306,6 @@ namespace Nino\Modules\Images {
 				$digits = $digits[0]. $digits[0]. $digits[1]. $digits[1]. $digits[2]. $digits[2];
 
 			return '#'. $digits;
-		}
-
-		/**
-		 *	A vector picture reduced to what an icon needs. The svg is parsed and rebuilt: only the elements
-		 *	and attributes of the allow lists above are copied, a value is only copied if it holds nothing but
-		 *	the characters of a number, a colour, a path or a transform, and a function it calls is one of a
-		 *	short list - and `url()` only to an id of the same picture. Scripts, styles, foreign objects,
-		 *	images, links and every event attribute are therefore not cleaned out of the picture but never
-		 *	part of the copy. A document type, entity declarations, a root that is no svg in the svg namespace,
-		 *	bytes that are no UTF-8 and a picture too large or without any shape are refused
-		 *
-		 *	@param		string		$svg					The uploaded bytes
-		 *
-		 *	@return 	string|false							The svg to keep, or false
-		 */
-		public static function cleanSvg( string $svg ): string|false {
-
-			if( $svg === '' || strlen( $svg ) > self::MAX_SVG_BYTES || str_contains( $svg, "\0" ) === true || mb_check_encoding( $svg, 'UTF-8' ) === false )
-				return false;
-
-			// Before the parser sees them: an entity is how a small file becomes a large one or reads a file
-			if( preg_match( '/<!(?:DOCTYPE|ENTITY|ELEMENT|ATTLIST|NOTATION)/i', $svg ) === 1 )
-				return false;
-
-			$previous = libxml_use_internal_errors( true );
-			$source 	= new \DOMDocument();
-			$loaded 	= $source->loadXML( $svg, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_NOCDATA );
-			libxml_clear_errors();
-			libxml_use_internal_errors( $previous );
-
-			if( $loaded === false || $source->doctype !== null )
-				return false;
-
-			$root = $source->documentElement;
-			if( $root === null || $root->localName !== 'svg' || $root->namespaceURI !== self::SVG_NS )
-				return false;
-
-			$target	= new \DOMDocument( '1.0', 'UTF-8' );
-			$copy 	= $target->createElementNS( self::SVG_NS, 'svg' );
-			$target->appendChild( $copy );
-
-			$count = 0;
-			self::_copySvg( $target, $root, $copy, 0, $count );
-
-			// Too many elements, or no shape drawn - groups, definitions and gradients alone are no icon
-			$shapes = 0;
-			foreach( [ 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon' ] as $shape )
-				$shapes += $copy->getElementsByTagName( $shape )->length;
-
-			if( $count < 0 || $shapes < 1 )
-				return false;
-
-			$out = $target->saveXML( $copy );
-
-			return is_string( $out ) === true && $out !== '' ? $out. "\n" : false;
-		}
-
-		/**
-		 *	Copy the attributes and the allowed children of one svg element into its clean copy
-		 *
-		 *	@param		\DOMDocument	$target
-		 *	@param		\DOMElement		$from
-		 *	@param		\DOMElement		$to
-		 *	@param		int						$depth
-		 *	@param		int						&$count			(reference) The shapes copied so far; -1 once there are too many
-		 *
-		 *	@return 	void
-		 */
-		private static function _copySvg( \DOMDocument $target, \DOMElement $from, \DOMElement $to, int $depth, int &$count ): void {
-
-			foreach( $from->attributes as $attribute ) {
-
-				// A prefixed attribute (xlink:href, xml:space, xmlns:x) is no attribute of the list
-				if( $attribute->namespaceURI !== null || in_array( $attribute->localName, self::SVG_ATTRIBUTES, true ) === false || self::_safeValue( $attribute->localName, $attribute->value ) === false )
-					continue;
-
-				$to->setAttribute( $attribute->localName, $attribute->value );
-			}
-
-			foreach( $from->childNodes as $child ) {
-
-				if( $child instanceof \DOMElement === false || $child->namespaceURI !== self::SVG_NS || in_array( $child->localName, self::SVG_ELEMENTS, true ) === false )
-					continue;
-
-				if( $count < 0 || ++$count > 2000 || $depth >= 24 ) {
-					$count = -1;
-					return;
-				}
-
-				$clone = $target->createElement( $child->localName );
-				$to->appendChild( $clone );
-				self::_copySvg( $target, $child, $clone, $depth + 1, $count );
-			}
-		}
-
-		/**
-		 *	Whether an attribute value may be copied: an id is a plain name, anything else holds the characters of
-		 *	numbers, colours, paths and transforms and calls only the functions of the list - `url()` to an id
-		 *
-		 *	@param		string		$name
-		 *	@param		string		$value
-		 *
-		 *	@return 	bool
-		 */
-		private static function _safeValue( string $name, string $value ): bool {
-
-			if( strlen( $value ) > 20000 )
-				return false;
-
-			if( $name === 'id' )
-				return preg_match( '/\A[A-Za-z][A-Za-z0-9_-]{0,63}\z/', $value ) === 1;
-
-			if( preg_match( '/\A[A-Za-z0-9#.,%()\s+_-]*\z/', $value ) !== 1 )
-				return false;
-
-			if( preg_match_all( '/([A-Za-z]+)\s*\(/', $value, $calls ) > 0 )
-				foreach( $calls[1] as $call )
-					if( in_array( strtolower( $call ), self::SVG_FUNCTIONS, true ) === false )
-						return false;
-
-			// Every url( is a reference to an id of this picture
-			return preg_match_all( '/url\s*\(/i', $value ) === preg_match_all( '/url\(#[A-Za-z][A-Za-z0-9_-]*\)/i', $value );
 		}
 
 		/**

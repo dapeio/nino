@@ -816,6 +816,8 @@ namespace Nino\Modules {
 
 				if( str_starts_with( $archiveName, 'images/' ) === true && in_array( strtolower( pathinfo( $archiveName, PATHINFO_EXTENSION ) ), self::PICTURE_FORMATS, true ) === true )
 					$pictures += $size;
+				else if( str_starts_with( $archiveName, 'fonts/' ) === true && in_array( strtolower( pathinfo( $archiveName, PATHINFO_EXTENSION ) ), [ 'woff', 'woff2' ], true ) === true )
+					$pictures += $size;
 			}
 
 			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes, 'pictures' => $pictures ];

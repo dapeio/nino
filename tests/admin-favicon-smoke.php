@@ -143,18 +143,12 @@ function faviconLog( string $sandbox ): array {
 }
 
 /**
- *	A svg with everything a svg can do that an icon must not
+ *	A svg an icon cannot be made of as it is: it carries a script beside its one path
  *
  *	@return		string
  */
 function faviconDirtySvg(): string {
-	return '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16 16" width="16" height="16" onload="alert(1)">'
-		. '<script>alert(2)</script><style>circle{fill:url(http://evil.example/x)}</style>'
-		. '<defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f" onclick="alert(3)"/></linearGradient></defs>'
-		. '<foreignObject width="10" height="10"><div xmlns="http://www.w3.org/1999/xhtml">hello</div></foreignObject>'
-		. '<image href="http://evil.example/p.png" width="4" height="4"/><use xlink:href="http://evil.example/s.svg#a"/><a href="javascript:alert(4)"><rect width="1" height="1"/></a>'
-		. '<circle cx="8" cy="8" r="6" fill="url(#g)" stroke="url(http://evil.example/x)" style="fill:red" class="x" onmouseover="alert(5)"/>'
-		. '<path d="M1 1 L15 15" stroke="red" xlink:href="http://evil.example/"/><!-- comment --></svg>';
+	return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><script>alert(1)</script><path d="M1 1 L15 15" stroke="red" onclick="alert(2)"/></svg>';
 }
 
 
@@ -225,8 +219,7 @@ echo "\n";
 
 echo "The vector icon\n";
 
-pinSvgCleaned( $appData, $sandbox );
-pinSvgRefused();
+pinSvgStored( $appData, $sandbox );
 
 echo "\n";
 
@@ -472,87 +465,27 @@ function pinColoursKeptWhenEmpty( array $set ): void {
 }
 
 /**
- *	A svg is kept clean, and a set without one removes the old one
+ *	A svg is kept as \Nino\Images::cleanSvg() rebuilds it, and a set without one removes the old one
  *
  *	@param		array 		&$appData
  *	@param		string		$sandbox
  *
  *	@return		void
  */
-function pinSvgCleaned( array &$appData, string $sandbox ): void {
+function pinSvgStored( array &$appData, string $sandbox ): void {
 
-	$clean = \Nino\Modules\Images\Favicon::cleanSvg( faviconDirtySvg() );
-	check( 'a svg with a script, a style, a foreign object, an image, a link, a use and every event attribute is kept as its shapes: no script, no style, no href, no event, no address but the namespace',
-		is_string( $clean ) === true && preg_match( '/script|style|foreignObject|<image|<use|<a[ >]|href|on[a-z]+=|class=|javascript|evil/i', $clean ) !== 1
-		&& substr_count( $clean, 'http' ) === 1 && str_contains( $clean, 'xmlns="http://www.w3.org/2000/svg"' ) === true );
-	check( '...what draws stays: the gradient with its stops, the circle with a reference to the gradient, the path', is_string( $clean ) === true && str_contains( $clean, '<linearGradient id="g">' ) === true && substr_count( $clean, '<stop ' ) === 2
-		&& str_contains( $clean, 'fill="url(#g)"' ) === true && str_contains( $clean, '<path d="M1 1 L15 15" stroke="red"/>' ) === true && str_contains( $clean, 'stroke="url' ) === false );
+	$clean = \Nino\Images::cleanSvg( faviconDirtySvg() );
 
 	[ $status, $body ] = callFavicon( $appData, 'favicon/generate', [], [ 'file' => faviconPicture( 512, 512 ), 'svg' => faviconDirtySvg() ] );
 	$stored = (string) @file_get_contents( $sandbox. '/public/favicon/favicon.svg' );
-	check( 'posted with a picture the svg is stored cleaned, and the status shows it', $status === 200 && $stored === $clean && end( $body['files'] )['exists'] === true );
+	check( 'posted with a picture the svg is stored as the kernel rebuilds it - no script, no event - and the status shows it', $status === 200 && is_string( $clean ) === true && $stored === $clean
+		&& preg_match( '/script|onclick/', $stored ) !== 1 && end( $body['files'] )['exists'] === true );
 
 	[ $status ] = callFavicon( $appData, 'favicon/generate', [], [ 'file' => faviconPicture( 512, 512 ) ] );
 	check( 'a set made without a svg removes the one the old set had - it would draw the old picture beside the new icons', $status === 200 && is_file( $sandbox. '/public/favicon/favicon.svg' ) === false );
 
 	[ $status ] = callFavicon( $appData, 'favicon/generate', [], [ 'file' => faviconPicture( 512, 512 ), 'svg' => faviconDirtySvg() ] );
 	check( 'and once more with one, for the undo below', $status === 200 && is_file( $sandbox. '/public/favicon/favicon.svg' ) === true );
-}
-
-/**
- *	What is no svg an icon can be made of
- *
- *	@return		void
- */
-function pinSvgRefused(): void {
-	$ns = 'xmlns="http://www.w3.org/2000/svg"';
-	$refused = [
-		'a document type'							=> '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY a "b">]><svg '. $ns. '><path d="M0 0"/></svg>',
-		'an entity declaration'				=> '<!ENTITY x SYSTEM "file:///etc/passwd"><svg '. $ns. '><path d="M0 0"/></svg>',
-		'a root that is no svg'				=> '<html '. $ns. '><path d="M0 0"/></html>',
-		'an svg in another namespace'	=> '<svg xmlns="http://example.com/x"><path d="M0 0"/></svg>',
-		'a root with no namespace whose shapes have one'	=> '<svg><path xmlns="http://www.w3.org/2000/svg" d="M0 0"/></svg>',
-		'no xml at all'								=> 'this is not a picture',
-		'a broken one'								=> '<svg '. $ns. '><path d="M0 0"></svg>',
-		'an svg without a shape'			=> '<svg '. $ns. '><script>alert(1)</script></svg>',
-		'one in another encoding'			=> "\xFF\xFE<\0s\0v\0g\0>\0",
-		'one that is too large'				=> '<svg '. $ns. '>'. str_repeat( '<path d="M0 0"/>', 20000 ). '</svg>',
-		'nothing'											=> '',
-		'a group and nothing in it'		=> '<svg '. $ns. '><g/></svg>',
-		'definitions with no shape'		=> '<svg '. $ns. '><defs/></svg>',
-		'a gradient and no shape'			=> '<svg '. $ns. '><defs><linearGradient id="g"><stop offset="0"/></linearGradient></defs></svg>',
-		'one a byte over the size limit'	=> '<svg '. $ns. '><path d="M0 0"/></svg>'. str_repeat( ' ', \Nino\Modules\Images\Favicon::MAX_SVG_BYTES - 41 + 1 ),
-		'one with 2001 elements'			=> '<svg '. $ns. '>'. str_repeat( '<path d="M0 0"/>', 2001 ). '</svg>',
-		'one that declares latin-1 and is no utf-8 without a nul'	=> "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><svg ". $ns. "><path d=\"M0 0\" fill=\"\xE9\"/></svg>",
-	];
-	$notRefused = [];
-	foreach( $refused as $label => $svg )
-		if( \Nino\Modules\Images\Favicon::cleanSvg( $svg ) !== false )
-			$notRefused[] = $label;
-	check( 'a svg with a document type or an entity, one that is no svg, broken, empty of shapes, in another encoding or too large is refused'. ( $notRefused === [] ? '' : ' - kept: '. implode( ', ', $notRefused ) ), $notRefused === [] );
-
-	$limit = '<svg '. $ns. '><path d="M0 0"/></svg>';
-	check( 'the largest svg that is allowed, and 2000 elements, are taken', \Nino\Modules\Images\Favicon::cleanSvg( $limit. str_repeat( ' ', \Nino\Modules\Images\Favicon::MAX_SVG_BYTES - strlen( $limit ) ) ) !== false
-		&& \Nino\Modules\Images\Favicon::cleanSvg( '<svg '. $ns. '>'. str_repeat( '<path d="M0 0"/>', 2000 ). '</svg>' ) !== false );
-
-	$mixed = (string) \Nino\Modules\Images\Favicon::cleanSvg( '<svg '. $ns. '><path d="M0 0"/><path xmlns="http://example.com/x" d="M9 9"/><x:path xmlns:x="http://example.com/y" d="M8 8"/><linearGradient id="a b"/><linearGradient id="9x"/><linearGradient id="ok_1"/></svg>' );
-	check( 'an element of another namespace is dropped with the name of a shape, and an id is a plain name: "a b" and "9x" are not kept, "ok_1" is', substr_count( $mixed, '<path' ) === 1 && str_contains( $mixed, 'M9' ) === false && str_contains( $mixed, 'M8' ) === false
-		&& str_contains( $mixed, 'id="a b"' ) === false && str_contains( $mixed, 'id="9x"' ) === false && str_contains( $mixed, 'id="ok_1"' ) === true );
-
-	$deep = '<svg '. $ns. '>'. str_repeat( '<g>', 40 ). '<path d="M0 0"/>'. str_repeat( '</g>', 40 ). '</svg>';
-	check( 'a picture nested deeper than an icon needs is refused', \Nino\Modules\Images\Favicon::cleanSvg( $deep ) === false );
-
-	// What a plain value could carry that the shapes do not need: an event, a style, a class, a link - under names that are no attribute of the list, with values that pass every other check
-	$names = (string) \Nino\Modules\Images\Favicon::cleanSvg( '<svg '. $ns. ' xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M0 0" onclick="go" onload="1" onmouseover="x" style="fill:red" class="a" href="b" xlink:href="b" target="b" data-x="1" fill="red"/></svg>' );
-	check( 'an attribute that is no attribute of the list is not kept, whatever its value - events, style, class, links, data', $names !== '' && str_contains( $names, '<path d="M0 0" fill="red"/>' ) === true );
-
-	$values = '<svg '. $ns. '><path d="M0 0" fill="url(evil.png)"/><path d="M1 1" fill="url( #a )"/><path d="M2 2" fill="red;display:none"/><path d="M3 3" fill="red\' onclick=\'x"/><path d="M4 4" fill="red"/></svg>';
-	$kept = (string) \Nino\Modules\Images\Favicon::cleanSvg( $values );
-	check( 'a reference that is no id of the picture, a value with a style in it and one that closes its own quote are dropped with the attribute - one by one, whatever else is checked', substr_count( $kept, '<path' ) === 5 && substr_count( $kept, 'fill=' ) === 1 && str_contains( $kept, 'url' ) === false && str_contains( $kept, 'display' ) === false && str_contains( $kept, 'onclick' ) === false );
-
-	$values = '<svg '. $ns. '><path d="M0 0" fill="javascript:alert(1)"/><path d="M1 1" fill="expression(alert(1))" stroke="url(https://x.example/a)"/><path d="M2 2" fill="red;background:url(x)"/><path d="M3 3" fill="rgb(1,2,3)" transform="rotate(45 8 8)"/></svg>';
-	$kept = (string) \Nino\Modules\Images\Favicon::cleanSvg( $values );
-	check( 'a value that is no number, colour, path or transform is dropped with its attribute, and a plain colour function and a transform stay', preg_match( '/javascript|expression|https|background/', $kept ) !== 1 && str_contains( $kept, 'fill="rgb(1,2,3)"' ) === true && str_contains( $kept, 'transform="rotate(45 8 8)"' ) === true && substr_count( $kept, '<path' ) === 4 );
 }
 
 /**

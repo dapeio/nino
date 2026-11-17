@@ -1474,6 +1474,105 @@ file_put_contents( $pagesDir. '/crm-portal/list.tpl', 'a folder the flat archive
 check( 'an archive that has no folder in it restores as it did, and touches no template of a folder', $status === 200 && ( $body['ok'] ?? false ) === true
 	&& file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' && file_get_contents( $pagesDir. '/crm-portal/list.tpl' ) === 'a folder the flat archive knows nothing of' );
 
+// --- The blocks of the project and the installed fonts ------------------------
+//
+// private/blocks/ is where the project keeps the blocks it wrote itself and public/fonts/ where the fonts it installed stand: an
+// archive carries each as blocks/ and fonts/, and a restore puts them where they were. What an install of a font leaves beside its
+// target, the work folder, and what is no file of a block or of a font are none of the archive
+echo "Blocks and fonts in an archive\n";
+
+$blocksDir	= $sandbox. '/private/blocks';
+$fontsDir		= $sandbox. '/public/fonts';
+$ownBlocks	= [
+	'hero/block.json'				=> '{"category":"intro","rank":10}',
+	'hero/block.tpl'				=> "[section-wrap id=\"hero\"]\n",
+	'hero/text/en_US.json'	=> '{"title":"Hero \u00e4"}',
+];
+$ownFonts		= [
+	'inter/font.json'				=> '{"family":"Inter","version":"1.0"}',
+	'inter/400.woff2'				=> "wOF2". random_bytes( 300 ),
+	'inter/LICENSE.txt'			=> "SIL Open Font License\n",
+];
+$noise			= [
+	$blocksDir. '/hero/README.md'							=> 'not a file of a block',
+	$fontsDir. '/.work-abc123/400.woff2'			=> 'the work of an install that is not done',
+	$fontsDir. '/inter/shell.php'							=> '<?php echo 1;',
+];
+
+foreach( $ownBlocks as $name => $bytes ) {
+	@mkdir( dirname( $blocksDir. '/'. $name ), 0755, true );
+	file_put_contents( $blocksDir. '/'. $name, $bytes );
+}
+
+foreach( $ownFonts as $name => $bytes ) {
+	@mkdir( dirname( $fontsDir. '/'. $name ), 0755, true );
+	file_put_contents( $fontsDir. '/'. $name, $bytes );
+}
+
+foreach( $noise as $path => $bytes ) {
+	@mkdir( dirname( $path ), 0755, true );
+	file_put_contents( $path, $bytes );
+}
+
+$ownId			= \Nino\Modules\Backups::now( $appData );
+$ownEntries	= is_string( $ownId ) === true ? $readArchive( $ownId ) : [];
+$carried		= array_filter( $ownEntries, static fn( string $name ): bool => str_starts_with( $name, 'blocks/' ) === true || str_starts_with( $name, 'fonts/' ) === true, ARRAY_FILTER_USE_KEY );
+$expected		= array_merge( array_combine( array_map( static fn( string $name ): string => 'blocks/'. $name, array_keys( $ownBlocks ) ), $ownBlocks ), array_combine( array_map( static fn( string $name ): string => 'fonts/'. $name, array_keys( $ownFonts ) ), $ownFonts ) );
+ksort( $carried );
+ksort( $expected );
+check( 'an archive carries the blocks of the project as blocks/<block>/..., and the installed fonts as fonts/<family>/..., byte for byte - and not the work folder of an install, a file that is no part of a block or of a font, or a script among the fonts', $carried === $expected );
+
+// Changed after the archive, a family gone, and one block written after it
+file_put_contents( $blocksDir. '/hero/block.json', 'changed after the archive' );
+\Nino\Filesystem::removeDir( $fontsDir. '/inter' );
+@mkdir( $blocksDir. '/late', 0755, true );
+file_put_contents( $blocksDir. '/late/block.json', 'written after the archive' );
+
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $ownId ] );
+$same = true;
+
+foreach( $ownBlocks as $name => $bytes )
+	if( @file_get_contents( $blocksDir. '/'. $name ) !== $bytes )
+		$same = false;
+
+foreach( $ownFonts as $name => $bytes )
+	if( @file_get_contents( $fontsDir. '/'. $name ) !== $bytes )
+		$same = false;
+
+check( 'a restore puts the blocks and the fonts back where the project keeps them - private/blocks/ and public/fonts/, the folder made where it is gone - byte for byte, and no blocks/ or fonts/ appears in the root', $status === 200 && ( $body['ok'] ?? false ) === true && $same === true
+	&& is_dir( $sandbox. '/blocks' ) === false && is_dir( $sandbox. '/fonts' ) === false && is_dir( $sandbox. '/private/fonts' ) === false );
+check( '...and leaves a block that the archive has not, as it leaves a template that it has not', file_get_contents( $blocksDir. '/late/block.json' ) === 'written after the archive' );
+
+// An archive made before the blocks and the fonts were in it - or of a project that had none: the same format with fewer entries
+$olderId = date( 'Y-m-d' ). '-100002';
+$writeArchive( $olderId, array_diff_key( $ownEntries, $carried ) );
+file_put_contents( $blocksDir. '/hero/block.json', 'kept on disk' );
+file_put_contents( $fontsDir. '/inter/font.json', 'kept on disk as well' );
+file_put_contents( $pagesDir. '/page-probe.tpl', 'changed after the older archive' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $olderId ] );
+check( 'an archive that has no blocks and no fonts restores as it did and takes nothing away: the blocks and the fonts on disk are as they were', $status === 200 && ( $body['ok'] ?? false ) === true
+	&& file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' && file_get_contents( $blocksDir. '/hero/block.json' ) === 'kept on disk'
+	&& file_get_contents( $blocksDir. '/late/block.json' ) === 'written after the archive' && file_get_contents( $fontsDir. '/inter/font.json' ) === 'kept on disk as well'
+	&& file_get_contents( $fontsDir. '/inter/400.woff2' ) === $ownFonts['inter/400.woff2'] );
+
+// What is no file of a font is refused whatever key the archive was made with
+$scriptId = date( 'Y-m-d' ). '-100003';
+$writeArchive( $scriptId, array_merge( $ownEntries, [ 'fonts/inter/shell.php' => '<?php echo 1;', 'blocks/hero/x.php.json' => '{}' ] ) );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $scriptId ] );
+check( 'an archive made with the key of the project that holds a script among the fonts or the blocks is refused as well - 422, nothing of it written', $status === 422
+	&& is_file( $fontsDir. '/inter/shell.php' ) === false && is_file( $blocksDir. '/hero/x.php.json' ) === false );
+
+// A project that has no blocks of its own and no fonts makes an archive with none of them
+\Nino\Filesystem::removeDir( $blocksDir );
+\Nino\Filesystem::removeDir( $fontsDir );
+$emptyId = \Nino\Modules\Backups::now( $appData );
+$empty = is_string( $emptyId ) === true ? $readArchive( $emptyId ) : [ 'blocks/' => 1 ];
+check( 'a project without blocks of its own and without fonts has an archive without them, and the backup does not fail for the folders that are not there',
+	array_filter( array_keys( $empty ), static fn( string $name ): bool => str_starts_with( $name, 'blocks/' ) === true || str_starts_with( $name, 'fonts/' ) === true ) === [] && isset( $empty['templates/page-probe.tpl'] ) === true );
+
 // An archive somebody with the key made by hand. Each one carries a good
 // template before the entry that is refused: it is refused as a whole, nothing
 // of it is written, and no snapshot is made for it

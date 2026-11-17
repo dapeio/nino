@@ -107,6 +107,8 @@ namespace Nino {
 			$templates 	= \Nino\Filesystem::path( $appData, '/templates' );
 			$assets 		= \Nino\Filesystem::path( $appData, '/assets' );
 			$images 		= \Nino\Filesystem::path( $appData, '/images' );
+			$blocks 		= self::target( $appData, 'blocks' );
+			$fonts 			= self::target( $appData, 'fonts' );
 			$data 			= \Nino\Filesystem::path( $appData, '/data' );
 			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
 			$files 			= [];
@@ -134,8 +136,12 @@ namespace Nino {
 			// private asset and template ones. Of templates/ only the
 			// templates are taken, at any depth (see template()): the pages of
 			// the Builder and the frames of Design among them, and which of the
-			// others a person wrote is not something a file says
-			foreach( [ 'templates' => $templates, 'images' => $images, 'assets' => $assets ] as $archive => $root ) {
+			// others a person wrote is not something a file says. The blocks the
+			// project wrote itself (private/blocks/) and the fonts that are
+			// installed (public/fonts/) are carried the same way, each file by the
+			// rule of its directory (see block() and font()) - the work folder an
+			// install of a font makes beside its target is none of them
+			foreach( [ 'templates' => $templates, 'images' => $images, 'assets' => $assets, 'blocks' => $blocks, 'fonts' => $fonts ] as $archive => $root ) {
 
 				if( is_dir( $root ) === false )
 					continue;
@@ -154,6 +160,12 @@ namespace Nino {
 					$relative = str_replace( DIRECTORY_SEPARATOR, '/', substr( $path, strlen( rtrim( $root, DIRECTORY_SEPARATOR ) ) + 1 ) );
 
 					if( $archive === 'templates' && self::template( $relative ) === false )
+						continue;
+
+					if( $archive === 'blocks' && self::block( $relative ) === false )
+						continue;
+
+					if( $archive === 'fonts' && self::font( $relative ) === false )
 						continue;
 
 					$files[$path] = $archive. '/'. $relative;
@@ -255,8 +267,67 @@ namespace Nino {
 		// The top-level entries of an archive: manifest() makes no others, and
 		// nino.php is stamp()'s. A restore copies each one into the project, so
 		// an archive that names another would plant a file next to index.php
-		private const array ARCHIVE_DIRS = [ 'text', 'elements', 'templates', 'assets', 'images', 'data' ];
+		private const array ARCHIVE_DIRS = [ 'text', 'elements', 'templates', 'assets', 'images', 'data', 'blocks', 'fonts' ];
 		private const array ARCHIVE_FILES = [ 'config.php', 'nino.php' ];
+
+		/**
+		 *	Where a top-level directory of an archive lives in the project. All of them are resolved by their
+		 *	own name (see \Nino\Filesystem::path()) but one: the blocks of the project are below the private
+		 *	root as private/blocks/, and an archive names them blocks/. The one place of the mapping, for the
+		 *	collection and for the restore alike
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$entry				The directory as the archive names it, eg. 'templates'
+		 *
+		 *	@return 	string										Absolute path
+		 */
+		public static function target( array &$appData, string $entry ): string {
+			return \Nino\Filesystem::path( $appData, $entry === 'blocks' ? '/private/blocks' : '/'. $entry );
+		}
+
+		/**
+		 *	Whether a path below blocks/ is a file of a block: a json or a template, in no hidden folder. A block
+		 *	is data and has no code (see \Nino\Blocks), so what else lies there is none of the project's
+		 *	blocks. The one rule of what a backup collects there and of what a restore takes
+		 *
+		 *	@param		string		$relative			eg. 'hero/block.json' or 'hero/text/en_US.json'
+		 *
+		 *	@return 	bool
+		 */
+		public static function block( string $relative ): bool {
+			return self::_plain( $relative, self::BLOCK_NAME );
+		}
+
+		/**
+		 *	Whether a path below fonts/ is a file of an installed font: a font file, the font.json that names the
+		 *	family and its licence as text, in no hidden folder - the work folder of an install, .work-<random>,
+		 *	is one. The directory is public, so a name a webserver hands to an interpreter is none. The one rule
+		 *	of what a backup collects there and of what a restore takes
+		 *
+		 *	@param		string		$relative			eg. 'inter/400.woff2' or 'inter/font.json'
+		 *
+		 *	@return 	bool
+		 */
+		public static function font( string $relative ): bool {
+			return self::_plain( $relative, self::FONT_NAME );
+		}
+
+		// A file of a directory that is carried by name: plain segments, none of them hidden, the name of the file by the pattern
+		private static function _plain( string $relative, string $pattern ): bool {
+
+			$segments = explode( '/', $relative );
+			$name 		= (string) array_pop( $segments );
+
+			foreach( array_merge( $segments, [ $name ] ) as $segment )
+				if( preg_match( '/\.(?:php|phtml|phar|pht|phps)(?:\d|\.|$)/i', $segment ) === 1 )
+					return false;
+
+			foreach( $segments as $segment )
+				if( preg_match( '/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/D', $segment ) !== 1 )
+					return false;
+
+			return preg_match( $pattern, $name ) === 1;
+		}
 
 		/**
 		 *	Whether a path below templates/ is a template: a file that is called
@@ -419,6 +490,11 @@ namespace Nino {
 		// what the directory is open to
 		private const string IMAGE_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:jpe?g|png|webp|gif|avif|ico|svg)$/D';
 
+		// The names a file below blocks/ may have, and one below fonts/: a block is a json and a template, a font is the font and the two
+		// files that say what it is. Nothing a webserver hands to an interpreter, and fonts/ is open to it
+		private const string BLOCK_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:json|tpl)$/D';
+		private const string FONT_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:woff2?|ttf|otf|json|txt)$/D';
+
 		// One token of a data file's body: what var_export() writes for an array of strings, numbers,
 		// booleans and null - and the same in the short form of an array, which a file written by hand has -
 		// and nothing else. Anything that is no token of it is no data: a name, a variable, a call, a
@@ -573,6 +649,12 @@ namespace Nino {
 						return self::_refuse( $relative, 'a drawing that is more than shapes' );
 				}
 
+				if( str_starts_with( $relative, 'blocks/' ) === true && self::block( substr( $relative, 7 ) ) === false )
+					return self::_refuse( $relative, 'a file that is no part of a block' );
+
+				if( str_starts_with( $relative, 'fonts/' ) === true && self::font( substr( $relative, 6 ) ) === false )
+					return self::_refuse( $relative, 'a file that is no part of a font' );
+
 				if( preg_match( '/\.(?:php|phtml|phar|pht|phps)\d?$/i', $name ) !== 1 )
 					continue;
 
@@ -653,6 +735,14 @@ namespace Nino {
 				}
 				else if( self::template( implode( '/', $below ) ) === false )
 					return 'a file that is no template';
+			}
+
+			if( ( $segments[0] === 'blocks' || $segments[0] === 'fonts' ) && count( $segments ) > 1 && $dir === false ) {
+
+				$below = implode( '/', array_slice( $segments, 1 ) );
+
+				if( ( $segments[0] === 'blocks' ? self::block( $below ) : self::font( $below ) ) === false )
+					return 'a file that is no part of a '. ( $segments[0] === 'blocks' ? 'block' : 'font' );
 			}
 
 			return null;

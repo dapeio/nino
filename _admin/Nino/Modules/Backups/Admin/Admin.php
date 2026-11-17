@@ -1089,19 +1089,22 @@ namespace Nino\Modules\Backups {
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/admin/restore', $restoreArgs );
 
 			// The archive's own layout is flat - text/, elements/, templates/,
-			// assets/, images/, data/ - but those no longer share one
-			// destination on disk: everything but images is private and
-			// resolves against the private root (see
-			// \Nino\Filesystem::PRIVATE_DIRS). Copied one top-level entry at a
+			// assets/, images/, data/, blocks/, fonts/ - and they do not share
+			// one destination on disk: everything but images and fonts is
+			// private and resolves against the private root (see
+			// \Nino\Filesystem::PRIVATE_DIRS), and blocks/ is private/blocks/
+			// (see \Nino\Backup::target()). Copied one top-level entry at a
 			// time rather than as a single tree, so each lands wherever this
 			// project actually keeps it. What a directory of the archive holds
 			// replaces the file of the same name on disk, and a file on disk
 			// that the archive has not is left alone - for the templates, in a
 			// folder of templates/ as well, and the assets as for the texts and
-			// the elements; the folder is made where it is missing
+			// the elements; the folder is made where it is missing. An archive
+			// that has no blocks/ or no fonts/ puts nothing there and takes
+			// nothing away: the blocks and the fonts on disk stay
 			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
 
-				$target = \Nino\Filesystem::path( $appData, '/'. basename( $entry ) );
+				$target = \Nino\Backup::target( $appData, basename( $entry ) );
 
 				if( is_dir( $entry ) === true )
 					\Nino\Filesystem::copyDir( $entry, $target );
