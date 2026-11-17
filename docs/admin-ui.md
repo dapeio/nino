@@ -1,0 +1,347 @@
+# The Workbench Interface
+
+The rules every screen of the workbench keeps: the kernel's panels, the panels of a feature, the setup wizard and the recovery page. Their aim is one sentence - **the same task looks the same, is called the same and behaves the same wherever it is done.** What a screen is built from is in the [panel recipe](recipes/admin-panel.md) ("Designing an admin frontend" is the reference of the classes and `Nino.adminUi.*` blocks); this chapter says which of them a screen uses for which task, and what it must not build itself.
+
+The words **MUST**, **MUST NOT** and **SHOULD** are normative, as in the [agent guide](../AGENTS.md). A panel that is changed is brought to every rule of this chapter, its stylesheet included, in the same change; a panel that is new keeps them from its first line. The [checklist](#checklist) at the end is the review of a view.
+
+## Principles
+
+1. **One task, one block.** What the kernel has as a block (`Nino.adminUi.*`, a `.nino-admin-*` class) a panel does not build itself, not even "nearly the same". Where a block is missing it is added to the kernel, not to the panel.
+2. **Every view has the same build:** head, context bar, content, bar. Each part has one place for each thing - the way back at the top left, the main button at the bottom right, delete at the bottom left. A work surface has the same build without the head ([Anatomy](#anatomy-of-a-view)).
+3. **One way of saving per view:** a form with Save in the bar, a work surface with its save bar, or an immediate action with its answer as a toast - never mixed ([Saving](#saving)).
+4. **Words from the list.** The same thing has the same name everywhere; a button says what it does; no raw key stands without a word before it ([Words](#words)).
+5. **Nothing is lost silently, nothing is asked twice.** Unsaved input reports to the shell; a question is asked by the table of levels; where there is an undo, it replaces the question ([Dialogs](#dialogs)).
+6. **The keyboard, 390 px, light and dark belong to the task.** Targets are at least 24 px, text at least 12 px, contrast at least 4.5 : 1, the page never scrolls sideways, the focus is visible, and nothing means something by colour alone.
+
+## Anatomy of a view
+
+```
+head ─────────── title · tabs (first level) ························ ? ┐  Nino.adminUi.panelHead()
+context bar ──── ‹ Back to …   [tools of the view]                      ┤  Nino.adminUi.contextBar()
+content          one column (at most 62 rem) or split()                 │
+bar ──────────── [Delete thing] [● Changed]   line  [Side] [Main]       ┤  actionBar() / listActions() / saveBar()
+```
+
+| Part | Rule | Block |
+|---|---|---|
+| Head | A list or form view has the head with the panel's title and the "?" of its manual - the Dashboard too. The tabs of the first level stand in the head and nowhere else. A count at a tab is a badge, not a part of the word. | `panelHead()`, `tabBadge()` |
+| Work surface | A work surface - a draft with a preview that is saved as a whole - has no head: it uses the whole height. The panel's name stands small in the context bar above the way back and stays the heading of the view, which the focus goes to; the "?" of the manual is an icon button at the right of the context bar. The name of the thing and the tools of the view stand in the context bar, `split()` follows it directly and reaches down to the bar, and the preview is the one scroll area. What is rarely needed (the frame of a page, an identifier, markup) is behind an icon button beside the name. The list of the same panel keeps its head. | `contextBar()`, `split()` |
+| Address | Every view has an address: `#panel`, `#panel/<tab>`, `#panel/<tab>/<thing>`, `#panel/<thing>/new`. Reloading and the browser's back button keep it. | `Nino.admin.router`, `levels()` |
+| Way back | Exactly ONE back link, at the left of the context bar: "Back to <name of the level above>". A deeper level replaces the link; it does not put a second one under it. | `contextBar()`, `.nino-admin-back-link`, `levels()` |
+| Tools of the view | The width of a preview, the choice of a page and "Reload" stand at the right of the context bar or in the bar of the preview - never in the content. | `split()` |
+| Working language | The language in which content is shown and edited is chosen once for the whole workbench, in the account area of the rail. No panel has a language switch of its own. A view with values that depend on the language shows the working language as a quiet badge in the context bar as soon as it is not the native one. The interface language and the working language have two different names. | - |
+| Introduction | At most one paragraph, directly under the context bar, before the content. | `hint( text, 'lead' )` |
+| Section | A group of a form is a `fieldset > legend`. A section of a view without a form has a title of its own. Nothing is larger than the panel's title under it. A section that opens and closes is an accordion, and only that. | `fieldset`, `accordion()` |
+| Surface | A card is `.nino-admin-card` (a `fieldset` is one). A panel draws no frames, radii or shadows of its own. | `.nino-admin-card` |
+| Two columns | Settings at the left, a preview at the right: only `split()`. At 390 px its switch says "Settings | Preview" unless the view has a better fixed name. | `split()`, `previewFrame()` |
+
+```js
+// The level "element" under "Elements > Imprint": one back link, the tools of the level beside it
+const back = Nino.adminUi.el( 'a', 'nino-admin-back-link', Nino.adminUi.format( t('/_admin/elements/label/back-to'), typeTitle ) );
+back.href = '#elements/'+ type;
+mount.appendChild( Nino.adminUi.contextBar( back, tools ) );
+```
+
+## Lists and tables
+
+| Task | The one way | Block |
+|---|---|---|
+| The directory of a panel - the things it manages, as soon as a row shows more than a name and one detail or has actions of its own (pages, elements, redirects, fonts) | A **table** in `.nino-admin-table-scroll`: a search field over the full width above it that searches in the browser ("Search <things>"), sortable columns, small buttons at the right of each row (open, duplicate, delete in red), page size and paging below, "New <thing>" at the bottom right of the bar. The whole set is loaded and filtered in the browser. | `Nino.adminUi.table()` |
+| Groups and short directories that are only opened (text groups, image groups, navigations, roles) | A **list**: a row of 53 px, the name in the strong weight, a quiet second line, a "›" at the end. The whole row is the link (an `a` with an address). No chain of brackets in the first line: "Logo (/logo, 500x100, no image)" becomes a name and a second line. | `.nino-admin-list` and `.nino-admin-list-link` |
+| Column heads of a table | Words, never the help text of the field; the column of the actions has no head. | `table()` |
+| Entries whose look is the content (a theme, a block) | **Cards** with a preview picture, all of the same height; a head line (name and badge) without a wrap, no description where the picture shows it, the actions as small buttons in ONE line at the bottom. Cards are used for nothing else. | `scaleFrame()` for the picture |
+| Entries that are only read | A dense list. | `.nino-admin-list-dense` |
+| Ordered rows in a draft | The row with icon buttons up, down and remove at the end. | `.nino-admin-move`, `iconButton()`, `tree()` |
+| Actions of a row | Opening is the row. Further actions: at most three small buttons at the end of the row, in the order of the bar (side ... main), the dangerous one last and as `danger`. No 38 px buttons in a row. | `button( ..., { small : true } )` |
+| New | "New <thing>" is the main button at the right of the bar of the list - in every panel. | `listActions()` |
+| Search and filter | The search field stands at the left above the list, its placeholder is "Search <things>" (without "..."); a filter is a select or a chip beside it. From 12 entries on a list SHOULD have a search. | `table()` |
+| Empty | A box with one sentence and - where there is one - the next step as a button. Never a bare sentence, never a hint line. An empty result of a filter says that the filter finds nothing. | `emptyState()` |
+| A list that failed to load | The error stands in place of the list. | `showError()` |
+| Order | Where the order of a list changes without a form (routes), it is saved at once and said as a toast; in a form it belongs to the draft. | - |
+
+## Forms
+
+| Task | The one way | Block |
+|---|---|---|
+| Field | The label stands at the LEFT of the field in every form, from a width of 48 rem (`.nino-admin-fieldgrid`) and in a dialog from 40 rem; in a narrow column (a phone, `split()`, the sheet of properties, a dialog under 40 rem) it stands above. A label has at most two lines; one that needs three is worded too long and is shortened - the rest belongs behind the "?". The same look on a desktop and on a phone is no aim. A placeholder is never the label. | `textField()`, `numberField()`, `selectField()`, `.nino-admin-fieldgrid` |
+| Help | ALWAYS behind the (?) icon at the name of the field - never as text under the field, in a dialog and in a sheet of properties too. The icon is a button of 24 px named "Help for <field>" with `aria-expanded`; a click or Enter opens the sentence as a small bubble at the field, Esc and a click beside it close it. The sentence is always in the document and tied to the field by `aria-describedby`, so a screen reader hears it without a click. It explains what the value does. What is **not** help and stays visible at the field: the error, a counter, the limits of an upload, a conversion of the value ("= 1 h") and the result of a check (the contrast of a colour). | - |
+| Required | A star after the name and `aria-required`. Every required field, in every form. | `.nino-admin-required` |
+| Checking | When saving, not while typing (exceptions: the colour field and a counter). A form carries `novalidate`; the browser's own bubble never appears. An error is a sentence under the field and a sentence in the line of the bar, the focus goes to the first wrong field. A button is not disabled because the input is invalid. | `fieldError()`, `clearFieldErrors()`, `status.fail()` |
+| Wording of errors | empty: "<Name> is missing." - wrong: "<Name> is not valid: <what is expected>." - taken: "<Name> is already taken." Whole sentences with a full stop. | fills `/_admin/common/error/*` |
+| Yes or no | A switch. | `switchField()` |
+| Several of a set | Rows of checkboxes. | `.nino-admin-checklist` |
+| One of two to five | The steps bar. | `steps()` |
+| One of many | A select. | `selectField()` |
+| Colour | Hex, picker and contrast. | `color()` |
+| File | One button "Upload <thing>" with the file name, the limits below it. It uploads at once (and says so as a toast) or with the saving of the form - the view decides by [Saving](#saving). No bare `input[type=file]`. | `uploadHint()`, `checkImage()` |
+| Code, CSS, JSON | A field or block in a fixed-width face, at 12 px, with a scroll bar of its own. | - |
+| Values in several languages | The form shows the working language of the workbench. All languages under one another only for short values that are required in EVERY language (the name and address of a page or route, an alt text): one row per language, the language as a badge in front. Languages are named "German (de_DE)" everywhere. | - |
+| A field whose work textfills decide | An icon "[ ]" in the form, size and place of the (?) icon, directly beside it at the name of the field. It appears only for accounts that may edit the field, and only at: multi-line text fields, HTML+ fields, technical values and the sources of loops. A click opens a dialog with the available textfills (search, name, notation, today's value in the working language); **a click on a row copies the notation to the clipboard** and says so as a toast - nothing is pasted at the caret. Without https or localhost the browser has no clipboard: the click then selects the notation to copy by hand. The dialog stays open until "Close". Anyone who may design chooses every source of a loop - choosing a source is not editing it. | - |
+| Character counter | "235 / 8000" at the right above the field. | `.nino-admin-char-counter` |
+| Width of a field | The full width of the column; a number, a date, a colour or an identifier is short (12 rem). No further widths. | - |
+
+```js
+form.noValidate = true;
+const name = Nino.adminUi.textField( { label : t('/_admin/roles/label/name'), name : 'name', required : true } );
+// when saving
+Nino.adminUi.clearFieldErrors( form );
+if( name.input.value.trim() === '' ) {
+	status.fail( t('/_admin/common/error/fields') );
+	Nino.adminUi.fieldError( name.el, name.input, 'roles-name-error', Nino.adminUi.format( t('/_admin/common/error/missing'), t('/_admin/roles/label/name') ) );
+	name.input.focus();
+	return done( false );
+}
+```
+
+## Saving
+
+Three models. A view has exactly one.
+
+| Model | When | Bar | Block |
+|---|---|---|---|
+| **A form** | the fields of a record or of a setting | `[Delete <thing>] [● Changed] ... line · [side actions] · [Save]` | `actionBar()`, `status()`, `Nino.admin.dirty.watchForm()` |
+| **B work surface** | a draft with a preview that is saved as a whole | `[● Changed] line ... [Undo] [Redo] [more] · [Save]` | `saveBar()`, `previewFrame()`, `conflict()` |
+| **C immediate** | one single action without a form: upload, switch on or off, the order of a list, back up, duplicate, copy | no bar (or only `listActions()`) | the answer as a toast |
+
+- **Exactly one main button per view, at the far right of the bar.** No Save button in the content, none per row. What reads "Apply" per row belongs to the form (model A) or is a view of its own.
+- **The word:** "Save" for what exists; "Create <thing>" in a view or a dialog that creates; never "Apply", "OK", "Done". An effect beyond saving has a name of its own and stands to the LEFT of the main button ("Apply to website"), or it is the main button of a view of its own.
+- **At the left** stands only "Delete <thing>" (`danger`) and beside it the state as a badge: "● Changed" / "✓ Saved".
+- **The line:** "Saving ..." (only after 0.4 s), then "Saved at hh:mm."; an error stays until something changes. Success is never written as a hint line in the content.
+- **After saving the view stays as it is.** A new thing gets its address; there is no jump to the list.
+- **Unsaved input** is reported by every view of the models A and B to `Nino.admin.dirty`; the shell asks "Save · Discard · Cancel". `save( done )` ends on every way with `done( ok )`. **Ctrl/Cmd+S** saves through the registry.
+- **Conflict (409):** model B asks with `conflict()`; model A shows the server's sentence in the line and leaves the form as it is.
+- **Immediate (C)** says what happened, for 4 s, and to a screen reader (`role="status"`). The form is **one toast** at the bottom right above the bar, at most one at a time, and never for an error.
+
+```js
+const bar = Nino.adminUi.actionBar( barElement );
+bar.appendChild( Nino.adminUi.button( t('/_admin/routes/label/delete'), remove, { kind : 'danger' } ) );
+const status = Nino.adminUi.status( line );
+Nino.admin.dirty.watchForm( 'routes', function() { return form }, save );
+```
+
+## Dialogs
+
+| Case | Form |
+|---|---|
+| A question before an action | `confirm( level, { title, message, yes, no } )` |
+| Make or copy something that needs only a name and at most four fields (duplicate, "save as") | `formDialog()` |
+| Pick something (a block, a source, a component) | `pickDialog()`, size `wide` |
+| The properties of ONE part of a work surface (a component, a logo, the menu of a frame) while the surface stays in view | `propertiesDialog()`: the title is the kind and name of the part, inside an `accordion()` with one section open (the content); the values go into the draft and the preview at once, the sheet has only "Close" - saving is done with the bar of the surface |
+| Text to read (a manual, the available textfills, markup to look at) | `manualDialog()` |
+| Everything else - every form of a record of its own with more than four fields, everything with an address of its own | a view of its own, no dialog |
+| A section that opens inside a form | only `accordion()`; never a "Delete" or "Duplicate" form inside a form |
+
+**Rules**
+
+- **Block:** every dialog is `choiceDialog()` or a block on it. No `window.confirm()`, `alert()`, `prompt()`, no `<dialog>` of its own - not in the wizard and not on the recovery page either.
+- **Title:** always. Verb and thing as a statement, without punctuation and without "...": "Delete element", "Duplicate theme". It is not a question. The text under it is the question in one sentence and - where something is lost - a second that says what.
+- **Buttons:** one row at the right. In every dialog the order is: further answers, Cancel, and the main answer at the far right. The answer that goes on is worded like the title ("Delete element"), never "Yes" or "OK". Exactly one button is `primary` or `danger`.
+- **Danger:** `danger` and the focus never on the destroying button: it opens on Cancel. Otherwise the focus opens on the first field or the first button.
+- **Closing:** Esc is the answer that does nothing. No "x", no closing by a click beside the dialog. The focus returns to what opened it.
+- **Sizes:** `narrow` 26 rem (a question), `form` 40 rem, `wide` 60 rem, `sheet` 28 rem at the right over the whole height. Title and answers stand, the content scrolls; at 390 px the dialog fills the width. The sheet of `propertiesDialog()` is not modal from 38 rem: no backdrop, the surface moves in and stays in use.
+- **Checking in a dialog** is the checking of a form (`fieldError()`); the dialog stays open until the server has said yes.
+
+**When a question is asked** (`level`; the shell's policy: development asks only `destructive`, production asks everything):
+
+| Level | Actions |
+|---|---|
+| `destructive` | delete · remove from disk · restore (a backup, the last state) · overwrite (an import, a conflict) · reset to the default |
+| `big` | apply to the website · activate or deactivate · rename an identifier · change the mode or the native language · log everybody out |
+| `routine` | whatever is done all day |
+| no question, but "Undo" | on a work surface with a history (model B): remove, move, insert. The line of the bar says so: "... Undo brings it back." |
+| no question | taking something out of an unsaved draft (the "x" of a row) |
+
+Typing the identifier (`confirm( ..., { typed } )`) is only for a thing that takes many others with it (an element type with all of its elements).
+
+```js
+Nino.adminUi.confirm( 'destructive', {
+	title    : t('/_admin/elements/confirm/delete-title'),        // "Delete element"
+	message  : Nino.adminUi.format( t('/_admin/elements/confirm/delete'), name ),
+	yes      : t('/_admin/elements/confirm/delete-title'),
+	no       : t('/_admin/common/label/cancel'),
+	onChoose : function( ok ) { if( ok === true ) remove() },
+} );
+```
+
+## Feedback
+
+| What | Form | Place | Block |
+|---|---|---|---|
+| Error at a field | A sentence, red, `aria-invalid` | under the field | `fieldError()` |
+| Saving refused or failed | A sentence, `role="alert"` | the line of the bar | `status.fail()`, `status.error()`, `saveBar().line` |
+| A list or view could not load | A sentence | in place of the content | `showError()` |
+| Success of a form | "Saved at hh:mm." and the badge "✓ Saved" | the bar | `status.saved()` |
+| Success of an immediate action | A toast: one sentence with "✓", 4 s, `role="status"`, it stays while the pointer rests on it | bottom right above the bar | - |
+| Something needs attention until it is fixed | A box with a sign and a sentence, optionally a link | at the top of the content | `notice()` |
+| The explanation of a whole view or section | Quiet text | above the content or in the section | `hint()` - only explanation, never success, error or emptiness, never the help of ONE field (that stands behind the "?") |
+| Nothing there | A box | in place of the list | `emptyState()` |
+| The state of a thing | A badge with a word | beside the name | `.nino-admin-badge[data-state]` |
+| Loading | The sentence "<Thing> is loading ...", `aria-busy` | in place of the content | - (no spinner, no skeleton) |
+| Locked | The button is `disabled`; the reason stands behind a (?) icon at the button (and as `title`) | at the button | - |
+| Session expired, conflict | A dialog | - | the shell, `conflict()` |
+
+Colour never says something alone: red has a word, a badge has a sign (●, ✓). Red means "takes something away" or "has failed" - nothing else.
+
+## Buttons and icons
+
+| Kind | Class | For | Height |
+|---|---|---|---|
+| Main | `.nino-admin-btn-primary` | the one action of the view or dialog | 38 px |
+| Normal | `.nino-admin-btn-secondary` | everything else | 38 px |
+| Dangerous | `.nino-admin-btn-danger` | takes something away for good or switches the website off | 38 px |
+| Small | the kind and `.nino-admin-btn--small` | in rows, cards, beside fields | 30 px |
+| Icon | `iconButton()` | up, down, remove, add, reload, settings, markup ... in rows and toolbars | 28 x 28 px |
+| Link | `.nino-admin-linkbutton` | a quiet action in a text ("Show all") | at least 24 px |
+
+- Every button comes from `Nino.adminUi.button( text, onClick, { kind, small, icon, name, type } )` or `iconButton( icon, name, onClick, { danger, small } )`. No panel defines a button class; no button is without the class of its kind.
+- **Icons are Lucide, everywhere.** A panel gets them from `Nino.adminUi.icon( name )`: an inline SVG in `currentColor`, 16 px, `aria-hidden`. Characters such as arrows, crosses and circled arrows are no icons and do not stand in buttons.
+- **An icon without a word** only in rows and toolbars, and always with a name (`aria-label` and `title`). An icon before a word is set only by the block (`button( ..., { icon } )`), never by a character in the text. No "..." at a button.
+- **Dangerous is red - on the website itself too:** "Delete" in the bar of a block carries the danger colour like every `danger` button.
+- A navigation is a link (`a`), not a main button: "Edit" on a card is `secondary`.
+- In every row of buttons the order is: side ... main (at the right). The dangerous one stands for itself (at the left of a bar, last in a row).
+
+## Words
+
+One word per thing. The fills are in `/_admin/common/label/*`; a panel takes them from there and writes none of its own for the same thing.
+
+| Thing | German | English | Not |
+|---|---|---|---|
+| Take a thing away for good | **Löschen** / "<Ding> löschen" | Delete | Remove (for what is permanent) |
+| Take a thing out of something, it stays (an image from its slot, a route from a navigation, a field from a draft) | **Entfernen** | Remove | Delete |
+| Take the files of a feature from the disk | **Deinstallieren** | Uninstall | Remove |
+| Button above a list | **Neue/r/s <Ding>** | New <thing> | Add, Create, "+" |
+| Main button of a view that creates | **<Ding> anlegen** | Create <thing> | Save |
+| Put a row into a draft | **<Ding> hinzufügen** | Add <thing> | New |
+| Put a block at a place (page editor) | **<Ding> einfügen** | Insert <thing> | Add |
+| Keep | **Speichern** | Save | Apply, OK, Done |
+| Bring what is saved to the website | **Auf Website anwenden** | Apply to website | Activate, Publish |
+| A copy | **Duplizieren** | Duplicate | Copy (that is the clipboard) |
+| Leave a dialog, do nothing | **Abbrechen** | Cancel | Close, No |
+| Leave a dialog that is only read | **Schließen** | Close | OK |
+| Throw away what is unsaved | **Verwerfen** | Discard | Reset |
+| Set to the system's default | **Zurücksetzen** | Reset | Discard |
+| Get an earlier state | **Wiederherstellen** | Restore | Reset, Load |
+| On or off of a feature, an account | **Aktivieren / Deaktivieren**; state "Aktiv / Inaktiv" | Activate / Deactivate | Switch on |
+| Switch | **An / Aus** | On / Off | ON / OFF in capitals |
+| Back link | **Zurück zu <Name>** | Back to <name> | Back to the list, All <things> |
+| States of the bar | **Geändert · Gespeichert · Wird gespeichert ... · Gespeichert um hh:mm.** | Changed · Saved · Saving ... · Saved at hh:mm. | Unsaved changes (only in the shell's dialog) |
+| Search | **<Dinge> suchen** | Search <things> | filter |
+| Empty | **Noch keine <Dinge>.** / filtered: **Keine <Dinge> gefunden.** | No <things> yet. / No <things> found. | - |
+| Error at a field | **<Name> fehlt.** · **<Name> ist ungültig: ...** | <Name> is missing. · <Name> is not valid: ... | This required field is empty |
+| Address of a page | **Adresse** (the technical identifier is the "Element URI", explained once) | Address | Uri |
+| Language | **Deutsch (de_DE)** | German (de_DE) | de_DE alone |
+| Navigation | its name ("Hauptmenü"), the identifier quiet behind it (`main`) | - | the identifier alone |
+| Date | **17.11.2026, 06:02** (de) · **2026-11-17, 06:02** (en) | | seconds; ISO in a German interface |
+
+Form: the German address is "Du/Dein/Dir" with a capital. Buttons and titles are in sentence case, without a full stop and without "..." (German: the verb in the infinitive at the end - "Route löschen"; English: the verb first - "Delete route"). Sentences end with a full stop. The ellipsis of a loading sentence is a space and "...". Quotation marks are „...“ in German, “...” in English. No raw key, type name or code stands as the only word: first the word, then the identifier in `code`. Every word is a fill, in both languages.
+
+The setup wizard and the recovery page are bilingual: German is the default, English is offered at the top right, and the choice holds for the run. They use the same list of words and the same blocks.
+
+## Narrow widths
+
+The workbench is fully usable on a phone, with one exception: a **work surface** (a page editor, a theme editor) only has to work there - every action is reachable, nothing runs over the edge, targets are at least 24 px - and is not arranged for it. It is built and checked for a desktop and a tablet.
+
+- The page never scrolls sideways. What is wider (a table, code) scrolls in a frame of its own.
+- Tabs wrap into a second row; nothing disappears behind the edge without a visible sign. The "?" stays in the row of the title.
+- Labels stand above the fields (a narrow column); fields take the full width. The (?) icon stays at the name of the field.
+- The bar stays at the bottom: the line above, the badge at the left and the buttons at the right below it; buttons become small (30 px), the words stay. No bar has more than four buttons.
+- `split()` shows one side and the switch; a grid of cards is one column; a dialog fills the width, its title and buttons stay in sight.
+- Targets are at least 24 x 24 px (icon buttons 28 px), at least 4 px between two targets.
+
+## Keyboard and focus
+
+- Whatever the mouse can do, the keyboard can. The order is the reading order: head, context bar, content, bar.
+- The focus ring is `outline: 2px solid var(--editor-blue)` (fields: `var(--editor-focus)`) and is never removed.
+- After a change of view the focus is on its heading (`tabindex="-1"`, without a visible ring for the mouse); after a dialog on what opened it; after the deletion of a row on the next one, else the previous, else the empty state; after a refused save on the first wrong field.
+- A composed block has one tab stop and the arrow keys (`steps()`, `tree()`, `accordion()`, tabs).
+- Enter in a one-line field is the main button of the form or dialog. Esc closes dialogs and nothing else.
+- Shortcuts: Ctrl/Cmd+S saves (the shell). Further shortcuts are assigned by the shell alone.
+- Changes of state are announced: the line of the bar is `role="status"`, an error is `role="alert"`, loading is `aria-busy`.
+
+## Tokens
+
+A rule of the workbench, of a panel or of a feature writes no number for type, weight, space, radius, shadow, height or colour - it names a step. The steps are custom properties of `:root` in `_admin/assets/style.css` (`nino.system`), and they are the same for the kernel's panels and for a feature's.
+
+| Scale | Tokens | Values |
+|---|---|---|
+| Type | `--nino-admin-text-xs`, `-sm`, `-md`, `-lg`, `-xl`, `-2xl` | 12 px (never less, whatever the root size is) · 12.6 px · 13.5 px · 15 px (the base) · 21 px (the title of a record) · 27 px (the title of a panel) |
+| Weight | `--nino-admin-weight-normal`, `-medium`, `-strong`, `-heavy` | 400 · 550 · 650 · 750 |
+| Space | `--nino-admin-space-1` ... `-8`, `--nino-admin-space-legend` | .25 · .375 · .5 · .625 · .75 · 1 · 1.25 · 1.5 rem; 2.5 rem above the first field of a card with a legend |
+| Radius | `--editor-radius-sm`, `--editor-radius`, `--nino-admin-radius-pill` | 7 px · 10 px · 999 px |
+| Shadow | `--editor-shadow-sm`, `--editor-shadow` | |
+| Height | `--nino-admin-control-height`, `--nino-admin-control-small`, `--nino-admin-control-icon`, `--nino-admin-control-icon-small`, `--nino-admin-row-height`, `--nino-admin-row-dense`, `--nino-admin-row-compact` | 38 px (44 px on a coarse pointer) · 30 px · 28 px · 24 px · 53 px (a row of a list with a second line) · 46 px (a dense row, a switch; 50 px on a coarse pointer) · 34 px (an entry of the rail, a tree row) |
+| Colour | `--editor-*` | text only in `--editor-text`, `--editor-text-secondary`, `--editor-blue`, `--editor-red-ink`, `--editor-green`, `--editor-orange-ink`; the word of a danger button in `--nino-admin-danger-ink` |
+
+Space is for `padding`, `margin` and `gap`. A value is the nearest step (a tie goes up); the steps are the values the sheet used most, so that what is rounded is the exception and the look of the workbench stays. What lies below half of the smallest step (under .125 rem) is the width of a hairline and not a space, and stays as it is, as do `0`, `auto`, `em` (which follow the type), a percentage, and a pixel value of a border or an overlap. What a rule needs beyond a step is written once as an exception with a comment that says why and how it was measured; the exceptions of the design system are these:
+
+- The root size, `15px`, which the steps count from.
+- The size of a tile's value (`1.6rem`): a date of ten characters fills a tile of 155 px at this size and wraps at the step above, at 390 px wide.
+- Sizes in `em` (code inside a text, a fieldset) and `inherit`: they follow the text around them.
+- The widths of a label column (`7rem`, `11rem`), the top margin of the login card (`clamp( 2rem, 9vh, 6rem )`) and the room of the arrow of a select (`14px`), which are layout, not space.
+- The heights `54px` (a choice with a name and a line under it) and the radius `12px` (the card of the login).
+
+Each exception stands at its place in `style.css` with a comment, and the test names it by selector, property and value.
+
+**Where the rule holds.** The rule is kept by `_admin/assets/style.css`, and the test holds it there. The stylesheets of the kernel's panels (`_admin/Nino/Modules/*/assets`), the wizard's and those of the features still write sizes of their own: each is brought to the tokens by the change that brings its panel to this chapter, and from then on the same test holds it.
+
+What is drawn on the website itself (the bar of a block in the page editor) MUST read the same tokens: the block hands them on as custom properties into its shadow DOM and keeps no colour, size or radius of its own.
+
+## What a panel does not build itself
+
+A panel (script, template, stylesheet - the kernel's or a feature's) MUST NOT:
+
+1. create a button other than with `Nino.adminUi.button()` or `iconButton()`, or define a button, chip or link-button class;
+2. open a dialog other than through `choiceDialog()` and the blocks on it, or use `window.confirm`, `alert` or `prompt`;
+3. write a bar (`.nino-admin-actionbar`, `-savebar`, `-contextbar`) by hand, or show more than one bar per view;
+4. rebuild list rows, cards, badges, tabs, switches, error, success, empty and hint lines with classes of its own;
+5. restyle a `nino-admin-*` class in its stylesheet (other than spacing and arrangement in its own root element), write a fixed colour, size, radius or shadow, or read a token that `style.css` does not declare;
+6. write a rule without its own root element (`#themes-app ...`) - a dialog gets its size from the size class of the kernel, not from an unscoped panel rule;
+7. give a thing of the list of words a name of its own, or write a sentence in a script;
+8. use the browser's checking (`required` without `novalidate`), a placeholder as a label, a help text under a field, or a language switch of its own for content;
+9. write success as a `hint` into the content, or change the view after saving;
+10. show a view without an address, without the back link of [Anatomy](#anatomy-of-a-view), or with a second back link.
+
+A panel's stylesheet then holds only the arrangement of its own content (a grid, spaces from the scale) and what exists only there (the swatches of a palette, the preview tile of a block).
+
+## Checklist
+
+For every review of a view. A line marked **[T]** can be held as a structural test.
+
+**Build**
+- [ ] A list or form view: head with title and "?", tabs only in the head. A work surface: no head, the panel's name small in the context bar. An address for every level, reloading keeps it.
+- [ ] Exactly one back link, "Back to <name>", in the context bar.
+- [ ] At most one bar; exactly one main button, at the far right; "Delete <thing>" at the left. [T]
+
+**Lists**
+- [ ] A list, table or cards from the block; the row opens; actions small, the dangerous one last.
+- [ ] The empty state as a box; a load error in place of the list. [T]
+
+**Forms**
+- [ ] Every field has a `label`, at the left of the field (narrow: above), at most two lines; help only behind the (?); required with a star; the textfill icon only at the kinds of field named above.
+- [ ] No language switch of its own; a view that depends on the language shows the badge of the working language. [T]
+- [ ] `novalidate`; errors with `fieldError()` and the line; the focus on the first error. [T]
+- [ ] Yes/no is a switch; one of a few is `steps()`; a colour is `color()`; a file is a button with its limits.
+
+**Saving**
+- [ ] One model (A, B or C); no Save button in the content. [T]
+- [ ] `Nino.admin.dirty` is registered; `save( done )` always ends; Ctrl+S saves. [T]
+- [ ] After saving the view stays; the line says "Saved at ...".
+
+**Dialogs**
+- [ ] A block; a title; the button is worded like the action; Cancel at the left of the main answer; the level by the table; a dangerous one opens on Cancel. [T]
+- [ ] No dialog for a form of more than four fields.
+
+**Words**
+- [ ] Words from the list; every word a fill in German and English; no raw identifier alone; "Du" with a capital; no "..." at a button. [T partly]
+
+**Buttons and values**
+- [ ] Every button from the block, with the class of its kind; an icon button with a name. [T]
+- [ ] The stylesheet of the panel: scoped, only tokens, no restyling of a `nino-admin-*` class. [T]
+
+**Measures**
+- [ ] 390 px: no sideways scrolling, nothing hidden (a work surface only has to be reachable); targets at least 24 px; text at least 12 px; contrast at least 4.5 : 1, light and dark.
+- [ ] Keyboard: everything reachable, the focus visible, the focus in the right place after a dialog, a deletion and an error.
+
+## What the tests pin
+
+`tests/admin-guide-smoke.php` reads the sources of the workbench and holds what can be held by structure, never by words: every `--nino-admin-*` token that a stylesheet or script of `_admin` reads is declared, every `nino-admin-*` class that a script of `_admin` uses has a rule in `style.css`, and `style.css` names type and space only through the tokens, apart from the exceptions above. A rule of this chapter that can be held by structure is added to that suite in the change that brings the block it needs.

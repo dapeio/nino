@@ -5,6 +5,11 @@ rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
+How a panel looks and behaves is not this recipe's to decide: [The workbench
+interface](../admin-ui.md) is the binding rule for every panel, a feature's
+included - the build of a view, lists, forms, saving, dialogs, words and the
+tokens - and a panel is reviewed against its checklist.
+
 A panel is one screen of the workbench: a navigation link, a content pane,
 an action map, a permission, and the script that renders into the pane.
 `/_admin` builds its shell from a panel registry (`\Nino\Admin\Panels`), so a
@@ -1346,6 +1351,12 @@ refuses before it sends anything goes into the line with `status.fail( text )`
 that something is wrong, the fields say what.
 
 ## Designing an admin frontend
+
+This section is the reference of the classes and blocks; which of them a screen
+uses for which task, and what a panel must not build itself, is
+[The workbench interface](../admin-ui.md). The design system's tokens for type,
+weight, space and height are declared at the top of `style.css`; a panel's
+stylesheet names a step of them and writes no size of its own.
 
 The `nino.system` half of `_admin/assets/style.css` is the design system for
 the workbench and every panel in it, the setup wizard and the recovery page

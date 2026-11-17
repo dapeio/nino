@@ -882,7 +882,7 @@ check( '"Log out" is an icon button without a word on the page, named by its tit
 	&& preg_match( '/ class="[^"]*\bnino-admin-rail-danger\b[^"]*"/', $logoutIcon['attributes'] ) === 1 && str_contains( $logoutIcon['attributes'], 'type="button"' ) );
 $railCss = (string) file_get_contents( dirname( __DIR__ ). '/_admin/assets/style.css' );
 check( 'both icons are a box of at least 24 px, the floor of the pointer target',
-	preg_match( '/#admin-user-follow,\s*#admin-user-logout\s*\{[^}]*\bmin-width:\s*24px;[^}]*\bmin-height:\s*24px;/', $railCss ) === 1 );
+	preg_match( '/#admin-user-follow,\s*#admin-user-logout\s*\{[^}]*\bmin-width:\s*var\(--nino-admin-control-icon-small\);[^}]*\bmin-height:\s*var\(--nino-admin-control-icon-small\);/', $railCss ) === 1 );
 check( 'the settings button has a title as well as its name',
 	preg_match( '/<button\b[^>]* id="admin-nav-ui-toggle"[^>]* title="\[\[\/_admin\/user\/settings\]\]"/', $indexTemplate ) === 1 );
 check( 'an empty mode chip is not drawn, in the design system and on the folded rail',
@@ -891,7 +891,7 @@ check( 'an empty mode chip is not drawn, in the design system and on the folded 
 check( 'on a phone the brand keeps the room of its words, so that the address is what gives way',
 	preg_match( '/@media \(max-width: 38rem\) \{\s*#admin-page-wrap \.nino-admin-rail-head > \.admin-brand \{\s*flex-shrink: 0;/', $railCss ) === 1 );
 check( 'the address leaves room under it for the focus ring of the icons',
-	preg_match( '/#admin-user-email \{\s*flex: 1 0 100%;[^}]*margin-bottom: \.35rem;/', $railCss ) === 1 );
+	preg_match( '/#admin-user-email \{\s*flex: 1 0 100%;[^}]*margin-bottom: var\(--nino-admin-space-2\);/', $railCss ) === 1 );
 check( 'on the desktop the head of the rail has no gap between the brand row and the account block',
 	preg_match( '/@media \(min-width: 64rem\) \{\s*#admin-page-wrap \.nino-admin-rail \{[^}]*\}\s*#admin-page-wrap \.nino-admin-rail-head \{\s*gap: 0;/', $railCss ) === 1 );
 preg_match_all( '/\[\[(\/_admin\/follow\/[a-z\/-]+)\]\]/', $followTemplate. $indexTemplate, $followKeys );

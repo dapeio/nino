@@ -149,7 +149,7 @@ function rule( selector ) {
 	return at === -1 ? '' : css.slice( at, css.indexOf( '}', at ) );
 }
 
-check( 'the icon button is a target of 28px and the small one of 24px', /width: 28px/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon' ) ) && /min-height: 28px/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon' ) ) && /width: 24px/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon--small' ) ) && /min-height: 24px/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon--small' ) ) );
+check( 'the icon button is a target of 28px and the small one of 24px', /width: var\(--nino-admin-control-icon\)/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon' ) ) && /min-height: var\(--nino-admin-control-icon\)/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon' ) ) && /width: var\(--nino-admin-control-icon-small\)/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon--small' ) ) && /min-height: var\(--nino-admin-control-icon-small\)/.test( rule( ':where(.nino-admin) .nino-admin-btn-icon--small' ) ) );
 check( 'it has the focus ring of every button', /button[^{]*:focus-visible\s*\{[^}]*outline: 2px solid/.test( css ) );
 
 done();

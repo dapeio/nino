@@ -82,6 +82,10 @@
 	   grey and 5.0:1 on the blue and green tints */
 	--editor-red: #dc2626;
 	--editor-red-ink: #c81e1e;
+	/* The word of a danger button: red on its own pale red, on the grey of the
+	   page - the red ink above measured 4.33:1 there, this one 4.88:1. In the
+	   dark scheme the two are one. */
+	--nino-admin-danger-ink: #b91c1c;
 	--editor-red-soft: rgba(220,38,38,.1);
 	--editor-green: #146c34;
 	--editor-green-soft: rgba(22,163,74,.1);
@@ -114,13 +118,46 @@
 	   under the one is the line under the other */
 	--nino-admin-head-height: 52px;
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
+	/* Type, weight, space and height are scales of a few steps each. A rule of
+	   the workbench, of a panel or of a feature names a step; it does not write
+	   a size of its own. The steps are in rem, so that they follow the root size
+	   (15px) - the one exception is the smallest type, which never falls under
+	   12px whatever the root is. The steps of space are the values the sheet
+	   used most, in eighths of a rem; the one beyond them (2.5rem) is the room
+	   above the first field of a card with a legend. */
+	--nino-admin-text-xs: max( .8rem, 12px );
+	--nino-admin-text-sm: .84rem;
+	--nino-admin-text-md: .9rem;
+	--nino-admin-text-lg: 1rem;
+	--nino-admin-text-xl: 1.4rem;
+	--nino-admin-text-2xl: 1.8rem;
+	--nino-admin-weight-normal: 400;
+	--nino-admin-weight-medium: 550;
+	--nino-admin-weight-strong: 650;
+	--nino-admin-weight-heavy: 750;
+	--nino-admin-space-1: .25rem;
+	--nino-admin-space-2: .375rem;
+	--nino-admin-space-3: .5rem;
+	--nino-admin-space-4: .625rem;
+	--nino-admin-space-5: .75rem;
+	--nino-admin-space-6: 1rem;
+	--nino-admin-space-7: 1.25rem;
+	--nino-admin-space-8: 1.5rem;
+	--nino-admin-space-legend: 2.5rem;
+	--nino-admin-radius-pill: 999px;
 	--nino-admin-control-height: 38px;
+	--nino-admin-control-small: 30px;
+	--nino-admin-control-icon: 28px;
+	--nino-admin-control-icon-small: 24px;
+	--nino-admin-row-compact: 34px;
 	/* The widths of a dialog: a question, a form, a list to pick from, the sheet of properties */
 	--nino-admin-dialog-narrow: 26rem;
 	--nino-admin-dialog-form: 40rem;
 	--nino-admin-dialog-wide: 60rem;
 	--nino-admin-dialog-sheet: 28rem;
-	--nino-admin-row-height: 46px;
+	/* The row of a list that is opened (the guide's 53px) and the row that only holds a line or a switch (46px) */
+	--nino-admin-row-height: 53px;
+	--nino-admin-row-dense: 46px;
 	/* The chevron and its reserved space stay together. A single SVG stroke
 	   avoids the sub-pixel seam two touching gradient triangles can expose. */
 	--nino-admin-select-indicator: 1.6rem;
@@ -142,6 +179,7 @@
 		--editor-blue-soft: rgba(96,165,250,.14);
 		--editor-red: #f87171;
 		--editor-red-ink: var(--editor-red);
+		--nino-admin-danger-ink: var(--editor-red);
 		--editor-red-soft: rgba(248,113,113,.14);
 		--editor-green: #4ade80;
 		--editor-green-soft: rgba(74,222,128,.14);
@@ -172,6 +210,7 @@
 	--editor-blue-soft: rgba(96,165,250,.14);
 	--editor-red: #f87171;
 	--editor-red-ink: var(--editor-red);
+	--nino-admin-danger-ink: var(--editor-red);
 	--editor-red-soft: rgba(248,113,113,.14);
 	--editor-green: #4ade80;
 	--editor-green-soft: rgba(74,222,128,.14);
@@ -251,8 +290,8 @@ a {
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
-	gap: .65rem;
-	padding: max(.75rem, env(safe-area-inset-top)) 1rem .75rem;
+	gap: var(--nino-admin-space-4);
+	padding: max(var(--nino-admin-space-5), env(safe-area-inset-top)) var(--nino-admin-space-6) var(--nino-admin-space-5);
 	border-bottom: 1px solid var(--nino-admin-rail-border);
 	background: var(--editor-bar-bg);
 	color: var(--nino-admin-rail-text);
@@ -264,7 +303,7 @@ a {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 1rem;
+	gap: var(--nino-admin-space-6);
 }
 
 :where(.nino-admin) :is(.nino-admin-auth-brand, .nino-admin-brand-copy, .nino-admin-rail-user) {
@@ -298,15 +337,15 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-brand-copy strong {
-	font-size: .94rem;
+	font-size: var(--nino-admin-text-lg);
 	letter-spacing: -.01em;
 }
 
 :where(.nino-admin) .nino-admin-brand-copy small {
-	margin-top: .18rem;
+	margin-top: var(--nino-admin-space-1);
 	color: var(--nino-admin-rail-muted);
-	font-size: max( .68rem, 12px );
-	font-weight: 650;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	letter-spacing: .085em;
 	text-transform: uppercase;
 }
@@ -328,12 +367,12 @@ a {
 	align-self: center;
 	min-height: 1.6rem;
 	margin-left: auto;
-	padding: .1rem .6rem;
+	padding: .1rem var(--nino-admin-space-4);
 	border: 1px solid currentColor;
-	border-radius: 999px;
+	border-radius: var(--nino-admin-radius-pill);
 	color: var(--nino-admin-rail-muted);
-	font-size: max( .72rem, 12px );
-	font-weight: 650;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	line-height: 1.4;
 	white-space: nowrap;
 	text-decoration: none;
@@ -370,17 +409,17 @@ a {
 	:where(.nino-admin) .nino-admin-mode-chip::before {
 		content: attr(data-initial);
 		content: attr(data-initial) / "";
-		font-size: max( .78rem, 12px );
+		font-size: var(--nino-admin-text-xs);
 		line-height: 1;
 	}
 }
 
 :where(.nino-admin) .nino-admin-rail-user {
 	justify-content: flex-end;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	min-width: 0;
 	color: var(--nino-admin-rail-muted);
-	font-size: .82rem;
+	font-size: var(--nino-admin-text-sm);
 }
 
 :where(.nino-admin) .nino-admin-rail-danger {
@@ -431,11 +470,11 @@ a {
 :where(.nino-admin) .nino-admin-nav > :is(a, span) {
 	flex: 0 0 auto;
 	margin-bottom: -1px;
-	padding: .62rem .65rem;
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-4);
 	border-bottom: 2px solid transparent;
 	color: var(--nino-admin-rail-muted);
-	font-size: .82rem;
-	font-weight: 550;
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-medium);
 	white-space: nowrap;
 }
 
@@ -446,7 +485,7 @@ a {
 
 :where(.nino-admin) .nino-admin-nav > :is(a, span).active {
 	border-bottom-color: var(--editor-blue);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 /* A link is an icon and a label. The icon stands in for the label on the
@@ -455,7 +494,7 @@ a {
 :where(.nino-admin) .nino-admin-nav > a {
 	display: inline-flex;
 	align-items: center;
-	gap: .55rem;
+	gap: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-nav-icon {
@@ -472,8 +511,8 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-nav-icon b {
-	font-size: max( .72rem, 12px );
-	font-weight: 750;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-heavy);
 	line-height: 1;
 }
 
@@ -497,7 +536,7 @@ a {
 	:where(.nino-admin) .nino-admin-nav--select > .nino-admin-nav-select {
 		display: block;
 		flex: 1 1 auto;
-		margin: .4rem 0;
+		margin: var(--nino-admin-space-2) 0;
 	}
 }
 
@@ -506,7 +545,7 @@ a {
 	max-width: 76rem;
 	min-width: 0;
 	margin: 0 auto;
-	padding: 1rem var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + 1.5rem);
+	padding: var(--nino-admin-space-6) var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + var(--nino-admin-space-8));
 	scroll-padding-block-start: calc(var(--nino-admin-contextbar-height) + .5rem);
 	scroll-padding-block-end: calc(var(--nino-admin-actionbar-height) + .5rem);
 }
@@ -527,13 +566,13 @@ a {
 	top: .5rem;
 	left: .5rem;
 	z-index: 100;
-	padding: .55rem .9rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-6);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-blue);
 	box-shadow: var(--editor-shadow);
 	color: var(--nino-admin-active-text);
-	font-size: .84rem;
-	font-weight: 650;
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-strong);
 	transform: translateY(-200%);
 }
 
@@ -549,36 +588,36 @@ a {
 
 :where(.nino-admin) :is(h1, h2, h3, h4) {
 	color: var(--editor-text);
-	font-weight: 700;
+	font-weight: var(--nino-admin-weight-strong);
 	line-height: 1.2;
 	letter-spacing: -.025em;
 }
 
 :where(.nino-admin) :is(.main-title, .main-title--withuri) {
-	margin: 0 0 .2rem;
-	font-size: clamp(1.15rem, 2vw, 1.4rem);
-	font-weight: 700;
+	margin: 0 0 var(--nino-admin-space-1);
+	font-size: var(--nino-admin-text-xl);
+	font-weight: var(--nino-admin-weight-strong);
 	line-height: 1.2;
 	letter-spacing: -.025em;
 }
 
 :where(.nino-admin) .main-uri {
-	margin: 0 0 .85rem;
+	margin: 0 0 var(--nino-admin-space-5);
 	color: var(--editor-text-secondary);
-	font: max( .75rem, 12px )/1.4 var(--nino-admin-mono);
+	font: var(--nino-admin-text-xs)/1.4 var(--nino-admin-mono);
 }
 
 :where(.nino-admin) fieldset legend,
 :where(.nino-admin) .nino-admin-eyebrow {
-	font-size: max( .7rem, 12px );
-	font-weight: 750;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-heavy);
 	letter-spacing: .065em;
 	text-transform: uppercase;
 }
 
 :where(.nino-admin) .nino-admin-hint {
 	color: var(--editor-text-secondary);
-	font-size: .8rem;
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.55;
 }
 
@@ -588,12 +627,12 @@ a {
    collection is a state, not an error, and it should look the same on the
    dashboard, in a panel and on a tab. */
 :where(.nino-admin) .nino-admin-empty {
-	margin: .5rem 0 .9rem;
-	padding: 1rem 1.1rem;
+	margin: var(--nino-admin-space-3) 0 var(--nino-admin-space-6);
+	padding: var(--nino-admin-space-6) var(--nino-admin-space-6);
 	border: 1px dashed var(--editor-border);
 	border-radius: var(--editor-radius);
 	color: var(--editor-text-secondary);
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 	line-height: 1.5;
 	text-align: center;
 }
@@ -604,28 +643,28 @@ a {
    above the content, never in the colour alone: the amber bar is only the
    mark the eye finds first, and both themes carry their own amber. */
 :where(.nino-admin) .nino-admin-notice {
-	margin: 0 0 .65rem;
-	padding: .65rem .85rem;
+	margin: 0 0 var(--nino-admin-space-4);
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-5);
 	border: 1px solid color-mix(in srgb, var(--editor-orange) 45%, transparent);
 	border-inline-start: 4px solid var(--editor-orange);
 	border-radius: var(--editor-radius);
 	background: color-mix(in srgb, var(--editor-orange) 10%, var(--editor-bg-elevated));
 	color: var(--editor-text);
-	font-size: .85rem;
+	font-size: var(--nino-admin-text-sm);
 	line-height: 1.5;
 }
 
 :where(.nino-admin) .nino-admin-notice a {
 	color: var(--editor-blue);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 	white-space: nowrap;
 }
 
 /* The hint that introduces a whole screen rather than one field: a tinted
    block at the top of the pane instead of a line of grey text. */
 :where(.nino-admin) .nino-admin-hint-lead {
-	margin: 0 0 .8rem;
-	padding: .75rem .85rem;
+	margin: 0 0 var(--nino-admin-space-5);
+	padding: var(--nino-admin-space-5) var(--nino-admin-space-5);
 	border-radius: var(--editor-radius);
 	background: var(--editor-blue-soft);
 	box-shadow: none;
@@ -635,7 +674,7 @@ a {
 
 :where(.nino-admin) button {
 	min-height: var(--nino-admin-control-height);
-	padding: .48rem .82rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	border: 0;
 	border-radius: var(--editor-radius-sm);
 	appearance: none;
@@ -644,8 +683,8 @@ a {
 	color: var(--editor-blue);
 	cursor: pointer;
 	font: inherit;
-	font-size: .84rem;
-	font-weight: 650;
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-strong);
 	line-height: 1.4rem;
 	box-shadow: inset 0 0 0 1px var(--editor-border), var(--editor-shadow-sm);
 	transform: none;
@@ -705,7 +744,7 @@ a {
 	border-color: color-mix(in srgb, var(--editor-red) 38%, transparent);
 	background: var(--editor-red-soft);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-red) 38%, transparent);
-	color: var(--editor-red-ink);
+	color: var(--nino-admin-danger-ink);
 	opacity: 1;
 }
 
@@ -719,9 +758,9 @@ a {
    changes the size and nothing else, so it goes beside the variant that says
    what the button does (primary, secondary, danger) */
 :where(.nino-admin) .nino-admin-btn--small {
-	min-height: 30px;
-	padding: .25rem .55rem;
-	font-size: max( .76rem, 12px );
+	min-height: var(--nino-admin-control-small);
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-3);
+	font-size: var(--nino-admin-text-xs);
 }
 
 /* A button that has an icon before its word (Nino.adminUi.button( text, fn,
@@ -729,7 +768,7 @@ a {
 :where(.nino-admin) .nino-admin-btn--lead-icon {
 	display: inline-flex;
 	align-items: center;
-	gap: .4rem;
+	gap: var(--nino-admin-space-2);
 }
 
 :where(.nino-admin) .nino-admin-icon {
@@ -744,18 +783,18 @@ a {
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
-	width: 28px;
-	min-width: 28px;
-	height: 28px;
-	min-height: 28px;
+	width: var(--nino-admin-control-icon);
+	min-width: var(--nino-admin-control-icon);
+	height: var(--nino-admin-control-icon);
+	min-height: var(--nino-admin-control-icon);
 	padding: 0;
 }
 
 :where(.nino-admin) .nino-admin-btn-icon--small {
-	width: 24px;
-	min-width: 24px;
-	height: 24px;
-	min-height: 24px;
+	width: var(--nino-admin-control-icon-small);
+	min-width: var(--nino-admin-control-icon-small);
+	height: var(--nino-admin-control-icon-small);
+	min-height: var(--nino-admin-control-icon-small);
 }
 
 /* Buttons - and a line of status, a link - in one row inside a form or under
@@ -768,7 +807,7 @@ a {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-actions--end {
@@ -786,10 +825,10 @@ a {
    only signal */
 :where(.nino-admin) .nino-admin-badge {
 	display: inline-block;
-	padding: .1rem .55rem;
+	padding: .1rem var(--nino-admin-space-3);
 	border: 1px solid currentColor;
-	border-radius: 999px;
-	font-size: max( .72rem, 12px );
+	border-radius: var(--nino-admin-radius-pill);
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.4;
 	white-space: nowrap;
 }
@@ -813,7 +852,7 @@ a {
 /* The chip Nino.adminUi.tabBadge() puts on the button of a tab: a little away
    from the label it follows */
 :where(.nino-admin) .nino-admin-tab-badge {
-	margin-left: .45rem;
+	margin-left: var(--nino-admin-space-3);
 }
 
 /* The square buttons at the end of a row of an ordered list - up, down,
@@ -825,7 +864,7 @@ a {
 :where(.nino-admin) .nino-admin-move {
 	display: flex;
 	flex: 0 0 auto;
-	gap: .25rem;
+	gap: var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) .nino-admin-move button {
@@ -837,7 +876,7 @@ a {
 	padding: 0;
 	border-radius: var(--editor-radius-sm);
 	box-shadow: inset 0 0 0 1px var(--editor-border);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1;
 }
 
@@ -847,7 +886,7 @@ a {
 
 /* ...and at the end of a row of a list it stands off the row's edge */
 :where(.nino-admin) .nino-admin-list > li > .nino-admin-move {
-	padding: 0 .65rem;
+	padding: 0 var(--nino-admin-space-4);
 }
 
 :where(.nino-admin) :is(
@@ -864,13 +903,13 @@ a {
 	width: 100%;
 	max-width: 100%;
 	min-height: var(--nino-admin-control-height);
-	padding: .48rem .62rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background-color: var(--editor-bg-elevated);
 	color: var(--editor-text);
 	font: inherit;
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
 	transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
@@ -894,11 +933,11 @@ a {
 	background-color: var(--editor-bg-elevated);
 	color: var(--editor-text);
 	font: inherit;
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 	box-shadow: inset 0 1px 1px rgba(15,23,42,.025);
 	appearance: none;
 	-webkit-appearance: none;
-	padding: .48rem var(--nino-admin-select-indicator) .48rem .62rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-select-indicator) var(--nino-admin-space-3) var(--nino-admin-space-4);
 	background-image: var(--nino-admin-select-chevron);
 	background-position: right .65rem center;
 	background-size: 12px 8px;
@@ -957,13 +996,13 @@ a {
    knows the syntax, so it is drawn and not read out. */
 :where(.nino-admin) .nino-admin-status {
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-status[data-state]::before {
 	display: inline-block;
-	margin-right: .35rem;
-	font-weight: 600;
+	margin-right: var(--nino-admin-space-2);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-status[data-state="saving"]::before {
@@ -1039,9 +1078,9 @@ a {
 	display: flex;
 	flex: 1 1 auto;
 	flex-direction: column;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	min-height: 0;
-	padding: 1.25rem;
+	padding: var(--nino-admin-space-7);
 }
 
 :where(.nino-admin) .nino-admin-dialog-head {
@@ -1049,7 +1088,7 @@ a {
 	flex: none;
 	align-items: center;
 	justify-content: space-between;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-dialog-head > * {
@@ -1057,7 +1096,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-dialog-title {
-	font-size: 1.05rem;
+	font-size: var(--nino-admin-text-lg);
 	overflow-wrap: anywhere;
 }
 
@@ -1072,7 +1111,7 @@ a {
 	display: grid;
 	flex: 1 1 auto;
 	align-content: start;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	min-height: 0;
 	/* Room for the ring of a field at the edge of what scrolls, which the box would cut off */
 	margin: -4px;
@@ -1097,7 +1136,7 @@ a {
 	flex: none;
 	flex-wrap: wrap;
 	justify-content: flex-end;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-dialog-actions > button {
@@ -1110,7 +1149,7 @@ a {
 :where(.nino-admin) .nino-admin-dialog-fields,
 :where(.nino-admin) .nino-admin-dialog-typed {
 	display: grid;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	margin: 0;
 }
 
@@ -1126,7 +1165,7 @@ a {
 
 :where(.nino-admin) .nino-admin-dialog-fields > .nino-admin-field-error,
 :where(.nino-admin) .nino-admin-dialog-form > .nino-admin-field-error {
-	margin: -.4rem 0 0;
+	margin: calc( var(--nino-admin-space-2) * -1 ) 0 0;
 }
 
 @media (min-width: 40rem) {
@@ -1134,7 +1173,7 @@ a {
 		display: grid;
 		grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
 		align-items: center;
-		gap: .75rem;
+		gap: var(--nino-admin-space-5);
 	}
 
 	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field > span {
@@ -1142,7 +1181,7 @@ a {
 	}
 
 	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field-error {
-		margin-left: calc(min(max(7rem, 28%), 11rem) + .75rem);
+		margin-left: calc(min(max(7rem, 28%), 11rem) + var(--nino-admin-space-5));
 	}
 }
 
@@ -1150,7 +1189,7 @@ a {
    search stays at the top while the rows scroll under it. */
 :where(.nino-admin) .nino-admin-pick {
 	display: grid;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 	align-content: start;
 }
 
@@ -1162,15 +1201,15 @@ a {
 
 :where(.nino-admin) .nino-admin-pick-list {
 	display: grid;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-pick-item {
 	display: grid;
-	gap: .15rem;
+	gap: var(--nino-admin-space-1);
 	width: 100%;
 	min-height: var(--nino-admin-control-height);
-	padding: .5rem .75rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
@@ -1189,13 +1228,13 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-pick-name {
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-pick-line {
 	color: var(--editor-text-secondary);
-	font-weight: 400;
-	font-size: max( .84rem, 12px );
+	font-weight: var(--nino-admin-weight-normal);
+	font-size: var(--nino-admin-text-sm);
 }
 
 :where(.nino-admin) .nino-admin-pick-empty {
@@ -1255,12 +1294,12 @@ a {
    Features panel puts it under a tab, so it is as long as it is instead of
    scrolling inside a frame that showed three of its seven headings. */
 :where(.nino-admin) .nino-admin-manual {
-	font-size: .85rem;
+	font-size: var(--nino-admin-text-sm);
 	line-height: 1.55;
 }
 
 :where(.nino-admin) .nino-admin-manual p {
-	margin: 0 0 .6rem;
+	margin: 0 0 var(--nino-admin-space-4);
 }
 
 :where(.nino-admin) .nino-admin-manual p:last-child {
@@ -1280,10 +1319,10 @@ a {
    glance at rather than a thing to read, and the look has to hold that up -
    the headings small, the handles aligned, the lines tight. */
 :where(.nino-admin) .nino-admin-manual-heading {
-	margin: .9rem 0 .3rem;
+	margin: var(--nino-admin-space-6) 0 var(--nino-admin-space-1);
 	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
-	font-weight: 600;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	letter-spacing: .02em;
 	text-transform: uppercase;
 }
@@ -1300,7 +1339,7 @@ a {
 :where(.nino-admin) .nino-admin-manual-section {
 	display: grid;
 	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-	gap: .2rem .7rem;
+	gap: var(--nino-admin-space-1) var(--nino-admin-space-5);
 	align-items: baseline;
 	margin: 0;
 }
@@ -1327,9 +1366,9 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-manual-section--terms > dt {
-	margin-top: .7rem;
+	margin-top: var(--nino-admin-space-5);
 	color: var(--editor-text);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-manual-section--terms > dt:empty {
@@ -1355,7 +1394,7 @@ a {
 	}
 
 	:where(.nino-admin) .nino-admin-manual-section > dd {
-		margin-bottom: .5rem;
+		margin-bottom: var(--nino-admin-space-3);
 	}
 }
 
@@ -1379,7 +1418,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-dialog--manual .nino-admin-manual-section:not(.nino-admin-manual-section--terms) > dd {
-	margin-bottom: .5rem;
+	margin-bottom: var(--nino-admin-space-3);
 }
 
 /* --------------------------------------------------------- Cards and forms */
@@ -1399,8 +1438,8 @@ a {
 
 :where(.nino-admin) fieldset {
 	position: relative;
-	margin: 0 0 .75rem;
-	padding: 2.65rem 1rem .2rem;
+	margin: 0 0 var(--nino-admin-space-5);
+	padding: var(--nino-admin-space-legend) var(--nino-admin-space-6) var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) fieldset legend {
@@ -1412,30 +1451,30 @@ a {
 }
 :where(.nino-admin) fieldset:has(legend),
 :where(.nino-admin) .nino-admin-checkbox-fieldset:has(legend) {
-	padding-top:2.65rem;
+	padding-top: var(--nino-admin-space-legend);
 }
 
 :where(.nino-admin) .nino-admin-field {
 	display: block;
-	margin: 0 0 .72rem;
+	margin: 0 0 var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-field > span,
 :where(.nino-admin) .nino-admin-field-name {
 	display: block;
-	margin-bottom: .22rem;
+	margin-bottom: var(--nino-admin-space-1);
 	color: var(--editor-text-secondary);
-	font-size: max( .74rem, 12px );
-	font-weight: 600;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-field-header {
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	min-width: 0;
-	margin-bottom: .22rem;
+	margin-bottom: var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) .nino-admin-field-header .nino-admin-field-name {
@@ -1448,7 +1487,7 @@ a {
 	flex: 0 0 auto;
 	margin: 0;
 	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 	white-space: nowrap;
@@ -1456,13 +1495,13 @@ a {
 
 :where(.nino-admin) .nino-admin-char-counter.is-limit {
 	color: var(--editor-red-ink);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-field-hint {
-	margin: -.4rem 0 .72rem;
+	margin: calc( var(--nino-admin-space-2) * -1 ) 0 var(--nino-admin-space-5);
 	color: var(--editor-text-secondary);
-	font-size: max( .74rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.45;
 }
 
@@ -1470,16 +1509,16 @@ a {
    The sentence says so itself; the colour only supports it. */
 :where(.nino-admin) .nino-admin-field-hint.is-warning {
 	color: var(--editor-orange-ink);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 /* The mark after the name of a field that cannot be left empty. Drawn by the
    panel with aria-hidden: what a screen reader gets is aria-required on the
    control, so the star is not read out as "star". */
 :where(.nino-admin) .nino-admin-required {
-	margin-left: .2rem;
+	margin-left: var(--nino-admin-space-1);
 	color: var(--editor-red-ink);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 /* The sentence under a field a save was refused for. A class of its own: the
@@ -1488,9 +1527,9 @@ a {
    with aria-describedby; the words are not an alert, the form's status line
    announces the refusal once. */
 :where(.nino-admin) .nino-admin-field-error {
-	margin: .3rem 0 .72rem;
+	margin: var(--nino-admin-space-1) 0 var(--nino-admin-space-5);
 	color: var(--editor-red-ink);
-	font-size: max( .74rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.45;
 	overflow-wrap: anywhere;
 }
@@ -1510,7 +1549,7 @@ a {
 :where(.nino-admin) .nino-admin-field-suffixed {
 	display: flex;
 	align-items: center;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-field-suffixed :is(input, textarea) {
@@ -1522,25 +1561,25 @@ a {
 :where(.nino-admin) .nino-admin-field-suffix {
 	flex: 0 0 auto;
 	color: var(--editor-text-secondary);
-	font-size: .8rem;
-	font-weight: 650;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-checkbox-fieldset {
-	padding: 1rem .5rem;
+	padding: var(--nino-admin-space-6) var(--nino-admin-space-3);
 	font-size: max( .9em, 12px );
 }
 
 :where(.nino-admin) .nino-admin-checkbox-fieldset label {
-	margin-right: 1.5rem;
+	margin-right: var(--nino-admin-space-8);
 }
 
 :where(.nino-admin) .nino-admin-checkbox-field {
 	display: flex;
 	align-items: center;
-	gap: .5rem;
-	min-height: 34px;
-	margin: 0 0 .28rem;
+	gap: var(--nino-admin-space-3);
+	min-height: var(--nino-admin-row-compact);
+	margin: 0 0 var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) .nino-admin-field input[type="checkbox"],
@@ -1560,13 +1599,13 @@ a {
 	display: flex;
 	align-items: center;
 	min-height: var(--nino-admin-control-height);
-	padding-right: 1rem;
+	padding-right: var(--nino-admin-space-6);
 	border: 1px solid var(--editor-border);
 	border-right: 0;
 	background: var(--editor-bg-elevated);
 	color: var(--editor-text);
 	cursor: pointer;
-	font-size: .82rem;
+	font-size: var(--nino-admin-text-sm);
 	transition: background-color .15s ease, color .15s ease;
 }
 
@@ -1603,15 +1642,15 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-field-image-dimensions {
-	margin: -.2rem 0 .5rem;
+	margin: calc( var(--nino-admin-space-1) * -1 ) 0 var(--nino-admin-space-3);
 	color: var(--editor-text-secondary);
-	font-size: max( .74rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-field-image {
 	display: flex;
 	flex-direction: column;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-field-image-preview {
@@ -1625,25 +1664,25 @@ a {
 
 :where(.nino-admin) .nino-admin-field-image input[type="file"] {
 	min-height: auto;
-	padding: .5rem;
+	padding: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-field-image-msg {
 	margin: 0;
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-field-image-msg.is-error {
 	color: var(--editor-red-ink);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 /* A warning is not an error: the picture was saved. The text says what is
    wrong in words, the colour only supports it. */
 :where(.nino-admin) .nino-admin-field-image-msg.is-warning {
 	color: var(--editor-orange-ink);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 /* The multi-reference control (Nino.adminUi.elementList()): the chosen
@@ -1666,16 +1705,16 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-elementlist-results {
-	margin-top: .35rem;
+	margin-top: var(--nino-admin-space-2);
 }
 
 :where(.nino-admin) .nino-admin-elementlist-chosen > li,
 :where(.nino-admin) .nino-admin-elementlist-results > li {
 	display: flex;
 	align-items: center;
-	gap: .4rem;
-	padding: .3rem .45rem;
-	font-size: .8rem;
+	gap: var(--nino-admin-space-2);
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-3);
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-elementlist-chosen > li + li,
@@ -1696,17 +1735,17 @@ a {
 :where(.nino-admin) .nino-admin-elementlist-actions {
 	display: flex;
 	flex: 0 0 auto;
-	gap: .15rem;
+	gap: var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) .nino-admin-elementlist :is(.nino-admin-elementlist-actions, li) > button {
 	min-height: auto;
-	padding: .1rem .35rem;
+	padding: .1rem var(--nino-admin-space-2);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-grouped);
 	color: var(--editor-text);
-	font-size: max( .78rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.3;
 	cursor: pointer;
 }
@@ -1731,20 +1770,20 @@ a {
 
 :where(.nino-admin) .nino-admin-elementlist-count {
 	display: block;
-	margin: .25rem 0 0;
+	margin: var(--nino-admin-space-1) 0 0;
 	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 }
 
 :where(.nino-admin) .nino-admin-elementlist-count.is-limit {
 	color: var(--editor-orange-ink);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-elementlist-search {
-	margin-top: .35rem;
+	margin-top: var(--nino-admin-space-2);
 }
 
 /* A list of texts (Nino.adminUi.stringList()): one row per text, the text
@@ -1753,7 +1792,7 @@ a {
    here is an input somebody is typing into, and one that scrolls inside
    itself hides what is being written */
 :where(.nino-admin) .nino-admin-stringlist-rows {
-	margin: 0 0 .35rem;
+	margin: 0 0 var(--nino-admin-space-2);
 	padding: 0;
 	list-style: none;
 }
@@ -1761,8 +1800,8 @@ a {
 :where(.nino-admin) .nino-admin-stringlist-rows > li {
 	display: flex;
 	align-items: center;
-	gap: .4rem;
-	padding: .15rem 0;
+	gap: var(--nino-admin-space-2);
+	padding: var(--nino-admin-space-1) 0;
 }
 
 :where(.nino-admin) .nino-admin-stringlist-input {
@@ -1773,18 +1812,18 @@ a {
 :where(.nino-admin) .nino-admin-stringlist-actions {
 	display: flex;
 	flex: 0 0 auto;
-	gap: .15rem;
+	gap: var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) .nino-admin-stringlist :is(.nino-admin-stringlist-actions, .nino-admin-stringlist-add) > button,
 :where(.nino-admin) .nino-admin-stringlist-add {
 	min-height: auto;
-	padding: .1rem .5rem;
+	padding: .1rem var(--nino-admin-space-3);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-grouped);
 	color: var(--editor-text);
-	font-size: max( .78rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.3;
 	cursor: pointer;
 }
@@ -1813,15 +1852,15 @@ a {
 :where(.nino-admin) .nino-admin-locale-select {
 	width: auto;
 	max-width: 7rem;
-	min-height: 30px;
-	padding-top: .25rem;
-	padding-bottom: .25rem;
-	padding-left: .6rem;
+	min-height: var(--nino-admin-control-small);
+	padding-top: var(--nino-admin-space-1);
+	padding-bottom: var(--nino-admin-space-1);
+	padding-left: var(--nino-admin-space-4);
 	border-color: transparent;
 	background-color: var(--editor-blue-soft);
 	color: var(--editor-blue);
-	font-size: max( .78rem, 12px );
-	font-weight: 600;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-locale-select--corner {
@@ -1851,9 +1890,9 @@ a {
 :where(.nino-admin) .nino-admin-switch {
 	display: flex;
 	align-items: center;
-	gap: .7rem;
-	min-height: var(--nino-admin-row-height);
-	padding: .5rem .1rem;
+	gap: var(--nino-admin-space-5);
+	min-height: var(--nino-admin-row-dense);
+	padding: var(--nino-admin-space-3) .1rem;
 	cursor: pointer;
 }
 
@@ -1876,7 +1915,7 @@ a {
 	height: 1.35rem;
 	margin-top: .1rem;
 	border: 1px solid var(--editor-separator);
-	border-radius: 999px;
+	border-radius: var(--nino-admin-radius-pill);
 	background-color: var(--nino-admin-surface-muted);
 	transition: background-color .16s ease, border-color .16s ease;
 }
@@ -1920,13 +1959,13 @@ a {
 	gap: .1rem;
 	flex: 1 1 auto;
 	min-width: 0;
-	font-size: .88rem;
+	font-size: var(--nino-admin-text-md);
 	line-height: 1.35;
 }
 
 :where(.nino-admin) .nino-admin-switch-copy small {
 	color: var(--editor-text-secondary);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.4;
 }
 
@@ -1936,10 +1975,10 @@ a {
 :where(.nino-admin) .nino-admin-switch-state {
 	flex: none;
 	min-width: 2.4rem;
-	margin-top: .16rem;
+	margin-top: var(--nino-admin-space-1);
 	color: var(--editor-text-secondary);
-	font-size: max( .74rem, 12px );
-	font-weight: 600;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	letter-spacing: .04em;
 	text-transform: uppercase;
 	text-align: right;
@@ -1974,7 +2013,7 @@ a {
      <div class="nino-admin-tabpanel" role="tabpanel">…</div> */
 :where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel):not(.nino-admin-tabs--bar) {
 	display: flex;
-	margin: 0 0 .9rem;
+	margin: 0 0 var(--nino-admin-space-6);
 	border-radius:var(--editor-radius-sm);
 	overflow:hidden;
 }
@@ -1986,7 +2025,7 @@ a {
    of equal boxes with the underline's colours on top: half of each */
 :where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--panel):not(.nino-admin-tabs--bar) .nino-admin-tab {
 	flex: 1 1 auto;
-	padding: .5rem .3rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-1);
 	border: 0;
 	box-shadow: none;
 	border-radius:0;
@@ -1996,8 +2035,8 @@ a {
 	margin-bottom: -1px;
 	background: var(--editor-bg-elevated);
 	color: var(--editor-text-secondary);
-	font-size: .8rem;
-	font-weight: 600;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	cursor: pointer;
 	border-right: 1px solid var(--editor-border);
 }
@@ -2041,14 +2080,14 @@ a {
    width between them */
 :where(.nino-admin) .nino-admin-tabs--bar:not(.nino-admin-tabs--panel) {
 	display: flex;
-	gap: .25rem;
-	margin: 0 0 1.25rem;
+	gap: var(--nino-admin-space-1);
+	margin: 0 0 var(--nino-admin-space-7);
 	border-bottom: 1px solid var(--editor-separator);
 }
 
 :where(.nino-admin) .nino-admin-tabs--bar .nino-admin-tab {
 	flex: 0 0 auto;
-	padding: .55rem 1.25rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-7) var(--nino-admin-space-4);
 	border-bottom: 2px solid transparent;
 	border-radius: 0;
 	/* A tab is a word on the rule, not a button on the page: the surface
@@ -2084,15 +2123,15 @@ a {
 	display: flex;
 	flex-direction: column;
 	gap: .12rem;
-	font-size:.85rem;
+	font-size: var(--nino-admin-text-sm);
 }
 
 :where(.nino-admin) .nino-admin-checklist label {
 	display: flex;
 	align-items: center;
-	gap: .55rem;
-	min-height: 38px;
-	padding: .45rem .65rem;
+	gap: var(--nino-admin-space-3);
+	min-height: var(--nino-admin-control-height);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
 	border-radius: var(--editor-radius-sm);
 }
 
@@ -2103,22 +2142,22 @@ a {
    that happens to end in something else. */
 :where(.nino-admin) .nino-admin-checklist-state {
 	margin-left: auto;
-	padding-left: .75rem;
+	padding-left: var(--nino-admin-space-5);
 	color: var(--editor-text-secondary);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	text-align: right;
 }
 
 :where(.nino-admin) .nino-admin-richtext {
-	margin-bottom: .72rem;
+	margin-bottom: var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-richtext-toolbar {
 	display: flex;
 	flex-wrap: wrap;
-	gap: .2rem;
-	margin-bottom: .32rem;
-	padding: .22rem;
+	gap: var(--nino-admin-space-1);
+	margin-bottom: var(--nino-admin-space-2);
+	padding: var(--nino-admin-space-1);
 	width: fit-content;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
@@ -2126,22 +2165,22 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-richtext-btn {
-	min-height: 30px;
-	padding: .3rem .55rem;
+	min-height: var(--nino-admin-control-small);
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-3);
 	background: transparent;
 	color: var(--editor-text);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	box-shadow: none;
 }
 
 :where(.nino-admin) .nino-admin-richtext-btn[data-tag="em"] {
 	font-style: italic;
-	font-weight: 400;
+	font-weight: var(--nino-admin-weight-normal);
 }
 
 :where(.nino-admin) .nino-admin-richtext-btn[data-tag="code"] {
 	font-family: var(--nino-admin-mono);
-	font-weight: 500;
+	font-weight: var(--nino-admin-weight-normal);
 }
 
 :where(.nino-admin) .nino-admin-richtext-btn.active {
@@ -2156,11 +2195,11 @@ a {
 	   3rem stays for a browser without lh */
 	min-height: 3rem;
 	min-height: max(3rem, calc(var(--nino-admin-richtext-rows, 0) * 1lh + 1.1rem));
-	padding: .55rem .65rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
-	font-size: .86rem;
+	font-size: var(--nino-admin-text-sm);
 	-webkit-user-select: text;
 	user-select: text;
 	-webkit-touch-callout: default;
@@ -2175,7 +2214,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-richtext-content strong {
-	font-weight: 700;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-richtext-content em {
@@ -2204,7 +2243,7 @@ a {
    'blocks' format): a gap the size of the field's own text instead of the
    browser's full line, so a field stays a field-sized thing */
 :where(.nino-admin) .nino-admin-richtext-content :is(p, ul, ol) {
-	margin: 0 0 .5rem;
+	margin: 0 0 var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-richtext-content :is(p, ul, ol):last-child {
@@ -2212,7 +2251,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-richtext-content :is(ul, ol) {
-	padding-left: 1.4rem;
+	padding-left: var(--nino-admin-space-8);
 }
 
 :where(.nino-admin) .nino-admin-richtext-content ul {
@@ -2225,8 +2264,8 @@ a {
 
 :where(.nino-admin) .nino-admin-richtext-linkbar {
 	display: flex;
-	gap: .4rem;
-	margin-top: .5rem;
+	gap: var(--nino-admin-space-2);
+	margin-top: var(--nino-admin-space-3);
 }
 
 :where(.nino-admin) .nino-admin-richtext-linkbar[hidden] {
@@ -2241,7 +2280,7 @@ a {
 
 :where(.nino-admin) .nino-admin-list {
 	list-style: none;
-	margin: 0 0 .8rem;
+	margin: 0 0 var(--nino-admin-space-5);
 	padding: 0;
 	overflow: hidden;
 	border: 1px solid var(--editor-border);
@@ -2267,30 +2306,36 @@ a {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: .75rem;
-	min-height: var(--nino-admin-row-height);
-	padding: .58rem .78rem;
+	gap: var(--nino-admin-space-5);
+	min-height: var(--nino-admin-row-dense);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	color: var(--editor-text);
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 }
 
 /* A row that opens a form and writes no address is a button with the look of the
    link beside it (.nino-admin-list-link): the button's own surface, weight and
    height give way, the row is the width of the list and reads from the left */
+/* An entry with a second line is the row of 53px; one with a name alone is
+   as high as the dense row */
+:where(.nino-admin) .nino-admin-list li > :is(a, button.nino-admin-list-link):has(.nino-admin-list-copy) {
+	min-height: var(--nino-admin-row-height);
+}
+
 :where(.nino-admin) .nino-admin-list li > button.nino-admin-list-link {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	width: 100%;
-	min-height: var(--nino-admin-row-height);
-	padding: .58rem .78rem;
+	min-height: var(--nino-admin-row-dense);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	border: 0;
 	border-radius: 0;
 	background: transparent;
 	box-shadow: none;
 	color: var(--editor-text);
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 	font-weight: inherit;
 	line-height: inherit;
 	text-align: left;
@@ -2309,7 +2354,7 @@ a {
 	content: "›";
 	margin-left: auto;
 	color: var(--editor-text-secondary);
-	font-size: 1.15rem;
+	font-size: var(--nino-admin-text-lg);
 	line-height: 1;
 }
 
@@ -2321,8 +2366,8 @@ a {
 
 :where(.nino-admin) .nino-admin-list-copy strong {
 	overflow: hidden;
-	font-size: .84rem;
-	font-weight: 650;
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-strong);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -2330,7 +2375,7 @@ a {
 :where(.nino-admin) .nino-admin-list-copy small {
 	overflow: hidden;
 	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	line-height: 1.35;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -2339,8 +2384,8 @@ a {
 /* Rows that are read, not drilled into (log lines, submissions, subscribers):
    the same grouped surface, without the chevron affordance. */
 :where(.nino-admin) .nino-admin-list-dense > li {
-	min-height: var(--nino-admin-row-height);
-	padding: .58rem .78rem;
+	min-height: var(--nino-admin-row-dense);
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-list-dense > li:hover {
@@ -2360,18 +2405,19 @@ a {
 :where(.nino-admin) .nino-admin-list-buttons > button {
 	display: flex;
 	align-items: center;
-	gap: .75rem;
+	gap: var(--nino-admin-space-5);
 	width: 100%;
+	/* A choice with a name and a line under it: 54px holds both without a wrap - a height of its own, between the rows of 46 and 53px */
 	min-height: 54px;
 	text-align: left;
 	margin: 0;
-	padding: .62rem .78rem;
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-5);
 	border: 0;
 	border-bottom: 1px solid var(--editor-separator);
 	border-radius: 0;
 	background: transparent;
 	box-shadow: none;
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 	transform: none;
 }
 
@@ -2435,8 +2481,8 @@ a {
 :where(.nino-admin) .nino-admin-table-toolbar {
 	display: flex;
 	align-items: center;
-	gap: .5rem;
-	margin-bottom: .6rem;
+	gap: var(--nino-admin-space-3);
+	margin-bottom: var(--nino-admin-space-4);
 }
 
 :where(.nino-admin) .nino-admin-table-search {
@@ -2458,11 +2504,11 @@ a {
 :where(.nino-admin) .nino-admin-table {
 	width: 100%;
 	border-collapse: collapse;
-	font-size: .82rem;
+	font-size: var(--nino-admin-text-sm);
 }
 
 :where(.nino-admin) .nino-admin-table :is(th, td) {
-	padding: .5rem .78rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	border-bottom: 1px solid var(--editor-separator);
 	text-align: left;
 	white-space: nowrap;
@@ -2484,14 +2530,14 @@ a {
 :where(.nino-admin) .nino-admin-table-sort {
 	width: 100%;
 	min-height: 0;
-	padding: .5rem .78rem;
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	border: 0;
 	border-radius: 0;
 	background: transparent;
 	box-shadow: none;
 	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
-	font-weight: 700;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	letter-spacing: .04em;
 	text-align: left;
 	text-transform: uppercase;
@@ -2552,7 +2598,7 @@ a {
 :where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-uri {
 	color: var(--editor-text-secondary);
 	font-family: var(--nino-admin-mono);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-table td.is-empty::after {
@@ -2564,30 +2610,30 @@ a {
 :where(.nino-admin) .nino-admin-table-pager {
 	display: flex;
 	align-items: center;
-	gap: .5rem;
-	margin: .6rem 0 .8rem;
+	gap: var(--nino-admin-space-3);
+	margin: var(--nino-admin-space-4) 0 var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-table-range {
 	flex: 1 1 auto;
 	color: var(--editor-text-secondary);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	font-variant-numeric: tabular-nums;
 }
 
 :where(.nino-admin) .nino-admin-table-size {
 	width: auto;
-	min-height: 30px;
-	padding-top: .2rem;
-	padding-bottom: .2rem;
-	font-size: max( .76rem, 12px );
+	min-height: var(--nino-admin-control-small);
+	padding-top: var(--nino-admin-space-1);
+	padding-bottom: var(--nino-admin-space-1);
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-table-step {
 	min-width: 2.2rem;
-	min-height: 30px;
-	padding: .2rem .5rem;
-	font-size: .9rem;
+	min-height: var(--nino-admin-control-small);
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-3);
+	font-size: var(--nino-admin-text-md);
 	line-height: 1;
 }
 
@@ -2596,15 +2642,15 @@ a {
 :where(.nino-admin) .nino-admin-tiles {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-	gap: .65rem;
-	margin-bottom: .75rem;
+	gap: var(--nino-admin-space-4);
+	margin-bottom: var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-tile {
 	display: flex;
 	flex-direction: column;
-	gap: .25rem;
-	padding: 1.5rem 0;
+	gap: var(--nino-admin-space-1);
+	padding: var(--nino-admin-space-8) 0;
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius);
 	background: var(--editor-bg-elevated);
@@ -2621,35 +2667,38 @@ a {
 	transform: none;
 }
 
+/* The one size between the steps (exception of the scale): a date of ten
+   characters in heavy tabular figures fills a tile of 155px at 24px, and at
+   the step above (27px) it wraps onto a second line at 390px wide */
 :where(.nino-admin) .nino-admin-tile-value {
 	font-size: 1.6rem;
-	font-weight: 720;
+	font-weight: var(--nino-admin-weight-heavy);
 	font-variant-numeric: tabular-nums;
 	line-height: 1.1;
 }
 
 :where(.nino-admin) .nino-admin-tile-label {
 	color: var(--editor-text-secondary);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-card {
-	margin-bottom: .75rem;
-	padding: 1.2rem;
+	margin-bottom: var(--nino-admin-space-5);
+	padding: var(--nino-admin-space-7);
 	background: var(--editor-bg-grouped);
 }
 
 :where(.nino-admin) .nino-admin-card:has(legend) {
-	padding-top:1.85rem;
+	padding-top: var(--nino-admin-space-8);
 }
 
 /*	h2 as well as h3: a panel's own screens sit under the shell's one <h1>,
 	so a card's title is the page's second level, not its third - the levels
 	a screen reader reads out have to be a ladder without a rung missing */
 :where(.nino-admin) .nino-admin-card :is(h2, h3) {
-	margin-bottom: .55rem;
-	font-size: .9rem;
-  margin-top: .25rem;
+	margin-bottom: var(--nino-admin-space-3);
+	font-size: var(--nino-admin-text-md);
+  margin-top: var(--nino-admin-space-1);
 }
 
 /* A share-of-total bar: a labelled row over a thin track, drawn by the
@@ -2658,9 +2707,9 @@ a {
 :where(.nino-admin) .nino-admin-meter-row {
 	display: flex;
 	justify-content: space-between;
-	gap: 1rem;
-	margin-bottom: .28rem;
-	font-size: .8rem;
+	gap: var(--nino-admin-space-6);
+	margin-bottom: var(--nino-admin-space-1);
+	font-size: var(--nino-admin-text-xs);
 }
 
 :where(.nino-admin) .nino-admin-meter-count {
@@ -2672,7 +2721,7 @@ a {
 	display: block;
 	height: 4px;
 	overflow: hidden;
-	border-radius: 999px;
+	border-radius: var(--nino-admin-radius-pill);
 	background: var(--editor-separator);
 }
 
@@ -2688,13 +2737,13 @@ a {
 :where(.nino-admin) .nino-admin-back-link {
 	display: inline-flex;
 	align-items: center;
-	gap: .42rem;
+	gap: var(--nino-admin-space-2);
 	width: fit-content;
 	min-height: var(--nino-admin-control-height);
-	padding: .35rem .48rem;
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-3);
 	color: var(--editor-blue);
-	font-size: .82rem;
-	font-weight: 600;
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-strong);
 	line-height: 1.2;
 }
 
@@ -2715,10 +2764,10 @@ a {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: .65rem;
+	gap: var(--nino-admin-space-4);
 	min-height: var(--nino-admin-contextbar-height);
-	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1rem;
-	padding: .48rem var(--nino-admin-content-inline);
+	margin: calc( var(--nino-admin-space-6) * -1 ) calc(var(--nino-admin-content-inline) * -1) var(--nino-admin-space-6);
+	padding: var(--nino-admin-space-3) var(--nino-admin-content-inline);
 	border-bottom: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
@@ -2730,12 +2779,12 @@ a {
 	position: static;
 	width: auto;
 	margin: 0;
-	padding: .35rem .48rem;
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-3);
 	border: 0;
 	border-radius: var(--editor-radius-sm);
 	background: transparent;
 	box-shadow: none;
-	font-size: .82rem;
+	font-size: var(--nino-admin-text-sm);
 }
 
 .nino-admin .nino-admin-contextbar :is(select, button) {
@@ -2762,10 +2811,10 @@ a {
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 	min-height: var(--nino-admin-actionbar-height);
 	margin: 0;
-	padding: .65rem 1rem max(.65rem, env(safe-area-inset-bottom));
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-6) max(var(--nino-admin-space-4), env(safe-area-inset-bottom));
 	border-top: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 	box-shadow: 0 -.5rem 1.5rem rgba(15,23,42,.055);
@@ -2780,7 +2829,7 @@ a {
 	max-width: none;
 	margin: 0;
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	text-align: right;
 }
 
@@ -2809,14 +2858,14 @@ a {
 	flex: 1 1 auto;
 	min-width: 0;
 	color: var(--editor-orange-ink);
-	font-size: max( .78rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 	text-align: right;
 }
 
 .nino-admin .nino-admin-actionbar > .nino-admin-actionbar-dirty::before {
 	content: "\25CF";
 	content: "\25CF" / "";
-	margin-right: .35rem;
+	margin-right: var(--nino-admin-space-2);
 }
 
 .nino-admin .nino-admin-actionbar button {
@@ -2857,8 +2906,9 @@ a {
 }
 
 .nino-admin-auth-card {
-	padding: 1.6rem;
+	padding: var(--nino-admin-space-8);
 	border: 1px solid var(--editor-border);
+	/* The card of the login is the one surface rounder than the 10px of the others, as it stands alone on the page */
 	border-radius: 12px;
 	background: var(--editor-bg-grouped);
 	box-shadow: var(--editor-shadow);
@@ -2867,9 +2917,9 @@ a {
 .nino-admin-auth-brand {
 	display: flex;
 	align-items: center;
-	gap: .65rem;
-	margin-bottom: 1.2rem;
-	font-weight: 750;
+	gap: var(--nino-admin-space-4);
+	margin-bottom: var(--nino-admin-space-7);
+	font-weight: var(--nino-admin-weight-heavy);
 	letter-spacing: -.02em;
 }
 
@@ -2881,8 +2931,8 @@ a {
 }
 
 .nino-admin-auth-title {
-	margin: 0 0 .35rem;
-	font-size: 1.4rem;
+	margin: 0 0 var(--nino-admin-space-2);
+	font-size: var(--nino-admin-text-xl);
 	line-height: 1.2;
 	letter-spacing: -.035em;
 }
@@ -2905,9 +2955,9 @@ a {
 	display: flex;
 	flex: none;
 	align-items: center;
-	gap: .6rem;
+	gap: var(--nino-admin-space-4);
 	min-height: var(--nino-admin-head-height);
-	padding: .35rem 1rem;
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-6);
 	border-bottom: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 }
@@ -2923,7 +2973,7 @@ a {
 	min-width: 0;
 	overflow: hidden;
 	color: var(--editor-text-secondary);
-	font-size: .84rem;
+	font-size: var(--nino-admin-text-sm);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -2964,12 +3014,12 @@ a {
 
 @media (max-width: 38rem) {
 	.nino-admin-follow-bar {
-		gap: .45rem;
-		padding-inline: .6rem;
+		gap: var(--nino-admin-space-3);
+		padding-inline: var(--nino-admin-space-4);
 	}
 
 	.nino-admin-follow-switch .nino-admin-switch {
-		gap: .45rem;
+		gap: var(--nino-admin-space-3);
 	}
 
 	/* The word beside the knob gives way on a phone, as does the label (see
@@ -3004,7 +3054,7 @@ a {
 		top: 0;
 		align-self: start;
 		height: 100dvh;
-		padding: 1rem .72rem;
+		padding: var(--nino-admin-space-6) var(--nino-admin-space-5);
 		border-right: 1px solid var(--nino-admin-rail-border);
 		background: var(--nino-admin-rail);
 		color: var(--nino-admin-rail-text);
@@ -3013,7 +3063,7 @@ a {
 	.nino-admin .nino-admin-rail-head {
 		align-items: stretch;
 		flex-direction: column;
-		padding: 0 .35rem .85rem;
+		padding: 0 var(--nino-admin-space-2) var(--nino-admin-space-5);
 	}
 
 	.nino-admin .nino-admin-rail .nino-admin-brand-copy strong {
@@ -3032,11 +3082,11 @@ a {
 	}
 
 	.nino-admin .nino-admin-rail-user {
-		padding: .3rem .5rem .1rem 1.4rem;
+		padding: var(--nino-admin-space-1) var(--nino-admin-space-3) .1rem var(--nino-admin-space-8);
 		border-color: var(--nino-admin-rail-border);
 		background: var(--editor-bg);
 		color: var(--nino-admin-rail-muted);
-		margin: 0 -1.1rem;
+		margin: 0 calc( var(--nino-admin-space-6) * -1 );
 		justify-content: space-between;
 	}
 
@@ -3054,12 +3104,13 @@ a {
 	}
 
 	.nino-admin .nino-admin-nav > :is(a, span) {
-		padding: .55rem .68rem;
+		min-height: var(--nino-admin-row-compact);
+		padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
 		border: 0;
 		border-radius: var(--editor-radius-sm);
 		background: transparent;
 		color: var(--nino-admin-rail-text);
-		font-size: .82rem;
+		font-size: var(--nino-admin-text-sm);
 	}
 
 	.nino-admin .nino-admin-nav > a:hover {
@@ -3085,19 +3136,19 @@ a {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: .5rem;
+		gap: var(--nino-admin-space-3);
 		width: 100%;
 		min-height: 0;
     margin: .1rem 0;
-    padding: .8rem .68rem;
+    padding: var(--nino-admin-space-5) var(--nino-admin-space-4);
 		border: 0;
 		border-radius: var(--editor-radius-sm);
 		background: transparent;
 		box-shadow: none;
 		color: var(--nino-admin-rail-muted);
 		cursor: pointer;
-		font-size: max( .64rem, 12px );
-		font-weight: 700;
+		font-size: var(--nino-admin-text-xs);
+		font-weight: var(--nino-admin-weight-strong);
 		letter-spacing: .09em;
 		line-height: 1.4;
 		text-align: left;
@@ -3182,11 +3233,11 @@ a {
 		margin: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		padding: 1rem var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + 2rem);
+		padding: var(--nino-admin-space-6) var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + var(--nino-admin-space-8));
 	}
 
 	.nino-admin .nino-admin-contextbar {
-		margin: -1.25rem calc(var(--nino-admin-content-inline) * -1) 1rem;
+		margin: calc( var(--nino-admin-space-7) * -1 ) calc(var(--nino-admin-content-inline) * -1) var(--nino-admin-space-6);
 		padding-right: var(--nino-admin-content-inline);
 		padding-left: var(--nino-admin-content-inline);
 	}
@@ -3224,8 +3275,8 @@ a {
 	}
 
 	.nino-admin-shell--folded .nino-admin-rail {
-		padding-right: .5rem;
-		padding-left: .5rem;
+		padding-right: var(--nino-admin-space-3);
+		padding-left: var(--nino-admin-space-3);
 	}
 
 	.nino-admin-shell--folded :is(.nino-admin-brand-copy, .nino-admin-rail-user, .nino-admin-nav-group) {
@@ -3267,7 +3318,7 @@ a {
 	.nino-admin-shell--folded .nino-admin-rail-user > .nino-admin-mode-chip::before {
 		content: attr(data-initial);
 		content: attr(data-initial) / "";
-		font-size: max( .78rem, 12px );
+		font-size: var(--nino-admin-text-xs);
 		line-height: 1;
 	}
 
@@ -3293,7 +3344,7 @@ a {
 		text-indent:-9999rem;
 		height:2px;
 		padding:0;
-		margin:.3rem .5rem .2rem;
+		margin: var(--nino-admin-space-1) var(--nino-admin-space-3) var(--nino-admin-space-1);
 		overflow:hidden;
 		background:var(--editor-border);
 		cursor:default;
@@ -3304,7 +3355,7 @@ a {
 		display:none;
 	}
 	.nino-admin-shell--folded.nino-admin .nino-admin-rail-head {
-		margin-bottom:1rem;
+		margin-bottom: var(--nino-admin-space-6);
 	}
 
 	.nino-admin-shell--folded .nino-admin-actionbar {
@@ -3319,10 +3370,10 @@ a {
 	.nino-admin fieldset > .nino-admin-fieldgrid > .nino-admin-field:not(.nino-admin-field-wide) {
 		display: grid;
 		grid-template-columns: minmax(9rem, 22%) minmax(0, 1fr);
-		gap: .3rem .8rem;
+		gap: var(--nino-admin-space-1) var(--nino-admin-space-5);
 		align-items: start;
 		margin: 0;
-		padding: .48rem 0;
+		padding: var(--nino-admin-space-3) 0;
 		border-top: 1px solid var(--editor-separator);
 	}
 
@@ -3334,7 +3385,7 @@ a {
 	.nino-admin fieldset > .nino-admin-field:not(.nino-admin-field-wide) > :is(span, .nino-admin-field-header),
 	.nino-admin fieldset > .nino-admin-fieldgrid > .nino-admin-field:not(.nino-admin-field-wide) > :is(span, .nino-admin-field-header) {
 		grid-column: 1;
-		margin: .18rem 0 0;
+		margin: var(--nino-admin-space-1) 0 0;
 	}
 
 	.nino-admin fieldset > .nino-admin-field:not(.nino-admin-field-wide) > :not(span):not(.nino-admin-field-header),
@@ -3381,14 +3432,14 @@ a {
 :where(.nino-admin) .nino-admin-accordion-button {
 	display: flex;
 	align-items: center;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 	width: 100%;
-	padding: .3rem .75rem;
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-5);
 	border-radius: 0;
 	background: var(--nino-admin-surface-muted);
 	box-shadow: none;
 	color: var(--editor-text);
-	font-weight: 700;
+	font-weight: var(--nino-admin-weight-strong);
 	text-align: left;
 }
 
@@ -3408,8 +3459,8 @@ a {
 	min-width: 0;
 	overflow: hidden;
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
-	font-weight: 400;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
 	text-align: right;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -3431,7 +3482,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-accordion-body {
-	padding: .65rem .75rem;
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-5);
 	border-top: 1px solid var(--editor-separator);
 }
 
@@ -3462,11 +3513,11 @@ a {
 	flex: 1 1 auto;
 	min-width: 2.4rem;
 	min-height: 2.2rem;
-	padding: 0 .55rem;
+	padding: 0 var(--nino-admin-space-3);
 	border-right: 1px solid var(--editor-separator);
 	border-radius: 0;
 	box-shadow: none;
-	font-size: .82rem;
+	font-size: var(--nino-admin-text-sm);
 	font-variant-numeric: tabular-nums;
 }
 
@@ -3478,7 +3529,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-steps-step.is-active {
-	font-weight: 700;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-steps-step[data-standard="true"]::after {
@@ -3488,7 +3539,7 @@ a {
 	left: 50%;
 	width: .28rem;
 	height: .28rem;
-	margin-left: -.14rem;
+	margin-left: calc( var(--nino-admin-space-1) * -1 );
 	border-radius: 50%;
 	background: currentColor;
 }
@@ -3512,7 +3563,7 @@ a {
 :where(.nino-admin) .nino-admin-split-grid {
 	display: grid;
 	grid-template-columns: minmax(18rem, 23rem) minmax(0, 1fr);
-	gap: 1rem;
+	gap: var(--nino-admin-space-6);
 	align-items: start;
 }
 
@@ -3536,12 +3587,12 @@ a {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: .5rem;
-	padding: .3rem .6rem;
+	gap: var(--nino-admin-space-3);
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-4);
 	border-bottom: 1px solid var(--editor-separator);
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
-	font-weight: 650;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-split-tools {
@@ -3549,7 +3600,7 @@ a {
 	flex: 1 1 auto;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: .35rem;
+	gap: var(--nino-admin-space-2);
 	min-width: 0;
 }
 
@@ -3604,7 +3655,7 @@ a {
 
 	.nino-admin .nino-admin-split-switch {
 		display: flex;
-		margin-bottom: .75rem;
+		margin-bottom: var(--nino-admin-space-5);
 	}
 
 	.nino-admin .nino-admin-split-grid {
@@ -3651,9 +3702,9 @@ a {
 	   buttons at the right, and the buttons are compact (30 px, 12 px words) so that three of them and the badge are two rows at most */
 	.nino-admin .nino-admin-savebar {
 		flex-wrap: wrap;
-		gap: .35rem .4rem;
-		padding-top: .5rem;
-		padding-bottom: max(.5rem, env(safe-area-inset-bottom));
+		gap: var(--nino-admin-space-2) var(--nino-admin-space-2);
+		padding-top: var(--nino-admin-space-3);
+		padding-bottom: max(var(--nino-admin-space-3), env(safe-area-inset-bottom));
 	}
 
 	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-savebar-state {
@@ -3661,9 +3712,9 @@ a {
 	}
 
 	.nino-admin .nino-admin-actionbar.nino-admin-savebar > button {
-		min-height: 30px;
-		padding: .2rem .6rem;
-		font-size: max( .76rem, 12px );
+		min-height: var(--nino-admin-control-small);
+		padding: var(--nino-admin-space-1) var(--nino-admin-space-4);
+		font-size: var(--nino-admin-text-xs);
 		line-height: 1.2rem;
 	}
 
@@ -3713,10 +3764,10 @@ a {
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: .3rem;
-	min-height: 34px;
+	gap: var(--nino-admin-space-1);
+	min-height: var(--nino-admin-row-compact);
 	padding-block: 2px;
-	padding-inline-end: .35rem;
+	padding-inline-end: var(--nino-admin-space-2);
 	border-radius: var(--editor-radius-sm);
 	color: var(--editor-text);
 	cursor: pointer;
@@ -3729,7 +3780,7 @@ a {
 :where(.nino-admin) .nino-admin-tree-row.is-selected {
 	background: color-mix(in srgb, var(--editor-blue) 16%, transparent);
 	box-shadow: inset 3px 0 0 var(--editor-blue);
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-tree-item:focus-visible > .nino-admin-tree-row {
@@ -3743,8 +3794,8 @@ a {
 	align-items: center;
 	justify-content: center;
 	width: 1.75rem;
-	min-width: 28px;
-	height: 28px;
+	min-width: var(--nino-admin-control-icon);
+	height: var(--nino-admin-control-icon);
 	color: var(--editor-text-secondary);
 	user-select: none;
 }
@@ -3767,11 +3818,11 @@ a {
 :where(.nino-admin) .nino-admin-tree-hint {
 	display: flex;
 	align-items: center;
-	gap: .3rem;
+	gap: var(--nino-admin-space-1);
 	min-width: 0;
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
-	font-weight: 400;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
 	line-height: 1.3;
 }
 
@@ -3786,8 +3837,8 @@ a {
 :where(.nino-admin) .nino-admin-tree-state {
 	flex: 0 0 auto;
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
-	font-weight: 400;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
 }
 
 :where(.nino-admin) .nino-admin-tree-state[data-state="marked"]::before {
@@ -3801,8 +3852,8 @@ a {
 	min-width: 0;
 	overflow: hidden;
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
-	font-weight: 400;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -3830,8 +3881,8 @@ a {
 	border: 1.5px solid currentColor;
 	border-radius: 50%;
 	color: var(--editor-orange-ink);
-	font-size: max( .72rem, 12px );
-	font-weight: 700;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 	line-height: 1;
 }
 
@@ -3850,14 +3901,14 @@ a {
 
 /* A glyph button: a small square, no surface of its own until it is hovered */
 :where(.nino-admin) .nino-admin-tree-action {
-	min-width: 28px;
-	min-height: 28px;
-	height: 28px;
-	padding: 0 .3rem;
+	min-width: var(--nino-admin-control-icon);
+	min-height: var(--nino-admin-control-icon);
+	height: var(--nino-admin-control-icon);
+	padding: 0 var(--nino-admin-space-1);
 	background: transparent;
 	box-shadow: none;
 	color: var(--editor-text-secondary);
-	font-size: max( .84rem, 12px );
+	font-size: var(--nino-admin-text-sm);
 	line-height: 1;
 }
 
@@ -3892,9 +3943,9 @@ a {
 :where(.nino-admin) .nino-admin-color {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto auto;
-	gap: 0 .5rem;
+	gap: 0 var(--nino-admin-space-3);
 	align-items: end;
-	margin: 0 0 .72rem;
+	margin: 0 0 var(--nino-admin-space-5);
 }
 
 :where(.nino-admin) .nino-admin-color > .nino-admin-field {
@@ -3912,7 +3963,7 @@ a {
 	grid-row: 1;
 	width: 3rem;
 	height: var(--nino-admin-control-height);
-	padding: .2rem;
+	padding: var(--nino-admin-space-1);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
@@ -3943,7 +3994,7 @@ a {
 	height: var(--nino-admin-control-height);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
-	font-weight: 700;
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-color-swatch[hidden],
@@ -3954,17 +4005,17 @@ a {
 :where(.nino-admin) .nino-admin-color > .nino-admin-field-error {
 	grid-column: 1 / -1;
 	grid-row: 2;
-	margin: .3rem 0 0;
+	margin: var(--nino-admin-space-1) 0 0;
 }
 
 :where(.nino-admin) .nino-admin-color-contrast {
 	display: flex;
 	grid-column: 1 / -1;
 	grid-row: 3;
-	gap: .4rem;
-	margin: .4rem 0 0;
-	font-size: max( .78rem, 12px );
-	font-weight: 650;
+	gap: var(--nino-admin-space-2);
+	margin: var(--nino-admin-space-2) 0 0;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 :where(.nino-admin) .nino-admin-color-contrast[data-state="ok"] {
@@ -3979,7 +4030,7 @@ a {
 
 @media (max-width: 63.999rem) {
 	.nino-admin .nino-admin-pane {
-		padding-bottom: calc(var(--nino-admin-actionbar-height) + 1.25rem);
+		padding-bottom: calc(var(--nino-admin-actionbar-height) + var(--nino-admin-space-7));
 	}
 }
 
@@ -3991,9 +4042,9 @@ a {
 
 @media (max-width: 38rem) {
 	.nino-admin .nino-admin-actionbar {
-		gap: .4rem;
-		padding-right: .7rem;
-		padding-left: .7rem;
+		gap: var(--nino-admin-space-2);
+		padding-right: var(--nino-admin-space-5);
+		padding-left: var(--nino-admin-space-5);
 	}
 
 	.nino-admin .nino-admin-actionbar > :is(.nino-admin-actionbar-status, p, [role="status"]) {
@@ -4015,7 +4066,7 @@ a {
 @media (pointer: coarse) {
 	:root {
 		--nino-admin-control-height: 44px;
-		--nino-admin-row-height: 50px;
+		--nino-admin-row-dense: 50px;
 	}
 }
 
@@ -4083,10 +4134,10 @@ a {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0 1.5rem;
+	gap: 0 var(--nino-admin-space-8);
 	min-height: var(--nino-admin-head-height);
-	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
-	padding: .35rem var(--nino-admin-content-inline) 0;
+	margin: calc( var(--nino-admin-space-6) * -1 ) calc(var(--nino-admin-content-inline) * -1) var(--nino-admin-space-7);
+	padding: var(--nino-admin-space-2) var(--nino-admin-content-inline) 0;
 	border-bottom: 1px solid var(--editor-separator);
 	background: var(--editor-bar-bg);
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
@@ -4103,8 +4154,8 @@ a {
  *	strip and one without sit at the same height */
 #admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-title {
 	margin: 0;
-	padding-bottom: .35rem;
-	font-size: 1.8rem;
+	padding-bottom: var(--nino-admin-space-2);
+	font-size: var(--nino-admin-text-2xl);
 	line-height: 1.2;
 }
 /*	The strip lays itself out in the head and brings neither its own bleed
@@ -4113,7 +4164,7 @@ a {
 #admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-tabs {
 	display: flex;
 	flex: 1 1 auto;
-	gap: .25rem;
+	gap: var(--nino-admin-space-1);
 	min-width: 0;
 	margin: 0;
 	padding: 0;
@@ -4125,9 +4176,9 @@ a {
 	display: flex;
 	flex: 0 0 auto;
 	align-items: center;
-	gap: .5rem;
+	gap: var(--nino-admin-space-3);
 	margin-left: auto;
-	padding-bottom: .35rem;
+	padding-bottom: var(--nino-admin-space-2);
 }
 #admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-actions:empty {
 	display: none;
@@ -4144,15 +4195,15 @@ a {
 	min-width: 2rem;
 	height: 2rem;
 	min-height: 2rem;
-	margin: 0 0 .35rem auto;
+	margin: 0 0 var(--nino-admin-space-2) auto;
 	padding: 0;
 	border-radius: 50%;
 	color: var(--editor-text-secondary);
-	font-size: .95rem;
+	font-size: var(--nino-admin-text-lg);
 	line-height: 1;
 }
 #admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-actions:not(:empty) + .admin-panel-manual {
-	margin-left: -1rem;
+	margin-left: calc( var(--nino-admin-space-6) * -1 );
 }
 /*	A pane without a name to put in a head - the Dashboard - has the "?" alone,
  *	in a row of its own that is no head (Nino.adminUi.panelHead() answers null
@@ -4160,7 +4211,7 @@ a {
  *	under it */
 #admin-content-wrap > [data-panel] > .admin-panel-manualrow {
 	display: flex;
-	margin: 0 0 .5rem;
+	margin: 0 0 var(--nino-admin-space-3);
 }
 #admin-content-wrap > [data-panel] > .admin-panel-manualrow > .admin-panel-manual {
 	margin-bottom: 0;
@@ -4182,7 +4233,7 @@ a {
 .admin-brand {
 	display: flex;
 	align-items: center;
-	gap: .65rem;
+	gap: var(--nino-admin-space-4);
 	min-width: 0;
 }
 /*	On the desktop the head of the rail is the brand row: the account block
@@ -4207,18 +4258,18 @@ a {
 	/* The bleed is the rail's inline padding plus the head's own */
 	#admin-page-wrap .nino-admin-rail-head > .admin-brand {
 		min-height: var(--nino-admin-head-height);
-		margin-inline: calc(-.72rem - .35rem);
-		padding-inline: calc(.72rem + .35rem);
+		margin-inline: calc(var(--nino-admin-space-5) * -1 - var(--nino-admin-space-2));
+		padding-inline: calc(var(--nino-admin-space-5) + var(--nino-admin-space-2));
 		border-bottom: 1px solid var(--editor-separator);
 	}
 	/* Folded, the rail's inline padding is .5rem */
 	#admin-page-wrap.nino-admin-shell--folded .nino-admin-rail-head > .admin-brand {
 		justify-content: center;
-		margin-inline: calc(-.5rem - .35rem);
-		padding-inline: calc(.5rem + .35rem);
+		margin-inline: calc(var(--nino-admin-space-3) * -1 - var(--nino-admin-space-2));
+		padding-inline: calc(var(--nino-admin-space-3) + var(--nino-admin-space-2));
 	}
 	#admin-page-wrap.nino-admin-shell--folded .nino-admin-rail-head {
-		margin-bottom: .5rem;
+		margin-bottom: var(--nino-admin-space-3);
 	}
 	#admin-page-wrap.nino-admin-shell--folded .nino-admin-rail-toggle {
 		top: calc(var(--nino-admin-head-height) + .25rem);
@@ -4250,8 +4301,8 @@ a {
 	place-items: center;
 	width: 2rem;
 	height: 2rem;
-	min-width: 24px;
-	min-height: 24px;
+	min-width: var(--nino-admin-control-icon-small);
+	min-height: var(--nino-admin-control-icon-small);
 	border-radius: var(--editor-radius-sm);
 }
 #admin-user-follow:hover {
@@ -4311,7 +4362,7 @@ a {
 	border-radius: var(--editor-radius-sm);
 	background: transparent;
 	box-shadow: none;
-	font-size: 1rem;
+	font-size: var(--nino-admin-text-lg);
 	line-height: 1;
 }
 #admin-nav-ui-toggle:hover:not(:disabled), #admin-theme-toggle:hover:not(:disabled) {
@@ -4349,9 +4400,9 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	z-index: 20;
 	display: flex;
 	align-items: center;
-	gap: .5rem;
-	margin-top: .4rem;
-	padding: .5rem .75rem;
+	gap: var(--nino-admin-space-3);
+	margin-top: var(--nino-admin-space-2);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-bg-elevated);
@@ -4366,14 +4417,14 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	width: auto;
 	max-width: none;
 	min-height: 0;
-	margin: 0 1rem 0 0;
+	margin: 0 var(--nino-admin-space-6) 0 0;
 	flex: 0 0 auto;
 	box-sizing: content-box;
 	border: none;
 	background-color: transparent;
 	box-shadow: none;
 	color: var(--editor-text-secondary);
-	font-size: .85rem;
+	font-size: var(--nino-admin-text-sm);
 	cursor: pointer;
 }
 
@@ -4385,22 +4436,22 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 .admin-type-btn > div {
 	flex: 1 1 auto;
 	min-width: 0;
-	font-weight: 650;
+	font-weight: var(--nino-admin-weight-strong);
 }
 .admin-type-btn-descr {
 	display: block;
 	margin-top: .06rem;
 	overflow: hidden;
 	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
-	font-weight: 400;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .admin-view-button-chev {
 	margin-left: auto;
 	color: var(--editor-text-secondary);
-	font-size: 1.15rem;
+	font-size: var(--nino-admin-text-lg);
 	line-height: 1;
 }
 
@@ -4408,19 +4459,19 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 
 #form-login #admin-localepicker {
 	display: block;
-	margin: 1.5rem auto 0;
+	margin: var(--nino-admin-space-8) auto 0;
 }
 #form-login #form-message {
-	margin: 0 0 1.2rem;
+	margin: 0 0 var(--nino-admin-space-7);
 }
 #form-login #submit {
 	width: 100%;
-	margin-top: .5rem;
+	margin-top: var(--nino-admin-space-3);
 }
 #form-message {
 	min-height: 1.2rem;
 	color: var(--editor-text-secondary);
-	font-size: .82rem;
+	font-size: var(--nino-admin-text-sm);
 }
 #form-message.pending {
 	color: var(--editor-blue);
@@ -4445,9 +4496,9 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 #admin-page-wrap .admin-scan-ignore {
 	display: flex;
 	align-items: center;
-	gap: .4rem;
-	margin: .4rem 0 0;
-	font-size: .8rem;
+	gap: var(--nino-admin-space-2);
+	margin: var(--nino-admin-space-2) 0 0;
+	font-size: var(--nino-admin-text-xs);
 }
 
 }
@@ -4465,13 +4516,13 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 		flex-wrap: wrap;
 		justify-content: flex-start;
 		gap:0;
-		padding:.5rem .7rem .3rem 1.4rem
+		padding: var(--nino-admin-space-3) var(--nino-admin-space-5) var(--nino-admin-space-1) var(--nino-admin-space-8)
 	}
 	#admin-user-email {
 		flex: 1 0 100%;
 		/* The focus ring of the icons under it does not touch the box */
-		margin-bottom: .35rem;
-		font-size: max( .78rem, 12px );
+		margin-bottom: var(--nino-admin-space-2);
+		font-size: var(--nino-admin-text-xs);
 	}
 	/*	The icons stand under the address, in the same place whichever mode the
 	 *	project is in, and the word of the mode, where there is one, at the
@@ -4486,7 +4537,7 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	 *	mark above the fold button, both centred in the icon column */
 	#admin-page-wrap.nino-admin-shell--folded .admin-brand {
 		flex-direction: column;
-		gap: .45rem;
+		gap: var(--nino-admin-space-3);
 	}
 	/*	The account block waits for the unfold, and two things in it stay, one
 	 *	under the other in the middle of the column: the icon of the window of
@@ -4496,10 +4547,10 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 		flex-direction: column;
 		flex-wrap: nowrap;
 		align-items: center;
-		gap: .25rem;
+		gap: var(--nino-admin-space-1);
 		margin: 0;
 		/* Under the fold button, which is fixed to the column below the brand mark */
-		padding: 2.4rem 0 .4rem;
+		padding: var(--nino-admin-space-legend) 0 var(--nino-admin-space-2);
 		background: none;
 	}
 	#admin-page-wrap.nino-admin-shell--folded #admin-user > :not(#admin-user-follow, #admin-mode-chip) {
@@ -4523,6 +4574,7 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
    and says so here, in the layer that is allowed to outrank nino.system. */
 #admin-page-wrap #admin-localepicker,
 #form-login #admin-localepicker {
+	/* The room of the chevron of the select: a width of the arrow (14px), not a step of space */
 	padding: .1rem 14px .1rem 0;
 	background-image:
 		linear-gradient(45deg, transparent 50%, #a0a8b2 50%),

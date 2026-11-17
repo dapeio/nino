@@ -177,7 +177,7 @@ check( 'the rail\'s icon buttons share one box, independent of the icon inside t
 // rule that has to stand in the workbench layer, since a later layer wins
 // whatever the selector
 check( 'a pane\'s head carries the workbench bar surface, full width and flush to the top',
-	/#admin-content-wrap > \[data-panel\] > \.admin-panel-head \{[^}]*margin: -1rem calc\(var\(--nino-admin-content-inline\) \* -1\)[^}]*background: var\(--editor-bar-bg\);/s.test( workbenchCss ) );
+	/#admin-content-wrap > \[data-panel\] > \.admin-panel-head \{[^}]*margin: calc\( var\(--nino-admin-space-6\) \* -1 \) calc\(var\(--nino-admin-content-inline\) \* -1\)[^}]*background: var\(--editor-bar-bg\);/s.test( workbenchCss ) );
 check( '...its name brings no margin of its own, and its strip no rule of its own',
 	/> \.admin-panel-head > \.admin-panel-title \{[^}]*margin: 0;/s.test( workbenchCss ) && /> \.admin-panel-head > \.admin-panel-tabs \{[^}]*border-bottom: 0;/s.test( workbenchCss ) );
 check( '...and in a workspace the head does not bleed, said in the layer that can say it',

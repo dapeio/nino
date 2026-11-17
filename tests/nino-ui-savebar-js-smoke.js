@@ -46,7 +46,7 @@ const names = bar => findAll( bar.el, el => el.tagName === 'BUTTON' ).map( el =>
 const stylesheet = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
 check( 'on a phone the bar of a saveBar shows its line only where it is not empty and does not draw the registry\'s mark of unsaved changes',
 	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-status:not\(:empty\) \{\s*display: block;[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheet ) === true );
-check( 'on a phone the line is the row above the badge and the buttons, which are compact: 30 px and 12 px words', /@media \(max-width: 38rem\) \{[^@]*\.nino-admin-savebar > button \{\s*min-height: 30px;[^}]*font-size: max\( \.76rem, 12px \)[^@]*\.nino-admin-savebar > \.nino-admin-status:not\(:empty\) \{[^}]*order: -3;[^}]*flex: 1 0 100%/.test( stylesheet ) === true );
+check( 'on a phone the line is the row above the badge and the buttons, which are compact: 30 px and 12 px words', /@media \(max-width: 38rem\) \{[^@]*\.nino-admin-savebar > button \{\s*min-height: var\(--nino-admin-control-small\);[^}]*font-size: var\(--nino-admin-text-xs\)[^@]*\.nino-admin-savebar > \.nino-admin-status:not\(:empty\) \{[^}]*order: -3;[^}]*flex: 1 0 100%/.test( stylesheet ) === true );
 check( 'the sentence of a first change is kept off the screen by the stylesheet, and only while the line still says it', /\.nino-admin-savebar > \.nino-admin-status\[data-once\]\[data-state="dirty"\] \{[^}]*clip-path: inset\(50%\)/.test( stylesheet ) === true );
 
 console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whole\n' );
