@@ -2881,6 +2881,25 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a link would be drawn for an address as it is written - with its entities, as a template or a text holds
+		 *	it: a reference to a page of the site, or what _address() lets pass. A tool that takes a link target asks this
+		 *	before it writes one, so that it stores nothing the drawing drops
+		 *
+		 *	@param		string		$written			The address as it is written
+		 *
+		 *	@return 	bool
+		 */
+		public static function address( string $written ): bool {
+
+			$href = html_entity_decode( $written, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+			if( preg_match( '#^page:/[^\\s]*$#D', $href ) === 1 )
+				return str_contains( $href, '..' ) === false && preg_match( '/[\x00-\x1F\x7F]/', $href ) !== 1;
+
+			return $href !== '' && self::_address( $href ) !== null;
+		}
+
+		/**
 		 *	An address, escaped - or null where its scheme is none a link may take. What a site's own address
 		 *	looks like, a path or an anchor or one of four schemes, passes; a protocol-relative one does not.
 		 *	A browser drops a control character in front of a scheme before it reads the address, so none is

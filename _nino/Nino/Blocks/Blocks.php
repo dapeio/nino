@@ -322,6 +322,13 @@ namespace Nino {
 				$used[$slot['name']] = [ 'kind' => $kind, 'where' => $where ];
 			}
 
+			// The text a link reads is its address, in every language: the same rule as for one that is written into the template
+			foreach( $found['slots'] as $slot )
+				if( $slot['kind'] === 'link' )
+					foreach( $texts as $locale => $said )
+						if( isset( $said[$slot['name']] ) === true && \Nino\Components::address( (string) $said[$slot['name']] ) === false )
+							return 'text/'. $locale. '.json, "'. $slot['name']. '": a link reads it, and it is no address a link is drawn for';
+
 			$words = array_keys( array_filter( $used, static fn( array $use ): bool => $use['kind'] === 'text' ) );
 			$pictures = array_keys( array_filter( $used, static fn( array $use ): bool => $use['kind'] === 'image' ) );
 
@@ -1031,6 +1038,13 @@ namespace Nino {
 					if( is_string( $value ) === true && $value !== '' && strpos( '~/.', $value[0] ) !== false
 						&& self::_reads( $value, in_array( $schema['attributes'][$attribute]['type'] ?? '', [ 'text', 'image', 'link' ], true ), $type ) === false )
 						return 'the value of "'. self::_shown( (string) $attribute ). '" of "'. self::_shown( $name ). '" begins like a source and is neither ~name where that is read, a placeholder of the kernel nor a field of a placeholder type of elements';
+
+				// An address that is written into the block is one a link is drawn for: no scheme that runs a script, no other host by
+				// two slashes. The drawing drops such a target; a block that carries one is no block
+				foreach( (array) ( $node['a'] ?? [] ) as $attribute => $value )
+					if( ( $schema['attributes'][$attribute]['type'] ?? '' ) === 'link' && is_string( $value ) === true && $value !== '' && $value[0] !== '~'
+						&& \Nino\Components::address( $value ) === false )
+						return 'the address in "'. self::_shown( (string) $attribute ). '" of "'. self::_shown( $name ). '" is none a link is drawn for';
 
 				if( is_array( $node['c'] ?? null ) === true ) {
 
