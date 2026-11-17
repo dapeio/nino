@@ -367,6 +367,19 @@ $schemas = \Nino\Components::components( $appData );
 check( 'switched on, the register holds the twenty and the six groups', count( $schemas ) === 20 && count( \Nino\Components::groups( $appData ) ) === 6
 	&& array_keys( array_diff_key( \Nino\Components::groups( $appData ), array_flip( [ 'button', 'footer', 'header', 'image', 'section', 'text' ] ) ) ) === [] );
 
+// every choice of the twenty whose options are a list names each option in both languages, and the schema says so by itself: nothing here lists a word (a list a method answers brings its own labels)
+$unlabelled = [];
+
+foreach( $schemas as $name => $schema )
+	foreach( $schema['attributes'] as $attribute => $declared )
+		if( $declared['type'] === 'choice' && is_array( $declared['options'] ) === true && isset( $declared['optionLabels'] ) === false )
+			foreach( $declared['options'] as $option )
+				foreach( [ 'de_DE', 'en_US' ] as $language )
+					if( is_array( $declared['labels'][$option] ?? null ) === false || is_string( $declared['labels'][$option][$language] ?? null ) === false || $declared['labels'][$option][$language] === '' )
+						$unlabelled[] = $name. '.'. $attribute. '='. $option. ' ('. $language. ')';
+
+check( 'every option of every choice of basis has a label in de_DE and en_US'. ( $unlabelled === [] ? '' : ' - '. implode( ', ', array_slice( $unlabelled, 0, 5 ) ) ), $unlabelled === [] );
+
 // what a tool offers where: the nine that hold something
 $holds = [
 	''							=> [ 'footer-wrap', 'header-wrap', 'html', 'section-wrap' ],

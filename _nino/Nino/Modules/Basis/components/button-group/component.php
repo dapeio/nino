@@ -7,6 +7,6 @@ return [
 	'in'         => [ 'flow' ],
 	'offers'     => [],
 	'attributes' => [
-		'align' => [ 'type' => 'choice', 'options' => [ 'start', 'center', 'end' ], 'default' => 'start', 'label' => [ 'de_DE' => 'Ausrichtung', 'en_US' => 'Alignment' ] ],
+		'align' => [ 'type' => 'choice', 'options' => [ 'start', 'center', 'end' ], 'labels' => [ 'start' => [ 'de_DE' => 'Links', 'en_US' => 'Left' ], 'center' => [ 'de_DE' => 'Mitte', 'en_US' => 'Center' ], 'end' => [ 'de_DE' => 'Rechts', 'en_US' => 'Right' ] ], 'default' => 'start', 'label' => [ 'de_DE' => 'Ausrichtung', 'en_US' => 'Alignment' ] ],
 	],
 ];

@@ -519,6 +519,21 @@ unset( $appData['./nino/callbacks'][\Nino\Components::VARIANTS] );
 $withLabels = \Nino\Components::validate( 'v-labels', [ 'label' => 'V', 'variants' => [ 'soft' ], 'labels' => [ 'soft' => 'Soft surface', 'gone' => 'Gone', 'regular' => [ 'de_DE' => '' ] ] ] );
 check( 'a schema may label its own variants: those that are labels of words it names are kept, and a schema without labels has no key for them',
 	is_array( $withLabels ) === true && $withLabels['labels'] === [ 'soft' => 'Soft surface' ] && array_key_exists( 'labels', \Nino\Components::validate( 'v-plain', [ 'label' => 'V', 'variants' => [ 'soft' ] ] ) ) === false );
+
+// The labels of the options of a choice: what a tool shows for each
+$optionLabels = \Nino\Components::validate( 'o-labels', [ 'label' => 'O', 'attributes' => [
+	'align' => [ 'type' => 'choice', 'options' => [ 'start', '0', 'end' ], 'default' => 'start', 'responsive' => true, 'labels' => [ 'start' => [ 'de_DE' => 'Links' ], '0' => 'Zero', 'end' => "a\0b", 'gone' => 'Gone' ] ],
+	'tone' => [ 'type' => 'choice', 'options' => [ 'a', 'b' ], 'default' => 'a', 'labels' => [ 'a' => str_repeat( 'x', 201 ), 'b' => [ 1 ] ] ],
+] ] );
+check( 'a choice may label its options, also a responsive one and a numeric word: the labels of options it has come through; a label that is none falls away and the option stays, as does one of a word that is no option, and with no label left the key is gone',
+	is_array( $optionLabels ) === true && $optionLabels['attributes']['align']['labels'] === [ 'start' => [ 'de_DE' => 'Links' ], '0' => 'Zero' ]
+	&& $optionLabels['attributes']['align']['options'] === [ 'start', '0', 'end' ] && $optionLabels['attributes']['tone']['options'] === [ 'a', 'b' ]
+	&& array_key_exists( 'labels', $optionLabels['attributes']['tone'] ) === false );
+check( 'the labels of options are for a choice, and a map', is_string( \Nino\Components::validate( 'o-int', [ 'label' => 'O', 'attributes' => [ 'n' => [ 'type' => 'int', 'default' => 1, 'labels' => [ '1' => 'One' ] ] ] ] ) )
+	&& is_string( \Nino\Components::validate( 'o-text', [ 'label' => 'O', 'attributes' => [ 'n' => [ 'type' => 'choice', 'options' => [ 'a' ], 'default' => 'a', 'labels' => 'One' ] ] ] ) ) );
+\Nino\Components::addComponent( $appData, 'o-labels', [ 'label' => 'O', 'template' => '<i></i>', 'attributes' => [ 'align' => [ 'type' => 'choice', 'options' => [ 'start', 'end' ], 'default' => 'start', 'labels' => [ 'end' => [ 'de_DE' => 'Rechts' ] ] ] ] ] );
+check( 'the schema the register hands out carries the labels of the options', \Nino\Components::components( $appData )['o-labels']['attributes']['align']['labels'] === [ 'end' => [ 'de_DE' => 'Rechts' ] ] );
+
 $out = $draw( '[card variant="poster"][/card]' );
 check( 'F2/V3: no callback, no variant of it - the call keeps what it wrote in the document, and it is drawn without it', $out === '<article class="card"></article>' );
 

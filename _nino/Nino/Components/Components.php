@@ -37,6 +37,8 @@ namespace Nino {
 	 *											'variants'	the words of the one open axis; regular is always there, first
 	 *											'labels'		variant => text, or a locale => text map: what a tool shows for a variant the
 	 *																	schema names; a label of a word that is no variant, or one that is no label, is left out
+	 *											An attribute of a choice may carry 'labels' beside 'options': option => text or locale => text map, what
+	 *											a tool shows for an option of the list; one of a word that is no option, or that is no label, is left out
 	 *											'template'	the markup, or the name of a *.tpl file in the directory a feature gives
 	 *											'icon', 'preview'	for a tool
 	 *
@@ -162,7 +164,7 @@ namespace Nino {
 
 		// The keys of a schema and of an attribute, which is all validate() accepts
 		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
-		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input' ];
+		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input', 'labels' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
 		// the word of a variant or of an option that is written as a class; the value of an id; a field of an element
@@ -3008,14 +3010,14 @@ namespace Nino {
 		}
 
 		/**
-		 *	The labels of variants that are labels: of a map of variant => text or locale => text, those whose variant is
+		 *	The labels of variants or options that are labels: of a map of word => text or locale => text, those whose word is
 		 *	one of the words and whose text has nothing empty, no control character but the line break and the tab and no
 		 *	more than LABEL_LENGTH bytes (each, for a locale map). The rest is left out
 		 *
 		 *	@param		array			$given
 		 *	@param		array			$words
 		 *
-		 *	@return 	array										variant => label
+		 *	@return 	array										word => label
 		 */
 		private static function _labels( array $given, array $words ): array {
 
@@ -3023,7 +3025,10 @@ namespace Nino {
 
 			foreach( $given as $word => $label ) {
 
-				if( is_string( $word ) === false || in_array( $word, $words, true ) === false || self::_words( $label ) === false )
+				// A numeric word is an int as a key
+				$word = (string) $word;
+
+				if( in_array( $word, $words, true ) === false || self::_words( $label ) === false )
 					continue;
 
 				foreach( (array) $label as $text )
@@ -3254,9 +3259,12 @@ namespace Nino {
 			if( $type === 'choice' )
 				$clean['responsive'] = ( $declared['responsive'] ?? false ) === true;
 
-			foreach( [ 'options', 'min', 'max' ] as $key )
-				if( isset( $declared[$key] ) === true && $type !== ( $key === 'options' ? 'choice' : 'int' ) )
-					return $where. '"'. $key. '" is for '. ( $key === 'options' ? 'a choice' : 'an int' );
+			foreach( [ 'options', 'labels', 'min', 'max' ] as $key )
+				if( isset( $declared[$key] ) === true && $type !== ( $key === 'min' || $key === 'max' ? 'int' : 'choice' ) )
+					return $where. '"'. $key. '" is for '. ( $key === 'min' || $key === 'max' ? 'an int' : 'a choice' );
+
+			if( isset( $declared['labels'] ) === true && is_array( $declared['labels'] ) === false )
+				return $where. '"labels" must be a map of option => label';
 
 			$default = $declared['default'];
 
@@ -3304,6 +3312,12 @@ namespace Nino {
 
 				if( count( array_unique( $clean['options'] ) ) !== count( $clean['options'] ) )
 					return $where. '"options" names a value twice';
+
+				// The label of an option that is one and is a label; the rest falls away and the option stays
+				$labels = self::_labels( (array) ( $declared['labels'] ?? [] ), $clean['options'] );
+
+				if( $labels !== [] )
+					$clean['labels'] = $labels;
 
 				if( ( $clean['input'] ?? '' ) === 'icons' ) {
 

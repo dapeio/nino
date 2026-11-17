@@ -206,6 +206,9 @@ What the register does for the renderer, and what it leaves to it:
   renderer - is handed what it holds and draws it as often as it needs;
   `\Nino\Components::sources()` answers which keys and pictures a source reads,
   for whoever scans a template.
+- `'labels' => [ 'big' => 'Large' ]` in the attribute names what a tool shows for
+  an option of a list (a text or a `locale => string` map); it is read from the
+  schema `components()` hands out, and an option without one shows as its word.
 - The `options` of a `choice` are a list, or the name of a static method of the
   feature's own class (`\Nino\Modules\<Directory>` or below it) that answers them
   where the project alone knows them - its menus, its forms:
