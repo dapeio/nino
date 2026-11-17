@@ -93,7 +93,6 @@
 
 				Nino.admin.text._locales = response.locales.map( function( entry ) { return entry.locale } );
 				Nino.admin.text._inactive = response.locales.filter( function( entry ) { return entry.active === false } ).map( function( entry ) { return entry.locale } );
-				Nino.admin.sessionLocale.init( response.selectedLocale );
 				Nino.admin.text._data = response;
 				Nino.admin.text._buildModel();
 				Nino.admin.text._renderList();
@@ -110,13 +109,13 @@
 		},
 
 		/**
-		 *	The language the panel shows: the one of the session, which is the
-		 *	one the interface is in too
+		 *	The language the panel shows: the one the workbench edits content in
+		 *	(Nino.admin.workLocale), the first language of the panel where there is none
 		 *
 		 *	@return		{string}
 		 */
 		_locale : function() {
-			return Nino.admin.sessionLocale.current ?? Nino.admin.text._locales[0] ?? '';
+			return Nino.admin.workLocale.current ?? Nino.admin.text._locales[0] ?? '';
 		},
 
 		/**
@@ -340,7 +339,7 @@
 					Nino.admin.text._search.shown = 0;
 					Nino.admin.text._renderCategoryList();
 				},
-				select : { locales : Nino.admin.text._locales, inactive : Nino.admin.text._inactive, value : Nino.admin.text._locale(), onChange : function( locale ) { Nino.admin.text._setLocale( locale ) } },
+				select : { locales : Nino.admin.text._locales, inactive : Nino.admin.text._inactive, value : Nino.admin.text._locale(), onChange : function( locale ) { Nino.admin.workLocale.set( locale ) } },
 				chips : [ { id : 'empty', onToggle : function() {
 					Nino.admin.text._search.emptyOnly = Nino.admin.text._search.emptyOnly === false;
 					Nino.admin.text._search.shown = 0;
@@ -367,15 +366,45 @@
 		},
 
 		/**
-		 *	Change the language the panel shows. Nothing is edited by it: it is
-		 *	the session's language, which the next form opens in too
+		 *	The workbench's content language moved (Nino.admin.workLocale): the form
+		 *	on screen shows the other translation, the list is drawn in it. Nothing
+		 *	is edited by it, and a panel that is not drawn yet reads the language
+		 *	when it is
 		 *
 		 *	@param		{string}	locale
 		 *
 		 *	@return		void
 		 */
-		_setLocale : function( locale ) {
-			Nino.admin.sessionLocale.set( locale );
+		_followLocale : function( locale ) {
+
+			if( Nino.admin.text._data === null || Nino.admin.text._model === null )
+				return;
+
+			const form = dc.getElementById('text-form');
+
+			// The list's select is behind the form, and says the language it is drawn in when the person is back
+			const listSelect = dc.getElementById('text-list-locale');
+			if( listSelect !== null )
+				listSelect.value = locale;
+
+			if( form.classList.contains('admin-hidden') === false && dc.getElementById('text-edit-form') !== null ) {
+
+				if( locale === Nino.admin.text._selectedLocale )
+					return;
+
+				Nino.admin.text._storeVisibleLocaleFields();
+				Nino.admin.text._selectedLocale = locale;
+				Nino.admin.text._model.locale = locale;
+
+				const select = dc.getElementById('text-form-locale-select');
+				if( select !== null )
+					select.value = locale;
+
+				Nino.admin.text._renderLocaleFields();
+				Nino.adminUi.localeBadge( locale, form.querySelector('.nino-admin-contextbar') );
+				return;
+			}
+
 			Nino.admin.text._search.shown = 0;
 			Nino.admin.text._buildModel();
 			Nino.admin.text._renderCategoryList();
@@ -574,7 +603,7 @@
 			return Nino.admin.textKeys.hitElement( hit, locale, function() {
 				Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) );
 				Nino.admin.text._openGroup( hit.item.row.id, hit.item.field.entry.key, true );
-			}, Nino.admin.text._setLocale );
+			}, Nino.admin.workLocale.set );
 		},
 
 		/**
@@ -593,7 +622,7 @@
 
 			Nino.admin.text._currentGroup 	= group;
 			Nino.admin.text._focusKey 			= key ?? null;
-			Nino.admin.text._selectedLocale = Nino.admin.sessionLocale.current ?? Nino.admin.text._locales[0] ?? '';
+			Nino.admin.text._selectedLocale = Nino.admin.text._locale();
 			Nino.admin.text._localeValues 	= {};
 			Nino.admin.text._dirtyLocales 	= [];
 			Nino.admin.text._baseline 			= { global : {}, locale : {} };
@@ -1072,14 +1101,9 @@
 					locales : Nino.admin.text._locales,
 					inactive : Nino.admin.text._inactive,
 					current : Nino.admin.text._selectedLocale,
-					onChange : function( locale ) {
-						Nino.admin.text._storeVisibleLocaleFields();
-						Nino.admin.text._selectedLocale = locale;
-						Nino.admin.text._model.locale = locale;
-						Nino.admin.sessionLocale.set( locale );
-						Nino.admin.text._renderLocaleFields();
-					},
+					onChange : function( locale ) { Nino.admin.workLocale.set( locale ) },
 				} ) );
+				Nino.adminUi.localeBadge( Nino.admin.text._selectedLocale, toolbar );
 			}
 
 			const stored = Nino.admin.text._localeValues[Nino.admin.text._selectedLocale] ?? {};
@@ -1281,6 +1305,9 @@
 		},
 	};
 
+	// The language moves for this panel whoever moved it (see Nino.admin.workLocale)
+	Nino.admin.workLocale.follow( 'text', Nino.admin.text._followLocale );
+
 	// The shell asks before anything throws the open group's input away (see
 	// Nino.admin.dirty). A shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
@@ -1288,6 +1315,7 @@
 			isDirty : Nino.admin.text.isDirty,
 			save		: function( done ) { Nino.admin.text._save( done ) },
 			discard : Nino.admin.text.discard,
+			saving		: function() { return Nino.admin.text._saving === true },
 		} );
 
 })(window, document, document.documentElement, document.body);

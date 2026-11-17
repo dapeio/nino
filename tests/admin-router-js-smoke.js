@@ -159,7 +159,7 @@ function panel( file, nodes, name, levels, before = [] ) {
 				current : () => hash,
 				leave : ( names, leaving, proceed, resync ) => { asked.push( { names : names, leaving : leaving, resync : resync } ); proceed() },
 			},
-			sessionLocale : { current : 'de_DE', init(){} },
+			workLocale : { current : 'de_DE', follow(){} },
 			// The counters of the shell: nothing is written in these checks, so nothing moves
 			touch(){}, stamp : () => 0,
 		},

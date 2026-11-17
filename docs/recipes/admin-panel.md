@@ -890,8 +890,11 @@ and the `aria-required` of a required field, its `input` the control;
 `button( text, onClick, options )` a real button, whose `name` is the title and
 the `aria-label` of a glyph (its kind, size and icon are in
 [Buttons and icons](#buttons-and-icons)); `el( tag, className, text )` an element with a class
-and a text; and `localeSelect( options )` the switch of the translation a form
-shows, for the context bar - what a change does is the panel's. Their docblocks in
+and a text; `localeSelect( options )` the switch of the translation a form
+shows, for the context bar - what a change does is the panel's (it calls
+`Nino.admin.workLocale.set()` and draws when the language moves) -; `localeName( code, among )`
+the name of a language, and `localeBadge( locale, bar )` the pill of the context bar that names
+the content language where it is not the native one. Their docblocks in
 `_admin/assets/Nino.admin.js` are the reference.
 
 ### Help, notes and textfills at a field
@@ -1137,6 +1140,60 @@ Nino.admin.touch( 'templates' );
 // A write that was about one page of the website says which
 Nino.admin.touch( 'routes', '/blog/hello' );
 ```
+
+## The language content is edited in
+
+A view that shows values which depend on the language - a translation of an element, a text of a
+key, the name of a page - shows the language the whole workbench edits content in, and has no
+switch of its own to choose another: it is chosen once, in the account area of the rail, and
+held for the session by the server (`\Nino\Admin\Admin::contentLocale()`). The page hands it
+to the script on the shell root (`data-work-locale`, `data-native-locale` and the names of the
+languages in `data-locales`), and `Nino.admin.workLocale` is the one source of it: `current`
+is the code, `native` the language the project's own words are in, and it starts as that. It is
+not the language the workbench is drawn in - that is the interface language, which the picker of
+the settings menu sets (`\Nino\Admin\Admin::sessionLocale()`) - and the two are never called
+by one name: "Edit content in" and "Interface language".
+
+A view reads `current` whenever it draws, and follows the language where one of its levels is
+on screen when it moves, whoever moved it - the rail, or a panel that sets it:
+
+```js
+// current is the language to draw in; a language this view has no translation of (one the website does not serve) is a choice of the view
+const locale = Nino.admin.workLocale.current ?? Nino.admin.catalog._locales[0] ?? '';
+
+// a select of the view - only until the panel of the view drops it - tells the source and leaves the drawing to the follower
+Nino.adminUi.localeSelect( { locales : locales, current : locale, onChange : function( code ) { Nino.admin.workLocale.set( code ) } } );
+
+// the name is the view's entry of the registry of unsaved input (see Unsaved input): the rail asks about those entries before it moves the language
+Nino.admin.workLocale.follow( 'catalog', function( code ) {
+	Nino.admin.catalog._storeVisibleFields();
+	Nino.admin.catalog._draw( code );
+	Nino.adminUi.localeBadge( code, bar );
+} );
+```
+
+A choice in the rail asks first, as every exit of the workbench does, when a view that follows
+the language holds unsaved input (Save, Discard, Cancel; Discard also closes the form it threw
+away); Cancel stays in the old language. A view that holds nothing the language touches follows
+with the name `null` and is not asked about. `set()` moves the source, tells the server and calls
+every follower; a view that is not on screen only has to read `current` when it is drawn.
+
+A view that writes content in one language and cannot draw another without being opened anew
+does not follow; it calls `Nino.admin.workLocale.bind( name )`
+with the name of its entry of unsaved input and its panel. The rail then asks about its unsaved
+input as well, and while the view is on screen it loads the page anew in the language chosen
+(the address stays, as at a change of the interface language), so that no view shows one language
+and writes another. An entry of that registry may carry `saving()`, true while a save runs: the rail
+does not take its choice then and says so, instead of asking a question that ends in a save which
+is not made twice. A writer that is sent to the server names the language of its text in the
+request, and never leaves it to the session, which another window of the same browser may move.
+
+A view whose content depends on the language says so where the person looks, once the language
+is not the native one: `Nino.adminUi.localeBadge( locale, bar )` puts a quiet pill in the context
+bar (and takes it away again for the native language), so that nobody writes in a foreign
+language unnoticed. A language is named in one form everywhere - `Nino.adminUi.localeName( code )`,
+"Deutsch" or "English (US)", the code behind it only where two of the languages that stand
+together (`localeName( code, among )`) are named alike, which `localeSelect()` does for its options.
 
 ## Saying what happened
 

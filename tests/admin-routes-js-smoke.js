@@ -132,6 +132,7 @@ const Nino = {
 		formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar },
 		touch : function( topic, uri ) { touched.push( topic ); touchedUris.push( uri ) },
 		stamp : function( topic ) { return stamps[topic] ?? 0 },
+		workLocale : { current : null, follow : function() {} },
 	},
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
@@ -474,6 +475,19 @@ check( '...else the one of every language', panel._publicPath( { de_DE : '/ueber
 check( '...else the first there is, an empty one passed over', panel._publicPath( { de_DE : '  ', fr_FR : '/accueil' } ) === '/accueil' );
 check( '...with the slash it lacks, and none for a page that has no address', panel._publicPath( { en_US : ' about ' } ) === '/about' && panel._publicPath( {} ) === '' && panel._publicPath( { en_US : '' } ) === '' );
 panel._selectedLocale = selectedBefore;
+
+// The list names its pages in the language the workbench edits content in, where the website serves it: the one source, not the answer the server gave when the list was read
+const localesBefore = panel._locales;
+const sourceBefore = Nino.admin.workLocale.current;
+panel._locales = [ 'de_DE', 'en_US' ];
+panel._selectedLocale = 'de_DE';
+Nino.admin.workLocale.current = 'en_US';
+check( 'the address and the name on the list are the workbench\'s language where the website has it', panel._language() === 'en_US' && panel._publicPath( { de_DE : '/ueber-uns', en_US : '/about' } ) === '/about' );
+Nino.admin.workLocale.current = 'it_IT';
+check( '...and the one the server named where it has not - a language the website does not serve yet', panel._language() === 'de_DE' && panel._publicPath( { de_DE : '/ueber-uns', en_US : '/about' } ) === '/ueber-uns' );
+panel._locales = localesBefore;
+panel._selectedLocale = selectedBefore;
+Nino.admin.workLocale.current = sourceBefore;
 answer( 200, listing( [ '/', '/contact' ] ) );
 
 // A route that picks its template at runtime has no template to choose: the
@@ -866,7 +880,7 @@ answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page
 		console : console,
 		document : { getElementById : node, querySelectorAll : () => [], documentElement : null, body : null },
 		Nino : {
-			admin : { dirty : { watchForm : ( name, getter, save ) => watched.push( { name : name, getter : getter, save : save } ), snapshot : name => calls.push( 'snapshot '+ name ) }, touch : topic => calls.push( 'touch '+ topic ), stamp : () => 0 },
+			admin : { dirty : { watchForm : ( name, getter, save ) => watched.push( { name : name, getter : getter, save : save } ), snapshot : name => calls.push( 'snapshot '+ name ) }, touch : topic => calls.push( 'touch '+ topic ), stamp : () => 0, workLocale : { current : null, follow(){} } },
 			events : { bindCallback : function() {} },
 			http : { sendRequest : ( uri, method, callback, data ) => sent.push( { action : data.action, callback : callback } ) },
 			content : { getText : key => key },

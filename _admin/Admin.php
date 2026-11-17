@@ -54,7 +54,7 @@ namespace Nino\Admin {
 		// names and the one it remembers
 		public const string FOLLOW_PATH = '/^\/(?!\/)(?!_admin(?:[\/?#]|$))[^\s<>"\'\\\\\x00-\x1f\x7f]*$/iD';
 
-		/*	The language switcher, the one fragment this class renders itself -
+		/*	The language switchers, the fragments this class renders itself -
 			declared once rather than concatenated inside _localePickerHtml().
 			Being a property is the point: a project that wants a different
 			control replaces the entry rather than the method. Every other
@@ -70,6 +70,12 @@ namespace Nino\Admin {
 				// nothing about what changing it does
 				'localepicker'	=> '<select id="admin-localepicker" aria-label="[[/_admin/label/language]]">[[content]]</select>',
 				'locale-option'	=> '<option value="?locale=[[locale]]"[[selected]]>[[label]]</option>',
+				// The choice of the language content is edited in (see contentLocale()),
+				// once in the account area of the rail and once in the settings menu,
+				// each with its word: the stylesheet shows the one that fits the rail's
+				// state, and Nino.admin.workLocale fills both with the same options
+				'worklocale-rail'	=> '<div class="nino-admin-worklocale nino-admin-worklocale--rail"><label for="admin-worklocale-rail">[[/_admin/label/worklocale]]</label><select id="admin-worklocale-rail" data-worklocale></select></div>',
+				'worklocale-menu'	=> '<div class="nino-admin-worklocale nino-admin-worklocale--menu"><label for="admin-worklocale-menu">[[/_admin/label/worklocale]]</label><select id="admin-worklocale-menu" data-worklocale></select></div>',
 			];
 
 		/**
@@ -236,6 +242,9 @@ namespace Nino\Admin {
 			}
 
 			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
+				// Whoever signs in next - the same account or another - starts on the
+				// native language, as the first one did: the choice lasts as long as the sign-in
+				\Nino\Runtime::unsetSessionValue( $appData, './admin/content-locale' );
 				$request['/nino/http/response']['body'] = '[template /_admin/templates/page-login]';
 				return;
 			}
@@ -274,10 +283,19 @@ namespace Nino\Admin {
 			// see safe to make
 			$mode = ( $appData['/nino/mode'] ?? '' ) === 'development' ? 'development' : 'production';
 
+			// The languages content can be edited in, and the one it is edited in now:
+			// what the script of the shell (Nino.admin.workLocale) starts from
+			$workLocales = self::workLocales( $appData );
+
 			// Only the panels this account may use are rendered at all - the
 			// permission checks in every action stay authoritative, this keeps
 			// the navigation honest and the page free of predictable 403s
 			\Nino\Html::addFills( $appData, [
+				'[[/_admin/worklocale/current]]'	=> self::contentLocale( $appData ),
+				'[[/_admin/worklocale/native]]'		=> \Nino\Locales::getNativeLocale( $appData ),
+				'[[/_admin/worklocale/locales]]'	=> str_replace( '[', '&#91;', htmlspecialchars( json_encode( $workLocales, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ?: '[]', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
+				'[[/_admin/worklocale/rail]]'			=> count( $workLocales ) > 1 ? self::$html['worklocale-rail'] : '',
+				'[[/_admin/worklocale/menu]]'			=> count( $workLocales ) > 1 ? self::$html['worklocale-menu'] : '',
 				'[[/_admin/nav]]'						=> self::navHtml( $appData ),
 				'[[/_admin/panes]]'					=> self::panesHtml( $appData ),
 				'[[/_admin/upload/bytes]]'	=> (string) $limits['bytes'],
@@ -984,12 +1002,13 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	The working language of this session: the translation Elements and
-		 *	Text (the Keys tab too) open on, and the one Routes names its pages in
-		 *	where they have a name in it (the select above those screens, POST
-		 *	admin/locale), so opening the next form - in this or another panel -
-		 *	starts on it instead of always resetting to whichever locale happens
-		 *	to come first. Its own session value, apart from
+		 *	The working language of this session - the language content is edited
+		 *	in: the translation Elements and Text (the Keys tab too) open on, and
+		 *	the one Routes names its pages in where they have a name in it. It is
+		 *	chosen once for the whole workbench, in the account area of the rail
+		 *	(Nino.admin.workLocale, POST admin/locale), so opening the next form - in
+		 *	this or another panel - starts on it instead of always resetting to
+		 *	whichever locale happens to come first. Its own session value, apart from
 		 *	the interface language (sessionLocale()) and from the visitor's
 		 *	locale, which the workbench never writes. Falls back to the site's
 		 *	native locale if nothing has been chosen yet, or the stored one is
@@ -1014,6 +1033,36 @@ namespace Nino\Admin {
 				return \Nino\Locales::getNativeLocale( $appData );
 
 			return $locale;
+		}
+
+		/**
+		 *	The languages content can be edited in, for the choice in the rail: the
+		 *	ones textLocales() names, each with the name the project gives it - the
+		 *	fill /_nino/locale/<code>/name, which the site's own picker shows - or,
+		 *	where it has none, the language's own name (\Nino\Locales::ENDONYMS) or
+		 *	the code. The form a name is written in is the script's
+		 *	(Nino.adminUi.localeName())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ { locale, name, active } ]
+		 */
+		public static function workLocales( array &$appData ): array {
+
+			$locales = [];
+
+			foreach( self::textLocales( $appData ) as $entry ) {
+
+				$name = \Nino\Html::renderTextfill( $appData, '/_nino/locale/'. $entry['locale']. '/name' );
+
+				$locales[] = [
+					'locale'	=> $entry['locale'],
+					'name'		=> $name !== '' ? $name : ( \Nino\Locales::ENDONYMS[$entry['locale']] ?? $entry['locale'] ),
+					'active'	=> $entry['active'],
+				];
+			}
+
+			return $locales;
 		}
 
 		/**

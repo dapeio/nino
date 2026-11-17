@@ -1364,7 +1364,7 @@ dialogNodes.msg.textContent = '';
 checkedWith( 'expired', 200 );
 check( 'a 403 from the login whose check finds the session still gone says so', dialogNodes.msg.textContent === 'error 403 text' && dialogNodes.submit.disabled === false );
 
-withDialog.Nino.admin.sessionLocale.set( 'de_DE' );
+withDialog.Nino.admin.workLocale.set( 'de_DE' );
 check( 'the locale switch posts through the one request helper', requested[requested.length - 1].uri === '/sub/_admin/' && requested[requested.length - 1].data.action === 'admin/locale' && requested[requested.length - 1].data.data === '{"locale":"de_DE"}' );
 
 /*	Unsaved input. A panel that keeps a form registers with the shell and says

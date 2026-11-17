@@ -95,6 +95,32 @@
 		},
 
 		/**
+		 *	The language a page is named in on the list: the one the workbench edits
+		 *	content in (Nino.admin.workLocale) where the website serves it, else the one
+		 *	the server named when the list was read
+		 *
+		 *	@return		{string}
+		 */
+		_language : function() {
+
+			const current = Nino.admin.workLocale.current;
+
+			return Nino.admin.routes._locales.indexOf( current ) !== -1 ? current : Nino.admin.routes._selectedLocale;
+		},
+
+		/**
+		 *	The workbench's content language moved: the list names its pages in it.
+		 *	Nothing a form holds depends on it, so no question is asked about the form
+		 *
+		 *	@return		void
+		 */
+		_followLocale : function() {
+
+			if( Nino.admin.routes._ready === true )
+				Nino.admin.routes._renderList();
+		},
+
+		/**
 		 *	Re-show whichever level (list or form) is currently on - and read
 		 *	the list again first where a page template was written since it was
 		 *	read (the Builder creates them), so that the form's select offers it.
@@ -341,7 +367,7 @@
 		 */
 		_publicPath : function( httpUris ) {
 
-			const wanted = [ Nino.admin.routes._selectedLocale, '' ].concat( Object.keys( httpUris ) );
+			const wanted = [ Nino.admin.routes._language(), '' ].concat( Object.keys( httpUris ) );
 			const found = wanted.find( function( key ) { return typeof httpUris[key] === 'string' && httpUris[key].trim() !== '' } );
 
 			if( found === undefined )
@@ -371,7 +397,7 @@
 				return String( ( ( entry.text || {} )[locale] || {} ).name || '' ).trim();
 			};
 
-			const locales = [ Nino.admin.routes._selectedLocale ].concat( Nino.admin.routes._locales );
+			const locales = [ Nino.admin.routes._language() ].concat( Nino.admin.routes._locales );
 
 			for( let i = 0; i < locales.length; i++ )
 				if( locales[i] !== '' && nameIn( locales[i] ) !== '' )
@@ -1291,6 +1317,9 @@
 	};
 
 	Nino.events.bindCallback( 'ready', Nino.admin.routes.init );
+
+	// The list names its pages in the content language, whoever moved it (see Nino.admin.workLocale)
+	Nino.admin.workLocale.follow( null, Nino.admin.routes._followLocale );
 
 	// The shell asks before anything throws the open page's input away (see
 	// Nino.admin.dirty). A shell without the registry is simply not asking

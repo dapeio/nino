@@ -3368,16 +3368,19 @@
 		 *	the locale codes, the current one picked. It says what the form below
 		 *	it shows rather than collecting a value, so it is the compact pill of
 		 *	the design system (.nino-admin-locale-select) and sits in the pinned
-		 *	context bar. What a change does is the caller's - the Elements and
-		 *	Text panels also tell the session (Nino.admin.sessionLocale), the Keys
-		 *	tab does not. The select is named: the caller's label, or the shared
+		 *	context bar. What a change does is the caller's - a panel that works in
+		 *	the language of the workbench tells the one source of it
+		 *	(Nino.admin.workLocale.set()) and draws what it shows when that source
+		 *	says it moved. The select is named: the caller's label, or the shared
 		 *	word for a translation where it has none - a combobox of bare codes
-		 *	is announced as nothing else
+		 *	is announced as nothing else. An option says the language by its name
+		 *	(localeName()), the code behind it only where two of the list are
+		 *	named alike
 		 *
 		 *	@param		{Object}		options					{ locales, inactive, current, label, id, onChange }
-		 *														- locales    the codes, which are also what the options say
+		 *														- locales    the codes, which are the values of the options
 		 *														- inactive   the codes of the languages the website does not serve yet,
-		 *														             which an option says with the word Inactive in parentheses behind its code
+		 *														             which an option says with the word Inactive in parentheses behind its name
 		 *														- current    the code that is picked
 		 *														- label      the select's aria-label, /_admin/common/label/locale by default
 		 *														- onChange   called with the picked code on every change
@@ -3396,11 +3399,7 @@
 			select.setAttribute( 'aria-label', options.label || Nino.adminUi.text('/_admin/common/label/locale') );
 
 			( options.locales || [] ).forEach( function( locale ) {
-				const option = dc.createElement('option');
-				option.value = locale;
-				option.textContent = ( options.inactive || [] ).indexOf( locale ) === -1 ? locale : locale+ ' ('+ Nino.adminUi.text('/_admin/common/word/inactive')+ ')';
-				option.selected = ( locale === options.current );
-				select.appendChild( option );
+				select.appendChild( Nino.adminUi.localeOption( locale, options.locales, options.inactive, options.current ) );
 			} );
 
 			select.addEventListener( 'change', function() {
@@ -3409,6 +3408,95 @@
 			} );
 
 			return select;
+		},
+
+		// The languages the workbench names, which the shell hands over once
+		// (Nino.admin.workLocale.init()): the native language of the project and
+		// the name of each language, code -> name, as the site's own picker says it
+		locales : { native : '', names : {} },
+
+		/**
+		 *	The name of a language, the one form the whole workbench writes it in
+		 *	("Deutsch", "English (US)"): what the project calls it, the code where it
+		 *	does not. Where it is told the languages that stand together - the
+		 *	options of a select, the rows of a form - and another of them has the
+		 *	same name, the code follows in parentheses, so that two of one name can be
+		 *	told apart; otherwise the code stays out of sight
+		 *
+		 *	@param		{string}				code					The language, eg. de_DE
+		 *	@param		{Array<string>}	[among]				The codes that are shown together with it
+		 *
+		 *	@return		{string}
+		 */
+		localeName : function( code, among ) {
+
+			const names = Nino.adminUi.locales.names;
+			const nameOf = function( locale ) {
+				return Object.prototype.hasOwnProperty.call( names, locale ) === true && typeof names[locale] === 'string' && names[locale] !== '' ? names[locale] : locale;
+			};
+			const name = nameOf( code );
+
+			if( Array.isArray( among ) === true && among.some( function( other ) { return other !== code && nameOf( other ).toLowerCase() === name.toLowerCase() } ) === true )
+				return name+ ' ('+ code+ ')';
+
+			return name;
+		},
+
+		/**
+		 *	The option of a language in a select: its code the value, its name the text
+		 *	(localeName()), and for a language the website does not serve yet the
+		 *	shared word Inactive in parentheses behind the name
+		 *
+		 *	@param		{string}				locale			The language
+		 *	@param		{Array<string>}	[among]			The codes that stand in the same select
+		 *	@param		{Array<string>}	[inactive]	The codes of the languages the website does not serve yet
+		 *	@param		{string}				[current]		The code that is picked
+		 *
+		 *	@return		{Element}
+		 */
+		localeOption : function( locale, among, inactive, current ) {
+
+			const option = dc.createElement('option');
+			const name = Nino.adminUi.localeName( locale, among );
+
+			option.value = locale;
+			option.textContent = ( inactive || [] ).indexOf( locale ) === -1 ? name : name+ ' ('+ Nino.adminUi.text('/_admin/common/word/inactive')+ ')';
+			option.selected = ( locale === current );
+
+			return option;
+		},
+
+		/**
+		 *	The quiet pill for the context bar of a view that shows content in a
+		 *	language: it names the language of the content - only when that is not
+		 *	the native language of the project, so that nobody writes in a foreign
+		 *	language without noticing. With a bar, the bar's own badge is replaced
+		 *	(or taken away), so a view that follows the language draws it again by
+		 *	calling this
+		 *
+		 *	@param		{string}			locale			The language of the content on screen
+		 *	@param		{Element}			[bar]				The context bar to put it in, at the end
+		 *	@param		{boolean}			[always]		Also for the native language: the view shows it where the workbench's content language is another one the view has no translation of
+		 *
+		 *	@return		{Element|null}							The pill, null for the native language
+		 */
+		localeBadge : function( locale, bar, always ) {
+
+			const hasBar = bar !== undefined && bar !== null;
+			const old = hasBar === true ? bar.querySelector('.nino-admin-locale-badge') : null;
+			let badge = null;
+
+			if( typeof locale === 'string' && locale !== '' && ( locale !== Nino.adminUi.locales.native || always === true ) ) {
+				badge = Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-locale-badge', Nino.adminUi.format( Nino.adminUi.text('/_admin/common/label/worklocale-badge'), Nino.adminUi.localeName( locale ) ) );
+				badge.dataset.state = 'warn';
+			}
+
+			if( old !== null && old !== undefined )
+				badge === null ? old.remove() : old.replaceWith( badge );
+			else if( hasBar === true && badge !== null )
+				bar.appendChild( badge );
+
+			return badge;
 		},
 
 		/**

@@ -4760,15 +4760,34 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 		right: auto;
 		left: -.25rem;
 	}
+	/*	The language the content is edited in stands under the icons, a row of
+	 *	its own, while the rail is open; folded, and on a phone, the settings
+	 *	menu has it */
+	#admin-page-wrap:not(.nino-admin-shell--folded) #admin-user .nino-admin-worklocale--rail {
+		display: flex;
+		flex: 1 0 100%;
+		margin-top: var(--nino-admin-space-2);
+	}
+	#admin-page-wrap:not(.nino-admin-shell--folded) .nino-admin-worklocale--menu {
+		display: none;
+	}
+	/*	Folded, the menu opens beside the column of icons, over the pane, and not over the icons below the button */
+	#admin-page-wrap.nino-admin-shell--folded #admin-nav-ui-menu {
+		top: 0;
+		left: calc(100% + var(--nino-admin-space-3));
+		margin-top: 0;
+	}
 	/*	Folded (see Nino.admin.rail in script.js), the brand row stacks: the
 	 *	mark above the fold button, both centred in the icon column */
 	#admin-page-wrap.nino-admin-shell--folded .admin-brand {
 		flex-direction: column;
 		gap: var(--nino-admin-space-3);
 	}
-	/*	The account block waits for the unfold, and two things in it stay, one
+	/*	The account block waits for the unfold, and three things in it stay, one
 	 *	under the other in the middle of the column: the icon of the window of
-	 *	the website, and in development the letter of the mode */
+	 *	the website, the settings button - its menu holds the language of the
+	 *	content beside the one of the interface, which the rail has no room for
+	 *	here - and in development the letter of the mode */
 	#admin-page-wrap.nino-admin-shell--folded #admin-user {
 		display: flex;
 		flex-direction: column;
@@ -4780,7 +4799,7 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 		padding: var(--nino-admin-space-legend) 0 var(--nino-admin-space-2);
 		background: none;
 	}
-	#admin-page-wrap.nino-admin-shell--folded #admin-user > :not(#admin-user-follow, #admin-mode-chip) {
+	#admin-page-wrap.nino-admin-shell--folded #admin-user > :not(#admin-user-follow, #admin-mode-chip, #admin-nav-ui) {
 		display: none;
 	}
 }
@@ -4816,6 +4835,64 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 #form-login #admin-localepicker:focus-visible {
 	outline: 2px solid var(--editor-blue);
 	outline-offset: 2px;
+}
+
+/* The language content is edited in (Nino.admin.workLocale) is a choice of
+   the same kind as the interface language and looks like it: a word and a flat
+   dropdown, in the account area of the rail and in the settings menu. Below the
+   sidebar breakpoint and folded the rail's one is out of the way */
+#admin-page-wrap .nino-admin-worklocale {
+	display: flex;
+	flex-direction: column;
+	gap: var(--nino-admin-space-1);
+	min-width: 0;
+}
+#admin-page-wrap .nino-admin-worklocale--rail {
+	display: none;
+}
+#admin-page-wrap .nino-admin-worklocale > label {
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	line-height: 1.2;
+}
+#admin-page-wrap .nino-admin-worklocale select {
+	width: auto;
+	max-width: 100%;
+	min-height: var(--nino-admin-control-icon-small);
+	margin: 0;
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-6) var(--nino-admin-space-1) 0;
+	border: none;
+	background-color: transparent;
+	background-image:
+		linear-gradient(45deg, transparent 50%, #a0a8b2 50%),
+		linear-gradient(135deg, #a0a8b2 50%, transparent 50%);
+	background-position: calc(100% - 4px) 50%, 100% 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+	box-shadow: none;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-sm);
+	cursor: pointer;
+}
+#admin-page-wrap #admin-localepicker {
+	min-height: var(--nino-admin-control-icon-small);
+}
+#admin-page-wrap .nino-admin-worklocale select:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+/* Two labelled choices side by side in the menu give way to a narrow screen: the menu is as wide as they are, its place is
+   only as wide as the button it opens from */
+#admin-nav-ui-menu {
+	flex-wrap: wrap;
+	align-items: flex-end;
+	width: max-content;
+	max-width: calc(100vw - 2 * var(--nino-admin-space-6));
+}
+
+/* The badge of the language in a context bar keeps its size when the bar is narrow */
+#admin-page-wrap .nino-admin-contextbar .nino-admin-locale-badge {
+	flex: 0 0 auto;
 }
 
 }

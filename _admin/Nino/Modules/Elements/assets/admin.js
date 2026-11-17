@@ -142,7 +142,6 @@
 					return Nino.admin.elements._showError( dc.getElementById('elements-types'), status, response );
 				}
 				Nino.admin.elements._locales = response.locales;
-				Nino.admin.sessionLocale.init( response.selectedLocale );
 				Nino.admin.elements._renderTypes( response.types );
 				Nino.admin.elements._ready = true;
 
@@ -807,8 +806,8 @@
 		},
 
 		/**
-		 *	The working language as far as this panel can show it: the session's
-		 *	where it is one of the site's languages, else $otherwise. The Text panel
+		 *	The working language as far as this panel can show it: the workbench's
+		 *	(Nino.admin.workLocale) where it is one of the site's languages, else $otherwise. The Text panel
 		 *	also names languages the website does not serve yet, and an element has
 		 *	no select for those here
 		 *
@@ -818,7 +817,7 @@
 		 */
 		_workingLocale : function( otherwise ) {
 
-			const current = Nino.admin.sessionLocale.current;
+			const current = Nino.admin.workLocale.current;
 
 			return Nino.admin.elements._locales.indexOf( current ) !== -1 ? current : otherwise;
 		},
@@ -866,17 +865,16 @@
 
 			// Which translation the cells show, said in the form the edit form says
 			// it in: the same select, and it moves the workbench's content locale
-			// with it. A type with no per-language field has nothing to switch
+			// with it - the list is drawn again when that moves (_followLocale()).
+			// A type with no per-language field has nothing to switch
 			if( Nino.admin.elements._localeKeys.length > 0 )
 				toolbar.appendChild( Nino.adminUi.localeSelect( {
 					id : 'elements-list-locale-select',
 					locales : Nino.admin.elements._locales,
 					current : Nino.admin.elements._workingLocale( Nino.admin.elements._locales[0] ?? '' ),
-					onChange : function( locale ) {
-						Nino.admin.sessionLocale.set( locale );
-						Nino.admin.elements._refreshList();
-					},
+					onChange : function( locale ) { Nino.admin.workLocale.set( locale ) },
 				} ) );
+				Nino.admin.elements._paintBadge( toolbar, Nino.admin.elements._workingLocale( '' ) || Nino.adminUi.locales.native );
 
 			const title = dc.createElement('div');
 			title.className = 'main-title--withuri';
@@ -1053,7 +1051,7 @@
 
 				// Prefer the remembered session locale, if this element actually has
 				// data for it - otherwise fall back to whichever comes first
-				const preferred = Nino.admin.sessionLocale.current;
+				const preferred = Nino.admin.workLocale.current;
 
 				Nino.admin.elements._isNew 				= false;
 				Nino.admin.elements._currentUri 	= uri;
@@ -2029,7 +2027,7 @@
 			const form = dc.getElementById('elements-form');
 
 			if( announce === true && problems.length > 0 && problems[0].locale !== null && problems[0].locale !== Nino.admin.elements._selectedLocale && Nino.admin.elements._localeKeys.length > 0 ) {
-				Nino.admin.elements._switchLocale( problems[0].locale );
+				Nino.admin.workLocale.set( problems[0].locale );
 			}
 
 			Nino.adminUi.clearFieldErrors( form );
@@ -2141,10 +2139,11 @@
 			select.querySelectorAll('option').forEach( function( option ) {
 
 				const open = problems.filter( function( problem ) { return problem.locale === option.value } ).length;
+				const name = Nino.adminUi.localeName( option.value, Nino.admin.elements._locales );
 
 				option.textContent = open === 0
-					? option.value
-					: Nino.adminUi.format( Nino.content.getText('/_admin/elements/label/locale-open'), option.value, open );
+					? name
+					: Nino.adminUi.format( Nino.content.getText('/_admin/elements/label/locale-open'), name, open );
 			} );
 		},
 
@@ -2218,7 +2217,7 @@
 
 			const first = Nino.admin.elements._refused[0];
 			if( first.locale !== null && first.locale !== Nino.admin.elements._selectedLocale )
-				Nino.admin.elements._switchLocale( first.locale );
+				Nino.admin.workLocale.set( first.locale );
 
 			Nino.admin.elements._drawRefusals( true );
 		},
@@ -2785,10 +2784,57 @@
 		},
 
 		/**
-		 *	Show another translation: what is on screen is stored first, the
-		 *	switch itself follows (the select's own change handler reads the
-		 *	value from the select, so a switch made from code sets it too), and
-		 *	the workbench's content locale moves with it
+		 *	The workbench's content language moved (Nino.admin.workLocale): the form
+		 *	on screen shows the other translation, the list on screen shows its cells
+		 *	in it. Anything else - the picker of the types, a level that is not
+		 *	drawn - reads the language when it is drawn. A form of a type with no
+		 *	field per language, and a language this panel has no select for (one the
+		 *	website does not serve yet), stay as they are
+		 *
+		 *	@param		{string}	locale
+		 *
+		 *	@return		void
+		 */
+		_followLocale : function( locale ) {
+
+			const visible = function( id ) {
+				const level = dc.getElementById( id );
+				return level !== null && level !== undefined && level.classList.contains('admin-hidden') === false;
+			};
+
+			if( visible('elements-form') === true && dc.getElementById('elements-edit-form') !== null ) {
+
+				if( Nino.admin.elements._localeKeys.length > 0 && Nino.admin.elements._locales.indexOf( locale ) !== -1 && locale !== Nino.admin.elements._selectedLocale )
+					Nino.admin.elements._switchLocale( locale );
+				else
+					Nino.admin.elements._paintBadge( dc.getElementById('elements-form').querySelector('.nino-admin-contextbar'), Nino.admin.elements._selectedLocale );
+
+				return;
+			}
+
+			if( visible('elements-list') === true && Nino.admin.elements._currentType !== null )
+				Nino.admin.elements._refreshList();
+		},
+
+		/**
+		 *	The badge of the language this view shows, in its bar: for a language that
+		 *	is not the native one, and for the one it shows when that is not the
+		 *	workbench's - a language this panel has no translation of (one the website
+		 *	does not serve yet), where the form shows and writes another and says so
+		 *
+		 *	@param		{Element|null}	bar
+		 *	@param		{string}				shown				The language on screen
+		 *
+		 *	@return		void
+		 */
+		_paintBadge : function( bar, shown ) {
+			Nino.adminUi.localeBadge( shown, bar, shown !== Nino.admin.workLocale.current );
+		},
+
+		/**
+		 *	Show another translation: what is on screen is stored first, then the
+		 *	select is set to it (so a switch made from code shows it too) and the
+		 *	fields are drawn again
 		 *
 		 *	@param		{string}	locale
 		 *
@@ -2802,14 +2848,13 @@
 			if( select !== null )
 				select.value = locale;
 
-			Nino.admin.sessionLocale.set( locale );
-
 			// The selection moves in the same breath as the fields: until the
 			// old translation is taken down, anything that reads the form (the
 			// shell's question about unsaved input, a store of the visible
 			// fields) must still find it under its own locale
 			Nino.admin.elements._selectedLocale = locale;
 			Nino.admin.elements._renderLocaleFields();
+			Nino.admin.elements._paintBadge( dc.getElementById('elements-form').querySelector('.nino-admin-contextbar'), locale );
 		},
 
 		/**
@@ -2976,8 +3021,9 @@
 					id : 'elements-form-locale-select',
 					locales : Nino.admin.elements._locales,
 					current : Nino.admin.elements._selectedLocale,
-					onChange : function( locale ) { Nino.admin.elements._switchLocale( locale ) },
+					onChange : function( locale ) { Nino.admin.workLocale.set( locale ) },
 				} ) );
+				Nino.admin.elements._paintBadge( toolbar, Nino.admin.elements._selectedLocale );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'elements-form-locale-fields';
@@ -3596,6 +3642,9 @@
 		},
 	};
 
+	// The language moves for this panel whoever moved it (see Nino.admin.workLocale)
+	Nino.admin.workLocale.follow( 'elements', Nino.admin.elements._followLocale );
+
 	// The shell asks before anything throws this form's input away (see
 	// Nino.admin.dirty). A shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
@@ -3603,6 +3652,7 @@
 			isDirty : Nino.admin.elements.isDirty,
 			save		: function( done ) { Nino.admin.elements._save( done ) },
 			discard : Nino.admin.elements.discard,
+			saving		: function() { return Nino.admin.elements._saving === true },
 		} );
 
 })(window, document, document.documentElement, document.body);

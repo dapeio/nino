@@ -115,9 +115,6 @@
 				Nino.admin.keys._inactive = response.locales.filter( function( entry ) { return entry.active === false } ).map( function( entry ) { return entry.locale } );
 				Nino.admin.keys._categories = response.categories ?? {};
 
-				if( typeof Nino.admin.sessionLocale === 'object' )
-					Nino.admin.sessionLocale.init( response.selectedLocale );
-
 				Nino.admin.keys._data = response;
 				Nino.admin.keys._buildModel();
 				Nino.admin.keys._renderCategoryList();
@@ -136,14 +133,13 @@
 		},
 
 		/**
-		 *	The language the tab shows: the one of the session, which is the one
-		 *	the interface is in too - the first language where the session has
-		 *	none yet
+		 *	The language the tab shows: the one the workbench edits content in
+		 *	(Nino.admin.workLocale), the first language of the tab where there is none
 		 *
 		 *	@return		{string}
 		 */
 		_locale : function() {
-			return ( typeof Nino.admin.sessionLocale === 'object' ? Nino.admin.sessionLocale.current : null ) ?? Nino.admin.keys._locales[0] ?? '';
+			return Nino.admin.workLocale.current ?? Nino.admin.keys._locales[0] ?? '';
 		},
 
 		/**
@@ -357,21 +353,42 @@
 			return Nino.admin.textKeys.hitElement( hit, locale, function() {
 				Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) );
 				Nino.admin.keys._openGroup( hit.item.row.id, hit.item.field.entry.key, true );
-			}, Nino.admin.keys._setLocale );
+			}, Nino.admin.workLocale.set );
 		},
 
 		/**
-		 *	Change the language the tab shows. It is the session's language, which
-		 *	the Text panel and the next form open in too
+		 *	The workbench's content language moved (Nino.admin.workLocale): the form
+		 *	of a row on screen shows the other translation, the list is drawn in it.
+		 *	The other forms of the tab (a new key, the scan) have no translation to
+		 *	show and read the language when they are drawn
 		 *
 		 *	@param		{string}	locale
 		 *
 		 *	@return		void
 		 */
-		_setLocale : function( locale ) {
+		_followLocale : function( locale ) {
 
-			if( typeof Nino.admin.sessionLocale === 'object' )
-				Nino.admin.sessionLocale.set( locale );
+			if( Nino.admin.keys._data === null )
+				return;
+
+			const form = dc.getElementById('keys-form');
+
+			if( form.classList.contains('admin-hidden') === false && Nino.admin.keys._view === 'group' && dc.getElementById('keys-edit-form') !== null ) {
+
+				if( locale === Nino.admin.keys._selectedLocale )
+					return;
+
+				Nino.admin.keys._storeVisibleLocaleFields();
+				Nino.admin.keys._selectedLocale = locale;
+
+				const select = dc.getElementById('keys-form-locale-select');
+				if( select !== null )
+					select.value = locale;
+
+				Nino.admin.keys._renderLocaleFields();
+				Nino.adminUi.localeBadge( locale, form.querySelector('.nino-admin-contextbar') );
+				return;
+			}
 
 			Nino.admin.keys._search.shown = 0;
 			Nino.admin.keys._buildModel();
@@ -1292,12 +1309,9 @@
 					locales : Nino.admin.keys._locales,
 					inactive : Nino.admin.keys._inactive,
 					current : Nino.admin.keys._selectedLocale,
-					onChange : function( locale ) {
-						Nino.admin.keys._storeVisibleLocaleFields();
-						Nino.admin.keys._selectedLocale = locale;
-						Nino.admin.keys._renderLocaleFields();
-					},
+					onChange : function( locale ) { Nino.admin.workLocale.set( locale ) },
 				} ) );
+				Nino.adminUi.localeBadge( Nino.admin.keys._selectedLocale, toolbar );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'keys-form-locale-fields';
@@ -1857,7 +1871,9 @@
 				return;
 			}
 
-			keys._apiCall( 'create', { key : key, global : dc.getElementById('keys-form-new-global').checked, value : dc.getElementById('keys-form-new-value').value }, answered );
+			// The text is written in the language this tab shows - said in the request, since another window of the same session may have moved the session's own
+			const value = dc.getElementById('keys-form-new-value').value;
+			keys._apiCall( 'create', { key : key, global : dc.getElementById('keys-form-new-global').checked, value : value, values : { [ keys._locale() ] : value } }, answered );
 		},
 
 		/**
@@ -2124,7 +2140,8 @@
 				return { key : row.key, value : row.valueInput === null ? '' : row.valueInput.value, ignore : row.ignoreCheck.checked };
 			} );
 
-			Nino.admin.keys._apiCall( 'scanapply', { rows : payload }, function( status, response ) {
+			// The values are written in the language this tab shows, said in the request (see the new key above)
+			Nino.admin.keys._apiCall( 'scanapply', { rows : payload, locale : Nino.admin.keys._locale() }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
@@ -2155,6 +2172,9 @@
 
 	Nino.events.bindCallback( 'ready', Nino.admin.keys.init );
 
+	// The language moves for this tab whoever moved it (see Nino.admin.workLocale)
+	Nino.admin.workLocale.follow( 'keys', Nino.admin.keys._followLocale );
+
 	// The shell asks before anything throws the tab's input away (see
 	// Nino.admin.dirty). A shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
@@ -2162,6 +2182,7 @@
 			isDirty : Nino.admin.keys.isDirty,
 			save		: Nino.admin.keys._saveOpen,
 			discard : Nino.admin.keys.discard,
+			saving		: function() { return Nino.admin.keys._saving === true },
 		} );
 
 })(window, document, document.documentElement, document.body);

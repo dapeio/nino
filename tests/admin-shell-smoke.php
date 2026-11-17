@@ -1120,6 +1120,71 @@ check( '...and nothing else: the working language is still the native one, and t
 	&& \Nino\Runtime::getSessionValue( $apart, './nino/locales/current', 'unwritten' ) === 'unwritten' );
 \Nino\Runtime::unsetSessionValue( $apart, './admin/locale' );
 
+// The language content is edited in is chosen once, in the account area of the rail: the page carries it with the native language and the
+// names of the languages for the script (Nino.admin.workLocale), and the two selects only where there is more than one language to choose
+$workPage = static function( array $state ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+	\Nino\Admin\Admin::handleGet( $state, $request );
+	return [
+		'current'	=> \Nino\Html::renderTextfill( $state, '/_admin/worklocale/current' ),
+		'native'	=> \Nino\Html::renderTextfill( $state, '/_admin/worklocale/native' ),
+		'raw'			=> \Nino\Html::renderTextfill( $state, '/_admin/worklocale/locales' ),
+		'locales'	=> json_decode( html_entity_decode( \Nino\Html::renderTextfill( $state, '/_admin/worklocale/locales' ), ENT_QUOTES | ENT_HTML5 ), true ),
+		'rail'		=> \Nino\Html::renderTextfill( $state, '/_admin/worklocale/rail' ),
+		'menu'		=> \Nino\Html::renderTextfill( $state, '/_admin/worklocale/menu' ),
+	];
+};
+$two = $apart;
+// The languages that have a text file, as getTextLocales() keeps its answer for the request: the second is one the website does not serve
+$two['./nino/locales/text'] = [ 'de_DE', 'en_US', 'it_IT' ];
+\Nino\Runtime::unsetSessionValue( $two, './admin/content-locale' );
+$twoPage = $workPage( $two );
+check( 'the page starts the working language on the native one of the project, whatever language the interface speaks',
+	$twoPage['current'] === $two['/nino/locales/native'] && $twoPage['native'] === $two['/nino/locales/native'] );
+\Nino\Runtime::setSessionValue( $two, './admin/content-locale', 'en_US' );
+check( '...and on the one the session holds once a language was chosen', $workPage( $two )['current'] === 'en_US' );
+check( '...the languages it offers are the ones that have a text file, each with a name, and say whether the website serves it',
+	array_column( $twoPage['locales'], 'locale' ) === [ 'de_DE', 'en_US', 'it_IT' ] && array_filter( $twoPage['locales'], static fn( array $entry ): bool => $entry['name'] === '' || is_bool( $entry['active'] ) === false ) === []
+	&& array_column( $twoPage['locales'], 'active', 'locale' )['it_IT'] === false && array_column( $twoPage['locales'], 'active', 'locale' )['de_DE'] === true );
+$named = $two;
+\Nino\Html::addFills( $named, [ '[[/_nino/locale/en_US/name]]' => 'English [US]' ], '*' );
+$nameOf = static fn( array $state, string $locale ): string => array_column( \Nino\Admin\Admin::workLocales( $state ), 'name', 'locale' )[$locale] ?? '';
+check( 'a language is named as the project names it for its own picker, in the language\'s own name where the project gave none, and by its code where nothing knows it',
+	$nameOf( $named, 'en_US' ) === 'English [US]' && $nameOf( $two, 'de_DE' ) === \Nino\Locales::ENDONYMS['de_DE'] && array_column( \Nino\Admin\Admin::workLocales( $two ), 'locale' ) !== [] );
+// A name is the project's own text: it stands in an attribute of the shell root, in the page as it is, and read by nobody
+$hostile = $two;
+\Nino\Html::addFills( $hostile, [ '[[/_nino/locale/en_US/name]]' => 'E "x" <b>[[/nino/dir]]</b>' ], '*' );
+$hostileRaw = $workPage( $hostile )['raw'];
+check( 'a language name with quotes, a tag and a shortcode stays text in the attribute: no quote, angle or opening bracket of it is raw, and it reads back as it was',
+	preg_match( '/[\["<>]/', $hostileRaw ) === 0 && array_column( json_decode( html_entity_decode( $hostileRaw, ENT_QUOTES | ENT_HTML5 ), true ), 'name', 'locale' )['en_US'] === 'E "x" <b>[[/nino/dir]]</b>' );
+check( 'both selects stand on the page for a project of more than one language - the rail\'s with its word, the menu\'s - and each is a bare select for the script to fill',
+	count( $twoPage['locales'] ) > 1 && substr_count( $twoPage['rail'], '<select' ) === 1 && substr_count( $twoPage['menu'], '<select' ) === 1
+	&& str_contains( $twoPage['rail'], 'data-worklocale' ) && str_contains( $twoPage['menu'], 'data-worklocale' ) && str_contains( $twoPage['rail'], '<option' ) === false );
+$one = $two;
+$one[ './nino/locales/text' ] = [ $one['/nino/locales/native'] ];
+$onePage = $workPage( $one );
+$signedOut = $two;
+\Nino\Runtime::setSessionValue( $signedOut, './admin/content-locale', 'en_US' );
+\Nino\Auth::logoutUser( $signedOut );
+$outPage = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+\Nino\Admin\Admin::handleGet( $signedOut, $outPage );
+check( 'the login page is what a signed-out visitor gets, and the working language the last sign-in chose is gone with it: the next one starts on the native language',
+	str_contains( $outPage['/nino/http/response']['body'], 'page-login' ) && \Nino\Admin\Admin::contentLocale( $signedOut ) === $signedOut['/nino/locales/native']
+	&& \Nino\Runtime::getSessionValue( $signedOut, './admin/content-locale', 'unwritten' ) === 'unwritten' );
+check( 'a project of one language has no select at all, and the page still names the language', $onePage['rail'] === '' && $onePage['menu'] === '' && count( $onePage['locales'] ) === 1 );
+check( 'the template carries the language, the native one and the names on the shell root, and the choice stands once in the account block - after the mode, on a row of its own - and once in the settings menu',
+	preg_match( '/<div id="admin-page-wrap"[^>]* data-work-locale="\[\[\/_admin\/worklocale\/current\]\]"[^>]* data-native-locale="\[\[\/_admin\/worklocale\/native\]\]"[^>]* data-locales="\[\[\/_admin\/worklocale\/locales\]\]"/', $indexTemplate ) === 1
+	&& strpos( $indexTemplate, '[[/_admin/worklocale/rail]]' ) > strpos( $indexTemplate, 'id="admin-mode-chip"' ) && strpos( $indexTemplate, '[[/_admin/worklocale/rail]]' ) < strpos( $indexTemplate, '<nav id="admin-nav-wrap"' )
+	&& strpos( $indexTemplate, '[[/_admin/worklocale/menu]]' ) > strpos( $indexTemplate, 'id="admin-nav-ui-menu"' ) && strpos( $indexTemplate, '[[/_admin/worklocale/menu]]' ) < strpos( $indexTemplate, 'id="admin-mode-chip"' ) );
+$railCss = (string) file_get_contents( dirname( __DIR__ ). '/_admin/assets/style.css' );
+check( 'the stylesheet shows one of the two choices: the rail\'s only while the rail is open on a screen that has one, the menu\'s everywhere else - and the settings button stays when the rail is folded, since it holds the choice then',
+	preg_match( '/#admin-page-wrap \.nino-admin-worklocale--rail\s*\{\s*display:\s*none;/', $railCss ) === 1
+	&& preg_match( '/@media \(min-width: 64rem\) \{.*?#admin-page-wrap:not\(\.nino-admin-shell--folded\) #admin-user \.nino-admin-worklocale--rail\s*\{\s*display:\s*flex;/s', $railCss ) === 1
+	&& preg_match( '/#admin-page-wrap:not\(\.nino-admin-shell--folded\) \.nino-admin-worklocale--menu\s*\{\s*display:\s*none;/', $railCss ) === 1
+	&& preg_match( '/#admin-user > :not\(#admin-user-follow, #admin-mode-chip, #admin-nav-ui\)\s*\{\s*display:\s*none;/', $railCss ) === 1 );
+check( 'the two words are told apart in both interface languages: "Edit content in" is not the interface language\'s word',
+	array_map( static fn( string $locale ): bool => ( $fills = require dirname( __DIR__ ). '/_admin/text/'. $locale. '.php' ) && ( $fills['[[/_admin/label/worklocale]]'] ?? '' ) !== '' && $fills['[[/_admin/label/worklocale]]'] !== $fills['[[/_admin/label/language]]'], [ 'de_DE', 'en_US' ] ) === [ true, true ] );
+
 // The shell says the language its words are in - the interface language where the workbench has words of it, English where it has none - and not the
 // tag the website writes into its pages, which belongs to the website
 $shellHead = (string) file_get_contents( dirname( __DIR__ ). '/_admin/templates/html-header.tpl' );

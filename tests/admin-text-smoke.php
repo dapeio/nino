@@ -1072,6 +1072,22 @@ check( 'a row left empty is counted as left for later', ( $body['skipped'] ?? nu
 $deApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 check( 'the created key holds its starting value in the working language, and the key empty in the others', ( $deApply['[[/template/page-apply/intro/heading]]'] ?? null ) === 'Willkommen' && ( $enApply['[[/template/page-apply/intro/heading]]'] ?? null ) === '' );
+// The language of the values is the request's: another window of the same session may have moved the one the session holds
+file_put_contents( $sandbox. '/private/templates/scan-locale-fixture.tpl', '<h1>[[/template/page-locale/intro/heading]]</h1><h2>[[/template/page-locale/intro/second]]</h2>' );
+$sessionWas = \Nino\Admin\Admin::contentLocale( $appData );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'locale' => 'en_US', 'rows' => [
+	[ 'key' => '/template/page-locale/intro/heading', 'value' => 'Welcome', 'ignore' => false ],
+] ] );
+$deLocale = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$enLocale = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+check( 'the scan writes its values in the language the request names, whichever the session holds',
+	$status === 200 && $sessionWas === 'de_DE' && ( $enLocale['[[/template/page-locale/intro/heading]]'] ?? null ) === 'Welcome' && ( $deLocale['[[/template/page-locale/intro/heading]]'] ?? null ) === '' );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'locale' => '../x', 'rows' => [
+	[ 'key' => '/template/page-locale/intro/second', 'value' => 'Never', 'ignore' => false ],
+] ] );
+check( '...and refuses a language that has no text file, writing nothing', $status === 400 && isset( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/template/page-locale/intro/second]]'] ) === false );
+unlink( $sandbox. '/private/templates/scan-locale-fixture.tpl' );
+
 // A field holding nothing but spaces is the same "not decided yet" an empty
 // one is, and a key created from it would look filled in without being it
 check( 'the starting value is trimmed rather than stored as typed', str_contains( (string) ( $deApply['[[/template/page-apply/intro/heading]]'] ?? '' ), ' ' ) === false );

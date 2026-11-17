@@ -549,42 +549,229 @@
 		},
 
 		/**
-		 *	Shared "which locale am I currently working in" cache, so switching
-		 *	it in Elements also applies the next time Text opens an item (and
-		 *	vice versa) - each panel keeping its own copy would go stale the
-		 *	moment the OTHER one changed it, since both only fetch their
-		 *	initial value once, from their own init(). Persisted server-side
-		 *	(POST admin/locale) so it also survives a reload.
+		 *	The language the workbench edits content in - the one source of it:
+		 *	Elements, Text and the Keys tab read it and set it, and the choice in
+		 *	the account area of the rail (#admin-worklocale) is the same value. It
+		 *	is not the language of the interface, which the picker of the settings
+		 *	menu sets and the page is rendered in (Admin::sessionLocale()). It starts as
+		 *	the language the project's own words are in (the native one), and the
+		 *	server holds it for the session (POST admin/locale), so it survives a
+		 *	reload
+		 *
+		 *	A view that shows what depends on the language follows it: it registers
+		 *	under the name of its entry of the registry of unsaved input
+		 *	(follow()) and draws again when the language moves, whoever moved it.
+		 *	The choice in the rail asks about the unsaved input of those views first
+		 *	(choose())
 		 */
-		sessionLocale : {
+		workLocale : {
 
 			current : null,
 
+			// The native language of the project, which is where it starts and the one that needs no badge
+			native : '',
+
+			// [ { locale, name, active } ], the languages the workbench can work in: the website's own and those that have a text file
+			locales : [],
+
+			// [ { name, handler } ] in the order they registered
+			_followers : [],
+
+			// The names of the views that hold content of one language and do not follow it (bind())
+			_bound : [],
+
 			/**
-			 *	Called by each panel's init() with its own initial locale, once
-			 *	it's known - first one in wins, so a later-resolving panel's
-			 *	initial value never overwrites one the user already changed
+			 *	Read what the shell rendered (the data of #admin-page-wrap) and wire the
+			 *	choice in the rail: one select in the account area and one in the
+			 *	settings menu, of which the stylesheet shows the one that fits the
+			 *	rail's state. The server renders them only for a project of more
+			 *	than one language
+			 *
+			 *	@return		void
+			 */
+			init : function() {
+
+				const wrap = dc.getElementById('admin-page-wrap');
+
+				if( wrap === null || wrap === undefined || wrap.dataset === undefined || typeof wrap.dataset.locales !== 'string' )
+					return;
+
+				let list = [];
+				try {
+					list = JSON.parse( wrap.dataset.locales );
+				}
+				catch( error ) {
+					list = [];
+				}
+
+				Nino.admin.workLocale.locales	= Array.isArray( list ) === true ? list.filter( function( entry ) { return entry !== null && typeof entry === 'object' && typeof entry.locale === 'string' } ) : [];
+				Nino.admin.workLocale.native	= String( wrap.dataset.nativeLocale ?? '' );
+				Nino.admin.workLocale.current	= String( wrap.dataset.workLocale ?? '' ) || Nino.admin.workLocale.native;
+
+				const names = {};
+				Nino.admin.workLocale.locales.forEach( function( entry ) { names[entry.locale] = String( entry.name ?? '' ) } );
+				Nino.adminUi.locales = { native : Nino.admin.workLocale.native, names : names };
+
+				const codes = Nino.admin.workLocale.locales.map( function( entry ) { return entry.locale } );
+
+				dc.querySelectorAll('select[data-worklocale]').forEach( function( select ) {
+
+					Nino.admin.workLocale.locales.forEach( function( entry ) {
+						select.appendChild( Nino.adminUi.localeOption( entry.locale, codes, entry.active === false ? [ entry.locale ] : [], Nino.admin.workLocale.current ) );
+					} );
+
+					select.value = Nino.admin.workLocale.current;
+					select.addEventListener( 'change', function() { Nino.admin.workLocale.choose( select.value ) } );
+				} );
+			},
+
+			/**
+			 *	A view that follows the language: handler( locale ) is called whenever
+			 *	the language moved - by the rail, by a select of a panel, by whatever
+			 *	called set() - after current has the new value. A view that is not on
+			 *	screen only has to note it: the next time it is drawn it reads current
+			 *
+			 *	@param		{string|null}	name				The name the view is registered under in the registry of unsaved input (dirty.register()), which is what the question before a change in the rail asks about; null for a view that holds nothing the language touches
+			 *	@param		{Function}	handler
+			 *
+			 *	@return		void
+			 */
+			follow : function( name, handler ) {
+				Nino.admin.workLocale._followers.push( { name : name, handler : handler } );
+			},
+
+			/**
+			 *	A view that writes content in one language and cannot draw another without
+			 *	being opened anew - one that does not follow() - says so under its name in the
+			 *	registry of unsaved input. The choice in the rail then asks about its unsaved
+			 *	input too, and while it is on screen the page is loaded anew in the language
+			 *	chosen (the hash stays, as at a change of the interface language), so that the
+			 *	view is never left showing one language and writing another. Loading it anew
+			 *	is the one thing the shell can do for a view whose drawing it does not know
+			 *
+			 *	@param		{string}		name				The name of its entry of the registry of unsaved input, which is also the name of its panel
+			 *
+			 *	@return		void
+			 */
+			bind : function( name ) {
+				Nino.admin.workLocale._bound.push( name );
+			},
+
+			/**
+			 *	The choice in the rail. It asks first when a view that follows the
+			 *	language holds unsaved input - Save, Discard or Cancel, as every exit
+			 *	of the workbench does (dirty.guard()). Cancel keeps the language, and the
+			 *	rail shows it again. Discard also closes the forms it threw away, the
+			 *	way a move to another panel does, before the language moves. A view that
+			 *	is bound to a language (bind()) is asked about as well and, on screen,
+			 *	loaded anew. While a view that follows is saving, the choice is not
+			 *	taken, and says so
 			 *
 			 *	@param		{string}	locale
 			 *
 			 *	@return		void
 			 */
-			init : function( locale ) {
-				if( Nino.admin.sessionLocale.current === null )
-					Nino.admin.sessionLocale.current = locale;
+			choose : function( locale ) {
+
+				const names = Nino.admin.workLocale._followers.map( function( follower ) { return follower.name } ).filter( function( name ) { return name !== null } ).concat( Nino.admin.workLocale._bound );
+
+				if( locale === Nino.admin.workLocale.current || Nino.admin.workLocale.locales.some( function( entry ) { return entry.locale === locale } ) === false ) {
+					Nino.admin.workLocale._show();
+					return;
+				}
+
+				// A save is running in a view that follows: the question would end in a save that is not
+				// made twice, and the language would stay without a word. It is said, and the choice is not taken
+				if( names.some( function( name ) {
+					const entry = Nino.admin.dirty._entries[name];
+					return entry !== undefined && typeof entry.saving === 'function' && entry.saving() === true;
+				} ) === true ) {
+					Nino.admin.workLocale._show();
+					Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/worklocale-busy'), { kind : 'info' } );
+					return;
+				}
+
+				const held = Nino.admin.dirty.dirtyNames( names );
+
+				// A view that is bound to a language and on screen is drawn anew by loading the page: the server has the new language first
+				const reloads = Nino.admin.workLocale._bound.indexOf( Nino.admin.router.current().panel ) !== -1;
+
+				Nino.admin.dirty.guard( names, function( answered ) {
+
+					if( reloads === true ) {
+						Nino.adminUi.api.call( 'admin/locale', { locale : locale }, function() { wn.location.reload() } );
+						return;
+					}
+
+					if( answered === 'discard' )
+						held.forEach( Nino.admin.dirty._close );
+
+					Nino.admin.workLocale.set( locale );
+				}, Nino.admin.workLocale._show, reloads );
 			},
 
 			/**
-			 *	Called when the user changes a locale switch in any panel -
-			 *	fire and forget, nothing in the UI depends on the request's result
+			 *	Change the language: what a panel's own select does, and the rail's
+			 *	after its question. The server is told (fire and forget, nothing in the
+			 *	UI depends on the answer), the rail shows it and the views that follow
+			 *	draw it
 			 *
 			 *	@param		{string}	locale
 			 *
 			 *	@return		void
 			 */
 			set : function( locale ) {
-				Nino.admin.sessionLocale.current = locale;
+
+				if( typeof locale !== 'string' || locale === '' || locale === Nino.admin.workLocale.current )
+					return;
+
+				Nino.admin.workLocale._apply( locale );
 				Nino.adminUi.api.call( 'admin/locale', { locale : locale }, function() {} );
+			},
+
+			/**
+			 *	Move the language without telling the server: the rail, the views that
+			 *	follow. For the caller that has told the server itself
+			 *
+			 *	@param		{string}	locale
+			 *
+			 *	@return		void
+			 */
+			_apply : function( locale ) {
+
+				Nino.admin.workLocale.current = locale;
+				Nino.admin.workLocale._show();
+				Nino.admin.workLocale._followers.slice().forEach( function( follower ) { follower.handler( locale ) } );
+			},
+
+			/**
+			 *	Show the language the rail's selects hold
+			 *
+			 *	@return		void
+			 */
+			_show : function() {
+				dc.querySelectorAll('select[data-worklocale]').forEach( function( select ) { select.value = Nino.admin.workLocale.current ?? '' } );
+			},
+		},
+
+		/**
+		 *	The name the catalogue's Builder still writes the language by
+		 *	(features/Builder/assets/admin.js sets .current after it has posted
+		 *	admin/locale itself). It is no second source: the assignment moves the
+		 *	one (workLocale), so the rail and the views that follow it agree with the
+		 *	Builder. A deliberate bridge for a catalogue that is released after the
+		 *	kernel, measured by the Builder's switch of its page language moving the
+		 *	rail's select; it goes with the Builder's own change to workLocale.set()
+		 */
+		sessionLocale : {
+
+			get current() {
+				return Nino.admin.workLocale.current;
+			},
+
+			set current( locale ) {
+				if( locale !== Nino.admin.workLocale.current )
+					Nino.admin.workLocale._apply( locale );
 			},
 		},
 
@@ -2400,6 +2587,7 @@
 
 			Nino.admin.theme.init();
 			Nino.admin.navUi.init();
+			Nino.admin.workLocale.init();
 			Nino.admin.rail.init();
 			Nino.admin.mode.init();
 			Nino.admin.sessionDialog.init();

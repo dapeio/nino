@@ -1,6 +1,6 @@
 [template /_admin/templates/html-header]
 		[csrf]
-		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]" data-upload-bytes="[[/_admin/upload/bytes]]" data-upload-pixels="[[/_admin/upload/pixels]]" data-mode="[[/_admin/mode]]" data-maintenance="[[/_admin/maintenance]]">
+		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]" data-upload-bytes="[[/_admin/upload/bytes]]" data-upload-pixels="[[/_admin/upload/pixels]]" data-mode="[[/_admin/mode]]" data-maintenance="[[/_admin/maintenance]]" data-work-locale="[[/_admin/worklocale/current]]" data-native-locale="[[/_admin/worklocale/native]]" data-locales="[[/_admin/worklocale/locales]]">
 			<a class="nino-admin-skip" href="#admin-content-wrap">[[/_admin/label/skip]]</a>
 			<aside id="admin-bar-wrap" class="nino-admin-rail" aria-label="[[/_admin/label/rail]]">
 				<!-- Brand and account sit on one row on a phone and stack in the
@@ -26,10 +26,12 @@
 									<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="admin-theme-toggle-dark lucide lucide-moon-icon lucide-moon"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
 									<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="admin-theme-toggle-light lucide lucide-sun-icon lucide-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
 								</button>
-								[[/_admin/localepicker]]
+								<div class="nino-admin-worklocale nino-admin-worklocale--interface"><label for="admin-localepicker">[[/_admin/label/language]]</label>[[/_admin/localepicker]]</div>
+								[[/_admin/worklocale/menu]]
 							</div>
 						</div>
 						<a id="admin-mode-chip" class="nino-admin-mode-chip" href="#config"></a>
+						[[/_admin/worklocale/rail]]
 					</div>
 				</div>
 

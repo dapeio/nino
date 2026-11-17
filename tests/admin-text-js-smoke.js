@@ -27,6 +27,7 @@ sandbox.window = sandbox;
 sandbox.Nino = {
 	editor : {},
 	events : { bindCallback : function() {} },
+	admin : { workLocale : { current : null, follow : function() {} } },
 };
 
 load( '_admin/Nino/Modules/Text/assets/admin.js', vm.createContext( sandbox ), 'text.js' );
@@ -59,7 +60,7 @@ keysSandbox.window = keysSandbox;
 // What the tab told the shell it had written - Nino.admin.touch( topic ), see script.js
 keysSandbox.touched = [];
 keysSandbox.Nino = {
-	admin : { touch : function( topic ) { keysSandbox.touched.push( topic ) } },
+	admin : { touch : function( topic ) { keysSandbox.touched.push( topic ) }, workLocale : { current : null, follow : function() {} } },
 	content : { getText : function( key ) { return key } },
 	events : { bindCallback : function() {} },
 };
@@ -71,13 +72,15 @@ const keys = keysSandbox.Nino.admin.keys;
 let sent = null;
 keys._apiCall = function( endpoint, payload ) { sent = { endpoint : endpoint, payload : payload } };
 
+keysSandbox.Nino.admin.workLocale.current = 'en_US';
 keys._saveScanResults( [
 	{ key : '/a/one', 	valueInput : { value : 'Value' }, ignoreCheck : { checked : false } },
 	{ key : '/a/two', 	valueInput : { value : '' }, 			ignoreCheck : { checked : false } },
 	{ key : '/a/three', valueInput : { value : '' }, 			ignoreCheck : { checked : true 	} },
 ] );
 
-check( 'the whole form goes to the server in one request', sent !== null && sent.endpoint === 'scanapply' && sent.payload.rows.length === 3 );
+check( 'the whole form goes to the server in one request, with the language the tab shows - the values are written in it', sent !== null && sent.endpoint === 'scanapply' && sent.payload.rows.length === 3 && sent.payload.locale === 'en_US' );
+keysSandbox.Nino.admin.workLocale.current = null;
 check( '...including the rows left empty, which the server passes over', sent.payload.rows[1].key === '/a/two' && sent.payload.rows[1].value === '' && sent.payload.rows[1].ignore === false );
 check( '...and the ignored ones, which is how they get retired at all', sent.payload.rows[2].key === '/a/three' && sent.payload.rows[2].ignore === true );
 check( 'a filled row carries its value', sent.payload.rows[0].value === 'Value' );
@@ -170,7 +173,7 @@ check( 'a group with nothing writable in it is not offered a Save button',
 const shown = { hidden : false, forms : true };
 const formNode = { classList : { contains : function() { return shown.hidden } } };
 sandbox.document.getElementById = function( id ) { return ( id === 'text-form' ) ? formNode : ( id === 'text-edit-form' && shown.forms === true ? {} : null ) };
-sandbox.Nino.admin.sessionLocale = { current : null };
+sandbox.Nino.admin.workLocale = { current : null, follow : function() {} };
 
 text._groups = { g : [
 	{ key : '/g/title', global : true, writable : true },
@@ -561,6 +564,7 @@ function fakeDom() {
 			appendChild( c ) { if( c.parentNode ) c.remove(); c.parentNode = this; this.children.push( c ); return c },
 			removeChild( c ) { c.remove(); return c },
 			remove() { if( this.parentNode ) this.parentNode.children.splice( this.parentNode.children.indexOf( this ), 1 ); this.parentNode = null },
+			replaceWith( other ) { const at = this.parentNode.children.indexOf( this ); other.parentNode = this.parentNode; this.parentNode.children.splice( at, 1, other ); this.parentNode = null },
 			replaceChild( fresh, old ) { const at = this.children.indexOf( old ); fresh.parentNode = this; this.children.splice( at, 1, fresh ); old.parentNode = null; return old },
 			addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) },
 			fire( type, ev = {} ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( Object.assign( { target : this, preventDefault(){} }, ev ) ) ) },
@@ -612,7 +616,8 @@ function world( locale, hash, session ) {
 			touch : topic => { touched.push( topic ); stamps[topic] = ( stamps[topic] ?? 0 ) + 1 },
 			stamp : topic => stamps[topic] ?? 0,
 			router : { set : ( p, parts ) => calls.push( 'set '+ [ p ].concat( parts ).join('/') ), go : ( p, parts ) => calls.push( 'go '+ [ p ].concat( parts ).join('/') ), current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed(), href : ( p, parts ) => '#'+ [ p ].concat( parts ).map( encodeURIComponent ).join('/') },
-			sessionLocale : { current : session === undefined ? locale : session, init : code => { if( box.Nino.admin.sessionLocale.current === null ) box.Nino.admin.sessionLocale.current = code }, set : code => { calls.push( 'locale '+ code ); box.Nino.admin.sessionLocale.current = code } },
+			// The one source of the content language: set() moves it and calls the views that follow it, as the shell does
+			workLocale : ( followers => ( { current : session === undefined ? locale : session, follow : ( name, handler ) => followers.push( handler ), set : code => { calls.push( 'locale '+ code ); box.Nino.admin.workLocale.current = code; followers.forEach( handler => handler( code ) ) } } ) )( [] ),
 			formToolbar : back => { const bar = dom.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( back ); return bar },
 			htmlEditor : { create : ( mount, value ) => { mount.setAttribute( 'data-editor', 'yes' ); let held = String( value ?? '' ); return { getValue : () => held, setValue : v => { held = v }, destroy(){} } } },
 		},
@@ -976,6 +981,18 @@ function openedText( response, hash, locale ) {
 	select.fire('change');
 	check( '...and what was typed in the language left is there when it is back', t.text._fieldEls['/template/page-services/intro/title'].value === 'Leistungen neu' && t.text._dirtyLocales.join() === 'de_DE' );
 
+	// the language moves where this form has no part in it - the rail's choice - and the form shows it, with the badge of a language that is not the native one
+	t.Nino.adminUi.locales = { native : 'de_DE', names : {} };
+	const bar = () => t.form.querySelector('.nino-admin-contextbar');
+	t.Nino.admin.workLocale.set( 'en_US' );
+	check( 'the form follows a language the workbench moved: the select, the fields and the model',
+		select.value === 'en_US' && t.text._fieldEls['/template/page-services/intro/title'].value === 'Services' && t.text._model.locale === 'en_US' && t.text._selectedLocale === 'en_US' );
+	check( '...and the bar of the form says it is not the native language', bar().querySelector('.nino-admin-locale-badge') !== null );
+	check( '...the select of the list behind the form says it as well, for the person who is back', t.list.querySelector('#text-list-locale').value === 'en_US' );
+	t.Nino.admin.workLocale.set( 'de_DE' );
+	check( '...the native language needs no badge, and what was typed in it is there', bar().querySelector('.nino-admin-locale-badge') === null && t.text._fieldEls['/template/page-services/intro/title'].value === 'Leistungen neu' );
+	t.Nino.adminUi.locales = { native : '', names : {} };
+
 	// a save of a page carries the keys of both namespaces in one request
 	t.sent.length = 0;
 	t.text._fieldEls['/_nino/webpage/services/title'].value = 'Neuer Seitentitel';
@@ -1170,7 +1187,7 @@ const keysResponse = ( extra ) => Object.assign( { keys : homeKeys.map( e => Obj
 const lastWrite = k => k.sent.filter( c => c.endpoint !== 'list' ).at(-1);
 
 function openedKeys( response, hash ) {
-	const w = world( 'de_DE', hash, null );
+	const w = world( 'de_DE', hash, 'en_US' );
 	const { title, levels : [ list, form ] } = w.pane( 'keys', 'keys-list', 'keys-form' );
 	form.classList.add('admin-hidden');
 	const sent = [];
@@ -1333,7 +1350,7 @@ function openedKeys( response, hash ) {
 	control('keys-form-new-value').value = 'Katalog';
 	control('keys-form-new-global').checked = true;
 	k.keys._saveNewKey();
-	check( 'submitting creates the key the segments make, with its value and whether it is global', lastWrite( k ).endpoint === 'create' && JSON.stringify( lastWrite( k ).payload ) === '{"key":"/project/catalog/list/title","global":true,"value":"Katalog"}' );
+	check( 'submitting creates the key the segments make, with its value, whether it is global, and the language the tab shows it in - the session of another window may hold another', lastWrite( k ).endpoint === 'create' && JSON.stringify( lastWrite( k ).payload ) === '{"key":"/project/catalog/list/title","global":true,"value":"Katalog","values":{"en_US":"Katalog"}}' );
 	check( '...a write of texts, and nothing a template is told of: the key is the project\'s', k.touched.join() === 'texts' );
 }
 
@@ -1431,6 +1448,21 @@ function openedKeys( response, hash ) {
 	type( 'keys-form-name', 'cta' );
 	k.keys._saveNewKey();
 	check( 'a key with a segment that is no word is written as typed', lastWrite( k ).endpoint === 'create' && lastWrite( k ).payload.key === '/project/company/general/cta' );
+}
+
+{
+	// the Keys tab follows the language of the workbench in its form as well: one source for the Text panel, the tab and the elements
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services' );
+	const select = k.form.querySelector('#keys-form-locale-select');
+	check( 'the form of the tab opens in the language of the workbench', select.value === 'en_US' && k.keys._selectedLocale === 'en_US' );
+	k.Nino.adminUi.locales = { native : 'de_DE', names : {} };
+	k.Nino.admin.workLocale.set( 'de_DE' );
+	check( 'a language the workbench moved is the one the form shows, in the select and in the fields', select.value === 'de_DE' && k.keys._selectedLocale === 'de_DE' && k.keys._locale() === 'de_DE' );
+	select.value = 'en_US';
+	select.fire('change');
+	check( 'and the select of the form moves the workbench\'s language, which it did not before: the Text panel opens in it next',
+		k.calls.includes('locale en_US') && k.keys._selectedLocale === 'en_US' && k.form.querySelector('.nino-admin-contextbar').querySelector('.nino-admin-locale-badge') !== null );
 }
 
 {

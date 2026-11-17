@@ -13,6 +13,9 @@ const path 	= require('path');
 const vm 		= require('vm');
 const { check, done, load } = require( './harness.js' );
 
+// What the panel registered with the one source of the content language, by name and handler
+const followed = [];
+
 const sandbox = {
 	console : console,
 	document : { documentElement : null, body : null },
@@ -21,6 +24,7 @@ sandbox.window = sandbox;
 sandbox.Nino = {
 	editor : {},
 	events : { bindCallback : function() {} },
+	admin : { workLocale : { current : null, follow : function( name, handler ) { followed.push( [ name, handler ] ) } } },
 };
 
 const source = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/admin.js' ), 'utf8' );
@@ -39,8 +43,20 @@ vm.runInContext(
 );
 
 const elements = sandbox.Nino.admin.elements;
+check( 'the panel follows the language of the workbench under the name of its entry of unsaved input, with the handler that draws it: a move in the rail reaches the form and the list',
+	followed.length === 1 && followed[0][0] === 'elements' && followed[0][1] === elements._followLocale );
 // The form a person opens, as the script has it: later checks stand it in for what they drive
 const originalOpenForm = elements._openForm;
+
+// The one source of the workbench's content language as the shell has it: set() moves it and calls the panel that follows it
+// (told: what was set). A stand-in where a check is about the panel's own answer to a move; the checks draw a translation
+// by hand now and then, which the real source would not see either, so it does not skip a move to the language it holds
+const sourceOf = ( current, told ) => ( { current : current, follow(){}, set( locale ) {
+	this.current = locale;
+	if( told !== undefined )
+		told.push( locale );
+	elements._followLocale( locale );
+} } );
 
 // The shell's counters (see Nino.admin.touch()): what the panel says it wrote
 const touched = [];
@@ -429,7 +445,7 @@ function countTypesRequests() {
 			callback( { status : 200, responseJSON : { types : [], locales : [ 'de_DE' ], selectedLocale : 'de_DE' } } );
 		} },
 		content : { getText : key => key },
-		admin : { router : { set(){}, go(){}, current : () => ( { panel : '', parts : [] } ), leave : ( names, leaving, proceed ) => proceed() }, sessionLocale : { init(){} } },
+		admin : { router : { set(){}, go(){}, current : () => ( { panel : '', parts : [] } ), leave : ( names, leaving, proceed ) => proceed() }, workLocale : { follow(){} } },
 		adminUi : { text : value => value, emptyState : el, listActions : el },
 	};
 
@@ -483,7 +499,7 @@ check( '...and coming back to the overview re-reads it, which is what that secon
 				current : () => hash,
 				leave : ( names, leaving, proceed, resync ) => { asked.push( { names : names, leaving : leaving, resync : resync } ); proceed() },
 			},
-			sessionLocale : { current : 'de_DE', init(){} },
+			workLocale : { current : 'de_DE', follow(){} },
 		},
 		adminUi : {},
 	};
@@ -814,7 +830,7 @@ if( typeof elements._renderNav === 'function' ) {
 	sandbox.document.getElementById = id => ( { 'elements-form' : formNode, 'elements-list' : listNode } )[id] ?? null;
 	sandbox.Nino.adminUi.listActions = () => dom.make('div');
 	// The list notes the workbench's content locale, which the shell owns
-	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
+	sandbox.Nino.admin.workLocale = { current : 'de_DE', set(){}, follow(){} };
 	elements._locales = [ 'de_DE', 'en_US' ];
 	elements._renderList( [ { uri : 'cy', label : 'Cy' }, { uri : 'dee', label : 'Dee' } ] );
 	const refreshed = formNode.querySelectorAll('.admin-element-nav button');
@@ -868,13 +884,13 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'the list remembers the translation it shows', elements._listLocale === 'de_DE' );
 
 	// The Text panel works in languages the website does not serve yet; an element has no version of one to show or to edit here
-	sandbox.Nino.admin.sessionLocale = { current : 'it_IT', set(){}, init(){} };
+	sandbox.Nino.admin.workLocale = { current : 'it_IT', set(){}, follow(){} };
 	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );
 	check( 'a working language this panel does not offer - one the website does not serve yet - is none for it: the list reads the server\'s own', elements._workingLocale( '' ) === '' && elements._listLocale === '' );
 	check( '...and a form opens on the first language it has, or the one it is told', elements._workingLocale( 'de_DE' ) === 'de_DE' );
-	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set(){}, init(){} };
+	sandbox.Nino.admin.workLocale = sourceOf( 'en_US' );
 	check( '...a language it offers is the working language as it was', elements._workingLocale( '' ) === 'en_US' );
-	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
+	sandbox.Nino.admin.workLocale = { current : 'de_DE', set(){}, follow(){} };
 
 	// No column: the plain list
 	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );
@@ -890,7 +906,7 @@ if( typeof elements._renderNav === 'function' ) {
 	const setLocales = [];
 	const refreshWas = elements._refreshList;
 	elements._refreshList = () => refreshes.push( 'refresh' );
-	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set : locale => setLocales.push( locale ), init(){} };
+	sandbox.Nino.admin.workLocale = sourceOf( 'en_US', setLocales );
 	// What the server answers: 'from' is an object, field => locale, and an empty one is an empty object
 	const mixed = [
 		{ uri : 'ada', label : 'Ada', values : { title : 'Ada', subtitle : 'Adele', open : true, price : 9.5 }, from : { title : 'de_DE', subtitle : 'fr_FR', open : 'de_DE' } },
@@ -901,7 +917,7 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'a list of a type with a field per language has the switch of the form: the languages of the site, the working one picked', listSelect !== undefined && dom.find( listSelect, n => n.tagName === 'option' ).map( o => o.value + ( o.selected === true ? '*' : '' ) ).join() === 'de_DE,en_US*' );
 	listSelect.value = 'de_DE';
 	listSelect.listeners.change();
-	check( '...choosing another moves the workbench\'s language and reads the list again', setLocales.join() === 'de_DE' && refreshes.length === 1 );
+	check( '...choosing another moves the workbench\'s language, and the list - which follows it - is read again', setLocales.join() === 'de_DE' && refreshes.length === 1 );
 	// The table is the shared one and draws what a column's render() answers; what the list hands it is read here
 	const tableWas = sandbox.Nino.adminUi.table;
 	let tableOptions = null;
@@ -927,7 +943,7 @@ if( typeof elements._renderNav === 'function' ) {
 	elements._localeKeys = localeKeysWas;
 	elements._currentModel = modelWas;
 	elements._refreshList = refreshWas;
-	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
+	sandbox.Nino.admin.workLocale = { current : 'de_DE', set(){}, follow(){} };
 
 	// A type that has a note of its own - the legal texts say they are no
 	// legal advice - shows it above its elements, as text; one that has none is as it was
@@ -1182,7 +1198,7 @@ function fakeDom() {
 	sandbox.Nino.content = { getText : key => texts[key] ?? ( key.indexOf('/field/') !== -1 || key.indexOf('/common/word/') !== -1 ? '' : key ) };
 	sandbox.Nino.admin.formToolbar = backLink => { const bar = d.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
 	const localeSwitches = [];
-	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set : locale => localeSwitches.push( locale ), init(){} };
+	sandbox.Nino.admin.workLocale = sourceOf( 'en_US', localeSwitches );
 	sandbox.Nino.admin.publicUrl = path => '/public'+ path;
 	sandbox.Nino.admin.router = { set(){}, go(){}, current : () => ( { panel : '', parts : [] } ), leave : ( names, leaving, proceed ) => proceed() };
 	const editorMarks = [];
@@ -1366,15 +1382,54 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		outcome === false && elements._selectedLocale === 'de_DE' && d.doc.getElementById('elements-form-locale-select').value === 'de_DE' && localeSwitches.join() === 'de_DE' );
 	check( '...and the field there is marked and has the focus', field('name').getAttribute('aria-invalid') === 'true' && field('name').focused === true );
 	check( 'the other translation shows no open fields now', JSON.stringify( optionsText() ) === JSON.stringify( [ 'de_DE - 1 open', 'en_US' ] ) );
+	{
+		// the switch keeps the names of the languages while it counts - the code is not what the workbench calls a language
+		const namesWere = sandbox.Nino.adminUi.locales;
+		sandbox.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English (US)' } };
+		elements._markLocales( [ { locale : 'de_DE', key : 'name' } ] );
+		check( '...and says each by its name, counted or not', JSON.stringify( optionsText() ) === JSON.stringify( [ 'Deutsch - 1 open', 'English (US)' ] ) );
+		elements._markLocales( [] );
+		check( '...a translation with nothing open is the bare name', JSON.stringify( optionsText() ) === JSON.stringify( [ 'Deutsch', 'English (US)' ] ) );
+		sandbox.Nino.adminUi.locales = namesWere;
+		elements._markLocales( [ { locale : 'en_US', key : 'name' } ] );
+		elements._markLocales( [] );
+	}
 
-	// until the old translation is taken down the selection is still its own
-	const realSessionLocale = sandbox.Nino.admin.sessionLocale;
-	const seenDuringSwitch = [];
-	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set : locale => seenDuringSwitch.push( { to : locale, selected : elements._selectedLocale, name : field('name').value } ), init(){} };
+	// the redraw is the follower's: it moves the selection and the fields, and never tells the source again
+	const realWorkLocale = sandbox.Nino.admin.workLocale;
+	const toldOnSwitch = [];
+	sandbox.Nino.admin.workLocale = sourceOf( 'de_DE', toldOnSwitch );
 	elements._switchLocale( 'en_US' );
-	check( 'the content locale is told while the old translation is still on screen and still selected', seenDuringSwitch.length === 1 && seenDuringSwitch[0].to === 'en_US' && seenDuringSwitch[0].selected === 'de_DE' && elements._selectedLocale === 'en_US' );
+	check( 'drawing another translation does not set the workbench\'s language again - the one who moved it did', toldOnSwitch.length === 0 && elements._selectedLocale === 'en_US' );
 	elements._switchLocale( 'de_DE' );
-	sandbox.Nino.admin.sessionLocale = realSessionLocale;
+	sandbox.Nino.admin.workLocale = realWorkLocale;
+
+	// the workbench's language moved - from the rail or from another panel - and the form on screen shows that translation, with the badge of the language where it is not the native one
+	{
+		const nativeWas = sandbox.Nino.adminUi.locales;
+		sandbox.Nino.adminUi.locales = { native : 'de_DE', names : {} };
+		const bar = () => d.doc.getElementById('elements-form').querySelector('.nino-admin-contextbar');
+		const badge = () => bar().querySelector('.nino-admin-locale-badge');
+		elements._followLocale( 'en_US' );
+		check( 'the form follows the language of the workbench: the translation, the select and the fields',
+			elements._selectedLocale === 'en_US' && d.doc.getElementById('elements-form-locale-select').value === 'en_US' );
+		check( '...and says it is not the native one, in the bar of the form', badge() !== null );
+		elements._followLocale( 'de_DE' );
+		check( '...the native language needs no badge', elements._selectedLocale === 'de_DE' && badge() === null );
+		sandbox.Nino.admin.workLocale.current = 'it_IT';
+		elements._followLocale( 'it_IT' );
+		check( 'a language the website does not serve - which Text works in, and this form has no translation of - leaves the form as it is', elements._selectedLocale === 'de_DE' );
+		check( '...and the bar says which language it shows and writes, the native one too: the rail names another, and the form must not say nothing', badge() !== null );
+		sandbox.Nino.admin.workLocale.current = 'de_DE';
+		elements._followLocale( 'de_DE' );
+		check( '...and nothing once the two agree on the native language', badge() === null );
+		const keysWere = elements._localeKeys;
+		elements._localeKeys = [];
+		elements._followLocale( 'en_US' );
+		check( 'a form of a type with nothing per language has no translation to show', elements._selectedLocale === 'de_DE' );
+		elements._localeKeys = keysWere;
+		sandbox.Nino.adminUi.locales = nativeWas;
+	}
 
 	// the marks come back with a translation drawn afresh
 	elements._switchLocale( 'en_US' );
@@ -1835,6 +1890,9 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 			elements._localeValues = {};
 			elements._dirtyLocales = [];
 			elements._resetEdits();
+			// A blank form opens in the working language, as _openForm() has it
+			sandbox.Nino.admin.workLocale.current = 'en_US';
+			elements._selectedLocale = elements._workingLocale( elements._locales[0] ?? '' );
 			elements._renderForm();
 		};
 		const bar = () => d.doc.getElementById('elements-form-actions').querySelectorAll('button');
@@ -2117,7 +2175,7 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	const registered = [];
 	const box = { console : console, document : { documentElement : null, body : null } };
 	box.window = box;
-	box.Nino = { editor : {}, events : { bindCallback(){} }, admin : { dirty : { register : ( name, entry ) => registered.push( [ name, entry ] ) } } };
+	box.Nino = { editor : {}, events : { bindCallback(){} }, admin : { workLocale : { follow(){} }, dirty : { register : ( name, entry ) => registered.push( [ name, entry ] ) } } };
 	vm.runInContext( source, vm.createContext( box ), { filename : 'elements.js' } );
 	check( 'the Elements form registers with the shell under its name, with the three words the shell asks it',
 		registered.length === 1 && registered[0][0] === 'elements' && [ 'isDirty', 'save', 'discard' ].every( k => typeof registered[0][1][k] === 'function' ) );
@@ -2137,7 +2195,7 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	sandbox.CSS = { escape : value => String( value ) };
 	sandbox.Nino.content = { getText : key => key };
 	sandbox.Nino.admin.formToolbar = backLink => { const bar = f.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
-	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set(){}, init(){} };
+	sandbox.Nino.admin.workLocale = sourceOf( 'en_US' );
 	sandbox.Nino.admin.htmlEditor = { create : () => ( { getValue : () => '', setValue(){}, destroy(){} } ) };
 	// The bar under a list, as the design system makes it: the buttons in a bar of the list's kind
 	sandbox.Nino.adminUi.listActions = buttons => { const bar = f.make('div'); bar.className = 'nino-admin-actionbar nino-admin-list-actions'; buttons.forEach( button => bar.appendChild( button ) ); return bar };

@@ -916,6 +916,16 @@ namespace Nino\Modules\Text {
 			$data = \Nino\Admin\Admin::postData();
 			$rows = is_array( $data['rows'] ?? null ) ? $data['rows'] : [];
 
+			// The language the values are written in comes with the request, as the
+			// language of each value does in the other writers of the workbench; a
+			// request that names none leaves it to _writeKey()
+			$locale = array_key_exists( 'locale', $data ) === true ? \Nino\Admin\Admin::postString( $data, 'locale' ) : null;
+
+			if( $locale !== null && in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown locale' );
+				return;
+			}
+
 			$missing = [];
 			foreach( self::_scanMissing( $appData ) as $entry )
 				$missing[$entry['key']] = $entry['kind'];
@@ -946,7 +956,7 @@ namespace Nino\Modules\Text {
 					continue;
 				}
 
-				self::_writeKey( $appData, $key, false, $value );
+				self::_writeKey( $appData, $key, false, $value, null, $locale === null ? null : [ $locale => $value ] );
 				$created++;
 			}
 

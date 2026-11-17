@@ -29,7 +29,7 @@ bar ──────────── [Delete thing] [● Changed]   line  [S
 | Address | Every view has an address: `#panel`, `#panel/<tab>`, `#panel/<tab>/<thing>`, `#panel/<thing>/new`. Reloading and the browser's back button keep it. | `Nino.admin.router`, `levels()` |
 | Way back | Exactly ONE back link, at the left of the context bar: "Back to <name of the level above>" - one wording, the name from the head of the pane or given. A deeper level replaces the link; it does not put a second one under it. | `contextBar( { back } )`, `levels()` |
 | Tools of the view | The width of a preview, the choice of a page and "Reload" stand at the right of the context bar or in the bar of the preview - never in the content. | `split()` |
-| Working language | The language in which content is shown and edited is chosen once for the whole workbench, in the account area of the rail. No panel has a language switch of its own. A view with values that depend on the language shows the working language as a quiet badge in the context bar as soon as it is not the native one. The interface language and the working language have two different names. | - |
+| Working language | The language in which content is shown and edited is chosen once for the whole workbench, in the account area of the rail. No panel has a language switch of its own. A view with values that depend on the language shows the working language as a quiet badge in the context bar as soon as it is not the native one. The interface language ("Interface language", the picker in the settings menu) and the working language ("Edit content in") have two different names and two places. The rail shows it as a select under the account's icons; folded and on a phone it stands in the settings menu beside the interface language, and only a project of more than one language has it. A change asks before it throws unsaved input of a view that follows the language away (Save, Discard, Cancel), and the open view draws again in the new language. A panel reads and sets it, and a view that depends on it follows it. | `Nino.admin.workLocale`, `Nino.adminUi.localeBadge()` |
 | Introduction | At most one paragraph, directly under the context bar, before the content. | `hint( text, 'lead' )` |
 | Section | A group of a form is a `fieldset > legend`. A section of a view without a form has a title of its own. Nothing is larger than the panel's title under it. A section that opens and closes is an accordion, and only that. | `fieldset`, `accordion()` |
 | Surface | A card is `.nino-admin-card` (a `fieldset` is one). A panel draws no frames, radii or shadows of its own. | `.nino-admin-card` |
@@ -79,7 +79,7 @@ Nino.adminUi.contextBar( { panel : 'Themes', title : theme.name, back : { to : '
 | Colour | Hex, picker and contrast. | `color()` |
 | File | One button "Upload <thing>" with the file name, the limits below it. It uploads at once (and says so as a toast) or with the saving of the form - the view decides by [Saving](#saving). No bare `input[type=file]`. | `uploadHint()`, `checkImage()` |
 | Code, CSS, JSON | A field or block in a fixed-width face, at 12 px, with a scroll bar of its own. | - |
-| Values in several languages | The form shows the working language of the workbench. All languages under one another only for short values that are required in EVERY language (the name and address of a page or route, an alt text): one row per language, the language as a badge in front. Languages are named "German (de_DE)" everywhere. | - |
+| Values in several languages | The form shows the working language of the workbench. All languages under one another only for short values that are required in EVERY language (the name and address of a page or route, an alt text): one row per language, the language as a badge in front. A language is named by the one block of the workbench - "Deutsch", "English (US)" -, the code quiet behind the name only where two of the languages that stand together are named alike. | `Nino.adminUi.localeName()` |
 | A field whose work textfills decide | An icon "[ ]" in the form, size and place of the (?) icon, directly beside it at the name of the field. It appears only for accounts that may edit the field, and only at: multi-line text fields, HTML+ fields, technical values and the sources of loops. A click opens a dialog with the available textfills (search, name, notation, today's value in the working language); **a click on a row copies the notation to the clipboard**, says so as a toast and closes the dialog - nothing is pasted at the caret. Without https or localhost the browser has no clipboard: the click then selects the notation in the row, a sentence in the dialog says to copy it with the keyboard (no toast, no mark of success), and the dialog stays. After a copy the focus is back in the field. The icon is the option `fills` of the field's block, which the caller sets only for an account that may edit the field. Anyone who may design chooses every source of a loop - choosing a source is not editing it. | `fills`, `fillsDialog()` |
 | Character counter | "235 / 8000" at the right above the field. | `.nino-admin-char-counter` |
 | Width of a field | The full width of the column; a number, a date, a colour or an identifier is short (12 rem). No further widths. | - |
@@ -238,7 +238,7 @@ One word per thing. The fills are in `/_admin/common/label/*`; a panel takes the
 | Empty | **Noch keine <Dinge>.** / filtered: **Keine <Dinge> gefunden.** | No <things> yet. / No <things> found. | - |
 | Error at a field | **<Name> fehlt.** · **<Name> ist ungültig: ...** | <Name> is missing. · <Name> is not valid: ... | This required field is empty |
 | Address of a page | **Adresse** (the technical identifier is the "Element URI", explained once) | Address | Uri |
-| Language | **Deutsch (de_DE)** | German (de_DE) | de_DE alone |
+| Language | **Deutsch**, **English (US)** - as the project names it for its own picker; the code behind it only where two are named alike | Deutsch, English (US) | de_DE alone, "German (de_DE)" |
 | Navigation | its name ("Hauptmenü"), the identifier quiet behind it (`main`) | - | the identifier alone |
 | Date | **17.11.2026, 06:02** (de) · **2026-11-17, 06:02** (en) | | seconds; ISO in a German interface |
 
@@ -327,7 +327,7 @@ For every review of a view. A line marked **[T]** can be held as a structural te
 
 **Forms**
 - [ ] Every field has a `label`, at the left of the field (narrow: above), at most two lines; help only behind the (?); required with a star; the textfill icon only at the kinds of field named above.
-- [ ] No language switch of its own; a view that depends on the language shows the badge of the working language. [T]
+- [ ] No language switch of its own; a view that depends on the language follows `Nino.admin.workLocale` and shows the badge of the working language (`localeBadge()`), languages named by `localeName()`. [T]
 - [ ] `novalidate`; errors with `fieldError()` and the line; the focus on the first error. [T]
 - [ ] Yes/no is a switch; one of a few is `steps()`; a colour is `color()`; a file is a button with its limits.
 
