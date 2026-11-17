@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'footer',
 	'label'      => [ 'de_DE' => 'Spalte', 'en_US' => 'Column' ],
+	'icon'       => 'columns-3',
 	'in'         => [ 'footer-wrap' ],
 	'offers'     => [ 'flow' ],
 	'attributes' => [

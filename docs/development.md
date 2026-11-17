@@ -667,7 +667,7 @@ A component is registered in the `init()` of a module or a feature, where the sh
 | `attributes` | `name => schema` of the attributes, below |
 | `variants` | The words of its one open axis, a list. `regular` is always there, first |
 | `template` | The markup, a string of at most 65 536 bytes. A string that is no more than the name of a `.tpl` file is a file name, which `validate()` reads in the directory of a feature where it is given one and `addComponent()` is not: there it is refused |
-| `icon`, `preview` | For a tool, and nothing the drawing reads: an icon of 1 to 12 parts (`path`, `circle`, `ellipse`, `rect`, `line`, `polyline`, `polygon`, each with the geometry of its tag and nothing else), and one of the pictures `title`, `text`, `image`, `button`, `block` (the default), `cells`, `table` |
+| `icon`, `preview` | For a tool, and nothing the drawing reads: an icon, the name of one of `\Nino\Components::ICONS` (the table of `Nino.adminUi.icon()`, which the tree of the workbench draws before the component; the neutral square, `\Nino\Components::NEUTRAL_ICON`, where there is none and for a name the table has not, which the log says once), and one of the pictures `title`, `text`, `image`, `button`, `block` (the default), `cells`, `table` |
 
 A name is a slug of at most 40 characters - lower case letters, digits and hyphens, the first a letter, a hyphen only between two of the others - and is neither `page` nor `flow`; those two are the places of the kernel.
 
@@ -839,7 +839,7 @@ What the children are is not looked at before: a name nobody registered in them 
 - an attribute has no `default`, an unknown `type`, a name that is no lowerCamel identifier or that is reserved, a `choice` without options, with a repeated option, with a default outside them or with options that are no words where they are classes, an `int` with a bound that is no integer, `min` above `max` or a default outside them, a `bool` whose default is no bool, a `string`, `link` or `image` whose default is no string, an `id` whose default is no word or longer than 64 characters, a `class` that is no bool or is `true` on a type that makes no class, a `responsive` that is not on a choice that is a class, `options`, `min` or `max` on another type, or an `input` its type has not;
 - an attribute is named `id` and is not of the type `id`, or a second attribute is;
 - a `template` is no string, is longer than 65 536 bytes or has a null byte;
-- an `icon` is no list of 1 to 12 parts of the tags and geometry above, or holds more than 2048 characters of values.
+- an `icon` is no string (a name the table has not is no reason: the neutral icon stands for it).
 
 ### A feature's components
 

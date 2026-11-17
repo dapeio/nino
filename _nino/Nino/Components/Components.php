@@ -40,7 +40,9 @@ namespace Nino {
 	 *											An attribute of a choice may carry 'labels' beside 'options': option => text or locale => text map, what
 	 *											a tool shows for an option of the list; one of a word that is no option, or that is no label, is left out
 	 *											'template'	the markup, or the name of a *.tpl file in the directory a feature gives
-	 *											'icon', 'preview'	for a tool
+	 *											'icon'			for a tool: the name of an icon of ICONS, the one it draws beside the component; a name the table
+	 *																	has not is the neutral one, NEUTRAL_ICON, and is said once in the log
+	 *											'preview'		for a tool: one of PREVIEWS
 	 *
 	 *										The markup of a template has [[class]], [[value]], [[content]],
 	 *										[[content:<name>]] (what the children of that name drew), [[id]],
@@ -215,26 +217,21 @@ namespace Nino {
 			[ 'start', 'center', 'end' ],
 		];
 
-		// What an icon is made of: the tags a part may be, each with the attributes it takes (the radii of a rect may
-		// be left out), how a value is written, how long it may be and what a message calls it, and how many parts an
-		// icon has and how many characters its values have together
-		private const array ICON_TAGS = [
-			'path'		=> [ 'd' ],
-			'circle'	=> [ 'cx', 'cy', 'r' ],
-			'ellipse'	=> [ 'cx', 'cy', 'rx', 'ry' ],
-			'rect'		=> [ 'x', 'y', 'width', 'height', 'rx', 'ry' ],
-			'line'		=> [ 'x1', 'y1', 'x2', 'y2' ],
-			'polyline'	=> [ 'points' ],
-			'polygon'	=> [ 'points' ],
+		// The icon of a component that names none the table has
+		public const string NEUTRAL_ICON = 'square';
+
+		// The components whose unknown icon was said in the log, once in a request
+		private static array $_iconsSaid = [];
+
+		// The icons a component may name: the table of Nino.adminUi.icon() in _admin/assets/Nino.admin.js, name for name
+		public const array ICONS = [
+			'arrow-down', 'arrow-up', 'brackets', 'check', 'chevron-down', 'chevron-left', 'chevron-right',
+			'chevron-up', 'chevrons-left', 'chevrons-right', 'circle-help', 'code', 'columns-3', 'copy',
+			'database', 'ellipsis', 'external-link', 'eye', 'eye-off', 'heading', 'image', 'list', 'lock',
+			'menu', 'mouse-pointer-click', 'panel-bottom', 'panel-top', 'panels-top-left', 'pencil', 'plus',
+			'rectangle-horizontal', 'redo-2', 'refresh-cw', 'repeat', 'rows-2', 'search', 'settings-2',
+			'sliders-horizontal', 'square', 'table', 'text', 'trash-2', 'triangle-alert', 'undo-2', 'x',
 		];
-		private const array ICON_OPTIONAL = [ 'rect' => [ 'rx', 'ry' ] ];
-		private const array ICON_VALUES = [
-			'number'	=> [ '/^-?\d+(\.\d+)?$/D', 12, 'a number' ],
-			'd'			=> [ '/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/D', 512, 'a path' ],
-			'points'	=> [ '/^[0-9 .,-]+$/D', 256, 'a list of points' ],
-		];
-		private const int ICON_PARTS = 12;
-		private const int ICON_LENGTH = 2048;
 
 		// The longest label of a variant, in bytes: of the text, or of each text of a locale map
 		private const int LABEL_LENGTH = 200;
@@ -1123,12 +1120,21 @@ namespace Nino {
 
 			if( isset( $schema['icon'] ) === true ) {
 
-				$icon = self::_icon( $what, $schema['icon'] );
+				if( is_string( $schema['icon'] ) === false )
+					return $what. ': "icon" must be the name of an icon';
 
-				if( is_string( $icon ) === true )
-					return $icon;
+				// Only a tool reads it, so a name the table has not is no reason to refuse the component: the neutral icon stands for it, and the log says so once
+				if( in_array( $schema['icon'], self::ICONS, true ) === false ) {
 
-				$clean['icon'] = $icon;
+					if( isset( self::$_iconsSaid[$name] ) === false ) {
+						self::$_iconsSaid[$name] = true;
+						trigger_error( 'Components: the icon of "'. $name. '" is none of Components::ICONS - the neutral one is used', E_USER_NOTICE );
+					}
+
+					$schema['icon'] = self::NEUTRAL_ICON;
+				}
+
+				$clean['icon'] = $schema['icon'];
 			}
 
 			// regular is always there and stands first; the others are words
@@ -3545,75 +3551,6 @@ namespace Nino {
 			}
 
 			return $list;
-		}
-
-		/**
-		 *	The icon of a component, checked and complete: the parts of a 24 by 24 icon that a tool draws with a
-		 *	stroke. Geometry and no markup, and checked as such: a list of 1 to ICON_PARTS parts, each a list of
-		 *	two, a tag of ICON_TAGS and the map of its attributes, which holds every one the tag takes (but for
-		 *	ICON_OPTIONAL) and no other - each value a string of the characters ICON_VALUES allows it and no
-		 *	longer than that, and all the values together at most ICON_LENGTH characters
-		 *
-		 *	@param		string		$what					How the message names the component
-		 *	@param		mixed			$icon
-		 *
-		 *	@return 	array|string						The clean list of parts, or what is wrong with it
-		 */
-		private static function _icon( string $what, mixed $icon ): array|string {
-
-			$where = $what. ': "icon" ';
-
-			if( is_array( $icon ) === false || array_is_list( $icon ) === false || $icon === [] )
-				return $where. 'is a list of parts, each a tag and its attributes';
-
-			if( count( $icon ) > self::ICON_PARTS )
-				return $where. 'holds more than '. self::ICON_PARTS. ' parts';
-
-			$clean = [];
-			$length = 0;
-
-			foreach( $icon as $index => $part ) {
-
-				if( is_array( $part ) === false || array_is_list( $part ) === false || count( $part ) !== 2 || is_string( $part[0] ) === false || is_array( $part[1] ) === false )
-					return $where. 'is a list of parts, each a tag and its attributes';
-
-				[ $tag, $attributes ] = $part;
-
-				$which = $where. 'part '. ( $index + 1 );
-
-				if( array_key_exists( $tag, self::ICON_TAGS ) === false )
-					return $which. ' names "'. self::_shown( $tag ). '", which is no tag of an icon';
-
-				$article = in_array( $tag[0], [ 'a', 'e', 'i', 'o', 'u' ], true ) === true ? 'an' : 'a';
-
-				foreach( array_keys( $attributes ) as $name )
-					if( in_array( $name, self::ICON_TAGS[$tag], true ) === false )
-						return $which. ': "'. self::_shown( (string) $name ). '" is none of '. $article. ' '. $tag;
-
-				foreach( array_diff( self::ICON_TAGS[$tag], self::ICON_OPTIONAL[$tag] ?? [] ) as $name )
-					if( array_key_exists( $name, $attributes ) === false )
-						return $which. ': '. $article. ' '. $tag. ' needs "'. $name. '"';
-
-				foreach( $attributes as $name => $value ) {
-
-					[ $pattern, $most, $kind ] = self::ICON_VALUES[$name] ?? self::ICON_VALUES['number'];
-
-					if( is_string( $value ) === false || preg_match( $pattern, $value ) !== 1 )
-						return $which. ': "'. $name. '" is not '. $kind;
-
-					if( strlen( $value ) > $most )
-						return $which. ': "'. $name. '" is longer than '. $most. ' characters';
-
-					$length += strlen( $value );
-				}
-
-				$clean[] = [ $tag, $attributes ];
-			}
-
-			if( $length > self::ICON_LENGTH )
-				return $where. 'is longer than '. self::ICON_LENGTH. ' characters';
-
-			return $clean;
 		}
 	}
 

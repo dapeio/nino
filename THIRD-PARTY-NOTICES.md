@@ -3,9 +3,8 @@
 Nino's own code is released under the [MIT License](LICENSE). It bundles no
 third-party library, but it draws icons from one: the workbench's pages, the
 install wizard and the `icon()` of every workbench panel inline SVG icons
-from [Lucide](https://lucide.dev), and the kernel's components carry Lucide's
-icons as geometry in `Components.php`, and the scripts of the workbench draw the
-icons of their buttons from a table of it. Lucide is released under the ISC License;
+from [Lucide](https://lucide.dev), and the scripts of the workbench draw the
+icons of their buttons, trees and components from a table of it. Lucide is released under the ISC License;
 the icons it took over from Feather, the project it grew out of, are under
 the MIT License as well. Both licenses ask for their notice to travel with
 every copy of the icons, and this file is where it does.
@@ -14,20 +13,16 @@ every copy of the icons, and this file is where it does.
 | --- | --- |
 | `_admin/templates/page-*.tpl`, `_admin/install/templates/page-*.tpl` | the Nino mark (`box`), the workbench's toggles, the wizard's step and progress icons |
 | `_admin/Nino/Modules/*/Admin/Admin.php`, `_nino/Nino/Modules/*/Admin/Admin.php` | one per panel, the one its entry in the workbench menu shows |
-| `_nino/Nino/Modules/Components/Components.php` | the geometry of the sixteen components' icons, as a tool shows them |
-| `_admin/assets/Nino.admin.js` | the table behind `Nino.adminUi.icon()`: the geometry of 29 icons of Lucide 0.577.0 that the buttons of the workbench's scripts show |
+| `_admin/assets/Nino.admin.js` | the table behind `Nino.adminUi.icon()`: the geometry of 45 icons of Lucide 0.577.0 that the buttons, the trees and the components of the workbench's scripts show |
 
 Most of them keep Lucide's own class names - `lucide lucide-<name>` - in
 their markup, which is how to find them.
 
 ## Lucide
 
-The sixteen components' icons are ten icons of Lucide 0.577.0 - heading, type,
-text-align-start, panel-top, mouse-pointer-click, image, contrast, code,
-separator-horizontal and chevron-down - transcribed as the parts inside the
-`<svg>` of each file and kept as data that a tool draws, not as markup. Of
-these, `code`, `type` and `chevron-down` are among the icons derived from
-Feather that are listed below.
+The icons of the table are transcribed as the parts inside the `<svg>` of each Lucide 0.577.0
+file and kept as data that a script draws, not as markup. Of these, `arrow-down`, `arrow-up`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `code`, `columns-3`, `database`, `ellipsis`, `external-link`, `lock`, `plus`, `search`, `square`, `trash-2` and `x` are among the
+icons derived from Feather that are listed below (`circle-help`, `ellipsis` and `columns-3` under the names `help-circle`, `more-horizontal` and `columns`).
 
 ISC License
 

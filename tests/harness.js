@@ -345,7 +345,8 @@ function element( tag ) {
 		// the honest answer for a stand-in
 		scrollHeight : 0,
 		clientHeight : 0,
-		style : {},
+		// A custom property is set with setProperty() and read back under its name
+		style : { setProperty : function( name, value ) { this[name] = String( value ) } },
 		dataset : {},
 		attributes : {},
 		children : [],

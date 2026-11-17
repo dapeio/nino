@@ -100,24 +100,39 @@
 		'chevron-left' : [ 'm15 18-6-6 6-6' ],
 		'chevron-right' : [ 'm9 18 6-6-6-6' ],
 		'chevron-up' : [ 'm18 15-6-6-6 6' ],
-		'circle-help' : [ [ 'circle', { cx : '12', cy : '12', r : '10' } ], 'M9.09 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3', 'M12 17h.01' ],
+		'chevrons-left' : [ 'm11 17-5-5 5-5', 'm18 17-5-5 5-5' ],
+		'chevrons-right' : [ 'm6 17 5-5-5-5', 'm13 17 5-5-5-5' ],
+		'circle-help' : [ [ 'circle', { cx : '12', cy : '12', r : '10' } ], 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3', 'M12 17h.01' ],
 		code : [ 'm16 18 6-6-6-6', 'm8 6-6 6 6 6' ],
+		'columns-3' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M9 3v18', 'M15 3v18' ],
 		copy : [ [ 'rect', { width : '14', height : '14', x : '8', y : '8', rx : '2', ry : '2' } ], 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' ],
 		database : [ [ 'ellipse', { cx : '12', cy : '5', rx : '9', ry : '3' } ], 'M3 5V19A9 3 0 0 0 21 19V5', 'M3 12A9 3 0 0 0 21 12' ],
+		ellipsis : [ [ 'circle', { cx : '12', cy : '12', r : '1' } ], [ 'circle', { cx : '19', cy : '12', r : '1' } ], [ 'circle', { cx : '5', cy : '12', r : '1' } ] ],
 		'external-link' : [ 'M15 3h6v6', 'M10 14 21 3', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' ],
 		eye : [ 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0', [ 'circle', { cx : '12', cy : '12', r : '3' } ] ],
 		'eye-off' : [ 'M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49', 'M14.084 14.158a3 3 0 0 1-4.242-4.242', 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143', 'm2 2 20 20' ],
+		heading : [ 'M6 12h12', 'M6 20V4', 'M18 20V4' ],
+		image : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2', ry : '2' } ], [ 'circle', { cx : '9', cy : '9', r : '2' } ], 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' ],
 		list : [ 'M3 5h.01', 'M3 12h.01', 'M3 19h.01', 'M8 5h13', 'M8 12h13', 'M8 19h13' ],
+		lock : [ [ 'rect', { width : '18', height : '11', x : '3', y : '11', rx : '2', ry : '2' } ], 'M7 11V7a5 5 0 0 1 10 0v4' ],
+		menu : [ 'M4 5h16', 'M4 12h16', 'M4 19h16' ],
+		'mouse-pointer-click' : [ 'M14 4.1 12 6', 'm5.1 8-2.9-.8', 'm6 12-1.9 2', 'M7.2 2.2 8 5.1', 'M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z' ],
+		'panel-bottom' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 15h18' ],
 		'panel-top' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18' ],
 		'panels-top-left' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18', 'M9 21V9' ],
 		pencil : [ 'M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z', 'm15 5 4 4' ],
 		plus : [ 'M5 12h14', 'M12 5v14' ],
+		'rectangle-horizontal' : [ [ 'rect', { width : '20', height : '12', x : '2', y : '6', rx : '2' } ] ],
 		'redo-2' : [ 'm15 14 5-5-5-5', 'M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13' ],
 		'refresh-cw' : [ 'M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8', 'M21 3v5h-5', 'M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16', 'M8 16H3v5' ],
 		repeat : [ 'm17 2 4 4-4 4', 'M3 11v-1a4 4 0 0 1 4-4h14', 'm7 22-4-4 4-4', 'M21 13v1a4 4 0 0 1-4 4H3' ],
+		'rows-2' : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 12h18' ],
 		search : [ 'm21 21-4.34-4.34', [ 'circle', { cx : '11', cy : '11', r : '8' } ] ],
 		'settings-2' : [ 'M14 17H5', 'M19 7h-9', [ 'circle', { cx : '17', cy : '17', r : '3' } ], [ 'circle', { cx : '7', cy : '7', r : '3' } ] ],
 		'sliders-horizontal' : [ 'M10 5H3', 'M12 19H3', 'M14 3v4', 'M16 17v4', 'M21 12h-9', 'M21 19h-5', 'M21 5h-7', 'M8 10v4', 'M8 12H3' ],
+		square : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ] ],
+		table : [ 'M12 3v18', [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18', 'M3 15h18' ],
+		text : [ 'M21 5H3', 'M15 12H3', 'M17 19H3' ],
 		'trash-2' : [ 'M10 11v6', 'M14 11v6', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M3 6h18', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' ],
 		'triangle-alert' : [ 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01' ],
 		'undo-2' : [ 'M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11' ],
@@ -6098,6 +6113,189 @@
 					stopped = true;
 					wn.clearTimeout( timer );
 				},
+
+				// The marks of the page in the frame, which come back with every page the frame loads: see frameMarks()
+				marks : function( marks ) {
+					return Nino.adminUi.frameMarks( Object.assign( { frame : options.split.frame }, marks ) );
+				},
+			};
+		},
+
+		/**
+		 *	The page in a frame, marked from the workbench and marking back: the elements a key stands for have a box of the accent colour round
+		 *	them - every one of them, where one thing is drawn more than once - and the pointer over an element of the page is told with the key
+		 *	of what it is over, so that the preview takes part in hoverSync() as the tree does. What a key stands for is the caller's: elements( key )
+		 *	answers the elements of the page that are that key, keyAt( element ) the key of the thing an element is part of, or null. The boxes are
+		 *	drawn in a shadow root of an element appended to the page, so that nothing of the page's style reaches them, they take no pointer
+		 *	and are hidden from a screen reader, and are drawn again where the page is laid out again or scrolls - they stand fixed in its viewport, where the elements are, so a header that sticks keeps its box -, all the measures read before the first box is written; a page of another origin or an error page is no page to mark and is passed over in silence; the frame is read where it has a page
+		 *	and after each one it loads, so the marks outlive a reload. Nothing else is written in the page. The colour is the workbench's: the
+		 *	tokens --editor-blue and --editor-blue-soft, read when the page is marked. Owns no strings
+		 *
+		 *	@param		{Object}		options					{ frame, elements, keyAt, onHover }
+		 *														- frame       the iframe element
+		 *														- elements    elements( key ) answers the elements of the page that stand for the key
+		 *														- keyAt       keyAt( element ) answers the key of what the element is part of, or null
+		 *														- onHover     called with the key when the pointer comes over a thing of the page, with null when it leaves them; told once for each change
+		 *
+		 *	@return		{Object}										{ highlight( keys, [options] ), refresh(), stop() } - highlight() takes a key, a list of them or null, marks those and no others and tells nobody; with { scroll : true } the page rolls to the first of them; refresh() draws the boxes again where the page was laid out again; stop() takes the marks and the listeners away
+		 */
+		frameMarks : function( options ) {
+
+			const frame = options.frame;
+			let keys = [];
+			let layer = null;
+			let host = null;
+			let doc = null;
+			let reported = null;
+			let observer = null;
+			// What is listened to in the page that is there: the page goes when the frame loads another, and these with it
+			const listeners = [];
+
+			const say = function( key ) {
+
+				if( key === reported )
+					return;
+
+				reported = key;
+
+				if( typeof options.onHover === 'function' )
+					options.onHover( key );
+			};
+
+			const paint = function( scroll ) {
+
+				if( layer === null )
+					return;
+
+				const win = frame.contentWindow;
+				const rects = [];
+
+				// Every measure is read before anything is written: reading after a write makes the page lay itself out for each box
+				keys.forEach( function( key ) {
+					options.elements( key ).forEach( function( element ) { rects.push( element.getBoundingClientRect() ) } );
+				} );
+
+				while( layer.firstChild !== null )
+					layer.removeChild( layer.firstChild );
+
+				// The boxes are fixed in the viewport of the page - a header that sticks keeps its box, a body that is moved or positioned moves none - and follow the scroll
+				rects.forEach( function( rect ) {
+
+					const box = doc.createElement( 'div' );
+
+					box.className = 'mark';
+					box.style.top = rect.top+ 'px';
+					box.style.left = rect.left+ 'px';
+					box.style.width = rect.width+ 'px';
+					box.style.height = rect.height+ 'px';
+					layer.appendChild( box );
+				} );
+
+				if( scroll === true && rects.length > 0 )
+					win.scrollTo( { top : Math.max( 0, rects[0].top + win.scrollY - win.innerHeight / 3 ) } );
+			};
+
+			const release = function() {
+
+				// The page may be another one's by now - a page of another origin, the page of an error: its window answers nothing, and there is nothing left to take off it
+				listeners.splice( 0 ).forEach( function( held ) {
+					try {
+						held[0].removeEventListener( held[1], held[2] );
+					}
+					catch( blocked ) {
+						// the listeners go with the page
+					}
+				} );
+
+				if( observer !== null )
+					observer.disconnect();
+
+				if( host !== null && host.parentNode !== null )
+					host.parentNode.removeChild( host );
+
+				observer = null;
+				layer = null;
+				host = null;
+				doc = null;
+			};
+
+			const listen = function( target, name, fn ) {
+				target.addEventListener( name, fn );
+				listeners.push( [ target, name, fn ] );
+			};
+
+			// The page the frame has now: the layer of boxes, the pointer, the layout
+			const attach = function() {
+
+				release();
+
+				const now = frame.contentDocument;
+				const win = frame.contentWindow;
+
+				if( now === null || now === undefined || now.body === null || now.body === undefined || win === null )
+					return;
+
+				const tokens = typeof wn.getComputedStyle === 'function' ? wn.getComputedStyle( dE ) : null;
+				const shadow = ( host = now.createElement( 'nino-ui-marks' ) ).attachShadow( { mode : 'open' } );
+				const style = now.createElement( 'style' );
+
+				doc = now;
+				layer = now.createElement( 'div' );
+				style.textContent = ':host{all:initial;position:fixed;top:0;left:0;width:0;height:0;z-index:2147483000}.mark{position:absolute;pointer-events:none;box-sizing:border-box;border:2px solid var(--nino-mark);border-radius:3px;background:var(--nino-mark-soft)}';
+				host.style.setProperty( '--nino-mark', tokens === null ? '' : tokens.getPropertyValue( '--editor-blue' ) );
+				host.style.setProperty( '--nino-mark-soft', tokens === null ? '' : tokens.getPropertyValue( '--editor-blue-soft' ) );
+				host.setAttribute( 'aria-hidden', 'true' );
+				shadow.appendChild( style );
+				shadow.appendChild( layer );
+				now.body.appendChild( host );
+
+				listen( now, 'pointerover', function( ev ) { say( options.keyAt( ev.target ) ?? null ) } );
+				listen( now.documentElement, 'pointerleave', function() { say( null ) } );
+				listen( win, 'resize', function() { paint( false ) } );
+
+				// Drawn again when the page has scrolled, once for the frames that come between
+				let waiting = false;
+
+				listen( win, 'scroll', function() {
+
+					if( waiting === true )
+						return;
+
+					waiting = true;
+					win.requestAnimationFrame( function() {
+						waiting = false;
+						paint( false );
+					} );
+				} );
+
+				if( typeof win.ResizeObserver === 'function' ) {
+					observer = new win.ResizeObserver( function() { paint( false ) } );
+					observer.observe( now.body );
+				}
+
+				paint( false );
+			};
+
+			frame.addEventListener( 'load', attach );
+			attach();
+
+			return {
+
+				highlight : function( wanted, how ) {
+
+					keys = wanted === null || wanted === undefined ? [] : ( Array.isArray( wanted ) === true ? wanted : [ wanted ] ).map( String );
+					paint( how !== undefined && how.scroll === true );
+				},
+
+				refresh : function() {
+					paint( false );
+				},
+
+				stop : function() {
+					frame.removeEventListener( 'load', attach );
+					release();
+					keys = [];
+				},
 			};
 		},
 
@@ -6388,24 +6586,116 @@
 		},
 
 		/**
-		 *	A tree: entries one under another, each a row with a label, a quiet second line of
-		 *	detail, a sign that carries a hint, and buttons of its own - the components of a page,
-		 *	the folders of a store. The caller gives the entries as data and draws nothing itself;
-		 *	the tree is the pattern of the same name: role tree, treeitem and group, aria-level,
-		 *	aria-expanded on the entries that have children, aria-selected, and exactly one entry
-		 *	in the tab order (the one that last had the focus, else the chosen one, else the first),
-		 *	the others reached by the keys.
+		 *	A switchboard for views that show the same things: what one of them points at - the pointer over a
+		 *	component, the focus on a row - the others show as well, in every direction. The preview, the outline
+		 *	and the tree of a builder join it, each with the function that marks a key on its own side, and report
+		 *	what its own pointer is over; the switchboard hands it on to every member but the one that reported, so
+		 *	that nothing is told its own word back and a view that marks what it is told cannot start a loop. A key
+		 *	is a string, or a list of them where one thing is drawn more than once (the pattern of a loop in a
+		 *	preview), or null for nothing. Reporting what is reported already tells nobody. It draws nothing and
+		 *	owns no strings
+		 *
+		 *	@return		{Object}										{ join( on ), get() } - join( on ) takes a function that is called with the key
+		 *																	another member reported and answers { set( key ), leave() }: set() reports a key, null for
+		 *																	nothing - which takes the key away only from the member that reported it: a view that
+		 *																	has reported nothing cannot clear what another is pointing at -, leave() takes the member
+		 *																	out and, where it had the key, reports nothing; get() is the key reported last
+		 */
+		hoverSync : function() {
+
+			const members = new Set();
+			let held = null;
+			let holder = null;
+
+			const same = function( one, other ) {
+
+				if( Array.isArray( one ) === true || Array.isArray( other ) === true )
+					return Array.isArray( one ) === true && Array.isArray( other ) === true && one.length === other.length && one.every( function( key, at ) { return key === other[at] } );
+
+				return one === other;
+			};
+
+			// A member that has no key reported cannot take one away: what is reported last is what is shown
+			const report = function( from, key ) {
+
+				const now = key === undefined ? null : key;
+
+				if( now === null && from !== null && from !== holder )
+					return;
+
+				if( same( now, held ) === true )
+					return;
+
+				held = now;
+				holder = now === null ? null : from;
+				members.forEach( function( member ) {
+					if( member !== from )
+						member.on( now );
+				} );
+			};
+
+			return {
+
+				join : function( on ) {
+
+					const member = { on : on };
+					members.add( member );
+
+					return {
+
+						set : function( key ) {
+
+							if( members.has( member ) === true )
+								report( member, key );
+						},
+
+						leave : function() {
+
+							if( members.delete( member ) === true && holder === member )
+								report( null, null );
+						},
+					};
+				},
+
+				get : function() {
+					return held;
+				},
+			};
+		},
+
+		/**
+		 *	A tree: entries one under another, each a row with a type icon, a name in two voices - the
+		 *	kind in bold, the content quietly after it -, a quiet note at the right, and buttons of its
+		 *	own - the components of a page, the folders of a store. The caller gives the entries as data
+		 *	and draws nothing itself; the tree is the pattern of the same name: role tree, treeitem and
+		 *	group, aria-level, aria-expanded on the entries that have children, aria-selected, and exactly
+		 *	one entry in the tab order (the one that last had the focus, else the chosen one, else the
+		 *	first), the others reached by the keys.
+		 *
+		 *	It is drawn the one way for every tree of the workbench: a vertical guide line for each entry
+		 *	that holds others, with a branch to each of its children; the chosen row a tint with a hairline
+		 *	of the accent colour round it - no shadow - and its name in the text colour, heavier; the buttons
+		 *	of a row only under the pointer, on the row that has the stop while the focus is in the tree - Tab from the row goes to its first button - and on the chosen row (a device that
+		 *	has no pointer to hover with shows them there alone). A hint is a line of its own under its row.
+		 *	An entry that says nothing of its kind has the neutral icon of the set.
+		 *
+		 *	A loop is an entry whose children are drawn once as the pattern of what is repeated for each
+		 *	element of its source: the entry carries the loop icon and its note, the guide of its children is
+		 *	dashed and in the accent colour, and a tag "per element" stands over the first of them. Where a
+		 *	loop stands inside the pattern of another the tag names the type of its elements. A field the
+		 *	pattern reads is a tag with the database icon and the name of the field, which is never cut
+		 *	short: the name of the kind gives way to it first.
 		 *
 		 *	Up and Down walk the entries that can be seen, Right opens a closed entry and goes to the
 		 *	first child of an open one, Left closes an open entry and goes to the parent of a closed
 		 *	one, Home and End go to the first and the last, Enter and Space choose, a letter goes to
-		 *	the next entry whose label begins with it (wrapping). A click on the arrow opens or closes,
+		 *	the next entry whose kind begins with it (wrapping). A click on the arrow opens or closes,
 		 *	a click on the row chooses. The buttons of a row are in the tab order only while the row
 		 *	is the one that has the stop, so that a tree of fifty rows is one stop and not two hundred;
 		 *	Tab from the row reaches them, a mouse reaches all of them. A locked entry can be walked to,
-		 *	opened and closed but not chosen, and says so in a word, seen and in its description (not by
-		 *	aria-disabled, which would take its buttons from a screen reader too); what its buttons may do
-		 *	is the caller's, through disabled
+		 *	opened and closed but not chosen, and says so in a word with a lock, seen and in its description
+		 *	(not by aria-disabled, which would take its buttons from a screen reader too); what its buttons
+		 *	may do is the caller's, through disabled
 		 *
 		 *	The tree does not own the data and writes no address: the caller binds the chosen entry
 		 *	to its own address, as levels() and accordion() leave theirs to the panel. What it keeps
@@ -6416,22 +6706,30 @@
 		 *	pressed, on that button, else on the row. An id follows the component, not its place: where an
 		 *	entry is gone the stop and the focus go to its next sibling, else the previous one, else its
 		 *	parent. A person's move of the stop, and this one, is told through onFocus; select(), focus() and
-		 *	update() otherwise call nobody back. An update with no entries leaves the focus nowhere. Owns no strings: the labels,
-		 *	the details, the hints and the names of the buttons are the caller's, the words for a locked
-		 *	and a marked entry are fills
+		 *	update() otherwise call nobody back. An update with no entries leaves the focus nowhere.
 		 *
-		 *	@param		{Object}		options					{ id, label, labelledby, items, selected, text, onSelect, onToggle, onAction, onFocus }
+		 *	What the pointer or the focus is over is told through onHover, with the id, and with null where
+		 *	it is over none - the hook of hoverSync(); and highlight() marks entries the way the pointer
+		 *	does, from outside, without moving the focus or the page. With options.path the tree makes a
+		 *	line that names the way to the chosen entry, "kind > kind > kind", each name a button that
+		 *	chooses its entry: the caller puts tree.path above tree.el, where it stays at the top of
+		 *	what scrolls. Owns no strings: the labels, the names and the hints are the caller's, the words
+		 *	for a locked and a marked entry, a loop, a field and the path are fills
+		 *
+		 *	@param		{Object}		options					{ id, label, labelledby, items, selected, path, text, onSelect, onToggle, onAction, onFocus, onHover }
 		 *														- id          the beginning of the ids it makes, a token (a space in it becomes a hyphen)
 		 *														- label       the tree's name for a screen reader; or labelledby, the id of what names it
-		 *														- items       [ { id, label, detail, children, open, marked, locked, hint, actions } ] - id a string, unique in the tree; detail the quiet second line; children the same shape; open whether it is open when the tree first sees it; marked says that the entry is the one shown elsewhere (the preview); locked as above; hint { text, state } - a sign and its sentence under the label, state warn, error or muted; actions [ { key, label, name, disabled, danger } ] - label the glyph, name what a screen reader and a title say, danger draws it as one that destroys; locked and marked show as words beside the row
+		 *														- items       [ { id, kind, name, detail, label, icon, meta, children, open, marked, locked, hint, loop, source, actions } ] - id a string, unique in the tree; kind the bold word (label is the same word, where an entry has no kind); name the content, quiet, after it; detail a second quiet note; icon the Lucide name of its type icon, an unknown one is the neutral icon; meta a quiet note at the right that gives way to the buttons; children the same shape; open whether it is open when the tree first sees it; marked says that the entry is the one shown elsewhere (the preview); locked as above; hint { text, state } - or finding, the same - a sign and its sentence on a line of its own under the row, state warn, error or muted; loop true, a string - the note - or { detail, type } - the note and the type of the elements, which the tag of a loop in a loop names; source a field name, or { field, label } - label the word before it; actions [ { key, icon, label, name, disabled, danger } ] - icon the Lucide name of the button, which the glyphs + ↑ ↓ × of label stand for where there is none, name what a screen reader and a title say, danger draws it as one that destroys; locked and marked show as words beside the row
 		 *														- selected    the id chosen at the start
-		 *														- text        { locked, marked } to say the words differently
+		 *														- path        true makes the line of the way to the chosen entry: tree.path
+		 *														- text        { locked, marked, each, eachNote, loop, source, path } to say the words differently
 		 *														- onSelect    called with the id and the item after a choice made by hand, also of the entry that is chosen already
 		 *														- onToggle    called with the id, whether it is open or closed after the move, and the item after a hand opened or closed it
 		 *														- onAction    called with the key of the button, the id and the item after a press
 		 *														- onFocus     called with the id and the item when the stop moves to another entry, by a hand or because its entry is gone
+		 *														- onHover     called with the id when the pointer or the focus comes over an entry, and with null when it leaves them; not for a redrawing that leaves it where it was
 		 *
-		 *	@return		{Object}										{ el, update( items ), select( id ), focus( [id] ), get() } - select() chooses an entry (not a locked one: it answers false), opens what is above it and scrolls it into view, null chooses none; focus() puts the focus on the entry (the one with the stop by default); both answer whether the id is there; get() is { selected, stop, open }
+		 *	@return		{Object}										{ el, path, update( items ), select( id ), focus( [id], [key] ), highlight( ids, [options] ), get() } - select() chooses an entry (not a locked one: it answers false), opens what is above it and scrolls it into view, null chooses none; focus() puts the focus on the entry (the one with the stop by default), on its button with the key where there is one that can be pressed; both answer whether the id is there, and focus() of an id that is not there yet - the row a caller is about to draw - is kept for the next update(), which puts the focus there once; highlight() takes an id, a list of them or null, marks those and no others, tells nobody, and with { scroll : true } opens what is above the first of them and scrolls it into view - without it the page stays where it is; it answers whether one of them is there; path is the line of the way, or null; get() is { selected, stop, open }
 		 */
 		tree : function( options ) {
 
@@ -6439,6 +6737,9 @@
 			const prefix	= typeof options.id === 'string' && options.id !== '' ? options.id.replace( /\s+/g, '-' ) : 'nino-admin-tree-'+ ( ++serial );
 			const text		= options.text || {};
 			const word		= function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
+
+			// The glyphs the label of a button may be where it names no icon: what each stands for
+			const GLYPHS	= { '+' : 'plus', '↑' : 'arrow-up', '↓' : 'arrow-down', '×' : 'trash-2' };
 
 			const root = Nino.adminUi.el( 'ul', 'nino-admin-tree' );
 			root.id = prefix;
@@ -6449,6 +6750,14 @@
 			else if( typeof options.label === 'string' )
 				root.setAttribute( 'aria-label', options.label );
 
+			// The line of the way to the chosen entry, over the tree: its own element, since a list holds no line
+			const bar = options.path === true ? Nino.adminUi.el( 'nav', 'nino-admin-tree-path' ) : null;
+
+			if( bar !== null ) {
+				bar.setAttribute( 'aria-label', word( 'path', '/_admin/common/tree/path' ) );
+				bar.hidden = true;
+			}
+
 			let order = [];
 			let byId = new Map();
 			let parts = new Map();
@@ -6457,6 +6766,28 @@
 			const open = new Set();
 			let selected = typeof options.selected === 'string' ? options.selected : null;
 			let stop = null;
+
+			// What the pointer or the focus is over - whichever of the two moved last, as an id; what was told last; what the caller marks from outside; and the entry a caller asked the focus for that is not there yet
+			let hoverAt = null;
+			let hoverBy = '';
+			let told = null;
+			let wish = null;
+			let lit = new Set();
+			let drawing = false;
+
+			// Said once for each change of the entry that is pointed at, and never from inside a redrawing, which leaves what is pointed at where it was
+			const tellOver = function() {
+
+				const now = hoverAt;
+
+				if( drawing === true || now === told )
+					return;
+
+				told = now;
+
+				if( typeof options.onHover === 'function' )
+					options.onHover( now );
+			};
 
 			// What stands for an element of the tree: the entry it is of, and which piece of the row it is
 			const locate = function( target ) {
@@ -6497,6 +6828,11 @@
 				return order.filter( shown );
 			};
 
+			// The word of an entry: its kind, which its label is where it has none
+			const kindOf = function( item ) {
+				return String( item.kind ?? item.label ?? '' );
+			};
+
 			const paintOpen = function( entry ) {
 
 				if( entry.group === null )
@@ -6505,14 +6841,74 @@
 				const on = open.has( entry.id );
 
 				entry.li.setAttribute( 'aria-expanded', on === true ? 'true' : 'false' );
-				entry.toggle.textContent = on === true ? '▾' : '▸';
 				entry.group.hidden = on === false;
+			};
+
+			// The line of the way: the kinds of the entries from the top to the chosen one, each of the ones above a button that chooses it
+			const paintPath = function() {
+
+				if( bar === null )
+					return;
+
+				while( bar.firstChild !== null )
+					bar.removeChild( bar.firstChild );
+
+				const entry = selected === null ? null : ( byId.get( selected ) ?? null );
+
+				bar.hidden = entry === null;
+
+				if( entry === null )
+					return;
+
+				const chain = [];
+
+				for( let up = entry; up !== null; up = up.parent )
+					chain.unshift( up );
+
+				chain.forEach( function( link, at ) {
+
+					if( at > 0 ) {
+						const sign = Nino.adminUi.el( 'span', 'nino-admin-tree-path-sign' );
+						sign.setAttribute( 'aria-hidden', 'true' );
+						sign.appendChild( Nino.adminUi.icon( 'chevron-right', { size : 12 } ) );
+						bar.appendChild( sign );
+					}
+
+					const name = kindOf( link.item )+ ( link.loop !== null ? ' · '+ word( 'each', '/_admin/common/tree/each' ) : '' );
+
+					if( at === chain.length - 1 ) {
+						const here = Nino.adminUi.el( 'span', 'nino-admin-tree-path-now', name );
+						here.setAttribute( 'aria-current', 'location' );
+						bar.appendChild( here );
+						return;
+					}
+
+					bar.appendChild( Nino.adminUi.button( name, function() {
+						go( link );
+						choose( link );
+					}, { kind : 'link', className : 'nino-admin-tree-path-link' } ) );
+				} );
+
+				// One line: a long way scrolls inside it, and the place - the end - is the part that stays in sight
+				bar.scrollLeft = bar.scrollWidth;
+
+				// ...also where the tree is not on the page yet and has no width to measure
+				if( typeof wn.requestAnimationFrame === 'function' )
+					wn.requestAnimationFrame( function() { bar.scrollLeft = bar.scrollWidth } );
 			};
 
 			const paintSelected = function() {
 				order.forEach( function( entry ) {
 					entry.li.setAttribute( 'aria-selected', entry.id === selected ? 'true' : 'false' );
 					entry.row.classList.toggle( 'is-selected', entry.id === selected );
+				} );
+
+				paintPath();
+			};
+
+			const paintLit = function() {
+				order.forEach( function( entry ) {
+					entry.row.classList.toggle( 'is-lit', lit.has( entry.id ) );
 				} );
 			};
 
@@ -6523,6 +6919,7 @@
 
 				if( stop !== null && stop !== entry ) {
 					stop.li.tabIndex = -1;
+					stop.row.classList.remove( 'is-stop' );
 					stop.buttons.forEach( function( button ) { button.tabIndex = -1 } );
 				}
 
@@ -6532,6 +6929,7 @@
 					return;
 
 				entry.li.tabIndex = 0;
+				entry.row.classList.add( 'is-stop' );
 				entry.buttons.forEach( function( button ) { button.tabIndex = 0 } );
 
 				if( moved === true && told === true && typeof options.onFocus === 'function' )
@@ -6593,6 +6991,36 @@
 				show( entry, entry.li );
 			};
 
+			// The focus on an entry, and on the button of it that has the key where there is one that can be pressed
+			const focusOn = function( entry, key ) {
+
+				reveal( entry );
+				go( entry );
+
+				const button = key === undefined ? undefined : entry.keyed.get( key );
+
+				if( button !== undefined && button.disabled === false )
+					show( entry, button );
+			};
+
+			// A button of a row: an icon button where there is an icon to give it - its own, or the one its glyph stands for - and a word of its own where there is none
+			const actionButton = function( action, press ) {
+
+				const icon = Object.hasOwn( ICONS, String( action.icon ) ) === true ? action.icon : ( Object.hasOwn( GLYPHS, String( action.label ) ) === true ? GLYPHS[String( action.label )] : undefined );
+				const name = typeof action.name === 'string' ? action.name : '';
+				const classes = 'nino-admin-tree-action'+ ( action.danger === true ? ' nino-admin-tree-action--danger' : '' );
+				let button;
+
+				if( icon !== undefined && name.trim() !== '' )
+					button = Nino.adminUi.iconButton( icon, name, press, { danger : action.danger === true, small : true, className : classes, disabled : action.disabled === true } );
+				else
+					button = Nino.adminUi.button( String( action.label ?? '' ), press, { className : classes, name : name === '' ? undefined : name, disabled : action.disabled === true } );
+
+				button.dataset.key = String( action.key );
+
+				return button;
+			};
+
 			const make = function( list, parent, level, into ) {
 
 				list.forEach( function( item, at ) {
@@ -6600,17 +7028,22 @@
 					const id = String( item.id );
 					const n = ++drawn;
 					const kids = Array.isArray( item.children ) === true ? item.children : [];
-					const hint = typeof item.hint === 'object' && item.hint !== null && typeof item.hint.text === 'string' && item.hint.text !== '' ? item.hint : null;
+					const found = item.hint ?? item.finding;
+					const hint = typeof found === 'string' && found !== '' ? { text : found } : ( typeof found === 'object' && found !== null && typeof found.text === 'string' && found.text !== '' ? found : null );
 					const locked = item.locked === true;
 					const marked = item.marked === true;
+					const named = typeof item.name === 'string' ? item.name : '';
 					const detail = typeof item.detail === 'string' ? item.detail : '';
+					const meta = typeof item.meta === 'string' ? item.meta : '';
+					const loop = item.loop === true ? {} : ( typeof item.loop === 'string' ? { detail : item.loop } : ( typeof item.loop === 'object' && item.loop !== null ? item.loop : null ) );
+					const source = typeof item.source === 'string' ? { field : item.source } : ( typeof item.source === 'object' && item.source !== null && typeof item.source.field === 'string' ? item.source : null );
 
 					const li = Nino.adminUi.el( 'li', 'nino-admin-tree-item' );
 					const row = Nino.adminUi.el( 'div', 'nino-admin-tree-row' );
 					const toggle = Nino.adminUi.el( 'span', 'nino-admin-tree-toggle' );
-					const label = Nino.adminUi.el( 'span', 'nino-admin-tree-label', String( item.label ?? '' ) );
+					const label = Nino.adminUi.el( 'span', 'nino-admin-tree-label', kindOf( item ) );
 
-					const entry = { id : id, item : item, parent : parent, level : level, li : li, row : row, toggle : toggle, label : label, group : null, buttons : [], keyed : new Map() };
+					const entry = { id : id, item : item, parent : parent, level : level, loop : loop, li : li, row : row, toggle : toggle, label : label, group : null, buttons : [], keyed : new Map() };
 
 					li.setAttribute( 'role', 'treeitem' );
 					li.setAttribute( 'aria-level', String( level ) );
@@ -6622,28 +7055,78 @@
 
 					li.dataset.locked = locked === true ? 'true' : 'false';
 					li.dataset.marked = marked === true ? 'true' : 'false';
+					li.dataset.loop = loop !== null ? 'true' : 'false';
 
 					// The indent is the level's: a rule of the stylesheet cannot count levels
-					row.style.paddingInlineStart = ( .3 + ( level - 1 ) * 1.1 ).toFixed(2)+ 'rem';
+					li.style.setProperty( '--depth', String( level - 1 ) );
 
 					label.id = prefix+ '-'+ n+ '-label';
 					label.title = label.textContent;
 					toggle.setAttribute( 'aria-hidden', 'true' );
+
+					if( kids.length > 0 )
+						toggle.appendChild( Nino.adminUi.icon( 'chevron-right', { size : 14 } ) );
+
 					row.appendChild( toggle );
 
-					// The label, and under it - where there is one - the sentence of the hint
+					// The icon of the entry's type: the loop's own where it is one, the neutral square where the entry names none
+					const type = Nino.adminUi.el( 'span', 'nino-admin-tree-type' );
+					type.appendChild( Nino.adminUi.icon( loop !== null ? 'repeat' : ( Object.hasOwn( ICONS, String( item.icon ) ) === true ? item.icon : 'square' ) ) );
+					row.appendChild( type );
+
+					// The kind in bold, the content and the notes quietly after it, the field the entry reads last, and never cut short
 					const column = Nino.adminUi.el( 'span', 'nino-admin-tree-text' );
-					column.appendChild( label );
+					const lead = Nino.adminUi.el( 'span', 'nino-admin-tree-lead' );
+					lead.appendChild( label );
+					column.appendChild( lead );
 					row.appendChild( column );
 
+					// What names the entry besides its kind: its content, or the field it reads - the kind alone names no entry among its like
 					const says = [];
+					const names = [];
 
-					if( detail !== '' ) {
-						const quiet = Nino.adminUi.el( 'span', 'nino-admin-tree-detail', detail );
-						quiet.title = detail;
-						quiet.setAttribute( 'aria-hidden', 'true' );
-						row.appendChild( quiet );
-						says.push( detail );
+					if( loop !== null )
+						says.push( word( 'loop', '/_admin/common/tree/loop' ) );
+
+					[ [ named, 'nino-admin-tree-name' ], [ detail, 'nino-admin-tree-detail' ], [ typeof loop?.detail === 'string' ? loop.detail : '', 'nino-admin-tree-detail' ] ].forEach( function( quiet ) {
+
+						if( quiet[0] === '' )
+							return;
+
+						const note = Nino.adminUi.el( 'span', quiet[1], quiet[0] );
+						note.title = quiet[0];
+						note.setAttribute( 'aria-hidden', 'true' );
+						lead.appendChild( note );
+
+						if( quiet[1] === 'nino-admin-tree-name' )
+							names.push( quiet[0] );
+						else
+							says.push( quiet[0] );
+					} );
+
+					if( source !== null ) {
+
+						const field = String( source.field );
+						const said = ( typeof source.label === 'string' && source.label !== '' ? source.label : word( 'source', '/_admin/common/tree/source' ) )+ ' '+ field;
+						const tag = Nino.adminUi.el( 'span', 'nino-admin-tree-source' );
+
+						if( typeof source.label === 'string' && source.label !== '' )
+							tag.appendChild( Nino.adminUi.el( 'span', 'nino-admin-tree-source-word', source.label ) );
+
+						tag.appendChild( Nino.adminUi.icon( 'database', { size : 13 } ) );
+						tag.appendChild( Nino.adminUi.el( 'code', 'nino-admin-tree-source-field', field ) );
+						tag.title = said;
+						tag.setAttribute( 'aria-hidden', 'true' );
+						column.appendChild( tag );
+						names.push( said );
+					}
+
+					if( meta !== '' ) {
+						const note = Nino.adminUi.el( 'span', 'nino-admin-tree-meta', meta );
+						note.title = meta;
+						note.setAttribute( 'aria-hidden', 'true' );
+						row.appendChild( note );
+						says.push( meta );
 					}
 
 					// Words, not signs: the state of an entry is said where the eye is, quietly, and also in the description
@@ -6656,23 +7139,62 @@
 						const chip = Nino.adminUi.el( 'span', 'nino-admin-tree-state', said );
 						chip.dataset.state = state[1];
 						chip.setAttribute( 'aria-hidden', 'true' );
+
+						if( state[1] === 'locked' )
+							chip.insertBefore( Nino.adminUi.icon( 'lock', { size : 14 } ), chip.firstChild );
+
 						row.appendChild( chip );
 						says.push( said );
 					} );
 
+					const actions = Array.isArray( item.actions ) === true ? item.actions : [];
+
+					if( actions.length > 0 ) {
+
+						const buttons = Nino.adminUi.el( 'span', 'nino-admin-tree-actions' );
+
+						actions.forEach( function( action ) {
+
+							const button = actionButton( action, function() {
+								if( typeof options.onAction === 'function' )
+									options.onAction( action.key, id, item );
+							} );
+
+							button.tabIndex = -1;
+							entry.buttons.push( button );
+							entry.keyed.set( action.key, button );
+							parts.set( button, { entry : entry, part : 'action' } );
+							buttons.appendChild( button );
+						} );
+
+						parts.set( buttons, { entry : entry, part : 'actions' } );
+						row.classList.add( 'is-actionable' );
+						row.appendChild( buttons );
+					}
+
+					// A hint is a line of its own under the row, as wide as the row and not part of its tint
+					let line = null;
+
 					if( hint !== null ) {
-						const line = Nino.adminUi.el( 'span', 'nino-admin-tree-hint' );
-						const sign = Nino.adminUi.el( 'span', 'nino-admin-tree-sign', '!' );
+						line = Nino.adminUi.el( 'span', 'nino-admin-tree-hint' );
+						const sign = Nino.adminUi.el( 'span', 'nino-admin-tree-sign' );
 						sign.dataset.state = [ 'error', 'muted' ].indexOf( hint.state ) !== -1 ? hint.state : 'warn';
+						sign.appendChild( Nino.adminUi.icon( 'triangle-alert', { size : 14 } ) );
 						line.setAttribute( 'aria-hidden', 'true' );
 						line.appendChild( sign );
 						line.appendChild( Nino.adminUi.el( 'span', 'nino-admin-tree-hint-text', hint.text ) );
 						line.title = hint.text;
-						column.appendChild( line );
 						says.push( hint.text );
 					}
 
-					// A screen reader reads the name, then what the row says besides
+					// A screen reader reads the name - the kind and what names it - then what the row says besides
+					if( names.length > 0 ) {
+						const known = Nino.adminUi.el( 'span', 'nino-admin-sr-only', names.join( ', ' ) );
+						known.id = prefix+ '-'+ n+ '-name';
+						li.setAttribute( 'aria-labelledby', label.id+ ' '+ known.id );
+						row.appendChild( known );
+					}
+
 					if( says.length > 0 ) {
 						const info = Nino.adminUi.el( 'span', 'nino-admin-sr-only', says.join( ', ' ) );
 						info.id = prefix+ '-'+ n+ '-info';
@@ -6680,31 +7202,11 @@
 						row.appendChild( info );
 					}
 
-					const actions = Array.isArray( item.actions ) === true ? item.actions : [];
-
-					if( actions.length > 0 ) {
-
-						const bar = Nino.adminUi.el( 'span', 'nino-admin-tree-actions' );
-
-						actions.forEach( function( action ) {
-
-							const button = Nino.adminUi.button( String( action.label ?? '' ), function() {
-								if( typeof options.onAction === 'function' )
-									options.onAction( action.key, id, item );
-							}, { className : 'nino-admin-tree-action'+ ( action.danger === true ? ' nino-admin-tree-action--danger' : '' ), name : action.name, disabled : action.disabled === true } );
-
-							button.tabIndex = -1;
-							entry.buttons.push( button );
-							entry.keyed.set( action.key, button );
-							parts.set( button, { entry : entry, part : 'action' } );
-							bar.appendChild( button );
-						} );
-
-						parts.set( bar, { entry : entry, part : 'actions' } );
-						row.appendChild( bar );
-					}
-
 					li.appendChild( row );
+
+					if( line !== null )
+						li.appendChild( line );
+
 					into.appendChild( li );
 
 					parts.set( li, { entry : entry, part : 'item' } );
@@ -6713,9 +7215,35 @@
 					byId.set( id, entry );
 
 					if( kids.length > 0 ) {
-						entry.group = Nino.adminUi.el( 'ul', 'nino-admin-tree-group' );
+
+						entry.group = Nino.adminUi.el( 'ul', 'nino-admin-tree-group'+ ( loop !== null ? ' nino-admin-tree-group--each' : '' ) );
 						entry.group.setAttribute( 'role', 'group' );
+
+						if( loop !== null )
+							entry.group.setAttribute( 'aria-label', word( 'eachNote', '/_admin/common/tree/each-note' ) );
+
 						li.appendChild( entry.group );
+
+						// What stands under a loop is the pattern of what is repeated: a tag over it says so, and in a loop in a loop names the type of its elements
+						if( loop !== null ) {
+
+							const tag = Nino.adminUi.el( 'li', 'nino-admin-tree-each' );
+							const inner = Nino.adminUi.el( 'span', 'nino-admin-tree-each-tag' );
+							let nested = false;
+
+							for( let up = parent; up !== null; up = up.parent )
+								nested = nested || up.loop !== null;
+
+							tag.setAttribute( 'role', 'presentation' );
+							tag.setAttribute( 'aria-hidden', 'true' );
+							tag.style.setProperty( '--depth', String( level ) );
+							inner.appendChild( Nino.adminUi.icon( 'repeat', { size : 12 } ) );
+							inner.appendChild( dc.createTextNode( word( 'each', '/_admin/common/tree/each' )+ ( nested === true && typeof loop.type === 'string' && loop.type !== '' ? ' · '+ loop.type : '' ) ) );
+							tag.appendChild( inner );
+							tag.appendChild( Nino.adminUi.el( 'span', 'nino-admin-tree-each-note', word( 'eachNote', '/_admin/common/tree/each-note' ) ) );
+							entry.group.appendChild( tag );
+						}
+
 						make( kids, entry, level + 1, entry.group );
 					}
 				} );
@@ -6735,6 +7263,9 @@
 					const at = siblings.indexOf( stop );
 					[ siblings[at + 1], siblings[at - 1], stop.parent ].forEach( function( other ) { if( other !== undefined && other !== null ) near.push( other.id ) } );
 				}
+
+				// Taking the old rows away takes the focus from them, and giving it back puts it on a row: neither is news to whoever is told of what is pointed at
+				drawing = true;
 
 				while( root.firstChild !== null )
 					root.removeChild( root.firstChild );
@@ -6762,6 +7293,7 @@
 
 				order.forEach( paintOpen );
 				paintSelected();
+				paintLit();
 
 				const seen = visible();
 				const kept = was !== null && byId.has( was ) === true && shown( byId.get( was ) ) === true ? byId.get( was ) : null;
@@ -6778,6 +7310,25 @@
 
 					show( stop, back !== null && back.disabled === false ? back : stop.li );
 				}
+
+				// What the caller asked the focus for before the entry was there: asked once, kept over one redrawing
+				if( wish !== null && byId.has( wish.id ) === true ) {
+					const asked = wish;
+					wish = null;
+					focusOn( byId.get( asked.id ), asked.key );
+				}
+				else
+					wish = null;
+
+				drawing = false;
+
+				if( inside( dc.activeElement ) === false )
+					root.classList.remove( 'is-inside' );
+
+				if( hoverAt !== null && ( byId.has( hoverAt ) === false || ( hoverBy === 'focus' && inside( dc.activeElement ) === false ) ) )
+					hoverAt = null;
+
+				tellOver();
 			};
 
 			const keyOf = function( node ) {
@@ -6829,7 +7380,7 @@
 					const letter = ev.key.toLowerCase();
 					const ring = seen.slice( at + 1 ).concat( seen.slice( 0, at ) );
 
-					next = ring.find( function( other ) { return String( other.item.label ?? '' ).toLowerCase().indexOf( letter ) === 0 } ) ?? null;
+					next = ring.find( function( other ) { return kindOf( other.item ).toLowerCase().indexOf( letter ) === 0 } ) ?? null;
 
 					if( next === null )
 						return;
@@ -6860,13 +7411,52 @@
 				choose( found.entry );
 			} );
 
-			// The stop follows the hand: a click or a Tab that lands in a row makes it the row of the tab order
+			// The stop follows the hand: a click or a Tab that lands in a row makes it the row of the tab order; and the focus in a row is what is pointed at, as the pointer is
 			root.addEventListener( 'focusin', function( ev ) {
 
 				const found = locate( ev.target );
 
 				if( found !== null && found.entry !== stop )
 					setStop( found.entry, true );
+
+				root.classList.add( 'is-inside' );
+
+				// The focus a redrawing gives back is no move of what is pointed at
+				if( found !== null && drawing === false ) {
+					hoverAt = found.entry.id;
+					hoverBy = 'focus';
+					tellOver();
+				}
+			} );
+
+			// The row with the stop shows its buttons while the focus is anywhere in the tree - on the row or on one of them - and a redrawing, which takes the focus for a moment, leaves it so
+			root.addEventListener( 'focusout', function( ev ) {
+
+				if( drawing === true || inside( ev.relatedTarget ) === true )
+					return;
+
+				root.classList.remove( 'is-inside' );
+
+				if( hoverBy === 'focus' ) {
+					hoverAt = null;
+					tellOver();
+				}
+			} );
+
+			root.addEventListener( 'pointerover', function( ev ) {
+
+				const found = locate( ev.target );
+
+				hoverAt = found === null ? null : found.entry.id;
+				hoverBy = 'pointer';
+				tellOver();
+			} );
+
+			root.addEventListener( 'pointerleave', function() {
+
+				hoverAt = null;
+				hoverBy = 'pointer';
+				tellOver();
 			} );
 
 			draw( Array.isArray( options.items ) === true ? options.items : [] );
@@ -6874,6 +7464,8 @@
 			return {
 
 				el : root,
+
+				path : bar,
 
 				update : function( items ) {
 					draw( Array.isArray( items ) === true ? items : [] );
@@ -6901,17 +7493,36 @@
 					return true;
 				},
 
-				focus : function( id ) {
+				focus : function( id, key ) {
 
 					const entry = id === undefined ? stop : byId.get( String( id ) );
 
-					if( entry === undefined || entry === null )
+					if( entry === undefined || entry === null ) {
+						// An entry the caller is about to draw: the next redrawing puts the focus there
+						wish = id === undefined ? null : { id : String( id ), key : key };
 						return false;
+					}
 
-					reveal( entry );
-					go( entry );
+					focusOn( entry, key );
 
 					return true;
+				},
+
+				highlight : function( keys, how ) {
+
+					const list = keys === null || keys === undefined ? [] : ( Array.isArray( keys ) === true ? keys : [ keys ] ).map( String );
+
+					lit = new Set( list );
+					paintLit();
+
+					const first = list.map( function( id ) { return byId.get( id ) } ).find( function( entry ) { return entry !== undefined } );
+
+					if( first !== undefined && how !== undefined && how.scroll === true ) {
+						reveal( first );
+						first.row.scrollIntoView( { block : 'nearest' } );
+					}
+
+					return first !== undefined;
 				},
 
 				get : function() {

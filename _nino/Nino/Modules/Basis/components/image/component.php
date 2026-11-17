@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'image',
 	'label'      => [ 'de_DE' => 'Bild', 'en_US' => 'Image' ],
+	'icon'       => 'image',
 	'in'         => [ 'flow' ],
 	'source'     => 'image',
 	'preview'    => 'image',

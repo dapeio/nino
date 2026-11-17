@@ -150,6 +150,9 @@
 	--nino-admin-control-icon: 28px;
 	--nino-admin-control-icon-small: 24px;
 	--nino-admin-row-compact: 34px;
+	--nino-admin-tree-indent: 1.4rem;
+	--nino-admin-tree-guide: 14px;
+	--nino-admin-tree-lead: 2.5rem;
 	/* The widths of a dialog: a question, a form, a list to pick from, the sheet of properties */
 	--nino-admin-dialog-narrow: 26rem;
 	--nino-admin-dialog-form: 40rem;
@@ -4146,15 +4149,25 @@ a {
 	}
 }
 
-/* The tree (Nino.adminUi.tree()): rows one under another, quiet - no box for a level, the
-   indent is the row's own padding (set by the script, which counts the levels). A row is
-   34 px high at least, its arrow and its buttons are 28 px; the label is cut with an
-   ellipsis where the row is narrow (it carries its text as a title), then the detail,
-   and the buttons stay. The chosen row is a tint and a bar at its edge and a heavier
-   word, the marked and the locked have a word at the end of the row, a hint a sign with a "!"
-   and its sentence under the label - none of them by colour alone. The ring of the focus is drawn inside the row,
-   on the entry that has it (the entry is the list item, whose own ring is transparent: it would
-   take in the entries under it) */
+/* The tree (Nino.adminUi.tree()): rows one under another, the one form of every tree of the
+   workbench. A row is 34 px high at least; its arrow is a target of 24 px and its buttons are
+   24 px. The indent is the row's own padding, from the depth the script sets on the entry
+   (--depth, a count of levels, which a rule cannot make); the guide lines are drawn by the
+   entries: each child has the stretch of its parent's line that runs past it - to its middle,
+   for the last one - and a branch that leads from the line to its row. The chosen row is a
+   tint with a hairline of the accent colour round it, and no shadow: its name is the text
+   colour, heavier. What is marked from outside (.is-lit) has the tint of the pointer. The buttons
+   of a row are drawn under the pointer, on the row that has the stop while the focus is in the
+   tree (the script keeps .is-stop on the row and .is-inside on the tree: :focus-visible is lost
+   at the first Tab, and the button the Tab goes to would be gone with it), and on the chosen
+   row; where there is no pointer to hover with (a touch screen) the chosen row has them. The
+   kind of an entry is bold, its content and notes quiet. What a row gives way in, when it is
+   narrow: the content and the notes first, each with an ellipsis and its text as a title, then
+   the kind, with an ellipsis - it does not shrink beside them, it is cut only where it is wider than the line; a field the entry reads is a tag that is never cut - it does not
+   shrink, and where it does not fit beside the name it goes on a second line of the row. A hint is
+   a line of its own under its row, a loop a dashed accent line and a tag "per element" over its
+   pattern. The ring of the focus is drawn inside the row, on the entry that has it (the entry
+   is the list item, whose own ring is transparent: it would take in the entries under it) */
 :where(.nino-admin) .nino-admin-tree,
 :where(.nino-admin) .nino-admin-tree-group {
 	margin: 0;
@@ -4170,72 +4183,243 @@ a {
 	display: none;
 }
 
-:where(.nino-admin) .nino-admin-tree-item {
+:where(.nino-admin) .nino-admin-tree-item,
+:where(.nino-admin) .nino-admin-tree-each {
+	position: relative;
 	margin: 0;
 	padding: 0;
+	list-style: none;
+}
+
+:where(.nino-admin) .nino-admin-tree-item {
 	outline: 2px solid transparent;
+}
+
+/* The line of the parent past a child, and its branch to the row */
+:where(.nino-admin) .nino-admin-tree-group > li::before {
+	content: "";
+	position: absolute;
+	inset-block: 0;
+	inset-inline-start: calc( ( var(--depth) - 1 ) * var(--nino-admin-tree-indent) + var(--nino-admin-tree-guide) );
+	border-inline-start: 1px solid var(--editor-border);
+	pointer-events: none;
+}
+
+:where(.nino-admin) .nino-admin-tree-group > li:last-child::before {
+	inset-block-end: auto;
+	height: calc( var(--nino-admin-row-compact) / 2 );
+}
+
+:where(.nino-admin) .nino-admin-tree-group > .nino-admin-tree-item > .nino-admin-tree-row::before {
+	content: "";
+	position: absolute;
+	inset-block-start: calc( var(--nino-admin-row-compact) / 2 );
+	inset-inline-start: calc( ( var(--depth) - 1 ) * var(--nino-admin-tree-indent) + var(--nino-admin-tree-guide) );
+	width: calc( var(--nino-admin-tree-indent) - var(--nino-admin-tree-guide) + 8px );
+	border-block-start: 1px solid var(--editor-border);
+	pointer-events: none;
+}
+
+:where(.nino-admin) .nino-admin-tree-group--each > li::before {
+	border-inline-start: 2px dashed var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-tree-group--each > .nino-admin-tree-item > .nino-admin-tree-row::before {
+	border-block-start: 2px dashed var(--editor-blue);
 }
 
 :where(.nino-admin) .nino-admin-tree-row {
 	position: relative;
 	display: flex;
-	align-items: center;
-	gap: var(--nino-admin-space-1);
+	align-items: flex-start;
+	gap: var(--nino-admin-space-2);
 	min-height: var(--nino-admin-row-compact);
-	padding-block: 2px;
+	padding-block: var(--nino-admin-space-1);
+	padding-inline-start: calc( var(--depth) * var(--nino-admin-tree-indent) + 2px );
 	padding-inline-end: var(--nino-admin-space-2);
+	border: 1px solid transparent;
 	border-radius: var(--editor-radius-sm);
 	color: var(--editor-text);
 	cursor: pointer;
 }
 
-:where(.nino-admin) .nino-admin-tree-row:hover {
-	background: color-mix(in srgb, var(--editor-blue) 6%, transparent);
+:where(.nino-admin) .nino-admin-tree-row.is-lit {
+	background: color-mix(in srgb, var(--editor-blue) 7%, transparent);
 }
 
 :where(.nino-admin) .nino-admin-tree-row.is-selected {
-	background: color-mix(in srgb, var(--editor-blue) 16%, transparent);
-	box-shadow: inset 3px 0 0 var(--editor-blue);
-	font-weight: var(--nino-admin-weight-strong);
+	border-color: var(--editor-blue);
+	background: var(--editor-blue-soft);
 }
 
 :where(.nino-admin) .nino-admin-tree-item:focus-visible > .nino-admin-tree-row {
 	outline: 2px solid var(--editor-blue);
-	outline-offset: -2px;
+	outline-offset: 1px;
 }
 
+/* The arrow: a target of 24 px where there is something to open, a hair of room where there is not */
 :where(.nino-admin) .nino-admin-tree-toggle {
 	display: inline-flex;
-	flex: 0 0 auto;
+	flex: 0 0 var(--nino-admin-control-icon-small);
 	align-items: center;
 	justify-content: center;
-	width: 1.75rem;
-	min-width: var(--nino-admin-control-icon);
-	height: var(--nino-admin-control-icon);
+	height: var(--nino-admin-control-icon-small);
 	color: var(--editor-text-secondary);
 	user-select: none;
 }
 
-:where(.nino-admin) .nino-admin-tree-text {
-	display: flex;
-	flex: 0 1 auto;
-	flex-direction: column;
-	min-width: 0;
+:where(.nino-admin) .nino-admin-tree-toggle:empty {
+	flex-basis: 4px;
 }
 
-:where(.nino-admin) .nino-admin-tree-label {
+:where(.nino-admin) .nino-admin-tree-item[aria-expanded="true"] > .nino-admin-tree-row > .nino-admin-tree-toggle > svg {
+	transform: rotate(90deg);
+}
+
+:where(.nino-admin) .nino-admin-tree-type {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	height: var(--nino-admin-control-icon-small);
+	color: var(--editor-text-secondary);
+}
+
+:where(.nino-admin) .nino-admin-tree-item[data-loop="true"] > .nino-admin-tree-row > .nino-admin-tree-type {
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-tree-text {
+	display: flex;
+	flex: 1 1 0;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 var(--nino-admin-space-3);
 	min-width: 0;
+	line-height: var(--nino-admin-control-icon-small);
+}
+
+/* The kind and the content, one line that gives way: the content first, then the kind */
+:where(.nino-admin) .nino-admin-tree-lead {
+	display: flex;
+	flex: 0 1 auto;
+	align-items: baseline;
+	gap: var(--nino-admin-space-3);
+	min-width: 0;
+	max-width: 100%;
 	overflow: hidden;
-	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-/* The sentence of a hint, under the label: the sign carries the state, the words the colour of the quiet text */
+:where(.nino-admin) .nino-admin-tree-label {
+	flex: 0 0 auto;
+	max-width: 100%;
+	overflow: hidden;
+	font-size: var(--nino-admin-text-sm);
+	font-weight: var(--nino-admin-weight-strong);
+	text-overflow: ellipsis;
+}
+
+:where(.nino-admin) .nino-admin-tree-row.is-selected .nino-admin-tree-label {
+	font-weight: var(--nino-admin-weight-heavy);
+}
+
+:where(.nino-admin) .nino-admin-tree-name,
+:where(.nino-admin) .nino-admin-tree-detail {
+	flex: 0 100 auto;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
+	text-overflow: ellipsis;
+}
+
+/* A field the entry reads: the name of it is the one thing a row never cuts - it does not shrink, it has no ellipsis */
+:where(.nino-admin) .nino-admin-tree-source {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	max-width: 100%;
+	gap: var(--nino-admin-space-1);
+	padding: 0 var(--nino-admin-space-2);
+	border: 1px solid var(--editor-separator);
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
+	line-height: 1.5;
+}
+
+/* Where a field stands beside a content, the content has a measure of its own, so that the tag does not go to a second line for a long sentence */
+:where(.nino-admin) .nino-admin-tree-text:has(> .nino-admin-tree-source) .nino-admin-tree-name {
+	max-width: 12rem;
+}
+
+:where(.nino-admin) .nino-admin-tree-source-word {
+	margin-inline-end: var(--nino-admin-space-1);
+}
+
+:where(.nino-admin) .nino-admin-tree-source-field {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: var(--editor-text);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+}
+
+/* A quiet note at the right of the row, which the buttons take the place of */
+:where(.nino-admin) .nino-admin-tree-meta {
+	flex: 0 1 auto;
+	align-self: flex-start;
+	min-width: 0;
+	max-width: 9rem;
+	overflow: hidden;
+	margin-block: 2px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0 var(--nino-admin-space-2);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--nino-admin-radius-pill);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	line-height: 1.5;
+}
+
+/* Marked and locked are words, quiet, at the end of the row; the dot before "marked" is the colour of the mark in the preview, the lock is before "locked" */
+:where(.nino-admin) .nino-admin-tree-state {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	height: var(--nino-admin-control-icon-small);
+	gap: var(--nino-admin-space-1);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
+}
+
+:where(.nino-admin) .nino-admin-tree-state[data-state="marked"]::before {
+	content: "\25CF";
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-tree-item[data-locked="true"] > .nino-admin-tree-row {
+	cursor: default;
+}
+
+:where(.nino-admin) .nino-admin-tree-item[data-locked="true"] > .nino-admin-tree-row :is(.nino-admin-tree-label, .nino-admin-tree-type) {
+	color: var(--editor-text-secondary);
+}
+
+/* The sentence of a hint, on a line of its own under the row, in line with the names above it */
 :where(.nino-admin) .nino-admin-tree-hint {
 	display: flex;
-	align-items: center;
-	gap: var(--nino-admin-space-1);
-	min-width: 0;
+	align-items: flex-start;
+	gap: var(--nino-admin-space-2);
+	min-height: var(--nino-admin-control-icon-small);
+	padding-block: var(--nino-admin-space-1);
+	padding-inline-start: calc( var(--depth) * var(--nino-admin-tree-indent) + var(--nino-admin-tree-lead) );
+	padding-inline-end: var(--nino-admin-space-2);
 	color: var(--editor-text-secondary);
 	font-size: var(--nino-admin-text-xs);
 	font-weight: var(--nino-admin-weight-normal);
@@ -4244,62 +4428,13 @@ a {
 
 :where(.nino-admin) .nino-admin-tree-hint-text {
 	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* Marked and locked are words, quiet, at the end of the row; the dot before "marked" is the colour of the mark in the preview */
-:where(.nino-admin) .nino-admin-tree-state {
-	flex: 0 0 auto;
-	color: var(--editor-text-secondary);
-	font-size: var(--nino-admin-text-xs);
-	font-weight: var(--nino-admin-weight-normal);
-}
-
-:where(.nino-admin) .nino-admin-tree-state[data-state="marked"]::before {
-	content: "● ";
-	color: var(--editor-blue);
-}
-
-
-:where(.nino-admin) .nino-admin-tree-detail {
-	flex: 1 1 0;
-	min-width: 0;
-	overflow: hidden;
-	color: var(--editor-text-secondary);
-	font-size: var(--nino-admin-text-xs);
-	font-weight: var(--nino-admin-weight-normal);
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* Where there is no detail the buttons still go to the edge */
-:where(.nino-admin) .nino-admin-tree-actions {
-	display: inline-flex;
-	flex: 0 0 auto;
-	gap: 2px;
-	margin-inline-start: auto;
-}
-
-:where(.nino-admin) .nino-admin-tree-item[data-locked="true"] > .nino-admin-tree-row {
-	color: var(--editor-text-secondary);
-	cursor: default;
+	overflow-wrap: anywhere;
 }
 
 :where(.nino-admin) .nino-admin-tree-sign {
 	display: inline-flex;
 	flex: 0 0 auto;
-	align-items: center;
-	justify-content: center;
-	width: 1.1rem;
-	height: 1.1rem;
-	border: 1.5px solid currentColor;
-	border-radius: 50%;
 	color: var(--editor-orange-ink);
-	font-size: var(--nino-admin-text-xs);
-	font-weight: var(--nino-admin-weight-strong);
-	line-height: 1;
 }
 
 :where(.nino-admin) .nino-admin-tree-sign[data-state="error"] {
@@ -4310,22 +4445,91 @@ a {
 	color: var(--editor-text-secondary);
 }
 
-/* On a tinted row (hovered, chosen) the orange ink is a step toward the text colour, where it fell under 4.5 : 1 */
-:where(.nino-admin) .nino-admin-tree-row:is(:hover, .is-selected) .nino-admin-tree-sign[data-state="warn"] {
-	color: color-mix(in srgb, var(--editor-orange-ink) 60%, var(--editor-text));
+:where(.nino-admin) .nino-admin-tree-hint:has(> .nino-admin-tree-sign[data-state="warn"]) > .nino-admin-tree-hint-text {
+	color: var(--editor-orange-ink);
 }
 
-/* A glyph button: a small square, no surface of its own until it is hovered */
+:where(.nino-admin) .nino-admin-tree-hint:has(> .nino-admin-tree-sign[data-state="error"]) > .nino-admin-tree-hint-text {
+	color: var(--editor-red-ink);
+}
+
+/* The tag over the pattern of a loop */
+:where(.nino-admin) .nino-admin-tree-each {
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	min-height: var(--nino-admin-control-icon-small);
+	padding-inline-start: calc( var(--depth) * var(--nino-admin-tree-indent) + var(--nino-admin-tree-lead) );
+}
+
+:where(.nino-admin) .nino-admin-tree-each-tag {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: var(--nino-admin-space-1);
+	padding: 0 var(--nino-admin-space-3);
+	border: 1px solid var(--editor-blue);
+	border-radius: var(--nino-admin-radius-pill);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
+	line-height: 1.5;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-tree-each-note {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The buttons of a row: out of sight until the pointer, the focus or the choice is on the row, and then the quiet note gives way to them */
+:where(.nino-admin) .nino-admin-tree-actions {
+	display: none;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 2px;
+}
+
+:where(.nino-admin) .nino-admin-tree-row.is-selected > .nino-admin-tree-actions,
+:where(.nino-admin) .nino-admin-tree-row:focus-within > .nino-admin-tree-actions,
+:where(.nino-admin) .nino-admin-tree.is-inside .nino-admin-tree-row.is-stop > .nino-admin-tree-actions {
+	display: inline-flex;
+}
+
+:where(.nino-admin) .nino-admin-tree-row.is-actionable:is(.is-selected, :focus-within) > .nino-admin-tree-meta,
+:where(.nino-admin) .nino-admin-tree.is-inside .nino-admin-tree-row.is-actionable.is-stop > .nino-admin-tree-meta {
+	display: none;
+}
+
+@media (hover: hover) {
+
+	:where(.nino-admin) .nino-admin-tree-row:hover {
+		background: color-mix(in srgb, var(--editor-blue) 7%, transparent);
+	}
+
+	:where(.nino-admin) .nino-admin-tree-row.is-selected:hover {
+		background: var(--editor-blue-soft);
+	}
+
+	:where(.nino-admin) .nino-admin-tree-row:hover > .nino-admin-tree-actions {
+		display: inline-flex;
+	}
+
+	:where(.nino-admin) .nino-admin-tree-row.is-actionable:hover > .nino-admin-tree-meta {
+		display: none;
+	}
+}
+
+/* A button of a row is an icon button of 24 px with no surface of its own until it is hovered; the one that destroys is red in its ink */
 :where(.nino-admin) .nino-admin-tree-action {
-	min-width: var(--nino-admin-control-icon);
-	min-height: var(--nino-admin-control-icon);
-	height: var(--nino-admin-control-icon);
-	padding: 0 var(--nino-admin-space-1);
 	background: transparent;
 	box-shadow: none;
 	color: var(--editor-text-secondary);
-	font-size: var(--nino-admin-text-sm);
-	line-height: 1;
 }
 
 :where(.nino-admin) .nino-admin-tree-action:focus-visible {
@@ -4334,20 +4538,66 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-tree-action:not(:disabled):hover {
+	background: var(--editor-blue-soft);
 	color: var(--editor-text);
 }
 
+:where(.nino-admin) .nino-admin-tree-action--danger {
+	color: var(--nino-admin-danger-ink);
+}
+
 :where(.nino-admin) .nino-admin-tree-action--danger:not(:disabled):hover {
-	color: var(--editor-red-ink);
+	background: var(--editor-red);
+	color: var(--nino-admin-active-text);
+}
+
+/* The way to the chosen entry, over the tree, which stays at the top of what scrolls */
+:where(.nino-admin) .nino-admin-tree-path {
+	position: sticky;
+	inset-block-start: 0;
+	z-index: 1;
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0 var(--nino-admin-space-1);
+	overflow-x: auto;
+	scrollbar-width: thin;
+	white-space: nowrap;
+	padding-block: var(--nino-admin-space-2);
+	border-bottom: 1px solid var(--editor-separator);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+}
+
+:where(.nino-admin) .nino-admin-tree-path[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-tree-path-sign {
+	display: inline-flex;
+	flex: 0 0 auto;
+}
+
+:where(.nino-admin) .nino-admin-tree-path-link {
+	flex: 0 0 auto;
+	min-height: var(--nino-admin-control-icon-small);
+	font-size: var(--nino-admin-text-xs);
+}
+
+:where(.nino-admin) .nino-admin-tree-path-now {
+	flex: 0 0 auto;
+	color: var(--editor-text);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 @media (forced-colors: active) {
 
 	:where(.nino-admin) .nino-admin-tree-row.is-selected {
 		forced-color-adjust: none;
+		border-color: Highlight;
 		background: Highlight;
 		color: HighlightText;
-		box-shadow: none;
 	}
 }
 

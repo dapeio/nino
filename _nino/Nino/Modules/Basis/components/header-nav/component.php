@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'header',
 	'label'      => [ 'de_DE' => 'Menü', 'en_US' => 'Menu' ],
+	'icon'       => 'menu',
 	'in'         => [ 'header-wrap' ],
 	'once'       => true,
 	'attributes' => [

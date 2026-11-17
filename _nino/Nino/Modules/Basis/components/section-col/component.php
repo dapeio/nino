@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'section',
 	'label'      => [ 'de_DE' => 'Spalte', 'en_US' => 'Column' ],
+	'icon'       => 'columns-3',
 	'in'         => [ 'section-row' ],
 	'offers'     => [ 'flow' ],
 	'variants'   => [ 'card' ],

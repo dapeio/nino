@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'footer',
 	'label'      => [ 'de_DE' => 'Logo', 'en_US' => 'Logo' ],
+	'icon'       => 'image',
 	'in'         => [ 'footer-col' ],
 	'source'     => 'image',
 	'attributes' => [

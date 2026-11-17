@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'text',
 	'label'      => [ 'de_DE' => 'Text', 'en_US' => 'Text' ],
+	'icon'       => 'text',
 	'in'         => [ 'flow' ],
 	'source'     => 'text',
 	'format'     => 'blocks',

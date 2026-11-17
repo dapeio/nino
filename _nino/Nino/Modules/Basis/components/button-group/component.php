@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'button',
 	'label'      => [ 'de_DE' => 'Button-Gruppe', 'en_US' => 'Button group' ],
+	'icon'       => 'mouse-pointer-click',
 	'in'         => [ 'flow' ],
 	'offers'     => [],
 	'attributes' => [

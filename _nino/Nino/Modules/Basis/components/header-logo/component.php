@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'header',
 	'label'      => [ 'de_DE' => 'Logo', 'en_US' => 'Logo' ],
+	'icon'       => 'image',
 	'in'         => [ 'header-wrap' ],
 	'once'       => true,
 	'attributes' => [

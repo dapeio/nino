@@ -392,6 +392,23 @@ foreach( array_keys( $schemas ) as $name )
 
 check( 'every variant of basis but the regular one has a label in de_DE and en_US'. ( $unnamed === [] ? '' : ' - '. implode( ', ', $unnamed ) ), $unnamed === [] && array_key_exists( 'card', \Nino\Components::variants( $appData, 'section-col' )['variants'] ) === true );
 
+// every component of basis names an icon, and it is one the workbench draws: the table of icon() in the script is the table of the register, name for name
+$unpictured = [];
+
+foreach( $schemas as $name => $schema )
+	if( is_string( $schema['icon'] ?? null ) === false || in_array( $schema['icon'], \Nino\Components::ICONS, true ) === false )
+		$unpictured[] = $name;
+
+check( 'every component of basis names an icon of the table'. ( $unpictured === [] ? '' : ' - '. implode( ', ', $unpictured ) ), $unpictured === [] );
+
+preg_match( '/const ICONS = \{\n(.*?)\n\t\};/s', (string) file_get_contents( dirname( __DIR__ ). '/_admin/assets/Nino.admin.js' ), $table );
+$drawn = array_map( static fn( string $line ): string => trim( explode( ' :', trim( $line ), 2 )[0], "'" ), explode( "\n", $table[1] ?? '' ) );
+sort( $drawn );
+$named = \Nino\Components::ICONS;
+sort( $named );
+
+check( 'the icons the register accepts are the icons the script of the workbench draws, name for name', $drawn !== [ '' ] && $drawn === $named );
+
 // what a tool offers where: the nine that hold something
 $holds = [
 	''							=> [ 'footer-wrap', 'header-wrap', 'html', 'section-wrap' ],

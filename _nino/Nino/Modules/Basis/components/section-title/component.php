@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'section',
 	'label'      => [ 'de_DE' => 'Titel', 'en_US' => 'Title' ],
+	'icon'       => 'heading',
 	'in'         => [ 'section-col' ],
 	'source'     => 'text',
 	'format'     => 'inline',

@@ -1033,11 +1033,7 @@ $refused = [
 	[ 'a template that is a file with a null byte in it', 'x', [ 'label' => 'X', 'template' => 'nul.tpl' ], '"template"', null, $directory ],
 	[ 'a template that is markup with a null byte', 'x', [ 'label' => 'X', 'template' => "<x>\0</x>" ], '"template"' ],
 	[ 'a template that is too long', 'x', [ 'label' => 'X', 'template' => str_repeat( '<', 65537 ) ], '"template"' ],
-	[ 'an icon that is a string', 'x', $ok + [ 'icon' => 'star' ], '"icon"' ],
-	[ 'an icon of an unknown tag', 'x', $ok + [ 'icon' => [ [ 'script', [ 'd' => 'M0 0' ] ] ] ], '"icon"' ],
-	[ 'an icon with an attribute the tag does not take', 'x', $ok + [ 'icon' => [ [ 'path', [ 'd' => 'M0 0', 'onload' => '1' ] ] ] ], '"icon"' ],
-	[ 'an icon with a path that has a letter it may not', 'x', $ok + [ 'icon' => [ [ 'path', [ 'd' => 'M0 0 <x>' ] ] ] ], '"icon"' ],
-	[ 'an icon of too many parts', 'x', $ok + [ 'icon' => array_fill( 0, 13, [ 'path', [ 'd' => 'M0 0' ] ] ) ], '"icon"' ],
+	[ 'an icon that is no name but a list of parts', 'x', $ok + [ 'icon' => [ [ 'path', [ 'd' => 'M0 0' ] ] ] ], '"icon"' ],
 	[ 'a name with a line break at its end', "x\n", $ok, 'name' ],
 	[ 'an attribute with a line break at its end', 'x', $attribute( $choice, "a\n" ), 'attribute' ],
 	[ 'a group with a line break at its end', 'x', $ok + [ 'group' => "g\n" ], '"group"' ],
@@ -1051,13 +1047,6 @@ $refused = [
 	[ 'a template named by a file in a directory that has a name like it, with a space', 'x', [ 'label' => 'X', 'template' => 'a b.tpl' ], '"template"', null, $directory ],
 	[ 'a template named by a hidden file', 'x', [ 'label' => 'X', 'template' => '.hidden.tpl' ], '"template"', null, $directory ],
 	[ 'a method of a class whose name starts with the one of the feature', 'x', $attribute( [ 'type' => 'choice', 'options' => '\Nino\Modules\DemoX::options', 'default' => '' ] ), 'options', 'demo', $directory ],
-	[ 'an icon whose part is a string', 'x', $ok + [ 'icon' => [ 'path' ] ], '"icon"' ],
-	[ 'an icon whose part holds a tag that is none and nothing else', 'x', $ok + [ 'icon' => [ [ 'path' ] ] ], '"icon"' ],
-	[ 'an icon whose circle has no radius', 'x', $ok + [ 'icon' => [ [ 'circle', [ 'cx' => '1', 'cy' => '1' ] ] ] ], '"icon"' ],
-	[ 'an icon whose value is no number', 'x', $ok + [ 'icon' => [ [ 'circle', [ 'cx' => '1', 'cy' => '1', 'r' => 'a' ] ] ] ], '"icon"' ],
-	[ 'an icon whose path is too long', 'x', $ok + [ 'icon' => [ [ 'path', [ 'd' => str_repeat( 'M', 513 ) ] ] ] ], '"icon"' ],
-	[ 'an icon whose values are too long all together', 'x', $ok + [ 'icon' => array_fill( 0, 5, [ 'path', [ 'd' => str_repeat( 'M', 512 ) ] ] ) ], '"icon"' ],
-	[ 'an icon with no part', 'x', $ok + [ 'icon' => [] ], '"icon"' ],
 	[ 'a feature that is no slug', 'x', $ok, 'feature', 'Demo Feature' ],
 ];
 
@@ -1074,6 +1063,14 @@ foreach( $refused as $case ) {
 		$unnamed[] = $what. ' ('. $answer. ')';
 }
 check( 'validate() turns down each of the '. count( $refused ). ' schemas that is wrong - a name, a key, a label, places, a source, a format, attributes, options, defaults, a template, an icon'. ( $refusedAll === [] ? '' : ' - not: '. implode( '; ', $refusedAll ) ), $refusedAll === [] );
+
+// A name the table has not is no reason to refuse a component: the neutral icon stands for it, and the log says so once
+$ignored = ninoWarnings();
+$strange = \Nino\Components::validate( 'strange', $ok + [ 'icon' => 'star' ] );
+\Nino\Components::validate( 'strange', $ok + [ 'icon' => 'star' ] );
+$said = ninoWarnings();
+check( 'an icon the table has not is accepted as the neutral one, which validate() accepts again as it is, and the log says it once', is_array( $strange ) === true && $strange['icon'] === \Nino\Components::NEUTRAL_ICON
+	&& \Nino\Components::validate( 'strange', $strange ) === $strange && count( $said ) === 1 );
 check( '...and says which field it is: the message names the key, the attribute or the name'. ( $unnamed === [] ? '' : ' - not: '. implode( '; ', $unnamed ) ), $unnamed === [] );
 check( 'a message is short, whatever it was given: a name of a million characters and a null byte are not in it', ( static function(): bool {
 	$long = \Nino\Components::validate( str_repeat( "a\0", 500000 ), [ 'label' => 'X' ] );
@@ -1087,7 +1084,7 @@ $accepted = [
 	'a container that offers nothing' => [ 'x', $ok + [ 'offers' => [] ], null, null ],
 	'a container that is through, and one that says it is not' => [ 'x', $ok + [ 'offers' => [ 'flow' ], 'through' => true, 'children' => 'nodes' ], null, null ],
 	'all the keys' => [ 'x', [ 'label' => [ 'de_DE' => 'X', 'en_US' => 'X' ], 'group' => 'basis', 'in' => [ 'flow', 'card' ], 'offers' => [ 'flow' ], 'once' => true, 'source' => 'text', 'format' => 'lines', 'variants' => [ 'soft' ],
-		'preview' => 'button', 'icon' => [ [ 'path', [ 'd' => 'M0 0L1 1' ] ], [ 'rect', [ 'x' => '1', 'y' => '1', 'width' => '2', 'height' => '2' ] ] ], 'template' => '<x>[[value]]</x>',
+		'preview' => 'button', 'icon' => 'columns-3', 'template' => '<x>[[value]]</x>',
 		'attributes' => [ 'size' => $choice + [ 'responsive' => true, 'input' => 'segment', 'label' => [ 'de_DE' => 'Größe' ], 'hint' => 'How big' ], 'on' => [ 'type' => 'bool', 'default' => true, 'input' => 'checkbox' ], 'n' => [ 'type' => 'int', 'default' => 2, 'min' => 1, 'max' => 3 ],
 			's' => [ 'type' => 'string', 'default' => "a\nb" ], 'l' => [ 'type' => 'link', 'default' => '/x' ], 'i' => [ 'type' => 'image', 'default' => '' ], 'id' => [ 'type' => 'id', 'default' => 'start' ] ] ], null, null ],
 	'options that are numbers' => [ 'x', $attribute( [ 'type' => 'choice', 'options' => [ 1, 2, '3' ], 'default' => 2 ] ), null, null ],

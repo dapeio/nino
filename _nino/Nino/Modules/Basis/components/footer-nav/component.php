@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'footer',
 	'label'      => [ 'de_DE' => 'Menü', 'en_US' => 'Menu' ],
+	'icon'       => 'menu',
 	'in'         => [ 'footer-col' ],
 	'attributes' => [
 		'menu' => [ 'type' => 'choice', 'options' => '\\Nino\\Modules\\Basis::menus', 'default' => 'footer', 'class' => false, 'label' => [ 'de_DE' => 'Navigation', 'en_US' => 'Navigation' ] ],

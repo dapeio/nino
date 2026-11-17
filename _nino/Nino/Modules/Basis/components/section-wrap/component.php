@@ -4,6 +4,7 @@ declare(strict_types=1);
 return [
 	'group'      => 'section',
 	'label'      => [ 'de_DE' => 'Abschnitt', 'en_US' => 'Section' ],
+	'icon'       => 'panel-top',
 	'in'         => [ 'page' ],
 	'offers'     => [],
 	'attributes' => [

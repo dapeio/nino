@@ -4,7 +4,12 @@
  *											entries given as data: the roles and levels of the
  *											pattern, the one entry in the tab order, every key,
  *											the buttons of a row, a locked entry and the hint, and
- *											a redrawing that keeps the focus and what is open.
+ *											a redrawing that keeps the focus and what is open; the
+ *											one drawing of every tree - icons, a loop's pattern, the
+ *											field of a source, the buttons that show only where the
+ *											pointer, the focus or the choice is, a chosen row with
+ *											no shadow -, the line of the way, what is pointed at
+ *											told and marked from outside, and hoverSync().
  *
  *	Usage: node tests/nino-ui-tree-js-smoke.js
  */
@@ -12,7 +17,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, load, element, findAll, fills, documentOf } = require( './harness.js' );
+const { check, done, load, element, findAll, fills, documentOf, source } = require( './harness.js' );
 
 const mount = element('div');
 const doc = documentOf( mount );
@@ -305,5 +310,289 @@ third.update( small().slice( 3 ) );
 entry( third, 'k' ).focus();
 third.update( [ { id : 'g', label : 'G' } ] );
 check( 'with no sibling at all it goes to the parent', focused( third ) === 'g' && stops( third ).join() === 'g' );
+
+// --- the drawing: icons, a loop, a source, the path ---------------------------------------------------------------------------
+
+// What an icon is drawn of, to tell one from another: the attributes of its parts
+function drawn( svg ) {
+	return svg.children.map( function( part ) { return JSON.stringify( part.attributes ) } ).join();
+}
+
+function typeOf( tree, id ) {
+	return findAll( entry( tree, id ).children[0], function( el ) { return el.className === 'nino-admin-tree-type' } )[0].children[0];
+}
+
+const iconed = adminUi.tree( { label : 'x', items : [
+	{ id : 'h', kind : 'Title', name : 'Hello', icon : 'heading', meta : 'H2', actions : [ { key : 'up', icon : 'arrow-up', label : 'U', name : 'Up' }, { key : 'add', label : '+', name : 'Add' }, { key : 'odd', label : '?', name : 'Odd' }, { key : 'rm', label : '×', name : 'Remove', danger : true } ] },
+	{ id : 'n', kind : 'Nothing' },
+	{ id : 'u', kind : 'Unknown', icon : 'no-such-icon' },
+] } );
+const buttonsOf = findAll( entry( iconed, 'h' ).children[0], function( el ) { return el.tagName === 'BUTTON' } );
+
+check( 'an entry has the icon of its type before its name, the neutral one where it names none or one the set has not',
+	drawn( typeOf( iconed, 'h' ) ) === drawn( adminUi.icon( 'heading' ) ) && drawn( typeOf( iconed, 'n' ) ) === drawn( adminUi.icon( 'square' ) ) && drawn( typeOf( iconed, 'u' ) ) === drawn( adminUi.icon( 'square' ) ) );
+function nameOf( tree, id ) {
+	return entry( tree, id ).getAttribute('aria-labelledby').split(' ').map( function( ref ) { return findAll( entry( tree, id ), function( el ) { return el.id === ref } )[0].textContent } ).join( ' ' );
+}
+
+check( 'the name of an entry is its kind and what names it among its like - the content, or the field - and the note, the state and the hint are its description, not twice',
+	nameOf( iconed, 'h' ) === 'Title Hello' && findAll( entry( iconed, 'h' ), function( el ) { return el.id === entry( iconed, 'h' ).getAttribute('aria-describedby') } )[0].textContent === 'H2'
+		&& findAll( entry( iconed, 'h' ), function( el ) { return el.className === 'nino-admin-tree-name' } )[0].getAttribute('aria-hidden') === 'true' && nameOf( iconed, 'n' ) === 'Nothing' );
+check( 'a button is an icon button with the icon it names, the one its glyph stands for, or - with neither - its own word; the one that destroys says so',
+	drawn( buttonsOf[0].children[0] ) === drawn( adminUi.icon( 'arrow-up' ) ) && drawn( buttonsOf[1].children[0] ) === drawn( adminUi.icon( 'plus' ) )
+		&& buttonsOf[2].textContent === '?' && buttonsOf[2].children.length === 0 && drawn( buttonsOf[3].children[0] ) === drawn( adminUi.icon( 'trash-2' ) )
+		&& buttonsOf[3].className.indexOf( 'nino-admin-btn-danger' ) !== -1 && buttonsOf[0].className.indexOf( 'nino-admin-btn-icon' ) !== -1 );
+
+function looped() {
+	return [
+		{ id : 'sec', kind : 'Section', open : true, children : [
+			{ id : 'coll', kind : 'Collection', open : true, loop : { detail : 'Team - 3 elements', type : 'Member' }, children : [
+				{ id : 'ttl', kind : 'Title', source : '.title' },
+				{ id : 'inner', kind : 'List', open : true, loop : { type : 'Skill' }, children : [ { id : 'sk', kind : 'Text', source : { field : '.name', label : 'Target' } } ] },
+			] },
+		] },
+	];
+}
+
+const loops = adminUi.tree( { label : 'x', items : looped() } );
+const pattern = findAll( entry( loops, 'coll' ), function( el ) { return el.getAttribute('role') === 'group' } )[0];
+const tags = findAll( loops.el, function( el ) { return el.className === 'nino-admin-tree-each-tag' } );
+
+check( 'a loop is drawn with the loop icon, its note, and its children as the pattern: a group that says so, with a tag over the first of them that is no entry',
+	drawn( typeOf( loops, 'coll' ) ) === drawn( adminUi.icon( 'repeat' ) ) && entry( loops, 'coll' ).dataset.loop === 'true' && entry( loops, 'ttl' ).dataset.loop === 'false'
+		&& pattern.className.indexOf( 'nino-admin-tree-group--each' ) !== -1 && pattern.children[0].className === 'nino-admin-tree-each' && pattern.children[0].getAttribute('role') === 'presentation'
+		&& pattern.children[0].children[0] === tags[0] && findAll( loops.el, function( el ) { return el.getAttribute('role') === 'treeitem' } ).length === 5
+		&& findAll( entry( loops, 'coll' ), function( el ) { return el.id === entry( loops, 'coll' ).getAttribute('aria-describedby') } )[0].textContent.indexOf( 'Team - 3 elements' ) !== -1 );
+check( 'the tag of a loop names the type of its elements where the loop is in the pattern of another, and not at the top',
+	tags.length === 2 && tags[0].children.every( function( part ) { return part.textContent.indexOf( 'Member' ) === -1 } ) && tags[1].children[1].textContent.indexOf( 'Skill' ) !== -1 && tags[0].children[1].textContent.indexOf( 'Skill' ) === -1 );
+
+const sources = findAll( loops.el, function( el ) { return el.className === 'nino-admin-tree-source' } );
+
+check( 'an entry that reads a field is named by its kind and the field, and the pattern of a loop is a group with a name that says it is repeated',
+	nameOf( loops, 'ttl' ) === 'Title '+ fills( '_admin/text/en_US.php' )['/_admin/common/tree/source']+ ' .title' && nameOf( loops, 'sk' ) === 'Text Target .name'
+		&& pattern.getAttribute('aria-label') === fills( '_admin/text/en_US.php' )['/_admin/common/tree/each-note'] && findAll( entry( loops, 'sec' ), function( el ) { return el.getAttribute('role') === 'group' } )[0].getAttribute('aria-label') === null );
+
+check( 'the field an entry reads is a tag with the database icon and the whole name, with a word before it where the caller gives one, and the full text as its title',
+	sources.length === 2 && drawn( sources[0].children[0] ) === drawn( adminUi.icon( 'database', { size : 13 } ) ) && sources[0].children[1].textContent === '.title'
+		&& sources[1].children[0].textContent === 'Target' && sources[1].children[2].textContent === '.name' && sources[1].title === 'Target .name' );
+
+function rules( css, part ) {
+	const found = [];
+	css.replace( /\/\*[\s\S]*?\*\//g, '' ).replace( /([^{}]+)\{([^{}]*)\}/g, function( all, selector, body ) { if( selector.indexOf( part ) !== -1 ) found.push( { selector : selector.replace( /\s+/g, ' ' ).trim(), body : body.replace( /\s+/g, ' ' ).trim() } ) } );
+	return found;
+}
+
+const css = source( '_admin/assets/style.css' );
+
+check( 'the stylesheet never cuts the field of a source: it neither shrinks nor ends in an ellipsis, a row that is too narrow for it goes on a second line, and what is beside it gives way - the content shrinks, the kind is cut only where it is wider than the line, both with an ellipsis',
+	( function() {
+		const own = rules( css, '.nino-admin-tree-source' ).filter( function( rule ) { return /\.nino-admin-tree-source$/.test( rule.selector ) } );
+		const factor = function( part ) { const found = rules( css, part ).map( function( rule ) { return rule.body.match( /flex: 0 ([\d.]+) auto/ ) } ).filter( Boolean )[0]; return found === undefined ? 0 : Number( found[1] ) };
+		const column = rules( css, '.nino-admin-tree-text' ).filter( function( rule ) { return /\.nino-admin-tree-text$/.test( rule.selector ) } );
+		const label = rules( css, '.nino-admin-tree-label' ).filter( function( rule ) { return rule.selector === ':where(.nino-admin) .nino-admin-tree-label' } );
+		return own.length === 1 && /flex: 0 0 auto/.test( own[0].body ) && /overflow|text-overflow/.test( own[0].body ) === false && column.length === 1 && /flex-wrap: wrap/.test( column[0].body )
+			&& rules( css, '.nino-admin-tree-source-field' ).some( function( rule ) { return /overflow-wrap: anywhere/.test( rule.body ) } ) && factor( '.nino-admin-tree-name' ) >= 1 && label.length === 1 && /flex: 0 0 auto/.test( label[0].body ) && /max-width: 100%/.test( label[0].body ) && /text-overflow: ellipsis/.test( label[0].body );
+	} )() );
+check( 'the line of the way is one line, which scrolls where the way is long, and not one that grows',
+	( function() {
+		const line = rules( css, '.nino-admin-tree-path' ).filter( function( rule ) { return /\.nino-admin-tree-path$/.test( rule.selector ) } );
+		return line.length === 1 && /flex-wrap: nowrap/.test( line[0].body ) && /overflow-x: auto/.test( line[0].body );
+	} )() );
+check( 'the chosen row has no shadow: no rule of a chosen row of a tree sets a box-shadow, and it has a hairline of the accent colour instead',
+	( function() {
+		const chosen = rules( css, '.nino-admin-tree-row.is-selected' );
+		return chosen.length > 0 && chosen.every( function( rule ) { return rule.body.indexOf( 'box-shadow' ) === -1 } ) && chosen.some( function( rule ) { return /border-color: var\(--editor-blue\)/.test( rule.body ) } );
+	} )() );
+check( 'the buttons of a row are out of sight by default and shown by the pointer - where there is one to hover with -, by the focus in the row and by the choice',
+	( function() {
+		const base = rules( css, '.nino-admin-tree-actions' ).filter( function( rule ) { return rule.selector === ':where(.nino-admin) .nino-admin-tree-actions' } );
+		const shows = rules( css, '.nino-admin-tree-actions' ).filter( function( rule ) { return /display: inline-flex/.test( rule.body ) && /display: none/.test( rule.body ) === false } ).map( function( rule ) { return rule.selector } ).join( ' | ' );
+		return base.length === 1 && /display: none/.test( base[0].body ) && /\.is-selected > \.nino-admin-tree-actions/.test( shows ) && /:focus-within > \.nino-admin-tree-actions/.test( shows )
+			&& /@media \(hover: hover\) \{[^@]*\.nino-admin-tree-row:hover > \.nino-admin-tree-actions/.test( css );
+	} )() );
+check( 'the buttons of a row can all be reached by the keyboard from its row, and by no key from any other', buttons( entry( tree, 'wrap' ) ).length === 2 && stops( tree ).length === 1 && ( function() {
+	entry( tree, 'wrap' ).focus();
+	return buttons( entry( tree, 'wrap' ) ).every( function( b ) { return b.tabIndex === 0 } ) && buttons( entry( tree, 'text' ) ).every( function( b ) { return b.tabIndex === -1 } );
+} )() );
+
+// the line of the way
+
+const walked = [];
+const pathed = adminUi.tree( { label : 'x', path : true, items : looped(), onSelect : function( id ) { walked.push( id ) } } );
+mount.appendChild( pathed.path );
+mount.appendChild( pathed.el );
+
+check( 'a tree asked for a path makes its line, which is not in the tree and is hidden while nothing is chosen; without the option there is none',
+	pathed.path.tagName === 'NAV' && pathed.path.hidden === true && pathed.path.parentNode === mount && pathed.el.children.indexOf( pathed.path ) === -1 && adminUi.tree( { label : 'x', items : looped() } ).path === null );
+pathed.select( 'sk' );
+check( 'it names the kinds from the top to the chosen entry, the entries above as buttons and the chosen one as the place, a loop with its word',
+	pathed.path.hidden === false && pathed.path.attributes['aria-label'] === fills( '_admin/text/en_US.php' )['/_admin/common/tree/path']
+		&& findAll( pathed.path, function( el ) { return el.tagName === 'BUTTON' } ).map( function( b ) { return b.textContent } ).join() === 'Section,Collection · '+ fills( '_admin/text/en_US.php' )['/_admin/common/tree/each']+ ',List · '+ fills( '_admin/text/en_US.php' )['/_admin/common/tree/each']
+		&& findAll( pathed.path, function( el ) { return el.attributes['aria-current'] === 'location' } )[0].textContent === 'Text' );
+click( findAll( pathed.path, function( el ) { return el.tagName === 'BUTTON' } )[1] );
+check( 'a name in the line chooses its entry, tells the caller, takes the stop and the focus into the tree, and the line follows',
+	walked.join() === 'coll' && pathed.get().selected === 'coll' && focused( pathed ) === 'coll'
+		&& findAll( pathed.path, function( el ) { return el.attributes['aria-current'] === 'location' } )[0].textContent.indexOf( 'Collection' ) === 0 );
+pathed.select( null );
+check( 'with nothing chosen the line is gone again', pathed.path.hidden === true && pathed.path.children.length === 0 );
+
+// --- what is pointed at: told, and marked from outside ----------------------------------------------------------------------
+
+const pointed = [];
+const hover = build( { onHover : function( id ) { pointed.push( id ) } } );
+mount.appendChild( hover.el );
+const over = function( id ) { entry( hover, id ).children[0].dispatchEvent( { type : 'pointerover', bubbles : true } ) };
+
+over( 'text' );
+over( 'text' );
+over( 'title' );
+hover.el.dispatchEvent( { type : 'pointerleave' } );
+check( 'the pointer over an entry is told with its id, once for each change, and null where it leaves them all', pointed.join() === 'text,title,' );
+
+pointed.length = 0;
+entry( hover, 'space' ).focus();
+over( 'text' );
+hover.el.dispatchEvent( { type : 'pointerleave' } );
+check( 'the focus in an entry is told the same way, and what moved last is what is pointed at: when the pointer has gone nothing is, the focus that stands in the tree does not speak for it', pointed.join() === 'space,text,' );
+
+// A page takes the focus from a row that is taken away, and says so: the tree that is drawn again is not news for the one that is told what is pointed at
+const takeAway = hover.el.removeChild;
+hover.el.removeChild = function( child ) {
+	hover.el.dispatchEvent( { type : 'focusout', relatedTarget : null } );
+	return takeAway.call( hover.el, child );
+};
+pointed.length = 0;
+hover.update( data() );
+hover.el.removeChild = takeAway;
+check( 'a redrawing that leaves the pointer and the focus where they were tells nobody, though the page took the focus from the rows it replaced, and neither does a call from outside',
+	pointed.length === 0 && ( hover.highlight( 'links' ), hover.select( 'title' ), pointed.length === 0 ) );
+
+scrolled.length = 0;
+const keptFocus = focused( hover );
+hover.highlight( [ 'title', 'foot' ] );
+const lit = function( tree ) { return entries( tree ).filter( function( el ) { return el.children[0].className.split( ' ' ).indexOf( 'is-lit' ) !== -1 } ).map( function( el ) { return el.dataset.id } ).join(); };
+check( 'highlight() marks the entries it is given, and only those, moves neither the focus nor the page, and answers whether one is there',
+	lit( hover ) === 'title,foot' && focused( hover ) === keptFocus && scrolled.length === 0 && hover.highlight( 'nothing' ) === false && lit( hover ) === '' && hover.highlight( 'text' ) === true );
+hover.highlight( null );
+const closedBefore = entry( hover, 'b' ).getAttribute( 'aria-expanded' );
+hover.highlight( 'button', { scroll : true } );
+check( 'with scroll it opens what is above the first one and rolls it into view, and null takes every mark away',
+	closedBefore === 'false' && entry( hover, 'b' ).getAttribute( 'aria-expanded' ) === 'true' && scrolled.length === 1 && lit( hover ) === 'button' && ( hover.highlight( null ), lit( hover ) === '' ) );
+hover.highlight( 'text' );
+hover.update( data() );
+check( 'a redrawing keeps what is marked from outside', lit( hover ) === 'text' );
+
+// --- the keyboard reaches the buttons of the row that has the stop ------------------------------------------------------------------
+
+const rowOf = function( tree, id ) { return entry( tree, id ).children[0] };
+const classesOf = function( el ) { return el.className.split( ' ' ) };
+const stopRows = function( tree ) { return entries( tree ).filter( function( el ) { return classesOf( rowOf( tree, el.dataset.id ) ).indexOf( 'is-stop' ) !== -1 } ).map( function( el ) { return el.dataset.id } ).join(); };
+
+const keyed = build();
+mount.appendChild( keyed.el );
+
+check( 'the row that has the stop carries the class the stylesheet shows its buttons by, and it moves with the stop',
+	stopRows( keyed ) === 'title' && ( press( entry( keyed, 'title' ), 'ArrowDown' ), stopRows( keyed ) === 'text' ) && ( keyed.focus( 'wrap' ), stopRows( keyed ) === 'wrap' ) );
+
+const outside = element( 'button' );
+entry( keyed, 'wrap' ).focus();
+check( 'the tree knows the focus is in it while it is on a row or on a button of one - Tab from the row to its button does not leave it - and not once it has gone out',
+	classesOf( keyed.el ).indexOf( 'is-inside' ) !== -1
+		&& ( keyed.el.dispatchEvent( { type : 'focusout', relatedTarget : buttons( entry( keyed, 'wrap' ) )[0] } ), classesOf( keyed.el ).indexOf( 'is-inside' ) !== -1 )
+		&& ( keyed.el.dispatchEvent( { type : 'focusout', relatedTarget : outside } ), classesOf( keyed.el ).indexOf( 'is-inside' ) === -1 )
+		&& ( entry( keyed, 'foot' ).focus(), classesOf( keyed.el ).indexOf( 'is-inside' ) !== -1 ) );
+check( 'a redrawing, which takes the focus from the rows for a moment, does not take it from the tree - not for a moment either: the button the focus goes back to must be shown when it is asked for it',
+	( function() {
+		const before = keyed.el.removeChild;
+		const seen = [];
+		keyed.el.removeChild = function( child ) { keyed.el.dispatchEvent( { type : 'focusout', relatedTarget : null } ); seen.push( classesOf( keyed.el ).indexOf( 'is-inside' ) !== -1 ); return before.call( keyed.el, child ) };
+		keyed.update( data() );
+		keyed.el.removeChild = before;
+		return seen.length > 0 && seen.every( function( inside ) { return inside } ) && classesOf( keyed.el ).indexOf( 'is-inside' ) !== -1 && stopRows( keyed ) === 'foot';
+	} )() );
+
+check( 'the stylesheet shows the buttons of the row that has the stop while the focus is in the tree, and no rule makes them depend on :focus-visible, which the first Tab takes away',
+	( function() {
+		const own = rules( css, '.nino-admin-tree-actions' );
+		return own.some( function( rule ) { return /\.nino-admin-tree\.is-inside \.nino-admin-tree-row\.is-stop > \.nino-admin-tree-actions/.test( rule.selector ) && /display: inline-flex/.test( rule.body ) } )
+			&& own.every( function( rule ) { return rule.selector.indexOf( 'focus-visible' ) === -1 } );
+	} )() );
+
+// the focus after an action: the same button of the moved row, the next row of one that went, the new row
+
+function flowItems( list ) {
+	const buttonsOf = [ { key : 'up', icon : 'arrow-up', name : 'Up' }, { key : 'down', icon : 'arrow-down', name : 'Down' }, { key : 'remove', icon : 'trash-2', name : 'Remove', danger : true } ];
+	return list.map( function( id ) { return id === 'g' ? { id : 'g', label : 'G', open : true, actions : [ { key : 'add', icon : 'plus', name : 'Add' } ], children : [ { id : 'k', label : 'K', actions : buttonsOf } ] } : { id : id, label : id.toUpperCase(), actions : buttonsOf } } );
+}
+
+let order = [ 'p', 'q', 'r', 'g' ];
+const kids = [];
+const flow = adminUi.tree( { label : 'x', items : flowItems( order ), onAction : function( key, id ) {
+
+	if( key === 'down' )
+		order.splice( order.indexOf( id ), 2, order[order.indexOf( id ) + 1], id );
+	else if( key === 'remove' )
+		order.splice( order.indexOf( id ), 1 );
+	else if( key === 'add' )
+		kids.push( 'n'+ kids.length );
+
+	const items = flowItems( order );
+	items[items.length - 1].children = items[items.length - 1].children.concat( kids.map( function( id ) { return { id : id, label : id } } ) );
+	flow.update( items );
+} } );
+mount.appendChild( flow.el );
+
+const press2 = function( id, index ) { const button = buttons( entry( flow, id ) )[index]; button.focus(); click( button ) };
+
+entry( flow, 'q' ).focus();
+press2( 'p', 1 );
+check( 'after a move the focus is on the same button of the row that was moved, where it is not chosen', order.join() === 'q,p,r,g' && buttons( entry( flow, 'p' ) )[1].focused === true && classesOf( flow.el ).indexOf( 'is-inside' ) !== -1 );
+press2( 'p', 2 );
+check( 'after a removal the focus is on the next row, else the one before, else the parent', order.join() === 'q,r,g' && focused( flow ) === 'r' );
+press2( 'r', 2 );
+press2( 'q', 2 );
+check( 'and where the last one of a level goes, on the one before it', order.join() === 'g' && focused( flow ) === 'g' );
+press2( 'g', 0 );
+const withLate = function( there ) { return flowItems( order ).map( function( item ) { return Object.assign( item, { children : item.children.concat( [ { id : 'n0', label : 'n0' } ], there === true ? [ { id : 'late', label : 'late' } ] : [] ) } ) } ) };
+check( 'a new row is there after the redrawing the action made: the focus is on it where the caller asks for it',
+	order.join() === 'g' && focused( flow ) === 'n0' || ( flow.focus( 'n0' ) === true && focused( flow ) === 'n0' ) );
+check( 'an entry that is not there yet is asked the focus for before it is drawn, and has it once it is - and the ask is not kept for a later redrawing',
+	flow.focus( 'late' ) === false && ( flow.update( withLate( true ) ), focused( flow ) === 'late' )
+		&& ( flow.focus( 'gone' ), flow.update( withLate( true ) ), entry( flow, 'g' ).focus(), flow.update( withLate( true ) ), focused( flow ) === 'g' ) );
+check( 'focus( id, key ) goes to the button of the row with that key, and to the row where the button is not there or is not to be pressed',
+	( flow.update( flowItems( [ 'p', 'g' ] ) ), flow.focus( 'p', 'down' ) === true && buttons( entry( flow, 'p' ) )[1].focused === true && flow.focus( 'p', 'nothing' ) === true && focused( flow ) === 'p' ) );
+
+// --- the switchboard ---------------------------------------------------------------------------------------------------------
+
+const board = adminUi.hoverSync();
+const heard = { a : [], b : [], c : [] };
+const memberA = board.join( function( key ) { heard.a.push( key ) } );
+const memberB = board.join( function( key ) { heard.b.push( key ) } );
+board.join( function( key ) { heard.c.push( key ) } );
+
+memberA.set( 'x' );
+memberA.set( 'x' );
+memberB.set( [ 'x', 'y' ] );
+memberB.set( [ 'x', 'y' ] );
+memberA.set( null );
+check( 'what one member reports every other is told, once, and the reporter never; a key reported again, or a list of the same keys, tells nobody - and a member that holds no key cannot take away the one another holds',
+	heard.a.join( '|' ) === 'x,y' && heard.b.join( '|' ) === 'x' && heard.c.join( '|' ) === 'x|x,y' && board.get().join() === 'x,y' );
+memberB.set( null );
+memberB.set( 'z' );
+memberB.leave();
+check( 'the member that holds the key takes it away with null or by leaving, and is told nothing after', board.get() === null && heard.b.length === 1 && heard.a.join( '|' ) === 'x,y||z|' && ( memberB.set( 'q' ), board.get() === null ) );
+
+// the tree and two views through one board
+
+const wired = adminUi.hoverSync();
+const other = [];
+const treeSide = build();
+mount.appendChild( treeSide.el );
+const asMember = wired.join( function( key ) { treeSide.highlight( key ) } );
+treeSide.update( data() );
+wired.join( function( key ) { other.push( key ) } ).set( 'text' );
+check( 'a tree and another view through one switchboard mark one another: what the tree highlights is what the other reported', lit( treeSide ) === 'text' && other.length === 0 );
+asMember.set( 'title' );
+check( 'and what the tree reports - the hook of onHover - reaches the other and is not marked back on the tree', other.join() === 'title' && lit( treeSide ) === 'text' );
 
 done();

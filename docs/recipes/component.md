@@ -230,10 +230,12 @@ What the register does for the renderer, and what it leaves to it:
   `base`, `alt`, `tint`, `primary` and `dark`, written as `<name>--ground-<word>`,
   which `Nino.css` answers for every component alike.
 - `icon` and `preview` are for a tool and change nothing about the drawing. An
-  icon is geometry and not markup: a list of 1 to 12 parts, each a tag (`path`,
-  `circle`, `ellipse`, `rect`, `line`, `polyline` or `polygon`) and the map of the
-  attributes that tag takes, every value a string.
-  `'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]` is a line across the middle.
+  icon is the name of one of the icons of the workbench - a Lucide name of
+  `\Nino\Components::ICONS`, the table of `Nino.adminUi.icon()` -, which a tool draws
+  before the component in a tree and an outline: `'icon' => 'columns-3'` for a
+  column. A component without one has the neutral square, and so has one that names an icon the
+  table has not: the schema stands, the icon is the neutral one and the log says so once - the
+  components of the kernel's own feature name only icons of the table.
 - A schema that cannot be worked with is refused: the component is not
   registered, the feature goes on without it and the log says why once - and the
   Features panel shows the reason. A name that is no slug, a key that is none of

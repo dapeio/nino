@@ -12,7 +12,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, load, element, documentOf, fills } = require( './harness.js' );
+const { check, done, load, element, documentOf, fills, fire } = require( './harness.js' );
 
 const clock = { now : 1000000 };
 const timers = [];
@@ -158,6 +158,145 @@ console.log( 'Nino.adminUi.previewFrame - a preview that follows a draft\n' );
 	w.frame.flush( function( ok ) { told.push( ok ) } );
 	w.frame.schedule();
 	check( '...nothing is sent, and whoever waits is told it came to nothing', w.sent.length === 1 && told.join() === 'false' );
+}
+
+// --- the marks of the page in the frame ---------------------------------------------------------------
+
+// A page of the frame: a body, the elements of two things - one of them drawn twice, as the pattern of a loop is - and a window that scrolls
+function page() {
+
+	const made = function( tag ) {
+		const el = element( tag );
+		el.attachShadow = function() { el.shadow = element( 'shadow' ); return el.shadow };
+		return el;
+	};
+	const thing = function( key, top ) {
+		const el = element( 'div' );
+		el.key = key;
+		el.getBoundingClientRect = function() { return { top : top, left : 10, width : 200, height : 50 } };
+		return el;
+	};
+	const doc = Object.assign( element( 'document' ), { createElement : made, body : made( 'body' ), documentElement : made( 'html' ) } );
+	const win = element( 'window' );
+
+	win.scrollX = 0;
+	win.scrollY = 100;
+	win.innerHeight = 600;
+	win.scrolledTo = [];
+	win.frames = [];
+	win.requestAnimationFrame = function( fn ) { win.frames.push( fn ) };
+	win.scrollTo = function( where ) { win.scrolledTo.push( where ) };
+	doc.things = { a : [ thing( 'a', 20 ), thing( 'a', 400 ) ], b : [ thing( 'b', 90 ) ] };
+
+	return { doc : doc, win : win };
+}
+
+{
+	const first = page();
+	const frame = element( 'iframe' );
+	const hovered = [];
+
+	frame.contentDocument = first.doc;
+	frame.contentWindow = first.win;
+
+	const marks = adminUi.frameMarks( {
+		frame : frame,
+		elements : function( key ) { return frame.contentDocument.things[key] ?? [] },
+		keyAt : function( target ) { return target.key ?? null },
+		onHover : function( key ) { hovered.push( key ) },
+	} );
+	const layer = function( doc ) { return doc.body.children[0].shadow.children[1] };
+
+	check( 'the page is given one element, in the shadow of which the marks are drawn, hidden from a screen reader, with no box as long as nothing is marked',
+		first.doc.body.children.length === 1 && first.doc.body.children[0].tagName === 'NINO-UI-MARKS' && first.doc.body.children[0].getAttribute( 'aria-hidden' ) === 'true' && layer( first.doc ).children.length === 0 );
+
+	marks.highlight( 'a' );
+	check( 'a key is marked with a box on every element that stands for it, where it is in the viewport of the page, and nobody is told',
+		layer( first.doc ).children.map( function( box ) { return box.style.top }).join() === '20px,400px' && layer( first.doc ).children[0].style.width === '200px' && hovered.length === 0 );
+	marks.highlight( [ 'b' ] );
+	marks.highlight( null );
+	check( 'a list of keys and null replace what was marked, and null takes every box away', layer( first.doc ).children.length === 0 && first.win.scrolledTo.length === 0 );
+	marks.highlight( 'b', { scroll : true } );
+	check( 'with scroll the page rolls to the first of them, one third of the height from the top', first.win.scrolledTo.length === 1 && first.win.scrolledTo[0].top === 0 );
+
+	first.doc.documentElement.dispatchEvent( { type : 'pointerleave' } );
+	fire( first.doc, 'pointerover', { target : first.doc.things.a[1] } );
+	fire( first.doc, 'pointerover', { target : first.doc.things.a[0] } );
+	fire( first.doc, 'pointerover', { target : first.doc.things.b[0] } );
+	first.doc.documentElement.dispatchEvent( { type : 'pointerleave' } );
+	check( 'the pointer over a thing of the page is told with its key, once for each change - the two drawings of one key are one thing - and null where it leaves', hovered.join() === 'a,b,' );
+
+	first.win.dispatchEvent( { type : 'resize' } );
+	check( 'a page that is laid out again has its boxes drawn again', layer( first.doc ).children.length === 1 );
+
+	// the page scrolls: the elements are where they are in the viewport now, and the boxes with them - once for the scrolls of one frame
+	first.doc.things.b[0].getBoundingClientRect = function() { return { top : -40, left : 10, width : 200, height : 50 } };
+	first.win.dispatchEvent( { type : 'scroll' } );
+	first.win.dispatchEvent( { type : 'scroll' } );
+	check( 'a page that scrolls has its boxes drawn where the elements are now, once for the scrolls that come before the next frame, and a host that is fixed in the viewport',
+		first.win.frames.length === 1 && ( first.win.frames.shift()(), layer( first.doc ).children[0].style.top === '-40px' ) && first.doc.body.children[0].shadow.children[0].textContent.indexOf( 'position:fixed' ) !== -1 );
+
+	// the frame loads another page: the marks come back, on it alone
+	const second = page();
+	frame.contentDocument = second.doc;
+	frame.contentWindow = second.win;
+	frame.dispatchEvent( { type : 'load' } );
+	check( 'a page the frame loads has the marks as well - the key that was marked - and the page that is gone has no listener left',
+		second.doc.body.children.length === 1 && layer( second.doc ).children.length === 1 && ( hovered.length = 0, fire( first.doc, 'pointerover', { target : first.doc.things.a[0] } ), hovered.length === 0 ) );
+	fire( second.doc, 'pointerover', { target : second.doc.things.a[0] } );
+	check( 'and the new page tells what the pointer is over', hovered.join() === 'a' );
+
+	// a page of another origin, or the page of an error: its window answers nothing
+	second.win.removeEventListener = function() { throw new Error( 'SecurityError: blocked a frame' ) };
+	frame.contentDocument = null;
+	frame.contentWindow = element( 'foreign' );
+	let thrown = null;
+	try {
+		frame.dispatchEvent( { type : 'load' } );
+		marks.highlight( 'a' );
+		marks.refresh();
+	}
+	catch( error ) {
+		thrown = error;
+	}
+	check( 'a frame that lands on a page that is not the workbench\'s - the listeners of the last page cannot be taken off its window - throws nothing, and the marks are silent', thrown === null && second.doc.body.children.length === 0 );
+
+	// many repetitions: the measures are read before the first box is written
+	const third = page();
+	const log = [];
+	const crowd = [];
+	for( let at = 0; at < 400; at++ ) {
+		const el = element( 'div' );
+		el.key = 'many';
+		el.getBoundingClientRect = function() { log.push( 'read' ); return { top : at, left : 0, width : 10, height : 10 } };
+		crowd.push( el );
+	}
+	third.doc.things.many = crowd;
+	const append = third.doc.createElement;
+	third.doc.createElement = function( tag ) {
+		const el = append( tag );
+		if( tag === 'div' )
+			el.style = new Proxy( el.style, { set : function( target, name, value ) { log.push( 'write' ); target[name] = value; return true } } );
+		return el;
+	};
+	frame.contentDocument = third.doc;
+	frame.contentWindow = third.win;
+	frame.dispatchEvent( { type : 'load' } );
+	log.length = 0;
+	marks.highlight( 'many' );
+	check( 'a key that stands for four hundred elements is read in one go and then drawn: no measure is read after the first box was written', log.filter( function( entry ) { return entry === 'read' } ).length === 400 && log.indexOf( 'write' ) > log.lastIndexOf( 'read' ) );
+
+	marks.stop();
+	frame.dispatchEvent( { type : 'load' } );
+	check( 'after stop() the marks and the listeners are gone and a load draws nothing', second.doc.body.children.length === 0 && ( fire( second.doc, 'pointerover', { target : second.doc.things.b[0] } ), hovered.join() === 'a' ) );
+}
+
+{
+	const w = build();
+	w.split.frame = element( 'iframe' );
+	w.split.frame.contentDocument = null;
+	const marks = w.frame.marks( { elements : function() { return [] }, keyAt : function() { return null } } );
+	check( 'previewFrame() gives the marks of the frame of its split: a page that is not there yet is no error, and one that comes is marked', typeof marks.highlight === 'function' && ( marks.highlight( 'a' ), marks.refresh(), marks.stop(), true ) );
 }
 
 done();

@@ -988,13 +988,10 @@ when `small`) with the focus ring of every button, and `danger` gives it the col
 const up = Nino.adminUi.iconButton( 'arrow-up', Nino.content.getText('/_admin/catalog/label/up'), function() { move( index, -1 ) }, { disabled : index === 0 } );
 ```
 
-The names of the set are `arrow-down`, `arrow-up`, `brackets`, `check`, `chevron-down`,
-`chevron-left`, `chevron-right`, `chevron-up`, `code`, `copy`, `database`,
-`external-link`, `eye`, `eye-off`, `list`, `panel-top`, `panels-top-left`, `pencil`,
-`plus`, `redo-2`, `refresh-cw`, `repeat`, `search`, `settings-2`, `sliders-horizontal`,
-`trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
-spells them, in the `ICONS` table of `_admin/assets/Nino.admin.js`. Another icon is
-added to that table, as a string for a path and `[ tag, attributes ]` for any other
+The names of the set are `arrow-down`, `arrow-up`, `brackets`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `code`, `columns-3`, `copy`, `database`, `ellipsis`, `external-link`, `eye`, `eye-off`, `heading`, `image`, `list`, `lock`, `menu`, `mouse-pointer-click`, `panel-bottom`, `panel-top`, `panels-top-left`, `pencil`, `plus`, `rectangle-horizontal`, `redo-2`, `refresh-cw`, `repeat`, `rows-2`, `search`, `settings-2`, `sliders-horizontal`, `square`, `table`, `text`, `trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
+spells them, in the `ICONS` table of `_admin/assets/Nino.admin.js`; `\Nino\Components::ICONS`
+is the same list for the schema of a component, and a test holds the two together. Another icon is
+added to both, to the table as a string for a path and `[ tag, attributes ]` for any other
 shape, from the same version of Lucide.
 
 ## Dialogs
@@ -1558,7 +1555,7 @@ Reach for an existing class first; only invent one when no role fits.
 | One choice among a few steps (-2 to +2, or named) | `.nino-admin-steps` via `Nino.adminUi.steps()`, a radiogroup |
 | Controls on one side, a preview on the other, a switch between them where it is narrow | `.nino-admin-split` via `Nino.adminUi.split()` |
 | A preview that follows a draft, the question of a refused save, the bar of a screen that is saved as a whole | `Nino.adminUi.previewFrame()`, `conflict()` and `.nino-admin-savebar` via `saveBar()` - see [the three builders](#workbench-screens-that-save-as-a-whole-the-preview-loop-the-conflict-and-the-save-bar) |
-| Entries one under another with children, a second line, a hint and buttons of their own - the components of a page | `.nino-admin-tree` via `Nino.adminUi.tree()`, a `role="tree"` - see [A tree](#a-tree) |
+| Entries one under another with children, a type icon, a hint and buttons of their own - the components of a page, the outline of a template; the same marked in several views at once | `.nino-admin-tree` via `Nino.adminUi.tree()`, a `role="tree"`, with `hoverSync()` and `previewFrame().marks()` - see [A tree](#a-tree) |
 | A colour as a hex code, a picker and its contrast against another colour | `.nino-admin-color` via `Nino.adminUi.color()` |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
@@ -1922,55 +1919,116 @@ Each has a suite - `tests/nino-ui-previewframe-js-smoke.js`, `tests/nino-ui-conf
 
 **`Nino.adminUi.tree( options )`** shows entries the caller gives as data, each with its children, as the
 ARIA pattern of the same name: `role="tree"`, `treeitem` and `group`, `aria-level`, `aria-expanded` on the
-entries that have children, `aria-selected`, and exactly one entry in the tab order. An entry is
-`{ id, label, detail, children, open, marked, locked, hint, actions }`: `detail` is the quiet second line,
-`marked` says that the entry is the one shown elsewhere (the preview), `locked` that it can be walked to
-and opened but not chosen, `hint` is `{ text, state }` - a sign and its sentence, shown under the label and read by a screen reader as
-part of the entry's description - and `actions` are the buttons of the row, `{ key, label, name, disabled, danger }`,
-the label a glyph (`+`, `↑`, `↓`, `×`), the name what a screen reader and a title say, `danger` drawing a
-button that destroys (the red it takes on hover). A marked and a locked entry carry a quiet word at the end of
-the row, never a sign alone. Ids are strings and
-unique in the tree, and an id follows the component, not its place: a panel that takes the path of a node
-as its id loses the open state and the focus of a node that moved. The tree's own `id` is a token. Labels, details and hints are set as text; the words for a locked and a marked entry
-are the fills `/_admin/common/tree/*`, or `text : { locked, marked }`.
+entries that have children, `aria-selected`, and exactly one entry in the tab order. It is the one drawing of
+every tree of the workbench - a panel that has entries one under another with children uses it and draws no
+list of its own. An entry is
+
+```
+{ id, kind, name, detail, label, icon, meta, children, open, marked, locked, hint, loop, source, actions }
+```
+
+- `id` is a string, unique in the tree, and follows the component, not its place: a panel that takes the path of
+  a node as its id loses the open state and the focus of a node that moved.
+- `kind` is the bold word - "Section", "Row", "Title" -, `name` the content, quietly after it, `detail` a second
+  quiet note; `label` is the word of an entry that has no `kind`, and `label` with `detail` is how a
+  plain entry is given. Labels, names and hints are set as text. A letter key goes to the next entry whose kind
+  begins with it.
+- `icon` is the Lucide name of its type icon, drawn before the kind; an entry that names none or one the set has not
+  has the neutral square. A component names its own in the schema (`icon`, see the
+  [component recipe](component.md)), so a panel passes `schema.icon` through.
+- `meta` is a quiet note at the right - the width of a column, a variant - that gives way to the buttons.
+- `marked` says that the entry is the one shown elsewhere (the preview), `locked` that it can be walked to and
+  opened but not chosen. A marked and a locked entry carry a quiet word at the end of the row - the locked one
+  with a lock - never a sign alone.
+- `hint` (or `finding`, the same) is `{ text, state }` or the sentence alone: a line of its own under the row, with
+  a warning sign, `state` warn, error or muted, read by a screen reader as part of the entry's description.
+- `loop` makes the entry a loop - `true`, the quiet note as a string, or `{ detail, type }`: the entry carries the loop
+  icon and its note, and its children are the pattern of what is repeated "per element": the guide line of the
+  pattern is dashed and in the accent colour and a tag over the first child says so. Where a loop stands inside the
+  pattern of another, its tag names `type`, the type of its elements, so that two tags one under another are told apart.
+- `source` is the field an entry reads, `'.title'` or `{ field, label }` (a word before the field, "Target"): a tag with the
+  database icon and the name of the field, which the row never cuts: the content gives way first, then the kind - each ends in an ellipsis and keeps its full text as a title - and where the tag does not fit beside them it goes on a second line of the row. A screen reader reads the kind and then the content, or the field ("Text Field .teaser"), as the name of the row; the note, the state and the hint are its description, and the pattern of a loop is a group named "pattern, repeated for every element".
+- `actions` are the buttons of the row, `{ key, icon, name, disabled, danger }`: each is an `iconButton()` of 24 px, `icon` the
+  Lucide name (`plus`, `arrow-up`, `arrow-down`, `trash-2`), `name` what a screen reader and a title say, `danger`
+  drawing the one that destroys in red. The glyphs `+`, `↑`, `↓` and `×` as `label` stand for those four icons where there is
+  no `icon`; a button with neither has its `label` as its word.
+
+The buttons of a row are drawn only where the pointer is over it (where there is a pointer), on the row that has the stop while
+the focus is anywhere in the tree - so Tab from any row goes to its first button, then through the rest, then out of the tree, and Shift+Tab
+back - and on the chosen row; on a touch screen on the chosen row alone. The chosen row has a tint with a hairline of
+the accent colour round it and no shadow, and its kind is heavier, in the text colour. Guide lines run down the left
+of every entry that holds others, with a branch to each child; the last child's line ends at its branch.
 
 Up and Down walk the entries that can be seen, Right opens a closed entry and goes to the first child of
 an open one, Left closes an open entry and goes to the parent of a closed one, Home and End go to the ends,
-Enter and Space choose (also the entry that is chosen already: in a builder that is the way into it), and a
-letter goes to the next entry whose label begins with it. A click on the arrow opens or closes, a click on
-the row chooses. The buttons of a row are in the tab order only while its row is the one with the stop, so
-that Tab from the row reaches them and a tree of fifty rows is one stop; the mouse reaches every one.
+Enter and Space choose (also the entry that is chosen already: in a builder that is the way into it). A click on the
+arrow opens or closes, a click on the row chooses. The buttons of a row are in the tab order only while its row is the
+one with the stop, so that Tab from the row reaches them and a tree of fifty rows is one stop; the mouse reaches every one.
 A locked entry carries no `aria-disabled` (that would take its buttons from a screen reader too) and
 `select()` refuses it. The tree writes no address - the caller binds the chosen entry to its own, as with `levels()`: `onSelect`
 is told the id and the item, `onToggle` the id and whether it is open after the move, `onAction` the key, the id and
-the item, each only after a hand did it; `onFocus` is told the id and the item when the stop moves to another entry, so that
-a panel can mark the component in its preview. `update( items )` draws new data and keeps, where the ids stay,
-what is open (an id the tree has not seen takes the item's `open`), what is chosen, the stop and the
-focus - on the button of the row where it stood on one, if that is still there and can be pressed, else on the row.
-Where the entry of the focus is gone, the focus goes to its next sibling, else the previous one, else the parent;
-`update( [] )` leaves it nowhere. `select( id )` chooses an entry, opens what is above
-it and scrolls it into view, `focus( [id] )` puts the focus on it, `get()` answers `{ selected, stop, open }`;
-none of them calls back, and they answer `false` for an id the tree has not.
+the item, each only after a hand did it; `onFocus` is told the id and the item when the stop moves to another entry.
+`update( items )` draws new data and keeps, where the ids stay, what is open (an id the tree has not seen takes the
+item's `open`), what is chosen, the stop and the focus - on the button of the row where it stood on one, if that is still
+there and can be pressed, else on the row. Where the entry of the focus is gone, the focus goes to its next sibling,
+else the previous one, else the parent; `update( [] )` leaves it nowhere. `select( id )` chooses an entry, opens what is above
+it and scrolls it into view, `focus( [id], [key] )` puts the focus on it - on its button with that key, where there is one that can be pressed -, `get()` answers `{ selected, stop, open }`;
+none of them calls back, and they answer `false` for an id the tree has not. After an action the panel draws the tree again with `update()` and the focus stays where a person expects it: on the same button of the row that moved, on the next row (else the one before, else the parent) of one that was removed; for a row the action added the panel asks `tree.focus( newId )` - before or after the `update()` that draws it: asked for an id that is not there yet, the tree remembers it for the next `update()` and puts the focus there once.
 
 ```js
 const tree = Nino.adminUi.tree( {
-	label : 'Components', selected : 'title',
+	label : 'Components', selected : 'title', path : true,
 	items : [
-		{ id : 'wrap', label : 'Wrap', detail : 'Section', open : true, actions : [ { key : 'add', label : '+', name : 'Add inside Wrap' } ], children : [
-			{ id : 'title', label : 'Title', detail : 'Heading', actions : [ { key : 'up', label : '↑', name : 'Move Title up', disabled : true }, { key : 'remove', label : '×', name : 'Remove Title' } ] },
-			{ id : 'html', label : 'Free HTML', locked : true, hint : { text : 'Not editable here' } },
+		{ id : 'wrap', kind : 'Section', icon : 'panel-top', meta : 'Regular', open : true, actions : [ { key : 'add', icon : 'plus', name : 'Add inside Section' } ], children : [
+			{ id : 'title', kind : 'Title', icon : 'heading', name : 'Three good reasons', meta : 'H2', actions : [ { key : 'up', icon : 'arrow-up', name : 'Move Title up', disabled : true }, { key : 'remove', icon : 'trash-2', name : 'Remove Title', danger : true } ] },
+			{ id : 'html', kind : 'Free HTML', icon : 'code', locked : true, hint : 'Not editable here' },
+			{ id : 'team', kind : 'Collection', loop : { detail : 'Team - 3 elements', type : 'Member' }, open : true, children : [
+				{ id : 'name', kind : 'Title', icon : 'heading', source : '.title' },
+			] },
 		] },
 	],
 	onSelect : function( id ) { Nino.admin.router.set( 'builder', [ 'page', id ] ) },
 	onAction : function( key, id ) { if( key === 'remove' ) remove( id ) },
 } );
+mount.appendChild( tree.path );
 mount.appendChild( tree.el );
 // after a change: tree.update( itemsNow ); after Back: tree.select( idOfTheAddress )
 ```
 
-The rows are 34 px high (a row with a hint is two lines) with arrows and buttons of 28 px, a long label is cut with an ellipsis and keeps
-its text as a title, and nothing overflows at 390 px. It is drawn by the stylesheet in both schemes
-(`tests/nino-ui-tree-js-smoke.js` holds the keys and the ARIA).
+**The path.** With `path : true` the tree makes `tree.path` (otherwise `null`), a line that names the way to the chosen entry,
+"Section > Row > Column > Title": the kinds from the top to the chosen entry, each one above a button that chooses its
+entry and takes the focus into the tree, the chosen one as the place (`aria-current`), a loop with its word. It is
+a `nav` of its own, since a list holds no line: the caller puts it over `tree.el` in the element that scrolls, where it stays
+at the top. It is one line - a long way scrolls inside it, the end, the place, in sight - and hidden while nothing is chosen.
+
+**Pointed at, in every view.** `onHover( id )` is told when the pointer or the focus comes over an entry - and `null`
+when it leaves them all - once for each change; a redrawing that leaves them where they were tells nobody.
+`tree.highlight( id | ids | null, [{ scroll }] )` marks entries the way the pointer does - the tint, not the buttons - from
+outside, without moving the focus or the page and without telling anybody; with `scroll : true` it opens what is above
+the first and rolls it into view. What is marked outlives `update()`. The ids are the keys of the sync.
+
+`Nino.adminUi.hoverSync()` is the switchboard between views that show the same things: `join( on )` gives a
+member `{ set( key ), leave() }`, and `on( key )` is called with what another member reported - a string, a list of
+them where one thing is drawn more than once (the pattern of a loop in a preview), or `null`. A member never hears its own
+report, a key reported again tells nobody, `null` takes the key away only from the member that reported it (a view that has pointed at nothing cannot clear what another is pointing at: what is reported last is shown), and `leave()` takes the member and its key away. The tree reports what moved last, the pointer or the focus: when the pointer has gone it reports nothing, the focus that stands in the tree does not speak for it. The preview side is
+`previewFrame().marks( { elements, keyAt, onHover } )` (or `Nino.adminUi.frameMarks( { frame, ... } )`):
+`elements( key )` answers the elements of the page in the frame that stand for the key, `keyAt( element )` the key of what an
+element is part of; it draws a box of the accent colour round every element of the marked keys, in a shadow root of the
+page that takes no pointer and stands fixed in the viewport - a header that sticks keeps its box, a moved body moves none, the boxes follow the scroll -, tells the pointer over the page through `onHover`, and comes back with each page the frame
+loads. Outline, preview and tree are wired alike:
+
+```js
+const board = Nino.adminUi.hoverSync();
+const asTree = board.join( function( key ) { tree.highlight( key ) } );
+const marks = preview.marks( { elements : elementsOfKey, keyAt : keyOfElement, onHover : function( key ) { asPreview.set( key ) } } );
+const asPreview = board.join( function( key ) { marks.highlight( key ) } );
+// tree: onHover : function( id ) { asTree.set( id ) }
+```
+
+The rows are 34 px high with arrows of 24 px and buttons of 24 px, the indent is `--nino-admin-tree-indent`, a long kind or
+content is cut with an ellipsis and keeps its text as a title, and nothing overflows at 390 px. It is drawn by the stylesheet in both
+schemes (`tests/nino-ui-tree-js-smoke.js` holds the keys, the ARIA, the drawing, the path and the sync; `tests/nino-ui-previewframe-js-smoke.js`
+the marks of the frame).
 
 ## Panel tests
 
