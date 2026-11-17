@@ -46,6 +46,7 @@ const names = bar => findAll( bar.el, el => el.tagName === 'BUTTON' ).map( el =>
 const stylesheet = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
 check( 'on a phone the bar of a saveBar shows its line only where it is not empty and does not draw the registry\'s mark of unsaved changes',
 	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-status:not\(:empty\) \{\s*display: block;[^@]*\.nino-admin-actionbar\.nino-admin-savebar > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheet ) === true );
+check( 'on a phone the line is the row above the badge and the buttons, which are compact: 30 px and 12 px words', /@media \(max-width: 38rem\) \{[^@]*\.nino-admin-savebar > button \{\s*min-height: 30px;[^}]*font-size: max\( \.76rem, 12px \)[^@]*\.nino-admin-savebar > \.nino-admin-status:not\(:empty\) \{[^}]*order: -3;[^}]*flex: 1 0 100%/.test( stylesheet ) === true );
 check( 'the sentence of a first change is kept off the screen by the stylesheet, and only while the line still says it', /\.nino-admin-savebar > \.nino-admin-status\[data-once\]\[data-state="dirty"\] \{[^}]*clip-path: inset\(50%\)/.test( stylesheet ) === true );
 
 console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whole\n' );
@@ -85,7 +86,10 @@ console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whol
 	w.bar.set( { dirty : true } );
 	fire( w.bar.save, 'click' );
 	fire( w.bar.save, 'click' );
-	check( 'Save is pressed once at a time: the line says it is saving, Save is off, and a second press is not a second save', w.saves.length === 1 && w.bar.save.disabled === true && w.bar.line.state === 'saving' );
+	check( 'Save is pressed once at a time: Save is off, and a second press is not a second save', w.saves.length === 1 && w.bar.save.disabled === true );
+	check( '...the line says "saving" only when the save has taken a moment: not at the press, where the caller may still be asking something', w.bar.line.state !== 'saving' && timers[timers.length - 1].ms === 400 );
+	timers[timers.length - 1].fn();
+	check( '...and then it does', w.bar.line.state === 'saving' );
 
 	w.bar.set( { dirty : true } );
 	w.saves.shift()( true );
@@ -170,6 +174,17 @@ console.log( 'Nino.adminUi.saveBar - the bar of a screen that is saved as a whol
 	w.bar.line.dirty( 'Not named yet.' );
 	timers[timers.length - 1].fn();
 	check( '...and so do words of its own that the caller gave in the state of changes', w.bar.line.state === 'dirty' && w.bar.line.element.textContent === 'Not named yet.' );
+}
+
+{
+	const w = build();
+
+	w.bar.set( { dirty : true } );
+	fire( w.bar.save, 'click' );
+	const quick = timers[timers.length - 1];
+	w.saves.shift()( true );
+	quick.fn();
+	check( 'a save that ended before the moment is over says "saved" and is not told "saving" after it', w.bar.line.state === 'saved' );
 }
 
 {

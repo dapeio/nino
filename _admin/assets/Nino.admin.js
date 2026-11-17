@@ -58,6 +58,9 @@
 	// How long the line of a saveBar() holds the sentence "unsaved changes" before it goes: the badge says the state from then on
 	const SAID_FOR = 4000;
 
+	// How long a save of a saveBar() is on its way before the line says "Saving", in milliseconds
+	const SAVING_AFTER = 400;
+
 	wn.Nino.adminUi = {
 
 		// How many search hits elementList() draws at once. The search itself
@@ -3994,6 +3997,7 @@
 			let busy = false;
 			let typed = false;
 			let heard = null;
+			let saying = null;
 
 			// The line says "unsaved changes" once, for the screen reader (the stylesheet keeps it off the screen: the badge shows
 			// the state), and the sentence goes after SAID_FOR where nobody has put another in its place
@@ -4053,11 +4057,19 @@
 
 				busy = true;
 				typed = false;
-				line.saving();
 				paint();
+
+				// "Saving" is said when the save has taken a moment, and not at the press: a caller that asks something first (a name, a
+				// confirmation) has not saved anything yet, and a save that is quick needs no sentence
+				wn.clearTimeout( saying );
+				saying = wn.setTimeout( function() {
+					if( busy === true && line.state !== 'error' )
+						line.saving();
+				}, SAVING_AFTER );
 
 				options.onSave( function( ok ) {
 
+					wn.clearTimeout( saying );
 					busy = false;
 
 					// What was changed while the save was on its way is not in what was sent: it stays a change

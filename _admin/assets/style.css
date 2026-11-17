@@ -3437,16 +3437,29 @@ a {
 
 @media (max-width: 38rem) {
 
+	/* The line, where it has words, is one row above; the badge and the buttons share the rows under it, the badge at the left and the
+	   buttons at the right, and the buttons are compact (30 px, 12 px words) so that three of them and the badge are two rows at most */
 	.nino-admin .nino-admin-savebar {
 		flex-wrap: wrap;
+		gap: .35rem .4rem;
+		padding-top: .5rem;
+		padding-bottom: max(.5rem, env(safe-area-inset-bottom));
 	}
 
 	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-savebar-state {
 		margin-right: auto;
 	}
 
+	.nino-admin .nino-admin-actionbar.nino-admin-savebar > button {
+		min-height: 30px;
+		padding: .2rem .6rem;
+		font-size: max( .76rem, 12px );
+		line-height: 1.2rem;
+	}
+
 	.nino-admin .nino-admin-actionbar.nino-admin-savebar > .nino-admin-status:not(:empty) {
 		display: block;
+		order: -3;
 		flex: 1 0 100%;
 	}
 

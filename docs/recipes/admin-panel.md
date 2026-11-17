@@ -1558,7 +1558,7 @@ the status line, the buttons of the panel (undo, redo - `buttons`), "Restore the
 what is the case with `set( { dirty, blocked, restorable } )` and the bar draws it: Save is on where there is a
 change and nothing keeps it back, `blocked` is a sentence the line says as an error while it holds, and Restore is
 on the screen once there is a last state and waits while changes are unsaved. Save is pressed once at a time; the
-panel's `onSave( done )` ends with `done( true )` or `done( false )` on every way it can end - a failure says
+panel's `onSave( done )` - the line says "Saving" only when it has been out for 0.4 seconds, so a question the panel asks first is no "Saving" - ends with `done( true )` or `done( false )` on every way it can end - a failure says
 itself on `bar.line` before it ends the save, and where it says nothing the line is back to "unsaved changes" -, and what
 was changed while it was on its way stays a change. The first change of a saved screen is said once on the line, a status a
 screen reader reads out: the sentence is kept off the screen - the badge shows the state - and goes after four seconds, and what the
@@ -1587,7 +1587,7 @@ Nino.admin.dirty.register( 'pd', bar.entry( { discard : drop } ) );
 
 Each has a suite - `tests/nino-ui-previewframe-js-smoke.js`, `tests/nino-ui-conflict-js-smoke.js` and
 `tests/nino-ui-savebar-js-smoke.js` - and they are drawn in the browser by the same stylesheet as the other builders
-(`.nino-admin-savebar` is an action bar, and on a phone the bar is the badge and the buttons, two rows at most, and its line is a row of its own only while it holds words).
+(`.nino-admin-savebar` is an action bar, and on a phone its line, while it holds words, is one row above, and the badge at the left and the compact buttons (30 px, 12 px words) at the right share the rows under it: two rows for the badge and three or four buttons).
 
 ### A tree
 
