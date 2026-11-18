@@ -36,7 +36,7 @@ Setze die Version auf `0.4.0`:
 Lege `features/Meetups/templates/meetups-signup.tpl` an:
 
 ```html features/Meetups/templates/meetups-signup.tpl
-<form class="nino-form [[class]]" method="post" action="[[/nino/dir]]/meetups" novalidate data-form-texts="/feature/meetups/signup/">
+<form class="nino-form [[class]]" method="post" action="[[/nino/dir]]/meetups" data-form-texts="/feature/meetups/signup/">
 	[csrf]
 	<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 	<label for="meetups-signup-meetup">[[/feature/meetups/signup/meetup]]</label>
@@ -54,7 +54,7 @@ Lege `features/Meetups/templates/meetups-signup.tpl` an:
 - `[[/nino/dir]]` ist das Verzeichnis, unter dem das Projekt läuft. Setze es vor jede Adresse.
 - Das Feld `website` ist eine Falle für Bots. Menschen sehen es nicht. Die Klasse `nino-form-trap` versteckt es.
 - `class="nino-form"` übergibt das Formular dem Skript von Nino und dem Stylesheet des Moduls Form (`form.css`), das Felder, Meldung und Knopf zeichnet; `nino-form-submit` ist die Klasse des Knopfes. `[[class]]` ist der Name der Komponente, `meetups-signup`. Es sendet ohne Neuladen ab, prüft die Pflichtfelder, markiert das falsche Feld und sagt in der Sprache der Seite, was fehlt. Eigenes JavaScript brauchst Du nicht.
-- `novalidate` schaltet die Meldung des Browsers ab, die in der Sprache des Browsers spräche. Die Prüfung macht das Skript.
+- Das Formular trägt kein `novalidate`: Das Skript setzt es selbst und prüft in der Sprache der Seite. Ohne JavaScript prüft der Browser `required` und die Feldtypen in seiner eigenen Sprache.
 - `data-form-texts` nennt den Anfang der Schlüssel, unter denen die Sätze des Skripts liegen. Der Schlüssel endet mit `/`. Der nächste Schritt legt sie an.
 - Das erste `<p>` des Formulars ist die Meldung: Das Skript schreibt den Satz hinein und macht den Absatz zur Live-Region. Der erste `<button>` ist der Knopf, den es während der Anfrage sperrt.
 - Die Auswahl der Treffen ist dieselbe Schleife wie in Tutorial 5. `[[.slug]]` ist der Name des Elements, zum Beispiel `christmas`.
@@ -152,7 +152,7 @@ Klicke im Bereich **Features** bei „Treffen“ auf **Auf 0.4.0 aktualisieren**
 Öffne `/meetups`. Unter der Liste steht das Formular mit einer Auswahl der kommenden Treffen, einem Feld für den Namen und dem Knopf „Anmelden“. Der Quelltext zeigt:
 
 ```html
-<form class="nino-form meetups-signup" method="post" action="/meetups" novalidate data-form-texts="/feature/meetups/signup/">
+<form class="nino-form meetups-signup" method="post" action="/meetups" data-form-texts="/feature/meetups/signup/">
 	<input type="hidden" name="_csrf" value="…">
 ```
 

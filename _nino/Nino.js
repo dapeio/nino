@@ -313,10 +313,11 @@
 			 *	@param		{Function}	callback			Called with the (normalized) xhr once done
 			 *	@param		{Object}		[data]				(optional) Key/value pairs sent as form data
 			 *	@param		{Object}		[auth]				(optional) { user, pw } sent as basic-auth header
+			 *	@param		{Object}		[headers]			(optional) Request headers, name => value
 			 *
 			 *	@return		void
 			 */
-			sendRequest : function( uri, method, callback, data, auth ) {
+			sendRequest : function( uri, method, callback, data, auth, headers ) {
 				let
 					formdata		= new FormData(),
 					xhr 				= new XMLHttpRequest(),
@@ -394,6 +395,9 @@
 					new TextEncoder().encode( auth.user + ':' + auth.pw ).forEach( function( byte ) { binary += String.fromCharCode( byte ) } );
 					xhr.setRequestHeader( 'Authorization', "Basic " + btoa( binary ) );
 				}
+
+				if( headers && typeof headers === 'object' )
+					Object.keys( headers ).forEach( function( name ) { xhr.setRequestHeader( name, headers[name] ) } );
 
 				xhr.send( formdata );
 			},

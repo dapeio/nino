@@ -45,9 +45,15 @@ echo "Modules\\Form::callbackResponse - validate/send/record a contact submissio
 // mails register their own
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
 
+// A request of the script of the page, which is answered with a status: one without the header is a browser's with no
+// script, and is answered with a redirect (see the pins of \Nino\Form::answer() below)
+function scriptRequest(): array {
+	return [ '/nino/http/request' => [ 'header' => [ \Nino\Form::SCRIPT_HEADER => '1' ] ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
+}
+
 function submitForm( array &$appData, array $post ): array {
 	$_POST = array_merge( [ 'name' => '', 'email' => '', 'message' => '', 'location' => '', 'cat' => '' ], $post );
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	$request = scriptRequest();
 	\Nino\Modules\Form::callbackResponse( $appData, $request );
 	return $request;
 }
@@ -198,7 +204,7 @@ unset( $_POST['_csrf'] );
 // warning Runtime::handleError() treats as fatal - an unauthenticated 500
 // from the one endpoint the whole internet may post to
 unset( $_POST['_csrf'] );
-$arrayRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$arrayRequest = scriptRequest();
 $_POST = [ 'name' => [ 'x' ], 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '' ];
 
 ninoWarnings();
@@ -260,12 +266,12 @@ $longNames = \Nino\Form::normalize( [ 'key' => 'long', 'fields' => [ [ 'name' =>
 check( 'a field name is bounded at definition time to what posted() reads', array_column( $longNames['fields'] ?? [], 'name' ) === [ str_repeat( 'n', 64 ) ] );
 
 $_POST = [ 'form' => 'quote', 'email' => 'jo@example.com', 'budget' => 'not-a-number', 'location' => '' ];
-$badTypeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$badTypeRequest = scriptRequest();
 \Nino\Modules\Form::callbackResponse( $appData, $badTypeRequest );
 check( 'a value that is not of its field\'s declared type is a 400', $badTypeRequest['/nino/http/response']['statusCode'] === 400 );
 
 $_POST = [ 'form' => 'quote', 'email' => 'jo@example.com', 'budget' => '5000', 'location' => '' ];
-$quoteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$quoteRequest = scriptRequest();
 \Nino\Modules\Form::callbackResponse( $appData, $quoteRequest );
 $quoteEntries = \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] );
 $quoteEntry   = end( $quoteEntries );
@@ -309,7 +315,7 @@ $taken = 0;
 $appData[ \Nino\Form::STORE ] = false;
 $storedBefore = count( \Nino\Form::entries( $appData ) );
 $_POST = [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '', 'cat' => '' ];
-$noStoreRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$noStoreRequest = scriptRequest();
 \Nino\Modules\Form::callbackResponse( $appData, $noStoreRequest );
 check( 'with recording off the mail still goes out and nothing is written', $noStoreRequest['/nino/http/response']['statusCode'] === 200
 	&& $taken === 2 && count( \Nino\Form::entries( $appData ) ) === $storedBefore );
@@ -677,7 +683,7 @@ $guarded = 0;
 
 $before = count( \Nino\Form::entries( $appData ) );
 $_POST = [ 'name' => 'Spam', 'email' => 'spam@example.com', 'message' => 'Buy', 'location' => '' ];
-$refusedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$refusedRequest = scriptRequest();
 \Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/POST://.form', $refusedRequest );
 check( 'a guard registered ahead of the module refuses without a callback name of its own', $guarded === 1
 	&& $refusedRequest['/nino/http/response']['statusCode'] === 418 && count( \Nino\Form::entries( $appData ) ) === $before );
@@ -795,7 +801,7 @@ $appData[ \Nino\Form::FORMS ] = [ [
 $typedPost = static function( array $post ) use ( &$appData ): int {
 	\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
 	$_POST = array_merge( [ 'form' => 'typed', 'consent' => 'on', 'plan' => '', 'since' => '', 'location' => '' ], $post );
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	$request = scriptRequest();
 	\Nino\Modules\Form::callbackResponse( $appData, $request );
 	return $request['/nino/http/response']['statusCode'];
 };
@@ -1384,6 +1390,150 @@ check( 'the trap of the form is out of the window and out of the layout, so that
 check( 'the script of the form is the one handler of every .nino-form and of the signup of the newsletter, and it needs nothing of a design layer: it asks Nino.content, Nino.http and Nino.events only',
 	str_contains( $formJs, "'.nino-form, .nino-newsletter-form'" ) === true && str_contains( $formJs, 'Nino.ui' ) === false && is_file( dirname( __DIR__ ). '/_nino/Nino.ui.js' ) === false );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $formPage ) );
+
+echo "\n";
+
+// --- \Nino\Form::answer() - the answer of a browser without the script ----
+
+echo "\\Nino\\Form::answer - a post without the header of the script is sent back to its page\n";
+
+$answerApp = ninoSandbox( 'form-answer' );
+\Nino\Html::addFills( $answerApp, [ '[[/project/mail/address/owner]]' => 'owner@example.com', '[[/module/form/subject/owner]]' => 'New inquiry', '[[/module/form/subject/user]]' => 'Thanks' ], '*' );
+\Nino\Callbacks::registerCallback( $answerApp, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
+
+// A post of a browser with no script: no marker, the page it came from in the Referer
+function plainRequest( string $referer, string $host = 'example.org' ): array {
+	return [ '/nino/http/request' => [ 'header' => [ 'Referer' => $referer, 'Host' => $host ] ], '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '' ] ];
+}
+
+// Where the browser is sent: the Location of the answer, '' where there is none
+function sentTo( array &$appData, string $referer, string $outcome = 'success', string $host = 'example.org', array $post = [] ): string {
+	$_POST = $post;
+	$request = plainRequest( $referer, $host );
+	\Nino\Form::answer( $appData, $request, $outcome );
+	return (string) ( $request['/nino/http/response']['header']['Location'] ?? '' );
+}
+
+check( 'the script marks its requests with one header, which the request keeps through the allowlist of the kernel',
+	\Nino\Http::filterHeaderFields( [ 'x-nino-form' => '1' ] ) === [ \Nino\Form::SCRIPT_HEADER => '1' ] );
+
+$scripted = scriptRequest();
+$_POST = [];
+\Nino\Form::answer( $answerApp, $scripted, 'success' );
+check( 'a request that carries the marker is left as the route made it: no redirect, no Location', $scripted['/nino/http/response']['statusCode'] === 200 && isset( $scripted['/nino/http/response']['header']['Location'] ) === false );
+
+$plain = plainRequest( 'http://example.org/contact' );
+$_POST = [];
+\Nino\Form::answer( $answerApp, $plain, 'success' );
+check( 'a request without it is answered with a 303 to the page it came from, with the outcome as the one parameter, and an empty body',
+	$plain['/nino/http/response']['statusCode'] === 303 && $plain['/nino/http/response']['header']['Location'] === '/contact?form=success' && $plain['/nino/http/response']['body'] === '' );
+
+check( 'the page keeps its other parameters, a parameter of the name of the outcome is replaced - the plain one and an array of it - and the id of the form is the fragment',
+	sentTo( $answerApp, 'http://example.org/a/b?x=1&form=old&form[]=z&y=%20', 'invalid', 'example.org', [ 'id' => 'contact-form' ] ) === '/a/b?x=1&y=%20&form=invalid#contact-form' );
+
+check( 'a posted id that is not the shape of an id is no fragment',
+	sentTo( $answerApp, 'http://example.org/a', 'success', 'example.org', [ 'id' => 'x" onload="1' ] ) === '/a?form=success' && sentTo( $answerApp, 'http://example.org/a', 'success', 'example.org', [ 'id' => '1st' ] ) === '/a?form=success' );
+
+// SAFETY: Location is a path of this site and nothing else
+$foreign = [
+	'protocol-relative'		=> 'http://example.org//evil.example/x',
+	'backslash'						=> 'http://example.org/\\evil.example',
+	'another host'				=> 'http://evil.example/contact',
+	'a host that starts like ours'	=> 'http://example.org.evil.example/contact',
+	'credentials'					=> 'http://example.org@evil.example/contact',
+	'credentials of ours'	=> 'http://user:pw@example.org/contact',
+	'another scheme'			=> 'https://example.org/contact',
+	'no scheme at all'		=> 'javascript:alert(1)',
+	'another scheme, the same port'	=> 'https://example.org:80/contact',
+	'another port'				=> 'http://example.org:8080/contact',
+	'no host'							=> '/contact',
+];
+$wrong = [];
+foreach( $foreign as $name => $referer )
+	if( sentTo( $answerApp, $referer ) !== '/?form=success' )
+		$wrong[] = $name;
+check( 'SAFETY: a Referer that is not an address of this site - another host, protocol-relative, backslash, credentials, another scheme or port - is sent to the start page', $wrong === [] );
+
+$injected = [];
+foreach( [ "\r\nSet-Cookie: a=b", "\n", "\t", "\0", ' ', "\x7f" ] as $char )
+	$injected[] = sentTo( $answerApp, 'http://example.org/a'. $char. 'b' );
+check( 'SAFETY: a Referer with a CR, LF, tab, NUL, space or DEL in it is sent to the start page - and no Location holds a control character',
+	array_unique( $injected ) === [ '/?form=success' ] );
+
+check( 'SAFETY: the outcome is a word of the fixed list - anything else is "error", and nothing of it reaches the address',
+	sentTo( $answerApp, 'http://example.org/a', "success\r\nSet-Cookie: a=b" ) === '/a?form=error' && sentTo( $answerApp, 'http://example.org/a', 'Success' ) === '/a?form=error' );
+
+check( 'SAFETY: the same port is the same origin, written out or left to the scheme\'s own - and the host is compared without regard to case',
+	sentTo( $answerApp, 'http://EXAMPLE.org:80/a' ) === '/a?form=success' && sentTo( $answerApp, 'http://example.org:8080/a', 'success', 'example.org:8080' ) === '/a?form=success' );
+
+$below = $answerApp;
+$below['/nino/dir'] = '/shop';
+check( 'under a directory the address is the path below it - the directory itself is the start page - and a path outside of it is the start page',
+	sentTo( $below, 'http://example.org/shop/contact' ) === '/shop/contact?form=success' && sentTo( $below, 'http://example.org/shop' ) === '/shop/?form=success'
+	&& sentTo( $below, 'http://example.org/shopping/contact' ) === '/shop/?form=success' && sentTo( $below, 'http://example.org/other' ) === '/shop/?form=success' );
+
+check( 'a query of the page that no Location of this site may hold - a colon ahead of a slash - is left out, and the visitor is sent back to the page all the same',
+	sentTo( $answerApp, 'http://example.org/contact?at=12:30&next=a/b' ) === '/contact?form=success' && sentTo( $answerApp, 'http://example.org/contact?q=%0d%0aX:1', 'invalid', 'example.org', [ 'id' => 'kontakt' ] ) === '/contact?form=invalid#kontakt' );
+check( 'with no Referer the start page',
+	sentTo( $answerApp, '' ) === '/?form=success' );
+
+// SAFETY: what a guard refused stays refused
+$refused = plainRequest( 'http://example.org/contact' );
+$_POST = [ '_csrf' => 'wrong-token' ];
+$refused['/nino/http/request']['method'] = 'POST';
+\Nino\Csrf::callbackResponse( $answerApp, $refused );
+$refusedAgain = $refused;
+\Nino\Form::handle( $answerApp, $refusedAgain );
+\Nino\Form::answer( $answerApp, $refused, 'success' );
+check( 'SAFETY: the 403 of the csrf guard is not turned into a redirect, by answer() or by Form::handle()',
+	$refused['/nino/http/response']['statusCode'] === 403 && isset( $refused['/nino/http/response']['header']['Location'] ) === false
+	&& $refusedAgain['/nino/http/response']['statusCode'] === 403 && isset( $refusedAgain['/nino/http/response']['header']['Location'] ) === false );
+
+// What /.form says, by what it answers the script
+$outcomes = [];
+$post = static fn( array $with ): array => array_merge( [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '', 'cat' => '', 'id' => 'contact' ], $with );
+foreach( [
+	'valid'							=> [ $post( [] ), 'success' ],
+	'honeypot'					=> [ $post( [ 'location' => 'bot' ] ), 'error' ],
+	'a form no key has'	=> [ $post( [ 'form' => 'nothing' ] ), 'error' ],
+	'refused entries'		=> [ $post( [ 'email' => 'no' ] ), 'email' ],
+] as $name => [ $fields, $want ] ) {
+	$_POST = $fields;
+	$request = plainRequest( 'http://example.org/contact' );
+	\Nino\Form::handle( $answerApp, $request );
+	$outcomes[$name] = ( $request['/nino/http/response']['header']['Location'] ?? '' ) === '/contact?form='. $want. '#contact' && $request['/nino/http/response']['statusCode'] === 303;
+}
+check( 'Form::handle() answers a post without the marker by what happened: a valid one success, the honeypot error - what the script says for its 418 - a form no key has error, refused entries email', array_filter( $outcomes ) === $outcomes );
+
+$_POST = $post( [] );
+$request = scriptRequest();
+\Nino\Form::handle( $answerApp, $request );
+check( 'Form::handle() answers the script as ever: the status and the body, no Location', $request['/nino/http/response']['statusCode'] === 200 && $request['/nino/http/response']['body'] === [ 'status' => 'ok' ] && isset( $request['/nino/http/response']['header']['Location'] ) === false );
+
+$_POST = $post( [] );
+$request = plainRequest( 'http://example.org/contact' );
+$request['/nino/http/response']['statusCode'] = 418;
+\Nino\Form::handle( $answerApp, $request );
+check( 'a status another callback left behind, a refusal that is no csrf one, is told as error', $request['/nino/http/response']['header']['Location'] === '/contact?form=error#contact' );
+
+$onlyTyped = [ 'key' => 'typed', 'fields' => [ [ 'type' => 'email' ], [ 'type' => 'date' ] ] ];
+$onlyEmail = [ 'key' => 'mail', 'fields' => [ [ 'type' => 'email' ], [ 'type' => 'text' ] ] ];
+$noEmail = [ 'key' => 'plain', 'fields' => [ [ 'type' => 'text' ] ] ];
+$refusal = new ReflectionMethod( \Nino\Form::class, '_refusal' );
+check( 'a refusal is "invalid" where the form holds a typed field or asks for no address, else "email" - the answer of the script to a 400',
+	[ $refusal->invoke( null, $onlyTyped ), $refusal->invoke( null, $noEmail ), $refusal->invoke( null, $onlyEmail ) ] === [ 'invalid', 'invalid', 'email' ] );
+
+// outcome(): the word back
+$read = static fn( mixed $value ): string => \Nino\Form::outcome( [ '/nino/http/request' => [ 'query' => [ 'form' => $value ] ] ] );
+check( 'outcome() reads one of the four words from the address, and nothing else - not another word, not an array, not no query',
+	array_map( $read, [ 'success', 'invalid', 'email', 'error' ] ) === [ 'success', 'invalid', 'email', 'error' ]
+	&& $read( 'required' ) === '' && $read( [ 'success' ] ) === '' && \Nino\Form::outcome( [] ) === '' );
+
+check( 'the words of the outcome are the lines of data-form-texts that say how a post ended, and the parameter is "form"',
+	\Nino\Form::OUTCOMES === [ 'success', 'invalid', 'email', 'error' ] && \Nino\Form::OUTCOME_PARAM === 'form' && \Nino\Form::SCRIPT_HEADER === 'X-Nino-Form' );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $answerApp ) );
+$_POST = [];
 
 echo "\n";
 

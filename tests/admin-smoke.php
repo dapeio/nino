@@ -1893,7 +1893,7 @@ echo "Submissions (Modules\\Form writes, Modules\\Form\\Editor::apiList reads)\n
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
 
 $_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
-$formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$formRequest = [ '/nino/http/request' => [ 'header' => [ \Nino\Form::SCRIPT_HEADER => '1' ] ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Form::callbackResponse( $appData, $formRequest );
 check( 'a valid contact submission succeeds', $formRequest['/nino/http/response']['statusCode'] === 200 );
 
@@ -1943,7 +1943,7 @@ check( 'the deletion is what the activity log writes for it', \Nino\Modules\Form
 
 // Sent again, so what follows sees the same one submission it did before
 $_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
-$formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$formRequest = [ '/nino/http/request' => [ 'header' => [ \Nino\Form::SCRIPT_HEADER => '1' ] ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Form::callbackResponse( $appData, $formRequest );
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 

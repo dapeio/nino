@@ -526,9 +526,9 @@ check( '...and the frames of the base unit are written in the components of Basi
 	&& preg_match( '/^\[footer-wrap\b.*\[footer-col\b.*\[footer-nav menu="footer"\].*\[footer-legal\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ) ) === 1
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ). (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ), 'nino-' ) === false );
 $contactPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/contact/templates/page-contact.tpl' );
-check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and the browser\'s bubble would be in its own',
+check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and a form without a script keeps the check of the browser, so the markup has no novalidate',
 	preg_match( '/<input type="text" id="contact-form-name"[^>]* autocomplete="name"/', $contactPage ) === 1 && preg_match( '/<input type="email" id="contact-form-email"[^>]* autocomplete="email"/', $contactPage ) === 1
-	&& preg_match( '/<form class="nino-form"[^>]* novalidate>/', $contactPage ) === 1 );
+	&& preg_match( '/<form class="nino-form"[^>]*>/', $contactPage ) === 1 && str_contains( $contactPage, 'novalidate' ) === false );
 
 // Nino.css is the reset and nothing else: its size, the tokens a part reads and no class of a component
 $ninoCss = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );

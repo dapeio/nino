@@ -203,8 +203,8 @@ $tag		= $tag[0] ?? '';
 preg_match( '/\bdata-form-texts="([^"]+\/)"/', $tag, $prefix );
 $prefix	= $prefix[1] ?? '';
 
-check( 'the sign-up form of tutorial 6 carries what the shared form script needs: its class, the prefix of its texts, no native check and an action',
-	preg_match( '/\bclass="(?:[^"]* )?nino-form(?: [^"]*)?"/', $tag ) === 1 && $prefix !== '' && preg_match( '/\bnovalidate\b/', $tag ) === 1 && preg_match( '/\baction="[^"]+"/', $tag ) === 1 );
+check( 'the sign-up form of tutorial 6 carries what the shared form script needs: its class, the prefix of its texts, an action, and no novalidate of its own - the script sets it, a browser without the script checks itself',
+	preg_match( '/\bclass="(?:[^"]* )?nino-form(?: [^"]*)?"/', $tag ) === 1 && $prefix !== '' && preg_match( '/\bnovalidate\b/', $tag ) !== 1 && preg_match( '/\baction="[^"]+"/', $tag ) === 1 );
 
 $published = static fn( string $markdown ): bool => $prefix !== '' && str_contains( $markdown, '\\Nino\\Modules\\Jstext::publish( $appData, [ \''. $prefix. '\' ] )' );
 

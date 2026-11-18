@@ -20,7 +20,7 @@
 			[/button-group]
 		[/section-col]
 		[section-col size="100 m:50"]
-			<form class="nino-form" action="[[/nino/dir]]/.form" method="post" novalidate>
+			<form class="nino-form" action="[[/nino/dir]]/.form" method="post">
 				[csrf]
 				<label for="contact-form-name">[[/template/common/form/name]] *</label>
 				<input type="text" id="contact-form-name" name="name" autocomplete="name" required>

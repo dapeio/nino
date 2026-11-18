@@ -129,6 +129,11 @@ sent.length = 0;
 sandbox.Nino.http.sendRequest( '/.nino/some/endpoint', 'POST', function() {}, {} );
 check( 'a request without a credential pair sets no Authorization header', sent[0].header['Authorization'] === undefined );
 
+// The headers a caller asks for go on the request, and a request that asks for none sets none
+sent.length = 0;
+sandbox.Nino.http.sendRequest( '/.form', 'POST', function() {}, {}, undefined, { 'X-Nino-Form' : '1' } );
+check( 'the headers a caller hands sendRequest() are set on the request', sent[0].header['X-Nino-Form'] === '1' && sent[0].header['Authorization'] === undefined );
+
 
 // --- what comes back ------------------------------------------------------
 

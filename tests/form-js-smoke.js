@@ -164,8 +164,8 @@ sandbox.Nino = {
 		getText : function( key ) { return sandbox.Nino.content.text[key] || '' },
 	},
 	http : {
-		sendRequest : function( uri, method, callback, data ) {
-			sent.push( { uri : uri, method : method, callback : callback, data : data } );
+		sendRequest : function( uri, method, callback, data, auth, headers ) {
+			sent.push( { uri : uri, method : method, callback : callback, data : data, headers : headers } );
 		},
 	},
 };
@@ -185,6 +185,9 @@ vm.runInContext(
 );
 
 sandbox.Nino.form.onReady();
+
+check( 'the script checks the entries itself, so it turns the check of the browser off on every form it drives - the markup does not have to',
+	forms.every( function( f ) { return f.noValidate === true } ) );
 
 check( 'every .nino-form on the page gets a submit handler', typeof forms[0].listeners.submit === 'function' && typeof forms[1].listeners.submit === 'function' );
 
@@ -210,6 +213,7 @@ forms[0].fill( { name : typedName, email : typedEmail, message : typedMessage } 
 forms[0].submit();
 
 check( 'a filled form posts to /.form', sent.length === 1 && sent[0].uri === '/.form' && sent[0].method === 'POST' );
+check( 'every request of the script carries the header that says a script made it, and no other', sent[0].headers !== undefined && JSON.stringify( sent[0].headers ) === '{"X-Nino-Form":"1"}' );
 check( 'an apostrophe in an address survives to the request', sent[0].data.email === typedEmail );
 check( 'punctuation in a name survives to the request', sent[0].data.name === typedName );
 check( 'punctuation in a message survives to the request', sent[0].data.message === typedMessage );

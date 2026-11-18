@@ -373,10 +373,19 @@
 						if( this.btn )
 							this.btn.disabled = true;
 
-						Nino.http.sendRequest( this.endpoint, 'POST', boundResponse, data );
+						// The header says a script made the request: the server answers it with a
+						// status, and a post without the header - a browser that runs no script -
+						// with a redirect back to the page (\Nino\Form::answer())
+						Nino.http.sendRequest( this.endpoint, 'POST', boundResponse, data, undefined, { 'X-Nino-Form' : '1' } );
 					};
 
 				for( let i=0, l=e.form.length; i<l; i++ ) {
+
+					// The script checks the entries itself, in the language of the page. The
+					// attribute is set here and not written into the markup: a visitor
+					// without the script gets the browser's own check of the required
+					// fields and of the address
+					e.form[i].noValidate = true;
 
 					e.form[i].fields	= e.form[i].querySelectorAll('input, textarea, select');
 					e.form[i].msg 		= e.form[i].querySelectorAll('p')[0];

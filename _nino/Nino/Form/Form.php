@@ -107,6 +107,22 @@ namespace Nino {
 		// form that wants a date asks for 'birthdate'
 		public const array RESERVED = [ 'form', 'location', '_csrf', '_t', 'id', 'date', 'ip' ];
 
+		// How a form says it is answered by the script of the page: the script sends this header with 1 on every
+		// request, and a request without it comes from a browser that runs no script and posts the form natively
+		public const string SCRIPT_HEADER = 'X-Nino-Form';
+
+		// What a browser without the script is sent back with: the one query parameter of the page it came from, and
+		// its value - one of these four words, the ones of the five lines of data-form-texts that are an outcome
+		// ('required' is the script's own, before a request is made)
+		public const string OUTCOME_PARAM = 'form';
+		public const array OUTCOMES = [ 'success', 'invalid', 'email', 'error' ];
+
+		// The posted field that names the form's own id on its page, which becomes the fragment of the address the
+		// browser is sent back to; 'id' is no name a field may take (RESERVED), so no field can be it
+		public const string ANCHOR_FIELD = 'id';
+		private const string ANCHOR = '/^[A-Za-z][A-Za-z0-9_-]{0,63}$/D';
+		private const int REFERER_LENGTH = 2048;
+
 		// The contact form Nino has always shipped, as data rather than as
 		// five lines of code. The labels are the fills its install unit
 		// writes, so a project that never opens a form builder sees exactly
@@ -571,7 +587,9 @@ namespace Nino {
 		 *	simply by setting a status other than 200 (\Nino\Csrf refuses the
 		 *	same way one step earlier, on the global /nino/http/response at
 		 *	priority 1), and this
-		 *	returns without sending or writing anything
+		 *	returns without sending or writing anything. What the post came to is
+		 *	then told to the visitor by answer(): the status and the body for the
+		 *	script of the page, a redirect back to the page for a browser without it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -580,15 +598,38 @@ namespace Nino {
 		 */
 		public static function handle( array &$appData, array &$request ): void {
 
+			$outcome = self::_process( $appData, $request );
+
+			if( $outcome !== '' )
+				self::answer( $appData, $request, $outcome );
+		}
+
+		/**
+		 *	The work of handle(): which form this is, whether the submission may pass, the mail pair it sends and the
+		 *	record it leaves, with the status and the body the script reads
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	string										The outcome a browser without the script is told (one of OUTCOMES), '' where the
+		 *																	request is left as a guard or another callback made it: the refusal of
+		 *																	the csrf guard, and a status that is no refusal
+		 */
+		private static function _process( array &$appData, array &$request ): string {
+
 			// Respect a rejection from an earlier callback: the global Csrf
 			// guard sets a flag of its own, anything else simply left a status
 			// behind. Two checks rather than one because the flag survives a
-			// later handler resetting the status, which is what it is for
+			// later handler resetting the status, which is what it is for.
+			// The csrf refusal stays a 403 for a browser without the script as
+			// well: no redirect is made for a post that carried no valid token
 			if( self::blocked( $request ) === true )
-				return;
+				return '';
 
-			if( (int) ( $request['/nino/http/response']['statusCode'] ?? 200 ) !== 200 )
-				return;
+			$status = (int) ( $request['/nino/http/response']['statusCode'] ?? 200 );
+
+			if( $status !== 200 )
+				return $status >= 400 ? 'error' : '';
 
 			$posted	= self::posted();
 			$form		= self::form( $appData, (string) ( $posted['form'] ?? '' ) );
@@ -600,23 +641,26 @@ namespace Nino {
 			// page posting 'Quote' was mailed and recorded as the contact form
 			if( $form === null ) {
 				$request['/nino/http/response']['statusCode'] = 404;
-				return;
+				return 'error';
 			}
 
 			// The honeypot no person sees. 418 here and for every other
 			// refusal a guard makes: the shared .nino-form script shows one
 			// generic message for anything that is not 200 or 400, so a bot
-			// never learns which check it tripped
+			// never learns which check it tripped - and a browser without the
+			// script is sent back with the same generic word, the one the
+			// script says for 418, where 'success' would have told the bot
+			// something the status does not
 			if( ( $posted['location'] ?? '' ) !== '' ) {
 				$request['/nino/http/response']['statusCode'] = 418;
-				return;
+				return 'error';
 			}
 
 			$values = self::validate( $form, $posted );
 
 			if( $values === false ) {
 				$request['/nino/http/response']['statusCode'] = 400;
-				return;
+				return self::_refusal( $form );
 			}
 
 			// The hour's cap of the site is reached: refused as the mail cap
@@ -625,7 +669,7 @@ namespace Nino {
 			// not close the form: the mail still goes out, see below
 			if( self::capped( $appData ) === 'hour' ) {
 				$request['/nino/http/response']['statusCode'] = 429;
-				return;
+				return 'error';
 			}
 
 			$sent = self::send( $appData, $form, $values );
@@ -639,7 +683,7 @@ namespace Nino {
 			// script shows as the generic message, so the visitor tries later
 			if( \Nino\Mail::rateLimited( $appData ) === true ) {
 				$request['/nino/http/response']['statusCode'] = 429;
-				return;
+				return 'error';
 			}
 
 			// Counted once the mail layer has taken it, so that an address the
@@ -667,7 +711,7 @@ namespace Nino {
 			// than a 500 that reads as a failure of the mail alone
 			if( $ownerSent === false && $monthFull === true ) {
 				$request['/nino/http/response']['statusCode'] = 429;
-				return;
+				return 'error';
 			}
 
 			// But "sent" is not what the visitor is told when the owner's mail
@@ -676,11 +720,142 @@ namespace Nino {
 			// the page (and the dashboard says why: \Nino\Mail::failure())
 			if( $ownerSent === false ) {
 				$request['/nino/http/response']['statusCode'] = 500;
-				return;
+				return 'error';
 			}
 
 			$request['/nino/http/response']['statusCode']	= 200;
 			$request['/nino/http/response']['body']				= [ 'status' => 'ok' ];
+
+			return 'success';
+		}
+
+		/**
+		 *	Which of the words 'invalid' and 'email' tells a visitor the entries of a form were refused: the answer the
+		 *	script of the page gives a 400 (form.js, formResponse()), so that a browser with it and one without say the
+		 *	same - 'invalid' where the form holds a url, number, date, select, radio or checkbox or asks for no address,
+		 *	'email' otherwise
+		 *
+		 *	@param		array 		$form					One normalized form
+		 *
+		 *	@return 	string
+		 */
+		private static function _refusal( array $form ): string {
+
+			$types = array_column( $form['fields'], 'type' );
+
+			if( array_intersect( $types, [ 'url', 'number', 'date', 'radio', 'checkbox', 'select' ] ) !== [] || in_array( 'email', $types, true ) === false )
+				return 'invalid';
+
+			return 'email';
+		}
+
+		/**
+		 *	Answer a post of a form: to the script of the page with the status and the body the route has set, and to a
+		 *	browser without it - a request that does not carry SCRIPT_HEADER - with a 303 back to the page the form
+		 *	came from, so that the visitor is not left on an empty page. The address is a path of this site and
+		 *	never anything else: the path of the Referer where its scheme, host and port are the site's own, else the
+		 *	start page; the query of it is kept but for a parameter of the name OUTCOME_PARAM, which is set to the
+		 *	outcome; and the fragment is the form's own id, where the post carries one in ANCHOR_FIELD and it is
+		 *	the shape of an id. An outcome that is none of OUTCOMES is 'error'. A request the csrf guard refused
+		 *	is left as the 403 it is, whatever is asked here. \Nino\Form::handle() calls this for the contact form; a
+		 *	feature that serves a form of its own calls it from its route callback when the entries are settled,
+		 *	after it has set the status and the body for the script, and a page reads the outcome back with
+		 *	outcome()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$outcome			One of OUTCOMES
+		 *
+		 *	@return 	void
+		 */
+		public static function answer( array &$appData, array &$request, string $outcome ): void {
+
+			if( self::blocked( $request ) === true || ( $request['/nino/http/request']['header'][ self::SCRIPT_HEADER ] ?? '' ) === '1' )
+				return;
+
+			if( in_array( $outcome, self::OUTCOMES, true ) === false )
+				$outcome = 'error';
+
+			$page		= self::_page( $appData, $request );
+			$query	= [];
+
+			foreach( explode( '&', $page['query'] ) as $pair )
+				if( $pair !== '' && urldecode( explode( '=', $pair, 2 )[0] ) !== self::OUTCOME_PARAM
+					&& str_starts_with( urldecode( explode( '=', $pair, 2 )[0] ), self::OUTCOME_PARAM. '[' ) === false )
+					$query[] = $pair;
+
+			$query[]	= self::OUTCOME_PARAM. '='. $outcome;
+			$anchor		= (string) ( self::posted()[ self::ANCHOR_FIELD ] ?? '' );
+
+			$anchor		= preg_match( self::ANCHOR, $anchor ) === 1 ? '#'. $anchor : '';
+			$to				= $page['path']. '?'. implode( '&', $query ). $anchor;
+
+			// A query the page had may hold what no Location of this site may - a colon ahead of the first slash reads as a
+			// scheme (\Nino\Http::isSitePath()) - and then the page is named without it: the visitor is sent back all the same
+			if( \Nino\Http::isSitePath( $to ) === false )
+				$to = $page['path']. '?'. self::OUTCOME_PARAM. '='. $outcome. $anchor;
+
+			\Nino\Http::redirect( $appData, $request, $to, 303 );
+		}
+
+		/**
+		 *	The outcome a visitor was sent back to a page with by answer()
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	string										One of OUTCOMES, '' where the address names none
+		 */
+		public static function outcome( array $request ): string {
+
+			$word = $request['/nino/http/request']['query'][ self::OUTCOME_PARAM ] ?? '';
+
+			return is_string( $word ) === true && in_array( $word, self::OUTCOMES, true ) === true ? $word : '';
+		}
+
+		/**
+		 *	The page a post came from, as a path of this site: the path and the query of the Referer where it is an
+		 *	address of this very site - the same scheme, host and port the request was made to - and the start page
+		 *	otherwise. Anything that could put a Location somewhere else is not trusted but sent to the start page:
+		 *	a control character, a space or a backslash anywhere in it, credentials, a path that is not under the
+		 *	project's directory, one that is no path of this site (\Nino\Http::isSitePath()), and one too long
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	array											'path' => below the project's directory, 'query' => without the '?'
+		 */
+		private static function _page( array &$appData, array $request ): array {
+
+			$start	= [ 'path' => '/', 'query' => '' ];
+			$header	= $request['/nino/http/request']['header'] ?? [];
+			$from		= $header['Referer'] ?? '';
+			$host		= $header['Host'] ?? '';
+
+			if( is_string( $from ) === false || is_string( $host ) === false || $from === '' || $host === '' || strlen( $from ) > self::REFERER_LENGTH
+				|| preg_match( '/[\x00-\x20\x7f\\\\]/', $from. $host ) === 1 )
+				return $start;
+
+			$secure	= ( $appData['/nino/session/force-secure-cookie'] ?? false ) === true || ( ( $_SERVER['HTTPS'] ?? '' ) !== '' && ( $_SERVER['HTTPS'] ?? '' ) !== 'off' );
+			$own		= parse_url( ( $secure === true ? 'https' : 'http' ). '://'. $host );
+			$url		= parse_url( $from );
+
+			if( is_array( $own ) === false || is_array( $url ) === false || isset( $own['host'], $url['host'], $url['scheme'] ) === false
+				|| isset( $url['user'] ) === true || isset( $url['pass'] ) === true )
+				return $start;
+
+			$port = static fn( array $parts, string $scheme ): int => (int) ( $parts['port'] ?? ( $scheme === 'https' ? 443 : 80 ) );
+
+			if( strtolower( $url['scheme'] ) !== ( $secure === true ? 'https' : 'http' ) || strtolower( $url['host'] ) !== strtolower( $own['host'] )
+				|| $port( $url, strtolower( $url['scheme'] ) ) !== $port( $own, $secure === true ? 'https' : 'http' ) )
+				return $start;
+
+			$path	= (string) ( $url['path'] ?? '/' );
+			$dir	= rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
+
+			if( $dir !== '' )
+				$path = $path === $dir ? '/' : ( str_starts_with( $path, $dir. '/' ) === true ? substr( $path, strlen( $dir ) ) : '' );
+
+			return \Nino\Http::isSitePath( $path ) === true ? [ 'path' => $path, 'query' => (string) ( $url['query'] ?? '' ) ] : $start;
 		}
 
 		/**

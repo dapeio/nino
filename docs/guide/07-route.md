@@ -144,7 +144,7 @@ Ein Update ist nicht nötig. Die Einheit hat sich nicht geändert.
 Öffne `/meetups`.
 
 - Wähle ein Treffen, gib einen Namen ein, sende ab. Die Seite bleibt stehen, im Formular steht „Danke. Du bist angemeldet.“, und das Formular ist gesperrt. In `private/data/meetups-signups.php` steht die Anmeldung. Ohne JavaScript landet der Browser auf `/meetups?signup=ok`.
-- Sende eine Anmeldung ohne Namen und eine ohne Token. Im Browser prüft das Skript den Namen (das Formular hat `novalidate`) und sendet nichts. Ohne JavaScript sendet der Browser das leere Formular ab und bekommt `400` mit dem Satz im Formular. Nimm `curl`:
+- Sende eine Anmeldung ohne Namen und eine ohne Token. Im Browser prüft das Skript den Namen und sendet nichts; ohne JavaScript hält der Browser das leere Pflichtfeld selbst zurück. Eine Anfrage, die an beidem vorbeigeht, bekommt `400` mit dem Satz im Formular. Nimm `curl`:
 
 ```bash
 J=$(mktemp)
