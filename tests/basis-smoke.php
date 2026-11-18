@@ -582,6 +582,16 @@ check( 'an image is the figure of the picture of a slot: its size, lazy, the alt
 	=== '<figure class="image image--ratio-4-3"><a href="/x"><img src="/public/images/card.jpg" width="800" height="450" alt="Call" loading="lazy" decoding="async"></a><figcaption>Cap</figcaption></figure>'
 	&& str_contains( $draw( '[image /template/page-basis/card-1/photo]' ), ' alt="Ein Bild im Speicher" ' ) && str_contains( $draw( '[image /template/page-basis/card-1/photo decorative]' ), ' alt="" ' ) && str_contains( $draw( '[image /template/page-basis/card-1/photo decorative alt="Call"]' ), ' alt="Call" ' )
 	&& $draw( '[image /logo alt="Call"]' ) === '<figure class="image"><img src="/public/images/logo.png" width="160" height="48" alt="Call" loading="lazy" decoding="async"></figure>' );
+// a picture fitted or of a fixed height, a row that stands in the middle, columns of a fifth and a sixth: each is a class of its own, and a value the schema does not list is no class
+check( 'an image takes fit (a bool) and a fixed height (a choice of four steps): each is a class of the figure and nothing else of the markup, and a height outside the steps is none',
+	$schemas['image']['attributes']['fit']['type'] === 'bool' && $schemas['image']['attributes']['fit']['default'] === false
+	&& $schemas['image']['attributes']['height']['options'] === [ 'auto', '1', '2', '3', '4' ] && $schemas['image']['attributes']['height']['default'] === 'auto'
+	&& $draw( '[image /logo decorative fit height="3" ratio="16-9"]' ) === '<figure class="image image--ratio-16-9 image--fit image--height-3"><img src="/public/images/logo.png" width="160" height="48" alt="" loading="lazy" decoding="async"></figure>'
+	&& $draw( '[image /logo decorative height="9" fit="no"]' ) === $draw( '[image /logo decorative]' ) && $draw( '[image /logo decorative height="auto"]' ) === '<figure class="image"><img src="/public/images/logo.png" width="160" height="48" alt="" loading="lazy" decoding="async"></figure>' );
+check( 'a row takes where its columns stand when they do not fill it, and a column takes a fifth and a sixth of the row at every width; the default of each is the markup of a row and a column that say nothing',
+	$schemas['section-row']['attributes']['halign']['options'] === [ 'start', 'center', 'end', 'between' ] && $schemas['section-row']['attributes']['halign']['default'] === 'start'
+	&& $draw( '[section-row halign="between"][section-col size="16 m:20 l:25"][/section-col][/section-row]' ) === '<div class="section-row section-row--halign-between"><div class="section-col section-col--size-16 section-col--m-size-20 section-col--l-size-25"></div></div>'
+	&& $draw( '[section-row halign="start"][section-col size="17"][/section-col][/section-row]' ) === '<div class="section-row"><div class="section-col"></div></div>' );
 $noticed = ninoWarnings();
 $anchored = $draw( '[image /template/page-basis/story/photo href="/x"][image /template/page-basis/story/photo href="/y" decorative][image /template/page-basis/story/photo alt="Named" href="/z"]' );
 $said = ninoWarnings();
@@ -826,7 +836,7 @@ foreach( glob( $basisDir. '/groups/*/group.php' ) as $groupFile )
 
 preg_match_all( '/^\| `[a-z-]+\.[a-z-]+` \| `--[a-z-]+` \| .*\|$/m', $manual, $listed );
 check( 'the manual lists the '. count( $rows ). ' knobs of basis with their token and ladder, as the group.php files hold them',
-	count( $rows ) === 16 && array_diff( $rows, $listed[0] ) === [] && array_diff( $listed[0], $rows ) === [] );
+	count( $rows ) === 17 && array_diff( $rows, $listed[0] ) === [] && array_diff( $listed[0], $rows ) === [] );
 $bleedRule = array_values( array_filter( basisRules( $nino ), static fn( array $rule ): bool => str_contains( $rule['body'], '--page-bleed' ) ) );
 $bleedWhole = ':where( [class$="--bleed"], [class*="--bleed "] ) > :first-child';
 check( 'bleed is a name of the page and is for the first child only: the reset sets --page-bleed to 1 there, whole word, and to 0 on everything inside it, and nothing else sets it; the figure of a picture works its corner out of it, with 0 where it is not set, and the picture reads that'
@@ -986,6 +996,7 @@ if( str_contains( $cell, 'grid-area: 1 / 1;' ) === false || str_contains( basisB
 // a fixed step is a factor on the knob of the same size: it never sets the token of the knob, so a theme that turns the knob turns the steps with it, in the same order
 // ...by the factors the manual names: 0, a half, one, one and a half, two and a half for a gap and a pad, an eighth under and over for a size; each grounds rule of the component says its own 1, so that no factor is inherited by what stands in it
 $steps = [ 'section' => [ 'section-row' => [ 'gap', '--section-row--f', '--section-row-gap', [ 0.0, 0.5, 1.0, 1.5, 2.5 ] ], 'section-col' => [ 'pad', '--section-col--f', '--section-col-pad', [ 0.0, 0.5, 1.0, 1.5, 2.5 ] ] ],
+	'image' => [ 'image' => [ 'height', '--image--f', '--image-height', [ 0.5, 1.0, 1.5, 2.5 ] ] ],
 	'text' => [ 'text' => [ 'size', '--text--f', '--text-size', [ 0.875, 1.0, 1.125 ] ] ], 'button' => [ 'button' => [ 'size', '--button--f', '--button-size', [ 0.875, 1.0, 1.125 ] ] ] ];
 
 foreach( $steps as $stepGroup => $stepComponents )
@@ -1022,6 +1033,34 @@ if( str_contains( basisBody( $partRules['section'], '.section-row' ), '--section
 	|| str_contains( basisBody( $partRules['button'], '.button' ), 'font-size: calc( var(--button-size) * var(--button--f) );' ) === false
 	|| substr_count( $css['section'], 'var(--section-row-gap)' ) !== 1 || substr_count( $css['section'], 'var(--section-col-pad)' ) !== 1 )
 	$bad[] = 'a part reads the knob of a step where it should read the knob times the factor';
+
+// a picture is fitted by object-fit and a fixed height is a factor on the knob of its own, which the step never sets: the width follows the picture and is cut at the column, and the picture is fitted into what is left
+$imageRules = $partRules['image'];
+
+if( str_contains( basisBody( $imageRules, '.image--fit img' ), 'object-fit: contain;' ) === false
+	|| str_contains( basisBody( $imageRules, '.image:where( [class*="--height-"] ) img' ), 'height: calc( var(--image-height) * var(--image--f) );' ) === false
+	|| str_contains( basisBody( $imageRules, '.image:where( [class*="--height-"] ) img' ), 'width: auto;' ) === false || str_contains( basisBody( $imageRules, '.image:where( [class*="--height-"] ) img' ), 'object-fit: contain;' ) === false
+	|| trim( basisBody( array_filter( $imageRules, static fn( array $rule ): bool => $rule['selector'] === '.image:where( [class*="--height-"] )' ), 'image:where' ) ) !== 'width: auto;'
+	|| trim( basisBody( array_filter( $imageRules, static fn( array $rule ): bool => $rule['selector'] === '.image:where( [class*="--height-"] ) img' && str_contains( $rule['body'], 'inline-block' ) ), 'image:where' ) ) !== 'display: inline-block; vertical-align: top;'
+	|| str_contains( basisBody( $imageRules, '.image--height-' ), '--image-height' ) === true )
+	$bad[] = 'a fitted picture or one of a fixed height is not fitted by object-fit, or a step of the height sets the knob and not a factor';
+
+// the columns of a fifth and a sixth stand at every width, and a row says where its columns stand with the line that wraps
+foreach( [ '16' => '6', '20' => '5' ] as $size => $count )
+	foreach( [ '' => [ '', '' ], 'm-' => [ 'm-', '@media (min-width: 768px)' ], 'l-' => [ 'l-', '@media (min-width: 1024px)' ] ] as $width => [ $prefix, $at ] )
+		if( str_contains( basisBody( array_filter( $partRules['section'], static fn( array $rule ): bool => $rule['selector'] === '.section-col--'. $prefix. 'size-'. $size ), '.section-col--'. $prefix. 'size-'. $size, $at ), '--section-col--n: '. $count. ';' ) === false )
+			$bad[] = 'a column of size '. $size. ' at '. ( $width === '' ? 'every width' : $width ). ' is not one of '. $count;
+
+foreach( [ 'center' => 'center', 'end' => 'flex-end', 'between' => 'space-between' ] as $halign => $justify )
+	if( trim( basisBody( array_filter( $partRules['section'], static fn( array $rule ): bool => $rule['selector'] === '.section-row--halign-'. $halign ), '.section-row--halign-'. $halign ) ) !== 'justify-content: '. $justify. ';' )
+		$bad[] = 'halign '. $halign. ' is not justify-content: '. $justify;
+
+// a title that is a link is underlined - no rule of the part takes the underline away from it - and thicker at the pointer; a title that is none has no rule of its own for it
+$titleLink = basisBody( array_filter( $partRules['section'], static fn( array $rule ): bool => $rule['selector'] === '.section-title a' ), '.section-title a' );
+
+if( str_contains( $titleLink, 'text-decoration' ) === true || str_contains( $titleLink, 'color: inherit;' ) === false || str_contains( basisBody( $partRules['section'], '.section-title a:hover' ), 'text-decoration-thickness: 2px;' ) === false
+	|| substr_count( $css['section'], 'text-decoration: none' ) !== 0 )
+	$bad[] = 'a title that is a link is not underlined, or an underline is taken from it';
 
 // the menu is a details, with no popover, and a wide screen shows its list where the browser lets the rules reach it
 $nav = basisBody( $partRules['header'], '.header-nav-details::details-content', '@media (min-width: 768px) @supports selector( ::details-content )' );
