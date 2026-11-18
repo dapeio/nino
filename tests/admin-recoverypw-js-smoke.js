@@ -5,10 +5,12 @@
  *
  *													The tab is one form: the old recovery password, the new
  *													one twice. What matters is what it sends and when - a
- *													repeat that differs sends nothing - and what it does
- *													with the answer: the three fields are emptied after a
- *													success, and kept after a failure so that a mistyped
- *													old password is typed once.
+ *													field that is empty, a new password that is too short
+ *													and a repeat that differs send nothing and say what is
+ *													wrong under the field - and what it does with the
+ *													answer: the three fields are emptied after a success,
+ *													and kept after a failure so that a mistyped old
+ *													password is typed once.
  *
  *	Usage: node tests/admin-recoverypw-js-smoke.js
  */
@@ -102,10 +104,17 @@ console.log('Admin Recovery password tab');
 tab.init();
 check( 'opening the tab asks the server for nothing - there is nothing of the server\'s in the form', requests.length === 0 );
 check( 'the form has the three password fields, each a password input', [ 'current', 'new', 'repeat' ].every( function( name ) { return field( name ) !== null && field( name ).type === 'password' } ) );
-check( '...with the autocomplete hints that keep a password manager from filling the wrong one', field('current').attributes.autocomplete === 'current-password'
-	&& field('new').attributes.autocomplete === 'new-password' && field('repeat').attributes.autocomplete === 'new-password' );
+check( '...with the autocomplete hints that keep a password manager from filling the wrong one', field('current').autocomplete === 'current-password'
+	&& field('new').autocomplete === 'new-password' && field('repeat').autocomplete === 'new-password' );
 check( '...the two new ones with the minimum length the server holds to', field('new').minLength === 8 && field('repeat').minLength === 8 );
-check( 'the status line is the action bar\'s own', field('msg') !== null && field('msg').classList.contains('nino-admin-actionbar-status') );
+const formEl = findAll( mount, function( el ) { return el.tagName === 'FORM' } )[0];
+const barEl = findAll( formEl, function( el ) { return el.classList.contains('nino-admin-actionbar') } );
+check( 'the form checks nothing by itself, and has one bar with its status line and one main button, the submit', formEl.noValidate === true && barEl.length === 1
+	&& barEl[0].children.includes( field('msg') ) && findAll( barEl[0], function( el ) { return el.classList.contains('nino-admin-btn-primary') } ).length === 1
+	&& findAll( barEl[0], function( el ) { return el.classList.contains('nino-admin-btn-primary') } )[0].type === 'submit' );
+check( 'every field is required and says so, and what the new password needs stands behind a (?) and no paragraph stands in the form', [ 'current', 'new', 'repeat' ].every( function( name ) { return field( name ).required === true && field( name ).attributes['aria-required'] === 'true' } )
+	&& field('new').attributes['aria-describedby'] !== undefined && findAll( formEl, function( el ) { return el.id === field('new').attributes['aria-describedby'].split(' ')[0] && el.classList.contains('nino-admin-help-text') } ).length === 1
+	&& findAll( formEl, function( el ) { return String( el.className ).indexOf('nino-admin-hint') !== -1 } ).length === 0 );
 check( 'the form is registered with the shell\'s dirty registry, and drawn means saved', dirty.forms.recoverypw !== undefined && dirty.forms.recoverypw.getter() === mount && dirty.snapshots.join() === 'recoverypw' );
 check( 'the inputs carry the field names the server\'s refusals use', field('current').dataset.field === 'current' && field('new').dataset.field === 'pw' );
 check( 'the tab shows again without being rebuilt', ( function() { const before = field('current'); tab.showCurrent(); return field('current') === before && requests.length === 0 } )() );
@@ -123,11 +132,24 @@ check( 'the tab shows again without being rebuilt', ( function() { const before 
 	check( '...and once the registry says it does not - the fields were put back - the line is clear again', message() === '' && field('msg').dataset.state === 'idle' );
 }
 
+// What is missing and what is too short is said before anything is sent, each under its field, and the first takes the focus
+const wrongsText = function() { return findAll( formEl, function( el ) { return el.classList.contains('nino-admin-field-error') } ).map( function( el ) { return el.textContent } ) };
+type( '', '', '' );
+submit();
+check( 'three empty fields send nothing and each says that it is missing, the first takes the focus', requests.length === 0 && wrongsText().indexOf( text('/_admin/recoverypw/error/repeat-missing') ) !== -1 && findAll( formEl, function( el ) { return el.classList.contains('nino-admin-field-error') } ).length === 3 && field('current').focused === true );
+type( 'old secret', 'short', 'short' );
+submit();
+check( 'a new password under the minimum sends nothing and says what is expected of it', requests.length === 0 && findAll( formEl, function( el ) { return el.classList.contains('nino-admin-field-error') } ).length === 1
+	&& field('new').attributes['aria-invalid'] === 'true' );
+
 // A repeat that differs: nothing is sent, and the fields stay as they are
 type( 'old secret', 'brand new secret', 'brand new secrat' );
 submit();
+const wrongs = function() { return findAll( formEl, function( el ) { return el.classList.contains('nino-admin-field-error') } ) };
 check( 'a repeat that differs sends nothing', requests.length === 0 );
-check( '...says why', message() === text('/_admin/recoverypw/error/mismatch') && text('/_admin/recoverypw/error/mismatch') !== '' );
+check( '...says why under the repeat, and the line of the bar says once that fields are marked', wrongs().length === 1 && wrongs()[0].textContent === text('/_admin/recoverypw/error/mismatch') && wrongs()[0].parentNode.children[ wrongs()[0].parentNode.children.indexOf( wrongs()[0] ) - 1 ].children.includes( field('repeat') )
+	&& field('repeat').attributes['aria-invalid'] === 'true' && field('msg').dataset.state === 'error' && message() === text('/_admin/users/error/fields') );
+check( '...and the focus goes to the field that is wrong', field('repeat').focused === true );
 check( '...and keeps what was typed', field('current').value === 'old secret' && field('new').value === 'brand new secret' );
 check( '...a save asked for by the registry says so with done( false )', ( function() { let result = null; dirty.forms.recoverypw.save( function( ok ) { result = ok } ); return result === false && requests.length === 0 } )() );
 
@@ -140,7 +162,8 @@ check( '...with the save button off while it runs', findAll( mount, function( el
 
 answer( 401, { error : 'wrong current password', code : 'recoverypw_wrong', params : [], field : 'current' } );
 check( 'a 401 shows the words of its code, not the server\'s English', message() === text('/_admin/error/recoverypw_wrong') && text('/_admin/error/recoverypw_wrong') !== '' );
-check( '...and marks the old password as the field it is about', field('current').attributes['aria-invalid'] === 'true' );
+check( '...marks the old password as the field it is about and says it under that field as well', field('current').attributes['aria-invalid'] === 'true'
+	&& wrongs().length === 1 && wrongs()[0].textContent === text('/_admin/error/recoverypw_wrong') );
 check( '...keeps all three fields, so the old password is the only thing typed again', field('current').value === 'old secret' && field('new').value === 'brand new secret' && field('repeat').value === 'brand new secret' );
 check( '...and gives the button back', findAll( mount, function( el ) { return el.type === 'submit' } )[0].disabled === false );
 
@@ -158,7 +181,7 @@ const snapshots = dirty.snapshots.length;
 answer( 200, { ok : true } );
 check( 'a success is the new baseline of the registry', dirty.snapshots.length === snapshots + 1 && dirty.snapshots[snapshots] === 'recoverypw' );
 check( 'a success empties all three fields', field('current').value === '' && field('new').value === '' && field('repeat').value === '' );
-check( '...says it is saved as a toast, the line empty', message() === '' && toasts.length === 1 && toasts[0] === text('/_admin/recoverypw/msg/saved') && text('/_admin/recoverypw/msg/saved') !== '' );
+check( '...says it is saved as a toast, the line empty', message() === '' && toasts.length === 1 && toasts[0] === text('/_admin/common/msg/saved') && text('/_admin/common/msg/saved') !== '' );
 
 // A save asked for by the registry (Save in the question before leaving) reports how it ended
 type( 'old secret', 'brand new secret', 'brand new secret' );
@@ -169,8 +192,8 @@ dirty.forms.recoverypw.save( function( ok ) { ended.push( ok ) } );
 answer( 200, { ok : true } );
 check( 'the registry\'s save reports done( false ) on a failed request and done( true ) on success', ended.join() === 'false,true' );
 
-// Every word is a fill, in both languages
-const keys = [ '/_admin/nav/recoverypw', '/_admin/recoverypw/intro', '/_admin/recoverypw/label/current', '/_admin/recoverypw/label/new', '/_admin/recoverypw/label/repeat', '/_admin/recoverypw/msg/saved', '/_admin/recoverypw/error/mismatch', '/_admin/error/recoverypw_wrong', '/_admin/error/recoverypw_password_short', '/_admin/error/recoverypw_locked', '/_admin/error/recoverypw_unset' ];
-check( 'every word of the tab is worded in English and in German', keys.every( function( key ) { return typeof moduleEn[key] === 'string' && moduleEn[key] !== '' && typeof moduleDe[key] === 'string' && moduleDe[key] !== '' } ) );
+// The words of the refusals the server names by code are worded in both languages (the words of the scripts are held by admin-users-js-smoke.js)
+const keys = [ '/_admin/error/recoverypw_wrong', '/_admin/error/recoverypw_password_short', '/_admin/error/recoverypw_locked', '/_admin/error/recoverypw_unset' ];
+check( 'every refusal of the tab is worded in English and in German', keys.every( function( key ) { return typeof moduleEn[key] === 'string' && moduleEn[key] !== '' && typeof moduleDe[key] === 'string' && moduleDe[key] !== '' } ) );
 
 done();

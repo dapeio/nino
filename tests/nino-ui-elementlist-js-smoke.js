@@ -5,13 +5,12 @@
  *											field uses once its model lets it hold more than one
  *											reference.
  *
- *											The element form and the Roles tab's permission
- *											picker render it (see _admin/Nino/Modules/Elements/
- *											assets/admin.js and _admin/Nino/Modules/Users/assets/roles.js),
- *											so its behaviour is pinned once here rather than twice
- *											over there: what the hidden input holds after every
- *											move, the cap, and that a target deleted since is
- *											still shown rather than dropped.
+ *											The element form renders it (see _admin/Nino/Modules/
+ *											Elements/assets/admin.js), so its behaviour is pinned
+ *											once here rather than over there: what the hidden
+ *											input holds after every move, the cap, and that a
+ *											target deleted since is still shown rather than
+ *											dropped.
  *
  *	Usage: node tests/nino-ui-elementlist-js-smoke.js
  */

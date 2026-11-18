@@ -911,17 +911,20 @@ check( '...and the check saw the modifier both image controls use', imageMsgModi
 {
 	const box = { console : console, document : { documentElement : null, body : null, getElementById : () => ( { textContent : '' } ) } };
 	box.window = box;
-	box.Nino = { admin : {}, content : { getText : key => key }, adminUi : { api : { errorText : () => 'x' } } };
+	box.Nino = { admin : {}, content : { getText : key => key }, adminUi : { api : { errorText : () => 'x' }, clearFieldErrors : () => {} } };
 	vm.runInContext( adminAsset( 'Users', 'roles.js' ), vm.createContext( box ), { filename : 'roles.js' } );
 	const roles = box.Nino.admin.roles;
 	roles._showError = () => {};
+	roles._line = { saving : () => {}, error : () => {}, saved : () => {} };
+	roles._openRole = () => {};
+	roles._renderList = () => {};
 	const answers = [ [ 200, { id : 'editor' } ], [ 500, null ] ];
 	roles._apiCall = ( endpoint, payload, callback ) => callback( ...answers.shift() );
 	const reported = [];
-	roles._save( { value : 'editor' }, { value : 'Editor' }, { fullCheck : { checked : false }, perms : () => [] }, ok => reported.push( ok ) );
+	roles._send( 'editor', 'Editor', [], ok => reported.push( ok ) );
 	check( 'a role that was written is reported as saved when only the list read after it fails', reported.join() === 'true' );
 	answers.push( [ 400, {} ] );
-	roles._save( { value : 'editor' }, { value : 'Editor' }, { fullCheck : { checked : false }, perms : () => [] }, ok => reported.push( ok ) );
+	roles._send( 'editor', 'Editor', [], ok => reported.push( ok ) );
 	check( '...and one the server refused is not', reported.join() === 'true,false' );
 }
 

@@ -13,7 +13,10 @@
  *													warning that comes with that transition - in and
  *													out again -, the summary
  *													of what a role may do, and that the Add button can
- *													only ever add a string out of the tree.
+ *													only ever add a string out of the tree. The
+ *													permissions are lists of ticks, a group each, and a
+ *													tick taken away is a permission taken away. The form
+ *													says what is missing under the field.
  *
  *	Usage: node tests/admin-roles-js-smoke.js
  */
@@ -51,6 +54,7 @@ const sandbox = {
 	console : console,
 	document : {
 		createElement : element,
+		createElementNS : function( space, tag ) { return element( tag ) },
 		createTextNode : function( value ) { return { tagName : '#TEXT', textContent : value, attributes : {}, dataset : {}, children : [] } },
 		getElementById : function() { return null },
 		documentElement : null,
@@ -62,17 +66,6 @@ sandbox.window = { Nino : Nino, confirm : function( message ) { confirms.push( m
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
-
-// The multi-reference picker has its own test: here it is a stand-in that
-// keeps what it was given
-const pickers = [];
-Nino.adminUi.elementList = function( options ) {
-	const picker = element('div');
-	picker.options = options;
-	pickers.push( picker );
-	return picker;
-};
-
 load( '_admin/Nino/Modules/Users/assets/roles.js', context );
 
 const roles = Nino.admin.roles;
@@ -162,15 +155,18 @@ check( 'the third list exists only for an action with fields, and starts with al
 	&& roles._fieldList( roles._actionList( entries[0] )[1] ).length === 0 && roles._fieldList( roles._actionList( entries[0] )[0] ).length === 0 );
 check( 'a held permission is named by its place in the tree', labels['/_admin/elements/services/update/title'] === ELEMENTS+ ' · Services · '+ text('/_admin/elements/scope/update')+ ' · title' );
 
-console.log('\nAdmin Roles - the picker and the warning');
+console.log('\nAdmin Roles - the lists of ticks and the warning');
 
+/*	The permissions drawn: the fieldsets under one holder, so that a question asks the whole of them	*/
 function draw( perms ) {
-	pickers.length = 0;
-	return roles._renderPermissions( perms );
+	const parts = roles._renderPermissions( perms );
+	parts.holder = element('div');
+	parts.fieldsets.forEach( function( set ) { parts.holder.appendChild( set ) } );
+	return parts;
 }
 
 function lists( parts ) {
-	const select = function( key ) { return parts.fieldset.querySelector('[data-key="'+ key+ '"]') };
+	const select = function( key ) { return parts.holder.querySelector('[data-key="'+ key+ '"]') };
 	return { area : select('scope-area'), action : select('scope-action'), field : select('scope-field') };
 }
 
@@ -180,15 +176,49 @@ function choose( select, index ) {
 }
 
 function addButton( parts ) {
-	return findAll( parts.fieldset, function( el ) { return el.tagName === 'BUTTON' && el.textContent === text('/_admin/roles/scope/add') } )[0];
+	return findAll( parts.holder, function( el ) { return el.tagName === 'BUTTON' && el.textContent === text('/_admin/roles/scope/add') } )[0];
 }
 
 function summary( parts ) {
-	return findAll( parts.fieldset, function( el ) { return el.tagName === 'LI' } ).map( function( li ) { return li.textContent } );
+	return findAll( parts.holder, function( el ) { return el.tagName === 'LI' } ).map( function( li ) { return li.textContent } );
+}
+
+/** The tick of a permission, in whichever list it stands */
+function tickOf( parts, perm ) {
+	return findAll( parts.holder, function( el ) { return el.tagName === 'INPUT' && el.type === 'checkbox' && el.value === perm } )[0] ?? null;
+}
+
+function tick( parts, perm, on ) {
+	const box = tickOf( parts, perm );
+	box.checked = on;
+	fire( box, 'change' );
+}
+
+/** The words a tick is named by */
+function nameOfTick( parts, perm ) {
+	return findAll( tickOf( parts, perm ).parentNode, function( el ) { return el.tagName === 'SPAN' } )[0].textContent;
 }
 
 let parts = draw( [ '/_admin/elements/manage' ] );
 let found = lists( parts );
+
+check( 'the permissions are one list of ticks for each group of the rail, in the order roles/list names them, and the group is the name of its list', findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).map( function( el ) { return el.dataset.group } ).join() === 'content,other'
+	&& findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).every( function( set ) { return set.tagName === 'FIELDSET' && set.children[0].tagName === 'LEGEND' } ) );
+check( '...every permission offered has its tick, the ones the role holds are ticked, and the other lists are not shown as long as nothing is held', tickOf( parts, '/_admin/elements/manage' ).checked === true && tickOf( parts, '/_admin/text/manage' ).checked === false
+	&& tickOf( parts, '/_admin/old/thing' ) !== null && parts.perms().join() === '/_admin/elements/manage' );
+check( 'full access is a switch, which is no tick of any list', tickOf( parts, '/*' ) === null && parts.fullCheck.type === 'checkbox' && parts.fullCheck.parentNode.className === 'nino-admin-switch' );
+
+tick( parts, '/_admin/text/manage', true );
+check( 'a tick adds the permission, and a tick taken away takes it', parts.perms().join() === '/_admin/elements/manage,/_admin/text/manage' );
+tick( parts, '/_admin/elements/manage', false );
+check( '...and nobody is asked about a door', parts.perms().join() === '/_admin/text/manage' && confirms.length === 0 );
+parts = draw( [ '/_admin/elements/manage', '/_admin/old/thing', '/_admin/elements/services/insert' ] );
+tick( parts, '/_admin/text/manage', true );
+check( 'a tick in one group leaves the permissions of every other group, the ones nobody offers and the added ones as they are', parts.perms().sort().join() === [ '/_admin/elements/manage', '/_admin/old/thing', '/_admin/elements/services/insert', '/_admin/text/manage' ].sort().join() );
+tick( parts, '/_admin/elements/manage', false );
+check( '...and a tick taken away takes that one alone', parts.perms().sort().join() === [ '/_admin/old/thing', '/_admin/elements/services/insert', '/_admin/text/manage' ].sort().join() );
+parts = draw( [ '/_admin/elements/manage' ] );
+found = lists( parts );
 
 check( 'the first list offers every area, under the name of its panel', found.area !== null
 	&& found.area.children.map( function( o ) { return o.textContent } ).join('|') === ELEMENTS+ ' · Services|'+ TEXT+ ' · /page-home' );
@@ -202,18 +232,21 @@ check( 'an action with fields brings the third list, with "all fields" first', f
 check( 'these lists are not an edit of the role', found.area.dataset.dirty === 'ignore' && found.action.dataset.dirty === 'ignore' && found.field.dataset.dirty === 'ignore' );
 
 // Adding the first single permission of a panel is the transition
+parts = draw( [ '/_admin/elements/manage' ] );
+found = lists( parts );
+choose( found.action, 2 );
+found = lists( parts );
 choose( found.field, 1 );
 confirmAnswer = false;
 fire( addButton( parts ), 'click' );
 check( 'the first single permission of a panel asks first, naming the panel', confirms.length === 1 && confirms[0].indexOf( ELEMENTS ) !== -1 && confirms[0] === Nino.adminUi.format( text('/_admin/roles/scope/warning'), ELEMENTS ) );
-check( '...and adds nothing when the answer is no', parts.perms().join() === '/_admin/elements/manage' );
+check( '...and adds nothing when the answer is no', parts.perms().join() === '/_admin/elements/manage' && tickOf( parts, '/_admin/elements/services/update/title' ) === null );
 
 confirmAnswer = true;
 fire( addButton( parts ), 'click' );
 check( 'with a yes it is added', parts.perms().indexOf( '/_admin/elements/services/update/title' ) !== -1 && confirms.length === 2 );
-check( '...and sits in the picker under its place in the tree', pickers[pickers.length - 1].options.options.some( function( o ) {
-	return o.value === '/_admin/elements/services/update/title' && o.label === labels['/_admin/elements/services/update/title'];
-} ) );
+check( '...and sits ticked in the list of its own, under its place in the tree', tickOf( parts, '/_admin/elements/services/update/title' ).checked === true
+	&& nameOfTick( parts, '/_admin/elements/services/update/title' ) === labels['/_admin/elements/services/update/title'] );
 
 found = lists( parts );
 choose( found.field, 2 );
@@ -221,7 +254,8 @@ fire( addButton( parts ), 'click' );
 check( 'the second single permission of the same panel does not ask again', confirms.length === 2 && parts.perms().indexOf( '/_admin/elements/services/update/body' ) !== -1 );
 
 fire( addButton( parts ), 'click' );
-check( 'a permission the role already holds is not added twice', parts.perms().filter( function( p ) { return p === '/_admin/elements/services/update/body' } ).length === 1 && confirms.length === 2 );
+check( 'a permission the role already holds is not added twice', parts.perms().filter( function( p ) { return p === '/_admin/elements/services/update/body' } ).length === 1 && confirms.length === 2
+	&& findAll( parts.holder, function( el ) { return el.tagName === 'INPUT' && el.value === '/_admin/elements/services/update/body' } ).length === 1 );
 
 // Another panel is another transition
 choose( lists( parts ).area, 1 );
@@ -230,44 +264,38 @@ fire( addButton( parts ), 'click' );
 check( 'a single permission of another panel asks again, naming that one', confirms.length === 3 && confirms[2] === Nino.adminUi.format( text('/_admin/roles/scope/warning'), TEXT ) );
 
 // Taking the last single permission of a panel away is the transition back
-// to everything. The picker's ✕ reports the list it has left
+// to everything: the tick of the list of its own
 const DOOR = '/_admin/elements/manage';
 const INSERT = '/_admin/elements/services/insert';
 const TITLE = '/_admin/elements/services/update/title';
-const lastPicker = function() { return pickers[pickers.length - 1] };
 
 parts = draw( [ DOOR, INSERT, TITLE ] );
 confirms.length = 0;
 confirmAnswer = false;
-lastPicker().options.onChange( [ DOOR, INSERT ] );
-check( 'removing one of two single permissions of a panel does not ask', confirms.length === 0 && parts.perms().join() === [ DOOR, INSERT ].join() );
+tick( parts, INSERT, false );
+check( 'taking one of two single permissions of a panel away does not ask', confirms.length === 0 && parts.perms().join() === [ DOOR, TITLE ].join() );
 
-const drawn = pickers.length;
-lastPicker().options.onChange( [ DOOR ] );
-check( 'removing the last one asks, naming the panel', confirms.length === 1 && confirms[0] === Nino.adminUi.format( text('/_admin/roles/scope/warning-leave'), ELEMENTS ) );
-check( '...and No keeps it', parts.perms().join() === [ DOOR, INSERT ].join() );
-check( '...with the picker drawn again from what the role holds', pickers.length === drawn + 1 && lastPicker().options.value.join() === [ DOOR, INSERT ].join() );
+tick( parts, TITLE, false );
+check( 'taking the last one away asks, naming the panel', confirms.length === 1 && confirms[0] === Nino.adminUi.format( text('/_admin/roles/scope/warning-leave'), ELEMENTS ) );
+check( '...and No keeps it, with its tick back where it was', parts.perms().join() === [ DOOR, TITLE ].join() && tickOf( parts, TITLE ).checked === true );
 
 confirmAnswer = true;
-lastPicker().options.onChange( [ DOOR ] );
-check( 'Yes removes it', confirms.length === 2 && parts.perms().join() === DOOR );
-
-lastPicker().options.onChange( [] );
-check( 'taking away a permission that is not a single one of a panel does not ask', confirms.length === 2 && parts.perms().length === 0 );
+tick( parts, TITLE, false );
+check( 'Yes takes it away', confirms.length === 2 && parts.perms().join() === DOOR && tickOf( parts, TITLE ).checked === false );
+tick( parts, TITLE, true );
+check( '...and the tick is still there to take it back, which asks the other way', confirms.length === 3 && parts.perms().join() === [ DOOR, TITLE ].join() );
 
 // A permission that is held but not offered any more, and is in the tree
 parts = draw( [ '/_admin/text/update/page-home/hero/title', '/_admin/old/thing' ] );
-const options = pickers[pickers.length - 1].options.options;
-check( 'a held scoped permission is named by the tree, one outside it by its string', options.some( function( o ) { return o.value === '/_admin/text/update/page-home/hero/title' && o.label === labels['/_admin/text/update/page-home/hero/title'] } )
-	&& options.some( function( o ) { return o.value === '/_admin/old/thing' && o.label === text('/_admin/roles/group/other')+ ' · /_admin/old/thing' } ) );
-check( 'a role that holds a single permission names its panel under the picker', findAll( parts.fieldset, function( el ) { return el.textContent === Nino.adminUi.format( text('/_admin/roles/scope/detail-hint'), TEXT ) } ).length === 1 );
+check( 'a held scoped permission is named by the tree, one outside it stands in the list of the permissions nobody offers', nameOfTick( parts, '/_admin/text/update/page-home/hero/title' ) === labels['/_admin/text/update/page-home/hero/title']
+	&& tickOf( parts, '/_admin/old/thing' ).checked === true && findAll( parts.holder, function( el ) { return el.dataset.group === 'other' } )[0].children.some( function( child ) { return child.children.length > 0 && findAll( child, function( el ) { return el === tickOf( parts, '/_admin/old/thing' ) } ).length === 1 } ) );
+check( 'a role that holds a single permission says what it may do in that panel, in the summary', summary( parts ).some( function( line ) { return line.indexOf( TEXT ) !== -1 } ) );
 
 // The order is the server's, not a copy of it: a group the registry adds
-// reaches the picker without a change here
+// reaches the form without a change here
 roles._groups = [ 'other', 'content' ];
-draw( [] );
-check( 'the picker lists every offered permission, group by group in the order roles/list names them',
-	pickers[pickers.length - 1].options.options.map( function( o ) { return o.value } ).join('|') === [ '/_admin/old/thing', '/_admin/elements/manage', '/_admin/text/manage' ].join('|') );
+parts = draw( [] );
+check( 'the lists follow the order roles/list names the groups in', findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).map( function( el ) { return el.dataset.group } ).join() === 'other,content' );
 roles._groups = [ 'content', 'structure', 'features', 'system', 'other' ];
 
 console.log('\nAdmin Roles - what the role may do');
@@ -299,10 +327,13 @@ check( 'what nothing explains is named by its string', unknown.indexOf( Nino.adm
 	&& unknown.indexOf( Nino.adminUi.format( text('/_admin/roles/summary/unknown'), '/_admin/elements/services/update/surprise' ) ) !== -1 );
 
 parts = draw( [ '/_admin/elements/manage' ] );
-check( 'the form carries the summary under its title and refreshes it on every change', summary( parts ).join('|') === Nino.adminUi.format( text('/_admin/roles/summary/doors'), ELEMENTS ) );
+check( 'the form carries the summary and refreshes it on every change', summary( parts ).join('|') === Nino.adminUi.format( text('/_admin/roles/summary/doors'), ELEMENTS ) );
+tick( parts, '/_admin/text/manage', true );
+check( '...a tick is a change of it', summary( parts ).join('|') === Nino.adminUi.format( text('/_admin/roles/summary/doors'), ELEMENTS+ ', '+ TEXT ) );
 parts.fullCheck.checked = true;
 fire( parts.fullCheck, 'change' );
-check( '...and with full access it says so', summary( parts ).join('|') === text('/_admin/roles/summary/full') );
+check( '...and with full access it says so, and the lists are not shown', summary( parts ).join('|') === text('/_admin/roles/summary/full')
+	&& findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).every( function( set ) { return set.classList.contains('admin-hidden') } ) );
 
 
 console.log('\nAdmin Roles - the drill-down');
@@ -312,6 +343,9 @@ console.log('\nAdmin Roles - the drill-down');
 	again where the list was drawn anew behind the form - and a delete leaves it
 	nowhere to stand	*/
 {
+	// A text node has no class list
+	const hasClass = function( el, name ) { return typeof el.className === 'string' && el.className.split(/\s+/).indexOf( name ) !== -1 };
+
 	// The pane the shell draws: the name of the panel in its head, and the two levels beside it
 	const pane = element('div');
 	pane.dataset.panel = 'roles';
@@ -333,13 +367,13 @@ console.log('\nAdmin Roles - the drill-down');
 	const shell = {
 		router : { current : function() { return { panel : 'roles', parts : [] } }, go : function() {}, set : function() {}, leave : function() {},
 			href : function( name, at ) { return '#'+ [ name ].concat( at || [] ).map( encodeURIComponent ).join('/') } },
-		formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar },
 	};
-	const page = { admin : shell, events : { bindCallback : function() {} }, http : { sendRequest : function( uri, method, callback, data ) { sent.push( { action : data.action, callback : callback } ) } }, content : { getText : text } };
+	const page = { admin : shell, events : { bindCallback : function() {} }, http : { sendRequest : function( uri, method, callback, data ) { sent.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } ) } }, content : { getText : text } };
 	const box = {
 		console : console,
 		document : {
 			createElement : element,
+			createElementNS : function( space, tag ) { return element( tag ) },
 			createTextNode : function( value ) { return { tagName : '#TEXT', textContent : value, attributes : {}, dataset : {}, children : [] } },
 			getElementById : function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null },
 			documentElement : null,
@@ -352,7 +386,9 @@ console.log('\nAdmin Roles - the drill-down');
 	box.window = { Nino : page, confirm : function() { return deleteAnswer } };
 	const drillContext = vm.createContext( box );
 	load( '_admin/assets/Nino.admin.js', drillContext );
-	page.adminUi.elementList = function() { return element('div') };
+
+	const toasts = [];
+	page.adminUi.say = function( words ) { toasts.push( words ) };
 	load( '_admin/Nino/Modules/Users/assets/roles.js', drillContext );
 
 	const drilled = page.admin.roles;
@@ -363,9 +399,14 @@ console.log('\nAdmin Roles - the drill-down');
 	drilled._renderList();
 	drilled._showList();
 
-	const linkOf = function( id ) { return findAll( list, function( el ) { return el.tagName === 'A' } ).find( function( a ) { return a.dataset.role === id } ) };
+	const linkOf = function( id ) {
+		const row = findAll( list, function( el ) { return el.tagName === 'LI' } ).find( function( li ) { return li.dataset.row === id } );
+		return row === undefined ? undefined : findAll( row, function( el ) { return el.tagName === 'A' } )[0];
+	};
 	const focusedNow = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
 	const backLinkOf = function() { return findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0] };
+	const byId = function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null };
+	const errorsOf = function() { return findAll( form, function( el ) { return hasClass( el, 'nino-admin-field-error' ) } ) };
 
 	check( 'a row is a link with the address of the role it opens', linkOf('editor').href === '#roles/editor' && linkOf('author').href === '#roles/author' );
 
@@ -379,11 +420,69 @@ console.log('\nAdmin Roles - the drill-down');
 	const addButton = findAll( list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
 	fire( addButton, 'click' );
 	check( 'a new role opens the same way', form.classList.contains('admin-hidden') === false && focusedNow() === backLinkOf() );
+
+	// The form checks nothing by itself: what is missing and what is no id is said under the field
+	const edit = byId('roles-edit-form');
+	check( 'the form is novalidate, and its two fields are required with their star', edit.noValidate === true && byId('roles-form-id').required === true && byId('roles-form-name').required === true );
+	fire( edit, 'submit' );
+	check( 'an empty form sends nothing, says under the id and the name that they are missing, and the focus goes to the first', sent.length === 0 && errorsOf().length === 2 && byId('roles-form-id').attributes['aria-invalid'] === 'true' && byId('roles-form-id').focused === true );
+	byId('roles-form-id').value = 'Not An Id';
+	byId('roles-form-name').value = 'Newcomer';
+	fire( edit, 'submit' );
+	check( 'an id that is no id sends nothing and says what is expected, the sentence of the name is gone', sent.length === 0 && errorsOf().length === 1 );
+
+	// Save: what goes out is the id, the name and the ticked permissions; the answer opens the role and says it
+	// A new role takes no id a role holds: it would be written over
+	byId('roles-form-id').value = 'editor';
+	fire( edit, 'submit' );
+	check( 'an id that a role holds sends nothing and is said to be taken under the field', sent.length === 0 && errorsOf().length === 1 && byId('roles-form-id').attributes['aria-invalid'] === 'true' );
+
+	// Full access is sent as the one permission it is, whatever the lists hold
+	byId('roles-form-id').value = 'newcomer';
+	tick( { holder : form }, '/_admin/text/manage', true );
+	drilled._parts.permissions.fullCheck.checked = true;
+	fire( drilled._parts.permissions.fullCheck, 'change' );
+	fire( edit, 'submit' );
+	check( 'with full access on the form sends the one permission \'/*\' and nothing of the ticks', sent.length === 1 && sent[0].payload.perms.join() === '/*' );
+	sent.length = 0;
+	drilled._parts.permissions.fullCheck.checked = false;
+	fire( drilled._parts.permissions.fullCheck, 'change' );
+
+	fire( edit, 'submit' );
+	check( 'a good form sends roles/save with the id, the name and what is ticked', sent.length === 1 && sent[0].action === 'roles/save' && sent[0].payload.create === true && sent[0].payload.id === 'newcomer' && sent[0].payload.label === 'Newcomer' && sent[0].payload.perms.join() === '/_admin/text/manage' && errorsOf().length === 0 );
+	sent[0].callback( { status : 200, responseJSON : { id : 'newcomer' } } );
+	drilled._roles.push( { id : 'newcomer', label : 'Newcomer', users : 0, perms : [ '/_admin/text/manage' ] } );
+	sent[1].callback( { status : 200, responseJSON : { roles : drilled._roles, permOptions : OPTIONS, groups : [ 'content', 'other' ], scopes : SCOPES } } );
+	check( 'the saved role is the one on the form, drawn from what the server holds, and saving it is said as a toast and by the badge, in no line', byId('roles-form-id').disabled === true && byId('roles-form-id').value === 'newcomer'
+		&& toasts.length === 1 && toasts[0] === text('/_admin/common/msg/saved') && byId('roles-form-msg').textContent === '' );
+
+	// The server's refusal of a taken id is said under the id as well
+	fire( byId('roles-edit-form'), 'submit' );
+	sent[sent.length - 1].callback( { status : 409, responseJSON : { error : 'taken', code : 'roles_id_taken', field : 'id' } } );
+	check( 'a refusal for an id that is taken is said under the id', errorsOf().length === 1 && byId('roles-form-id').attributes['aria-invalid'] === 'true' );
+	sent[sent.length - 1].callback = function() {};
+
+	// A refusal that names the id is said under it
+	fire( byId('roles-edit-form'), 'submit' );
+	sent[sent.length - 1].callback( { status : 400, responseJSON : { error : 'invalid id', code : 'roles_invalid_id' } } );
+	check( 'a refusal of the server is said in the line of the bar, and - for the id - under the field', byId('roles-form-msg').dataset.state === 'error' && errorsOf().length === 1 );
+
 	fire( backLinkOf(), 'click' );
-	check( '...and Back returns to the New role button', focusedNow() === addButton && list.classList.contains('admin-hidden') === false );
+	check( '...and Back returns to the row of the role', focusedNow() === linkOf('newcomer') && list.classList.contains('admin-hidden') === false );
+	const addAgain = findAll( list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
+	fire( addAgain, 'click' );
+	fire( backLinkOf(), 'click' );
+	check( '...and, from a new one, to the New role button as the list is drawn now', focusedNow() === addAgain && list.classList.contains('admin-hidden') === false );
+
+	// The bar: delete at the left, ONE main button at the right, and a role accounts hold cannot go
+	fire( linkOf('editor'), 'click' );
+	const bar = findAll( byId('roles-edit-form'), function( el ) { return hasClass( el, 'nino-admin-actionbar' ) } )[0];
+	const barButtons = findAll( bar, function( el ) { return el.tagName === 'BUTTON' } );
+	check( 'the bar of a form has Delete first, as the one dangerous button, and one main button, the submit, last', barButtons.length === 2 && barButtons[0].classList.contains('nino-admin-btn-danger') && barButtons[1].classList.contains('nino-admin-btn-primary') && barButtons[1].type === 'submit' );
+	check( '...and the Delete of a role that accounts hold is off, with its reason as its title', barButtons[0].disabled === true && barButtons[0].title === text('/_admin/roles/label/delete-hint') );
 
 	fire( linkOf('author'), 'click' );
-	findAll( form, function( el ) { return el.id === 'roles-form-name' } )[0].focus();
+	byId('roles-form-name').focus();
 	deleteAnswer = false;
 	const sentBefore = sent.length;
 	drilled._delete();
@@ -391,19 +490,31 @@ console.log('\nAdmin Roles - the drill-down');
 	deleteAnswer = true;
 	drilled._delete();
 	check( '...and a Yes sends it', sent.length === sentBefore + 1 && sent[sent.length - 1].action === 'roles/delete' );
+	toasts.length = 0;
 	sent[sent.length - 1].callback( { status : 200, responseJSON : {} } );
-	check( 'a deleted role leaves the focus nothing to stand on in the form: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
+	check( 'a deleted role leaves the focus nothing to stand on in the form: it goes to the name of the panel, and the deletion is a toast', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle
+		&& toasts.length === 1 && toasts[0] === text('/_admin/common/msg/deleted') );
+
+	// What a role is called is only ever text
+	drilled._roles.push( { id : 'markup', label : '<img src=x onerror=1>', users : 0, perms : [] } );
+	drilled._renderList();
+	drilled._showList();
+	fire( linkOf('markup'), 'click' );
+	const roleTitle = findAll( form, function( el ) { return el.tagName === 'LEGEND' } )[0];
+	check( 'the title of a role\'s form and its row are its name as text, whatever it holds', roleTitle.textContent === '<img src=x onerror=1>' && roleTitle.children.length === 0
+		&& findAll( list, function( el ) { return el.tagName === 'STRONG' && el.textContent === '<img src=x onerror=1>' && el.children.length === 0 } ).length === 1 );
+	drilled._showList();
 
 	// A role that holds what the signed-in account does not is shown, not
-	// edited: no field, no button, what it may do in words, and why
+	// edited: no field to type in, no button, what it may do in words, and why
 	drilled._roles.push( { id : 'wide', label : 'Wide', users : 2, perms : [ '/*' ], canChange : false } );
 	drilled._renderList();
 	drilled._showList();
 	fire( linkOf('wide'), 'click' );
-	check( 'a role the account may not change has no field and no button in its form', findAll( form, function( el ) { return el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'SELECT' } ).length === 0
+	check( 'a role the account may not change has nothing to type in and no button in its form', findAll( form, function( el ) { return el.tagName === 'INPUT' && el.readOnly !== true || el.tagName === 'BUTTON' || el.tagName === 'SELECT' } ).length === 0
 		&& findAll( form, function( el ) { return el.id === 'roles-form-name' } ).length === 0 );
 	check( '...it says what the role may do and why it is not editable', findAll( form, function( el ) { return el.tagName === 'LI' } ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/roles/summary/full')
-		&& findAll( form, function( el ) { return el.textContent === text('/_admin/roles/label/beyond') } ).length === 1 );
+		&& findAll( form, function( el ) { return hasClass( el, 'nino-admin-notice' ) && el.textContent === text('/_admin/roles/label/beyond') } ).length === 1 );
 	drilled._showList();
 	fire( linkOf('editor'), 'click' );
 	drilled._roles.push( { id : 'carried', label : 'Carried', users : 1, perms : [ '/_admin/text/manage' ], canChange : false, heldBeyond : true } );
@@ -415,13 +526,14 @@ console.log('\nAdmin Roles - the drill-down');
 	drilled._showList();
 	fire( linkOf('wide'), 'click' );
 	check( '...and the one that holds it itself says that', findAll( form, function( el ) { return el.textContent === text('/_admin/roles/label/beyond') } ).length === 1 );
-	check( '...and what it says is said in both languages', [ 'en_US', 'de_DE' ].every( function( locale ) {
-		const words = fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php');
-		return [ '/_admin/roles/label/beyond', '/_admin/roles/label/held-beyond', '/_admin/error/roles_role_beyond', '/_admin/error/roles_role_beyond_scoped', '/_admin/error/roles_role_held_beyond', '/_admin/error/roles_role_held_beyond_scoped' ].every( function( key ) { return typeof words[key] === 'string' && words[key] !== '' } );
-	} ) );
 	drilled._showList();
 	fire( linkOf('editor'), 'click' );
-	check( '...and a role that may be changed keeps its form', findAll( form, function( el ) { return el.id === 'roles-form-name' } ).length === 1 && findAll( form, function( el ) { return el.tagName === 'BUTTON' } ).length > 0 );
+	check( '...and a role that may be changed keeps its form', byId('roles-form-name') !== null && byId('roles-form-name').readOnly !== true && findAll( form, function( el ) { return el.tagName === 'BUTTON' } ).length > 0 );
 }
+
+check( 'the words of the refusals the server names by code are worded in English and in German', [ 'en_US', 'de_DE' ].every( function( locale ) {
+	const words = fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php');
+	return [ '/_admin/error/roles_role_beyond', '/_admin/error/roles_role_beyond_scoped', '/_admin/error/roles_role_held_beyond', '/_admin/error/roles_role_held_beyond_scoped' ].every( function( key ) { return typeof words[key] === 'string' && words[key] !== '' } );
+} ) );
 
 done();

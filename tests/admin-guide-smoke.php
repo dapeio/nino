@@ -418,6 +418,8 @@ check( 'a dialog of a form takes each of them as a type of field, and a question
 $converted = [
 	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
+	'_admin/Nino/Modules/Users/assets/admin.js',
+	'_admin/Nino/Modules/Users/assets/roles.js',
 ];
 
 $byHand = [];
@@ -448,6 +450,9 @@ $listed = [
 	'_admin/Nino/Modules/Text/assets/keys.js'			=> 'adminUi.list(',
 	'_admin/Nino/Modules/Text/assets/textkeys.js'	=> 'adminUi.filterBar(',
 	'_admin/Nino/Modules/Features/assets/admin.js'	=> 'adminUi.table(',
+	'_admin/Nino/Modules/Users/assets/admin.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Users/assets/roles.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Users/assets/lockout.js'	=> 'adminUi.list(',
 ];
 
 $ownClass = '/admin-type-btn|admin-view-button-chev|admin-text-chip|admin-text-search|admin-text-block|nino-admin-list-buttons/';
@@ -504,6 +509,57 @@ foreach( $schemaForms as $script ) {
 }
 
 check( 'no form drawn from a schema puts the sentence of a field, or the explanation of a section, under it'. ( $underneath === [] ? '' : ' - '. implode( ', ', $underneath ) ), $underneath === [] );
+
+// --- the forms of Users, Roles, Login protection and the Recovery password are built from the blocks ----------------
+
+/*	The four scripts of the Users panel draw their forms as the chapter asks: every form is novalidate, every field is a block (a
+	label, a select, an input of their own is none), the bar is the block's with one main button, what is wrong is said under the
+	field, and what went well is a toast. The list grows: the patch that brings another form over adds its script here	*/
+$guideForms = [
+	'_admin/Nino/Modules/Users/assets/admin.js',
+	'_admin/Nino/Modules/Users/assets/roles.js',
+	'_admin/Nino/Modules/Users/assets/lockout.js',
+	'_admin/Nino/Modules/Users/assets/recoverypw.js',
+];
+
+/*	The comments of a script that stand at the beginning of a line: a script that writes the string '/*' (the permission of full access) is no comment	*/
+$comments = static function( string $source ): string {
+	return (string) preg_replace( '~^[ \t]*/\*.*?\*/~ms', '', $source );
+};
+
+$handmade		= [];
+$unchecked	= [];
+$unbarred		= [];
+
+foreach( $guideForms as $script ) {
+
+	$source = $comments( $read( $script ) );
+	$forms	= substr_count( $source, "createElement('form')" );
+
+	// A form that the browser checks speaks in its own language, and a field that is built by hand is none of the blocks
+	if( $forms < 1 || substr_count( $source, '.noValidate = true' ) !== $forms || preg_match( "/createElement\(\s*'(label|input|select|textarea|button)'\s*\)/", $source ) === 1 )
+		$handmade[] = $script;
+
+	if( str_contains( $source, 'adminUi.fieldError(' ) === false || str_contains( $source, 'adminUi.clearFieldErrors(' ) === false )
+		$unchecked[] = $script;
+
+	// The bar is the block's: a status line, one main button, and nothing is shown as a bar of its own
+	if( str_contains( $source, 'adminUi.actionBar(' ) === false || preg_match( '/(className\s*=|classList\.(add|toggle)\()\s*[\'"][^\'"]*nino-admin-(actionbar|btn-)/', $source ) === 1 )
+		$unbarred[] = $script;
+}
+
+check( 'every form of the Users panel is novalidate and made of the blocks of the workbench'. ( $handmade === [] ? '' : ' - '. implode( ', ', $handmade ) ), $handmade === [] );
+check( '...says what is wrong under the field and clears it again'. ( $unchecked === [] ? '' : ' - '. implode( ', ', $unchecked ) ), $unchecked === [] );
+check( '...and has the one bar of the blocks, with no class of a button or a bar written in the script'. ( $unbarred === [] ? '' : ' - '. implode( ', ', $unbarred ) ), $unbarred === [] );
+
+// The permissions of a role are lists of ticks: a target of the list is the height of a control, never the 23 px of the picker's buttons
+$rolesScript = $comments( $read( '_admin/Nino/Modules/Users/assets/roles.js' ) );
+$rowRule = $sortRule( ':where(.nino-admin) .nino-admin-checklist label' );
+
+check( 'the permissions of a role are lists of ticks, not the picker with its small buttons', str_contains( $rolesScript, 'adminUi.checklist(' ) === true && str_contains( $rolesScript, 'adminUi.elementList(' ) === false );
+check( '...a row of such a list is at least 28 px high: its rule reads the height of a control, and that token is 28 px or more', preg_match( '/min-height: var\(--nino-admin-control-height\)/', $rowRule ) === 1
+	&& preg_match( '/^(\d+)px$/', $light['--nino-admin-control-height'] ?? '', $rowHeight ) === 1 && (int) $rowHeight[1] >= 28 );
+check( '...and full access is a switch', str_contains( $rolesScript, 'adminUi.switchField(' ) === true );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

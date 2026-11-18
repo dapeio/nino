@@ -347,7 +347,7 @@ console.log('Nino.adminUi.confirm');
 		}
 	} );
 	check( 'the questions that switch something off or take it back to the base make the dangerous answer the way on, and the ones about an account or a role do not tell of visitors',
-		said['/_admin/users/confirm/deactivate'] === 'danger/account' && said['/_admin/favicon/confirm/reset'] === 'danger/site'
+		said['/_admin/users/confirm/deactivate'] === '/account' && said['/_admin/favicon/confirm/reset'] === 'danger/site'
 		&& said['/_admin/users/confirm/logoutall'] === '/account' && said['/_admin/roles/scope/warning'] === '/account' && said['/_admin/roles/scope/warning-leave'] === '/account' );
 	check( 'every panel script that asks names the weight of its question as the workbench has decided it, and a weight is one of three words - an unnamed one is taken for the heaviest, so a misspelled one would ask more than it was meant to and never say so',
 		calls === Object.keys( expected ).length && JSON.stringify( Object.keys( found ).sort().map( key => [ key, found[key] ] ) ) === JSON.stringify( Object.keys( expected ).sort().map( key => [ key, expected[key] ] ) ) );

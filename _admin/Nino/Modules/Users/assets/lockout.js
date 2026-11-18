@@ -9,7 +9,9 @@
  *													form, and below them the accounts locked right now,
  *													each with a button that lifts its lock. See
  *													Lockout/Lockout.php beside it for the schema this
- *													renders and validates against.
+ *													renders and validates against. A number is checked
+ *													before it is sent and said under its field - the
+ *													form is novalidate.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -22,17 +24,23 @@
 
 	Nino.admin.lockout = {
 
-		// Survives the re-render a successful save triggers - see _save()
-
 		// Whether the form has been built once - see showCurrent()
 		_ready : false,
+
+		// The status line of the form's bar - see Nino.adminUi.status(). Drawn again with the form
+		_line : null,
+
+		// The schema the form on screen was drawn from, which its numbers are checked against
+		_fields : [],
 
 		/**
 		 *	Load the schema plus current values and render the form
 		 *
+		 *	@param		{Function}	[drawn]				Called once the form is drawn
+		 *
 		 *	@return		void
 		 */
-		init : function() {
+		init : function( drawn ) {
 
 			const wrap = dc.getElementById('lockout-form');
 			if( wrap === null )
@@ -44,6 +52,9 @@
 
 				Nino.admin.lockout._render( response.fields, response.locked || [] );
 				Nino.admin.lockout._ready = true;
+
+				if( typeof drawn === 'function' )
+					drawn();
 			} );
 		},
 
@@ -69,7 +80,7 @@
 
 			Nino.admin.lockout._apiCall( 'list', {}, function( status, response ) {
 				if( status === 200 && response !== null && Array.isArray( response.locked ) === true )
-					Nino.admin.lockout._renderLocked( response.locked, '' );
+					Nino.admin.lockout._renderLocked( response.locked );
 			} );
 		},
 
@@ -112,8 +123,10 @@
 
 			const wrap = dc.getElementById('lockout-form');
 			wrap.innerHTML = '';
+			Nino.admin.lockout._fields = fields;
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 
 			const fieldset = dc.createElement('fieldset');
 			const legend = dc.createElement('legend');
@@ -134,26 +147,18 @@
 			lockedSet.id = 'lockout-locked';
 			form.appendChild( lockedSet );
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.className = 'nino-admin-btn-primary';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
 			const msg = dc.createElement('p');
 			msg.id = 'lockout-form-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			actions.appendChild( msg );
+			const bar = Nino.adminUi.actionBar( { status : { line : msg }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
 
-			form.appendChild( actions );
+			Nino.admin.lockout._line = bar.line;
+			bar.line.bind( form );
+			form.appendChild( bar.el );
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.lockout._save() } );
 
 			wrap.appendChild( form );
 
-			Nino.admin.lockout._renderLocked( locked, '' );
+			Nino.admin.lockout._renderLocked( locked );
 
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
@@ -166,11 +171,10 @@
 		 *	number form above it keeps what was typed into it
 		 *
 		 *	@param		{Array}		locked			[ { mail, until }, ... ]
-		 *	@param		{string}	message			What to say under the list, '' for nothing
 		 *
 		 *	@return		void
 		 */
-		_renderLocked : function( locked, message ) {
+		_renderLocked : function( locked ) {
 
 			const fieldset = dc.getElementById('lockout-locked');
 			if( fieldset === null )
@@ -182,59 +186,29 @@
 			legend.textContent = Nino.content.getText('/_admin/lockout/locked/title');
 			fieldset.appendChild( legend );
 
+			// What went wrong lifting a lock stands under the list; what went well is a toast
 			const line = dc.createElement('p');
-			line.className = 'nino-admin-hint';
 			const status = Nino.adminUi.status( line );
 
 			if( locked.length === 0 )
 				fieldset.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/lockout/locked/empty') ) );
-			else {
-
-				const ul = dc.createElement('ul');
-				ul.className = 'nino-admin-list nino-admin-list-dense';
-
-				locked.forEach( function( account ) {
-
-					const li = dc.createElement('li');
-
-					const copy = dc.createElement('span');
-					copy.className = 'nino-admin-list-copy';
-					const mail = dc.createElement('strong');
-					mail.textContent = account.mail;
-					const until = dc.createElement('small');
-					until.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/lockout/locked/until'), account.until );
-					copy.appendChild( mail );
-					copy.appendChild( until );
-
-					if( account.canChange === false ) {
-						const why = dc.createElement('small');
-						why.textContent = Nino.content.getText('/_admin/lockout/label/beyond');
-						copy.appendChild( why );
-					}
-
-					li.appendChild( copy );
+			else
+				fieldset.appendChild( Nino.adminUi.list( locked.map( function( account ) {
 
 					// An account that holds what the signed-in one does not is not theirs
 					// to open (see Users\Admin::beyond()): listed, with no button
-					if( account.canChange !== false ) {
-						const button = dc.createElement('button');
-						button.type = 'button';
-						button.className = 'nino-admin-btn-secondary';
-						button.textContent = Nino.content.getText('/_admin/lockout/label/unlock');
-						button.addEventListener( 'click', function() { Nino.admin.lockout._unlock( account.mail, button, status ) } );
-						li.appendChild( button );
-					}
+					const until = Nino.adminUi.format( Nino.content.getText('/_admin/lockout/locked/until'), account.until );
+					const unlock = account.canChange === false ? null : Nino.adminUi.button( Nino.content.getText('/_admin/lockout/label/unlock'), function() { Nino.admin.lockout._unlock( account.mail, unlock, status ) }, { kind : 'secondary', small : true } );
 
-					ul.appendChild( li );
-				} );
-
-				fieldset.appendChild( ul );
-			}
+					return {
+						key			: account.mail,
+						title		: account.mail,
+						detail	: unlock === null ? until+ ' · '+ Nino.content.getText('/_admin/lockout/label/beyond') : until,
+						actions	: unlock === null ? [] : [ unlock ],
+					};
+				} ), { label : Nino.content.getText('/_admin/lockout/locked/title') } ) );
 
 			fieldset.appendChild( line );
-
-			if( message !== '' )
-				status.idle( message );
 		},
 
 		/**
@@ -259,8 +233,73 @@
 					return;
 				}
 
-				Nino.admin.lockout._renderLocked( response.locked || [], Nino.adminUi.format( Nino.content.getText('/_admin/lockout/msg/unlocked'), mail ) );
+				// The focus goes to the button of the row that took the place of the one that left, else the one before it, else the empty state
+				const before = Array.from( dc.getElementById('lockout-locked').querySelectorAll('button') );
+				const at = before.indexOf( button );
+
+				Nino.admin.lockout._renderLocked( response.locked || [] );
+
+				const after = Array.from( dc.getElementById('lockout-locked').querySelectorAll('button') );
+				const next = after.length === 0 ? dc.getElementById('lockout-locked').querySelector('.nino-admin-empty') : after[Math.min( Math.max( at, 0 ), after.length - 1 )];
+
+				if( next !== null && next !== undefined ) {
+					if( after.length === 0 )
+						next.setAttribute( 'tabindex', '-1' );
+
+					next.focus();
+				}
+
+				Nino.adminUi.say( Nino.adminUi.format( Nino.content.getText('/_admin/lockout/msg/unlocked'), mail ) );
 			} );
+		},
+
+		/**
+		 *	Check both numbers before they are sent: a number that is no whole number in the bounds of its field says
+		 *	so under the field, the line of the bar says it once, and the first takes the focus. The form is novalidate,
+		 *	so the browser's own bubble never speaks
+		 *
+		 *	@param		{Element}		form
+		 *	@param		{Array}			fields				The schema the form was drawn from: [ { key, min, max, label, ... } ]
+		 *	@param		{Object}		line					The status line of the form's bar
+		 *
+		 *	@return		{boolean}									Whether every number is fine
+		 */
+		_check : function( form, fields, line ) {
+
+			Nino.adminUi.clearFieldErrors( form );
+
+			let first = null;
+
+			fields.forEach( function( field ) {
+
+				const input = form.querySelector( '[data-key="'+ field.key+ '"]' );
+				const name = Nino.adminUi.text( field.label );
+				const value = input.value.trim();
+				const number = Number( value );
+
+				let sentence = '';
+
+				if( value === '' )
+					sentence = Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), name );
+				else if( /^[0-9]+$/.test( value ) === false || number < field.min || number > field.max )
+					sentence = Nino.adminUi.format( Nino.content.getText('/_admin/users/error/invalid'), name, Nino.adminUi.format( Nino.content.getText('/_admin/lockout/expect/range'), field.min, field.max ) );
+
+				if( sentence === '' )
+					return;
+
+				Nino.adminUi.fieldError( input.closest('label'), input, 'lockout-error-'+ field.key.replace( /[^a-z0-9]+/g, '-' ), sentence );
+
+				if( first === null )
+					first = input;
+			} );
+
+			if( first === null )
+				return true;
+
+			line.fail( Nino.content.getText('/_admin/users/error/fields') );
+			first.focus();
+
+			return false;
 		},
 
 		/**
@@ -281,27 +320,34 @@
 					done( ok );
 			};
 
-			const msg = dc.getElementById('lockout-form-msg');
+			const line = Nino.admin.lockout._line;
+
+			if( Nino.admin.lockout._check( dc.getElementById('lockout-form').querySelector('form'), Nino.admin.lockout._fields, line ) === false ) {
+				report( false );
+				return;
+			}
+
 			const fields = {};
 
 			Array.prototype.slice.call( dc.querySelectorAll('#lockout-form [data-key]') ).forEach( function( el ) {
 				fields[el.dataset.key] = el.value.trim();
 			} );
 
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			line.saving();
 
 			Nino.admin.lockout._apiCall( 'save', { fields : fields }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
 
-				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'lockout' );
-				Nino.admin.lockout.init();
+
+				// The form is drawn again from what the server holds, and the new bar says it
+				Nino.admin.lockout.init( function() { Nino.admin.lockout._line.saved() } );
 				report( true );
 			} );
 		},

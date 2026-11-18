@@ -1755,7 +1755,7 @@ function moduleWords( string $module, string $locale ): array {
 function pinAccountNameWords(): void {
 
 	$keys = [];
-	foreach( [ 'label/name', 'label/name-hint', 'manual/name' ] as $part )
+	foreach( [ 'label/name', 'hint/name', 'manual/name' ] as $part )
 		$keys[] = '/_admin/users/'. $part;
 	foreach( [ 'users_name_long', 'users_name_invalid' ] as $code )
 		$keys[] = '/_admin/error/'. $code;

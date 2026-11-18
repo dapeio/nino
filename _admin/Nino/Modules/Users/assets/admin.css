@@ -5,8 +5,8 @@
  *	Modules\Users			Accounts, roles and login protection
  *	admin.css								What the module's /_admin panel needs beyond the design
  *													system in _admin/assets/style.css: the three lists that
- *													add a finer permission to a role, the summary of
- *													what the role may do and the name column of the list. Bundled while the module is there
+ *													add a finer permission to a role and the summary of
+ *													what the role may do. Bundled while the module is there
  *													(see the panel's assets()), so the same layer rules
  *													apply - the shell's stylesheet fixes the layer order,
  *													this one only ever adds to nino.tool, and every selector
@@ -20,51 +20,39 @@
 
 @layer nino.tool {
 
-/* -------------------------------------------------------- The name column */
+/* ------------------------------------------------- A line that is shown ---- */
 
-/* The name of an account in the list, between the row's text and its chevron:
-   as wide as it is, and shortened with an ellipsis before it pushes the
-   address out of the row */
-#users-list .admin-users-name {
-	flex: 0 1 auto;
-	max-width: 40%;
-	margin-left: auto;
-	overflow: hidden;
-	color: var(--editor-text-secondary);
-	font-size: .8rem;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-#users-list a:has(.admin-users-name)::after {
-	margin-left: 0;
+/* The state of an account, its role, the accounts that hold a role: text in the place of a field, as high as the
+   field beside it would be and in the type of its text */
+#users-form .nino-admin-field > p,
+#roles-form .nino-admin-field > p {
+	margin: 0;
+	padding: var(--nino-admin-space-3) 0;
+	font-size: var(--nino-admin-text-md);
 }
 
 /* -------------------------------------------- Adding a finer permission ---- */
 
-/* Under the picker, in the same box: area, action and field are three lists
-   that depend on each other, and the button that adds what they stand on.
+/* In the section of the detailed permissions: area, action and field are three
+   lists that depend on each other, and the button that adds what they stand on.
    Each list takes the room it needs, the button stays its own size */
-#roles-form-permissions .admin-perm-scope {
+#roles-permissions-scoped .admin-perm-scope {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-end;
-	gap: .5rem;
-	margin-top: .5rem;
+	gap: var(--nino-admin-space-3);
+	margin: 0 0 var(--nino-admin-space-5);
 }
 
-#roles-form-permissions .admin-perm-scope > label {
+#roles-permissions-scoped .admin-perm-scope > label {
 	flex: 1 1 12rem;
 }
 
 /* ---------------------------------------------- What the role may do ---- */
 
-#roles-permissions-summary {
-	margin-top: .75rem;
-}
-
 #roles-permissions-summary > ul {
 	margin: 0;
-	padding-left: 1.2rem;
+	padding-left: var(--nino-admin-space-7);
 }
 
 }

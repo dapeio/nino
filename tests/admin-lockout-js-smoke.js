@@ -9,7 +9,9 @@
  *													must not touch the form: a number typed and not yet
  *													saved is still there afterwards, and nothing of the
  *													locked list carries a data-key, since the save posts
- *													every data-key of the form.
+ *													every data-key of the form. A number that is no whole
+ *													number in its bounds is said under its field before
+ *													anything is sent.
  *
  *	Usage: node tests/admin-lockout-js-smoke.js
  */
@@ -56,6 +58,9 @@ sandbox.window = { Nino : Nino };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
+
+const toasts = [];
+Nino.adminUi.say = function( text ) { toasts.push( text ) };
 load( '_admin/Nino/Modules/Users/assets/lockout.js', context );
 
 const tab = Nino.admin.lockout;
@@ -123,9 +128,10 @@ check( 'a click sends the unlock for the account of the row', requests.length ==
 check( '...and switches the button off while the request is on its way', button.disabled === true );
 
 answer( 200, { locked : [ { mail : 'b@example.com', until : '2026-10-05 15:00' } ] } );
+check( 'the focus goes to the button of the row that took the place of the one that left', findAll( rows()[0], function( el ) { return el.tagName === 'BUTTON' } )[0].focused === true );
 check( 'the answer redraws the list from what the server still holds', rows().length === 1
 	&& findAll( rows()[0], function( el ) { return el.textContent === 'b@example.com' } ).length === 1 );
-check( '...and says which lock was lifted', statusText() === 'The lock on a@example.com has been lifted.' );
+check( '...and says which lock was lifted as a toast, in no line', toasts.length === 1 && toasts[0] === 'The lock on a@example.com has been lifted.' && statusText() === '' );
 check( 'the number form was not rebuilt: what was typed is still there', mount.querySelector('[data-key="/nino/auth/maxtries"]') === maxtries && maxtries.value === '9' );
 
 // A refusal keeps the row and says why
@@ -140,6 +146,7 @@ check( '...and the status line says what happened, with the status', statusText(
 fire( second, 'click' );
 answer( 200, { locked : [] } );
 check( 'with nobody left locked the list says so', rows().length === 0 && lockedText().includes( 'No account is locked.' ) );
+check( '...and the focus goes to that sentence', findAll( lockedBox(), function( el ) { return el.focused === true } ).length === 1 );
 check( '...and the numbers still were not rebuilt', mount.querySelector('[data-key="/nino/auth/maxtries"]') === maxtries && maxtries.value === '9' );
 
 // Coming back to the tab: only the locked fieldset is fetched again
@@ -157,11 +164,24 @@ answer( 200, { fields : FIELDS, locked : [ { mail : 'w@example.com', until : '20
 check( 'a lock on an account that is not the account\'s to open has no button, the other has one', rows().length === 2
 	&& findAll( rows()[0], function( el ) { return el.tagName === 'BUTTON' } ).length === 0
 	&& findAll( rows()[1], function( el ) { return el.tagName === 'BUTTON' } ).length === 1 && lockedText().includes( 'w@example.com' ) );
-const whyIn = function( row ) { return findAll( row, function( el ) { return el.textContent === text('/_admin/lockout/label/beyond') } ).length };
+const whyIn = function( row ) { return findAll( row, function( el ) { return el.tagName === 'SMALL' && el.textContent.indexOf( text('/_admin/lockout/label/beyond') ) !== -1 } ).length };
 check( '...and the one without says why', text('/_admin/lockout/label/beyond') !== '' && whyIn( rows()[0] ) === 1 && whyIn( rows()[1] ) === 0 );
 
-check( 'the tab answers every word it says in both languages', [ 'locked/title', 'locked/empty', 'locked/until', 'label/unlock', 'msg/unlocked', 'error/unlock' ].every( function( key ) {
-	return [ 'en_US', 'de_DE' ].every( function( locale ) { return fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php')['/_admin/lockout/'+ key] !== undefined } );
-} ) );
+// The numbers are checked before they are sent: the form is novalidate, so what is wrong is said under the field
+const form = mount.querySelector('form');
+const errors = function() { return findAll( form, function( el ) { return el.classList.contains('nino-admin-field-error') } ) };
+const asked = requests.length;
+maxtries.value = '0';
+fire( form, 'submit' );
+check( 'the form checks nothing by itself, and a number out of its bounds sends nothing', form.noValidate === true && requests.length === asked );
+check( '...says what is expected under the field, marks it, and puts the focus there', errors().length === 1 && maxtries.attributes['aria-invalid'] === 'true' && maxtries.focused === true );
+
+maxtries.value = '7';
+fire( form, 'submit' );
+check( 'a number in its bounds is sent with the other one, and the old sentence is gone', requests.length === asked + 1 && requests[asked].action === 'lockout/save' && requests[asked].payload.fields['/nino/auth/maxtries'] === '7' && errors().length === 0 );
+toasts.length = 0;
+answer( 200, { ok : true } );
+answer( 200, { fields : FIELDS, locked : [] } );
+check( 'a save draws the form again from what the server holds and says it as a toast', toasts.length === 1 && toasts[0] === text('/_admin/common/msg/saved') );
 
 done();

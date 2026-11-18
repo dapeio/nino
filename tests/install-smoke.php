@@ -993,8 +993,8 @@ $minPwShown = [];
 foreach( [
 	'templates/page-recovery.tpl' 						=> '/(?:minlength="|at least )(\d+)/',
 	'install/templates/page-wizard.tpl' 				=> '/(?:minlength="|at least )(\d+)/',
-	'Nino/Modules/Users/assets/admin.js' 			=> '/minLength = (\d+)/',
-	'Nino/Modules/Users/assets/recoverypw.js' 	=> '/minLength = (\d+)/',
+	'Nino/Modules/Users/assets/admin.js' 			=> '/minLength\s*[=:]\s*(\d+)/',
+	'Nino/Modules/Users/assets/recoverypw.js' 	=> '/minLength\s*[=:]\s*(\d+)/',
 	'Nino/Modules/Users/text/en_US.php' 				=> '/at least (\d+) characters/',
 	'Nino/Modules/Users/text/de_DE.php' 				=> '/mindestens (\d+) Zeichen/',
 ] as $minPwFile => $minPwPattern ) {

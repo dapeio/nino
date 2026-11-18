@@ -4,8 +4,8 @@
  *	Nino										Framework
  *	recoverypw.js						"Recovery password" tab of the Users panel: the secret
  *													_admin/recovery.php asks for, changed with the old one.
- *													A form on the tab rather than a dialog - the workbench
- *													has no modal component. See
+ *													A form on the tab, novalidate: what is missing, too
+ *													short or not repeated is said under the field. See
  *													RecoveryPassword/RecoveryPassword.php beside it for what
  *													the server checks.
  *
@@ -77,8 +77,8 @@
 		},
 
 		/**
-		 *	One fieldset with the hint and the three password fields, and
-		 *	Save in the pinned action bar
+		 *	One fieldset with the three password fields, what it is for behind the (?) at its title, and Save in the
+		 *	pinned action bar
 		 *
 		 *	@param		{Element}		wrap
 		 *
@@ -89,75 +89,113 @@
 			wrap.innerHTML = '';
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 
 			const fieldset = dc.createElement('fieldset');
 			const legend = dc.createElement('legend');
 			legend.textContent = Nino.content.getText('/_admin/nav/recoverypw');
 			fieldset.appendChild( legend );
 
-			const intro = dc.createElement('p');
-			intro.className = 'nino-admin-hint';
-			intro.textContent = Nino.content.getText('/_admin/recoverypw/intro');
-			fieldset.appendChild( intro );
+			// What the tab is about stands behind the (?) at its title
+			Nino.adminUi.sectionHelp( legend, fieldset, Nino.content.getText('/_admin/recoverypw/intro') );
 
 			// No data-key: the three are read by id, by name, never as a set. The
 			// data-field is the name the server gives a refusal (see apiSave()), so
 			// the input it is about is marked
 			[
-				[ 'current', 'current-password', '/_admin/recoverypw/label/current', 'current' ],
-				[ 'new', 'new-password', '/_admin/recoverypw/label/new', 'pw' ],
-				[ 'repeat', 'new-password', '/_admin/recoverypw/label/repeat', '' ],
+				{ id : 'current', label : '/_admin/recoverypw/label/current', field : 'current', autocomplete : 'current-password' },
+				{ id : 'new', label : '/_admin/recoverypw/label/new', help : '/_admin/recoverypw/hint/new', field : 'pw', autocomplete : 'new-password', minLength : 8 },
+				{ id : 'repeat', label : '/_admin/recoverypw/label/repeat', field : '', autocomplete : 'new-password', minLength : 8 },
 			].forEach( function( row ) {
 
-				const label = dc.createElement('label');
-				label.className = 'nino-admin-field';
+				const label = Nino.adminUi.textField( {
+					id					: 'recoverypw-'+ row.id,
+					type				: 'password',
+					label				: Nino.content.getText( row.label ),
+					help				: row.help === undefined ? undefined : Nino.content.getText( row.help ),
+					required		: true,
+					minLength		: row.minLength,
+					autocomplete	: row.autocomplete,
+				} );
 
-				const caption = dc.createElement('span');
-				caption.textContent = Nino.content.getText( row[2] );
-				label.appendChild( caption );
-
-				const input = dc.createElement('input');
-				input.type = 'password';
-				input.id = 'recoverypw-'+ row[0];
-				if( row[3] !== '' )
-					input.dataset.field = row[3];
-				input.setAttribute( 'autocomplete', row[1] );
-				if( row[0] !== 'current' )
-					input.minLength = 8;
-				input.required = true;
-				label.appendChild( input );
+				if( row.field !== '' )
+					label.querySelector('input').dataset.field = row.field;
 
 				fieldset.appendChild( label );
 			} );
 
 			form.appendChild( fieldset );
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.id = 'recoverypw-save';
-			saveBtn.className = 'nino-admin-btn-primary';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
 			const msg = dc.createElement('p');
 			msg.id = 'recoverypw-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			actions.appendChild( msg );
-
-			form.appendChild( actions );
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.recoverypw._save() } );
+			const bar = Nino.adminUi.actionBar( { status : { line : msg }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit', id : 'recoverypw-save' } ) } );
 
 			// Saved or not, and - for a refused field - which one
-			Nino.admin.recoverypw._status = Nino.adminUi.status( msg, { saved : Nino.content.getText('/_admin/recoverypw/msg/saved') } );
-			Nino.admin.recoverypw._status.bind( form, Nino.admin.recoverypw._holdsInput );
+			Nino.admin.recoverypw._status = bar.line;
+			bar.line.bind( form, Nino.admin.recoverypw._holdsInput );
+
+			form.appendChild( bar.el );
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.recoverypw._save() } );
 
 			wrap.appendChild( form );
 
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot('recoverypw');
+		},
+
+		/**
+		 *	Say under a field what is wrong with it and put the focus there
+		 *
+		 *	@param		{Element}		input
+		 *	@param		{string}		sentence
+		 *
+		 *	@return		void
+		 */
+		_wrong : function( input, sentence ) {
+			Nino.adminUi.fieldError( input.closest('label'), input, 'recoverypw-error-'+ input.id, sentence );
+		},
+
+		/**
+		 *	Check the three fields before anything is sent: a missing one, a new password that is too short and a repeat
+		 *	that differs say what is wrong under the field, the line of the bar says so once, and the first takes the
+		 *	focus. The form is novalidate, so the browser's own bubble never speaks
+		 *
+		 *	@param		{Element}		form
+		 *
+		 *	@return		{boolean}									Whether every field is fine
+		 */
+		_check : function( form ) {
+
+			Nino.adminUi.clearFieldErrors( form );
+
+			const missing = function( key ) { return Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), Nino.content.getText( key ) ) };
+			const current = dc.getElementById('recoverypw-current');
+			const fresh = dc.getElementById('recoverypw-new');
+			const repeat = dc.getElementById('recoverypw-repeat');
+			const wrong = [];
+
+			if( current.value === '' )
+				wrong.push( [ current, missing('/_admin/recoverypw/label/current') ] );
+
+			if( fresh.value === '' )
+				wrong.push( [ fresh, missing('/_admin/recoverypw/label/new') ] );
+			else if( fresh.value.length < fresh.minLength )
+				wrong.push( [ fresh, Nino.adminUi.format( Nino.content.getText('/_admin/users/error/invalid'), Nino.content.getText('/_admin/recoverypw/label/new'), Nino.adminUi.format( Nino.content.getText('/_admin/users/expect/password'), fresh.minLength ) ) ] );
+
+			if( repeat.value === '' )
+				wrong.push( [ repeat, Nino.content.getText('/_admin/recoverypw/error/repeat-missing') ] );
+			else if( fresh.value !== repeat.value )
+				wrong.push( [ repeat, Nino.content.getText('/_admin/recoverypw/error/mismatch') ] );
+
+			wrong.forEach( function( found ) { Nino.admin.recoverypw._wrong( found[0], found[1] ) } );
+
+			if( wrong.length === 0 )
+				return true;
+
+			Nino.admin.recoverypw._status.fail( Nino.content.getText('/_admin/users/error/fields') );
+			wrong[0][0].focus();
+
+			return false;
 		},
 
 		/**
@@ -186,8 +224,7 @@
 			const fresh = dc.getElementById('recoverypw-new');
 			const repeat = dc.getElementById('recoverypw-repeat');
 
-			if( fresh.value !== repeat.value ) {
-				line.fail( Nino.content.getText('/_admin/recoverypw/error/mismatch') );
+			if( Nino.admin.recoverypw._check( current.closest('form') ) === false ) {
 				report( false );
 				return;
 			}
@@ -200,7 +237,16 @@
 				button.disabled = false;
 
 				if( status !== 200 || response === null ) {
+
+					Nino.adminUi.clearFieldErrors( current.closest('form') );
 					line.error( status, response, '/_admin/common/error/save' );
+
+					// The refusal that names a field says it under that field too
+					const named = response !== null && typeof response === 'object' ? [ current, fresh ].find( function( input ) { return input.dataset.field === response.field } ) : undefined;
+
+					if( named !== undefined )
+						Nino.admin.recoverypw._wrong( named, Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+
 					report( false );
 					return;
 				}

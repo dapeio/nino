@@ -11,11 +11,13 @@
  *													in the same save as the address and the password),
  *													deactivate and activate accounts and delete them. The
  *													list says which accounts are deactivated or locked and
- *													when each logged in last. What a role grants is the
- *													roles tab beside this one (roles.js), lifting a lock
- *													the login protection tab (lockout.js). An account that
- *													holds a permission the signed-in one does not is shown
- *													without a field or a button: it is not theirs to change.
+ *													when each logged in last. Every view has its address:
+ *													#users, #users/new and #users/<mail>. What a role grants
+ *													is the roles tab beside this one (roles.js), lifting a
+ *													lock the login protection tab (lockout.js). An account
+ *													that holds a permission the signed-in one does not is
+ *													shown without a field or a button: it is not theirs to
+ *													change.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -70,6 +72,10 @@
 				Nino.admin.users._roles = response.roles || [];
 				Nino.admin.users._renderList( response.users );
 				Nino.admin.users._ready = true;
+
+				// The address of the new-account form works on a fresh load as it does after a click: for an account that may create
+				if( hash.panel === 'users' && hash.parts[0] === 'new' && Nino.admin.users._canManage === true )
+					return Nino.admin.users._renderCreateForm();
 
 				const target = hash.panel === 'users' && hash.parts.length > 0
 					? Nino.admin.users._users.find( function( u ) { return u.mail === hash.parts[0] } )
@@ -223,7 +229,10 @@
 		 *	@return		{Element|null}
 		 */
 		_rowOf : function( mail ) {
-			return Array.from( dc.getElementById('users-list').querySelectorAll('a') ).find( function( link ) { return link.dataset.mail === mail } ) ?? null;
+
+			const row = Array.from( dc.getElementById('users-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === mail } );
+
+			return row === undefined ? null : row.querySelector('a');
 		},
 
 		/**
@@ -234,6 +243,21 @@
 		 */
 		_backTarget : function() {
 			return Nino.admin.users._currentUser === null ? Nino.admin.users._opener : Nino.admin.users._rowOf( Nino.admin.users._currentUser.mail );
+		},
+
+		/**
+		 *	The one way back of a form: "Back to <the panel>" in the context bar,
+		 *	which leaves the form for the list and puts the focus on its row
+		 *
+		 *	@param		{Element}	wrap				The level the bar stands in
+		 *
+		 *	@return		{Element}
+		 */
+		_contextBar : function( wrap ) {
+			return Nino.adminUi.contextBar( { back : { to : wrap, onClick : function() {
+				Nino.admin.router.go( 'users', [] );
+				Nino.admin.users._showList( Nino.admin.users._backTarget() );
+			} } } );
 		},
 
 		/**
@@ -258,43 +282,69 @@
 		},
 
 		/**
-		 *	A select over every role there is that the signed-in account may hand out, plus "no role" whenever the
-		 *	current value is not among them (an account without one, or a
-		 *	project without any yet) - so what is stored is always an option
+		 *	The role of an account as a field of a form: a select over every role
+		 *	there is that the signed-in account may hand out, plus "no role"
+		 *	whenever the current value is not among them (an account without one,
+		 *	or a project without any yet) - so what is stored is always an option.
+		 *	The select carries data-field, so that a refusal names it
 		 *
 		 *	@param		{string}	id
 		 *	@param		{string}	current				The role id to select
 		 *
-		 *	@return		{Element}
+		 *	@return		{Element}									The label of the field; its select is what the form reads
 		 */
 		_roleSelect : function( id, current ) {
-
-			const select = dc.createElement('select');
-			select.id = id;
-			select.name = 'role';
 
 			// Only a role the signed-in account may hand out (see Roles::notHeld()),
 			// and the one the account holds, which has to stay an option
 			const offered = Nino.admin.users._roles.filter( function( r ) { return r.canGrant !== false || r.id === current } );
+			const options = offered.map( function( role ) { return { value : role.id, label : role.label } } );
 
 			if( offered.some( function( r ) { return r.id === current } ) === false ) {
-				const none = dc.createElement('option');
-				none.value = '';
-				none.textContent = Nino.content.getText('/_admin/users/label/norole');
-				select.appendChild( none );
+				options.unshift( { value : '', label : Nino.content.getText('/_admin/users/label/norole') } );
 				current = '';
 			}
 
-			offered.forEach( function( role ) {
-				const option = dc.createElement('option');
-				option.value = role.id;
-				option.textContent = role.label;
-				select.appendChild( option );
+			const field = Nino.adminUi.selectField( {
+				key			: 'role',
+				id			: id,
+				label		: Nino.content.getText('/_admin/users/label/role'),
+				help		: Nino.content.getText('/_admin/users/hint/role'),
+				options	: options,
+				value		: current,
 			} );
 
-			select.value = current;
+			field.querySelector('select').dataset.field = 'role';
 
-			return select;
+			return field;
+		},
+
+		/**
+		 *	A line of text a form shows and does not take: the state of an account, its role where it is not the
+		 *	signed-in account's to change. Drawn as text - no input, no stop of the Tab key - in the place of a field,
+		 *	with the name at its left
+		 *
+		 *	@param		{string}	id
+		 *	@param		{string}	label
+		 *	@param		{string}	value
+		 *	@param		{string}	[help]
+		 *
+		 *	@return		{Element}									The label of the field
+		 */
+		_readOnly : function( id, label, value, help ) {
+
+			const field = Nino.adminUi.el( 'div', 'nino-admin-field' );
+			const name = Nino.adminUi.el( 'span', '', label );
+			const text = Nino.adminUi.el( 'p', '', value );
+
+			text.id = id;
+			field.appendChild( name );
+			field.appendChild( text );
+
+			if( help !== undefined )
+				name.appendChild( Nino.adminUi.fieldHelp( help, { field : text, name : label } ) );
+
+			return field;
 		},
 
 		/**
@@ -324,39 +374,168 @@
 		},
 
 		/**
-		 *	The name field of the create and the edit form and the line under it
-		 *	that says what the name is for. The input holds at most what the server
-		 *	accepts (it refuses a longer one, it does not cut), and carries
-		 *	data-field so that a refusal names it
+		 *	The name field of the create and the edit form. The input holds at most
+		 *	what the server accepts (it refuses a longer one, it does not cut), and
+		 *	carries data-field so that a refusal names it
 		 *
 		 *	@param		{string}	id
 		 *	@param		{string}	value					The name stored, '' for none
 		 *
-		 *	@return		{Object}									{ label, hint, input }
+		 *	@return		{Element}									The label of the field
 		 */
 		_nameField : function( id, value ) {
 
-			const label = dc.createElement('label');
-			label.className = 'nino-admin-field';
-			const span = dc.createElement('span');
-			span.textContent = Nino.content.getText('/_admin/users/label/name');
-			label.appendChild( span );
-			const input = dc.createElement('input');
-			input.type = 'text';
-			input.id = id;
-			input.dataset.field = 'name';
-			input.maxLength = 60;
-			input.autocomplete = 'off';
-			input.value = value;
-			input.setAttribute( 'aria-describedby', id+ '-hint' );
-			label.appendChild( input );
+			const field = Nino.adminUi.textField( {
+				id					: id,
+				label				: Nino.content.getText('/_admin/users/label/name'),
+				help				: Nino.content.getText('/_admin/users/hint/name'),
+				value				: value,
+				maxLength		: 60,
+				autocomplete	: 'off',
+			} );
 
-			const hint = dc.createElement('p');
-			hint.id = id+ '-hint';
-			hint.className = 'nino-admin-field-hint';
-			hint.textContent = Nino.content.getText('/_admin/users/label/name-hint');
+			field.querySelector('input').dataset.field = 'name';
 
-			return { label : label, hint : hint, input : input };
+			return field;
+		},
+
+		/**
+		 *	The email field of the create and the edit form
+		 *
+		 *	@param		{string}	id
+		 *	@param		{string}	value
+		 *
+		 *	@return		{Element}									The label of the field
+		 */
+		_mailField : function( id, value ) {
+
+			const field = Nino.adminUi.textField( {
+				id					: id,
+				type				: 'email',
+				label				: Nino.content.getText('/_admin/users/label/mail'),
+				help				: Nino.content.getText('/_admin/users/hint/mail'),
+				value				: value,
+				required		: true,
+				autocomplete	: 'off',
+			} );
+
+			field.querySelector('input').dataset.field = 'mail';
+
+			return field;
+		},
+
+		/**
+		 *	A password field of a form of this panel. The minimum is the one of the server, which refuses a shorter one
+		 *	all the same
+		 *
+		 *	@param		{Object}	options				{ id, field, label, help, required, minLength, autocomplete }
+		 *
+		 *	@return		{Element}									The label of the field
+		 */
+		_passwordField : function( options ) {
+
+			const field = Nino.adminUi.textField( {
+				id					: options.id,
+				type				: 'password',
+				label				: options.label,
+				help				: options.help,
+				required		: options.required === true,
+				minLength		: options.minLength,
+				autocomplete	: options.autocomplete,
+			} );
+
+			field.querySelector('input').dataset.field = options.field;
+
+			return field;
+		},
+
+		/**
+		 *	The sentence that is wrong with a field before anything is sent, '' where it is fine: an empty one that is
+		 *	required, an address that is none, a password that is too short
+		 *
+		 *	@param		{Element}	input
+		 *	@param		{string}	name					The name of the field
+		 *
+		 *	@return		{string}
+		 */
+		_problem : function( input, name ) {
+
+			const secret = input.type === 'password';
+			const value = secret === true ? input.value : input.value.trim();
+
+			if( value === '' )
+				return input.required === true ? Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), name ) : '';
+
+			if( input.type === 'email' && /^[^\s@]+@[^\s@]+$/.test( value ) === false )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/users/error/invalid'), name, Nino.content.getText('/_admin/users/expect/mail') );
+
+			if( secret === true && input.minLength > 0 && value.length < input.minLength )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/users/error/invalid'), name, Nino.adminUi.format( Nino.content.getText('/_admin/users/expect/password'), input.minLength ) );
+
+			return '';
+		},
+
+		/**
+		 *	Check the fields of a form before a request goes out: each wrong one says what is wrong under it, the line of
+		 *	the bar says so once, and the first takes the focus. The browser's own checking is off (the forms are
+		 *	novalidate), so its bubble in its own language never speaks
+		 *
+		 *	@param		{Element}		form
+		 *	@param		{Array}			fields				[ [ id of the input, fill of the name of the field ], ... ] in the order the fields stand
+		 *	@param		{Object}		line					The status line of the form's bar
+		 *
+		 *	@return		{boolean}									Whether every field is fine
+		 */
+		_check : function( form, fields, line ) {
+
+			Nino.adminUi.clearFieldErrors( form );
+
+			let first = null;
+
+			fields.forEach( function( field ) {
+
+				const input = dc.getElementById( field[0] );
+				const sentence = Nino.admin.users._problem( input, Nino.content.getText( field[1] ) );
+
+				if( sentence === '' )
+					return;
+
+				Nino.adminUi.fieldError( input.closest('label'), input, 'users-error-'+ input.id, sentence );
+
+				if( first === null )
+					first = input;
+			} );
+
+			if( first === null )
+				return true;
+
+			line.fail( Nino.content.getText('/_admin/users/error/fields') );
+			first.focus();
+
+			return false;
+		},
+
+		/**
+		 *	Say what the server refused: in the line of the bar and, where it named a field of the form, under that field
+		 *
+		 *	@param		{Element}		form
+		 *	@param		{Object}		line					The status line of the form's bar
+		 *	@param		{number}		status
+		 *	@param		{*}					response
+		 *	@param		{string}		fallback			The fill of the sentence for a refusal without a code
+		 *
+		 *	@return		void
+		 */
+		_refused : function( form, line, status, response, fallback ) {
+
+			Nino.adminUi.clearFieldErrors( form );
+			line.error( status, response, fallback );
+
+			const name = response !== null && typeof response === 'object' && typeof response.field === 'string' ? response.field : '';
+			const input = name === '' || /^[A-Za-z]+$/.test( name ) === false ? null : form.querySelector( '[data-field="'+ name+ '"]' );
+
+			if( input !== null )
+				Nino.adminUi.fieldError( input.closest('label'), input, 'users-error-'+ input.id, Nino.adminUi.api.errorText( status, response, fallback ) );
 		},
 
 		/**
@@ -372,46 +551,21 @@
 			const wrap = dc.getElementById('users-list');
 			wrap.innerHTML = '';
 
-			const ul = dc.createElement('ul');
-			ul.className = 'nino-admin-list';
-			users.forEach( function( user ) {
-				const li 		= dc.createElement('li');
+			// A row opens an account and writes its address: a link, with that address. What the account is
+			// addressed by, its name, leads the second line
+			wrap.appendChild( Nino.adminUi.list( users.map( function( user ) {
+				return {
+					key		: user.mail,
+					title	: user.mail + ( user.isSelf === true ? ' ('+ Nino.content.getText('/_admin/users/label/you')+ ')' : '' ),
+					detail	: ( typeof user.name === 'string' && user.name !== '' ? [ user.name ] : [] ).concat( [ Nino.admin.users._roleLabel( user ) ], Nino.admin.users._stateParts( user ) ).join(' · '),
+					href		: Nino.admin.router.href( 'users', [ user.mail ] ),
+					onOpen	: function() { Nino.admin.router.go( 'users', [ user.mail ] ); Nino.admin.users._openUser( user.mail, true ) },
+				};
+			} ), { label : Nino.content.getText('/_admin/nav/user') } ) );
 
-				// A row opens an account and writes its address: a link, with that address
-				const link	= dc.createElement('a');
-				link.href = Nino.admin.router.href( 'users', [ user.mail ] );
-				link.dataset.mail = user.mail;
-
-				const copy = dc.createElement('span');
-				copy.className = 'nino-admin-list-copy';
-				const mail = dc.createElement('strong');
-				mail.textContent = user.mail + ( user.isSelf === true ? ' ('+ Nino.content.getText('/_admin/users/label/you')+ ')' : '' );
-				const role = dc.createElement('small');
-				role.textContent = [ Nino.admin.users._roleLabel( user ) ].concat( Nino.admin.users._stateParts( user ) ).join(' · ');
-				copy.appendChild( mail );
-				copy.appendChild( role );
-				link.appendChild( copy );
-
-				// The name a feature addresses the account by, a column of its own
-				if( typeof user.name === 'string' && user.name !== '' ) {
-					const name = dc.createElement('span');
-					name.className = 'admin-users-name';
-					name.textContent = user.name;
-					link.appendChild( name );
-				}
-
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [ user.mail ] ); Nino.admin.users._openUser( user.mail, true ) } );
-				li.appendChild( link );
-				ul.appendChild( li );
-			} );
-			wrap.appendChild( ul );
 			if( Nino.admin.users._canManage === true ) {
-				const add = dc.createElement('button');
-				add.type = 'button';
-				add.className = 'nino-admin-btn-primary';
-				add.textContent = Nino.content.getText('/_admin/users/label/new');
-				add.addEventListener( 'click', function() { Nino.admin.router.go( 'users', [ 'new' ] ); Nino.admin.users._renderCreateForm( add ) } );
-				wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
+				const add = Nino.adminUi.button( Nino.content.getText('/_admin/users/label/new'), function() { Nino.admin.router.go( 'users', [ 'new' ] ); Nino.admin.users._renderCreateForm( add ) } );
+				wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : add } ).el );
 			}
 		},
 
@@ -425,74 +579,42 @@
 		 *	@return		void
 		 */
 		_renderCreateForm : function( opener ) {
+
 			const wrap = dc.getElementById('users-form');
 			wrap.innerHTML = '';
 			Nino.admin.users._currentUser = null;
 			Nino.admin.users._opener = opener ?? null;
-			const backLink = dc.createElement('a');
-			backLink.href = '#';
-			backLink.className = 'nino-admin-back-link';
-			backLink.textContent = Nino.content.getText('/_admin/users/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList( Nino.admin.users._backTarget() ) } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+			wrap.appendChild( Nino.admin.users._contextBar( wrap ) );
+
 			const form = dc.createElement('form');
 			form.id = 'users-create-form';
+			form.noValidate = true;
+
 			const fieldset = dc.createElement('fieldset');
 			const legend = dc.createElement('legend');
 			legend.textContent = Nino.content.getText('/_admin/users/label/new');
 			fieldset.appendChild( legend );
-			const mailLabel = dc.createElement('label');
-			mailLabel.className = 'nino-admin-field';
-			const mailSpan = dc.createElement('span');
-			mailSpan.textContent = Nino.content.getText('/_admin/users/label/mail');
-			mailLabel.appendChild( mailSpan );
-			const mailInput = dc.createElement('input');
-			mailInput.type = 'email';
-			mailInput.id = 'users-create-mail';
-			mailInput.dataset.field = 'mail';
-			mailInput.required = true;
-			mailInput.autocomplete = 'off';
-			mailLabel.appendChild( mailInput );
-			fieldset.appendChild( mailLabel );
+
+			const mailField = Nino.admin.users._mailField( 'users-create-mail', '' );
 			const nameField = Nino.admin.users._nameField( 'users-create-name', '' );
-			fieldset.appendChild( nameField.label );
-			fieldset.appendChild( nameField.hint );
-			const pwLabel = dc.createElement('label');
-			pwLabel.className = 'nino-admin-field';
-			const pwSpan = dc.createElement('span');
-			pwSpan.textContent = Nino.content.getText('/_admin/users/label/password');
-			pwLabel.appendChild( pwSpan );
-			const pwInput = dc.createElement('input');
-			pwInput.type = 'password';
-			pwInput.id = 'users-create-pw';
-			pwInput.dataset.field = 'pw';
-			pwInput.required = true;
-			pwInput.minLength = 8;
-			pwInput.autocomplete = 'new-password';
-			pwLabel.appendChild( pwInput );
-			fieldset.appendChild( pwLabel );
-			const roleLabel = dc.createElement('label');
-			roleLabel.className = 'nino-admin-field';
-			const roleSpan = dc.createElement('span');
-			roleSpan.textContent = Nino.content.getText('/_admin/users/label/role');
-			roleLabel.appendChild( roleSpan );
+			const pwField = Nino.admin.users._passwordField( { id : 'users-create-pw', field : 'pw', label : Nino.content.getText('/_admin/users/label/password'), help : Nino.content.getText('/_admin/users/hint/password'), required : true, minLength : 8, autocomplete : 'new-password' } );
 			const firstGrantable = Nino.admin.users._roles.find( function( r ) { return r.canGrant !== false } );
-			const roleSelect = Nino.admin.users._roleSelect( 'users-create-role', firstGrantable ? firstGrantable.id : '' );
-			roleLabel.appendChild( roleSelect );
-			fieldset.appendChild( roleLabel );
+			const roleField = Nino.admin.users._roleSelect( 'users-create-role', firstGrantable ? firstGrantable.id : '' );
+
+			[ mailField, nameField, pwField, roleField ].forEach( function( field ) { fieldset.appendChild( field ) } );
 			form.appendChild( fieldset );
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/users/label/create');
-			actions.appendChild( saveBtn );
+
 			const msg = dc.createElement('p');
 			msg.id = 'users-form-msg';
-			actions.appendChild( msg );
-			form.appendChild( actions );
-			const line = Nino.adminUi.status( msg );
+			const bar = Nino.adminUi.actionBar( { status : { line : msg, fresh : true }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/users/label/create'), null, { type : 'submit' } ) } );
+			const line = bar.line;
 			line.bind( form );
+			form.appendChild( bar.el );
+
+			const mailInput = mailField.querySelector('input');
+			const nameInput = nameField.querySelector('input');
+			const pwInput = pwField.querySelector('input');
+			const roleSelect = roleField.querySelector('select');
 
 			// Said once: the form submits it, and the shell's question about
 			// unsaved input saves through it (see Nino.admin.dirty.guard()), which
@@ -504,10 +626,15 @@
 						done( ok );
 				};
 
+				if( Nino.admin.users._check( form, [ [ 'users-create-mail', '/_admin/users/label/mail' ], [ 'users-create-pw', '/_admin/users/label/password' ] ], line ) === false ) {
+					report( false );
+					return;
+				}
+
 				line.saving();
-				Nino.admin.users._apiCall( 'create', { mail : mailInput.value.trim(), name : nameField.input.value.trim(), pw : pwInput.value, role : roleSelect.value }, function( status, response ) {
+				Nino.admin.users._apiCall( 'create', { mail : mailInput.value.trim(), name : nameInput.value.trim(), pw : pwInput.value, role : roleSelect.value }, function( status, response ) {
 					if( status !== 200 ) {
-						line.error( status, response, '/_admin/users/error/create' );
+						Nino.admin.users._refused( form, line, status, response, '/_admin/users/error/create' );
 						report( false );
 						return;
 					}
@@ -523,6 +650,7 @@
 						Nino.admin.users._users = listResponse.users;
 						Nino.admin.users._renderList( listResponse.users );
 						Nino.admin.users._openUser( response.mail, true );
+						Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
 						report( true );
 					} );
 				} );
@@ -565,8 +693,9 @@
 		 *	somebody else, text for everyone else), a new password (optional,
 		 *	leave blank to keep it unchanged), and - only when editing yourself -
 		 *	your current password to confirm the change. One Save writes all of
-		 *	it. Beside it, for a manager and not on their own account, the button
-		 *	that deactivates or activates the account
+		 *	it. The bar carries what else is done to the account: delete at the
+		 *	left, and beside Save the buttons that log it out everywhere and
+		 *	deactivate or activate it - a manager's, and not on their own account
 		 *
 		 *	@return		void
 		 */
@@ -576,131 +705,64 @@
 
 			const wrap = dc.getElementById('users-form');
 			wrap.innerHTML = '';
-
-			const backLink = dc.createElement('a');
-			backLink.href = '#';
-			backLink.className = 'nino-admin-back-link';
-			backLink.textContent = Nino.content.getText('/_admin/users/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList( Nino.admin.users._backTarget() ) } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+			wrap.appendChild( Nino.admin.users._contextBar( wrap ) );
 
 			const form = dc.createElement('form');
 			form.id = 'users-edit-form';
+			form.noValidate = true;
 
-
-			const usersWrap = dc.createElement('fieldset');
-			usersWrap.id = 'users-form-global';
+			const fieldset = dc.createElement('fieldset');
+			fieldset.id = 'users-form-global';
 			const legend = dc.createElement('legend');
 			legend.textContent = user.mail;
-			usersWrap.appendChild( legend );
-			wrap.appendChild(usersWrap)
+			fieldset.appendChild( legend );
+			form.appendChild( fieldset );
 
 			// Whether the account is deactivated or locked, and its last login
-			const state = dc.createElement('p');
-			state.id = 'users-form-state';
-			state.className = 'nino-admin-hint';
-			state.textContent = Nino.admin.users._stateParts( user ).join(' · ');
-			form.appendChild( state );
+			fieldset.appendChild( Nino.admin.users._readOnly( 'users-form-state', Nino.content.getText('/_admin/users/label/state'), Nino.admin.users._stateParts( user ).join(' · ') ) );
 
 			// An account that holds what the signed-in one does not is not theirs
 			// to change (see Users\Admin::beyond()): shown, with nothing to press
 			if( user.canChange === false )
-				return Nino.admin.users._renderBeyond( form, usersWrap, user );
+				return Nino.admin.users._renderBeyond( wrap, form, fieldset, user );
 
-			const mailLabel = dc.createElement('label');
-			mailLabel.className = 'nino-admin-field';
-			const mailSpan = dc.createElement('span');
-			mailSpan.textContent = Nino.content.getText('/_admin/users/label/mail');
-			mailLabel.appendChild( mailSpan );
-			const mailInput = dc.createElement('input');
-			mailInput.type = 'email';
-			mailInput.id = 'users-form-mail';
-			mailInput.dataset.field = 'mail';
-			mailInput.required = true;
-			mailInput.value = user.mail;
-			mailLabel.appendChild( mailInput );
-			form.appendChild( mailLabel );
-
+			const mailField = Nino.admin.users._mailField( 'users-form-mail', user.mail );
 			const nameField = Nino.admin.users._nameField( 'users-form-name', user.name || '' );
-			form.appendChild( nameField.label );
-			form.appendChild( nameField.hint );
+			const pwField = Nino.admin.users._passwordField( { id : 'users-form-pw', field : 'pw', label : Nino.content.getText('/_admin/users/label/newpw'), help : Nino.content.getText('/_admin/users/hint/newpw'), minLength : 8, autocomplete : 'new-password' } );
 
-			form.appendChild( Nino.admin.users._roleField() );
+			fieldset.appendChild( mailField );
+			fieldset.appendChild( nameField );
+			fieldset.appendChild( Nino.admin.users._roleField() );
+			fieldset.appendChild( pwField );
 
-			const pwLabel = dc.createElement('label');
-			pwLabel.className = 'nino-admin-field';
-			const pwSpan = dc.createElement('span');
-			pwSpan.textContent = Nino.content.getText('/_admin/users/label/newpw');
-			pwLabel.appendChild( pwSpan );
-			const pwInput = dc.createElement('input');
-			pwInput.type = 'password';
-			pwInput.id = 'users-form-pw';
-			pwInput.dataset.field = 'pw';
-			pwInput.minLength = 8;
-			pwInput.autocomplete = 'new-password';
-			pwLabel.appendChild( pwInput );
-			form.appendChild( pwLabel );
+			if( user.isSelf === true )
+				fieldset.appendChild( Nino.admin.users._passwordField( { id : 'users-form-currentpw', field : 'currentPassword', label : Nino.content.getText('/_admin/users/label/currentpw'), help : Nino.content.getText('/_admin/users/hint/currentpw'), required : true, autocomplete : 'current-password' } ) );
 
-			if( user.isSelf === true ) {
-				const curLabel = dc.createElement('label');
-				curLabel.className = 'nino-admin-field';
-				const curSpan = dc.createElement('span');
-				curSpan.textContent = Nino.content.getText('/_admin/users/label/currentpw');
-				curLabel.appendChild( curSpan );
-				const curInput = dc.createElement('input');
-				curInput.type = 'password';
-				curInput.id = 'users-form-currentpw';
-				curInput.dataset.field = 'currentPassword';
-				curInput.required = true;
-				curInput.autocomplete = 'current-password';
-				curLabel.appendChild( curInput );
-				form.appendChild( curLabel );
-			}
+			// The bar: Delete at the left, what else is done to the account beside Save - never to your own account:
+			// log out and let another manager do it
+			const manager = Nino.admin.users._canManage === true && user.isSelf !== true;
+			const side = [ Nino.adminUi.button( Nino.content.getText('/_admin/users/label/logoutall'), function() { Nino.admin.users._logoutAll() }, { kind : 'secondary' } ) ];
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.textContent = Nino.content.getText('/_admin/users/label/save');
-			actions.appendChild( saveBtn );
-
-			const logoutAllBtn = dc.createElement('button');
-			logoutAllBtn.type = 'button';
-			logoutAllBtn.textContent = Nino.content.getText('/_admin/users/label/logoutall');
-			logoutAllBtn.addEventListener( 'click', function() { Nino.admin.users._logoutAll() } );
-			actions.appendChild( logoutAllBtn );
-			// Never your own account: log out and let another manager do it
-			if( Nino.admin.users._canManage === true && user.isSelf !== true ) {
-
-				const statusBtn = dc.createElement('button');
-				statusBtn.type = 'button';
-				statusBtn.id = 'users-form-status-toggle';
-				statusBtn.textContent = Nino.content.getText( user.status === 'disabled' ? '/_admin/users/label/activate' : '/_admin/users/label/deactivate' );
-				statusBtn.addEventListener( 'click', function() { Nino.admin.users._toggleStatus() } );
-				actions.appendChild( statusBtn );
-
-				const delBtn = dc.createElement('button');
-				delBtn.type = 'button';
-				delBtn.className = 'nino-admin-btn-danger';
-				delBtn.textContent = Nino.content.getText('/_admin/users/label/delete');
-				delBtn.addEventListener( 'click', function() { Nino.admin.users._delete() } );
-				actions.appendChild( delBtn );
-			}
+			if( manager === true )
+				side.push( Nino.adminUi.button( Nino.content.getText( user.status === 'disabled' ? '/_admin/users/label/activate' : '/_admin/users/label/deactivate' ), function() { Nino.admin.users._toggleStatus() }, { kind : 'secondary', id : 'users-form-status-toggle' } ) );
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-form-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			actions.appendChild( msg );
+			const bar = Nino.adminUi.actionBar( {
+				danger		: manager === true ? Nino.adminUi.button( Nino.content.getText('/_admin/users/label/delete'), function() { Nino.admin.users._delete() }, { kind : 'danger' } ) : null,
+				status		: { line : msg },
+				secondary	: side,
+				primary		: Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ),
+			} );
 
-			form.appendChild( actions );
+			form.appendChild( bar.el );
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.users._save() } );
 
 			// Saved or not, and - for a wrong current password - which field
-			Nino.admin.users._status = Nino.adminUi.status( msg );
-			Nino.admin.users._status.bind( form );
+			Nino.admin.users._status = bar.line;
+			bar.line.bind( form );
 
-			usersWrap.appendChild( form );
+			wrap.appendChild( form );
 
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'users' );
@@ -708,40 +770,26 @@
 
 		/**
 		 *	The form of an account the signed-in one may not change: what the
-		 *	account holds as text, the reason, and the status line - no field, no
-		 *	button. Drawn into the form _renderForm() began
+		 *	account holds, the reason, and no field to type in and no button.
+		 *	Drawn into the form _renderForm() began
 		 *
-		 *	@param		{Element}	form				The edit form, with the state line in it
-		 *	@param		{Element}	usersWrap	The fieldset the form goes into
+		 *	@param		{Element}	wrap				The level the form goes into
+		 *	@param		{Element}	form				The edit form
+		 *	@param		{Element}	fieldset		The fieldset of the account, with its state in it
 		 *	@param		{Object}		user				The account
 		 *
 		 *	@return		void
 		 */
-		_renderBeyond : function( form, usersWrap, user ) {
-
-			const line = function( text ) {
-				const p = dc.createElement('p');
-				p.className = 'nino-admin-hint';
-				p.textContent = text;
-				form.appendChild( p );
-			};
+		_renderBeyond : function( wrap, form, fieldset, user ) {
 
 			if( typeof user.name === 'string' && user.name !== '' )
-				line( Nino.content.getText('/_admin/users/label/name')+ ': '+ user.name );
+				fieldset.appendChild( Nino.admin.users._readOnly( 'users-form-name', Nino.content.getText('/_admin/users/label/name'), user.name ) );
 
-			form.appendChild( Nino.admin.users._roleField() );
-			line( Nino.content.getText('/_admin/users/label/beyond') );
+			fieldset.appendChild( Nino.admin.users._roleField() );
+			fieldset.appendChild( Nino.adminUi.notice( Nino.content.getText('/_admin/users/label/beyond') ) );
 
-			const msg = dc.createElement('p');
-			msg.id = 'users-form-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-			actions.appendChild( msg );
-			form.appendChild( actions );
-
-			Nino.admin.users._status = Nino.adminUi.status( msg );
-			usersWrap.appendChild( form );
+			Nino.admin.users._status = null;
+			wrap.appendChild( form );
 
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'users' );
@@ -869,7 +917,7 @@
 		 *	The role of the open account, as a field of the edit form: a select
 		 *	a manager may change - never for their own account, same as the
 		 *	backend refuses (see Users\Admin::apiSave()): log out and ask another
-		 *	manager - and as plain text for everyone else. What a role grants is
+		 *	manager - and as a line of text for everyone else. What a role grants is
 		 *	the roles tab beside this panel, not this form
 		 *
 		 *	@return		{Element}
@@ -878,24 +926,16 @@
 
 			const user = Nino.admin.users._currentUser;
 
-			if( Nino.admin.users._canManage !== true || user.isSelf === true || user.canChange === false ) {
-				const current = dc.createElement('p');
-				current.className = 'nino-admin-hint';
-				current.textContent = Nino.content.getText('/_admin/users/label/role')+ ': '+ Nino.admin.users._roleLabel( user )+ ( Nino.admin.users._canManage === true && user.isSelf === true ? ' – '+ Nino.content.getText('/_admin/users/label/role-self') : '' );
-				return current;
-			}
+			if( Nino.admin.users._canManage !== true || user.isSelf === true || user.canChange === false )
+				return Nino.admin.users._readOnly( 'users-form-role', Nino.content.getText('/_admin/users/label/role'), Nino.admin.users._roleLabel( user ), Nino.admin.users._canManage === true && user.isSelf === true ? Nino.content.getText('/_admin/users/label/role-self') : undefined );
 
-			const roleLabel = dc.createElement('label');
-			roleLabel.className = 'nino-admin-field';
-			const roleSpan = dc.createElement('span');
-			roleSpan.textContent = Nino.content.getText('/_admin/users/label/role');
-			roleLabel.appendChild( roleSpan );
-			const select = Nino.admin.users._roleSelect( 'users-form-role-select', user.role );
+			const field = Nino.admin.users._roleSelect( 'users-form-role-select', user.role );
+			const select = field.querySelector('select');
+
 			// The role the account holds, to tell a change from what is stored
 			select.dataset.saved = select.value;
-			roleLabel.appendChild( select );
 
-			return roleLabel;
+			return field;
 		},
 
 		/**
@@ -908,10 +948,31 @@
 		 */
 		_save : function( done ) {
 
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
+
 			const user = Nino.admin.users._currentUser;
-			const mail = dc.getElementById('users-form-mail').value.trim();
-			const pw 	 = dc.getElementById('users-form-pw').value;
+			const form = dc.getElementById('users-edit-form');
 			const line = Nino.admin.users._status;
+
+			const mailInput = dc.getElementById('users-form-mail');
+			const pwInput = dc.getElementById('users-form-pw');
+			const curInput = dc.getElementById('users-form-currentpw');
+
+			const checked = [ [ 'users-form-mail', '/_admin/users/label/mail' ], [ 'users-form-pw', '/_admin/users/label/newpw' ] ];
+
+			if( curInput !== null )
+				checked.push( [ 'users-form-currentpw', '/_admin/users/label/currentpw' ] );
+
+			if( Nino.admin.users._check( form, checked, line ) === false ) {
+				report( false );
+				return;
+			}
+
+			const mail = mailInput.value.trim();
+			const pw 	 = pwInput.value;
 
 			const payload = { username : user.mail, mail : mail, pw : pw };
 
@@ -927,16 +988,15 @@
 				payload.name = nameInput.value.trim();
 
 			if( user.isSelf === true )
-				payload.currentPassword = dc.getElementById('users-form-currentpw').value;
+				payload.currentPassword = curInput.value;
 
 			line.saving();
 
 			Nino.admin.users._apiCall( 'save', payload, function( status, response ) {
 
 				if( status !== 200 ) {
-					line.error( status, response, '/_admin/users/error/save' );
-					if( typeof done === 'function' )
-						done( false );
+					Nino.admin.users._refused( form, line, status, response, '/_admin/users/error/save' );
+					report( false );
 					return;
 				}
 
@@ -964,16 +1024,14 @@
 				if( rail !== null )
 					rail.textContent = response.mail;
 
-				dc.getElementById('users-form-pw').value = '';
-				const curInput = dc.getElementById('users-form-currentpw');
+				pwInput.value = '';
 				if( curInput !== null )
 					curInput.value = '';
 
 				line.saved();
 				Nino.admin.router.set( 'users', [ user.mail ] );
 				Nino.admin.users._snapshot();
-				if( typeof done === 'function' )
-					done( true );
+				report( true );
 
 				// Refresh the list in the background so a renamed mail is reflected there too
 				Nino.admin.users._apiCall( 'list', {}, function( listStatus, listResponse ) {
@@ -1020,7 +1078,7 @@
 					button.textContent = Nino.content.getText( active === true ? '/_admin/users/label/deactivate' : '/_admin/users/label/activate' );
 					dc.getElementById('users-form-state').textContent = Nino.admin.users._stateParts( user ).join(' · ');
 					Nino.admin.users._renderList( Nino.admin.users._users );
-					Nino.admin.users._status.idle( Nino.content.getText( active === true ? '/_admin/users/msg/activated' : '/_admin/users/msg/deactivated' ) );
+					Nino.adminUi.say( Nino.content.getText( active === true ? '/_admin/users/msg/activated' : '/_admin/users/msg/deactivated' ) );
 				} );
 			};
 
@@ -1032,7 +1090,6 @@
 			Nino.adminUi.confirm( 'big', {
 				title			: Nino.content.getText('/_admin/users/confirm/deactivate-title'),
 				message		: Nino.content.getText('/_admin/users/confirm/deactivate'),
-				kind			: 'danger',
 				visitors	: false,
 				yes				: Nino.content.getText('/_admin/users/confirm/deactivate-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
@@ -1068,10 +1125,12 @@
 						Nino.admin.users._users = Nino.admin.users._users.filter( function( u ) { return u.mail !== user.mail } );
 						Nino.admin.users._renderList( Nino.admin.users._users );
 						Nino.admin.users._showList();
+						Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/deleted') );
 					} );
 				},
 			} );
 		},
+
 		/**
 		 *	Log the current user out of every session, after confirmation
 		 *
@@ -1109,7 +1168,7 @@
 								return;
 							}
 
-							Nino.admin.users._status.idle( Nino.content.getText('/_admin/users/msg/loggedout') );
+							Nino.adminUi.say( Nino.content.getText('/_admin/users/msg/loggedout') );
 						} );
 					};
 

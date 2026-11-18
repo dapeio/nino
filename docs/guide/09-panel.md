@@ -188,7 +188,7 @@ Lade `/_admin` neu. Ein Update ist nicht nötig, denn die Einheit hat sich nicht
 - Im Menü steht unter **Features** der Eintrag „Treffen“. Ein Bereich eines Features steht immer in dieser Gruppe.
 - Der Bereich zeigt die Anmeldungen aus Tutorial 7 in einer Tabelle: Name, Treffen, Zeitpunkt.
 - Neben dem Reiter „Treffen“ steht ein Reiter **Einstellungen**. Nino legt ihn selbst an, weil das Feature Einstellungen hat.
-- Öffne **Nutzer**, Reiter **Nutzerrollen**, und dort die Rolle „Editor“. In der Liste der Rechte steht „Features · Treffen“. Die Rolle hat das Recht nicht von selbst. Ein Konto mit der Rolle „Editor“ sieht den Bereich erst, wenn Du das Recht vergibst.
+- Öffne **Nutzer**, Reiter **Nutzerrollen**, und dort die Rolle „Editor“. Bei den Rechten steht in der Liste „Features“ der Eintrag „Treffen“. Die Rolle hat das Recht nicht von selbst. Ein Konto mit der Rolle „Editor“ sieht den Bereich erst, wenn Du das Recht vergibst.
 
 ## Häufige Fehler
 

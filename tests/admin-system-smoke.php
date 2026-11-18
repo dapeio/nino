@@ -2984,6 +2984,15 @@ check( '...naming it, so the typo can be found', str_contains( (string) ( $body[
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] ] );
 check( 'apiSave keeps a well-formed permission no panel offers', $status === 200 && $body['perms'] === [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] && $body['users'] === 0 );
 check( 'the role landed in config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles']['reviewer'] === [ 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] ] );
+// The form that makes a new role marks its request: an id that is taken is refused, and the role that holds it is as it was, byte for byte
+$rolesBefore = serialize( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles'] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Overwritten', 'perms' => [], 'create' => true ] );
+check( 'apiSave of a new role with an id that is taken is a 409 with its code, for the field "id"', $status === 409 && ( $body['code'] ?? '' ) === 'roles_id_taken' && ( $body['field'] ?? '' ) === 'id' );
+check( '...and the role that holds the id, and every other, is byte-equal to what it was', serialize( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles'] ) === $rolesBefore );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'brandnew', 'label' => 'Brand new', 'perms' => [], 'create' => true ] );
+check( '...a free id with the mark is created', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles']['brandnew'] ) );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage' ] ] );
+check( '...and the same request without the mark changes the role, as it always did', $status === 200 );
 check( 'a wildcard segment is a permission too', callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/text/update/page-home/*' ] ] )[0] === 200 );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage', '/*' ] ] );
 check( 'full access stands alone - it covers everything else already', $status === 200 && $body['perms'] === [ '/*' ] );

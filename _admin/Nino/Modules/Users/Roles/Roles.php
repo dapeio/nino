@@ -441,7 +441,7 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Create or change a role. Every permission has to be shaped like one
+		 *	Create or change a role (with `create` true: create only, an id that is taken is a 409). Every permission has to be shaped like one
 		 *	(PERM_PATTERN) and is refused by name otherwise, so a typo cannot
 		 *	end up in config.php looking like a grant; '/*' stands alone, since
 		 *	it covers everything else already. Tried on a copy first, for the
@@ -464,6 +464,13 @@ namespace Nino\Modules\Users {
 
 			if( preg_match( self::ID_PATTERN, $id ) !== 1 ) {
 				\Nino\Http::fail( $request, 400, 'a role id is a slug: lowercase letters, digits and hyphens, starting with a letter', 'roles_invalid_id', [], 'id' );
+				return;
+			}
+
+			// The form that makes a new role says so: an id that is taken is refused, and the role that holds it stays as it is.
+			// A request without the mark creates or changes, as it always did
+			if( ( $data['create'] ?? false ) === true && array_key_exists( $id, self::all( $appData ) ) === true ) {
+				\Nino\Http::fail( $request, 409, 'a role with this id exists', 'roles_id_taken', [], 'id' );
 				return;
 			}
 
