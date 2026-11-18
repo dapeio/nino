@@ -2,10 +2,10 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Maintenance							The Maintenance panel: one pane, one form - the state, the
- *													switch, the Retry-After seconds, and a note about who
- *													still sees the site. See Admin/Admin.php beside it for
- *													the two actions this renders and posts to. While the
+ *	Maintenance							The Maintenance panel: one pane, one form - the switch and
+ *													the Retry-After seconds, with what the switch does and who
+ *													still sees the site behind its (?). See Admin/Admin.php
+ *													beside it for the two actions this renders and posts to. While the
  *													switch is on, the notice every screen of the
  *													workbench carries is drawn from here too (_banner()).
  *
@@ -21,7 +21,11 @@
 	Nino.admin.maintenance = {
 
 		_ready 			: false,
-		// Survives the re-render a successful save triggers - see _save()
+		// The line of the bar: what is saving and why a save was refused (see Nino.adminUi.status()); drawn again with the form
+		_line 			: null,
+		// The bounds of the seconds the server answered with, and how many sentences of a wrong field were drawn
+		_bounds 		: { min : undefined, max : undefined },
+		_errors 		: 0,
 
 		/**
 		 *	Load the current state and render the form
@@ -150,8 +154,7 @@
 		},
 
 		/**
-		 *	The whole pane: the current state as a sentence, the form, and
-		 *	the shared save row
+		 *	The whole pane: the form and its bar
 		 *
 		 *	@param		{Element}		wrap
 		 *	@param		{Object}		data					{ status, retry, min, max }
@@ -161,23 +164,18 @@
 		_render : function( wrap, data ) {
 
 			wrap.innerHTML = '';
-
-			const state = dc.createElement('p');
-			state.className = 'nino-admin-hint-lead';
-			state.textContent = data.status === true
-				? Nino.content.getText('/_admin/maintenance/state/offline')
-				: Nino.content.getText('/_admin/maintenance/state/online');
-			wrap.appendChild( state );
+			Nino.admin.maintenance._bounds = { min : data.min, max : data.max };
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 			const fieldset = dc.createElement('fieldset');
 
+			// What the switch does and who still sees the site: one sentence behind the (?) at its name
 			fieldset.appendChild( Nino.adminUi.switchField( {
 				key 			: 'status',
 				checked 	: data.status === true,
 				label 		: Nino.content.getText('/_admin/maintenance/label/status'),
-				help 			: Nino.content.getText('/_admin/maintenance/hint/status'),
-				note 			: Nino.content.getText('/_admin/maintenance/hint/signedin'),
+				help 			: Nino.content.getText('/_admin/maintenance/hint/status')+ ' '+ Nino.content.getText('/_admin/maintenance/hint/signedin'),
 			} ) );
 
 			fieldset.appendChild( Nino.adminUi.numberField( {
@@ -192,22 +190,15 @@
 
 			form.appendChild( fieldset );
 
-			// Same shared actions row every module's form ends on
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.className = 'nino-admin-btn-primary';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
+			// The one bar of the view: the badge and the line, and Save as the one main button
 			const msg = dc.createElement('p');
 			msg.id = 'maintenance-form-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			actions.appendChild( msg );
 
-			form.appendChild( actions );
+			const bar = Nino.adminUi.actionBar( { status : { line : msg }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
+			Nino.admin.maintenance._line = bar.line;
+			bar.line.bind( form );
+
+			form.appendChild( bar.el );
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.maintenance._save() } );
 
 			wrap.appendChild( form );
@@ -235,11 +226,31 @@
 			};
 
 			const wrap = dc.getElementById('maintenance-form');
-			const msg = dc.getElementById('maintenance-form-msg');
+			const line = Nino.admin.maintenance._line;
 			const statusInput = wrap.querySelector('[data-key="status"]');
 			const retryInput = wrap.querySelector('[data-key="retry"]');
 
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			// Checked when saving: what is wrong is said at its field and in the line, with the focus on it
+			Nino.adminUi.clearFieldErrors( wrap );
+
+			const bounds = Nino.admin.maintenance._bounds;
+			const value = retryInput.value.trim();
+			const number = Number( value );
+
+			if( /^-?\d+$/.test( value ) === false || ( Number.isFinite( bounds.min ) === true && number < bounds.min ) || ( Number.isFinite( bounds.max ) === true && number > bounds.max ) ) {
+
+				const name = Nino.content.getText('/_admin/maintenance/label/retry');
+
+				Nino.adminUi.fieldError( retryInput.closest('label') ?? retryInput.parentNode, retryInput, 'maintenance-error-'+ ( ++Nino.admin.maintenance._errors ),
+					Number.isFinite( bounds.min ) === true && Number.isFinite( bounds.max ) === true
+						? Nino.adminUi.format( Nino.content.getText('/_admin/maintenance/error/range'), name, bounds.min, bounds.max )
+						: Nino.adminUi.format( Nino.content.getText('/_admin/maintenance/error/int'), name ) );
+				line.fail( Nino.content.getText('/_admin/maintenance/error/fields') );
+				retryInput.focus();
+				return report( false );
+			}
+
+			line.saving();
 
 			Nino.admin.maintenance._apiCall( 'set', {
 				status	: statusInput.checked,
@@ -247,16 +258,22 @@
 			}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
+
+					// A sentence of the server about the seconds stands at their field too
+					if( response !== null && typeof response === 'object' && response.field === 'retry' ) {
+						Nino.adminUi.fieldError( retryInput.closest('label') ?? retryInput.parentNode, retryInput, 'maintenance-error-'+ ( ++Nino.admin.maintenance._errors ), Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+						retryInput.focus();
+					}
+
 					report( false );
 					return;
 				}
 
-				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
+				line.saved();
 
 				// Re-rendered from the answer rather than left as typed: it
-				// carries the state config.php now actually holds, and the
-				// state sentence above the form has to follow it
+				// carries the state config.php now actually holds
 				Nino.admin.maintenance._render( wrap, response );
 				Nino.admin.maintenance._banner( response.status === true );
 				report( true );

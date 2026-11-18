@@ -4,6 +4,9 @@
 // workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/config]]'						=> 'Config',
+	'[[/_admin/config/error/fields]]'	=> 'Please check the marked fields.',
+	'[[/_admin/config/error/range]]'	=> '%s is not valid: a whole number from %d to %d is expected.',
+	'[[/_admin/config/error/int]]'	=> '%s is not valid: a whole number is expected.',
 	'[[/_admin/config/group/mode]]'			=> 'Mode',
 	'[[/_admin/config/intro/mode]]'			=> 'Whether this site is being built or is live. Switching it sets the four values it names, which stay yours to change afterwards.',
 	'[[/_admin/config/label/mode]]'			=> 'Mode',

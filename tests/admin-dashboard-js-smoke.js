@@ -76,10 +76,12 @@ const sandbox = {
 	} ),
 	Nino : Nino,
 };
+sandbox.document.documentElement = { lang : 'de' };
 sandbox.window = { Nino : Nino };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/assets/datetext.js', context );
 load( '_admin/Nino/Modules/Dashboard/assets/admin.js', context );
 
 const panel = Nino.admin.dashboard;
@@ -158,6 +160,24 @@ check( '...an empty list the same', notices().length === 0 );
 
 show( { tiles : [], notices : 'broken' } );
 check( '...and a notices that is no list is ignored rather than thrown at', notices().length === 0 );
+
+// --- the tile and the activity: a date is written in the one form of the workbench ----------------
+
+show( { tiles : [], notices : [], lastBackup : '2024-05-03', recentActivity : [ '2024-05-03 10:15  admin@example.com  Upload Image /logo', 'a line that is no line of the log' ] } );
+const backupTile = findAll( wrap, el => el.classList.contains('nino-admin-tile--backups') )[0];
+check( 'the date of the last backup is written as the workbench writes a day, not as it is stored', backupTile !== undefined && backupTile.children[0].textContent === Nino.adminUi.dateText('2024-05-03') && backupTile.children[0].textContent !== '2024-05-03' );
+show( { tiles : [], notices : [], lastBackup : null } );
+check( '...and a project that has none shows a dash', findAll( wrap, el => el.classList.contains('nino-admin-tile--backups') )[0].children[0].textContent === '–' );
+
+show( { tiles : [], notices : [], recentActivity : [ '2024-05-03 10:15  admin@example.com  Upload Image /logo', 'a line that is no line of the log' ] } );
+const activity = findAll( wrap, el => el.id === 'admin-dashboard-activity' )[0];
+check( 'a line of the activity is the time in the form of the workbench, the account and the sentence as it is stored', activity.children[0].textContent === Nino.adminUi.dateText('2024-05-03 10:15')+ ' · admin@example.com · Upload Image /logo'
+	&& activity.children[1].textContent === 'a line that is no line of the log' );
+
+const all = findAll( wrap, el => el.classList.contains('admin-dashboard-more') )[0];
+check( '"Show all" is a link to the Log with the class of a link-button - the target the guide gives a quiet action in a text - and no arrow of characters in it', all !== undefined && all.tagName === 'A' && all.href === '#logs' && all.classList.contains('nino-admin-linkbutton')
+	&& all.textContent === text('/_admin/dashboard/label/all') && /[\u2190-\u21ff]/.test( all.textContent ) === false );
+check( '...and stands after the list it belongs to', activity.parentNode.children[activity.parentNode.children.indexOf( activity ) + 1] === all );
 
 pinHeadAreas();
 

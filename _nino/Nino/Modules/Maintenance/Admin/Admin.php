@@ -67,7 +67,10 @@ namespace Nino\Modules\Maintenance {
 		}
 
 		public static function assets(): array {
-			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+			return [
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
+			];
 		}
 
 		// The module's own words, one <locale>.php per interface language

@@ -21,6 +21,7 @@ return [
 	'[[/_admin/error/backups_write]]'	=> 'There was no room left to write the backup, in the temporary directory or where the backups are kept, or a file could not be written. The backups that exist are untouched.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'The backup comes from Nino %s; this is %s.',
 	'[[/_admin/error/backups_busy]]'	=> 'A backup or a restore is running. Try again in a moment.',
+	'[[/_admin/backups/label/archives]]'	=> 'Archives',
 	'[[/_admin/backups/label/download]]'	=> 'Download',
 	'[[/_admin/backups/label/upload]]'	=> 'Upload an archive',
 	'[[/_admin/backups/kind/daily]]'	=> 'Daily',

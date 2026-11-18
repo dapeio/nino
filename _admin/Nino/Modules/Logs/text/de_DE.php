@@ -6,6 +6,11 @@ return [
 	'[[/_admin/nav/logs]]'					=> 'Log',
 	'[[/_admin/logs/error/load]]'					=> 'Laden fehlgeschlagen.',
 	'[[/_admin/logs/empty]]'							=> 'Noch keine Einträge.',
+	'[[/_admin/logs/nomatch]]'			=> 'Keine Einträge gefunden.',
+	'[[/_admin/logs/label/when]]'		=> 'Zeit',
+	'[[/_admin/logs/label/actor]]'		=> 'Konto',
+	'[[/_admin/logs/label/text]]'		=> 'Eintrag',
+	'[[/_admin/logs/label/search]]'		=> 'Einträge suchen',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/logs/manual/intro]]'	=> 'Wer wann was geändert hat: jede Anmeldung und jede Änderung in der Workbench, mit Zeit und Konto.',

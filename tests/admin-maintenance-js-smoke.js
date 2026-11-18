@@ -88,14 +88,16 @@ const sandbox = {
 	},
 	Nino : Nino,
 };
-sandbox.window = { Nino : Nino };
+sandbox.window = { Nino : Nino, setTimeout : function() { return 1 }, clearTimeout : function() {} };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
 
 // The form's own fields are the design system's business, and have their own
 // tests - here they are only there. The save reads them back by their key
+let switchOptions = null;
 Nino.adminUi.switchField = function( options ) {
+	switchOptions = options;
 	const field = element('div');
 	const input = element('input');
 	input.attributes['data-key'] = options.key;
@@ -139,6 +141,11 @@ check( 'the panel asks for the state', requests.length === 1 && requests[0].acti
 answer( 200, { status : false, retry : 3600 } );
 check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( content, function( el ) { return el.tagName === 'FIELDSET' } ).every( function( set ) { return set.children.every( function( child ) { return String( child.className ).indexOf('nino-admin-hint') === -1 || String( child.className ).indexOf('nino-admin-status') !== -1 } ) } ) );
 check( 'a site that is online has no notice', banners( content ).length === 0 );
+check( 'the pane opens on its form: no sentence stands over it, and what the switch does and who still sees the site is its help, with no note that stays under it', form.children.length === 1 && form.children[0].tagName === 'FORM'
+	&& switchOptions.help === text('/_admin/maintenance/hint/status')+ ' '+ text('/_admin/maintenance/hint/signedin') && switchOptions.note === undefined );
+const bar = findAll( form, function( el ) { return el.classList.contains('nino-admin-actionbar') } );
+const main = findAll( form, function( el ) { return el.classList.contains('nino-admin-btn-primary') } );
+check( 'the form ends in the one bar, whose last child is the one main button that submits it', bar.length === 1 && main.length === 1 && bar[0].children[bar[0].children.length - 1] === main[0] && main[0].type === 'submit' );
 
 present( true );
 requests.length = 0;
@@ -175,7 +182,8 @@ check( 'and one that answers true puts it back', banners( content ).length === 1
 requests.length = 0;
 panel._save();
 answer( 500, { error : 'could not write' } );
-check( 'a save that failed changes nothing about it', banners( content ).length === 1 );
+check( 'a save that failed changes nothing about it, and says why in the line of the bar', banners( content ).length === 1
+	&& findAll( content, function( el ) { return el.id === 'maintenance-form-msg' } )[0].dataset.state === 'error' );
 
 // --- asking again --------------------------------------------------------------
 
@@ -205,6 +213,23 @@ panel.init();
 answer( 200, { status : false, retry : 3600, min : 120, max : 86400 } );
 const retryInput = form.querySelector('[data-key="retry"]');
 check( 'the seconds field takes its bounds from the answer', retryInput !== null && retryInput.min === 120 && retryInput.max === 86400 );
+
+// --- checking: when saving, at the field, with the focus on it ------------------
+
+const realForm = findAll( form, el => el.tagName === 'FORM' )[0];
+const sentences = () => findAll( form, el => el.classList.contains('nino-admin-field-error') );
+check( 'the form is checked by the panel and never by the browser: it carries novalidate', realForm.noValidate === true );
+retryInput.value = '5';
+requests.length = 0;
+let ended = null;
+panel._save( function( ok ) { ended = ok } );
+check( 'seconds outside the bounds the server gave are refused before anything is sent: a sentence at the field, the field marked, the focus on it, and the line says so', requests.length === 0 && ended === false
+	&& retryInput.attributes['aria-invalid'] === 'true' && sentences().length === 1 && retryInput.focused === true && byId( form, 'maintenance-form-msg' ).dataset.state === 'error' );
+retryInput.value = '300';
+panel._save();
+check( '...and the sentence is gone when they are right, and the save is sent', sentences().length === 0 && requests.length === 1 );
+answer( 400, { error : 'x', code : 'invalid_value', field : 'retry' } );
+check( 'a refusal of the server that names the seconds says it at the field too, with the focus there', sentences().length === 1 && retryInput.focused === true );
 
 // --- the shell is told ---------------------------------------------------------
 

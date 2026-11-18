@@ -24,7 +24,7 @@
 #admin-dashboard-elements, #admin-dashboard-activity {
 	display: flex;
 	flex-direction: column;
-	gap: .45rem;
+	gap: var(--nino-admin-space-3);
 	margin: 0;
 	padding: 0;
 	list-style: none;
@@ -37,21 +37,28 @@
 }
 #admin-dashboard-activity {
 	color: var(--editor-text-secondary);
-	font-size: .8rem;
+	font-size: var(--nino-admin-text-sm);
 }
 #admin-dashboard-activity li {
-	padding-bottom: .4rem;
+	padding-bottom: var(--nino-admin-space-2);
 	border-bottom: 1px solid var(--editor-separator);
 }
 
-/* The "all of them" link under the activity list, appended as its next
-   sibling - see _activitySection() in admin.js */
+/* The date of the last backup is read as one word: in the form of an English
+   interface it would break at its hyphens in a tile of this width */
+#admin-dashboard-tiles .nino-admin-tile--backups .nino-admin-tile-value {
+	white-space: nowrap;
+}
+
+/* The "show all" link-button under the activity list, appended as its next
+   sibling - see _activitySection() in admin.js. A link is inline, so the
+   floor of the guide (24 px, the token of a small icon button) needs a box */
 #admin-dashboard-activity + .admin-dashboard-more {
 	display: inline-flex;
 	align-items: center;
 	min-height: var(--nino-admin-control-icon-small);
-	margin-top: .5rem;
-	font-size: .8rem;
+	margin-top: var(--nino-admin-space-3);
+	font-size: var(--nino-admin-text-sm);
 }
 
 }

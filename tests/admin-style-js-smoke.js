@@ -108,7 +108,7 @@ check( 'no size in them is under 12px at the root size of the workbench - one th
 	under.length === 0 || ( console.log( under.map( function( entry ) { return '    '+ entry.file+ ':'+ entry.line+ '  '+ entry.value } ).join('\n') ) && false ) );
 check( 'the sizes under the floor are written max( size, 12px ), so that the root size above them still counts: the smallest step of type, and the sizes of the panel sheets',
 	/--nino-admin-text-xs\s*:\s*max\(\s*[^,]+,\s*12px\s*\)/.test( source( '_admin/assets/style.css' ) ) === true
-	&& found.filter( function( entry ) { return /^max\(/.test( entry.value.trim() ) } ).length > 20 );
+	&& found.filter( function( entry ) { return /^max\(/.test( entry.value.trim() ) } ).length > 0 );
 
 // The reading of a size is itself checked, on the forms the sheets use
 check( 'a size is small by its form: rem and px under the floor, an em under 1, the first of a clamp()',

@@ -6,10 +6,12 @@
  *													backups the Backup engine (Backups.php beside it) creates,
  *													writes one more on request, restores one on request,
  *													hands one over as a file and takes one back.
- *													A native confirm() before the
+ *													A question in a dialog before the
  *													actual restore call is deliberate - this overwrites the
  *													live config.php/text/elements/images, there's no "are you
- *													sure" step server-side beyond that.
+ *													sure" step server-side beyond that. Every answer to
+ *													something done here is one toast; what is refused
+ *													stands in the line above the bar.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -36,6 +38,9 @@
 
 		// What an upload sends besides the file, a little: the fields of the form around it
 		_UPLOAD_OVERHEAD : 65536,
+
+		// The line above the bar, which says what a refused restore, upload or download was (see Nino.adminUi.status()); drawn again with the list
+		_line : null,
 
 		/**
 		 *	Load the available backup dates and render the list
@@ -94,8 +99,8 @@
 		},
 
 		/**
-		 *	Report a failure that leaves the list standing, in the line below
-		 *	it.
+		 *	Report a failure that leaves the list standing, in the line above
+		 *	the bar.
 		 *
 		 *	A refused restore is exactly that: nothing was overwritten, and
 		 *	every date on the list is still a date worth trying. It used to go
@@ -111,15 +116,12 @@
 		 */
 		_showRestoreError : function( status, response ) {
 
-			const message = dc.getElementById('backups-message');
-
-			// No list rendered means no line under it either, and then the
-			// error has to go somewhere rather than nowhere
-			if( message === null )
+			// No list rendered means no line either, and then the error has
+			// to go somewhere rather than nowhere
+			if( Nino.admin.backups._line === null || dc.getElementById('backups-message') === null )
 				return Nino.admin.backups._showError( status, response );
 
-			message.className = 'nino-admin-error';
-			message.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/request' );
+			Nino.admin.backups._line.error( status, response, '/_admin/common/error/request' );
 		},
 
 		/**
@@ -148,8 +150,7 @@
 		 */
 		_stoppedText : function( stopped ) {
 
-			const root = dc.documentElement;
-			const when = new Date( stopped.started * 1000 ).toLocaleString( root && root.lang ? root.lang : undefined );
+			const when = Nino.adminUi.dateText( new Date( stopped.started * 1000 ) );
 			const size = Nino.adminUi.megabytes( stopped.bytes );
 
 			if( stopped.cause === 'time' )
@@ -163,11 +164,13 @@
 
 		/**
 		 *	Render the list of available archives, most recent first, each with
-		 *	how it came to be, how large it is and its own buttons - and, below
-		 *	it, "Back up now", which is there for an empty list too: it is how the
-		 *	first archive of a project that has none yet is made - and the upload
-		 *	of an archive that was downloaded. "Back up now" is not offered while
-		 *	backups are switched off, which the server would refuse
+		 *	how it came to be, how large it is and its own small buttons - and,
+		 *	in the bar below it, "Back up now" as the one main button, which is
+		 *	there for an empty list too: it is how the first archive of a
+		 *	project that has none yet is made - and the upload of an archive that
+		 *	was downloaded beside it. "Back up now" is not offered while backups
+		 *	are switched off, which the server would refuse; the upload is then
+		 *	the one main button
 		 *
 		 *	@param		{Object[]}	archives			[ { id, kind: 'daily'|'manual'|'snapshot', size: bytes } ]
 		 *	@param		{boolean}		enabled				Whether backups are on
@@ -178,6 +181,7 @@
 		 */
 		_renderList : function( archives, enabled, missed, stopped ) {
 
+			const panel = Nino.admin.backups;
 			const wrap = dc.getElementById('backups-list');
 			wrap.innerHTML = '';
 
@@ -185,7 +189,7 @@
 			if( enabled !== false ) {
 
 				const isMissed = typeof missed === 'object' && missed !== null;
-				const detail = typeof stopped === 'object' && stopped !== null ? Nino.admin.backups._stoppedText( stopped ) : '';
+				const detail = typeof stopped === 'object' && stopped !== null ? panel._stoppedText( stopped ) : '';
 				const noReason = isMissed === true && ( typeof missed.reason !== 'string' || missed.reason === '' );
 
 				if( isMissed === true )
@@ -198,100 +202,63 @@
 					wrap.appendChild( Nino.adminUi.notice( detail ) );
 			}
 
+			// The accounts that may download and upload get a title over the archives, and behind its (?) what a
+			// downloaded archive needs to be of use - a warning with a consequence that a bar cannot carry: the
+			// bubble of a (?) in a fixed bar lies outside the window
+			const section = dc.createElement('section');
+			wrap.appendChild( section );
+
+			if( panel._full === true ) {
+				const title = Nino.adminUi.sectionTitle( Nino.content.getText('/_admin/backups/label/archives') );
+				section.appendChild( title );
+				Nino.adminUi.sectionHelp( title, section, Nino.content.getText('/_admin/backups/hint/key') );
+			}
+
 			if( archives.length === 0 )
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/backups/empty') ) );
+				section.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/backups/empty') ) );
 			else {
 
-				const ul = dc.createElement('ul');
-				ul.id = 'backups-dates';
-				ul.className = 'nino-admin-list';
+				// What it is: the date and the time, and - in words, never in colour alone - how it
+				// came to be and how large it is. The buttons of a row are small and the dangerous one
+				// stands last (rowActions())
+				const rows = archives.map( function( archive ) {
 
-				archives.forEach( function( archive ) {
+					const actions = [];
 
-					const li = dc.createElement('li');
-					li.setAttribute( 'data-kind', archive.kind );
+					if( panel._full === true )
+						actions.push( Nino.adminUi.button( Nino.content.getText('/_admin/backups/label/download'), function() { panel._download( archive.id ) }, { kind : 'secondary', small : true } ) );
 
-					// What it is: the name, which is the date and the time and, for an archive made by
-					// hand, says so - and in words, never in colour alone, how it came to be and how
-					// large it is
-					const info = dc.createElement('span');
-					info.className = 'backups-info';
+					const restore = Nino.adminUi.button( Nino.content.getText('/_admin/common/label/restore'), function() { panel._confirmRestore( archive.id, restore ) }, { kind : 'secondary', small : true } );
+					actions.push( restore );
 
-					const name = dc.createElement('span');
-					name.className = 'backups-id';
-					name.textContent = archive.id;
-					info.appendChild( name );
-
-					const meta = dc.createElement('span');
-					meta.className = 'backups-meta';
-					meta.textContent = [ Nino.content.getText('/_admin/backups/kind/'+ archive.kind), Nino.admin.backups._whenText( archive.id ), Nino.admin.backups._sizeText( archive.size ) ].join(' · ');
-					info.appendChild( meta );
-
-					li.appendChild( info );
-
-					const actions = dc.createElement('span');
-					actions.className = 'backups-actions';
-
-					const download = dc.createElement('button');
-					download.type = 'button';
-					download.className = 'backups-download';
-					download.textContent = Nino.content.getText('/_admin/backups/label/download');
-					download.addEventListener( 'click', function() { Nino.admin.backups._download( archive.id ) } );
-					if( Nino.admin.backups._full === true )
-						actions.appendChild( download );
-
-					const btn = dc.createElement('button');
-					btn.type = 'button';
-					btn.className = 'nino-admin-btn-danger';
-					btn.textContent = Nino.content.getText('/_admin/common/label/restore');
-					btn.addEventListener( 'click', function() { Nino.admin.backups._confirmRestore( archive.id ) } );
-					actions.appendChild( btn );
-
-					li.appendChild( actions );
-
-					ul.appendChild( li );
+					return {
+						key			: archive.id,
+						title		: panel._whenText( archive.id ) || archive.id,
+						detail	: [ Nino.content.getText('/_admin/backups/kind/'+ archive.kind), panel._sizeText( archive.size ) ].filter( function( part ) { return part !== '' } ).join(' · '),
+						actions	: actions,
+					};
 				} );
 
-				wrap.appendChild( ul );
+				const list = Nino.adminUi.list( rows, { label : Nino.content.getText('/_admin/nav/backups') } );
+				list.querySelector('ul').id = 'backups-dates';
+				section.appendChild( list );
 			}
 
-			// The line a refused restore or a refused backup reports into,
-			// beside the list rather than in place of it
+			// The line a refused restore or a refused backup reports into, beside
+			// the list rather than in place of it
 			const message = dc.createElement('p');
 			message.id = 'backups-message';
-			message.setAttribute( 'aria-live', 'polite' );
+			panel._line = Nino.adminUi.status( message );
 			wrap.appendChild( message );
 
-			if( Nino.admin.backups._full === true ) {
-				// What a downloaded archive needs to be of use, and what goes back: said to the
-				// accounts that may download and upload
-				const hint = dc.createElement('p');
-				hint.className = 'nino-admin-hint';
-				hint.textContent = Nino.content.getText('/_admin/backups/hint/key');
-				wrap.appendChild( hint );
+			let now = null;
+			let upload = null;
 
-				const limit = Nino.admin.backups._limit;
-				const upHint = dc.createElement('p');
-				upHint.className = 'nino-admin-hint';
-				upHint.textContent = limit > 0
-					? Nino.adminUi.format( Nino.content.getText('/_admin/backups/hint/upload'), Nino.adminUi.megabytes( limit ) )
-					: Nino.content.getText('/_admin/backups/hint/upload-sftp');
-				wrap.appendChild( upHint );
-			}
+			if( enabled !== false )
+				now = Nino.adminUi.button( Nino.content.getText('/_admin/backups/label/now'), function() { panel._backupNow( now ) }, { kind : 'primary', id : 'backups-now' } );
 
-			const buttons = [];
+			if( panel._full === true ) {
 
-			if( enabled !== false ) {
-				const now = dc.createElement('button');
-				now.type = 'button';
-				now.id = 'backups-now';
-				now.className = 'nino-admin-btn-primary';
-				now.textContent = Nino.content.getText('/_admin/backups/label/now');
-				now.addEventListener( 'click', function() { Nino.admin.backups._backupNow( now ) } );
-				buttons.push( now );
-			}
-
-			if( Nino.admin.backups._full === true ) {
 				// The file is chosen with the control the browser has; the button is
 				// the way to it from the keyboard and the same on every screen
 				const file = dc.createElement('input');
@@ -307,20 +274,29 @@
 
 					const chosen = file.files[0];
 					file.value = '';
-					Nino.admin.backups._upload( chosen );
+					panel._upload( chosen );
 				} );
 				wrap.appendChild( file );
 
-				const upload = dc.createElement('button');
-				upload.type = 'button';
-				upload.id = 'backups-upload';
-				upload.textContent = Nino.content.getText('/_admin/backups/label/upload');
-				upload.addEventListener( 'click', function() { file.click() } );
-				buttons.push( upload );
+				upload = Nino.adminUi.button( Nino.content.getText('/_admin/backups/label/upload'), function() { file.click() }, { kind : now === null ? 'primary' : 'secondary', id : 'backups-upload' } );
 			}
 
-			if( buttons.length > 0 )
-				wrap.appendChild( Nino.adminUi.listActions( buttons ) );
+			if( now === null && upload === null )
+				return;
+
+			// How large an upload may be, and the way round it, stays in view before the file is chosen
+			if( upload !== null ) {
+				const limit = panel._limit;
+				const note = dc.createElement('p');
+				note.id = 'backups-limit';
+				note.className = 'nino-admin-field-note';
+				note.textContent = limit > 0
+					? Nino.adminUi.format( Nino.content.getText('/_admin/backups/hint/upload'), Nino.adminUi.megabytes( limit ) )
+					: Nino.content.getText('/_admin/backups/hint/upload-sftp');
+				wrap.insertBefore( note, message.nextSibling );
+			}
+
+			wrap.appendChild( Nino.adminUi.actionBar( { list : true, secondary : now !== null && upload !== null ? [ upload ] : [], primary : now !== null ? now : upload } ).el );
 		},
 
 		/**
@@ -340,7 +316,7 @@
 
 		/**
 		 *	The date - and the time, for an archive that has one - an id names, in
-		 *	the language of the page
+		 *	the form of the interface language (Nino.adminUi.dateText())
 		 *
 		 *	@param		{string}		id						'Y-m-d', 'Y-m-d-His', 'Y-m-d-His-manual' or 'pre-restore-Y-m-d-His'
 		 *
@@ -348,16 +324,12 @@
 		 */
 		_whenText : function( id ) {
 
-			const part = /(\d{4})-(\d{2})-(\d{2})(?:-(\d{2})(\d{2})(\d{2}))?/.exec( id );
+			const part = /(\d{4})-(\d{2})-(\d{2})(?:-(\d{2})(\d{2})\d{2})?/.exec( id );
 
 			if( part === null )
 				return '';
 
-			const root = dc.documentElement;
-			const lang = root && root.lang ? root.lang : undefined;
-			const when = new Date( +part[1], +part[2] - 1, +part[3], +( part[4] || 0 ), +( part[5] || 0 ), +( part[6] || 0 ) );
-
-			return part[4] === undefined ? when.toLocaleDateString( lang ) : when.toLocaleString( lang );
+			return Nino.adminUi.dateText( part[1]+ '-'+ part[2]+ '-'+ part[3]+ ( part[4] === undefined ? '' : ' '+ part[4]+ ':'+ part[5] ) );
 		},
 
 		/**
@@ -374,11 +346,8 @@
 		 */
 		_download : function( id ) {
 
-			const message = dc.getElementById('backups-message');
-			if( message !== null ) {
-				message.className = '';
-				message.textContent = '';
-			}
+			if( Nino.admin.backups._line !== null )
+				Nino.admin.backups._line.idle();
 
 			let frame = dc.getElementById('backups-download');
 
@@ -456,13 +425,12 @@
 				return;
 
 			const known = typeof body.code === 'string' && /^[a-z][a-z0-9_]*$/.test( body.code ) === true && Nino.content.getText( '/_admin/error/'+ body.code ) !== '';
-			const line = dc.getElementById('backups-message');
+			const line = Nino.admin.backups._line;
 
-			if( line === null )
+			if( line === null || dc.getElementById('backups-message') === null )
 				return;
 
-			line.className = 'nino-admin-error';
-			line.textContent = known === true ? Nino.adminUi.api.errorText( 0, body ) : Nino.content.getText('/_admin/common/error/request');
+			line.fail( known === true ? Nino.adminUi.api.errorText( 0, body ) : Nino.content.getText('/_admin/common/error/request') );
 		},
 
 		/**
@@ -479,33 +447,32 @@
 		_upload : function( file ) {
 
 			const panel = Nino.admin.backups;
-			const message = dc.getElementById('backups-message');
+			const line = panel._line;
 
-			if( message === null )
+			if( line === null || dc.getElementById('backups-message') === null )
 				return;
 
-			message.className = '';
-			message.textContent = '';
+			line.idle();
 
 			if( panel._limit > 0 && file.size > panel._limit - panel._UPLOAD_OVERHEAD ) {
-				message.className = 'nino-admin-error';
-				message.textContent = Nino.adminUi.api.errorText( 413, { code : 'backups_too_large', params : [ Nino.adminUi.megabytes( panel._limit ) ] } );
+				line.fail( Nino.adminUi.api.errorText( 413, { code : 'backups_too_large', params : [ Nino.adminUi.megabytes( panel._limit ) ] } ) );
 				return;
 			}
 
 			panel._setBusy( true );
-			message.textContent = Nino.content.getText('/_admin/backups/msg/uploading');
+			line.idle( Nino.content.getText('/_admin/backups/msg/uploading') );
 
 			panel._apiCall( 'upload', {}, function( status, response ) {
 
 				panel._setBusy( false );
 
 				if( status !== 200 || response === null || typeof response.id !== 'string' ) {
-					message.textContent = '';
-					return panel._showRestoreError( status, response );
+					line.idle();
+					panel._showRestoreError( status, response );
+					return panel._focus('backups-upload');
 				}
 
-				let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/uploaded'), response.id );
+				let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/uploaded'), panel._whenText( response.id ) || response.id );
 
 				// An old archive that is put back is the first to go: said at once, where it can
 				// still be helped, not after it is gone
@@ -514,16 +481,16 @@
 
 				panel._apiCall( 'list', {}, function( code, body ) {
 
+					// The archive is in the list all the same: said before the error of the list
+					Nino.adminUi.say( said );
+
 					if( code !== 200 || body === null ) {
 						panel._showRestoreError( code, body );
-						const line = dc.getElementById('backups-message');
-						if( line !== null )
-							line.textContent = said+ ' '+ line.textContent;
 						return;
 					}
 
 					panel._show( body );
-					dc.getElementById('backups-message').textContent = said;
+					panel._focus('backups-upload');
 				} );
 			}, { file : file } );
 		},
@@ -539,40 +506,55 @@
 		 */
 		_backupNow : function( button ) {
 
+			const panel = Nino.admin.backups;
+
 			button.disabled = true;
 
-			const message = dc.getElementById('backups-message');
-			if( message !== null ) {
-				message.className = '';
-				message.textContent = '';
-			}
+			if( panel._line !== null )
+				panel._line.idle();
 
-			Nino.admin.backups._apiCall( 'now', {}, function( status, response ) {
+			panel._apiCall( 'now', {}, function( status, response ) {
 
 				button.disabled = false;
 
-				if( status !== 200 || response === null || typeof response.id !== 'string' )
-					return Nino.admin.backups._showRestoreError( status, response );
+				if( status !== 200 || response === null || typeof response.id !== 'string' ) {
+					panel._showRestoreError( status, response );
+					return button.focus();
+				}
 
-				const created = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/created'), response.id );
+				const created = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/created'), panel._whenText( response.id ) || response.id );
 
-				// The new list replaces the old one, the line with it: what
-				// was made is said once the list shows it
-				Nino.admin.backups._apiCall( 'list', {}, function( code, body ) {
+				// The new list replaces the old one; what was made is said once, as the toast
+				panel._apiCall( 'list', {}, function( code, body ) {
+
+					// The archive is made all the same: said before the error of the list
+					Nino.adminUi.say( created );
 
 					if( code !== 200 || body === null ) {
-						Nino.admin.backups._showRestoreError( code, body );
-						// The archive is made all the same: say so before the error
-						const line = dc.getElementById('backups-message');
-						if( line !== null )
-							line.textContent = created+ ' '+ line.textContent;
+						panel._showRestoreError( code, body );
 						return;
 					}
 
-					Nino.admin.backups._show( body );
-					dc.getElementById('backups-message').textContent = created;
+					panel._show( body );
+					panel._focus('backups-now');
 				} );
 			} );
+		},
+
+		/**
+		 *	Put the focus on a control of the list that was drawn anew - the one that did what was just said, so that the
+		 *	focus is not left on the page
+		 *
+		 *	@param		{string}		id
+		 *
+		 *	@return		void
+		 */
+		_focus : function( id ) {
+
+			const control = dc.getElementById( id ) ?? dc.getElementById('backups-now');
+
+			if( control !== null )
+				control.focus();
 		},
 
 		/**
@@ -601,25 +583,26 @@
 		 *	overwritten (see apiRestore() in Admin/Admin.php beside it)
 		 *
 		 *	@param		{string}		date
+		 *	@param		{Element}		[opener]			The button that asked, which has the focus again when the question is closed
 		 *
 		 *	@return		void
 		 */
-		_confirmRestore : function( date ) {
+		_confirmRestore : function( date, opener ) {
 
 			Nino.adminUi.confirm( 'destructive', {
 				title			: Nino.content.getText('/_admin/backups/confirm/restore-title'),
-				message		: Nino.adminUi.format( Nino.content.getText('/_admin/backups/confirm/restore'), date ),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/backups/confirm/restore'), Nino.admin.backups._whenText( date ) || date ),
 				yes				: Nino.content.getText('/_admin/backups/confirm/restore-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				opener		: opener,
 				onChoose	: function( ok ) {
 
 					if( ok === false )
 						return;
 
 					// Whatever a previous attempt left there is about that attempt
-					const message = dc.getElementById('backups-message');
-					if( message !== null )
-						message.textContent = '';
+					if( Nino.admin.backups._line !== null )
+						Nino.admin.backups._line.idle();
 
 					// The restore ends in a reload of the page and every form on it, and
 					// has put other files in their place by then: unsaved input is asked
@@ -633,10 +616,16 @@
 						Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
 							if( status !== 200 || response === null || response.ok !== true ) {
 								Nino.admin.backups._setBusy( false );
-								return Nino.admin.backups._showRestoreError( status, response );
+								Nino.admin.backups._showRestoreError( status, response );
+
+								// The button that asked has the focus again, so that a refusal is read where it was asked for
+								if( opener !== undefined && opener.isConnected === true )
+									opener.focus();
+
+								return;
 							}
 
-							let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date );
+							let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), Nino.admin.backups._whenText( date ) || date );
 
 							// A backup of another version of Nino restores all the same, and
 							// its notice - a code and its params, worded as a failure's is - is

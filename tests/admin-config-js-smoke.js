@@ -13,7 +13,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, fills, load, element, findAll } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
 
 
 // --- the words -------------------------------------------------------------
@@ -47,7 +47,7 @@ const sandbox = {
 	},
 	Nino : Nino,
 };
-sandbox.window = { Nino : Nino };
+sandbox.window = { Nino : Nino, setTimeout : function() { return 1 }, clearTimeout : function() {} };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
@@ -134,6 +134,15 @@ outcome = null;
 panel._save( function( ok ) { outcome = ok } );
 answer( 400, { error : 'x', code : 'invalid_value', field : '/nino/mode' } );
 check( 'a refused save does not tell the shell, and ends with done( false )', told.length === 0 && outcome === false );
+const line = findAll( mount, function( el ) { return el.id === 'config-form-msg' } )[0];
+check( '...and says why in the line of the bar, as an alert, where the person is looking', line !== undefined && line.dataset.state === 'error' && line.attributes.role === 'alert' && line.textContent !== '' );
+
+// The form ends in the one bar of the guide: the badge and the line, and Save as the one main button at the far right
+const bars = findAll( mount, function( el ) { return el.classList.contains('nino-admin-actionbar') } );
+const primaries = findAll( mount, function( el ) { return el.classList.contains('nino-admin-btn-primary') } );
+check( 'the form has one bar, whose last child is the one main button of the form, which submits it, and which has the badge of the state before it', bars.length === 1 && primaries.length === 1
+	&& bars[0].children[bars[0].children.length - 1] === primaries[0] && primaries[0].type === 'submit'
+	&& findAll( bars[0], function( el ) { return el.classList.contains('nino-admin-actionbar-state') } ).length === 1 );
 
 // A shell that is older than the mode
 delete Nino.admin.mode;
@@ -142,6 +151,39 @@ outcome = null;
 panel._save( function( ok ) { outcome = ok } );
 answer( 200, { saved : [], mode : 'development' } );
 check( 'a shell that has no mode is told nothing and the save ends all the same', outcome === true );
+
+// --- checking: when saving, at the field, with the focus on the first wrong one ---
+
+{
+	const withInt = JSON.parse( JSON.stringify( schema ) );
+	withInt.fields.push( { key : '/nino/mail/cap', type : 'int', group : 'mode', label : '/_admin/config/label/mailcap', hint : '/_admin/config/hint/mailcap', value : 5, min : 0, max : 1000 } );
+	requests.length = 0;
+	panel.init();
+	answer( 200, withInt );
+
+	const form = findAll( mount, function( el ) { return el.tagName === 'FORM' } )[0];
+	const number = findAll( mount, function( el ) { return el.attributes['data-key'] === '/nino/mail/cap' } )[0];
+	const sentences = function() { return findAll( mount, function( el ) { return el.classList.contains('nino-admin-field-error') } ) };
+	const lineNow = function() { return findAll( mount, function( el ) { return el.id === 'config-form-msg' } )[0] };
+
+	check( 'the form is checked by the panel and never by the browser: it carries novalidate', form.noValidate === true );
+	fire( form, 'input' );
+	check( 'what is typed into it turns the state of the bar to unsaved', lineNow().dataset.state === 'dirty' );
+
+	number.value = '-7';
+	requests.length = 0;
+	let ended = null;
+	panel._save( function( ok ) { ended = ok } );
+	check( 'a number outside its bounds is refused before anything is sent: a sentence at its field, the field marked, the focus on it, and the line says so', requests.length === 0 && ended === false
+		&& number.attributes['aria-invalid'] === 'true' && sentences().length === 1 && number.focused === true && lineNow().dataset.state === 'error' );
+
+	number.value = '5';
+	panel._save();
+	check( '...and the sentences of the refusal are gone when it is right', sentences().length === 0 && requests.length === 1 );
+	number.blur();
+	answer( 400, { error : 'x', code : 'invalid_value', field : '/nino/mail/cap' } );
+	check( 'a refusal of the server that names the field says it at the field too, and the focus goes there', sentences().length === 1 && number.attributes['aria-invalid'] === 'true' && number.focused === true && lineNow().dataset.state === 'error' );
+}
 
 // --- the words ---------------------------------------------------------------
 

@@ -41,6 +41,8 @@
 		// that no longer knows the form
 		_form 	 : '',
 		_filter  : '',
+		// Where the focus goes once the list is drawn after a deletion: the place of the card that was deleted, -1 for nowhere
+		_after   : -1,
 
 		/**
 		 *	Load the recorded submissions and render them. Same "always
@@ -129,7 +131,7 @@
 
 			const haystack = Nino.admin.submissions._fields( entry ).map( function( field ) {
 				return field.label+ ' '+ field.value;
-			} ).concat( [ entry.date || '' ] ).join( ' ' );
+			} ).concat( [ entry.date || '', Nino.admin.submissions._when( entry ) ] ).join( ' ' );
 
 			return haystack.toLowerCase().indexOf( query ) !== -1;
 		},
@@ -174,18 +176,28 @@
 		},
 
 		/**
+		 *	The day and the minute an entry came in, as the workbench writes a moment
+		 *	(Nino.adminUi.dateText()) - what the card shows, and so what the search finds
+		 *
+		 *	@param		{Object}	entry
+		 *
+		 *	@return		{string}									The text the stored date gives, the stored date itself where it is none
+		 */
+		_when : function( entry ) {
+			return Nino.adminUi.dateText( String( entry.date ?? '' ) ) || String( entry.date ?? '' );
+		},
+
+		/**
 		 *	The head above the list: the form to narrow to and the search
 		 *	over what is left. The select is drawn only where there is more
 		 *	than one form to choose between - on the single-form project this
 		 *	framework ships as, it would be a control with one option
 		 *
-		 *	@return		{Element}							<div class="nino-admin-table-toolbar">
+		 *	@return		{Element}							<div class="nino-admin-filterbar">
 		 */
 		_renderHead : function() {
 
-			const head = dc.createElement('div');
-			head.className = 'nino-admin-table-toolbar';
-
+			const items = [];
 			const keys = Object.keys( Nino.admin.submissions._forms );
 
 			if( keys.length > 1 ) {
@@ -215,16 +227,8 @@
 					Nino.admin.submissions._applyFilter();
 				} );
 
-				head.appendChild( select );
+				items.push( select );
 			}
-
-			const search = dc.createElement('input');
-			search.type = 'search';
-			search.id = 'submissions-search';
-			search.className = 'nino-admin-table-search';
-			search.value = Nino.admin.submissions._filter;
-			search.placeholder = Nino.content.getText('/_admin/submissions/label/search');
-			search.setAttribute( 'aria-label', Nino.content.getText('/_admin/submissions/label/search') );
 
 			/*	The cards are already in the document, so a keystroke only
 				decides which of them are shown - it does not draw the list
@@ -234,14 +238,18 @@
 				That also took the focus with it, which is why this listener
 				used to put it back afterwards. Nothing is replaced now, so
 				nothing loses it	*/
-			search.addEventListener( 'input', function() {
-				Nino.admin.submissions._filter = search.value;
-				Nino.admin.submissions._applyFilter();
-			} );
-
-			head.appendChild( search );
-
-			return head;
+			return Nino.adminUi.filterBar( {
+				search : {
+					id			: 'submissions-search',
+					label		: Nino.content.getText('/_admin/submissions/label/search'),
+					value		: Nino.admin.submissions._filter,
+					onInput	: function( query ) {
+						Nino.admin.submissions._filter = query;
+						Nino.admin.submissions._applyFilter();
+					},
+				},
+				items : items,
+			} ).el;
 		},
 
 		/**
@@ -269,6 +277,7 @@
 			// things, and the second one must not read as the first. This is
 			// the first: no cards to draw and no filters to offer over them
 			if( all.length === 0 ) {
+				Nino.admin.submissions._after = -1;
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/submissions/empty') ) );
 				return;
 			}
@@ -282,18 +291,13 @@
 			nomatch.classList.add('admin-hidden');
 			wrap.appendChild( nomatch );
 
-			const exportBtn = dc.createElement('button');
-			exportBtn.type = 'button';
-			exportBtn.id = 'submissions-export';
-			exportBtn.classList.add('nino-admin-btn-primary');
-			exportBtn.textContent = Nino.content.getText('/_admin/submissions/label/export');
 			// What is on screen, not what is on disk: an export taken while a
 			// form is selected is the export of that form. Read at the moment
 			// of the click, since the filters move without the list being
 			// drawn again
-			exportBtn.addEventListener( 'click', function() {
+			const exportBtn = Nino.adminUi.button( Nino.content.getText('/_admin/submissions/label/export'), function() {
 				Nino.admin.exportCsv( Nino.content.getText('/_admin/submissions/label/filename'), Nino.admin.submissions._entries.filter( Nino.admin.submissions._matches ) );
-			} );
+			}, { kind : 'primary', id : 'submissions-export' } );
 
 			/*	Every recorded submission gets its card, once. Which of them
 				are on screen is a class, not a redraw - see _applyFilter()	*/
@@ -307,9 +311,8 @@
 
 			wrap.appendChild( ul );
 
-			const actions = Nino.adminUi.listActions( [ exportBtn ] );
-			actions.id = 'submissions-actions';
-			wrap.appendChild( actions );
+			// The one bar of the list: its one main button is the export
+			wrap.appendChild( Nino.adminUi.actionBar( { list : true, id : 'submissions-actions', primary : exportBtn } ).el );
 
 			// Only show the "expand" hint on cards whose long value actually
 			// overflows its collapsed (line-clamped) height - can only be
@@ -322,6 +325,19 @@
 			} );
 
 			Nino.admin.submissions._applyFilter();
+
+			if( Nino.admin.submissions._after >= 0 ) {
+
+				const shown = Array.prototype.filter.call( ul.children, function( li ) { return li.classList.contains('admin-hidden') === false } );
+				const next = shown[ Math.min( Nino.admin.submissions._after, shown.length - 1 ) ];
+
+				Nino.admin.submissions._after = -1;
+
+				if( next !== undefined )
+					next.focus();
+				else
+					exportBtn.focus();
+			}
 		},
 
 		/**
@@ -391,7 +407,7 @@
 
 			const date = dc.createElement('span');
 			date.className = 'submissions-entry-date';
-			date.textContent = entry.date ?? '';
+			date.textContent = Nino.admin.submissions._when( entry );
 			header.appendChild( date );
 
 			// Which form this is, where a project has more than one. With a
@@ -463,21 +479,18 @@
 			// could remove the wrong row (see \Nino\Form::remove())
 			if( ( entry.id || '' ) !== '' ) {
 
-				const remove = dc.createElement('button');
-				remove.type = 'button';
-				remove.className = 'nino-admin-btn-danger submissions-entry-delete';
-				remove.textContent = Nino.content.getText('/_admin/common/label/delete');
-				remove.addEventListener( 'click', function( ev ) {
+				const remove = Nino.adminUi.button( Nino.content.getText('/_admin/common/label/delete'), function( ev ) {
 					ev.stopPropagation();
-					Nino.admin.submissions._delete( entry );
-				} );
+					Nino.admin.submissions._delete( entry, remove );
+				}, { kind : 'danger', small : true, className : 'submissions-entry-delete' } );
 
 				li.appendChild( remove );
 			}
 
 			li.addEventListener( 'click', Nino.admin.submissions._toggleEntry );
 			li.addEventListener( 'keydown', function( ev ) {
-				if( ev.key !== 'Enter' && ev.key !== ' ' )
+				// Only a key pressed on the card itself opens it: Enter on its Delete button or its mail link is theirs
+				if( ( ev.key !== 'Enter' && ev.key !== ' ' ) || ev.target !== li )
 					return;
 				ev.preventDefault();
 				Nino.admin.submissions._toggleEntry.call( li );
@@ -492,16 +505,18 @@
 		 *	what this panel shows
 		 *
 		 *	@param		{Object}	entry
+		 *	@param		{Element}	[opener]				The button that asked, which has the focus again when the question is closed
 		 *
 		 *	@return		void
 		 */
-		_delete : function( entry ) {
+		_delete : function( entry, opener ) {
 
 			Nino.adminUi.confirm( 'destructive', {
 				title			: Nino.content.getText('/_admin/submissions/confirm/delete-title'),
-				message		: Nino.adminUi.format( Nino.content.getText('/_admin/submissions/confirm/delete'), entry.date || '' ),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/submissions/confirm/delete'), Nino.admin.submissions._when( entry ) ),
 				yes				: Nino.content.getText('/_admin/submissions/confirm/delete-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				opener		: opener,
 				onChoose	: function( ok ) {
 
 					if( ok === false )
@@ -511,6 +526,9 @@
 						if( status !== 200 || response === null )
 							return Nino.admin.submissions._showError( status, response );
 
+						// What was deleted is said, and the focus goes to the card that took its place
+						Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/deleted') );
+						Nino.admin.submissions._after = Nino.admin.submissions._entries.indexOf( entry );
 						Nino.admin.submissions.init();
 					} );
 				},

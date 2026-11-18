@@ -149,21 +149,69 @@ check( 'the scripts of the workbench name classes, and every nino-admin-* class 
 
 // --- style.css names type, weight and space through the tokens ---------------------------------------
 
-/*	The declarations of style.css that are no custom property: [ selector, property, value ] in the order they stand, a rule inside a
-	media query by its own selector	*/
-$declarations = [];
+/*	What a stylesheet writes for type, weight and space that is no token: the declarations that are no custom property - [ selector, property,
+	value ] in the order they stand, a rule inside a media query by its own selector - read for font-size, font, font-weight and the properties of
+	space, apart from the named exceptions, each [ selector, property, value ] at the place it stands. Answers [ sizes of type read, declarations
+	of space read, what is stray ]	*/
+$strays = static function( string $css, array $exceptions ): array {
 
-preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $style, $rules, PREG_SET_ORDER );
+	$declarations = [];
 
-foreach( $rules as $rule ) {
-	foreach( explode( ';', $rule[2] ) as $declaration ) {
+	preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $css, $rules, PREG_SET_ORDER );
 
-		$parts = explode( ':', $declaration, 2 );
+	foreach( $rules as $rule ) {
+		foreach( explode( ';', $rule[2] ) as $declaration ) {
 
-		if( count( $parts ) === 2 && str_starts_with( trim( $parts[0] ), '--' ) === false )
-			$declarations[] = [ trim( (string) preg_replace( '/\s+/', ' ', $rule[1] ) ), trim( $parts[0] ), trim( (string) preg_replace( '/\s+/', ' ', $parts[1] ) ) ];
+			$parts = explode( ':', $declaration, 2 );
+
+			if( count( $parts ) === 2 && str_starts_with( trim( $parts[0] ), '--' ) === false )
+				$declarations[] = [ trim( (string) preg_replace( '/\s+/', ' ', $rule[1] ) ), trim( $parts[0] ), trim( (string) preg_replace( '/\s+/', ' ', $parts[1] ) ) ];
+		}
 	}
-}
+
+	$stray = [];
+	$typed = 0;
+	$spaced = 0;
+
+	foreach( $declarations as [ $selector, $property, $value ] ) {
+
+		$named = in_array( [ $selector, $property, $value ], $exceptions, true );
+
+		if( $property === 'font-size' ) {
+			$typed++;
+
+			if( preg_match( '/^(var\(--nino-admin-text-(xs|sm|md|lg|xl|2xl)\)|inherit|0)$/', $value ) !== 1 && $named === false )
+				$stray[] = "$selector: font-size: $value";
+		}
+
+		if( $property === 'font' && preg_match( '/^(var\(--nino-admin-text-(xs|sm|md|lg|xl|2xl)\)|inherit)(\/|$)/', $value ) !== 1 )
+			$stray[] = "$selector: font: $value";
+
+		if( $property === 'font-weight' && preg_match( '/^(var\(--nino-admin-weight-(normal|medium|strong|heavy)\)|inherit)$/', $value ) !== 1 )
+			$stray[] = "$selector: font-weight: $value";
+
+		if( preg_match( '/^(gap|row-gap|column-gap|(margin|padding)(-[a-z]+)*)$/', $property ) === 1 ) {
+			$spaced++;
+
+			if( $named === true )
+				continue;
+
+			// What is left of a value without its tokens: a length of a rem that is a step or more, or of more than 4px, is a space written by hand
+			$rest = (string) preg_replace( '/var\(--[a-z0-9-]+\)/', '', $value );
+
+			preg_match_all( '/(\d*\.?\d+)(rem|px)/', $rest, $lengths, PREG_SET_ORDER );
+
+			foreach( $lengths as $length ) {
+				if( ( $length[2] === 'rem' && (float) $length[1] >= .125 ) || ( $length[2] === 'px' && (float) $length[1] > 4 ) ) {
+					$stray[] = "$selector: $property: $value";
+					break;
+				}
+			}
+		}
+	}
+
+	return [ $typed, $spaced, $stray ];
+};
 
 /*	The named exceptions of the scale, by the place they stand - selector, property, value. Each is written at its place with a comment
 	that says why, and a value that stands anywhere else is not one	*/
@@ -179,46 +227,7 @@ $exceptions = [
 	[ '#admin-page-wrap #admin-localepicker, #form-login #admin-localepicker', 'padding', '.1rem 14px .1rem 0' ],	// the room of the chevron in the login's language select
 ];
 
-$stray = [];
-$typed = 0;
-$spaced = 0;
-
-foreach( $declarations as [ $selector, $property, $value ] ) {
-
-	$named = in_array( [ $selector, $property, $value ], $exceptions, true );
-
-	if( $property === 'font-size' ) {
-		$typed++;
-
-		if( preg_match( '/^(var\(--nino-admin-text-(xs|sm|md|lg|xl|2xl)\)|inherit|0)$/', $value ) !== 1 && $named === false )
-			$stray[] = "$selector: font-size: $value";
-	}
-
-	if( $property === 'font' && preg_match( '/^(var\(--nino-admin-text-(xs|sm|md|lg|xl|2xl)\)|inherit)(\/|$)/', $value ) !== 1 )
-		$stray[] = "$selector: font: $value";
-
-	if( $property === 'font-weight' && preg_match( '/^(var\(--nino-admin-weight-(normal|medium|strong|heavy)\)|inherit)$/', $value ) !== 1 )
-		$stray[] = "$selector: font-weight: $value";
-
-	if( preg_match( '/^(gap|row-gap|column-gap|(margin|padding)(-[a-z]+)*)$/', $property ) === 1 ) {
-		$spaced++;
-
-		if( $named === true )
-			continue;
-
-		// What is left of a value without its tokens: a length of a rem that is a step or more, or of more than 4px, is a space written by hand
-		$rest = (string) preg_replace( '/var\(--[a-z0-9-]+\)/', '', $value );
-
-		preg_match_all( '/(\d*\.?\d+)(rem|px)/', $rest, $lengths, PREG_SET_ORDER );
-
-		foreach( $lengths as $length ) {
-			if( ( $length[2] === 'rem' && (float) $length[1] >= .125 ) || ( $length[2] === 'px' && (float) $length[1] > 4 ) ) {
-				$stray[] = "$selector: $property: $value";
-				break;
-			}
-		}
-	}
-}
+[ $typed, $spaced, $stray ] = $strays( $style, $exceptions );
 
 check( 'style.css has sizes of type and declarations of space to read', $typed > 80 && $spaced > 250 );
 check( 'style.css writes type, weight and space only through the tokens, apart from the named exceptions'. ( $stray === [] ? '' : ' - '. implode( '; ', array_slice( $stray, 0, 8 ) ) ), $stray === [] );
@@ -453,6 +462,9 @@ $listed = [
 	'_admin/Nino/Modules/Users/assets/admin.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Users/assets/roles.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Users/assets/lockout.js'	=> 'adminUi.list(',
+	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.table(',
+	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
+	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.filterBar(',
 ];
 
 $ownClass = '/admin-type-btn|admin-view-button-chev|admin-text-chip|admin-text-search|admin-text-block|nino-admin-list-buttons/';
@@ -560,6 +572,111 @@ check( 'the permissions of a role are lists of ticks, not the picker with its sm
 check( '...a row of such a list is at least 28 px high: its rule reads the height of a control, and that token is 28 px or more', preg_match( '/min-height: var\(--nino-admin-control-height\)/', $rowRule ) === 1
 	&& preg_match( '/^(\d+)px$/', $light['--nino-admin-control-height'] ?? '', $rowHeight ) === 1 && (int) $rowHeight[1] >= 28 );
 check( '...and full access is a switch', str_contains( $rolesScript, 'adminUi.switchField(' ) === true );
+// --- the panels of the kernel that have gone over to the guide: Backups, Config, Maintenance, Language, Translations, Log, Requests, Dashboard ---
+
+/*	The forms and lists of these eight keep to what the guide asks of a panel, held by structure: the bar of a form or a list is the block's and its
+	one main button is the block's too, no sentence stands open over or under a field, a date is written by the one helper, a language is named by the
+	one block, and the stylesheets of the panels that still have one name type, weight and space through the tokens. The list grows: the patch that
+	brings another panel over adds its script here	*/
+$barred = [
+	'_admin/Nino/Modules/Backups/assets/admin.js',
+	'_admin/Nino/Modules/Config/assets/admin.js',
+	'_nino/Nino/Modules/Maintenance/assets/admin.js',
+	'_admin/Nino/Modules/Language/assets/admin.js',
+	'_admin/Nino/Modules/Language/assets/translations.js',
+	'_nino/Nino/Modules/Form/assets/admin.js',
+];
+
+$withoutBar = [];
+$byHandAgain = [];
+$hinted = [];
+
+foreach( $barred as $script ) {
+
+	// Without the comments of both kinds: a comment may say the word
+	$source = (string) preg_replace( '~^\s*//.*$~m', '', $bare( $read( $script ) ) );
+
+	if( str_contains( $source, 'adminUi.actionBar(' ) === false )
+		$withoutBar[] = $script;
+
+	if( preg_match( '/className\s*=\s*[\'"][^\'"]*nino-admin-(actionbar|btn-primary|btn-danger|back-link)|classList\.add\(\s*[\'"]nino-admin-btn-(primary|danger)|listActions\(|formToolbar\(/', $source ) === 1 )
+		$byHandAgain[] = $script;
+
+	// The Requests panel keeps its cards, which say what an entry holds as quiet text; no other of them has a line of hint of its own
+	if( str_contains( $script, '/Form/' ) === false && preg_match( '/nino-admin-hint|adminUi\.hint\(/', $source ) === 1 )
+		$hinted[] = $script;
+}
+
+check( 'the forms and lists that have gone over draw their bar with actionBar()'. ( $withoutBar === [] ? '' : ' - not '. implode( ', ', $withoutBar ) ), $withoutBar === [] );
+$unchecked = [];
+
+foreach( [ '_admin/Nino/Modules/Config/assets/admin.js', '_nino/Nino/Modules/Maintenance/assets/admin.js', '_admin/Nino/Modules/Language/assets/admin.js', '_admin/Nino/Modules/Language/assets/translations.js' ] as $script ) {
+	if( str_contains( $bare( $read( $script ) ), 'noValidate = true' ) === false )
+		$unchecked[] = $script;
+}
+
+check( 'the forms that have gone over are checked by the panel, never by the browser: each carries novalidate'. ( $unchecked === [] ? '' : ' - not '. implode( ', ', $unchecked ) ), $unchecked === [] );
+check( '...and name no bar, main button or danger button class of their own, nor listActions()'. ( $byHandAgain === [] ? '' : ' - '. implode( ', ', $byHandAgain ) ), $byHandAgain === [] );
+check( '...and write no open sentence of their own: what a field or a section does is behind its (?)'. ( $hinted === [] ? '' : ' - '. implode( ', ', $hinted ) ), $hinted === [] );
+
+$dated = [
+	'_admin/Nino/Modules/Backups/assets/admin.js',
+	'_admin/Nino/Modules/Dashboard/assets/admin.js',
+	'_admin/Nino/Modules/Logs/assets/admin.js',
+	'_nino/Nino/Modules/Form/assets/admin.js',
+];
+
+$ownDates = [];
+$noHelper = [];
+
+foreach( $dated as $script ) {
+
+	$source = $bare( $read( $script ) );
+
+	if( preg_match( '/toLocale(Date|Time)?String|Intl\.DateTimeFormat|toISOString|\.slice\(\s*0\s*,\s*1[06]\s*\)/', $source ) === 1 )
+		$ownDates[] = $script;
+
+	if( str_contains( $source, 'adminUi.dateText(' ) === false )
+		$noHelper[] = $script;
+}
+
+$shellScripts = $read( '_admin/Admin.php' );
+
+check( 'a date of the panels that show one is written by dateText() and by no formatting of the browser'. ( $ownDates === [] && $noHelper === [] ? '' : ' - '. implode( ', ', array_merge( $ownDates, $noHelper ) ) ), $ownDates === [] && $noHelper === [] );
+check( '...which is a file of its own, bundled after the design system and before the shell and every panel', preg_match( '/^\t\tdateText : function\(/m', $bare( $read( '_admin/assets/datetext.js' ) ) ) === 1
+	&& strpos( $shellScripts, "'/_admin/assets/Nino.admin.js'," ) !== false && strpos( $shellScripts, "'/_admin/assets/datetext.js'," ) !== false && strpos( $shellScripts, "'/_admin/assets/script.js'," ) !== false
+	&& strpos( $shellScripts, "'/_admin/assets/Nino.admin.js'," ) < strpos( $shellScripts, "'/_admin/assets/datetext.js'," ) && strpos( $shellScripts, "'/_admin/assets/datetext.js'," ) < strpos( $shellScripts, "'/_admin/assets/script.js'," ) );
+
+$unnamed = [];
+
+foreach( [ '_admin/Nino/Modules/Language/assets/admin.js', '_admin/Nino/Modules/Language/assets/translations.js' ] as $script ) {
+
+	$source = $bare( $read( $script ) );
+
+	if( str_contains( $source, 'adminUi.localeName(' ) === false || preg_match( '/\blocale\.name\b|\bentry\.name\b/', $source ) === 1 )
+		$unnamed[] = $script;
+}
+
+check( 'a language of the Language panel is named by localeName(), never by the name the server sends or by its code alone'. ( $unnamed === [] ? '' : ' - '. implode( ', ', $unnamed ) ), $unnamed === [] );
+check( 'the Translations tab is built from the blocks of a form: the file, the code field and the select, and no card of its own', str_contains( $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ), 'adminUi.fileField(' ) === true
+	&& str_contains( $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ), 'adminUi.codeField(' ) === true && str_contains( $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ), 'adminUi.selectField(' ) === true
+	&& preg_match( '/admin-translation|admin-step-number|nino-admin-card|<h2>/', $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ) ) === 0 );
+check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
+
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css' ];
+$untoken = [];
+
+foreach( $sheeted as $sheet ) {
+	[ , , $stray ] = $strays( $bare( $read( $sheet ) ), [] );
+
+	foreach( $stray as $found )
+		$untoken[] = $sheet. ': '. $found;
+}
+
+$unshipped = array_values( array_filter( $sheeted, static fn( string $sheet ): bool => str_contains( $read( dirname( $sheet, 2 ). '/Admin/Admin.php' ), "'/assets/admin.css'" ) === false ) );
+
+check( 'every one of those stylesheets is named by the assets() of its panel, which is what puts it in the bundle'. ( $unshipped === [] ? '' : ' - not '. implode( ', ', $unshipped ) ), $unshipped === [] );
+check( 'the stylesheets of the panels that have gone over name type, weight and space only through the tokens'. ( $untoken === [] ? '' : ' - '. implode( '; ', array_slice( $untoken, 0, 6 ) ) ), $untoken === [] );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

@@ -31,7 +31,6 @@
 		// Set once the first answer has rendered the form; showCurrent() builds
 		// nothing while it is set - see there
 		_ready 		: false,
-		_intro 		: '',
 		_fields 	: [],
 		// The locale inventory as apiList() reported it, plus whatever has been
 		// added in this session. Each entry: { code, name, hasText, keys, active }
@@ -43,9 +42,10 @@
 		// isDirty(): adding a language writes its file at once and adds a row
 		// to the list, which is not an edit of what Save stores
 		_saved 		: { active : [], native : '' },
-		// The adder's line under the list - the warning about a language without
-		// a file, what adding one made of the code, and why it did not (see
-		// Nino.adminUi.status()). Drawn again with the form
+		// The name of the list of languages and the sentence behind its (?), as the schema said them
+		_words 		: { label : '', help : undefined },
+		// The line of the bar: what is saving, what is unsaved and why a save was
+		// refused (see Nino.adminUi.status()). Drawn again with the form
 		_line 		: null,
 
 		/**
@@ -64,7 +64,6 @@
 				if( status !== 200 || response === null )
 					return Nino.admin.language._showError( wrap, status, response );
 
-				Nino.admin.language._intro 		= response.intro || '';
 				Nino.admin.language._fields 	= response.fields;
 				Nino.admin.language._locales	= response.locales;
 				Nino.admin.language._render();
@@ -115,63 +114,64 @@
 		},
 
 		/**
-		 *	One fieldset with the language list and the native select, and
-		 *	Save in the pinned action bar
+		 *	One fieldset with the list of languages and the native select, a
+		 *	notice above it while a language that is on has no file, and the one
+		 *	bar below: the badge and the line, "Add language" at the side and Save
+		 *	as the one main button
 		 *
 		 *	@return		void
 		 */
 		_render : function() {
 
+			const panel = Nino.admin.language;
 			const wrap = dc.getElementById('language-form');
 			wrap.innerHTML = '';
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 
+			// Where the warning about a language that is on and has no file of its own is drawn (see _refreshLocaleWarning())
+			const missing = dc.createElement('div');
+			missing.id = 'language-missing';
+			form.appendChild( missing );
+
+			// One section, which the head of the tab names: what each field does stands behind the (?) at its name
 			const fieldset = dc.createElement('fieldset');
-			const legend = dc.createElement('legend');
-			legend.textContent = Nino.content.getText('/_admin/nav/languages');
-			fieldset.appendChild( legend );
 
-			// What the section is about stands behind the (?) at its title
-			if( Nino.admin.language._intro !== '' )
-				Nino.adminUi.sectionHelp( legend, fieldset, Nino.adminUi.text( Nino.admin.language._intro ) );
-
-			Nino.admin.language._fields.forEach( function( field ) {
+			panel._fields.forEach( function( field ) {
 				if( field.type === 'locales' )
-					fieldset.appendChild( Nino.admin.language._renderLocales( field ) );
+					fieldset.appendChild( panel._renderLocales( field ) );
 				else if( field.type === 'native' )
-					fieldset.appendChild( Nino.admin.language._renderNative( field ) );
+					fieldset.appendChild( panel._renderNative( field ) );
 			} );
 
 			form.appendChild( fieldset );
 
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.className = 'nino-admin-btn-primary';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
 			const msg = dc.createElement('p');
 			msg.id = 'language-form-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			actions.appendChild( msg );
 
-			form.appendChild( actions );
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.language._save() } );
+			// A language is added in a dialog, from the bar: what it makes is a file, which is no part of what Save stores
+			const add = Nino.adminUi.button( Nino.content.getText('/_admin/language/label/add'), function() { panel._openAdder( add ) }, { kind : 'secondary', id : 'language-add' } );
+			const bar = Nino.adminUi.actionBar( {
+				status		: { line : msg },
+				secondary	: [ add ],
+				primary		: Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ),
+			} );
+			panel._line = bar.line;
+			bar.line.bind( form, panel.isDirty );
+
+			form.appendChild( bar.el );
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); panel._save() } );
 
 			wrap.appendChild( form );
 
 			// Only now, with the form actually in the document. Both of these
-			// reach their targets through getElementById - the adder and _save()
-			// need those ids anyway - and an element that is still a detached
-			// subtree is not findable that way
-			Nino.admin.language._renderLocaleRows();
-			Nino.admin.language._refreshNative( Nino.admin.language._nativeValue );
+			// reach their targets through getElementById, and an element that is
+			// still a detached subtree is not findable that way
+			panel._renderLocaleRows();
+			panel._refreshNative( panel._nativeValue );
 
-			Nino.admin.language._capture();
+			panel._capture();
 		},
 
 		/**
@@ -232,16 +232,16 @@
 		},
 
 		/**
-		 *	The language list: one row per locale the project knows about, which
-		 *	is the union of what config.php lists and what actually has a
-		 *	text/<locale>.php on disk (see Language::_localeInventory()).
+		 *	The mount of the list of languages: one row per locale the project
+		 *	knows about, which is the union of what config.php lists and what
+		 *	actually has a text/<locale>.php on disk (see Language::_localeInventory()).
 		 *
 		 *	Showing both sides is the point. A translated language that is
-		 *	simply switched off should be one checkbox away from being back on,
+		 *	simply switched off should be one tick away from being back on,
 		 *	and a language switched on without a text file of its own shows the
 		 *	texts of the native language and is offered for translation neither
 		 *	under Text nor under Translations - so that row says so, before the
-		 *	language is ever saved.
+		 *	language is ever saved. The rows are drawn by _renderLocaleRows()
 		 *
 		 *	@param		{Object}	field
 		 *
@@ -249,220 +249,144 @@
 		 */
 		_renderLocales : function( field ) {
 
-			const wrap = dc.createElement('div');
-			wrap.className = 'nino-admin-field nino-admin-field-wide';
+			const mount = dc.createElement('div');
+			mount.id = 'language-locales';
 
-			const span = dc.createElement('span');
-			span.className = 'nino-admin-field-name';
-			span.textContent = Nino.adminUi.text( field.label );
-			wrap.appendChild( span );
+			// The words of the checklist are the field's: the name and the help that stands behind the (?) at it
+			Nino.admin.language._words = { label : Nino.adminUi.text( field.label ), help : field.hint ? Nino.adminUi.text( field.hint ) : undefined };
 
-			const list = dc.createElement('div');
-			list.id = 'language-locales';
-			list.className = 'nino-admin-checklist';
-
-			// What the list does stands behind the (?) at its name: the list is a group, named by the name and described by it
-			if( field.hint )
-				Nino.adminUi.sectionHelp( span, list, Nino.adminUi.text( field.hint ) );
-
-			wrap.appendChild( list );
-
-			// Adding one is a plain text field rather than a picker: the set of
-			// locales a project may use is not something this panel gets to
-			// decide, and a text/<locale>.php is all a new one needs
-			const adder = dc.createElement('div');
-			adder.className = 'nino-admin-field';
-
-			const adderName = dc.createElement('span');
-			const adderLabel = dc.createElement('span');
-			adderLabel.id = 'language-locale-new-name';
-			adderLabel.textContent = Nino.content.getText('/_admin/language/label/add');
-			adderName.appendChild( adderLabel );
-			adder.appendChild( adderName );
-
-			// Said before the button is pressed, because pressing it writes a file: a warning with a consequence, which
-			// stays in view and is no help
-			const adderNote = dc.createElement('small');
-			adderNote.className = 'nino-admin-hint nino-admin-field-note';
-			adderNote.id = 'nino-admin-note-language-new';
-			adderNote.textContent = Nino.content.getText('/_admin/language/hint/add');
-			adder.appendChild( adderNote );
-
-			const adderRow = dc.createElement('div');
-			adderRow.className = 'admin-language-adder';
-
-			const adderInput = dc.createElement('input');
-			adderInput.type = 'text';
-			adderInput.id = 'language-locale-new';
-			adderInput.placeholder = 'fr_FR';
-			adderInput.autocomplete = 'off';
-			adderInput.spellcheck = false;
-			// Named by the words above it, not by the example in it
-			adderInput.setAttribute( 'aria-labelledby', adderLabel.id );
-			adderRow.appendChild( adderInput );
-
-			adderInput.setAttribute( 'aria-describedby', 'nino-admin-note-language-new' );
-
-			const adderBtn = dc.createElement('button');
-			adderBtn.type = 'button';
-			adderBtn.textContent = Nino.content.getText('/_admin/common/label/add');
-			adderBtn.addEventListener( 'click', function() { Nino.admin.language._addLocale() } );
-			adderRow.appendChild( adderBtn );
-
-			// Enter inside the field adds the language instead of submitting
-			// the whole form, which is what a lone text input in a form does
-			adderInput.addEventListener( 'keydown', function( ev ) {
-				if( ev.key !== 'Enter' )
-					return;
-				ev.preventDefault();
-				Nino.admin.language._addLocale();
-			} );
-
-			// What was refused is let go of as the code is typed again
-			adderInput.addEventListener( 'input', function() {
-				if( adderInput.getAttribute('aria-invalid') !== 'true' )
-					return;
-				Nino.adminUi.clearFieldErrors( adder );
-				Nino.admin.language._refreshLocaleWarning();
-			} );
-
-			adder.appendChild( adderRow );
-
-			const adderMsg = dc.createElement('p');
-			adderMsg.id = 'language-locale-msg';
-			adderMsg.className = 'nino-admin-hint';
-			adder.appendChild( adderMsg );
-			Nino.admin.language._line = Nino.adminUi.status( adderMsg );
-
-			wrap.appendChild( adder );
-
-			// Rows are filled by _render() once this is in the document
-			return wrap;
+			return mount;
 		},
 
 		/**
-		 *	(Re)build the locale rows from _locales
+		 *	(Re)build the locale rows from _locales: a list of ticks, each language
+		 *	named as the whole workbench names it, with what exists on disk for it at
+		 *	the end of its row - which is what decides whether switching it on
+		 *	produces a language with texts of its own or one that shows the native
+		 *	language's until it has a file
 		 *
 		 *	@return		void
 		 */
 		_renderLocaleRows : function() {
 
-			const list = dc.getElementById('language-locales');
-			if( list === null )
+			const panel = Nino.admin.language;
+			const mount = dc.getElementById('language-locales');
+			if( mount === null )
 				return;
 
-			list.innerHTML = '';
+			const codes = panel._locales.map( function( locale ) { return locale.code } );
 
-			Nino.admin.language._locales.forEach( function( locale ) {
-
-				// No .nino-admin-checkbox-field here: .nino-admin-checklist already
-				// styles its own rows, and carrying both stacked the two components'
-				// spacing on top of each other
-				const label = dc.createElement('label');
-
-				const input = dc.createElement('input');
-				input.type = 'checkbox';
-				input.checked = locale.active === true;
-				input.dataset.locale = locale.code;
-				input.addEventListener( 'change', function() {
-					locale.active = input.checked;
-					Nino.admin.language._refreshNative();
-					Nino.admin.language._refreshLocaleWarning();
-				} );
-				label.appendChild( input );
-
-				const name = dc.createElement('span');
-				name.textContent = locale.name+ ' · '+ locale.code;
-				label.appendChild( name );
-
-				// What exists on disk for it, which is what decides whether
-				// switching it on produces a language with texts of its own or
-				// one that shows the native language's until it has a file
-				const state = dc.createElement('small');
-				state.className = 'nino-admin-checklist-state';
-				state.textContent = locale.hasText === true
-					? Nino.adminUi.format( Nino.content.getText('/_admin/language/label/keys'), locale.keys )
-					: Nino.adminUi.format( Nino.content.getText('/_admin/language/label/notext'), locale.code );
-				label.appendChild( state );
-
-				list.appendChild( label );
+			const list = Nino.adminUi.checklist( {
+				key			: 'locales',
+				label		: panel._words.label,
+				help		: panel._words.help,
+				options	: panel._locales.map( function( locale ) {
+					return {
+						value : locale.code,
+						label : Nino.adminUi.localeName( locale.code, codes ),
+						state : locale.hasText === true
+							? Nino.adminUi.format( Nino.content.getText('/_admin/language/label/keys'), locale.keys )
+							: Nino.adminUi.format( Nino.content.getText('/_admin/language/label/notext'), locale.code ),
+					};
+				} ),
+				value		: panel._locales.filter( function( locale ) { return locale.active === true } ).map( function( locale ) { return locale.code } ),
+				onChange : function( ticked ) {
+					panel._locales.forEach( function( locale ) { locale.active = ticked.indexOf( locale.code ) !== -1 } );
+					panel._refreshNative();
+					panel._refreshLocaleWarning();
+				},
 			} );
 
-			Nino.admin.language._refreshLocaleWarning();
+			mount.innerHTML = '';
+			mount.appendChild( list.el );
+
+			panel._refreshLocaleWarning();
 		},
 
 		/**
 		 *	Warn about any language that is switched on without a text file of
-		 *	its own. Rendered into the adder's own message line, so it sits
-		 *	directly under the list it is about
+		 *	its own: a notice at the top of the form, which is there while one is
+		 *	and goes when it is switched off or its file is made
 		 *
 		 *	@return		void
 		 */
 		_refreshLocaleWarning : function() {
 
-			const line = Nino.admin.language._line;
-			if( line === null )
+			const mount = dc.getElementById('language-missing');
+			if( mount === null )
 				return;
 
+			const codes = Nino.admin.language._locales.map( function( locale ) { return locale.code } );
 			const missing = Nino.admin.language._locales
 				.filter( function( locale ) { return locale.active === true && locale.hasText !== true } )
-				.map( function( locale ) { return locale.code } );
+				.map( function( locale ) { return Nino.adminUi.localeName( locale.code, codes ) } );
 
-			if( missing.length === 0 ) {
-				line.idle( '' );
-				return;
-			}
+			mount.innerHTML = '';
 
-			line.fail( Nino.adminUi.format( Nino.content.getText('/_admin/language/error/missing'), missing.join( ', ' ) ) );
+			if( missing.length > 0 )
+				mount.appendChild( Nino.adminUi.notice( Nino.adminUi.format( Nino.content.getText('/_admin/language/error/missing'), missing.join( ', ' ) ) ) );
 		},
 
 		/**
-		 *	Add a locale typed into the adder field. A code that is no code is
-		 *	said where the person is: the field is marked and described by the
-		 *	sentence under it, which says what a code looks like, the line below
-		 *	announces that the value is not valid, and the focus goes back to
-		 *	the field
+		 *	The dialog that adds a language: a code and nothing else, and what
+		 *	pressing the button does said before it is pressed - it writes a file
+		 *
+		 *	@param		{Element}	opener					The button that opened it, which has the focus again when it closes
 		 *
 		 *	@return		void
 		 */
-		_addLocale : function() {
+		_openAdder : function( opener ) {
 
-			const input = dc.getElementById('language-locale-new');
-			const adder = input.closest('.nino-admin-field');
-			const line 	= Nino.admin.language._line;
-			const code 	= input.value.trim();
+			Nino.adminUi.formDialog( {
+				title		: Nino.content.getText('/_admin/language/label/add'),
+				fields	: [ {
+					key				: 'code',
+					label			: Nino.content.getText('/_admin/language/label/code'),
+					// What the code looks like and what pressing the button does stand behind the (?): nothing is overwritten, so no warning stays in view
+					help			: Nino.content.getText('/_admin/language/hint/code')+ ' '+ Nino.content.getText('/_admin/language/hint/add'),
+					required	: true,
+					validate	: function( value ) { return /^[a-z]{2}_[A-Z]{2}$/.test( value.trim() ) === true ? '' : Nino.content.getText('/_admin/language/error/id') },
+				} ],
+				submit	: Nino.content.getText('/_admin/language/label/add'),
+				cancel	: Nino.content.getText('/_admin/common/label/cancel'),
+				opener	: opener,
+				onSubmit : function( values, ctl ) { Nino.admin.language._addLocale( values.code.trim(), ctl ) },
+			} );
+		},
 
-			Nino.adminUi.clearFieldErrors( adder );
+		/**
+		 *	Add a locale named in the dialog. A code that is no code was refused
+		 *	by the dialog before it got here, at the field. A language that is
+		 *	listed and translated is switched back on instead of being added
+		 *	twice; any other has its file made first, then its row
+		 *
+		 *	@param		{string}		code
+		 *	@param		{Object}		ctl						The dialog's { close(), fail( key, text ) }
+		 *
+		 *	@return		void
+		 */
+		_addLocale : function( code, ctl ) {
 
-			if( /^[a-z]{2}_[A-Z]{2}$/.test( code ) === false ) {
-				line.fail( Nino.content.getText('/_admin/error/invalid_value') );
-				// Right under the row of the field, above the line
-				input.parentNode.after( Nino.adminUi.fieldError( adder, input, 'language-locale-error', Nino.content.getText('/_admin/language/error/id') ) );
-				input.focus();
-				return;
-			}
-
-			const existing = Nino.admin.language._locales.find( function( locale ) { return locale.code === code } );
+			const panel = Nino.admin.language;
+			const existing = panel._locales.find( function( locale ) { return locale.code === code } );
 
 			// Already listed and already translated - switch it back on rather
 			// than adding a duplicate, and leave its file alone
 			if( existing !== undefined && existing.hasText === true ) {
 				existing.active = true;
-				input.value = '';
-				Nino.admin.language._renderLocaleRows();
-				Nino.admin.language._refreshNative();
+				panel._renderLocaleRows();
+				panel._refreshNative();
+				ctl.close();
 				return;
 			}
-
-			line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/creating'), code ) );
 
 			// The file comes first, then the row: a language whose text file
 			// exists is a language that renders, and the row can then report
 			// how many keys are waiting instead of warning that none are
-			Nino.admin.language._apiCall( 'addlocale', { locale : code }, function( status, response ) {
+			panel._apiCall( 'addlocale', { locale : code }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					line.error( status, response, '/_admin/language/error/create' );
+					ctl.fail( 'code', Nino.adminUi.api.errorText( status, response, '/_admin/language/error/create' ) );
 					return;
 				}
 
@@ -478,27 +402,27 @@
 				// with nothing of its own one Save away from being served - its
 				// pages would show the native language's texts, all of them.
 				// Translate it first, then tick it. An already-translated language
-				// that was merely switched off takes the branch above and is
+				// that was merely switched off took the branch above and is
 				// ticked there.
 				if( existing === undefined ) {
-					Nino.admin.language._locales.push( entry );
-					Nino.admin.language._locales.sort( function( a, b ) { return a.code < b.code ? -1 : 1 } );
+					panel._locales.push( entry );
+					panel._locales.sort( function( a, b ) { return a.code < b.code ? -1 : 1 } );
 				}
 
-				input.value = '';
-				Nino.admin.language._renderLocaleRows();
-				Nino.admin.language._refreshNative();
+				panel._renderLocaleRows();
+				panel._refreshNative();
+				ctl.close();
 
-				// _renderLocaleRows() has just cleared this line via
-				// _refreshLocaleWarning(), so the outcome goes in afterwards. A
-				// language that is ticked already - the warning above led here -
+				// A language that is ticked already - the warning above led here -
 				// is not left off: its pages show the native language's texts
+				const name = Nino.adminUi.localeName( code );
+
 				if( response.created !== true )
-					line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys ) );
+					Nino.adminUi.say( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys ) );
 				else if( entry.active === true )
-					line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/served'), code, response.keys, response.from, code ) );
+					Nino.adminUi.say( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/served'), name, response.keys ) );
 				else
-					line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/created'), code, response.keys, response.from, code ) );
+					Nino.adminUi.say( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/created'), name, response.keys ) );
 			} );
 		},
 
@@ -544,14 +468,11 @@
 
 			const current = ( preferred !== undefined ) ? preferred : select.value;
 			const active 	= Nino.admin.language._locales.filter( function( locale ) { return locale.active === true } );
+			const codes 	= active.map( function( locale ) { return locale.code } );
 
 			select.innerHTML = '';
 			active.forEach( function( locale ) {
-				const option = dc.createElement('option');
-				option.value = locale.code;
-				option.textContent = locale.name+ ' · '+ locale.code;
-				option.selected = locale.code === current;
-				select.appendChild( option );
+				select.appendChild( Nino.adminUi.localeOption( locale.code, codes, [], current ) );
 			} );
 
 			// The previously native language was just switched off. Falling back
@@ -578,7 +499,7 @@
 					done( ok );
 			};
 
-			const msg = dc.getElementById('language-form-msg');
+			const line = Nino.admin.language._line;
 			const fields = {};
 
 			const active = Nino.admin.language._locales
@@ -591,17 +512,17 @@
 			if( native !== null && native.value !== '' )
 				fields['/nino/locales/native'] = native.value;
 
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			line.saving();
 
 			Nino.admin.language._apiCall( 'save', { fields : fields }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
 
-				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
+				line.saved();
 				Nino.admin.language._capture();
 
 				// Reloaded rather than left as typed: a saved language list

@@ -95,14 +95,18 @@ const sandbox = {
 	document : documentOf( mount ),
 	Nino : Nino,
 };
+sandbox.document.documentElement = { lang : 'en' };
 sandbox.window = {
 	Nino : Nino,
 	confirm : function() { return confirmAnswer },
 	location : { hash : '' },
+	setTimeout : function() { return 1 },
+	clearTimeout : function() {},
 };
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/assets/datetext.js', context );
 
 load( '_nino/Nino/Modules/Form/assets/admin.js', context );
 
@@ -181,8 +185,8 @@ check( 'every entry is a card, in the order the server sent them', cardIds() ===
 
 const quote = cards()[0];
 
-check( 'the header names the date and, with more than one form, which form it is',
-	quote.querySelector('.submissions-entry-date').textContent === '2026-09-08 10:00:00'
+check( 'the header names the day and the minute in the one form of the workbench - no seconds - and, with more than one form, which form it is',
+	quote.querySelector('.submissions-entry-date').textContent === Nino.adminUi.dateText('2026-09-08 10:00') && quote.querySelector('.submissions-entry-date').textContent.indexOf('00:00') === -1
 	&& quote.querySelector('.submissions-entry-cat').textContent === 'Quote' );
 check( 'the address to answer at is a mailto link, taken from the form\'s own email field whatever it is called',
 	byTag( quote, 'A' )[0].href === 'mailto:buyer@example.com' && byTag( quote, 'A' )[0].textContent === 'buyer@example.com' );
@@ -199,8 +203,8 @@ check( 'and it is not repeated among the pairs', pairs( cards()[1] ).join('|') =
 
 // --- what can be deleted ---------------------------------------------------
 
-check( 'a card carries a delete button', quote.querySelector('.submissions-entry-delete') !== null
-	&& hasClass( quote.querySelector('.submissions-entry-delete'), 'nino-admin-btn-danger' ) );
+check( 'a card carries a delete button, a small one of the dangerous kind', quote.querySelector('.submissions-entry-delete') !== null
+	&& hasClass( quote.querySelector('.submissions-entry-delete'), 'nino-admin-btn-danger' ) && hasClass( quote.querySelector('.submissions-entry-delete'), 'nino-admin-btn--small' ) );
 check( 'an entry too old to have an id carries none - there is nothing to address it by that survives a deletion',
 	cards()[2].querySelector('.submissions-entry-delete') === null );
 
@@ -238,6 +242,14 @@ check( 'the select offers every form, with the entry that turns it off first',
 	byTag( formNow(), 'OPTION' ).map( function( o ) { return o.value } ).join('|') === '|contact|quote'
 	&& byTag( formNow(), 'OPTION' )[0].textContent === text('/_admin/submissions/label/form-all') );
 
+check( 'the select and the search stand in the one filter bar of the design system, the search first', searchNow().parentNode === formNow().parentNode && hasClass( searchNow().parentNode, 'nino-admin-filterbar' )
+	&& searchNow().parentNode.attributes.role === 'search' && searchNow().parentNode.children[0] === searchNow() );
+searchNow().value = Nino.adminUi.dateText('2026-09-07 09:00');
+fire( searchNow(), 'input' );
+check( 'the search finds a day as the card shows it, not only as it is stored', cardIds() === 'bbbbbbbbbbbbbbbb' );
+searchNow().value = '';
+fire( searchNow(), 'input' );
+
 formNow().value = 'contact';
 fire( formNow(), 'change' );
 check( 'picking a form shows its submissions alone', cardIds() === 'bbbbbbbbbbbbbbbb,' );
@@ -261,10 +273,41 @@ fire( searchNow(), 'input' );
 check( 'cleared, every card is back', cardIds() === 'aaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbb,' );
 
 
+// --- the keyboard and what follows a deletion ------------------------------
+
+{
+	const card = cards()[0];
+	const toggled = () => hasClass( card, 'expanded' );
+	const before = toggled();
+	fire( card, 'keydown', { key : 'Enter', target : card.querySelector('.submissions-entry-delete') ?? card.querySelector('a') } );
+	check( 'Enter on a control inside a card is that control\'s: it does not open or close the card', toggled() === before );
+	fire( card, 'keydown', { key : 'Enter' } );
+	check( '...and Enter on the card itself does', toggled() !== before );
+}
+
+{
+	sandbox.document.body = element('body');
+	panel.init();
+	answer( 200, { entries : ENTRIES, forms : FORMS } );
+	formNow().value = '';
+	fire( formNow(), 'change' );
+	const del = cards()[0].querySelector('.submissions-entry-delete');
+	const toastsBefore = findAll( sandbox.document.body, el => hasClass( el, 'nino-admin-toast' ) ).length;
+	const count = requests.length;
+	fire( del, 'click' );
+	answer( 200, { deleted : true } );
+	check( 'a deletion is said as a toast and the list is read again', requests.length === count + 2 && requests[requests.length - 1].action === 'submissions/list' && findAll( sandbox.document.body, el => hasClass( el, 'nino-admin-toast' ) ).length === toastsBefore + 1 );
+	answer( 200, { entries : ENTRIES.slice( 1 ), forms : FORMS } );
+	check( '...and the focus goes to the card that took the place of the one deleted, not to the page', cards()[0].focused === true );
+}
+
 // --- the export is what is on screen ---------------------------------------
 
 formNow().value = 'contact';
 fire( formNow(), 'change' );
+const barOfList = sandbox.document.getElementById('submissions-actions');
+check( 'the export is the one main button of the one bar of the list', barOfList.className === 'nino-admin-actionbar nino-admin-list-actions' && barOfList.children.length === 1
+	&& barOfList.children[0] === sandbox.document.getElementById('submissions-export') && hasClass( barOfList.children[0], 'nino-admin-btn-primary' ) );
 fire( sandbox.document.getElementById('submissions-export'), 'click' );
 check( 'the export takes what the filters left, not what is on disk', exported.length === 1
 	&& exported[0].filename === text('/_admin/submissions/label/filename')

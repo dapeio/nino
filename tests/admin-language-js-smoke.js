@@ -1,15 +1,15 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	admin-language-js-smoke.js	DOM-light checks for the Language panel's adder
+ *	admin-language-js-smoke.js	DOM-light checks for the Language panel's script
  *													(_admin/Nino/Modules/Language/assets/admin.js).
  *
- *													A language is added from one text field. What is wrong
- *													with the code that was typed is said where the person
- *													is - at the field, which is marked and described, and in
- *													the line under it, which announces it - and the focus is
- *													back in the field. The checks below are about exactly
- *													that, and about the line that carries the other
- *													sentences of the adder.
+ *													The languages are named as the whole workbench names them
+ *													and ticked in a list of the design system; a language is
+ *													added in a dialog that asks for its code and nothing else,
+ *													where what is wrong with the code is said at its field; a
+ *													language that is on and has no file of its own is a notice
+ *													above the form; the form ends in the one bar of the guide,
+ *													Save its one main button, and what went well is a toast.
  *
  *	Usage: node tests/admin-language-js-smoke.js
  */
@@ -22,6 +22,7 @@ const { check, done, fills, load, element, findAll, fire } = require( './harness
 // --- the words -------------------------------------------------------------
 
 const moduleEn 		= fills('_admin/Nino/Modules/Language/text/en_US.php');
+const moduleDe 		= fills('_admin/Nino/Modules/Language/text/de_DE.php');
 const workbenchEn	= fills('_admin/text/en_US.php');
 
 function text( key ) {
@@ -31,13 +32,15 @@ function text( key ) {
 
 // --- the sandbox -----------------------------------------------------------
 
-/** The panel in its own context, with the form's mount in a page that has one focus */
+/** The panel in its own context, with the form's mount in a page that has one focus and dialogs that open and close */
 function build() {
 
 	const mount = element('div');
 	mount.id = 'language-form';
 
 	const requests = [];
+	const dialogs = [];
+	const body = element('body');
 
 	const Nino = {
 		admin : {},
@@ -47,19 +50,36 @@ function build() {
 	const sandbox = {
 		console : console,
 		document : {
-			createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
+			createElement : function( tag ) {
+				const created = element( tag );
+				if( tag === 'dialog' ) {
+					created.open = false;
+					created.showModal = function() { created.open = true };
+					created.contains = function( node ) { return node !== null && ( node === created || findAll( created, function( el ) { return el === node } ).length > 0 ) };
+					created.close = function() { created.open = false; fire( created, 'close' ) };
+					dialogs.push( created );
+				}
+				return created;
+			},
+			createElementNS : function( space, tag ) { return element( tag ) },
 			createTextNode : function( value ) { return Object.assign( element('#text'), { textContent : String( value ) } ) },
 			getElementById : function( id ) { return id === 'language-form' ? mount : ( findAll( mount, function( el ) { return el.id === id } )[0] ?? null ) },
+			addEventListener : function() {},
+			removeEventListener : function() {},
 			documentElement : null,
-			body : null,
+			body : body,
 			get activeElement() { return findAll( mount, function( el ) { return el.focused === true } )[0] ?? null },
 		},
 		Nino : Nino,
 	};
-	sandbox.window = { Nino : Nino };
+	sandbox.window = { Nino : Nino, setTimeout : function() { return 1 }, clearTimeout : function() {}, matchMedia : function() { return { matches : false } } };
 
 	const context = vm.createContext( sandbox );
 	load( '_admin/assets/Nino.admin.js', context );
+
+	// What the shell hands over: the native language and the name of each one as the site's own picker says it
+	Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English (US)', fr_FR : 'Français' } };
+
 	load( '_admin/Nino/Modules/Language/assets/admin.js', context );
 
 	const panel = Nino.admin.language;
@@ -69,20 +89,26 @@ function build() {
 		panel : panel,
 		mount : mount,
 		requests : requests,
+		dialogs : dialogs,
 		/** Answer the last request the panel made */
 		answer : function( status, body ) { requests[requests.length - 1].callback( status, body ) },
 		/** A sentence of the panel as it is said, its placeholders filled the way the panel fills them */
 		said : function( key, ...params ) { return Nino.adminUi.format( text( key ), ...params ) },
 		field : function( id ) { return findAll( mount, function( el ) { return el.id === id } )[0] },
-		/** What a person has in front of them */
-		focused : function() { return findAll( mount, function( el ) { return el.focused === true } )[0] ?? null },
+		/** The toasts on the page: what they say */
+		toasts : function() { return findAll( body, function( el ) { return el.classList.contains('nino-admin-toast-text') } ).map( function( el ) { return el.textContent } ) },
+		/** The tick of a language */
+		tick : function( code ) { return findAll( mount, function( el ) { return el.type === 'checkbox' && el.value === code } )[0] },
+		/** The row of a language, the list's own */
+		row : function( code ) { return findAll( mount, function( el ) { return el.type === 'checkbox' && el.value === code } )[0].parentNode },
+		localeName : Nino.adminUi.localeName,
 	};
 }
 
 const LOCALES = [
-	{ code : 'de_DE', name : 'Deutsch', hasText : true, keys : 120, active : true },
-	{ code : 'en_US', name : 'English', hasText : true, keys : 120, active : true },
-	{ code : 'fr_FR', name : 'Français', hasText : false, keys : 0, active : false },
+	{ code : 'de_DE', name : 'German (Germany)', hasText : true, keys : 120, active : true },
+	{ code : 'en_US', name : 'English (United States)', hasText : true, keys : 120, active : true },
+	{ code : 'fr_FR', name : 'French (France)', hasText : false, keys : 0, active : false },
 ];
 
 /** A panel that has read its list and drawn the form */
@@ -100,136 +126,164 @@ function opened() {
 	return t;
 }
 
+/** The dialog that adds a language, opened by the button of the bar */
+function adder( t ) {
+	fire( t.field('language-add'), 'click' );
+	const dialog = t.dialogs[t.dialogs.length - 1];
+	return {
+		dialog : dialog,
+		input : findAll( dialog, function( el ) { return el.tagName === 'INPUT' } )[0],
+		send : findAll( dialog, function( el ) { return el.tagName === 'BUTTON' } ).pop(),
+		errors : function() { return findAll( dialog, function( el ) { return el.className === 'nino-admin-field-error' } ) },
+	};
+}
+
 console.log('Admin Language');
 
 
-// --- the adder: a code that is none ----------------------------------------
+// --- the form --------------------------------------------------------------
 
 {
 	const t = opened();
-	const input = t.field('language-locale-new');
-	const line = t.field('language-locale-msg');
 
-check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( t.mount, function( el ) { return el.tagName === 'FIELDSET' } ).every( function( set ) { return set.children.every( function( child ) { return String( child.className ).indexOf('nino-admin-hint') === -1 || String( child.className ).indexOf('nino-admin-status') !== -1 } ) } ) && findAll( t.mount, function( el ) { return String( el.className ).indexOf('nino-admin-help-button') !== -1 } ).length > 0 );
-	check( 'the adder\'s field is named by the words above it, not by the example in it', input.attributes['aria-labelledby'] === 'language-locale-new-name' && t.field('language-locale-new-name').textContent === text('/_admin/language/label/add') );
-	check( 'its line is a status from the start: announced when it speaks, empty until it does', line.attributes.role === 'status' && line.attributes['aria-live'] === 'polite' && line.textContent === '' );
+	check( 'every language is a row of the list of ticks, named as the whole workbench names it - by the name the site gives it, not by the English name of the server, and not with its code', [ 'de_DE', 'en_US', 'fr_FR' ].every( function( code ) {
+		return findAll( t.row( code ), function( el ) { return el.textContent === t.localeName( code ) } ).length === 1;
+	} ) && t.localeName('en_US') === 'English (US)' );
+	check( '...with what exists for it at the end of the row: how many keys, or that there is no file', findAll( t.row('de_DE'), function( el ) { return el.classList.contains('nino-admin-checklist-state') } )[0].textContent === t.said( '/_admin/language/label/keys', 120 )
+		&& findAll( t.row('fr_FR'), function( el ) { return el.classList.contains('nino-admin-checklist-state') } )[0].textContent === t.said( '/_admin/language/label/notext', 'fr_FR' ) );
+	check( 'the ticked ones are the active ones, and the native select offers those and no others', t.tick('de_DE').checked === true && t.tick('fr_FR').checked === false
+		&& t.field('language-native').children.map( function( option ) { return option.value } ).join() === 'de_DE,en_US' && t.field('language-native').value === 'de_DE' );
+	check( '...each in the name of the workbench', t.field('language-native').children.map( function( option ) { return option.textContent } ).join() === 'Deutsch,English (US)' );
+	check( 'no paragraph that explains stands under the title of a section or under a field: it is behind a (?)', findAll( t.mount, function( el ) { return el.classList.contains('nino-admin-hint') } ).length === 0 && findAll( t.mount, function( el ) { return String( el.className ).indexOf('nino-admin-help-button') !== -1 } ).length > 0 );
 
-	// What the adder's input is described by before anything is refused: the sentence of its help, in the document
-	const helpId = input.attributes['aria-describedby'];
-	check( 'the adder\'s input is described by the sentence of its help, which is in the document', typeof helpId === 'string' && t.field( helpId ) !== undefined && t.field( helpId ).textContent === text('/_admin/language/hint/add') );
-
-	input.value = 'xx';
-	t.panel._addLocale();
-
-	const error = t.field('language-locale-error');
-	check( 'a code that is none is refused before anything is sent', t.requests.length === 1 && t.requests[0].endpoint === 'list' );
-	check( '...the field is marked, and described by the sentence under it', input.attributes['aria-invalid'] === 'true' && input.attributes['aria-describedby'].split(' ')[0] === 'language-locale-error' && input.attributes['aria-describedby'].split(' ').length === 2
-		&& error !== undefined && error.className === 'nino-admin-field-error' && error.textContent === text('/_admin/language/error/id') );
-	check( '...the sentence stands under the row of the field, not in it', error !== undefined && error.parentNode === input.parentNode.parentNode && error.parentNode.children.indexOf( error ) === error.parentNode.children.indexOf( input.parentNode ) + 1 );
-	check( '...the line under it announces that the value is not valid, as an alert - the sentence at the field says what a code looks like', line.attributes.role === 'alert' && line.attributes['aria-live'] === 'assertive' && line.textContent === text('/_admin/error/invalid_value') && line.textContent !== error.textContent );
-	check( '...and the focus is in the field, where it is typed again', t.focused() === input );
-
-	// A second refusal does not stack a second sentence
-	t.panel._addLocale();
-	check( 'a second refusal says it once', t.mount.children.length > 0 && findAll( t.mount, function( el ) { return el.className === 'nino-admin-field-error' } ).length === 1 );
-
-	input.value = 'fr';
-	fire( input, 'input' );
-	check( 'typing the code again lets the refusal go: the mark, the sentence and the alert', input.attributes['aria-invalid'] === undefined && input.attributes['aria-describedby'] === helpId
-		&& t.field('language-locale-error') === undefined && line.attributes.role === 'status' && line.textContent === '' );
+	const bars = findAll( t.mount, function( el ) { return el.classList.contains('nino-admin-actionbar') } );
+	const primaries = findAll( t.mount, function( el ) { return el.classList.contains('nino-admin-btn-primary') } );
+	check( 'the form ends in the one bar of the guide: the add button at its side, and Save as the one main button at the far right', bars.length === 1 && primaries.length === 1
+		&& bars[0].children[bars[0].children.length - 1] === primaries[0] && primaries[0].type === 'submit'
+		&& bars[0].children.indexOf( t.field('language-add') ) !== -1 && t.field('language-add').classList.contains('nino-admin-btn-secondary') );
+	check( 'there is no field for a new code in the form: the adder is a dialog', findAll( t.mount, function( el ) { return el.tagName === 'INPUT' && el.type === 'text' } ).length === 0 && t.dialogs.length === 0 );
 }
 
 
-// --- the adder: a code that is one -----------------------------------------
+// --- the dialog that adds a language ---------------------------------------
 
 {
 	const t = opened();
-	const input = t.field('language-locale-new');
-	const line = t.field('language-locale-msg');
+	const a = adder( t );
+	const before = t.requests.length;
 
-	input.value = 'it_IT';
-	t.panel._addLocale();
+	check( 'the button opens a dialog with one field, the code, and what pressing it does stands behind the (?) at the field, not in view under it', t.dialogs.length === 1 && a.dialog.open === true
+		&& findAll( a.dialog, function( el ) { return el.tagName === 'INPUT' } ).length === 1
+		&& findAll( a.dialog, function( el ) { return el.classList.contains('nino-admin-help-text') && el.textContent.indexOf( text('/_admin/language/hint/add') ) !== -1 } ).length === 1
+		&& findAll( a.dialog, function( el ) { return el.classList.contains('nino-admin-field-note') } ).length === 0 );
 
+	a.input.value = 'xx';
+	fire( a.send, 'click' );
+	check( 'a code that is none is refused at its field before anything is sent, with the sentence of what a code looks like - the dialog stays open', t.requests.length === before && a.dialog.open === true
+		&& a.input.attributes['aria-invalid'] === 'true' && a.errors().length === 1 && a.errors()[0].textContent === text('/_admin/language/error/id') );
+
+	a.input.value = 'it_IT';
+	fire( a.input, 'input' );
+	fire( a.send, 'click' );
 	const request = t.requests[t.requests.length - 1];
-	check( 'a code is sent as it is typed', request.endpoint === 'addlocale' && request.payload.locale === 'it_IT' );
-	check( '...and while the file is written the line says so, politely', line.attributes.role === 'status' && line.textContent === text('/_admin/language/msg/creating').replace( '%s', 'it_IT' ) );
+	check( 'a code is sent as it is typed, and the dialog stays open until the server has said yes', request.endpoint === 'addlocale' && request.payload.locale === 'it_IT' && a.dialog.open === true );
 
 	t.answer( 500, { error : 'refused' } );
-	check( 'a request the server refused is an alert in the same line, in the words it gave', line.attributes.role === 'alert' && line.textContent.indexOf( 'refused' ) !== -1 && t.field('language-locale-error') === undefined );
+	check( 'a request the server refused is said at the field, in the words it gave, and the dialog can be sent again', a.dialog.open === true && a.input.attributes['aria-invalid'] === 'true' && a.errors()[0].textContent.indexOf( 'refused' ) !== -1 && a.send.disabled === false );
 
-	input.value = 'it_IT';
-	t.panel._addLocale();
+	fire( a.send, 'click' );
 	t.answer( 200, { created : true, keys : 3, from : 'de_DE' } );
 	const added = t.panel._locales.find( function( locale ) { return locale.code === 'it_IT' } );
-	check( 'a language that was made is listed, switched off - a skeleton of empty keys is not served', added !== undefined && added.hasText === true && added.active === false && input.value === '' );
-	check( '...and the line says what was made, politely', line.attributes.role === 'status' && line.textContent.indexOf( 'it_IT' ) !== -1 );
-	check( '...in the words for a language that is left off, as one that is not ticked is', line.textContent === t.said( '/_admin/language/msg/created', 'it_IT', 3, 'de_DE', 'it_IT' ) );
+	check( 'a language that was made is listed, switched off - a skeleton of empty keys is not served - and the dialog is closed', added !== undefined && added.hasText === true && added.active === false && t.tick('it_IT').checked === false && a.dialog.open === false );
+	check( '...and it is said as a toast, in the words for a language that is left off', t.toasts().length === 1 && t.toasts()[0] === t.said( '/_admin/language/msg/created', t.localeName('it_IT'), 3 ) );
+	check( '...and the form is not unsaved by it: a file is made at once, and Save stores the ticks alone', t.panel.isDirty() === false );
 }
 
 
-// --- the adder: the file of a language that is on already --------------------
+// --- the file of a language that is on already -----------------------------
 
 {
 	const t = opened();
-	const line = t.field('language-locale-msg');
-	const french = function() { return t.field('language-locales').children.find( function( row ) { return row.children[0].dataset.locale === 'fr_FR' } ).children[0] };
 
 	// What the warning of a language without a file leads to: it is ticked, and its file is made
-	french().checked = true;
-	fire( french(), 'change' );
-	check( 'a language that is ticked and has no file is warned about, and the warning names the adder', line.attributes.role === 'alert' && line.textContent === t.said( '/_admin/language/error/missing', 'fr_FR' ) );
+	t.tick('fr_FR').checked = true;
+	fire( t.tick('fr_FR'), 'change' );
+	const notices = function() { return findAll( t.field('language-missing'), function( el ) { return el.classList.contains('nino-admin-notice') } ) };
+	check( 'a language that is ticked and has no file is a notice above the form, naming it in the words of the workbench', notices().length === 1 && notices()[0].textContent === t.said( '/_admin/language/error/missing', 'Français' ) );
+	check( '...and is no line of the bar, whose state it would take from the form', t.field('language-form-msg').textContent === '' );
 
-	const input = t.field('language-locale-new');
-	input.value = 'fr_FR';
-	t.panel._addLocale();
+	t.tick('fr_FR').checked = false;
+	fire( t.tick('fr_FR'), 'change' );
+	check( '...and switching it off again takes the notice away', notices().length === 0 );
+
+	t.tick('fr_FR').checked = true;
+	fire( t.tick('fr_FR'), 'change' );
+	const a = adder( t );
+	a.input.value = 'fr_FR';
+	fire( a.send, 'click' );
 	t.answer( 200, { created : true, keys : 3, from : 'de_DE' } );
 
 	const made = t.panel._locales.find( function( locale ) { return locale.code === 'fr_FR' } );
-	check( 'its file is made and it stays ticked: the language is on, as it was', made.hasText === true && made.active === true && french().checked === true && t.panel._locales.length === LOCALES.length );
-	check( '...and the line does not say it is left off: it says what its pages show, a status', line.attributes.role === 'status' && line.textContent === t.said( '/_admin/language/msg/served', 'fr_FR', 3, 'de_DE', 'fr_FR' ) && line.textContent !== t.said( '/_admin/language/msg/created', 'fr_FR', 3, 'de_DE', 'fr_FR' ) );
+	check( 'its file is made and it stays ticked: the language is on, as it was, and the notice is gone', made.hasText === true && made.active === true && t.tick('fr_FR').checked === true && t.panel._locales.length === LOCALES.length && notices().length === 0 );
+	check( '...and the toast does not say it is left off: it says what its pages show', t.toasts()[0] === t.said( '/_admin/language/msg/served', 'Français', 3 ) && t.toasts()[0] !== t.said( '/_admin/language/msg/created', 'Français', 3 ) );
 }
 
 
-// --- the adder: a file that is there already ---------------------------------
+// --- a file that is there already, a language that is listed ---------------
 
 {
 	const t = opened();
-	const line = t.field('language-locale-msg');
+	const a = adder( t );
 
-	t.field('language-locale-new').value = 'fr_FR';
-	t.panel._addLocale();
+	a.input.value = 'fr_FR';
+	fire( a.send, 'click' );
 	t.answer( 200, { created : false, keys : 3, from : 'de_DE' } );
-	check( 'a file the server had already is said to be left untouched, in a line of its own', line.attributes.role === 'status' && line.textContent === t.said( '/_admin/language/msg/existed', 'fr_FR', 3 ) );
+	check( 'a file the server had already is said to be left as it is, as a toast', t.toasts()[0] === t.said( '/_admin/language/msg/existed', 'fr_FR', 3 ) && a.dialog.open === false );
+
+	const b = adder( t );
+	const count = t.requests.length;
+	b.input.value = 'en_US';
+	t.tick('en_US').checked = false;
+	fire( t.tick('en_US'), 'change' );
+	fire( b.send, 'click' );
+	check( 'a language that is listed and translated is ticked again and nothing is asked of the server', t.requests.length === count && t.tick('en_US').checked === true && b.dialog.open === false );
 }
 
 
-// --- the line also carries the warning about a language without a file -------
+// --- saving ----------------------------------------------------------------
 
 {
 	const t = opened();
-	const line = t.field('language-locale-msg');
-	const french = t.field('language-locales').children.find( function( row ) { return row.children[0].dataset.locale === 'fr_FR' } ).children[0];
+	t.tick('en_US').checked = false;
+	fire( t.tick('en_US'), 'change' );
+	check( 'unticking a language is an unsaved change, and takes it out of the native select', t.panel.isDirty() === true && t.field('language-native').children.map( function( option ) { return option.value } ).join() === 'de_DE' );
 
-	check( 'while every language that is on has its file the line is empty', line.textContent === '' && line.attributes.role === 'status' );
+	let ended = null;
+	t.panel._save( function( ok ) { ended = ok } );
+	check( 'a save posts the ticked languages and the native one', t.requests[t.requests.length - 1].endpoint === 'save'
+		&& t.requests[t.requests.length - 1].payload.fields['/nino/locales/available'].join() === 'de_DE' && t.requests[t.requests.length - 1].payload.fields['/nino/locales/native'] === 'de_DE' );
 
-	french.checked = true;
-	fire( french, 'change' );
-	check( 'switching one on that has none is announced at once: what it will render, and where to get the file', line.attributes.role === 'alert' && line.textContent === text('/_admin/language/error/missing').replace( '%s', 'fr_FR' ) );
+	t.answer( 400, { error : 'no', code : 'invalid_value' } );
+	check( 'a refused save is said in the line of the bar, as an alert, and ends with done( false )', ended === false && t.field('language-form-msg').dataset.state === 'error' && t.field('language-form-msg').attributes.role === 'alert' && t.toasts().length === 0 );
 
-	french.checked = false;
-	fire( french, 'change' );
-	check( '...and switching it off again takes the warning away', line.attributes.role === 'status' && line.textContent === '' );
+	t.panel._save( function( ok ) { ended = ok } );
+	t.answer( 200, { saved : [] } );
+	check( 'a save that went through is a toast, once, and the form is read again from the server', ended === true && t.toasts().length === 1 && t.requests[t.requests.length - 1].endpoint === 'list' && t.panel.isDirty() === false );
 
-	// The sentence of a refused code does not outlast the warning it replaced: it goes with the typing, and the warning is back
-	french.checked = true;
-	fire( french, 'change' );
-	const input = t.field('language-locale-new');
-	input.value = 'xx';
-	t.panel._addLocale();
-	check( 'a refused code takes the line from the warning', line.textContent === text('/_admin/error/invalid_value') );
-	input.value = 'xxx';
-	fire( input, 'input' );
-	check( '...and the warning is back when the code is typed again', line.textContent === text('/_admin/language/error/missing').replace( '%s', 'fr_FR' ) && line.attributes.role === 'alert' );
+	t.tick('fr_FR').checked = true;
+	fire( t.tick('fr_FR'), 'change' );
+	t.panel.discard();
+	check( 'discarding puts the ticks back to what is stored', t.tick('fr_FR').checked === false && t.panel.isDirty() === false );
+}
+
+
+// --- the words -------------------------------------------------------------
+
+{
+	const keys = [ '/_admin/language/label/add', '/_admin/language/label/code', '/_admin/language/hint/code', '/_admin/language/msg/created', '/_admin/language/msg/served', '/_admin/language/msg/existed', '/_admin/language/error/id' ];
+	check( 'both interface languages have the words of the dialog and of what it says, none empty, and none the same as the other language', keys.every( function( key ) {
+		return ( moduleEn[key] ?? '' ) !== '' && ( moduleDe[key] ?? '' ) !== '' && moduleEn[key] !== moduleDe[key];
+	} ) );
 }
 
 done();

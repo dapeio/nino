@@ -362,21 +362,21 @@ check( 'a panel naming the features group from outside features/ is refused and 
 // The "?" that ends the head of a pane with a manual (see Panels::$html['head-manual'])
 $manualButton = static fn( string $uri ): string => '<button type="button" class="admin-panel-manual" data-manual="'. $uri. '" aria-haspopup="dialog" aria-label="[[/_admin/common/label/manual]]" title="[[/_admin/common/label/manual]]">?</button>';
 
-/*	The head is the default and the Dashboard the exception, not the other
-	way round: a panel that says nothing opens with the row that names it,
-	one that answers head() false opens on its screen alone - and the
-	registry carries the answer, so the rail and the panes read one value.
-	The Dashboard has a manual, and a "?" has to stand somewhere: in a row of
-	its own, which is no head - it has no name, no strip and no actions	*/
-check( 'a panel answering head() false opens on its screen alone; one that says nothing gets the head; the Dashboard, which has a manual, gets the "?" in a row of its own and nothing else', ( static function() use ( $withModule, $manualButton ): bool {
+/*	The head is the default and a panel that answers head() false the exception, not
+	the other way round: one that says nothing opens with the row that names it, one
+	that answers false opens on its screen alone - and the registry carries the
+	answer, so the rail and the panes read one value. The Dashboard says nothing: it
+	has the head with its name and the "?" of its manual, as every list and form
+	of the workbench has	*/
+check( 'a panel answering head() false opens on its screen alone; one that says nothing gets the head - the Dashboard too, with its title and the "?" of its manual', ( static function() use ( $withModule, $manualButton ): bool {
 	$withHeadless = $withModule;
 	$withHeadless['/nino/modules'] = array_merge( $withHeadless['/nino/modules'], [ 'AdminSmokeHeadlessModule' ] );
 	$registry = \Nino\Admin\Admin::panels( $withHeadless );
 	$html = \Nino\Admin\Panels::panesHtml( $registry );
-	return ( $registry['headless']['head'] ?? null ) === false && ( $registry['dummy']['head'] ?? null ) === true && ( $registry['dashboard']['head'] ?? null ) === false
+	return ( $registry['headless']['head'] ?? null ) === false && ( $registry['dummy']['head'] ?? null ) === true && ( $registry['dashboard']['head'] ?? null ) === true
 		&& str_contains( $html, '<div id="admin-content-headless" data-panel="headless" data-layout="page" hidden><div id="headless-list"></div></div>' ) === true
-		&& substr_count( $html, '<div class="admin-panel-head' ) === count( $registry ) - 2
-		&& str_contains( $html, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden><div class="admin-panel-manualrow">'. $manualButton( 'dashboard' ). '</div><div id="dashboard-list"></div></div>' ) === true
+		&& substr_count( $html, '<div class="admin-panel-head' ) === count( $registry ) - 1
+		&& str_contains( $html, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/dashboard]]</h2><div class="admin-panel-actions"></div>'. $manualButton( 'dashboard' ). '</div><div id="dashboard-list"></div></div>' ) === true
 		&& substr_count( $html, '<h2 class="admin-panel-title">' ) === substr_count( $html, '<div class="admin-panel-head">' );
 } )() );
 

@@ -21,6 +21,9 @@
 
 	Nino.admin.logs = {
 
+		// What the search holds, kept while the list is read again as the tab is shown again
+		_query : '',
+
 		/**
 		 *	Load the recorded activity lines and render them. Unlike the
 		 *	other panels (Elements/Text/Images/Users), there's no list/form
@@ -80,8 +83,29 @@
 		},
 
 		/**
+		 *	The line the log stores is the minute, the account and the sentence, two spaces between them
+		 *	(see \Nino\Modules\Logs\Admin::record()); a line that is none of that is shown as the sentence alone
+		 *
+		 *	@param		{string}		line
+		 *	@param		{number}		index					Where it stands in the answer: the identity of its row
+		 *
+		 *	@return		{Object}									{ key, when, actor, text }
+		 */
+		_parse : function( line, index ) {
+
+			const part = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) {2}(.*?) {2}(.*)$/s.exec( String( line ) );
+
+			return part === null
+				? { key : String( index ), when : '', actor : '', text : String( line ) }
+				: { key : String( index ), when : part[1], actor : part[2], text : part[3] };
+		},
+
+		/**
 		 *	Render the activity lines, most recent first (already sorted
-		 *	that way by the server)
+		 *	that way by the server), as a table of the design system: the time
+		 *	in the form of the workbench, the account and the sentence, with a
+		 *	search over the full width above it, sortable columns and paging below.
+		 *	The sentences are shown as they are stored
 		 *
 		 *	@param		{string[]}	lines
 		 *
@@ -97,17 +121,32 @@
 				return;
 			}
 
-			const ul = dc.createElement('ul');
-			ul.id = 'logs-entries';
-			ul.className = 'nino-admin-list nino-admin-list-dense';
-
-			lines.forEach( function( line ) {
-				const li = dc.createElement('li');
-				li.textContent = line;
-				ul.appendChild( li );
+			Nino.adminUi.table( {
+				mount		: wrap,
+				rows		: lines.map( Nino.admin.logs._parse ),
+				rowKey	: 'key',
+				search	: true,
+				query		: Nino.admin.logs._query,
+				onQuery	: function( query ) { Nino.admin.logs._query = query },
+				// The sentence is drawn with the time and the account under it: the search reads the sentence itself
+				searchText : function( row ) { return row.text },
+				columns	: [
+					{ key : 'when', label : Nino.content.getText('/_admin/logs/label/when'), render : function( value ) { return Nino.adminUi.dateText( value ) || value } },
+					{ key : 'actor', label : Nino.content.getText('/_admin/logs/label/actor') },
+					// The sentence, and under it - on a narrow screen, where the two columns before it are hidden - the time and the account
+					{ key : 'text', label : Nino.content.getText('/_admin/logs/label/text'), wrap : true, render : function( value, row ) {
+						const cell = Nino.adminUi.el( 'span', 'logs-entry' );
+						cell.appendChild( Nino.adminUi.el( 'span', 'logs-sentence', value ) );
+						cell.appendChild( Nino.adminUi.el( 'small', 'logs-meta', [ Nino.adminUi.dateText( row.when ) || row.when, row.actor ].filter( function( part ) { return part !== '' } ).join(' · ') ) );
+						return cell;
+					} },
+				],
+				labels	: {
+					search	: Nino.content.getText('/_admin/logs/label/search'),
+					empty		: Nino.content.getText('/_admin/logs/empty'),
+					noMatch	: Nino.content.getText('/_admin/logs/nomatch'),
+				},
 			} );
-
-			wrap.appendChild( ul );
 		},
 	};
 

@@ -4,6 +4,9 @@
 // Schlüssel und dieselbe Form wie text/<locale>.php der Workbench
 return [
 	'[[/_admin/nav/config]]'						=> 'Konfiguration',
+	'[[/_admin/config/error/fields]]'	=> 'Bitte prüfe die markierten Felder.',
+	'[[/_admin/config/error/range]]'	=> '%s ist ungültig: Erlaubt ist eine ganze Zahl von %d bis %d.',
+	'[[/_admin/config/error/int]]'	=> '%s ist ungültig: Erlaubt ist eine ganze Zahl.',
 	'[[/_admin/config/group/mode]]'			=> 'Modus',
 	'[[/_admin/config/intro/mode]]'			=> 'Ob diese Website gebaut wird oder live ist. Der Wechsel setzt die vier Werte, die er nennt; sie bleiben danach Deine zum Ändern.',
 	'[[/_admin/config/label/mode]]'			=> 'Modus',

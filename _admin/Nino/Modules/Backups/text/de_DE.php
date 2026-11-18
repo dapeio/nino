@@ -21,6 +21,7 @@ return [
 	'[[/_admin/error/backups_write]]'	=> 'Für das Backup war kein Platz mehr, im Temp-Ordner oder dort, wo die Backups liegen, oder eine Datei ließ sich nicht schreiben. Die vorhandenen Backups sind unberührt.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'Das Backup stammt aus Nino %s, hier läuft %s.',
 	'[[/_admin/error/backups_busy]]'	=> 'Ein Backup oder eine Wiederherstellung läuft gerade. Versuche es gleich noch einmal.',
+	'[[/_admin/backups/label/archives]]'	=> 'Archive',
 	'[[/_admin/backups/label/download]]'	=> 'Herunterladen',
 	'[[/_admin/backups/label/upload]]'	=> 'Archiv hochladen',
 	'[[/_admin/backups/kind/daily]]'	=> 'Täglich',

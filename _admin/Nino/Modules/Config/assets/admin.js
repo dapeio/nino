@@ -38,6 +38,8 @@
 		// Survives the re-render a successful save triggers - see _save()
 		_groups 	: {},
 		_fields 	: [],
+		// The line of the bar: what is saving, what is unsaved and why a save was refused (see Nino.adminUi.status())
+		_line 		: null,
 
 		/**
 		 *	Load the schema plus current values and render the form
@@ -115,6 +117,7 @@
 			wrap.innerHTML = '';
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 
 			Object.keys( Nino.admin.config._groups ).forEach( function( groupKey ) {
 
@@ -125,24 +128,17 @@
 				form.appendChild( Nino.admin.config._renderGroup( groupKey, fields ) );
 			} );
 
-			// Save + its message in the shared actions row every module's form
-			// ends on - style.css pins that row to the bottom of the
-			// viewport, so a long form never puts Save out of reach
-			const actions = dc.createElement('div');
-			actions.className = 'nino-admin-actionbar';
-
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'submit';
-			saveBtn.className = 'nino-admin-btn-primary';
-			saveBtn.textContent = Nino.content.getText('/_admin/common/label/save');
-			actions.appendChild( saveBtn );
-
+			// The one bar of the view, which style.css pins to the bottom of the
+			// viewport, so a long form never puts Save out of reach: the badge and
+			// the line, and Save as the one main button
 			const msg = dc.createElement('p');
 			msg.id = 'config-form-msg';
-			msg.className = 'nino-admin-actionbar-status';
-			actions.appendChild( msg );
 
-			form.appendChild( actions );
+			const bar = Nino.adminUi.actionBar( { status : { line : msg }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
+			Nino.admin.config._line = bar.line;
+			bar.line.bind( form );
+
+			form.appendChild( bar.el );
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.config._save() } );
 
 			wrap.appendChild( form );
@@ -283,6 +279,45 @@
 			return Nino.adminUi.numberField( field );
 		},
 
+		// How many sentences of a refused field have been drawn: the stem of their ids
+		_errors : 0,
+
+		/**
+		 *	The whole numbers of the form against their bounds, as the schema gave them: each one that is wrong gets the
+		 *	sentence of what is expected at its field
+		 *
+		 *	@return		{Element[]}						The controls that are wrong, in the order they stand in
+		 */
+		_check : function() {
+
+			const wrong = [];
+
+			Nino.admin.config._fields.filter( function( field ) { return field.type === 'int' } ).forEach( function( field ) {
+
+				const el = Array.prototype.slice.call( dc.querySelectorAll('#config-form [data-key]') ).find( function( input ) { return input.dataset.key === field.key } );
+
+				if( el === undefined )
+					return;
+
+				const value = el.value.trim();
+				const number = Number( value );
+				const bounded = Number.isFinite( field.min ) === true && Number.isFinite( field.max ) === true;
+				const fine = /^-?\d+$/.test( value ) === true && ( Number.isFinite( field.min ) === false || number >= field.min ) && ( Number.isFinite( field.max ) === false || number <= field.max );
+
+				if( fine === true )
+					return;
+
+				const name = Nino.adminUi.text( field.label );
+
+				Nino.adminUi.fieldError( el.closest('label') ?? el.parentNode, el, 'config-error-'+ ( ++Nino.admin.config._errors ), bounded === true
+					? Nino.adminUi.format( Nino.content.getText('/_admin/config/error/range'), name, field.min, field.max )
+					: Nino.adminUi.format( Nino.content.getText('/_admin/config/error/int'), name ) );
+				wrong.push( el );
+			} );
+
+			return wrong;
+		},
+
 		/**
 		 *	Collect every field and save the form in one request
 		 *
@@ -300,7 +335,7 @@
 					done( ok );
 			};
 
-			const msg = dc.getElementById('config-form-msg');
+			const line = Nino.admin.config._line;
 			const fields = {};
 
 			// Every switch and number input carries its own key, so collecting
@@ -318,17 +353,41 @@
 					fields[el.dataset.key] = el.value;
 			} );
 
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			// Checked when saving, not while typing: what is wrong is said at its field and in the line, and the
+			// focus goes to the first wrong one - the browser's own bubble never speaks
+			const form = dc.getElementById('config-form');
+			Nino.adminUi.clearFieldErrors( form );
+
+			const wrong = Nino.admin.config._check();
+
+			if( wrong.length > 0 ) {
+				line.fail( Nino.content.getText('/_admin/config/error/fields') );
+				wrong[0].focus();
+				return report( false );
+			}
+
+			line.saving();
 
 			Nino.admin.config._apiCall( 'save', { fields : fields }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
+
+					// The server names the field it refused: the sentence stands at it too
+					const refused = response !== null && typeof response === 'object' && typeof response.field === 'string'
+						? Array.prototype.slice.call( dc.querySelectorAll('#config-form [data-key]') ).find( function( el ) { return el.dataset.key === response.field } )
+						: undefined;
+
+					if( refused !== undefined ) {
+						Nino.adminUi.fieldError( refused.closest('label') ?? refused.parentNode, refused, 'config-error-'+ ( ++Nino.admin.config._errors ), Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+						refused.focus();
+					}
+
 					report( false );
 					return;
 				}
 
-				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
+				line.saved();
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'config' );
 

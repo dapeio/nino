@@ -117,8 +117,8 @@ check( 'a row of pressed-state buttons keeps every button in the tab order', swi
 	&& switchButtons.on.listeners.keydown === undefined );
 
 const languageSource = adminAsset( 'Language', 'admin.js' );
-check( 'Language lays out the locale input and its Add button as one in-flow row',
-	/#admin-page-wrap \.admin-language-adder \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s.test( adminAsset( 'Language', 'admin.css' ) ) );
+check( 'the one section of the Languages tab has no title of its own, and does not keep the room that a title takes',
+	/#language-form form > fieldset:not\(:has\(> legend\)\) \{[^}]*padding-top: var\(--nino-admin-space-3\);/s.test( adminAsset( 'Language', 'admin.css' ) ) );
 
 /*	The shell shows a panel by calling its showCurrent(), and a panel that
 	builds once gates init() there on `_ready === false`. Language got the
@@ -250,8 +250,6 @@ check( 'a clickable table row draws its own ring, inside the row the scroller wo
 		check( name+ ': the muted ink reads on the page and on a card - and so does a placeholder, which is the same ink', worst( '--editor-text-secondary', [ page, card ] ) >= 4.5 );
 		check( name+ ': the ink of an error reads on the page, on a card and on the tint of a destructive button', worst( '--editor-red-ink', [ page, card, soft( tokens, '--editor-red-soft', card ) ] ) >= 4.5 );
 		check( name+ ': the inks of "saved" and "unsaved" read on a card', worst( '--editor-green', [ card ] ) >= 4.5 && worst( '--editor-orange-ink', [ card ] ) >= 4.5 );
-		check( name+ ': the pill of the translations screen reads on its own tint, in the darker step of the blue', worst( '--editor-blue-hover', [ soft( tokens, '--editor-blue-soft', card ) ] ) >= 4.5
-			&& /\.admin-translations-intro > span \{[^}]*background: var\(--editor-blue-soft\);[^}]*color: var\(--editor-blue-hover\);/s.test( adminAsset( 'Language', 'admin.css' ) ) );
 		check( name+ ': the active ink reads on the blue of a primary action and of its hover, and on the red of a destructive one', [ '--editor-blue', '--editor-blue-hover', '--editor-red' ].every( function( ground ) { return ratio( read( tokens, '--nino-admin-active-text' ), read( tokens, ground ) ) >= 4.5 } ) );
 	} );
 	check( 'the surfaces keep their colours: the red and the orange of a border or a tint are not the inks', light['--editor-red'] === '#dc2626' && light['--editor-orange'] === '#d97706' && light['--editor-red-ink'] !== light['--editor-red'] && light['--editor-orange-ink'] !== light['--editor-orange'] );

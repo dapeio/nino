@@ -4,8 +4,9 @@
 // shape the workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/maintenance]]'						=> 'Maintenance',
-	'[[/_admin/maintenance/state/online]]'		=> 'The site is online.',
-	'[[/_admin/maintenance/state/offline]]'	=> 'The site shows the maintenance page.',
+	'[[/_admin/maintenance/error/fields]]'	=> 'Please check the marked field.',
+	'[[/_admin/maintenance/error/range]]'	=> '%s is not valid: a whole number from %d to %d is expected.',
+	'[[/_admin/maintenance/error/int]]'	=> '%s is not valid: a whole number is expected.',
 	'[[/_admin/maintenance/label/status]]'		=> 'Show the maintenance page',
 	'[[/_admin/maintenance/hint/status]]'		=> 'Every visitor gets a 503 answer instead of the site while this is on.',
 	'[[/_admin/maintenance/label/retry]]'		=> 'Retry after',

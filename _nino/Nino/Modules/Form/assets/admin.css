@@ -20,25 +20,25 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: .75rem;
-	margin-bottom: .3rem;
+	gap: var(--nino-admin-space-5);
+	margin-bottom: var(--nino-admin-space-1);
 }
 .submissions-entry-date {
 	color: var(--editor-text-secondary);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 .submissions-entry-cat {
 	display: inline-block;
-	padding: .15rem .5rem;
-	border-radius: 999px;
+	padding: var(--nino-admin-space-1) var(--nino-admin-space-3);
+	border-radius: var(--nino-admin-radius-pill);
 	background: var(--editor-blue-soft);
 	color: var(--editor-blue);
-	font-size: max( .72rem, 12px );
-	font-weight: 650;
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
 }
 .submissions-entry-name {
-	margin-bottom: .3rem;
-	font-weight: 650;
+	margin-bottom: var(--nino-admin-space-1);
+	font-weight: var(--nino-admin-weight-strong);
 }
 .submissions-entry-name a {
 	color: var(--editor-text);
@@ -53,9 +53,9 @@
 .submissions-entry-fields {
 	display: grid;
 	grid-template-columns: minmax(4rem, max-content) 1fr;
-	gap: .1rem .6rem;
-	margin: 0 0 .3rem;
-	font-size: .82rem;
+	gap: .1rem var(--nino-admin-space-4);
+	margin: 0 0 var(--nino-admin-space-1);
+	font-size: var(--nino-admin-text-sm);
 }
 .submissions-entry-fields dt {
 	color: var(--editor-text-secondary);
@@ -78,7 +78,7 @@
 		gap: 0 0;
 	}
 	.submissions-entry-fields dd {
-		margin-bottom: .25rem;
+		margin-bottom: var(--nino-admin-space-1);
 	}
 }
 
@@ -87,7 +87,7 @@
 	row of delete buttons to mis-click. */
 .submissions-entry-delete {
 	display: none;
-	margin-top: .5rem;
+	margin-top: var(--nino-admin-space-3);
 }
 .submissions-entry.expanded .submissions-entry-delete {
 	display: inline-block;
@@ -117,9 +117,9 @@
 }
 .submissions-entry-toggle {
 	display: none;
-	margin-top: .4rem;
+	margin-top: var(--nino-admin-space-2);
 	color: var(--editor-blue);
-	font-size: max( .76rem, 12px );
+	font-size: var(--nino-admin-text-xs);
 }
 .submissions-entry.has-overflow .submissions-entry-toggle {
 	display: inline-block;

@@ -3,7 +3,8 @@
  *	Admin							Native Text + Elements translation hand-off. Exports
  *										the versioned JSON document, accepts it back from a
  *										file or paste, and merges it into one chosen locale.
- *										A tab of the Language panel (see Language::tabs()).
+ *										A tab of the Language panel (see Language::tabs()): two
+ *										sections and one bar, the import its main button.
  *
  *	@package					Dape/Nino
  *	@author					David Perchermeier <mail@dape.io>
@@ -18,6 +19,11 @@
 
 		_info 	: null,
 		_ready 	: false,
+		// The controls of the form on screen: { form, target, json, file, button, label }, null while there is none
+		_fields : null,
+		// The line of the bar (see Nino.adminUi.status()), and whether an import is on its way
+		_line 	: null,
+		_busy 	: false,
 
 		init : function() {
 
@@ -67,55 +73,43 @@
 			return parsed;
 		},
 
+		/**
+		 *	The tab as the other panels' forms are built: two sections - the export, with its one small
+		 *	button, and the import, with the language it goes into, the file or the pasted document - and
+		 *	the one bar below, whose main button is the import. What explains a section stands behind the
+		 *	(?) at its title
+		 *
+		 *	@return		void
+		 */
 		_render : function() {
 
-			const info = Nino.admin.translations._info;
+			const panel = Nino.admin.translations;
+			const info = panel._info;
 			const wrap = dc.getElementById('translations-content');
 			wrap.innerHTML = '';
 
-			const intro = dc.createElement('header');
-			intro.className = 'admin-translations-intro';
-			const kicker = dc.createElement('span');
-			kicker.textContent = Nino.content.getText('/_admin/translations/label/workflow');
-			intro.appendChild( kicker );
-			// h2, not h1: the page's one heading is the shell's (see
-			// page-index.tpl) and a panel's own screen opens a level below it
-			const title = dc.createElement('h2');
-			title.textContent = Nino.content.getText('/_admin/translations/label/title');
-			intro.appendChild( title );
-			// The native locale sits emphasised inside the sentence, wherever
-			// the language puts it
-			const lead = dc.createElement('p');
-			const leadParts = Nino.content.getText('/_admin/translations/hint/intro').split( '%s' );
-			lead.appendChild( dc.createTextNode( leadParts[0] ) );
-			const native = dc.createElement('strong');
-			native.textContent = info.nativeLocale;
-			lead.appendChild( native );
-			lead.appendChild( dc.createTextNode( leadParts[1] ?? '' ) );
-			intro.appendChild( lead );
-			wrap.appendChild( intro );
+			const codes = info.locales.map( function( entry ) { return entry.locale } );
+			const native = Nino.adminUi.localeName( info.nativeLocale, codes );
+			const form = dc.createElement('form');
+			form.noValidate = true;
 
-			const flow = dc.createElement('div');
-			flow.className = 'admin-translations-flow';
+			// --- the export: one small button, and what the package holds behind the (?)
 
-			const exportCard = dc.createElement('section');
-			exportCard.className = 'nino-admin-card admin-translation-card';
-			exportCard.innerHTML = '<span class="admin-step-number">1</span><div class="admin-translation-card-copy"><h2></h2><p></p></div>';
-			exportCard.querySelector('h2').textContent = Nino.content.getText('/_admin/translations/label/export');
-			exportCard.querySelector('p').textContent = Nino.adminUi.format( Nino.content.getText('/_admin/translations/hint/export'), info.textCount, info.elementCount );
+			const exportSet = dc.createElement('fieldset');
+			const exportLegend = dc.createElement('legend');
+			exportLegend.textContent = Nino.content.getText('/_admin/translations/label/export');
+			exportSet.appendChild( exportLegend );
+			Nino.adminUi.sectionHelp( exportLegend, exportSet, Nino.adminUi.format( Nino.content.getText('/_admin/translations/hint/intro'), native )+ ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/translations/hint/export'), info.textCount, info.elementCount ) );
 
-			const exportBtn = dc.createElement('button');
-			exportBtn.type = 'button';
-			exportBtn.className = 'nino-admin-btn-primary';
-			exportBtn.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/translations/label/download'), info.nativeLocale );
-			exportBtn.addEventListener( 'click', function() {
+			const exportLabel = Nino.adminUi.format( Nino.content.getText('/_admin/translations/label/download'), native );
+			const exportBtn = Nino.adminUi.button( exportLabel, function() {
 				exportBtn.disabled = true;
 				exportBtn.textContent = Nino.content.getText('/_admin/translations/msg/preparing');
-				Nino.admin.translations._apiCall( 'export', {}, function( status, response ) {
+				panel._apiCall( 'export', {}, function( status, response ) {
 					exportBtn.disabled = false;
-					exportBtn.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/translations/label/download'), info.nativeLocale );
+					exportBtn.textContent = exportLabel;
 					if( status !== 200 || response === null )
-						return Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/error/export'), true );
+						return panel._line.fail( Nino.content.getText('/_admin/translations/error/export') );
 
 					const blob = new Blob( [ JSON.stringify( response, null, 2 )+ '\n' ], { type : 'application/json' } );
 					const url = URL.createObjectURL( blob );
@@ -126,136 +120,253 @@
 					a.click();
 					a.remove();
 					URL.revokeObjectURL( url );
-					Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/msg/downloaded'), false );
+					panel._line.idle();
+					Nino.adminUi.say( Nino.content.getText('/_admin/translations/msg/downloaded') );
 				} );
+			}, { kind : 'secondary', small : true, id : 'translations-export' } );
+
+			const exportActions = Nino.adminUi.el( 'div', 'nino-admin-actions' );
+			exportActions.appendChild( exportBtn );
+			exportSet.appendChild( exportActions );
+			form.appendChild( exportSet );
+
+			// --- the import: the language it goes into, the file or the document pasted
+
+			const importSet = dc.createElement('fieldset');
+			const importLegend = dc.createElement('legend');
+			importLegend.textContent = Nino.content.getText('/_admin/translations/label/import');
+			importSet.appendChild( importLegend );
+			Nino.adminUi.sectionHelp( importLegend, importSet, Nino.content.getText('/_admin/translations/hint/import') );
+
+			const target = Nino.adminUi.selectField( {
+				key			: 'target',
+				id			: 'translations-target-locale',
+				label		: Nino.content.getText('/_admin/translations/label/target'),
+				options	: info.locales.map( function( entry ) {
+					return {
+						value : entry.locale,
+						label : Nino.adminUi.localeName( entry.locale, codes )
+							+ ( entry.locale === info.nativeLocale ? ' '+ Nino.content.getText('/_admin/translations/label/native') : '' )
+							+ ( entry.active === false ? ' ('+ Nino.content.getText('/_admin/common/word/inactive')+ ')' : '' ),
+					};
+				} ),
+				// The first language that is not the native one: what is translated is the others
+				value		: ( info.locales.find( function( entry ) { return entry.locale !== info.nativeLocale } ) ?? { locale : info.nativeLocale } ).locale,
 			} );
-			exportCard.appendChild( exportBtn );
-			flow.appendChild( exportCard );
+			importSet.appendChild( target );
 
-			const importCard = dc.createElement('section');
-			importCard.className = 'nino-admin-card admin-translation-card admin-translation-card-import';
-			importCard.innerHTML = '<span class="admin-step-number">2</span><div class="admin-translation-card-copy"><h2></h2><p></p></div>';
-			importCard.querySelector('h2').textContent = Nino.content.getText('/_admin/translations/label/import');
-			importCard.querySelector('p').textContent = Nino.content.getText('/_admin/translations/hint/import');
-
-			const fields = dc.createElement('div');
-			fields.className = 'admin-translation-fields';
-
-			const localeLabel = dc.createElement('label');
-			localeLabel.className = 'nino-admin-field';
-			localeLabel.appendChild( dc.createElement('span') ).textContent = Nino.content.getText('/_admin/translations/label/target');
-			const localeSelect = dc.createElement('select');
-			localeSelect.id = 'translations-target-locale';
-			info.locales.forEach( function( entry ) {
-				const option = dc.createElement('option');
-				option.value = entry.locale;
-				option.textContent = entry.locale+ ( entry.locale === info.nativeLocale ? ' '+ Nino.content.getText('/_admin/translations/label/native') : '' )+ ( entry.active === false ? ' ('+ Nino.content.getText('/_admin/common/word/inactive')+ ')' : '' );
-				localeSelect.appendChild( option );
-			} );
-			localeSelect.value = ( info.locales.find( function( entry ) { return entry.locale !== info.nativeLocale } ) ?? { locale : info.nativeLocale } ).locale;
-			localeLabel.appendChild( localeSelect );
-			fields.appendChild( localeLabel );
-
-			const fileLabel = dc.createElement('label');
-			fileLabel.className = 'nino-admin-field';
-			fileLabel.appendChild( dc.createElement('span') ).textContent = Nino.content.getText('/_admin/translations/label/file');
-			const fileInput = dc.createElement('input');
-			fileInput.type = 'file';
-			fileInput.accept = 'application/json,.json';
-			fileLabel.appendChild( fileInput );
-			fields.appendChild( fileLabel );
-
-			const jsonLabel = dc.createElement('label');
-			jsonLabel.className = 'nino-admin-field admin-translation-json';
-			jsonLabel.appendChild( dc.createElement('span') ).textContent = Nino.content.getText('/_admin/translations/label/paste');
-			const textarea = dc.createElement('textarea');
-			textarea.id = 'translations-json';
-			textarea.rows = 14;
-			textarea.spellcheck = false;
-			textarea.placeholder = '{\n  "format": "nino.translation",\n  …\n}';
-			jsonLabel.appendChild( textarea );
-			fields.appendChild( jsonLabel );
-
-			fileInput.addEventListener( 'change', function() {
-				const file = fileInput.files[0];
-				if( file === undefined )
-					return;
-				file.text().then( function( value ) { textarea.value = value; Nino.admin.translations._setMessage( Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/loaded'), file.name ), false ) } )
-					.catch( function() { Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/error/read'), true ) } );
+			const json = Nino.adminUi.codeField( {
+				key					: 'json',
+				id					: 'translations-json',
+				label				: Nino.content.getText('/_admin/translations/label/paste'),
+				rows				: 14,
+				placeholder	: '{\n  "format": "nino.translation",\n  …\n}',
 			} );
 
-			const importBtn = dc.createElement('button');
-			importBtn.type = 'button';
-			importBtn.className = 'nino-admin-btn-primary';
-			importBtn.textContent = Nino.content.getText('/_admin/translations/label/importbtn');
-			importBtn.addEventListener( 'click', function() {
-				let translation;
-				try {
-					translation = Nino.admin.translations._parseJson( textarea.value );
-				} catch( error ) {
-					return Nino.admin.translations._setMessage( Nino.adminUi.format( Nino.content.getText('/_admin/translations/error/json'), error.message ), true );
-				}
-
-				const send = function() {
-
-					importBtn.disabled = true;
-					importBtn.textContent = Nino.content.getText('/_admin/translations/msg/importing');
-					Nino.admin.translations._apiCall( 'import', { targetLocale : localeSelect.value, translation : translation }, function( status, response ) {
-						importBtn.disabled = false;
-						importBtn.textContent = Nino.content.getText('/_admin/translations/label/importbtn');
-						if( status !== 200 || response === null )
-							return Nino.admin.translations._setMessage( Nino.adminUi.api.errorText( status, response, '/_admin/translations/error/import' ), true );
-
-						const imported = response.text.imported+ response.elements.imported;
-						const skipped = response.text.skipped+ response.elements.skipped;
-						let message = Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/imported'), imported, response.targetLocale, skipped );
-						if( response.errors.length > 0 )
-							message += ' '+ response.errors.join(' ');
-						Nino.admin.translations._setMessage( message, response.errors.length > 0 );
-					} );
-				};
-
-				// Importing into the native language overwrites the source the other
-				// languages are translated from: that is asked first
-				if( localeSelect.value !== info.nativeLocale ) {
-					send();
-					return;
-				}
-
-				Nino.adminUi.confirm( 'big', {
-					title			: Nino.content.getText('/_admin/translations/confirm/native-title'),
-					message		: Nino.content.getText('/_admin/translations/confirm/native'),
-					yes				: Nino.content.getText('/_admin/translations/confirm/native-title'),
-					kind			: 'danger',
-					no				: Nino.content.getText('/_admin/common/label/cancel'),
-					opener		: importBtn,
-					onChoose	: function( ok ) {
-						if( ok === true )
-							send();
-					},
-				} );
+			const file = Nino.adminUi.fileField( {
+				key			: 'file',
+				label		: Nino.content.getText('/_admin/translations/label/file'),
+				accept	: 'application/json,.json',
+				onChange : function( chosen ) {
+					if( chosen === null )
+						return;
+					chosen.text().then( function( value ) {
+						json.control.value = value;
+						Nino.adminUi.clearFieldErrors( importSet );
+						if( typeof Nino.admin.dirty === 'object' )
+							Nino.admin.dirty.refresh();
+					} ).catch( function() { file.error( Nino.content.getText('/_admin/translations/error/read') ) } );
+				},
 			} );
 
-			importCard.appendChild( fields );
-			importCard.appendChild( importBtn );
-			flow.appendChild( importCard );
-			wrap.appendChild( flow );
+			importSet.appendChild( file.el );
+			importSet.appendChild( json );
+			form.appendChild( importSet );
+
+			// --- the one bar: the import is the one main button of the view
 
 			const message = dc.createElement('p');
 			message.id = 'translations-message';
-			message.setAttribute( 'aria-live', 'polite' );
-			wrap.appendChild( message );
+
+			const importLabel = Nino.content.getText('/_admin/translations/label/importbtn');
+			const importBtn = Nino.adminUi.button( importLabel, null, { type : 'submit', kind : 'primary' } );
+			const bar = Nino.adminUi.actionBar( { status : { line : message, fresh : true }, primary : importBtn } );
+			panel._line = bar.line;
+			bar.line.bind( form, function() { return panel._holds() } );
+			form.appendChild( bar.el );
+
+			panel._fields = { form : form, target : target.querySelector('select'), json : json, file : file, button : importBtn, label : importLabel };
+
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); panel._import() } );
+
+			wrap.appendChild( form );
 		},
 
-		_setMessage : function( value, error ) {
-			const message = dc.getElementById('translations-message');
-			if( message === null )
+		/**
+		 *	Whether the form holds input nobody has sent: a document pasted or loaded from a file
+		 *
+		 *	@return		{boolean}
+		 */
+		_holds : function() {
+
+			const fields = Nino.admin.translations._fields;
+
+			return fields !== null && fields.json.control.value.trim() !== '';
+		},
+
+		/**
+		 *	Put the document into the language that is chosen. A document that is no JSON, or none at all, is said at
+		 *	its field; one into the native language - the source the others are translated from - is asked about first.
+		 *	Every way this ends reports to done( ok ), if there is one (see Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the document was imported, false otherwise
+		 *
+		 *	@return		void
+		 */
+		_import : function( done ) {
+
+			const panel = Nino.admin.translations;
+			const info = panel._info;
+			const fields = panel._fields;
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
+
+			if( fields === null || panel._busy === true )
+				return report( false );
+
+			Nino.adminUi.clearFieldErrors( fields.form );
+			panel._line.idle();
+
+			let translation;
+
+			if( fields.json.control.value.trim() === '' ) {
+				Nino.adminUi.fieldError( fields.json, fields.json.control, 'translations-json-error', Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), Nino.content.getText('/_admin/translations/label/paste') ) );
+				panel._line.fail( Nino.content.getText('/_admin/translations/error/fields') );
+				fields.json.control.focus();
+				return report( false );
+			}
+
+			try {
+				translation = panel._parseJson( fields.json.control.value );
+			} catch( error ) {
+				Nino.adminUi.fieldError( fields.json, fields.json.control, 'translations-json-error', Nino.adminUi.format( Nino.content.getText('/_admin/translations/error/json'), error.message ) );
+				panel._line.fail( Nino.content.getText('/_admin/translations/error/fields') );
+				fields.json.control.focus();
+				return report( false );
+			}
+
+			const send = function() {
+
+				panel._busy = true;
+				fields.button.disabled = true;
+				fields.button.textContent = Nino.content.getText('/_admin/translations/msg/importing');
+				panel._line.saving();
+
+				panel._apiCall( 'import', { targetLocale : fields.target.value, translation : translation }, function( status, response ) {
+
+					panel._busy = false;
+					fields.button.disabled = false;
+					fields.button.textContent = fields.label;
+
+					if( status !== 200 || response === null ) {
+						panel._line.error( status, response, '/_admin/translations/error/import' );
+						return report( false );
+					}
+
+					const imported = response.text.imported+ response.elements.imported;
+					const skipped = response.text.skipped+ response.elements.skipped;
+
+					Nino.adminUi.say( Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/imported'), imported, Nino.adminUi.localeName( response.targetLocale ), skipped ) );
+
+					// What the import turned away stays in the line, where it can be read and acted on
+					if( response.errors.length > 0 ) {
+						panel._line.fail( response.errors.join(' ') );
+						return report( true );
+					}
+
+					// The document is in: the field holds nothing that is not sent
+					panel._line.idle();
+					fields.json.control.value = '';
+					fields.file.clear( false );
+
+					if( typeof Nino.admin.dirty === 'object' )
+						Nino.admin.dirty.refresh();
+
+					report( true );
+				} );
+			};
+
+			// An import overwrites the values that match, in any language, and the native one is the source the
+			// others are translated from: it is asked first whatever the mode, with how many values it may touch
+			const target = fields.target.value;
+
+			Nino.adminUi.confirm( 'destructive', {
+				title			: Nino.content.getText('/_admin/translations/confirm/overwrite-title'),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/translations/confirm/overwrite'), panel._countValues( translation ), Nino.adminUi.localeName( target ) )
+					+ ( target === info.nativeLocale ? ' '+ Nino.content.getText('/_admin/translations/confirm/native') : '' ),
+				yes				: Nino.content.getText('/_admin/translations/confirm/overwrite-title'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				opener		: fields.button,
+				onChoose	: function( ok ) {
+					if( ok === true )
+						send();
+					else
+						report( false );
+				},
+			} );
+		},
+
+		/**
+		 *	How many values a document holds that an import may write: its texts and every text of its elements
+		 *
+		 *	@param		{Object}		translation
+		 *
+		 *	@return		{number}
+		 */
+		_countValues : function( translation ) {
+
+			const count = function( node ) {
+				if( typeof node === 'string' )
+					return 1;
+				if( node === null || typeof node !== 'object' )
+					return 0;
+				return Object.keys( node ).reduce( function( sum, key ) { return sum + count( node[key] ) }, 0 );
+			};
+
+			return count( translation.text ) + count( translation.elements );
+		},
+
+		/**
+		 *	Forget what was pasted or chosen: the form is about to be left or drawn again
+		 *
+		 *	@return		void
+		 */
+		_discard : function() {
+
+			const fields = Nino.admin.translations._fields;
+
+			if( fields === null )
 				return;
-			message.textContent = value;
-			message.className = error === true ? 'nino-admin-error' : 'admin-success';
+
+			fields.json.control.value = '';
+			fields.file.clear( false );
+			Nino.adminUi.clearFieldErrors( fields.form );
+			Nino.admin.translations._line.idle();
 		},
 	};
 
 	Nino.events.bindCallback( 'ready', Nino.admin.translations.init );
+
+	// The shell asks before anything throws a pasted document away (see Nino.admin.dirty): the question's
+	// Save is the import. A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.register( 'translations', {
+			isDirty : function() { return Nino.admin.translations._holds() },
+			save		: function( done ) { Nino.admin.translations._import( done ) },
+			discard : function() { Nino.admin.translations._discard() },
+		} );
 
 })(window, document, document.documentElement, document.body);

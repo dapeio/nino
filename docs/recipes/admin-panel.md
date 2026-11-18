@@ -56,7 +56,7 @@ request:
 | `panes()` | no | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
 | `template()` | no | instead of mount points: a `.tpl` rendered whole into the pane through the `[template]` shortcode - project-relative, no extension, no `..` |
 | `layout()` | no | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole pane, the rail folded to its icons) |
-| `head()` | no | `false` opens the pane on its screen alone, without the head that names the panel (the Dashboard); every other panel gets one, see below |
+| `head()` | no | `false` opens the pane on its screen alone, without the head that names the panel, for a work surface that names itself in its context bar; every other panel gets one, the Dashboard too, see below |
 | `manual()` | no | the handles of the panel's manual, in the order its `?` shows them: `'intro'` first, what the panel is for, then one for each thing a person does in it. A handle is a slug and a word of the Text panel's vocabulary; its line is the fill `/_admin/<uri>/manual/<handle>` of the panel's `text()` files, in every language. A feature's panel without one shows the manual of its manifest, and one with neither has no `?` - see [The manual](#the-manual) |
 | `icon()` | no | an inline `<svg>` for the rail; without one the folded rail shows the label's initial. Held to that one shape: nothing that runs |
 | `tabs()` | no | further panel classes shown as tabs of this panel's pane, see below |
@@ -185,7 +185,7 @@ the same button is left alone.
 
 ### The manual
 
-A pane with a manual ends its head with a `?` button (`Panels::$html['head-manual']`, a fragment like the rest of the head), and where there is no head - the Dashboard - draws it in a row of its own (`head-bare`, `.admin-panel-manualrow`: not a head, so `panelHead()` answers `null` for that pane as before), which is why that panel draws its screen into a mount of its own, `dashboard-list`, and not into the pane. The button names its pane in `data-manual`; one listener of the shell (`Nino.admin.manual`) answers every one of them, asks `admin/manual` for the manual and shows it with `Nino.adminUi.manual()` in `Nino.adminUi.manualDialog()` - a panel script does nothing for it. Which panes have one is in the registry (`manual`, the handles, and `manualFeature`, the key of the feature whose manifest manual a feature's panel shows); `Panels::hasManual()` says it, and `admin/manual` answers only for a pane the account may see.
+A pane with a manual ends its head with a `?` button (`Panels::$html['head-manual']`, a fragment like the rest of the head), and where there is no head - a work surface - draws it in a row of its own (`head-bare`, `.admin-panel-manualrow`: not a head, so `panelHead()` answers `null` for that pane as before), which is why that panel draws its screen into a mount of its own and not into the pane. The button names its pane in `data-manual`; one listener of the shell (`Nino.admin.manual`) answers every one of them, asks `admin/manual` for the manual and shows it with `Nino.adminUi.manual()` in `Nino.adminUi.manualDialog()` - a panel script does nothing for it. Which panes have one is in the registry (`manual`, the handles, and `manualFeature`, the key of the feature whose manifest manual a feature's panel shows); `Panels::hasManual()` says it, and `admin/manual` answers only for a pane the account may see.
 
 A panel writes its manual as text, one fill a handle, and names the handles in `manual()`:
 
@@ -1659,6 +1659,8 @@ dashboard tile's or a permission's label - may be a fill key or literal text;
 is both shown and compared stays translatable: send a slug and name it on the
 client (see the Features panel's `_categoryLabel()`), never
 compare against a word a locale file can change.
+
+A date or a moment a panel draws itself is written by `Nino.adminUi.dateText( value, options )` (`_admin/assets/datetext.js`, bundled after `Nino.admin.js`): `value` is a string as the files write it - `2026-11-17`, `2026-11-17 06:02`, a `T` for the space, seconds read and left out - or a `Date`, and the answer is `17.11.2026, 06:02` in a German interface and `2026-11-17, 06:02` in any other one, the date alone for a value that has no time of day, and `''` for what is no moment. A panel never formats a date with the browser's `toLocaleString()`.
 
 How a request goes to the server and how a failure is worded is [Saying what happened](#saying-what-happened); a form that holds unsaved input is [Unsaved input](#unsaved-input).
 

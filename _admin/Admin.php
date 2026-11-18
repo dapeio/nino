@@ -131,6 +131,7 @@ namespace Nino\Admin {
 			$scripts	= [
 				'/_nino/Nino.js',
 				'/_admin/assets/Nino.admin.js',
+				'/_admin/assets/datetext.js',
 				'/_admin/assets/script.js',
 			];
 
@@ -1548,8 +1549,9 @@ namespace Nino\Admin {
 	 *											                            'workspace' (the whole pane, edge to
 	 *											                            edge, the rail folded away)
 	 *											  head(): bool              false opens the pane on its screen alone,
-	 *											                            without the row that names the panel (the
-	 *											                            Dashboard); true, the default, keeps it
+	 *											                            without the row that names the panel (a work
+	 *											                            surface, which names itself in its context
+	 *											                            bar); true, the default, keeps it
 	 *											  manual(): array           the handles of the panel's manual, in the
 	 *											                            order its "?" shows them: one for what the
 	 *											                            panel is for ('intro') and one for each
@@ -1635,7 +1637,7 @@ namespace Nino\Admin {
 			Nino.adminUi.panelHead(), through which a panel's script puts a
 			strip or a button of its own there) and, last, the "?" of the
 			panel's manual where it has one. A panel answering head() false -
-			the Dashboard - opens on its screen alone, with the "?" in a row
+			a work surface - opens on its screen alone, with the "?" in a row
 			of its own	*/
 		public static
 			$html = [
@@ -2023,8 +2025,8 @@ namespace Nino\Admin {
 				$layout = 'page';
 
 			// Whether the pane opens with the head that names it (see
-			// panesHtml()). Every panel unless it says otherwise: a screen
-			// that is its own overview, the Dashboard, is the one that does
+			// panesHtml()). Every panel unless it says otherwise: a work
+			// surface, which names itself in its context bar, is one that does
 			$head = method_exists( $class, 'head' ) === true ? (bool) $class::head() : true;
 
 			// The handles of the panel's manual, in the order its "?" shows them

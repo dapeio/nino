@@ -126,7 +126,7 @@
 			// link lands on the first panel it does have, the same as any
 			// hash that names no visible pane
 			if( data.lastBackup !== undefined )
-				tiles.appendChild( Nino.admin.dashboard._tile( 'backups', data.lastBackup || '–', Nino.content.getText('/_admin/dashboard/label/lastbackup') ) );
+				tiles.appendChild( Nino.admin.dashboard._tile( 'backups', Nino.adminUi.dateText( String( data.lastBackup ?? '' ) ) || '–', Nino.content.getText('/_admin/dashboard/label/lastbackup') ) );
 			wrap.appendChild( tiles );
 
 			if( Array.isArray( data.elements ) )
@@ -321,9 +321,26 @@
 		},
 
 		/**
+		 *	One line of the log as the activity list says it: the time in the one form of the
+		 *	workbench, the account and the sentence as it is stored. A line that does not have
+		 *	the shape of the log's lines (the minute, the account and the sentence, two spaces
+		 *	between them) is shown as it is
+		 *
+		 *	@param		{string}	line
+		 *
+		 *	@return		{string}
+		 */
+		_activityLine : function( line ) {
+
+			const part = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) {2}(.*?) {2}(.*)$/s.exec( String( line ) );
+
+			return part === null ? String( line ) : [ Nino.adminUi.dateText( part[1] ) || part[1], part[2], part[3] ].join(' · ');
+		},
+
+		/**
 		 *	"Recent activity": the handful of most recent log lines
-		 *	(server already limits + orders them), same list markup as
-		 *	the Log panel's own full list
+		 *	(server already limits + orders them), and under them "Show all",
+		 *	a link-button of the design system that opens the Log
 		 *
 		 *	@param		{string[]}	lines
 		 *
@@ -348,7 +365,7 @@
 
 			lines.forEach( function( line ) {
 				const li = dc.createElement('li');
-				li.textContent = line;
+				li.textContent = Nino.admin.dashboard._activityLine( line );
 				ul.appendChild( li );
 			} );
 
@@ -356,8 +373,8 @@
 
 			const more = dc.createElement('a');
 			more.href = '#logs';
-			more.className = 'admin-dashboard-more';
-			more.textContent = Nino.content.getText('/_admin/dashboard/label/all')+ ' →';
+			more.className = 'nino-admin-linkbutton admin-dashboard-more';
+			more.textContent = Nino.content.getText('/_admin/dashboard/label/all');
 			section.appendChild( more );
 
 			return section;
