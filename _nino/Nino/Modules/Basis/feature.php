@@ -20,8 +20,8 @@ return [
 				'de_DE' => 'Der Fuß der Seite, mit [footer-col]-Spalten - [footer-logo], [footer-nav] und Fließendes - und einem [footer-legal] für die Rechtstexte und die Sprachen.',
 			],
 			'[section-wrap]' => [
-				'en_US' => 'A section of the page, with [section-row]s of [section-col]s; ground, image, dim and height are its own.',
-				'de_DE' => 'Ein Abschnitt der Seite, mit [section-row]-Zeilen aus [section-col]-Spalten; Grund, Bild, Abdunkeln und Höhe sind seine eigenen.',
+				'en_US' => 'A section of the page, with [section-row]s of [section-col]s; ground, image, picture (show or hide it), dim and height are its own.',
+				'de_DE' => 'Ein Abschnitt der Seite, mit [section-row]-Zeilen aus [section-col]-Spalten; Grund, Bild, Bild zeigen oder verbergen, Abdunkeln und Höhe sind seine eigenen.',
 			],
 			'[section-col variant="card"]' => [
 				'en_US' => 'A column that is a surface of its own: a card. size, ground, pad, bleed and link are its words; [section-title] and [section-subtitle] stand in it.',

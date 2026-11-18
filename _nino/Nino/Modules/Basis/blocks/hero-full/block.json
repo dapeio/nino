@@ -19,5 +19,19 @@
 				"en_US": "Background picture"
 			}
 		}
+	},
+	"variants": {
+		"image-full": {
+			"label": { "de_DE": "Volle Höhe", "en_US": "Full height" },
+			"set": { "root": { "height": "100" } }
+		},
+		"image-compact": {
+			"label": { "de_DE": "Kompakt", "en_US": "Compact" },
+			"set": { "root": { "height": "60" } }
+		},
+		"plain": {
+			"label": { "de_DE": "Ohne Bild", "en_US": "No picture" },
+			"set": { "root": { "picture": "off" } }
+		}
 	}
 }

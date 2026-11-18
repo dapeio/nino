@@ -9,6 +9,7 @@ declare(strict_types=1);
  *											B. one rule of a block each: what makes a block fail, as a fault in an otherwise good block
  *											C. what a folder may hold - code, links, a name that is none - read from the project, a hook and a feature
  *											D. what is kept: the cache of what was read, the log that says it once, a file that changed
+ *											E. variants: block.json names them, the register holds their values, a tree is told its variant and is put into another
  *
  *	Usage: php tests/blocks-smoke.php
  */
@@ -296,6 +297,273 @@ check( 'a type of elements of the kernel is read as the source of a loop, and a 
 $variant = blocksParts();
 $variant['tpl'] = str_replace( 'id="probe-1"', 'id="probe-1" variant="soft"', $variant['tpl'] );
 check( 'a variant the register does not have is no fault: the block names it and the tool says what it appears as', \Nino\Blocks::validate( $appData, 'probe', $variant )['variants'] === [ 'section-col' => [ 'soft' ] ] );
+
+// --- E. variants ---------------------------------------------------------------------------------------
+
+echo "\nE. Variants\n";
+
+$varSite = blocksSite();
+$varDir = ninoSandboxDir( $varSite ). '/private/blocks';
+$containers = \Nino\Components::containers( $varSite );
+$label = static fn( string $de, string $en ): array => [ 'de_DE' => $de, 'en_US' => $en ];
+$varied = static function( array $variants ): array {
+
+	$parts = blocksParts();
+	$meta = json_decode( $parts['json'], true );
+	$meta['variants'] = $variants;
+	$parts['json'] = json_encode( $meta );
+
+	return $parts;
+};
+
+// The places of the template of blocksParts(): 'root' is the section, '1' its row, '1.1' the column, '1.1.1' the title - the blanks between the calls count
+$good = [
+	'plain'	=> [ 'label' => $label( 'Schlicht', 'Plain' ), 'set' => [] ],
+	'wide'	=> [ 'label' => $label( 'Weit', 'Wide' ), 'set' => [ 'root' => [ 'height' => '100' ], '1' => [ 'gap' => '4', 'reverse' => 'on' ] ] ],
+	'calm'	=> [ 'label' => $label( 'Ruhig', 'Calm' ), 'set' => [ 'root' => [ 'height' => '60' ] ] ],
+];
+$refused = static function( array $variants ) use ( $varSite, $varied ): string {
+
+	$answer = \Nino\Blocks::validate( $varSite, 'probe', $varied( $variants ) );
+
+	return is_string( $answer ) === true ? $answer : '';
+};
+$says = static fn( string $reason, string $name ): bool => str_starts_with( $reason, 'block.json, variants, "'. $name. '": ' ) || str_starts_with( $reason, 'block.json, variants: "'. $name. '"' ) || str_starts_with( $reason, 'block.json: "variants"' );
+
+blocksWrite( $varDir, 'varied', $varied( $good ) );
+$block = \Nino\Blocks::get( $varSite, 'varied' );
+check( 'a block that names variants is a block, and get() and all() hand them back in the order of the file: name, label of every language and the set by place', is_array( $block ) === true && $block['alternatives'] === $good
+	&& \Nino\Blocks::all( $varSite )['varied']['alternatives'] === $good && \Nino\Blocks::rejected( $varSite ) === [] && ninoWarnings() === []
+	&& \Nino\Blocks::validate( $varSite, 'probe', $varied( $good ) )['alternatives'] === $good && $all['hero-full']['alternatives'] !== [] && \Nino\Blocks::all( $varSite )['varied']['variants'] === [] );
+check( 'a block with no variants has none: an empty list', \Nino\Blocks::validate( $varSite, 'probe', blocksParts() )['alternatives'] === [] && $all['three-columns']['alternatives'] === [] );
+
+blocksRequest( $varSite );
+$kept = \Nino\Blocks::get( $varSite, 'varied' );
+check( 'what was read is kept with its variants: the next request has them from the file of the cache, and says nothing', is_file( \Nino\Filesystem::path( $varSite, \Nino\Blocks::CACHE ) ) === true && $kept['alternatives'] === $good && ninoWarnings() === [] );
+
+$reasons = [
+	'a key of a variant that is none'																								=> [ 'wide', [ 'wide' => $good['wide'] + [ 'markup' => '<b>x</b>' ] ] ],
+	'a place the template has no call at'																						=> [ 'wide', [ 'wide' => [ 'set' => [ '1.1.1.0' => [ 'size' => 'l' ] ] ] + $good['wide'] ] ],
+	'a place that is no place'																											=> [ 'wide', [ 'wide' => [ 'set' => [ '../1' => [ 'gap' => '4' ] ] ] + $good['wide'] ] ],
+	'an attribute the component has not'																						=> [ 'wide', [ 'wide' => [ 'set' => [ '1' => [ 'columns' => '4' ] ] ] + $good['wide'] ] ],
+	'a value the attribute does not take'																						=> [ 'wide', [ 'wide' => [ 'set' => [ '1' => [ 'gap' => '9' ] ] ] + $good['wide'] ] ],
+	'a name that is no word'																												=> [ 'Wide', [ 'Wide' => $good['wide'] ] ],
+	'a label that lacks a language'																									=> [ 'wide', [ 'wide' => [ 'label' => [ 'en_US' => 'Wide' ] ] + $good['wide'] ] ],
+];
+
+foreach( $reasons as $what => [ $name, $variants ] ) {
+
+	$why = $refused( $variants );
+	check( 'a variant with '. $what. ' makes the block no block, with a sentence that names the variant', $why !== '' && $says( $why, $name ) === true );
+}
+
+// A block with a picture and a button, whose places are 1.1.1 and 1.1.3: what a variant must not set is tried on each kind of attribute
+$media = blocksParts();
+$media['tpl'] = "[section-wrap id=\"probe\"]\n\t[section-row]\n\t\t[section-col id=\"probe-1\"]\n\t\t\t[image ~pic alt=\"~alt\"]\n\t\t\t[button ~btn href=\"~link\"]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]";
+$mediaMeta = json_decode( $media['json'], true );
+$mediaMeta['images'] = [ '1-pic' => $mediaMeta['images']['background'] ];
+$media['json'] = json_encode( $mediaMeta );
+$mediaWords = [ '1-alt' => 'Words', '1-btn' => 'Go', '1-link' => 'page:/start' ];
+$media['texts'] = [ 'de_DE' => json_encode( $mediaWords ), 'en_US' => json_encode( $mediaWords ) ];
+$mediaRefused = static function( array $set ) use ( $varSite, $good, $media ): string {
+
+	$meta = json_decode( $media['json'], true );
+	$meta['variants'] = [ 'wide' => [ 'label' => $good['wide']['label'], 'set' => $set ] ];
+	$answer = \Nino\Blocks::validate( $varSite, 'probe', [ 'json' => json_encode( $meta ) ] + $media );
+
+	return is_string( $answer ) === true ? $answer : '';
+};
+check( 'the block with a picture and a button is a block, and a set of a look at both is one', $mediaRefused( [] ) === '' && $mediaRefused( [ '1.1.1' => [ 'ratio' => '1-1' ], '1.1.3' => [ 'tone' => 'quiet' ] ] ) === '' );
+
+$crossing = [
+	'a source (~name) as the value'													=> [ '1.1.1' => [ 'ratio' => '~title' ] ],
+	'a key of the project as the value'											=> [ 'root' => [ 'height' => '/project/company/general/name' ] ],
+	'an attribute that reads a picture'											=> [ 'root' => [ 'image' => '/nino/placeholder/landscape' ] ],
+	'an attribute that reads a text (the alt text of a picture)'	=> [ '1.1.1' => [ 'alt' => 'Injected words here' ] ],
+	'an attribute that reads a link (a link target of a button)'		=> [ '1.1.3' => [ 'href' => 'tel:0800123' ] ],
+	'a link target of a picture'														=> [ '1.1.1' => [ 'href' => 'mailto:x' ] ],
+	'a switch that is no class (a picture that is no content)'			=> [ '1.1.1' => [ 'decorative' => 'on' ] ],
+	'a choice that is no class (where a link opens)'					=> [ '1.1.3' => [ 'target' => 'blank' ] ],
+	'the id of the call'																		=> [ 'root' => [ 'id' => 'other' ] ],
+	'the class'																							=> [ 'root' => [ 'class' => 'evil' ] ],
+	'a variant of the component'														=> [ 'root' => [ 'variant' => 'band' ] ],
+	'a value that closes the call and opens another'				=> [ 'root' => [ 'height' => '100"][html]<b>' ] ],
+	'a value that is not a string'													=> [ 'root' => [ 'dim' => true ] ],
+];
+$passed = [];
+
+foreach( $crossing as $what => $set )
+	if( $mediaRefused( $set ) === '' )
+		$passed[] = $what;
+
+check( 'a set that would bring a source, a key, a picture, a text, an id, the class, markup or a variant of a component into a page makes the block no block'. ( $passed === [] ? '' : ' - not found: '. implode( '; ', $passed ) ), $passed === [] );
+check( 'a set at a component that reads its words is allowed where it sets a look, and an empty set is one: the block is a block', $refused( [ 'one' => [ 'label' => $label( 'Eins', 'One' ), 'set' => [ '1.1.1' => [ 'size' => 'xl' ] ] ], 'two' => $good['plain'] ] ) === '' );
+
+$many = [];
+
+for( $i = 1; $i <= \Nino\Blocks::MAX_VARIANTS + 1; $i++ )
+	$many['v'. $i] = $good['plain'];
+
+check( 'at most eight variants: eight are a block, nine are not, and the limit is the literal', ( new ReflectionClassConstant( \Nino\Blocks::class, 'MAX_VARIANTS' ) )->getValue() === 8
+	&& $refused( array_slice( $many, 0, 8 ) ) === '' && $says( $refused( $many ), 'x' ) === true && $refused( $many ) !== '' );
+
+$withTag = $refused( [ 'one' => [ 'label' => $label( 'Eins', 'One' ), 'set' => [ '1.1.1' => [ 'tag' => 'div' ] ] ] ] );
+check( 'a choice of a component that is not written as a class of it (tag of a title, where it is a div or a heading) is no look: the block is refused', $withTag !== '' && $says( $withTag, 'one' ) === true
+	&& $refused( [ 'one' => [ 'label' => $label( 'Eins', 'One' ), 'set' => [ '1.1.1' => [ 'size' => 'xl' ] ] ] ] ) === '' );
+check( 'a place is canonical and a call as the template is put into a page: no leading zero, no blank between calls, no call that is not there', $refused( [ 'one' => [ 'label' => $label( 'Eins', 'One' ), 'set' => [ '01' => [ 'gap' => '4' ] ] ] ] ) !== ''
+	&& $refused( [ 'one' => [ 'label' => $label( 'Eins', 'One' ), 'set' => [ '0' => [ 'gap' => '4' ] ] ] ] ) !== '' && $refused( [ 'one' => [ 'label' => $label( 'Eins', 'One' ), 'set' => [ '1.0' => [ 'gap' => '4' ] ] ] ] ) !== '' );
+// json_encode() writes a list for a map whose only key is 0, so the file is written out
+$raw = static function( string $variants ): array {
+
+	$parts = blocksParts();
+	$parts['json'] = str_replace( '"category"', '"variants":'. $variants. ',"category"', $parts['json'] );
+
+	return $parts;
+};
+$zero = \Nino\Blocks::validate( $varSite, 'probe', $raw( '{"0":{"label":{"de_DE":"N","en_US":"N"},"set":{}}}' ) );
+$zeroPlace = \Nino\Blocks::validate( $varSite, 'probe', $raw( '{"a":{"label":{"de_DE":"N","en_US":"N"},"set":{"0":{"gap":"4"}}}}' ) );
+check( 'a name that is 0 is a name, and a place that is 0 is a place that is no call, with the sentence for that and not the one for a list', is_array( $zero ) === true && array_keys( $zero['alternatives'] ) === [ 0 ]
+	&& is_string( $zeroPlace ) === true && str_contains( $zeroPlace, 'no call' ) === true );
+check( 'variants that are null or a list are no map: the block is refused, and none at all is a block', is_string( \Nino\Blocks::validate( $varSite, 'probe', $raw( 'null' ) ) ) === true && is_string( \Nino\Blocks::validate( $varSite, 'probe', $raw( '["x"]' ) ) ) === true
+	&& is_array( \Nino\Blocks::validate( $varSite, 'probe', blocksParts() ) ) === true );
+
+// A tree as a page holds it, changed as a person changes it: the notation is written, changed in its text and read again
+$edit = static fn( array $tree, string $from, string $to ): array => \Nino\Markup::parse( str_replace( $from, $to, \Nino\Markup::write( $tree, $containers ) ), $containers );
+$tree = $block['tree'];
+$wide = \Nino\Blocks::setVariant( $block, $tree, 'wide' );
+$calm = \Nino\Blocks::setVariant( $block, $tree, 'calm' );
+
+check( 'which variant a tree has: the one whose set holds at all its places - the template is the first with an empty set, the others are told by what they set', \Nino\Blocks::variantOf( $block, $tree ) === 'plain'
+	&& \Nino\Blocks::variantOf( $block, $wide ) === 'wide' && \Nino\Blocks::variantOf( $block, $calm ) === 'calm' );
+check( 'a tree whose person changed an attribute that a variant sets, to a value none of them has, is its own: null', \Nino\Blocks::variantOf( $block, $edit( $wide, 'gap="4"', 'gap="1"' ) ) === null
+	&& \Nino\Blocks::variantOf( $block, $edit( $tree, '[section-row]', '[section-row valign="end" gap="3"]' ) ) === null );
+check( 'a tree keeps its variant when a person changes a text, a source or an attribute that no variant sets', \Nino\Blocks::variantOf( $block, $edit( $wide, '[section-title ~title]', '[section-title ~other text="Hello" tag="h2"]' ) ) === 'wide'
+	&& \Nino\Blocks::variantOf( $block, $edit( $tree, '[section-wrap id="probe"', '[section-wrap id="probe" ground="dark"' ) ) === 'plain' );
+
+$twice = $block;
+$twice['alternatives'] = [ 'same' => $good['plain'] ] + $good;
+check( 'two variants that hold are told by the first in the order of the file', \Nino\Blocks::variantOf( $twice, $tree ) === 'same' && \Nino\Blocks::variantOf( $block, $tree ) === 'plain'
+	&& \Nino\Blocks::variantOf( [ 'tree' => $tree ], $tree ) === null );
+
+$mine = $edit( $edit( $tree, '[section-row]', '[section-row halign="center"]' ), '[section-title ~title]', '[section-title ~other text="Hello" tag="h2"]' );
+check( 'setting a variant and setting the first again gives the tree it began with, to the byte, and so do setting two variants one after the other', \Nino\Blocks::setVariant( $block, $wide, 'plain' ) === $tree
+	&& \Nino\Blocks::setVariant( $block, \Nino\Blocks::setVariant( $block, $mine, 'wide' ), 'plain' ) === $mine && \Nino\Blocks::setVariant( $block, $calm, 'wide' ) === $wide && \Nino\Blocks::setVariant( $block, $wide, 'calm' ) === $calm
+	&& \Nino\Markup::write( \Nino\Blocks::setVariant( $block, $wide, 'plain' ), $containers ) === $block['source'] );
+
+$set = \Nino\Blocks::setVariant( $block, $mine, 'wide' );
+$strip = static function( array $nodes ) use ( &$strip ): array {
+
+	foreach( $nodes as $at => $node )
+		if( isset( $node['n'] ) === true ) {
+
+			$nodes[$at]['a'] = array_diff_key( $node['a'], [ 'height' => 1, 'gap' => 1, 'reverse' => 1 ] );
+			$nodes[$at]['c'] = is_array( $node['c'] ) === true ? $strip( $node['c'] ) : null;
+		}
+
+	return $nodes;
+};
+check( 'a variant changes what it sets and nothing else: texts, sources, children and the attributes of a person that no variant names stay as they were', $strip( $set ) === $strip( $mine ) && $set !== $mine
+	&& \Nino\Markup::write( \Nino\Blocks::setVariant( $block, $edit( $wide, 'gap="4"', 'gap="1"' ), 'calm' ), $containers ) === \Nino\Markup::write( $calm, $containers ) );
+
+$cut = $tree;
+$cut[0]['c'] = [ $tree[0]['c'][0] ];
+$other = $tree;
+$other[0]['c'][1]['n'] = 'section-col';
+$grown = \Nino\Blocks::setVariant( $block, $cut, 'wide' );
+check( 'a place the tree has not, or where another component stands, is passed over by setVariant and makes the tree its own for variantOf, which variantsFit says; a name that is none gives the tree back', $grown === array_replace_recursive( $cut, [ 0 => [ 'a' => [ 'height' => '100' ] ] ] )
+	&& \Nino\Blocks::setVariant( $block, $other, 'wide' )[0]['c'][1] === $other[0]['c'][1] && \Nino\Blocks::variantOf( $block, $cut ) === null && \Nino\Blocks::variantOf( $block, $other ) === null
+	&& \Nino\Blocks::variantOf( $block, array_replace( $tree, [ 0 => array_replace( $tree[0], [ 'n' => 'section-col' ] ) ] ) ) === null && \Nino\Blocks::setVariant( $block, array_replace( $tree, [ 0 => array_replace( $tree[0], [ 'n' => 'section-col' ] ) ] ), 'wide' )[0]['a'] === $tree[0]['a']
+	&& \Nino\Blocks::variantsFit( $block, $tree ) === true && \Nino\Blocks::variantsFit( $block, $cut ) === false && \Nino\Blocks::variantsFit( $block, $other ) === false && \Nino\Blocks::setVariant( $block, $tree, 'nobody' ) === $tree );
+
+$added = $edit( $tree, "\n\t[section-row]", "\n\t[section-row]\n\t[/section-row]\n\t[section-row]" );
+$moved = $edit( $tree, '[section-row]', '[section-col]' );
+check( 'a call put in before the place of a set, at any level on the way to it, makes the tree its own: nothing is told, nothing is set - and the root alone has no level to differ in', \Nino\Blocks::variantOf( $block, $added ) === null && \Nino\Blocks::variantsFit( $block, $added ) === false
+	&& \Nino\Blocks::setVariant( $block, $added, 'wide' )[0]['c'] === $added[0]['c'] && \Nino\Blocks::setVariant( $block, $added, 'wide' )[0]['a']['height'] === '100'
+	&& \Nino\Blocks::variantOf( $block, [ [ 'n' => 'section-wrap', 's' => '', 'a' => [ 'height' => '60' ], 'c' => null ] ] ) === null
+	&& \Nino\Blocks::variantOf( $block, $moved ) === null );
+
+$page = array_merge( [ [ 't' => "Intro\n" ] ], $wide );
+check( 'a tree that has words before its root has the root found as its first call, and the places are counted from it', \Nino\Blocks::variantOf( $block, $page ) === 'wide' && \Nino\Blocks::setVariant( $block, $page, 'calm' )[0] === $page[0] && \Nino\Blocks::variantOf( $block, \Nino\Blocks::setVariant( $block, $page, 'calm' ) ) === 'calm'
+	&& \Nino\Blocks::variantOf( $block, [] ) === null && \Nino\Blocks::variantOf( $block, [ [ 't' => 'x' ] ] ) === null && \Nino\Blocks::variantsFit( $block, [] ) === false );
+
+$shifted = $edit( $tree, '[section-wrap id="probe" image="~background"', '[section-wrap id="probe" height="80" image="~background"' );
+check( 'an attribute that stands in the call is set where it stands, and one that is not is put at its end: the bytes of the rest are the person\'s', str_contains( \Nino\Markup::write( \Nino\Blocks::setVariant( $block, $shifted, 'calm' ), $containers ), 'id="probe" height="60" image="~background"' ) === true
+	&& str_contains( \Nino\Markup::write( \Nino\Blocks::setVariant( $block, $shifted, 'wide' ), $containers ), '[section-row gap="4" reverse="on"]' ) === true );
+
+$stack = $good + [ 'stack' => [ 'label' => $label( 'Gestapelt', 'Stacked' ), 'set' => [ '1' => [ 'gap' => '2' ] ] ] ];
+$defaulted = \Nino\Blocks::validate( $varSite, 'probe', $varied( $stack ) ) + [ 'tree' => $block['tree'] ];
+check( 'an attribute that is not written has the default of its schema: one that is written as the default is the same for variantOf, and setVariant takes the attribute out where the value is the default', is_array( $defaulted ) === true
+	&& \Nino\Blocks::variantOf( $defaulted, $edit( $tree, '[section-row]', '[section-row gap="2"]' ) ) === 'plain' && \Nino\Blocks::variantOf( $defaulted, $edit( $tree, '[section-wrap id="probe"', '[section-wrap id="probe" dim="off"' ) ) === 'plain'
+	&& \Nino\Markup::write( \Nino\Blocks::setVariant( $defaulted, $wide, 'stack' ), $containers ) === $block['source'] );
+
+$broken = [
+	[ [ 'alternatives' => 'x', 'tree' => $tree ], $tree ],
+	[ [ 'alternatives' => [ 'v' => 'x' ], 'tree' => $tree ], $tree ],
+	[ [ 'alternatives' => [ 'v' => [ 'set' => [ 'root' => 'x' ] ] ], 'tree' => $tree ], $tree ],
+	[ [ 'alternatives' => [ 'v' => [ 'set' => [ 'root' => [ 'height' => 5 ] ] ] ], 'tree' => 'x' ], $tree ],
+	[ $block, [ [ 'n' => 'section-wrap', 'a' => 'text', 'c' => [] ] ] ],
+	[ $block, [ [ 'n' => 'section-wrap', 'a' => [ 'height' => '60' ], 'c' => [ 'x', 5, null ] ] ] ],
+	[ $block, [ 'x', 5, null ] ],
+];
+$threw = 0;
+
+foreach( $broken as [ $odd, $oddTree ] )
+	try {
+
+		\Nino\Blocks::variantOf( $odd, $oddTree );
+		\Nino\Blocks::variantsFit( $odd, $oddTree );
+		\Nino\Blocks::setVariant( $odd, $oddTree, 'v' );
+		\Nino\Blocks::setVariant( $odd, $oddTree, 'wide' );
+	}
+	catch( \Throwable ) {
+		$threw++;
+	}
+
+check( 'nothing throws for a block or a tree that is of no form the kernel makes: hand-built alternatives, a tree whose attributes are no list, words in the place of calls', $threw === 0 );
+
+$laid = static fn( array $block ): array => \Nino\Markup::layout( [ $block['tree'][0] ], 0 );
+$compactTpl = '[section-wrap id="probe"][section-row][section-col id="probe-1"][section-title ~title][/section-col][/section-row][section-row][section-col id="probe-2"][section-title ~two][/section-col][/section-row][/section-wrap]';
+$compact = blocksParts();
+$compact['tpl'] = $compactTpl;
+$compactMeta = json_decode( $compact['json'], true );
+$compactMeta['images'] = [];
+$compactMeta['variants'] = [ 'a' => [ 'label' => $label( 'A', 'A' ), 'set' => [] ], 'b' => [ 'label' => $label( 'B', 'B' ), 'set' => [ '3' => [ 'reverse' => 'on' ] ] ] ];
+$compact['json'] = json_encode( $compactMeta );
+$compact['texts'] = [ 'de_DE' => json_encode( [ '1-title' => 'T', '2-two' => 'Z' ] ), 'en_US' => json_encode( [ '1-title' => 'T', '2-two' => 'Z' ] ) ];
+blocksWrite( $varDir, 'compact', $compact );
+blocksRequest( $varSite );
+$cb = \Nino\Blocks::get( $varSite, 'compact' );
+$put = is_array( $cb ) === true ? \Nino\Blocks::setVariant( $cb, $laid( $cb ), 'b' ) : [];
+check( 'a template with no blanks between its calls is read in the form the block is put into a page in: the places are those of that form, the second row is "3", the variant is set on it and told, and the first row is left', is_array( $cb ) === true
+	&& substr_count( \Nino\Markup::write( $put, $containers ), 'reverse="on"' ) === 1 && str_contains( \Nino\Markup::write( $put, $containers ), "\n\t[section-row]\n\t\t[section-col id=\"probe-2\"]" ) === false
+	&& \Nino\Blocks::variantOf( $cb, $put ) === 'b' && \Nino\Blocks::variantOf( $cb, $laid( $cb ) ) === 'a' && \Nino\Blocks::variantOf( $cb, $cb['tree'] ) === null );
+
+$split = \Nino\Blocks::get( $appData, 'split-image-text' );
+$right = \Nino\Blocks::setVariant( $split, $laid( $split ), 'image-right' );
+$extra = \Nino\Markup::parse( str_replace( "\n\t[section-row gap=\"3\"", "\n\t[section-row]\n\t\t[section-col]\n\t\t\t[text text=\"New\"]\n\t\t[/section-col]\n\t[/section-row]\n\t[section-row gap=\"3\"", \Nino\Markup::write( $right, $containers ) ), $containers );
+check( 'a row put in before the picture row is a tree of its own: nothing is told of it, image-left changes nothing, and the picture row is not turned by image-right set on a left tree', \Nino\Blocks::variantOf( $split, $extra ) === null && \Nino\Blocks::setVariant( $split, $extra, 'image-left' ) === $extra
+	&& \Nino\Blocks::variantsFit( $split, $extra ) === false && \Nino\Blocks::variantsFit( $split, $right ) === true );
+
+$names = [ 'hero-full' => [ 'image-full', 'image-compact', 'plain' ], 'split-image-text' => [ 'image-left', 'image-right' ] ];
+$told = true;
+$moved = true;
+
+foreach( $names as $key => $variants ) {
+
+	$basis = \Nino\Blocks::get( $appData, $key );
+	$told = $told && array_keys( $basis['alternatives'] ) === $variants && \Nino\Blocks::variantOf( $basis, $basis['tree'] ) === $variants[0] && $basis['alternatives'][$variants[1]]['label']['de_DE'] !== '' && $basis['alternatives'][$variants[1]]['label']['en_US'] !== '';
+
+	foreach( $variants as $name ) {
+
+		$put = \Nino\Blocks::setVariant( $basis, $basis['tree'], $name );
+		$told = $told && \Nino\Blocks::variantOf( $basis, $put ) === $name && ( $name !== 'plain' || ( str_contains( \Nino\Markup::write( $put, $containers ), ' picture="off"' ) === true && str_contains( \Nino\Markup::write( $put, $containers ), 'image="~background"' ) === true ) );
+		$moved = $moved && ( $name === $variants[0] ) === ( $put === $basis['tree'] ) && \Nino\Blocks::setVariant( $basis, $put, $variants[0] ) === $basis['tree'];
+	}
+}
+
+check( 'hero-full and split-image-text load with their variants, each is set on the tree of the block and told again, and the second one is a tree of its own', $told === true && $moved === true );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $varSite ) );
 
 // --- C. what a folder may hold -------------------------------------------------------------------------
 

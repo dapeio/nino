@@ -19,5 +19,15 @@
 				"en_US": "Picture beside the text"
 			}
 		}
+	},
+	"variants": {
+		"image-left": {
+			"label": { "de_DE": "Bild links", "en_US": "Picture left" },
+			"set": {}
+		},
+		"image-right": {
+			"label": { "de_DE": "Bild rechts", "en_US": "Picture right" },
+			"set": { "1": { "reverse": "on" } }
+		}
 	}
 }

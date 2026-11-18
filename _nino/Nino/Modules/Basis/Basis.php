@@ -313,7 +313,7 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace section-wrap: the picture behind the content, where the call names one and it has a file
+		 *	Replace section-wrap: the picture behind the content, where the call names one, it has a file and picture is not off
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by the register
@@ -324,7 +324,7 @@ namespace Nino\Modules {
 		 */
 		public static function componentSectionWrap( array &$appData, array $args, string $content, array $context ): string {
 
-			$picture = self::_picture( $appData, $args['image'], $context );
+			$picture = $args['picture'] === 'off' ? null : self::_picture( $appData, $args['image'], $context );
 
 			return \Nino\Components::fill( $appData, 'section-wrap', $args, $content, [
 				'[[picture]]' => $picture === null ? '' : strtr( self::$html['background'], [ '[[src]]' => $picture['src'], '[[size]]' => $picture['size'] ] ),

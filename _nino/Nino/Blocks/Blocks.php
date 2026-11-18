@@ -14,7 +14,7 @@ namespace Nino {
 	 *	Blocks - the pieces of a page a tool offers to put in: a hero, two columns of a picture and a text, the header
 	 *	or the footer of every page. A block is data and has no code: a folder blocks/<key>/ with
 	 *
-	 *		block.json			name and description in every language, the category, the rank, the picture slots
+	 *		block.json			name and description in every language, the category, the rank, the picture slots, optionally the variants
 	 *		block.tpl				one call - a section-wrap, a header-wrap or a footer-wrap - with an id, made of components
 	 *		text/<locale>.json	the words of the sources the template reads with ~name, one file for each language
 	 *		images/<name>.<ext>	optional: the picture of a slot of block.json, svg, webp, png or jpg, at most one for a slot
@@ -52,6 +52,11 @@ namespace Nino {
 	 *	  bytes, MAX_SIDE pixels on a side, of the type its ending says (\Nino\Images::size()), a svg that \Nino\Images::cleanSvg() takes -
 	 *	  and no other file in images/
 	 *	- the category says what the root is: 'frame' for a header-wrap and a footer-wrap, one of the others for a section-wrap
+	 *	- a variant is a name, a label in every language and a set: place => attribute => value, where a place is 'root' (the root of the template) or
+	 *	  the indices from the root down, the blanks counted ('1.1.1', the position \Nino\Markup gives a node and the Builder writes), and the
+	 *	  attribute is one of the schema of the component that stands there that is a look - a choice or a switch the register writes as a class of the
+	 *	  component, never a source, a text, a picture, a link, an id, the class itself or an attribute that goes into the markup - with a value the schema takes, that is no source. A variant changes how the components stand and
+	 *	  never what they say: no markup, no source and no link target comes into a page by it. At most MAX_VARIANTS; see variantOf() and setVariant()
 	 *
 	 *	The name a text has in its file is the name of the source for a call whose nearest id above is the id of the root, and for one
 	 *	below another id the part of that id behind the id of the root and a hyphen, a hyphen and the name: ~title below
@@ -93,6 +98,7 @@ namespace Nino {
 		public const int MAX_TEXT = 600;
 		public const int MAX_TEXTS = 60;
 		public const int MAX_IMAGES = 8;
+		public const int MAX_VARIANTS = 8;
 
 		// The picture a slot may bring: bytes, pixels on a side, and the type of the picture each ending stands for (a svg is read by cleanSvg())
 		public const int MAX_PICTURE = 524288;
@@ -105,7 +111,9 @@ namespace Nino {
 		public const array PACK_FILES = [ 'pack.json', 'preview.webp', 'LICENSE.txt' ];
 
 		// How many levels of json a file may have, how long the id of a root and the word of a source may be
+		// block.json has one level more: a variant is a name, a set, a place and its attributes
 		private const int DEPTH = 5;
+		private const int DEPTH_META = 6;
 		private const int ID_LENGTH = 32;
 
 		// The file names of a block; the key of a block, the root of a folder, a locale, an id, the name of a text or a slot and the name of a source
@@ -114,6 +122,9 @@ namespace Nino {
 		private const string WORD = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D';
 		private const string SOURCE = '/^~[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D';
 		private const string PICTURE = '/^([a-z0-9]+(?:-[a-z0-9]+)*)\.(svg|webp|png|jpg)$/D';
+
+		// The place of a variant's set: the root of the template, or the indices from the root down, no leading zero
+		private const string PLACE = '/^(?:root|(?:0|[1-9][0-9]{0,3})(?:\.(?:0|[1-9][0-9]{0,3})){0,15})$/D';
 
 		// What no folder of a block holds, whatever the name is spelt like
 		private const string CODE = '/\.(?:php\d?|phtml|phar|inc)(?:\.|$)/i';
@@ -138,7 +149,8 @@ namespace Nino {
 		 *																	the features whose components it calls - worked out from the register -, 'variants' => component => the
 		 *																	variants it names, 'images' => name => [ 'placeholder', 'width', 'height', 'label' => locale => text ], 'pictures' => slot =>
 		 *																	'images/<slot>.<ext>', the file below the folder of the block, for each slot that has a picture of its own,
-		 *																	'missing' => the keys of the features that are off and whose components it calls, [] where it can be put in ]
+		 *																	'missing' => the keys of the features that are off and whose components it calls, [] where it can be put in,
+		 *																	'alternatives' => the variants block.json names, in its order: name => [ 'label' => locale => text, 'set' => place => attribute => value ], [] for none ]
 		 */
 		public static function all( array &$appData ): array {
 
@@ -192,6 +204,147 @@ namespace Nino {
 		public static function rejected( array &$appData ): array {
 
 			return self::_state( $appData )['rejected'];
+		}
+
+		/**
+		 *	Which variant of a block a tree has: the first, in the order of block.json, whose set holds at every place of it and with which every
+		 *	attribute that any other variant sets has the value the template has. A value is read as the register reads it: an attribute that is
+		 *	not written has the default of its schema, so that reverse="off" is not written and is the same. A tree whose places are not those of the
+		 *	template - a call is taken out, put in or moved at a level on the way to a place any variant names - is its own: null, as is one with no call.
+		 *	Pure: nothing is read but what is handed in
+		 *
+		 *	The places count in the form a block is put into a page in: the root of the template as \Nino\Markup::layout() sets it out, a call on a line
+		 *	of its own with the blanks between the calls counted, whatever the file block.tpl has between its calls. The trees are lists of nodes as
+		 *	\Nino\Markup::parse() answers them: the first call of the list is the root of the block, and a block that is put into a tree of a page as
+		 *	one node is handed as [ $node ]
+		 *
+		 *	@param		array			$block				A block as get() answers it, with its 'tree', 'alternatives' and 'defaults' - never what a request brings
+		 *	@param		array			$tree					The tree of the block as it stands in a page
+		 *
+		 *	@return 	string|null								The name of the variant, null where none is the tree's: it is its own
+		 */
+		public static function variantOf( array $block, array $tree ): ?string {
+
+			$alternatives = self::_sets( $block['alternatives'] ?? null );
+			$laid = self::_laid( $block['tree'] ?? null );
+			$touched = self::_touched( $alternatives );
+
+			if( $alternatives === [] || $laid === [] || self::_root( $tree ) === null )
+				return null;
+
+			$fits = [];
+
+			foreach( $touched as $place => $attributes ) {
+
+				$way = self::_fit( $tree, $laid, (string) $place );
+
+				if( $way === null )
+					return null;
+
+				$fits[$place] = [ self::_node( $tree, $way[0] ), self::_node( $laid, $way[1] ) ];
+			}
+
+			foreach( $alternatives as $name => $variant ) {
+
+				$holds = true;
+
+				foreach( $touched as $place => $attributes )
+					foreach( $attributes as $attribute => $unused ) {
+
+						[ $node, $origin ] = $fits[$place];
+						$meta = $block['defaults'][$place][$attribute] ?? null;
+						$expected = array_key_exists( $attribute, $variant[$place] ?? [] ) === true ? $variant[$place][$attribute] : ( $origin['a'][$attribute] ?? null );
+
+						if( self::_value( $node['a'][$attribute] ?? null, $meta ) !== self::_value( $expected, $meta ) )
+							$holds = false;
+					}
+
+				if( $holds === true )
+					return (string) $name;
+			}
+
+			return null;
+		}
+
+		/**
+		 *	Whether the places of the variants are in a tree: every place any variant of the block names is a call of the name the template has there,
+		 *	and on the way to it each level has the same run of calls and blanks as the template. A tree that is not built like that is no tree whose
+		 *	variant is told or set - a tool shows no choice of a variant for it. A block with no variants fits nothing. Pure, and in the form of variantOf()
+		 *
+		 *	@param		array			$block				A block as get() answers it
+		 *	@param		array			$tree					The tree of the block as it stands in a page
+		 *
+		 *	@return 	bool
+		 */
+		public static function variantsFit( array $block, array $tree ): bool {
+
+			$alternatives = self::_sets( $block['alternatives'] ?? null );
+			$laid = self::_laid( $block['tree'] ?? null );
+
+			if( $alternatives === [] || $laid === [] || self::_root( $tree ) === null )
+				return false;
+
+			foreach( self::_touched( $alternatives ) as $place => $attributes )
+				if( self::_fit( $tree, $laid, (string) $place ) === null )
+					return false;
+
+			return true;
+		}
+
+		/**
+		 *	The tree of a block with a variant set: every attribute that any variant of the block sets is as the template has it, and then the set of the
+		 *	variant is on - a value that is the default of its attribute is not written, the attribute is taken out. What no variant names - the texts, the
+		 *	sources, the children, an attribute a person changed - stays as it is, to the byte. A place that is not the template's, as variantsFit() says,
+		 *	is left out; an unknown name gives the tree back. Nothing is kept of the variant that was set before. Pure, and in the form of variantOf()
+		 *
+		 *	@param		array			$block				A block as get() answers it, with its 'tree', 'alternatives' and 'defaults' - never what a request brings
+		 *	@param		array			$tree					The tree of the block as it stands in a page
+		 *	@param		string		$name					The name of the variant
+		 *
+		 *	@return 	array										The tree
+		 */
+		public static function setVariant( array $block, array $tree, string $name ): array {
+
+			$alternatives = self::_sets( $block['alternatives'] ?? null );
+			$laid = self::_laid( $block['tree'] ?? null );
+
+			if( array_key_exists( $name, $alternatives ) === false || $laid === [] )
+				return $tree;
+
+			foreach( self::_touched( $alternatives ) as $place => $attributes ) {
+
+				$way = self::_fit( $tree, $laid, (string) $place );
+
+				if( $way === null )
+					continue;
+
+				$origin = self::_node( $laid, $way[1] );
+				$values = [];
+
+				foreach( $attributes as $attribute => $unused )
+					$values[$attribute] = array_key_exists( $attribute, $origin['a'] ) === true ? [ $origin['a'][$attribute] ] : [];
+
+				foreach( $alternatives[$name][$place] ?? [] as $attribute => $value ) {
+
+					$meta = $block['defaults'][$place][$attribute] ?? null;
+					$values[$attribute] = $meta !== null && self::_value( $value, $meta ) === self::_value( null, $meta ) ? [] : [ $value ];
+				}
+
+				$node = &$tree[$way[0][0]];
+
+				foreach( array_slice( $way[0], 1 ) as $step )
+					$node = &$node['c'][$step];
+
+				foreach( $values as $attribute => $value )
+					if( $value === [] )
+						unset( $node['a'][$attribute] );
+					else
+						$node['a'][$attribute] = $value[0];
+
+				unset( $node );
+			}
+
+			return $tree;
 		}
 
 		/**
@@ -269,7 +422,7 @@ namespace Nino {
 			if( strlen( $key ) > \Nino\Components::NAME_LENGTH || preg_match( \Nino\Components::NAME, $key ) !== 1 )
 				return 'a key is a slug of lower case letters, digits and hyphens, at most '. \Nino\Components::NAME_LENGTH. ' characters';
 
-			$meta = self::_json( (string) ( $parts['json'] ?? '' ), 'block.json' );
+			$meta = self::_json( (string) ( $parts['json'] ?? '' ), 'block.json', self::DEPTH_META );
 
 			if( is_string( $meta ) === true )
 				return $meta;
@@ -318,7 +471,7 @@ namespace Nino {
 					return 'text/'. $locale. '.json has not the names that text/'. self::FALLBACK. '.json has: a block has the same texts in each language';
 			}
 
-			$block = self::_meta( $meta, $locales );
+			$block = self::_meta( $meta, $locales, json_decode( (string) ( $parts['json'] ?? '' ), false, self::DEPTH_META ) );
 
 			if( is_string( $block ) === true )
 				return $block;
@@ -335,6 +488,11 @@ namespace Nino {
 
 			if( ( $found['wrap'] === 'section-wrap' ) === ( $block['category'] === 'frame' ) )
 				return 'the category "'. $block['category']. '" is not one for a '. $found['wrap']. ': a frame is a header-wrap or a footer-wrap, the rest are section-wraps';
+
+			$defaults = self::_places( $appData, $found, $block['alternatives'] );
+
+			if( is_string( $defaults ) === true )
+				return $defaults;
 
 			// What the template reads, by the name it has in the files: each text is read and each source has its text
 			$used = [];
@@ -394,6 +552,8 @@ namespace Nino {
 				'features'		=> $features,
 				'missing'			=> $found['missing'],
 				'variants'		=> $found['variants'],
+				'alternatives'	=> $block['alternatives'],
+				'defaults'		=> $defaults,
 				'images'			=> $block['images'],
 				'pictures'		=> $own,
 				'id'					=> $found['id'],
@@ -841,25 +1001,26 @@ namespace Nino {
 				return null;
 
 			foreach( $value['blocks'] as $key => $block )
-				if( is_string( $key ) === false || is_array( $block ) === false || isset( $block['source'], $block['texts'], $block['slots'], $block['pictures'], $block['origin'], $block['label'], $block['category'], $block['rank'] ) === false )
+				if( is_string( $key ) === false || is_array( $block ) === false || isset( $block['source'], $block['texts'], $block['slots'], $block['pictures'], $block['alternatives'], $block['defaults'], $block['origin'], $block['label'], $block['category'], $block['rank'] ) === false )
 					return null;
 
 			return $value;
 		}
 
 		/**
-		 *	block.json: the name and the description in each language, the category, the rank and the slots of pictures
+		 *	block.json: the name and the description in each language, the category, the rank, the slots of pictures and the variants
 		 *
 		 *	@param		array			$meta					What the file holds
 		 *	@param		array			$locales			The languages of the texts
+		 *	@param		mixed			$objects			The same file read with objects: a list and a map are told apart there, which {"0": ...} is not in an array
 		 *
-		 *	@return 	array|string							[ 'name', 'description', 'category', 'rank', 'images' ] or what is wrong
+		 *	@return 	array|string							[ 'name', 'description', 'category', 'rank', 'images', 'alternatives' ] or what is wrong
 		 */
-		private static function _meta( array $meta, array $locales ): array|string {
+		private static function _meta( array $meta, array $locales, mixed $objects = null ): array|string {
 
 			foreach( array_keys( $meta ) as $key )
-				if( in_array( $key, [ 'name', 'description', 'category', 'rank', 'images' ], true ) === false )
-					return 'block.json: "'. self::_shown( (string) $key ). '" is no key of a block - there are name, description, category, rank, images';
+				if( in_array( $key, [ 'name', 'description', 'category', 'rank', 'images', 'variants' ], true ) === false )
+					return 'block.json: "'. self::_shown( (string) $key ). '" is no key of a block - there are name, description, category, rank, images, variants';
 
 			$block = [];
 
@@ -919,7 +1080,81 @@ namespace Nino {
 				$block['images'][$name] = [ 'placeholder' => $slot['placeholder'], 'width' => $slot['width'], 'height' => $slot['height'], 'label' => $slot['label'] ];
 			}
 
+			$alternatives = self::_alternatives( array_key_exists( 'variants', $meta ) === true ? $meta['variants'] : [], $locales, array_key_exists( 'variants', $meta ) === true && is_object( $objects ) === true ? $objects->variants : new \stdClass() );
+
+			if( is_string( $alternatives ) === true )
+				return $alternatives;
+
+			$block['alternatives'] = $alternatives;
+
 			return $block;
+		}
+
+		/**
+		 *	The variants of block.json as they are written: a name, a label and a set of places, each with attributes and their values. What the
+		 *	template and the register say of them is for _places()
+		 *
+		 *	@param		mixed			$variants			What the file holds under "variants"
+		 *	@param		array			$locales			The languages of the texts
+		 *	@param		mixed			$shape				The same value read with objects: a name or a place may be 0, and {"0": ...} is a list as an array
+		 *
+		 *	@return 	array|string							name => [ 'label', 'set' ] in the order of the file, or what is wrong
+		 */
+		private static function _alternatives( mixed $variants, array $locales, mixed $shape ): array|string {
+
+			if( is_array( $variants ) === false || ( $variants !== [] && is_object( $shape ) === false ) || count( $variants ) > self::MAX_VARIANTS )
+				return 'block.json: "variants" is a map of at most '. self::MAX_VARIANTS. ' variants';
+
+			$shapes = is_object( $shape ) === true ? (array) $shape : [];
+			$found = [];
+
+			foreach( $variants as $name => $variant ) {
+
+				$name = (string) $name;
+				$where = 'block.json, variants, "'. self::_shown( $name ). '": ';
+
+				if( preg_match( self::WORD, $name ) !== 1 || strlen( $name ) > \Nino\Components::NAME_LENGTH )
+					return 'block.json, variants: "'. self::_shown( $name ). '" is no name of a variant - words of lower case letters and digits, joined by hyphens';
+
+				if( is_array( $variant ) === false || is_object( $shapes[$name] ?? null ) === false || count( $variant ) !== 2 || array_key_exists( 'label', $variant ) === false || array_key_exists( 'set', $variant ) === false )
+					return $where. 'a variant is a label and a set';
+
+				if( is_array( $variant['label'] ) === false || $variant['label'] === [] )
+					return $where. 'the label is a map of language => text';
+
+				$problem = self::_localized( $variant['label'], $locales, self::MAX_NAME );
+
+				if( $problem !== null )
+					return $where. 'label: '. $problem;
+
+				if( is_array( $variant['set'] ) === false || ( $variant['set'] !== [] && is_object( $shapes[$name]->set ?? null ) === false ) )
+					return $where. 'the set is a map of place => attributes';
+
+				$places = (array) ( $shapes[$name]->set ?? new \stdClass() );
+				$set = [];
+
+				foreach( $variant['set'] as $place => $attributes ) {
+
+					$place = (string) $place;
+
+					if( preg_match( self::PLACE, $place ) !== 1 )
+						return $where. '"'. self::_shown( $place ). '" is no place: "root", or the indices from the root down, such as "1.1"';
+
+					if( is_array( $attributes ) === false || ( $attributes !== [] && is_object( $places[$place] ?? null ) === false ) )
+						return $where. 'the place "'. $place. '" has a map of attribute => value';
+
+					foreach( $attributes as $attribute => $value )
+						if( preg_match( '/^[a-z][a-zA-Z0-9]*$/D', (string) $attribute ) !== 1 || strlen( (string) $attribute ) > \Nino\Components::NAME_LENGTH || is_string( $value ) === false
+							|| $value === '' || strlen( $value ) > self::MAX_NAME || preg_match( '/^[A-Za-z0-9-][A-Za-z0-9 :-]*$/D', $value ) !== 1 )
+							return $where. 'the place "'. $place. '": "'. self::_shown( (string) $attribute ). '" is no attribute with a value that is a plain word';
+
+					$set[$place] = $attributes;
+				}
+
+				$found[$name] = [ 'label' => $variant['label'], 'set' => $set ];
+			}
+
+			return $found;
 		}
 
 		/**
@@ -1002,19 +1237,20 @@ namespace Nino {
 		 *
 		 *	@param		string		$raw
 		 *	@param		string		$what					The name of the file, for what is said
+		 *	@param		int				$depth				How many levels it may have
 		 *
 		 *	@return 	array|string
 		 */
-		private static function _json( string $raw, string $what ): array|string {
+		private static function _json( string $raw, string $what, int $depth = self::DEPTH ): array|string {
 
 			if( strlen( $raw ) > self::MAX_JSON || str_contains( $raw, "\0" ) === true )
 				return $what. ' is longer than '. self::MAX_JSON. ' bytes, or holds a null byte';
 
 			try {
-				$value = json_decode( $raw, true, self::DEPTH, JSON_THROW_ON_ERROR );
+				$value = json_decode( $raw, true, $depth, JSON_THROW_ON_ERROR );
 			}
 			catch( \JsonException ) {
-				return $what. ' is no json of at most '. self::DEPTH. ' levels';
+				return $what. ' is no json of at most '. $depth. ' levels';
 			}
 
 			if( is_array( $value ) === false || ( $value !== [] && array_is_list( $value ) === true ) )
@@ -1029,7 +1265,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source
 		 *
-		 *	@return 	array|string							[ 'wrap' => the root, 'id' => its id, 'calls' => name => true, 'variants' => name => words, 'slots' => the slots get() lists ], or what is wrong
+		 *	@return 	array|string							[ 'wrap' => the root, 'id' => its id, 'calls' => name => true, 'variants' => name => words, 'slots' => the slots get() lists, 'tree' => the nodes ], or what is wrong
 		 */
 		private static function _template( array &$appData, string $source ): array|string {
 
@@ -1132,7 +1368,7 @@ namespace Nino {
 
 			ksort( $missing );
 
-			return [ 'wrap' => $root['n'], 'id' => $id, 'calls' => $calls, 'missing' => array_keys( $missing ), 'variants' => $variants, 'slots' => array_values( $slots ) ];
+			return [ 'wrap' => $root['n'], 'id' => $id, 'calls' => $calls, 'missing' => array_keys( $missing ), 'variants' => $variants, 'slots' => array_values( $slots ), 'tree' => $nodes ];
 		}
 
 		/**
@@ -1216,6 +1452,272 @@ namespace Nino {
 			}
 
 			return null;
+		}
+
+		/**
+		 *	The variants of a block as the functions read them: what is not a name with places of attributes that have a string for a value is not
+		 *	kept, so that nothing a hand-built block holds can throw
+		 *
+		 *	@param		mixed			$alternatives	What 'alternatives' holds
+		 *
+		 *	@return 	array										name => place => attribute => value
+		 */
+		private static function _sets( mixed $alternatives ): array {
+
+			$sets = [];
+
+			foreach( is_array( $alternatives ) === true ? $alternatives : [] as $name => $variant ) {
+
+				if( is_array( $variant ) === false || is_array( $variant['set'] ?? null ) === false )
+					continue;
+
+				$sets[$name] = [];
+
+				foreach( $variant['set'] as $place => $attributes )
+					foreach( is_array( $attributes ) === true ? $attributes : [] as $attribute => $value )
+						if( is_string( $value ) === true )
+							$sets[$name][$place][$attribute] = $value;
+			}
+
+			return $sets;
+		}
+
+		/**
+		 *	What the variants of a block set, by place: place => attribute => true, the places in the order they are first named
+		 *
+		 *	@param		array			$sets					As _sets() answers
+		 *
+		 *	@return 	array
+		 */
+		private static function _touched( array $sets ): array {
+
+			$touched = [];
+
+			foreach( $sets as $variant )
+				foreach( $variant as $place => $attributes )
+					foreach( array_keys( $attributes ) as $attribute )
+						$touched[$place][$attribute] = true;
+
+			return $touched;
+		}
+
+		/**
+		 *	The index of the root of a tree: its first call
+		 *
+		 *	@param		array			$tree
+		 *
+		 *	@return 	int|null
+		 */
+		private static function _root( array $tree ): ?int {
+
+			foreach( $tree as $at => $node )
+				if( is_array( $node ) === true && is_string( $node['n'] ?? null ) === true && is_array( $node['a'] ?? [] ) === true )
+					return (int) $at;
+
+			return null;
+		}
+
+		/**
+		 *	The root of the template of a block in the form it is put into a page in: set out by \Nino\Markup::layout(), the first call alone in a list
+		 *
+		 *	@param		mixed			$tree					The 'tree' of a block
+		 *
+		 *	@return 	array										[ the root ], or [] where there is none
+		 */
+		private static function _laid( mixed $tree ): array {
+
+			$root = is_array( $tree ) === true ? self::_root( $tree ) : null;
+
+			return $root === null ? [] : \Nino\Markup::layout( [ $tree[$root] ], 0 );
+		}
+
+		/**
+		 *	The way to a place in a tree: the index of the root among the nodes, then the indices below it. A place is 'root' or the dotted indices
+		 *	from the root down, the blanks counted, and it names a call
+		 *
+		 *	@param		array			$tree
+		 *	@param		string		$place
+		 *
+		 *	@return 	array|null								null where the tree has no call at the place
+		 */
+		private static function _steps( array $tree, string $place ): ?array {
+
+			$root = preg_match( self::PLACE, $place ) === 1 ? self::_root( $tree ) : null;
+
+			if( $root === null )
+				return null;
+
+			$steps = [ $root ];
+			$node = $tree[$root];
+
+			foreach( $place === 'root' ? [] : explode( '.', $place ) as $index ) {
+
+				$node = is_array( $node['c'] ?? null ) === true ? ( $node['c'][(int) $index] ?? null ) : null;
+
+				if( is_array( $node ) === false || is_string( $node['n'] ?? null ) === false || is_array( $node['a'] ?? [] ) === false )
+					return null;
+
+				$steps[] = (int) $index;
+			}
+
+			return $steps;
+		}
+
+		/**
+		 *	The ways to a place in a tree and in the template, where the place is the same in both: the call there has the name the template has, and
+		 *	on the way down each level has the same run of calls and blanks, by the name of each call
+		 *
+		 *	@param		array			$tree
+		 *	@param		array			$laid					As _laid() answers
+		 *	@param		string		$place
+		 *
+		 *	@return 	array|null								[ the way in the tree, the way in the template ]
+		 */
+		private static function _fit( array $tree, array $laid, string $place ): ?array {
+
+			$a = self::_steps( $tree, $place );
+			$b = self::_steps( $laid, $place );
+
+			if( $a === null || $b === null )
+				return null;
+
+			$x = $tree[$a[0]];
+			$y = $laid[$b[0]];
+
+			if( $x['n'] !== $y['n'] )
+				return null;
+
+			$kinds = static fn( array $nodes ): array => array_map( static fn( mixed $node ): string => is_array( $node ) === true && is_string( $node['n'] ?? null ) === true ? $node['n'] : '', array_values( $nodes ) );
+
+			foreach( array_slice( $a, 1 ) as $step ) {
+
+				if( $kinds( $x['c'] ) !== $kinds( $y['c'] ) )
+					return null;
+
+				$x = $x['c'][$step];
+				$y = $y['c'][$step];
+			}
+
+			return [ $a, $b ];
+		}
+
+		/**
+		 *	The node at the end of a way that _steps() found, with an empty list of attributes where it has none
+		 *
+		 *	@param		array			$tree
+		 *	@param		array			$steps
+		 *
+		 *	@return 	array
+		 */
+		private static function _node( array $tree, array $steps ): array {
+
+			$node = $tree[$steps[0]];
+
+			foreach( array_slice( $steps, 1 ) as $step )
+				$node = $node['c'][$step];
+
+			return $node + [ 'a' => [] ];
+		}
+
+		/**
+		 *	A value of an attribute as the register reads it, to be compared: what is not written is the default of the schema, a switch is on or off
+		 *
+		 *	@param		mixed			$raw					The value as a call has it, null where it is not written
+		 *	@param		array|null	$meta					[ the type, the default ] of the attribute, null where the block does not say
+		 *
+		 *	@return 	string|bool|null
+		 */
+		private static function _value( mixed $raw, ?array $meta ): string|bool|null {
+
+			if( $meta === null )
+				return is_string( $raw ) === true || is_bool( $raw ) === true ? $raw : null;
+
+			if( $raw === null )
+				$raw = $meta[1];
+
+			if( $meta[0] === 'bool' )
+				return $raw === true || ( is_string( $raw ) === true && in_array( strtolower( $raw ), \Nino\Components::ON, true ) === true );
+
+			return is_string( $raw ) === true ? $raw : ( $raw === false || $raw === null ? '' : (string) $raw );
+		}
+
+		/**
+		 *	What the template and the register say of the places of the variants: each place is a call of the template as it is put into a page, its
+		 *	attribute is one of the schema of that component that is a look - a choice or a switch that is written as a class of the
+		 *	component, so that it is how the component stands and nothing it says - and the tree with the set of the variant in it is read by the
+		 *	register as the tree of the template is: the same findings and no other, so that no value comes in that a stored tree would not take
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$found				What _template() answers
+		 *	@param		array			$alternatives	What _alternatives() answers
+		 *
+		 *	@return 	array|string							place => attribute => [ type, default ] of what the variants set, or what is wrong
+		 */
+		private static function _places( array &$appData, array $found, array $alternatives ): array|string {
+
+			$defaults = [];
+
+			if( $alternatives === [] )
+				return $defaults;
+
+			$tree = self::_laid( $found['tree'] );
+			$registry = \Nino\Components::components( $appData );
+			$absent = self::_absent( $appData );
+			$before = [];
+
+			foreach( \Nino\Components::check( $appData, $tree ) as $position => $findings )
+				foreach( $findings as $finding )
+					$before[$position. '|'. $finding['code']. '|'. $finding['detail']] = true;
+
+			foreach( $alternatives as $name => $variant ) {
+
+				$where = 'block.json, variants, "'. $name. '": ';
+				$changed = $tree;
+
+				foreach( $variant['set'] as $place => $attributes ) {
+
+					$place = (string) $place;
+					$steps = self::_steps( $tree, $place );
+
+					if( $steps === null )
+						return $where. 'the place "'. $place. '" is no call of block.tpl, as it is put into a page';
+
+					$component = (string) self::_node( $tree, $steps )['n'];
+					$schema = $registry[$component] ?? null;
+
+					// What a feature that is off brings has no schema to hold a value against: the block is one that needs the feature
+					if( $schema === null && isset( $absent[$component] ) === true )
+						continue;
+
+					$node = &$changed[$steps[0]];
+
+					foreach( array_slice( $steps, 1 ) as $step )
+						$node = &$node['c'][$step];
+
+					foreach( $attributes as $attribute => $value ) {
+
+						$declared = $schema['attributes'][$attribute] ?? null;
+
+						if( $declared === null )
+							return $where. '"'. self::_shown( (string) $attribute ). '" is no attribute of "'. $component. '" at "'. $place. '"';
+
+						if( $declared['class'] !== true )
+							return $where. '"'. $attribute. '" of "'. $component. '" at "'. $place. '" is no look: a variant sets an attribute that is a class of the component, and says nothing';
+
+						$node['a'][$attribute] = $value;
+						$defaults[$place][$attribute] = [ $declared['type'], $declared['default'] ];
+					}
+
+					unset( $node );
+				}
+
+				foreach( \Nino\Components::check( $appData, $changed ) as $position => $findings )
+					foreach( $findings as $finding )
+						if( isset( $before[$position. '|'. $finding['code']. '|'. $finding['detail']] ) === false )
+							return $where. 'the register finds "'. $finding['code']. '" ('. self::_shown( (string) $finding['detail'] ). ') at '. $position. ' of the tree with the set: a value of the set is none the attribute takes';
+			}
+
+			return $defaults;
 		}
 
 		/**
