@@ -326,6 +326,10 @@ console.log('Nino.adminUi.confirm');
 		'/_admin/features/confirm/deactivate' : 'big',
 		'/_admin/features/confirm/deactivate-refused' : 'big',
 		'/_admin/features/confirm/application' : 'big',
+		'/_admin/features/confirm/activate' : 'big',
+		'/_admin/features/confirm/update' : 'big',
+		'/_admin/features/confirm/install' : 'big',
+		'/_admin/features/confirm/reapply' : 'big',
 		'/_admin/navs/confirm/delete' : 'destructive',
 		'/_admin/submissions/confirm/delete' : 'destructive',
 	};

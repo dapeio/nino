@@ -48,8 +48,8 @@
 		};
 
 		/**
-		 *	Draw the form of one feature entry: its fields, and the bar with
-		 *	Save and the line that says how it went
+		 *	Draw the form of one feature entry: its fields, and the bar of every form - the state, the line
+		 *	that says how it went and Save as its one main button
 		 *
 		 *	@param		{Object}	feature				An entry of features/list
 		 *
@@ -60,25 +60,17 @@
 			mount.innerHTML = '';
 
 			const form = dc.createElement('form');
+			form.noValidate = true;
 			form.dataset.feature = feature.key;
 			form.appendChild( Nino.admin.features._renderSettings( feature, true ) );
 
-			const bar = Nino.adminUi.actionBar( dc.createElement('div') );
+			const bar = Nino.adminUi.actionBar( { status : { line : dc.createElement('p') }, primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ) } );
 
-			const save = dc.createElement('button');
-			save.type = 'submit';
-			save.className = 'nino-admin-btn-primary';
-			save.textContent = Nino.content.getText('/_admin/common/label/save');
-			bar.appendChild( save );
-
-			const msg = dc.createElement('p');
-			msg.setAttribute( 'aria-live', 'polite' );
-			bar.appendChild( msg );
-
-			form.appendChild( bar );
+			bar.line.bind( form );
+			form.appendChild( bar.el );
 			mount.appendChild( form );
 
-			current = { feature : feature, form : form, save : save, msg : msg };
+			current = { feature : feature, form : form, line : bar.line };
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); submit() } );
 
@@ -90,7 +82,7 @@
 		/**
 		 *	Save the form in one request and draw it again from the entry the
 		 *	answer carries - the values as config.php holds them now, and the
-		 *	secret's hint saying it is set
+		 *	secret's note saying it is set; the new bar says it was saved
 		 *
 		 *	Every way this ends reports to done( ok ), if there is one (see
 		 *	Nino.admin.dirty.guard())
@@ -101,32 +93,28 @@
 		 */
 		const submit = function( done ) {
 
-			const report = function( ok ) {
-				if( typeof done === 'function' )
-					done( ok );
-			};
-
 			const parts = current;
+			const key = Nino.admin.features._focusKey();
 
-			parts.save.disabled = true;
-			parts.msg.classList.remove('nino-admin-error');
-			parts.msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			Nino.admin.features._save( parts.feature, parts.form, parts.line, function( response, typed ) {
 
-			call( 'settings', { key : key, fields : Nino.admin.features._collect( parts.form ) }, function( status, response ) {
+				if( typeof response.feature !== 'object' || response.feature === null ) {
+					parts.line.fail( Nino.content.getText('/_admin/common/error/save') );
+					return false;
+				}
 
-				parts.save.disabled = false;
-
-				if( status !== 200 || response === null || typeof response.feature !== 'object' ) {
-					parts.msg.classList.add('nino-admin-error');
-					parts.msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
-					report( false );
-					return;
+				// Something was typed meanwhile: the form stays as it is, with what was typed, and says it has something to save
+				if( typed === true ) {
+					parts.feature = response.feature;
+					parts.line.dirty();
+					return true;
 				}
 
 				render( response.feature );
-				Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
-				report( true );
-			} );
+				current.line.saved();
+				Nino.admin.features._refocus( current.form, key );
+				return true;
+			}, done );
 		};
 
 		/**

@@ -564,12 +564,17 @@ namespace Nino\Modules\Features {
 			if( $errors !== [] ) {
 
 				// A whole-form error (the kernel's key '') is its message
-				// alone; a field's is named, so the form can point at it
+				// alone; a field's is named, so the form can point at it:
+				// the first one that is named is the field of the answer
 				$messages = [];
-				foreach( $errors as $name => $message )
+				$field		= '';
+				foreach( $errors as $name => $message ) {
 					$messages[] = (string) $name === '' ? (string) $message : $name. ': '. $message;
+					if( $field === '' )
+						$field = (string) $name;
+				}
 
-				\Nino\Http::fail( $request, 400, implode( '; ', $messages ) );
+				\Nino\Http::fail( $request, 400, implode( '; ', $messages ), '', [], $field );
 				return;
 			}
 
@@ -1791,6 +1796,8 @@ namespace Nino\Modules\Features {
 				'calledIn'		=> self::_calledIn( $appData, $feature['key'] ),
 				// Whether it brings an install unit, which is what the Apply again action works on
 				'unit'				=> is_dir( $feature['dir']. '/install' ),
+				// Whether it owns files under data/, which an uninstall leaves where they are
+				'data'				=> array_values( $feature['data'] ?? [] ),
 				'settings'		=> $settings,
 				'settingsTab'	=> $settingsTab,
 			];

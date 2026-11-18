@@ -4,13 +4,12 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Features				The features installed below features/, and the catalogue
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the pinned head with
- *													its two filters, the rows of the list, and the row of
- *													buttons a feature or a catalogue offer carries. Bundled while
- *													the module is there (see the panel's assets()), so the
- *													same layer rules apply - the shell's stylesheet fixes the
- *													layer order, this one only ever adds to nino.tool, scoped
- *													to the panel's own pane.
+ *													system in _admin/assets/style.css: the lines under the name
+ *													of a row, the line a row reports into, and the measure of a
+ *													feature's own view. Bundled while the module is there (see
+ *													the panel's assets()), so the same layer rules apply - the
+ *													shell's stylesheet fixes the layer order, this one only ever
+ *													adds to nino.tool, scoped to the panel's own ids.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -19,294 +18,92 @@
 
 @layer nino.tool {
 
-/*	The head of the list: the category over what the tabs hold; the tab strip stands in the pane's own head
-	beside the panel's name (see _admin/assets/style.css), and only comes
-	here where there is none. The row stays at the top while the rows scroll
-	under it - a catalogue of any size is a long page, and what you have
-	narrowed to is exactly what you must not lose sight of while looking
-	through it. It closes against the pane's head above it, the gap that
-	head leaves under itself taken back, so the two read as one bar.
-
-	The shared strip is deliberately not sticky (see _admin/assets/style.css)
-	because a panel with tabs drills into a form whose context bar is pinned
-	to the same edge, and the two would sit on top of each other. That cannot
-	happen here: drilling into a feature's settings hides this whole pane, so
-	only ever one of the two is on screen. Hence the rule lives here, scoped
-	to this pane, rather than in the shared stylesheet.
-
-	The bar surface and the bleed to both edges are the ones the context bar
-	uses, so the two read as the same piece of chrome. */
+/*	The category stands in the head of the pane, in the slot the shell keeps for actions; only where the script
+	was drawn without a head does it stand in a row of the list. */
 #features-list .admin-features-head {
-	position: sticky;
-	top: -1rem;
-	z-index: 22;
 	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
 	justify-content: flex-end;
-	gap: .5rem 1rem;
-	margin: -1.25rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
-	padding: .5rem var(--nino-admin-content-inline);
-	border-bottom: 1px solid var(--editor-separator);
-	background: var(--editor-bar-bg);
-	box-shadow: 0 1px 0 rgba(15,23,42,.025);
-	backdrop-filter: blur(18px) saturate(170%);
-	-webkit-backdrop-filter: blur(18px) saturate(170%);
+	margin-bottom: var(--nino-admin-space-5);
 }
 
-#features-list .nino-admin-list-copy {
-	max-width: 80%;
+/*	The category, a labelled select, is one line: the word and the control. It never shrinks past the width of its
+	longest option, because a select whose text is cut off says nothing about what is currently selected - which is
+	the one thing it has to say while a filtered list is being read. */
+#admin-content-features .admin-panel-actions .admin-features-category,
+#features-list .admin-features-head > .admin-features-category {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
 }
 
-/*	The strip, where the pane has no head to hold it: it brings neither its
-	own bleed nor the border the row already draws. */
-#features-list .admin-features-head > .admin-panel-tabs {
-	flex: 1 1 auto;
-	min-width: 0;
-	margin: 0;
-	border-bottom: 0;
-}
-
-/*	The head has nothing to hold on a tab that has no category to choose */
-#features-list .admin-features-head:empty {
+/*	Not drawn while a feature's own view is on screen: the display above would otherwise outrank the attribute. */
+#admin-content-features .admin-features-category[hidden] {
 	display: none;
 }
 
-/*	The category. It never shrinks past the width of its longest option,
-	because a select whose text is cut off says nothing about what is
-	currently selected - which is the one thing it has to say while a
-	filtered list is being read. */
-#features-list .admin-features-head > .admin-features-category {
-	flex: 0 0 auto;
+#admin-content-features .admin-features-category select {
 	width: auto;
 	max-width: 14rem;
-	margin: 0 0 .35rem;
 }
 
-/*	A row of the grouped list: what it is on the left, what can be done with
-	it on the right. An active feature is not one of these - it is the shared
-	drill-down row (.admin-type-btn), because everything it offers is on the
-	screen behind its chevron. */
-#features-list .nino-admin-list > li {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: .5rem .75rem;
-	min-height: var(--nino-admin-row-height);
-	padding: .58rem .78rem;
-}
-
-/*	The name of a row of a table: the line under it is one line, cut where it does not fit, and
-	what has to be read whole wraps (below) */
+/*	The name of a row of a table: the line under it is one line, cut where it does not fit, and what has to be
+	read whole wraps (below). The measure is a layout one: a longer line is read by going back to the wrong start, and
+	a name that is squeezed to three letters on a phone says nothing - the table scrolls in its frame instead. */
 #features-list .nino-admin-table .nino-admin-list-copy {
+	min-width: 12rem;
 	max-width: 30rem;
 }
 
-/*	An offer no version of which fits this kernel: readable, and visibly not
-	something to act on. */
+/*	An offer no version of which fits this kernel: readable, and visibly not something to act on. */
 #features-list .nino-admin-list-copy[aria-disabled="true"] {
 	opacity: .6;
 }
 
-/*	What a button of a row says it is doing: a short line under the notes, and nothing where there is none */
-#features-list .nino-admin-table td .nino-admin-hint {
-	margin: 0;
-	white-space: normal;
-}
-
-#features-list .nino-admin-table td .nino-admin-hint:empty {
-	display: none;
-}
-
-/*	How far along a feature is - "Beta", "Example" - after its name, in the
-	list and on the screen behind the chevron. A small outlined tag in the
-	muted text colour: the word is always written out, so the meaning is
-	never carried by a colour alone, and the border is only what sets it
-	apart from the name. */
-#features-list .admin-features-badge,
-#features-detail .admin-features-badge {
-	display: inline-block;
-	margin-left: .5rem;
-	padding: 0 .45rem;
-	border: 1px solid var(--editor-separator);
-	border-radius: 999px;
-	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
-	font-weight: 600;
-	line-height: 1.5;
-	vertical-align: .1em;
-	white-space: nowrap;
-}
-
-/*	A requirement, a reason an activation is refused, what an offer asks of
-	this kernel. The shared list copy ellipsizes one line, which is right for
-	a description and wrong for a reason - these wrap and are read whole. */
+/*	A requirement, a reason an activation is refused, what an offer asks of this kernel. The shared list copy
+	ellipsizes one line, which is right for a description and wrong for a reason - these wrap and are read whole. */
 #features-list .admin-features-note {
 	white-space: normal;
 	overflow: visible;
 }
 
-/*	An application is a row that says more than a feature does - what it is
-	for, the features it switches on, which are still off, what it leaves alone
-	- and each of those lines is read, so they stand a little apart. */
-#features-list li[data-application] .admin-features-note {
-	margin-top: .2rem;
-}
-
-/*	What a set-up reports is a sentence or two - which feature stopped it, why,
-	and what is on - and is read from the left like any paragraph. */
-#features-list li[data-application] .admin-features-actions > p {
-	flex: 1 1 18rem;
-	text-align: left;
-}
-
-/*	Where an application leads once it is set up is a link and looks like the
-	button that set it up: the same control, an anchor for what it does. */
-#features-list .admin-features-actions > a.nino-admin-btn-primary {
-	display: inline-flex;
-	align-items: center;
-	box-sizing: border-box;
-	min-height: var(--nino-admin-control-height);
-	padding: .48rem .82rem;
-	border-radius: var(--editor-radius-sm);
-	font-size: .84rem;
-	font-weight: 650;
-	line-height: 1.4rem;
-	text-decoration: none;
-	white-space: nowrap;
-}
-
-/*	Activate on an inactive feature; Install or the archive link on an offer.
-	The script builds them as siblings with no whitespace between them, so
-	without a gap of their own they touch. */
-#features-list .admin-features-actions {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: flex-end;
-	gap: .5rem;
-}
-
-/*	The line they report into - "Activating …", or a kernel refusal that is a
-	whole sentence. It takes what is left of the row, and takes a row of its
-	own before it squeezes the button. */
-#features-list .admin-features-actions > p {
-	flex: 1 1 12rem;
+/*	What a button of a row says it is doing, or why it was refused: a short line under the notes, and nothing
+	where there is none. */
+#features-list .nino-admin-table td .nino-admin-status {
 	margin: 0;
-	text-align: right;
+	white-space: normal;
 }
 
-/*	Nothing to report, nothing to make room for: an empty line would push
-	every row of a long list that bit taller for no reason. */
-#features-list .admin-features-actions > p:empty {
+#features-list .nino-admin-table td .nino-admin-status:empty {
 	display: none;
 }
 
-/*	The screen behind a feature's chevron: its name and the line under it
-	read as a heading, not as another row. */
-#features-detail h2 {
-	margin: 0 0 .15rem;
+/*	What the last switch left behind - the places that still hold the shortcodes of a feature that is off - is a
+	few lines kept as they were written. */
+#features-notices .nino-admin-notice {
+	white-space: pre-line;
 }
 
-#features-detail h2 + .nino-admin-hint {
-	margin-top: 0;
-}
-
-/*	The two tabs of a feature's screen: what it is, what can be set on it.
-	The shared strip, under the heading rather than at the top of a pane -
-	so it needs the gap the heading does not give it. */
-#features-detail .features-detail-tabs {
-	margin-top: 1.25rem;
-}
-
-/*	A pane holds what the tab promises and nothing around it - the strip above
-	it already says where the reader is, so there is no frame of its own to
-	draw. The settings pane is the exception only in that it *is* a fieldset:
-	the workbench's own form surface, the same one every other panel's settings
-	stand on. A screen with a single pane - a feature that describes itself
-	nowhere, or declares no setting - gets the same spacing with no strip over
-	it. */
-#features-detail .features-detail-pane {
-	margin-top: 1.25rem;
-}
-
-#features-detail .features-detail-tabs ~ .features-detail-pane {
-	margin-top: 0;
-}
-
-/*	The shared fieldset keeps the top of its box clear for a legend that is
-	positioned into it. Under a tab there is none - the tab is the group's name
-	and the pane says so with aria-labelledby - so that room is a gap above the
-	first field with nothing in it. */
-#features-detail fieldset.features-detail-pane:not(:has(legend)) {
-	padding-top: 1rem;
-}
-
-/*	What the feature is, in the sentence its own manifest describes itself
-	with. It used to be the tail of the line under the heading, where it was
-	scanned rather than read; here it leads the pane that promises it. */
-#features-detail .features-about-lead {
-	margin: 0 0 1.1rem;
-	color: var(--editor-text-secondary);
-}
-
-/*	Both of them held to a measure. The pane is as wide as the panel, and a
-	sentence or a two-column reference run across 1100px is read by going back
-	to the start of the wrong line. */
+/*	What the feature is, in the sentence its own manifest describes itself with, leads the pane that promises it;
+	both are held to a measure: a sentence or a two-column reference run across 1100px is read by going back to
+	the start of the wrong line. */
 #features-detail .features-about {
 	max-width: 56rem;
 }
 
-
-/*	The line above the list that says what the last switch, install or set-up
-	did. It may hold several lines - where a feature's shortcodes still stand -
-	which are kept as they were written, and it is not drawn while it is empty. */
-#features-list .admin-features-note-line {
-	margin: 0 0 .85rem;
-	color: var(--editor-text);
-	font-size: .84rem;
-	white-space: pre-line;
+#features-detail .features-about-lead {
+	margin: 0 0 var(--nino-admin-space-6);
+	color: var(--editor-text-secondary);
 }
 
-#features-list .admin-features-note-line:empty {
-	display: none;
+/*	A pane holds what its tab promises and nothing around it; a view with one pane has no strip over it, and
+	gets the same gap under the line of facts. */
+#features-detail .features-detail-pane {
+	margin-top: var(--nino-admin-space-6);
 }
 
-/*	Apply content again: the button, what it does and what it did, on a screen
-	of its own width. The sentences wrap and are read whole. */
-#features-detail .admin-features-reapply {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: .5rem 1rem;
-	max-width: 56rem;
-	margin: 0 0 1rem;
-}
-
-/*	Held while it works with aria-disabled, which keeps the focus where the keyboard is */
-#features-detail .admin-features-reapply button[aria-disabled="true"] {
-	opacity: .6;
-	cursor: progress;
-}
-
-#features-detail .admin-features-reapply > p {
-	flex: 1 1 18rem;
-	margin: 0;
-}
-
-#features-detail .admin-features-reapply > .admin-features-reapply-note {
-	flex-basis: 100%;
-	color: var(--editor-text);
-	font-size: .84rem;
-}
-
-#features-detail .admin-features-reapply > .admin-features-reapply-note.nino-admin-error {
-	color: var(--editor-red-ink);
-}
-
-#features-detail .admin-features-reapply > .admin-features-reapply-note:empty {
-	display: none;
+#features-detail .nino-admin-tabs ~ .features-detail-pane {
+	margin-top: 0;
 }
 
 }

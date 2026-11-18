@@ -433,6 +433,7 @@ $converted = [
 	'_admin/Nino/Modules/Elements/assets/admin.js',
 	'_admin/Nino/Modules/Elements/assets/types.js',
 	'_admin/Nino/Modules/Text/assets/keys.js',
+	'_admin/Nino/Modules/Features/assets/admin.js',
 ];
 
 $byHand = [];
@@ -455,7 +456,7 @@ check( '...and use actionBar(), contextBar() and say()'. ( $lacking === [] ? '' 
 // --- the panels that have gone over to the blocks of a list ------------------------------------------------
 
 /*	The panels whose lists are drawn by the blocks: the groups of Text and Keys by list(), their filter by filterBar() and
-	chip(), the three tabs of Features by table(). Each script names the block it draws with, and no script or stylesheet of
+	chip(), the four tabs of Features by table(). Each script names the block it draws with, and no script or stylesheet of
 	them names a class of a list row, a chip, a search bar or a group of a panel's own. The list grows: the patch that brings
 	another panel over adds its script here	*/
 $listed = [
@@ -513,6 +514,7 @@ $schemaForms = [
 	'_admin/Nino/Modules/Users/assets/lockout.js',
 	'_admin/Nino/Modules/Language/assets/admin.js',
 	'_admin/Nino/Modules/Features/assets/admin.js',
+	'_admin/Nino/Modules/Features/assets/settings.js',
 	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/admin.js',
@@ -532,8 +534,7 @@ foreach( $schemaForms as $script ) {
 	if( preg_match( '/\bhint\s*:|\bconst\s+hint\s*=\s*dc\.createElement\(\s*\'small\'/', $source ) === 1 )
 		$underneath[] = $script;
 
-	// The Features panel's own intro is the one of its list of applications, no section of a settings form
-	if( str_contains( $script, '/Features/' ) === false && preg_match( '/\bintro\.className\s*=\s*\'nino-admin-hint\'/', $source ) === 1 )
+	if( preg_match( '/\bintro\.className\s*=\s*\'nino-admin-hint\'/', $source ) === 1 )
 		$underneath[] = $script;
 }
 
@@ -556,6 +557,7 @@ $guideForms = [
 	'_admin/Nino/Modules/Elements/assets/admin.js',
 	'_admin/Nino/Modules/Elements/assets/types.js',
 	'_admin/Nino/Modules/Text/assets/keys.js',
+	'_admin/Nino/Modules/Features/assets/admin.js',
 ];
 
 /*	The comments of a script that stand at the beginning of a line: a script that writes the string '/*' (the permission of full access) is no comment	*/
@@ -697,7 +699,7 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
 $sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {
@@ -887,6 +889,27 @@ $partsSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read(
 check( 'the fields of both are the blocks of the workbench - a line, several lines, the switch, the select and the textfills of the field - and the text of a field that is not an editor is no field of the panel\'s own',
 	str_contains( $partsSource, 'adminUi.textField' ) === true && str_contains( $partsSource, 'adminUi.textareaField' ) === true && str_contains( $partsSource, 'adminUi.fillsButton(' ) === true && str_contains( $partsSource, 'adminUi.fieldError(' ) === true
 	&& str_contains( $keysSource, 'adminUi.switchField(' ) === true && str_contains( $keysSource, 'adminUi.selectField(' ) === true && str_contains( $keysSource, 'adminUi.rowActions(' ) === true && preg_match( '/createElement\(\s*\'(label|input|textarea|button)\'\s*\)/', $partsSource.$keysSource.$textSource ) === 0 );
+
+// --- the Features panel: one table for every tab, the count of a tab a chip, an address for a feature, a toast and a question for a switch -----------
+
+/*	Held by structure - the call of the block, never a word: the tabs are the block's and each carries its count as the chip of the workbench, not
+	as a number in its label; a feature's view has an address the router is told, links to, moves by and is asked before it is left; a switch asks
+	with the block and says what went well with the toast, never as a line of its own; the form of the Settings tab of a feature's own panel is
+	novalidate, has the bar of the blocks and is saved by the panel's own request	*/
+$featuresSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Features/assets/admin.js' ) ) );
+$featuresTab = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Features/assets/settings.js' ) ) );
+
+check( 'the four tabs of the Features panel, and the two of a feature\'s view, are the tabs block, each of the four with its count as the chip of the workbench and never as a number in its label', substr_count( $featuresSource, 'adminUi.tabs(' ) === 2
+	&& str_contains( $featuresSource, 'nino-admin-tab-badge' ) === true && preg_match( '/\'\s*\(\'\s*\+\s*counts/', $featuresSource ) === 0 );
+check( 'every tab is the one table of the workbench, its rows have their actions through the block of the row, and the way on to an application is a link', substr_count( $featuresSource, 'adminUi.table(' ) === 1
+	&& str_contains( $featuresSource, 'table( {' ) === true && preg_match( '/createElement\(\s*\'(table|tr|td|ul|li)\'\s*\)/', $featuresSource ) === 0 );
+check( 'the view of a feature has an address: the router is told it, links to it, moves by it and is asked before it is left', str_contains( $featuresSource, 'router.set(' ) === true && str_contains( $featuresSource, 'router.href(' ) === true
+	&& str_contains( $featuresSource, 'router.go(' ) === true && str_contains( $featuresSource, 'router.leave(' ) === true && str_contains( $featuresSource, 'router.current(' ) === true );
+check( 'a switch asks with the block, says what went well with the toast, and writes no success line of its own, nor a question of the browser\'s', str_contains( $featuresSource, 'adminUi.confirm(' ) === true && str_contains( $featuresSource, 'adminUi.say(' ) === true
+	&& preg_match( '/_said\b|\'features-note\'|\b(window|wn)\.(confirm|alert|prompt)\(/', $featuresSource ) === 0 );
+check( 'the Settings tab of a feature\'s own panel is a form that is novalidate, has the bar of the blocks, is checked and saved by the panel\'s own code, and builds no field of its own', substr_count( $featuresTab, '.noValidate = true' ) === 1
+	&& str_contains( $featuresTab, 'adminUi.actionBar(' ) === true && str_contains( $featuresTab, 'features._save(' ) === true && str_contains( $featuresTab, 'features._renderSettings(' ) === true
+	&& preg_match( "/createElement\\(\\s*'(label|input|select|textarea|button)'\\s*\\)/", $featuresTab ) === 0 );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

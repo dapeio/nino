@@ -71,6 +71,7 @@ const Nino = {
 const sandbox = {
 	console : console,
 	document : {
+		get activeElement() { return mounts.map( function( m ) { return findAll( m, function( el ) { return el.focused === true } )[0] } ).filter( Boolean )[0] ?? null },
 		createElement : element, createElementNS : function( space, tag ) { return element( tag ) },
 		createTextNode : textNode,
 		getElementById : function( id ) { return mounts.filter( function( m ) { return m.id === id } )[0] ?? null },
@@ -142,7 +143,7 @@ check( 'the group names itself with one legend - a lone tab pane has no strip to
 const save = byTag( form, 'button' ).filter( function( el ) { return el.type === 'submit' } )[0];
 const bar = save.parentNode;
 const line = byTag( bar, 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
-check( 'an action bar holds a Save button and a status line that is announced', hasClass( bar, 'nino-admin-actionbar' ) && save.textContent === text('/_admin/common/label/save') && line !== undefined && line.textContent === '' );
+check( 'the form is novalidate and its bar is the one of the blocks: a Save button as its one main button and a status line that is announced', form.noValidate === true && hasClass( bar, 'nino-admin-actionbar' ) && hasClass( save, 'nino-admin-btn-primary' ) && save.textContent === text('/_admin/common/label/save') && line !== undefined && line.textContent === '' );
 check( 'the secret\'s input is empty whatever is stored', controls.filter( function( el ) { return el.dataset.key === 'apiKey' } )[0].value === '' );
 check( 'the form is what the shell asks about unsaved input, and was taken as saved when drawn', dirty.watched['sample-settings'].getter() === form && dirty.snapshots.join() === 'sample-settings' );
 
@@ -154,28 +155,44 @@ check( 'showing the tab again asks for nothing and keeps the form and what was t
 
 // --- Save
 
+const typedTitle = controls.filter( function( el ) { return el.dataset.key === 'title' } )[0];
+typedTitle.value = '';
+fire( form, 'submit' );
+check( 'a required setting that is empty is said under its field and in the line, and nothing is posted', requests.length === 1 && typedTitle.attributes['aria-invalid'] === 'true' && line.dataset.state === 'error' );
+typedTitle.value = 'Typed';
+
 fire( form, 'submit' );
 const posted = requests[requests.length - 1];
 check( 'Save posts features/settings with the key of this mount and every field collected by data-key', posted.action === 'features/settings' && posted.payload.key === 'sample'
 	&& Object.keys( posted.payload.fields ).sort().join(',') === 'apiKey,enabled,hosts,limit,mode,title' );
 check( 'a switch posts its state, a number its text, a list its raw lines, the secret the empty string that keeps it, a typed value as typed', posted.payload.fields.enabled === true && posted.payload.fields.limit === '7'
 	&& posted.payload.fields.hosts === 'one\ntwo' && posted.payload.fields.apiKey === '' && posted.payload.fields.title === 'Typed' && posted.payload.fields.mode === 'safe' );
-check( 'while it saves the button is held and the line says so', save.disabled === true && line.textContent === text('/_admin/common/msg/saving') );
+check( 'while it saves the line of the bar says so', line.dataset.state === 'saving' && line.textContent === text('/_admin/common/msg/saving') );
 
 answer( 400, { error : 'limit: must be at most 50' } );
-check( 'a refusal is told as an error with its status, and the button is free', save.disabled === false && hasClass( line, 'nino-admin-error' ) && line.textContent === '(400) limit: must be at most 50' );
+check( 'a refusal is told in the line of the bar, as an alert, with its status', line.dataset.state === 'error' && line.attributes.role === 'alert' && line.textContent === '(400) limit: must be at most 50' );
 check( '...on the same form, which keeps what was typed', byTag( sampleTab.mount, 'form' )[0] === form );
 
 fire( form, 'submit' );
 answer( 500, null );
-check( 'a failure without an answer falls back to the fill for saving', hasClass( line, 'nino-admin-error' ) && line.textContent === '(500) '+ text('/_admin/common/error/save') );
+check( 'a failure without an answer falls back to the fill for saving', line.dataset.state === 'error' && line.textContent === '(500) '+ text('/_admin/common/error/save') );
 
+fire( form, 'submit' );
+const onTheWay = requests.length;
+fire( form, 'submit' );
+check( 'while the form is on its way the main button is held and a second submit sends nothing', requests.length === onTheWay && save.disabled === true );
+typedTitle.value = 'typed meanwhile';
+answer( 200, { feature : Object.assign( {}, ENTRY ) } );
+check( 'what is typed while it saves stays in its field: the same form, the line says there is something to save and no toast says it is saved', byTag( sampleTab.mount, 'form' )[0] === form && typedTitle.value === 'typed meanwhile' && line.dataset.state === 'dirty' && toasts.length === 0 && save.disabled === false );
+typedTitle.value = 'Typed';
+typedTitle.focus();
 fire( form, 'submit' );
 const savedEntry = Object.assign( {}, ENTRY, { settings : ENTRY.settings.map( function( f ) { return f.name === 'title' ? Object.assign( {}, f, { value : 'Typed' } ) : f } ) } );
 answer( 200, { feature : savedEntry } );
 const rebuilt = byTag( sampleTab.mount, 'form' )[0];
 check( 'a saved form is drawn again from the entry the answer carries, without asking features/list again', rebuilt !== form && requests[requests.length - 1].action === 'features/settings'
 	&& rebuilt.querySelectorAll('[data-key]').filter( function( el ) { return el.dataset.key === 'title' } )[0].value === 'Typed' );
+check( '...and the focus is on the control it was on, in the form that was drawn', rebuilt.contains( findAll( rebuilt, function( el ) { return el.focused === true } )[0] ) && findAll( rebuilt, function( el ) { return el.focused === true } )[0].dataset.key === 'title' );
 check( '...says it was saved with a toast, and takes the new form as saved', toasts.length === 1 && toasts[0] === text('/_admin/common/msg/saved')
 	&& dirty.snapshots.length === 2 && dirty.watched['sample-settings'].getter() === rebuilt );
 
@@ -210,6 +227,6 @@ check( 'and draws the form once the list has the feature', byTag( otherTab.mount
 // --- the words
 
 check( 'the tab\'s own name is a fill of the module in both languages', moduleEn['/_admin/features/tab/settings'] === 'Settings' && moduleDe['/_admin/features/tab/settings'] === 'Einstellungen' );
-check( 'it posts nothing but the two actions the Features panel already has', ( script.match( /call\( '[a-z]+'/g ) || [] ).sort().join() === "call( 'list',call( 'settings'" );
+check( 'it asks for the list itself and saves through the Features panel\'s own request - the two actions the panel already has', ( script.match( /call\( '[a-z]+'/g ) || [] ).join() === "call( 'list'" && script.includes( 'Nino.admin.features._save(' ) );
 
 done();
