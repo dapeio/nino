@@ -899,9 +899,7 @@ namespace Nino {
 
 			$mails = [ [
 				'to'			=> $owner,
-				'subject'	=> $form['subject'] !== ''
-					? \Nino\Html::putFills( $appData, $form['subject'], [] )
-					: \Nino\Html::putFills( $appData, '[[/module/form/subject/owner]]', [] ),
+				'subject'	=> self::_subject( $appData, $form['subject'] !== '' ? $form['subject'] : '[[/module/form/subject/owner]]' ),
 				'body'		=> self::render( $appData, $form, $values, $form['ownerTemplate'] ),
 				'replyTo'	=> $reply !== '' ? $reply : $owner,
 			] ];
@@ -911,12 +909,27 @@ namespace Nino {
 			if( $form['confirm'] === true && $reply !== '' )
 				$mails[] = [
 					'to'			=> $reply,
-					'subject'	=> \Nino\Html::putFills( $appData, '[[/module/form/subject/user]]', [] ),
+					'subject'	=> self::_subject( $appData, '[[/module/form/subject/user]]' ),
 					'body'		=> self::render( $appData, $form, $values, $form['userTemplate'] ),
 					'replyTo'	=> $owner,
 				];
 
 			return \Nino\Mail::sendAll( $appData, $mails );
+		}
+
+		/**
+		 *	The subject of a mail: the fills of the line resolved, and the result read as the characters it means. A word
+		 *	of the Text panel is html - an apostrophe is &#039; there, a bracket &#91; - and a subject is plain text, so
+		 *	the entities would reach the reader as they are written. An entity can spell a line break, so every control
+		 *	character of the result is a space: no transport is handed a subject of two lines
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$line					The subject as the form or the module has it, fills included
+		 *
+		 *	@return 	string
+		 */
+		private static function _subject( array &$appData, string $line ): string {
+			return trim( preg_replace( '/[\x00-\x1F\x7F]+/', ' ', html_entity_decode( \Nino\Html::putFills( $appData, $line, [] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) ?? '' );
 		}
 
 		/**

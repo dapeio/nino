@@ -595,6 +595,15 @@ check( 'a locale the visitor did choose survives a submission unchanged', $chose
 	&& \Nino\Runtime::getSessionValue( $appData, './nino/locales/current', '' ) === 'en_US' );
 check( '...and the owner mail is still the native one', ( $localeMails[0]['subject'] ?? '' ) === 'deutsch' );
 
+// A subject is plain text: a word of the Text panel is html, and its entities are read as the characters they mean -
+// a line break one of them spells is a space, and one PHP does not read (a carriage return, a nul) is left as the text it is
+\Nino\Html::addFills( $appData, [ '[[/test/locale/probe]]' => 'Jo&#039;s &quot;offer&quot; &amp; &#91;more&#93;&#13;&#10;Bcc: x@example.org&#0;' ], 'de_DE' );
+$localeMails = [];
+$plainRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'SAFETY: the subject of a mail is the characters its words mean, on one line: an entity is read, a line break it spells is a space, and no control character is left',
+	$plainRequest['/nino/http/response']['statusCode'] === 200 && ( $localeMails[0]['subject'] ?? '' ) === 'Jo\'s "offer" & [more]&#13; Bcc: x@example.org&#0;' && preg_match( '/[\x00-\x1F\x7F]/', $localeMails[0]['subject'] ) === 0 );
+\Nino\Html::addFills( $appData, [ '[[/test/locale/probe]]' => 'deutsch' ], 'de_DE' );
+
 // The two switches, side by side: one is a choice and is remembered, the
 // other is this request's business and is not
 \Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
