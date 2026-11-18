@@ -115,4 +115,17 @@ check( 'a slot with a uri that is none, a label that is none, a size no upload c
 check( 'dropSlot() takes the slot out of config.php and answers it; its file is not touched', \Nino\Images::dropSlot( $appData, $slot )['filename'] === 'hero.webp' && isset( $config()[$slot] ) === false && isset( $appData['/nino/html/images'][$slot] ) === false );
 check( '...and a slot that is not there is none to drop', \Nino\Images::dropSlot( $appData, $slot ) === false && \Nino\Images::dropSlot( $appData, '/x/../y' ) === false );
 
+// A reader takes the lock, includes the file and writes what it read back: the compiled copy OPcache holds of the file has to be
+// gone before the lock is, or the next writer reads the list as it was and the entry written here is lost. OPcache is off on the
+// command line, so the order is read in the method: the write, the invalidation, the release, in that order, and no invalidation after
+$body = ( static function(): string {
+	$method = new \ReflectionMethod( \Nino\Filesystem::class, 'putFileContent' );
+	return implode( '', array_slice( (array) file( (string) $method->getFileName() ), $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1 ) );
+} )();
+$written = strpos( $body, 'self::_writeFile(' );
+$invalidated = strpos( $body, 'opcache_invalidate(' );
+$released = strpos( $body, 'self::unlockFile(', (int) $written );
+check( 'SAFETY: a write drops the compiled copy of the file before it releases the lock, and at no other place',
+	$written !== false && $invalidated !== false && $released !== false && $written < $invalidated && $invalidated < $released && substr_count( $body, 'opcache_invalidate(' ) === 1 );
+
 ninoDone( $appData );

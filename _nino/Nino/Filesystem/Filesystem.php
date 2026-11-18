@@ -158,6 +158,16 @@ namespace Nino {
 
 			$success = self::_writeFile( $path, (string) $content );
 
+			/*	The compiled copy of a .php file goes while the lock is still held. A reader takes the lock, includes the
+				file and writes what it read back with its own change: released first, the lock let the next one in
+				while OPcache still answered the include with the list as it was before this write - a file older than
+				opcache.file_update_protection is kept there - and that writer put the old list back with its entry
+				added, so the entry written here was gone, both calls answering true. Measured without the kernel, 20
+				writers at once on a file ten seconds old, 25 rounds: one entry lost in every round in the other order,
+				none in this one	*/
+			if( $success === true && function_exists( 'opcache_invalidate' ) === true && is_file( $path ) === true )
+				opcache_invalidate( $path, true );
+
 			// Released either way, including for $nolock === true: the write is
 			// the end of the caller's read-modify-write sequence (lockFile() ->
 			// read -> putFileContent()), which is exactly where the previous
@@ -186,10 +196,6 @@ namespace Nino {
 				this is the one place.	*/
 			if( str_starts_with( '/'. ltrim( $filename, '/' ), '/text/' ) === true )
 				unset( $appData['./nino/html/filecache'], $appData['./nino/locales/text'] );
-
-			// Reset opcache
-			if( function_exists( 'opcache_invalidate' ) === true && is_file( $path ) === true )
-				opcache_invalidate( $path, true );
 
 			// Refresh the fingerprint getFileContent() compares against, so the
 			// write this call just made doesn't look like someone else's change
