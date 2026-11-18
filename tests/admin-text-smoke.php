@@ -1498,6 +1498,52 @@ else
 unset( $appData['./nino/elements/cache'] );
 $appData['/nino/http/routes'] = $legalRoutes;
 
+// --- the Keys tab names its rows as the Text panel does, and both offer the textfills a field may take ---------------------
+
+echo "Text and Keys - one name for a row, the textfills of a field, a row saved unchanged\n";
+
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/project/company/fillsdemo/name]]' => 'Acme AG', '[[/project/company/fillsdemo/secret]]' => 'Geheim', '[[/project/mail/fillsdemo/sender]]' => 'mail@acme.test' ] );
+\Nino\Text::setBlacklisted( $appData, '/project/company/fillsdemo/secret', true );
+
+[ $status, $textBody ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+[ , $keysBody ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+check( 'the Keys tab answers what the rows are named and arranged by - the pages, the names of the templates and of the features, the order the templates read the keys in - and it is what the Text panel answers',
+	$status === 200 && isset( $keysBody['pages'], $keysBody['templates'], $keysBody['features'], $keysBody['order'] ) === true
+	&& $keysBody['pages'] === $textBody['pages'] && $keysBody['templates'] === $textBody['templates'] && $keysBody['features'] === $textBody['features'] );
+check( '...which is one function of the panel, asked for the keys of the answer', array_keys( \Nino\Modules\Text\Admin::naming( $appData, [] ) ) === [ 'order', 'pages', 'templates', 'features' ] );
+
+[ $status, $fillsBody ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiFills' );
+$notations = array_column( $fillsBody['fills'] ?? [], 'notation', 'key' );
+check( 'text/fills lists the texts a field may take: the keys of the namespaces a text may name, each in the notation of a template with what it says', $status === 200 && ( $notations['/project/company/fillsdemo/name'] ?? '' ) === '[[/project/company/fillsdemo/name]]'
+	&& array_column( $fillsBody['fills'], 'value', 'key' )['/project/company/fillsdemo/name'] === 'Acme AG' );
+check( '...and no key that is hidden from the workbench, and none outside the namespaces', isset( $notations['/project/company/fillsdemo/secret'] ) === false && isset( $notations['/project/mail/fillsdemo/sender'] ) === false );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => $texts + [ '[[/project/company/fillsdemo/name]]' => 'Acme Inc' ] );
+[ $status, $inEnglish ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiFills', [ 'locale' => 'en_US' ] );
+check( 'the textfills say what each text says in the language of the form that asks - the one it was drawn in - and not in the one the session happens to be in', $status === 200 && array_column( $inEnglish['fills'] ?? [], 'value', 'key' )['/project/company/fillsdemo/name'] === 'Acme Inc' );
+[ , $inOther ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiFills', [ 'locale' => 'xx_XX' ] );
+[ , $inKeys ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiFills', [ 'locale' => 'en_US' ] );
+check( '...a language the site does not have is the language of the session, and the Keys tab takes the language too', $inOther['fills'] === $fillsBody['fills'] && $inKeys['fills'] === $inEnglish['fills'] );
+[ $status, $keysFills ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiFills' );
+check( 'keys/fills answers the same list under the tab\'s own permission', $status === 200 && $keysFills['fills'] === $fillsBody['fills'] );
+[ $status, $none ] = ninoCall( $appData, [ \Nino\Modules\Text\Admin::class, 'apiFills' ], [], null, 403 );
+check( 'a request whose status is already 403 (csrf) is answered with nothing', $status === 403 && isset( $none['fills'] ) === false );
+
+// A row saved without a change leaves what is stored as it is: the files of the texts and of the formats, byte for byte
+$formatted = \Nino\Text::entry( $appData, '/project/company/fillsdemo/name' );
+\Nino\Text::updateMeta( $appData, '/project/company/fillsdemo/name', [ 'format' => 'inline', 'maxlength' => 400 ] );
+$stored = static fn( string $file ): string => (string) @file_get_contents( \Nino\Filesystem::path( $appData, $file ) );
+$before = [ $stored( '/text/de_DE.php' ), $stored( '/text/global.php' ), $stored( '/text/meta.php' ), $stored( '/text/blacklist.php' ) ];
+$group = array_values( array_filter( \Nino\Text::entries( $appData, false ), static fn( array $entry ): bool => str_starts_with( $entry['key'], '/project/company/' ) ) );
+$items = array_map( static fn( array $entry ): array => [ 'key' => $entry['key'], 'locale' => $entry['global'] === true ? '*' : 'de_DE', 'value' => $entry['global'] === true ? $entry['values']['*'] : (string) $entry['values']['de_DE'] ], $group );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => $items ] );
+check( 'a row sent back as it is stored leaves the files of the texts, the formats and the hidden keys byte for byte as they were', $status === 200 && count( $items ) >= 2
+	&& $before === [ $stored( '/text/de_DE.php' ), $stored( '/text/global.php' ), $stored( '/text/meta.php' ), $stored( '/text/blacklist.php' ) ] && $formatted !== null );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => array_diff_key( $texts, array_flip( [ '[[/project/company/fillsdemo/name]]', '[[/project/company/fillsdemo/secret]]', '[[/project/mail/fillsdemo/sender]]' ] ) ) );
+\Nino\Text::setBlacklisted( $appData, '/project/company/fillsdemo/secret', false );
+\Nino\Text::setMeta( $appData, '/project/company/fillsdemo/name', null, null );
+
+echo "\n";
+
 echo "\n";
 
 ninoDone( $appData );

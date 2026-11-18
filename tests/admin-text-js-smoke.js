@@ -1,13 +1,22 @@
 /**
  *	Nino									A compact filesystembased php framework
- *	admin-text-js-smoke.js	DOM-free checks for the Text editor's
- *										multi-locale save planning, the shared key model
- *										(rows, sections, search, page details), the
- *										editor's list and form on a fake DOM, and the Text
- *										Keys tab's scan form - which answers three
- *										questions per key and must send all three, or a
- *										row the operator meant to retire quietly comes
- *										back - and its segment form.
+ *	admin-text-js-smoke.js	DOM-light checks for the Text panel and its Keys tab
+ *										(_admin/Nino/Modules/Text/assets): how keys are named and
+ *										fall into rows, sections and fields, how they are searched,
+ *										and what the two views do on a fake page.
+ *
+ *										The groups of both tabs are the list of the workbench, with
+ *										the same names and an address each; the language the
+ *										texts are shown in is the workbench's own, there is no
+ *										switch of it here, and a form shows one language and
+ *										writes that one and no other. The Text panel saves what
+ *										was changed with one Save and sends nothing where nothing
+ *										was; the Keys tab saves a key's shape and its text with
+ *										the one Save as well, asks once for the formats that
+ *										would change what is stored, and says at the field which
+ *										part a server turned down - what is not saved is not
+ *										counted as saved. A key is made and renamed in a view of
+ *										its own with an address, checked when it is sent.
  *
  *	Usage: node tests/admin-text-js-smoke.js
  */
@@ -18,485 +27,6 @@ const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
 const { check, done, fills, load } = require( './harness.js' );
-
-const sandbox = {
-	console : console,
-	document : { documentElement : null, body : null },
-};
-sandbox.window = sandbox;
-sandbox.Nino = {
-	editor : {},
-	events : { bindCallback : function() {} },
-	admin : { workLocale : { current : null, follow : function() {} } },
-};
-
-load( '_admin/Nino/Modules/Text/assets/admin.js', vm.createContext( sandbox ), 'text.js' );
-
-const text = sandbox.Nino.admin.text;
-
-text._dirtyLocales = [ 'de_DE', 'en_US' ];
-text._selectedLocale = 'en_US';
-check( 'Save includes every locale edited before the visible one', JSON.stringify( text._saveLocales() ) === JSON.stringify( [ 'de_DE', 'en_US' ] ) );
-
-text._dirtyLocales = [];
-check( 'the visible locale carries a global-only save', JSON.stringify( text._saveLocales() ) === JSON.stringify( [ 'en_US' ] ) );
-
-text._dirtyLocales = [ 'en_US' ];
-check( 'the visible locale is not queued twice', JSON.stringify( text._saveLocales() ) === JSON.stringify( [ 'en_US' ] ) );
-
-
-// --- the scan form's three answers ----------------------------------------
-//
-// A row is created (it has a value), left for later (it is empty) or retired
-// (it is ticked). Which one is the server's call, so the request has to carry
-// every row - the version before this filtered the ignored ones out client-
-// side, which is exactly why an ignored key came back on the next scan.
-
-const keysSandbox = {
-	console : console,
-	document : { documentElement : null, body : null, getElementById : function() { return { textContent : '' } } },
-};
-keysSandbox.window = keysSandbox;
-// What the tab told the shell it had written - Nino.admin.touch( topic ), see script.js
-keysSandbox.touched = [];
-keysSandbox.Nino = {
-	admin : { touch : function( topic ) { keysSandbox.touched.push( topic ) }, workLocale : { current : null, follow : function() {} } },
-	content : { getText : function( key ) { return key } },
-	events : { bindCallback : function() {} },
-};
-
-load( '_admin/Nino/Modules/Text/assets/keys.js', vm.createContext( keysSandbox ) );
-
-const keys = keysSandbox.Nino.admin.keys;
-
-let sent = null;
-keys._apiCall = function( endpoint, payload ) { sent = { endpoint : endpoint, payload : payload } };
-
-keysSandbox.Nino.admin.workLocale.current = 'en_US';
-keys._saveScanResults( [
-	{ key : '/a/one', 	valueInput : { value : 'Value' }, ignoreCheck : { checked : false } },
-	{ key : '/a/two', 	valueInput : { value : '' }, 			ignoreCheck : { checked : false } },
-	{ key : '/a/three', valueInput : { value : '' }, 			ignoreCheck : { checked : true 	} },
-] );
-
-check( 'the whole form goes to the server in one request, with the language the tab shows - the values are written in it', sent !== null && sent.endpoint === 'scanapply' && sent.payload.rows.length === 3 && sent.payload.locale === 'en_US' );
-keysSandbox.Nino.admin.workLocale.current = null;
-check( '...including the rows left empty, which the server passes over', sent.payload.rows[1].key === '/a/two' && sent.payload.rows[1].value === '' && sent.payload.rows[1].ignore === false );
-check( '...and the ignored ones, which is how they get retired at all', sent.payload.rows[2].key === '/a/three' && sent.payload.rows[2].ignore === true );
-check( 'a filled row carries its value', sent.payload.rows[0].value === 'Value' );
-
-// A row the scan lists without an input - a key off the grammar, which is
-// renamed in the template and can only be ignored - sends no value, and
-// still carries its ignore. A key of the system has no row to send at all
-keys._saveScanResults( [
-	{ key : '/foo/bar', valueInput : null, ignoreCheck : { checked : true } },
-	{ key : '/foo/baz', valueInput : null, ignoreCheck : { checked : false } },
-] );
-check( 'a row without an input sends an empty value and its ignore', sent.payload.rows.length === 2 && sent.payload.rows[0].value === '' && sent.payload.rows[0].ignore === true && sent.payload.rows[1].ignore === false );
-keys._view = 'scan';
-keys._scanRows = [ { key : '/foo/bar', valueInput : null, ignoreCheck : { checked : false } } ];
-keysSandbox.document.getElementById = function() { return { classList : { contains : function() { return false } } } };
-check( 'a form whose rows have no input is not dirty until one is ticked', keys.isDirty() === false );
-keys._scanRows[0].ignoreCheck.checked = true;
-check( '...and is then', keys.isDirty() === true );
-keys.discard();
-check( '...and discarding unticks it without an input to empty', keys._scanRows[0].ignoreCheck.checked === false );
-keys._view = 'group';
-keysSandbox.document.getElementById = function() { return { textContent : '' } };
-
-// What the scan says about a key it cannot create, or about where one comes from: a fill, in the words of the workbench
-keysSandbox.Nino.adminUi = { format : function( text, a ) { return text.replace( '%s', a ) } };
-check( 'a key that is simply to be created has no note', keys._scanNote( { kind : 'create', hint : null } ) === '' );
-check( 'a key off the grammar says so', keys._scanNote( { kind : 'grammar' } ) === '/_admin/keys/scan/grammar' );
-check( 'a key of the system says who writes it - the Routes panel, the Language panel - or that nobody does', keys._scanNote( { kind : 'system', writer : 'routes' } ) === '/_admin/keys/scan/system-routes'
-	&& keys._scanNote( { kind : 'system', writer : 'language' } ) === '/_admin/keys/scan/system-language' && keys._scanNote( { kind : 'system', writer : null } ) === '/_admin/keys/scan/system-none' );
-check( 'a /feature or /module key says whose it normally is', keys._scanNote( { kind : 'create', hint : 'feature', owner : 'consent' } ) === '/_admin/keys/scan/hint-feature'
-	&& keys._scanNote( { kind : 'create', hint : 'module', owner : 'form' } ) === '/_admin/keys/scan/hint-module' );
-// The fills it asks for are put together at runtime ('system-<writer>', 'hint-<kind>'), which the static check of
-// tests/admin-shell-smoke.php cannot see: both languages carry every one
-[ 'en_US', 'de_DE' ].forEach( function( locale ) {
-	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/text/'+ locale+ '.php' ), 'utf8' );
-	const has = key => words.includes( "[[/_admin/keys/scan/"+ key+ "]]'" );
-	check( locale+ ': every note of the scan, and the list of keys other templates read as well, has its words',
-		[ 'grammar', 'system-routes', 'system-language', 'system-none', 'hint-feature', 'hint-module', 'also-title', 'also-hint', 'also-line' ].every( has ) && words.includes( "[[/_admin/error/keys_system]]'" ) );
-} );
-
-const keysSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/keys.js' ), 'utf8' );
-// Three outcomes are not obvious from three controls, so the form says them
-check( 'the form explains what an empty row and an ignored row each mean',
-	keysSource.includes( "Nino.content.getText('/_admin/keys/scan/hint')" ) );
-check( '...and the checkbox says the ignore is permanent',
-	keysSource.includes( "Nino.content.getText('/_admin/keys/label/scan-ignore')" ) );
-// The old flow ended in an alert() built from a hardcoded English sentence -
-// the one string in this module that no locale file could reach
-check( 'the outcome is reported as a fill rather than an untranslatable alert',
-	keysSource.includes( "Nino.content.getText('/_admin/keys/scan/result')" ) && keysSource.includes( "' created. Failed: '" ) === false );
-
-
-// --- a key this account may not write -------------------------------------
-//
-// apiKeys() flags each key; the panel shows what it may not change as
-// read-only. The flag is absent for anyone unrestricted, so "not false" is
-// the test - "=== true" would lock every key of every install that has no
-// scoped permissions at all.
-
-check( 'a key with no flag is writable', text._writable( { key : '/a/one' } ) === true );
-check( 'a key flagged writable is writable', text._writable( { key : '/a/one', writable : true } ) === true );
-check( 'a key flagged unwritable is not', text._writable( { key : '/a/one', writable : false } ) === false );
-
-const textSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/admin.js' ), 'utf8' );
-check( 'a read-only key is shown rather than hidden',
-	textSource.includes( "view.className = 'admin-text-readonly'" ) );
-// Snapshotting a field that isn't there reads '' back and would overwrite the
-// real value on the next locale switch
-check( 'read-only keys are left out of the locale snapshot and the save',
-	textSource.split( '&& Nino.admin.text._writable( e ) === true' ).length === 4 );
-// ...and nowhere else: filtering them out of the render too would hide the
-// text a writable field is being edited next to, which is the point of
-// editing a whole row at once
-const renderForm = textSource.slice( textSource.indexOf( '_renderGroupForm : function()' ), textSource.indexOf( '_save : function' ) );
-check( '...but still rendered, so the row reads as one list',
-	renderForm.includes( 'section.fields.forEach( function( field ) {' ) && renderForm.includes( 'Nino.admin.text._renderKeyField( entry, value, field.label )' )
-	&& renderForm.includes( '_writable( e ) === true } );' ) === true && renderForm.split( '_writable(' ).length === 2 );
-check( 'a group with nothing writable in it is not offered a Save button',
-	textSource.includes( 'if( writable === true ) {' ) );
-
-
-// --- unsaved input: what the shell asks about -------------------------------
-//
-// Both forms hold input in controls the stored values do not mirror: the
-// translation on screen, the other translations edited and left, the global
-// fields. A control is compared with what it held when it was drawn - a
-// rich-text field reads back as markup that is not always the stored string,
-// so comparing with the stored value would make a mere visit look like an edit.
-
-const shown = { hidden : false, forms : true };
-const formNode = { classList : { contains : function() { return shown.hidden } } };
-sandbox.document.getElementById = function( id ) { return ( id === 'text-form' ) ? formNode : ( id === 'text-edit-form' && shown.forms === true ? {} : null ) };
-sandbox.Nino.admin.workLocale = { current : null, follow : function() {} };
-
-text._groups = { g : [
-	{ key : '/g/title', global : true, writable : true },
-	{ key : '/g/body', global : false, writable : true },
-	{ key : '/g/fixed', global : false, writable : false },
-] };
-text._currentGroup = 'g';
-text._fieldEls = { '/g/title' : { value : 'Title' }, '/g/body' : { value : 'Body' }, '/g/fixed' : { value : 'Fixed' } };
-text._htmlEditors = {};
-text._dirtyLocales = [];
-text._captureBaseline( true );
-
-check( 'a group nobody touched holds nothing unsaved', text.isDirty() === false );
-text._fieldEls['/g/title'].value = 'Title!';
-check( 'an edited global field is unsaved input', text.isDirty() === true );
-text._fieldEls['/g/title'].value = 'Title';
-check( '...and typing it back takes that away', text.isDirty() === false );
-text._fieldEls['/g/body'].value = 'Body!';
-check( 'so is an edited field of the translation on screen', text.isDirty() === true );
-text._fieldEls['/g/body'].value = 'Body';
-text._fieldEls['/g/fixed'].value = 'Changed';
-check( 'a key this account may not write is nothing it could save', text.isDirty() === false );
-text._dirtyLocales = [ 'de_DE' ];
-check( 'a translation that was edited and left is unsaved input', text.isDirty() === true );
-shown.hidden = true;
-check( 'a form that is not on screen holds nothing the person could lose track of', text.isDirty() === false );
-shown.hidden = false;
-shown.forms = false;
-check( 'a list has nothing typed into it', text.isDirty() === false );
-shown.forms = true;
-text._fieldEls['/g/title'].value = 'Title!';
-text.discard();
-check( 'discarding forgets the edited translations and takes the form as it stands for the saved one', text._dirtyLocales.length === 0 && text.isDirty() === false );
-
-// ...but not while a save runs: it finishes with what it was given
-text._dirtyLocales = [ 'de_DE' ];
-text._localeValues = { de_DE : { '/g/body' : 'Typed' } };
-text._saving = true;
-text.discard();
-check( 'discarding while a save runs leaves the edited translations and their values alone', JSON.stringify( text._dirtyLocales ) === '["de_DE"]' && text._localeValues.de_DE['/g/body'] === 'Typed' );
-text._saving = false;
-text.discard();
-check( '...and once it has ended discards again', text._dirtyLocales.length === 0 && JSON.stringify( text._localeValues ) === '{}' );
-
-text._selectedLocale = 'en_US';
-text._localeValues = { en_US : { '/g/body' : 'stored' } };
-text._baseline.locale = { '/g/body' : 'Body' };
-text._storeVisibleLocaleFields();
-check( 'merely visiting a translation does not mark it, even where the stored string differs from what the control reads back', text._dirtyLocales.length === 0 );
-text._fieldEls['/g/body'].value = 'Edited';
-text._storeVisibleLocaleFields();
-check( '...an edit does', JSON.stringify( text._dirtyLocales ) === '["en_US"]' );
-
-check( 'the Text panel registers with the shell behind a check that the shell has the registry',
-	/if\( typeof Nino\.admin\.dirty === 'object' \)\s*Nino\.admin\.dirty\.register\( 'text', \{\s*isDirty : Nino\.admin\.text\.isDirty,\s*save\s*: function\( done \) \{ Nino\.admin\.text\._save\( done \) \},\s*discard : Nino\.admin\.text\.discard,/.test( textSource ) === true );
-
-// --- the Keys tab: a save writes every language edited --------------------
-//
-// One batch per translation, one after the other, the global keys with the
-// first only; a failure stops the loop and leaves the rest edited; the
-// confirmation comes once, after the last.
-
-const msg = { textContent : '' };
-const pendingControls = [ { disabled : false }, { disabled : false } ];
-const pendingLinks = [
-	{ attrs : {}, style : {}, closest : function() { return null }, setAttribute : function( n, v ) { this.attrs[n] = v } },
-	// a link inside an html editor: the editor's content, which its value reads back
-	{ attrs : {}, style : {}, closest : function() { return {} }, setAttribute : function( n, v ) { this.attrs[n] = v } },
-];
-const pendingEditable = [ { contentEditable : 'true', attrs : {}, setAttribute : function( n, v ) { this.attrs[n] = v } } ];
-const keysForm = {
-	classList : { contains : function() { return false } },
-	querySelectorAll : function( selector ) {
-		return selector === 'input, textarea, select, button' ? pendingControls : ( selector === 'a' ? pendingLinks : ( selector === '[contenteditable]' ? pendingEditable : [] ) );
-	},
-};
-const keysView = { forms : true };
-keysSandbox.document.getElementById = function( id ) {
-	if( id === 'keys-form-msg' ) return msg;
-	if( id === 'keys-form' ) return keysForm;
-	if( id === 'keys-edit-form' ) return keysView.forms === true ? {} : null;
-	return { textContent : '' };
-};
-keysSandbox.confirm = function() { return true };
-keysSandbox.Nino.content.getText = function( key ) { return key === '/_admin/keys/error/save-partial' ? 'partial: %s' : key };
-// The question of the design system, with the browser's confirm as its answer, and the weights it was asked with
-const askedLevels = [];
-const toasts = [];
-keysSandbox.Nino.adminUi = {
-	say : function( text ) { toasts.push( text ) },
-	api : { errorText : function( status ) { return 'error '+ status } },
-	format : function( text, ...params ) { let at = 0; return String( text ).replace( /%[sdn]/g, function( token ) { return at < params.length ? String( params[at++] ) : token } ) },
-	confirm : function( level, options ) { askedLevels.push( level ); options.onChoose( keysSandbox.window.confirm( options.message ) === true ); return true },
-};
-keys._renderCategoryList = function() { keysSandbox.listDrawn = ( keysSandbox.listDrawn ?? 0 ) + 1 };
-
-keys._groups = { g : [
-	{ key : '/g/title', global : true, values : { '*' : 'Title' } },
-	{ key : '/g/body', global : false, values : { de_DE : 'Text', en_US : 'Body' } },
-] };
-keys._currentGroup = 'g';
-keys._locales = [ 'de_DE', 'en_US' ];
-keys._selectedLocale = 'de_DE';
-keys._localeValues = {};
-keys._dirtyLocales = [];
-keys._fieldEls = { '/g/title' : { value : 'Title' }, '/g/body' : { value : 'Text' } };
-keys._htmlEditors = {};
-keys._view = 'group';
-keys._captureBaseline( true );
-
-check( 'a category nobody touched holds nothing unsaved', keys.isDirty() === false );
-keys._storeVisibleLocaleFields();
-check( '...and looking at a translation does not edit it', keys._dirtyLocales.length === 0 );
-keys._fieldEls['/g/body'].value = 'Text!';
-keys._storeVisibleLocaleFields();
-check( 'an edited translation is tracked', JSON.stringify( keys._dirtyLocales ) === '["de_DE"]' && keys.isDirty() === true );
-keys._selectedLocale = 'en_US';
-keys._baseline.locale = { '/g/body' : 'Body' };
-keys._fieldEls['/g/body'].value = 'Body!';
-keys._storeVisibleLocaleFields();
-check( '...in the order they were edited', JSON.stringify( keys._dirtyLocales ) === '["de_DE","en_US"]' && JSON.stringify( keys._saveLocales() ) === '["de_DE","en_US"]' );
-check( 'one edited translation is written once, not twice', ( function() { keys._storeVisibleLocaleFields(); return keys._dirtyLocales.length === 2 } )() );
-
-const requests = [];
-keys._apiCall = function( endpoint, payload, callback ) { requests.push( { endpoint : endpoint, payload : payload, callback : callback } ) };
-const answers = function( request, failedKey ) {
-	const results = {};
-	request.payload.items.forEach( function( item ) { results[item.key] = item.key === failedKey ? { ok : false } : { ok : true, value : item.value+ '.' } } );
-	request.callback( 200, { results : results } );
-};
-
-let ended = [];
-keys._save( function( ok ) { ended.push( ok ) } );
-check( 'a save sends the first edited translation with the global keys', requests.length === 1 && requests[0].endpoint === 'savebatch'
-	&& requests[0].payload.items.map( function( i ) { return i.key+ '@'+ i.locale+ '='+ i.value } ).join() === '/g/title@*=Title,/g/body@de_DE=Text!' );
-check( '...the form is held while it runs', keys._saving === true && pendingControls.every( function( c ) { return c.disabled === true } ) && pendingLinks[0].attrs['aria-disabled'] === 'true' && pendingEditable[0].contentEditable === 'false' );
-check( '...but the links of a rich text are left alone, so what the editor returns is what it held', Object.keys( pendingLinks[1].attrs ).length === 0 && Object.keys( pendingLinks[1].style ).length === 0 );
-let blocked = null;
-keys._save( function( ok ) { blocked = ok } );
-check( '...and a second submit while it runs sends nothing and says no', requests.length === 1 && blocked === false );
-keys.discard();
-check( '...and discarding while it runs leaves the translations it still has to send, and their values, alone', JSON.stringify( keys._dirtyLocales ) === '["de_DE","en_US"]' && Object.keys( keys._localeValues ).length > 0 );
-
-answers( requests[0] );
-check( 'the next translation follows once the first is written - without the global keys again, and with nothing said yet',
-	requests.length === 2 && requests[1].payload.items.map( function( i ) { return i.key+ '@'+ i.locale+ '='+ i.value } ).join() === '/g/body@en_US=Body!'
-	&& msg.textContent === '/_admin/common/msg/saving' && ended.length === 0 && JSON.stringify( keys._dirtyLocales ) === '["en_US"]' );
-answers( requests[1] );
-check( 'the confirmation comes once, after the last translation, with the form given back and the list redrawn',
-	msg.textContent === '' && toasts.join() === '/_admin/common/msg/saved' && ended.join() === 'true' && keys._saving === false && keys._dirtyLocales.length === 0
-	&& pendingControls.every( function( c ) { return c.disabled === false } ) && keysSandbox.listDrawn === 1 );
-check( '...what the server answered is what the model holds now', keys._groups.g[1].values.de_DE === 'Text!.' && keys._groups.g[1].values.en_US === 'Body!.' && keys._localeValues.de_DE['/g/body'] === 'Text!.' );
-check( '...and the controls count as saved', keys.isDirty() === false );
-check( 'every request the server answered told the shell that texts were written - the Builder reads them - one for each of the two translations', keysSandbox.touched.join() === 'texts,texts' );
-
-// a request that fails
-requests.length = 0;
-keys._dirtyLocales = [ 'de_DE', 'en_US' ];
-keys._localeValues = { de_DE : { '/g/body' : 'A' }, en_US : { '/g/body' : 'B' } };
-ended = [];
-keys._save( function( ok ) { ended.push( ok ) } );
-requests[0].callback( 500, null );
-check( 'a failed request stops the loop: nothing further is sent, every translation stays edited, the message names the language',
-	requests.length === 1 && ended.join() === 'false' && JSON.stringify( keys._dirtyLocales ) === '["de_DE","en_US"]' && keys._saving === false
-	&& msg.textContent.indexOf('(de_DE)') !== -1 && pendingControls.every( function( c ) { return c.disabled === false } ) );
-check( '...and a request that failed wrote nothing, so the shell hears nothing', keysSandbox.touched.length === 2 );
-
-// a key the server did not accept
-requests.length = 0;
-ended = [];
-keys._save( function( ok ) { ended.push( ok ) } );
-answers( requests[0] );
-answers( requests[1], '/g/body' );
-check( 'a key the server refused stops the loop after the translations that went through; the rest stays edited and the message says key (language)',
-	ended.join() === 'false' && JSON.stringify( keys._dirtyLocales ) === '["en_US"]' && msg.textContent.indexOf('/g/body (en_US)') !== -1 );
-check( '...and the global keys went out once', requests[0].payload.items.some( function( i ) { return i.locale === '*' } ) && requests[1].payload.items.every( function( i ) { return i.locale !== '*' } ) );
-check( 'a request with a key refused in it wrote the others: the shell hears of both requests', keysSandbox.touched.length === 4 );
-
-// a result the answer does not contain counts as refused as well
-requests.length = 0;
-keys._dirtyLocales = [ 'de_DE' ];
-ended = [];
-keys._save( function( ok ) { ended.push( ok ) } );
-requests[0].callback( 200, { results : {} } );
-check( 'a key the answer says nothing about is not taken for written', ended.join() === 'false' && JSON.stringify( keys._dirtyLocales ) === '["de_DE"]' );
-
-// only globals changed: the visible translation carries them
-requests.length = 0;
-keys._dirtyLocales = [];
-keys._selectedLocale = 'de_DE';
-keys._save();
-check( 'with nothing but a global key changed, the visible translation is the one request that carries it', requests.length === 1 && requests[0].payload.items.some( function( i ) { return i.locale === '*' } ) );
-requests[0].callback( 500, null );
-
-// the other forms of the tab: the one that creates a key or renames one asks for its four segments
-keys._view = 'new';
-keys._formInitial = JSON.stringify( { namespace : 'project', category : '', part : '', name : '' } );
-const segmentForm = ( segments, extra ) => function( id ) {
-	const fields = Object.assign( { 'keys-form': keysForm, 'keys-form-namespace' : { value : segments.namespace }, 'keys-form-category' : { value : segments.category }, 'keys-form-part' : { value : segments.part }, 'keys-form-name' : { value : segments.name },
-		'keys-form-new-value' : { value : '' }, 'keys-form-new-global' : { checked : false } }, extra );
-	return fields[id] ?? { textContent : '' };
-};
-keysSandbox.document.getElementById = segmentForm( { namespace : 'project', category : '', part : '', name : '' } );
-check( 'a form of /project and nothing else holds nothing', keys.isDirty() === false );
-keysSandbox.document.getElementById = segmentForm( { namespace : 'project', category : 'company', part : '', name : '' } );
-check( '...a segment typed into it does', keys.isDirty() === true );
-keysSandbox.document.getElementById = segmentForm( { namespace : 'template', category : 'common', part : '', name : '' } );
-check( '...and so does another namespace', keys.isDirty() === true );
-keys._formInitial = JSON.stringify( { namespace : 'project', category : 'company', part : 'general', name : 'name' } );
-keysSandbox.document.getElementById = segmentForm( { namespace : 'project', category : 'company', part : 'general', name : 'name' } );
-check( 'a form that renames holds nothing while it shows the key\'s own segments', keys.isDirty() === false );
-keysSandbox.document.getElementById = segmentForm( { namespace : 'project', category : 'company', part : 'general', name : 'title' } );
-check( '...and something once one is changed', keys.isDirty() === true );
-let redrawn = 0;
-keys._renderNewKeyForm = function() { redrawn++ };
-keys.discard();
-check( 'discarding draws the form again as it was opened', redrawn === 1 );
-keys._view = 'scan';
-keys._scanRows = [ { valueInput : { value : '' }, ignoreCheck : { checked : false } }, { valueInput : { value : '' }, ignoreCheck : { checked : false } } ];
-check( 'a scan form with every row as it was drawn holds nothing', keys.isDirty() === false );
-keys._scanRows[1].valueInput.value = 'x';
-check( '...a value typed into a row does', keys.isDirty() === true );
-keys._scanRows[1].valueInput.value = '';
-keys._scanRows[0].ignoreCheck.checked = true;
-check( '...so does a row ticked as ignored', keys.isDirty() === true );
-keys.discard();
-check( 'discarding empties the scan form', keys.isDirty() === false );
-keys._view = 'group';
-
-// the exits that reload the tab ask first - and so does the one that leaves the row for the form that renames
-const asked = [];
-// What a call told the shell it had written
-const touchedBy = call => { const before = keysSandbox.touched.length; call(); return keysSandbox.touched.slice( before ).join() };
-keysSandbox.Nino.admin.dirty = { guard : function( names, proceed, onCancel ) { asked.push( { names : names, proceed : proceed, onCancel : onCancel } ) }, refresh : function() {}, register : function() {} };
-requests.length = 0;
-let undone = 0;
-let opened = 0;
-keys._showForm = function() { opened++ };
-keysSandbox.window.confirm = function() { return false };
-keys._deleteKey( '/g/title' );
-check( 'a delete that is answered No asks the shell nothing and sends nothing', asked.length === 0 && requests.length === 0 );
-keysSandbox.window.confirm = function() { return true };
-keys._saveSchema( '/g/title', true, false, function() { undone++ } );
-keys._openNewKeyForm( '/g/title' );
-keys._deleteKey( '/g/title' );
-check( 'a schema change, the form that renames and a delete ask about the open row before anything happens', asked.length === 3 && requests.length === 0 && opened === 0 && asked.every( function( a ) { return JSON.stringify( a.names ) === '["keys"]' } ) );
-check( '...the delete is asked as a destructive question first, and the others are no question of the weights', askedLevels.join() === 'destructive,destructive' );
-asked[0].onCancel();
-check( '...a Cancel on a schema checkbox puts the box back', undone === 1 && requests.length === 0 );
-const written = keysSandbox.touched.length;
-asked[0].proceed();
-asked[1].proceed();
-asked[2].proceed();
-check( '...an answer lets each request go, and opens the form with the key to rename', requests.map( function( r ) { return r.endpoint } ).join() === 'save,delete' && opened === 1 && keys._renameFrom === '/g/title' && keys._view === 'new' );
-const kept = requests.slice();
-check( '...a schema change and a delete are writes of texts once the server says they are done - and not before', keysSandbox.touched.length === written
-	&& touchedBy( () => kept[0].callback( 200, { ok : true } ) ) === 'texts' && touchedBy( () => kept[1].callback( 200, { ok : true } ) ) === 'texts' );
-delete keysSandbox.Nino.admin.dirty;
-opened = 0;
-keys._openNewKeyForm( '/g/title' );
-check( 'a shell without the registry asks nothing', opened === 1 && keys._renameFrom === '/g/title' );
-keys._openNewKeyForm();
-check( 'the form that creates a key leaves the list, which has nothing to lose, without asking', opened === 2 && keys._renameFrom === null && keys._view === 'new' );
-keys._view = 'group';
-
-// --- a key's format and limit ---------------------------------------------
-//
-// Applied together with the two checkboxes through keys/save, which leaves a
-// setting out as "unchanged": the checkboxes alone must keep posting without
-// them. A format that holds less than the one before converts every stored
-// text, so it is asked about first - and the question names the conversion.
-
-check( 'the Keys tab knows the four formats, narrowest first, in the order the server states them', JSON.stringify( keys.FORMATS ) === '["plain","inline","lines","blocks"]' );
-
-const confirms = [];
-keysSandbox.window.confirm = function( question ) { confirms.push( question ); return true };
-keysSandbox.window.alert = function() {};
-const plainWords = keysSandbox.Nino.content.getText;
-keysSandbox.Nino.content.getText = function( key ) { return key === '/_admin/keys/confirm/format' ? 'Change %s from %s to %s? %s' : plainWords( key ) };
-keys._currentGroup = 'g';
-requests.length = 0;
-
-keys._saveSettings( { key : '/g/body', format : 'lines' }, false, false, 'blocks', '400' );
-check( 'applying posts the key, both checkboxes, the format and the limit as one keys/save', requests.length === 1 && requests[0].endpoint === 'save'
-	&& JSON.stringify( requests[0].payload ) === JSON.stringify( { key : '/g/body', global : false, blacklisted : false, format : 'blocks', maxlength : 400 } ) );
-check( '...widening asks nothing', confirms.length === 0 );
-
-keys._saveSettings( { key : '/g/body', format : 'lines' }, true, true, 'auto', '' );
-check( 'a limit left empty is posted as null - automatic - and "auto" as itself', JSON.stringify( requests[1].payload ) === JSON.stringify( { key : '/g/body', global : true, blacklisted : true, format : 'auto', maxlength : null } ) && confirms.length === 0 );
-
-keys._saveSettings( { key : '/g/body', format : 'blocks' }, false, false, 'plain', '' );
-check( 'narrowing asks first, as a big question, naming the key, the two formats and what becomes of the text', confirms.length === 1 && askedLevels.slice(-1)[0] === 'big' && confirms[0].includes( '/g/body' ) && confirms[0].includes( '/_admin/keys/format/blocks' ) && confirms[0].includes( '/_admin/keys/format/plain' ) && confirms[0].includes( '/_admin/keys/convert/plain' ) === true );
-keysSandbox.window.confirm = function( question ) { confirms.push( question ); return false };
-keys._saveSettings( { key : '/g/body', format : 'blocks' }, false, false, 'inline', '' );
-check( '...and a No sends nothing', requests.length === 3 );
-keysSandbox.window.confirm = function( question ) { confirms.push( question ); return true };
-keys._saveSettings( { key : '/g/body', format : 'lines' }, false, false, 'lines', '' );
-check( 'the format a key already has is no change to ask about', confirms.length === 2 && requests.length === 4 );
-
-check( 'a success comes back to the category it was made in - and is a write of texts', touchedBy( () => requests[0].callback( 200, { ok : true } ) ) === 'texts' && keys._reopen === 'g' );
-keys._reopen = null;
-check( 'a refusal says so, reloads nothing and wrote nothing', touchedBy( () => requests[1].callback( 400, { error : 'x', code : 'keys_limit' } ) ) === '' && keys._reopen === null );
-
-keysSandbox.Nino.content.getText = plainWords;
-check( 'the controls are drawn from the entry: a format select with "auto" first, a limit input, an Apply button',
-	keysSource.includes( "[ 'auto' ].concat( Nino.admin.keys.FORMATS )" ) && keysSource.includes( "className = 'admin-text-limit-input'" ) && keysSource.includes( "getText('/_admin/keys/label/apply')" ) );
-check( 'the format and the limit show what is set: the stored format or "auto", the limit or empty', keysSource.includes( "entry.formatSet === true ? entry.format : 'auto'" ) && keysSource.includes( "entry.maxlengthSet === true ? String( entry.maxlength ) : ''" ) );
-check( 'both editors are handed the key\'s format - the Text panel and this tab', /htmlEditor\.create\( mount, value \?\? '', entry\.maxlength, 0, entry\.format \)/.test( keysSource )
-	&& /htmlEditor\.create\( mount, value \?\? '', entry\.maxlength, 0, entry\.format \)/.test( fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/admin.js' ), 'utf8' ) ) );
-check( 'the group is opened again once the list has loaded', /const reopen = Nino\.admin\.keys\._reopen;[\s\S]{0,300}Nino\.admin\.keys\._openGroup\( reopen \)/.test( keysSource ) );
-
-// keys.js builds '/_admin/keys/format/<format>' and '/_admin/keys/convert/<format>' at runtime, which
-// the static fill check of tests/admin-shell-smoke.php cannot see: both languages carry every one.
-// A conversion is asked about only when it narrows, so 'blocks' has no convert text
-[ 'en_US', 'de_DE' ].forEach( function( locale ) {
-	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/text/'+ locale+ '.php' ), 'utf8' );
-	const has = key => words.includes( "[[/_admin/keys/"+ key+ "]]'" );
-	check( locale+ ': every format the select offers has a name, and every format a conversion can narrow to says what happens to the text',
-		[ 'auto' ].concat( keys.FORMATS ).every( format => has( 'format/'+ format ) ) && keys.FORMATS.filter( format => format !== 'blocks' ).every( format => has( 'convert/'+ format ) ) );
-} );
-
-const keysRegistration = keysSource.indexOf( "Nino.admin.dirty.register( 'keys'" );
-check( 'the Keys tab registers with the shell behind a check that the shell has the registry', keysRegistration !== -1 && keysSource.slice( 0, keysRegistration ).trimEnd().endsWith( "if( typeof Nino.admin.dirty === 'object' )" ) );
 
 // ============================================================================
 // Finding and reading texts: the names of a key, the rows they fall into, the
@@ -569,16 +99,32 @@ function fakeDom() {
 			},
 			get className() { return [ ...classes ].join(' ') }, set className( v ) { classes = new Set( String( v ).split( /\s+/ ).filter( Boolean ) ) },
 			get textContent() { return this._text + this.children.map( c => c.textContent ).join('') }, set textContent( v ) { this.children = []; this._text = String( v ) },
-			get innerHTML() { return '' }, set innerHTML( v ) { this.children.forEach( c => c.parentNode = null ); this.children = []; this._text = '' },
+			get innerHTML() { return '' }, set innerHTML( v ) { this.children.forEach( c => c.parentNode = null ); this.children = []; this._text = ''; String( v ).split( /(<[^>]+>)/ ).forEach( p => { const m = /^<(\w+)[^>]*>$/.exec( p ); if( m ) this.appendChild( make( m[1] ) ); else if( p.indexOf( '</' ) !== 0 ) this._text += p } ) },
 			setAttribute( k, v ) { this.attrs[k] = String( v ) }, getAttribute( k ) { return this.attrs[k] ?? null }, hasAttribute( k ) { return k in this.attrs }, removeAttribute( k ) { delete this.attrs[k] },
 			get isConnected() { for( let n = this; n; n = n.parentNode ) if( n === root ) return true; return false },
 			appendChild( c ) { if( c.parentNode ) c.remove(); c.parentNode = this; this.children.push( c ); return c },
 			removeChild( c ) { c.remove(); return c },
+			after( other ) { const at = this.parentNode.children.indexOf( this ); other.remove(); other.parentNode = this.parentNode; this.parentNode.children.splice( at + 1, 0, other ) },
+			insertBefore( c, ref ) { if( c.parentNode ) c.remove(); c.parentNode = this; const at = ref === null || ref === undefined ? this.children.length : this.children.indexOf( ref ); this.children.splice( at, 0, c ); return c },
+			contains( other ) { for( let n = other; n; n = n.parentNode ) if( n === this ) return true; return false },
+			get firstChild() { return this.children[0] ?? null },
 			remove() { if( this.parentNode ) this.parentNode.children.splice( this.parentNode.children.indexOf( this ), 1 ); this.parentNode = null },
 			replaceWith( other ) { const at = this.parentNode.children.indexOf( this ); other.parentNode = this.parentNode; this.parentNode.children.splice( at, 1, other ); this.parentNode = null },
 			replaceChild( fresh, old ) { const at = this.children.indexOf( old ); fresh.parentNode = this; this.children.splice( at, 1, fresh ); old.parentNode = null; return old },
-			addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) },
-			fire( type, ev = {} ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( Object.assign( { target : this, preventDefault(){} }, ev ) ) ) },
+			addEventListener( type, fn, options ) {
+				const own = this;
+				const listener = options !== undefined && options.once === true ? ( ev => { own.listeners[type].splice( own.listeners[type].indexOf( listener ), 1 ); fn( ev ) } ) : fn;
+				( this.listeners[type] = this.listeners[type] ?? [] ).push( listener );
+			},
+			// What is typed or chosen in a control is heard by everything round it, as in a page
+			fire( type, ev = {} ) {
+				const event = Object.assign( { target : this, preventDefault(){} }, ev );
+				for( let n = this; n; n = n.parentNode ) {
+					( n.listeners[type] ?? [] ).slice().forEach( fn => fn( event ) );
+					if( type !== 'input' && type !== 'change' )
+						break;
+				}
+			},
 			click() { this.fire('click') },
 			focus() { if( held !== null && held !== this ) held.focused = false; held = this; this.focused = true },
 			scrollIntoView() { this.scrolled = true },
@@ -599,6 +145,7 @@ function fakeDom() {
 	const doc = {
 		documentElement : make('html'), body : root, createElement : make,
 		createTextNode : text => Object.assign( make('#text'), { _text : String( text ) } ),
+		createElementNS : ( space, tag ) => make( tag ),
 		getElementById : id => walk( root ).find( n => n.id === id ) ?? null,
 		querySelector : selector => root.querySelector( selector ), querySelectorAll : selector => root.querySelectorAll( selector ),
 		get activeElement() { return held !== null && held.isConnected === true ? held : null },
@@ -619,7 +166,7 @@ function world( locale, hash, session ) {
 	box.Event = function( type ) { this.type = type };
 	const calls = [];
 	// The counters of the shell (script.js): what the panels told it they wrote, and what they read
-	const stamps = { templates : 0, texts : 0 }, touched = [];
+	const stamps = { templates : 0, texts : 0 }, touched = [], registry = {}, counts = { refresh : 0, guard : 0 };
 	box.Nino = {
 		editor : {}, events : { bindCallback(){} },
 		content : { getText : key => words[key] ?? '' },
@@ -628,9 +175,11 @@ function world( locale, hash, session ) {
 			stamp : topic => stamps[topic] ?? 0,
 			router : { set : ( p, parts ) => calls.push( 'set '+ [ p ].concat( parts ).join('/') ), go : ( p, parts ) => calls.push( 'go '+ [ p ].concat( parts ).join('/') ), current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed(), href : ( p, parts ) => '#'+ [ p ].concat( parts ).map( encodeURIComponent ).join('/') },
 			// The one source of the content language: set() moves it and calls the views that follow it, as the shell does
-			workLocale : ( followers => ( { current : session === undefined ? locale : session, follow : ( name, handler ) => followers.push( handler ), set : code => { calls.push( 'locale '+ code ); box.Nino.admin.workLocale.current = code; followers.forEach( handler => handler( code ) ) } } ) )( [] ),
-			formToolbar : back => { const bar = dom.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( back ); return bar },
-			htmlEditor : { create : ( mount, value ) => { mount.setAttribute( 'data-editor', 'yes' ); let held = String( value ?? '' ); return { getValue : () => held, setValue : v => { held = v }, destroy(){} } } },
+			workLocale : ( followers => ( { current : session === undefined ? locale : session, follow : ( name, handler ) => followers.push( handler ), set : code => { calls.push( 'locale '+ code ); box.Nino.admin.workLocale.current = code; followers.forEach( handler => handler( code ) ) }, choose : code => box.Nino.admin.workLocale.set( code ) } ) )( [] ),
+			// The shell's registry of unsaved input: what the panels register under their names, and how often they asked it to look again
+			dirty : { entries : registry, register : ( name, entry ) => { registry[name] = entry }, refresh : () => { counts.refresh++ }, guard : ( names, proceed ) => { counts.guard++; proceed() } },
+			// The rich-text editor, which keeps what it is given and says what a field marked it with
+			htmlEditor : { create : ( mount, value ) => { mount.setAttribute( 'data-editor', 'yes' ); mount.dataset.editor = 'yes'; let held = String( value ?? '' ); const marks = {}; return { getValue : () => held, setValue : v => { held = v }, focus(){}, mark : state => Object.assign( marks, state ), marks : marks, destroy(){} } } },
 		},
 	};
 
@@ -652,7 +201,7 @@ function world( locale, hash, session ) {
 		return { title : title, levels : ids.map( id => { const level = dom.make('div'); level.id = id; el.appendChild( level ); return level } ) };
 	};
 
-	return { dom, box, calls, words, touched, stamps, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount, pane };
+	return { dom, box, calls, words, touched, stamps, registry, counts, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount, pane };
 }
 
 // Whether the focus is in a level, as a person who looks at the page would say
@@ -793,7 +342,6 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 	check( 'a page without a route is named by what its template calls itself, else by its category: "Seite · Beiträge"',
 		w.T.rowLabel( hello, hello.rows['template/page-hello'] ) === 'Hello World' && w.T.rowLabel( hello, hello.rows['template/page-posts'] ) === 'Seite · Beiträge' && w.T.rowLabel( hello, hello.rows['template/page-2026-home'] ) === 'Page 2026 home' );
 	check( 'a row is summed up in the language: how many keys, the beginning of their texts', w.T.rowSummary( model.rows['project/company'], 'de_DE' ) === '(4) Acme, Wir bauen Dinge, mail@acme.test, Deutschland' );
-	check( 'a legend shows the beginning of the first text of its section, what is typed counting', w.T.sectionPreview( page[1], 'de_DE' ) === 'Leistungen' && w.T.sectionPreview( page[1], 'de_DE', { '/template/page-services/intro/title' : 'Ein sehr langer Titel, der weit über die vierzig Zeichen hinausgeht' } ) === 'Ein sehr langer Titel, der weit über die ..' );
 }
 
 // The demo catalogue is a route to a template that is no page-* and has no category: a page of the site, with a row of its own
@@ -878,144 +426,308 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 		&& w.T.resolve( model, [ '_nino', 'webpage', 'blog', 'name' ] ).row === '_nino/webpage' );
 	check( 'hashParts: a row as its path, a key without its leading slash', JSON.stringify( w.T.hashParts( 'template/page-services' ) ) === '["template","page-services"]' && JSON.stringify( w.T.hashParts( 'x', '/a/b/c' ) ) === '["a","b","c"]' );
 }
-
 // --- the Text panel: the list, the search, the form ------------------------------------
 
-const textResponse = ( extra ) => Object.assign( { keys : homeKeys.filter( e => e.blacklisted === false ), locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages,
+const copies = list => list.map( e => Object.assign( {}, e, { values : Object.assign( {}, e.values ) } ) );
+// The words of the workbench in German, by their fills: what a check asks for is the fill, never the wording
+const D = workbenchWords('de_DE');
+const W = key => D[key];
+const F = ( key, ...params ) => { let at = 0; return W( key ).replace( /%[sdn]/g, token => at < params.length ? String( params[at++] ) : token ) };
+const stem = key => W( key ).split('%')[0];
+const group = id => W('/_admin/text/group/'+ id);
+
+const textResponse = ( extra ) => Object.assign( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ), locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages,
 	templates : homeData().templates, features : homeData().features }, extra ?? {} );
 
+/** A page of the workbench with the Text panel open on a stubbed server: what it asked, what it said as a toast, and the answers it can be made to give */
 function openedText( response, hash, locale ) {
 	const w = world( locale ?? 'de_DE', hash );
 	const { title, levels : [ list, form ] } = w.pane( 'text', 'text-list', 'text-form' );
+	title.textContent = 'Texte';
 	form.classList.add('admin-hidden');
-	const sent = [];
-	const told = [];
+	// The name the head of the pane says: the fake page cannot answer the selector the block asks it with
+	w.Nino.adminUi.panelName = () => 'Texte';
+	w.Nino.adminUi.fillsDialog = options => { w.dialogs.push( options ); return true };
+	const sent = [], told = [], held = [];
+	w.dialogs = [];
+	const handle = { hold : false, refuse : {}, fail : null };
 	w.Nino.adminUi.say = sentence => told.push( sentence );
 	const text = w.Nino.admin.text;
 	text._apiCall = ( endpoint, payload, callback ) => {
 		sent.push( { endpoint : endpoint, payload : payload } );
-		if( endpoint === 'keys' )
-			return callback( 200, response );
-		const results = {};
-		payload.items.forEach( item => { results[item.key] = { ok : true, value : item.value } } );
-		callback( 200, { results : results } );
+		const answer = () => {
+			if( endpoint === 'keys' )
+				return callback( 200, response );
+			if( endpoint === 'fills' )
+				return callback( 200, { fills : [ { key : '/project/company/general/name', notation : '[[/project/company/general/name]]', value : 'Acme' } ] } );
+			if( handle.fail !== null )
+				return callback( handle.fail.status, handle.fail.body );
+			const results = {};
+			payload.items.forEach( item => { results[item.key] = handle.refuse[item.key] ?? { ok : true, value : item.value } } );
+			callback( 200, { results : results } );
+		};
+		if( handle.hold === true && endpoint === 'savebatch' )
+			held.push( answer );
+		else
+			answer();
 	};
 	text.init();
-	return Object.assign( w, { list, form, title, sent, text, told } );
+	return Object.assign( w, { list, form, title, sent, text, told, handle, held, dialogs : w.dialogs } );
 }
+
+/** The names of the fields of a section, as the labels at the left say them */
+const namesOf = section => section.querySelectorAll('.nino-admin-field').map( f => f.children[0].firstChild.textContent );
+const writes = t => t.sent.filter( c => c.endpoint === 'savebatch' );
+const fieldOf = ( t, key ) => t.form.querySelector('[data-key="'+ key+ '"]');
+const controlOf = ( t, key ) => fieldOf( t, key ).querySelector('input, textarea');
+const typeInto = ( control, value ) => { control.value = value; control.fire('input') };
+const submitText = t => t.form.querySelector('form').fire('submit');
+const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group ).click();
 
 {
 	const t = openedText( textResponse() );
 	const rows = opens( t.list );
 
-	check( 'the list is two blocks: the pages, and the rest in groups - each with its heading', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Seiten,Allgemein'
-		&& t.list.querySelectorAll('h3').map( h => h.textContent ).join() === 'Projekt,Bausteine,Module,Features,System,Weitere' );
-	check( '...a row for each page, named after the route, and one for each group of the others', rows.length === Object.keys( t.text._model.rows ).length && keyOf( rows[0] ) === 'template/page-services'
-		&& rows.map( r => r.querySelector('strong').textContent ).slice( 0, 2 ).join() === 'Leistungen,Rechtliches' );
+	check( 'the list is two blocks: the pages, and the rest in groups - each with its heading', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === [ 'pages', 'general' ].map( group ).join()
+		&& t.list.querySelectorAll('h3').map( h => h.textContent ).join() === [ 'project', 'blocks', 'modules', 'features', 'system', 'other' ].map( group ).join() );
+	check( '...a row for each page, named after the route, and one for each group of the others - the rows of the workbench\'s list', rows.length === Object.keys( t.text._model.rows ).length && keyOf( rows[0] ) === 'template/page-services'
+		&& rows.map( r => r.querySelector('strong').textContent ).slice( 0, 2 ).join() === 'Leistungen,Rechtliches' && t.list.querySelectorAll('li').every( li => li.classList.contains('nino-admin-list-row') ) );
 	check( '...with what it holds as its line: how many keys and the beginning of their texts', rows[0].querySelector('small').textContent.startsWith( '(9) ' ) );
-	check( 'the search, the language and the filter are above the rows, each named', t.list.querySelector('#text-search').getAttribute('aria-label') === 'Texte durchsuchen' && t.list.querySelector('#text-list-locale').getAttribute('aria-label') === 'Sprache'
-		&& t.list.querySelector('#text-list-empty').textContent === 'Leer in de_DE' && t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'false' );
+	check( 'every row is a link to an address of its own, which writes it when it is pressed', rows.every( r => r.tagName === 'a' && r.href === '#text/'+ keyOf( r ).split('/').join('/') ) );
+	check( 'the bar of the list has the search and the filter and no switch of a language: the language is the workbench\'s', t.list.querySelector('#text-search').getAttribute('aria-label') === W('/_admin/text/label/search')
+		&& t.list.querySelectorAll('select').length === 0 && t.list.querySelector('.nino-admin-filterbar') !== null && t.list.querySelector('#text-list-empty').classList.contains('nino-admin-chip') );
+	check( '...and the filter names the language the way the workbench does, and is off', t.list.querySelector('#text-list-empty').textContent === F('/_admin/text/label/empty-in','de_DE') && t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'false' );
 	check( 'the words of the workbench are not among the rows', opens( t.list ).every( r => keyOf( r ) !== '_admin' ) );
+
+	t.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	t.Nino.admin.workLocale.set( 'en_US' );
+	check( 'the language the rail moves is the one the list is named in, and the filter says it', t.list.querySelector('#text-list-empty').textContent === F('/_admin/text/label/empty-in','English')
+		&& opens( t.list ).slice( 0, 2 ).map( r => r.querySelector('strong').textContent ).join() === 'Services,Legal' );
+	t.Nino.admin.workLocale.set( 'de_DE' );
 
 	// the search
 	const box = t.list.querySelector('#text-search');
 	box.value = 'beraten';
 	box.fire('input');
-	check( 'a search replaces the rows by hits: the path, the piece of text with the word marked, the key', opens( t.list ).length === 0 && t.list.querySelectorAll('.admin-text-hit').length === 1
-		&& t.list.querySelector('.admin-text-hit strong').textContent === 'Leistungen › Eintrag 1 › Text' && t.list.querySelector('mark').textContent === 'beraten' && t.list.querySelector('.admin-text-hit-key').textContent === '/template/page-services/item-1/text' );
-	check( '...and says how many there are, where a screen reader hears it', t.list.querySelector('#text-list-status').textContent === '1 Treffer' && t.list.querySelector('#text-list-status').getAttribute('aria-live') === 'polite' );
-	check( 'a hit in the language on screen has no code of a language', t.list.querySelectorAll('.admin-text-hit-lang').length === 0 );
+	check( 'a search replaces the rows by hits, the rows of the list again: the path, the piece of text with the word marked, the key behind it', opens( t.list ).length === 1 && t.list.querySelectorAll('li').length === 1
+		&& t.list.querySelector('strong').textContent === 'Leistungen › Eintrag 1 › Text' && t.list.querySelector('mark')?.textContent === 'beraten' && t.list.querySelector('.admin-text-hit-key').textContent === '/template/page-services/item-1/text'
+		&& t.list.querySelector('small').textContent.startsWith( 'Wir ' ) );
+	check( '...each a link to the row of the key, at its own address', opens( t.list )[0].href === '#text/template/page-services/item-1/text' );
+	check( '...and says how many there are, where a screen reader hears it', t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/result',1) && t.list.querySelector('#text-list-status').getAttribute('aria-live') === 'polite' );
+	check( 'a hit in the language on screen has no code of a language', t.list.querySelectorAll('.nino-admin-row-actions').length === 0 );
 	box.value = 'xyzzy';
 	box.fire('input');
-	check( 'nothing found says so, with the empty state of the workbench', t.list.querySelectorAll('.admin-text-hit').length === 0 && t.list.querySelector('.nino-admin-empty').textContent === 'Nichts gefunden.' && t.list.querySelector('#text-list-status').textContent === '0 Treffer' );
+	check( 'nothing found says so, with the empty state of the workbench', t.list.querySelectorAll('li').length === 0 && t.list.querySelector('.nino-admin-empty').textContent === W('/_admin/text/msg/nothing') && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/results',0) );
 	box.value = '';
 	box.fire('input');
 	check( 'an empty box is the rows again', opens( t.list ).length === rows.length && t.list.querySelector('#text-list-status').textContent === '' );
 
-	// a hit in another language: its code switches the language and nothing else
+	// a hit in another language: its code asks for the language, and nothing else
 	box.value = 'consulting';
 	box.fire('input');
-	const lang = t.list.querySelector('.admin-text-hit-lang');
-	check( 'a hit in another language shows that language\'s code, as a button named for what it does', lang.textContent === 'en_US' && lang.getAttribute('aria-label') === 'Die Texte in en_US zeigen' );
-	lang.click();
-	check( '...which switches the language of the session and the panel, and opens nothing', t.calls.includes('locale en_US') && t.text._currentGroup === null && t.list.querySelector('#text-list-empty').textContent === 'Leer in en_US'
-		&& t.list.querySelectorAll('.admin-text-hit-lang').length === 0 && t.list.querySelectorAll('.admin-text-hit').length === 1 );
+	const lang = t.list.querySelector('.nino-admin-row-actions button');
+	check( 'a hit in another language shows that language\'s code as a small button of the workbench, named for what it does', lang.textContent === 'en_US' && lang.classList.contains('nino-admin-btn--small') && lang.getAttribute('aria-label') === F('/_admin/text/label/switch-language','English') );
+	const chosen = [];
+	t.Nino.admin.workLocale.choose = code => chosen.push( code );
+	t.list.querySelector('.nino-admin-row-actions button').click();
+	check( '...which asks the workbench for it - as every change of the language is, so that a view with unsaved input is asked about first - and opens nothing', chosen.join() === 'en_US' && t.text._currentGroup === null );
+	t.Nino.admin.workLocale.choose = undefined;
 	box.value = '';
 	box.fire('input');
-	check( 'in the other language the pages are named by what their routes are called there', opens( t.list ).slice( 0, 2 ).map( r => r.querySelector('strong').textContent ).join() === 'Services,Legal' );
+
+	t.Nino.admin.workLocale.set( 'en_US' );
 	t.list.querySelector('#text-list-empty').click();
 	check( 'the filter for the keys with no text in the language shows them as hits, and says it is on', t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'true'
-		&& t.list.querySelectorAll('.admin-text-hit').map( h => h.querySelector('.admin-text-hit-key').textContent ).join() === '/template/page-services/intro/text' );
-	t.list.querySelector('#text-list-locale').value = 'de_DE';
-	t.list.querySelector('#text-list-locale').fire('change');
-	check( '...and follows the language chosen in the list', t.calls.includes('locale de_DE') && t.list.querySelector('#text-list-empty').textContent === 'Leer in de_DE' && t.list.querySelectorAll('.admin-text-hit').length === 0 );
+		&& t.list.querySelectorAll('.admin-text-hit-key').map( h => h.textContent ).join() === '/template/page-services/intro/text' );
 	t.list.querySelector('#text-list-empty').click();
+	t.Nino.admin.workLocale.set( 'de_DE' );
 
 	// a hit opens its row, at the field
 	box.value = 'beraten';
 	box.fire('input');
 	t.calls.length = 0;
-	t.list.querySelector('.admin-text-hit-open').click();
-	const field = t.form.querySelector('[data-key="/template/page-services/item-1/text"]');
-	check( 'a hit opens its row at the field - the address names the key, the field is marked, scrolled to and has the cursor', t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false && t.list.classList.contains('admin-hidden') === true
+	opens( t.list )[0].click();
+	const field = fieldOf( t, '/template/page-services/item-1/text' );
+	check( 'a hit opens its row at the field - the address names the key, the field is marked and scrolled to', t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false && t.list.classList.contains('admin-hidden') === true
 		&& t.calls.includes( 'go text/template/page-services/item-1/text' ) && t.calls.includes( 'set text/template/page-services/item-1/text' ) && field.classList.contains('is-found') && field.scrolled === true );
+}
 
-	// the form
+{
+	// the form of a row
+	const t = openedText( textResponse() );
+	openRow( t, 'template/page-services' );
+
+	const back = t.form.querySelectorAll('.nino-admin-back-link');
+	check( 'the way back is one link in the context bar, to the panel by its name, and the bar says what the view is', back.length === 1 && back[0].textContent === F('/_admin/common/label/back-to',W('/_admin/text/label/back-name')) && back[0].closest('.nino-admin-contextbar') !== null
+		&& t.form.querySelector('.nino-admin-contextbar-title').textContent === 'Leistungen' && t.form.querySelectorAll('.main-title').length === 0 );
+	check( 'the form has no switch of a language and no select at all', t.form.querySelectorAll('select').length === 0 );
 	const sections = t.form.querySelectorAll('fieldset.admin-text-section');
-	check( 'the form is a section for each part, the details of the page first, then in the order of the template', sections.map( f => f.dataset.section ).join() === 'webpage:/services,intro,item-1,item-2,legal'
-		&& t.form.querySelector('.main-title').textContent === 'Leistungen' );
-	check( '...a legend with the name of the section, the route of a page small, and the beginning of the first text',
-		sections[0].querySelector('legend .admin-text-section-name').textContent === 'Seitenangaben' && sections[0].querySelector('legend code').textContent === '/services' && sections[0].querySelector('legend .admin-text-section-preview').textContent === 'Leistungen'
-		&& sections[1].querySelector('legend .admin-text-section-name').textContent === 'Einleitung' && sections[1].querySelector('legend .admin-text-section-preview').textContent === 'Leistungen' && sections[2].querySelector('legend .admin-text-section-name').textContent === 'Eintrag 1' );
-	check( 'the fields are named in German - the key is not the name', sections[0].querySelectorAll('.nino-admin-field-name').map( n => n.textContent ).join() === 'Name im Menü,Seitentitel,Beschreibung für Suchmaschinen'
-		&& sections[2].querySelectorAll('.nino-admin-field-name').map( n => n.textContent ).join() === 'Titel,Text' && t.form.querySelectorAll('.nino-admin-field-name').every( n => n.textContent.indexOf('[[') === -1 ) );
-	const title = t.form.querySelector('[data-key="/template/page-services/intro/title"]');
-	const control = title.querySelector('textarea');
-	check( 'a field is named by its name and described by its key and counter - they are not the name', control.getAttribute('aria-labelledby') === title.querySelector('.nino-admin-field-name').id && title.querySelector('.nino-admin-field-name').textContent === 'Titel'
-		&& control.getAttribute('aria-describedby') === title.querySelector('.admin-text-meta').id && title.querySelector('.admin-text-meta code').textContent === '/template/page-services/intro/title'
-		&& title.querySelector('.admin-text-meta .nino-admin-char-counter').textContent === '10 / 150' && title.querySelector('label') === null );
-	check( 'a rich-text field is a group named the same way', ( () => { const rich = t.form.querySelector('[data-key="/template/page-services/item-1/text"]'); return rich.getAttribute('role') === 'group' && rich.getAttribute('aria-labelledby') === rich.querySelector('.nino-admin-field-name').id && rich.getAttribute('aria-describedby') === rich.querySelector('.admin-text-meta').id } )() );
-	check( 'a field one per language carries no badge', t.form.querySelectorAll('.admin-text-badge').length === 0 );
-	check( 'a form has the locale switch in its toolbar, in the language of the session', t.form.querySelector('#text-form-locale-select').value === 'de_DE' && t.form.querySelector('#text-form-locale-select').getAttribute('aria-label') === 'Sprache' );
+	check( 'the form is a section for each part, the details of the page first, then in the order of the template', sections.map( f => f.dataset.section ).join() === 'webpage:/services,intro,item-1,item-2,legal' );
+	check( '...a legend with the name of the section and, for a page, its route small', sections[0].querySelector('legend .admin-text-section-name').textContent === W('/_admin/text/label/page-details') && sections[0].querySelector('legend code')?.textContent === '/services'
+		&& sections[1].querySelector('legend .admin-text-section-name').textContent === W('/_admin/common/word/intro') && sections[1].querySelector('legend code') === null );
+	check( 'the fields stand in a grid whose labels are at the left: a fieldgrid in the fieldset, a field of the workbench for each key', sections.every( s => s.querySelector('.nino-admin-fieldgrid') !== null && s.querySelector('.nino-admin-fieldgrid').children.every( f => f.classList.contains('nino-admin-field') ) ) );
+	check( '...named in German - the key is not the name', namesOf( sections[0] ).join() === [ 'name', 'title', 'description' ].map( f => W('/_admin/text/label/page-'+ f) ).join() );
 
-	// the language changes the fields one per language, in place, and nothing else
-	const keysBefore = Object.keys( t.text._fieldEls ).sort().join();
-	control.value = 'Leistungen neu';
-	const select = t.form.querySelector('#text-form-locale-select');
-	select.value = 'en_US';
-	select.fire('change');
-	check( 'switching the language draws the texts of that language - each in its section, none lost from the form\'s fields',
-		t.text._fieldEls['/template/page-services/intro/title'].value === 'Services' && Object.keys( t.text._fieldEls ).sort().join() === keysBefore
-		&& t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === sections.map( f => f.dataset.section ).join() && t.calls.includes('locale en_US')
-		&& t.form.querySelector('[data-key="/template/page-services/intro/title"]').parentNode === sections[1].querySelector('.nino-admin-fieldgrid') );
-	check( '...the legends follow the language', t.form.querySelectorAll('fieldset.admin-text-section')[1].querySelector('.admin-text-section-preview').textContent === 'Services' );
-	check( '...and the model names the rows in it from then on', t.text._model.locale === 'en_US' );
-	select.value = 'de_DE';
-	select.fire('change');
-	check( '...and what was typed in the language left is there when it is back', t.text._fieldEls['/template/page-services/intro/title'].value === 'Leistungen neu' && t.text._dirtyLocales.join() === 'de_DE' );
+	// what a field is
+	const form = t.form.querySelector('form');
+	check( 'the form checks nothing itself, and is the one form of the view', form.noValidate === true && t.form.querySelectorAll('form').length === 1 );
+	check( 'a plain text of a line is a line, with its key and its count under it', ( () => { const f = fieldOf( t, '/template/page-services/intro/title' ); return f.querySelector('input') !== null && f.querySelector('textarea') === null
+		&& f.querySelector('.admin-text-meta code').textContent === '/template/page-services/intro/title' && f.querySelector('.nino-admin-char-counter').textContent === '10 / 150' } )() );
+	check( 'a text with markup is the rich-text editor of the workbench, named by a span its group points at', ( () => { const f = fieldOf( t, '/template/page-services/item-1/text' ); return f.querySelector('[data-editor]') !== null
+		&& f.getAttribute('role') === 'group' && f.getAttribute('aria-labelledby') === f.querySelector('span').id } )() );
+	check( 'no field is a label that holds the editor, and none carries the key as its name', t.form.querySelectorAll('.admin-text-field').every( f => f.querySelector('span').textContent.indexOf('/') === -1 ) );
+	check( 'the textfills are asked for at a field the account may change that is a text with markup', fieldOf( t, '/template/page-services/item-1/text' ).querySelector('.nino-admin-fills-button') !== null );
+	check( '...and at no field of one line', t.form.querySelectorAll('.admin-text-field').filter( f => f.querySelector('input') !== null ).every( f => f.querySelector('.nino-admin-fills-button') === null ) );
 
-	// the language moves where this form has no part in it - the rail's choice - and the form shows it, with the badge of a language that is not the native one
-	t.Nino.adminUi.locales = { native : 'de_DE', names : {} };
-	const bar = () => t.form.querySelector('.nino-admin-contextbar');
+	// the bar: one, with one main button
+	const bars = t.form.querySelectorAll('.nino-admin-actionbar');
+	check( 'the view has one bar, with one main button that submits - no button of Save in the content', bars.length === 1 && bars[0].querySelectorAll('.nino-admin-btn-primary').length === 1 && bars[0].querySelector('.nino-admin-btn-primary').type === 'submit'
+		&& t.form.querySelectorAll('button').filter( b => b.type === 'submit' ).length === 1 && bars[0].querySelectorAll('.nino-admin-btn-danger').length === 0 );
+	check( '...with the state of the form and the line that says what a save did', bars[0].querySelector('.nino-admin-actionbar-state') !== null && t.form.querySelector('#text-form-msg') !== null );
+	check( 'the panel is in the registry of unsaved input under its name, with the bar that carries its mark', typeof t.registry.text.isDirty === 'function' && typeof t.registry.text.save === 'function' && typeof t.registry.text.discard === 'function' && t.registry.text.bar() === bars[0] );
+	check( 'a form nobody touched holds nothing unsaved', t.registry.text.isDirty() === false );
+
+	// a save that changes nothing sends nothing
+	submitText( t );
+	check( 'a save with nothing changed sends nothing and says it is saved', writes( t ).length === 0 && t.told.join() === W('/_admin/common/msg/saved') );
+
+	// a save sends what was changed, in the language the form shows
+	typeInto( controlOf( t, '/template/page-services/intro/title' ), 'Leistungen neu' );
+	check( 'a field that differs from what it held is unsaved input for the shell', t.registry.text.isDirty() === true );
+	typeInto( controlOf( t, '/template/page-services/intro/title' ), 'Leistungen' );
+	check( '...and typing it back takes that away', t.registry.text.isDirty() === false );
+	typeInto( controlOf( t, '/template/page-services/intro/title' ), 'Leistungen neu' );
+	typeInto( controlOf( t, '/_nino/webpage/services/title' ), 'Neuer Seitentitel' );
+	t.told.length = 0;
+	submitText( t );
+	const batch = writes( t )[0];
+	check( 'a save sends the keys that were changed - the text of the template and the details of the page together - and no other', writes( t ).length === 1 && batch.payload.items.map( i => i.key ).sort().join() === '/_nino/webpage/services/title,/template/page-services/intro/title'
+		&& batch.payload.items.every( i => i.locale === 'de_DE' ) );
+	check( '...says it with a toast, the line left empty and the form as it was - no jump to the list', t.told.join() === W('/_admin/common/msg/saved') && t.form.querySelector('#text-form-msg').textContent === '' && t.form.classList.contains('admin-hidden') === false && t.registry.text.isDirty() === false );
+	check( '...and tells the shell that texts were written, once, and no template, which the panel does not write', t.touched.join() === 'texts' );
+	check( '...what the server answered is what the model holds', t.text._groups['template/page-services'].find( e => e.key === '/template/page-services/intro/title' ).values.de_DE === 'Leistungen neu' );
+}
+
+{
+	// a key that is the same in every language says so, and is written to the one text
+	const t = openedText( textResponse() );
+	openRow( t, 'project/company' );
+	const name = fieldOf( t, '/project/company/general/name' );
+	check( 'a field that is the same in every language carries a badge beside its name, and the field is described by it', name.querySelector('.nino-admin-badge').textContent === W('/_admin/text/label/all-languages')
+		&& name.querySelector('input').getAttribute('aria-describedby') === name.querySelector('.nino-admin-badge').id && fieldOf( t, '/project/company/general/description' ).querySelector('.nino-admin-badge') === null );
+	check( 'the row is called by its name in the vocabulary, and the fields that are the same in every language come first in their section', t.form.querySelector('.nino-admin-contextbar-title').textContent === W('/_admin/common/word/company')
+		&& namesOf( t.form.querySelectorAll('fieldset.admin-text-section')[0] ).join() === [ 'name', 'description' ].map( w => W('/_admin/common/word/'+ w) ).join() );
+	typeInto( controlOf( t, '/project/company/general/name' ), 'Acme AG' );
+	typeInto( controlOf( t, '/project/company/general/description' ), 'Wir bauen mehr' );
+	submitText( t );
+	const items = writes( t )[0].payload.items;
+	check( 'a save writes it to the one text, and a text of a language to the language the form shows', items.find( i => i.key === '/project/company/general/name' ).locale === '*' && items.find( i => i.key === '/project/company/general/description' ).locale === 'de_DE' );
+}
+
+{
+	// textareas: a text with a line break, or a long one, is a field of several lines
+	const longText = 'Ein langer Satz, der über die Länge einer Zeile hinausgeht und deshalb in einem Feld von mehreren Zeilen steht.';
+	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).concat( [ textEntry( '/project/shop/about/two', { de_DE : 'Zeile eins\nZeile zwei', en_US : '' } ), textEntry( '/project/shop/about/long', { de_DE : longText, en_US : '' } ), textEntry( '/project/shop/about/high', { de_DE : 'Kurz', en_US : '' }, { maxlength : 600 } ) ] ) } );
+	const t = openedText( response );
+	openRow( t, 'project/shop' );
+	const kind = key => fieldOf( t, key ).querySelector('textarea') !== null ? 'textarea' : 'input';
+	check( 'a text with a line break, a text longer than a line and one with a high limit are fields of several lines - a short one is a line', [ '/project/shop/about/two', '/project/shop/about/long', '/project/shop/about/high' ].every( k => kind( k ) === 'textarea' ) );
+	check( '...which is where the textfills are asked for, at the name, for the account that may change it', [ '/project/shop/about/two', '/project/shop/about/long' ].every( k => fieldOf( t, k ).querySelector('.nino-admin-fills-button') !== null ) );
+	fieldOf( t, '/project/shop/about/two' ).querySelector('.nino-admin-fills-button').click();
+	check( '...and the list they offer is the server\'s, asked when the button is pressed', t.sent.some( c => c.endpoint === 'fills' ) );
+	check( 'a plain text of a line keeps its line breaks where it has them: a value with one is never put into a field that would cut it', kind( '/project/shop/about/two' ) === 'textarea' && controlOf( t, '/project/shop/about/two' ).value === 'Zeile eins\nZeile zwei' );
+}
+
+{
+	// the language: a form shows one and writes that one
+	const t = openedText( textResponse() );
+	t.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	openRow( t, 'template/page-services' );
+	const title = '/template/page-services/intro/title';
+	check( 'a form in the native language has no badge of a language', t.form.querySelector('.nino-admin-locale-badge') === null && controlOf( t, title ).value === 'Leistungen' );
+
+	// the language moved under the form without the form being told: what it writes is what it shows
+	t.box.Nino.admin.workLocale.current = 'en_US';
+	typeInto( controlOf( t, title ), 'Leistungen B' );
+	submitText( t );
+	check( 'a form writes the language it shows, whatever the workbench says by now', writes( t )[0].payload.items.length === 1 && writes( t )[0].payload.items[0].locale === 'de_DE' && writes( t )[0].payload.items[0].value === 'Leistungen B' );
+	t.box.Nino.admin.workLocale.current = 'de_DE';
+
+	// the language moved, as the shell does it after it has asked
+	typeInto( controlOf( t, title ), 'In German' );
 	t.Nino.admin.workLocale.set( 'en_US' );
-	check( 'the form follows a language the workbench moved: the select, the fields and the model',
-		select.value === 'en_US' && t.text._fieldEls['/template/page-services/intro/title'].value === 'Services' && t.text._model.locale === 'en_US' && t.text._selectedLocale === 'en_US' );
-	check( '...and the bar of the form says it is not the native language', bar().querySelector('.nino-admin-locale-badge') !== null );
-	check( '...the select of the list behind the form says it as well, for the person who is back', t.list.querySelector('#text-list-locale').value === 'en_US' );
-	t.Nino.admin.workLocale.set( 'de_DE' );
-	check( '...the native language needs no badge, and what was typed in it is there', bar().querySelector('.nino-admin-locale-badge') === null && t.text._fieldEls['/template/page-services/intro/title'].value === 'Leistungen neu' );
-	t.Nino.adminUi.locales = { native : '', names : {} };
-
-	// a save of a page carries the keys of both namespaces in one request
+	check( 'the form follows a language the workbench moved: it is drawn again in it, the pill in its bar says so, and what was typed is not there', controlOf( t, title ).value === 'Services' && t.form.querySelector('.nino-admin-locale-badge') !== null
+		&& t.text._shownLocale === 'en_US' && t.registry.text.isDirty() === false );
+	typeInto( controlOf( t, title ), 'Services two' );
 	t.sent.length = 0;
-	t.text._fieldEls['/_nino/webpage/services/title'].value = 'Neuer Seitentitel';
-	t.form.querySelector('form').fire('submit');
-	const batch = t.sent.find( c => c.endpoint === 'savebatch' );
-	check( 'a save of a page sends the keys of its template and the details of its route in one request', batch !== undefined && t.sent.filter( c => c.endpoint === 'savebatch' ).length === 1
-		&& batch.payload.items.some( i => i.key === '/template/page-services/intro/title' && i.value === 'Leistungen neu' && i.locale === 'de_DE' )
-		&& batch.payload.items.some( i => i.key === '/_nino/webpage/services/title' && i.value === 'Neuer Seitentitel' && i.locale === 'de_DE' ) );
-	check( '...and says it is saved with a toast, the line of the form left empty', t.form.querySelector('#text-form-msg').textContent === '' && t.told.length === 1 && t.text._dirtyLocales.length === 0 );
-	check( 'a save is a write of texts: the shell is told so, once - and of no template, which this panel does not write', t.touched.join() === 'texts' );
+	submitText( t );
+	check( '...and writes that language, and no other', writes( t ).length === 1 && writes( t )[0].payload.items.length === 1 && writes( t )[0].payload.items[0].locale === 'en_US' && writes( t )[0].payload.items[0].value === 'Services two' );
+	t.Nino.admin.workLocale.set( 'de_DE' );
+	check( '...the native language needs no pill', t.form.querySelector('.nino-admin-locale-badge') === null && controlOf( t, title ).value === 'Leistungen B' );
+}
+
+{
+	// a server that turns a key down: said at its field, the key stays changed, the others are saved
+	const t = openedText( textResponse() );
+	openRow( t, 'template/page-services' );
+	const title = '/template/page-services/intro/title', text = '/template/page-services/intro/text';
+	typeInto( controlOf( t, title ), 'Eins' );
+	typeInto( controlOf( t, text ), 'Zwei' );
+	t.handle.refuse[text] = { ok : false, error : 'could not be written' };
+	submitText( t );
+	check( 'a key the server turns down says so at its field, in a sentence under it, and the field is marked', fieldOf( t, text ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 && controlOf( t, text ).getAttribute('aria-invalid') === 'true'
+		&& fieldOf( t, title ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 );
+	check( '...and the form says how many were not saved, in the line of the bar - no toast of success', t.form.querySelector('#text-form-msg').textContent === W('/_admin/text/error/one') && t.told.length === 0 );
+	check( '...the key stays unsaved input, the one that was saved is not', t.registry.text.isDirty() === true && t.text._session.changed().join() === text );
+	typeInto( controlOf( t, text ), 'Zwei!' );
+	check( '...and typing into the field takes its sentence away', fieldOf( t, text ).parentNode.querySelectorAll('.nino-admin-field-error').length === 0 && controlOf( t, text ).getAttribute('aria-invalid') === null );
+	t.handle.refuse = {};
+	t.sent.length = 0;
+	submitText( t );
+	check( 'the next save sends the key that is still changed, and nothing else', writes( t )[0].payload.items.map( i => i.key ).join() === text && t.registry.text.isDirty() === false );
+
+	// a request that fails
+	typeInto( controlOf( t, title ), 'Drei' );
+	t.handle.fail = { status : 500, body : null };
+	submitText( t );
+	check( 'a request that fails leaves the form as it is, unsaved, and says so in the line', t.registry.text.isDirty() === true && t.form.querySelector('#text-form-msg').textContent.indexOf( '500' ) !== -1 );
+	t.handle.fail = null;
+
+	// what is typed while the request runs is not in what was sent
+	t.handle.hold = true;
+	typeInto( controlOf( t, title ), 'Vier' );
+	submitText( t );
+	typeInto( controlOf( t, title ), 'Vier und mehr' );
+	let ended = null;
+	t.registry.text.save( ok => { ended = ok } );
+	check( 'a second save while one runs is told no, and sends nothing', ended === false && writes( t ).length === 3 );
+	check( 'the shell sees a save that runs', t.registry.text.saving() === true );
+	t.held.shift()();
+	check( 'what was typed while the request was on its way stays unsaved input', t.registry.text.isDirty() === true && controlOf( t, title ).value === 'Vier und mehr' && t.registry.text.saving() === false );
+	t.handle.hold = false;
+
+	// discard
+	t.registry.text.discard();
+	check( 'discarding puts the fields back to what they held', controlOf( t, title ).value === 'Vier' && t.registry.text.isDirty() === false );
+}
+
+{
+	// keys this account may not write are read, in place
+	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => e.key.indexOf( '/project/company/' ) === 0 ? Object.assign( {}, e, { writable : e.key.endsWith( 'email' ) } ) : e ) } );
+	const t = openedText( response );
+	openRow( t, 'project/company' );
+	const view = fieldOf( t, '/project/company/general/name' ).querySelector('.admin-text-readonly');
+	check( 'a key the account may not write is shown as text - named like the others - and has no field and no textfills', view !== null && view.textContent === 'Acme' && t.text._session.get( '/project/company/general/name' ).readonly === true
+		&& view.getAttribute('aria-labelledby') === view.parentNode.querySelector('span').id && fieldOf( t, '/project/company/general/name' ).querySelector('input, textarea, .nino-admin-fills-button') === null );
+	check( '...the keys it may write are fields, and a save sends only those', controlOf( t, '/project/company/contact/email' ) !== null && t.form.querySelectorAll('button').filter( b => b.type === 'submit' ).length === 1 );
+	typeInto( controlOf( t, '/project/company/contact/email' ), 'x@acme.test' );
+	submitText( t );
+	check( '...and a save sends only the keys it may write that were changed', writes( t )[0].payload.items.map( i => i.key ).join() === '/project/company/contact/email' );
+
+	// a row with nothing writable has no Save
+	const none = openedText( textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => Object.assign( {}, e, { writable : false } ) ) } ) );
+	openRow( none, 'project/company' );
+	check( 'a row this account may not write anywhere is a row to read: no bar, no Save', none.form.querySelectorAll('.nino-admin-actionbar').length === 0 && none.registry.text.isDirty() === false );
 }
 
 {
@@ -1070,44 +782,11 @@ function openedText( response, hash, locale ) {
 	const box = t.list.querySelector('#text-search');
 	box.value = 'konstrukteur';
 	box.fire('input');
-	check( 'the search over keys with a part named constructor answers, in the Text panel', t.list.querySelectorAll('.admin-text-hit').length === 1 );
+	check( 'the search over keys with a part named constructor answers, in the Text panel', t.list.querySelectorAll('li').length === 1 );
 	box.value = '';
 	box.fire('input');
 	opens( t.list ).find( r => keyOf( r ) === 'project/shop' ).click();
-	check( '...and the form of its row opens, with the section named by the part', t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === 'constructor' && t.text._fieldEls['/project/shop/constructor/name'].value === 'Konstrukteur' );
-}
-
-{
-	// the project: fields that are the same in every language carry the mark, and come first in their section
-	const t = openedText( textResponse() );
-	opens( t.list ).find( r => keyOf( r ) === 'project/company' ).click();
-	const general = t.form.querySelector('fieldset[data-section="general"]') ?? t.form.querySelectorAll('fieldset.admin-text-section').find( f => f.dataset.section === 'general' );
-	check( 'a row of the project has "general" first, its fields that are the same in every language first - marked "Alle Sprachen"',
-		t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === 'general,contact'
-		&& general.querySelectorAll('.nino-admin-field-name').map( n => n.textContent ).join() === 'Name,Beschreibung' && general.querySelectorAll('.admin-text-badge').map( b => b.parentNode.querySelector('.nino-admin-field-name').textContent ).join() === 'Name'
-		&& general.querySelector('.admin-text-badge').textContent === 'Alle Sprachen' && t.form.querySelectorAll('.admin-text-badge').length === 2 );
-	check( 'the badge is in the description of the field, so a screen reader hears that it is the same in every language', ( () => {
-		const field = general.querySelector('[data-key="/project/company/general/name"]'); const badge = field.querySelector('.admin-text-badge');
-		return badge.id !== '' && field.querySelector('textarea').getAttribute('aria-describedby') === badge.id+ ' '+ field.querySelector('.admin-text-meta').id } )() );
-	check( 'the row is called by its name in the vocabulary', t.form.querySelector('.main-title').textContent === 'Unternehmen' );
-	// the language switch does not touch a field that is the same in every language
-	const mail = t.text._fieldEls['/project/company/contact/email'];
-	mail.value = 'neu@acme.test';
-	const select = t.form.querySelector('#text-form-locale-select');
-	select.value = 'en_US';
-	select.fire('change');
-	check( 'a field that is the same in every language keeps what is typed when the language changes', t.text._fieldEls['/project/company/contact/email'] === mail && mail.value === 'neu@acme.test' && t.text._fieldEls['/project/company/contact/country'].value === 'Germany' );
-}
-
-{
-	// keys this account may not write are read, in place
-	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => e.key.indexOf( '/project/company/' ) === 0 ? Object.assign( {}, e, { writable : e.key.endsWith( 'email' ) } ) : e ) } );
-	const t = openedText( response );
-	opens( t.list ).find( r => keyOf( r ) === 'project/company' ).click();
-	const view = t.form.querySelector('[data-key="/project/company/general/name"] .admin-text-readonly');
-	check( 'a key the account may not write is shown as text - named and described like the others - and has no field', view !== null && view.textContent === 'Acme' && t.text._fieldEls['/project/company/general/name'] === undefined
-		&& view.getAttribute('aria-labelledby') === view.parentNode.querySelector('.nino-admin-field-name').id && view.parentNode.querySelector('.admin-text-meta code').textContent === '/project/company/general/name' );
-	check( '...the keys it may write are fields', t.text._fieldEls['/project/company/contact/email'] !== undefined && t.form.querySelector('button[type="submit"]') !== null );
+	check( '...and the form of its row opens, with the section named by the part', t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === 'constructor' && controlOf( t, '/project/shop/constructor/name' ).value === 'Konstrukteur' );
 }
 
 {
@@ -1147,7 +826,7 @@ function openedText( response, hash, locale ) {
 	const box = t.list.querySelector('#text-search');
 	box.value = 'beraten';
 	box.fire('input');
-	t.list.querySelector('.admin-text-hit-open').click();
+	opens( t.list )[0].click();
 	check( 'a hit takes the focus into the form as well', focusIn( t, t.form ) );
 
 	// the level shown again, by the address or by a step through the history: the focus is the person's
@@ -1167,433 +846,685 @@ function openedText( response, hash, locale ) {
 	const box = t.list.querySelector('#text-search');
 	box.value = 'treffer';
 	box.fire('input');
-	const more = () => t.list.querySelectorAll('button').find( b => b.textContent === 'Weitere anzeigen' );
-	check( 'a search with many hits draws fifty and offers more', t.list.querySelectorAll('.admin-text-hit').length === 50 && more() !== undefined && t.list.querySelector('#text-list-status').textContent === '120 Treffer' );
+	const more = () => t.list.querySelectorAll('button').find( b => b.textContent === W('/_admin/text/label/more') );
+	check( 'a search with many hits draws fifty and offers more', t.list.querySelectorAll('li').length === 50 && more() !== undefined && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/results',120) );
 	more().click();
-	check( '...fifty more', t.list.querySelectorAll('.admin-text-hit').length === 100 && more() !== undefined );
+	check( '...fifty more', t.list.querySelectorAll('li').length === 100 && more() !== undefined );
 	more().click();
-	check( '...until there are no more, and no button', t.list.querySelectorAll('.admin-text-hit').length === 120 && more() === undefined );
+	check( '...until there are no more, and no button', t.list.querySelectorAll('li').length === 120 && more() === undefined );
 	box.value = 'treffer 119';
 	box.fire('input');
-	check( 'typing again begins at the first fifty', t.list.querySelectorAll('.admin-text-hit').length === 1 && t.list.querySelector('#text-list-status').textContent === '1 Treffer' );
-	t.list.querySelector('#text-list-locale').value = 'en_US';
-	t.list.querySelector('#text-list-locale').fire('change');
+	check( 'typing again begins at the first fifty', t.list.querySelectorAll('li').length === 1 && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/result',1) );
+	t.Nino.admin.workLocale.set( 'en_US' );
 	t.list.querySelector('#text-list-empty').click();
 	box.value = '';
 	box.fire('input');
-	check( 'the filter alone is a list of hits as well: 50 of the 120 keys that are empty in English', t.list.querySelectorAll('.admin-text-hit').length === 50 && t.list.querySelector('#text-list-status').textContent === '120 Treffer' );
+	check( 'the filter alone is a list of hits as well: 50 of the 120 keys that are empty in English', t.list.querySelectorAll('li').length === 50 && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/results',120) );
 }
 
 {
 	// without the Routes module there are no pages, and the list has no block of them
 	const t = openedText( textResponse( { pages : null } ) );
-	check( 'without pages the list has the one block, and the details of a page are among the system\'s rows', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Allgemein'
+	check( 'without pages the list has the one block, and the details of a page are among the system\'s rows', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === group('general')
 		&& opens( t.list ).some( r => keyOf( r ) === '_nino/webpage' ) );
 }
 
-// --- the Keys tab: the list, the search, the form that creates and renames --------------
-
-const keysResponse = ( extra ) => Object.assign( { keys : homeKeys.map( e => Object.assign( {}, e ) ), locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'en_US',
-	categories : { template : [ 'common', 'frame-header', 'page-services' ], feature : [ 'consent' ], module : [ 'form', 'localepicker' ], project : [ 'company', 'website', 'mail', 'catalog' ] } }, extra ?? {} );
-
-// What the tab asked of the server last, the reload that follows every write aside
-const lastWrite = k => k.sent.filter( c => c.endpoint !== 'list' ).at(-1);
-
-function openedKeys( response, hash ) {
-	const w = world( 'de_DE', hash, 'en_US' );
-	const { title, levels : [ list, form ] } = w.pane( 'keys', 'keys-list', 'keys-form' );
-	form.classList.add('admin-hidden');
-	const sent = [];
-	const keys = w.Nino.admin.keys;
-	keys._apiCall = ( endpoint, payload, callback ) => {
-		sent.push( { endpoint : endpoint, payload : payload } );
-		callback( 200, endpoint === 'list' ? response : { ok : true } );
-	};
-	keys.init();
-	return Object.assign( w, { list, form, title, sent, keys } );
+{
+	// what the form calls a change: a whitespace is one, a text that is only the fallback of a language is none, a hit is text
+	const t = openedText( textResponse() );
+	t.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	openRow( t, 'template/page-services' );
+	const title = '/template/page-services/intro/title', intro = '/template/page-services/intro/text';
+	typeInto( controlOf( t, title ), 'Leistungen ' );
+	check( 'a text that differs from the stored one by a whitespace only is a change: the form is unsaved and the save sends it', t.registry.text.isDirty() === true );
+	submitText( t );
+	check( '...as typed, with the whitespace', writes( t ).length === 1 && writes( t )[0].payload.items.length === 1 && writes( t )[0].payload.items[0].value === 'Leistungen ' );
+	t.Nino.admin.workLocale.set( 'en_US' );
+	check( 'a language that has no text of its own is drawn with an empty field: the text of another language that stands in for it is never put into the field', controlOf( t, intro ).value === '' && t.registry.text.isDirty() === false );
+	t.sent.length = 0;
+	submitText( t );
+	check( '...and saved as it is, it sends nothing for that key', writes( t ).every( c => c.payload.items.every( i => i.key !== intro ) ) );
+	// the fills are asked for in the language of the form
+	fieldOf( t, '/template/page-services/item-1/text' ).querySelector('.nino-admin-fills-button').click();
+	check( 'the textfills are asked for in the language the form is drawn in', t.sent.filter( c => c.endpoint === 'fills' ).at(-1).payload.locale === 'en_US' );
 }
 
 {
+	// a hit arrives as text, whatever the text holds
+	const bad = 'Treffer &lt;img src=x&gt; und &lt;b&gt;fett&lt;/b&gt;';
+	const t = openedText( textResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [ textEntry( '/project/shop/xss/name', { de_DE : bad, en_US : bad } ) ] ) } ) );
+	const box = t.list.querySelector('#text-search');
+	box.value = 'treffer';
+	box.fire('input');
+	check( 'a hit that holds markup shows it as words: the text is in the row and no element is made from it', t.list.querySelectorAll('li').length === 1 && t.list.textContent.indexOf( '<b>fett</b>' ) !== -1 && t.list.querySelectorAll('img, b').length === 0 );
+}
+
+{
+	// a key that cannot be written is read as text, markup included
+	const readonly = textEntry( '/project/company/note/html', { de_DE : '<p>Hallo <b>Welt</b></p>', en_US : '' }, { html : true, format : 'blocks', writable : false } );
+	const t = openedText( textResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [ readonly ] ) } ) );
+	openRow( t, 'project/company' );
+	const view = fieldOf( t, '/project/company/note/html' ).querySelector('.admin-text-readonly');
+	check( 'a text with markup that the account may not write is read as text: the words, and no element made from the markup', view !== null && view.textContent.indexOf( 'Hallo' ) !== -1 && view.textContent.indexOf( '<' ) === -1 && view.querySelectorAll('b, p').length === 0 );
+}
+
+// --- the Keys tab: the list, the search, the form of a row, the form that makes and renames a key ---
+
+const keysResponse = ( extra ) => Object.assign( { keys : homeKeys.map( e => Object.assign( {}, e, { values : Object.assign( {}, e.values ), formatSet : false, maxlengthSet : false } ) ),
+	locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages, templates : homeData().templates, features : homeData().features,
+	categories : { template : [ 'common', 'frame-header', 'page-services' ], feature : [ 'consent' ], module : [ 'form', 'localepicker' ], project : [ 'company', 'website', 'mail', 'catalog' ] } }, extra ?? {} );
+
+/**
+ *	A page of the workbench with the Keys tab open on a server that holds the keys and changes them the way the real one does: a shape that is
+ *	saved is what the next list says, a text that is written is the text of the key. What it refuses is told to refuse
+ */
+function openedKeys( response, hash, language ) {
+	const w = world( 'de_DE', hash, language ?? 'de_DE' );
+	const { title, levels : [ list, form ] } = w.pane( 'keys', 'keys-list', 'keys-form' );
+	title.textContent = 'Texte';
+	form.classList.add('admin-hidden');
+	w.Nino.adminUi.panelName = () => 'Texte';
+	w.Nino.adminUi.fillsDialog = () => true;
+	const sent = [], told = [], asked = [];
+	const handle = { answer : true, refuse : {}, down : false, hold : false, held : [], listed : 0, scan : { missing : [], alsoUsed : [] } };
+	w.Nino.adminUi.say = sentence => told.push( sentence );
+	w.Nino.adminUi.confirm = ( level, options ) => { asked.push( Object.assign( { level : level }, options ) ); options.onChoose( handle.answer ); return true };
+	const keys = w.Nino.admin.keys;
+	const entry = key => response.keys.find( e => e.key === key );
+
+	keys._apiCall = ( endpoint, payload, callback ) => {
+		sent.push( { endpoint : endpoint, payload : payload } );
+		if( handle.hold === true && endpoint === 'save' ) {
+			handle.held.push( () => { handle.hold = false; keys._apiCall( endpoint, payload, callback ); sent.pop() } );
+			return;
+		}
+		const refused = [].concat( handle.refuse[endpoint] ?? [] ).find( r => r.key === undefined || r.key === payload.key );
+		if( refused !== undefined )
+			return callback( refused.status, refused.body );
+		if( endpoint === 'list' ) {
+			handle.listed++;
+			return handle.down === true && handle.listed > 1 ? callback( 500, null ) : callback( 200, response );
+		}
+		if( endpoint === 'fills' )
+			return callback( 200, { fills : [] } );
+		if( endpoint === 'scan' )
+			return callback( 200, handle.scan );
+		if( endpoint === 'save' ) {
+			const e = entry( payload.key );
+			// A limit under the longest text the key holds is turned down, as the real server does
+			const longest = Math.max( ...Object.values( e.values ).map( v => String( v ?? '' ).length ) );
+			if( payload.maxlength !== null && payload.maxlength < longest )
+				return callback( 400, { error : 'limit below the current text', code : 'keys_limit_short', params : [ longest ], field : 'maxlength' } );
+			if( e.global !== payload.global )
+				e.values = payload.global === true ? { '*' : Object.values( e.values ).find( v => v !== '' && v !== null ) ?? '' } : Object.fromEntries( [ 'de_DE', 'en_US' ].map( code => [ code, Object.values( e.values )[0] ] ) );
+			e.global = payload.global;
+			e.blacklisted = payload.blacklisted;
+			e.formatSet = payload.format !== 'auto';
+			e.format = payload.format === 'auto' ? 'plain' : payload.format;
+			e.html = e.format !== 'plain';
+			e.maxlengthSet = payload.maxlength !== null;
+			e.maxlength = payload.maxlength ?? 150;
+			return callback( 200, {} );
+		}
+		if( endpoint === 'savebatch' ) {
+			const results = {};
+			payload.items.forEach( item => {
+				const refused = handle.refuse['item:'+ item.key];
+				if( refused === undefined )
+					entry( item.key ).values[item.locale] = item.value;
+				results[item.key] = refused ?? { ok : true, value : item.value };
+			} );
+			return callback( 200, { results : results } );
+		}
+		if( endpoint === 'delete' ) {
+			response.keys = response.keys.filter( e => e.key !== payload.key );
+			return callback( 200, {} );
+		}
+		if( endpoint === 'create' ) {
+			response.keys.push( textEntry( payload.key, payload.global === true ? { '*' : payload.value } : { de_DE : payload.value, en_US : '' } ) );
+			return callback( 200, { ok : true, key : payload.key } );
+		}
+		if( endpoint === 'rename' ) {
+			entry( payload.key ).key = payload.newKey;
+			return callback( 200, { ok : true, key : payload.newKey } );
+		}
+		callback( 200, { created : 1, ignored : 1, skipped : 1 } );
+	};
+	keys.init();
+	return Object.assign( w, { list, form, title, sent, keys, told, asked, handle, response, entry } );
+}
+
+const keyWrites = k => k.sent.filter( c => c.endpoint !== 'list' && c.endpoint !== 'fills' );
+const settingsOf = ( k, key ) => k.form.querySelector('[data-settings="'+ key+ '"]');
+const part = ( row, selector ) => row.querySelector( selector );
+const rowButtons = row => row.querySelectorAll('.nino-admin-row-actions button');
+const keyControl = ( k, key ) => k.form.querySelector('[data-key="'+ key+ '"]').querySelector('input, textarea');
+const submitKeys = k => k.form.querySelector('form').fire('submit');
+const choose = ( select, value ) => { select.value = value; select.fire('change') };
+const tick = box => { box.checked = box.checked === false; box.fire('change') };
+
+{
 	const k = openedKeys( keysResponse() );
+	const text = openedText( textResponse() );
 
-	check( 'the Keys tab has the rows of the Text panel - with the hidden keys and the words of the workbench, which it exists to show - as a list of links', k.list.querySelectorAll('ul.nino-admin-list').length > 0
-		&& k.list.querySelectorAll('.nino-admin-list a').some( a => keyOf( a ) === '_admin' ) && k.list.querySelectorAll('.nino-admin-list a').some( a => keyOf( a ) === 'project/mail' )
-		&& k.list.querySelector('#keys-list-body').tagName === 'section' );
-	check( '...each a link with the address of its row, because opening it writes that address - none to nowhere', k.list.querySelectorAll('.nino-admin-list a').every( a => a.href.indexOf('#keys/') === 0 )
-		&& k.list.querySelectorAll('a').find( a => keyOf( a ) === 'project/mail' ).href === '#keys/project/mail' && k.list.querySelectorAll('a').find( a => keyOf( a ) === '_admin' ).href === '#keys/_admin' );
-	check( '...the page rows are blocks, as there is no route list here, and have their names from the vocabulary', k.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Allgemein'
-		&& k.list.querySelectorAll('a').find( a => keyOf( a ) === 'template/frame-header' ).querySelector('strong').textContent === 'Kopfrahmen' );
-	check( 'the session language is the one the tab opens in - the previews are English where the session is', k.keys._locale() === 'en_US' && k.list.querySelectorAll('a').find( a => keyOf( a ) === 'project/company' ).querySelector('small').textContent.includes( 'We build things' ) );
-	check( 'the scan and the new key sit in the action bar, below the list', k.list.querySelector('.nino-admin-list-actions') !== null || k.list.children[k.list.children.length - 1].querySelectorAll('button').length === 2 );
+	check( 'the Keys tab has the groups of the Text panel as the list of the workbench - with the hidden keys and the words of the workbench, which it exists to show - each a link with an address of its own', k.list.querySelectorAll('ul.nino-admin-list').length > 0
+		&& opens( k.list ).some( a => keyOf( a ) === '_admin' ) && opens( k.list ).some( a => keyOf( a ) === 'project/mail' ) && opens( k.list ).every( a => a.tagName === 'a' && a.href === '#keys/'+ keyOf( a ) )
+		&& k.list.querySelectorAll('li').every( li => li.classList.contains('nino-admin-list-row') ) );
+	const nameOf = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group ).querySelector('strong').textContent;
+	check( '...and a group has the one name in both tabs: the pages by their routes, the others by the words of the vocabulary - "Leistungen", not "Page services"',
+		[ 'template/page-services', 'project/company', 'feature/consent', 'template/frame-header' ].every( g => nameOf( k, g ) === nameOf( text, g ) ) && nameOf( k, 'template/page-services' ) === 'Leistungen' && nameOf( k, 'template/frame-header' ) === W('/_admin/common/word/frame-header') );
+	check( '...and the same height: the same row of the block, two lines', [ 'template/page-services', 'project/company' ].every( g => opens( k.list ).find( r => keyOf( r ) === g ).parentNode.parentNode.className === opens( text.list ).find( r => keyOf( r ) === g ).parentNode.parentNode.className ) );
+	check( 'the bar of the list holds the scan and the new key, with the main button for the new key and nothing else', ( () => { const bar = k.list.querySelector('.nino-admin-list-actions'); return bar !== null && bar.querySelectorAll('button').length === 2
+		&& bar.querySelectorAll('.nino-admin-btn-primary').length === 1 && bar.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/new') && bar.querySelector('.nino-admin-btn-secondary').textContent === W('/_admin/keys/label/scan') } )() );
+	check( 'there is no switch of a language in the tab', k.list.querySelectorAll('select').length === 0 );
 
-	// the search: with the hidden keys, and a filter for them alone
+	// the search with the hidden keys, and the chip for them alone
 	const box = k.list.querySelector('#keys-search');
-	check( 'the search is the Text panel\'s - the same box, named the same - and a chip for the hidden keys', box.getAttribute('aria-label') === 'Texte durchsuchen' && k.list.querySelector('#keys-list-hidden').textContent === 'Nur ausgeblendete'
-		&& k.list.querySelector('#keys-list-hidden').getAttribute('aria-pressed') === 'false' );
+	check( 'the search is the Text panel\'s, with a chip of the workbench for the hidden keys', box.getAttribute('aria-label') === W('/_admin/text/label/search') && k.list.querySelector('#keys-list-hidden').classList.contains('nino-admin-chip') && k.list.querySelector('#keys-list-hidden').textContent === W('/_admin/keys/label/hidden-only') );
 	box.value = 'netzwerk';
 	box.fire('input');
-	check( 'it finds a hidden key as well', k.list.querySelectorAll('.admin-text-hit').length === 1 && k.list.querySelector('.admin-text-hit-key').textContent === '/_admin/elements/field/social/title' );
+	check( 'it finds a hidden key as well, as a row of the list', k.list.querySelectorAll('li').length === 1 && k.list.querySelector('.admin-text-hit-key').textContent === '/_admin/elements/field/social/title' && opens( k.list )[0].href === '#keys/_admin/elements/field/social/title' );
 	box.value = '';
 	box.fire('input');
 	k.list.querySelector('#keys-list-hidden').click();
 	check( 'only the hidden ones: the chip is on, and the hits are the keys hidden from the Text panel', k.list.querySelector('#keys-list-hidden').getAttribute('aria-pressed') === 'true'
 		&& k.list.querySelectorAll('.admin-text-hit-key').map( c => c.textContent ).sort().join() === '/_admin/elements/field/social/title,/_nino/webpage/services/uri,/project/mail/color/backdrop' );
 	k.list.querySelector('#keys-list-hidden').click();
-
-	// a key in another language: the code switches the session language
 	box.value = 'consulting';
 	box.fire('input');
-	k.calls.length = 0;
-	check( 'a hit in the language the tab is not in shows its code; there is none in the language it is in', k.list.querySelectorAll('.admin-text-hit-lang').length === 0 );
-	box.value = 'beratung';
-	box.fire('input');
-	const lang = k.list.querySelector('.admin-text-hit-lang');
-	check( '...and the code switches the language', lang.textContent === 'de_DE' && ( lang.click(), k.calls.includes('locale de_DE') && k.keys._locale() === 'de_DE' ) );
-
-	// a hit opens its row at its field
+	check( 'a hit in another language has that language\'s code as a small button, and it asks the workbench for it', ( () => { const code = k.list.querySelector('.nino-admin-row-actions button'); const asked = [];
+		k.Nino.admin.workLocale.choose = c => asked.push( c ); code.click(); k.Nino.admin.workLocale.choose = c => k.Nino.admin.workLocale.set( c ); return code.textContent === 'en_US' && asked.join() === 'en_US' } )() );
 	box.value = 'beratung';
 	box.fire('input');
 	k.calls.length = 0;
-	k.list.querySelector('.admin-text-hit-open').click();
+	opens( k.list )[0].click();
 	check( 'a hit opens the row at the key: the address names it, the field is marked', k.keys._currentGroup === 'template/page-services' && k.calls.includes('go keys/template/page-services/item-1/title') && k.calls.includes('set keys/template/page-services/item-1/title')
 		&& k.form.querySelector('[data-key="/template/page-services/item-1/title"]').classList.contains('is-found') && k.keys._view === 'group' );
-
-	// the form of a row: the key is read, named, and renamed in a form of its own
-	const key = k.form.querySelector('[data-key="/template/page-services/item-1/title"]');
-	check( 'a key shows its key in a field that is read and has a name - and the name it is read by under it',
-		key.querySelector('.admin-text-key-input').readOnly === true && key.querySelector('.admin-text-key-input').value === '/template/page-services/item-1/title' && key.querySelector('.admin-text-key-input').getAttribute('aria-label') === 'Schlüssel'
-		&& key.querySelector('.admin-text-subtitle').textContent === 'Eintrag 1 › Titel' && key.querySelector('.admin-text-key-input').getAttribute('aria-describedby') === key.querySelector('.admin-text-subtitle').id );
-	check( '...its text has the same name, not the key', key.querySelector('textarea').getAttribute('aria-label') === 'Eintrag 1 › Titel' );
-	check( 'the keys of a row come in the order of their sections - the Keys tab knows no template, so a section and its fields are in the alphabet',
-		k.form.querySelectorAll('.admin-text-subtitle').map( n => n.textContent ).join() === 'Einleitung › Text,Einleitung › Titel,Eintrag 1 › Text,Eintrag 1 › Titel,Eintrag 2 › Titel,Legal › Anmerkung' );
-	const buttonsOf = el => el.querySelectorAll('button').map( b => b.textContent );
-	check( 'a key of the grammar can be renamed and deleted', buttonsOf( key ).includes( 'Umbenennen' ) && buttonsOf( key ).includes( 'Löschen' ) );
-	k.keys._openGroup( '_nino/webpage' );
-	check( 'a key of the system - a page\'s details, a language\'s name - has no button to rename it: only its value is edited, and it can be deleted',
-		k.form.querySelectorAll('.admin-text-field').length > 0 && k.form.querySelectorAll('.admin-text-field').every( f => buttonsOf( f ).includes( 'Umbenennen' ) === false && buttonsOf( f ).includes( 'Löschen' ) ) );
-	k.keys._openGroup( '_admin' );
-	check( '...nor has a word of the workbench', k.form.querySelectorAll('.admin-text-field').every( f => buttonsOf( f ).includes( 'Umbenennen' ) === false ) );
-	k.keys._openGroup( 'website' );
-	check( '...but a key somebody made up can be renamed - into the grammar', buttonsOf( k.form.querySelector('[data-key="/website/contact/uri"]') ).includes( 'Umbenennen' ) );
 }
 
 {
-	// the form that renames: the four segments of the key, the namespace already unlocked where the key is not the project's
+	// the form of a row: a text and what it is, for every key, and one Save
 	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services' );
-	k.form.querySelector('[data-key="/template/page-services/item-1/title"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
+	opens( k.list ).find( a => keyOf( a ) === 'template/page-services' ).click();
+	const KEY = '/template/page-services/intro/title';
 
+	check( 'the form has the way back in the context bar, the name of the row, and no select of a language', k.form.querySelectorAll('.nino-admin-back-link').length === 1 && k.form.querySelector('.nino-admin-back-link').textContent === F('/_admin/common/label/back-to',W('/_admin/text/label/back-name'))
+		&& k.form.querySelector('.nino-admin-contextbar-title').textContent === 'Leistungen' && k.form.querySelectorAll('select').filter( s => s.dataset.settings === undefined && s.closest('.admin-key-settings') === null ).length === 0 );
+	check( 'a key is a field named like the Text panel\'s, with the key and the count under it, and under it the row of what the key is', ( () => { const f = k.form.querySelector('[data-key="'+ KEY+ '"]'); return f.querySelector('.admin-text-meta code').textContent === KEY
+		&& f.querySelector('input').value === 'Leistungen' && settingsOf( k, KEY ) !== null && f.parentNode === settingsOf( k, KEY ).parentNode && f.parentNode.children.indexOf( settingsOf( k, KEY ) ) === f.parentNode.children.indexOf( f ) + 1 } )() );
+	const row = settingsOf( k, KEY );
+	check( 'the row of a key is a format, a limit, whether it is global and whether it is hidden - fields of the workbench, each with its own name - and the buttons of the key at its end', ( () => {
+		const select = part( row, 'select' ), limit = part( row, 'input[type="number"]' ), boxes = row.querySelectorAll('input').filter( i => i.type === 'checkbox' );
+		return select.children.map( o => o.value ).join() === 'auto,plain,inline,lines,blocks' && select.value === 'auto' && limit.value === '' && limit.min === '1' && boxes.length === 2 && boxes.every( b => b.checked === false )
+			&& row.querySelectorAll('.nino-admin-switch').length === 2 && row.children[0].tagName === 'span' && row.querySelector('.nino-admin-help') !== null } )() );
+	check( '...Rename and Delete are the small buttons at the end of the row of the key, the one that takes something away last and red', ( () => { const buttons = rowButtons( row );
+		return buttons.map( b => b.textContent ).join() === [ 'rename', 'delete' ].map( w => W('/_admin/common/label/'+ w) ).join() && buttons.every( b => b.classList.contains('nino-admin-btn--small') ) && buttons[1].classList.contains('nino-admin-btn-danger') && buttons.every( b => b.getAttribute('aria-label').indexOf( KEY ) !== -1 ) } )() );
+	check( '...a key of the system has no button to rename it - its name is what the code that reads it asks for - and one somebody made up has', ( () => {
+		k.keys._openGroup( '_nino/webpage' ); const a = rowButtons( k.form.querySelector('.admin-key-settings') ).map( b => b.textContent ).join();
+		k.keys._openGroup( 'website' ); const b = rowButtons( k.form.querySelector('.admin-key-settings') ).map( b => b.textContent ).join();
+		k.keys._openGroup( 'template/page-services' ); return a === W('/_admin/common/label/delete') && b === [ 'rename', 'delete' ].map( w => W('/_admin/common/label/'+ w) ).join() } )() );
+	check( 'the view has one bar with one main button that submits, and no button of Apply, in the rows or anywhere', k.form.querySelectorAll('.nino-admin-actionbar').length === 1 && k.form.querySelectorAll('.nino-admin-btn-primary').length === 1
+		&& k.form.querySelector('.nino-admin-btn-primary').type === 'submit' && k.form.querySelectorAll('button').filter( b => b.type === 'submit' ).length === 1 );
+	check( 'a key the form holds that is the same in every language has the badge, and the row says that it is global', ( () => { k.keys._openGroup( 'project/company' ); const f = k.form.querySelector('[data-key="/project/company/general/name"]');
+		const g = settingsOf( k, '/project/company/general/name' ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[0]; k.keys._openGroup( 'template/page-services' ); return f.querySelector('.nino-admin-badge') !== null && g.checked === true } )() );
+	check( 'the fill icon is at a field of several lines and a text with markup, and not at a line', k.form.querySelectorAll('.admin-text-field').every( f => ( f.querySelector('input') !== null ) === ( f.querySelector('.nino-admin-fills-button') === null ) ) );
+
+	// nothing changed: nothing is sent
+	submitKeys( k );
+	check( 'a save with nothing changed sends nothing and says it is saved', keyWrites( k ).length === 0 && k.told.join() === W('/_admin/common/msg/saved') );
+
+	// a text
+	typeInto( keyControl( k, KEY ), 'Unsere Leistungen' );
+	check( 'a changed text is unsaved input', k.registry.keys.isDirty() === true );
+	submitKeys( k );
+	check( 'a save of a text sends the text and nothing of its shape, then reads the keys again and draws the row from what the server holds', keyWrites( k ).map( c => c.endpoint ).join() === 'savebatch'
+		&& keyWrites( k )[0].payload.items.length === 1 && keyWrites( k )[0].payload.items[0].key === KEY && keyWrites( k )[0].payload.items[0].locale === 'de_DE' && k.sent.at(-1).endpoint === 'list' );
+	check( '...says it as a toast, the line empty, the view and the address as they were - and the form holds no unsaved input', k.told.at(-1) === W('/_admin/common/msg/saved') && k.form.querySelector('#keys-form-msg').textContent === '' && k.keys._currentGroup === 'template/page-services' && k.registry.keys.isDirty() === false
+		&& keyControl( k, KEY ).value === 'Unsere Leistungen' );
+	check( '...and tells the shell that texts were written, once for each request that wrote', k.touched.join() === 'texts' );
+}
+
+{
+	// the shape of a key is saved with its text, by the one Save
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title', X = '/template/page-services/intro/text';
+	const row = key => settingsOf( k, key );
+
+	choose( part( row( T ), 'select' ), 'lines' );
+	check( 'a format that is chosen is unsaved input for the shell', k.registry.keys.isDirty() === true );
+	choose( part( row( T ), 'select' ), 'auto' );
+	check( '...and chosen back it is not', k.registry.keys.isDirty() === false );
+	choose( part( row( T ), 'select' ), 'lines' );
+	typeInto( part( row( T ), 'input[type="number"]' ), '90' );
+	tick( row( X ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[1] );
+	typeInto( keyControl( k, X ), 'Das bieten wir an: mehr' );
+	submitKeys( k );
+	const writes = keyWrites( k );
+	check( 'a save writes the shape of each key that changed, one request each, and then the texts that changed in one - and the formats a text was widened to ask nothing', writes.map( c => c.endpoint ).join() === 'save,save,savebatch' && k.asked.length === 0 );
+	check( '...a shape with the format, the limit as a number and both ticks', JSON.stringify( writes[0].payload ) === JSON.stringify( { key : T, global : false, blacklisted : false, format : 'lines', maxlength : 90 } )
+		&& JSON.stringify( writes[1].payload ) === JSON.stringify( { key : X, global : false, blacklisted : true, format : 'auto', maxlength : null } ) );
+	check( '...and the text in the language the form shows', writes[2].payload.items.length === 1 && writes[2].payload.items[0].key === X && writes[2].payload.items[0].locale === 'de_DE' );
+	check( 'the row is drawn again from what the server holds: the format, the limit and the ticks are the stored ones, and nothing is unsaved', part( row( T ), 'select' ).value === 'lines' && part( row( T ), 'input[type="number"]' ).value === '90'
+		&& row( X ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[1].checked === true && k.registry.keys.isDirty() === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
+
+	// while the requests run the form is held, and drawn again from the server when they are done
+	choose( part( row( T ), 'select' ), 'inline' );
+	typeInto( keyControl( k, X ), 'Während es läuft' );
+	k.handle.hold = true;
+	submitKeys( k );
+	let second = null;
+	k.registry.keys.save( ok => { second = ok } );
+	check( 'while the requests of a save run the form is busy: its controls are held, the shell sees a save that runs, and a second save is told no and sends nothing', k.form.querySelector('form').getAttribute('aria-busy') === 'true'
+		&& k.form.querySelectorAll('input, textarea, select, button').every( c => c.disabled === true ) && k.registry.keys.saving() === true && second === false && keyWrites( k ).filter( c => c.endpoint === 'save' ).length === 3 );
+	k.handle.held.shift()();
+	check( '...and when they are done the form is free again, drawn from what the server holds', k.registry.keys.saving() === false && k.form.querySelector('form').getAttribute('aria-busy') !== 'true' && k.form.querySelectorAll('button').some( c => c.disabled === true ) === false
+		&& part( row( T ), 'select' ).value === 'inline' && k.registry.keys.isDirty() === false );
+
+	// a key made global: its text is written to the one text
+	tick( row( X ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[0] );
+	typeInto( keyControl( k, X ), 'Global jetzt' );
+	submitKeys( k );
+	const batch = keyWrites( k ).at(-1);
+	check( 'a key that is made global has its text written to the one text of every language, and not to the language on screen', batch.endpoint === 'savebatch' && batch.payload.items[0].locale === '*' && k.keys._groups['template/page-services'].find( e => e.key === X ).global === true );
+}
+
+{
+	// a format that holds less asks once, for all the keys it changes
+	const response = keysResponse();
+	[ '/template/page-services/item-1/text', '/template/page-services/intro/title' ].forEach( key => { const e = response.keys.find( x => x.key === key ); e.format = 'blocks'; e.formatSet = true; e.html = true } );
+	const k = openedKeys( response );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const A = '/template/page-services/item-1/text', B = '/template/page-services/intro/title', C = '/template/page-services/item-2/title';
+	choose( part( settingsOf( k, A ), 'select' ), 'plain' );
+	choose( part( settingsOf( k, B ), 'select' ), 'inline' );
+	choose( part( settingsOf( k, C ), 'select' ), 'blocks' );
+	k.handle.answer = false;
+	submitKeys( k );
+	check( 'two formats that hold less are asked about once, with the heaviest weight - what is stored is converted - and the keys they change as the details of the question', k.asked.length === 1 && k.asked[0].level === 'destructive'
+		&& k.asked[0].details.length === 2 && k.asked[0].details.some( d => d.indexOf( A ) === 0 ) && k.asked[0].details.some( d => d.indexOf( B ) === 0 ) );
+	check( '...a format that holds as much as the one before is not among them, and a question that is answered no sends nothing', k.asked[0].details.every( d => d.indexOf( C ) === -1 ) && keyWrites( k ).length === 0 && k.registry.keys.isDirty() === true );
+	k.handle.answer = true;
+	submitKeys( k );
+	check( 'answered yes it writes the shape of all three, in one go, and asks nothing more', k.asked.length === 2 && keyWrites( k ).filter( c => c.endpoint === 'save' ).length === 3 );
+	choose( part( settingsOf( k, B ), 'select' ), 'blocks' );
+	submitKeys( k );
+	check( 'a format that holds more asks nothing', k.asked.length === 2 && keyWrites( k ).filter( c => c.endpoint === 'save' ).length === 4 );
+}
+
+{
+	// a server that turns a part down: said at its field, nothing counts as saved that is not
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title', X = '/template/page-services/intro/text', Y = '/template/page-services/item-2/title';
+	const row = key => settingsOf( k, key );
+	const limitOf = key => part( row( key ), 'input[type="number"]' );
+	typeInto( limitOf( T ), '5' );
+	typeInto( keyControl( k, T ), 'Ein neuer Titel' );
+	typeInto( keyControl( k, X ), 'Ein neuer Text' );
+	typeInto( keyControl( k, Y ), 'Ein neuer Titel B' );
+	choose( part( row( Y ), 'select' ), 'lines' );
+	k.handle.refuse.save = [
+		{ key : T, status : 400, body : { error : 'limit', code : 'keys_limit_short', params : [ 14 ], field : 'maxlength' } },
+		{ key : Y, status : 400, body : { error : 'unknown format', code : 'keys_format', params : [], field : 'format' } },
+	];
+	submitKeys( k );
+	const writes = keyWrites( k );
+	check( 'a shape the server turns down is said under its field - the limit under the limit, the format under the format - in the words of the server', row( T ).querySelectorAll('.nino-admin-field-error').length === 1 && limitOf( T ).getAttribute('aria-invalid') === 'true'
+		&& row( Y ).querySelectorAll('.nino-admin-field-error').length === 1 && part( row( Y ), 'select' ).getAttribute('aria-invalid') === 'true' && row( T ).querySelector('.nino-admin-field-error').textContent === F('/_admin/error/keys_limit_short',14) );
+	check( 'a text made shorter in the save that lowers its limit is written before the shape, so that the server does not refuse a limit under the text; the text of a key whose shape was turned down for another reason is not sent', writes.map( c => c.endpoint ).join() === 'savebatch,save,save,savebatch'
+		&& writes[0].payload.items.map( i => i.key ).join() === T && writes[3].payload.items.map( i => i.key ).join() === X );
+	check( '...what the server took is saved and what it did not is still unsaved input, drawn as it was typed', k.registry.keys.isDirty() === true && limitOf( T ).value === '5' && part( row( Y ), 'select' ).value === 'lines' && keyControl( k, Y ).value === 'Ein neuer Titel B'
+		&& k.keys._session.changed().join() === Y && k.keys._shapeChanged().sort().join() === [ T, Y ].sort().join() );
+	check( '...the line of the bar says how many keys were not saved - no toast of success - and the focus is on the first field that is wrong', k.form.querySelector('#keys-form-msg').textContent === F('/_admin/keys/error/some',2) && k.told.length === 0 && k.dom.doc.activeElement === limitOf( T ) );
+	k.handle.refuse = {};
+	typeInto( limitOf( T ), '40' );
+	k.sent.length = 0;
+	submitKeys( k );
+	check( 'the next save sends what is still unsaved, the shapes of both keys and the text of the one', keyWrites( k ).map( c => c.endpoint ).join() === 'save,save,savebatch' && keyWrites( k ).at(-1).payload.items.map( i => i.key ).join() === Y
+		&& k.registry.keys.isDirty() === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
+	check( '...and after a save that went well the focus is on the main button', k.dom.doc.activeElement === k.form.querySelector('.nino-admin-btn-primary') );
+
+	// a text the server turns down
+	typeInto( keyControl( k, X ), 'Noch ein Text' );
+	k.handle.refuse['item:'+ X] = { ok : false, error : 'could not be written' };
+	submitKeys( k );
+	check( 'a text the server turns down is said under its field, stays unsaved input and takes the focus', fieldOf( k, X ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 && k.registry.keys.isDirty() === true && keyControl( k, X ).value === 'Noch ein Text' && k.dom.doc.activeElement === keyControl( k, X ) );
+	delete k.handle.refuse['item:'+ X];
+
+	// a limit that is no number is said before anything is sent
+	k.sent.length = 0;
+	typeInto( limitOf( T ), '0' );
+	submitKeys( k );
+	check( 'a limit that is not a whole number from 1 is said at its field before anything is sent, with the focus on it', keyWrites( k ).length === 0 && row( T ).querySelectorAll('.nino-admin-field-error').length === 1 && k.dom.doc.activeElement === limitOf( T )
+		&& k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/fields') );
+	typeInto( limitOf( T ), '40' );
+}
+
+{
+	// one key that was not saved is said in the singular, several in the plural
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title';
+	typeInto( keyControl( k, T ), 'Neu' );
+	k.handle.refuse['item:'+ T] = { ok : false, error : 'could not be written' };
+	submitKeys( k );
+	check( 'one key that was not saved is said in the singular, which is not the sentence of several', k.form.querySelector('#keys-form-msg').textContent === F('/_admin/keys/error/one',1) && F('/_admin/keys/error/one',1) !== F('/_admin/keys/error/some',1) );
+}
+
+{
+	// the limit and the text in one save: each action is valid by itself, in either direction
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const X = '/template/page-services/intro/text', T = '/template/page-services/intro/title';
+	typeInto( part( settingsOf( k, X ), 'input[type="number"]' ), '40' );
+	typeInto( keyControl( k, T ), 'Kürzer' );
+	typeInto( part( settingsOf( k, T ), 'input[type="number"]' ), '10' );
+	typeInto( keyControl( k, X ), 'Ein Text' );
+	k.entry( X ).values.de_DE = 'Ein Text von mehr als vierzig Zeichen Länge, der gekürzt wird.';
+	k.keys._openGroup( 'template/page-services', null, true );
+	typeInto( part( settingsOf( k, X ), 'input[type="number"]' ), '20' );
+	typeInto( keyControl( k, X ), 'Gekürzt' );
+	k.sent.length = 0;
+	submitKeys( k );
+	check( 'a limit lowered under the text a key holds and the text made shorter in the same save: the text is written first and the limit is taken', keyWrites( k ).map( c => c.endpoint ).join() === 'savebatch,save' && k.registry.keys.isDirty() === false
+		&& k.form.querySelectorAll('.nino-admin-field-error').length === 0 );
+
+	// the limit raised and the text made longer: the field takes the longer text as the limit is typed, and the shape is written first
+	const control = keyControl( k, X );
+	const before = control.maxLength;
+	typeInto( part( settingsOf( k, X ), 'input[type="number"]' ), '400' );
+	check( 'a limit that is typed is the limit the field counts to and takes, before the save', control.maxLength === 400 && before === 20 && fieldOf( k, X ).querySelector('.nino-admin-char-counter').textContent.split(' / ')[1] === '400' );
+	typeInto( control, 'x'.repeat( 300 ) );
+	k.sent.length = 0;
+	submitKeys( k );
+	check( '...a limit raised and the text made longer in the same save: the shape is written first, then the text', keyWrites( k ).map( c => c.endpoint ).join() === 'save,savebatch' && k.registry.keys.isDirty() === false );
+}
+
+{
+	// a key that becomes global drops the texts of the other languages: asked once with the formats, naming each key and the languages
+	const response = keysResponse();
+	const A = '/template/page-services/item-1/title', C = '/template/page-services/intro/title', D = '/template/page-services/item-1/text';
+	response.keys.find( e => e.key === C ).values = { de_DE : 'Gleich', en_US : 'Gleich' };
+	{ const e = response.keys.find( x => x.key === D ); e.format = 'blocks'; e.formatSet = true; e.html = true }
+	const k = openedKeys( response );
+	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	k.keys._openGroup( 'template/page-services', null, true );
+	const globalBox = key => settingsOf( k, key ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[0];
+	k.handle.answer = false;
+	tick( globalBox( A ) );
+	tick( globalBox( C ) );
+	tick( globalBox( '/template/page-services/intro/text' ) );
+	submitKeys( k );
+	check( 'a key that becomes global asks, with the heaviest weight, naming the key and the languages that lose their text and the one whose text stays - and a key whose other texts are the same does not', k.asked.length === 1 && k.asked[0].level === 'destructive'
+		&& k.asked[0].details.length === 1 && k.asked[0].details[0] === F('/_admin/keys/confirm/global-line',A,'English','Deutsch') ); // the key whose other language has no text is not among them
+	check( '...answered no it changes nothing: nothing is sent and the form is as it was typed', keyWrites( k ).length === 0 && k.registry.keys.isDirty() === true && globalBox( A ).checked === true );
+	choose( part( settingsOf( k, D ), 'select' ), 'plain' );
+	submitKeys( k );
+	check( 'a narrower format and a global key are one question with both among its details', k.asked.length === 2 && k.asked[1].details.length === 2 && k.asked[1].details.some( d => d.indexOf( D ) === 0 ) && k.asked[1].details.some( d => d.indexOf( A ) === 0 ) );
+	k.handle.answer = true;
+	submitKeys( k );
+	check( '...answered yes both are written', keyWrites( k ).filter( c => c.endpoint === 'save' ).map( c => c.payload.key ).sort().join() === [ A, C, D, '/template/page-services/intro/text' ].sort().join() && k.asked.length === 3 );
+}
+
+{
+	// the keys cannot be read again after what was written: the form stays, says it, and keeps what was turned down
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title', X = '/template/page-services/intro/text';
+	typeInto( keyControl( k, T ), 'Gespeichert aber nicht gelesen' );
+	typeInto( keyControl( k, X ), 'Abgelehnt' );
+	k.handle.refuse['item:'+ X] = { ok : false, error : 'could not be written' };
+	k.handle.down = true;
+	submitKeys( k );
+	check( 'where the keys cannot be read again the form stays: the line says it was saved and not read again, with a button that reads them, and the controls are free', k.form.querySelector('form') !== null && k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/reload')
+		&& k.form.querySelector('#keys-reload') !== null && k.form.querySelector('form').getAttribute('aria-busy') !== 'true' && k.form.querySelectorAll('input, textarea, select, button').every( c => c.disabled === false ) );
+	check( '...what was written counts as saved and what was turned down is still unsaved input at its field, so the shell asks about exactly that', k.registry.keys.isDirty() === true && k.keys._session.changed().join() === X
+		&& fieldOf( k, X ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 && keyControl( k, X ).value === 'Abgelehnt' );
+	k.handle.down = false;
+	k.handle.refuse = {};
+	k.form.querySelector('#keys-reload').click();
+	check( 'the button reads the keys anew and draws the row from them', k.form.querySelector('#keys-reload') === null && keyControl( k, T ).value === 'Gespeichert aber nicht gelesen' && k.registry.keys.isDirty() === false );
+}
+
+{
+	// delete: asked, and said at the bar
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title';
+	k.handle.answer = false;
+	rowButtons( settingsOf( k, T ) )[1].click();
+	check( 'deleting asks first, with the heaviest weight, and the title and the answer say what is done', k.asked.length === 1 && k.asked[0].level === 'destructive' && k.asked[0].title === W('/_admin/keys/confirm/delete-title') && k.asked[0].yes === k.asked[0].title && keyWrites( k ).length === 0 );
+	k.handle.answer = true;
+	k.handle.refuse.delete = { status : 500, body : null };
+	rowButtons( settingsOf( k, T ) )[1].click();
+	check( 'a refusal stands in the line of the bar - no window of the browser - and the key is still there', k.form.querySelector('#keys-form-msg').textContent.indexOf( '500' ) !== -1 && settingsOf( k, T ) !== null && k.told.length === 0 );
+	delete k.handle.refuse.delete;
+	rowButtons( settingsOf( k, T ) )[1].click();
+	check( 'a delete that went through draws the row again without the key, says it and keeps the address', keyWrites( k ).at(-1).endpoint === 'delete' && settingsOf( k, T ) === null && k.told.at(-1) === W('/_admin/common/msg/deleted') && k.form.classList.contains('admin-hidden') === false && k.touched.join() === 'texts' );
+
+	// it asks about unsaved input first, as the row is drawn again
+	typeInto( keyControl( k, '/template/page-services/intro/text' ), 'x' );
+	const before = k.counts.guard;
+	rowButtons( settingsOf( k, '/template/page-services/item-2/title' ) )[1].click();
+	check( 'a delete of a key in a row that holds unsaved input asks the shell first', k.counts.guard === before + 1 );
+}
+
+{
+	// the form that renames: an address, the four segments, checked when it is sent
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/item-1/title';
+	k.calls.length = 0;
+	rowButtons( settingsOf( k, T ) )[0].click();
 	const control = id => k.form.querySelector( '#'+ id );
 	const options = id => control( id ).children.filter( c => c.tagName === 'option' ).map( o => o.value );
-	const submit = () => k.form.querySelector('button[type="submit"]');
-	check( 'renaming opens the form with the key\'s segments, one in each field', k.keys._view === 'new' && k.keys._renameFrom === '/template/page-services/item-1/title' && control('keys-form-namespace').value === 'template' && control('keys-form-category').value === 'page-services'
-		&& control('keys-form-part').value === 'item-1' && control('keys-form-name').value === 'title' && k.form.querySelector('.main-title').textContent === 'Textschlüssel umbenennen' );
-	check( '...a namespace other than /project already unlocked, so the choice has them all - and never /_nino or /_admin', options('keys-form-namespace').join() === 'project,template,feature,module' && k.form.querySelectorAll('button').every( b => b.hidden === true || b.textContent !== 'Entsperren' ) );
-	check( '...the category a choice: the templates there are, with "common"', control('keys-form-category').tagName === 'select' && options('keys-form-category').join() === 'common,frame-header,page-services' );
-	check( '...the key they make and the name it is read by below them, and the button off while the key is what it was', control('keys-form-preview').textContent === '/template/page-services/item-1/title'
-		&& k.form.querySelector('#keys-form-shown').textContent === 'Angezeigt als Eintrag 1 › Titel' && submit().disabled === true && submit().textContent === 'Umbenennen' );
-	check( '...and no starting value, which a key that exists has', control('keys-form-new-value') === null && control('keys-form-new-global') === null );
+	check( 'Rename opens the form of a rename at its address, with the four segments of the key', k.keys._view === 'new' && k.keys._renameFrom === T && k.calls.includes('go keys/@rename/template/page-services/item-1/title') && k.calls.includes('set keys/@rename/template/page-services/item-1/title')
+		&& control('keys-form-namespace').value === 'template' && control('keys-form-category').value === 'page-services' && control('keys-form-part').value === 'item-1' && control('keys-form-name').value === 'title' );
+	check( '...the title says it and the main button says it - one main button, not locked', k.form.querySelector('.nino-admin-contextbar-title').textContent === W('/_admin/keys/label/rename-title') && k.form.querySelectorAll('.nino-admin-btn-primary').length === 1
+		&& k.form.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/rename-title') && k.form.querySelector('.nino-admin-btn-primary').disabled === false && k.form.querySelector('form').noValidate === true );
+	check( '...a namespace other than /project is unlocked, so the choice has them all; the category is a choice of what there is', options('keys-form-namespace').join() === 'project,template,feature,module' && options('keys-form-category').join() === 'common,frame-header,page-services'
+		&& control('keys-form-preview').textContent === T && control('keys-form-new-value') === null );
+	check( 'the form is in the address of the tab, and Back shows the list', k.keys._parts().join() === '@rename,template,page-services,item-1,title' );
+
+	submitKeys( k );
+	check( 'a key that is not changed is no rename: the line says so, nothing is sent, the focus is at the name', keyWrites( k ).length === 0 && k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/unchanged') && k.dom.doc.activeElement === control('keys-form-name') );
 	const name = control('keys-form-name');
-	name.value = 'Titel';
-	name.fire('input');
-	check( 'a segment with a capital is marked as the user types, says what is wrong, and the button stays off', name.getAttribute('aria-invalid') === 'true' && control('keys-form-name-error').hidden === false
-		&& name.getAttribute('aria-describedby') === 'keys-form-name-error' && submit().disabled === true && control('keys-form-name-error').textContent.includes( 'Bindestriche' ) );
-	name.value = 'a.b';
-	name.fire('input');
-	check( '...so is one with a dot', name.getAttribute('aria-invalid') === 'true' && submit().disabled === true );
-	name.value = 'heading-2';
-	name.fire('input');
-	check( 'a word of a key is not marked, and the button is on once the key is another', name.getAttribute('aria-invalid') === 'false' && control('keys-form-name-error').hidden === true && name.getAttribute('aria-describedby') !== 'keys-form-name-error' && submit().disabled === false
-		&& control('keys-form-preview').textContent === '/template/page-services/item-1/heading-2' );
-	const part = control('keys-form-part');
-	part.value = '';
-	part.fire('input');
-	check( 'a segment left empty keeps the button off without calling it wrong', submit().disabled === true && part.getAttribute('aria-invalid') === 'false' );
-	part.value = 'item-1';
-	part.fire('input');
-	check( 'dirty once a segment is changed', k.keys.isDirty() === true );
-	k.keys._saveNewKey();
-	check( 'submitting renames the key to the one the segments make', lastWrite( k ).endpoint === 'rename' && JSON.stringify( lastWrite( k ).payload ) === '{"key":"/template/page-services/item-1/title","newKey":"/template/page-services/item-1/heading-2"}' );
-	check( '...a write of texts, and of templates too where the key is one a template reads: the Text panel has a row for it', k.touched.join() === 'texts,templates' );
+	typeInto( name, 'Titel!' );
+	submitKeys( k );
+	check( 'a segment that is no word of a key is said under it when the form is sent, with what is expected - and nothing is sent', keyWrites( k ).length === 0 && k.form.querySelectorAll('.nino-admin-field-error').length === 1 && name.getAttribute('aria-invalid') === 'true'
+		&& k.form.querySelector('.nino-admin-field-error').textContent === F('/_admin/keys/error/invalid',W('/_admin/keys/label/name'),W('/_admin/keys/expect/segment')) );
+	typeInto( name, 'heading-2' );
+	check( 'the key the segments make is said as it is typed, and how the panel will read it', control('keys-form-preview').textContent === '/template/page-services/item-1/heading-2' && k.form.querySelector('#keys-form-shown').textContent === W('/_admin/keys/label/shown-as')+ ' '+ k.U.slugLabel('item-1')+ ' › '+ k.U.slugLabel('heading-2') );
+	typeInto( control('keys-form-part'), 'cta' );
+	check( '...a segment that is no word of the vocabulary but is one of a key is said under it - a warning, no refusal', k.form.querySelectorAll('.admin-key-note').some( n => n.textContent.indexOf( stem('/_admin/keys/hint/not-a-word') ) === 0 ) );
+	typeInto( control('keys-form-part'), 'item-1' );
+	k.handle.refuse.rename = { status : 409, body : { error : 'key already exists', code : 'keys_exists', params : [ '/template/page-services/item-1/heading-2' ], field : 'newKey' } };
+	submitKeys( k );
+	check( 'a key the server refuses - one that is taken - is said at the name field and in the line, with the focus there', k.form.querySelectorAll('.nino-admin-field-error').length === 1 && name.getAttribute('aria-invalid') === 'true' && k.form.querySelector('#keys-form-msg').textContent === F('/_admin/error/keys_exists','/template/page-services/item-1/heading-2') && k.dom.doc.activeElement === name );
+	delete k.handle.refuse.rename;
+	submitKeys( k );
+	check( 'submitting renames the key to the one the segments make', keyWrites( k ).at(-1).endpoint === 'rename' && JSON.stringify( keyWrites( k ).at(-1).payload ) === JSON.stringify( { key : T, newKey : '/template/page-services/item-1/heading-2' } ) );
+	check( '...a write of texts, and of templates too where the key is one a template reads', k.touched.join() === 'texts,templates' );
+	check( '...and the key has its place: its row is open at it, at its address, as a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'template/page-services' && k.calls.at(-1).indexOf( 'set keys/template/page-services/item-1/heading-2' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved') );
 }
 
 {
-	// the form that creates: /project to begin with, the rest after an explicit unlock
+	// the form that creates
 	const k = openedKeys( keysResponse() );
-	k.keys._openNewKeyForm();
+	k.calls.length = 0;
+	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-primary').click();
 	const control = id => k.form.querySelector( '#'+ id );
 	const options = id => control( id ).children.filter( c => c.tagName === 'option' ).map( o => o.value );
-	const unlock = () => k.form.querySelectorAll('button').find( b => b.textContent === 'Entsperren' );
-	const submit = () => k.form.querySelector('button[type="submit"]');
+	check( 'a new key has an address of its own, the at sign keeping it from a row called new', k.keys._view === 'new' && k.keys._renameFrom === null && k.calls.includes('go keys/@new') && k.calls.includes('set keys/@new') );
+	check( '...the labels are at the left of the fields (the form is a fieldset of fields of the workbench), and every field of the segments is required', k.form.querySelector('fieldset').children.some( c => c.classList.contains('nino-admin-field') )
+		&& [ 'keys-form-category', 'keys-form-part', 'keys-form-name' ].every( id => control( id ).getAttribute('aria-required') === 'true' ) );
+	check( 'the main button says what it does, and is not locked while the form is empty', k.form.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/create') && k.form.querySelector('.nino-admin-btn-primary').disabled === false && k.form.querySelector('form').noValidate === true );
+	check( '...a new key begins with /project alone to choose from, and a switch of the workbench that unlocks the others, with its reason behind the (?)', options('keys-form-namespace').join() === 'project'
+		&& k.form.querySelector('.nino-admin-switch') !== null && k.form.querySelectorAll('.nino-admin-help-text').some( h => h.textContent === W('/_admin/keys/hint/unlock') ) );
+	check( '...its category is a field with suggestions for /project', control('keys-form-category').tagName === 'input' && control('keys-form-category').getAttribute('list') === 'keys-form-categories' && k.form.querySelector('#keys-form-categories').children.map( o => o.value ).join() === 'company,website,mail,catalog' );
+	check( '...and has a starting value, which is a field of several lines with the textfills', control('keys-form-new-value').tagName === 'textarea' && control('keys-form-new-value').closest('.nino-admin-field').querySelector('.nino-admin-fills-button') !== null && control('keys-form-new-global') !== null );
 
-	check( 'a new key begins with /project alone to choose from, and a button that unlocks the others, with the reason for it beside them', k.keys._view === 'new' && k.keys._renameFrom === null && options('keys-form-namespace').join() === 'project' && unlock().hidden === false
-		&& k.form.querySelectorAll('.nino-admin-hint').some( h => h.textContent.includes( 'Install-Einheit' ) && h.hidden === false ) );
-	check( '...the category a field with the categories there are as suggestions - the ones the project is shipped with and the ones keys already use', control('keys-form-category').tagName === 'input' && control('keys-form-category').getAttribute('list') === 'keys-form-categories'
-		&& control('keys-form-categories').children.map( o => o.value ).join() === 'company,website,mail,catalog' && control('keys-form-category').value === '' );
-	check( '...a part, a name, whether it is the same in every language, and a starting value', control('keys-form-part').value === '' && control('keys-form-name').value === '' && control('keys-form-new-global') !== null && control('keys-form-new-value') !== null
-		&& submit().disabled === true && submit().textContent === 'Anlegen' && k.form.querySelector('.main-title').textContent === 'Neuer Textschlüssel' );
-	check( 'a form nobody touched holds nothing', k.keys.isDirty() === false );
-	unlock().click();
-	check( 'unlocking offers /template, /feature and /module - and never /_nino or /_admin, which the workbench does not create', options('keys-form-namespace').join() === 'project,template,feature,module' && unlock().hidden === true
-		&& options('keys-form-namespace').every( o => o.indexOf('_') === -1 ) && k.form.querySelectorAll('.nino-admin-hint').some( h => h.textContent.includes( 'Install-Einheit' ) && h.hidden === false ) );
-	control('keys-form-namespace').value = 'template';
-	control('keys-form-namespace').fire('change');
-	check( 'the namespace /template offers the templates there are and "common" as the category', control('keys-form-category').tagName === 'select' && options('keys-form-category').join() === 'common,frame-header,page-services' && control('keys-form-categories') === null );
-	control('keys-form-namespace').value = 'feature';
-	control('keys-form-namespace').fire('change');
-	check( '/feature offers the features that are installed', options('keys-form-category').join() === 'consent' );
-	control('keys-form-namespace').value = 'module';
-	control('keys-form-namespace').fire('change');
-	check( '/module the modules of the kernel', options('keys-form-category').join() === 'form,localepicker' );
-	control('keys-form-namespace').value = 'project';
-	control('keys-form-namespace').fire('change');
-	control('keys-form-category').value = 'catalog';
-	control('keys-form-category').fire('input');
-	control('keys-form-part').value = 'list';
-	control('keys-form-part').fire('input');
-	control('keys-form-name').value = 'title';
-	control('keys-form-name').fire('input');
-	check( 'back at /project the category is a field again, and a key typed into the form is a key that can be made', control('keys-form-category').tagName === 'input' && control('keys-form-preview').textContent === '/project/catalog/list/title' && submit().disabled === false
-		&& k.form.querySelector('#keys-form-shown').textContent === 'Angezeigt als Liste › Titel' && k.keys.isDirty() === true );
-	control('keys-form-category').value = 'Catalog';
-	control('keys-form-category').fire('input');
-	check( 'a category of the project is checked like the other segments', control('keys-form-category').getAttribute('aria-invalid') === 'true' && submit().disabled === true && control('keys-form-category-error').hidden === false );
-	control('keys-form-category').value = 'catalog';
-	control('keys-form-category').fire('input');
-	control('keys-form-new-value').value = 'Katalog';
-	control('keys-form-new-global').checked = true;
-	k.keys._saveNewKey();
-	check( 'submitting creates the key the segments make, with its value, whether it is global, and the language the tab shows it in - the session of another window may hold another', lastWrite( k ).endpoint === 'create' && JSON.stringify( lastWrite( k ).payload ) === '{"key":"/project/catalog/list/title","global":true,"value":"Katalog","values":{"en_US":"Katalog"}}' );
-	check( '...a write of texts, and nothing a template is told of: the key is the project\'s', k.touched.join() === 'texts' );
+	const unlock = k.form.querySelector('.nino-admin-switch input');
+	unlock.checked = true;
+	unlock.fire('change');
+	check( 'the unlock offers the other namespaces, and takes the category from a choice for a template, a feature or a module', options('keys-form-namespace').join() === 'project,template,feature,module' );
+	choose( control('keys-form-namespace'), 'template' );
+	check( '...whose categories are the ones there are', control('keys-form-category').tagName === 'select' && options('keys-form-category').join() === 'common,frame-header,page-services' );
+	unlock.checked = false;
+	unlock.fire('change');
+	check( 'locking it again takes them away', options('keys-form-namespace').join() === 'project' && control('keys-form-namespace').value === 'project' );
+
+	submitKeys( k );
+	const errors = k.form.querySelectorAll('.nino-admin-field-error').map( e => e.textContent );
+	check( 'sent empty, the form says under each segment that it is missing - the first takes the focus - and sends nothing', errors.join() === [ 'category', 'part', 'name' ].map( f => F('/_admin/common/error/missing',W('/_admin/keys/label/'+ f)) ).join() && keyWrites( k ).length === 0 && k.dom.doc.activeElement === control('keys-form-category') );
+	check( '...and the line of the bar says so once', k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/fields') );
+	typeInto( control('keys-form-category'), 'company' );
+	typeInto( control('keys-form-part'), 'tester' );
+	typeInto( control('keys-form-name'), 'zzz-name' );
+	typeInto( control('keys-form-new-value'), 'Hallo Welt' );
+	check( 'the form is unsaved input once something is typed', k.registry.keys.isDirty() === true );
+	submitKeys( k );
+	check( 'sent, the form makes the key from its segments, with the starting value in the language of the workbench', keyWrites( k )[0].endpoint === 'create' && JSON.stringify( keyWrites( k )[0].payload ) === JSON.stringify( { key : '/project/company/tester/zzz-name', global : false, value : 'Hallo Welt', values : { de_DE : 'Hallo Welt' } } ) );
+	check( '...the new key is open in its row, at its address, with the cursor in it, and a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'project/company' && k.calls.at(-1).indexOf( 'set keys/project/company/tester/zzz-name' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved')
+		&& k.form.querySelector('[data-key="/project/company/tester/zzz-name"]') !== null );
 }
 
 {
-	// a key of a template is one the Text panel has no row for yet: it is told of the templates as well
-	const k = openedKeys( keysResponse() );
-	k.keys._openNewKeyForm();
-	const control = id => k.form.querySelector( '#'+ id );
-	k.form.querySelectorAll('button').find( b => b.textContent === 'Entsperren' ).click();
-	control('keys-form-namespace').value = 'template';
-	control('keys-form-namespace').fire('change');
-	[ [ 'keys-form-part', 'label' ], [ 'keys-form-name', 'fax' ] ].forEach( ( [ id, value ] ) => { control( id ).value = value; control( id ).fire('input') } );
-	k.keys._saveNewKey();
-	check( 'creating a key of a template is a write of texts and of templates, in that order', lastWrite( k ).endpoint === 'create' && lastWrite( k ).payload.key === '/template/common/label/fax' && k.touched.join() === 'texts,templates' );
-	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 500, { error : 'refused' } );
-	k.keys._openNewKeyForm();
-	k.form.querySelectorAll('button').find( b => b.textContent === 'Entsperren' ).click();
-	control('keys-form-namespace').value = 'template';
-	control('keys-form-namespace').fire('change');
-	[ [ 'keys-form-part', 'label' ], [ 'keys-form-name', 'fax' ] ].forEach( ( [ id, value ] ) => { control( id ).value = value; control( id ).fire('input') } );
-	k.keys._saveNewKey();
-	check( '...and a key the server refused is no write: the shell hears nothing more', k.touched.join() === 'texts,templates' );
-}
-
-{
-	// the scan: what it creates is a write of texts - and of templates where one of the keys it was asked to create is a template's
-	const k = openedKeys( keysResponse() );
-	k.mount( 'keys-scan-msg' );
-	let answer = null;
-	k.keys._apiCall = ( endpoint, payload, callback ) => { k.sent.push( { endpoint : endpoint, payload : payload } ); callback( 200, endpoint === 'scanapply' ? answer : keysResponse() ) };
-	const row = ( key, value, ignore ) => ( { key : key, valueInput : { value : value }, ignoreCheck : { checked : ignore } } );
-	const scan = ( rows, response ) => { const before = k.touched.length; answer = response; k.keys._saveScanResults( rows ); return k.touched.slice( before ).join() };
-
-	check( 'a scan that created keys of the project is a write of texts', scan( [ row( '/project/shop/list/title', 'Shop', false ) ], { created : 1, ignored : 0, skipped : 0 } ) === 'texts' );
-	check( '...of templates as well where a key of a template was among the ones it was asked to create', scan( [ row( '/project/shop/list/title', 'Shop', false ), row( '/template/common/label/fax', 'Fax', false ) ], { created : 2, ignored : 0, skipped : 0 } ) === 'texts,templates' );
-	check( '...not where the key of the template was only ignored, or left empty and nothing came of it', scan( [ row( '/template/common/label/fax', '', true ) ], { created : 0, ignored : 1, skipped : 0 } ) === 'texts'
-		&& scan( [ row( '/template/common/label/fax', '', false ) ], { created : 0, ignored : 0, skipped : 1 } ) === 'texts' );
-	check( '...nor where it was ignored while a key of the project was created beside it', scan( [ row( '/project/shop/list/title', 'Shop', false ), row( '/template/common/label/fax', '', true ) ], { created : 1, ignored : 1, skipped : 0 } ) === 'texts' );
-	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 500, null );
-	check( 'a scan the server refused wrote nothing', ( () => { const before = k.touched.length; k.keys._saveScanResults( [ row( '/template/common/label/fax', 'Fax', false ) ] ); return k.touched.length === before } )() );
-}
-
-{
-	// a segment that is no word of the vocabulary is said so, under its field - and the key saves all the same
-	const k = openedKeys( keysResponse() );
-	k.keys._openNewKeyForm();
-	const control = id => k.form.querySelector( '#'+ id );
-	const hint = id => control( id+ '-hint' );
-	const ids = [ 'keys-form-category', 'keys-form-part', 'keys-form-name' ];
-	const type = ( id, value ) => { control( id ).value = value; control( id ).fire('input') };
-	const submit = () => k.form.querySelector('button[type="submit"]');
-	const said = ( slug, shown ) => k.U.format( k.words['/_admin/keys/hint/not-a-word'], slug, shown );
-
-	check( 'a form nobody typed into has the line under each of the three segments - a paragraph of its own, hidden and empty, after the error and not a part of it', ids.every( id => hint( id ) !== null && hint( id ).tagName === 'p' && hint( id ).hidden === true && hint( id ).textContent === ''
-		&& hint( id ).classList.contains('nino-admin-field-hint') && hint( id ).classList.contains('is-warning') && hint( id ) !== control( id+ '-error' ) && hint( id ).parentNode === control( id+ '-error' ).parentNode
-		&& hint( id ).parentNode.children.indexOf( hint( id ) ) === hint( id ).parentNode.children.indexOf( control( id+ '-error' ) ) + 1 ) );
-	type( 'keys-form-category', 'company' );
-	type( 'keys-form-part', 'general' );
-	type( 'keys-form-name', 'title' );
-	check( 'segments that are words of the vocabulary have no hint - and nothing that describes them', ids.every( id => hint( id ).hidden === true && hint( id ).textContent === '' && control( id ).getAttribute('aria-describedby') === null ) && submit().disabled === false );
-
-	type( 'keys-form-name', 'cta' );
-	check( 'a segment that is no word gets the hint under its own field: what it is and how the panel will show it - and nothing else is marked', hint( 'keys-form-name' ).hidden === false && hint( 'keys-form-name' ).textContent === said( 'cta', 'Cta' )
-		&& hint( 'keys-form-name' ).textContent.includes( '„cta“' ) && hint( 'keys-form-name' ).textContent.includes( '„Cta“' ) && hint( 'keys-form-part' ).hidden === true && hint( 'keys-form-category' ).hidden === true );
-	check( '...nothing is refused: the key can be made, the field is not wrong and the error stays hidden - and the hint is what describes the field, so that a screen reader says it with the field', submit().disabled === false && control('keys-form-name').getAttribute('aria-invalid') === 'false'
-		&& control('keys-form-name-error').hidden === true && control('keys-form-name').getAttribute('aria-describedby') === hint( 'keys-form-name' ).id && hint( 'keys-form-name' ).id === 'keys-form-name-hint'
-		&& control('keys-form-part').getAttribute('aria-describedby') === null && control('keys-form-category').getAttribute('aria-describedby') === null );
-	type( 'keys-form-category', 'catalog' );
-	check( 'the category and the part are checked the same way, each under its own field', hint( 'keys-form-category' ).hidden === false && hint( 'keys-form-category' ).textContent === said( 'catalog', 'Catalog' ) && hint( 'keys-form-part' ).hidden === true );
-	type( 'keys-form-part', 'hero-cta' );
-	check( '...a compound of a word and one that is none is none: it is shown as the words that are there and the rest as it is written', hint( 'keys-form-part' ).hidden === false && hint( 'keys-form-part' ).textContent === said( 'hero-cta', k.U.slugLabel( 'hero-cta' ) ) );
-
-	// the rule of admin-text-smoke: a word, <word>-<number>, <word>-<word>
-	[ 'button', 'section', 'section-2', 'item-12', 'button-label', 'unit-day', 'accept-all' ].forEach( slug => {
-		type( 'keys-form-name', slug );
-		check( 'a covered slug has no hint: '+ slug, hint( 'keys-form-name' ).hidden === true && hint( 'keys-form-name' ).textContent === '' );
-	} );
-	[ 'cta-2', 'cta-button', 'button-cta', 'section-x' ].forEach( slug => {
-		type( 'keys-form-name', slug );
-		check( 'an uncovered slug has one: '+ slug, hint( 'keys-form-name' ).hidden === false && hint( 'keys-form-name' ).textContent === said( slug, k.U.slugLabel( slug ) ) );
-	} );
-
-	// what is wrong has its own line, and the hint stands aside for it
-	type( 'keys-form-name', 'Cta' );
-	check( 'a slug that is wrong has the error, and no hint beside it', control('keys-form-name-error').hidden === false && hint( 'keys-form-name' ).hidden === true && hint( 'keys-form-name' ).textContent === ''
-		&& control('keys-form-name').getAttribute('aria-describedby') === 'keys-form-name-error' );
-	type( 'keys-form-name', 'cta' );
-	check( '...and the hint is there again once it is right, and describes the field again instead of the error', control('keys-form-name-error').hidden === true && hint( 'keys-form-name' ).hidden === false && control('keys-form-name').getAttribute('aria-describedby') === 'keys-form-name-hint' );
-	type( 'keys-form-name', '' );
-	check( 'an empty field has none, and nothing describes it', hint( 'keys-form-name' ).hidden === true && hint( 'keys-form-name' ).textContent === '' && control('keys-form-name').getAttribute('aria-describedby') === null );
-
-	// the key saves as it is, with the hint on screen
-	type( 'keys-form-category', 'company' );
-	type( 'keys-form-part', 'general' );
-	type( 'keys-form-name', 'cta' );
-	k.keys._saveNewKey();
-	check( 'a key with a segment that is no word is written as typed', lastWrite( k ).endpoint === 'create' && lastWrite( k ).payload.key === '/project/company/general/cta' );
-}
-
-{
-	// the Keys tab follows the language of the workbench in its form as well: one source for the Text panel, the tab and the elements
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services' );
-	const select = k.form.querySelector('#keys-form-locale-select');
-	check( 'the form of the tab opens in the language of the workbench', select.value === 'en_US' && k.keys._selectedLocale === 'en_US' );
-	k.Nino.adminUi.locales = { native : 'de_DE', names : {} };
+	// the language: a row shows one and writes that one
+	const k = openedKeys( keysResponse(), undefined, 'en_US' );
+	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title';
+	check( 'a row opens in the language of the workbench, which is the pill of its bar - and the list names its rows in it', keyControl( k, T ).value === 'Services' && k.form.querySelector('.nino-admin-locale-badge') !== null && k.keys._shownLocale === 'en_US' );
+	k.box.Nino.admin.workLocale.current = 'de_DE';
+	typeInto( keyControl( k, T ), 'Services B' );
+	submitKeys( k );
+	check( 'it writes the language it shows, whatever the workbench says by now', keyWrites( k )[0].payload.items[0].locale === 'en_US' );
 	k.Nino.admin.workLocale.set( 'de_DE' );
-	check( 'a language the workbench moved is the one the form shows, in the select and in the fields', select.value === 'de_DE' && k.keys._selectedLocale === 'de_DE' && k.keys._locale() === 'de_DE' );
-	select.value = 'en_US';
-	select.fire('change');
-	check( 'and the select of the form moves the workbench\'s language, which it did not before: the Text panel opens in it next',
-		k.calls.includes('locale en_US') && k.keys._selectedLocale === 'en_US' && k.form.querySelector('.nino-admin-contextbar').querySelector('.nino-admin-locale-badge') !== null );
+	check( 'a language the workbench moved draws the row again in it, and the pill goes', keyControl( k, T ).value === 'Leistungen' && k.form.querySelector('.nino-admin-locale-badge') === null && k.keys._shownLocale === 'de_DE' );
 }
 
 {
-	// the form that renames says it too: the category of a key is the template, which is a word of the vocabulary or is not
+	// the scan: a view with an address, the three answers of a finding, said as a toast
 	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services' );
-	k.form.querySelector('[data-key="/template/page-services/item-1/title"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
-	const hint = id => k.form.querySelector( '#'+ id+ '-hint' );
-	check( 'the form that renames has the line as well: the category is the template of the key, which is a word or is not - "page-services" is not', hint( 'keys-form-category' ).hidden === false
-		&& hint( 'keys-form-category' ).textContent === k.U.format( k.words['/_admin/keys/hint/not-a-word'], 'page-services', k.U.slugLabel( 'page-services' ) ) && hint( 'keys-form-part' ).hidden === true && hint( 'keys-form-name' ).hidden === true );
-	const category = k.form.querySelector('#keys-form-category');
-	category.value = 'common';
-	category.fire('change');
-	check( '...and follows the choice of the template', hint( 'keys-form-category' ).hidden === true );
+	k.handle.scan = { missing : [
+		{ key : '/project/shop/hero/title', files : [ 'page-shop.tpl' ], kind : 'create', hint : null },
+		{ key : '/project/shop/hero/text', files : [ 'page-shop.tpl', 'page-other.tpl' ], kind : 'create', hint : 'feature', owner : 'consent' },
+		{ key : '/foo/bar', files : [ 'page-shop.tpl' ], kind : 'grammar' },
+		{ key : '/_nino/webpage/shop/name', files : [ 'page-shop.tpl' ], kind : 'system', writer : 'routes' },
+	], alsoUsed : [ { key : '/template/page-shop/x/y', files : [ 'page-other.tpl' ] } ] };
+	k.calls.length = 0;
+	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-secondary').click();
+	check( 'the scan is a view with an address of its own, and says that it is scanning in place of the form while it runs', k.keys._view === 'scan' && k.calls.includes('go keys/@scan') && k.form.querySelector('form') !== null );
+	const rows = k.form.querySelectorAll('fieldset.admin-keys-scan-row');
+	check( 'a finding is a card with the key as its name, where it is read, and a starting value - where a key can be made here - and the three outcomes of it: a value, nothing, or ignored for good', rows.length === 4 && rows[0].querySelector('legend').textContent === '/project/shop/hero/title'
+		&& rows[0].querySelector('input') !== null && rows[2].querySelectorAll('input').filter( i => i.type === 'text' ).length === 0 && rows[3].querySelectorAll('input').length === 0 );
+	check( '...what the scan says besides - why a key cannot be made, who writes it - stands at the finding as a line of its own, and every note has its words', rows[1].textContent.indexOf( F('/_admin/keys/scan/hint-feature','consent') ) !== -1 && rows[2].textContent.indexOf( W('/_admin/keys/scan/grammar') ) !== -1 && rows[3].textContent.indexOf( W('/_admin/keys/scan/system-routes') ) !== -1 );
+	check( '...a key of the system has nothing to tick: it is the system\'s to write', rows[3].querySelectorAll('input').length === 0 && rows[2].querySelectorAll('input').filter( i => i.type === 'checkbox' ).length === 1 );
+	check( 'the keys another template reads as well are listed as a note, and counted nowhere', k.form.textContent.indexOf( '/template/page-shop/x/y' ) !== -1 && k.keys._scanRows.length === 3 );
+	check( 'the bar has the one main button, and no explanation stands open over the rows: the scan is explained behind the ? of the panel', k.form.querySelectorAll('.nino-admin-btn-primary').length === 1 && k.form.querySelectorAll('.nino-admin-hint').length === 0 );
+	check( 'a form nobody touched holds nothing unsaved', k.registry.keys.isDirty() === false );
+	typeInto( rows[0].querySelector('input'), 'Eine Überschrift' );
+	rows[2].querySelectorAll('input').find( i => i.type === 'checkbox' ).checked = true;
+	check( 'a value typed or a key ticked is unsaved input', k.registry.keys.isDirty() === true );
+	submitKeys( k );
+	const apply = keyWrites( k ).at(-1);
+	check( 'the whole form goes to the server in one request, with the language the tab shows: every finding, the ones left empty included - which the server passes over - and the ignored ones', apply.endpoint === 'scanapply' && apply.payload.rows.length === 3 && apply.payload.locale === 'de_DE'
+		&& apply.payload.rows[0].value === 'Eine Überschrift' && apply.payload.rows[0].ignore === false && apply.payload.rows[1].value === '' && apply.payload.rows[2].ignore === true );
+	check( 'what came of it is one sentence as a toast, and the list is back - with the keys that were made', k.told.at(-1) === W('/_admin/keys/scan/result').replace( '%c', '1' ).replace( '%i', '1' ).replace( '%s', '1' ) && k.form.classList.contains('admin-hidden') === true && k.list.classList.contains('admin-hidden') === false );
+	check( '...a write of texts, and of templates where a key of a template was made', k.touched.join() === 'texts' );
+	k.handle.scan = { missing : [], alsoUsed : [] };
+	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-secondary').click();
+	check( 'a scan that finds nothing says so in the box of the workbench, with no bar to save', k.form.querySelector('.nino-admin-empty') !== null && k.form.querySelectorAll('.nino-admin-actionbar').length === 0 && k.registry.keys.isDirty() === false );
 }
 
 {
-	// a key somebody made up starts the form at /project with nothing in it; renaming it moves the key into the grammar
+	// the address of a view of the tab
 	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'website' );
-	k.form.querySelector('[data-key="/website/contact/uri"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
-	const control = id => k.form.querySelector( '#'+ id );
-	check( 'a key that follows no grammar starts at /project with the rest empty - the namespaces to the others locked', control('keys-form-namespace').value === 'project' && control('keys-form-namespace').children.length === 1
-		&& control('keys-form-category').value === '' && control('keys-form-part').value === '' && control('keys-form-name').value === '' && k.keys._renameFrom === '/website/contact/uri' && k.keys.isDirty() === false );
-	// ...and the form is drawn again as it was opened when its input is thrown away
-	control('keys-form-part').value = 'x';
-	k.keys.discard();
-	check( 'discarding what was typed draws the form as it was opened', control('keys-form-part') !== null && k.form.querySelector('#keys-form-part').value === '' && k.keys.isDirty() === false );
+	const target = parts => JSON.stringify( k.keys._target( parts ) );
+	check( 'an address names a row, a key in it, the form of a new key, the scan, or the rename of a key that can be renamed', target( [ 'template', 'page-services' ] ) === '{"view":"group","row":"template/page-services","key":null}'
+		&& target( [ 'template', 'page-services', 'intro', 'title' ] ) === '{"view":"group","row":"template/page-services","key":"/template/page-services/intro/title"}' && target( [ '@new' ] ) === '{"view":"new","key":null}' && target( [ '@scan' ] ) === '{"view":"scan"}'
+		&& target( [ '@rename', 'template', 'page-services', 'intro', 'title' ] ) === '{"view":"new","key":"/template/page-services/intro/title"}' );
+	check( '...and what is not there is the list: a rename of a key that is not there or of one of the system, an at sign with more behind it, a row nobody has', k.keys._target( [ '@rename', 'template', 'nope', 'a', 'b' ] ) === null && k.keys._target( [ '@rename', '_nino', 'webpage', 'services', 'title' ] ) === null
+		&& k.keys._target( [ '@new', 'x' ] ) === null && k.keys._target( [ '@scan', 'x' ] ) === null && k.keys._target( [ 'nothing' ] ) === null && k.keys._target( [ '@rename' ] ) === null );
 }
 
 {
-	// a deep link into the tab, and only on its first load
-	const k = openedKeys( keysResponse(), { panel : 'keys', parts : [ 'project', 'company', 'general', 'name' ] } );
-	check( 'a hash that names a key opens its row at that key when the tab loads', k.keys._currentGroup === 'project/company' && k.keys._focusKey === '/project/company/general/name' && k.form.querySelector('[data-key="/project/company/general/name"]').classList.contains('is-found') );
-	k.keys._showList();
-	k.keys.init();
-	check( '...and a reload after a change - which the hash still names - goes back to the list, as it always did', k.list.classList.contains('admin-hidden') === false );
-}
-
-{
-	// the focus of a drill-down in the Keys tab: into the form of a row, the new key or the scan, and back to the control that opened it
+	// the fills a field offers are the tab's own, asked of the server in the language on screen
 	const k = openedKeys( keysResponse() );
-	const link = group => k.list.querySelectorAll('a').find( a => keyOf( a ) === group );
-	const back = () => k.form.querySelector('.nino-admin-back-link');
-
-	link('project/company').click();
-	check( 'a row that is opened takes the focus into its form', k.form.classList.contains('admin-hidden') === false && focusIn( k, k.form ) );
-	back().click();
-	check( 'Back shows the list and gives the focus to the link of that row', k.list.classList.contains('admin-hidden') === false && k.dom.doc.activeElement === link('project/company') );
-
-	const add = k.list.querySelector('.nino-admin-btn-primary');
-	add.click();
-	check( 'the form for a new key takes the focus', k.keys._view === 'new' && focusIn( k, k.form ) );
-	back().click();
-	check( '...and Back returns it to the button that opened it', k.list.classList.contains('admin-hidden') === false && k.dom.doc.activeElement === add );
-
-	let scanned = null;
-	k.keys._apiCall = ( endpoint, payload, callback ) => { if( endpoint === 'scan' ) scanned = () => callback( 200, { missing : [ { key : '/project/shop/list/title', files : [ 'page-shop.tpl' ], kind : 'create' } ], alsoUsed : [] } ) };
-	const scan = k.list.querySelector('.nino-admin-btn-secondary');
-	scan.click();
-	check( 'the scan takes the focus into its form while it runs', k.keys._view === 'scan' && focusIn( k, k.form ) );
-	const waiting = back();
-	scanned();
-	check( '...and the form that its answer draws over the one that waited has it, on its own back link - not the body', back() !== waiting && k.dom.doc.activeElement === back() );
-	back().click();
-	check( 'Back returns it to the Scan button', k.dom.doc.activeElement === scan );
-
-	// a key is renamed from the form of its row: the form that held the button is drawn over, and Back then has the heading of the list to go to
-	link('template/page-services').click();
-	k.form.querySelector('[data-key="/template/page-services/item-1/title"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
-	check( 'a rename takes the focus into its form', k.keys._view === 'new' && focusIn( k, k.form ) );
-	back().click();
-	check( '...and Back, with the button that was pressed gone, still lands in the list - on a stop of its own and not on the body', k.list.classList.contains('admin-hidden') === false && focusIn( k, k.list ) );
-
-	// the list shown again: the focus stays, unless it stood in the form that goes
-	link('project/company').click();
-	k.keys._showList();
-	check( 'the list shown again with the focus in the form that goes gives it to the name of the panel', k.dom.doc.activeElement === k.title );
+	let listed = 'none';
+	k.keys._loadFills( list => { listed = list } );
+	check( 'the textfills are asked for with the tab\'s own action, and the answer is the list', k.sent.at(-1).endpoint === 'fills' && Array.isArray( listed ) === true );
+	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 200, { fills : [ { key : '/project/company/contact/phone', notation : '[[/project/company/contact/phone]]', value : '+49' } ] } );
+	k.keys._loadFills( list => { listed = list } );
+	check( '...each row named by its key read as words, with the notation the field reads and what it says today', JSON.stringify( listed ) === JSON.stringify( [ { name : [ 'company', 'contact', 'phone' ].map( w => k.U.slugLabel( w ) ).join(' \u00B7 '), notation : '[[/project/company/contact/phone]]', value : '+49' } ] ) );
+	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 403, null );
+	k.keys._loadFills( list => { listed = list } );
+	check( '...and where they could not be had, none is said and the field is left as it is', listed === null );
 }
 
 {
-	// a row named like a member of Object.prototype opens in the Keys tab as well
-	const k = openedKeys( keysResponse( { keys : homeKeys.concat( [ textEntry( '/constructor/x', { de_DE : 'Frei' } ), textEntry( '/project/shop/constructor/name', { de_DE : 'Konstrukteur' } ) ] ) } ) );
-	k.keys._openGroup( 'constructor' );
-	check( 'a row named constructor opens in the Keys tab, and a search over keys with such a part answers', k.keys._currentGroup === 'constructor' && k.form.querySelector('[data-key="/constructor/x"]') !== null );
-	k.keys._showList();
-	const box = k.list.querySelector('#keys-search');
-	box.value = 'konstrukteur';
-	box.fire('input');
-	check( '...the hit is the key', k.list.querySelectorAll('.admin-text-hit').length === 1 );
+	// the focus after a delete: the key that stands where the deleted one did, else the list; and the language is told in the other views
+	const response = keysResponse();
+	response.keys.push( textEntry( '/project/shop/solo/name', { de_DE : 'Einzig', en_US : 'Only' } ) );
+	const k = openedKeys( response );
+	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	k.keys._openGroup( 'template/page-services', null, true );
+	const order = k.keys._session.keys();
+	const T = '/template/page-services/intro/title', next = order[order.indexOf( T ) + 1];
+	rowButtons( settingsOf( k, T ) )[1].click();
+	check( 'after a delete the focus is on the field of the key that stands where the deleted one was', settingsOf( k, T ) === null && k.dom.doc.activeElement === keyControl( k, next ) );
+	const last = k.keys._session.keys().at(-1);
+	rowButtons( settingsOf( k, last ) )[1].click();
+	check( '...and where it was the last one, on the one before', k.dom.doc.activeElement === keyControl( k, k.keys._session.keys().at(-1) ) );
+
+	k.keys._openGroup( 'project/shop', null, true );
+	rowButtons( settingsOf( k, '/project/shop/solo/name' ) )[1].click();
+	check( 'a delete that leaves the group without a key draws the list, which is the empty state of the group, and the focus is not lost to the page', k.keys._view === null && k.form.classList.contains('admin-hidden') && k.dom.doc.activeElement !== null && k.dom.doc.activeElement !== k.dom.doc.body );
+
+	// the language the workbench is in is said by a pill in the views that make or scan, and it follows
+	k.Nino.admin.workLocale.current = 'en_US';
+	k.keys._openNewKeyForm( null, null, true );
+	check( 'the form that makes a key says the language its starting value is written in, by the pill of the bar', k.form.querySelector('.nino-admin-locale-badge') !== null );
+	k.Nino.admin.workLocale.set( 'de_DE' );
+	check( '...and the native language needs none', k.form.querySelector('.nino-admin-locale-badge') === null );
+	k.Nino.admin.workLocale.set( 'en_US' );
+	check( '...the language the workbench moves to is the pill, without the form being drawn again', k.form.querySelector('.nino-admin-locale-badge') !== null );
+	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-secondary').click();
+	check( 'the scan says the language its new keys get their value in, in the same way', k.keys._view === 'scan' && k.form.querySelector('.nino-admin-locale-badge') !== null );
 }
 
 {
-	// the tab has no list of pages, so it cannot say of a page's details that they have no page
-	const k = openedKeys( keysResponse() );
-	check( 'the row of the details of pages is called by the neutral "Seitenangaben" in the Keys tab', k.list.querySelectorAll('a').find( a => keyOf( a ) === '_nino/webpage' ).querySelector('strong').textContent === 'Seitenangaben' );
+	// a language without a value is an empty field, a whitespace is a change, and the fills ask in the language of the form
+	const response = keysResponse();
+	const k = openedKeys( response, undefined, 'en_US' );
+	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
+	k.keys._openGroup( 'template/page-services', null, true );
+	const X = '/template/page-services/intro/text', T = '/template/page-services/intro/title';
+	check( 'a language that has no text for a key draws its field empty - the text of another language is not put in as if it were its own', keyControl( k, X ).value === '' && keyControl( k, T ).value === 'Services' && k.registry.keys.isDirty() === false );
+	typeInto( keyControl( k, T ), 'Services ' );
+	submitKeys( k );
+	check( 'a whitespace is a change, and is saved as typed, in the language of the form', keyWrites( k ).length === 1 && keyWrites( k )[0].payload.items.length === 1 && keyWrites( k )[0].payload.items[0].value === 'Services ' && keyWrites( k )[0].payload.items[0].locale === 'en_US' );
+	k.sent.length = 0;
+	submitKeys( k );
+	check( 'a save without a change sends no text, and none for the key that had none', keyWrites( k ).every( c => c.endpoint !== 'savebatch' ) );
+	k.keys._loadFills( () => {} );
+	check( 'the textfills are asked for in the language of the form', k.sent.at(-1).endpoint === 'fills' && k.sent.at(-1).payload.locale === 'en_US' );
 }
-
-// --- a language that has a text file and is not served: the selects say so ----------------
 
 {
-	// The answer names the languages of the files, each with whether the website serves it; the panels translate into one before it is switched on
-	const withOff = [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true }, { locale : 'it_IT', active : false } ];
-	const optionTexts = select => select.children.map( o => o.textContent ).join('|');
-	const t = openedText( textResponse( { locales : withOff } ) );
-	const word = t.words['/_admin/common/word/inactive'];
-	check( 'the Text panel offers every language the answer names, and the one the website does not serve says so - the word of the workbench for it, in parentheses behind the code', word !== undefined && word !== ''
-		&& t.text._locales.join() === 'de_DE,en_US,it_IT' && t.text._inactive.join() === 'it_IT'
-		&& optionTexts( t.list.querySelector('#text-list-locale') ) === 'de_DE|en_US|it_IT ('+ word+ ')' && t.list.querySelector('#text-list-locale').children.map( o => o.value ).join() === 'de_DE,en_US,it_IT' );
-	opens( t.list ).find( r => keyOf( r ) === 'template/page-services' ).click();
-	check( '...in the form of a row too, whose select keeps the code as its value', optionTexts( t.form.querySelector('#text-form-locale-select') ) === 'de_DE|en_US|it_IT ('+ word+ ')' );
-	const every = openedText( textResponse() );
-	check( '...and a site whose languages are all served marks none', every.text._inactive.length === 0 && optionTexts( every.list.querySelector('#text-list-locale') ) === 'de_DE|en_US' );
-
-	const k = openedKeys( keysResponse( { locales : withOff } ) );
-	k.list.querySelectorAll('a').find( a => keyOf( a ) === 'project/company' ).click();
-	check( 'the Keys tab does the same in the form of a row', k.keys._locales.join() === 'de_DE,en_US,it_IT' && k.keys._inactive.join() === 'it_IT'
-		&& optionTexts( k.form.querySelector('#keys-form-locale-select') ) === 'de_DE|en_US|it_IT ('+ word+ ')' );
+	// words: every fill the two scripts ask for is there in both languages
+	const files = [ '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js', '_admin/Nino/Modules/Text/assets/textkeys.js' ];
+	const used = new Set();
+	files.forEach( file => { for( const m of fs.readFileSync( path.join( __dirname, '..', file ), 'utf8' ).matchAll( /(?:getText|text)\(\s*'(\/_admin\/[^']+)'/g ) ) used.add( m[1] ) } );
+	[ 'en_US', 'de_DE' ].forEach( locale => {
+		const words = workbenchWords( locale );
+		const missing = [ ...used ].filter( key => key.endsWith('/') === false && key.endsWith('-') === false && words[key] === undefined );
+		check( locale+ ': every fill the scripts of the Text module name is there'+ ( missing.length === 0 ? '' : ' - not '+ missing.join() ), missing.length === 0 );
+		const sorts = [ 'grammar', 'system-routes', 'system-language', 'system-none', 'hint-feature', 'hint-module' ].filter( s => words['/_admin/keys/scan/'+ s] === undefined );
+		check( locale+ ': every note of the scan, which is put together at runtime, has its words', sorts.length === 0 );
+		check( locale+ ': every word of a format and of its conversion is there', [ 'auto', 'plain', 'inline', 'lines', 'blocks' ].every( f => words['/_admin/keys/format/'+ f] !== undefined ) && [ 'plain', 'inline', 'lines' ].every( f => words['/_admin/keys/convert/'+ f] !== undefined ) );
+	} );
 }
-
 done();

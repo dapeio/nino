@@ -218,27 +218,47 @@ console.log( 'Text' );
 console.log( 'Text Keys' );
 {
 	const nodes = { 'keys-form' : { classList : classes( true ) }, 'keys-list' : { classList : classes( false ) } };
-	const { module, calls, asked, at, box } = panel( '_admin/Nino/Modules/Text/assets/keys.js', nodes, 'keys', [ '_showList', '_showForm', '_openGroup', '_destroyHtmlEditors' ], [ '_admin/Nino/Modules/Text/assets/textkeys.js' ] );
+	const { module, calls, asked, at, box } = panel( '_admin/Nino/Modules/Text/assets/keys.js', nodes, 'keys', [ '_showList', '_showForm', '_openGroup', '_openNewKeyForm', '_openScanForm', '_destroyHtmlEditors' ], [ '_admin/Nino/Modules/Text/assets/textkeys.js' ] );
 	const entry = key => ( { key : key, global : false, values : { de_DE : 'x' } } );
 	module._model = box.Nino.admin.textKeys.build( { entries : [ entry('/template/page-home/welcome/title'), entry('/project/company/general/name') ], locale : 'de_DE', admin : true } );
-	const on = ( form, group, view ) => { nodes['keys-form'].classList = classes( form === false ); nodes['keys-list'].classList = classes( form === true ); module._currentGroup = group ?? null; module._view = view ?? 'group' };
+	const on = ( form, group, view, renaming ) => { nodes['keys-form'].classList = classes( form === false ); nodes['keys-list'].classList = classes( form === true ); module._currentGroup = group ?? null; module._view = view ?? 'group'; module._renameFrom = renaming ?? null };
 
 	on( false );
 	at( 'keys', 'template', 'page-home', 'welcome', 'title' );
-	check( 'a hash that names a key opens the row that holds it, at that key', calls.join() === 'openGroup template/page-home /template/page-home/welcome/title' && asked[0].leaving === false );
+	check( 'a hash that names a key opens the row that holds it, at that key', calls.join() === 'openGroup template/page-home /template/page-home/welcome/title false' && asked[0].leaving === false );
 	on( true, 'template/page-home' );
 	at( 'keys' );
 	check( 'the bare tab is the list, asked first - a form is left', calls.join() === 'destroyHtmlEditors,showList' && asked[0].leaving === true && JSON.stringify( asked[0].names ) === '["keys"]' );
 	at( 'keys', 'project', 'company' );
-	check( 'another row replaces this one', calls.join() === 'openGroup project/company null' && asked[0].leaving === true );
+	check( 'another row replaces this one', calls.join() === 'openGroup project/company null false' && asked[0].leaving === true );
 	at( 'keys', 'template', 'page-home' );
 	check( 'the row on screen is only written back', calls.join() === 'showForm' && asked.length === 0 );
+
+	// the forms that make, rename and scan have an address, which an at sign keeps from a row of the same name
+	on( false );
+	at( 'keys', '@new' );
+	check( 'the address of a new key opens the form that makes one', calls.join() === 'openNewKeyForm null undefined false' && asked[0].leaving === false );
+	at( 'keys', '@scan' );
+	check( '...the address of the scan the scan', calls.join() === 'openScanForm undefined false' );
+	at( 'keys', '@rename', 'template', 'page-home', 'welcome', 'title' );
+	check( '...and the address of a rename the form that renames that key', calls.join() === 'openNewKeyForm /template/page-home/welcome/title undefined false' );
+	at( 'keys', '@rename', 'template', 'page-home', 'nope', 'title' );
+	check( 'a rename of a key there is not is the list', calls.join() === 'showList' );
 	on( true, null, 'new' );
+	at( 'keys', '@new' );
+	check( 'the form that makes a key is only written back where it is on screen', calls.join() === 'showForm' && asked.length === 0 );
 	at( 'keys' );
-	check( 'the form that creates or renames a key is not in the address: the bare tab leaves it where it is', calls.join() === 'showForm' && asked.length === 0 );
-	at( 'keys', 'nope' );
-	check( '...and so does a row there is not', calls.join() === 'showForm' && asked.length === 0 );
+	check( 'the bare tab leaves it for the list, asked first as every form is', calls.join() === 'destroyHtmlEditors,showList' && asked[0].leaving === true );
+	at( 'keys', '@scan' );
+	check( 'the scan replaces it', calls.join() === 'openScanForm undefined false' && asked[0].leaving === true );
+	on( true, null, 'new', '/template/page-home/welcome/title' );
+	at( 'keys', '@rename', 'template', 'page-home', 'welcome', 'title' );
+	check( 'the rename of the key on screen is only written back', calls.join() === 'showForm' && asked.length === 0 );
+	at( 'keys', '@new' );
+	check( '...and the form of a new key replaces it', calls.join() === 'openNewKeyForm null undefined false' && asked[0].leaving === true );
 	on( true, 'template/page-home' );
+	at( 'keys', 'nope' );
+	check( 'a row there is not is the list', calls.join() === 'destroyHtmlEditors,showList' );
 	at( 'text', 'template', 'page-home' );
 	check( 'another panel\'s hash keeps the level in memory', calls.join() === 'showForm' && asked.length === 0 );
 }
@@ -315,7 +335,7 @@ console.log( 'Back links and rows' );
 {
 	// Every back link of a drill-down panel is a step Back returns to - the browser's own
 	// Back then has something to return to, and the level it leaves is the one the link leaves
-	[ '_admin/Nino/Modules/Text/assets/admin.js' ].forEach( function( file ) {
+	[].forEach( function( file ) {
 
 		const script = source( file );
 		const links = script.split( 'backLink.addEventListener(' ).slice( 1 );
@@ -325,7 +345,7 @@ console.log( 'Back links and rows' );
 	} );
 
 	// The panels whose way back is the context bar's: the click that leaves a form goes through the router as well
-	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Elements/assets/types.js', '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Images/assets/slots.js' ].forEach( function( file ) {
+	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Elements/assets/types.js', '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Images/assets/slots.js', '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js' ].forEach( function( file ) {
 
 		const script = source( file );
 		const links = script.split( /back\s*:\s*\{ to : [^\n]*onClick : function\(\) \{/ ).slice( 1 );

@@ -48,6 +48,7 @@ namespace Nino\Modules\Text {
 			return [
 				'text/keys' 			=> [ self::class, 'apiKeys' ],
 				'text/savebatch' 	=> [ self::class, 'apiSaveBatch' ],
+				'text/fills' 			=> [ self::class, 'apiFills' ],
 			];
 		}
 
@@ -186,11 +187,50 @@ namespace Nino\Modules\Text {
 				'keys' 					=> $keys,
 				'locales' 			=> \Nino\Admin\Admin::textLocales( $appData ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
-				'order' 				=> self::_order( $appData, array_column( $keys, 'key' ) ),
+			] + self::naming( $appData, array_column( $keys, 'key' ) ) );
+		}
+
+		/**
+		 *	What the rows of the Text panel and of its Keys tab are arranged and named by - the same for both, so that
+		 *	a row has one name in either: the order the templates read the keys in, the pages and their templates, the
+		 *	names the templates give themselves and the names of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$keys					The keys the answer holds
+		 *
+		 *	@return 	array										{ order, pages, templates, features }
+		 */
+		public static function naming( array &$appData, array $keys ): array {
+			return [
+				'order' 				=> self::_order( $appData, $keys ),
 				'pages' 				=> self::_pages( $appData ),
 				'templates' 		=> self::_templates( $appData ),
 				'features' 			=> self::_features( $appData ),
-			] );
+			];
+		}
+
+		/**
+		 *	The textfills a text may take, for the "[ ]" at the name of a multi-line text and of a text with markup:
+		 *	the keys of the namespaces a text may name (see \Nino\Text::FILL_FORMS), each in the notation of a template
+		 *	and with what it says in the language the form shows (the posted `locale`, one of the languages that have a text file)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiFills( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$locale = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'locale' );
+
+			// The language of the form that asks - another window of the session may have moved the session's own
+			if( in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false )
+				$locale = \Nino\Admin\Admin::contentLocale( $appData );
+
+			\Nino\Http::ok( $request, [ 'fills' => \Nino\Text::fills( $appData, 'textfill', $locale ) ] );
 		}
 
 		/**

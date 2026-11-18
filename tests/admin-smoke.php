@@ -1572,6 +1572,9 @@ check( 'a user with no perms is rejected from elements/types', $status === 403 )
 [ $status ] = callAdminPost( $appData, 'text/keys' );
 check( 'a user with no perms is rejected from text/keys', $status === 403 );
 
+[ $status, $body ] = callAdminPost( $appData, 'text/fills' );
+check( '...and from text/fills, which lists the texts a field may take, and from keys/fills', $status === 403 && isset( $body['fills'] ) === false && callAdminPost( $appData, 'keys/fills' )[0] === 403 );
+
 [ $status ] = callAdminPost( $appData, 'images/list' );
 check( 'a user with no perms is rejected from images/list', $status === 403 );
 
@@ -1601,6 +1604,7 @@ check( 'a user with only Elements::MANAGE_PERM can reach elements/types', $statu
 
 [ $status ] = callAdminPost( $appData, 'text/keys' );
 check( 'that same user still can\'t reach text/keys - perms don\'t leak across modules', $status === 403 );
+check( '...nor text/fills, nor keys/fills', callAdminPost( $appData, 'text/fills' )[0] === 403 && callAdminPost( $appData, 'keys/fills' )[0] === 403 );
 
 // The dashboard summary panel itself stays reachable to any logged-in admin
 // regardless of perms, but each module-specific field within it is only

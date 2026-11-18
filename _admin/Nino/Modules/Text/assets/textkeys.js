@@ -5,8 +5,10 @@
  *													fall into rows, sections and fields, in what order, under
  *													which names - and the search over them. Functions over
  *													the data the server sent (see \Nino\Modules\Text\Admin::
- *													apiKeys()), pure but for searchBar() and hitElement(),
- *													which build the DOM both tabs draw alike. The only thing
+ *													apiKeys()), pure but for what builds the DOM both tabs
+ *													draw alike: the search bar and a hit, the sections of a
+ *													row, the field of one key's value and the session that
+ *													knows which of its fields were changed. The only thing
  *													they ask the page is the words of the workbench, through
  *													Nino.content.getText() and Nino.adminUi.slugLabel().
  *
@@ -36,6 +38,11 @@
 
 		// The categories of /project the project is shipped with, in this order
 		PROJECT_CATEGORIES : [ 'company', 'website', 'mail' ],
+
+		// What a plain text may be and still be one line: the most characters any of its values holds, and the
+		// highest limit of its key. A short name or a technical value is a line; a sentence is a field of several
+		SINGLE_LINE_LENGTH : 80,
+		SINGLE_LINE_LIMIT : 200,
 
 		/**
 		 *	A text the way a search compares it: without accents, in lower case.
@@ -126,6 +133,28 @@
 		 */
 		isEmptyIn : function( entry, locale ) {
 			return entry.global === false && Nino.admin.textKeys.plain( entry.values[locale] ) === '';
+		},
+
+		/**
+		 *	Whether the value of a key is one line of text: a plain text with no line break in any language, no longer
+		 *	than a line and with a limit of a line. Every other text is a field of several lines (a text with markup is
+		 *	the rich-text field and is not asked)
+		 *
+		 *	@param		{Object}	entry
+		 *
+		 *	@return		{boolean}
+		 */
+		isSingleLine : function( entry ) {
+
+			const T = Nino.admin.textKeys;
+
+			if( entry.html === true || entry.maxlength > T.SINGLE_LINE_LIMIT )
+				return false;
+
+			return Object.keys( entry.values ).every( function( code ) {
+				const text = String( entry.values[code] ?? '' );
+				return /[\r\n]/.test( text ) === false && text.length <= T.SINGLE_LINE_LENGTH;
+			} );
 		},
 
 		/**
@@ -475,31 +504,6 @@
 		},
 
 		/**
-		 *	The beginning of the first text of a section, for its legend
-		 *
-		 *	@param		{Object}	section
-		 *	@param		{string}	locale
-		 *	@param		{Object}	[typed]								key => what is typed into the field of a language's text, not stored yet
-		 *	@param		{number}	[length]
-		 *
-		 *	@return		{string}
-		 */
-		sectionPreview : function( section, locale, typed, length ) {
-
-			const T = Nino.admin.textKeys;
-			length = length ?? 40;
-
-			for( let at = 0; at < section.fields.length; at++ ) {
-				const entry = section.fields[at].entry;
-				const text = T.plain( entry.global === false && typed !== undefined && typed[entry.key] !== undefined ? typed[entry.key] : T.valueOf( entry, locale ) );
-				if( text !== '' )
-					return text.length > length ? text.slice( 0, length )+ ' ..' : text;
-			}
-
-			return '';
-		},
-
-		/**
 		 *	Every field of the model in the order the list shows them, each
 		 *	with the path a person reads it by: "Leistungen › Eintrag 1 › Titel"
 		 *
@@ -680,30 +684,18 @@
 		},
 
 		/**
-		 *	The search box of a list, with what narrows it: a language to read the
-		 *	texts in, filters that are on or off. The words of the controls are
-		 *	the panel's - this draws them
+		 *	The search box of a list, with what narrows it: filters that are on or off. The language the texts are
+		 *	read in is the workbench's own (Nino.admin.workLocale), there is no switch of it here. The words of the
+		 *	controls are the panel's - this draws them
 		 *
 		 *	@param		{Object}	config
 		 *													query			what the box holds to begin with
 		 *													onQuery		called with what was typed
-		 *													select		null, or { locales, inactive, value, onChange } - a language switch, the languages the website does not serve yet marked
 		 *													chips			[ { id, onToggle } ] - the filters; their text and state are set by the caller
 		 *
-		 *	@return		{Object}									{ bar, input, select, chips : id => button }
+		 *	@return		{Object}									{ bar, input, chips : id => button }
 		 */
 		searchBar : function( config ) {
-
-			let select = null;
-
-			if( config.select !== null && config.select !== undefined )
-				select = Nino.adminUi.localeSelect( {
-					label : Nino.content.getText('/_admin/text/label/language'),
-					locales : config.select.locales,
-					inactive : config.select.inactive,
-					current : config.select.value,
-					onChange : function( locale ) { config.select.onChange( locale ) },
-				} );
 
 			const chips = Object.create( null );
 
@@ -718,73 +710,394 @@
 					placeholder : Nino.content.getText('/_admin/text/placeholder/search'),
 					onInput : config.onQuery,
 				},
-				items : ( select === null ? [] : [ select ] ).concat( Object.keys( chips ).map( function( id ) { return chips[id] } ) ),
+				items : Object.keys( chips ).map( function( id ) { return chips[id] } ),
 			} );
 
-			return { bar : bar.el, input : bar.input, select : select, chips : chips };
+			return { bar : bar.el, input : bar.input, chips : chips };
 		},
 
 		/**
-		 *	A hit as one line: the path a key is read by, the piece of its text with
-		 *	the words marked, the key small, and - where the words are in another
-		 *	language than the one on screen - that language's code, a button of its
-		 *	own. Text nodes and <mark>s made from them, never markup: what a key
+		 *	The hits of a search as the list of the workbench: a row for each, the path a key is read by over the
+		 *	piece of its text with the words marked and the key small, and - where the words are in another language
+		 *	than the one on screen - the code of that language as a small button at the end of the row. The row is a
+		 *	link to the row of the key. The marks are <mark>s and the rest text nodes, never markup: what a key
 		 *	holds is whatever somebody typed into a text file
 		 *
-		 *	@param		{Object}		hit							See search()
+		 *	@param		{Array}			hits						See search()
 		 *	@param		{string}		locale					The language on screen
-		 *	@param		{Function}	onOpen					Called when the line is clicked
-		 *	@param		{Function}	onLanguage			Called with the code when it is clicked
+		 *	@param		{Object}		handlers				{ href( hit ), onOpen( hit ), onLanguage( code ) }
 		 *
-		 *	@return		{Element}
+		 *	@return		{Element}										What list() answers
 		 */
-		hitElement : function( hit, locale, onOpen, onLanguage ) {
+		hitList : function( hits, locale, handlers ) {
 
-			const line = dc.createElement('div');
-			line.className = 'admin-text-hit';
+			const list = Nino.adminUi.list( hits.map( function( hit ) {
 
-			const open = dc.createElement('button');
-			open.type = 'button';
-			open.className = 'admin-text-hit-open';
+				const key = hit.item.field.entry.key;
+				const words = hit.snippet.map( function( part ) { return part.text } ).join('');
+				const actions = [];
 
-			const path = dc.createElement('strong');
-			path.textContent = hit.item.path.join(' › ');
-			open.appendChild( path );
+				if( hit.locale !== '' && hit.locale !== '*' && hit.locale !== locale ) {
+					const tag = Nino.adminUi.button( hit.locale, function() { handlers.onLanguage( hit.locale ) }, { kind : 'secondary', small : true } );
+					tag.setAttribute( 'aria-label', Nino.adminUi.format( Nino.content.getText('/_admin/text/label/switch-language'), Nino.adminUi.localeName( hit.locale ) ) );
+					actions.push( tag );
+				}
 
-			if( hit.snippet.length > 0 ) {
-				const snippet = dc.createElement('span');
-				snippet.className = 'admin-text-hit-snippet';
+				return {
+					key : key,
+					title : hit.item.path.join(' › '),
+					detail : words === '' ? key : words+ ' '+ key,
+					href : handlers.href( hit ),
+					onOpen : function() { handlers.onOpen( hit ) },
+					actions : actions,
+				};
+			} ), { label : Nino.content.getText('/_admin/text/label/search') } );
+
+			// The second line of a row is text; the words found in it are marked, and the key stands small behind it
+			Array.from( list.querySelectorAll('li') ).forEach( function( li, at ) {
+
+				const line = li.querySelector('small');
+				const hit = hits[at];
+
+				while( line.firstChild !== null && line.firstChild !== undefined )
+					line.removeChild( line.firstChild );
+
 				hit.snippet.forEach( function( part ) {
-					if( part.mark === true ) {
-						const mark = dc.createElement('mark');
-						mark.textContent = part.text;
-						snippet.appendChild( mark );
-					} else {
-						snippet.appendChild( dc.createTextNode( part.text ) );
-					}
+					if( part.mark === true )
+						line.appendChild( Nino.adminUi.el( 'mark', '', part.text ) );
+					else
+						line.appendChild( dc.createTextNode( part.text ) );
 				} );
-				open.appendChild( snippet );
+
+				line.appendChild( dc.createTextNode( ' ' ) );
+				line.appendChild( Nino.adminUi.el( 'code', 'admin-text-hit-key', hit.item.field.entry.key ) );
+			} );
+
+			return list;
+		},
+
+		/**
+		 *	The textfills a field takes, as the rows the dialog of the "[ ]" shows: the name of each is its key read
+		 *	as words, its notation the one the field reads, its value what it says in the language on screen
+		 *
+		 *	@param		{Function}	ask						ask( callback ) calls the server's action and hands callback ( status, body )
+		 *	@param		{Function}	done					Called once with the rows, or with null where they could not be had
+		 *
+		 *	@return		void
+		 */
+		fills : function( ask, done ) {
+
+			ask( function( status, response ) {
+
+				if( status !== 200 || response === null || Array.isArray( response.fills ) === false ) {
+					done( null );
+					return;
+				}
+
+				done( response.fills.map( function( fill ) {
+					return {
+						name : fill.key.split('/').slice( 2 ).map( function( part ) { return Nino.adminUi.slugLabel( part ) } ).join(' \u00B7 '),
+						notation : fill.notation,
+						value : fill.value,
+					};
+				} ) );
+			} );
+		},
+
+		/**
+		 *	The sections of a row as the form draws them, one fieldset each: its name in the legend, the path of a page
+		 *	quietly behind it, and its fields in a grid whose labels stand at the left. What a field is, is the
+		 *	caller's: build( field, section ) answers its element
+		 *
+		 *	@param		{Object}		model
+		 *	@param		{Object}		row
+		 *	@param		{Function}	build							build( { entry, label }, section ) -> Element, or a list of them
+		 *
+		 *	@return		{Array}											The fieldsets, in the order they are shown
+		 */
+		sectionsView : function( model, row, build ) {
+
+			return Nino.admin.textKeys.sections( model, row ).map( function( section ) {
+
+				const fieldset = Nino.adminUi.el( 'fieldset', 'admin-text-section' );
+				fieldset.dataset.section = section.id;
+
+				const legend = Nino.adminUi.el( 'legend', '' );
+				legend.appendChild( Nino.adminUi.el( 'span', 'admin-text-section-name', section.label ) );
+
+				if( section.route !== '' )
+					legend.appendChild( Nino.adminUi.el( 'code', 'admin-text-section-route', section.route ) );
+
+				fieldset.appendChild( legend );
+
+				const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+
+				// A field is one element of the grid, or several: the rows that belong to one key
+				section.fields.forEach( function( field ) {
+					[].concat( build( field, section ) ).forEach( function( el ) { grid.appendChild( el ) } );
+				} );
+
+				fieldset.appendChild( grid );
+
+				return fieldset;
+			} );
+		},
+
+		/**
+		 *	The field of one key's value, in the build of every field of the workbench: its name at the left of it, the
+		 *	key and the count of what is typed under it. A plain text of one line is a line (textField()), of several
+		 *	a field of several (textareaField()), a text with markup the rich-text editor; a text the account may not
+		 *	change is shown as text. Where the key is the same in every language the name says so with a badge. The
+		 *	"[ ]" of the textfills stands at the name of a field of several lines and of a rich-text field, for the
+		 *	account that may change it (options.fills)
+		 *
+		 *	A refusal is said under the field (fail()) and goes when the field is typed into or the next save begins
+		 *
+		 *	@param		{Object}		options
+		 *													entry				the key, see \Nino\Text::entries()
+		 *													value				its text in the language on screen, or the one text of a global key
+		 *													label				the name of the field
+		 *													id					the id of the field's control
+		 *													writable		false for a key this account may not change
+		 *													fills				null, or load( done ) answering the textfills to done( list ), null where they could not be had
+		 *
+		 *	@return		{Object}										{ el, key, control, readonly, read(), write( text ), focus(), fail( sentence ), release(), destroy() }
+		 */
+		valueField : function( options ) {
+
+			const T 				= Nino.admin.textKeys;
+			let entry 			= options.entry;
+			const label 		= String( options.label ?? entry.key );
+			const value 		= String( options.value ?? '' );
+			const writable 	= options.writable !== false;
+			const id 				= String( options.id );
+
+			const meta = Nino.adminUi.el( 'div', 'admin-text-meta' );
+			meta.appendChild( Nino.adminUi.el( 'code', '', entry.key ) );
+
+			// A field that is the same in every language says so beside its name; the badge describes the field, and
+			// its id is one of a note, which an error leaves in the description
+			const badge = entry.global === true ? Nino.adminUi.el( 'span', 'nino-admin-badge', Nino.content.getText('/_admin/text/label/all-languages') ) : null;
+
+			if( badge !== null )
+				badge.id = 'nino-admin-note-'+ id+ '-badge';
+
+			let error = null;
+
+			const handle = {
+				entry : entry, key : entry.key, el : null, control : null, readonly : writable === false,
+				read : null, write : null, focus : function() {}, destroy : function() {}, fail : null, setLimit : function() {},
+				// The sentence under the field, and the field marked: taken away again
+				release : function() {
+					if( error === null )
+						return;
+					error.remove();
+					error = null;
+					handle.unmark();
+				},
+			};
+
+			// What a refusal puts on the box that is typed into: how the control is marked and let go again
+			handle.unmark = function() {};
+
+			// The refusal of a field: under it, until it is typed into
+			const refuse = function( wrapper, control, sentence, marks ) {
+				handle.release();
+				error = Nino.adminUi.fieldError( wrapper, control, id+ '-error', sentence );
+				marks( true );
+				handle.unmark = function() { marks( false ) };
+				wrapper.addEventListener( 'input', handle.release, { once : true } );
+			};
+
+			if( writable === false ) {
+
+				const el = Nino.adminUi.el( 'div', 'nino-admin-field admin-text-field' );
+				const name = Nino.adminUi.el( 'span', '', label );
+				const view = Nino.adminUi.el( 'div', 'admin-text-readonly' );
+
+				name.id = id+ '-name';
+				view.setAttribute( 'role', 'group' );
+				view.setAttribute( 'aria-labelledby', name.id );
+
+				// Read, not edited: a text with markup is shown as the words it holds, set as text and never as markup -
+				// a value that somebody wrote into a file by hand is no markup to run in the page of a restricted account
+				view.textContent = entry.html === true ? T.plain( value ) : value;
+
+				el.dataset.key = entry.key;
+
+				if( badge !== null )
+					name.appendChild( badge );
+
+				el.appendChild( name );
+				el.appendChild( view );
+				el.appendChild( meta );
+
+				handle.el = el;
+				handle.control = view;
+				handle.read = function() { return value };
+				handle.write = function() {};
+				handle.fail = function() {};
+
+				return handle;
 			}
 
-			const key = dc.createElement('code');
-			key.className = 'admin-text-hit-key';
-			key.textContent = hit.item.field.entry.key;
-			open.appendChild( key );
+			// A field of the editor: no label can hold it, so the name stands in a span the group is named by
+			if( entry.html === true ) {
 
-			open.addEventListener( 'click', onOpen );
-			line.appendChild( open );
+				const el = Nino.adminUi.el( 'div', 'nino-admin-field admin-text-field' );
+				const name = Nino.adminUi.el( 'span', '', label );
+				const mount = Nino.adminUi.el( 'div', '' );
 
-			if( hit.locale !== '' && hit.locale !== '*' && hit.locale !== locale ) {
-				const tag = dc.createElement('button');
-				tag.type = 'button';
-				tag.className = 'admin-text-hit-lang';
-				tag.textContent = hit.locale;
-				tag.setAttribute( 'aria-label', Nino.adminUi.format( Nino.content.getText('/_admin/text/label/switch-language'), hit.locale ) );
-				tag.addEventListener( 'click', function() { onLanguage( hit.locale ) } );
-				line.appendChild( tag );
+				name.id = id+ '-name';
+				el.dataset.key = entry.key;
+				el.setAttribute( 'role', 'group' );
+				el.setAttribute( 'aria-labelledby', name.id );
+
+				const editor = Nino.admin.htmlEditor.create( mount, value, entry.maxlength, 0, entry.format );
+
+				if( badge !== null ) {
+					name.appendChild( badge );
+					editor.mark( { describedBy : badge.id } );
+				}
+
+				if( typeof options.fills === 'function' )
+					name.appendChild( Nino.adminUi.fillsButton( { load : options.fills, opener : function() { return mount.querySelector('[contenteditable]') ?? mount } }, null, label ) );
+
+				el.appendChild( name );
+				el.appendChild( mount );
+				el.appendChild( meta );
+
+				handle.el = el;
+				handle.control = mount;
+				handle.read = function() { return editor.getValue() };
+				handle.write = function( text ) { editor.setValue( String( text ) ) };
+				handle.focus = function() { editor.focus() };
+				handle.destroy = function() { editor.destroy() };
+				handle.fail = function( sentence ) {
+					refuse( el, null, sentence, function( on ) {
+						editor.mark( { invalid : on, describedBy : on === true ? error.id : ( badge === null ? '' : badge.id ) } );
+					} );
+				};
+
+				return handle;
 			}
 
-			return line;
+			const single = T.isSingleLine( entry );
+			const field = ( single === true ? Nino.adminUi.textField : Nino.adminUi.textareaField )( {
+				id : id,
+				label : label,
+				value : value,
+				maxLength : entry.maxlength,
+				// The textfills are for a text of several lines; a line has none
+				fills : single === false && typeof options.fills === 'function' ? { editable : true, load : options.fills } : undefined,
+			} );
+			const control = field.querySelector( single === true ? 'input' : 'textarea' );
+
+			field.className = 'nino-admin-field admin-text-field';
+			field.dataset.key = entry.key;
+			control.spellcheck = single === false;
+
+			if( badge !== null ) {
+				field.children[0].appendChild( badge );
+				control.setAttribute( 'aria-describedby', badge.id );
+			}
+
+			const counter = Nino.adminUi.el( 'span', 'nino-admin-char-counter' );
+			const count = function() {
+				counter.textContent = control.value.length+ ' / '+ entry.maxlength;
+				counter.classList.toggle( 'is-limit', control.value.length >= entry.maxlength );
+			};
+
+			control.addEventListener( 'input', count );
+			count();
+
+			meta.appendChild( counter );
+			field.appendChild( meta );
+
+			// The limit the field counts to and takes, as the form of the key says it before it is saved: a text can be
+			// made longer in the save that raises the limit
+			handle.setLimit = function( limit ) {
+				entry = Object.assign( {}, entry, { maxlength : limit } );
+				control.maxLength = limit;
+				count();
+			};
+
+			handle.el = field;
+			handle.control = control;
+			handle.read = function() { return control.value };
+			handle.write = function( text ) { control.value = String( text ); count() };
+			handle.focus = function() { control.focus() };
+			handle.fail = function( sentence ) {
+				refuse( field, control, sentence, function( on ) {
+					if( on === true )
+						return;
+					control.removeAttribute('aria-invalid');
+					if( badge === null )
+						control.removeAttribute('aria-describedby');
+					else
+						control.setAttribute( 'aria-describedby', badge.id );
+				} );
+			};
+
+			return handle;
+		},
+
+		/**
+		 *	What a form of values knows of its fields: the text each held when it was drawn or last stored, which of
+		 *	them differs now, and how to put one back. A rich-text field reads back as the markup it built, which is
+		 *	not always the string the server holds - so a field is changed when it differs from what it held then, and
+		 *	not from the stored value
+		 *
+		 *	@return		{Object}									{ add( field ), get( key ), keys(), changed(), isDirty(), capture( key ), discard(), destroy() }
+		 */
+		session : function() {
+
+			const fields = Object.create( null );
+			const base = Object.create( null );
+
+			const session = {
+
+				add : function( field ) {
+					fields[field.key] = field;
+					base[field.key] = field.read();
+				},
+
+				get : function( key ) {
+					return fields[key];
+				},
+
+				keys : function() {
+					return Object.keys( fields );
+				},
+
+				// The keys whose field holds another text than it did - the text of a key the account may not change is shown, and never differs
+				changed : function() {
+					return Object.keys( fields ).filter( function( key ) { return fields[key].read() !== base[key] } );
+				},
+
+				isDirty : function() {
+					return session.changed().length > 0;
+				},
+
+				// Take what the field holds now as what is stored; or, given the text, what it was stored as
+				capture : function( key, text ) {
+					base[key] = text === undefined ? fields[key].read() : String( text );
+				},
+
+				discard : function() {
+					Object.keys( fields ).forEach( function( key ) {
+						if( fields[key].read() !== base[key] )
+							fields[key].write( base[key] );
+					} );
+				},
+
+				destroy : function() {
+					Object.keys( fields ).forEach( function( key ) { fields[key].destroy() } );
+					Object.keys( fields ).forEach( function( key ) { delete fields[key]; delete base[key] } );
+				},
+			};
+
+			return session;
 		},
 
 		/**

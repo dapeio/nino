@@ -432,6 +432,7 @@ $converted = [
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Elements/assets/admin.js',
 	'_admin/Nino/Modules/Elements/assets/types.js',
+	'_admin/Nino/Modules/Text/assets/keys.js',
 ];
 
 $byHand = [];
@@ -554,6 +555,7 @@ $guideForms = [
 	'_admin/Nino/Modules/Images/assets/favicon.js',
 	'_admin/Nino/Modules/Elements/assets/admin.js',
 	'_admin/Nino/Modules/Elements/assets/types.js',
+	'_admin/Nino/Modules/Text/assets/keys.js',
 ];
 
 /*	The comments of a script that stand at the beginning of a line: a script that writes the string '/*' (the permission of full access) is no comment	*/
@@ -613,6 +615,8 @@ $barred = [
 	'_admin/Nino/Modules/Images/assets/favicon.js',
 	'_admin/Nino/Modules/Elements/assets/admin.js',
 	'_admin/Nino/Modules/Elements/assets/types.js',
+	'_admin/Nino/Modules/Text/assets/admin.js',
+	'_admin/Nino/Modules/Text/assets/keys.js',
 ];
 
 $withoutBar = [];
@@ -693,6 +697,7 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
 $sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {
@@ -847,6 +852,41 @@ check( 'the label of a field of a type is at the left of it like every label: no
 $elementsSheet = $bare( $read( '_admin/Nino/Modules/Elements/assets/admin.css' ) );
 
 check( 'the stylesheet of the Elements panel restyles no block: it names the ids of its own views only, and no number for type, weight or space', preg_match( '/^(?!#elements-form|#types-form|#types-fields|\s|\/|@|\}|$)/m', $elementsSheet ) === 0 );
+// --- the Text panel and its Keys tab: the groups, the language, the one way of saving, the key in a view of its own ------------------
+
+/*	The two tabs draw their groups with the list of the workbench and give each an address; neither has a switch of the language of its own - the
+	language is the workbench's, which both follow and show as the pill of the bar; the one Save of a row is the bar's, with no button of Apply in a
+	row; a key is renamed and deleted by the small buttons at the end of its row, which ask as the guide asks; a key is made in a view of its own.
+	Held by structure - the call of the block, never a word	*/
+$textTabs = [ '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js', '_admin/Nino/Modules/Text/assets/textkeys.js' ];
+$ownLanguage = [];
+$nativeAsk = [];
+$unaddressed = [];
+
+foreach( $textTabs as $script ) {
+
+	$source = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( $script ) ) );
+
+	if( str_contains( $source, 'localeSelect(' ) === true || preg_match( '/createElement\(\s*\'select\'\s*\)/', $source ) === 1 )
+		$ownLanguage[] = $script;
+
+	if( preg_match( '/\b(window|wn)\.(confirm|alert|prompt)\(|(?<![\w.])(alert|prompt|confirm)\(/', $source ) === 1 )
+		$nativeAsk[] = $script;
+
+	if( $script !== $textTabs[2] && ( str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false || preg_match( '/workLocale\.follow\(\s*\'(text|keys)\'/', $source ) !== 1 || str_contains( $source, 'adminUi.localeBadge(' ) === false ) )
+		$unaddressed[] = $script;
+}
+
+check( 'neither tab of the Text panel has a switch of a language of its own, and none asks with the browser\'s dialogs'. ( $ownLanguage === [] && $nativeAsk === [] ? '' : ' - '. implode( ', ', array_merge( $ownLanguage, $nativeAsk ) ) ), $ownLanguage === [] && $nativeAsk === [] );
+check( '...both follow the language of the workbench by their name, show it as the pill of the bar, and give every view an address that the router is told, links to, moves by and asks before leaving'. ( $unaddressed === [] ? '' : ' - '. implode( ', ', $unaddressed ) ), $unaddressed === [] );
+
+$textSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Text/assets/admin.js' ) ) );
+$keysSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Text/assets/keys.js' ) ) );
+$partsSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Text/assets/textkeys.js' ) ) );
+
+check( 'the fields of both are the blocks of the workbench - a line, several lines, the switch, the select and the textfills of the field - and the text of a field that is not an editor is no field of the panel\'s own',
+	str_contains( $partsSource, 'adminUi.textField' ) === true && str_contains( $partsSource, 'adminUi.textareaField' ) === true && str_contains( $partsSource, 'adminUi.fillsButton(' ) === true && str_contains( $partsSource, 'adminUi.fieldError(' ) === true
+	&& str_contains( $keysSource, 'adminUi.switchField(' ) === true && str_contains( $keysSource, 'adminUi.selectField(' ) === true && str_contains( $keysSource, 'adminUi.rowActions(' ) === true && preg_match( '/createElement\(\s*\'(label|input|textarea|button)\'\s*\)/', $partsSource.$keysSource.$textSource ) === 0 );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

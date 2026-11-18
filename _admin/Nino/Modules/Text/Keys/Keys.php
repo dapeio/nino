@@ -50,6 +50,7 @@ namespace Nino\Modules\Text {
 				'keys/delete' 		=> [ self::class, 'apiDelete' ],
 				'keys/scan' 			=> [ self::class, 'apiScan' ],
 				'keys/scanapply' => [ self::class, 'apiScanApply' ],
+				'keys/fills' 		=> [ self::class, 'apiFills' ],
 			];
 		}
 
@@ -136,6 +137,10 @@ namespace Nino\Modules\Text {
 		 *	  - module		the kernel modules, by their directory in lower case
 		 *	  - project		company, website and mail, and the ones keys already use
 		 *
+		 *	and what names and arranges the rows - the pages, the names of the templates and of the
+		 *	features, the order the templates read the keys in - which is the Text panel's own answer
+		 *	(see Admin::naming()), so that a row has one name in both
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *
@@ -154,7 +159,30 @@ namespace Nino\Modules\Text {
 				'locales' => \Nino\Admin\Admin::textLocales( $appData ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'categories' => self::_categories( $appData, $keys ),
-			] );
+			] + Admin::naming( $appData, array_column( $keys, 'key' ) ) );
+		}
+
+		/**
+		 *	The textfills a text may take, for the "[ ]" at the name of a multi-line text and of a text with markup -
+		 *	the Text panel's answer (see Admin::apiFills()), asked under this tab's own permission
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiFills( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$locale = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'locale' );
+
+			// The language of the form that asks - another window of the session may have moved the session's own
+			if( in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false )
+				$locale = \Nino\Admin\Admin::contentLocale( $appData );
+
+			\Nino\Http::ok( $request, [ 'fills' => \Nino\Text::fills( $appData, 'textfill', $locale ) ] );
 		}
 
 		/**
@@ -432,8 +460,8 @@ namespace Nino\Modules\Text {
 		 *
 		 *	The format ('auto' or one of \Nino\Html::FORMATS) and the limit (an
 		 *	int, null or '' for automatic) are optional: a request that leaves
-		 *	one out leaves it as it is - the two checkboxes of the form post
-		 *	without them. A format that is set converts every stored value to it
+		 *	one out leaves it as it is, so a caller that changes only the shape
+		 *	sends neither. A format that is set converts every stored value to it
 		 *	(see _convertFormat()); 'auto' only forgets the choice, the values
 		 *	stay as they are. A limit below the longest text the key holds is
 		 *	refused: the editor would cut the text at it on the next keystroke

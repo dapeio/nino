@@ -4,11 +4,12 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Text			The text fills and their keys
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the search and the
- *													hits of the Text panel and its Keys tab, the sections of
- *													a form, the Keys tab's schema rows and segment inputs,
- *													and the wide two-column form the text screen becomes on
- *													a desktop. Bundled while the module is there (see the
+ *													system in _admin/assets/style.css: the words found in a
+ *													hit, the line under a text that names its key and counts
+ *													what is typed, the text that may not be changed, the rows of
+ *													a key's settings and the lines of the scan - the
+ *													arrangement of what the module draws and nothing the
+ *													blocks have. Bundled while the module is there (see the
  *													panel's assets()), so the same layer rules apply - the
  *													shell's stylesheet fixes the layer order, this one only
  *													ever adds to nino.tool, scoped to the panel's own ids.
@@ -20,262 +21,175 @@
 
 @layer nino.tool {
 
-/* --------------------------------------------------------------- Text */
-
-#keys-form label:not(.nino-admin-field) {
-	display: flex;
-	align-items: center;
-	gap: .45rem;
-	margin: 0 0 .75rem;
-	font-size: .8rem;
-}
-
-#admin-page-wrap .admin-text-schema {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0 1rem;
-	margin: .4rem 0 .75rem;
-}
-
-#admin-page-wrap .admin-text-schema label {
-	margin: 0;
-}
-
-/* The format and the limit of a key: a select and a number beside the two
-   checkboxes, as wide as what they hold */
-#admin-page-wrap .admin-text-format-select,
-#admin-page-wrap .admin-text-limit-input {
-	width: auto;
-	min-height: 30px;
-	padding-top: .25rem;
-	padding-bottom: .25rem;
-	font-size: max( .76rem, 12px );
-}
-
-#admin-page-wrap .admin-text-limit-input {
-	width: 6.5rem;
-}
-
-#admin-page-wrap .admin-text-key-input {
-	flex: 1 1 auto;
-	min-width: 8rem;
-	font: max( .76rem, 12px )/1.4 var(--nino-admin-mono);
-}
-
-#admin-page-wrap .admin-text-key-btn {
-	flex: 0 0 auto;
-	min-height: 30px;
-	padding: .3rem .55rem;
-	font-size: max( .76rem, 12px );
-}
-
-/* ----------------------------------------------- Dense text-key editing */
-
-@media (min-width: 48rem) {
-	#admin-content-text .nino-admin-field-wide {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		grid-template-areas:
-			"header schema"
-			"value value";
-		align-items: center;
-		gap: 0 1rem;
-		margin-bottom: .4rem;
-		padding-bottom: .4rem;
-		border-bottom: 1px solid var(--editor-separator);
-	}
-
-	#admin-content-text .nino-admin-field-wide:last-child {
-		padding-bottom: 0;
-		border-bottom: 0;
-	}
-
-	#admin-content-text .nino-admin-field-wide > .nino-admin-field-header {
-		grid-area: header;
-		margin-bottom: .25rem;
-	}
-
-	#admin-content-text .nino-admin-field-wide > .admin-text-schema {
-		grid-area: schema;
-		margin: 0 0 .25rem;
-	}
-
-	#admin-content-text .nino-admin-field-wide > *:not(.nino-admin-field-header):not(.admin-text-schema) {
-		grid-area: value;
-	}
-}
-
-/* ------------------------------------------- A key this account may read */
-
-/* Same box as the textarea next to it, so the group still reads as one
-   list of fields - but flat and unfocusable, because there is nothing to
-   type into. The permission that decides this is /_admin/text/update<key> */
-#admin-content-text .admin-text-readonly {
-	padding: .55rem .7rem;
-	border: 1px solid var(--editor-separator);
-	border-radius: var(--editor-radius-sm);
-	background: var(--nino-admin-surface-muted);
-	color: var(--editor-text-secondary);
-	font-size: .82rem;
-	line-height: 1.5;
-	white-space: pre-wrap;
-}
-
-#admin-content-text .admin-text-readonly > :first-child { margin-top: 0 }
-#admin-content-text .admin-text-readonly > :last-child { margin-bottom: 0 }
-
-#admin-content-text .admin-text-readonly:empty::before {
-	content: "—";
-	opacity: .55;
-}
-
 /* ------------------------------------------- Finding a text: the list */
 
-/* A hit: the main button opens the row at the field, the language code beside
-   it is a button of its own and does nothing else than switch the language */
-#text-list .admin-text-hits,
-#keys-list .admin-text-hits {
-	margin-bottom: .6rem;
-}
-
-#text-list .admin-text-hit,
-#keys-list .admin-text-hit {
-	display: flex;
-	align-items: stretch;
-	border-bottom: 1px solid var(--editor-separator);
-}
-
-#text-list .admin-text-hit:last-child,
-#keys-list .admin-text-hit:last-child {
-	border-bottom: 0;
-}
-
-#text-list .admin-text-hit-open,
-#keys-list .admin-text-hit-open {
-	display: grid;
-	flex: 1 1 auto;
-	gap: .1rem;
-	min-width: 0;
-	min-height: 54px;
-	padding: .62rem .78rem;
-	border-radius: 0;
-	background: transparent;
-	box-shadow: none;
-	color: var(--editor-text);
-	font-size: .84rem;
-	text-align: left;
-}
-
-#text-list .admin-text-hit-open:hover,
-#keys-list .admin-text-hit-open:hover {
-	background: var(--editor-blue-soft);
-}
-
-#text-list .admin-text-hit-snippet,
-#keys-list .admin-text-hit-snippet {
+/* How many hits there are: a quiet line over them, empty where nothing is searched for */
+#text-list .admin-text-count,
+#keys-list .admin-text-count {
+	margin: 0 0 var(--nino-admin-space-3);
 	color: var(--editor-text-secondary);
-	font-size: max( .78rem, 12px );
-	font-weight: 400;
-	line-height: 1.4;
-	overflow-wrap: anywhere;
+	font-size: var(--nino-admin-text-xs);
 }
 
-#text-list .admin-text-hit-key,
-#keys-list .admin-text-hit-key {
-	color: var(--editor-text-secondary);
-	font: 400 .7rem/1.4 var(--nino-admin-mono);
-	overflow-wrap: anywhere;
+#text-list .admin-text-count:empty,
+#keys-list .admin-text-count:empty {
+	display: none;
 }
 
-#text-list .admin-text-hit-lang,
-#keys-list .admin-text-hit-lang {
-	flex: 0 0 auto;
-	align-self: center;
-	min-height: 26px;
-	margin: 0 .78rem 0 0;
-	padding: .1rem .5rem;
-	font-size: max( .7rem, 12px );
-}
-
+/* The words found, marked in the second line of a hit, and the key behind them */
 #text-list mark,
 #keys-list mark {
-	padding: 0 .1em;
-	border-radius: 2px;
+	padding: 0 var(--nino-admin-space-1);
+	border-radius: var(--editor-radius-sm);
 	background: var(--editor-blue-soft);
 	box-shadow: inset 0 -2px 0 var(--editor-blue);
 	color: inherit;
 }
 
+#text-list .admin-text-hit-key,
+#keys-list .admin-text-hit-key {
+	margin-left: var(--nino-admin-space-2);
+	font: var(--nino-admin-text-xs)/1.4 var(--nino-admin-mono);
+	overflow-wrap: anywhere;
+}
+
 /* ------------------------------------------- Reading a row: its sections */
 
-/* What the legend says besides the name of the section: the route of a page
-   and the beginning of its first text. Not in capitals like the name */
+/* What the legend says besides the name of the section: the path of a page. Not in capitals like the name */
 #text-form .admin-text-section-route,
-#text-form .admin-text-section-preview {
-	margin-left: .6rem;
-	font-size: max( .72rem, 12px );
-	font-weight: 400;
+#keys-form .admin-text-section-route {
+	margin-left: var(--nino-admin-space-4);
+	font: var(--nino-admin-text-xs)/1.4 var(--nino-admin-mono);
 	letter-spacing: 0;
 	text-transform: none;
 }
 
-#text-form .admin-text-section-route {
-	font-family: var(--nino-admin-mono);
-}
-
-#text-form .admin-text-section-preview {
-	color: var(--editor-text-secondary);
-}
-
-/* A field that is the same in every language says so, beside its name */
-#text-form .admin-text-badge,
-#keys-form .admin-text-badge {
-	flex: 0 0 auto;
-	padding: .05rem .5rem;
-	border-radius: 999px;
-	background: var(--editor-blue-soft);
-	color: var(--editor-text-secondary);
-	font-size: max( .68rem, 12px );
-	font-weight: 600;
-	white-space: nowrap;
-}
-
-/* The key the field is, small, and the counter of what was typed - the
-   description of the field, not part of its name */
+/* The key the field is, small, and the count of what was typed - the description of the field, not part of its name */
 #text-form .admin-text-meta,
 #keys-form .admin-text-meta {
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
-	gap: .75rem;
-	margin-top: .22rem;
+	gap: var(--nino-admin-space-5);
 	min-width: 0;
+	margin-top: var(--nino-admin-space-2);
 }
 
 #text-form .admin-text-meta code,
 #keys-form .admin-text-meta code {
 	min-width: 0;
 	color: var(--editor-text-secondary);
-	font: 400 .7rem/1.4 var(--nino-admin-mono);
+	font: var(--nino-admin-text-xs)/1.4 var(--nino-admin-mono);
 	overflow-wrap: anywhere;
 }
 
-/* The name a key is read by, in the Keys tab, over the text it names */
-#keys-form .admin-text-subtitle {
-	display: block;
-	margin: 0 0 .25rem;
-	color: var(--editor-text-secondary);
-	font-size: max( .74rem, 12px );
-	font-weight: 600;
+/* A field that is the same in every language says so with a pill beside its name */
+#text-form .admin-text-field > span > .nino-admin-badge,
+#keys-form .admin-text-field > span > .nino-admin-badge {
+	margin-left: var(--nino-admin-space-3);
 }
 
-/* The field a hit or a link led to, marked until the row is left. A
-   mark that stays and does not move, so there is nothing to switch off for
-   those who ask for less motion */
+/* A text this account may read: the box of the text next to it, flat and with nothing to type into */
+#text-form .admin-text-readonly {
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
+	border: 1px solid var(--editor-separator);
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	color: var(--editor-text-secondary);
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+#text-form .admin-text-readonly > :first-child {
+	margin-top: 0;
+}
+
+#text-form .admin-text-readonly > :last-child {
+	margin-bottom: 0;
+}
+
+#text-form .admin-text-readonly:empty::before {
+	content: "—";
+}
+
+/* The field a hit or a link led to, marked until the row is left. A mark that stays and does not move, so there is nothing
+   to switch off for those who ask for less motion */
 #text-form .admin-text-field.is-found,
 #keys-form .admin-text-field.is-found {
 	background: var(--editor-blue-soft);
-	box-shadow: -3px 0 0 var(--editor-blue);
+	box-shadow: calc( var(--nino-admin-space-1) * -1 ) 0 0 var(--editor-blue);
+}
+
+/* ------------------------------------------ A key: its shape, its rows */
+
+/* What a key is besides its text - format, limit, global, hidden - in one row under the text, the buttons of the key at its end; the row belongs to the text above it */
+#keys-form .nino-admin-field.admin-key-settings {
+	border-top: 0;
+	padding-top: 0;
+}
+
+#keys-form .admin-key-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--nino-admin-space-3) var(--nino-admin-space-6);
+}
+
+#keys-form .admin-key-controls > .nino-admin-field {
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	margin: 0;
+}
+
+#keys-form .admin-key-controls > .nino-admin-field > span {
+	margin: 0;
+}
+
+/* A number is short */
+#keys-form .admin-key-controls input[type="number"] {
+	width: 8rem;
+}
+
+#keys-form .admin-key-controls .nino-admin-row-actions {
+	margin-left: auto;
+}
+
+/* A refusal of the row stands in a line of its own, whatever stands before it */
+#keys-form .admin-key-controls > .nino-admin-field-error {
+	flex: 1 1 100%;
+	margin: 0;
+}
+
+/* The key that the segments make, and how the panel will read it, in the place of a field's control */
+#keys-new-form .admin-key-composed {
+	display: grid;
+	gap: var(--nino-admin-space-1);
+	min-width: 0;
+}
+
+#keys-new-form .admin-key-composed code {
+	font: var(--nino-admin-text-sm)/1.4 var(--nino-admin-mono);
+	overflow-wrap: anywhere;
+}
+
+/* A word that is no word of the vocabulary and what it reads as: said under the field, and no refusal */
+#keys-new-form .admin-key-note,
+#keys-new-form .admin-key-composed .admin-key-note {
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+}
+
+/* ------------------------------------------------ The scan of the templates */
+
+/* What a finding shows and does not take - where it is read, what to do - is a line at the height of the name beside it */
+#keys-scan-form .admin-keys-scan-line {
+	margin: 0;
+}
+
+/* The legend of a finding is the key a template reads: its case is its meaning, and capitals would change it */
+#keys-scan-form .admin-keys-scan-row > legend {
+	text-transform: none;
 }
 
 }
