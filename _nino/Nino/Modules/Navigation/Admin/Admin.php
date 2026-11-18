@@ -39,6 +39,15 @@ namespace Nino\Modules\Navigation {
 	 *												hand. A hand-written route joins a menu exactly the same
 	 *												way and shows up here like any other.
 	 *
+	 *												A menu may have a name - "Main menu" - which the panel
+	 *												shows before the key. It is an optional entry of
+	 *												'/nino/html/navnames', key =&gt; name, a key of its own beside
+	 *												the plain list of keys, which stays a list: a menu without a name has
+	 *												no entry, and a config.php that never heard of names is
+	 *												written back as it was. The name is one line of plain
+	 *												text (see cleanName()); a rename of the key takes it
+	 *												along and a delete takes it away.
+	 *
 	 *												A menu is saved as a whole: the panel keeps a working copy
 	 *												of the entries, and Save writes the complete running order
 	 *												in one request, under the config lock (see apiSave()).
@@ -58,6 +67,9 @@ namespace Nino\Modules\Navigation {
 	class Admin {
 
 		public const string MANAGE_PERM = '/_admin/navs/manage';
+
+		// How long the name of a menu may be, in characters
+		public const int NAME_MAX = 80;
 
 		public static function perm(): string {
 			return self::MANAGE_PERM;
@@ -88,7 +100,7 @@ namespace Nino\Modules\Navigation {
 
 		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
 		public static function manual(): array {
-			return [ 'intro', 'navigation', 'item', 'name', 'save', 'delete' ];
+			return [ 'intro', 'navigation', 'name', 'item', 'unnamed', 'save', 'delete' ];
 		}
 
 		public static function icon(): string {
@@ -101,7 +113,7 @@ namespace Nino\Modules\Navigation {
 		}
 
 		public static function assets(): array {
-			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ), \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ) ];
+			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
 		}
 
 		// The panel's own strings, one <locale>.php per interface language
@@ -131,8 +143,9 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Every menu, each with the routes standing in it in their running
-		 *	order, plus every route that could be added to one.
+		 *	Every menu - its key, its name ('' where it has none) - each with the
+		 *	routes standing in it in their running order, plus every route that
+		 *	could be added to one.
 		 *
 		 *	Also the whole response of the other actions here: each of them
 		 *	changes what this returns, and the frontend simply re-renders from
@@ -164,6 +177,12 @@ namespace Nino\Modules\Navigation {
 		 *	'/nino/html/navroutes' - and what is stored for a page that is gone
 		 *	(a feature switched off) goes with the first save of that menu.
 		 *	Without 'entries' a save only creates or renames, as it always did.
+		 *
+		 *	'name', when posted, is the menu's name - one line of plain text, see
+		 *	cleanName(); an empty one takes the name away, and a request without
+		 *	the field leaves the name as it is. The names are kept under
+		 *	'/nino/html/navnames', key =&gt; name, and the key of a menu that has
+		 *	none has no entry there.
 		 *
 		 *	A rename follows the key everywhere it is used as a key: the
 		 *	registry, keeping its place in it, and every route that is a member,
@@ -213,10 +232,30 @@ namespace Nino\Modules\Navigation {
 					return;
 				}
 
+				// A name that is posted is checked before anything is read or written
+				$name = null;
+
+				if( array_key_exists( 'name', $data ) === true ) {
+
+					$name = self::cleanName( $data['name'] );
+
+					if( $name === null ) {
+						\Nino\Http::fail( $request, 400, 'invalid navigation name', 'navs_invalid_name', [ self::NAME_MAX ], 'name' );
+						return;
+					}
+				}
+
 				$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 				$routes 		= (array) ( $config['/nino/http/routes'] ?? [] );
 				$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
 				$registry 	= self::_storedRegistry( $config );
+				$names 			= self::_storedNames( $config );
+
+				// A hand-written key of names that is no list is left as it is, and no name is written into it
+				if( $names === null && ( $name ?? '' ) !== '' ) {
+					\Nino\Http::fail( $request, 409, 'the names in config.php are no list', 'navs_names_unusable', [], 'name' );
+					return;
+				}
 
 				// Free means free everywhere, not just in the registry: a route
 				// carrying an unregistered menu key by hand would otherwise have
@@ -285,17 +324,30 @@ namespace Nino\Modules\Navigation {
 					foreach( $navroutes as $routeKey => $memberships )
 						if( isset( $memberships[$originalKey] ) === true )
 							$navroutes[$routeKey] = self::_renamed( $memberships, $originalKey, $key );
+
+					// The name goes with the key, in the place it stood
+					if( $names !== null && isset( $names[$originalKey] ) === true )
+						$names = self::_renamed( $names, $originalKey, $key );
+				}
+
+				if( $name !== null && $names !== null ) {
+
+					if( $name === '' )
+						unset( $names[$key] );
+					else
+						$names[$key] = $name;
 				}
 
 				if( $order !== null )
 					self::_applyOrder( $routes, $navroutes, $candidates, $key, $order );
 
 				$appData['/nino/html/navs'] = array_values( $registry );
+				self::_setNames( $appData, $names );
 
 				if( $originalKey === '' && $order === null ) {
 
-					// Nothing but the registry changed
-					\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs' ] );
+					// Nothing but the registry and the names changed
+					\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/html/navnames' ] );
 
 					\Nino\Http::ok( $request, self::_payload( $appData, $live ) );
 					return;
@@ -349,6 +401,10 @@ namespace Nino\Modules\Navigation {
 
 				$routes 		= (array) ( $config['/nino/http/routes'] ?? [] );
 				$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
+				$names 			= self::_storedNames( $config );
+
+				if( $names !== null )
+					unset( $names[$key] );
 
 				foreach( $routes as $routeKey => $route ) {
 
@@ -376,6 +432,7 @@ namespace Nino\Modules\Navigation {
 				}
 
 				$appData['/nino/html/navs'] = array_values( $registry );
+				self::_setNames( $appData, $names );
 
 				self::_persist( $appData, $routes, $navroutes, $live );
 
@@ -383,6 +440,82 @@ namespace Nino\Modules\Navigation {
 			} finally {
 				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
+		}
+
+		/**
+		 *	The name a request posts for a menu, as it is kept: without blanks of any kind at its ends, one line
+		 *	of plain text of at most NAME_MAX characters, with no control or
+		 *	format character in it (a line break, a null byte, a direction
+		 *	override) and valid UTF-8. An empty one is valid - it takes the name
+		 *	away
+		 *
+		 *	@param		mixed 		$raw					What was posted
+		 *
+		 *	@return 	string|null							The name, '' for none, null where it is refused
+		 */
+		public static function cleanName( mixed $raw ): ?string {
+
+			if( is_string( $raw ) === false )
+				return null;
+
+			// Blanks of every kind at the ends are none: a name of a no-break space alone is no name
+			$name = preg_replace( '/^[\p{Z}\s]+|[\p{Z}\s]+$/u', '', $raw );
+
+			if( $name === null || preg_match( '/^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]*$/u', $name ) !== 1 )
+				return null;
+
+			return mb_strlen( $name, 'UTF-8' ) > self::NAME_MAX ? null : $name;
+		}
+
+		/**
+		 *	The names as config.php holds them right now, as they stand: menu key =&gt;
+		 *	name. A hand-written entry that is no name (a number, a list) is kept in
+		 *	it, so that saving another menu never drops what somebody wrote
+		 *	there; nothing reads it as a name (see nameOf()). Null where the key
+		 *	holds something that is no list at all
+		 *
+		 *	@param		array 		$config				The content of config.php, read under the lock
+		 *
+		 *	@return 	array|null
+		 */
+		private static function _storedNames( array $config ): ?array {
+
+			$stored = $config['/nino/html/navnames'] ?? [];
+
+			return is_array( $stored ) === true ? $stored : null;
+		}
+
+		/**
+		 *	The name of one menu: the entry when it is a non-empty string, else ''
+		 *
+		 *	@param		array|null	$names				See _storedNames()
+		 *	@param		string		$key
+		 *
+		 *	@return 	string
+		 */
+		private static function _nameOf( ?array $names, string $key ): string {
+			return is_string( $names[$key] ?? null ) === true ? $names[$key] : '';
+		}
+
+		/**
+		 *	Put the names into $appData for the write that follows: absent rather
+		 *	than empty, so that a project with no names has no such key in its
+		 *	config.php
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array|null	$names				Menu key =&gt; name; null leaves the key as it is
+		 *
+		 *	@return 	void
+		 */
+		private static function _setNames( array &$appData, ?array $names ): void {
+
+			if( $names === null )
+				return;
+
+			if( $names === [] )
+				unset( $appData['/nino/html/navnames'] );
+			else
+				$appData['/nino/html/navnames'] = $names;
 		}
 
 		/**
@@ -695,7 +828,7 @@ namespace Nino\Modules\Navigation {
 			else
 				$appData['/nino/html/navroutes'] = $navroutes;
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/http/routes', '/nino/html/navroutes' ] );
+			\Nino\AppData::writeContentData( $appData, [ '/nino/html/navs', '/nino/html/navnames', '/nino/http/routes', '/nino/html/navroutes' ] );
 
 			$appData['/nino/http/routes'] = array_merge( $live, $routes );
 		}
@@ -714,8 +847,8 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Everything the dialog draws itself from: the menus with their members
-		 *	in order and every route that could join one
+		 *	Everything the panel draws itself from: the menus with their keys,
+		 *	names and members in order, and every route that could join one
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$live					The live route array, as it was before this request replaced anything
@@ -729,6 +862,7 @@ namespace Nino\Modules\Navigation {
 			$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
 			$candidates = self::_candidates( $routes, $live, \Nino\Locales::getNativeLocale( $appData ) );
 			$labels 		= self::_labels( $appData, $candidates );
+			$names 			= self::_storedNames( $config );
 
 			$navs = [];
 			foreach( self::registry( $appData ) as $key ) {
@@ -737,7 +871,7 @@ namespace Nino\Modules\Navigation {
 				foreach( self::_members( $routes, $navroutes, $candidates, $key ) as $entryKey )
 					$entries[] = $labels[$entryKey];
 
-				$navs[] = [ 'key' => $key, 'entries' => $entries ];
+				$navs[] = [ 'key' => $key, 'name' => self::_nameOf( $names, $key ), 'entries' => $entries ];
 			}
 
 			return [

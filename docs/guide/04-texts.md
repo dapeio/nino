@@ -129,7 +129,7 @@ Der Quelltext der deutschen Seite zeigt:
 </section>
 ```
 
-Die Seite steht noch in keinem Menü. Welche Seite in welches Menü kommt, entscheidet das Projekt: Öffne den Bereich **Routen**, klicke auf `/meetups` und wähle „In der Navigation „main“ zeigen“. Der Eintrag heißt dann „Treffen“.
+Die Seite steht noch in keinem Menü. Welche Seite in welches Menü kommt, entscheidet das Projekt: Öffne den Bereich **Routen**, klicke auf `/meetups` und hake bei „In Navigationen zeigen“ das Menü „main“ an. Der Eintrag heißt dann „Treffen“.
 
 In `private/` findest Du jetzt:
 

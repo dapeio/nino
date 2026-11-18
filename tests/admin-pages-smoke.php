@@ -1068,6 +1068,148 @@ check( 'deleting the menu takes the page out of it', array_key_exists( '/nino/ht
 $appData['/nino/http/routes'] = $persistedRoutes;
 unset( $appData['/nino/html/navroutes'] );
 
+/*	The name of a menu. It is an entry of '/nino/html/navnames' beside the plain list of keys: a menu without a name has no entry,
+	and a config.php that holds no name is written back as it was, byte for byte	*/
+echo "Modules\\Navigation\\Admin - the name of a menu\n";
+
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/html/navs'] = [ 'main', 'footer' ];
+	unset( $config['/nino/html/navnames'] );
+	return $config;
+} );
+$appData['/nino/html/navs'] = [ 'main', 'footer' ];
+unset( $appData['/nino/html/navnames'] );
+$namesInFile = static fn(): mixed => \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navnames'] ?? null;
+$nameOf = static function( array $body, string $key ): ?string {
+	$at = array_search( $key, array_column( $body['navs'], 'key' ), true );
+	return $at === false ? null : $body['navs'][$at]['name'];
+};
+
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/', '/contact' ] ] );
+$before = $configNow();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/', '/contact' ] ] );
+check( 'a menu that has no name is saved byte for byte as it was, and is listed with an empty one', $status === 200 && $configNow() === $before && $nameOf( $body, 'main' ) === '' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'name' => '  ', 'entries' => [ '/', '/contact' ] ] );
+check( '...whether the name is left out or empty', $status === 200 && $configNow() === $before && $namesInFile() === null );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'name' => '  Hauptmenü ' ] );
+check( 'a name is kept trimmed, under its key, beside the plain list of keys', $status === 200 && $namesInFile() === [ 'main' => 'Hauptmenü' ] && $nameOf( $body, 'main' ) === 'Hauptmenü'
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === [ 'main', 'footer' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/contact', '/' ] ] );
+check( 'a save that does not post the name leaves it', $status === 200 && $nameOf( $body, 'main' ) === 'Hauptmenü' && $namesInFile() === [ 'main' => 'Hauptmenü' ] );
+
+$appData['/nino/html/navs'] = [ 'main', 'footer' ];
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
+$kept = $appData['/nino/html/navnames'];
+$appData['/nino/html/navnames'] = $kept + [ 'ghost' => 'Geist', 'footer' => 42 ];
+[ , $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$appData['/nino/html/navnames'] = $kept;
+array_pop( $appData['/nino/modules'] );
+check( 'the Routes panel is told the names of the menus that have one - not of a menu that is not registered, nor one that is no text', ( $body['navNames'] ?? null ) === [ 'main' => 'Hauptmenü' ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'primary' ] );
+check( 'a rename of the key takes the name along', $status === 200 && $namesInFile() === [ 'primary' => 'Hauptmenü' ] && $nameOf( $body, 'primary' ) === 'Hauptmenü' );
+
+$refusals = [
+	'a line break'			=> "Haupt\nmenü",
+	'a null byte'				=> "Haupt\0menü",
+	'a direction mark'	=> "Haupt\u{202E}menü",
+	'a line separator'	=> "Haupt\u{2028}menü",
+	'a tab'							=> "Haupt\tmenü",
+	'a list'						=> [ 'a' ],
+	'a number'					=> 5,
+	'too long'					=> str_repeat( 'ä', \Nino\Modules\Navigation\Admin::NAME_MAX + 1 ),
+];
+$before = $configNow();
+$refused = [];
+foreach( $refusals as $what => $posted ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => $posted ] );
+	if( $status !== 400 || ( $body['code'] ?? '' ) !== 'navs_invalid_name' || ( $body['field'] ?? '' ) !== 'name' )
+		$refused[] = $what;
+}
+check( 'a name that is not one line of plain text is refused at the field "name", and nothing is written'. ( $refused === [] ? '' : ' - not '. implode( ', ', $refused ) ), $refused === [] && $configNow() === $before
+	&& \Nino\Modules\Navigation\Admin::cleanName( "Haupt\xC3\x28menü" ) === null );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => str_repeat( 'ä', \Nino\Modules\Navigation\Admin::NAME_MAX ) ] );
+check( '...and the longest one it takes is as long as the limit says, counted in characters', $status === 200 && mb_strlen( $namesInFile()['primary'], 'UTF-8' ) === \Nino\Modules\Navigation\Admin::NAME_MAX );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => '' ] );
+check( 'an empty name takes the name away, and with the last one the key of names leaves config.php', $status === 200 && $nameOf( $body, 'primary' ) === '' && $namesInFile() === null );
+
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => 'Kopf' ] );
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'side', 'name' => 'Seite' ] );
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'side' ] );
+check( 'a created menu has the name it was given, and the delete of a menu takes its name away and no other', $namesInFile() === [ 'primary' => 'Kopf' ] );
+
+$before = $configNow();
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Navigation\Admin::class, 'apiSave' ], [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => 'Fremd' ], null, 403 );
+check( 'a request the CSRF check has refused writes no name', $status === 403 && $configNow() === $before );
+\Nino\Auth::logoutUser( $appData );
+ninoUser( $appData, 'routes-only@example.com', [ '/_admin/routes/manage' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => 'Fremd' ] );
+check( '...nor does an account without the right to manage the navigations', $status === 403 && $namesInFile() === [ 'primary' => 'Kopf' ] );
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+$configArray = static fn(): array => \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$setNames = static function( mixed $names ) use ( &$appData ): void {
+	\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ) use ( $names ): array {
+		if( $names === null )
+			unset( $config['/nino/html/navnames'] );
+		else
+			$config['/nino/html/navnames'] = $names;
+		return $config;
+	} );
+	$names === null ? ( function() use ( &$appData ) { unset( $appData['/nino/html/navnames'] ); } )() : ( $appData['/nino/html/navnames'] = $names );
+};
+
+// Saving a name leaves the rest of config.php as it is: the routes keep their memberships and their order
+$setNames( null );
+$kept = $configArray();
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => 'Nur der Name' ] );
+$after = $configArray();
+$named = $after['/nino/html/navnames'] ?? null;
+unset( $after['/nino/html/navnames'] );
+check( 'a save of the name alone changes nothing in config.php but the names', $status === 200 && $named === [ 'primary' => 'Nur der Name' ] && $after === $kept );
+
+// What somebody wrote by hand into the names - a number, a list, a name for a key nobody has - stays when another menu is saved
+$foreign = [ 'footer' => 42, 'legal' => [ 'x' ], 'ghost' => 'Geist' ];
+$setNames( $foreign );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => 'Kopf' ] );
+check( 'an entry of the names that is no name, or is for a key no menu has, is kept when another menu is saved, and read as no name', $status === 200 && $configArray()['/nino/html/navnames'] === $foreign + [ 'primary' => 'Kopf' ]
+	&& $nameOf( $body, 'footer' ) === '' && $nameOf( $body, 'primary' ) === 'Kopf' );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => '' ] );
+check( '...and an empty name takes away its own entry and no other', $status === 200 && $configArray()['/nino/html/navnames'] === $foreign );
+
+// A key that is no list at all is left as it is, and a name is refused for it
+$setNames( 'Hauptmenü' );
+$before = $configNow();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => 'Kopf' ] );
+check( 'names that are no list in config.php are not written over: a name is refused with a code at the field, and nothing is written', $status === 409 && ( $body['code'] ?? '' ) === 'navs_names_unusable' && ( $body['field'] ?? '' ) === 'name' && $configNow() === $before );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => '', 'entries' => [ '/' ] ] );
+check( '...a save with no name goes through and leaves the key as it was', $status === 200 && $configArray()['/nino/html/navnames'] === 'Hauptmenü' );
+$setNames( null );
+
+// A name of blanks of any kind - a no-break space too - is no name, and blanks at its ends are none of it
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => "\u{00A0}\u{2003} " ] );
+check( 'a name of no-break spaces alone is no name', $status === 200 && $nameOf( $body, 'primary' ) === '' && $namesInFile() === null );
+[ , $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'primary', 'name' => "\u{00A0}Kopf\u{00A0}" ] );
+check( '...and no-break spaces around a name are cut off it', $nameOf( $body, 'primary' ) === 'Kopf' );
+
+// A tick for a navigation that is not there is refused by the page action, and nothing is written; with the module off the form has no ticks
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
+$beforeRoutes = $configArray()['/nino/http/routes'];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+	'originalUri' => '/home', 'uri' => '/home', 'httpUris' => [ '' => '/' ], 'template' => 'page-home', 'navs' => [ 'primary', 'ghost' ], 'text' => $pageText('Home'),
+] );
+check( 'a page saved with a tick for a navigation that is gone is refused with a code at the field "navs", and nothing is written', $status === 400 && ( $body['code'] ?? '' ) === 'routes_unknown_nav' && ( $body['field'] ?? '' ) === 'navs' && ( $body['params'] ?? [] ) === [ 'ghost' ]
+	&& $configArray()['/nino/http/routes'] === $beforeRoutes );
+array_pop( $appData['/nino/modules'] );
+
+unset( $appData['/nino/html/navnames'] );
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'primary' ] );
+
+echo "\n";
+
 /*	The hook the shortcode's lines pass through before they are drawn. Three
 	pages in 'main', none in 'side'; every registration is taken away again by
 	its name, so that nothing after this block is called by it	*/

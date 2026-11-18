@@ -143,7 +143,6 @@ namespace Nino\Modules\Routes {
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
-				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
 			];
 		}
 
@@ -186,7 +185,8 @@ namespace Nino\Modules\Routes {
 		 *	locales with what each is called and the one the workbench is on,
 		 *	and the navigations a page can be put into (empty while the
 		 *	Navigation module is inactive, which is what tells the frontend to
-		 *	offer no menu fields at all), and the pages features route at
+		 *	offer no menu fields at all) with the names they have (a map, key =>
+		 *	name, of the ones that have one), and the pages features route at
 		 *	runtime (see runtimeRoutes()), apart from the persisted ones
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -213,6 +213,7 @@ namespace Nino\Modules\Routes {
 				'localeNames' 	=> self::_localeNames( $appData, $locales ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData, true ),
 				'navs' 					=> $navs,
+				'navNames' 			=> \Nino\Pages::navNames( $appData ),
 			] );
 		}
 
@@ -444,6 +445,19 @@ namespace Nino\Modules\Routes {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
+
+			// A tick for a navigation that is not there (it was renamed or deleted since the form was drawn) is refused and not dropped:
+			// the page would be saved without a menu the person ticked. While the Navigation module is off the form has no ticks and
+			// what is posted is narrowed to the menus there are, as entryNavs() does
+			$ticked = in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ) === true && is_array( $data['navs'] ?? null ) === true ? $data['navs'] : [];
+
+			foreach( $ticked as $navKey ) {
+
+				if( is_string( $navKey ) === false || in_array( $navKey, \Nino\Pages::navKeys( $appData ), true ) === false ) {
+					\Nino\Http::fail( $request, 400, 'unknown navigation', 'routes_unknown_nav', [ is_string( $navKey ) === true ? $navKey : '' ], 'navs' );
+					return;
+				}
+			}
 
 			$result = \Nino\Pages::put( $appData, [
 				'uri' 				=> \Nino\Admin\Admin::postString( $data, 'uri' ),

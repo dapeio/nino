@@ -3,12 +3,18 @@
  *	admin-navs-js-smoke.js	DOM-light checks for the Navigations panel's script
  *													(_nino/Nino/Modules/Navigation/assets/admin.js).
  *
- *													A menu is a working copy: ↑, ↓, × and Add change the
- *													entries on screen and write nothing, Save posts the
- *													whole running order in one request, and what was
- *													changed and not saved is never lost to a click on an
- *													arrow, to the panel being shown again, or to the back
- *													link. The checks below are about exactly that.
+ *													A menu is a working copy: up, down, remove and Add
+ *													change the entries on screen and write nothing, Save
+ *													posts the whole running order in one request - and
+ *													the name and the key with it -, and what was changed
+ *													and not saved is never lost to a click on a row, to
+ *													the panel being shown again, or to the back link. A
+ *													menu has a name, which is optional, and its key: the
+ *													list names it by the name and shows the key quietly
+ *													beside it. Every view has an address (#navs,
+ *													#navs/@new, #navs/<key>), and a save leaves the person
+ *													in the menu. What is wrong is said at the field, the
+ *													server's refusals too.
  *
  *	Usage: node tests/admin-navs-js-smoke.js
  */
@@ -16,6 +22,7 @@
 'use strict';
 
 const vm 		= require('vm');
+const fs 		= require('fs');
 const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
 
 // --- the words -------------------------------------------------------------
@@ -34,7 +41,7 @@ function text( key ) {
  *	One panel in its own context. `shell` is the registry the workbench's
  *	script.js would provide, or null for a shell that has none
  */
-function build( shell ) {
+function build( shell, hash ) {
 
 	// The pane the shell draws: the name of the panel in its head, and the two levels beside it
 	const pane = element('div');
@@ -53,18 +60,31 @@ function build( shell ) {
 	form.classList.add('admin-hidden');
 	pane.appendChild( form );
 
-	// The page a toast is drawn in
-	const page = element('body');
-
 	const requests = [];
-	const confirms = [];
 	// What the panel said it wrote (see Nino.admin.touch() of the shell)
 	const touched = [];
-	const box = { confirmAnswer : false };
+	const toasts = [];
+	const questions = [];
+	const written = [];
+	const moved = [];
+	const leaves = [];
+	const box = { questionAnswer : false, hash : hash ?? { panel : 'navs', parts : [] } };
+
+	const everything = function() {
+		return [ list, form ].concat( findAll( list, function() { return true } ), findAll( form, function() { return true } ) );
+	};
 
 	const Nino = {
-		admin : { formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar },
-			touch : function( topic ) { touched.push( topic ) }, stamp : function() { return 0 } },
+		admin : {
+			touch : function( topic ) { touched.push( topic ) }, stamp : function() { return 0 },
+			router : {
+				current : function() { return box.hash },
+				go : function( panel, parts ) { moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+				set : function( panel, parts ) { written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+				leave : function( names, open, proceed, resync ) { leaves.push( { open : open, proceed : proceed, resync : resync } ) },
+				href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') },
+			},
+		},
 		events : { bindCallback : function() {} },
 		http : { sendRequest : function( uri, method, callback, data ) {
 			requests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } );
@@ -79,22 +99,30 @@ function build( shell ) {
 		document : {
 			createElement : element,
 			createElementNS : function( space, tag ) { return element( tag ) },
-			getElementById : function( id ) {
-				if( id === 'navs-list' ) return list;
-				if( id === 'navs-form' ) return form;
-				return findAll( list, function( el ) { return el.id === id } )[0] ?? findAll( form, function( el ) { return el.id === id } )[0] ?? null;
-			},
+			createTextNode : function( content ) { return Object.assign( element('#text'), { textContent : String( content ) } ) },
+			getElementById : function( id ) { return everything().find( function( el ) { return el.id === id } ) ?? null },
 			documentElement : null,
-			body : page,
+			body : null,
 			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
 		},
 		Nino : Nino,
 	};
-	sandbox.window = { Nino : Nino, location : { hash : '' }, setTimeout : function() { return 1 }, clearTimeout : function() {}, confirm : function( message ) { confirms.push( message ); return box.confirmAnswer } };
+	sandbox.window = { Nino : Nino, location : { hash : '' }, setTimeout : function() { return 1 }, clearTimeout : function() {} };
 
 	const context = vm.createContext( sandbox );
 	load( '_admin/assets/Nino.admin.js', context );
+
+	Nino.adminUi.say = function( words ) { toasts.push( words ) };
+	Nino.adminUi.confirm = function( level, options ) {
+		questions.push( Object.assign( { level : level }, options ) );
+		options.onChoose( box.questionAnswer );
+		return true;
+	};
 	load( '_nino/Nino/Modules/Navigation/assets/admin.js', context );
+
+	const entryRows = function() {
+		return findAll( form, function( el ) { return el.classList.contains('nino-admin-list-row') } );
+	};
 
 	return {
 		panel : Nino.admin.navs,
@@ -102,21 +130,35 @@ function build( shell ) {
 		form : form,
 		title : paneTitle,
 		requests : requests,
-		confirms : confirms,
+		questions : questions,
 		touched : touched,
-		page : page,
+		toasts : toasts,
+		written : written,
+		moved : moved,
+		leaves : leaves,
 		box : box,
 		/** Answer the last request the panel made, the way Nino.http.sendRequest() calls back */
 		answer : function( status, body ) { requests[requests.length - 1].callback( { status : status, responseJSON : body } ) },
 		field : function( id ) { return findAll( form, function( el ) { return el.id === id } )[0] },
-		byClass : function( className ) { return findAll( form, function( el ) { return el.className === className } ) },
-		/** The entries on screen, as their row labels without the position */
-		entries : function() { return findAll( form, function( el ) { return el.className === 'admin-page-row' } ).map( function( li ) { return li.children[0].textContent.replace( /^\d+\. /, '' ).replace( /\s+/g, ' ' ).trim() } ) },
-		/** One entry's ↑, ↓ or × */
+		/** The rows of the menus on the list */
+		menus : function() { return findAll( list, function( el ) { return el.classList.contains('nino-admin-list-row') } ) },
+		/** The title and the quiet line of a row of the list */
+		menuTitle : function( li ) { return findAll( li, function( el ) { return el.tagName === 'STRONG' } )[0].textContent },
+		menuDetail : function( li ) { return findAll( li, function( el ) { return el.tagName === 'SMALL' } )[0].textContent },
+		link : function( li ) { return findAll( li, function( el ) { return el.classList.contains('nino-admin-row-open') } )[0] },
+		/** The entries on screen, as the title and the paths of each row */
+		entries : function() { return entryRows().map( function( li ) { return findAll( li, function( el ) { return el.tagName === 'STRONG' } )[0].textContent+ ' ('+ findAll( li, function( el ) { return el.tagName === 'SMALL' } )[0].textContent+ ')' } ) },
+		/** One entry's up, down or remove button */
 		button : function( index, which ) {
-			const row = findAll( form, function( el ) { return el.className === 'admin-page-row' } )[index];
-			return row.children[1].children[ { up : 0, down : 1, remove : 2 }[which] ];
+			return findAll( entryRows()[index], function( el ) { return el.classList.contains('nino-admin-row-actions') } )[0].children[ { up : 0, down : 1, remove : 2 }[which] ];
 		},
+		theForm : function() { return findAll( form, function( el ) { return el.tagName === 'FORM' } )[0] },
+		back : function() { return findAll( form, function( el ) { return el.classList.contains('nino-admin-back-link') } )[0] },
+		bar : function() { return findAll( form, function( el ) { return el.classList.contains('nino-admin-actionbar') } )[0] },
+		barButtons : function() { return findAll( form, function( el ) { return el.classList.contains('nino-admin-actionbar') } )[0].children.filter( function( el ) { return el.tagName === 'BUTTON' } ) },
+		errors : function() { return findAll( form, function( el ) { return el.className === 'nino-admin-field-error' } ) },
+		addButton : function() { return findAll( form, function( el ) { return el.id === 'navs-form-addbtn' } )[0] },
+		newButton : function() { return findAll( list, function( el ) { return el.classList.contains('nino-admin-btn-primary') } )[0] },
 	};
 }
 
@@ -127,19 +169,19 @@ const ROUTES = [
 	{ httpUri : '/blog', uri : '/blog', label : '/blog', named : false, runtime : true },
 ];
 
-function payload( entries ) {
+function payload( entries, name ) {
 	return {
-		navs : [ { key : 'main', entries : entries.map( function( uri ) { return ROUTES.find( function( route ) { return route.httpUri === uri } ) } ) }, { key : 'footer', entries : [] } ],
+		navs : [ { key : 'main', name : name ?? '', entries : entries.map( function( uri ) { return ROUTES.find( function( route ) { return route.httpUri === uri } ) } ) }, { key : 'footer', name : '', entries : [] } ],
 		routes : ROUTES,
 	};
 }
 
 /** A panel that has read its list and has the menu "main" open */
-function opened( shell ) {
+function opened( shell, name ) {
 	const t = build( shell );
 	t.panel.init();
-	t.answer( 200, payload( [ '/', '/about' ] ) );
-	t.panel._openForm( t.panel._navs[0] );
+	t.answer( 200, payload( [ '/', '/about' ], name ) );
+	fire( t.link( t.menus()[0] ), 'click' );
 	return t;
 }
 
@@ -152,15 +194,124 @@ console.log('Admin Navigations');
 	const t = build( null );
 	t.panel.init();
 	check( 'the panel asks for the menus', t.requests.length === 1 && t.requests[0].action === 'navs/list' );
-	t.answer( 200, payload( [ '/', '/about' ] ) );
-	const rows = findAll( t.list, function( el ) { return el.className === 'nino-admin-list-link' } );
-	check( 'a menu is a row with the number of its entries', rows.map( function( row ) { return row.textContent } ).join() === 'main (2),footer (0)' );
-	check( '...a button, because opening it writes no address - not a link to nowhere', rows.every( function( row ) { return row.tagName === 'BUTTON' && row.type === 'button' && row.href === '' } ) );
+	t.answer( 200, payload( [ '/', '/about' ], 'Hauptmenü' ) );
+	check( 'a menu is a row: its name over its key and the number of its entries, quietly', t.menus().length === 2 && t.menuTitle( t.menus()[0] ) === 'Hauptmenü' && t.menuDetail( t.menus()[0] ) === 'main · '+ text('/_admin/navs/list/entries').replace( '%d', '2' ) );
+	check( '...a menu without a name is shown by its key, and says only how many entries it has', t.menuTitle( t.menus()[1] ) === 'footer' && t.menuDetail( t.menus()[1] ) === text('/_admin/navs/list/entries-none') && text('/_admin/navs/list/entries-none') !== '' );
+	check( '...a row is a link with the address of its menu, which the click opens through the router', t.menus().every( function( li ) { return t.link( li ).tagName === 'A' && t.link( li ).href === '#navs/'+ li.dataset.row } ) );
+	check( 'a list that is read shows the list, at its address', t.list.classList.contains('admin-hidden') === false && t.form.classList.contains('admin-hidden') === true && t.written.at(-1) === '["navs"]' );
+	check( '...and the New navigation button is the one main button of the list', t.newButton() !== undefined && t.newButton().textContent === text('/_admin/navs/label/new') );
 
 	// The panel is there only while the Navigation module is, so the list has
 	// nothing to say about the module - whatever else an answer carries
 	t.panel._apply( Object.assign( payload( [ '/' ] ), { active : false } ) );
-	check( 'the list draws the menus and nothing about the module', findAll( t.list, function( el ) { return el.className === 'nino-admin-hint' } ).length === 0 );
+	check( 'the list draws the menus and nothing about the module', findAll( t.list, function( el ) { return el.classList.contains('nino-admin-hint') } ).length === 0 );
+
+	t.panel._apply( payload( [ '/' ] ) );
+	check( '...a menu with one entry says so in the singular', t.menuDetail( t.menus()[0] ) === text('/_admin/navs/list/entries-one') && text('/_admin/navs/list/entries-one') !== text('/_admin/navs/list/entries') );
+
+	t.panel._apply( { navs : [], routes : ROUTES } );
+	check( 'a project with no menu has the empty state, as a box, and still the button', findAll( t.list, function( el ) { return el.classList.contains('nino-admin-empty') } ).length === 1 && t.newButton() !== undefined );
+}
+
+
+// --- the addresses ---------------------------------------------------------
+
+{
+	const t = build( null, { panel : 'navs', parts : [ 'main' ] } );
+	t.panel.init();
+	t.answer( 200, payload( [ '/', '/about' ] ) );
+	check( 'a fresh load on #navs/<key> opens the menu, at its address, with its entries', t.form.classList.contains('admin-hidden') === false && t.field('navs-form-key').value === 'main' && t.entries().length === 2 && t.written.at(-1) === '["navs","main"]' );
+}
+
+{
+	const t = build( null, { panel : 'navs', parts : [ '@new' ] } );
+	t.panel.init();
+	t.answer( 200, payload( [ '/' ] ) );
+	check( 'the main button of a form that creates is worded as creating, another fill than Save', t.barButtons().at(-1).textContent === text('/_admin/navs/label/create') && text('/_admin/navs/label/create') !== text('/_admin/common/label/save') && text('/_admin/navs/label/create') !== '' );
+	check( 'a fresh load on #navs/@new opens the form of a new menu: an empty key, no running order yet, nothing to delete', t.form.classList.contains('admin-hidden') === false && t.field('navs-form-key').value === '' && t.entries().length === 0
+		&& t.field('navs-form-add') === undefined && t.barButtons().length === 1 && t.written.at(-1) === '["navs","@new"]' );
+}
+
+{
+	const t = build( null, { panel : 'navs', parts : [ 'new' ] } );
+	t.panel.init();
+	t.answer( 200, { navs : [ { key : 'new', name : '', entries : [] } ], routes : ROUTES } );
+	check( 'a menu called new has an address of its own: a fresh load on #navs/new opens that menu, not the form of a new one', t.menus()[0].dataset.row === 'new' && t.link( t.menus()[0] ).href === '#navs/new'
+		&& t.field('navs-form-key').value === 'new' && t.field('navs-form-add') !== undefined );
+}
+
+{
+	const t = build( null, { panel : 'navs', parts : [ 'nothing' ] } );
+	t.panel.init();
+	t.answer( 200, payload( [ '/' ] ) );
+	check( 'an address that names no menu is the list', t.list.classList.contains('admin-hidden') === false && t.written.at(-1) === '["navs"]' );
+}
+
+{
+	const t = build( null );
+	t.panel.init();
+	t.answer( 200, payload( [ '/', '/about' ] ) );
+	fire( t.link( t.menus()[1] ), 'click' );
+	check( 'a row opens its menu through the router and writes its address, and the focus goes into the form', t.moved.at(-1) === '["navs","footer"]' && t.written.at(-1) === '["navs","footer"]' && t.form.classList.contains('admin-hidden') === false
+		&& t.list.classList.contains('admin-hidden') === true && t.back().focused === true );
+	check( '...the menu of that row is the one that is open', t.field('navs-form-key').value === 'footer' );
+
+	fire( t.back(), 'click' );
+	check( 'Back shows the list, writes its address and puts the focus on the row that was opened', t.form.classList.contains('admin-hidden') === true && t.link( t.menus()[1] ).focused === true && t.moved.at(-1) === '["navs"]' && t.panel._currentKey === null );
+
+	fire( t.newButton(), 'click' );
+	check( 'a new menu opens the same way, at #navs/@new', t.moved.at(-1) === '["navs","@new"]' && findAll( t.form, function( el ) { return el.focused === true } ).length === 1 );
+	fire( t.back(), 'click' );
+	check( '...and Back returns to the New navigation button', t.newButton().focused === true );
+
+	// A step through the history: the router is asked to leave, and the panel moves when it is let go
+	t.box.hash = { panel : 'navs', parts : [ 'main' ] };
+	t.panel.showCurrent();
+	check( 'a showing whose address names a menu asks the router to leave the level on screen and moves when it is let go', t.leaves.length === 1 && t.leaves[0].open === false && t.form.classList.contains('admin-hidden') === true );
+	t.leaves[0].proceed();
+	check( '...to the menu the address names', t.form.classList.contains('admin-hidden') === false && t.field('navs-form-key').value === 'main' );
+	t.leaves.length = 0;
+	t.panel.showCurrent();
+	check( 'an address that is the level on screen asks nothing', t.leaves.length === 0 );
+	t.box.hash = { panel : 'users', parts : [] };
+	t.panel.showCurrent();
+	check( 'an address of another panel leaves the level in memory as it is', t.leaves.length === 0 && t.form.classList.contains('admin-hidden') === false );
+}
+
+
+// --- the name --------------------------------------------------------------
+
+{
+	const t = opened( null, 'Hauptmenü' );
+	check( 'the form of a menu has its name and its key, the key required, and both behind a (?) with their help and no sentence of their own under them', t.field('navs-form-name').value === 'Hauptmenü' && t.field('navs-form-key').value === 'main'
+		&& t.field('navs-form-key').attributes['aria-required'] === 'true' && t.field('navs-form-name').attributes['aria-required'] === undefined
+		&& findAll( t.form, function( el ) { return el.classList.contains('nino-admin-help') } ).length >= 2 && findAll( t.form, function( el ) { return el.classList.contains('nino-admin-hint') } ).length === 0 );
+	const server = fs.readFileSync( __dirname+ '/../_nino/Nino/Modules/Navigation/Admin/Admin.php', 'utf8' ).match( /public const int NAME_MAX = (\d+);/ )[1];
+	check( 'the name takes as many characters as the server does', t.field('navs-form-name').maxLength === Number( server ) );
+
+	t.field('navs-form-name').value = '  Kopfmenü ';
+	fire( t.theForm(), 'submit' );
+	const sent = t.requests.at(-1);
+	check( 'Save sends the name, trimmed, with the key - and no order: the entries were not touched, so the routes keep their memberships as they are', sent.action === 'navs/save' && JSON.stringify( sent.payload ) === JSON.stringify( { originalKey : 'main', key : 'main', name : 'Kopfmenü' } ) );
+	t.answer( 200, payload( [ '/', '/about' ], 'Kopfmenü' ) );
+	check( 'a name that is saved is the name of the list', t.menuTitle( t.menus()[0] ) === 'Kopfmenü' && t.field('navs-form-name').value === 'Kopfmenü' );
+
+	fire( t.button( 1, 'up' ), 'click' );
+	fire( t.theForm(), 'submit' );
+	check( 'a save after a move sends the whole order', JSON.stringify( t.requests.at(-1).payload.entries ) === '["/about","/"]' );
+	t.answer( 200, payload( [ '/about', '/' ], 'Kopfmenü' ) );
+
+	t.field('navs-form-name').value = '';
+	fire( t.theForm(), 'submit' );
+	check( 'an empty name is sent as the empty name: it takes the name away', t.requests.at(-1).payload.name === '' );
+	t.answer( 200, payload( [ '/', '/about' ], '' ) );
+	check( '...and the menu is shown by its key again', t.menuTitle( t.menus()[0] ) === 'main' );
+
+	t.field('navs-form-name').value = 'x\ny';
+	fire( t.theForm(), 'submit' );
+	t.answer( 400, { error : 'invalid navigation name', code : 'navs_invalid_name', params : [ 80 ], field : 'name' } );
+	check( 'a refusal that names the name is said under the name, with the focus there, and in the line of the bar', t.field('navs-form-name').attributes['aria-invalid'] === 'true' && t.field('navs-form-name').focused === true
+		&& t.errors().length === 1 && t.errors()[0].textContent === text('/_admin/error/navs_invalid_name').replace( '%s', '80' ) && t.field('navs-form-msg').textContent === t.errors()[0].textContent );
 }
 
 
@@ -170,40 +321,44 @@ console.log('Admin Navigations');
 	const t = opened( null );
 	const sent = t.requests.length;
 
-	check( 'an opened menu shows its entries in their running order', t.entries().join() === 'Start (/),About (/about)' );
+	check( 'an opened menu shows its entries in their running order, the paths quietly under each', t.entries().join() === 'Start (/),About (/about)' );
 	check( 'the status line says nothing while nothing is changed', t.field('navs-form-msg').textContent === '' && t.panel._isDirty() === false );
 
 	// A key typed above the entries must survive a click below
 	t.field('navs-form-key').value = 'primary';
 
-	t.button( 1, 'up' ).listeners.click[0]();
-	check( '↑ moves the entry on screen', t.entries().join() === 'About (/about),Start (/)' );
-	t.button( 0, 'down' ).listeners.click[0]();
-	check( '↓ moves it back', t.entries().join() === 'Start (/),About (/about)' );
+	fire( t.button( 1, 'up' ), 'click' );
+	check( 'up moves the entry on screen, and the focus stays on the button of the entry that moved', t.entries().join() === 'About (/about),Start (/)' && t.button( 0, 'up' ).disabled === true && t.button( 0, 'down' ).focused === true );
+	fire( t.button( 0, 'down' ), 'click' );
+	check( 'down moves it back', t.entries().join() === 'Start (/),About (/about)' && t.button( 1, 'down' ).disabled === true && t.button( 1, 'up' ).focused === true );
 	check( 'the first entry cannot go up, the last cannot go down', t.button( 0, 'up' ).disabled === true && t.button( 1, 'down' ).disabled === true );
+	check( 'every button of a row is an icon with a name of its own, the remove one in the colour of what takes something away', [ 'up', 'down', 'remove' ].every( function( which ) {
+		const button = t.button( 0, which );
+		return button.classList.contains('nino-admin-btn-icon') && button.attributes['aria-label'] === text( '/_admin/navs/label/'+ ( which === 'up' ? 'moveup' : ( which === 'down' ? 'movedown' : 'remove' ) ) ) && button.attributes['aria-label'] !== '';
+	} ) && t.button( 0, 'remove' ).classList.contains('nino-admin-btn-danger') && t.button( 0, 'up' ).classList.contains('nino-admin-btn-danger') === false );
 
-	t.button( 0, 'remove' ).listeners.click[0]();
-	check( '× takes the entry out on screen', t.entries().join() === 'About (/about)' );
+	fire( t.button( 0, 'remove' ), 'click' );
+	check( 'remove takes the entry out on screen, and the focus goes to the entry that stands in its place', t.entries().join() === 'About (/about)' && t.button( 0, 'remove' ).focused === true );
 
 	const addSelect = t.field('navs-form-add');
 	check( 'the picker offers the routes that are not in the menu yet - the ones only a feature registers among them - and the one already in it is not', addSelect.children.map( function( option ) { return option.value } ).join() === ',/,/contact,/blog' );
 	addSelect.value = '/contact';
-	addSelect.listeners.change[0]();
-	findAll( t.form, function( el ) { return el.textContent === text('/_admin/navs/label/addbtn') } )[0].listeners.click[0]();
+	fire( t.addButton(), 'click' );
 	check( 'Add puts the chosen route at the end of the copy', t.entries().join() === 'About (/about),Contact (/contact)' );
 
 	check( 'not one of these touched the server', t.requests.length === sent );
 	check( 'the key that was typed survived every one of them', t.field('navs-form-key').value === 'primary' );
-	check( 'the status line says there is something to save', t.field('navs-form-msg').textContent === text('/_admin/navs/msg/unsaved') && text('/_admin/navs/msg/unsaved') !== '' );
 	check( 'the panel knows its copy differs from what is saved', t.panel._isDirty() === true );
 
 	// Save: the whole order, one request
-	fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
-	check( 'Save sends one request with the complete order, under the key that was typed', t.requests.length === sent + 1 && t.requests[sent].action === 'navs/save'
-		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : 'main', key : 'primary', entries : [ '/about', '/contact' ] } ) );
-	t.answer( 200, { navs : [ { key : 'primary', entries : [ ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES } );
+	fire( t.theForm(), 'submit' );
+	check( 'Save sends one request with the complete order, under the key that was typed, with the name', t.requests.length === sent + 1 && t.requests[sent].action === 'navs/save'
+		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : 'main', key : 'primary', name : '', entries : [ '/about', '/contact' ] } ) );
+	t.touched.length = 0;
+	t.answer( 200, { navs : [ { key : 'primary', name : '', entries : [ ROUTES[1], ROUTES[2] ] }, { key : 'footer', name : '', entries : [] } ], routes : ROUTES } );
 	check( 'the answer is drawn: the copy is the saved menu now', t.entries().join() === 'About (/about),Contact (/contact)' && t.panel._isDirty() === false && t.panel._currentKey === 'primary' );
-	check( '...and says it was saved as a toast, not as a line that stays', t.page.querySelectorAll('.nino-admin-toast-text')[0].textContent === text('/_admin/common/msg/saved') && t.field('navs-form-msg').textContent === '' );
+	check( '...and says it was saved as a toast, not as a line that stays', t.toasts.length === 1 && t.toasts[0] === text('/_admin/common/msg/saved') && t.field('navs-form-msg').textContent === '' );
+	check( '...the person stays in the menu, which has the key it has now as its address and the button that was pressed', t.form.classList.contains('admin-hidden') === false && t.written.at(-1) === '["navs","primary"]' && t.list.classList.contains('admin-hidden') === true );
 	check( '...and tells the other panels that navigations were written', t.touched.join() === 'navigations' );
 }
 
@@ -212,63 +367,68 @@ console.log('Admin Navigations');
 
 {
 	const t = opened( null );
-	t.button( 1, 'up' ).listeners.click[0]();
-	fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
+	fire( t.button( 1, 'up' ), 'click' );
+	fire( t.theForm(), 'submit' );
 	t.answer( 404, { error : 'unknown route: "/about"', code : 'navs_unknown_route', params : [ '/about' ] } );
-	check( 'a refused save keeps the copy as it is and says why', t.entries().join() === 'About (/about),Start (/)' && t.panel._isDirty() === true
-		&& t.field('navs-form-msg').textContent.includes('/about') );
-	check( '...and wrote nothing the other panels need to know of', t.touched.length === 0 );
+	check( 'a refused save keeps the copy as it is and says why, in the line of the bar as an alert', t.entries().join() === 'About (/about),Start (/)' && t.panel._isDirty() === true
+		&& t.field('navs-form-msg').textContent.includes('/about') && t.field('navs-form-msg').attributes.role === 'alert' );
+	check( '...and wrote nothing the other panels need to know of, and no toast', t.touched.length === 0 && t.toasts.length === 0 );
 }
 
 
-// --- the id is required -----------------------------------------------------
+// --- the key is required -----------------------------------------------------
 
 {
 	const t = build( null );
 	t.panel.init();
 	t.answer( 200, payload( [ '/' ] ) );
-	fire( findAll( t.list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0], 'click' );
+	fire( t.newButton(), 'click' );
 
 	const key 	= t.field('navs-form-key');
 	const sent 	= t.requests.length;
-	const submit = function() { fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' ) };
-	const errors = function() { return findAll( t.form, function( el ) { return el.className === 'nino-admin-field-error' } ) };
+	const submit = function() { fire( t.theForm(), 'submit' ) };
 
-	check( 'a new menu opens with an empty id: nothing is suggested that a Save would take for a decision', key.value === '' && key.required === true );
+	check( 'a new menu opens with an empty key: nothing is suggested that a Save would take for a decision', key.value === '' );
 
 	submit();
 	check( 'Save on the blank form sends nothing', t.requests.length === sent && t.touched.length === 0 );
-	check( '...the field is marked and says at itself that it is a required one', key.attributes['aria-invalid'] === 'true' && errors().length === 1 && errors()[0].textContent === text('/_admin/common/error/required')
-		&& text('/_admin/common/error/required') !== '' && key.attributes['aria-describedby'] === errors()[0].id );
-	check( '...the focus is there, and the status line is not the one that says "saved"', key.focused === true && t.field('navs-form-msg').textContent !== text('/_admin/common/msg/saved') && t.field('navs-form-msg').textContent !== text('/_admin/common/msg/saving') );
+	check( '...the field is marked and says at itself that it is missing', key.attributes['aria-invalid'] === 'true' && t.errors().length === 1 && t.errors()[0].textContent.length > 0 && key.attributes['aria-describedby'].split(' ').indexOf( t.errors()[0].id ) !== -1 );
+	check( '...the focus is there, and the line of the bar is the alert that says so', key.focused === true && t.field('navs-form-msg').dataset.state === 'error' && t.field('navs-form-msg').textContent === text('/_admin/navs/error/fields') );
 
 	key.value = '   ';
 	submit();
-	check( 'an id of blanks is no id', t.requests.length === sent && errors().length === 1 );
+	check( 'a key of blanks is no key', t.requests.length === sent && t.errors().length === 1 );
 
 	key.value = 'Main Menu';
 	submit();
-	check( 'an id the server would refuse is not sent either, and the sentence is the invalid-id one, with the id in it', t.requests.length === sent && errors().length === 1
-		&& errors()[0].textContent === text('/_admin/error/navs_invalid_id').replace( '%s', 'Main Menu' ) && key.attributes['aria-invalid'] === 'true' );
+	check( 'a key the server would refuse is not sent either, and the sentence is the invalid-key one, with the key in it', t.requests.length === sent && t.errors().length === 1
+		&& t.errors()[0].textContent === text('/_admin/error/navs_invalid_id').replace( '%s', 'Main Menu' ) && key.attributes['aria-invalid'] === 'true' );
 
 	key.value = 'a.b';
 	submit();
-	check( 'a dot is no part of an id, as on the server', t.requests.length === sent && errors().length === 1 );
-	check( 'the form is not validated by the browser, whose bubble would say it in other words', findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0].noValidate === true );
+	check( 'a dot is no part of a key, as on the server', t.requests.length === sent && t.errors().length === 1 );
+	check( 'the form is not validated by the browser, whose bubble would say it in other words', t.theForm().noValidate === true );
 
 	// One pattern for both sides: the client's is the server's, written out
-	const fs = require('fs');
 	const server = fs.readFileSync( __dirname+ '/../_nino/Nino/Modules/Navigation/Admin/Admin.php', 'utf8' ).match( /private static function isValidKey[\s\S]*?preg_match\( '#(.+?)#'/ )[1];
 	const client = fs.readFileSync( __dirname+ '/../_nino/Nino/Modules/Navigation/assets/admin.js', 'utf8' ).match( /\/(\^\[a-z\][^\/]*\$)\/\.test\( key \)/ )[1];
-	check( 'the pattern the client checks an id against is the one the server does', server === client );
+	check( 'the pattern the client checks a key against is the one the server does', server === client );
 
 	key.value = 'side-nav_2';
 	submit();
-	check( 'a valid id goes out with the first Save, and the marks of the attempts before it are gone', t.requests.length === sent + 1 && t.requests[sent].action === 'navs/save'
-		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : '', key : 'side-nav_2' } ) && errors().length === 0 && key.attributes['aria-invalid'] === undefined );
+	check( 'a valid key goes out with the first Save, and the marks of the attempts before it are gone', t.requests.length === sent + 1 && t.requests[sent].action === 'navs/save'
+		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : '', key : 'side-nav_2', name : '' } ) && t.errors().length === 0 && key.attributes['aria-invalid'] === undefined );
 
 	t.answer( 409, { error : 'navigation id already taken', code : 'navs_id_taken', params : [ 'side-nav_2' ], field : 'key' } );
-	check( 'an id the server refuses is marked at the field as well, with the server\'s sentence', errors().length === 1 && errors()[0].textContent === text('/_admin/error/navs_id_taken').replace( '%s', 'side-nav_2' ) && key.attributes['aria-invalid'] === 'true' );
+	check( 'a key the server refuses is marked at the field as well, with the server\'s sentence', t.errors().length === 1 && t.errors()[0].textContent === text('/_admin/error/navs_id_taken').replace( '%s', 'side-nav_2' ) && key.attributes['aria-invalid'] === 'true' );
+
+	// A new menu that was written: the form is the menu's own now, with its running order and its Delete, at its address
+	submit();
+	t.touched.length = 0;
+	t.answer( 200, { navs : [ { key : 'side-nav_2', name : '', entries : [] }, { key : 'main', name : '', entries : [] } ], routes : ROUTES } );
+	check( 'a new menu that was saved is open as a menu: at its address, with its running order to fill and Delete at the left of the bar', t.written.at(-1) === '["navs","side-nav_2"]' && t.field('navs-form-add') !== undefined
+		&& t.barButtons().length === 2 && t.barButtons()[0].classList.contains('nino-admin-btn-danger') && t.toasts.length === 1 && t.touched.join() === 'navigations' );
+	check( '...with the focus on the main button that was pressed', t.barButtons().at(-1).focused === true );
 }
 
 
@@ -278,19 +438,40 @@ console.log('Admin Navigations');
 	const t = opened( null );
 	const sent = t.requests.length;
 
-	t.box.confirmAnswer = false;
-	t.panel._delete();
+	t.box.questionAnswer = false;
+	fire( t.barButtons()[0], 'click' );
+	const asked = t.questions.at(-1);
+	check( 'a delete is a question of the destructive level, with a title the answer is worded like', t.questions.length === 1 && asked.level === 'destructive' && asked.title === asked.yes && asked.title === text('/_admin/navs/confirm/delete-title') && asked.title !== '' );
+	check( '...it names what goes - the menu and its place in the routes - and what stays', asked.details.length === 2 && asked.details[0].title === text('/_admin/navs/confirm/deleted') && asked.details[0].lines.length === 2
+		&& asked.details[0].lines[0].includes('main') && asked.details[0].lines[1].includes('2') && asked.details[1].title === text('/_admin/navs/confirm/kept') && asked.details[1].lines.length === 2 );
 	check( 'a delete that is not confirmed sends nothing and tells nobody anything', t.requests.length === sent && t.touched.length === 0 );
 
-	t.box.confirmAnswer = true;
-	t.panel._delete();
-	check( 'a confirmed one asks the server to delete the menu that is open', t.requests[t.requests.length - 1].action === 'navs/delete' && t.requests[t.requests.length - 1].payload.key === 'main' );
+	t.box.questionAnswer = true;
+	fire( t.barButtons()[0], 'click' );
+	check( 'a confirmed one asks the server to delete the menu that is open', t.requests.at(-1).action === 'navs/delete' && t.requests.at(-1).payload.key === 'main' );
 	t.answer( 403, { error : 'no permission' } );
-	check( 'a refused delete says so, and nothing was written', t.field('navs-form-msg').textContent.includes('no permission') && t.touched.length === 0 );
+	check( 'a refused delete says so, in the line of the bar, and nothing was written', t.field('navs-form-msg').textContent.includes('no permission') && t.touched.length === 0 && t.form.classList.contains('admin-hidden') === false );
 
-	t.panel._delete();
-	t.answer( 200, { navs : [ { key : 'footer', entries : [] } ], routes : ROUTES } );
-	check( 'one that went through tells the other panels that navigations were written, and the list shows the menus that are left', t.touched.join() === 'navigations' && t.form.classList.contains('admin-hidden') === true );
+	fire( t.barButtons()[0], 'click' );
+	t.answer( 200, { navs : [ { key : 'footer', name : '', entries : [] } ], routes : ROUTES } );
+	check( 'one that went through tells the other panels that navigations were written, says so as a toast, and shows the list of the menus that are left, at its address', t.touched.join() === 'navigations' && t.toasts.length === 1 && t.toasts[0] === text('/_admin/common/msg/deleted')
+		&& t.form.classList.contains('admin-hidden') === true && t.menus().length === 1 && t.written.at(-1) === '["navs"]' );
+	check( '...the focus goes to a row that is left', t.link( t.menus()[0] ).focused === true );
+}
+
+{
+	const t = opened( null, 'Hauptmenü' );
+	t.box.questionAnswer = false;
+	fire( t.barButtons()[0], 'click' );
+	check( 'the question names the menu by its name, and its key in the list of what goes', t.questions.at(-1).message.includes('Hauptmenü') && t.questions.at(-1).details[0].lines[0].includes('main') );
+}
+
+{
+	const t = opened( null );
+	t.box.questionAnswer = true;
+	fire( t.barButtons()[0], 'click' );
+	t.answer( 200, { navs : [], routes : ROUTES } );
+	check( 'a menu that was deleted with no menu left leaves the focus no row to stand on: it goes to the name of the panel', t.form.classList.contains('admin-hidden') === true && t.title.focused === true );
 }
 
 
@@ -299,17 +480,22 @@ console.log('Admin Navigations');
 {
 	const t = opened( null );
 	const select = t.field('navs-form-add');
-	const addBtn = findAll( t.form, function( el ) { return el.textContent === text('/_admin/navs/label/addbtn') } )[0];
 	check( 'the picker starts on an empty choice, not on the first route', select.children[0].value === '' && select.children[0].selected === true && select.value === ''
 		&& select.children[0].textContent === text('/_admin/navs/label/choose') && text('/_admin/navs/label/choose') !== '' );
-	check( '...and Add waits for a choice', addBtn.disabled === true );
+	const before = t.entries().length;
+	check( '...and Add is not locked while nothing is chosen', t.addButton().disabled === false );
+	fire( t.addButton(), 'click' );
+	check( '...it says at the picker what is missing, with the focus, and adds nothing', t.entries().length === before && select.attributes['aria-invalid'] === 'true' && select.focused === true && t.errors().length === 1 && t.panel._isDirty() === false );
 	select.value = '/blog';
-	select.listeners.change[0]();
-	check( '...which enables it', addBtn.disabled === false );
-	select.value = '';
-	select.listeners.change[0]();
-	check( '...and choosing nothing again disables it', addBtn.disabled === true );
-	check( 'a route that is not named yet is offered with the marker, a runtime one included', select.children.some( function( option ) { return option.value === '/blog' && option.textContent.includes( text('/_admin/navs/label/unnamed-short') ) } ) );
+	fire( t.addButton(), 'click' );
+	check( 'a choice is added, and the sentence at the picker is gone', t.entries().length === before + 1 && t.errors().length === 0 && t.panel._isDirty() === true );
+	check( 'a route that is not named yet is offered with the marker, a runtime one included, and shown in the list with a badge', ( function() {
+		fire( t.button( before, 'remove' ), 'click' );
+		return t.field('navs-form-add').children.some( function( option ) { return option.value === '/blog' && option.textContent.includes( text('/_admin/navs/label/unnamed-short') ) } );
+	} )() );
+	t.field('navs-form-add').value = '/blog';
+	fire( t.addButton(), 'click' );
+	check( '...the badge says it is not named yet', findAll( t.form, function( el ) { return el.classList.contains('nino-admin-badge') && el.textContent === text('/_admin/navs/label/unnamed') } ).length === 1 );
 }
 
 
@@ -317,64 +503,8 @@ console.log('Admin Navigations');
 
 {
 	const t = opened( null );
-	const back = t.byClass('nino-admin-back-link')[0] ?? findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0];
-
-	fire( back, 'click' );
-	check( 'the back link leaves a menu that holds nothing unsaved without asking', t.confirms.length === 0 && t.form.classList.contains('admin-hidden') === true );
-
-	t.panel._openForm( t.panel._navs[0] );
-	t.button( 1, 'up' ).listeners.click[0]();
-	t.box.confirmAnswer = false;
-	fire( findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
-	check( 'with changes that are not saved it asks first, in the workbench\'s words', t.confirms.length === 1 && t.confirms[0] === text('/_admin/navs/confirm/discard') && text('/_admin/navs/confirm/discard') !== '' );
-	check( '...and stays on the menu, copy and all, when the answer is no', t.form.classList.contains('admin-hidden') === false && t.entries().join() === 'About (/about),Start (/)' );
-
-	t.box.confirmAnswer = true;
-	fire( findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
-	check( '...and leaves, with the copy dropped, when it is yes', t.form.classList.contains('admin-hidden') === true && t.panel._dirty === false && t.panel._entries.length === 0 );
-
-	// A typed id is unsaved input as well
-	t.confirms.length = 0;
-	t.box.confirmAnswer = false;
-	t.panel._openForm( t.panel._navs[0] );
-	t.field('navs-form-key').value = 'other';
-	fire( findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
-	check( 'an id that was typed and not saved asks as well', t.confirms.length === 1 );
-}
-
-
-// --- the focus -------------------------------------------------------------
-
-/*	It falls to the body when a level is hidden with the control that was
-	pressed in it. A menu that is opened takes the focus into itself, and Back
-	gives it to the row that opened it	*/
-{
-	const t = build( null );
-	t.panel.init();
-	t.answer( 200, payload( [ '/', '/about' ] ) );
-	const rows = findAll( t.list, function( el ) { return el.className === 'nino-admin-list-link' } );
-
-	fire( rows[1], 'click' );
-	const back = findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0];
-	check( 'opening a menu shows its form and moves the focus into it', t.form.classList.contains('admin-hidden') === false && t.list.classList.contains('admin-hidden') === true && back.focused === true );
-
-	fire( back, 'click' );
-	check( 'Back shows the list and puts the focus on the row that was opened', t.form.classList.contains('admin-hidden') === true && rows[1].focused === true && t.panel._currentKey === null );
-
-	const add = findAll( t.list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
-	fire( add, 'click' );
-	check( 'a new menu opens the same way', findAll( t.form, function( el ) { return el.focused === true } ).length === 1 );
-	fire( findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
-	check( '...and Back returns to the New navigation button', add.focused === true );
-}
-
-{
-	const t = opened( null );
-	t.field('navs-form-key').focus();
-	t.box.confirmAnswer = true;
-	t.panel._delete();
-	t.answer( 200, { navs : [ { key : 'footer', entries : [] } ], routes : ROUTES } );
-	check( 'a menu that was deleted leaves the focus no control to stand on: it goes to the name of the panel', t.form.classList.contains('admin-hidden') === true && t.title.focused === true );
+	fire( t.back(), 'click' );
+	check( 'the back link leaves a menu and shows the list - the question about what is unsaved is the shell\'s, not the panel\'s', t.questions.length === 0 && t.form.classList.contains('admin-hidden') === true && t.panel._dirty === false && t.panel._entries.length === 0 );
 }
 
 
@@ -386,19 +516,19 @@ console.log('Admin Navigations');
 
 	t.panel.showCurrent();
 	check( 'showing the panel again reads the menus and routes again', t.requests.length === before + 1 && t.requests[before].action === 'navs/list' );
-	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[1] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/news', uri : '/news', label : 'News', named : true, runtime : true } ] ) } );
+	t.answer( 200, { navs : [ { key : 'main', name : '', entries : [ ROUTES[1] ] }, { key : 'footer', name : '', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/news', uri : '/news', label : 'News', named : true, runtime : true } ] ) } );
 	check( '...and draws the open menu from the answer, when it holds nothing unsaved', t.entries().join() === 'About (/about)'
 		&& t.field('navs-form-add').children.some( function( option ) { return option.value === '/news' } ) );
 
 	// ...but never over a copy somebody changed
-	t.button( 0, 'remove' ).listeners.click[0]();
+	fire( t.button( 0, 'remove' ), 'click' );
 	t.field('navs-form-key').value = 'typed';
 	const again = t.requests.length;
 	t.panel.showCurrent();
-	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[0], ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/shop', uri : '/shop', label : 'Shop', named : true, runtime : true } ] ) } );
-	check( 'a copy with changes is read over nothing: entries and typed id stay', t.requests.length === again + 1 && t.entries().join() === '' && t.field('navs-form-key').value === 'typed' && t.panel._isDirty() === true );
+	t.answer( 200, { navs : [ { key : 'main', name : '', entries : [ ROUTES[0], ROUTES[1], ROUTES[2] ] }, { key : 'footer', name : '', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/shop', uri : '/shop', label : 'Shop', named : true, runtime : true } ] ) } );
+	check( 'a copy with changes is read over nothing: entries and typed key stay', t.requests.length === again + 1 && t.entries().join() === '' && t.field('navs-form-key').value === 'typed' && t.panel._isDirty() === true );
 	check( '...while the routes it can still pick from are the new ones', t.field('navs-form-add').children.some( function( option ) { return option.value === '/shop' } ) && t.field('navs-form-add').children.some( function( option ) { return option.value === '/news' } ) === false );
-	check( '...and the list of menus has the saved state', findAll( t.list, function( el ) { return el.className === 'nino-admin-list-link' } ).map( function( row ) { return row.textContent } )[0] === 'main (3)' );
+	check( '...and the list of menus has the saved state', t.menuDetail( t.menus()[0] ) === text('/_admin/navs/list/entries').replace( '%d', '3' ) );
 
 	// A read that fails changes nothing
 	t.panel.showCurrent();
@@ -416,20 +546,19 @@ console.log('Admin Navigations');
 	const PRIVACY = { httpUri : '/datenschutz', uri : '/legal/privacy', label : 'Datenschutz', named : true, runtime : true, paths : [ '/datenschutz', '/privacy' ] };
 	const t = build( null );
 	t.panel.init();
-	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
-	t.panel._openForm( t.panel._navs[0] );
+	t.answer( 200, { navs : [ { key : 'legal', name : '', entries : [ IMPRINT ] }, { key : 'main', name : '', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
+	fire( t.link( t.menus()[0] ), 'click' );
 
 	check( 'an entry that has a route per language is one row, with every path of it', t.entries().join() === 'Impressum (/impressum, /imprint)' );
 	check( '...and the picker offers the other page once, with its paths', t.field('navs-form-add').children.filter( function( option ) { return option.value === '/datenschutz' } ).length === 1
 		&& t.field('navs-form-add').children.some( function( option ) { return option.textContent === 'Datenschutz (/datenschutz, /privacy)' } )
 		&& t.field('navs-form-add').children.every( function( option ) { return option.value !== '/imprint' && option.value !== '/privacy' } ) );
 	t.field('navs-form-add').value = '/datenschutz';
-	t.field('navs-form-add').listeners.change[0]();
-	findAll( t.form, function( el ) { return el.textContent === text('/_admin/navs/label/addbtn') } )[0].listeners.click[0]();
+	fire( t.addButton(), 'click' );
 	check( 'Add puts the other page in as one entry too', t.entries().join() === 'Impressum (/impressum, /imprint),Datenschutz (/datenschutz, /privacy)' );
-	fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
-	check( 'Save sends each page once, by the first of its paths: the server finds the Element-URI by it', JSON.stringify( t.requests[t.requests.length - 1].payload.entries ) === '["/impressum","/datenschutz"]' );
-	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT, PRIVACY ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
+	fire( t.theForm(), 'submit' );
+	check( 'Save sends each page once, by the first of its paths: the server finds the Element-URI by it', JSON.stringify( t.requests.at(-1).payload.entries ) === '["/impressum","/datenschutz"]' );
+	t.answer( 200, { navs : [ { key : 'legal', name : '', entries : [ IMPRINT, PRIVACY ] }, { key : 'main', name : '', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
 	check( '...and the saved menu is drawn the same way', t.entries().join() === 'Impressum (/impressum, /imprint),Datenschutz (/datenschutz, /privacy)' );
 }
 
@@ -446,19 +575,24 @@ console.log('Admin Navigations');
 		&& [ 'isDirty', 'save', 'discard', 'bar' ].every( function( name ) { return typeof registered.navs[name] === 'function' } ) );
 	check( 'nothing is unsaved after the menu is opened', registered.navs.isDirty() === false );
 
-	t.button( 1, 'up' ).listeners.click[0]();
+	fire( t.button( 1, 'up' ), 'click' );
 	check( 'a change to the copy is unsaved input for the shell, and the shell is told', registered.navs.isDirty() === true && refreshes.length > 0 );
 	check( '...and the panel does not say "unsaved" a second time next to the shell\'s own marker', t.field('navs-form-msg').textContent === '' );
-	check( 'the marker goes in the action bar of the form', registered.navs.bar() === findAll( t.form, function( el ) { return el.classList.contains('nino-admin-actionbar') } )[0] );
+	check( 'the marker goes in the action bar of the form', registered.navs.bar() === t.bar() );
 
-	// With the shell there, it asks in its own dialog, so the panel does not ask a second time
-	t.box.confirmAnswer = false;
-	fire( findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
-	check( 'a shell that has the registry has asked already - the panel does not ask again', t.confirms.length === 0 && t.form.classList.contains('admin-hidden') === true );
+	t.field('navs-form-name').value = 'Typed';
+	fire( t.back(), 'click' );
+	check( 'a name that was typed is unsaved input as well', registered.navs.isDirty() === false && t.form.classList.contains('admin-hidden') === true );
+
+	fire( t.link( t.menus()[0] ), 'click' );
+	check( '...and the form of a menu that was opened is clean', registered.navs.isDirty() === false );
+	t.field('navs-form-name').value = 'Typed';
+	check( '...a name typed into it is not', registered.navs.isDirty() === true );
+	registered.navs.discard();
+	check( 'Discard lets the changes go', registered.navs.isDirty() === false );
 
 	// Save from the shell reports how it went
-	t.panel._openForm( t.panel._navs[0] );
-	t.button( 1, 'up' ).listeners.click[0]();
+	fire( t.button( 1, 'up' ), 'click' );
 	const outcomes = [];
 	registered.navs.save( function( ok ) { outcomes.push( ok ) } );
 	t.answer( 500, null );
@@ -467,9 +601,9 @@ console.log('Admin Navigations');
 	t.answer( 200, payload( [ '/about', '/' ] ) );
 	check( '...one that goes through reports true, and nothing is unsaved afterwards', outcomes.join() === 'false,true' && registered.navs.isDirty() === false );
 
-	t.button( 1, 'up' ).listeners.click[0]();
-	registered.navs.discard();
-	check( 'Discard lets the changes go', registered.navs.isDirty() === false );
+	t.field('navs-form-key').value = '';
+	registered.navs.save( function( ok ) { outcomes.push( ok ) } );
+	check( 'one with no key ends in false as well, without a request', outcomes.join() === 'false,true,false' && t.requests.at(-1).action === 'navs/save' && t.errors().length === 1 );
 }
 
 done();

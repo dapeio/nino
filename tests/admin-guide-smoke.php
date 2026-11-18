@@ -462,6 +462,8 @@ $listed = [
 	'_admin/Nino/Modules/Users/assets/admin.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Users/assets/roles.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Users/assets/lockout.js'	=> 'adminUi.list(',
+	'_admin/Nino/Modules/Routes/assets/admin.js'		=> 'adminUi.list(',
+	'_nino/Nino/Modules/Navigation/assets/admin.js'	=> 'adminUi.list(',
 	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.table(',
 	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
 	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.filterBar(',
@@ -503,6 +505,8 @@ $schemaForms = [
 	'_admin/Nino/Modules/Users/assets/lockout.js',
 	'_admin/Nino/Modules/Language/assets/admin.js',
 	'_admin/Nino/Modules/Features/assets/admin.js',
+	'_admin/Nino/Modules/Routes/assets/admin.js',
+	'_nino/Nino/Modules/Navigation/assets/admin.js',
 ];
 
 $underneath = [];
@@ -532,6 +536,8 @@ $guideForms = [
 	'_admin/Nino/Modules/Users/assets/roles.js',
 	'_admin/Nino/Modules/Users/assets/lockout.js',
 	'_admin/Nino/Modules/Users/assets/recoverypw.js',
+	'_admin/Nino/Modules/Routes/assets/admin.js',
+	'_nino/Nino/Modules/Navigation/assets/admin.js',
 ];
 
 /*	The comments of a script that stand at the beginning of a line: a script that writes the string '/*' (the permission of full access) is no comment	*/
@@ -560,7 +566,7 @@ foreach( $guideForms as $script ) {
 		$unbarred[] = $script;
 }
 
-check( 'every form of the Users panel is novalidate and made of the blocks of the workbench'. ( $handmade === [] ? '' : ' - '. implode( ', ', $handmade ) ), $handmade === [] );
+check( 'every form of the panels that follow the guide here (Users, Routes, Navigations) is novalidate and made of the blocks of the workbench'. ( $handmade === [] ? '' : ' - '. implode( ', ', $handmade ) ), $handmade === [] );
 check( '...says what is wrong under the field and clears it again'. ( $unchecked === [] ? '' : ' - '. implode( ', ', $unchecked ) ), $unchecked === [] );
 check( '...and has the one bar of the blocks, with no class of a button or a bar written in the script'. ( $unbarred === [] ? '' : ' - '. implode( ', ', $unbarred ) ), $unbarred === [] );
 
@@ -574,7 +580,7 @@ check( '...a row of such a list is at least 28 px high: its rule reads the heigh
 check( '...and full access is a switch', str_contains( $rolesScript, 'adminUi.switchField(' ) === true );
 // --- the panels of the kernel that have gone over to the guide: Backups, Config, Maintenance, Language, Translations, Log, Requests, Dashboard ---
 
-/*	The forms and lists of these eight keep to what the guide asks of a panel, held by structure: the bar of a form or a list is the block's and its
+/*	The forms and lists of these eight, and of Routes and Navigations, keep to what the guide asks of a panel, held by structure: the bar of a form or a list is the block's and its
 	one main button is the block's too, no sentence stands open over or under a field, a date is written by the one helper, a language is named by the
 	one block, and the stylesheets of the panels that still have one name type, weight and space through the tokens. The list grows: the patch that
 	brings another panel over adds its script here	*/
@@ -585,6 +591,8 @@ $barred = [
 	'_admin/Nino/Modules/Language/assets/admin.js',
 	'_admin/Nino/Modules/Language/assets/translations.js',
 	'_nino/Nino/Modules/Form/assets/admin.js',
+	'_admin/Nino/Modules/Routes/assets/admin.js',
+	'_nino/Nino/Modules/Navigation/assets/admin.js',
 ];
 
 $withoutBar = [];
@@ -677,6 +685,49 @@ $unshipped = array_values( array_filter( $sheeted, static fn( string $sheet ): b
 
 check( 'every one of those stylesheets is named by the assets() of its panel, which is what puts it in the bundle'. ( $unshipped === [] ? '' : ' - not '. implode( ', ', $unshipped ) ), $unshipped === [] );
 check( 'the stylesheets of the panels that have gone over name type, weight and space only through the tokens'. ( $untoken === [] ? '' : ' - '. implode( '; ', array_slice( $untoken, 0, 6 ) ) ), $untoken === [] );
+
+// --- Routes and Navigations: the build the guide asks of a list, a form and an address ---------------------------
+
+/*	The two scripts are held by the lists above (bar, list, form, no open sentence). What is held here is what is theirs alone: the
+	choice of a block for a tick, an icon and a language, the address of every view, no stylesheet of their own and no question
+	of the browser's. Held by structure - the call of the block, never a word	*/
+$routing = [ '_admin/Nino/Modules/Routes/assets/admin.js', '_nino/Nino/Modules/Navigation/assets/admin.js' ];
+$ticked = [];
+$iconless = [];
+$unaddressed = [];
+$native = [];
+
+foreach( $routing as $script ) {
+
+	$source = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( $script ) ) );
+
+	if( preg_match( '/type\s*=\s*[\'"]checkbox|nino-admin-checkbox-field|nino-admin-switch\b/', $source ) === 1 )
+		$ticked[] = $script;
+
+	if( str_contains( $source, 'adminUi.iconButton(' ) === false || preg_match( '/[↑↓×↗]/u', $source ) === 1 )
+		$iconless[] = $script;
+
+	if( str_contains( $source, 'router.set(' ) === false || str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false )
+		$unaddressed[] = $script;
+
+	if( preg_match( '/\b(window|wn)\.(confirm|alert|prompt)\(|(?<![\w.])(alert|prompt|confirm)\(/', $source ) === 1 || str_contains( $source, 'adminUi.confirm(' ) === false )
+		$native[] = $script;
+}
+
+check( 'Routes and Navigations draw no tick of their own: a yes or no is the switch, several of a set the checklist'. ( $ticked === [] ? '' : ' - '. implode( ', ', $ticked ) ), $ticked === [] );
+check( '...an icon in a row is the block\'s, with a name, and no arrow or cross character stands for one'. ( $iconless === [] ? '' : ' - '. implode( ', ', $iconless ) ), $iconless === [] );
+check( '...every view has an address: the router is told it, links to it, moves by it and is asked before it is left'. ( $unaddressed === [] ? '' : ' - '. implode( ', ', $unaddressed ) ), $unaddressed === [] );
+check( '...a question is the block\'s, never the browser\'s'. ( $native === [] ? '' : ' - '. implode( ', ', $native ) ), $native === [] );
+
+$routesScript = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Routes/assets/admin.js' ) ) );
+
+check( 'the values of every language of a route - name, title and address - are rows of localeRows(), the description follows the working language and says so', substr_count( $routesScript, 'adminUi.localeRows(' ) >= 3
+	&& str_contains( $routesScript, 'adminUi.localeBadge(' ) === true && preg_match( '/workLocale\.follow\(\s*\'routes\'/', $routesScript ) === 1 && str_contains( $routesScript, 'adminUi.checklist(' ) === true && str_contains( $routesScript, 'adminUi.switchField(' ) === true );
+
+$withStyle = array_values( array_filter( [ '_admin/Nino/Modules/Routes', '_nino/Nino/Modules/Navigation' ], static fn( string $dir ): bool => is_file( $root. '/'. $dir. '/assets/admin.css' ) === true
+	|| str_contains( $read( $dir. '/Admin/Admin.php' ), "'/assets/admin.css'" ) === true ) );
+
+check( 'neither panel ships a stylesheet of its own: what they draw is the blocks\' and the design system\'s'. ( $withStyle === [] ? '' : ' - '. implode( ', ', $withStyle ) ), $withStyle === [] );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

@@ -541,6 +541,29 @@ namespace Nino {
 		}
 
 		/**
+		 *	The names the menus of navKeys() have, '/nino/html/navnames': menu key =&gt; name. A menu without a name is not in it, and a
+		 *	name whose menu is not registered is left out. A form shows the name before the key and the key where there is none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return		array										Menu key =&gt; name
+		 */
+		public static function navNames( array &$appData ): array {
+
+			$stored = $appData['/nino/html/navnames'] ?? [];
+			$names 	= [];
+
+			if( is_array( $stored ) === false )
+				return $names;
+
+			foreach( self::navKeys( $appData ) as $key )
+				if( is_string( $stored[$key] ?? null ) === true && $stored[$key] !== '' )
+					$names[$key] = $stored[$key];
+
+			return $names;
+		}
+
+		/**
 		 *	The name, title and description a request posts, per language, trimmed and as plain text. A name and a title are
 		 *	required in every language: a key nobody wrote renders as the raw [[...]] on the page and in the menu. The description
 		 *	is optional. The first thing missing is the answer, and nothing is written
