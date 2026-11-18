@@ -883,6 +883,16 @@ namespace Nino\Modules\Elements {
 			$title = trim( \Nino\Admin\Admin::postString( $data, 'title' ) );
 			$model = self::cleanModel( $data['model'] ?? [] );
 
+			// The words a field is called in the element form are no part of what the editor makes (it has no control for
+			// them), but a copy of a type carries them: a label that is valid - a string, or a language => string map - is kept
+			foreach( $model as $key => $field ) {
+
+				$label = is_array( $data['model'] ) === true && is_array( $data['model'][$key] ?? null ) === true ? ( $data['model'][$key]['label'] ?? null ) : null;
+
+				if( $label !== null && \Nino\Features::localizedValid( $label ) === true )
+					$model[$key]['label'] = $label;
+			}
+
 			$danglingReference = self::_unknownReferencedType( $appData, $model );
 
 			if( $danglingReference !== null ) {

@@ -304,7 +304,7 @@ console.log('Nino.adminUi.confirm');
 	// site that is being built is asked, so the table is the contract and a change of it is a decision
 	const expected = {
 		'/_admin/types/confirm/rename' : 'big',
-		'/_admin/types/hint/delete' : 'destructive',
+		'/_admin/types/confirm/delete' : 'destructive',
 		'/_admin/elements/confirm/image-remove' : 'destructive',
 		'/_admin/elements/confirm/delete' : 'destructive',
 		'/_admin/backups/confirm/restore' : 'destructive',

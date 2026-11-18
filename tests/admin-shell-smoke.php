@@ -927,10 +927,10 @@ check( 'the shell\'s registry is bundled before every panel script that register
 // admin frontend")
 foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 	$elementFills = (array) include dirname( __DIR__ ). '/_admin/Nino/Modules/Elements/text/'. $locale. '.php';
-	check( $locale. ': the Elements form words its refusals in fills, the JSON one without bracket characters',
-		isset( $elementFills['[[/_admin/elements/error/json]]'], $elementFills['[[/_admin/elements/label/locale-open]]'] ) === true
-		&& preg_match( '/[\[\]]/', $elementFills['[[/_admin/elements/error/json]]'] ) === 0
-		&& str_contains( $elementFills['[[/_admin/elements/label/locale-open]]'], '%s' ) === true && str_contains( $elementFills['[[/_admin/elements/label/locale-open]]'], '%d' ) === true );
+	check( $locale. ': the Elements form words its refusals in fills - a sentence with the name of the field and what is expected of it - the JSON one without bracket characters',
+		isset( $elementFills['[[/_admin/elements/error/invalid]]'], $elementFills['[[/_admin/elements/expect/json]]'] ) === true
+		&& preg_match( '/[\[\]]/', $elementFills['[[/_admin/elements/expect/json]]'] ) === 0
+		&& substr_count( $elementFills['[[/_admin/elements/error/invalid]]'], '%s' ) === 2 );
 }
 check( 'the nav and the panes reach the template as fills', str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/nav' ), 'data-panel="dummy"' ) === true && str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/panes' ), 'id="dummy-list"' ) === true );
 

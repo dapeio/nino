@@ -430,6 +430,8 @@ $converted = [
 	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/roles.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
+	'_admin/Nino/Modules/Elements/assets/admin.js',
+	'_admin/Nino/Modules/Elements/assets/types.js',
 ];
 
 $byHand = [];
@@ -470,6 +472,8 @@ $listed = [
 	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.filterBar(',
 	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Images/assets/slots.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Elements/assets/admin.js'	=> 'adminUi.table(',
+	'_admin/Nino/Modules/Elements/assets/types.js'	=> 'adminUi.list(',
 ];
 
 $ownClass = '/admin-type-btn|admin-view-button-chev|admin-text-chip|admin-text-search|admin-text-block|nino-admin-list-buttons/';
@@ -513,6 +517,8 @@ $schemaForms = [
 	'_admin/Nino/Modules/Images/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Images/assets/favicon.js',
+	'_admin/Nino/Modules/Elements/assets/admin.js',
+	'_admin/Nino/Modules/Elements/assets/types.js',
 ];
 
 $underneath = [];
@@ -546,6 +552,8 @@ $guideForms = [
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Images/assets/favicon.js',
+	'_admin/Nino/Modules/Elements/assets/admin.js',
+	'_admin/Nino/Modules/Elements/assets/types.js',
 ];
 
 /*	The comments of a script that stand at the beginning of a line: a script that writes the string '/*' (the permission of full access) is no comment	*/
@@ -603,6 +611,8 @@ $barred = [
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Images/assets/favicon.js',
+	'_admin/Nino/Modules/Elements/assets/admin.js',
+	'_admin/Nino/Modules/Elements/assets/types.js',
 ];
 
 $withoutBar = [];
@@ -628,7 +638,7 @@ foreach( $barred as $script ) {
 check( 'the forms and lists that have gone over draw their bar with actionBar()'. ( $withoutBar === [] ? '' : ' - not '. implode( ', ', $withoutBar ) ), $withoutBar === [] );
 $unchecked = [];
 
-foreach( [ '_admin/Nino/Modules/Config/assets/admin.js', '_nino/Nino/Modules/Maintenance/assets/admin.js', '_admin/Nino/Modules/Language/assets/admin.js', '_admin/Nino/Modules/Language/assets/translations.js', '_admin/Nino/Modules/Images/assets/slots.js', '_admin/Nino/Modules/Images/assets/favicon.js' ] as $script ) {
+foreach( [ '_admin/Nino/Modules/Config/assets/admin.js', '_nino/Nino/Modules/Maintenance/assets/admin.js', '_admin/Nino/Modules/Language/assets/admin.js', '_admin/Nino/Modules/Language/assets/translations.js', '_admin/Nino/Modules/Images/assets/slots.js', '_admin/Nino/Modules/Images/assets/favicon.js', '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Elements/assets/types.js' ] as $script ) {
 	if( str_contains( $bare( $read( $script ) ), 'noValidate = true' ) === false )
 		$unchecked[] = $script;
 }
@@ -682,7 +692,7 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 	&& preg_match( '/admin-translation|admin-step-number|nino-admin-card|<h2>/', $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ) ) === 0 );
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {
@@ -788,6 +798,55 @@ $faviconSheet = $bare( $read( '_admin/Nino/Modules/Images/assets/favicon.css' ) 
 [ , , $faviconStray ] = $strays( $faviconSheet, [] );
 
 check( 'the stylesheet of the Favicon tab is named by its tab, and names type, weight and space only through the tokens'. ( $faviconStray === [] ? '' : ' - '. implode( '; ', array_slice( $faviconStray, 0, 6 ) ) ), $faviconStray === [] && str_contains( $read( '_admin/Nino/Modules/Images/Favicon/Favicon.php' ), "'/assets/favicon.css'" ) === true );
+
+// --- the Elements panel and the Element Types tab are built of the blocks, and every view has an address ------------------------------
+
+/*	The two scripts are held by the lists above (bar, list, form, no open sentence, novalidate). What is held here is what is theirs alone: the
+	block that draws each kind of field, no language switch of their own - the language is the workbench's and the form follows it -, no
+	control of the browser's own kind, no character for an icon, an address for every view that is written, linked to and asked about
+	before it is left, and no stylesheet that restyles a block. Held by structure - the call of the block, never a word	*/
+$elementsPanel = [
+	'_admin/Nino/Modules/Elements/assets/admin.js'	=> [ 'adminUi.switchField(', 'adminUi.selectField(', 'adminUi.textareaField(', 'adminUi.codeField(', 'adminUi.fileField(', 'adminUi.dateTime(', 'adminUi.stringList(', 'adminUi.elementList(', 'adminUi.accordion(', 'adminUi.fillsButton(', 'adminUi.localeBadge(', 'adminUi.contextBar(', 'adminUi.table(', 'adminUi.confirm(' ],
+	'_admin/Nino/Modules/Elements/assets/types.js'	=> [ 'adminUi.selectField(', 'adminUi.checklist(', 'adminUi.numberField(', 'adminUi.switchField(', 'adminUi.iconButton(', 'adminUi.formDialog(', 'adminUi.confirm(', 'adminUi.fieldHelp(', 'adminUi.sectionTitle(' ],
+];
+
+$unblocked = [];
+$ownKinds = [];
+$unaddressed = [];
+
+foreach( $elementsPanel as $script => $blocks ) {
+
+	$source = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( $script ) ) );
+
+	foreach( $blocks as $block ) {
+		if( str_contains( $source, $block ) === false )
+			$unblocked[] = $script. ': '. $block;
+	}
+
+	// A language switch of the panel's own, the old pair of radios, a bare file input, the browser's dialogs, and the characters that stood for an icon
+	if( preg_match( '/localeSelect\(|type\s*=\s*\'(?:radio|file)\'|nino-admin-field-radio|\b(?:wn|window)\.(?:alert|confirm|prompt)\(|[↑↓✕]/u', $source ) === 1 )
+		$ownKinds[] = $script;
+
+	if( str_contains( $source, 'router.set(' ) === false || str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false || str_contains( $source, "'@new'" ) === false )
+		$unaddressed[] = $script;
+}
+
+check( 'the Elements panel and the Element Types tab draw with the blocks the guide names for each task'. ( $unblocked === [] ? '' : ' - not '. implode( ', ', $unblocked ) ), $unblocked === [] );
+check( '...with no language switch of their own, no radios, no bare file input, no dialog of the browser and no character for an icon'. ( $ownKinds === [] ? '' : ' - '. implode( ', ', $ownKinds ) ), $ownKinds === [] );
+check( '...and every view has an address - the new one is @new, which no element or type can be called - that is written, linked to, moved by and asked before it is left'. ( $unaddressed === [] ? '' : ' - '. implode( ', ', $unaddressed ) ), $unaddressed === [] );
+
+$elementsSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Elements/assets/admin.js' ) ) );
+
+check( 'the form of an element follows the language the workbench edits content in, and shows it in its bar', preg_match( '/workLocale\.follow\(\s*\'elements\'/', $elementsSource ) === 1 && str_contains( $elementsSource, 'adminUi.localeBadge(' ) === true && str_contains( $elementsSource, 'workLocale.set(' ) === false );
+
+$typesSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Elements/assets/types.js' ) ) );
+
+check( 'the label of a field of a type is at the left of it like every label: no placeholder stands for a name, and the question for a deletion asks for the identifier to be typed', preg_match( '/placeholder\s*:\s*text\(\s*\'\/_admin\/types\/placeholder\/(?!options)/', $typesSource ) === 0
+	&& preg_match( '/typed\s*:\s*uri/', $typesSource ) === 1 );
+
+$elementsSheet = $bare( $read( '_admin/Nino/Modules/Elements/assets/admin.css' ) );
+
+check( 'the stylesheet of the Elements panel restyles no block: it names the ids of its own views only, and no number for type, weight or space', preg_match( '/^(?!#elements-form|#types-form|#types-fields|\s|\/|@|\}|$)/m', $elementsSheet ) === 0 );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

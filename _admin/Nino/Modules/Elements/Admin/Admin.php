@@ -138,7 +138,8 @@ namespace Nino\Modules\Elements {
 				$types[] = [
 					'type' 					=> $type,
 					'title' 				=> $typeData['title'] ?? $type,
-					'descr' 				=> self::typeDescr( $appData, $type ),
+					// How many elements the type holds: the second line of its row
+					'count' 				=> count( \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] ) ),
 					'model' 				=> self::_labelled( $appData, $typeData['model'] ?? [] ),
 					// What this account may do here - the form draws itself from
 					// it rather than offering controls the save would refuse
@@ -1155,32 +1156,6 @@ namespace Nino\Modules\Elements {
 		}
 
 		/**
-		 *		Pick a human readable description for an type
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$type					Type name (eg. "services")
-		 *
-		 *	@return 	string									Readable description
-		 */
-		private static function typeDescr( array &$appData, string $type ): string {
-
-			$elements = \Nino\Elements::queryElements( $appData, '/'. $type, [], '*', [] );
-			$info = '('. count( $elements ). ') ';
-
-			// The prefix only, not every occurrence: a type called 'news' would
-			// otherwise lose the word from the middle of an element's own name
-			foreach( $elements as $elData )
-				$info .= substr( (string) $elData['.uri'], strlen( '/'. $type ) ). ', ';
-
-			// mb_strimwidth, not substr: an element name may hold any character
-			// the kernel api accepts, so a cut counted in bytes could land
-			// inside a multibyte one - and json_encode() answers a string that
-			// is not valid utf-8 with false, which is this whole panel coming
-			// back empty
-			return mb_strimwidth( $info, 0, 153, ' ..', 'UTF-8' );
-		}
-
-		/**
 		 *	The model field keys a table cell can show: everything except an
 		 *	image (a file), an array (a structure) and a rich-text string (its
 		 *	value is markup, and a cell renders text).
@@ -1222,8 +1197,7 @@ namespace Nino\Modules\Elements {
 		 *	field happened to come first, so two types with the same content
 		 *	labelled their rows differently and reordering a model silently
 		 *	relabelled every row in it. A uri is not as pretty, but it is the
-		 *	thing the row actually is, and it matches how the type overview
-		 *	already lists its elements (see typeDescr()).
+		 *	thing the row actually is.
 		 *
 		 *	@param		array 		$element			Resolved element data
 		 *	@param		string		$uri					Element uri, used when there is no title

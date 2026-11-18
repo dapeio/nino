@@ -879,14 +879,14 @@ check( '...and it is hidden only above the phone width, and only in a bar that h
 	/@media \(min-width: 38\.001rem\) \{\s*\.nino-admin \.nino-admin-actionbar:has\(> \.nino-admin-status\) > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheetSource ) === true );
 
 const askTexts = [ '/_admin/common/confirm/unsaved', '/_admin/common/label/discard', '/_admin/common/label/cancel' ];
-const elementTexts = [ '/_admin/elements/error/json', '/_admin/elements/label/locale-open', '/_admin/elements/error/required' ];
+const elementTexts = [ '/_admin/elements/error/invalid', '/_admin/elements/expect/json', '/_admin/elements/error/fields' ];
 check( 'the words of the question are fills in both interface languages',
 	[ 'en_US', 'de_DE' ].every( l => askTexts.every( k => workbenchText( l ).includes( "'[["+ k+ "]]'" ) ) && elementTexts.every( k => adminModuleText( 'Elements', l ).includes( "'[["+ k+ "]]'" ) ) ) );
 // Elements and Routes say an empty required field with one sentence, which is the shell's
 check( 'the sentence at an empty required field is a fill of the shell in both interface languages',
 	[ 'en_US', 'de_DE' ].every( l => workbenchText( l ).includes( "'[[/_admin/common/error/required]]'" ) ) );
-check( '...and the JSON refusal contains no bracket characters (a fill is parsed as a fill key)',
-	[ 'en_US', 'de_DE' ].every( l => { const m = adminModuleText( 'Elements', l ).match( /\[\[\/_admin\/elements\/error\/json\]\]'\s*=>\s*'([^']*)'/ ); return m !== null && /[\[\]]/.test( m[1] ) === false } ) );
+check( '...and what is expected of a JSON field contains no bracket characters (a fill is parsed as a fill key)',
+	[ 'en_US', 'de_DE' ].every( l => { const m = adminModuleText( 'Elements', l ).match( /\[\[\/_admin\/elements\/expect\/json\]\]'\s*=>\s*'([^']*)'/ ); return m !== null && /[\[\]]/.test( m[1] ) === false } ) );
 
 console.log('\nOne stylesheet');
 
@@ -901,7 +901,7 @@ const imageMsgModifiers = new Set();
 localizedScripts.forEach( e => { for( const m of e[1].matchAll( /nino-admin-field-image-msg ([a-z-]+)/g ) ) imageMsgModifiers.add( m[1] ) } );
 const unknownModifiers = Array.from( imageMsgModifiers ).filter( mod => stylesheet.includes( '.nino-admin-field-image-msg.'+ mod ) === false );
 check( 'every modifier a script puts beside the image message is one the stylesheet styles'+ ( unknownModifiers.length ? ' - unknown: '+ unknownModifiers.join(', ') : '' ), unknownModifiers.length === 0 );
-check( '...and the check saw the modifier both image controls use', imageMsgModifiers.has('is-error') );
+check( '...and no script puts an image message beside a control any more: the file field says what is wrong with a file at the field', imageMsgModifiers.size === 0 );
 
 // A write that went through is reported as done, whatever the list read after it does:
 // the question that asked for the Save would otherwise offer it again, and a second

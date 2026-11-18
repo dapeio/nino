@@ -661,24 +661,19 @@ $kept = \Nino\Filesystem::getFileContent( $appData, '/elements/labelled.php', fa
 check( 'saving a type in the editor keeps the label of each field, one that is renamed with it, and gives none to a field that had none', ( $kept['title']['label']['de_DE'] ?? null ) === 'Überschrift' && ( $kept['venue']['label']['en_US'] ?? null ) === 'Where'
 	&& ( $kept['seats']['label'] ?? null ) === 'Seats' && array_key_exists( 'label', $kept['extra'] ) === false && array_key_exists( 'odd', $kept ) === false );
 
-// The line under a type names its elements and is cut at 150 bytes. An
-// element uri may hold any character the kernel api accepts, so the cut could
-// land inside a multibyte one - and json_encode() answers a string that is
-// not valid utf-8 with false, which is the whole panel coming back empty
+// A type says how many elements it holds - the second line of its row - and an element whose uri is long and not ascii
+// is one of them: the answer is still text, so the panel's answer can be encoded at all
 \Nino\Filesystem::putFileContent( $appData, '/elements/langtype.php', [
 	'title'	=> 'Umlaute',
 	'model'	=> [ 'title' => [ 'type' => 'string', 'locale' => true ] ],
 	'*'			=> [ '*' => [] ],
 ] );
-// Placed so the cut lands inside the 'ü': '(1) ' and the leading '/' are
-// five bytes, so byte 150 of the line is byte 145 of the name
 \Nino\Elements::insertElement( $appData, '/langtype/'. str_repeat( 'a', 144 ). 'über-uns', [ 'title' => 'Ü' ], 'de_DE' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiTypes' );
 $langRow = $body['types'][ array_search( 'langtype', array_column( $body['types'], 'type' ), true ) ] ?? [];
-check( 'a type whose element names are long and not ascii still answers', $status === 200 && ( $langRow['descr'] ?? '' ) !== '' );
-check( '...with a line that is text, so the panel\'s answer can be encoded at all', mb_check_encoding( (string) ( $langRow['descr'] ?? '' ), 'UTF-8' ) === true
-	&& json_encode( $body ) !== false );
+check( 'a type answers the number of its elements, whatever their names are', $status === 200 && ( $langRow['count'] ?? null ) === 1 && array_key_exists( 'descr', $langRow ) === false );
+check( '...and the answer can be encoded at all', json_encode( $body ) !== false );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'nope' ] );
 check( 'apiList 404s for an unknown type', $status === 404 );
@@ -1476,6 +1471,57 @@ foreach( $described as [ $class, $action, $data, $needle ] ) {
 		$silent[] = $action;
 }
 check( 'every one of these writes is described by the class that runs it'. ( $silent === [] ? '' : ' - silent: '. implode( ', ', $silent ) ), $silent === [] );
+
+// --- A type and an element saved as the form sends them leave their file as it is --------------------------
+
+echo "Saved without a change\n";
+
+/*	tests/fixtures/admin/elements-roundtrip.json is what the two scripts of the panels - the Element Types tab and the Elements
+	form - read and send for one type and one element: the suites of both (tests/admin-elementtypes-js-smoke.js,
+	tests/admin-elements-js-smoke.js) pin that the form sends exactly that for what it was given, and this one that the server
+	keeps exactly that, byte for byte	*/
+$roundtrip = json_decode( (string) file_get_contents( __DIR__. '/fixtures/admin/elements-roundtrip.json' ), true );
+
+ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'roundmaker', 'title' => 'Makers', 'model' => [ 'name' => [ 'type' => 'string' ] ] ] );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => $roundtrip['type'], 'title' => $roundtrip['typePayload']['title'], 'model' => $roundtrip['typePayload']['model'], 'autoincrement' => $roundtrip['typePayload']['autoincrement'] ] );
+check( 'the type the form sends is created', $status === 200 );
+
+[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiGet' ], [ 'uri' => $roundtrip['type'] ] );
+check( 'what the server keeps of it is the model the fixture says the form is given: one is the other read back', ( $body['model'] ?? null ) == $roundtrip['model'] && array_keys( $body['model'] ?? [] ) === array_keys( $roundtrip['model'] ) );
+
+$typeFile = $sandbox. '/private/elements/'. $roundtrip['type']. '.php';
+$typeBytes = (string) file_get_contents( $typeFile );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => $roundtrip['type'], 'title' => $roundtrip['typePayload']['title'], 'model' => $roundtrip['typePayload']['model'], 'autoincrement' => $roundtrip['typePayload']['autoincrement'], 'renames' => [] ] );
+check( 'a type saved without a change leaves its file byte for byte as it was', $status === 200 && (string) file_get_contents( $typeFile ) === $typeBytes );
+
+foreach( [ 'ada', 'ben' ] as $maker )
+	\Nino\Elements::insertElement( $appData, '/roundmaker/'. $maker, [ 'name' => ucfirst( $maker ) ], 'de_DE' );
+
+\Nino\Elements::insertElement( $appData, '/'. $roundtrip['type']. '/hammer', array_merge( $roundtrip['stored']['global'], $roundtrip['stored']['locales']['de_DE'] ), 'de_DE' );
+
+[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiGet' ], [ 'type' => $roundtrip['type'], 'uri' => 'hammer' ] );
+check( 'the element the form is given is the one the fixture says: what the server answers for it - every language of the site, null where the element has no text', ( $body['global'] ?? null ) == $roundtrip['stored']['global']
+	&& array_intersect_key( $body['locales'] ?? [], $roundtrip['stored']['locales'] ) == $roundtrip['stored']['locales'] );
+
+$elementFile = $sandbox. '/private/elements/'. $roundtrip['type']. '.php';
+$elementBytes = (string) file_get_contents( $elementFile );
+
+foreach( $roundtrip['same'] as $locale => $fields ) {
+	[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiSave' ], [ 'type' => $roundtrip['type'], 'uri' => 'hammer', 'locale' => $locale, 'isNew' => false, 'fields' => $fields ] );
+	check( 'the fields a form in '. $locale. ' sends for what was changed, with the values the element holds, leave its file byte for byte as it was - the order of its keys, a switch that is off, a language it has no text in', $status === 200 && (string) file_get_contents( $elementFile ) === $elementBytes );
+}
+
+// An element written by hand: a save sends the fields that were changed, and the odd values and the missing fields of the rest stay as they are
+$raw = [ 'active' => 1, 'stock' => '7', 'price' => 3 ];
+\Nino\Filesystem::mutate( $appData, '/elements/'. $roundtrip['type']. '.php', static function( mixed $state ) use ( $raw ): array { $state = (array) $state; $state['*']['legacy'] = $raw; $state['de_DE']['legacy'] = [ 'title' => 'Alt', 'unknownfield' => 'x' ]; return $state; }, [] );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiSave' ], [ 'type' => $roundtrip['type'], 'uri' => 'legacy', 'locale' => 'de_DE', 'isNew' => false, 'fields' => [ 'title' => 'Neu' ] ] );
+$after = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $roundtrip['type']. '.php', [] );
+check( 'a save of one field of an element written by hand writes that field and no other: what is stored as 1, as \'7\' or not at all stays as it is', $status === 200 && ( $after['*']['legacy'] ?? null ) === $raw && ( $after['de_DE']['legacy']['title'] ?? null ) === 'Neu' && ( $after['de_DE']['legacy']['unknownfield'] ?? null ) === 'x' && array_keys( $after['*']['legacy'] ) === array_keys( $raw ) );
+
+// A copy of a type carries the words its fields are called in the element form
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'labelcopy', 'title' => 'L', 'model' => [ 'a' => [ 'type' => 'string', 'label' => [ 'de_DE' => 'Eins', 'en_US' => 'One' ] ], 'b' => [ 'type' => 'string', 'label' => '' ], 'c' => [ 'type' => 'string', 'label' => [ 'de_DE' => 5 ] ] ] ] );
+$labelled = \Nino\Filesystem::getFileContent( $appData, '/elements/labelcopy.php', [] )['model'] ?? [];
+check( 'a type created with labels keeps those that are words in a language or in many, and drops what is none', $status === 200 && ( $labelled['a']['label'] ?? null ) === [ 'de_DE' => 'Eins', 'en_US' => 'One' ] && isset( $labelled['b']['label'] ) === false && isset( $labelled['c']['label'] ) === false );
 
 echo "\n";
 

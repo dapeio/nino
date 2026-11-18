@@ -1,0 +1,55 @@
+{
+	"type": "roundtrip",
+	"title": "Round trip",
+	"model": {
+		"title": {"type": "string", "locale": true, "required": true, "maxlength": 150},
+		"summary": {"type": "string", "locale": true, "breaks": true, "inputsize": 4, "maxlength": 400},
+		"body": {"type": "string", "locale": true, "html": true, "blocks": true, "maxlength": 8000, "inputsize": 8},
+		"price": {"type": "double", "suffix": "EUR", "required": true},
+		"stock": {"type": "integer"},
+		"active": {"type": "boolean"},
+		"featured": {"type": "boolean"},
+		"category": {"type": "string", "options": ["tools", "toys", "books"]},
+		"tags": {"type": "array"},
+		"meta": {"type": "array"},
+		"launch": {"type": "date"},
+		"starts": {"type": "datetime"},
+		"maker": {"type": "element", "elementType": "roundmaker"},
+		"related": {"type": "element", "elementType": "roundmaker", "multiple": 3}
+	},
+	"stored": {
+		"global": {"price": 9, "stock": 4, "active": false, "featured": true, "category": "toys", "tags": ["steel", "heavy"], "meta": {"weight": 1.2}, "launch": "2026-03-01", "starts": "2026-03-01T10:30", "maker": "/roundmaker/ada", "related": ["/roundmaker/ada", "/roundmaker/ben"]},
+		"locales": {
+			"de_DE": {"title": "Hammer", "summary": "Ein guter Hammer.\nSchwer.", "body": "<p>Der <strong>beste</strong> Hammer.</p>"},
+			"en_US": {"title": null, "summary": null, "body": null}
+		}
+	},
+	"edit": {
+		"de_DE": {"stock": 5, "active": true, "featured": false, "title": "Hammer 2"},
+		"en_US": {"stock": 6}
+	},
+	"same": {
+		"de_DE": {"stock": 4, "active": false, "featured": true, "title": "Hammer"},
+		"en_US": {"stock": 4}
+	},
+	"typePayload": {
+		"title": "Round trip",
+		"autoincrement": false,
+		"model": {
+			"title": {"type": "string", "locale": true, "required": true, "html": false, "blocks": false, "breaks": false, "maxlength": "150", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"summary": {"type": "string", "locale": true, "required": false, "html": false, "blocks": false, "breaks": true, "maxlength": "400", "inputsize": "4", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"body": {"type": "string", "locale": true, "required": false, "html": true, "blocks": true, "breaks": false, "maxlength": "8000", "inputsize": "8", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"price": {"type": "double", "locale": false, "required": true, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "EUR", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"stock": {"type": "integer", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"active": {"type": "boolean", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"featured": {"type": "boolean", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"category": {"type": "string", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": ["tools", "toys", "books"]},
+			"tags": {"type": "array", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"meta": {"type": "array", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"launch": {"type": "date", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"starts": {"type": "datetime", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "", "multiple": false, "multipleMax": "", "options": []},
+			"maker": {"type": "element", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "roundmaker", "multiple": false, "multipleMax": "", "options": []},
+			"related": {"type": "element", "locale": false, "required": false, "html": false, "blocks": false, "breaks": false, "maxlength": "", "inputsize": "", "width": "", "height": "", "fit": false, "alt": "", "suffix": "", "elementType": "roundmaker", "multiple": true, "multipleMax": "3", "options": []}
+		}
+	}
+}

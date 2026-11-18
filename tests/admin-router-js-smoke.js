@@ -315,7 +315,7 @@ console.log( 'Back links and rows' );
 {
 	// Every back link of a drill-down panel is a step Back returns to - the browser's own
 	// Back then has something to return to, and the level it leaves is the one the link leaves
-	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Text/assets/admin.js' ].forEach( function( file ) {
+	[ '_admin/Nino/Modules/Text/assets/admin.js' ].forEach( function( file ) {
 
 		const script = source( file );
 		const links = script.split( 'backLink.addEventListener(' ).slice( 1 );
@@ -325,7 +325,7 @@ console.log( 'Back links and rows' );
 	} );
 
 	// The panels whose way back is the context bar's: the click that leaves a form goes through the router as well
-	[ '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Images/assets/slots.js' ].forEach( function( file ) {
+	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Elements/assets/types.js', '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Images/assets/slots.js' ].forEach( function( file ) {
 
 		const script = source( file );
 		const links = script.split( /back\s*:\s*\{ to : [^\n]*onClick : function\(\) \{/ ).slice( 1 );
@@ -336,7 +336,7 @@ console.log( 'Back links and rows' );
 
 	// A state sync - the address made true to what is saved - replaces the entry it is on
 	const elements = source('_admin/Nino/Modules/Elements/assets/admin.js');
-	check( 'saving a new element writes its uri over the \'new\' entry instead of adding one', ( elements.match( /router\.set\( 'elements', \[ Nino\.admin\.elements\._currentType, Nino\.admin\.elements\._currentUri \] \)/g ) || [] ).length === 2 );
+	check( 'saving a new element writes its uri over the \'new\' entry instead of adding one', ( elements.match( /router\.set\( 'elements', \[ type, elements\._currentUri \] \)/g ) || [] ).length === 2 );
 }
 
 done();
