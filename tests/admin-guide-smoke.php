@@ -429,6 +429,7 @@ $converted = [
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/roles.js',
+	'_admin/Nino/Modules/Images/assets/slots.js',
 ];
 
 $byHand = [];
@@ -467,6 +468,8 @@ $listed = [
 	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.table(',
 	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
 	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.filterBar(',
+	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Images/assets/slots.js'		=> 'adminUi.list(',
 ];
 
 $ownClass = '/admin-type-btn|admin-view-button-chev|admin-text-chip|admin-text-search|admin-text-block|nino-admin-list-buttons/';
@@ -507,6 +510,9 @@ $schemaForms = [
 	'_admin/Nino/Modules/Features/assets/admin.js',
 	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
+	'_admin/Nino/Modules/Images/assets/admin.js',
+	'_admin/Nino/Modules/Images/assets/slots.js',
+	'_admin/Nino/Modules/Images/assets/favicon.js',
 ];
 
 $underneath = [];
@@ -538,6 +544,8 @@ $guideForms = [
 	'_admin/Nino/Modules/Users/assets/recoverypw.js',
 	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
+	'_admin/Nino/Modules/Images/assets/slots.js',
+	'_admin/Nino/Modules/Images/assets/favicon.js',
 ];
 
 /*	The comments of a script that stand at the beginning of a line: a script that writes the string '/*' (the permission of full access) is no comment	*/
@@ -593,6 +601,8 @@ $barred = [
 	'_nino/Nino/Modules/Form/assets/admin.js',
 	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
+	'_admin/Nino/Modules/Images/assets/slots.js',
+	'_admin/Nino/Modules/Images/assets/favicon.js',
 ];
 
 $withoutBar = [];
@@ -618,7 +628,7 @@ foreach( $barred as $script ) {
 check( 'the forms and lists that have gone over draw their bar with actionBar()'. ( $withoutBar === [] ? '' : ' - not '. implode( ', ', $withoutBar ) ), $withoutBar === [] );
 $unchecked = [];
 
-foreach( [ '_admin/Nino/Modules/Config/assets/admin.js', '_nino/Nino/Modules/Maintenance/assets/admin.js', '_admin/Nino/Modules/Language/assets/admin.js', '_admin/Nino/Modules/Language/assets/translations.js' ] as $script ) {
+foreach( [ '_admin/Nino/Modules/Config/assets/admin.js', '_nino/Nino/Modules/Maintenance/assets/admin.js', '_admin/Nino/Modules/Language/assets/admin.js', '_admin/Nino/Modules/Language/assets/translations.js', '_admin/Nino/Modules/Images/assets/slots.js', '_admin/Nino/Modules/Images/assets/favicon.js' ] as $script ) {
 	if( str_contains( $bare( $read( $script ) ), 'noValidate = true' ) === false )
 		$unchecked[] = $script;
 }
@@ -632,6 +642,7 @@ $dated = [
 	'_admin/Nino/Modules/Dashboard/assets/admin.js',
 	'_admin/Nino/Modules/Logs/assets/admin.js',
 	'_nino/Nino/Modules/Form/assets/admin.js',
+	'_admin/Nino/Modules/Images/assets/favicon.js',
 ];
 
 $ownDates = [];
@@ -671,7 +682,7 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 	&& preg_match( '/admin-translation|admin-step-number|nino-admin-card|<h2>/', $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ) ) === 0 );
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {
@@ -728,6 +739,55 @@ $withStyle = array_values( array_filter( [ '_admin/Nino/Modules/Routes', '_nino/
 	|| str_contains( $read( $dir. '/Admin/Admin.php' ), "'/assets/admin.css'" ) === true ) );
 
 check( 'neither panel ships a stylesheet of its own: what they draw is the blocks\' and the design system\'s'. ( $withStyle === [] ? '' : ' - '. implode( ', ', $withStyle ) ), $withStyle === [] );
+// --- the Images panel and its two tabs are built of the blocks, and every action of them is said as the guide says it ---------------
+
+/*	The Images panel is the guide's third model - nothing is saved by a button, an upload and an alt text are said by a toast and what is
+	wrong at the field -, the Image Slots tab a list and a form, the Favicon tab a form with the colour block and the file block. Held by
+	structure: which block draws a part, and that no part is drawn by hand, asked with the browser's dialogs or styled with a number	*/
+$images = [
+	'_admin/Nino/Modules/Images/assets/admin.js'		=> [ 'adminUi.localeRows(', 'adminUi.fileField(', 'adminUi.contextBar(', 'adminUi.confirm(', 'adminUi.say(', 'adminUi.list(' ],
+	'_admin/Nino/Modules/Images/assets/slots.js'		=> [ 'adminUi.textField(', 'adminUi.checkField(', 'adminUi.confirm(', 'adminUi.say(' ],
+	'_admin/Nino/Modules/Images/assets/favicon.js'	=> [ 'adminUi.color(', 'adminUi.fileField(', 'adminUi.confirm(', 'adminUi.dateText(', 'adminUi.sectionHelp(' ],
+];
+
+$unblocked = [];
+$browser = [];
+$bareFields = [];
+
+foreach( $images as $script => $blocks ) {
+
+	$source = (string) preg_replace( '~^\s*//.*$~m', '', $bare( $read( $script ) ) );
+
+	foreach( $blocks as $block ) {
+		if( str_contains( $source, $block ) === false )
+			$unblocked[] = $script. ': '. $block;
+	}
+
+	if( preg_match( '/\b(?:wn|window)\.(?:alert|confirm|prompt)\(|\bcreateElement\(\s*\'(?:label|input|select|textarea)\'\s*\)|formToolbar\(|\.type\s*=\s*\'file\'|nino-admin-field-image-msg/', $source ) === 1 )
+		$browser[] = $script;
+
+	if( preg_match( '/\bhint\s*:|\.className\s*=\s*\'nino-admin-hint/', $source ) === 1 )
+		$bareFields[] = $script;
+}
+
+check( 'the three scripts of the Images panel draw with the blocks the guide names for each task'. ( $unblocked === [] ? '' : ' - not '. implode( ', ', $unblocked ) ), $unblocked === [] );
+check( '...and ask with no dialog of the browser, build no label, input or select by hand, no bare file input, no toolbar of the old build and no line of the image message of the old build'. ( $browser === [] ? '' : ' - '. implode( ', ', $browser ) ), $browser === [] );
+check( '...and put the sentence of no field under it: the help is the option of its block'. ( $bareFields === [] ? '' : ' - '. implode( ', ', $bareFields ) ), $bareFields === [] );
+
+$imagesSource = $bare( $read( '_admin/Nino/Modules/Images/assets/admin.js' ) );
+
+check( 'the Images panel has no bar and no Save, since every action of it is immediate: no actionBar(), no submit, and no form', str_contains( $imagesSource, 'actionBar(' ) === false && str_contains( $imagesSource, "createElement('form')" ) === false && str_contains( $imagesSource, "'submit'" ) === false );
+check( '...an alt text is saved when its field is left: the script listens for the blur of the control of each language', preg_match( '/addEventListener\(\s*\'blur\'\s*,[^;]{0,80}_saveAlt\(/', $imagesSource ) === 1 );
+
+$faviconSource = $bare( $read( '_admin/Nino/Modules/Images/assets/favicon.js' ) );
+
+check( 'Undo and Reset of the favicon are asked about as the guide asks for what is overwritten - the set that stands is not kept by Undo, and Reset takes the kept one with it - in development as well', preg_match_all( '/adminUi\.confirm\(\s*\'destructive\'/', $faviconSource ) === 2 && preg_match_all( '/adminUi\.confirm\(\s*\'big\'/', $faviconSource ) === 0 );
+check( '...and the colour fields are the colour block, not a text field of their own', preg_match_all( '/adminUi\.color\(/', $faviconSource ) === 1 && str_contains( $faviconSource, 'maxLength = 7' ) === true && str_contains( $faviconSource, "type = 'text'" ) === false );
+
+$faviconSheet = $bare( $read( '_admin/Nino/Modules/Images/assets/favicon.css' ) );
+[ , , $faviconStray ] = $strays( $faviconSheet, [] );
+
+check( 'the stylesheet of the Favicon tab is named by its tab, and names type, weight and space only through the tokens'. ( $faviconStray === [] ? '' : ' - '. implode( '; ', array_slice( $faviconStray, 0, 6 ) ) ), $faviconStray === [] && str_contains( $read( '_admin/Nino/Modules/Images/Favicon/Favicon.php' ), "'/assets/favicon.css'" ) === true );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 

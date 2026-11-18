@@ -7,23 +7,25 @@
  *	admin.js 								Admin "Images" panel: developer-fixed image slots
  *													(/nino/html/images in config.php), grouped by the
  *													slot uri's first path segment ("<category>/<identifier>",
- *													same convention as Text's key categories) into a
- *													category list -> all slots of that category shown at
- *													once. Slots can't be added/removed here, only the file
- *													each currently points to changes - or goes away: Remove
- *													takes the image out of a slot after a question and leaves
- *													the slot. Uploading works exactly
- *													like Elements' "image" field (immediate commit, centered
- *													crop/resize, no orphaned files on replace) - each slot's
- *													upload commits on its own the moment a file is chosen,
- *													so unlike Text there is no batched save for the category.
- *													A picture smaller than the slot's target size is saved
- *													and said to be: crop mode scales it up. Each slot also
- *													says which pages use it - or that none does - and keeps
- *													an alt text per language, saved on its own button; empty
- *													means decorative. An alt text typed and not saved is
- *													reported to Nino.admin.dirty, which asks before the form
- *													is left.
+ *													same convention as Text's key categories) into a list of
+ *													categories -> all slots of that category shown at once,
+ *													each category with an address of its own
+ *													(#images/<category>). Slots can't be added/removed here,
+ *													only the file each currently points to changes - or goes
+ *													away: Remove takes the image out of a slot after a
+ *													question and leaves the slot.
+ *
+ *													Everything here is immediate - the guide's third model - so
+ *													there is no Save and no bar. A file that is chosen is stored
+ *													at once, cut to the slot's size as an Elements "image" field
+ *													is, and a toast says so; an alt text, one short value for each
+ *													language, is saved when its field is left and its value has
+ *													changed, and a toast says so. What the server refuses is said
+ *													at the field, and the value stays in it: Nino.admin.dirty
+ *													knows of it, so that no change of view loses it silently. A
+ *													picture smaller than the slot's target size is saved and said
+ *													to be, where it stays in view: crop mode scales it up. Each
+ *													slot also says which pages use it - or that none does.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -38,8 +40,7 @@
 
 		_groups				: {},
 		_locales			: [],
-		_altCount			: 0,
-		_altEditors		: [],
+		_editors			: [],
 		_currentGroup	: null,
 		_loading			: false,
 		_ready				: false,
@@ -272,8 +273,8 @@
 		},
 
 		/**
-		 *	The button of a category as the list is drawn now: the list is drawn
-		 *	again where the slots are read anew, and the button that was pressed is
+		 *	The row of a category as the list is drawn now: the list is drawn
+		 *	again where the slots are read anew, and the link that was pressed is
 		 *	gone with the old drawing
 		 *
 		 *	@param		{string}	group
@@ -281,7 +282,10 @@
 		 *	@return		{Element|null}
 		 */
 		_rowOf : function( group ) {
-			return Array.from( dc.getElementById('images-list').querySelectorAll('button') ).find( function( button ) { return button.dataset.group === group } ) ?? null;
+
+			const row = Array.from( dc.getElementById('images-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === group } );
+
+			return row === undefined ? null : row.querySelector('a');
 		},
 
 		/**
@@ -306,7 +310,9 @@
 		},
 
 		/**
-		 *	Render the category list, styled the same as Text's
+		 *	Render the category list: a row for each category, a link with the
+		 *	address of the category, its name over the number of its slots and
+		 *	their names. No slots at all: the tab that creates them is the next step
 		 *
 		 *	@return		void
 		 */
@@ -314,48 +320,24 @@
 
 			const wrap = dc.getElementById('images-list');
 			wrap.innerHTML = '';
-			// The wrapper IS the list, so its classes belong to the rows: a
-			// re-render that ends up empty has to take them off again, or the
-			// notice below is drawn inside a list surface with nothing in it
-			wrap.classList.remove( 'nino-admin-list', 'nino-admin-list-buttons' );
 
-			// No slots at all - there is nothing to show a picture for yet, and
-			// the tab that creates them is the next step (see the Slots tab)
 			if( Object.keys( Nino.admin.images._groups ).length === 0 ) {
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/slots/empty/images') ) );
+				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/slots/empty/images'), Nino.adminUi.button( Nino.content.getText('/_admin/nav/slots'), function() { wn.location.hash = '#slots' } ) ) );
 				return;
 			}
 
-			wrap.classList.add( 'nino-admin-list', 'nino-admin-list-buttons' );
-
-			Object.keys( Nino.admin.images._groups ).sort().forEach( function( group ) {
+			wrap.appendChild( Nino.adminUi.list( Object.keys( Nino.admin.images._groups ).sort().map( function( group ) {
 
 				const slots = Nino.admin.images._groups[group];
 
-				const btn = dc.createElement('button');
-				btn.type = 'button';
-				btn.className = 'admin-type-btn';
-				btn.dataset.group = group;
-
-				const titleWrap = dc.createElement('div');
-				titleWrap.textContent = Nino.admin.images._groupLabel( group );
-
-				const descr = dc.createElement('div');
-				descr.className = 'admin-type-btn-descr';
-				descr.textContent = '(' + slots.length + ') '+ slots.map( function( s ) { return s.label } ).join(', ');
-				titleWrap.appendChild( descr );
-
-				const chev = dc.createElement('span');
-				chev.className = 'admin-view-button-chev';
-				chev.setAttribute( 'aria-hidden', 'true' );
-				chev.textContent = '›';
-
-				btn.appendChild( titleWrap );
-				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() { Nino.admin.images._openGroup( group, true ) } );
-
-				wrap.appendChild( btn );
-			} );
+				return {
+					key			: group,
+					title		: Nino.admin.images._groupLabel( group ),
+					detail	: Nino.adminUi.format( Nino.content.getText('/_admin/images/label/count'), slots.length )+ ' · '+ slots.map( function( slot ) { return slot.label } ).join(', '),
+					href		: Nino.admin.router.href( 'images', Nino.admin.images._groupParts( group ) ),
+					onOpen	: function() { Nino.admin.images._openGroup( group, true ) },
+				};
+			} ), { label : Nino.content.getText('/_admin/nav/images') } ) );
 		},
 
 		/**
@@ -365,7 +347,7 @@
 		 *	it (an older one, a test) goes straight on
 		 *
 		 *	@param		{string}		group
-		 *	@param		{boolean}		[opened]	The person pressed its button: the focus goes into the form. Otherwise it is shown as it stands, by the address
+		 *	@param		{boolean}		[opened]	The person pressed its row: the focus goes into the form. Otherwise it is shown as it stands, by the address
 		 *
 		 *	@return		void
 		 */
@@ -378,23 +360,19 @@
 				Nino.admin.images._showForm( opened === true );
 			};
 
-			if( typeof Nino.admin.dirty !== 'object' ) {
+			if( typeof Nino.admin.dirty !== 'object' )
 				open();
-				return;
-			}
-
-			Nino.admin.dirty.guard( [ 'images' ], open );
+			else
+				Nino.admin.dirty.guard( [ 'images' ], open );
 		},
 
 		/**
 		 *	Render every slot of the current category, stacked - each with its
-		 *	own target dimensions, current preview (if any) and a file input
+		 *	own target dimensions, current preview (if any) and a file field
 		 *	that uploads immediately, same as an Elements "image" field. Unlike
 		 *	Text's category form, there is nothing to batch: a slot always
-		 *	exists already (developer-fixed) and each upload commits on its own.
-		 *	The alt texts are the one thing typed into it that is not committed
-		 *	at once: each slot saves its own on its button, and the shell saves
-		 *	the ones still open when it asks about unsaved input
+		 *	exists already (developer-fixed), each upload commits on its own and
+		 *	so does each alt text, when its field is left
 		 *
 		 *	@return		void
 		 */
@@ -405,19 +383,15 @@
 
 			const wrap = dc.getElementById('images-form');
 			wrap.innerHTML = '';
-			Nino.admin.images._altEditors = [];
+			Nino.admin.images._editors = [];
 
-			const backLink = dc.createElement('a');
-			backLink.href = '#';
-			backLink.className = 'nino-admin-back-link';
-			backLink.textContent = Nino.content.getText('/_admin/images/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'images', [] ); Nino.admin.images._showList( Nino.admin.images._rowOf( Nino.admin.images._currentGroup ) ) } );
-			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
-
-			const title = dc.createElement('div');
-			title.className = 'main-title';
-			title.textContent = Nino.admin.images._groupLabel( group );
-			wrap.appendChild( title );
+			wrap.appendChild( Nino.adminUi.contextBar( {
+				back	: { to : wrap, href : Nino.admin.router.href( 'images', [] ), onClick : function() { Nino.admin.images._guarded( function() {
+					Nino.admin.router.go( 'images', [] );
+					Nino.admin.images._showList( Nino.admin.images._rowOf( Nino.admin.images._currentGroup ) );
+				} ) } },
+				title	: Nino.admin.images._groupLabel( group ),
+			} ) );
 
 			slots.forEach( function( slot ) {
 				wrap.appendChild( Nino.admin.images._renderSlotField( slot ) );
@@ -427,9 +401,28 @@
 		},
 
 		/**
-		 *	Render one slot as a labeled fieldset: target dimensions, where
-		 *	it is used, current preview (if any), a file input that uploads
-		 *	immediately, a Remove button and the alt texts
+		 *	A line of text a slot shows and does not take - its target size, the pages that use it, the call a
+		 *	template writes for it: no input, no stop of the Tab key, the name at its left
+		 *
+		 *	@param		{string}				label
+		 *	@param		{Element|string}	value
+		 *
+		 *	@return		{Element}										The field
+		 */
+		_readOnly : function( label, value ) {
+
+			const field = Nino.adminUi.el( 'div', 'nino-admin-field' );
+
+			field.appendChild( Nino.adminUi.el( 'span', '', label ) );
+			field.appendChild( typeof value === 'string' ? Nino.adminUi.el( 'p', '', value ) : value );
+
+			return field;
+		},
+
+		/**
+		 *	Render one slot as a card: target dimensions, where it is used, the
+		 *	call a template writes, the picture with Remove and the file field
+		 *	that uploads at once, and the alt texts
 		 *
 		 *	@param		{Object}	slot
 		 *
@@ -438,10 +431,13 @@
 		_renderSlotField : function( slot ) {
 
 			const fieldset = dc.createElement('fieldset');
-			fieldset.className = 'images-slot-field';
+			fieldset.className = 'images-slot';
 			const legend = dc.createElement('legend');
 			legend.textContent = slot.label;
 			fieldset.appendChild( legend );
+
+			fieldset.appendChild( Nino.admin.images._readOnly( Nino.content.getText('/_admin/images/label/target'), slot.width+ ' × '+ slot.height+ ' px' ) );
+			fieldset.appendChild( Nino.admin.images._renderUsage( slot ) );
 
 			// The actual shortcode usage for this slot, copy/paste-ready for templating.
 			// Deliberately built from two string pieces, not one "[image " literal -
@@ -449,19 +445,7 @@
 			// admin's own assets get cached (see Assets::_createCachefile()), and a
 			// literal "[image ...]"-shaped string is indistinguishable there from a
 			// real shortcode call, silently resolving to '' since no such slot exists
-			const imageUri = dc.createElement('span');
-			imageUri.className = 'nino-admin-field-name';
-			imageUri.textContent = '[' + 'image ' + slot.uri + ']';
-			fieldset.appendChild( imageUri );
-
-			const dimensions = dc.createElement('p');
-			dimensions.className = 'nino-admin-field-image-dimensions';
-			dimensions.textContent = Nino.content.getText('/_admin/common/label/image-target')+ ' '+ slot.width+ ' × '+ slot.height+ ' px';
-			fieldset.appendChild( dimensions );
-			fieldset.appendChild( Nino.admin.images._renderUsage( slot ) );
-
-			const imageWrap = dc.createElement('div');
-			imageWrap.className = 'nino-admin-field-image';
+			fieldset.appendChild( Nino.admin.images._readOnly( Nino.content.getText('/_admin/images/label/call'), Nino.adminUi.el( 'code', '', '[' + 'image ' + slot.uri + ']' ) ) );
 
 			const preview = dc.createElement('img');
 			preview.className = 'nino-admin-field-image-preview';
@@ -469,41 +453,44 @@
 			preview.hidden = ! slot.url;
 			if( slot.url )
 				preview.src = slot.url;
-			imageWrap.appendChild( preview );
 
-			const fileInput = dc.createElement('input');
-			fileInput.type = 'file';
-			fileInput.accept = 'image/*';
+			// What the server will take stays in view, since nobody should have to fail an upload to learn the limit
+			const limits = Nino.adminUi.uploadHint();
 
-			const msg = dc.createElement('p');
-			msg.className = 'nino-admin-field-image-msg';
-			msg.setAttribute( 'aria-live', 'polite' );
+			const file = Nino.adminUi.fileField( {
+				label		: Nino.content.getText('/_admin/images/label/image'),
+				help		: Nino.content.getText('/_admin/images/hint/image'),
+				note		: limits === null ? undefined : limits.textContent,
+				accept	: '.jpg,.jpeg,.png,.webp,.gif',
+				maxBytes : Nino.adminUi.limits().bytes,
+				onChange : function( chosen ) {
+					if( chosen !== null )
+						Nino.admin.images._uploadImage( slot, chosen, parts );
+				},
+			} );
 
 			// The slot stays and its image goes: only there is one to take away
-			const removeBtn = dc.createElement('button');
-			removeBtn.type = 'button';
-			removeBtn.className = 'nino-admin-btn-danger';
-			removeBtn.textContent = Nino.content.getText('/_admin/images/label/remove');
+			const removeBtn = Nino.adminUi.button( Nino.content.getText('/_admin/images/label/remove'), function() {
+				Nino.admin.images._removeImage( slot, parts );
+			}, { kind : 'danger', small : true } );
 			removeBtn.hidden = ! slot.url;
-			removeBtn.addEventListener( 'click', function() {
-				Nino.admin.images._removeImage( slot, preview, msg, removeBtn );
-			} );
 
-			fileInput.addEventListener( 'change', function() {
-				if( fileInput.files.length === 0 )
-					return;
-				Nino.admin.images._uploadImage( slot, fileInput.files[0], preview, msg, fileInput, removeBtn );
-			} );
-			imageWrap.appendChild( fileInput );
-			// What the server will take, before the file is chosen
-			const hint = Nino.adminUi.uploadHint();
-			if( hint !== null )
-				imageWrap.appendChild( hint );
-			imageWrap.appendChild( removeBtn );
-			imageWrap.appendChild( msg );
+			const shown = Nino.adminUi.el( 'div', 'images-slot-image' );
+			shown.appendChild( preview );
+			shown.appendChild( removeBtn );
 
-			fieldset.appendChild( imageWrap );
+			// A picture below the target size is saved, and that stays said at the field: the sentence and its place are the upload's
+			const warning = Nino.adminUi.notice('');
+			warning.hidden = true;
+
+			file.el.insertBefore( shown, file.el.children[1] );
+			file.el.appendChild( warning );
+
+			const parts = { file : file, preview : preview, remove : removeBtn, warning : warning, fieldset : fieldset };
+
+			fieldset.appendChild( file.el );
 			fieldset.appendChild( Nino.admin.images._renderAlt( slot, preview ) );
+
 			return fieldset;
 		},
 
@@ -525,113 +512,108 @@
 		},
 
 		/**
-		 *	The line that says where a slot is used - the pages whose
-		 *	templates show it - or, with the warning's modifier, that none
-		 *	does: an image uploaded to such a slot never appears on the
-		 *	website. The words carry the warning, not only the colour
+		 *	The field that says where a slot is used - the pages whose
+		 *	templates show it - or, as a notice, that none does: an image
+		 *	uploaded to such a slot never appears on the website. The words
+		 *	carry the warning, not only the colour
 		 *
 		 *	@param		{Object}	slot
 		 *
-		 *	@return		{Element}								<p>
+		 *	@return		{Element}								The field
 		 */
 		_renderUsage : function( slot ) {
 
 			const pages = ( slot.usage && slot.usage.pages ) || [];
 
-			const line = dc.createElement('p');
-			line.className = 'nino-admin-field-hint';
+			if( pages.length === 0 )
+				return Nino.admin.images._readOnly( Nino.content.getText('/_admin/images/label/usedon'), Nino.adminUi.notice( Nino.content.getText('/_admin/images/msg/unused') ) );
 
-			if( pages.length === 0 ) {
-				line.className = 'nino-admin-field-hint is-warning';
-				line.textContent = Nino.content.getText('/_admin/images/msg/unused');
-				return line;
-			}
-
-			line.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/images/label/usedon'), pages.map( function( page ) {
+			return Nino.admin.images._readOnly( Nino.content.getText('/_admin/images/label/usedon'), pages.map( function( page ) {
 				return page.name === page.httpUri ? page.httpUri : page.name+ ' ('+ page.httpUri+ ')';
 			} ).join(', ') );
-
-			return line;
 		},
 
 		/**
-		 *	One text input per available site language for the
-		 *	slot's alt text, one hint that every input points to, and a button
-		 *	that saves them all - an alt text is not part of an upload and has
-		 *	its own request. Empty means decorative, which the hint says
+		 *	The alt text of a slot: one short value for each language of the site,
+		 *	one row under the other, the working language first. The words of the
+		 *	field say that empty means decorative. Each value is saved by itself
+		 *	when its field is left and it differs from what the server confirmed
+		 *	for that field (see _saveAlt())
+		 *
+		 *	Every field has one baseline: the value the server last confirmed for it,
+		 *	at the load or in the answer to its own save - never the answer to another
+		 *	field's save, which carries a map that may be older or newer. A field is
+		 *	unsaved input as long as its value differs from it, while a request is on
+		 *	its way and after one failed
 		 *
 		 *	@param		{Object}	slot
 		 *	@param		{Element}	preview					The slot's <img>, whose alt follows what is saved here
 		 *
-		 *	@return		{Element}								<div>
+		 *	@return		{Element}								The field
 		 */
 		_renderAlt : function( slot, preview ) {
 
-			const wrap = dc.createElement('div');
-			wrap.className = 'images-slot-alt';
-
-			const hint = dc.createElement('p');
-			hint.className = 'nino-admin-hint';
-			hint.id = 'images-alt-hint-'+ ( ++Nino.admin.images._altCount );
-			hint.textContent = Nino.content.getText('/_admin/images/hint/alt');
-			wrap.appendChild( hint );
-
-			const inputs = {};
-			Nino.admin.images._locales.forEach( function( locale ) {
-
-				const label = dc.createElement('label');
-				label.className = 'nino-admin-field';
-				const name = dc.createElement('span');
-				name.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/images/label/alt'), locale );
-				label.appendChild( name );
-
-				const input = dc.createElement('input');
-				input.type = 'text';
-				input.maxLength = 250;
-				input.value = ( slot.alt && slot.alt[locale] ) || '';
-				input.setAttribute( 'aria-describedby', hint.id );
-				label.appendChild( input );
-
-				inputs[locale] = input;
-				wrap.appendChild( label );
+			const rows = Nino.adminUi.localeRows( {
+				key				: 'alt',
+				label			: Nino.content.getText('/_admin/images/label/alt'),
+				help			: Nino.content.getText('/_admin/images/hint/alt'),
+				locales		: Nino.admin.images._locales,
+				values		: slot.alt || {},
+				maxLength	: 250,
 			} );
 
-			const msg = dc.createElement('p');
-			msg.className = 'nino-admin-field-image-msg';
-			msg.setAttribute( 'aria-live', 'polite' );
+			const base = {};
+			Object.keys( rows.controls ).forEach( function( code ) { base[code] = ( slot.alt && slot.alt[code] ) || '' } );
 
-			const saveBtn = dc.createElement('button');
-			saveBtn.type = 'button';
-			saveBtn.className = 'nino-admin-btn-secondary';
-			saveBtn.textContent = Nino.content.getText('/_admin/images/label/alt-save');
+			// base: the confirmed value; sent: the value of the last request, failed or not; seq: the number of the last request; saving, queued, waiting, discarded: the request that is out
+			const editor = { slot : slot, preview : preview, rows : rows, base : base, sent : {}, seq : {}, saving : {}, queued : {}, waiting : {}, discarded : {} };
+			Nino.admin.images._editors.push( editor );
 
-			const editor = { slot : slot, preview : preview, inputs : inputs, msg : msg, saveBtn : saveBtn, saving : false };
-			Nino.admin.images._altEditors.push( editor );
+			Object.keys( rows.controls ).forEach( function( code ) {
 
-			saveBtn.addEventListener( 'click', function() { Nino.admin.images._saveAlt( editor ) } );
+				rows.controls[code].addEventListener( 'blur', function() { Nino.admin.images._saveAlt( editor, code ) } );
 
-			wrap.appendChild( saveBtn );
-			wrap.appendChild( msg );
+				// What is typed makes the sentence of that language stale, and is input the shell may have to ask about
+				rows.controls[code].addEventListener( 'input', function() {
+					Nino.adminUi.clearFieldErrors( rows.controls[code].parentNode );
+					Nino.admin.images._refreshDirty();
+				} );
+			} );
 
-			return wrap;
+			return rows.el;
 		},
 
 		/**
-		 *	Save the alt texts of one slot: every input it shows, empty ones
-		 *	included, in one request. What the server stored (cleaned) is put
-		 *	back into the inputs that still hold what was sent, so that a text
-		 *	saved with a trailing space does not stay "unsaved"
+		 *	The languages of one slot whose field holds a value other than the baseline
 		 *
-		 *	Every way this ends reports to done( ok ), if there is one: the
-		 *	shell's question about unsaved input saves through it and goes on
-		 *	only when it hears true (see Nino.admin.dirty.guard())
+		 *	@param		{Object}		editor				One entry of _editors
 		 *
-		 *	@param		{Object}		editor				One entry of _altEditors
-		 *	@param		{Function}	[done]				Called once with true when the texts were written, false otherwise
+		 *	@return		{Array<string>}
+		 */
+		_changedAlt : function( editor ) {
+			return Object.keys( editor.rows.controls ).filter( function( code ) { return editor.rows.controls[code].value !== editor.base[code] } );
+		},
+
+		/**
+		 *	Save the alt text of one language of one slot, if it differs from the baseline: one request for that
+		 *	language alone (an empty text removes its entry, see \Nino\Images::setSlotAlt()), a toast when it is
+		 *	stored, and when it is not the sentence at the field with the value left in it - no focus is taken,
+		 *	and leaving the field sends nothing more: the value is sent again when it was changed, or by the Save
+		 *	of the shell (force). The answer sets the baseline of this language and nothing else: what it says of
+		 *	the others is not what their fields showed. A text changed while the request is out is sent when it is
+		 *	answered, and so is a Save that asked meanwhile
+		 *
+		 *	Every way this ends reports to done( ok ), if there is one: the shell's question about unsaved input
+		 *	saves through it and goes on only when it hears true (see Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Object}		editor				One entry of _editors
+		 *	@param		{string}		code					The language
+		 *	@param		{Function}	[done]				Called once with true when the text is stored (or was), false otherwise
+		 *	@param		{boolean}		[force]				Send a value that was sent and refused, too
 		 *
 		 *	@return		void
 		 */
-		_saveAlt : function( editor, done ) {
+		_saveAlt : function( editor, code, done, force ) {
 
 			const report = function( ok ) {
 				Nino.admin.images._refreshDirty();
@@ -639,80 +621,108 @@
 					done( ok );
 			};
 
-			// A second submit while one runs: the one running decides
-			if( editor.saving === true ) {
+			const control = editor.rows.controls[code];
+
+			// A save while one runs: it is sent when that one is answered, and the caller hears of that
+			if( editor.saving[code] === true ) {
+				if( control.value !== editor.sent[code] || force === true )
+					editor.queued[code] = true;
+				if( typeof done === 'function' )
+					( editor.waiting[code] = editor.waiting[code] ?? [] ).push( done );
+				return;
+			}
+
+			if( control.value === editor.base[code] ) {
+				report( true );
+				return;
+			}
+
+			// Leaving a field whose value was sent and refused is no reason to send it again
+			if( force !== true && control.value === editor.sent[code] ) {
 				report( false );
 				return;
 			}
 
-			const sent = {};
-			Object.keys( editor.inputs ).forEach( function( locale ) { sent[locale] = editor.inputs[locale].value } );
+			const sent = control.value;
+			const mine = ( editor.seq[code] ?? 0 ) + 1;
 
-			editor.saving = true;
-			editor.saveBtn.disabled = true;
-			editor.msg.className = 'nino-admin-field-image-msg';
-			editor.msg.textContent = Nino.content.getText('/_admin/images/msg/pending');
+			editor.saving[code] = true;
+			editor.sent[code] = sent;
+			editor.seq[code] = mine;
+			editor.queued[code] = false;
 
-			Nino.admin.images._apiCall( 'alt', { uri : editor.slot.uri, alt : sent }, function( status, response ) {
+			Nino.admin.images._apiCall( 'alt', { uri : editor.slot.uri, alt : { [ code ] : sent } }, function( status, response ) {
 
-				editor.saving = false;
-				editor.saveBtn.disabled = false;
+				// An answer that is not to the last request of this field is no news
+				if( mine !== editor.seq[code] )
+					return;
+
+				editor.saving[code] = false;
+
+				// Whoever asked for a save while this one was out hears how it ended
+				const waiting = editor.waiting[code] ?? [];
+				const finish = function( ok ) {
+					report( ok );
+					waiting.forEach( function( wait ) { wait( ok ) } );
+				};
+
+				editor.waiting[code] = [];
 
 				if( status !== 200 || response === null ) {
-					editor.msg.className = 'nino-admin-field-image-msg is-error';
-					editor.msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/alt' );
-					report( false );
+					editor.queued[code] = false;
+					editor.discarded[code] = false;
+					editor.rows.error( code, Nino.adminUi.api.errorText( status, response, '/_admin/images/error/alt' ) );
+					finish( false );
 					return;
 				}
 
 				Nino.admin.touch( 'slots' );
 
-				editor.slot.alt = response.alt || {};
+				const stored = ( response.alt && response.alt[code] ) || '';
+
+				editor.base[code] = stored;
+				editor.slot.alt = Object.assign( {}, editor.slot.alt );
+
+				if( stored === '' )
+					delete editor.slot.alt[code];
+				else
+					editor.slot.alt[code] = stored;
+
 				editor.preview.alt = Nino.admin.images._previewAlt( editor.slot );
-				Object.keys( editor.inputs ).forEach( function( locale ) {
-					if( editor.inputs[locale].value === sent[locale] )
-						editor.inputs[locale].value = editor.slot.alt[locale] || '';
-				} );
-				editor.msg.textContent = Nino.content.getText('/_admin/images/msg/alt-saved');
-				report( true );
+
+				if( control.value === sent || editor.discarded[code] === true )
+					control.value = stored;
+
+				editor.discarded[code] = false;
+				Nino.adminUi.clearFieldErrors( control.parentNode );
+				Nino.adminUi.say( Nino.adminUi.format( Nino.content.getText('/_admin/images/msg/alt-saved'), Nino.adminUi.localeName( code, editor.rows.locales ) ) );
+
+				if( editor.queued[code] === true && control.value !== editor.base[code] ) {
+					editor.waiting[code] = waiting;
+					Nino.admin.images._saveAlt( editor, code, done, true );
+					return;
+				}
+
+				finish( true );
 			} );
 		},
 
 		/**
-		 *	Whether the inputs of one slot's alt texts differ from what is stored
-		 *
-		 *	@param		{Object}		editor				One entry of _altEditors
-		 *
-		 *	@return		{boolean}
-		 */
-		_altChanged : function( editor ) {
-			return Object.keys( editor.inputs ).some( function( locale ) {
-				return editor.inputs[locale].value !== ( ( editor.slot.alt && editor.slot.alt[locale] ) || '' );
-			} );
-		},
-
-		/**
-		 *	Whether the category on screen holds alt texts nobody has saved -
-		 *	what the shell asks before it lets anything throw that away (see
-		 *	Nino.admin.dirty). A list has nothing typed into it, and an upload
-		 *	or a removal commits on its own
+		 *	Whether the category holds alt texts nobody has stored - a value that differs from what the server
+		 *	confirmed for its field, also while its request is on its way and after it failed, and also while
+		 *	the list is shown: what the shell asks before it lets anything throw that away (see Nino.admin.dirty).
+		 *	An upload or a removal commits on its own
 		 *
 		 *	@return		{boolean}
 		 */
 		isDirty : function() {
-
-			const form = dc.getElementById('images-form');
-
-			if( form === null || form.classList.contains('admin-hidden') === true )
-				return false;
-
-			return Nino.admin.images._altEditors.some( Nino.admin.images._altChanged );
+			return Nino.admin.images._editors.some( function( editor ) { return Nino.admin.images._changedAlt( editor ).length > 0 } );
 		},
 
 		/**
-		 *	Save every slot's alt texts that differ from what is stored, one
-		 *	request after the other - the shell's Save in its question about
-		 *	unsaved input. Stops at the first that fails
+		 *	Save every alt text that differs from the baseline, one request after the other - the shell's Save in
+		 *	its question about unsaved input. A request that is out is waited for, and what was typed since is
+		 *	sent after it. Stops at the first that fails
 		 *
 		 *	@param		{Function}	done					Called once with true when everything was written, false otherwise
 		 *
@@ -720,7 +730,12 @@
 		 */
 		save : function( done ) {
 
-			const open = Nino.admin.images._altEditors.filter( Nino.admin.images._altChanged );
+			const open = [];
+
+			Nino.admin.images._editors.forEach( function( editor ) {
+				Nino.admin.images._changedAlt( editor ).forEach( function( code ) { open.push( [ editor, code ] ) } );
+			} );
+
 			let at = 0;
 
 			const next = function() {
@@ -730,37 +745,55 @@
 					return;
 				}
 
-				Nino.admin.images._saveAlt( open[at++], function( ok ) {
+				const entry = open[at++];
+
+				Nino.admin.images._saveAlt( entry[0], entry[1], function( ok ) {
 					if( ok === true )
 						next();
 					else
 						done( false );
-				} );
+				}, true );
 			};
 
 			next();
 		},
 
 		/**
-		 *	Throw the input away: the inputs go back to what is stored. The
-		 *	form is about to be left or drawn again. A slot whose save is
-		 *	running is left alone - it finishes with what it was given
+		 *	Throw the input away: every field goes back to its baseline and loses its sentence. A language whose
+		 *	request is out is put back as well, and again by its answer, which sets the baseline it confirms
 		 *
 		 *	@return		void
 		 */
 		discard : function() {
 
-			Nino.admin.images._altEditors.forEach( function( editor ) {
+			Nino.admin.images._editors.forEach( function( editor ) {
 
-				if( editor.saving === true )
-					return;
+				Object.keys( editor.rows.controls ).forEach( function( code ) {
+					editor.rows.controls[code].value = editor.base[code];
 
-				Object.keys( editor.inputs ).forEach( function( locale ) {
-					editor.inputs[locale].value = ( editor.slot.alt && editor.slot.alt[locale] ) || '';
+					if( editor.saving[code] === true )
+						editor.discarded[code] = true;
 				} );
+
+				editor.rows.clear();
 			} );
 
 			Nino.admin.images._refreshDirty();
+		},
+
+		/**
+		 *	Ask the shell about unsaved alt texts before a way out that stays in this panel - the back link - and
+		 *	go on when it says so
+		 *
+		 *	@param		{Function}	proceed
+		 *
+		 *	@return		void
+		 */
+		_guarded : function( proceed ) {
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.guard( [ 'images' ], proceed );
+			else
+				proceed();
 		},
 
 		/**
@@ -779,45 +812,42 @@
 		 *	nothing there. A cancelled question sends nothing
 		 *
 		 *	@param		{Object}	slot
-		 *	@param		{Element}	preview					<img> preview element
-		 *	@param		{Element}	msg							Status message element
-		 *	@param		{Element}	removeBtn				The Remove button itself, disabled while pending
+		 *	@param		{Object}	parts						The slot's parts: { file, preview, remove, warning }
 		 *
 		 *	@return		void
 		 */
-		_removeImage : function( slot, preview, msg, removeBtn ) {
+		_removeImage : function( slot, parts ) {
 
 			Nino.adminUi.confirm( 'destructive', {
 				title			: Nino.content.getText('/_admin/images/confirm/remove-title'),
 				message		: Nino.adminUi.format( Nino.content.getText('/_admin/images/confirm/remove'), slot.label ),
 				yes				: Nino.content.getText('/_admin/images/confirm/remove-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
-				opener		: removeBtn,
+				opener		: parts.remove,
 				onChoose	: function( ok ) {
 
 					if( ok === false )
 						return;
 
-					removeBtn.disabled = true;
-					msg.className = 'nino-admin-field-image-msg';
-					msg.textContent = Nino.content.getText('/_admin/images/msg/pending');
+					parts.remove.disabled = true;
+					parts.file.clearError();
 
 					Nino.admin.images._apiCall( 'remove', { uri : slot.uri }, function( status, response ) {
 
-						removeBtn.disabled = false;
+						parts.remove.disabled = false;
 
 						if( status !== 200 || response === null ) {
-							msg.className = 'nino-admin-field-image-msg is-error';
-							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/remove' );
+							parts.file.error( Nino.adminUi.api.errorText( status, response, '/_admin/images/error/remove' ) );
 							return;
 						}
 
 						Nino.admin.touch( 'slots' );
 
 						slot.url = null;
-						preview.hidden = true;
-						removeBtn.hidden = true;
-						msg.textContent = Nino.content.getText('/_admin/images/msg/removed');
+						parts.preview.hidden = true;
+						parts.remove.hidden = true;
+						parts.warning.hidden = true;
+						Nino.adminUi.say( Nino.content.getText('/_admin/images/msg/removed') );
 					} );
 				},
 			} );
@@ -825,43 +855,43 @@
 
 		/**
 		 *	Upload a new image for one slot, immediately - the server commits
-		 *	it straight away and deletes the previous file
+		 *	it straight away and deletes the previous file. A file the server
+		 *	cannot take is refused here, with the reason, before it is sent;
+		 *	what the server refuses is said at the field. The field is emptied
+		 *	again once the answer is in: what it holds is the slot's image, which
+		 *	the preview shows
 		 *
 		 *	@param		{Object}	slot
 		 *	@param		{File}		file
-		 *	@param		{Element}	preview					<img> preview element
-		 *	@param		{Element}	msg							Status message element
-		 *	@param		{Element}	fileInput				The <input type=file> itself, disabled while pending
-		 *	@param		{Element}	removeBtn				The Remove button, shown once there is an image
+		 *	@param		{Object}	parts						The slot's parts: { file, preview, remove, warning, fieldset }
 		 *
 		 *	@return		void
 		 */
-		_uploadImage : function( slot, file, preview, msg, fileInput, removeBtn ) {
+		_uploadImage : function( slot, file, parts ) {
 
-			fileInput.disabled = true;
-			msg.className = 'nino-admin-field-image-msg';
-			msg.textContent = Nino.content.getText('/_admin/images/msg/pending');
+			parts.file.button.disabled = true;
+			parts.fieldset.setAttribute( 'aria-busy', 'true' );
 
-			// A file the server cannot take is refused here, with the reason,
-			// instead of after the upload
+			const finish = function() {
+				parts.file.button.disabled = false;
+				parts.fieldset.removeAttribute('aria-busy');
+				parts.file.clear();
+			};
+
 			Nino.adminUi.checkImage( file, function( rejection ) {
 
 				if( rejection !== null ) {
-					fileInput.disabled = false;
-					fileInput.value = '';
-					msg.className = 'nino-admin-field-image-msg is-error';
-					msg.textContent = Nino.adminUi.api.errorText( 400, rejection );
+					finish();
+					parts.file.error( Nino.adminUi.api.errorText( 400, rejection ) );
 					return;
 				}
 
 				Nino.admin.images._apiCall( 'upload', { uri : slot.uri }, function( status, response ) {
 
-					fileInput.disabled = false;
-					fileInput.value = '';
+					finish();
 
 					if( status !== 200 || response === null ) {
-						msg.className = 'nino-admin-field-image-msg is-error';
-						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/save' );
+						parts.file.error( Nino.adminUi.api.errorText( status, response, '/_admin/images/error/save' ) );
 						return;
 					}
 
@@ -876,20 +906,18 @@
 					// preview still showed the old picture until a hard reload.
 					// The stamp is on the <img> only; the url the panel keeps and
 					// the page later renders stays the clean one
-					preview.src = response.url + ( response.url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
-					preview.hidden = false;
-					removeBtn.hidden = false;
+					parts.preview.src = response.url + ( response.url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
+					parts.preview.hidden = false;
+					parts.remove.hidden = false;
 
 					// Saved either way - but a picture below the target size was
-					// scaled up, and that is said where it can be seen: in words
+					// scaled up, and that stays said where it can be seen: in words
 					// as well as in colour
-					if( response.belowTarget === true && response.source ) {
-						msg.className = 'nino-admin-field-image-msg is-warning';
-						msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/images/msg/below-target'), response.source.width+ ' × '+ response.source.height+ ' px' );
-						return;
-					}
+					parts.warning.hidden = ! ( response.belowTarget === true && response.source );
 
-					msg.textContent = '';
+					if( parts.warning.hidden === false )
+						parts.warning.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/images/msg/below-target'), response.source.width+ ' × '+ response.source.height+ ' px' );
+
 					Nino.adminUi.say( Nino.content.getText('/_admin/images/msg/saved') );
 				}, { file : file } );
 			} );

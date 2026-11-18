@@ -59,7 +59,10 @@ namespace Nino\Modules\Images {
 		}
 
 		public static function assets(): array {
-			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+			return [
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
+			];
 		}
 
 		// The module's own words, one <locale>.php per interface language -
@@ -215,8 +218,8 @@ namespace Nino\Modules\Images {
 		/**
 		 *	Save the alt texts of one slot - { uri, alt : { <locale> : text } }.
 		 *	Merged per posted language, an empty text removes that language's
-		 *	entry (see \Nino\Images::setSlotAlt()), so the panel posts every
-		 *	input it shows. An alt text is one short line: more than 250
+		 *	entry (see \Nino\Images::setSlotAlt()), so the panel posts the one
+		 *	language it saves, when its field is left. An alt text is one short line: more than 250
 		 *	characters once it is cleaned, a language the site does not have,
 		 *	a value that is not a string and bytes that are not UTF-8 are all
 		 *	a 400 and change nothing. Answers the slot's stored map

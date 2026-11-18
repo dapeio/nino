@@ -315,7 +315,7 @@ console.log( 'Back links and rows' );
 {
 	// Every back link of a drill-down panel is a step Back returns to - the browser's own
 	// Back then has something to return to, and the level it leaves is the one the link leaves
-	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Text/assets/admin.js' ].forEach( function( file ) {
+	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Text/assets/admin.js' ].forEach( function( file ) {
 
 		const script = source( file );
 		const links = script.split( 'backLink.addEventListener(' ).slice( 1 );
@@ -325,10 +325,10 @@ console.log( 'Back links and rows' );
 	} );
 
 	// The panels whose way back is the context bar's: the click that leaves a form goes through the router as well
-	[ '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js' ].forEach( function( file ) {
+	[ '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Images/assets/slots.js' ].forEach( function( file ) {
 
 		const script = source( file );
-		const links = script.split( 'back : { to : wrap, onClick : function() {' ).slice( 1 );
+		const links = script.split( /back\s*:\s*\{ to : [^\n]*onClick : function\(\) \{/ ).slice( 1 );
 
 		check( file+ ': every back link adds an entry before it shows the level above', links.length > 0 && links.every( function( link ) { return /Nino\.admin\.router\.go\(/.test( link.slice( 0, 200 ) ) } ) );
 		check( file+ ': a level opened from a list is pushed, never replaced, and the state syncs are not', script.split( 'router.go(' ).length > 2 );

@@ -1320,10 +1320,16 @@ first - it maps what php says about a file that did not arrive to a status, a
 code and the limit - and `\Nino\Images::reject( $bytes )` for what is wrong
 with the picture (`image_too_large`, `image_type`, `image_too_many_pixels`).
 The browser knows the limits too (`\Nino\Images::limits()` writes them onto the
-shell as `data-upload-bytes` and `data-upload-pixels`): put
-`Nino.adminUi.uploadHint()` under the file input, and send the file through
+shell as `data-upload-bytes` and `data-upload-pixels`): where a file field is the
+block's (`Nino.adminUi.fileField()`) the text of `Nino.adminUi.uploadHint()` is
+its `note` and `Nino.adminUi.limits().bytes` its `maxBytes`, so that the limit
+stays in view and a file over it is refused at the field; send the file through
 `Nino.adminUi.checkImage( file, done )` first, which refuses one that cannot
-work in the server's own words without sending it.
+work in the server's own words without sending it, and say what the server
+refuses at the field with `error( text )` of the block. An upload that is the
+whole action of its view is stored at once and said by a toast (the guide's
+third model), and the block is emptied again, since the picture it holds is the
+one the view shows.
 
 A question before an action is `Nino.adminUi.confirm( level, { title, message,
 yes, no, kind, typed, visitors, opener, onChoose } )`, never `window.confirm()`: the project is in

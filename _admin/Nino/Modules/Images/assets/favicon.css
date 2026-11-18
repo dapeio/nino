@@ -1,62 +1,111 @@
-/*	Favicon tab of the Images panel: the set as a row of pictures at their own size, each with its caption */
+@layer nino.system, nino.tool, nino.local;
 
-:where(.nino-admin) .admin-favicon-preview {
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Images			The Favicon tab
+ *	favicon.css							What the Favicon tab needs beyond the design system in
+ *													_admin/assets/style.css: the set as a row of pictures at
+ *													their own size, each with its caption, and the colour block
+ *													in the columns of the other fields of the form. Bundled
+ *													while the module is there (see the tab's assets()), so the
+ *													same layer rules apply - the shell's stylesheet fixes the
+ *													layer order, this one only ever adds to nino.tool, scoped
+ *													to the tab's own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+#favicon-set .admin-favicon-preview {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-end;
-	gap: 1rem 1.5rem;
-	margin: .5rem 0 0;
+	gap: var(--nino-admin-space-6) var(--nino-admin-space-8);
+	margin: var(--nino-admin-space-3) 0 0;
 	padding: 0;
 	list-style: none;
 }
 
-:where(.nino-admin) .admin-favicon-item {
+#favicon-set .admin-favicon-item {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: .375rem;
+	gap: var(--nino-admin-space-2);
 	max-width: 100%;
 }
 
-:where(.nino-admin) .admin-favicon-image {
+#favicon-set .admin-favicon-image {
 	display: block;
 	max-width: 100%;
 	height: auto;
 	/* A transparent icon is seen on a ground that shows it is transparent */
 	background: repeating-conic-gradient(color-mix(in srgb, currentColor 12%, transparent) 0 25%, transparent 0 50%) 0 0 / 12px 12px;
-	border-radius: 2px;
+	border-radius: var(--editor-radius-sm);
 }
 
-:where(.nino-admin) .admin-favicon-caption,
-:where(.nino-admin) .admin-favicon-missing {
-	font-size: .8125rem;
+#favicon-set .admin-favicon-caption,
+#favicon-set .admin-favicon-missing {
+	font-size: var(--nino-admin-text-xs);
 	color: var(--editor-text-secondary);
 }
 
-:where(.nino-admin) .admin-favicon-item .admin-favicon-missing {
+#favicon-set .admin-favicon-item .admin-favicon-missing {
 	min-width: 4rem;
-	padding: .5rem;
+	padding: var(--nino-admin-space-3);
 	border: 1px dashed var(--editor-border);
-	border-radius: 4px;
+	border-radius: var(--editor-radius-sm);
 	text-align: center;
 }
 
-:where(.nino-admin) #favicon-set .nino-admin-field > small {
-	display: block;
-	margin-top: .22rem;
-	color: var(--editor-text-secondary);
-	font-size: max( .72rem, 12px );
-	line-height: 1.45;
+/* The date of the set is a line at the height of the name beside it */
+#favicon-set .nino-admin-field > p {
+	margin: 0;
 }
 
-:where(.nino-admin) .admin-favicon-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: .5rem;
-	margin-top: 1rem;
+/* The colour block draws its name above the field. In a form that is wide enough the name stands at the left like the name of every
+   field (the columns of fieldset > .nino-admin-field in style.css), so the block's label gives its parts to the block's own grid:
+   the name, the code, the picker and the surface in one row, and the sentence of an error and the contrast under the code */
+@media (min-width: 48rem) {
+
+	#favicon-set .nino-admin-color {
+		grid-template-columns: minmax(9rem, 22%) minmax(0, 1fr) auto auto;
+		gap: 0 var(--nino-admin-space-5);
+		align-items: start;
+		margin: 0;
+		padding: var(--nino-admin-space-3) 0;
+		border-top: 1px solid var(--editor-separator);
+	}
+
+	#favicon-set .nino-admin-color > .nino-admin-field {
+		display: contents;
+	}
+
+	#favicon-set .nino-admin-color > .nino-admin-field > span {
+		grid-column: 1;
+		grid-row: 1;
+		margin: var(--nino-admin-space-1) 0 0;
+	}
+
+	#favicon-set .nino-admin-color-hex {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	#favicon-set .nino-admin-color-picker {
+		grid-column: 3;
+	}
+
+	#favicon-set .nino-admin-color-swatch {
+		grid-column: 4;
+	}
+
+	#favicon-set .nino-admin-color > .nino-admin-field-error,
+	#favicon-set .nino-admin-color-contrast {
+		grid-column: 2 / -1;
+	}
 }
 
-:where(.nino-admin) .admin-favicon-actions[hidden],
-:where(.nino-admin) .admin-favicon-actions > [hidden] {
-	display: none;
 }

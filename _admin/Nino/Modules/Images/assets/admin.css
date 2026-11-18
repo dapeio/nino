@@ -1,0 +1,46 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Images			The picture of every image slot
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the picture of a slot
+ *													and the button that takes it away, one under the other, and
+ *													the lines a slot shows and does not take. Bundled while the
+ *													module is there (see the panel's assets()), so the same layer
+ *													rules apply - the shell's stylesheet fixes the layer order,
+ *													this one only ever adds to nino.tool, scoped to the panel's
+ *													own ids.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/* The picture of a slot and Remove, one under the other at the left of their column */
+#images-form .images-slot-image {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--nino-admin-space-3);
+}
+
+/* A slot that has no picture has nothing to put here: neither a gap nor a row */
+#images-form .images-slot-image:not(:has(> :not([hidden]))) {
+	display: none;
+}
+
+/* What a slot shows and does not take - its size, the pages, the call - is a line at the height of the name beside it */
+#images-form .images-slot > .nino-admin-field > p,
+#slots-form .slots-scan-row > .nino-admin-field > p {
+	margin: 0;
+}
+
+/* The legend of a finding of the scan is the path a template writes: its case is its meaning, and capitals would change it */
+#slots-form .slots-scan-row > legend {
+	text-transform: none;
+}
+
+}
