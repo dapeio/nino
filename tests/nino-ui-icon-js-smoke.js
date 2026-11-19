@@ -43,6 +43,9 @@ const adminUi = sandbox.Nino.adminUi;
 // The names that the guide and the plan ask for
 const NAMES = [ 'trash-2', 'copy', 'arrow-up', 'arrow-down', 'plus', 'x', 'code', 'brackets', 'repeat', 'database', 'settings-2', 'sliders-horizontal', 'undo-2', 'redo-2', 'refresh-cw', 'search', 'chevron-left', 'chevron-right', 'chevron-down', 'external-link', 'pencil', 'check', 'triangle-alert', 'eye', 'eye-off', 'panels-top-left', 'panel-top', 'list' ];
 
+// The ones the Builder drew itself: the devices, the alignments of a text, of columns and of rows, the direction
+const BUILDER = [ 'smartphone', 'tablet', 'monitor', 'align-left', 'align-center', 'align-right', 'align-justify', 'align-start-horizontal', 'align-center-horizontal', 'align-end-horizontal', 'stretch-horizontal', 'stretch-vertical', 'align-start-vertical', 'align-center-vertical', 'align-end-vertical', 'align-horizontal-space-between', 'arrow-left', 'arrow-right', 'arrow-left-right' ];
+
 // The ones the components of the catalogue name: a component whose icon the table lacks draws the neutral square
 const CATALOGUE = [ 'square-split-horizontal', 'timer', 'play', 'text-cursor-input', 'images', 'clock', 'sun-moon', 'mail', 'newspaper', 'share-2', 'move-horizontal', 'contact', 'hand', 'cookie', 'gauge' ];
 
@@ -92,6 +95,7 @@ const drawn = NAMES.concat( CATALOGUE ).every( function( name ) {
 } );
 
 check( 'every icon that the guide names and every icon the catalogue names has a drawing', drawn === true );
+check( 'the icons the Builder drew itself - devices, alignments, direction - are in the table, each with a drawing', BUILDER.every( function( name ) { return adminUi.icon( name ).children.length > 0 } ) === true );
 check( 'the drawing of a known name raised no warning', warnings.length === asked );
 
 // --- button() ---------------------------------------------------------------

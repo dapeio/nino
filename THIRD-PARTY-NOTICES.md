@@ -13,7 +13,7 @@ every copy of the icons, and this file is where it does.
 | --- | --- |
 | `_admin/templates/page-*.tpl`, `_admin/install/templates/page-*.tpl` | the Nino mark (`box`), the workbench's toggles, the wizard's step and progress icons |
 | `_admin/Nino/Modules/*/Admin/Admin.php`, `_nino/Nino/Modules/*/Admin/Admin.php` | one per panel, the one its entry in the workbench menu shows |
-| `_admin/assets/Nino.admin.js` | the table behind `Nino.adminUi.icon()`: the geometry of 60 icons of Lucide 0.577.0 that the buttons, the trees and the components of the workbench's scripts show |
+| `_admin/assets/Nino.admin.js` | the table behind `Nino.adminUi.icon()`: the geometry of 79 icons of Lucide 0.577.0 that the buttons, the trees and the components of the workbench's scripts show |
 
 Most of them keep Lucide's own class names - `lucide lucide-<name>` - in
 their markup, which is how to find them.
@@ -21,7 +21,7 @@ their markup, which is how to find them.
 ## Lucide
 
 The icons of the table are transcribed as the parts inside the `<svg>` of each Lucide 0.577.0
-file and kept as data that a script draws, not as markup. Of these, `arrow-down`, `arrow-up`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `clock`, `code`, `columns-3`, `database`, `ellipsis`, `external-link`, `lock`, `plus`, `search`, `square`, `trash-2` and `x` are among the
+file and kept as data that a script draws, not as markup. Of these, `arrow-down`, `arrow-left`, `arrow-right`, `arrow-up`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `clock`, `code`, `columns-3`, `database`, `ellipsis`, `external-link`, `lock`, `monitor`, `plus`, `search`, `smartphone`, `square`, `tablet`, `trash-2` and `x` are among the
 icons derived from Feather that are listed below (`circle-help`, `ellipsis` and `columns-3` under the names `help-circle`, `more-horizontal` and `columns`).
 
 ISC License

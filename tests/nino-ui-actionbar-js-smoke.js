@@ -234,6 +234,12 @@ console.log( '\nNino.adminUi.contextBar - the way back\n' );
 	const lead = findAll( surface, el => classes( el ).includes('nino-admin-contextbar-lead') )[0];
 
 	check( 'the option panel puts the name of the panel small over the way back, and marks the bar for the stylesheet', small !== undefined && small.textContent === 'Themes' && lead.children[0] === small && lead.children[1].tagName === 'A' && surface.dataset.panel === 'Themes' );
+	const unlabelled = adminUi.contextBar( { panel : 'Themes', panelLabel : false, title : 'Brand', back : { to : 'Themes' } } );
+
+	check( 'panelLabel false draws no name of the panel - not hidden, not there - and the bar is still marked, so that the head of the pane gives way',
+		findAll( unlabelled, el => classes( el ).includes('nino-admin-contextbar-panel') ).length === 0 && unlabelled.dataset.panel === 'Themes' && findAll( unlabelled, el => el.textContent === 'Themes' ).length === 0 );
+	check( '...the way back and the title are what they are', findAll( unlabelled, el => classes( el ).includes('nino-admin-contextbar-lead') )[0].children.length === 1 && findAll( unlabelled, el => el.tagName === 'H3' )[0].textContent === 'Brand' );
+
 	const name = surface.children[1];
 
 	check( '...then the title of the view as a heading in the group of the name, and the tools at the right', classes( name ).includes('nino-admin-contextbar-name') === true && name.children[0].tagName === 'H3' && name.children[0].textContent === 'Brand'
@@ -325,9 +331,13 @@ console.log( '\nNino.adminUi.contextBar - the name of a surface and its tools\n'
 		at !== -1 && /contextbar-tools-toggle\s*\{\s*display:\s*inline-flex/.test( narrow ) && /contextbar-tools\s*\{[^}]*position:\s*absolute[^}]*display:\s*none/.test( narrow ) && /\[data-tools="open"\][^{]*contextbar-tools\s*\{\s*display:\s*flex/.test( narrow ) );
 }
 
+// The bar that counts is one on the screen: it is in a child of the pane that is not hidden and has no hidden ancestor of its own (a leaf of a split view, a level left behind), so that a hidden level's bar does not keep the head away
+const live = '\\[data-panel\\]:has\\(> :not\\(\\.admin-hidden\\):not\\(\\[hidden\\]\\) \\.nino-admin-contextbar\\[data-panel\\]:not\\(:is\\(\\.admin-hidden, \\[hidden\\]\\) \\*\\)\\) > \\.admin-panel-head';
+
 check( 'where a bar has the name of the panel the head of the pane gives way: out of the page and out of the tab order, its heading left for a screen reader',
-	/\[data-panel\]:has\(> :not\(\.admin-hidden\):not\(\[hidden\]\) \.nino-admin-contextbar\[data-panel\]\) > \.admin-panel-head \{[^}]*clip-path: inset\(50%\)/.test( stylesheet ) === true
-	&& /\[data-panel\]:has\(> :not\(\.admin-hidden\):not\(\[hidden\]\) \.nino-admin-contextbar\[data-panel\]\) > \.admin-panel-head > :not\(\.admin-panel-title\) \{\s*display: none/.test( stylesheet ) === true );
+	new RegExp( live+ ' \\{[^}]*clip-path: inset\\(50%\\)' ).test( stylesheet ) === true
+	&& new RegExp( live+ ' > :not\\(\\.admin-panel-title\\) \\{\\s*display: none' ).test( stylesheet ) === true );
+check( '...and a bar in a hidden level - hidden, or inside one that is - is not one of them: the head is there with the list again', stylesheet.split( ':not(:is(.admin-hidden, [hidden]) *)' ).length === 3 );
 
 {
 	const back = element('a');
@@ -366,6 +376,7 @@ check( 'where a bar has the name of the panel the head of the pane gives way: ou
 	check( 'with the name of the panel the "?" of the head goes into the bar, as an icon button at its right end - the same trigger and the same name',
 		help !== undefined && help.dataset.manual === 'themes' && help.getAttribute('aria-label') === 'Manual' && bar.children[bar.children.length - 1] === help && findAll( help, el => el.tagName === 'SVG' ).length === 1 );
 	check( '...and without the name of the panel there is none', findAll( adminUi.contextBar( { back : { to : form } } ), el => el.tagName === 'BUTTON' ).length === 0 );
+	check( '...and with panelLabel false the "?" is still in the bar', findAll( adminUi.contextBar( { panel : 'Themes', panelLabel : false, back : { to : form } } ), el => el.tagName === 'BUTTON' && el.dataset.manual === 'themes' ).length === 1 );
 
 	form.appendChild( bar );
 	form.classList.remove('admin-hidden');

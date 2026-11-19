@@ -97,7 +97,21 @@
 	// the scripts of the workbench take an icon from; the rail's and the panels' own icons are markup of the
 	// pages, and a table in a script is the cheapest way to have the same drawings without a request or a build
 	const ICONS = {
+		'align-center' : [ 'M21 5H3', 'M17 12H7', 'M19 19H5' ],
+		'align-center-horizontal' : [ 'M2 12h20', 'M10 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4', 'M10 8V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v4', 'M20 16v1a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-1', 'M14 8V7c0-1.1.9-2 2-2h2a2 2 0 0 1 2 2v1' ],
+		'align-center-vertical' : [ 'M12 2v20', 'M8 10H4a2 2 0 0 1-2-2V6c0-1.1.9-2 2-2h4', 'M16 10h4a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-4', 'M8 20H7a2 2 0 0 1-2-2v-2c0-1.1.9-2 2-2h1', 'M16 14h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1' ],
+		'align-end-horizontal' : [ [ 'rect', { width : '6', height : '16', x : '4', y : '2', rx : '2' } ], [ 'rect', { width : '6', height : '9', x : '14', y : '9', rx : '2' } ], 'M22 22H2' ],
+		'align-end-vertical' : [ [ 'rect', { width : '16', height : '6', x : '2', y : '4', rx : '2' } ], [ 'rect', { width : '9', height : '6', x : '9', y : '14', rx : '2' } ], 'M22 22V2' ],
+		'align-horizontal-space-between' : [ [ 'rect', { width : '6', height : '14', x : '3', y : '5', rx : '2' } ], [ 'rect', { width : '6', height : '10', x : '15', y : '7', rx : '2' } ], 'M3 2v20', 'M21 2v20' ],
+		'align-justify' : [ 'M3 5h18', 'M3 12h18', 'M3 19h18' ],
+		'align-left' : [ 'M21 5H3', 'M15 12H3', 'M17 19H3' ],
+		'align-right' : [ 'M21 5H3', 'M21 12H9', 'M21 19H7' ],
+		'align-start-horizontal' : [ [ 'rect', { width : '6', height : '16', x : '4', y : '6', rx : '2' } ], [ 'rect', { width : '6', height : '9', x : '14', y : '6', rx : '2' } ], 'M22 2H2' ],
+		'align-start-vertical' : [ [ 'rect', { width : '9', height : '6', x : '6', y : '14', rx : '2' } ], [ 'rect', { width : '16', height : '6', x : '6', y : '4', rx : '2' } ], 'M2 2v20' ],
 		'arrow-down' : [ 'M12 5v14', 'm19 12-7 7-7-7' ],
+		'arrow-left' : [ 'm12 19-7-7 7-7', 'M19 12H5' ],
+		'arrow-left-right' : [ 'M8 3 4 7l4 4', 'M4 7h16', 'm16 21 4-4-4-4', 'M20 17H4' ],
+		'arrow-right' : [ 'M5 12h14', 'm12 5 7 7-7 7' ],
 		'arrow-up' : [ 'm5 12 7-7 7 7', 'M12 19V5' ],
 		brackets : [ 'M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3', 'M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3' ],
 		check : [ 'M20 6 9 17l-5-5' ],
@@ -128,6 +142,7 @@
 		lock : [ [ 'rect', { width : '18', height : '11', x : '3', y : '11', rx : '2', ry : '2' } ], 'M7 11V7a5 5 0 0 1 10 0v4' ],
 		mail : [ 'm22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7', [ 'rect', { x : '2', y : '4', width : '20', height : '16', rx : '2' } ] ],
 		menu : [ 'M4 5h16', 'M4 12h16', 'M4 19h16' ],
+		monitor : [ [ 'rect', { width : '20', height : '14', x : '2', y : '3', rx : '2' } ], 'M8 21h8', 'M12 17v4' ],
 		'mouse-pointer-click' : [ 'M14 4.1 12 6', 'm5.1 8-2.9-.8', 'm6 12-1.9 2', 'M7.2 2.2 8 5.1', 'M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z' ],
 		'move-horizontal' : [ 'm18 8 4 4-4 4', 'M2 12h20', 'm6 8-4 4 4 4' ],
 		newspaper : [ 'M15 18h-5', 'M18 14h-8', 'M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2', [ 'rect', { width : '8', height : '4', x : '10', y : '6', rx : '1' } ] ],
@@ -146,10 +161,14 @@
 		'settings-2' : [ 'M14 17H5', 'M19 7h-9', [ 'circle', { cx : '17', cy : '17', r : '3' } ], [ 'circle', { cx : '7', cy : '7', r : '3' } ] ],
 		'share-2' : [ [ 'circle', { cx : '18', cy : '5', r : '3' } ], [ 'circle', { cx : '6', cy : '12', r : '3' } ], [ 'circle', { cx : '18', cy : '19', r : '3' } ], [ 'line', { x1 : '8.59', x2 : '15.42', y1 : '13.51', y2 : '17.49' } ], [ 'line', { x1 : '15.41', x2 : '8.59', y1 : '6.51', y2 : '10.49' } ] ],
 		'sliders-horizontal' : [ 'M10 5H3', 'M12 19H3', 'M14 3v4', 'M16 17v4', 'M21 12h-9', 'M21 19h-5', 'M21 5h-7', 'M8 10v4', 'M8 12H3' ],
+		smartphone : [ [ 'rect', { width : '14', height : '20', x : '5', y : '2', rx : '2', ry : '2' } ], 'M12 18h.01' ],
 		square : [ [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ] ],
 		'square-split-horizontal' : [ 'M8 19H5c-1 0-2-1-2-2V7c0-1 1-2 2-2h3', 'M16 5h3c1 0 2 1 2 2v10c0 1-1 2-2 2h-3', [ 'line', { x1 : '12', x2 : '12', y1 : '4', y2 : '20' } ] ],
+		'stretch-horizontal' : [ [ 'rect', { width : '20', height : '6', x : '2', y : '4', rx : '2' } ], [ 'rect', { width : '20', height : '6', x : '2', y : '14', rx : '2' } ] ],
+		'stretch-vertical' : [ [ 'rect', { width : '6', height : '20', x : '4', y : '2', rx : '2' } ], [ 'rect', { width : '6', height : '20', x : '14', y : '2', rx : '2' } ] ],
 		'sun-moon' : [ 'M12 2v2', 'M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715', 'M16 12a4 4 0 0 0-4-4', 'm19 5-1.256 1.256', 'M20 12h2' ],
 		table : [ 'M12 3v18', [ 'rect', { width : '18', height : '18', x : '3', y : '3', rx : '2' } ], 'M3 9h18', 'M3 15h18' ],
+		tablet : [ [ 'rect', { width : '16', height : '20', x : '4', y : '2', rx : '2', ry : '2' } ], 'M12 18h.01' ],
 		text : [ 'M21 5H3', 'M15 12H3', 'M17 19H3' ],
 		'text-cursor-input' : [ 'M12 20h-1a2 2 0 0 1-2-2 2 2 0 0 1-2 2H6', 'M13 8h7a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-7', 'M5 16H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h1', 'M6 4h1a2 2 0 0 1 2 2 2 2 0 0 1 2-2h1', 'M9 6v12' ],
 		timer : [ [ 'line', { x1 : '10', x2 : '14', y1 : '2', y2 : '2' } ], [ 'line', { x1 : '12', x2 : '15', y1 : '14', y2 : '11' } ], [ 'circle', { cx : '12', cy : '14', r : '8' } ] ],
@@ -208,6 +227,9 @@
 		 *	            the pane (.admin-panel-head) gives way while the level with this bar is on the screen - its heading stays for
 		 *	            a screen reader - and the "?" of its manual is an icon button at the right end of the bar, the same
 		 *	            trigger (data-manual) with the same name
+		 *	  - panelLabel  false leaves the name of the panel out of the bar - it is not drawn, not even hidden - where the view says it
+		 *	            by other means (a title that is the name); the head of the pane still gives way and the "?" still stands in the
+		 *	            bar, for panel is what says both. Default true
 		 *	  - within  an element of the pane, where the head is looked for when back.to is a name
 		 *
 		 *	@param		{Element|Object}	[backLink]			The link out of the level, or the options
@@ -233,7 +255,9 @@
 
 				if( typeof options.panel === 'string' && options.panel !== '' ) {
 					bar.dataset.panel = options.panel;
-					lead.appendChild( Nino.adminUi.el( 'span', 'nino-admin-contextbar-panel', options.panel ) );
+
+					if( options.panelLabel !== false )
+						lead.appendChild( Nino.adminUi.el( 'span', 'nino-admin-contextbar-panel', options.panel ) );
 				}
 
 				if( options.back !== undefined && options.back !== null ) {
@@ -1744,6 +1768,7 @@
 		 *	@param		{boolean}		[options.nested]			The dialog asks something of an open dialog and stands on it
 		 *	@param		{string}		[options.escape]			The value of the choice that Escape is, where it is not the first 'secondary' one
 		 *	@param		{string}		[options.describedBy]	The ids that describe a dialog that holds `content`
+		 *	@param		{boolean}		[options.dismiss]			A press that starts and ends on the darkened surface behind a modal dialog closes it as its secondary answer does - the guard asked, the focus back where it was. A press that starts inside the dialog and is let go outside it (a selection dragged out of a field) does not, nor does one on a dialog that is not the top one. Default false: a question is closed by an answer
 		 *	@param		{boolean}		[options.modeless]		Not modal: no backdrop, no trap for the focus, the page behind stays in use; Escape closes it where the focus is in it or nobody else is asking. The workbench root carries nino-admin-has-sheet while it is open
 		 *	@param		{boolean}		[options.refuseWithoutDialog]	Where the browser has no <dialog>, the answer is the secondary one without asking (a word that has to be typed cannot be answered by OK)
 		 *	@param		{Array}			options.choices				[ { value, label, kind } ], kind 'primary', 'danger' or 'secondary'
@@ -1905,6 +1930,27 @@
 					event.preventDefault();
 					handle.close( cancel.value, true );
 				} );
+
+			// The surface behind a modal dialog is the dialog's own box as far as an event can tell: a press on it has the dialog itself as its
+			// target (the dialog is all body, no padding), a press inside has an element of it. Both ends of the press are asked for, because
+			// a drag that starts in a field and is let go beside the dialog ends as a click on the dialog
+			if( options.dismiss === true && modeless === false ) {
+
+				let pressed = false;
+
+				dialog.addEventListener( 'pointerdown', function( event ) {
+					pressed = event.target === dialog;
+				} );
+
+				dialog.addEventListener( 'pointerup', function( event ) {
+
+					const surface = pressed === true && event.target === dialog;
+					pressed = false;
+
+					if( surface === true && Nino.adminUi._choiceStack[Nino.adminUi._choiceStack.length - 1] === dialog )
+						handle.close( cancel.value, true );
+				} );
+			}
 
 			dialog.addEventListener( 'cancel', function( event ) {
 				if( typeof options.guard === 'function' && options.guard( cancel.value, handle ) === false )
@@ -2432,7 +2478,9 @@
 		 *	says yes. While the request is out the dialog does not close and does
 		 *	not send twice. Cancel, Escape and the dialog's own close ask once
 		 *	whether to throw away what was typed - and only when something was
-		 *	changed; an unchanged form closes without a word.
+		 *	changed; an unchanged form closes without a word. It takes no
+		 *	`dismiss` (see choiceDialog()): a press on the surface beside a form
+		 *	never closes it, whatever was typed
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.title					What is made of what, as a statement: "Duplicate theme"
@@ -6614,11 +6662,14 @@
 		 *	The strip does not own the value: it reports a choice made by hand
 		 *	through onChange and takes one from outside through set(), which
 		 *	reports nothing. A step may be disabled alone, the strip as a whole
-		 *	through disable(). Owns no strings, the word for the default apart
+		 *	through disable(). A step with an icon (a name of ICONS) shows the icon in
+		 *	the middle of the step in place of its word, which stays the step's name
+		 *	for a screen reader and its tooltip. Owns no strings, the word for the
+		 *	default apart
 		 *
 		 *	@param		{Object}		options					{ label, labelledby, steps, value, standard, disabled, id, wide, onChange }
 		 *														- label       the group's name for a screen reader; or labelledby, the id of what names it
-		 *														- steps       the steps, in order: a number or a string (a number is written -2, 0, +2), or { value, label, title, disabled }
+		 *														- steps       the steps, in order: a number or a string (a number is written -2, 0, +2), or { value, label, title, disabled, icon } - icon a name of ICONS, drawn in place of the label; the label is then the name of the step, and its tooltip where the step has no title
 		 *														- value       the chosen step's value; none is chosen where it matches no step
 		 *														- standard    the value of the step that is the default
 		 *														- disabled    the strip cannot be operated
@@ -6637,8 +6688,8 @@
 
 			const steps = options.steps.map( function( step ) {
 				return typeof step === 'object' && step !== null
-					? { value : step.value, label : step.label ?? written( step.value ), title : step.title, disabled : step.disabled === true }
-					: { value : step, label : written( step ), title : undefined, disabled : false };
+					? { value : step.value, label : step.label ?? written( step.value ), title : step.title, disabled : step.disabled === true, icon : typeof step.icon === 'string' && Object.hasOwn( ICONS, step.icon ) === true ? step.icon : '' }
+					: { value : step, label : written( step ), title : undefined, disabled : false, icon : '' };
 			} );
 
 			const group = dc.createElement('div');
@@ -6662,10 +6713,19 @@
 				button.type = 'button';
 				button.className = 'nino-admin-steps-step';
 				button.setAttribute( 'role', 'radio' );
-				button.appendChild( Nino.adminUi.el( 'span', '', step.label ) );
 
-				if( step.title )
-					button.title = step.title;
+				// A picture is the face of the step, centred in it; the word stays as its name for a screen reader and as its tooltip
+				if( step.icon !== '' ) {
+					const face = Nino.adminUi.el( 'span', 'nino-admin-steps-icon' );
+					face.appendChild( Nino.adminUi.icon( step.icon ) );
+					face.appendChild( Nino.adminUi.el( 'span', 'nino-admin-sr-only', step.label ) );
+					button.appendChild( face );
+				}
+				else
+					button.appendChild( Nino.adminUi.el( 'span', '', step.label ) );
+
+				if( step.title || step.icon !== '' )
+					button.title = step.title || step.label;
 
 				if( options.standard !== undefined && step.value === options.standard ) {
 					button.dataset.standard = 'true';

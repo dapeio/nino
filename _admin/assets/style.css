@@ -3340,10 +3340,14 @@ a {
 	container: nino-contextbar / inline-size;
 }
 
-/* The name of the view, what is quietly beside it and the icons for what is rarely needed: one group that takes the room the tools leave */
+/* The name of the view, what is quietly beside it and the icons for what is rarely needed: one group that takes the room the tools leave. It wraps rather than squeezes: the pill that
+   names the language of the content (131 px) beside a title, a code and icons does not fit in the 190 px a phone leaves after the way back, and what does not fit goes on a line under
+   the title - the title keeps its width, and one that is wider than the group is cut with an ellipsis on a line of its own. Measured at 390 px: the bar is as wide as the screen, 0 px over */
 .nino-admin .nino-admin-contextbar-name {
 	display: flex;
 	flex: 1 1 auto;
+	flex-wrap: wrap;
+	row-gap: var(--nino-admin-space-1);
 	align-items: center;
 	gap: var(--nino-admin-space-3);
 	min-width: 0;
@@ -3459,6 +3463,7 @@ a {
 .nino-admin .nino-admin-contextbar-title {
 	flex: 0 1 auto;
 	min-width: 0;
+	max-width: 100%;
 	margin: 0;
 	overflow: hidden;
 	font-size: var(--nino-admin-text-md);
@@ -4299,6 +4304,23 @@ a {
 	font-weight: var(--nino-admin-weight-strong);
 }
 
+/* A step with an icon: the picture is the face of the step, in the middle of it (the word beside it is for a screen reader, see steps()). The face is a block and the icon a
+   block in it, so that no line of the button's text sits above or under the icon: as an inline box it stood 3 px above the middle of a step of 33 px */
+:where(.nino-admin) .nino-admin-steps-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* The step's own right edge is a line of 1 px inside its box, which would take the middle of the icon half a pixel to the left of the middle of the step */
+:where(.nino-admin) .nino-admin-steps-step:not(:last-child) > .nino-admin-steps-icon {
+	margin-inline-end: -1px;
+}
+
+:where(.nino-admin) .nino-admin-steps-icon > .nino-admin-icon {
+	display: block;
+}
+
 :where(.nino-admin) .nino-admin-steps-step[data-standard="true"]::after {
 	content: "";
 	position: absolute;
@@ -4506,6 +4528,14 @@ a {
 	min-height: 0;
 	overflow-y: auto;
 	padding: var(--nino-admin-space-3) 0;
+}
+
+/* What the view points at from outside (is-lit) in the folded strip - the strip holds what the caller gives it, buttons of the components of an outline - is the accent in the same way as in the tree */
+:where(.nino-admin) .nino-admin-split-aside-rail .is-lit {
+	border-color: var(--editor-blue);
+	background: var(--editor-blue-soft);
+	box-shadow: inset 0 0 0 1px var(--editor-blue);
+	color: var(--editor-blue);
 }
 
 :where(.nino-admin) :is(.nino-admin-split-aside-body, .nino-admin-split-aside-rail)[hidden] {
@@ -4919,8 +4949,12 @@ a {
 	cursor: pointer;
 }
 
+/* What another view points at - the pointer over a block, the component a pencil is for - is marked in the row by the accent: a line of 2 px inside the row over the tint, so that it is seen at
+   a glance and is more than a shade of the ground (the line is the accent against the ground, 3 : 1 or more in both schemes). The chosen row has its hairline and the heavier name;
+   a row that is both keeps the chosen one's border and gains the line */
 :where(.nino-admin) .nino-admin-tree-row.is-lit {
-	background: color-mix(in srgb, var(--editor-blue) 7%, transparent);
+	background: color-mix(in srgb, var(--editor-blue) 18%, transparent);
+	box-shadow: inset 0 0 0 2px var(--editor-blue);
 }
 
 :where(.nino-admin) .nino-admin-tree-row.is-selected {
@@ -5096,7 +5130,7 @@ a {
 	padding-block: var(--nino-admin-space-1);
 	padding-inline-start: calc( var(--depth) * var(--nino-admin-tree-indent) + var(--nino-admin-tree-lead) );
 	padding-inline-end: var(--nino-admin-space-2);
-	color: var(--editor-text-secondary);
+	color: color-mix(in srgb, var(--editor-text-secondary) 80%, var(--editor-text));
 	font-size: var(--nino-admin-text-xs);
 	font-weight: var(--nino-admin-weight-normal);
 	line-height: 1.3;
@@ -5571,9 +5605,10 @@ a {
 }
 
 /*	Where the context bar of the level that is on the screen has the name of the panel (Nino.adminUi.contextBar( { panel } )) the
-	head of the pane gives way, and is there again with the level of the list: out of the page and out of the tab order, its heading left for a screen reader. Said here, in the layer of the head, for
-	the reason the bleed above is	*/
-#admin-content-wrap > [data-panel]:has(> :not(.admin-hidden):not([hidden]) .nino-admin-contextbar[data-panel]) > .admin-panel-head {
+	head of the pane gives way, and is there again with the level of the list: out of the page and out of the tab order, its heading left for a screen reader. A bar that stands in a level
+	that is hidden (a leaf of a split view, a level a drill-down has left) is not on the screen and does not count: the bar must have no hidden ancestor, however deep it stands in a
+	level that is itself on the screen. Said here, in the layer of the head, for the reason the bleed above is	*/
+#admin-content-wrap > [data-panel]:has(> :not(.admin-hidden):not([hidden]) .nino-admin-contextbar[data-panel]:not(:is(.admin-hidden, [hidden]) *)) > .admin-panel-head {
 	position: absolute;
 	width: 1px;
 	height: 1px;
@@ -5585,7 +5620,7 @@ a {
 	white-space: nowrap;
 }
 
-#admin-content-wrap > [data-panel]:has(> :not(.admin-hidden):not([hidden]) .nino-admin-contextbar[data-panel]) > .admin-panel-head > :not(.admin-panel-title) {
+#admin-content-wrap > [data-panel]:has(> :not(.admin-hidden):not([hidden]) .nino-admin-contextbar[data-panel]:not(:is(.admin-hidden, [hidden]) *)) > .admin-panel-head > :not(.admin-panel-title) {
 	display: none;
 }
 

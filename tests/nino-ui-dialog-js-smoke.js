@@ -651,6 +651,56 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 }
 
 
+// --- choiceDialog(): dismiss - a press on the surface behind a modal dialog ---------
+
+{
+	const w = world();
+	const answers = [];
+	const opener = element('button');
+	const open = ( extra ) => {
+		w.ui.choiceDialog( Object.assign( { message : 'x', opener : opener, choices : [ { value : 'cancel', label : 'Cancel', kind : 'secondary' }, { value : 'ok', label : 'Ok', kind : 'primary' } ], onChoose : function( value ) { answers.push( value ) } }, extra ) );
+		return last( w );
+	};
+	const surface = ( dialog, down, up ) => { fire( dialog, 'pointerdown', { target : down } ); fire( dialog, 'pointerup', { target : up } ) };
+
+	let dialog = open( {} );
+	surface( dialog, dialog, dialog );
+	check( 'without dismiss a press on the surface does nothing - a question is closed by an answer', dialog.open === true && answers.length === 0 );
+	dialog.close();
+	answers.length = 0;
+
+	dialog = open( { dismiss : true } );
+	const inside = buttons( dialog )[0];
+	surface( dialog, inside, dialog );
+	surface( dialog, dialog, inside );
+	check( 'with dismiss a press that starts or ends inside the dialog does not close it - a selection dragged out of a field', dialog.open === true && answers.length === 0 );
+
+	surface( dialog, dialog, dialog );
+	check( '...one that starts and ends on the surface closes it as its secondary answer, and the focus goes back to what had it', dialog.open === false && answers.join() === 'cancel' && opener.focused === true );
+
+	let kept = 0;
+	dialog = open( { dismiss : true, guard : function() { kept++; return false } } );
+	surface( dialog, dialog, dialog );
+	check( '...the guard is asked, and keeps the dialog open as it keeps it from the Cancel button', kept === 1 && dialog.open === true );
+	dialog.close();
+
+	const below = open( { dismiss : true } );
+	const above = open( { dismiss : true, nested : true } );
+	surface( below, below, below );
+	check( '...a dialog that is not the top one is not closed by it', below.open === true && above.open === true );
+	surface( above, above, above );
+	check( '...the top one is', above.open === false && below.open === true );
+	below.close();
+
+	const form = world();
+	form.ui.formDialog( { title : 'Make', fields : [ { key : 'name', label : 'Name', type : 'text', value : '' } ], submit : 'Make', cancel : 'Cancel', dismiss : true, onSubmit : function() {} } );
+	const made = last( form );
+	fire( made, 'pointerdown', { target : made } );
+	fire( made, 'pointerup', { target : made } );
+	check( 'formDialog() takes no dismiss: a press on the surface never closes a form', made.open === true );
+}
+
+
 // --- choiceDialog(): the Tab key stays in a modal ----------------------------------
 
 {

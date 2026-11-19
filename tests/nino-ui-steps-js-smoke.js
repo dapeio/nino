@@ -158,6 +158,21 @@ check( '...and is not the end', partly.get() === 2 );
 fire( partlySteps[2], 'click' );
 check( '...and cannot be pressed', partly.get() === 2 );
 
+// --- a step with an icon -------------------------------------------------------------------
+
+{
+	const pictured = adminUi.steps( { label : 'Width', steps : [ { value : 'm', label : 'Mobile', icon : 'smartphone' }, { value : 'd', label : 'Desktop', icon : 'monitor', title : 'Wide' }, { value : 'x', label : 'Plain' }, { value : 'y', label : 'Stray', icon : 'no-such-icon' } ], value : 'm' } );
+	const faces = radios( pictured );
+	const svgs = button => findAll( button, function( el ) { return el.tagName === 'SVG' } );
+	const quiet = button => findAll( button, function( el ) { return String( el.className ).split(' ').includes('nino-admin-sr-only') } );
+
+	check( 'a step with an icon shows the icon in a face of its own, and its word stays for a screen reader',
+		svgs( faces[0] ).length === 1 && findAll( faces[0], function( el ) { return String( el.className ) === 'nino-admin-steps-icon' } ).length === 1 && quiet( faces[0] ).length === 1 && quiet( faces[0] )[0].textContent === 'Mobile' && faces[0].title === 'Mobile' );
+	check( '...the title of the step stays its tooltip where it has one', faces[1].title === 'Wide' && quiet( faces[1] )[0].textContent === 'Desktop' );
+	check( '...a step without an icon, and one whose icon the table does not have, is drawn with its word as every step is', [ faces[2], faces[3] ].every( function( button ) { return svgs( button ).length === 0 && quiet( button ).length === 0 && button.children[0].textContent === ( button === faces[2] ? 'Plain' : 'Stray' ) && button.title === undefined || button.title === '' } ) );
+	check( '...and a picture does not change what a step is: radios, one chosen, the same keys', faces.every( function( button ) { return button.getAttribute('role') === 'radio' } ) && checked( pictured ) === 'true,false,false,false' && ( key( faces[0], 'ArrowRight' ), pictured.get() === 'd' ) );
+}
+
 // --- what is put in ------------------------------------------------------------------------------
 
 const hostile = '<img src=x onerror=alert(1)>';

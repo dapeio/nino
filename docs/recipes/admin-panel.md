@@ -1047,7 +1047,7 @@ when `small`) with the focus ring of every button, and `danger` gives it the col
 const up = Nino.adminUi.iconButton( 'arrow-up', Nino.content.getText('/_admin/catalog/label/up'), function() { move( index, -1 ) }, { disabled : index === 0 } );
 ```
 
-The names of the set are `arrow-down`, `arrow-up`, `brackets`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `clock`, `code`, `columns-3`, `contact`, `cookie`, `copy`, `database`, `ellipsis`, `external-link`, `eye`, `eye-off`, `gauge`, `hand`, `heading`, `image`, `images`, `list`, `lock`, `mail`, `menu`, `mouse-pointer-click`, `move-horizontal`, `newspaper`, `panel-bottom`, `panel-top`, `panels-top-left`, `pencil`, `play`, `plus`, `rectangle-horizontal`, `redo-2`, `refresh-cw`, `repeat`, `rows-2`, `search`, `settings-2`, `share-2`, `sliders-horizontal`, `square`, `square-split-horizontal`, `sun-moon`, `table`, `text`, `text-cursor-input`, `timer`, `trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
+The names of the set are `align-center`, `align-center-horizontal`, `align-center-vertical`, `align-end-horizontal`, `align-end-vertical`, `align-horizontal-space-between`, `align-justify`, `align-left`, `align-right`, `align-start-horizontal`, `align-start-vertical`, `arrow-down`, `arrow-left`, `arrow-left-right`, `arrow-right`, `arrow-up`, `brackets`, `check`, `chevron-down`, `chevron-left`, `chevron-right`, `chevron-up`, `chevrons-left`, `chevrons-right`, `circle-help`, `clock`, `code`, `columns-3`, `contact`, `cookie`, `copy`, `database`, `ellipsis`, `external-link`, `eye`, `eye-off`, `gauge`, `hand`, `heading`, `image`, `images`, `list`, `lock`, `mail`, `menu`, `monitor`, `mouse-pointer-click`, `move-horizontal`, `newspaper`, `panel-bottom`, `panel-top`, `panels-top-left`, `pencil`, `play`, `plus`, `rectangle-horizontal`, `redo-2`, `refresh-cw`, `repeat`, `rows-2`, `search`, `settings-2`, `share-2`, `sliders-horizontal`, `smartphone`, `square`, `square-split-horizontal`, `stretch-horizontal`, `stretch-vertical`, `sun-moon`, `table`, `tablet`, `text`, `text-cursor-input`, `timer`, `trash-2`, `triangle-alert`, `undo-2` and `x`: Lucide 0.577.0, spelled as Lucide
 spells them, in the `ICONS` table of `_admin/assets/Nino.admin.js`; `\Nino\Components::ICONS`
 is the same list for the schema of a component, and a test holds the two together. Another icon is
 added to both, to the table as a string for a path and `[ tag, attributes ]` for any other
@@ -1083,6 +1083,12 @@ owns a word.
 the message with `textContent`, never as markup, and the caller cuts a long list short with a line of its own ("and 3
 more"). A modal dialog keeps the Tab key in itself: the rest of the page is inert while it is open, and Tab at the last
 control goes to the first, Shift+Tab at the first to the last.
+
+`choiceDialog( { dismiss : true } )` lets a press on the darkened surface behind a modal dialog close it as its secondary answer
+does: the `guard` is asked and the focus goes back to `opener`. Both ends of the press must lie on the surface - a selection
+dragged out of a field and let go beside the dialog does not close it - and the dialog must be the top one of the stack. The
+default is `false`: a question is closed by an answer. `formDialog()` and `confirm()` do not pass the option on, so a form is
+never closed by a press beside it.
 
 `formDialog( { title, fields, submit, cancel, message, size, onSubmit, onCancel,
 opener } )` draws `fields` - `[ { key, label, type, value, required, maxLength,
@@ -1254,7 +1260,8 @@ request, and never leaves it to the session, which another window of the same br
 A view whose content depends on the language says so where the person looks, once the language
 is not the native one: `Nino.adminUi.localeBadge( locale, bar )` puts a quiet pill in the context
 bar (and takes it away again for the native language), so that nobody writes in a foreign
-language unnoticed. A language is named in one form everywhere - `Nino.adminUi.localeName( code )`,
+language unnoticed. Where the bar is narrow, the name of the view, its code, its icons and the pill wrap onto a second line
+rather than squeeze: nothing is cut away and the bar is never wider than the screen. A language is named in one form everywhere - `Nino.adminUi.localeName( code )`,
 "Deutsch" or "English (US)", the code behind it only where two of the languages that stand
 together (`localeName( code, among )`) are named alike, which `localeSelect()` does for its options.
 
@@ -1595,7 +1602,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
 | Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
 | Scrolling content column | `.nino-admin-pane` |
-| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar( { back, title, code, icons, tools, panel } )` (called with a link and its controls it takes them as they are); the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
+| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar( { back, title, code, icons, tools, panel, panelLabel } )` (called with a link and its controls it takes them as they are); the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
 | Back link inside that row | `.nino-admin-back-link`, drawn by `contextBar( { back : { to, onClick } } )` as "Back to <to>" |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar( { danger, status, secondary, primary } )`: the destructive action at the left, the state and its line, the side actions, ONE main button at the right edge |
 | The answer to an action that went well | `Nino.adminUi.say( text )`: the toast above the bar, one at a time, never for an error |
@@ -1821,7 +1828,10 @@ accordion.follow();
 **Steps** is a `radiogroup` of buttons: the chosen step is the one tab stop, the
 arrows move the choice and the focus (and wrap), Home and End go to the ends. A
 number is written with its sign; `standard` marks the default step with a dot
-and with its name for a screen reader. `onChange` is told what the hand chose,
+and with its name for a screen reader. A step may be `{ value, label, title, disabled, icon }`: with an `icon` (a name of
+the [icon table](#buttons-and-icons)) the step shows the icon, centred, in place of its word; the word stays the step's name for a
+screen reader and its tooltip where the step has no `title`. A step without an `icon` is drawn as it always is, and a name that the
+table does not have is a step with its word. `onChange` is told what the hand chose,
 `set()` reports nothing, and `disable()` takes the strip out of use.
 
 ```js
@@ -2138,7 +2148,9 @@ when it leaves them all - once for each change; a redrawing that leaves them whe
 `tree.highlight( id | ids | null, [{ scroll }] )` marks entries the way the pointer does - the tint, not the buttons - from
 outside, without moving the focus and without telling anybody; it opens what is above the first and rolls it into
 view where it lies outside the window of the tree (`scrollIntoView( { block : 'nearest' } )`), and `scroll : false` leaves
-the tree where it is. What is marked outlives `update()`. The ids are the keys of the sync.
+the tree where it is. What is marked outlives `update()`. The ids are the keys of the sync. A marked row has the accent inside it - the tint and a line of
+2 px, 3 : 1 or more against the ground in both colour schemes - and the chosen row keeps its hairline and its heavier name, so the two stay apart; a button
+with the class `is-lit` in the strip that `split( { aside : { rail } } )` draws is marked in the same colours.
 
 `Nino.adminUi.hoverSync()` is the switchboard between views that show the same things: `join( on )` gives a
 member `{ set( key ), leave() }`, and `on( key )` is called with what another member reported - a string, a list of

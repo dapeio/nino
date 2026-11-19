@@ -366,6 +366,29 @@ foreach( [ 'light' => [ $light, [ $light ] ], 'dark (system)' => [ $system, [ $s
 	check( "$name: and one under the pointer, on the tint over the surface (". round( $contrast( $words['text'], $over( $tint, $ground ) ), 2 ). ")", $contrast( $words['text'], $over( $tint, $ground ) ) >= 4.5 );
 }
 
+// --- the tree: the row that is pointed at, the chosen row and the sentence of a hint hold their contrast ------------
+
+$hintRule = $sortRule( ':where(.nino-admin) .nino-admin-tree-hint' );
+preg_match( '/color: (color-mix\([^;]*\));/', $hintRule, $hintInk );
+
+foreach( [ 'light' => [ $light, [ $light ] ], 'dark (system)' => [ $system, [ $system, $light ] ], 'dark (chosen)' => [ $chosen, [ $chosen, $light ] ] ] as $name => [ $own, $schemes ] ) {
+
+	$accent	= $colour( $own['--editor-blue'] ?? $light['--editor-blue'], $schemes );
+	$tint		= $colour( $own['--editor-blue-soft'] ?? $light['--editor-blue-soft'], $schemes );
+	$ink		= $mixed( $hintInk[1] ?? '', $own, $schemes );
+	$grounds	= [ 'the page' => $colour( $own['--editor-bg'] ?? $light['--editor-bg'], $schemes ), 'a card' => $colour( $own['--editor-bg-elevated'] ?? $light['--editor-bg-elevated'], $schemes ) ];
+
+	check( "$name: the accent, the tint of the chosen row and the ink of a hint are colours", $accent !== null && $tint !== null && $ink !== null && $grounds['the page'] !== null && $grounds['a card'] !== null );
+
+	if( $accent === null || $tint === null || $ink === null || $grounds['the page'] === null || $grounds['a card'] === null )
+		continue;
+
+	foreach( $grounds as $label => $ground ) {
+		check( "$name: the line of a row that is pointed at is 3 : 1 against $label (". round( $contrast( $accent, $ground ), 2 ). ")", $contrast( $accent, $ground ) >= 3.0 );
+		check( "$name: the sentence of a hint holds 4.5 : 1 on $label and on the tint of the chosen row over it (". round( $contrast( $ink, $over( $tint, $ground ) ), 2 ). ")", $contrast( $ink, $ground ) >= 4.5 && $contrast( $ink, $over( $tint, $ground ) ) >= 4.5 );
+	}
+}
+
 // --- a table keeps its actions in reach, a switch its words in the spelling of the words, a link its size ---
 
 check( 'the column of the actions of a table sticks to the right edge at every width: its rule stands outside a media query', preg_match( '/\n:where\(\.nino-admin\) \.nino-admin-table :is\(th, td\)\.nino-admin-table-actions \{[^}]*position: sticky;[^}]*right: 0;/', "\n". $style ) === 1 );
@@ -910,6 +933,34 @@ check( 'a switch asks with the block, says what went well with the toast, and wr
 check( 'the Settings tab of a feature\'s own panel is a form that is novalidate, has the bar of the blocks, is checked and saved by the panel\'s own code, and builds no field of its own', substr_count( $featuresTab, '.noValidate = true' ) === 1
 	&& str_contains( $featuresTab, 'adminUi.actionBar(' ) === true && str_contains( $featuresTab, 'features._save(' ) === true && str_contains( $featuresTab, 'features._renderSettings(' ) === true
 	&& preg_match( "/createElement\\(\\s*'(label|input|select|textarea|button)'\\s*\\)/", $featuresTab ) === 0 );
+
+// --- the pieces the work surfaces draw with: icons, the marked row, the bar that wraps ------------------------
+
+/*	Held by structure: the icon table of the script is listed, name for name, in the panel recipe; a row that another view points at has the accent as a
+	line inside the row over the tint (and so has a button of the folded strip), and the chosen row keeps its own border; the name group of the context
+	bar wraps, so that a pill beside a title cannot push the bar wider than the screen	*/
+preg_match( '/const ICONS = \{\n(.*?)\n\t\};/s', $read( '_admin/assets/Nino.admin.js' ), $table );
+$drawn = array_map( static fn( string $line ): string => trim( explode( ' :', trim( $line ), 2 )[0], "'" ), explode( "\n", $table[1] ?? '' ) );
+$recipe = $read( 'docs/recipes/admin-panel.md' );
+$unlisted = array_values( array_filter( $drawn, static fn( string $name ): bool => $name === '' || str_contains( $recipe, '`'. $name. '`' ) === false ) );
+
+check( 'every icon of the table of the script is listed in the panel recipe'. ( $unlisted === [] ? '' : ' - '. implode( ', ', $unlisted ) ), count( $drawn ) > 60 && $unlisted === [] );
+
+$rule = static function( string $selector ) use ( $style ): string {
+	$at = strpos( $style, $selector. ' {' );
+	return $at === false ? '' : substr( $style, $at, (int) strpos( $style, '}', $at ) - $at );
+};
+
+check( 'a row of the tree that another view points at has the accent as a line inside the row over the tint, and the chosen row keeps its border',
+	preg_match( '/background: color-mix\(in srgb, var\(--editor-blue\) 18%, transparent\);\s*box-shadow: inset 0 0 0 2px var\(--editor-blue\)/', $rule( ':where(.nino-admin) .nino-admin-tree-row.is-lit' ) ) === 1
+	&& str_contains( $rule( ':where(.nino-admin) .nino-admin-tree-row.is-selected' ), 'border-color: var(--editor-blue)' ) === true
+	&& str_contains( $rule( ':where(.nino-admin) .nino-admin-tree-row.is-selected' ), 'box-shadow' ) === false );
+check( 'a button of the folded strip that is pointed at has the accent as well',
+	preg_match( '/border-color: var\(--editor-blue\);\s*background: var\(--editor-blue-soft\);\s*box-shadow: inset 0 0 0 1px var\(--editor-blue\)/', $rule( ':where(.nino-admin) .nino-admin-split-aside-rail .is-lit' ) ) === 1 );
+check( 'the name group of the context bar wraps, and a title is never wider than the group it stands in',
+	preg_match( '/flex-wrap: wrap/', $rule( '.nino-admin .nino-admin-contextbar-name' ) ) === 1 && str_contains( $rule( '.nino-admin .nino-admin-contextbar-title' ), 'max-width: 100%' ) === true );
+check( 'a step with an icon has the icon as a block in a face that centres it',
+	preg_match( '/display: flex;\s*align-items: center;\s*justify-content: center/', $rule( ':where(.nino-admin) .nino-admin-steps-icon' ) ) === 1 && str_contains( $rule( ':where(.nino-admin) .nino-admin-steps-icon > .nino-admin-icon' ), 'display: block' ) === true );
 
 // --- the chapter is linked and its links land ----------------------------------------------------------
 
