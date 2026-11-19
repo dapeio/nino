@@ -775,6 +775,67 @@ namespace Nino {
 		}
 
 		/**
+		 *	Answer the bytes of a file as a download: an attachment the browser saves under a name, which nothing draws - the body is not read for
+		 *	calls or fills, whatever it holds (a csv or a page of html that is a document of the project is a document, not a template). Sets the
+		 *	status 200, Content-Type, Content-Disposition: attachment, X-Content-Type-Options: nosniff, Cache-Control: private, no-store and
+		 *	Content-Length, and marks the response raw, which Html::response() leaves as it is.
+		 *
+		 *	The name is made harmless: what stands before the last slash or backslash goes, so do control characters, quotes and backslashes (a line
+		 *	break in a header is a second header), and one that is empty afterwards is "download". The header says it as `filename` with an ASCII
+		 *	stand-in - the other characters are an underscore - and, where the name is not ASCII, as `filename*` (RFC 5987, utf-8, percent-encoded).
+		 *	A type that is no `type/subtype` with an optional charset is application/octet-stream
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$bytes				The file
+		 *	@param		string		$filename			The name it is saved under, as it is found
+		 *	@param		string		$contentType	Eg. 'text/csv; charset=utf-8'
+		 *
+		 *	@return 	void
+		 */
+		public static function download( array &$request, string $bytes, string $filename, string $contentType = 'application/octet-stream' ): void {
+
+			// A path is not a name; the part after the last separator is
+			$name = (string) preg_replace( '/^.*[\/\\\\]/s', '', $filename );
+			$name = (string) preg_replace( '/[\x00-\x1f\x7f"\\\\]/', '', $name );
+
+			if( preg_match( '//u', $name ) !== 1 )
+				$name = (string) mb_convert_encoding( $name, 'UTF-8', 'UTF-8' );
+
+			// What formats text and is no letter - the marks that turn a line round (U+202E makes "evil\u{202E}fdp.exe" read as "evilexe.pdf"), the line and paragraph separators - is no part of a name
+			$name = trim( (string) preg_replace( '/[\p{Cf}\p{Zl}\p{Zp}]/u', '', $name ), " .\t" );
+
+			// Cut where the name is too long, and the ending stays: the first part gives way
+			if( strlen( $name ) > 150 ) {
+
+				$dot = strrpos( $name, '.' );
+				$ending = $dot !== false && $dot > 0 && strlen( $name ) - $dot <= 16 ? substr( $name, $dot ) : '';
+
+				$name = rtrim( (string) mb_strcut( $name, 0, 150 - strlen( $ending ), 'UTF-8' ) ). $ending;
+			}
+
+			if( $name === '' )
+				$name = 'download';
+
+			$ascii = (string) preg_replace( '/[^\x20-\x7e]/', '_', (string) preg_replace( '/[^\x00-\x7f]/u', '_', $name ) );
+			$disposition = 'attachment; filename="'. $ascii. '"';
+
+			if( $ascii !== $name )
+				$disposition .= "; filename*=UTF-8''". rawurlencode( $name );
+
+			if( preg_match( '/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*(?:; charset=[a-z0-9._-]+)?$/iD', $contentType ) !== 1 )
+				$contentType = 'application/octet-stream';
+
+			$request['/nino/http/response']['statusCode'] = 200;
+			$request['/nino/http/response']['body'] = $bytes;
+			$request['/nino/http/response']['raw'] = true;
+			$request['/nino/http/response']['header']['Content-Type'] = $contentType;
+			$request['/nino/http/response']['header']['Content-Disposition'] = $disposition;
+			$request['/nino/http/response']['header']['X-Content-Type-Options'] = 'nosniff';
+			$request['/nino/http/response']['header']['Cache-Control'] = 'private, no-store';
+			$request['/nino/http/response']['header']['Content-Length'] = (string) strlen( $bytes );
+		}
+
+		/**
 		 *	Make the response a redirect: the status, the Location header and an
 		 *	empty body, in one call. A handler must not send a header itself (it
 		 *	changes the response, see Http::output()), and a redirect set by hand

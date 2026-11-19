@@ -701,6 +701,32 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 }
 
 
+// --- confirm(): a question asked of an open dialog --------------------------------
+
+{
+	const w = world();
+	Object.defineProperty( w.doc, 'activeElement', { get : () => findAll( w.body, el => el.focused === true )[0] ?? null, configurable : true } );
+
+	w.ui.formDialog( { title : 'Make', fields : [ { key : 'name', label : 'Name', type : 'text', value : '' } ], submit : 'Make', cancel : 'Cancel', onSubmit : function() {} } );
+	const below = w.dialogs[0];
+	const field = findAll( below, el => el.tagName === 'INPUT' )[0];
+	field.focus();
+
+	const answers = [];
+	const asked = w.ui.confirm( 'destructive', Object.assign( { title : 'Throw away', message : 'Sure?', yes : 'Throw away', no : 'Keep', onChoose : function( ok ) { answers.push( ok ) } } ) );
+
+	check( 'a question without nested is not asked of an open dialog, as before', asked === false && w.dialogs.length === 1 );
+
+	const nested = w.ui.confirm( 'destructive', { title : 'Throw away', message : 'Sure?', yes : 'Throw away', no : 'Keep', nested : true, onChoose : function( ok ) { answers.push( ok ) } } );
+	const above = w.dialogs[1];
+
+	check( 'with nested it is asked on the open dialog, which stays open and is not given the focus', nested === true && w.dialogs.length === 2 && above.open === true && below.open === true );
+
+	escape( above );
+	check( 'Escape closes the question alone, answers No, and the focus is back in the dialog below, on what had it', above.open === false && below.open === true && answers.join() === 'false' && field.focused === true );
+}
+
+
 // --- choiceDialog(): the Tab key stays in a modal ----------------------------------
 
 {

@@ -835,6 +835,224 @@
 			return actions;
 		},
 
+		// The close of the menu that is open: one at a time, a second one opening closes the first
+		_menuClose : null,
+
+		/**
+		 *	A button that opens a menu - WAI-ARIA "Menu Button": the trigger says aria-haspopup="menu" and aria-expanded, the list is
+		 *	role="menu" of role="menuitem" buttons, one stop of the Tab key (the items take the focus by the arrows, not by Tab).
+		 *	Enter, Space and the Down arrow open it on the first item, the Up arrow on the last; Down and Up walk the items and wrap,
+		 *	Home and End go to the ends, a letter goes to the next item that begins with it, Escape closes it and gives the focus back to the trigger, so does a choice; Tab, a press beside
+		 *	the menu, a scroll and a resize close it. What takes something away is red and last, whatever the order it was given in.
+		 *	An item made of a button of a row (the actions of a table) presses that button, which is not in the page: a handler that asks where the
+		 *	button stands (closest('tr')) or reads a state it was given later finds none of it - the action says what it needs through the row it was made for
+		 *	The list stands fixed at the trigger's right edge and flips above it where there is no room below, so that the frame of a
+		 *	table does not cut it. Owns no strings: the name of the trigger is the caller's
+		 *
+		 *	@param		{Object}		options					{ label, items, icon, small, className, id }
+		 *														- label       the name of the trigger (and of the list), not optional
+		 *														- items       [ { label, onClick, danger, disabled } ] - a disabled item is read and not pressed
+		 *														- icon        a name of ICONS, 'ellipsis' by default
+		 *														- small       the small icon button (24 px)
+		 *
+		 *	@return		{Object}										{ el, button, list, open(), close( [focus] ), isOpen() }
+		 */
+		menuButton : function( options ) {
+
+			const label = typeof options.label === 'string' ? options.label.trim() : '';
+
+			if( label === '' )
+				throw new TypeError( 'Nino.adminUi.menuButton(): a menu needs the name of its button' );
+
+			const given = ( options.items || [] ).filter( function( item ) { return item !== null && typeof item === 'object' } );
+			const items = given.filter( function( item ) { return item.danger !== true } ).concat( given.filter( function( item ) { return item.danger === true } ) );
+
+			const wrap = Nino.adminUi.el( 'span', 'nino-admin-menu' );
+			const list = Nino.adminUi.el( 'div', 'nino-admin-menu-list' );
+			const button = Nino.adminUi.iconButton( options.icon ?? 'ellipsis', label, null, { small : options.small === true, className : options.className, id : options.id } );
+
+			list.id = 'nino-admin-menu-'+ ( ++serial );
+			list.setAttribute( 'role', 'menu' );
+			list.setAttribute( 'aria-label', label );
+			list.hidden = true;
+			button.setAttribute( 'aria-haspopup', 'menu' );
+			button.setAttribute( 'aria-expanded', 'false' );
+			button.setAttribute( 'aria-controls', list.id );
+
+			const nodes = items.map( function( item ) {
+
+				const node = Nino.adminUi.el( 'button', 'nino-admin-menu-item'+ ( item.danger === true ? ' nino-admin-menu-item--danger' : '' ), String( item.label ?? '' ) );
+
+				node.type = 'button';
+				node.setAttribute( 'role', 'menuitem' );
+				node.tabIndex = -1;
+
+				if( item.disabled === true )
+					node.setAttribute( 'aria-disabled', 'true' );
+
+				node.addEventListener( 'click', function() {
+
+					if( item.disabled === true )
+						return;
+
+					close( true );
+
+					if( typeof item.onClick === 'function' )
+						item.onClick();
+				} );
+
+				list.appendChild( node );
+
+				return node;
+			} );
+
+			const isOpen = function() { return list.hidden === false };
+
+			const beside = function( ev ) {
+				if( wrap.contains( ev.target ) === false )
+					close( false );
+			};
+
+			const away = function( ev ) {
+				if( list.contains( ev.target ) === false )
+					close( false );
+			};
+
+			function close( focus ) {
+
+				if( isOpen() === false )
+					return;
+
+				list.hidden = true;
+				button.setAttribute( 'aria-expanded', 'false' );
+				dc.removeEventListener( 'click', beside, true );
+				dc.removeEventListener( 'scroll', away, true );
+				wn.removeEventListener( 'resize', away );
+
+				if( Nino.adminUi._menuClose === close )
+					Nino.adminUi._menuClose = null;
+
+				if( focus === true )
+					button.focus();
+			}
+
+			const open = function( at ) {
+
+				if( isOpen() === true || nodes.length === 0 )
+					return;
+
+				if( typeof Nino.adminUi._menuClose === 'function' )
+					Nino.adminUi._menuClose( false );
+
+				list.hidden = false;
+				button.setAttribute( 'aria-expanded', 'true' );
+
+				// Fixed at the trigger, so that no frame of overflow cuts it: right edge to right edge, above where the room below is short
+				const at_ = button.getBoundingClientRect();
+				const room = list.getBoundingClientRect();
+				const below = at_.bottom + 4;
+				const high = typeof wn.innerHeight === 'number' ? wn.innerHeight : 0;
+
+				list.style.top = ( high > 0 && below + room.height > high && at_.top - 4 - room.height >= 0 ? at_.top - 4 - room.height : below )+ 'px';
+				list.style.left = Math.max( 4, at_.right - room.width )+ 'px';
+
+				Nino.adminUi._menuClose = close;
+				dc.addEventListener( 'click', beside, true );
+				dc.addEventListener( 'scroll', away, true );
+				wn.addEventListener( 'resize', away );
+
+				nodes[at === 'last' ? nodes.length - 1 : 0].focus();
+			};
+
+			button.addEventListener( 'click', function() { isOpen() === true ? close( true ) : open( 'first' ) } );
+			button.addEventListener( 'keydown', function( ev ) {
+
+				if( ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp' )
+					return;
+
+				ev.preventDefault();
+				open( ev.key === 'ArrowUp' ? 'last' : 'first' );
+			} );
+
+			list.addEventListener( 'keydown', function( ev ) {
+
+				const here = nodes.indexOf( ev.target );
+				let to = -1;
+
+				if( ev.key === 'ArrowDown' )		to = ( here + 1 ) % nodes.length;
+				else if( ev.key === 'ArrowUp' )	to = ( here - 1 + nodes.length ) % nodes.length;
+				else if( ev.key === 'Home' )		to = 0;
+				else if( ev.key === 'End' )			to = nodes.length - 1;
+				else if( ev.key === 'Escape' ) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					close( true );
+					return;
+				}
+				else if( ev.key === 'Tab' ) {
+					close( false );
+					return;
+				}
+				// A letter goes to the next item that begins with it, round the list
+				else if( ev.key.length === 1 && ev.key !== ' ' && ev.ctrlKey !== true && ev.metaKey !== true && ev.altKey !== true ) {
+
+					const letter = ev.key.toLowerCase();
+					const found = nodes.map( function( node, at ) { return ( here + 1 + at ) % nodes.length } ).find( function( at ) { return nodes[at].textContent.trim().toLowerCase().indexOf( letter ) === 0 } );
+
+					if( found === undefined )
+						return;
+
+					to = found;
+				}
+				else
+					return;
+
+				ev.preventDefault();
+				nodes[to].focus();
+			} );
+
+			wrap.appendChild( button );
+			wrap.appendChild( list );
+
+			return { el : wrap, button : button, list : list, open : function() { open( 'first' ) }, close : close, isOpen : isOpen };
+		},
+
+		/**
+		 *	The buttons at the end of a row of a table: up to `inline` of them stand as they are (see rowActions()); with more, the first two
+		 *	stand and the rest are in a menu behind one icon button, "More actions" - the one that takes something away last. An item of the menu
+		 *	is named by the name of its button (aria-label, title or text) and presses it
+		 *
+		 *	@param		{Array}			buttons				Elements made by button() or iconButton()
+		 *	@param		{number}		[inline]			How many may stand before the menu takes the rest, 2 or 3 (3 by default)
+		 *
+		 *	@return		{Element}									<span class="nino-admin-row-actions">
+		 */
+		_rowActionsMenu : function( buttons, inline ) {
+
+			const given = ( buttons || [] ).filter( function( button ) { return button !== null && button !== undefined } );
+			const limit = Math.min( 3, Math.max( 2, Math.floor( Number( inline ) ) || 3 ) );
+
+			if( given.length <= limit )
+				return Nino.adminUi.rowActions( given );
+
+			const dangerous = function( button ) { return button.classList.contains('nino-admin-btn-danger') };
+			const ordered = given.filter( function( button ) { return dangerous( button ) === false } ).concat( given.filter( dangerous ) );
+			const actions = Nino.adminUi.el( 'span', 'nino-admin-row-actions' );
+			const named = function( button ) { return String( button.getAttribute('aria-label') || button.title || button.textContent || '' ).trim() };
+
+			ordered.slice( 0, 2 ).forEach( function( button ) { actions.appendChild( button ) } );
+
+			actions.appendChild( Nino.adminUi.menuButton( {
+				label : Nino.adminUi.text('/_admin/common/table/more'),
+				small : true,
+				items : ordered.slice( 2 ).map( function( button ) {
+					return { label : named( button ), danger : dangerous( button ), disabled : button.disabled === true, onClick : function() { button.click() } };
+				} ),
+			} ).el );
+
+			return actions;
+		},
+
 		/**
 		 *	A heading over a group of rows: the small caps line of a list that has
 		 *	groups. Owns no strings
@@ -2235,6 +2453,7 @@
 		 *	@param		{string}		[options.typedLabel]		What the field says, with %s for the word; /_admin/common/confirm/typed by default
 		 *	@param		{boolean}		[options.visitors]			false where the action does not touch what visitors see (an account, a role): the policy's note that visitors see the change at once is left out
 		 *	@param		{Element}		[options.opener]				See choiceDialog()
+		 *	@param		{boolean}		[options.nested]				The question is asked of an open dialog - a form that asks before it throws something away - and stands on it: the focus goes back into the dialog below when it closes, and Escape closes this one alone. See choiceDialog()
 		 *	@param		{Function}	options.onChoose				Called once with true or false, and with `typed` the word that was typed as the second argument - not at all when false is returned
 		 *
 		 *	@return		{boolean}												false when another question is already open and this one was not asked, which is the same click arriving twice
@@ -2307,6 +2526,7 @@
 				details		: field === null ? options.details : undefined,
 				note			: options.visitors === false ? '' : policy.note,
 				opener		: options.opener,
+				nested		: options.nested === true,
 				focus			: field ?? undefined,
 				describedBy : field === null ? undefined : ids,
 				refuseWithoutDialog : field !== null,
@@ -5632,8 +5852,21 @@
 		 *																					buttons or links of its own is reached through them
 		 *	@param		{string}		[options.rowKey]			Row property used as the row's identity - also written on the row as data-row, where a
 		 *																					caller finds it again after the table was drawn anew
+		 *	@param		{number}		[options.actionsInline]	How many actions stand in a row before a menu takes the rest, 2 or 3 (3 by default): with more
+		 *																					than that the first two stand as they are and the others are in a menu behind "More actions"
+		 *																					(see menuButton()), the one that takes something away last
+		 *	@param		{Object}		[options.select]			{ actions, label, rowLabel } - the rows can be chosen. A first column of checkboxes, each named by
+		 *																					rowLabel( row ) (the text of the first column by default), and in the head one for the rows of the page
+		 *																					that is shown, with the three states none, some, all of them. With one chosen a bar over the table says how
+		 *																					many, how many of them are not on this page (by the search or the paging), offers "All N matches" where the
+		 *																					search matches more rows than the page shows, has the actions as buttons - actions : [ { key, label, icon,
+		 *																					danger, run( keys ) } ], run is handed the keys (the rowKey, as it is in the row) of ALL the chosen rows, in the
+		 *																					order of rows - and "Clear selection". A search, a sort and a page keep what is chosen; setRows() drops the keys
+		 *																					that are gone. Shift and a click chooses the range from the box touched last to this one, on the page that is
+		 *																					shown (the box is remembered by its row, and forgotten by a search, a sort, a page and new rows). label names
+		 *																					the head's checkbox. Without select the table has none of it
 		 *
-		 *	@return		{Object}													{ setRows, destroy }
+		 *	@return		{Object}													{ setRows, destroy, selected(), clearSelection() } - selected() the keys of the chosen rows, in the order of rows
 		 */
 		table : function( options ) {
 
@@ -5651,6 +5884,16 @@
 			let query 		= typeof options.query === 'string' ? options.query : '';
 
 			const model = Nino.adminUi.tableModel;
+
+			// The rows that can be chosen: the key (as a string) of each, and the key as it is in the row
+			const selecting = typeof options.select === 'object' && options.select !== null;
+			const chosen = new Map();
+			let matchedNow = [];
+			let pageNow = [];
+			let anchor = null;
+			const keyOf = function( row ) {
+				return row !== null && typeof row === 'object' && row[rowKey] !== undefined && row[rowKey] !== null && String( row[rowKey] ) !== '' ? row[rowKey] : null;
+			};
 
 			// What a cell shows is what the search reads. The text of a column that has a drawing function is
 			// what the drawing makes, found once for each row and column and kept until the rows change
@@ -5715,6 +5958,49 @@
 			toolbar.appendChild( search );
 			mount.appendChild( toolbar );
 
+			// --- the bar of the chosen rows ---------------------------------
+			let bar = null;
+			let barCount = null;
+			let barHidden = null;
+			let barAll = null;
+			let said = null;
+
+			if( selecting === true ) {
+
+				bar = dc.createElement('div');
+				bar.className = 'nino-admin-table-selection nino-admin-hidden';
+				barCount = Nino.adminUi.el( 'span', 'nino-admin-table-selection-count' );
+				bar.appendChild( barCount );
+				barHidden = Nino.adminUi.el( 'span', 'nino-admin-table-selection-hidden' );
+				bar.appendChild( barHidden );
+
+				( Array.isArray( options.select.actions ) === true ? options.select.actions : [] ).forEach( function( action ) {
+
+					bar.appendChild( Nino.adminUi.button( String( action.label ?? '' ), function() {
+						if( typeof action.run === 'function' )
+							action.run( selected() );
+					}, { kind : action.danger === true ? 'danger' : 'secondary', small : true, icon : action.icon } ) );
+				} );
+
+				// The rows of the other pages, offered with their number - never chosen without it being said
+				barAll = Nino.adminUi.button( '', function() {
+
+					matchedNow.map( keyOf ).filter( function( key ) { return key !== null } ).forEach( function( key ) { chosen.set( String( key ), key ) } );
+					anchor = null;
+					syncSelection( true );
+				}, { kind : 'secondary', small : true } );
+				bar.appendChild( barAll );
+
+				bar.appendChild( Nino.adminUi.button( Nino.adminUi.text('/_admin/common/table/clear'), function() { clearSelection() }, { kind : 'link', small : true } ) );
+
+				// The number is said once for each change, to a screen reader, and is always in the page: a live region that comes and goes says nothing
+				said = Nino.adminUi.el( 'span', 'nino-admin-sr-only' );
+				said.setAttribute( 'aria-live', 'polite' );
+				said.setAttribute( 'role', 'status' );
+				mount.appendChild( said );
+				mount.appendChild( bar );
+			}
+
 			// --- table ------------------------------------------------
 			const scroller = dc.createElement('div');
 			scroller.className = 'nino-admin-table-scroll';
@@ -5724,6 +6010,44 @@
 
 			const thead = dc.createElement('thead');
 			const headRow = dc.createElement('tr');
+
+			// A box of the chosen rows, 24 px to press: the label is the target, the input is drawn in it
+			const checkbox = function( name ) {
+
+				const box = dc.createElement('label');
+				box.className = 'nino-admin-table-selectcell';
+
+				const input = dc.createElement('input');
+				input.type = 'checkbox';
+				input.className = 'nino-admin-table-check';
+				input.setAttribute( 'aria-label', name );
+				box.appendChild( input );
+
+				return { box : box, input : input };
+			};
+
+			let headCheck = null;
+
+			if( selecting === true ) {
+				const th = dc.createElement('th');
+				const all = checkbox( options.select.label ?? Nino.adminUi.text('/_admin/common/table/select-page') );
+
+				th.className = 'nino-admin-table-select';
+				headCheck = all.input;
+				// The box of the head is for the rows of the page that is shown: what a person sees is what is chosen. The rows of the other pages are chosen
+				// by the offer in the bar, which says how many they are
+				headCheck.addEventListener( 'click', function() {
+
+					const keys = pageNow.map( keyOf ).filter( function( key ) { return key !== null } );
+					const every = keys.length > 0 && keys.every( function( key ) { return chosen.has( String( key ) ) } );
+
+					keys.forEach( function( key ) { every === true ? chosen.delete( String( key ) ) : chosen.set( String( key ), key ) } );
+					anchor = null;
+					syncSelection( true );
+				} );
+				th.appendChild( all.box );
+				headRow.appendChild( th );
+			}
 
 			columns.forEach( function( column ) {
 
@@ -5830,6 +6154,11 @@
 				const view 		= model.page( sorted, pageSize, page );
 
 				page = view.page;
+				matchedNow = sorted;
+				pageNow = view.rows;
+
+				// A press with Shift reaches back to a box on the page that is shown, and a page that was drawn anew has none that was touched
+				anchor = null;
 
 				headRow.querySelectorAll('th').forEach( function( th ) {
 
@@ -5871,6 +6200,47 @@
 						} );
 					}
 
+					if( selecting === true ) {
+
+						const td = dc.createElement('td');
+						const key = keyOf( row );
+
+						td.className = 'nino-admin-table-select';
+
+						if( key !== null ) {
+
+							const first = columns.length > 0 ? shown( row, columns[0] ) : '';
+							const named = typeof options.select.rowLabel === 'function' ? String( options.select.rowLabel( row ) ?? '' ) : first;
+							const one = checkbox( named !== '' ? named : String( key ) );
+							const at = view.rows.indexOf( row );
+
+							one.input.addEventListener( 'click', function( ev ) {
+
+								const on = one.input.checked === true;
+								const from = anchor === null ? -1 : pageNow.findIndex( function( other ) { return keyOf( other ) !== null && String( keyOf( other ) ) === anchor } );
+
+								// Shift and a click: the range on the page from the last box touched - the row, by its key, and only where it is on this page - in the state this one now has
+								if( ev.shiftKey === true && from !== -1 )
+									pageNow.slice( Math.min( from, at ), Math.max( from, at ) + 1 ).forEach( function( other ) {
+
+										const otherKey = keyOf( other );
+
+										if( otherKey !== null )
+											on === true ? chosen.set( String( otherKey ), otherKey ) : chosen.delete( String( otherKey ) );
+									} );
+								else
+									on === true ? chosen.set( String( key ), key ) : chosen.delete( String( key ) );
+
+								anchor = String( key );
+								syncSelection( true );
+							} );
+
+							td.appendChild( one.box );
+						}
+
+						tr.appendChild( td );
+					}
+
 					columns.forEach( function( column ) {
 
 						const td = dc.createElement('td');
@@ -5905,7 +6275,7 @@
 						td.className = 'nino-admin-table-actions';
 
 						if( typeof options.actions === 'function' )
-							td.appendChild( Nino.adminUi.rowActions( options.actions( row ) ) );
+							td.appendChild( Nino.adminUi._rowActionsMenu( options.actions( row ), options.actionsInline ) );
 
 						// A row that opens says so
 						if( typeof options.onRowClick === 'function' ) {
@@ -5951,13 +6321,82 @@
 				toolbar.classList.toggle( 'nino-admin-hidden', rows.length === 0 && query === '' );
 				empty.classList.toggle( 'nino-admin-hidden', view.total !== 0 );
 				pager.classList.toggle( 'nino-admin-hidden', view.total === 0 );
+
+				syncSelection( false );
+			}
+
+			// What is chosen, in the order of the rows
+			function selected() {
+				return rows.map( keyOf ).filter( function( key ) { return key !== null && chosen.has( String( key ) ) } );
+			}
+
+			// The boxes, the head's three states and the bar say what is chosen; say tells a screen reader the number
+			function syncSelection( say ) {
+
+				if( selecting !== true )
+					return;
+
+				const keys = pageNow.map( keyOf ).filter( function( key ) { return key !== null } );
+				const among = keys.filter( function( key ) { return chosen.has( String( key ) ) } ).length;
+				const matched = matchedNow.map( keyOf ).filter( function( key ) { return key !== null } );
+				const matchedChosen = matched.filter( function( key ) { return chosen.has( String( key ) ) } ).length;
+
+				headCheck.checked = keys.length > 0 && among === keys.length;
+				headCheck.indeterminate = among > 0 && among < keys.length;
+				headCheck.disabled = keys.length === 0;
+
+				Array.from( tbody.querySelectorAll('tr') ).forEach( function( tr ) {
+
+					const box = tr.querySelector('.nino-admin-table-check');
+					const on = tr.dataset.row !== undefined && chosen.has( tr.dataset.row );
+
+					if( box !== null )
+						box.checked = on;
+
+					tr.classList.toggle( 'is-selected', on );
+				} );
+
+				// What is chosen and cannot be seen on this page - by the search or by the page - is said with the number, so that an action never reaches more than is shown
+				const text = Nino.adminUi.format( Nino.adminUi.text('/_admin/common/table/selected'), chosen.size );
+				const unseen = chosen.size - among;
+				const unseenText = unseen > 0 ? Nino.adminUi.format( Nino.adminUi.text('/_admin/common/table/unseen'), unseen ) : '';
+				const offer = matched.length > keys.length && matchedChosen < matched.length;
+
+				barCount.textContent = text;
+				barHidden.textContent = unseenText;
+				barHidden.classList.toggle( 'nino-admin-hidden', unseen < 1 );
+				barAll.textContent = offer === true ? Nino.adminUi.format( Nino.adminUi.text('/_admin/common/table/all'), matched.length ) : '';
+				barAll.classList.toggle( 'nino-admin-hidden', offer === false );
+				bar.classList.toggle( 'nino-admin-hidden', chosen.size === 0 );
+
+				if( say === true )
+					said.textContent = chosen.size === 0 ? '' : text+ ( unseenText === '' ? '' : ', '+ unseenText );
+			}
+
+			function clearSelection() {
+				chosen.clear();
+				anchor = null;
+				syncSelection( true );
 			}
 
 			draw();
 
 			return {
-				setRows : function( next ) { rows = next || []; shownText = new Map(); page = 1; draw() },
+				setRows : function( next ) {
+
+					rows = next || [];
+					shownText = new Map();
+					page = 1;
+
+					// A key that is not in the new rows is gone from the choice
+					const present = new Set( rows.map( keyOf ).filter( function( key ) { return key !== null } ).map( String ) );
+					Array.from( chosen.keys() ).forEach( function( key ) { if( present.has( key ) === false ) chosen.delete( key ) } );
+
+					draw();
+				},
 				destroy : function() { mount.innerHTML = ''; mount.classList.remove('nino-admin-table-wrap') },
+				selected : selected,
+				clearSelection : clearSelection,
 			};
 		},
 
@@ -6834,6 +7273,7 @@
 		 *														- page        the value of the page that is shown
 		 *														- widths      the names of the widths the strip offers, 'mobile', 'tablet' and 'desktop' by default; the words are the fills /_admin/common/preview/<name>, or text[name]
 		 *														- width       the name of the width that is chosen; none is chosen where it is none of the names
+		 *														- icons       true draws the widths as pictures - a phone, a tablet, a monitor for mobile, tablet and desktop - in place of their words, which stay the name of each step for a screen reader and its tooltip; a width with another name keeps its word. Default false
 		 *														- note        a quiet line beside the choice of the page - text, or an element -, what the page shows where the choice does not say it ("Automatic")
 		 *														- reload      false leaves the button out, where the view has one of its own (a split() that is no surface has it in its bar)
 		 *														- text        { shows, width, reload } to say the three words differently
@@ -6889,7 +7329,12 @@
 
 			const widths = Nino.adminUi.steps( {
 				labelledby	: caption.id,
-				steps				: names.map( function( name ) { return { value : name, label : text[name] ?? ( Nino.content.getText( '/_admin/common/preview/'+ name ) || name ) } } ),
+				steps				: names.map( function( name ) {
+
+					const device = { mobile : 'smartphone', tablet : 'tablet', desktop : 'monitor' };
+
+					return { value : name, label : text[name] ?? ( Nino.content.getText( '/_admin/common/preview/'+ name ) || name ), icon : options.icons === true && Object.hasOwn( device, name ) === true ? device[name] : undefined };
+				} ),
 				value				: options.width,
 				onChange		: function( name ) {
 					if( typeof options.onWidth === 'function' )
@@ -7051,6 +7496,7 @@
 		 *	@param		{Object}		options					{ id, settings, preview, view, sandbox, previewTitle, text, fill, aside, onView, onReload, onLoad }
 		 *														- settings    the controls; without them there is no column for them - the view is the side column and the preview (the switch is then named by aside.label), or the preview alone
 		 *														- fill        true for a work surface
+		 *														- settingsWidth  'wide' gives the settings column 480 px where the view has the room - half of the view at the most, and only from 46 rem of view on, where half is the usual width; with or without fill, and a side column keeps its layout; any other value is the usual width
 		 *														- aside       { content, label, collapsed, rail } - content an element, label the name of the button (it says what the column holds: "Outline"), collapsed whether the column starts folded where the session holds nothing, rail an element drawn in the folded strip
 		 *														- settings    the controls, an Element (more can be put into split.settings later)
 		 *														- preview     { src, title, width } for a page, an Element for a preview the caller draws; width is the layout width of the page in px, 1 to 10000
@@ -7073,7 +7519,7 @@
 			const root = dc.createElement('div');
 			const fill = options.fill === true;
 
-			root.className = 'nino-admin-split'+ ( fill === true ? ' nino-admin-split--fill' : '' );
+			root.className = 'nino-admin-split'+ ( fill === true ? ' nino-admin-split--fill' : '' )+ ( options.settingsWidth === 'wide' ? ' nino-admin-split--settings-wide' : '' );
 			root.dataset.view = options.view === 'preview' ? 'preview' : 'settings';
 
 			// Without settings there is no column for them: the view is the side column and the preview, or the preview alone

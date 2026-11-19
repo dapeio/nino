@@ -94,6 +94,7 @@ namespace Nino {
 			'file-version'		=> '"version" is major.minor.patch',
 			'file-words'			=> '"%s" is a string or a locale => string map, with no empty text',
 			'file-map'				=> '"%s" is a map',
+			'file-markup'			=> '"%s" holds markup: a name and a description are text, with no <, > or [[',
 			'identity'				=> '"key" is "%s" and the package is installed as "%s"',
 			'part-claims'			=> '"%s" is a component of the project: a part of a group the project does not have names components of its own',
 			'part-key'				=> '"%s" is no key of a part - there are %s',
@@ -881,9 +882,16 @@ namespace Nino {
 			if( is_string( $json['version'] ?? null ) === false || preg_match( self::VERSION, $json['version'] ) !== 1 )
 				return self::_problem( 'file-version', $file );
 
-			foreach( [ 'name', 'description' ] as $words )
+			foreach( [ 'name', 'description' ] as $words ) {
+
 				if( \Nino\Features::localizedValid( $json[$words] ?? null ) === false )
 					return self::_problem( 'file-words', $file, [ $words ] );
+
+				// The name is drawn in a list of the workbench and the catalogue: a tag or a call in it is a tag or a call there
+				foreach( is_array( $json[$words] ?? null ) === true ? $json[$words] : [ $json[$words] ?? '' ] as $text )
+					if( is_string( $text ) === true && preg_match( '/[<>]|\[\[/', $text ) === 1 )
+						return self::_problem( 'file-markup', $file, [ $words ] );
+			}
 
 			if( isset( $json['brand'] ) === true && is_array( $json['brand'] ) === false )
 				return self::_problem( 'file-map', $file, [ 'brand' ] );

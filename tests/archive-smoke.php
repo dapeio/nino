@@ -417,6 +417,25 @@ foreach( [ \Nino\Packages::BLOCKS => [ 'probe-pack', $pack ], \Nino\Packages::TH
 		&& strlen( (string) $archive ) <= \Nino\Catalogue::ARCHIVE_BYTES[$kind] );
 }
 
+echo "\nWhat refuses, and where\n";
+
+// read() names the entry a refusal is about in $refused, as write() does in its answer: below the folder, or whole for the wrong folder; a character that is no printable one is a question mark
+$where = static function( array $entries, ?string $folder = 'pack' ): array {
+	$path = null;
+	$answer = \Nino\Archive::read( (string) gzencode( archiveTar( $entries ) ), $folder, 40, 4096, 65536, null, $path );
+	return [ is_string( $answer ) === true ? $answer : 'ok', $path ];
+};
+
+check( 'a good archive answers its files and no path', $where( $good ) === [ 'ok', '' ] );
+check( 'a segment that is no plain name is refused with the path of the entry below the folder', $where( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( 'pack/ok.txt', 'x' ), archiveEntry( 'pack/sub/-bad.txt', 'x' ) ] ) === [ 'path', 'sub/-bad.txt' ] );
+check( '...so is a name that is twice, in the spelling a Mac folds together, and a file that is too large', $where( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( 'pack/a.txt', 'x' ), archiveEntry( 'pack/A.txt', 'x' ) ] ) === [ 'duplicate', 'A.txt' ]
+	&& $where( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( 'pack/big.bin', str_repeat( 'x', 5000 ) ) ] ) === [ 'file-size', 'big.bin' ] );
+check( '...a file that is not in the folder is refused with its whole path; a link with its name', $where( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( 'other/a.txt', 'x' ) ] ) === [ 'folder', 'other/a.txt' ]
+	&& $where( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( 'pack/link', '', '2' ) ] ) === [ 'type', 'pack/link' ] );
+check( '...a name with a control character is shown with a question mark in its place, and where the archive itself is the fault there is no path', $where( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( "pack/a\x01b.txt", 'x' ) ] ) === [ 'path', 'pack/a?b.txt' ]
+	&& \Nino\Archive::read( 'not an archive', 'pack', 40, 4096, 65536, null, $stale ) === 'gzip' && $stale === '' );
+check( 'what read() answers is what it answered: the call without the new argument is the call that was', is_array( \Nino\Archive::read( (string) gzencode( archiveTar( $good ) ), 'pack', 40, 4096, 65536 ) ) === true && \Nino\Archive::read( (string) gzencode( archiveTar( [ archiveEntry( 'pack/', '', '5' ), archiveEntry( 'pack/sub/-bad.txt', 'x' ) ] ) ), 'pack', 40, 4096, 65536 ) === 'path' );
+
 echo "\n";
 
 ninoDone( $app );

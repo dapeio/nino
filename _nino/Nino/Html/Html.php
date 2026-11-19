@@ -96,6 +96,10 @@ namespace Nino {
 			if( is_string( $request['/nino/http/response']['body'] ) !== true )
 				return;
 
+			// A download (Http::download()) is bytes, not a template: nothing is read of them for calls or fills
+			if( ( $request['/nino/http/response']['raw'] ?? false ) === true )
+				return;
+
 			$body = self::renderHtml( $appData, $request['/nino/http/response']['body'] );
 
 			// The preview of the workbench asks for its page to be marked from the first picture on (see \Nino\Preview::mark()); only a request that holds a draft is

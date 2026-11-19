@@ -262,6 +262,11 @@ namespace Nino\Modules {
 				|| isset( $request['/nino/http/response']['file'] ) === true || isset( $request['./nino/http/stream'] ) === true )
 				return;
 
+			// A download (\Nino\Http::download()) is bytes with a name and a type that the stored body would lose: a copy of them would be served as a page.
+			// Cache-Control is no word on this: it speaks to browsers and proxies, and every page carries no-store by default (\Nino\Http)
+			if( ( $request['/nino/http/response']['raw'] ?? false ) === true )
+				return;
+
 			// The lifetime the configuration gives, cut short by a shortcode that
 			// said where its output stops being true (see limit()); a moment that
 			// has passed leaves nothing worth storing, and a page that is not

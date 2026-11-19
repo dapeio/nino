@@ -212,6 +212,9 @@ $faults = [
 	'a picture of no slot'							=> [ [ 'blocks/probe/images/nowhere.png' => $png ], 'block', 'blocks/probe' ],
 	'a preview that is no webp'					=> [ [ 'preview.webp' => $png ], 'preview', 'preview.webp' ],
 	'a theme.json with a field that is no key of a theme'	=> [ [ 'theme.json' => json_encode( [ 'key' => 'craft-probe', 'version' => '1.0.0', 'name' => 'x', 'description' => 'x', 'run' => 'x' ] ) ], 'file-key', 'theme.json' ],
+	'a name with a tag'									=> [ [ 'theme.json' => json_encode( [ 'key' => 'craft-probe', 'version' => '1.0.0', 'name' => 'a <b>b</b>', 'description' => 'x' ] ) ], 'file-markup', 'theme.json' ],
+	'a name in one language with a call'	=> [ [ 'theme.json' => json_encode( [ 'key' => 'craft-probe', 'version' => '1.0.0', 'name' => [ 'de_DE' => 'Gut', 'en_US' => 'a [[/project/company/name]]' ], 'description' => 'x' ] ) ], 'file-markup', 'theme.json' ],
+	'a description with a closing bracket of a tag'	=> [ [ 'theme.json' => json_encode( [ 'key' => 'craft-probe', 'version' => '1.0.0', 'name' => 'x', 'description' => 'x>' ] ) ], 'file-markup', 'theme.json' ],
 ];
 
 foreach( $faults as $label => [ $change, $code, $path ] ) {
@@ -222,6 +225,9 @@ foreach( $faults as $label => [ $change, $code, $path ] ) {
 
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'probe/block.tpl' => '[html]x[/html]' ] ) );
 check( 'a package of blocks with a block that is no block is refused with the folder of the block', $problem !== null && $problem['code'] === 'block' && $problem['path'] === 'probe' );
+
+$problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'pack.json' => json_encode( [ 'key' => 'probe-pack', 'version' => '1.0.0', 'name' => '<script>x</script>', 'description' => 'Probe' ] ) ] ) );
+check( 'the name of a package of blocks is text as well: a tag in it is refused, and the good name of the same package is none', $problem !== null && $problem['code'] === 'file-markup' && $problem['path'] === 'pack.json' && \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $block, $webp ) ) === null );
 
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'README.md' => 'x' ] ) );
 check( 'a file of a theme is no file of a package of blocks', $problem !== null && $problem['code'] === 'not-allowed' && $problem['path'] === 'README.md' );

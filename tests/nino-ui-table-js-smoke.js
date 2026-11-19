@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { check, done, element, fire } = require( './harness.js' );
+const { check, done, element, fire, fills } = require( './harness.js' );
 
 // Nino.admin.js is an IIFE over (window, document, documentElement, body) and ends by
 // bootstrapping itself, so it needs a context where `window` is the global -
@@ -307,5 +307,123 @@ check( 'the search reads the text a cell shows: what a drawing function makes is
 foundBox.value = 'Inactive';
 fire( foundBox, 'input' );
 check( '...and a part of the shown text narrows to the rows that show it', foundRows() === '/two' );
+
+/*	The choice of rows: table( { select } ). A first column of boxes, one in the head for the rows the search matches, a bar with what can be done
+	with the chosen ones; the search, the sort and the page keep the choice, new rows drop the keys that are gone. Without the option the table
+	has none of it	*/
+// The words of the workbench, so that what the bar says is what it says to a person; an icon is an svg of the document's own
+const words = fills( '_admin/text/en_US.php' );
+ctx.Nino.content.getText = key => words[key] ?? '';
+ctx.document.createElementNS = ( space, tag ) => element( tag );
+// A call that throws is a check that fails, with its name - not the end of the run
+const attempt = fn => { try { return fn() } catch( error ) { return false } };
+const classOf = ( el, name ) => String( el.className ).split(' ').includes( name );
+const twelve = () => Array.from( { length : 12 }, ( _, at ) => ( { uri : '/r'+ ( at + 1 ), name : 'Row '+ ( at + 1 ) } ) );
+const draw = ( extra ) => {
+	const mount = element('div');
+	const ran = [];
+	const handle = ctx.Nino.adminUi.table( Object.assign( {
+		mount : mount,
+		columns : [ { key : 'name', label : 'Name', type : 'string' }, { key : 'uri', label : 'Uri', type : 'string' } ],
+		rows : twelve(),
+		labels : { search : 'Search', empty : '', noMatch : '' },
+		select : { actions : [ { key : 'drop', label : 'Drop', danger : true, run : keys => ran.push( keys ) }, { key : 'keep', label : 'Keep', run : keys => ran.push( keys ) } ] },
+	}, extra || {} ) );
+	return { mount : mount, ran : ran, handle : handle };
+};
+const boxes = ( t ) => descendants( t.mount ).filter( el => classOf( el, 'nino-admin-table-check' ) );
+const rowBoxes = ( t ) => boxes( t ).slice( 1 );
+const headBox = ( t ) => boxes( t )[0];
+const press = ( box, shift ) => { box.checked = box.checked !== true; fire( box, 'click', { shiftKey : shift === true } ) };
+const barOf = ( t ) => descendants( t.mount ).filter( el => classOf( el, 'nino-admin-table-selection' ) )[0];
+const searchOf = ( t ) => descendants( t.mount ).filter( el => el.type === 'search' )[0];
+
+const plain = attempt( () => draw( { select : undefined } ) );
+check( 'without select the table has no box, no column for it and no bar', plain !== false && boxes( plain ).length === 0 && descendants( plain.mount ).filter( el => classOf( el, 'nino-admin-table-select' ) || classOf( el, 'nino-admin-table-selection' ) ).length === 0 && plain.handle.selected()  .length === 0 );
+
+const choice = draw();
+
+check( 'with select every row has a box named by the text of its first column, the head a box of its own, in a first column', boxes( choice ).length === 13 && rowBoxes( choice )[0].getAttribute('aria-label') === 'Row 1'
+	&& descendants( choice.mount ).filter( el => el.tagName === 'TR' )[0].children[0].className === 'nino-admin-table-select' );
+check( 'the bar is not drawn while nothing is chosen, and the head says none', classOf( barOf( choice ), 'nino-admin-hidden' ) === true && headBox( choice ).checked === false && headBox( choice ).indeterminate === false );
+
+press( rowBoxes( choice )[1] );
+check( 'one chosen: the bar shows with the count, the row is marked, the head says some; selected() has its key', classOf( barOf( choice ), 'nino-admin-hidden' ) === false && barOf( choice ).children[0].textContent.includes('1')
+	&& headBox( choice ).indeterminate === true && headBox( choice ).checked === false && choice.handle.selected().join() === '/r2' );
+
+press( headBox( choice ) );
+check( 'the head chooses the rows of the page and says all; pressed again it takes them away', choice.handle.selected().length === 12 && headBox( choice ).checked === true && headBox( choice ).indeterminate === false
+	&& ( press( headBox( choice ) ), choice.handle.selected().length === 0 && classOf( barOf( choice ), 'nino-admin-hidden' ) === true ) );
+
+press( rowBoxes( choice )[0] );
+const query = searchOf( choice );
+query.value = 'Row 1';
+fire( query, 'input' );
+check( 'a search keeps the choice, also of rows it hides, and the head speaks for the rows that are matched (Row 1, 10, 11, 12)', choice.handle.selected().join() === '/r1' && rowBoxes( choice ).length === 4 && headBox( choice ).indeterminate === true );
+press( headBox( choice ) );
+query.value = '';
+fire( query, 'input' );
+check( '...choosing all of them adds those four to the one that was, nothing else', choice.handle.selected().join() === '/r1,/r10,/r11,/r12' );
+
+choice.handle.setRows( twelve().filter( row => row.uri !== '/r10' && row.uri !== '/r12' ) );
+check( 'rows that are drawn anew drop the keys that are gone and keep the others', choice.handle.selected().join() === '/r1,/r11' && barOf( choice ).children[0].textContent.includes('2') );
+
+const buttonsOf = ( t ) => descendants( barOf( t ) ).filter( el => el.tagName === 'BUTTON' );
+fire( buttonsOf( choice )[1], 'click' );
+check( 'an action of the bar is handed the keys of the chosen rows, in the order of the rows; the one that takes something away is a danger button', choice.ran.length === 1 && choice.ran[0].join() === '/r1,/r11' && classOf( buttonsOf( choice )[0], 'nino-admin-btn-danger' ) === true );
+
+fire( buttonsOf( choice )[buttonsOf( choice ).length - 1], 'click' );
+check( 'Clear selection takes every choice away and hides the bar', choice.handle.selected().length === 0 && classOf( barOf( choice ), 'nino-admin-hidden' ) === true );
+
+const paged = draw( { pageSize : 5, pageSizes : [ 5, 50 ] } );
+const stepsOf = t => descendants( t.mount ).filter( el => el.className === 'nino-admin-table-step' );
+const hiddenOf = t => descendants( barOf( t ) ).filter( el => classOf( el, 'nino-admin-table-selection-hidden' ) )[0];
+const allOf = t => descendants( barOf( t ) ).filter( el => el.tagName === 'BUTTON' )[2];
+press( headBox( paged ) );
+check( 'the head chooses the rows of the page that is shown, not those of the other pages: 12 rows on pages of 5', rowBoxes( paged ).length === 5 && paged.handle.selected().join() === '/r1,/r2,/r3,/r4,/r5' && headBox( paged ).checked === true );
+check( 'the bar offers the rows of the other pages with their number - all 12 matches - and says nothing is out of sight yet', classOf( allOf( paged ), 'nino-admin-hidden' ) === false && allOf( paged ).textContent.includes('12') && classOf( hiddenOf( paged ), 'nino-admin-hidden' ) === true );
+fire( stepsOf( paged )[1], 'click' );
+check( 'on the next page the bar says how many of the chosen are not on it, and the head speaks for the page: none of it chosen', classOf( hiddenOf( paged ), 'nino-admin-hidden' ) === false && /5/.test( hiddenOf( paged ).textContent ) && headBox( paged ).checked === false && headBox( paged ).indeterminate === false );
+fire( allOf( paged ), 'click' );
+check( 'the offer chooses every match, and is gone when there is nothing more to offer; nothing is out of sight then but what the page does not show: 7', paged.handle.selected().length === 12 && classOf( allOf( paged ), 'nino-admin-hidden' ) === true && /7/.test( hiddenOf( paged ).textContent ) );
+paged.handle.clearSelection();
+check( 'the live region has the number, and is empty again when nothing is chosen', ( press( rowBoxes( paged )[0] ), descendants( paged.mount ).filter( el => el.getAttribute('aria-live') === 'polite' )[0].textContent.includes('1') ) && ( paged.handle.clearSelection(), descendants( paged.mount ).filter( el => el.getAttribute('aria-live') === 'polite' )[0].textContent === '' ) );
+
+// the anchor of Shift and a click is a row, not a place on a page
+const anchored = draw( { pageSize : 5, pageSizes : [ 5, 50 ] } );
+press( rowBoxes( anchored )[1] );
+fire( stepsOf( anchored )[1], 'click' );
+press( rowBoxes( anchored )[3], true );
+check( 'a box touched on the first page is no anchor on the second: Shift and a click there chooses the box that was pressed and nothing else', anchored.handle.selected().join() === '/r2,/r9' );
+const sorted = draw( { pageSize : 5, pageSizes : [ 5, 50 ] } );
+press( rowBoxes( sorted )[0] );
+fire( descendants( sorted.mount ).filter( el => el.className === 'nino-admin-table-sort' )[0], 'click' );
+press( rowBoxes( sorted )[3], true );
+check( '...nor after a sort, a search or new rows', sorted.handle.selected().length === 2 );
+
+// the key keeps its type; the order is the order of the rows; a table with no rows has a head that cannot be pressed
+const numbers = draw( { rowKey : 'id', rows : [ { id : 3, name : 'c' }, { id : 1, name : 'a' }, { id : 2, name : 'b' } ], columns : [ { key : 'name', label : 'Name', type : 'string' } ] } );
+press( rowBoxes( numbers )[2] );
+press( rowBoxes( numbers )[0] );
+check( 'a key is as it is in the row - a number stays one - and selected() is in the order of the rows, not of the choice', numbers.handle.selected().join() === '3,2' && numbers.handle.selected().every( key => typeof key === 'number' ) );
+const nothing = draw( { rows : [] } );
+check( 'a table with no rows has a head that cannot be pressed and no bar', headBox( nothing ).disabled === true && classOf( barOf( nothing ), 'nino-admin-hidden' ) === true );
+
+const ranged = draw();
+press( rowBoxes( ranged )[2] );
+press( rowBoxes( ranged )[6], true );
+check( 'Shift and a click chooses the range from the last box touched', ranged.handle.selected().join() === '/r3,/r4,/r5,/r6,/r7' );
+press( rowBoxes( ranged )[4], true );
+check( '...and takes a range away in the state of the box that was pressed', ranged.handle.selected().join() === '/r3,/r4' );
+ranged.handle.clearSelection();
+check( 'clearSelection() does the same from outside', ranged.handle.selected().length === 0 && rowBoxes( ranged ).every( box => box.checked === false ) );
+
+// --- the actions of a row ------------------------------------------------------------
+
+const rowsWith = ( count, extra ) => draw( Object.assign( { select : undefined, rows : [ { uri : '/x', name : 'X' } ], actions : () => Array.from( { length : count }, ( _, at ) => ctx.Nino.adminUi.iconButton( 'x', 'Action '+ at, null, { small : true } ) ) }, extra || {} ) );
+const menus = ( t ) => descendants( t.mount ).filter( el => classOf( el, 'nino-admin-menu' ) );
+
+check( 'a row with up to three actions has them as buttons and no menu', attempt( () => menus( rowsWith( 3 ) ).length === 0 && menus( rowsWith( 1 ) ).length === 0 ) === true );
+check( 'a row with more has the first two and a menu for the rest; actionsInline 2 puts the third in the menu', attempt( () => menus( rowsWith( 5 ) ).length === 1 && menus( rowsWith( 3, { actionsInline : 2 } ) ).length === 1 ) === true );
 
 done();

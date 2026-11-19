@@ -2147,6 +2147,19 @@ $sameWithoutFile = cacheRequest( '/home' );
 \Nino\Modules\Cache::callbackOutput( $appData, $sameWithoutFile );
 check( '...while the same request without the file is stored', cacheEntryCount( $appData ) === 1 );
 
+// A download is bytes with a name and a type: the page cache keeps the body alone, so a copy would come back as a page without them
+\Nino\Modules\Cache::_invalidate( $appData );
+$downloadToCache = cacheRequest( '/home' );
+\Nino\Http::download( $downloadToCache, 'a,b', 'x.csv', 'text/csv' );
+\Nino\Modules\Cache::callbackOutput( $appData, $downloadToCache );
+check( 'a download is never stored by the page cache', cacheEntryCount( $appData ) === 0 );
+
+// Cache-Control speaks to browsers and proxies: a page that carries the no-store every page carries by default is stored by the page cache all the same
+$storeless = cacheRequest( '/home', 'GET', [ 'header' => [ 'Cache-Control' => 'no-store' ] ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $storeless );
+check( 'a page with the default Cache-Control: no-store is stored by the page cache', cacheEntryCount( $appData ) === 1 );
+\Nino\Modules\Cache::_invalidate( $appData );
+
 // A query var is what makes a page not the same page for everyone - the
 // locale switch is exactly one
 \Nino\Modules\Cache::_invalidate( $appData );
@@ -2554,6 +2567,65 @@ function requestCopyAfterCallbacks( array &$appData ): void {
 }
 
 requestCopyAfterCallbacks( $appData );
+
+// --- Http::download - bytes as an attachment, which nothing draws -----------
+
+echo "\nHttp::download - the headers, the name, the body left alone\n";
+
+\Nino\Html::addFills( $appData, [ '/probe/download' => 'FILLED' ], '*' );
+
+$body = "a,b\n[[/probe/download]],<nino-x>\n";
+$fresh = static fn(): array => [ '/nino/http/request' => [ 'method' => 'GET', 'rawMethod' => 'GET', 'uri' => '/', 'header' => [], 'query' => [] ], '/nino/http/response' => [ 'uri' => '/', 'locale' => 'de_DE', 'header' => [ 'Content-Type' => 'text/html', 'X-Own' => 'kept' ], 'body' => '', 'statusCode' => 404 ] ];
+
+$plain = $fresh();
+\Nino\Http::ok( $plain, $body );
+\Nino\Html::response( $appData, $plain );
+
+$download = $fresh();
+\Nino\Http::download( $download, $body, 'export.csv', 'text/csv; charset=utf-8' );
+\Nino\Html::response( $appData, $download );
+$header = $download['/nino/http/response']['header'];
+
+check( 'a body that a response answers is drawn: a fill in it is filled (the control of the next check)', str_contains( $plain['/nino/http/response']['body'], 'FILLED' ) === true );
+check( 'a download answers 200 and the bytes as they are - a fill, a tag that looks like markup, a newline - for the renderer leaves them alone', $download['/nino/http/response']['statusCode'] === 200 && $download['/nino/http/response']['body'] === $body );
+check( 'it sets the type, an attachment under the name, no sniffing, no storing and the length - each of them', $header['Content-Type'] === 'text/csv; charset=utf-8' && $header['Content-Disposition'] === 'attachment; filename="export.csv"'
+	&& $header['X-Content-Type-Options'] === 'nosniff' && $header['Cache-Control'] === 'private, no-store' && $header['Content-Length'] === (string) strlen( $body ) && ( $header['X-Own'] ?? '' ) === 'kept' );
+
+$disposition = static function( string $name ) use ( $fresh ): string {
+	$request = $fresh();
+	\Nino\Http::download( $request, 'x', $name, 'text/plain' );
+	return $request['/nino/http/response']['header']['Content-Disposition'];
+};
+
+$names = [ '../x', '..\\..\\x.txt', '/etc/passwd', 'a"b', "a\r\nX: y", "a\0b", 'a\\"b' ];
+$unsafe = [];
+
+foreach( $names as $name ) {
+
+	$said = $disposition( $name );
+
+	// One line, one quoted name of printable characters, and nothing of the path or of a second header in it
+	if( preg_match( '/^attachment; filename="[\x20\x21\x23-\x5b\x5d-\x7e]+"$/', $said ) !== 1 || str_contains( $said, '/' ) === true || str_contains( $said, "\n" ) === true || str_contains( $said, "\r" ) === true )
+		$unsafe[] = $name;
+}
+
+check( 'a name is made harmless: no path, no quote, no backslash, no control character, whatever it was - the headers stay one line each'. ( $unsafe === [] ? '' : ' - '. implode( ', ', array_map( 'json_encode', $unsafe ) ) ), $unsafe === [] );
+check( '...what is left of a path is the last part; a name with nothing left is "download"', $disposition( '../x' ) === 'attachment; filename="x"' && $disposition( '/etc/passwd' ) === 'attachment; filename="passwd"' && $disposition( '../' ) === 'attachment; filename="download"' && $disposition( '' ) === 'attachment; filename="download"' );
+check( '...a name that is not ASCII has an ASCII stand-in and the utf-8 name percent-encoded after filename* (RFC 5987)', $disposition( 'Größe.csv' ) === 'attachment; filename="Gr__e.csv"; filename*=UTF-8\'\'Gr%C3%B6%C3%9Fe.csv' );
+check( '...and a name of bytes that are no utf-8 is made into text first, and still one line', preg_match( '/^attachment; filename="[\x20-\x7e]+"(; filename\*=UTF-8\'\'[A-Za-z0-9%._~-]+)?$/', $disposition( "a\xff\xfeb.csv" ) ) === 1 );
+check( '...a name is at most 150 bytes, and what is cut is the front of it: the ending stays', strlen( explode( '"', $disposition( str_repeat( 'a', 400 ). '.csv' ) )[1] ) <= 150 && str_ends_with( $disposition( str_repeat( 'ä', 200 ). '.csv' ), '.csv' ) === true && str_ends_with( explode( '"', $disposition( str_repeat( 'a', 400 ). '.csv' ) )[1], '.csv' ) === true );
+check( '...what turns text round or breaks a line - U+202E, U+2028, U+200F - is no part of a name; a backslash is a separator as a slash is; a name of dots alone is "download"',
+	$disposition( "evil\u{202E}fdp.exe" ) === 'attachment; filename="evilfdp.exe"' && $disposition( "a\u{2028}b\u{200F}.txt" ) === 'attachment; filename="ab.txt"'
+	&& $disposition( 'dir\\file.txt' ) === 'attachment; filename="file.txt"' && $disposition( '...' ) === 'attachment; filename="download"' && $disposition( '.' ) === 'attachment; filename="download"' );
+
+$typed = static function( string $type ) use ( $fresh ): string {
+	$request = $fresh();
+	\Nino\Http::download( $request, 'x', 'a.bin', $type );
+	return $request['/nino/http/response']['header']['Content-Type'];
+};
+
+check( 'a type that is no type/subtype with an optional charset - a second header, a space, a script - is application/octet-stream', $typed( "text/html\r\nSet-Cookie: a=b" ) === 'application/octet-stream' && $typed( 'text' ) === 'application/octet-stream'
+	&& $typed( 'text/html; x=y' ) === 'application/octet-stream' && $typed( "text/csv\n" ) === 'application/octet-stream' && $typed( 'application/gzip' ) === 'application/gzip' && $typed( 'text/csv; charset=utf-8' ) === 'text/csv; charset=utf-8' );
 
 // --- Cleanup ------------------------------------------------------------
 

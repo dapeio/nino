@@ -43,6 +43,8 @@ console.log( 'Nino.adminUi.previewTools - the tools of a preview\n' );
 	check( 'the width is a group of steps named by a word, one step for each width, the one that was asked for chosen',
 		tools.widths.el.getAttribute('role') === 'radiogroup' && steps.map( wordOf ).join() === [ 'mobile', 'tablet', 'desktop' ].map( name => word( 'preview/'+ name ) ).join() && tools.widths.el.getAttribute('aria-labelledby') !== null
 		&& steps.map( el => el.getAttribute('aria-checked') ).join() === 'false,true,false' && tools.width() === 'tablet' );
+	check( 'without icons the widths are words, as before', steps.every( el => findAll( el, node => node.tagName === 'SVG' ).length === 0 ) );
+
 	check( 'Reload is an icon button with a name', tools.reload.tagName === 'BUTTON' && tools.reload.getAttribute('aria-label') === word('split/reload') && findAll( tools.reload, el => el.tagName === 'SVG' ).length === 1 );
 
 	tools.select.value = '';
@@ -108,6 +110,20 @@ console.log( '\nNino.adminUi.previewFrame - the page in the frame is marked\n' )
 	check( 'the address of the page asks for the mark, so that the kernel writes it from the first byte - the script follows after the load', asked.length === 1 && asked[0] === '/p?nino-preview=t&nino-preview-mark=loose' );
 
 	check( 'a word that is none is refused: it is written in a page', [ 'Loose', 'a b', '"x', '1x' ].every( word => { try { adminUi.previewFrame( { split : split, send : () => {}, address : query => query, mark : word } ) } catch( e ) { return e.name === 'TypeError' } return false } ) );
+}
+
+{
+	const pictured = build( { icons : true, widths : [ 'mobile', 'tablet', 'desktop', 'wide' ] } );
+	const steps = buttonsOf( pictured.widths.el );
+	const svgs = el => findAll( el, node => node.tagName === 'SVG' );
+	const quiet = el => findAll( el, node => String( node.className ).split(' ').includes('nino-admin-sr-only') );
+
+	check( 'with icons the three widths are pictures, each with its word kept as the name for a screen reader and as its tooltip; a width that has no picture keeps its word',
+		steps.slice( 0, 3 ).every( ( el, at ) => svgs( el ).length === 1 && quiet( el )[0].textContent === word( 'preview/'+ [ 'mobile', 'tablet', 'desktop' ][at] ) && el.title === quiet( el )[0].textContent )
+		&& svgs( steps[3] ).length === 0 && steps[3].title === '' );
+	told.length = 0;
+	fire( steps[2], 'click' );
+	check( '...and they are chosen and told as the words are', told.join() === 'width:desktop' && pictured.width() === 'desktop' );
 }
 
 done();

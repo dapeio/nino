@@ -93,10 +93,15 @@ namespace Nino {
 		 *	@param		int										$total				The most bytes all files together may have
 		 *	@param		string|\Closure|null	$allow				Which files it may hold: a pattern (preg) or a callback ( string $path ): bool, both asked of the path below the
 		 *																							folder; null for every file whose segments are plain names
+		 *	@param		string|null						$refused			(reference) Where the answer is a code: the path of the entry it is about - below the folder, or as the archive has it for a folder
+		 *																							that is the wrong one - with what is no printable character of it as a question mark, '' where it is about no entry. It is the text of an archive somebody else made, printable
+		 *																							ASCII with <, > and quotes among it: a caller that shows it sets it as text, never as markup
 		 *
 		 *	@return 	array|string											path below the folder => content, in the order of the archive - or the code of what is wrong, one of the constants of this class
 		 */
-		public static function read( string $bytes, ?string $folder, int $entries, int $each, int $total, string|\Closure|null $allow = null ): array|string {
+		public static function read( string $bytes, ?string $folder, int $entries, int $each, int $total, string|\Closure|null $allow = null, ?string &$refused = null ): array|string {
+
+			$refused = '';
 
 			if( self::supported() === false )
 				return self::UNSUPPORTED;
@@ -122,6 +127,8 @@ namespace Nino {
 			$top = $folder;
 
 			while( true ) {
+
+				$refused = '';
 
 				// A tar that stops after its last entry, with no block of nothing to end it, is as complete as one that has it
 				if( $at >= $length )
@@ -160,18 +167,24 @@ namespace Nino {
 					continue;
 				}
 
-				if( $type !== '0' && $type !== "\0" && $type !== '5' )
+				if( $type !== '0' && $type !== "\0" && $type !== '5' ) {
+					$refused = self::_shown( $head );
 					return self::TYPE;
+				}
 
 				// A folder has no data: the size in its header is read by one tar as the blocks to jump over and by another as nothing, and an entry
 				// can be hidden in them
-				if( $type === '5' && $size !== 0 )
+				if( $type === '5' && $size !== 0 ) {
+					$refused = self::_shown( $head );
 					return self::HEADER;
+				}
 
 				$path = self::_path( $head, $type );
 
-				if( $path === null )
+				if( $path === null ) {
+					$refused = self::_shown( $head );
 					return self::PATH;
+				}
 
 				if( ++$count > $entries )
 					return self::COUNT;
@@ -184,20 +197,28 @@ namespace Nino {
 				// The folder itself: the one entry that is no file and has no path below it
 				if( count( $segments ) === 1 ) {
 
-					if( $type !== '5' || $segments[0] !== $top )
+					if( $type !== '5' || $segments[0] !== $top ) {
+						$refused = self::_printable( $path );
 						return self::FOLDER;
+					}
 
-					if( $topSeen === true )
+					if( $topSeen === true ) {
+						$refused = self::_printable( $path );
 						return self::DUPLICATE;
+					}
 
 					$topSeen = true;
 					continue;
 				}
 
-				if( $segments[0] !== $top )
+				if( $segments[0] !== $top ) {
+					$refused = self::_printable( $path );
 					return self::FOLDER;
+				}
 
 				$below = array_slice( $segments, 1 );
+				$relative = implode( '/', $below );
+				$refused = self::_printable( $relative );
 
 				if( count( $below ) > self::DEPTH_MAX )
 					return self::DEPTH;
@@ -205,8 +226,6 @@ namespace Nino {
 				foreach( $below as $segment )
 					if( preg_match( self::SEGMENT, $segment ) !== 1 )
 						return self::PATH;
-
-				$relative = implode( '/', $below );
 
 				// A name of digits alone is an integer as the key of an array, and the caller is promised strings
 				if( ctype_digit( $relative ) === true )
@@ -618,6 +637,33 @@ namespace Nino {
 					return null;
 
 			return $path;
+		}
+
+		/**
+		 *	What a path is called in an answer: as it is, with a character that is not printable ASCII - control characters, bytes of another make, a NUL - as a question
+		 *	mark, and at most 200 bytes of it
+		 *
+		 *	@param		string		$path
+		 *
+		 *	@return 	string
+		 */
+		private static function _printable( string $path ): string {
+			return substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $path ), 0, 200 );
+		}
+
+		/**
+		 *	The name of the entry a header opens, for an answer that says what it refuses: its name field and, in a ustar header, its prefix
+		 *
+		 *	@param		string		$head					The header block
+		 *
+		 *	@return 	string
+		 */
+		private static function _shown( string $head ): string {
+
+			$name = (string) strtok( substr( $head, 0, 100 ), "\0" );
+			$prefix = substr( $head, 257, 6 ) === "ustar\0" ? (string) strtok( substr( $head, 345, 155 ), "\0" ) : '';
+
+			return self::_printable( $prefix === '' ? $name : $prefix. '/'. $name );
 		}
 
 		/**

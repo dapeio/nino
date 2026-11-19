@@ -1071,7 +1071,7 @@ owns a word.
 
 | What | Builder |
 |---|---|
-| A question before an action | `confirm( level, { title, message, details, yes, no, onChoose } )` |
+| A question before an action | `confirm( level, { title, message, details, yes, no, nested, onChoose } )` - `nested : true` where it is asked of an open dialog: it stands on it, Esc closes it alone and the focus goes back into the dialog below |
 | Make or copy something from a name and at most four more fields (duplicate, save as) | `formDialog()` |
 | Pick one from a list (a block, a source, a component) | `pickDialog()` |
 | The properties of one part of a work surface, which stays in view | `propertiesDialog()` |
@@ -1842,7 +1842,7 @@ const spacing = Nino.adminUi.steps( {
 mount.appendChild( spacing.el );
 ```
 
-The **split view** is the settings on one side and the preview on the other. Where
+The **split view** is the settings on one side and the preview on the other. `settingsWidth : 'wide'` gives the settings column 480 px (18 rem at the least, half of the view at the most) instead of 23 rem, with or without `fill`. It has an effect from a view of 46 rem on, where half of it is the usual width - below that the view lays out as it does without; a side column and the narrow view lay out their own columns, and any other value is the usual width. Where
 the view itself is narrow (a container query: the pane beside the rail, not the
 window) a switch of two buttons shows one of them and keeps the other in the page,
 so a switch loses nothing. The preview is a page in an iframe or an element the
@@ -1933,9 +1933,9 @@ width the switch "Settings | Preview" is drawn, as in the other form.
 of the rail's button, `aria-expanded`, the focus stays on it), `collapsed` where it starts folded when the session holds nothing. A
 view with an `id` keeps whether its column is folded for the session. `split.aside` is `{ el, body, rail, toggle, collapsed(), collapse( on ) }`.
 
-`Nino.adminUi.previewTools( { pages, page, widths, width, text, onPage, onWidth, onReload } )` is the group of the tools of the
+`Nino.adminUi.previewTools( { pages, page, widths, width, icons, text, onPage, onWidth, onReload } )` is the group of the tools of the
 preview: a select named "Shows" for the page (drawn where `pages` is a list, `[ { value, label } ]`), the widths as one strip of
-steps (`mobile`, `tablet`, `desktop` unless `widths` names others), a quiet line beside the choice (`note`, `setNote()`) and Reload as an icon button (`reload : false` leaves it out where the view has one). It reports what a hand did; `setPage()`
+steps (`mobile`, `tablet`, `desktop` unless `widths` names others; `icons : true` draws them as a phone, a tablet and a monitor - the word stays the name of each step and its tooltip), a quiet line beside the choice (`note`, `setNote()`) and Reload as an icon button (`reload : false` leaves it out where the view has one). It reports what a hand did; `setPage()`
 and `setWidth()` move it from outside and report nothing. `contextBar( { tools : tools.el } )` puts it at the right of the context bar;
 where the bar is narrower than 56 rem (its own width) the group is a menu behind one icon button "Tools" - `aria-expanded`, Esc and a
 click beside it close it. The context bar also takes `code`, a quiet identifier after the title, and `icons`, icon buttons after that

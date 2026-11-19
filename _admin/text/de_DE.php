@@ -86,6 +86,12 @@ return [
 	'[[/_admin/common/label/prevpage]]'	=> 'Vorherige Seite',
 	'[[/_admin/common/label/nextpage]]'	=> 'Nächste Seite',
 	'[[/_admin/common/label/perpage]]'	=> 'Zeilen pro Seite',
+	'[[/_admin/common/table/select-page]]'	=> 'Zeilen dieser Seite wählen',
+	'[[/_admin/common/table/unseen]]'	=> '%n davon nicht zu sehen',
+	'[[/_admin/common/table/all]]'	=> 'Alle %n Treffer wählen',
+	'[[/_admin/common/table/selected]]'	=> '%n gewählt',
+	'[[/_admin/common/table/clear]]'	=> 'Auswahl aufheben',
+	'[[/_admin/common/table/more]]'	=> 'Weitere Aktionen',
 	// Die Wörter der Bausteine, die selbst welche zeichnen: Umschalter und
 	// Neuladen der geteilten Ansicht, Fehler und Urteil des Farbfelds, die
 	// Vorgabe der Stufenwahl (siehe Nino.adminUi.split(), color(), steps() und tree())

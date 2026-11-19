@@ -85,6 +85,12 @@ return [
 	'[[/_admin/common/label/prevpage]]'	=> 'Previous page',
 	'[[/_admin/common/label/nextpage]]'	=> 'Next page',
 	'[[/_admin/common/label/perpage]]'	=> 'Rows per page',
+	'[[/_admin/common/table/select-page]]'	=> 'Select the rows of this page',
+	'[[/_admin/common/table/unseen]]'	=> '%n of them not shown',
+	'[[/_admin/common/table/all]]'	=> 'Select all %n matches',
+	'[[/_admin/common/table/selected]]'	=> '%n selected',
+	'[[/_admin/common/table/clear]]'	=> 'Clear selection',
+	'[[/_admin/common/table/more]]'	=> 'More actions',
 	// The words of the building blocks that draw their own: the split view's switch
 	// and reload button, the colour field's error and verdict, the strip's default
 	// (see Nino.adminUi.split(), color(), steps() and tree())

@@ -455,4 +455,14 @@ check( 'a scaled port is the box the frame is placed in and cut by',
 check( '...and the frame in it is placed by the scaler, from its corner, and not held to the width of the pane',
 	/\.nino-admin-split-port--scaled\s*>\s*\.nino-admin-split-frame\s*\{[^}]*position:\s*absolute[^}]*max-width:\s*none[^}]*transform-origin:\s*0 0/.test( css ) );
 
+// settingsWidth: 'wide' is a class of the root and a column of up to 30 rem of the settings, in a view wide enough for two columns, with or without fill
+const hasWide = split => String( split.el.className ).split(' ').includes('nino-admin-split--settings-wide');
+
+check( 'settingsWidth wide puts a class on the view, with or without fill; no option, another word and another kind of value leave the view as it is',
+	hasWide( build( { settingsWidth : 'wide' } ) ) === true && hasWide( build( { settingsWidth : 'wide', fill : true } ) ) === true
+	&& [ undefined, 'narrow', 'WIDE', true, 30 ].every( value => hasWide( build( { settingsWidth : value } ) ) === false ) );
+check( '...and the class is the settings column of 480 px, half of the view at the most, from a view of 46 rem on - where half of it is the 23 rem the column has without, so it is never narrower - for a view of two columns that is no preview alone; a side column and the narrow view lay their own out',
+	/@container nino-split \(min-width: 46rem\) \{\s*\.nino-admin \.nino-admin-split--settings-wide:not\(\.nino-admin-split--solo\) > \.nino-admin-split-grid \{\s*grid-template-columns: minmax\(18rem, min\(480px, 50cqw\)\) minmax\(0, 1fr\);/.test( css )
+	&& css.indexOf('nino-admin-split--settings-wide') < css.indexOf('.nino-admin .nino-admin-split[data-aside] > .nino-admin-split-grid') );
+
 done();

@@ -2770,6 +2770,71 @@ a {
 	gap: var(--nino-admin-space-2);
 }
 
+/* The menu of Nino.adminUi.menuButton(): the trigger is an icon button, the list stands fixed at it - the frame of a table, which scrolls, does not cut it - over everything
+   that is in the page; a cell that holds an open one is raised over the sticky cells of the rows under it. An item is a row of 32 px, what takes something away is red */
+:where(.nino-admin) .nino-admin-menu {
+	display: inline-flex;
+	position: relative;
+}
+
+:where(.nino-admin) .nino-admin-menu-list {
+	position: fixed;
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	min-width: 11rem;
+	max-width: calc(100vw - 1rem);
+	padding: var(--nino-admin-space-1);
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+	box-shadow: var(--editor-shadow);
+	text-align: left;
+}
+
+:where(.nino-admin) .nino-admin-menu-list[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-menu-item {
+	display: flex;
+	align-items: center;
+	min-height: 2rem;
+	padding: var(--nino-admin-space-2) var(--nino-admin-space-4);
+	border: 0;
+	border-radius: var(--editor-radius-sm);
+	background: none;
+	box-shadow: none;
+	color: var(--editor-text);
+	font: inherit;
+	font-size: var(--nino-admin-text-sm);
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-menu-item:is(:hover, :focus-visible) {
+	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-menu-item:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
+}
+
+:where(.nino-admin) .nino-admin-menu-item--danger {
+	color: var(--editor-red-ink);
+}
+
+:where(.nino-admin) .nino-admin-menu-item[aria-disabled="true"] {
+	color: var(--editor-text-secondary);
+	cursor: default;
+}
+
+:where(.nino-admin) .nino-admin-table td.nino-admin-table-actions:has( .nino-admin-menu-list:not([hidden]) ) {
+	z-index: 5;
+}
+
 :where(.nino-admin) .nino-admin-row-chev {
 	flex: 0 0 auto;
 	color: var(--editor-text-secondary);
@@ -2941,6 +3006,60 @@ a {
 /* The search of a directory (table( { search : true } )): the whole width over the table */
 :where(.nino-admin) .nino-admin-table-toolbar--wide .nino-admin-table-search {
 	max-width: none;
+}
+
+/* table( { select } ): the first column holds the box of a row and, in the head, the box of all the rows the search matches (none, some, all). The label is the target of
+   24 px, the box is drawn in it; a chosen row has the tint of the accent, also under the sticky cell of its buttons. Over the table a bar says how many are chosen and has
+   what can be done with them: on the ground of a card, with the line of the accent - the red and the blue of its buttons hold 4.5 : 1 there, not on a tint */
+:where(.nino-admin) .nino-admin-table :is(th, td).nino-admin-table-select {
+	width: 1%;
+	padding-inline: var(--nino-admin-space-4) 0;
+}
+
+:where(.nino-admin) .nino-admin-table-selectcell {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--nino-admin-control-icon-small);
+	height: var(--nino-admin-control-icon-small);
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-table-check {
+	width: 1rem;
+	height: 1rem;
+	margin: 0;
+	accent-color: var(--editor-blue);
+	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-table tbody tr.is-selected td {
+	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-table tbody tr.is-selected td.nino-admin-table-actions {
+	background: linear-gradient( var(--editor-blue-soft), var(--editor-blue-soft) ), var(--editor-bg-grouped);
+}
+
+:where(.nino-admin) .nino-admin-table-selection {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	margin-bottom: var(--nino-admin-space-4);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
+	border: 1px solid var(--editor-blue);
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-bg-elevated);
+}
+
+:where(.nino-admin) .nino-admin-table-selection-hidden {
+	color: var(--editor-text-secondary);
+}
+
+:where(.nino-admin) .nino-admin-table-selection-count {
+	margin-right: var(--nino-admin-space-3);
+	font-weight: var(--nino-admin-weight-strong);
 }
 
 /* The buttons at the end of a row: a column with no head, at the right, in one line. It sticks to the right edge of the frame at every width:
@@ -4454,6 +4573,14 @@ a {
 	.nino-admin .nino-admin-split[data-view="settings"] > .nino-admin-split-grid > .nino-admin-split-preview,
 	.nino-admin .nino-admin-split[data-view="preview"] > .nino-admin-split-grid > .nino-admin-split-settings {
 		display: none;
+	}
+}
+
+/* settingsWidth: 'wide' - the settings column is 480 px where the view has the room and half of the view at the most. From 46 rem of view on, where half of it is the 23 rem that the column has without the option: never narrower than that, and the narrow view and the view of 44 to 46 rem keep their own layout. A side column, a view without settings and the narrow view lay out their own columns */
+@container nino-split (min-width: 46rem) {
+
+	.nino-admin .nino-admin-split--settings-wide:not(.nino-admin-split--solo) > .nino-admin-split-grid {
+		grid-template-columns: minmax(18rem, min(480px, 50cqw)) minmax(0, 1fr);
 	}
 }
 
