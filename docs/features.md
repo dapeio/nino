@@ -980,7 +980,8 @@ JavaScript tests carry a stand-in of their own and run with any Nino.
 
 A feature is one of three kinds of package that come from outside as a folder of files; the other two are data and have no code. `\Nino\Packages` is the one
 mechanism for them (`_nino/Nino/Packages/Packages.php`, checked by `tests/packages-smoke.php`): it looks at the files of a package in memory - as
-`\Nino\Archive::read()` answers them, path => bytes - and puts them in place; where the files come from is not its business.
+`\Nino\Archive::read()` answers them, path => bytes - and puts them in place; where the files come from is not its business. A tool that exports a package writes it with `\Nino\Archive::write()`
+([Reading and writing an archive](development.md#reading-and-writing-an-archive)), which makes the `.tar.gz` that `read()` reads back as the same files.
 
 | Kind | Lives in | May hold |
 | --- | --- | --- |

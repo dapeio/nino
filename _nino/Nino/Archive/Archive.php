@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
- *	Archive							A tar.gz read in memory, where it is bytes that somebody else made
+ *	Archive							A tar.gz read and written in memory
  *
  *	@package						Dape/Nino
  *	@author							David Perchermeier <mail@dape.io>
@@ -19,6 +19,10 @@ namespace Nino {
 	 *										that unpacks to more than may is stopped where it passes the limit and is not read to its end, and the tar is
 	 *										walked block by block. An answer is the files of a good archive or one code of this class, never a sentence:
 	 *										the caller words it.
+	 *
+	 *										write() makes the archive of such a folder: a plain ustar tar of the files given, sorted, with the time, the
+	 *										owner and the rights fixed, in a gzip stream whose header says nothing but that it is one - the same files give
+	 *										the same bytes - and refuses, by the codes of read(), whatever read() would refuse of it. Nothing is corrected.
 	 *
 	 *										A good archive holds exactly one folder, at its top, and below it plain files and plain folders, at most
 	 *										DEPTH segments deep. Refused is whatever a reader of another make could read as something else than this
@@ -43,7 +47,7 @@ namespace Nino {
 		public const string TRAILING		= 'trailing';					// Bytes behind the end of the gzip stream, or behind the end of the tar
 		public const string TRUNCATED		= 'truncated';				// The tar ends inside an entry
 		public const string HEADER			= 'header';						// A header that does not hold: checksum, size, the size of a folder
-		public const string TYPE				= 'type';							// An entry that is no file and no folder: a link, a device, a long name
+		public const string TYPE				= 'type';							// An entry that is no file and no folder: a link, a device, a long name; write() answers it for content that is no string
 		public const string PAX					= 'pax';							// An extended header that names a path, a link or a size, or is none
 		public const string PATH				= 'path';							// A name that is no path of plain segments
 		public const string DEPTH				= 'depth';						// More segments below the folder than DEPTH
@@ -53,6 +57,7 @@ namespace Nino {
 		public const string COUNT				= 'count';						// More entries than the caller allows
 		public const string FILE_SIZE		= 'file-size';				// A file larger than the caller allows
 		public const string TOTAL_SIZE	= 'total-size';				// The files together larger than the caller allows
+		public const string LONG				= 'long';							// write() only: a path that does not fit the name and prefix fields of a ustar header
 
 		// The most segments a path below the folder may have: a file in a folder in a folder ... counts one for itself
 		public const int DEPTH_MAX = 6;
@@ -249,6 +254,211 @@ namespace Nino {
 			}
 
 			return $found;
+		}
+
+		/**
+		 *	The archive of the files of one folder: a .tar.gz that read() reads with the same folder and no refusal, and that gives these files byte for byte
+		 *
+		 *	The tar is of the format ustar: the folder first, then the files in the order of their paths, each folder of a path before the first file below it. A
+		 *	header holds the name (or the prefix and the name, where the path is longer than 100 bytes - never a long-name record of the GNU tar or of pax), the rights
+		 *	0644 for a file and 0755 for a folder, the owner 0 and no name of an owner, the time given, the type flag 0 or 5, and the checksum. The gzip stream
+		 *	is made by gzencode() at the best level, and its header is set to what it says of no machine: no flag, no time, no name, no hint of the level and the
+		 *	system Unix. The same arguments give the same bytes where the zlib is the same one.
+		 *
+		 *	The rules of read() hold here as a refusal and are never made good, for the folders it writes as for the files: a path that is not of plain segments, a
+		 *	file or a folder whose path below the folder is nothing but digits, one that is too deep, a name twice - also in the spelling of another case, also a
+		 *	file that is a folder of another -, one that has no place in a ustar header, and the limits of the caller. What is refused is refused by a code of
+		 *	read() for the same fault, but where two rules catch it the code may be the other one (a path that is too deep and not plain is depth here, path there).
+		 *	The folder at the top is held to more than read() holds it to: a plain segment as the paths below it are, which no reader needs to be more. A file whose
+		 *	size the field of a header cannot hold is refused as a header. A callback of $allow that throws is not caught.
+		 *
+		 *	@param		string								$folder				The one folder at the top of the archive, a plain name
+		 *	@param		array									$files				path below the folder => bytes; the keys are plain segments joined by a slash
+		 *	@param		int										$entries			The most entries it may hold, as read() counts them: the folder, the folders below it and the files
+		 *	@param		int										$each					The most bytes one file may have
+		 *	@param		int										$total				The most bytes all files together may have
+		 *	@param		int										$time					The time of every entry, in seconds from 1970, at most 8589934591
+		 *	@param		string|\Closure|null	$allow				Which files it may hold, as read() takes it: a pattern or a callback ( string $path ): bool; null for every file
+		 *
+		 *	@return 	string|array{code: string, path: string}		The archive, which is the string; or the array [ 'code' => one of the constants of this class, 'path' => the path that is refused, '' where it is none ]
+		 */
+		public static function write( string $folder, array $files, int $entries, int $each, int $total, int $time = 0, string|\Closure|null $allow = null ): string|array {
+
+			if( self::supported() === false )
+				return self::_refused( self::UNSUPPORTED );
+
+			if( preg_match( self::SEGMENT, $folder ) !== 1 )
+				return self::_refused( self::FOLDER );
+
+			// The folder itself is an entry that counts, so that a limit of none holds nothing, not even the empty archive
+			if( $entries < 1 )
+				return self::_refused( self::COUNT );
+
+			if( $time < 0 || $time > 8589934591 )
+				return self::_refused( self::HEADER );
+
+			$paths = array_map( 'strval', array_keys( $files ) );
+			sort( $paths, SORT_STRING );
+
+			$tar = (string) self::_header( $folder. '/', 0, '5', $time );
+			$count = 1;
+			$sum = 0;
+			$names = [];
+			$parents = [];
+			$folders = [];
+
+			foreach( $paths as $path ) {
+
+				$bytes = $files[$path];
+
+				if( is_string( $bytes ) === false )
+					return self::_refused( self::TYPE, $path );
+
+				$segments = explode( '/', $path );
+
+				if( count( $segments ) > self::DEPTH_MAX )
+					return self::_refused( self::DEPTH, $path );
+
+				foreach( $segments as $segment )
+					if( preg_match( self::SEGMENT, $segment ) !== 1 )
+						return self::_refused( self::PATH, $path );
+
+				// A name of digits alone is an integer as the key of an array, which read() refuses
+				if( ctype_digit( $path ) === true )
+					return self::_refused( self::PATH, $path );
+
+				// A name is taken once in whatever case it is written, and it is a file or a folder: the file system of a Mac holds one of them
+				$folded = strtolower( $path );
+
+				if( isset( $names[$folded] ) === true || isset( $parents[$folded] ) === true )
+					return self::_refused( self::DUPLICATE, $path );
+
+				$names[$folded] = true;
+				$prefix = '';
+				$spelled = '';
+
+				foreach( array_slice( $segments, 0, -1 ) as $segment ) {
+
+					$prefix .= ( $prefix === '' ? '' : '/' ). strtolower( $segment );
+					$spelled .= ( $spelled === '' ? '' : '/' ). $segment;
+
+					// A folder is an entry that read() holds to the rule of the digits as it does a file
+					if( ctype_digit( $spelled ) === true )
+						return self::_refused( self::PATH, $path );
+
+					if( isset( $names[$prefix] ) === true )
+						return self::_refused( self::DUPLICATE, $path );
+
+					$parents[$prefix] = true;
+
+					if( isset( $folders[$prefix] ) === true ) {
+
+						if( $folders[$prefix] !== $spelled )
+							return self::_refused( self::DUPLICATE, $path );
+
+						continue;
+					}
+
+					$folders[$prefix] = $spelled;
+
+					if( ++$count > $entries )
+						return self::_refused( self::COUNT, $path );
+
+					$head = self::_header( $folder. '/'. $spelled. '/', 0, '5', $time );
+
+					if( $head === null )
+						return self::_refused( self::LONG, $path );
+
+					$tar .= $head;
+				}
+
+				if( ++$count > $entries )
+					return self::_refused( self::COUNT, $path );
+
+				if( $allow !== null && ( is_string( $allow ) === true ? preg_match( $allow, $path ) === 1 : $allow( $path ) === true ) === false )
+					return self::_refused( self::NAME, $path );
+
+				$size = strlen( $bytes );
+
+				// The field of a header holds eleven octal digits
+				if( $size > 8589934591 )
+					return self::_refused( self::HEADER, $path );
+
+				if( $size > $each )
+					return self::_refused( self::FILE_SIZE, $path );
+
+				$sum += $size;
+
+				if( $sum > $total )
+					return self::_refused( self::TOTAL_SIZE, $path );
+
+				$head = self::_header( $folder. '/'. $path, $size, '0', $time );
+
+				if( $head === null )
+					return self::_refused( self::LONG, $path );
+
+				$tar .= $head. $bytes. str_repeat( "\0", ( self::BLOCK - $size % self::BLOCK ) % self::BLOCK );
+			}
+
+			$packed = gzencode( $tar. str_repeat( "\0", 2 * self::BLOCK ), 9 );
+
+			if( $packed === false )
+				return self::_refused( self::GZIP );
+
+			// The header of the stream is ten bytes: the magic, the method, the flags, the time, the hint of the level and the system. zlib says the level
+			// and, by the system it was built for, which one it is; nothing of that is a fact of the files
+			return substr_replace( $packed, "\0\0\0\0\0\x03", 4, 6 );
+		}
+
+		/**
+		 *	The answer write() gives for what it refuses
+		 *
+		 *	@param		string		$code
+		 *	@param		string		$path
+		 *
+		 *	@return 	array
+		 */
+		private static function _refused( string $code, string $path = '' ): array {
+			return [ 'code' => $code, 'path' => $path ];
+		}
+
+		/**
+		 *	One ustar header: the block of an entry, with its checksum
+		 *
+		 *	@param		string		$path					The path in the archive, with a slash at the end for a folder
+		 *	@param		int				$size
+		 *	@param		string		$type					0 or 5
+		 *	@param		int				$time
+		 *
+		 *	@return 	string|null								null where the path has no place in the fields for the name and the prefix
+		 */
+		private static function _header( string $path, int $size, string $type, int $time ): ?string {
+
+			$prefix = '';
+			$name = $path;
+
+			// The prefix is what stands before a slash, and the name what stands behind it: the split is the last one that leaves the prefix in its field
+			if( strlen( $path ) > 100 ) {
+
+				$name = '';
+
+				for( $cut = strrpos( substr( $path, 0, 156 ), '/' ); $cut !== false; $cut = $cut === 0 ? false : strrpos( substr( $path, 0, $cut ), '/' ) )
+					if( $cut > 0 && $cut < strlen( $path ) - 1 && strlen( $path ) - $cut - 1 <= 100 ) {
+
+						$prefix = substr( $path, 0, $cut );
+						$name = substr( $path, $cut + 1 );
+						break;
+					}
+
+				if( $name === '' )
+					return null;
+			}
+
+			$head = str_pad( $name, 100, "\0" ). sprintf( '%07o', $type === '5' ? 0755 : 0644 ). "\0". sprintf( '%07o', 0 ). "\0". sprintf( '%07o', 0 ). "\0"
+				. sprintf( '%011o', $size ). "\0". sprintf( '%011o', $time ). "\0". '        '. $type. str_repeat( "\0", 100 ). "ustar\0". '00'
+				. str_repeat( "\0", 32 + 32 ). sprintf( '%07o', 0 ). "\0". sprintf( '%07o', 0 ). "\0". str_pad( $prefix, 155, "\0" ). str_repeat( "\0", 12 );
+
+			return substr( $head, 0, 148 ). sprintf( '%06o', array_sum( unpack( 'C*', $head ) ) ). "\0 ". substr( $head, 156 );
 		}
 
 		/**
