@@ -265,7 +265,7 @@ The components, as their schemas say them (a leaf has no end; the classes are th
 |  | `section-col` | section-row | itself, flow | none | - | `--[m-\|l-]size-{16,20,25,33,50,66,75,100}` `--[m-\|l-]align-{start,center,end}` `--[m-\|l-]hide-{off,on}` `--ground-{base,alt,tint,primary,dark}` `--pad-{0,1,2,3,4}` `--bleed` `--link` `--variant-card` | `[[id]]` |
 |  | `section-title` | section-col | - (a leaf) | text/inline | yes | `--size-{s,l,xl}` | `[[tag]]` `[[href]]` |
 |  | `section-subtitle` | section-col | - (a leaf) | text/inline | - | - | - |
-| **button** | `button` | flow, button-group | - (a leaf) | text/plain | yes | `--tone-{quiet}` `--size-{s,l}` `--wide` | `[[href]]` `[[target]]` |
+| **button** | `button` | flow, button-group | - (a leaf) | text/plain | yes | `--tone-{secondary,outline,quiet}` `--size-{s,l}` `--wide` | `[[href]]` `[[target]]` |
 |  | `button-group` | flow | itself | none | - | `--align-{center,end}` | - |
 | **image** | `image` | flow | - (a leaf) | image | yes | `--ratio-{1-1,4-3,3-2,3-4,16-9,21-9}` `--fit` `--height-{1,2,3,4}` `--focus-{top,right,bottom,left,top-left,top-right,bottom-left,bottom-right}` | `[[alt]]` `[[decorative]]` `[[caption]]` `[[href]]` |
 | **text** | `text` | flow | - (a leaf) | text/blocks | - | `--size-{s,l}` | `[[format]]` |

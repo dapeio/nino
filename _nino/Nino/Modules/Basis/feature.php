@@ -28,8 +28,8 @@ return [
 				'de_DE' => 'Eine Spalte, die eine eigene Fläche ist: eine Karte. size, ground, pad, bleed und link sind ihre Worte; [section-title] und [section-subtitle] stehen darin.',
 			],
 			'[button]' => [
-				'en_US' => 'A link that looks like a button, or - without an address - a span of the same look; [button-group] puts several in a row.',
-				'de_DE' => 'Ein Link, der wie ein Button aussieht, oder - ohne Adresse - ein span in derselben Form; [button-group] stellt mehrere in eine Reihe.',
+				'en_US' => 'A link that looks like a button, or - without an address - a span of the same look, in four weights - main, second colour, outline, quiet - that follow the ground; [button-group] puts several in a row.',
+				'de_DE' => 'Ein Link, der wie ein Button aussieht, oder - ohne Adresse - ein span in derselben Form, in vier Gewichten - Hauptknopf, Zweite Farbe, Umriss, Ruhig - die dem Grund folgen; [button-group] stellt mehrere in eine Reihe.',
 			],
 			'[image]' => [
 				'en_US' => 'The picture of a slot or of an image field, with a caption and a link where the call has them.',

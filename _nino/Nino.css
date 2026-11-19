@@ -31,6 +31,11 @@
 		--brand-line-base: light-dark( #cfd3d9, #3c414a );
 		--brand-accent-base: light-dark( var(--brand-color-1), #86b6f6 );
 		--brand-on-accent-base: light-dark( var(--brand-on-color-1), #0f1b2e );
+		/*	The second colour on a ground: dark writing on a lightened colour on a dark page. A brand with one colour sets --brand-color-2 and --brand-on-color-2 to
+			initial: 35 % of the first with the ink, white on it 5.25 : 1 at the least	*/
+		--brand-second-from-1: color-mix( in srgb, var(--brand-color-1) 35%, #1b1d21 );
+		--brand-second-base: light-dark( var(--brand-color-2, var(--brand-second-from-1)), color-mix( in srgb, var(--brand-color-2, var(--brand-second-from-1)) 45%, #fff ) );
+		--brand-on-second-base: light-dark( var(--brand-on-color-2, #fff), #0f1b2e );
 
 		/*	The roles a part reads: what the ground is that a thing stands on, and what is written on it	*/
 		--brand-ground: var(--brand-ground-base);
@@ -39,6 +44,8 @@
 		--brand-line: var(--brand-line-base);
 		--brand-accent: var(--brand-accent-base);
 		--brand-on-accent: var(--brand-on-accent-base);
+		--brand-second: var(--brand-second-base);
+		--brand-on-second: var(--brand-on-second-base);
 
 		/*	The page: the theme's	*/
 		--page-size: 100%;
@@ -86,6 +93,8 @@
 		--brand-line: var(--brand-line-base);
 		--brand-accent: var(--brand-accent-base);
 		--brand-on-accent: var(--brand-on-accent-base);
+		--brand-second: var(--brand-second-base);
+		--brand-on-second: var(--brand-on-second-base);
 	}
 	:where( [class$="--ground-alt"], [class*="--ground-alt "] ) { --brand-ground: var(--brand-ground-alt); }
 	:where( [class$="--ground-tint"], [class*="--ground-tint "] ) { --brand-ground: var(--brand-ground-tint); }
@@ -97,6 +106,8 @@
 		--brand-line: var(--brand-on-color-1);
 		--brand-accent: var(--brand-on-color-1);
 		--brand-on-accent: var(--brand-color-1);
+		--brand-second: var(--brand-color-2, var(--brand-second-from-1));
+		--brand-on-second: var(--brand-on-color-2, #fff);
 	}
 	:where( [class$="--ground-base"], [class*="--ground-base "], [class$="--ground-alt"], [class*="--ground-alt "], [class$="--ground-tint"], [class*="--ground-tint "], [class$="--ground-dark"], [class*="--ground-dark "], [class$="--ground-primary"], [class*="--ground-primary "] ) { background-color: var(--brand-ground); color: var(--brand-ink); }
 	/*	Where light-dark() is not known the palette has no value, and the roles of a ground that is dark are written out in the
@@ -110,6 +121,8 @@
 			--brand-line: #3c414a;
 			--brand-accent: #86b6f6;
 			--brand-on-accent: #0f1b2e;
+			--brand-second: #969ca6;
+			--brand-on-second: #0f1b2e;
 		}
 	}
 

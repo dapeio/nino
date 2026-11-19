@@ -806,7 +806,7 @@ check( 'a standard part sets no token but the knobs of the groups and helpers na
 // the tokens of the brand and of the page are the contract: all of them in Nino.css, in the layer of the reset
 $required = [ '--brand-scheme', '--brand-color-1', '--brand-color-2', '--brand-font-title', '--brand-font-text', '--brand-font-button', '--brand-ground-base', '--brand-ground-alt', '--brand-ground-tint', '--brand-ink-base',
 	'--brand-ink-quiet-base', '--brand-line-base', '--brand-accent-base', '--brand-on-accent-base', '--brand-on-color-1', '--brand-on-color-2', '--brand-ground', '--brand-ink', '--brand-ink-quiet', '--brand-line', '--brand-accent',
-	'--brand-on-accent', '--page-size', '--page-width', '--page-radius', '--page-line', '--page-motion', '--page-leading', '--page-space-1', '--page-space-2', '--page-space-3', '--page-space-4', '--page-space-5', '--page-space-6',
+	'--brand-on-accent', '--brand-second-base', '--brand-on-second-base', '--brand-second-from-1', '--brand-second', '--brand-on-second', '--page-size', '--page-width', '--page-radius', '--page-line', '--page-motion', '--page-leading', '--page-space-1', '--page-space-2', '--page-space-3', '--page-space-4', '--page-space-5', '--page-space-6',
 	'--page-scroll-pad', '--page-weight-title', '--page-weight-text', '--page-bleed', '--page-text-1', '--page-text-2', '--page-text-3', '--page-text-4', '--page-text-5', '--page-text-6' ];
 // The whole of Nino.css is the layer nino.reset
 $resetLayer = $nino;
@@ -869,7 +869,7 @@ foreach( $grounds as $ground )
 	if( $ofRoles( $whole( $ground ) ) === '' && in_array( $ground, [ 'base' ], true ) === false )
 		$meets[] = 'no rule for '. $ground;
 
-$palette = [ 'ground', 'ink', 'ink-quiet', 'line', 'accent', 'on-accent' ];
+$palette = [ 'ground', 'ink', 'ink-quiet', 'line', 'accent', 'on-accent', 'second', 'on-second' ];
 $page = $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark' ] ) ) );
 
 foreach( $palette as $role )
@@ -883,7 +883,7 @@ $meets = array_merge( $meets,
 	str_contains( $ofRoles( $whole( 'alt' ) ), '--brand-ground: var(--brand-ground-alt);' ) === true ? [] : [ 'alt does not change the ground' ],
 	str_contains( $ofRoles( $whole( 'tint' ) ), '--brand-ground: var(--brand-ground-tint);' ) === true ? [] : [ 'tint does not change the ground' ],
 	$ofRoles( $whole( 'dark' ) ) === 'color-scheme: dark;' ? [] : [ 'dark does not turn the mode' ],
-	array_filter( [ '--brand-ground: var(--brand-color-1);', '--brand-ink: var(--brand-on-color-1);', '--brand-accent: var(--brand-on-color-1);', '--brand-on-accent: var(--brand-color-1);' ], static fn( string $line ): bool => str_contains( $ofRoles( $whole( 'primary' ) ), $line ) === false ),
+	array_filter( [ '--brand-ground: var(--brand-color-1);', '--brand-ink: var(--brand-on-color-1);', '--brand-accent: var(--brand-on-color-1);', '--brand-on-accent: var(--brand-color-1);', '--brand-second: var(--brand-color-2,', '--brand-on-second: var(--brand-on-color-2,' ], static fn( string $line ): bool => str_contains( $ofRoles( $whole( 'primary' ) ), $line ) === false ),
 	str_contains( $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark', 'primary' ] ) ) ), 'background-color: var(--brand-ground); color: var(--brand-ink);' ) === true ? [] : [ 'a ground does not paint itself' ] );
 $fallback = basisBody( $rules, '--ground-dark', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' );
 check( 'the ground of a section and of a column is the class <name>--ground-<word>; Nino.css names the roles for each word, whole - base, alt, tint, primary, dark -: base the palette, alt and tint the ground, primary the colour of the brand, dark the mode, and a ground paints itself; dark is written out where light-dark() is not known'
@@ -1070,6 +1070,91 @@ $nav = basisBody( $partRules['header'], '.header-nav-details::details-content', 
 
 if( str_contains( $css['header'], 'popover' ) === true || str_contains( $nav, 'content-visibility: visible;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav-toggle', '@media (min-width: 768px) @supports selector( ::details-content )' ), 'display: none;' ) === false )
 	$bad[] = 'the menu is no details that a wide screen shows open where it can';
+
+// the weights of a button: four, in this order, main the default; each is drawn as its class and has a rule in the standard part; the quiet one names no colour of the brand, the others the roles of their ground
+$tone = $schemas['button']['attributes']['tone'];
+
+if( $tone['options'] !== [ 'primary', 'secondary', 'outline', 'quiet' ] || $tone['default'] !== 'primary' || array_keys( $tone['labels'] ) !== $tone['options'] )
+	$bad[] = 'the weights of a button are not main, second colour, outline and quiet, main the default, each with a label';
+
+foreach( [ 'secondary', 'outline', 'quiet' ] as $weight ) {
+
+	if( $draw( '[button text="Go" tone="'. $weight. '"]' ) !== '<span class="button button--tone-'. $weight. '">Go</span>' )
+		$bad[] = 'a button of the weight '. $weight. ' does not draw its class';
+
+	if( array_filter( $partRules['button'], static fn( array $rule ): bool => $rule['at'] === '' && $rule['selector'] === '.button--tone-'. $weight ) === [] )
+		$bad[] = 'the standard part has no rule for the weight '. $weight;
+}
+
+$quietRules = implode( ' ', array_column( array_filter( $partRules['button'], static fn( array $rule ): bool => str_contains( $rule['selector'], '.button--tone-quiet' ) ), 'body' ) );
+
+if( preg_match( '/--brand-(?:accent|on-accent|second|on-second|color)/', $quietRules ) === 1 || str_contains( $quietRules, '--brand-ink' ) === false )
+	$bad[] = 'the quiet weight names a colour of the brand, or is not the ink of its ground';
+
+$secondRule = basisBody( array_filter( $partRules['button'], static fn( array $rule ): bool => $rule['selector'] === '.button--tone-secondary' ), '.button--tone-secondary' );
+
+if( str_contains( $secondRule, 'background-color: var(--brand-second);' ) === false || str_contains( $secondRule, 'color: var(--brand-on-second);' ) === false || str_contains( basisBody( $partRules['button'], '.button--tone-outline' ), 'color: var(--brand-accent);' ) === false )
+	$bad[] = 'second colour and outline do not read the roles of their ground';
+
+// quiet: its fill and its ink are two helpers of the group, the ring and the words read the ink, the pointer turns the fill
+$quietOwn = basisBody( array_filter( $partRules['button'], static fn( array $rule ): bool => $rule['selector'] === '.button--tone-quiet' ), '.button--tone-quiet' );
+
+if( preg_match( '/--button--quiet-fill: color-mix\( in srgb, var\(--brand-ink\) 10%, var\(--brand-ground\) \);/', $quietOwn ) !== 1 || str_contains( $quietOwn, '--button--quiet-ink: var(--brand-ink);' ) === false
+	|| str_contains( $quietOwn, 'background-color: var(--button--quiet-fill);' ) === false || str_contains( $quietOwn, 'color: var(--button--quiet-ink);' ) === false
+	|| str_contains( basisBody( array_filter( $partRules['button'], static fn( array $rule ): bool => $rule['selector'] === '.button--tone-quiet:focus-visible' ), '.button--tone-quiet:focus-visible' ), 'outline-color: var(--button--quiet-ink);' ) === false
+	|| preg_match( '/--button--quiet-fill: color-mix\( in srgb, var\(--brand-ink\) 14%, var\(--brand-ground\) \);/', basisBody( $partRules['button'], 'a.button--tone-quiet:hover' ) ) !== 1 )
+	$bad[] = 'the quiet weight does not run on its two helpers, or its ring is not its ink, or the pointer does not turn its fill';
+
+// the outline is filled under the pointer, and with forced colours the four weights stay apart by the line
+$outlineHover = basisBody( $partRules['button'], 'a.button--tone-outline:hover' );
+$forcedLines = [ '.button' => '3px solid ButtonText', '.button--tone-secondary' => 'border-style: double', '.button--tone-outline' => 'border-width: 1px', '.button--tone-quiet' => 'border-style: dashed' ];
+
+foreach( $forcedLines as $forcedSelector => $forcedLine )
+	if( str_contains( basisBody( array_filter( $partRules['button'], static fn( array $rule ): bool => $rule['selector'] === $forcedSelector ), $forcedSelector, '@media (forced-colors: active)' ), $forcedLine ) === false )
+		$bad[] = 'with forced colours '. $forcedSelector. ' has not its line';
+
+if( str_contains( $outlineHover, 'background-color: var(--brand-accent);' ) === false || str_contains( $outlineHover, 'color: var(--brand-on-accent);' ) === false )
+	$bad[] = 'the outline is not filled under the pointer';
+
+// the second colour in Nino.css: a light page has the colour of the brand, a dark page lightens it by half with white under dark writing that holds 4.5 : 1 on the default colour;
+// a brand with one colour has the first colour at a share that leaves white writing 4.5 : 1 on it for every first colour (white is the worst); no light-dark() leaves the roles written out
+$bareNino = (string) preg_replace( '~/\*.*?\*/~s', '', $nino );
+$second = [ '--brand-second-base: light-dark( var(--brand-color-2, var(--brand-second-from-1)), color-mix( in srgb, var(--brand-color-2, var(--brand-second-from-1)) 45%, #fff ) );', '--brand-on-second-base: light-dark( var(--brand-on-color-2, #fff), #0f1b2e );' ];
+
+foreach( $second as $secondLine )
+	if( str_contains( $bareNino, $secondLine ) === false )
+		$bad[] = 'the second colour of the palette is not '. $secondLine;
+
+if( preg_match( '/--brand-second-from-1: color-mix\( in srgb, var\(--brand-color-1\) (\d+)%, #1b1d21 \);/', $bareNino, $share ) !== 1 )
+	$bad[] = 'a brand with one colour has no second colour from the first';
+else {
+	$mixShare = (int) $share[1] / 100;
+	$derived = array_map( static fn( int $i ): int => (int) round( 255 * $mixShare + [ 27, 29, 33 ][$i] * ( 1 - $mixShare ) ), [ 0, 1, 2 ] );
+
+	if( $mixShare <= 0 || $mixShare >= 1 || basisContrast( [ 255, 255, 255 ], $derived ) < 4.5 )
+		$bad[] = 'white on the second colour of a brand with one colour, made from a white first colour, is '. sprintf( '%.2f', basisContrast( [ 255, 255, 255 ], $derived ) ). ' : 1';
+}
+
+$lightened = array_map( static fn( int $value ): int => (int) round( $value * .45 + 255 * .55 ), [ 0x17, 0x23, 0x3a ] );
+
+if( basisContrast( [ 0x0f, 0x1b, 0x2e ], $lightened ) < 4.5 || basisContrast( $lightened, [ 0x15, 0x17, 0x1b ] ) < 3.0 )
+	$bad[] = 'the second colour of the dark page, lightened from the default, has not its writing at 4.5 : 1 or its ground at 3 : 1';
+
+$secondFallback = basisBody( $rules, '--ground-dark', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' );
+
+if( str_contains( $secondFallback, '--brand-second: #969ca6;' ) === false || str_contains( $secondFallback, '--brand-on-second: #0f1b2e;' ) === false || basisContrast( [ 0x96, 0x9c, 0xa6 ], [ 0x0f, 0x1b, 0x2e ] ) < 4.5 )
+	$bad[] = 'without light-dark() a dark ground does not write out the second colour and its writing';
+
+// every weight of the demo stands on a light and on a dark ground
+$demoGrounds = [];
+foreach( (array) preg_split( '/\[section-wrap /', (string) file_get_contents( $basisDir. '/groups/button/demo.tpl' ) ) as $demoChunk )
+	if( preg_match( '/^ground="(\w+)"/', $demoChunk, $demoGround ) === 1 && preg_match_all( '/tone="(\w+)"/', $demoChunk, $demoTone ) > 0 )
+		$demoGrounds[$demoGround[1]] = array_values( array_unique( array_merge( $demoGrounds[$demoGround[1]] ?? [], $demoTone[1] ) ) );
+
+foreach( [ 'base', 'dark' ] as $demoGround )
+	foreach( [ 'primary', 'secondary', 'outline', 'quiet' ] as $demoWeight )
+		if( in_array( $demoWeight, $demoGrounds[$demoGround] ?? [], true ) === false )
+			$bad[] = 'the demo has no '. $demoWeight. ' button on a '. $demoGround. ' ground';
 
 // on paper: no ground, dark writing, a button with a frame
 foreach( [ 'header' => '.header-wrap', 'footer' => '.footer-wrap', 'section' => '.section-wrap', 'button' => '.button' ] as $partGroup => $printed )
@@ -1454,6 +1539,9 @@ foreach( BASIS_COMPONENTS as $group => $members ) {
 				$demoProblems[] = $group. ': '. $name. ' has no call of the variant '. $variant;
 		}
 }
+$demoTones = array_unique( array_column( $demoSeen['button']['button'] ?? [], 'tone' ) );
+sort( $demoTones );
+check( 'the demo of the buttons shows every weight, and the ground dark as well as the light one', $demoTones === [ 'outline', 'primary', 'quiet', 'secondary' ] && in_array( 'dark', array_column( $demoSeen['button']['section-wrap'] ?? [], 'ground' ), true ) === true && in_array( 'base', array_column( $demoSeen['button']['section-wrap'] ?? [], 'ground' ), true ) === true );
 check( 'each demo is read with no note, calls every component of its group, and shows every value of a choice a knob hangs on and every variant: the schema says which ('. count( $demoSeen ). ' demos)'
 	. ( $demoProblems === [] ? '' : ' - '. implode( '; ', array_slice( $demoProblems, 0, 6 ) ) ), $demoProblems === [] );
 
@@ -1525,7 +1613,7 @@ ninoWarnings();
 // sizes
 $total = $bytes;
 $parts = array_map( static fn( string $group ): int => (int) filesize( $basisDir. '/groups/'. $group. '/part/part.css' ), array_keys( $read['groups'] ) );
-check( 'the six standard parts are 24 KB together at most ('. $total. ' bytes: '. implode( ', ', $parts ). ')', $total <= 24576 && count( $parts ) === 6 );
+check( 'the six standard parts are 26 KB together at most ('. $total. ' bytes: '. implode( ', ', $parts ). ')', $total <= 26624 && count( $parts ) === 6 );
 
 $listing = [];
 foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $basisDir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
