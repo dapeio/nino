@@ -614,8 +614,8 @@ namespace Nino {
 		 *	  selector with no class of its own (a type, `*`)
 		 *	- it reads only --brand-..., --page-... and the tokens of its own components (--<component>-...) and sets only the
 		 *	  latter, :root among the selectors as well
-		 *	- no !important, no @import, @layer, @namespace or @charset, and nothing that loads from outside: url(), image-set(),
-		 *	  -webkit-image-set(), src(), in any case
+		 *	- no !important, no @import, @layer, @namespace, @charset or @property, and nothing that loads from outside or from another
+		 *	  element: url(), image(), image-set(), -webkit-image-set(), src(), element(), cross-fade(), in any case
 		 *
 		 *	\Nino\Features::readComponents() asks it of the part of every group, and a suite of a feature asks it of the
 		 *	parts it ships
@@ -626,6 +626,19 @@ namespace Nino {
 		 *	@return 	array										What it does wrong, one sentence each; [] where it keeps the rule
 		 */
 		public static function partProblems( string $css, array $components ): array {
+
+			return self::_problems( $css, $components );
+		}
+
+		/**
+		 *	The check of partProblems() and themeProblems()
+		 *
+		 *	@param		string			$css
+		 *	@param		array|null	$components		The names of the components of the group; null for a theme, whose names are held to their form
+		 *
+		 *	@return 	array
+		 */
+		private static function _problems( string $css, ?array $components ): array {
 
 			$problems = [];
 			$escaped = false;
@@ -654,6 +667,51 @@ namespace Nino {
 			self::_checkPart( $items, $components, false, $problems );
 
 			return array_values( array_unique( $problems ) );
+		}
+
+		/**
+		 *	What the css of a THEME - theme.css, the free stylesheet a theme package brings besides its parts - does against the rule of mixing. Whether a theme is
+		 *	valid does not depend on the site it is checked on - on the features that are on or installed - so the rule of a part, partProblems(), is held over the
+		 *	FORM of a name and not over the names of the components of the register:
+		 *
+		 *	- a selector is made of class selectors only - a class is written as the classes of the components are: lower case letters, digits, hyphens and
+		 *	  underscores, starting with a letter - with pseudo classes and pseudo elements and the combinators between them (a blank, >, +, ~, and & where the rule
+		 *	  it stands in is made of classes). Whether a class belongs to a component of this site is not asked: a class that meets nothing here does no harm. An element,
+		 *	  an id, the universal selector and an attribute selector are refused
+		 *	- EVERY compound of a selector - the part between two combinators, the last one and the one behind ~, + and > as well, in a nesting with & and in the arguments of
+		 *	  :is(), :where(), :not() and :has() - carries a class of its own outside of any function: nothing in a theme.css is a rule about "any element"
+		 *	- a custom property is set where it is written as the token of a component (--<name>-..., and neither --brand-... nor --page-...) and read where it is one
+		 *	  of those, a --brand-... or a --page-...
+		 *	- no @import, @layer, @namespace, @charset, @property, no !important, no url(), image(), image-set(), src(), element(), cross-fade(), no backslash outside a string
+		 *
+		 *	A theme as a whole adds what a part has no cause to do and a stylesheet that is put into a page as it is must not:
+		 *
+		 *	- no @font-face: a font is the business of the Typefaces, not of a stylesheet that is checked for what it loads
+		 *	- no "</" and no "<!--" anywhere, comments and strings too: put in a style element, the first ends it and the page after it is the css's
+		 *	- no expression(), -moz-binding or behavior: the old ways to run a script from css
+		 *
+		 *	What is found is said with the line it stands on where that is known
+		 *
+		 *	@param		string		$css					The text of theme.css
+		 *
+		 *	@return 	array										What it does wrong, one sentence each; [] where it keeps the rule
+		 */
+		public static function themeProblems( string $css ): array {
+
+			$problems = [];
+			$line = static fn( string $text, int $offset ): int => 1 + substr_count( substr( $text, 0, $offset ), "\n" );
+
+			if( preg_match( '/<\/|<!--/', $css, $found, PREG_OFFSET_CAPTURE ) === 1 )
+				$problems[] = 'holds "'. $found[0][0]. '" (line '. $line( $css, $found[0][1] ). '), which would end or open markup where the css is put';
+
+			// Without its comments - their lines kept - what a comment says is not what the css does
+			$bare = (string) preg_replace_callback( '~/\*.*?\*/~s', static fn( array $comment ): string => ' '. str_repeat( "\n", substr_count( $comment[0], "\n" ) ), $css );
+
+			foreach( [ '/@font-face\b/i' => 'uses @font-face', '/(?<![A-Za-z0-9_-])expression\s*\(/i' => 'uses expression()', '/-moz-binding\b|(?<![A-Za-z0-9_-])behavior\s*:/i' => 'uses -moz-binding or behavior' ] as $pattern => $sentence )
+				if( preg_match( $pattern, $bare, $found, PREG_OFFSET_CAPTURE ) === 1 )
+					$problems[] = $sentence. ' (line '. $line( $bare, $found[0][1] ). ')';
+
+			return array_values( array_unique( array_merge( $problems, self::_problems( $css, null ) ) ) );
 		}
 
 		/**
@@ -727,7 +785,7 @@ namespace Nino {
 		 *
 		 *	@return 	void
 		 */
-		private static function _checkPart( array $items, array $components, bool $keyframes, array &$problems, bool $owned = false ): void {
+		private static function _checkPart( array $items, ?array $components, bool $keyframes, array &$problems, bool $owned = false ): void {
 
 			foreach( $items as $item ) {
 
@@ -762,7 +820,7 @@ namespace Nino {
 		 *
 		 *	@return 	void
 		 */
-		private static function _checkDeclaration( string $text, array $components, array &$problems ): void {
+		private static function _checkDeclaration( string $text, ?array $components, array &$problems ): void {
 
 			if( str_starts_with( $text, '@' ) === true ) {
 
@@ -787,6 +845,10 @@ namespace Nino {
 			if( preg_match( '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:url|image-set|src)\s*\(/i', $value ) === 1 )
 				$problems[] = preg_match( '/(?<![A-Za-z0-9_])url\s*\(/i', $value ) === 1 ? 'uses url()' : 'loads from outside: it uses image-set() or src()';
 
+			// What may load one day, or shows another element of the page as a picture
+			if( preg_match( '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:image|element|cross-fade)\s*\(/i', $value ) === 1 )
+				$problems[] = 'uses image(), element() or cross-fade(), which take a picture from outside or from another element';
+
 			if( preg_match_all( '/(?<![A-Za-z0-9_-])var\(\s*(--[^\s,)]*)/i', $value, $read ) > 0 )
 				foreach( array_unique( $read[1] ) as $token )
 					if( str_starts_with( $token, '--brand-' ) === false && str_starts_with( $token, '--page-' ) === false && self::_ownToken( $token, $components ) === false )
@@ -794,7 +856,7 @@ namespace Nino {
 		}
 
 		/**
-		 *	The at-rules a part has none of
+		 *	The at-rules a part has none of: @import, @layer, @namespace, @charset and @property (which sets the initial value of a token of the brand or of the page, wherever it is read)
 		 *
 		 *	@param		string		$prelude
 		 *	@param		array			$problems			(reference)
@@ -803,28 +865,24 @@ namespace Nino {
 		 */
 		private static function _checkAt( string $prelude, array &$problems ): void {
 
-			if( preg_match( '/^@([A-Za-z-]+)/', $prelude, $name ) === 1 && in_array( strtolower( $name[1] ), [ 'import', 'layer', 'namespace', 'charset' ], true ) === true )
+			if( preg_match( '/^@([A-Za-z-]+)/', $prelude, $name ) === 1 && in_array( strtolower( $name[1] ), [ 'import', 'layer', 'namespace', 'charset', 'property' ], true ) === true )
 				$problems[] = 'uses @'. strtolower( $name[1] );
 		}
 
 		/**
-		 *	The selectors of a rule: each starts from an element of the components of the group or is :root, and none meets what is not theirs
+		 *	The members of a selector list: cut at the commas that stand in no function and no attribute
 		 *
-		 *	@param		string		$prelude
-		 *	@param		array			$components
-		 *	@param		array			$problems			(reference)
-		 *	@param		bool			$owned				Whether the rule stands in a rule whose selectors all are the part's own
+		 *	@param		string		$text
 		 *
-		 *	@return 	bool										Whether every selector of the list is the part's own: what a rule nested in this one is relative to
+		 *	@return 	array<int, string>
 		 */
-		private static function _checkSelector( string $prelude, array $components, array &$problems, bool $owned = false ): bool {
+		private static function _list( string $text ): array {
 
-			// The commas of a list, not the ones inside a :is( , ) or an attribute
 			$list = [];
 			$depth = 0;
 			$one = '';
 
-			foreach( str_split( $prelude ) as $char ) {
+			foreach( str_split( $text ) as $char ) {
 
 				if( $char === '(' || $char === '[' )
 					$depth++;
@@ -840,6 +898,185 @@ namespace Nino {
 			}
 
 			$list[] = $one;
+
+			return $list;
+		}
+
+		/**
+		 *	The selectors of a rule of a theme.css: made of classes - of the form of a class of a component, whichever components the site has - pseudo classes
+		 *	and pseudo elements and combinators, every compound with a class of its own outside of any function (or & where the rule it stands in is such a rule)
+		 *
+		 *	@param		array			$list					The members of the list
+		 *	@param		array			$problems			(reference)
+		 *	@param		bool			$owned				Whether the rule stands in a rule made of such selectors
+		 *
+		 *	@return 	bool										Whether every selector of the list is such a one and none is :root: what a rule nested in this one is relative to
+		 */
+		private static function _checkThemeSelector( array $list, array &$problems, bool $owned ): bool {
+
+			$all = true;
+
+			foreach( $list as $selector ) {
+
+				$selector = trim( $selector );
+
+				if( $selector === ':root' ) {
+					$all = false;
+					continue;
+				}
+
+				self::_checkThemeComplex( $selector, $owned, $problems, 0 );
+			}
+
+			return $all;
+		}
+
+		/**
+		 *	One selector of a theme.css, or the argument of a function in one: its compounds are cut at the combinators and each is held to the rule
+		 *
+		 *	@param		string		$selector
+		 *	@param		bool			$owned
+		 *	@param		array			$problems			(reference)
+		 *	@param		int				$depth				How deep in functions it stands
+		 *
+		 *	@return 	void
+		 */
+		private static function _checkThemeComplex( string $selector, bool $owned, array &$problems, int $depth ): void {
+
+			if( $depth > 4 ) {
+				$problems[] = 'has a selector with functions nested too deep: '. self::_shown( $selector );
+				return;
+			}
+
+			$compounds = [];
+			$level = 0;
+			$one = '';
+
+			foreach( str_split( $selector ) as $char ) {
+
+				if( $char === '(' || $char === '[' )
+					$level++;
+				else if( $char === ')' || $char === ']' )
+					$level--;
+
+				if( $level === 0 && strpbrk( $char, " \t\n\r\f>+~" ) !== false ) {
+					$compounds[] = $one;
+					$one = '';
+				}
+				else
+					$one .= $char;
+			}
+
+			$compounds[] = $one;
+			$compounds = array_values( array_filter( $compounds, static fn( string $compound ): bool => $compound !== '' ) );
+
+			if( $compounds === [] )
+				$problems[] = 'has an empty selector';
+
+			foreach( $compounds as $compound )
+				self::_checkThemeCompound( $compound, $owned, $problems, $depth );
+		}
+
+		/**
+		 *	A compound of a theme.css selector: classes, pseudo classes and pseudo elements and nothing else, with a class outside of its functions, and
+		 *	in the functions that take a selector the same of every compound
+		 *
+		 *	@param		string		$compound
+		 *	@param		bool			$owned				Whether & stands for a rule made of classes
+		 *	@param		array			$problems			(reference)
+		 *	@param		int				$depth
+		 *
+		 *	@return 	void
+		 */
+		private static function _checkThemeCompound( string $compound, bool $owned, array &$problems, int $depth ): void {
+
+			// What stands outside of the functions, with the functions as ()
+			$top = '';
+			$calls = [];
+			$level = 0;
+			$name = '';
+			$body = '';
+
+			foreach( str_split( $compound ) as $char ) {
+
+				if( $char === '(' ) {
+
+					if( $level++ === 0 ) {
+						preg_match( '/[A-Za-z-]*$/', $top, $found );
+						$name = strtolower( $found[0] );
+						$body = '';
+						$top .= '(';
+						continue;
+					}
+				}
+				else if( $char === ')' && --$level === 0 ) {
+					$calls[] = [ $name, $body ];
+					$top .= ')';
+					continue;
+				}
+
+				if( $level > 0 )
+					$body .= $char;
+				else
+					$top .= $char;
+			}
+
+			if( $level !== 0 ) {
+				$problems[] = 'has a selector whose brackets do not close: '. self::_shown( $compound );
+				return;
+			}
+
+			$rest = (string) preg_replace( [ '/\.[a-z][a-z0-9_-]*/', '/::?[A-Za-z][A-Za-z-]*(?:\(\))?/', '/&/' ], '', $top );
+
+			if( $rest !== '' )
+				$problems[] = 'meets more than classes - an element, an id, the universal selector, an attribute selector or a class that is not written like the ones of the components: '. self::_shown( $compound );
+			else if( preg_match( '/\.[a-z]/', $top ) !== 1 && ( $owned === false || str_contains( $top, '&' ) === false ) )
+				$problems[] = 'has a part of a selector with no class of its own: '. self::_shown( $compound );
+
+			foreach( $calls as [ $name, $body ] ) {
+
+				if( in_array( $name, [ 'is', 'where', 'not', 'has' ], true ) === true )
+					$arguments = self::_list( $body );
+				else if( in_array( $name, [ 'nth-child', 'nth-last-child' ], true ) === true ) {
+
+					$parts = preg_split( '/\s+of\s+/i', $body, 2 );
+
+					if( preg_match( '/^\s*(?:even|odd|[+-]?\d*n?(?:\s*[+-]\s*\d+)?)\s*$/i', (string) $parts[0] ) !== 1 )
+						$problems[] = 'has a :'. $name. '() that is not read: '. self::_shown( $compound );
+
+					$arguments = isset( $parts[1] ) === true ? self::_list( $parts[1] ) : [];
+				}
+				else if( in_array( $name, [ 'nth-of-type', 'nth-last-of-type' ], true ) === true && preg_match( '/^\s*(?:even|odd|[+-]?\d*n?(?:\s*[+-]\s*\d+)?)\s*$/i', $body ) === 1 )
+					$arguments = [];
+				else if( in_array( $name, [ 'lang', 'dir' ], true ) === true && preg_match( '/^\s*[A-Za-z0-9-]+\s*$/', $body ) === 1 )
+					$arguments = [];
+				else {
+					$problems[] = 'uses :'. self::_shown( $name ). '(), which a theme.css has no use for: '. self::_shown( $compound );
+					$arguments = [];
+				}
+
+				foreach( $arguments as $argument )
+					self::_checkThemeComplex( trim( $argument ), $owned, $problems, $depth + 1 );
+			}
+		}
+
+		/**
+		 *	The selectors of a rule: each starts from an element of the components of the group or is :root, and none meets what is not theirs
+		 *
+		 *	@param		string		$prelude
+		 *	@param		array|null	$components		null for a theme
+		 *	@param		array			$problems			(reference)
+		 *	@param		bool			$owned				Whether the rule stands in a rule whose selectors all are the part's own
+		 *
+		 *	@return 	bool										Whether every selector of the list is the part's own: what a rule nested in this one is relative to
+		 */
+		private static function _checkSelector( string $prelude, ?array $components, array &$problems, bool $owned = false ): bool {
+
+			$list = self::_list( $prelude );
+
+			// A theme: the classes by their form, every compound of the selector with a class of its own
+			if( $components === null )
+				return self::_checkThemeSelector( $list, $problems, $owned );
 
 			$all = true;
 
@@ -998,7 +1235,11 @@ namespace Nino {
 		 *
 		 *	@return 	bool
 		 */
-		private static function _ownToken( string $token, array $components ): bool {
+		private static function _ownToken( string $token, ?array $components ): bool {
+
+			// A theme is held to the form of a token of a component, whatever the components of the site are: not one of the brand and not one of the page
+			if( $components === null )
+				return preg_match( '/^--[a-z][a-z0-9_]*(?:-[a-z0-9_]+)+$/', $token ) === 1 && str_starts_with( $token, '--brand-' ) === false && str_starts_with( $token, '--page-' ) === false;
 
 			foreach( $components as $component )
 				if( str_starts_with( $token, '--'. $component. '-' ) === true )

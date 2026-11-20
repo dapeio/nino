@@ -226,6 +226,259 @@ foreach( $faults as $label => [ $change, $code, $path ] ) {
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'probe/block.tpl' => '[html]x[/html]' ] ) );
 check( 'a package of blocks with a block that is no block is refused with the folder of the block', $problem !== null && $problem['code'] === 'block' && $problem['path'] === 'probe' );
 
+// The steps a part says its knobs are delivered at, and the free css of a theme
+$withButton = static function( mixed $values ) use ( $good ): array {
+
+	$json = json_decode( $good['parts/button/part.json'], true );
+	$json['values'] = $values;
+
+	return [ 'parts/button/part.json' => json_encode( $json ) ] + $good;
+};
+$page = json_decode( $good['parts/page/part.json'], true );
+$withPage = static fn( mixed $values ): array => [ 'parts/page/part.json' => json_encode( $page + [ 'values' => $values ] ) ] + $good;
+
+check( 'a theme without values and without theme.css is as good as it was, and a part may say the steps its knobs are delivered at: a knob of the group, a knob the part brings itself, a knob of the page, -2 to 2 and 0',
+	\Nino\Packages::check( $app, 'theme', $good ) === null && \Nino\Packages::check( $app, 'theme', $withButton( [ 'button.radius' => 1, 'button.space' => -2, 'button.size' => 0, 'button.radius' => 2 ] ) ) === null
+	&& \Nino\Packages::check( $app, 'theme', $withPage( [ 'radius' => -1 ] ) ) === null && \Nino\Packages::check( $app, 'theme', $withButton( [] ) ) === null && \Nino\Packages::check( $app, 'theme', $withPage( (object) [] ) ) === null );
+
+$badValues = [];
+
+foreach( [
+	'a knob the part has not'					=> [ 'button.nope' => 1 ],
+	'a knob of another group'					=> [ 'header-wrap.space' => 1 ],
+	'a step above the ladder'					=> [ 'button.radius' => 3 ],
+	'a step below the ladder'					=> [ 'button.radius' => -3 ],
+	'a step that is a string'					=> [ 'button.radius' => '1' ],
+	'a step that is a fraction'				=> [ 'button.radius' => 1.5 ],
+	'a step that is a list'						=> [ 'button.radius' => [ 1 ] ],
+	'a step that is nested'						=> [ 'button.radius' => [ 'a' => [ 'b' => 1 ] ] ],
+	'a step that is null'							=> [ 'button.radius' => null ],
+	'a step that is true'							=> [ 'button.radius' => true ],
+	'a name with a semicolon'					=> [ 'button.radius; color: red' => 1 ],
+	'a name that climbs'							=> [ '../button.radius' => 1 ],
+	'a name with a control character'	=> [ "button.radius\n" => 1 ],
+	'a name of digits'								=> [ '5' => 1 ],
+	'a list in place of a map'				=> [ 1, 2 ],
+	'a number'												=> 3,
+	'a string'												=> 'button.radius',
+	'null'														=> null,
+	'a thousand entries'							=> array_combine( array_map( static fn( int $at ): string => 'button.k'. $at, range( 1, 1000 ) ), array_fill( 0, 1000, 1 ) ),
+] as $label => $values )
+	if( ( \Nino\Packages::check( $app, 'theme', $withButton( $values ) )['code'] ?? '' ) !== 'part-values' )
+		$badValues[] = $label;
+
+check( 'values that name a knob the part has not, a step outside the ladder, a step that is no whole number, a name that is no name, a list or a thousand of them are refused as part-values'. ( $badValues === [] ? '' : ' - taken: '. implode( ', ', $badValues ) ), $badValues === [] );
+check( '...the part of the page is held to it as well, with the knobs it has', ( \Nino\Packages::check( $app, 'theme', $withPage( [ 'nope' => 1 ] ) )['code'] ?? '' ) === 'part-values' && ( \Nino\Packages::check( $app, 'theme', $withPage( [ 'radius' => 3 ] ) )['code'] ?? '' ) === 'part-values'
+	&& ( \Nino\Packages::check( $app, 'theme', $withPage( [ 'radius' => 3 ] ) )['path'] ?? '' ) === 'parts/page/part.json' );
+check( '...a group the project does not have is held to the knobs its part brings, and a part may carry the values of its own knob',
+	\Nino\Packages::check( $app, 'theme', [ 'parts/strange/part.json' => json_encode( [ 'contract' => 'strange@^1.0', 'knobs' => [ 'strange.x-glow' => [ 'label' => 'Glow', 'ladder' => [ '0', '1', '2', '3', '4' ] ] ], 'values' => [ 'strange.x-glow' => 1 ] ] ) ] + $good ) === null );
+
+$css = static fn( string $text ): array => [ 'theme.css' => $text ] + $good;
+$fine = ":root { --button-radius: 2px; }\n/* a comment may say url( and @import and !important */\n.button { border-radius: var(--button-radius); }\n.header-wrap--sticky .header-logo { opacity: .9; }\n@media (min-width: 768px) { .button--size-l { padding: 1rem; } }\n";
+
+check( 'a theme with a theme.css that keeps the rule of a part over the classes of every component is taken', \Nino\Packages::check( $app, 'theme', $css( $fine ) ) === null && \Nino\Packages::check( $app, 'theme', $css( '' ) ) === null );
+
+$badCss = [];
+
+foreach( [
+	'url()'														=> ".button { background: url(x.png); }",
+	'an @import'											=> "@import 'x.css';\n.button { color: red; }",
+	'an !important'										=> ".button { color: red !important; }",
+	'expression()'										=> ".button { width: expression(alert(1)); }",
+	'the end of a style element'			=> ".button { content: 'x'; }\n</style><script>alert(1)</script>",
+	'the end of a style element in a comment'	=> "/* </style> */\n.button { color: red; }",
+	'the end of a style element in a string'	=> ".button::after { content: '</style>'; }",
+	'the beginning of a comment of markup'	=> "<!-- .button { color: red; }",
+	'an element selector'							=> "body { margin: 0; }",
+	'a link selector'									=> "a { color: red; }",
+	'the universal selector'					=> "* { box-sizing: border-box; }",
+	'an id'														=> "#page { color: red; }",
+	'an id with a class of a component'	=> ".button#page { color: red; }",
+	'an attribute selector on the page'	=> "[data-x] { color: red; }",
+	'the classes of the page by an attribute'	=> "[class*=\"button\"] { color: red; }",
+	'@font-face'											=> "@font-face { font-family: X; src: local(Arial); }",
+	'@namespace'											=> "@namespace svg url(http://x);",
+	'@layer'													=> "@layer base { .button { color: red; } }",
+	'an escape that hides url('				=> ".button { background: \\75 rl(x.png); }",
+	'an escape in a selector'					=> ".bu\\74 ton { color: red; }",
+	'a token that is none of a component\'s'	=> ":root { --page-size: 1px; }",
+	'a token of the brand set'				=> ":root { --brand-color-1: red; }",
+	'a comment that is not closed'		=> ".button { color: red; } /* x",
+	'braces that do not balance'			=> ".button { color: red;",
+	'behavior'												=> ".button { behavior: url(x.htc); }",
+	'-moz-binding'										=> ".button { -moz-binding: x; }",
+	'a way out of the rule by @media'	=> "@media print { body { margin: 0; } }",
+] as $label => $text )
+	if( ( \Nino\Packages::check( $app, 'theme', $css( $text ) )['code'] ?? '' ) !== 'theme-css' )
+		$badCss[] = $label;
+
+check( 'a theme.css that loads, imports, forces, runs, ends the style element it is put in, meets the page by an element, an id, a universal or an attribute selector, names a font, hides any of it in an escape or a comment, or does not close, is refused as theme-css'
+	. ( $badCss === [] ? '' : ' - taken: '. implode( ', ', $badCss ) ), $badCss === [] );
+
+// Whether a theme.css is valid does not depend on the site: a class is held to its form, and not to the components the site has on
+$withGallery = $app;
+$withGallery[\Nino\Components::REGISTRY]['gallery-grid'] = $app[\Nino\Components::REGISTRY]['button'];
+$gallery = ".gallery-grid { gap: 0; }\n.gallery-grid--cols-3 .gallery-item:hover { --gallery-gap: 1rem; opacity: var(--brand-color-1, 1); }\n.no-feature-has-this_class-2 { color: red; }";
+
+check( 'the register of this site has no gallery and the one of the other has: the same theme.css is as good in both, and a class that no component has here is no cause to refuse it',
+	isset( $app[\Nino\Components::REGISTRY]['gallery-grid'] ) === false && isset( $withGallery[\Nino\Components::REGISTRY]['gallery-grid'] ) === true
+	&& \Nino\Packages::check( $app, 'theme', $css( $gallery ) ) === null && \Nino\Packages::check( $withGallery, 'theme', $css( $gallery ) ) === null
+	&& \Nino\Components::themeProblems( $gallery ) === [] );
+
+$wrong = [];
+
+foreach( [
+	'a class that is not written like the ones of the components'	=> '.Gallery-grid { gap: 0; }',
+	'a capital behind a good class'			=> '.a.Gallery-grid { gap: 0; }',
+	'a function nested five deep'				=> '.a:is(.b:is(.c:is(.d:is(.e:is(.f))))) { gap: 0; }',
+	'a class that starts with a digit'		=> '.3-up { gap: 0; }',
+	'a class that starts with a hyphen'	=> '.-up { gap: 0; }',
+	'an element with a class'						=> 'a.button { gap: 0; }',
+	'an element behind a class'					=> '.button a { gap: 0; }',
+	'an id behind a class'							=> '.button #x { gap: 0; }',
+	'an attribute selector behind a class'	=> '.button[disabled] { gap: 0; }',
+	'an attribute selector of the class'	=> '.button:where([class*="--x"]) { gap: 0; }',
+	'the universal selector behind a class'	=> '.section-wrap * { display: none; }',
+	'the universal selector behind ~'		=> '.section-wrap ~ * { display: none; }',
+	'the universal selector behind +'		=> '.header-wrap + * { display: none; }',
+	'the universal selector behind >'		=> '.header-wrap > * { display: none; }',
+	'an element as the last part'				=> '.section-wrap ~ div { display: none; }',
+	'an element as the last part behind +'	=> '.section-wrap .text + a { display: none; }',
+	'an element in the middle'					=> '.section-wrap div .text { display: none; }',
+	'the universal selector in a nesting'	=> '.section-wrap { & ~ * { display: none; } }',
+	'an element in a nesting'						=> '.section-wrap { & + div { display: none; } }',
+	'an element in a nesting without &'	=> '.section-wrap { > a { display: none; } }',
+	'an element two levels down'				=> '.a { .b { & ~ p { color: red; } } }',
+	'a part with only & at the top of the sheet'	=> '& .button { color: red; }',
+	':root with a descendant'						=> ':root .button { color: red; }',
+	'only a pseudo class'								=> ':hover { color: red; }',
+	'only a pseudo element'							=> '::before { content: ""; }',
+	'a part that is only :first-child'	=> '.button > :first-child { color: red; }',
+	'a class that is only in :not()'		=> ':not(.button) { color: red; }',
+	'a class that is only in :is()'			=> ':is(.a, .b) { color: red; }',
+	'body in :is()'											=> '.a:is(.b, body) { color: red; }',
+	'* in :where()'											=> ':where(*) .button { color: red; }',
+	'body in :not()'										=> '.button:not(body) { color: red; }',
+	'body in :has()'										=> '.button:has(body) { color: red; }',
+	'a combinator and * in :has()'			=> '.button:has(> *) { color: red; }',
+	'* behind ~ in :not()'							=> '.a:not(.b ~ *) { color: red; }',
+	'* in :is() in :not()'							=> '.a:not(:is(.b, *)) { color: red; }',
+	'an element in :nth-child( of )'		=> '.a:nth-child(2n+1 of div) { color: red; }',
+	'a function that takes no selector here'	=> '.a::part(x) { color: red; }',
+	'a function of no use'							=> '.a:host(.b) { color: red; }',
+	'an empty :is()'										=> '.a:is() { color: red; }',
+	'an empty member of a list'					=> '.a, { color: red; }',
+	'a bad member of a list'						=> '.a, body { color: red; }',
+	'a bad member behind a good one in a nesting'	=> '.a, .b { & ~ i, & ~ .c { color: red; } }',
+	'a bad one in @media'								=> '@media print { .a ~ * { display: none; } }',
+	'a bad one in @supports'						=> '@supports (display: grid) { .a ~ * { display: none; } }',
+	'a bad one in @container'						=> '@container (min-width: 1px) { .a ~ * { display: none; } }',
+] as $label => $text )
+	if( \Nino\Components::themeProblems( $text ) === [] || ( \Nino\Packages::check( $app, 'theme', $css( $text ) )['code'] ?? '' ) !== 'theme-css' )
+		$wrong[] = $label;
+
+check( 'every compound of a selector of a theme.css has a class of its own outside of any function - the last one, the one behind ~, + or >, one under & and one in :is(), :where(), :not() or :has() - and meets nothing but classes: the rest is refused'
+	. ( $wrong === [] ? '' : ' - taken: '. implode( ', ', $wrong ) ), $wrong === [] );
+
+$wrong = [];
+
+foreach( [
+	'a descendant'											=> '.a .b { color: red; }',
+	'the combinators'										=> '.a > .b + .c ~ .d .e { color: red; }',
+	'no blank around the combinators'		=> '.a>.b+.c~.d { color: red; }',
+	'pseudo classes and elements'				=> '.a:hover:not(.b):focus-visible::after, .a::before { color: red; }',
+	'a list'														=> '.a, .b ~ .c { color: red; }',
+	'a modifier'												=> '.section-col--bleed.section-col--link { color: red; }',
+	':is() and :where() of classes'			=> '.a:is(.b, .c) .d:where(.e ~ .f) { color: red; }',
+	':has() with a combinator in front'	=> '.a:has(> .b, + .c) { color: red; }',
+	':not() with a combination'					=> '.a:not(.b .c) { color: red; }',
+	'a nesting of the kinds'						=> '.a { & ~ .b { color: red; } & > .c { color: red; } > .d { color: red; } + .e { color: red; } .f { color: red; } &:hover { color: red; } }',
+	'a nesting in a nesting'						=> '.a { .b { & ~ .c { color: red; } } }',
+	'a nesting under a list'						=> '.a, .b { & ~ .c { color: red; } }',
+	'a position'												=> '.a:nth-child(2n+1):nth-last-child(odd):nth-of-type(3) .b:nth-child(2 of .c, .d) { color: red; }',
+	'a function nested four deep'				=> '.a:is(.b:is(.c:is(.d:is(.e)))) { gap: 0; }',
+	'a language'												=> '.a:lang(de) .b:dir(rtl) { color: red; }',
+	':root'															=> ':root { --gallery-gap: 1rem; }',
+	'a rule in @media, @supports and @container'	=> '@media (min-width: 1px) { .a ~ .b { color: red; } } @supports (display: grid) { .a { display: grid; } } @container (min-width: 1px) { .a .b { color: red; } }',
+	'keyframes'													=> '@keyframes spin { from { opacity: 0; } to { opacity: 1; } } .a { animation: spin 1s; }',
+] as $label => $text )
+	if( \Nino\Components::themeProblems( $text ) !== [] )
+		$wrong[] = $label. ': '. implode( '; ', \Nino\Components::themeProblems( $text ) );
+
+check( '...and a selector of classes with pseudo classes, pseudo elements and the combinators, in lists, in functions that take selectors and in nestings, is taken'. ( $wrong === [] ? '' : ' - refused: '. implode( ' | ', $wrong ) ), $wrong === [] );
+
+$wrong = [];
+
+foreach( [
+	'--gallery-gap'											=> [ ':root { --gallery-gap: 1px; }', true ],
+	'--a-b_c'														=> [ ':root { --a-b_c: 1px; }', true ],
+	'a token without a hyphen behind its name'	=> [ ':root { --gallery: 1px; }', false ],
+	'--page-space-1'										=> [ ':root { --page-space-1: 1px; }', false ],
+	'--brand-color-1'										=> [ ':root { --brand-color-1: red; }', false ],
+	'a token with a capital'						=> [ ':root { --Gallery-gap: 1px; }', false ],
+	'reading --page-size'								=> [ '.a { width: var(--page-size); }', true ],
+	'reading a token of no name'				=> [ '.a { width: var(--x); }', false ],
+	'reading a token of a component'		=> [ '.a { width: var(--gallery-gap); }', true ],
+] as $label => [ $text, $ok ] )
+	if( ( \Nino\Components::themeProblems( $text ) === [] ) !== $ok )
+		$wrong[] = $label;
+
+check( 'a token is set by a theme.css where it is written as the token of a component, whichever components the site has - neither --brand-... nor --page-... - and read where it is that, or a --brand-... or a --page-...'. ( $wrong === [] ? '' : ' - taken wrongly: '. implode( ', ', $wrong ) ), $wrong === [] );
+
+// What no stylesheet put into a page may do, in every spelling
+$wrong = [];
+
+foreach( [
+	'@font-face in capitals'						=> "@FONT-FACE { font-family: X; }",
+	'@Font-Face mixed'									=> "@Font-Face { font-family: X; }",
+	'behavior in capitals'							=> ".a { BEHAVIOR: url(x.htc); }",
+	'behavior mixed with a blank'				=> ".a { Behavior : x; }",
+	'-moz-binding in capitals'					=> ".a { -MOZ-BINDING: x; }",
+	'expression in capitals'						=> ".a { width: EXPRESSION(1); }",
+	'@property'													=> "@property --gallery-gap { syntax: '<length>'; inherits: false; initial-value: 0px; }",
+	'@property of the brand'						=> "@property --brand-color-1 { syntax: '*'; inherits: false; initial-value: red; }",
+	'@PROPERTY in capitals'							=> "@PROPERTY --page-size { syntax: '*'; inherits: false; }",
+	'image()'														=> ".a { background: image('x.png'); }",
+	'element()'													=> ".a { background: element(#x); }",
+	'-moz-element()'										=> ".a { background: -moz-element(#x); }",
+	'cross-fade()'											=> ".a { background: cross-fade(var(--page-size), var(--page-size), 50%); }",
+	'IMAGE() in capitals'								=> ".a { background: IMAGE('x.png'); }",
+] as $label => $text )
+	if( \Nino\Components::themeProblems( $text ) === [] )
+		$wrong[] = $label;
+
+check( 'a theme.css that uses @font-face, behavior, -moz-binding or expression() in any case of letters, an @property, or image(), element() and cross-fade() is refused'. ( $wrong === [] ? '' : ' - taken: '. implode( ', ', $wrong ) ), $wrong === [] );
+
+check( '...what a comment says is no use of it: @font-face, behavior:, -moz-binding and expression( in a comment are taken, whatever the case',
+	\Nino\Components::themeProblems( "/* @font-face { } behavior: x; -moz-binding: y; expression( 1 ) */\n.a { color: red; }\n/* a\n@FONT-FACE */" ) === []);
+
+// part.css: the same list of what loads, and no @property; a part keeps its own rule over the classes of its group
+$wrong = [];
+
+foreach( [ '@property --probe-x { syntax: "*"; inherits: false; }', '.probe { background: image("x.png"); }', '.probe { background: element(#x); }', '.probe { background: cross-fade(red, blue, 50%); }', '.probe { background: -webkit-cross-fade(red, blue, 50%); }' ] as $text )
+	if( \Nino\Components::partProblems( $text, [ 'probe' ] ) === [] )
+		$wrong[] = $text;
+
+check( 'a part.css refuses @property, image(), element() and cross-fade() as it does image-set() and src()'. ( $wrong === [] ? '' : ' - taken: '. implode( ', ', $wrong ) ), $wrong === []
+	&& \Nino\Components::partProblems( '.probe-x :is(th, td) > :first-child { color: red; } .probe:not(:last-child)::after { content: ""; }', [ 'probe' ] ) === [] );
+
+$long = \Nino\Packages::check( $app, 'theme', $css( str_repeat( ' ', \Nino\Packages::MAX_CSS + 1 ) ) );
+$problem = \Nino\Packages::check( $app, 'theme', $css( ".button { color: red; }\n.button { color: red; }\n</style>" ) );
+check( 'a theme.css above the limit of a part.css is too long, and what is wrong in one is said with the line it stands on',
+	( $long['code'] ?? '' ) === 'long' && ( $long['path'] ?? '' ) === 'theme.css' && ( $problem['path'] ?? '' ) === 'theme.css' && str_contains( implode( ' ', $problem['params'] ?? [] ), 'line 3' ) === true && str_contains( \Nino\Packages::why( $problem ), 'theme.css' ) === true );
+check( 'a theme.css may be as long as a part.css: 40 KB of rules are taken - the limit of a json is not its limit - and a rule found wrong below a comment of several lines says its line',
+	\Nino\Packages::check( $app, 'theme', $css( str_repeat( ".button { color: red; }\n", 1600 ) ) ) === null
+	&& str_contains( implode( ' ', \Nino\Packages::check( $app, 'theme', $css( "/* one\ntwo\nthree */\n.button { color: red; }\n@font-face { font-family: X; }" ) )['params'] ?? [] ), 'line 5' ) === true );
+check( 'a text that is not utf-8 or holds a null byte is no theme.css', ( \Nino\Packages::check( $app, 'theme', $css( "a\0b" ) )['code'] ?? '' ) === 'text' && ( \Nino\Packages::check( $app, 'theme', $css( "\xff\xfe" ) )['code'] ?? '' ) === 'text' );
+check( 'theme.css is a file of a theme and of nothing else: a package of blocks has none, and a theme has the one at its root and none in a folder',
+	( \Nino\Packages::check( $app, 'blocks', [ 'theme.css' => $fine ] + packagesPack( 'probe-pack', $block, $webp ) )['code'] ?? '' ) === 'not-allowed'
+	&& ( \Nino\Packages::check( $app, 'theme', [ 'parts/button/theme.css' => $fine ] + $good )['code'] ?? '' ) === 'not-allowed' && ( \Nino\Packages::check( $app, 'theme', [ 'blocks/probe/theme.css' => $fine ] + $good )['code'] ?? '' ) === 'not-allowed'
+	&& ( \Nino\Packages::check( $app, 'theme', [ 'Theme.css' => $fine ] + $good )['code'] ?? '' ) !== null );
+$placeApp = packagesSite();
+$placed = \Nino\Packages::place( $placeApp, 'theme', 'craft-probe', $css( $fine ) );
+check( 'place() puts the file with the others and a theme that has it is installed as the theme it is', $placed === true && file_get_contents( ninoSandboxDir( $placeApp ). '/private/packages/themes/craft-probe/theme.css' ) === $fine && \Nino\Packages::installed( $placeApp, 'theme' ) === [ 'craft-probe' => '1.0.0' ] );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $placeApp ) );
+
 // A frame may read the texts of the project, a block of the pages may not: the package follows the rule of \Nino\Blocks by itself, as a theme or as a package of blocks
 $frameJson = json_encode( [ 'name' => [ 'de_DE' => 'Fuss', 'en_US' => 'Foot' ], 'description' => [ 'de_DE' => 'Ein Fuss', 'en_US' => 'A foot' ], 'category' => 'frame', 'rank' => 20, 'images' => (object) [] ] );
 $frameFiles = static fn( string $tpl, string $json ): array => [ 'block.json' => $json, 'block.tpl' => $tpl, 'text/de_DE.json' => '{}', 'text/en_US.json' => '{}' ];

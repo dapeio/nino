@@ -18,15 +18,16 @@ namespace Nino {
 	 *
 	 *										kind		lives in															what it may hold
 	 *										feature	features/<Directory>/									code: the rules of the archive are all
-	 *										theme		private/packages/themes/<key>/				theme.json, parts/<group>/part.json and part.css, blocks/<block>/
-	 *																																(block.json, block.tpl, text/<xx_XX>.json, images/<slot>.<ext>), preview.webp,
+	 *										theme		private/packages/themes/<key>/				theme.json, theme.css, parts/<group>/part.json and part.css,
+	 *																																blocks/<block>/ (block.json, block.tpl, text/<xx_XX>.json, images/<slot>.<ext>), preview.webp,
 	 *																																LICENSE.txt, README.md
 	 *										blocks	private/packages/blocks/<key>/				pack.json, <block>/ as above, preview.webp, LICENSE.txt
 	 *
 	 *										A theme and a package of blocks are data and have no code, and what they hold is a list of paths of forms: a file that
 	 *										no form names is refused with its path, whatever it is called (a php file, an .htaccess, a script, a hidden file). Each
 	 *										of the files a form names is read by the rules of what reads it later: a part by \Nino\Components::validateGroup() and
-	 *										\Nino\Components::partProblems(), a block by \Nino\Blocks::validate(), a picture by \Nino\Images::size() and
+	 *										\Nino\Components::partProblems() (and the "values" of a part, the steps its knobs are delivered at, by the knobs the part has), theme.css by
+	 *										\Nino\Components::themeProblems(), a block by \Nino\Blocks::validate(), a picture by \Nino\Images::size() and
 	 *										\Nino\Images::cleanSvg(). A package with one file that is refused is refused as a whole; nothing of it is written. A svg is
 	 *										written as the picture cleanSvg() rebuilds, never as it came. private/ is never served, and no reader includes a file
 	 *										of a package. The packages are not in a backup: they come from the catalogue again, and nothing of a site hangs on them.
@@ -101,7 +102,7 @@ namespace Nino {
 			'part-contract'		=> '"contract" names the feature and the versions of it the part is for, as basis@^1.0',
 			'page-contract'		=> 'the contract of the page is kernel@<constraint>',
 			'page-css'				=> 'the page has no stylesheet: its part is part.json alone',
-			'page-keys'				=> 'the part of the page has a contract and knobs',
+			'page-keys'				=> 'the part of the page has a contract, knobs and values',
 			'page-knob'				=> 'the knob "%s" of the page is a slug with a label, a ladder of %s sets of tokens of the page, and small as true or false',
 			'group-feature'		=> 'the contract names "%s", the group is the feature "%s"\'s',
 			'ladder-unknown'	=> 'ladder "%s" is no knob of the group',
@@ -110,6 +111,8 @@ namespace Nino {
 			'variants'				=> 'variants of "%s": a component of the group, with a map of at most %s variants of a slug and a label',
 			'standard'				=> 'standard of "%s": the component of the group and the name of a variant',
 			'css'							=> 'the css of the part breaks the rules of a part: %s',
+			'part-values'			=> '"values" is a map of at most %s knobs of the part - "%s" is none of them or has no step - to a step from -2 to 2',
+			'theme-css'				=> 'the css of the theme breaks the rules of a theme\'s css: %s',
 			'part-json'				=> 'the part has no part.json',
 			'block'						=> 'the block is refused: %s',
 			'preview'					=> 'the picture is no webp picture of at most %s bytes and %s pixels on a side',
@@ -132,7 +135,9 @@ namespace Nino {
 		private const string VERSION = '/^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[A-Za-z0-9.]{1,20})?$/D';
 
 		// What a part.json may say; and the knobs of a component the part adds to the ones of the group, and the variants it names
-		private const array PART_KEYS = [ 'contract', 'ladders', 'knobs', 'variants', 'standard' ];
+		private const array PART_KEYS = [ 'contract', 'ladders', 'knobs', 'variants', 'standard', 'values' ];
+		// How many knobs the values of a part may name: the knobs of a group are at most six for a component
+		private const int MAX_VALUES = 64;
 		private const array THEME_KEYS = [ 'key', 'version', 'name', 'description', 'brand' ];
 		private const array PACK_KEYS = [ 'key', 'version', 'name', 'description' ];
 		private const int MAX_EXTRA = 2;
@@ -330,6 +335,15 @@ namespace Nino {
 
 					if( $problem !== null )
 						return $problem;
+				}
+
+				// The css of a theme as a whole: held to the rule of a part over the form of a class and of a token, so that it is valid on every site, whatever features it has on
+				if( isset( $found['single']['theme-css'] ) === true ) {
+
+					$problems = \Nino\Components::themeProblems( $found['single']['theme-css'] );
+
+					if( $problems !== [] )
+						return self::_problem( 'theme-css', 'theme.css', [ implode( '; ', $problems ) ] );
 				}
 			}
 
@@ -768,6 +782,9 @@ namespace Nino {
 			if( $path === ( $theme === true ? 'theme.json' : 'pack.json' ) )
 				return [ 'role' => $path ];
 
+			if( $theme === true && $path === 'theme.css' )
+				return [ 'role' => 'theme-css' ];
+
 			if( $theme === true && preg_match( '#^parts/('. $slug. ')/part\.(json|css)$#D', $path, $found ) === 1 )
 				return strlen( $found[1] ) <= \Nino\Components::NAME_LENGTH ? [ 'role' => 'part-'. $found[2], 'group' => $found[1] ] : null;
 
@@ -814,7 +831,7 @@ namespace Nino {
 			}
 
 			$limit = match( $role ) {
-				'part-css'							=> self::MAX_CSS,
+				'part-css', 'theme-css'	=> self::MAX_CSS,
 				'block-json', 'block-text'	=> \Nino\Blocks::MAX_JSON,
 				'block-tpl'							=> \Nino\Blocks::MAX_TEMPLATE,
 				'LICENSE.txt', 'README.md'	=> self::MAX_TEXT,
@@ -943,6 +960,7 @@ namespace Nino {
 				return self::_problem( 'group-feature', $path, [ $contract[1], $declared['feature'] ] );
 
 			$claimed = [];
+			$known = array_merge( array_keys( (array) ( $json['knobs'] ?? [] ) ), array_keys( (array) ( $json['ladders'] ?? [] ) ) );
 
 			foreach( [ 'ladders', 'knobs' ] as $key )
 				foreach( array_keys( (array) ( $json[$key] ?? [] ) ) as $name )
@@ -993,7 +1011,15 @@ namespace Nino {
 
 				if( is_string( $checked ) === true )
 					return self::_problem( 'group-knobs', $path, [ $checked ] );
+
+				// The knobs the part knows are those of the group - at the steps the part's ladders give them - and its own
+				$known = array_keys( $all );
 			}
+
+			$problem = self::_values( $json, $known, $path );
+
+			if( $problem !== null )
+				return $problem;
 
 			foreach( (array) ( $json['variants'] ?? [] ) as $component => $words ) {
 
@@ -1035,7 +1061,7 @@ namespace Nino {
 			if( trim( $css ) !== '' )
 				return self::_problem( 'page-css', $where. '/part.css' );
 
-			if( array_diff( array_keys( $json ), [ 'contract', 'knobs' ] ) !== [] )
+			if( array_diff( array_keys( $json ), [ 'contract', 'knobs', 'values' ] ) !== [] )
 				return self::_problem( 'page-keys', $path );
 
 			$knobs = $json['knobs'] ?? [];
@@ -1066,6 +1092,33 @@ namespace Nino {
 				if( $bad === true )
 					return self::_problem( 'page-knob', $path, [ self::_shown( (string) $name ), \Nino\Components::STEPS ] );
 			}
+
+			return self::_values( $json, array_map( 'strval', array_keys( $knobs ) ), $path );
+		}
+
+		/**
+		 *	The steps a part says its knobs stand on when the theme is delivered, 'values' of part.json: a map of the knobs the part has to a whole step from
+		 *	-2 to 2, 0 the middle one. Nothing is worked out here - the one who reads the theme takes the steps, and a part that has none is at the middle
+		 *
+		 *	@param		array			$json					What part.json holds
+		 *	@param		array			$known				The names of the knobs of the part: the group's and its own, or the page's
+		 *	@param		string		$path					part.json
+		 *
+		 *	@return 	array|null								What is wrong, null where nothing is
+		 */
+		private static function _values( array $json, array $known, string $path ): ?array {
+
+			if( array_key_exists( 'values', $json ) === false )
+				return null;
+
+			$values = $json['values'];
+
+			if( is_array( $values ) === false || ( $values !== [] && array_is_list( $values ) === true ) || count( $values ) > self::MAX_VALUES )
+				return self::_problem( 'part-values', $path, [ self::MAX_VALUES, '' ] );
+
+			foreach( $values as $knob => $step )
+				if( is_string( $knob ) === false || in_array( $knob, $known, true ) === false || is_int( $step ) === false || $step < -2 || $step > 2 )
+					return self::_problem( 'part-values', $path, [ self::MAX_VALUES, self::_shown( (string) $knob ) ] );
 
 			return null;
 		}
