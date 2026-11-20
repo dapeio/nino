@@ -1624,110 +1624,86 @@ check( 'the feature brings no script, and its parts no font or image: a file of 
 $docs = (string) file_get_contents( dirname( __DIR__ ). '/docs/features.md' );
 check( 'the table of the components in docs/features.md is the one the schemas make', str_contains( $docs, basisTable( $schemas ) ) );
 
-// the cost of a start page of seven sections: 70 calls, 28 of them texts - the median of 400 drawings, the smallest of up to three rounds
-$home = '';
-$fills = [];
+// the cost of a start page of seven sections: 70 calls, 28 of them texts. A clock says nothing on a machine that does other things as well, so the cost is what it is made
+// of: the calls that are drawn and the elements they make grow with the sections of the page and no faster, the same tree is the same page at every draw, and a draw reads
+// nothing from disk - no file is included while a tree is drawn. The time is told, and nothing hangs on it
+$startPage = static function( int $sections ): array {
 
-for( $s = 1; $s <= 7; $s++ ) {
+	$home = '';
+	$fills = [];
 
-	$k = '/template/page-basis/s'. $s. '/';
+	for( $s = 1; $s <= $sections; $s++ ) {
 
-	foreach( [ 'title' => 'Title '. $s, 'subtitle' => 'A subtitle that is a little longer', 'text' => 'A paragraph of text as a start page has it. It has two sentences.', 'more' => 'Learn more', 'side' => 'A second paragraph in the right column.', 'note' => 'And a third, short one.' ] as $n => $v )
-		$fills[$k. $n] = $v;
+		$k = '/template/page-basis/s'. $s. '/';
 
-	$home .= "[section-wrap id=\"s$s\" ground=\"alt\"]\n\t[section-row]\n\t\t[section-col size=\"100 m:50\"]\n\t\t\t[section-title ~title]\n\t\t\t[section-subtitle ~subtitle]\n\t\t\t[text ~text]\n\t\t\t[text ~more]\n\t\t[/section-col]\n\t\t[section-col size=\"100 m:50\" variant=\"card\"]\n\t\t\t[text ~side]\n\t\t\t[text ~note]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]\n";
-}
+		foreach( [ 'title' => 'Title '. $s, 'subtitle' => 'A subtitle that is a little longer', 'text' => 'A paragraph of text as a start page has it. It has two sentences.', 'more' => 'Learn more', 'side' => 'A second paragraph in the right column.', 'note' => 'And a third, short one.' ] as $n => $v )
+			$fills[$k. $n] = $v;
 
-$timed = basisSite();
-\Nino\Html::addFills( $timed, $fills, '*' );
-$tree = \Nino\Markup::parse( $home, \Nino\Components::containers( $timed ), $notes );
-$calls = preg_match_all( '/\[(?!\/)[a-z]/', $home );
-$texts = preg_match_all( '/\[text /', $home );
-$output = \Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] );
-$rounds = [];
-
-for( $round = 0; $round < 3; $round++ ) {
-
-	$times = [];
-
-	for( $i = 0; $i < 400; $i++ ) {
-
-		$started = hrtime( true );
-		\Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] );
-		$times[] = ( hrtime( true ) - $started ) / 1e6;
+		$home .= "[section-wrap id=\"s$s\" ground=\"alt\"]\n\t[section-row]\n\t\t[section-col size=\"100 m:50\"]\n\t\t\t[section-title ~title]\n\t\t\t[section-subtitle ~subtitle]\n\t\t\t[text ~text]\n\t\t\t[text ~more]\n\t\t[/section-col]\n\t\t[section-col size=\"100 m:50\" variant=\"card\"]\n\t\t\t[text ~side]\n\t\t\t[text ~note]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]\n";
 	}
 
-	sort( $times );
-	$rounds[] = $times[200];
 
-	if( min( $rounds ) <= 2.1 )
-		break;
-}
-echo sprintf( "  %d calls, %d of them texts, %d bytes drawn: median of 400 %s ms (rounds: %s)\n", $calls, $texts, strlen( $output ), sprintf( '%.3f', min( $rounds ) ), implode( ', ', array_map( static fn( float $ms ): string => sprintf( '%.3f', $ms ), $rounds ) ) );
-// The plan names 2.1 ms for this page (0.03 ms a call) and a quiet machine draws it in 1.2 ms, which is told above on every run. The pin is a budget
-// far from that - ten times the measure - since the runner of a shared service is several times slower from one run to the next, and a slow
-// machine is no reason for a failure
-check( 'a start page of seven sections - 70 calls, 28 of them texts in the format blocks - is drawn in 12 ms at the median (smallest of up to three rounds)', $calls === 70 && $texts === 28 && substr_count( $output, '<section' ) === 7 && min( $rounds ) <= 12 );
+	return [ $home, $fills ];
+};
+
+[ $home, $fills ] = $startPage( 7 );
+[ $homeBig, $fillsBig ] = $startPage( 28 );
+
+$timed = basisSite();
+\Nino\Html::addFills( $timed, $fills + $fillsBig, '*' );
+$tree = \Nino\Markup::parse( $home, \Nino\Components::containers( $timed ), $notes );
+$treeBig = \Nino\Markup::parse( $homeBig, \Nino\Components::containers( $timed ), $notes );
+$calls = preg_match_all( '/\[(?!\/)[a-z]/', $home );
+$callsBig = preg_match_all( '/\[(?!\/)[a-z]/', $homeBig );
+$texts = preg_match_all( '/\[text /', $home );
+$output = \Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] );
+$outputBig = \Nino\Components::render( $timed, $treeBig, [ 'template' => 'page-basis' ] );
+$included = count( get_included_files() );
+$same = true;
+
+for( $i = 0; $i < 50; $i++ )
+	$same = $same === true && \Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] ) === $output;
+
+$started = hrtime( true );
+
+for( $i = 0; $i < 200; $i++ )
+	\Nino\Components::render( $timed, $tree, [ 'template' => 'page-basis' ] );
+
+echo sprintf( "  %d calls, %d of them texts, %d bytes drawn: %.3f ms a draw (told, not pinned)\n", $calls, $texts, strlen( $output ), ( hrtime( true ) - $started ) / 1e6 / 200 );
+check( 'a start page of seven sections - 70 calls, 28 of them texts in the format blocks - is drawn whole: seven sections, no call left in it', $calls === 70 && $texts === 28 && substr_count( $output, '<section' ) === 7 && preg_match( '/\[[a-z]/', $output ) !== 1 );
+check( '...and the same tree is the same page at every one of fifty draws, and no file is included while it is drawn', $same === true && count( get_included_files() ) === $included );
+check( '...four times the sections are four times the calls, the sections and the paragraphs drawn, and the bytes follow the calls (the numbers of the titles apart): what is drawn grows with the page and no faster',
+	$callsBig === 4 * $calls && substr_count( $outputBig, '<section' ) === 4 * substr_count( $output, '<section' ) && substr_count( $outputBig, '<p ' ) === 4 * substr_count( $output, '<p ' )
+	&& strlen( $outputBig ) > 3.9 * strlen( $output ) && strlen( $outputBig ) < 4.2 * strlen( $output ) );
 
 $cold = ninoSandbox( 'basis-cold' );
 $cold['./nino/filesystem/path'] = dirname( __DIR__ );
 $cold['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
 \Nino\Features::registerComponents( $cold );
 
-/**	The median of 200 registrations of the twenty from the cache of the register, in ms: in this process, or in one that has opcache on	*/
-$register = static function( bool $opcache ) use ( $cold ): ?float {
+/**	What a registration of the twenty includes, in a process of its own - so that nothing of what the suite included before is in the count: how many files of components/ and groups/ of Basis
+ *	it includes (the schemas are read from them), how many files of the cache of the register, and how many components it registers. From the cache the first is 0 and the second 1: the
+ *	cache is the one file it reads, and not one of the schemas is included; with the cache turned off the files are read and the cache is none	*/
+$register = static function( bool $cache ) use ( $cold ): ?array {
 
-	$run = static function() use ( $cold ): string {
-
-		$times = [];
-
-		for( $n = 0; $n < 200; $n++ ) {
-
-			$one = $cold;
-			unset( $one['./nino/features/listed'], $one[\Nino\Components::REGISTRY], $one[\Nino\Components::OWNERS], $one[\Nino\Components::GROUPS] );
-			$started = hrtime( true );
-			\Nino\Features::registerComponents( $one );
-			$times[] = ( hrtime( true ) - $started ) / 1e6;
-		}
-
-		sort( $times );
-
-		return (string) ( count( \Nino\Components::components( $one ) ) === 20 ? $times[100] : -1 );
-	};
-
-	if( $opcache === false ) {
-
-		$best = (float) $run();
-		$best = min( $best, (float) $run() );
-
-		return $best;
-	}
-
-	if( extension_loaded( 'Zend OPcache' ) === false )
-		return null;
-
-	$script = sys_get_temp_dir(). '/nino-basis-opcache-'. getmypid(). '.php';
+	$script = sys_get_temp_dir(). '/nino-basis-register-'. getmypid(). '.php';
 	file_put_contents( $script, '<?php define( "NINO_FEATURES_DIR", '. var_export( NINO_FEATURES_DIR, true ). ' ); require '. var_export( __DIR__. '/harness.php', true ). ';
 		$cold = [ "./nino/uid" => '. var_export( ninoSandboxDir( $cold ), true ). ' ]; \\Nino\\AppData::prepare( $cold );
 		$cold["./nino/filesystem/path"] = '. var_export( dirname( __DIR__ ), true ). '; $cold["./nino/filesystem/configpath"] = $cold["./nino/filesystem/contentpath"] = '. var_export( ninoSandboxDir( $cold ). '/private', true ). '; $cold["./nino/filesystem/publicpath"] = '. var_export( ninoSandboxDir( $cold ). '/public', true ). ';
-		$cold["/nino/modules"] = [ "\\\\Nino\\\\Modules\\\\Basis" ]; $cold["/nino/dir"] = "";
-		$best = 9999.0;
-		for( $round = 0; $round < 2; $round++ ) { $times = [];
-			for( $n = 0; $n < 200; $n++ ) { $one = $cold; $started = hrtime( true ); \\Nino\\Features::registerComponents( $one ); $times[] = ( hrtime( true ) - $started ) / 1e6; }
-			sort( $times ); $best = min( $best, $times[100] ); }
-		echo count( \\Nino\\Components::components( $one ) ) === 20 ? $best : -1;' );
-	$out = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' -d opcache.enable_cli=1 -d opcache.file_update_protection=0 '. escapeshellarg( $script ). ' 2>&1' ) );
+		$cold["/nino/modules"] = [ "\\\\Nino\\\\Modules\\\\Basis" ]; $cold["/nino/dir"] = ""; $cold["/nino/markup/cache"] = '. ( $cache === true ? 'true' : 'false' ). ';
+		\\Nino\\Features::registerComponents( $cold );
+		$files = get_included_files();
+		echo json_encode( [ count( array_filter( $files, static fn( string $file ): bool => preg_match( "~/Basis/(components|groups)/~", $file ) === 1 ) ), count( array_filter( $files, static fn( string $file ): bool => str_contains( $file, "/cache/register/" ) ) ), count( \\Nino\\Components::components( $cold ) ) ] );' );
+	$out = trim( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $script ). ' 2>&1' ) );
 	unlink( $script );
 
-	return is_numeric( $out ) === true ? (float) $out : null;
+	return json_decode( $out, true );
 };
-$plain = $register( false );
-$cached = $register( true );
-echo sprintf( "  registering the twenty from the cache of the register: median of 200 %.3f ms without opcache, %s with it (the file is %d bytes; parsing it is most of the first)\n", $plain, $cached === null ? 'not run' : sprintf( '%.3f ms', $cached ), (int) @filesize( ninoSandboxDir( $cold ). '/private/data/cache/register/basis.php' ) );
-// The limits are ten times the measure on purpose: the plan names 0.1 ms with opcache and the median of 200 comes to 0.099 to 0.108 ms on a quiet machine
-// (0.42 to 0.74 ms without it), but to 0.185 ms in a run beside others and to several times that on the runner of a shared service - a limit near the
-// measured value fails by chance whenever the machine is busy, and a median of 200 does not take that away
-check( 'the twenty register from the cache of the register in 5 ms without opcache and 1.2 ms with it (ten times what is measured; the file is parsed at every request without it)', $plain > 0 && $plain < 5 && ( $cached === null || ( $cached > 0 && $cached < 1.2 ) ) );
+$fromCache = $register( true );
+$fromFiles = $register( false );
+echo sprintf( "  registering the twenty: from the cache of the register %s, from the files %s (files of components and groups included, files of the cache included, components)\n", json_encode( $fromCache ), json_encode( $fromFiles ) );
+check( 'the twenty register from the cache of the register without one of the files of components/ and groups/ being included - the cache is the one file read - and from the files where the cache is turned off',
+	is_array( $fromCache ) === true && $fromCache === [ 0, 1, 20 ] && is_array( $fromFiles ) === true && $fromFiles[0] >= 20 && $fromFiles[1] === 0 && $fromFiles[2] === 20 );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $cold ) );
 
 ninoDone( $appData );

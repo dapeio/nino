@@ -178,31 +178,45 @@ foreach( [ 'an empty' => '', 'a truncated' => '{ "tries": ', 'a non-array' => '7
 }
 \Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 
-// How long an answer takes is itself an answer. An installation whose
-// secret file went missing must not reject faster than one that has a
-// secret to reject against - see Recovery::DECOY_HASH
-$attempt = static function() use ( &$appData ): float {
-	// A fresh window each time, so neither measurement is cut short by the cooldown
+// How long an answer takes is itself an answer: an installation whose secret file went missing must not reject faster than one that has a secret to reject
+// against - see Recovery::DECOY_HASH. A clock is no proof of that on a machine that does other things as well, so the protection is shown by what it is made of:
+// the one attempt that is made leaves the same trace with and without a secret, it is one password_verify() whatever the file holds, and the decoy it verifies
+// against is made as the hashes the secret is stored as are (below, once a secret has been stored again)
+$attempt = static function() use ( &$appData ): array {
+	// A fresh window each time, so neither attempt is cut short by the cooldown
 	\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
-	$start = hrtime( true );
-	\Nino\Admin\Recovery::verify( $appData, 'definitely-the-wrong-password' );
-	return ( hrtime( true ) - $start ) / 1e6;
+	$status = \Nino\Admin\Recovery::verify( $appData, 'definitely-the-wrong-password' );
+	clearstatcache();
+	unset( $appData['./nino/filesystem/cache'][ \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json' ] );
+	return [ $status, \Nino\Filesystem::getFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [] )['tries'] ?? null ];
 };
 
 $withSecret = $attempt();
 @unlink( \Nino\Admin\Recovery::path( $appData ) );
 $withoutSecret = $attempt();
 
-// The constant is private, so read it out of the source: a php that moves
-// PASSWORD_DEFAULT on must fail a check here rather than quietly leave the
-// decoy cheaper than the hashes set() writes
-preg_match( '#DECOY_HASH = \'([^\']+)\'#', (string) @file_get_contents( __DIR__. '/../_admin/Admin.php' ), $decoy );
-check( 'the decoy hash is of the kind and cost this php hashes with', isset( $decoy[1] ) === true && password_needs_rehash( $decoy[1], PASSWORD_DEFAULT ) === false );
+// The constant is private, so read it out of the source, and so is the one call that verifies against it
+$adminSource = (string) @file_get_contents( __DIR__. '/../_admin/Admin.php' );
+preg_match( '#DECOY_HASH = \'([^\']+)\'#', $adminSource, $decoy );
+$recovery = substr( $adminSource, (int) strpos( $adminSource, 'class Recovery {' ) );
+check( 'the decoy hash is a bcrypt hash, as the hashes of the secret are', isset( $decoy[1] ) === true && ( password_get_info( $decoy[1] )['algoName'] ?? '' ) === 'bcrypt' );
 check( 'losing the secret file leaves no stored hash', \Nino\Admin\Recovery::hash( $appData ) === null );
 check( 'so nothing authenticates, least of all against the decoy', \Nino\Admin\Recovery::verify( $appData, 'definitely-the-wrong-password' ) === 401 );
-check( 'and that rejection costs what one against a real hash costs ('. round( $withoutSecret ). ' ms vs '. round( $withSecret ). ' ms)', $withoutSecret > $withSecret / 4 );
+check( 'and that rejection is the same attempt as one against a real hash: the same answer and the same trace - one try counted - with a secret and without', $withSecret === [ 401, 1 ] && $withoutSecret === [ 401, 1 ] );
+check( 'it is ONE password_verify() whatever the file holds - against the hash of the secret, or the decoy where there is none - and the answer of the decoy can never be yes',
+	substr_count( $recovery, 'password_verify( $' ) === 1 && str_contains( $recovery, 'password_verify( $password, $hash ?? self::DECOY_HASH ) === true && $hash !== null;' ) === true );
 
 check( 'the secret can be stored again for the rest of the file', \Nino\Admin\Recovery::set( $appData, 'the real password' ) === true );
+$stored = password_get_info( (string) \Nino\Admin\Recovery::hash( $appData ) );
+$decoyInfo = password_get_info( $decoy[1] ?? '' );
+preg_match( '#MIN_PHP_VERSION = \'([0-9.]+)\'#', (string) @file_get_contents( __DIR__. '/../_admin/install/Install.php' ), $minimum );
+
+// The decoy is a constant that is as costly as the hashes of the php Nino requires write: the cost password_hash() takes by default moved with php 8.4. On a php below it
+// the secret is stored cheaper than the decoy is, which no test can change: that is told, and pinned where the php is the one the product asks for
+if( version_compare( PHP_VERSION, $minimum[1] ?? '8.4.0', '>=' ) === true )
+	check( 'the decoy is of the algorithm and the cost of the hash the secret is stored as: nothing is cheaper to reject, or dearer, for a missing secret', ( $stored['algo'] ?? null ) !== null && $stored['algo'] === $decoyInfo['algo'] && ( $stored['options']['cost'] ?? null ) === ( $decoyInfo['options']['cost'] ?? 0 ) );
+else
+	echo '  (not pinned: this php is '. PHP_VERSION. ', Nino asks for '. ( $minimum[1] ?? '8.4.0' ). ' or newer - it stores the secret at cost '. ( $stored['options']['cost'] ?? '?' ). ' and the decoy has cost '. ( $decoyInfo['options']['cost'] ?? '?' ). ")\n";
 \Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 $noMarker = $appData;
 unset( $noMarker['/nino/install/completed'] );

@@ -224,11 +224,28 @@ check( 'a template of more than a megabyte is not drawn, and the log says which'
 $html = $render( '[template /templates/limit]' );
 check( '...and one of exactly a megabyte is', strlen( $html ) === ( 1 << 20 ) && ninoWarnings() === [] );
 
-$started = microtime( true );
+// Twenty thousand calls in one page are drawn once each: how often the shortcode runs is counted - a drawing that came back to what it had drawn, as a page that is
+// read again for every call would, runs it more often than the page has calls - for the page and for a fourth of it, and the answer of every call is the text it is
+$counted = new \ArrayObject( [ 0 ] );
+\Nino\Html::addShortcode( $appData, 'safety-counted', static function( array &$appData, array $args ) use ( $counted ): string {
+	$counted[0]++;
+	return 'x [csrf] [[/project/company/general/name]] [template /templates/x] y';
+}, false );
+$answer = 'x [csrf] [[/project/company/general/name]] [template /templates/x] y';
+$runs = [];
+
+foreach( [ 5000, 20000 ] as $calls ) {
+
+	$counted[0] = 0;
+	$html = $render( str_repeat( '[safety-counted]', $calls ) );
+	$runs[$calls] = [ $counted[0], $html === str_repeat( $answer, $calls ) ];
+}
+
+echo "      calls run: 5000 -> ". $runs[5000][0]. ", 20000 -> ". $runs[20000][0]. "\n";
+check( 'twenty thousand calls in one page are drawn, each once: the shortcode runs as often as the page has calls, for a fourth of the page and for the page, and every answer is the text it is',
+	$runs === [ 5000 => [ 5000, true ], 20000 => [ 20000, true ] ] );
 $html = $render( str_repeat( '[safety-answer]', 20000 ) );
-$seconds = microtime( true ) - $started;
-echo "      20000 calls: ". sprintf( '%.2f', $seconds ). " s\n";
-check( 'twenty thousand calls in one page are drawn, in a time that is no attack', strlen( $html ) === 20000 * strlen( 'x [csrf] [[/project/company/general/name]] [template /templates/x] y' ) && $seconds < 10 );
+check( '...and the shortcode that is not counted answers as many times the same', strlen( $html ) === 20000 * strlen( $answer ) );
 
 $ignored = ninoWarnings();
 

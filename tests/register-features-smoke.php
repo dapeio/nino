@@ -1462,43 +1462,40 @@ for( $i = 1; $i <= 20; $i++ ) {
 	], '<div class="[[class]]" title="[[title]]">[[value]][[content]]</div>' );
 }
 
+// What the register costs is told by what it reads, and no clock: each component.php of the feature counts the times it is included, so that a registration that is
+// served by the cache of the register is one in which not one of the twenty schemas is included - and one that reads the folders includes all of them
+foreach( glob( $score. '/components/*/component.php' ) ?: [] as $file )
+	file_put_contents( $file, str_replace( '<?php return', '<?php $GLOBALS["registerIncluded"] = ( $GLOBALS["registerIncluded"] ?? 0 ) + 1; return', (string) file_get_contents( $file ) ) );
+
+$GLOBALS['registerIncluded'] = 0;
 $timed = registerProject( 'register-time', [ '\\Nino\\Modules\\Score' ] );
 $timed = registerBoot( $timed );
 $count = count( \Nino\Components::components( $timed ) );
-$median = static function( callable $run, int $times = 400 ): float {
-
-	$spent = [];
-
-	for( $i = 0; $i < $times; $i++ ) {
-		$started = hrtime( true );
-		$run();
-		$spent[] = ( hrtime( true ) - $started ) / 1e6;
-	}
-
-	sort( $spent );
-
-	return $spent[intdiv( $times, 2 )];
-};
-$opcache = function_exists( 'opcache_get_status' ) === true && ( @opcache_get_status( false )['opcache_enabled'] ?? false ) === true;
-// opcache does not keep a file that was written in the last two seconds (opcache.file_update_protection): the file of the cache is made
-// as old as the one of a request that is not the first, or the number would be the compiling of a file
+$regFirst = $GLOBALS['registerIncluded'];
 $cacheFile = registerCache( $timed, 'score' );
-touch( $cacheFile, time() - 3600 );
 
-if( function_exists( 'opcache_invalidate' ) === true )
-	opcache_invalidate( $cacheFile, true );
+// Five more requests, each with nothing of the one before: the cache of the register serves them
+$GLOBALS['registerIncluded'] = 0;
 
-// The smallest of up to three rounds, the machine being what it is
-$limit = $opcache === true ? 0.3 : 1.5;
-$cached = INF;
+for( $regRequest = 0; $regRequest < 5; $regRequest++ ) {
+	$regOne = $timed;
+	unset( $regOne['./nino/features/listed'], $regOne[\Nino\Components::REGISTRY], $regOne[\Nino\Components::OWNERS], $regOne[\Nino\Components::GROUPS] );
+	\Nino\Features::registerComponents( $regOne );
+}
 
-for( $round = 0; $round < 3 && $cached > $limit; $round++ )
-	$cached = min( $cached, $median( static function() use ( $timed ): void { $request = $timed; \Nino\Features::registerComponents( $request ); } ) );
-
-$fresh = $median( static function() use ( $timed ): void { $request = $timed; $request['/nino/markup/cache'] = false; \Nino\Features::registerComponents( $request ); } );
-echo '  '. $count. ' schemas, opcache '. ( $opcache === true ? 'on' : 'off' ). sprintf( ': from the cache %.3f ms, read and checked %.3f ms (median of 400, the smallest of up to three rounds for the first)', $cached, $fresh ). "\n";
+$regServed = $GLOBALS['registerIncluded'];
+$regStamp = is_file( $cacheFile ) === true ? filemtime( $cacheFile ) : null;
+$regOne = $timed;
+unset( $regOne['./nino/features/listed'], $regOne[\Nino\Components::REGISTRY], $regOne[\Nino\Components::OWNERS], $regOne[\Nino\Components::GROUPS] );
+$regOne['/nino/markup/cache'] = false;
+$GLOBALS['registerIncluded'] = 0;
+\Nino\Features::registerComponents( $regOne );
+$regRead = $GLOBALS['registerIncluded'];
+clearstatcache();
+echo '  '. $count. ' schemas: included at the first registration '. $regFirst. ', in five requests from the cache '. $regServed. ', in one with the cache off '. $regRead. "\n";
 check( 'twenty schemas are registered, in six groups, from the cache and from the folders', $count === 20 && count( \Nino\Components::groups( $timed ) ) === 6 );
-check( 'registering them from the cache costs a part of reading and checking them, and a few tenths of a millisecond at most (a millisecond and a half where opcache is off, which parses the file at every request) - a generous pin: the numbers above are the measure', $cached < $limit && $cached < $fresh );
+check( 'registering them from the cache includes not one of the twenty component files, in any of five requests; the first registration read them all, and one with the cache turned off reads them all again and leaves the cache as it was',
+	$regFirst === 20 && $regServed === 0 && $regRead === 20 && is_file( $cacheFile ) === true && filemtime( $cacheFile ) === $regStamp );
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $timed ) );
 // An attribute selector on class is allowed where it only narrows an element the part owns, and nowhere else

@@ -468,22 +468,31 @@ check( 'lines come as a textarea or a list, trimmed and unique', $v( [ 'hosts' =
 /*	A list longer than the cap is refused - and refused without having been
 	de-duplicated first. The de-duplication was an in_array() over the list
 	built so far, so it walked that list once per posted line, and the cap was
-	only looked at once the whole post had been through it. Measured on the
-	method: 1 000 lines took 2.6 ms, 5 000 took 61 ms, and 20 000 took 883 ms
-	of cpu for an answer that was "too long" either way.
+	only looked at once the whole post had been through it: 20 000 lines took
+	883 ms of cpu for an answer that was "too long" either way.
 
-	The bound below is generous on purpose - twenty thousand lines now take
-	about 0.04 ms, and 883 ms is what it has to stay clear of	*/
+	How far the validator walked is told by what it finds on the way: behind the
+	line that goes over the cap the list holds what the validator refuses for
+	another reason - a thing that is no string, a line longer than a line may be.
+	A validator that stops at the cap never meets them and says "too long"; one that
+	walks the whole post meets the first of them and says that instead. No clock	*/
 $manyLines = [];
 for( $i = 0; $i < 20000; $i++ )
 	$manyLines[] = 'line number '. $i;
 
-$manyStart	= hrtime( true );
 $manyResult	= $v( [ 'hosts' => $manyLines ] );
-$manyMs			= ( hrtime( true ) - $manyStart ) / 1e6;
+$behind = $manyLines;
+$behind[250] = 5;
+$behind[300] = str_repeat( 'x', 100000 );
+$behindResult = $v( [ 'hosts' => $behind ] );
+$before = $manyLines;
+$before[100] = 5;
+$beforeResult = $v( [ 'hosts' => $before ] );
 
 check( 'a list longer than the cap is refused', ( $manyResult['errors']['hosts'] ?? '' ) === 'must be at most 200 lines' );
-check( '...as soon as it is too long, not after the whole post has been walked and de-duplicated ('. round( $manyMs, 2 ). ' ms)', $manyMs < 100 );
+check( '...as soon as it is too long, not after the whole post has been walked and de-duplicated: what stands behind the line that goes over the cap is never met - the answer is "too long", whatever it holds',
+	( $behindResult['errors']['hosts'] ?? '' ) === 'must be at most 200 lines' );
+check( '...and what stands before it is met: the same list with a thing that is no string among the first hundred lines is refused for that', ( $beforeResult['errors']['hosts'] ?? '' ) === 'must be a list of strings' );
 check( 'and a list at the cap is still accepted whole', count( $v( [ 'hosts' => array_slice( $manyLines, 0, 200 ) ] )['values']['hosts'] ?? [] ) === 200 );
 check( 'a setting the form did not send keeps its current value, and a stray key is ignored', $v( [ 'limit' => 3, 'stray' => 1 ], [ 'title' => 'Kept', 'stray' => 2 ] )['values'] === [ 'limit' => 3, 'title' => 'Kept' ] );
 check( 'every setting is checked before any is accepted', count( $v( [ 'limit' => 'x', 'title' => '', 'mode' => 'z' ] )['errors'] ) === 3 );

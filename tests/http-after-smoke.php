@@ -119,7 +119,7 @@ $appData = [ "./nino/uid" => $sb ];
 \Nino\AppData::prepare( $appData );
 foreach( [ "path" => $sb, "configpath" => $sb . "/private", "contentpath" => $sb . "/private", "publicpath" => $sb . "/public" ] as $n => $v ) $appData["./nino/filesystem/" . $n] = $v;
 $appData["/nino/dir"] = "";
-if( isset( $_GET["work"] ) ) \Nino\Http::afterResponse( $appData, static function() use ( $sb ): void { usleep( 300000 ); file_put_contents( $sb . "/served.txt", "x", FILE_APPEND ); } );
+if( isset( $_GET["work"] ) ) \Nino\Http::afterResponse( $appData, static function() use ( $sb ): void { for( $wait = 0; $wait < 200 && is_file( $sb . "/gate" ) === false; $wait++ ) usleep( 50000 ); file_put_contents( $sb . "/served.txt", "x", FILE_APPEND ); } );
 $request = [ "/nino/http/request" => [ "method" => "GET", "rawMethod" => "GET" ], "/nino/http/response" => [ "statusCode" => 200, "header" => [ "Content-Type" => "text/html" ], "body" => str_repeat( "<p>Grüße aus dem Test</p>", 200 ) ] ];
 \Nino\Http::output( $appData, $request );
 ' );
@@ -127,7 +127,17 @@ $probe = stream_socket_server( 'tcp://127.0.0.1:0' );
 $port = (int) substr( (string) stream_socket_get_name( $probe, false ), (int) strrpos( (string) stream_socket_get_name( $probe, false ), ':' ) + 1 );
 fclose( $probe );
 $server = proc_open( [ PHP_BINARY, '-d', 'zlib.output_compression=1', '-S', '127.0.0.1:'. $port, $router ], [ 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ], $serverPipes, $sandbox, [ 'NINO_ROOT' => dirname( __DIR__ ), 'NINO_SANDBOX' => $sandbox ] + $_ENV + [ 'PATH' => (string) getenv( 'PATH' ) ] );
-usleep( 700000 );
+// The server is there when it takes a connection: asked until it does (a fuse of ten seconds, no verdict)
+for( $ready = 0; $ready < 200; $ready++ ) {
+	$try = @stream_socket_client( 'tcp://127.0.0.1:'. $port, $errno, $errstr, 1 );
+
+	if( is_resource( $try ) === true ) {
+		fclose( $try );
+		break;
+	}
+
+	usleep( 50000 );
+}
 $fetch = static function( string $path ) use ( $port ): array {
 	$socket = stream_socket_client( 'tcp://127.0.0.1:'. $port, $errno, $errstr, 5 );
 	$start = microtime( true );
@@ -139,17 +149,23 @@ $fetch = static function( string $path ) use ( $port ): array {
 	preg_match( '/^Content-Length: (\d+)/mi', $headers, $length );
 	$body = isset( $length[1] ) === true ? (string) stream_get_contents( $socket, (int) $length[1] ) : (string) stream_get_contents( $socket );
 	$took = microtime( true ) - $start;
+	// Whether the work had written its mark when the client had the whole body: told by the order of the two, and no clock
+	clearstatcache();
+	$worked = is_file( $sandbox. '/served.txt' );
 	fclose( $socket );
-	return [ 'headers' => $headers, 'body' => $body, 'length' => isset( $length[1] ) === true ? (int) $length[1] : null, 'took' => $took ];
+	return [ 'headers' => $headers, 'body' => $body, 'length' => isset( $length[1] ) === true ? (int) $length[1] : null, 'took' => $took, 'worked' => $worked ];
 };
 @unlink( $sandbox. '/served.txt' );
+@unlink( $sandbox. '/gate' );
 $full = str_repeat( '<p>Grüße aus dem Test</p>', 200 );
+// The work waits at a gate that the test opens once the client has the body: a response that was held back for the work would not be there before the gate, and the work would
+// have run by the time it was (the wait at the gate is a fuse of ten seconds and no verdict). The server answers one request at a time, so the next one is served when the work is done
 $withWork = $fetch( '/?work=1' );
-usleep( 600000 );
+file_put_contents( $sandbox. '/gate', '1' );
 $plain = $fetch( '/' );
 fclose( $serverPipes[1] ?? STDIN );
 proc_terminate( $server );
-check( 'on a server that compresses every page, the response that carries work is whole and not compressed, as long as its body, and the client has it before the work is done', $withWork['body'] === $full && $withWork['length'] === strlen( $full ) && stripos( $withWork['headers'], 'Content-Encoding' ) === false && $withWork['took'] < 0.25 );
+check( 'on a server that compresses every page, the response that carries work is whole and not compressed, as long as its body, and the client has it before the work is done', $withWork['body'] === $full && $withWork['length'] === strlen( $full ) && stripos( $withWork['headers'], 'Content-Encoding' ) === false && $withWork['worked'] === false );
 check( '...the work ran, once, and the next response is compressed again', @file_get_contents( $sandbox. '/served.txt' ) === 'x' && stripos( $plain['headers'], 'Content-Encoding: gzip' ) !== false );
 
 foreach( [ 'html', 'json', 'head', 'banner', 'length', 'encoded', 'empty' ] as $case ) {

@@ -13,7 +13,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, load, element, findAll, fire, fills, documentOf } = require( './harness.js' );
+const { check, done, load, element, findAll, fire, fills, documentOf, source } = require( './harness.js' );
 
 // The clock of the page: what was asked to run later, until a test lets time pass
 let pending = [];
@@ -265,9 +265,15 @@ check( 'only a code that was parsed reaches the style of the surface: nothing el
 	/^#[0-9a-f]{6}$/.test( surface.style.backgroundColor ) && /^#[0-9a-f]{6}$/.test( surface.style.color ) && evil.get() === null && surface.hidden === true );
 
 const big = 'a'.repeat( 1000000 );
-const started = Date.now();
 type( evil, big );
-check( 'an input of a million characters is one that is not a colour, soon', evil.get() === null && Date.now() - started < 1000 );
+// "Soon" is no matter of a clock: the pattern that reads a colour has no quantifier without a bound - only the {3} and {6} of the two forms and one optional # - so that what it
+// takes is bounded by the pattern and not by the length of what it is given, and a million characters are refused after the seventh. A pattern that repeats a group, or one
+// that has a + or a * in it, would be read here
+const modelSource = String( source( '_admin/assets/Nino.admin.js' ) ).split( 'colorModel : {' )[1].split( 'luminance :' )[0];
+const pattern = /\/\^([^\n]*?)\$\/i\.exec\(/.exec( modelSource );
+check( 'an input of a million characters is one that is not a colour, and is refused as soon as any other: the pattern has no unbounded quantifier and no repeated group',
+	evil.get() === null && pattern !== null && /[*+]/.test( pattern[1] ) === false && /\)[*+?]|\)\{/.test( pattern[1] ) === false && ( pattern[1].match( /\{\d+\}/g ) || [] ).length === 2 );
+check( '...and a code that is a colour is read by it, in the forms it has', model.parse( '#ABC' ) === '#aabbcc' && model.parse( '1a2b3c' ) === '#1a2b3c' && model.parse( big ) === null );
 
 // --- the words ------------------------------------------------------------------------------------------------------------
 

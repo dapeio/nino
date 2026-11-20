@@ -855,34 +855,28 @@ foreach( $lines as [ $label, $bytes, $peak, $ms ] )
 check( 'under a memory limit of 128 MB the 16 worst documents below the limits of marks, words and notes are read and written, each with a peak of less than 100 MB counted for itself',
 	$status === 0 && $error === '' && count( $lines ) === 16 && array_filter( $lines, static fn( array $line ): bool => (int) $line[2] >= 100 ) === [] );
 
-// A time is a measurement on a machine that does other things as well: the least of five rounds, and where the growth still
-// looks worse than linear the whole measurement is taken anew, three times at most - a reader that is quadratic fails each one
-$ratios = [];
-for( $attempt = 0; $attempt < 3; $attempt++ ) {
-
-	$ratios = [];
-	foreach( [ '[a]' => [], '[box]' => [ 'box' => true ], '[/a]' => [] ] as $mark => $list ) {
-
-		$times = [];
-		foreach( [ 12500, 25000, 50000 ] as $count ) {
-			$source = str_repeat( $mark, $count );
-			$best = INF;
-			for( $round = 0; $round < 5; $round++ ) {
-				$notes = [];
-				[ , $ms ] = $timed( static function() use ( $source, $list, &$notes ): array { return \Nino\Markup::parse( $source, $list, $notes ); } );
-				$best = min( $best, $ms );
-			}
-			$times[$count] = $best;
-		}
-
-		$ratios[$mark] = $times[50000] / $times[12500];
-		printf( "  %-6s 12500: %6.1f ms   25000: %6.1f ms (x%.2f)   50000: %6.1f ms (x%.2f)\n", $mark, $times[12500], $times[25000], $times[25000] / $times[12500], $times[50000], $times[50000] / $times[25000] );
-	}
-
-	if( max( $ratios ) < 8 )
-		break;
-}
-check( 'the time grows with the number of marks and not faster: four times the marks, less than eight times the time (linear is four)', max( $ratios ) < 8 );
+// That the reader grows with the marks and not faster is shown by what its patterns may take, and no clock: the marks are found by patterns that give nothing back, so
+// that PCRE needs a number of steps for a mark that does not depend on how many marks there are. A process with the match limit of PCRE set to 300 steps for each match -
+// the limit counts steps and only counts them where the pattern is not compiled to machine code, which is why it is off - reads twelve and a half thousand marks, four
+// times that and the ten thousands between them without PCRE giving up once (the note "pattern" is PCRE giving up); a pattern that backtracks takes more than that and
+// the note is there. The tree has a node for each mark, so that what is read is counted by the marks as well
+$growth = '$out = []; foreach( [ "[a]" => [], "[box]" => [ "box" => true ], "[/a]" => [], "[a x=1 y=\"2\" z]" => [], "[[/a/b]]" => [], "[a /]" => [] ] as $mark => $list ) {'
+	. 'foreach( [ 12500, 25000, 50000 ] as $count ) { $notes = []; $tree = \Nino\Markup::parse( str_repeat( $mark, $count ), $list, $notes );'
+	. '$out[] = [ $mark, $count, count( $tree ), array_values( array_unique( array_column( $notes, "code" ) ) ) ]; unset( $tree, $notes ); } } echo json_encode( $out );';
+$code = '$_SERVER["REMOTE_ADDR"] = "127.0.0.1"; require '. var_export( __DIR__. '/harness.php', true ). '; '. $growth;
+$process = proc_open( [ PHP_BINARY, '-d', 'pcre.jit=0', '-d', 'pcre.backtrack_limit=300', '-d', 'memory_limit=256M', '-r', $code ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
+$grown = json_decode( (string) stream_get_contents( $pipes[1] ), true );
+stream_get_contents( $pipes[2] );
+fclose( $pipes[1] );
+fclose( $pipes[2] );
+proc_close( $process );
+$gave = is_array( $grown ) === true ? array_filter( $grown, static fn( array $row ): bool => in_array( 'pattern', $row[3], true ) === true ) : [ 'no answer' ];
+$nodes = is_array( $grown ) === true ? array_filter( $grown, static fn( array $row ): bool => $row[0] === '[a]' || $row[0] === '[a /]' ) : [];
+foreach( $nodes as $row )
+	printf( "  %-6s %6d marks: %6d nodes, notes %s\n", $row[0], $row[1], $row[2], json_encode( $row[3] ) );
+check( 'the reader grows with the number of marks and not faster: with a match limit of 300 steps and no machine code twelve and a half thousand, twenty-five thousand and fifty thousand marks of six kinds are read, and PCRE gives up on none',
+	is_array( $grown ) === true && count( $grown ) === 18 && $gave === [] );
+check( '...and what is read is counted by the marks: a node for each of them, four times the marks four times the nodes', is_array( $grown ) === true && array_reduce( $nodes, static fn( bool $kept, array $row ): bool => $kept === true && $row[2] === $row[1], true ) === true );
 
 echo "\n";
 
