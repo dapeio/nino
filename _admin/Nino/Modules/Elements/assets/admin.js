@@ -2092,7 +2092,7 @@
 						return;
 
 					// The words of the workbench for a code it knows, the callback's own sentence otherwise
-					const known = typeof item.code === 'string' && /^[a-z][a-z0-9_]*$/.test( item.code ) === true ? Nino.content.getText( '/_admin/error/'+ item.code ) : '';
+					const known = typeof item.code === 'string' && /^[a-z][a-z0-9_-]*$/.test( item.code ) === true ? Nino.content.getText( '/_admin/error/'+ item.code ) : '';
 
 					named.push( { key : item.field, text : known !== '' ? known : item.error } );
 				} );

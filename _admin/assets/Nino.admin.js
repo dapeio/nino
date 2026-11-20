@@ -612,7 +612,7 @@
 		 *	screen, a new one replaces the one before it; it goes after four seconds, and stays while the pointer rests on it
 		 *	or the focus is in it. It is a status, which a screen reader reads out, and it moves only where the person
 		 *	allows motion. It is for success alone: an error stays where it happened - at the field, in the line of the bar, in
-		 *	showError() - and a kind that says so is a TypeError. Owns no strings: the sentence is the caller's
+		 *	showError() - and a kind that is none of the two, 'error' among them, is the neutral one, 'info': it is never thrown at the panel. Owns no strings: the sentence is the caller's
 		 *	(/_admin/common/msg/saved is the shared one for a save, and what status().saved() says)
 		 *
 		 *	@param		{string}		text						The sentence
@@ -622,10 +622,10 @@
 		 */
 		say : function( text, options ) {
 
-			const kind = ( options || {} ).kind ?? 'success';
+			const asked = ( options || {} ).kind ?? 'success';
 
-			if( SAY_KINDS.indexOf( kind ) === -1 )
-				throw new TypeError( 'Nino.adminUi.say(): "'+ String( kind )+ '" is no kind of toast - an error is said where it happened, not here' );
+			// A kind this does not know - 'error' among them: an error is said where it happened - is the neutral one, and nothing is thrown at a panel that asked for it
+			const kind = SAY_KINDS.indexOf( asked ) === -1 ? 'info' : asked;
 
 			// Inside the workbench's own element, where the rules of the design system apply; a page without one has its body
 			const body = ( typeof dc.querySelector === 'function' ? dc.querySelector('.nino-admin') : null ) ?? dc.body ?? bd;
@@ -2905,11 +2905,17 @@
 		 *	search over the names and the lines, which has the focus; Enter in it
 		 *	picks the first that is left, and Down walks into the list; a list
 		 *	that is shorter is looked at, not searched, and the focus opens on its
-		 *	first item. The size is 'wide' unless the caller says otherwise
+		 *	first item. With groups or pictures the arrow keys walk the tiles in every direction (Left and Right along a row, Up and Down to the tile
+		 *	over or under, Home and End to the ends), over the groups, which have no stop of their own - a group is role="group", named by its heading - and the search
+		 *	hides a group that has nothing left. The size is 'wide' unless the caller says otherwise
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.title					What is picked, as a statement: "Insert block"
-		 *	@param		{Array}			options.items					[ { value, label, description, code } ] - code is a notation that stands in front of the description, in the face of code
+		 *	@param		{Array}			options.items					[ { value, label, description, code, group, image } ] - code is a notation that stands in front of the description, in the face of code;
+		 *																			group a text: items of the same group stand under one heading, the groups in the order they first appear (an item with none stands where it
+		 *																			comes, under no heading); image the address of a picture of the item: then every item is a tile - the picture of a fixed shape over the name, as
+		 *																			many in a row as fit - and an item without one has a quiet surface of the same size. A picture is decoration (alt=""), loaded when it comes
+		 *																			near, and the name says the item. With neither on any item the dialog is the list it was
 		 *	@param		{string}		[options.search]			What the search field is called ("Search blocks"); none, no search however many items there are
 		 *	@param		{number}		[options.searchFrom]	From how many items there is a search, PICK_SEARCH_FROM by default
 		 *	@param		{Function}	[options.onRow]				onRow( value, row, pick ) in place of picking at once: the caller decides when the pick is made, by calling pick()
@@ -2932,14 +2938,67 @@
 			let handle = null;
 			let picked = null;
 
+			// Groups and pictures are asked for by the items; without either the markup is the list it always was
+			const named = function( item ) { return typeof item.group === 'string' ? item.group : '' };
+			const grouped = options.items.some( function( item ) { return named( item ) !== '' } );
+			const tiled = options.items.some( function( item ) { return typeof item.image === 'string' && item.image !== '' } );
+			const sets = new Map();
+
 			const list = dc.createElement('div');
-			list.className = 'nino-admin-pick-list';
+			list.className = 'nino-admin-pick-list'+ ( tiled === true ? ' nino-admin-pick-list--tiles' : '' );
+
+			// Where an item goes: the list, or the set of its group - made at the first item of the group, under a heading that names it
+			const setOf = function( item ) {
+
+				if( grouped === false && tiled === false )
+					return list;
+
+				const name = named( item );
+
+				if( sets.has( name ) === false ) {
+
+					const box = Nino.adminUi.el( 'div', 'nino-admin-pick-group' );
+					const inner = Nino.adminUi.el( 'div', 'nino-admin-pick-set' );
+
+					if( name !== '' ) {
+						const title = Nino.adminUi.el( 'h3', 'nino-admin-pick-group-title', name );
+						title.id = 'nino-admin-pick-group-'+ ( ++serial );
+						box.setAttribute( 'role', 'group' );
+						box.setAttribute( 'aria-labelledby', title.id );
+						box.appendChild( title );
+					}
+
+					box.appendChild( inner );
+					list.appendChild( box );
+					sets.set( name, { box : box, inner : inner } );
+				}
+
+				return sets.get( name ).inner;
+			};
 
 			const rows = options.items.map( function( item ) {
 
 				const row = dc.createElement('button');
 				row.type = 'button';
-				row.className = 'nino-admin-pick-item';
+				row.className = 'nino-admin-pick-item'+ ( tiled === true ? ' nino-admin-pick-item--tile' : '' );
+
+				if( tiled === true ) {
+
+					const face = Nino.adminUi.el( 'span', 'nino-admin-pick-image' );
+
+					if( typeof item.image === 'string' && item.image !== '' ) {
+						const picture = dc.createElement('img');
+						picture.src = item.image;
+						picture.alt = '';
+						picture.loading = 'lazy';
+						picture.decoding = 'async';
+						face.appendChild( picture );
+					}
+
+					face.setAttribute( 'aria-hidden', 'true' );
+					row.appendChild( face );
+				}
+
 				row.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-name', item.label ) );
 
 				const hasCode = typeof item.code === 'string' && item.code !== '';
@@ -2966,12 +3025,17 @@
 					else
 						pick();
 				} );
-				list.appendChild( row );
+				setOf( item ).appendChild( row );
 
 				return { item : item, row : row };
 			} );
 
 			const visible = function() { return rows.filter( function( entry ) { return entry.row.hidden === false } ) };
+
+			// A group with nothing left in it is not shown, nor is its heading
+			const settle = function() {
+				sets.forEach( function( one ) { one.box.hidden = Array.from( one.inner.children ).every( function( row ) { return row.hidden === true } ) } );
+			};
 
 			const empty = dc.createElement('p');
 			empty.className = 'nino-admin-pick-empty';
@@ -2992,6 +3056,7 @@
 					rows.forEach( function( entry ) {
 						entry.row.hidden = words !== '' && ( entry.item.label+ ' '+ ( entry.item.code ?? '' )+ ' '+ ( entry.item.description ?? '' ) ).toLowerCase().indexOf( words ) === -1;
 					} );
+					settle();
 					empty.hidden = visible().length > 0 || empty.textContent === '';
 				} );
 
@@ -3013,11 +3078,36 @@
 					return;
 				}
 
+				const at = shown.indexOf( event.target );
+
+				// Tiles: every direction. Left and Right go along the tiles in the order they stand, Up and Down to the tile over or under the one that has the focus -
+				// the nearest line, and in it the tile whose middle is nearest - Home and End to the ends; the groups are no stops, the walk goes over them
+				if( ( grouped === true || tiled === true ) && at !== -1 && [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].indexOf( event.key ) !== -1 ) {
+					event.preventDefault();
+					shown[event.key === 'Home' ? 0 : ( event.key === 'End' ? shown.length - 1 : Math.max( 0, Math.min( shown.length - 1, at + ( event.key === 'ArrowRight' ? 1 : -1 ) ) ) )].focus();
+					return;
+				}
+
 				if( event.key !== 'ArrowDown' && event.key !== 'ArrowUp' )
 					return;
 
-				const at = shown.indexOf( event.target );
-				const next = event.key === 'ArrowDown' ? ( at === -1 ? 0 : at + 1 ) : at - 1;
+				let next = event.key === 'ArrowDown' ? ( at === -1 ? 0 : at + 1 ) : at - 1;
+
+				if( tiled === true && at !== -1 ) {
+
+					const here = shown[at].getBoundingClientRect();
+					const middle = function( box ) { return box.left + box.width / 2 };
+					const down = event.key === 'ArrowDown';
+					const lines = shown.map( function( row, index ) { return { index : index, box : row.getBoundingClientRect() } } ).filter( function( other ) { return down === true ? other.box.top > here.top + 1 : other.box.top < here.top - 1 } );
+
+					if( lines.length === 0 )
+						next = down === true ? shown.length : -1;
+					else {
+						const line = lines.reduce( function( best, other ) { return best === null || ( down === true ? other.box.top < best : other.box.top > best ) ? other.box.top : best }, null );
+
+						next = lines.filter( function( other ) { return other.box.top === line } ).reduce( function( best, other ) { return best === null || Math.abs( middle( other.box ) - middle( here ) ) < Math.abs( middle( best.box ) - middle( here ) ) ? other : best }, null ).index;
+					}
+				}
 
 				if( next >= 0 && next < shown.length ) {
 					event.preventDefault();
@@ -4722,6 +4812,29 @@
 
 
 			const button = Nino.adminUi.button( options.button ?? Nino.adminUi.text('/_admin/common/label/file-choose'), function() { input.click() }, { kind : 'secondary', id : options.id } );
+
+			// Enter on the button asks for the file picker the way Space does, when the key is let go: a picker asked for while the key goes down is refused by
+			// the browser in a dialog (Chromium takes the press for no gesture it will open a window for), so the button was dead for Enter and alive for Space. The
+			// key must have gone down on this button: the release of the Enter that opened the dialog arrives on it, and asks for nothing
+			let armed = false;
+
+			button.addEventListener( 'keydown', function( ev ) {
+
+				if( ev.key !== 'Enter' )
+					return;
+
+				ev.preventDefault();
+				armed = ev.repeat !== true;
+			} );
+			button.addEventListener( 'keyup', function( ev ) {
+
+				if( ev.key === 'Enter' && armed === true ) {
+					armed = false;
+					input.click();
+				}
+			} );
+			button.addEventListener( 'blur', function() { armed = false } );
+
 			const chosen = Nino.adminUi.el( 'span', 'nino-admin-filefield-name', Nino.adminUi.text('/_admin/common/label/file-none') );
 			const size = Nino.adminUi.el( 'span', 'nino-admin-filefield-size' );
 			const remove = Nino.adminUi.button( Nino.adminUi.text('/_admin/common/label/remove'), function() { handle.clear( true ) }, { kind : 'secondary', small : true } );
@@ -10296,7 +10409,7 @@
 				if( body.code === 'offline' )
 					return Nino.content.getText('/_admin/common/error/offline');
 
-				if( typeof body.code === 'string' && /^[a-z][a-z0-9_]*$/.test( body.code ) === true ) {
+				if( typeof body.code === 'string' && /^[a-z][a-z0-9_-]*$/.test( body.code ) === true ) {
 					const known = Nino.content.getText( '/_admin/error/'+ body.code );
 					if( known !== '' )
 						return Nino.adminUi.format( known, ...( Array.isArray( body.params ) === true ? body.params : [] ) );

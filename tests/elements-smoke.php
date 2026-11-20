@@ -1353,6 +1353,9 @@ $refuser = function( &$appData, &$typeData ) use ( &$named ) {
 		return $typeData;
 	\Nino\Elements::refuse( $appData, 'size', 'Size must stay below ten.' );
 	\Nino\Elements::refuse( $appData, 'name', 'The name is taken.', 'taken_name' );
+	\Nino\Elements::refuse( $appData, 'stock', 'Not in stock.', 'out-of_stock' );
+	foreach( [ 'a/b', 'a.b', '../x', 'a[[b', "ok\n", '-a' ] as $evil )
+		\Nino\Elements::refuse( $appData, 'evil', 'A sentence.', $evil );
 	\Nino\Elements::refuse( $appData, "bad\nfield", 'dropped for its name' );
 	\Nino\Elements::refuse( $appData, 'note', '   ' );
 	return \Nino\Elements::refuse( $appData, '.uri', 'No such address.', 'Bad Code' );
@@ -1365,13 +1368,20 @@ check( 'an insert whose callback refuses is vetoed: null, and nothing is written
 check( '...the fields it named are kept in the order it named them, with the sentence and a code of lower-case words', \Nino\Elements::refusals( $appData ) === [
 	[ 'field' => 'size', 'error' => 'Size must stay below ten.', 'code' => '' ],
 	[ 'field' => 'name', 'error' => 'The name is taken.', 'code' => 'taken_name' ],
+	[ 'field' => 'stock', 'error' => 'Not in stock.', 'code' => 'out-of_stock' ],
+	[ 'field' => 'evil', 'error' => 'A sentence.', 'code' => '' ],
+	[ 'field' => 'evil', 'error' => 'A sentence.', 'code' => '' ],
+	[ 'field' => 'evil', 'error' => 'A sentence.', 'code' => '' ],
+	[ 'field' => 'evil', 'error' => 'A sentence.', 'code' => '' ],
+	[ 'field' => 'evil', 'error' => 'A sentence.', 'code' => '' ],
+	[ 'field' => 'evil', 'error' => 'A sentence.', 'code' => '' ],
 	[ 'field' => '.uri', 'error' => 'No such address.', 'code' => '' ],
 ] );
 check( '...a refusal outside a write is recorded nowhere', ( static function() use ( &$appData ): bool { $before = \Nino\Elements::refusals( $appData ); $answer = \Nino\Elements::refuse( $appData, 'size', 'nope' ); return $answer === false && \Nino\Elements::refusals( $appData ) === $before; } )() );
 check( '...and the type file is not left locked', probeLockFree( $sandbox, '/elements/refusable.php' ) === true );
 
 $refused = \Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 12 ], 'de_DE' );
-check( 'an update is refused the same way', $refused === null && count( \Nino\Elements::refusals( $appData ) ) === 3 && \Nino\Elements::getElement( $appData, '/refusable/one', 'de_DE' )['size'] === 5 );
+check( 'an update is refused the same way', $refused === null && count( \Nino\Elements::refusals( $appData ) ) === 10 && \Nino\Elements::getElement( $appData, '/refusable/one', 'de_DE' )['size'] === 5 );
 
 \Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 12 ], 'de_DE' );
 \Nino\Elements::updateElement( $appData, '/refusable/nothing', [ 'size' => 1 ], 'de_DE' );

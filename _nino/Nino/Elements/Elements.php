@@ -568,7 +568,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$field				The key of the field in the model, or '.uri'
 		 *	@param		string		$sentence			Why, for the person who saved
-		 *	@param		string		$code					Lower-case letters, digits and underscores; '' for none
+		 *	@param		string		$code					Lower-case letters, digits, underscores and hyphens, beginning with a letter; '' for none
 		 *
 		 *	@return 	false											Always: the veto
 		 */
@@ -582,7 +582,7 @@ namespace Nino {
 			$appData['./nino/elements/writes'][$last]['refusals'][] = [
 				'field'	=> $field,
 				'error'	=> $sentence,
-				'code'	=> preg_match( '/^[a-z][a-z0-9_]*$/', $code ) === 1 ? $code : '',
+				'code'	=> preg_match( '/^[a-z][a-z0-9_-]*$/D', $code ) === 1 ? $code : '',
 			];
 
 			return false;

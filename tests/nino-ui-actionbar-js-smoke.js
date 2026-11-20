@@ -139,9 +139,9 @@ console.log( '\nNino.adminUi.say - the toast\n' );
 	check( '...and is no part of a bar: nothing in the toast is in an action bar', second.closest('.nino-admin-actionbar') === null );
 }
 
-check( 'a toast is for what went well alone: an error, a warning or a kind nobody knows is refused, and nothing is shown for it',
-	[ 'error', 'danger', 'warning', 'fail', 'nope' ].every( kind => thrown( () => adminUi.say( 'x', { kind : kind } ) ) ) === true
-	&& adminUi.say( 'x', { kind : 'info' } ).dataset.kind === 'info' && findAll( body, el => classes( el ).includes('nino-admin-toast') ).length === 1 );
+check( 'a toast is for what went well alone: a kind that is none of success and info - an error, a warning, a word nobody knows - never throws, and is drawn as the neutral one, the toast the same as any other',
+	[ 'error', 'danger', 'warning', 'fail', 'nope', 42, null ].every( kind => { try { const toast = adminUi.say( 'x', { kind : kind } ); return toast.dataset.kind === ( kind === null ? 'success' : 'info' ) && classes( toast ).includes('nino-admin-toast') } catch( error ) { return false } } ) === true
+	&& adminUi.say( 'x', { kind : 'info' } ).dataset.kind === 'info' && adminUi.say( 'x' ).dataset.kind === 'success' && findAll( body, el => classes( el ).includes('nino-admin-toast') ).length === 1 );
 
 {
 	const toast = adminUi.say( 'Saved.' );

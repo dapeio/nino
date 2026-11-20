@@ -364,7 +364,7 @@ field is the key of the model as the model spells it, or `.uri` for the element'
 name; one the model does not have is a sentence without a field. The sentence is
 the callback's own, in the language of the person who saves (for the workbench,
 `\Nino\Admin\Admin::sessionLocale()`); the code is optional, lower-case words
-joined by underscores, and is only for a sentence the workbench has in its own
+joined by underscores or hyphens, and is only for a sentence the workbench has in its own
 words (`/_admin/error/<code>`). A callback that refuses several fields calls it
 once for each, in the order it wants them read. Nothing is recorded outside such
 a callback.

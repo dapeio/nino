@@ -136,6 +136,18 @@ console.log( 'Nino.adminUi.checkField, checklist, localeRows, fileField, codeFie
 	check( '...and a file of the type with another spelling or by a type of its kind is taken, which takes the sentence away', field.value().name === 'photo.JPG' && errorsIn( field.el ).length === 0 && told.length === 2 );
 	fire( remove(), 'click' );
 	check( 'Remove takes the file away, says so and hides itself', field.value() === null && told[2] === null && name().dataset.state === 'none' && remove().hidden === true );
+	// Enter on the button asks for the picker when the key is let go, as Space does: a picker asked for while the key goes down is refused in a dialog
+	{
+		const picker = ui.fileField( { key : 'cv', label : 'CV' } );
+		let asked = 0;
+		picker.input.click = function() { asked++ };
+		const press = ( type, key, repeat ) => { const event = { prevented : false }; fire( picker.button, type, { key : key, repeat : repeat === true, preventDefault : function() { event.prevented = true } } ); return event };
+
+		check( 'Enter on the file button goes down without a click of its own and asks for the picker on its release, once', ( press( 'keydown', 'Enter' ).prevented === true && asked === 0 && ( press( 'keyup', 'Enter' ), asked === 1 ) && ( press( 'keyup', 'Enter' ), asked === 1 ) ) );
+		check( '...a release that no press on this button went before - the Enter that opened the dialog - asks for nothing; a key that repeats does not arm it; leaving the button disarms it',
+			( press( 'keyup', 'Enter' ), asked === 1 ) && ( press( 'keydown', 'Enter', true ), press( 'keyup', 'Enter' ), asked === 1 ) && ( press( 'keydown', 'Enter' ), fire( picker.button, 'blur' ), press( 'keyup', 'Enter' ), asked === 1 ) );
+		check( '...another key is left to the button, and the click of a pointer and of Space still asks at once', press( 'keydown', 'Tab' ).prevented === false && ( fire( picker.button, 'click' ), asked === 2 ) );
+	}
 	check( 'it uploads nothing: there is no request in the block, the caller has the File', ui.fileField.toString().indexOf('sendRequest') === -1 && ui.fileField.toString().indexOf('FormData') === -1 );
 	check( 'what a file is held to is read the way the picker reads accept', ui._accepts( { name : 'A.PDF', type : '' }, '.pdf' ) === true && ui._accepts( { name : 'a.pdf', type : '' }, 'image/*' ) === false && ui._accepts( { name : 'a', type : 'image/png' }, 'image/*' ) === true && ui._accepts( { name : '.pdf', type : '' }, '.pdf' ) === false );
 	check( 'a size is written as a person reads it', ui._bytes( 12 ) === '12 B' && ui._bytes( 1536 ) === '1.5 KB' && ui._bytes( 5 * 1048576 ) === '5 MB' );

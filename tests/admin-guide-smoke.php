@@ -962,6 +962,19 @@ check( 'the name group of the context bar wraps, and a title is never wider than
 check( 'a step with an icon has the icon as a block in a face that centres it',
 	preg_match( '/display: flex;\s*align-items: center;\s*justify-content: center/', $rule( ':where(.nino-admin) .nino-admin-steps-icon' ) ) === 1 && str_contains( $rule( ':where(.nino-admin) .nino-admin-steps-icon > .nino-admin-icon' ), 'display: block' ) === true );
 
+// --- an error code is the end of a text key: one form in every place that holds it to a form ------------------------
+
+/*	Held by structure: a script of the workbench that reads a code of a server answer for the sentence '/_admin/error/<code>' holds it to letters, digits, underscores and
+	hyphens (a hyphen is what the sentences of the packages of a theme have), and the same form stands in \Nino\Elements::refuse()	*/
+$narrow = [];
+
+foreach( $scripts as $script )
+	if( preg_match( '#/\^\[a-z\]\[a-z0-9_\]\*\$/\.test\(\s*\w+\.code#', $read( $script ) ) === 1 )
+		$narrow[] = $script;
+
+check( 'no script of the workbench holds an error code to the form without the hyphen'. ( $narrow === [] ? '' : ' - '. implode( ', ', $narrow ) ), $narrow === [] && substr_count( $read( '_admin/assets/Nino.admin.js' ), '/^[a-z][a-z0-9_-]*$/.test( body.code )' ) === 1 );
+check( '...and the register of the elements takes the same form for a code of a refusal, whole', str_contains( $read( '_nino/Nino/Elements/Elements.php' ), "preg_match( '/^[a-z][a-z0-9_-]*$/D', \$code )" ) === true );
+
 // --- the chapter is linked and its links land ----------------------------------------------------------
 
 $chapter = $read( 'docs/admin-ui.md' );

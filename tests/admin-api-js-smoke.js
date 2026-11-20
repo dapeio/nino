@@ -265,6 +265,11 @@ check( 'a body without a message falls to the panel\'s own sentence, with the st
 check( '...a key or literal text alike', errorText( 'en_US', 500, {}, 'Could not do that.' ) === '(500) Could not do that.' );
 check( '...and the generic request failure when it has neither', errorText( 'en_US', 502, undefined ) === '(502) Request failed.' );
 check( 'a request that never arrived is told as that, without a status', errorText( 'en_US', 500, { code : 'offline' }, '/_admin/common/error/save' ) === TEXT.en_US['/_admin/common/error/offline'] );
+// Sentences under every form a code could take, so that a lookup that is made shows: only a hyphen is let into a code besides the letters, digits and underscores
+[ 'probe_files-many', 'a/b', 'a.b', '../x', 'a[[b', 'A', 'a b', '-a', '_a', 'a-' ].forEach( code => { TEXT.en_US['/_admin/error/'+ code] = 'SENTENCE %s' } );
+check( 'a code with a hyphen - themelab_package_files-many - is said in the words of the interface, with its params', errorText( 'en_US', 400, { error : 'x', code : 'probe_files-many', params : [ 3 ] } ) === 'SENTENCE 3' );
+check( '...and no other form gets in: a slash, a dot, a way up, brackets, a capital, a space, a first hyphen or underscore are never looked up',
+	[ 'a/b', 'a.b', '../x', 'a[[b', 'A', 'a b', '-a', '_a', 'a\n' ].every( code => errorText( 'en_US', 400, { error : 'x', code : code } ) === '(400) x' ) );
 check( 'a code that is not a slug is never looked up', errorText( 'en_US', 400, { error : 'x', code : '../common/error/save' }, '' ) === '(400) x' );
 
 // showError() writes the error text into a container, replacing what stood there

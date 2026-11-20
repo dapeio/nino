@@ -152,7 +152,7 @@ Nino.adminUi.say( t('/_admin/common/msg/saved') );
 |---|---|
 | A question before an action | `confirm( level, { title, message, yes, no } )` (asked of an open dialog - a form that asks before it throws something away - it says `nested : true`, and Esc closes the question alone); where the question is about things - what a deletion takes and what it keeps - `details`, a list under the message |
 | Make or copy something that needs only a name and at most four fields (duplicate, "save as"): every field of the table above is a `type` of a field of the dialog - a tick, a list of ticks, the languages, a file, code, a moment - not only a text and a select | `formDialog()` |
-| Pick something (a block, a source, a component) | `pickDialog()`, size `wide` |
+| Pick something (a block, a source, a component) | `pickDialog()`, size `wide`; things that fall into groups say `group`, things that are known by their look say `image` (tiles in a grid, a quiet surface where there is no picture) |
 | The properties of ONE part of a work surface (a component, a logo, the menu of a frame) while the surface stays in view | `propertiesDialog()`: the title is the kind and name of the part, inside an `accordion()` with one section open (the content); the values go into the draft and the preview at once, the sheet has only "Close" - saving is done with the bar of the surface |
 | Text to read (a manual, the available textfills, markup to look at) | `manualDialog()` |
 | Everything else - every form of a record of its own with more than four fields, everything with an address of its own | a view of its own, no dialog |

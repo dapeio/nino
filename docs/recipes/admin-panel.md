@@ -936,7 +936,7 @@ Object.keys( values ).forEach( function( code ) {
 
 `Nino.adminUi.fileField( { key, label, accept, maxBytes, note, button, onChange } )` is the choice of a file as the guide has
 it: a button of the second kind, the name and the size of the chosen file beside it, "Remove", the limits as the `note`. A
-file that is larger than `maxBytes`, or of a type `accept` does not name, is not taken and is said at the field. It uploads
+file that is larger than `maxBytes`, or of a type `accept` does not name, is not taken and is said at the field. Enter on the button asks for the picker when the key is let go, as Space does (a picker asked for while the key goes down is refused in a dialog); the release of the Enter that opened the dialog asks for nothing. It uploads
 nothing: `onChange( file )` hands the `File` over (`null` once it was removed), `value()` answers it, and the view sends it
 the way its model of saving says - at once, with the form, through `Nino.adminUi.api.call()` - and reports it to
 `Nino.admin.dirty`, which does not follow a file by itself.
@@ -1120,8 +1120,10 @@ Nino.adminUi.formDialog( {
 ```
 
 `pickDialog( { title, items, search, searchFrom, empty, cancel, size, onChoose, onRow, onCancel, opener } )`
-draws `items` - `[ { value, label, description, code } ]`, `code` a notation in the face of code
-before the line - as rows; a press picks one and closes, or, where `onRow( value, row, pick )` is
+draws `items` - `[ { value, label, description, code, group, image } ]`, `code` a notation in the face of code
+before the line - as rows; with a `group` (a text) the items of one group stand under a heading, in the order the groups first appear (`role="group"`, named by the heading, and a search
+hides a group that has nothing left); with an `image` (an address) on any item every item is a tile in a grid - a picture of a fixed shape over the name, `alt=""`, loaded lazily,
+and a quiet surface of the same size for an item with none - and the arrows walk it in every direction, Home and End to the ends, over the groups; with neither the list is as it was; a press picks one and closes, or, where `onRow( value, row, pick )` is
 given, hands the press to it: the caller calls `pick()` when the pick is made. A search over the
 names and the lines is drawn from `Nino.adminUi.PICK_SEARCH_FROM` (8) items on, or from
 `searchFrom`, and only when `search` names it; the size is `--wide`.
@@ -1605,7 +1607,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar( { back, title, code, icons, tools, panel, panelLabel } )` (called with a link and its controls it takes them as they are); the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
 | Back link inside that row | `.nino-admin-back-link`, drawn by `contextBar( { back : { to, onClick } } )` as "Back to <to>" |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar( { danger, status, secondary, primary } )`: the destructive action at the left, the state and its line, the side actions, ONE main button at the right edge |
-| The answer to an action that went well | `Nino.adminUi.say( text )`: the toast above the bar, one at a time, never for an error |
+| The answer to an action that went well | `Nino.adminUi.say( text )`: the toast above the bar, one at a time, never for an error (a kind it does not know, 'error' too, is the neutral one and never throws) |
 | The manual of a screen - sections of a handle and what it does, or running text - in a dialog or on the screen | `.nino-admin-manual` via `Nino.adminUi.manual( content, options )`: `[ { heading, entries : [ { handle, text } ] } ]` or a text, `options.named` to name a handle in words instead of code, `options.none` for the sentence of an empty section, `options.level` for the headings; `Nino.adminUi.manualDialog()` shows it in `.nino-admin-dialog--manual` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.actionBar( { list : true, primary } )` for "New <thing>"; `Nino.adminUi.listActions( buttons )` for a list bar with more than one button (a scan and a new one, an export) |
 | Status text in a bottom bar - saving, unsaved changes, why it failed (a save that went well empties it: the toast and the badge say it) | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |

@@ -424,7 +424,7 @@
 			if( body === null || typeof body !== 'object' )
 				return;
 
-			const known = typeof body.code === 'string' && /^[a-z][a-z0-9_]*$/.test( body.code ) === true && Nino.content.getText( '/_admin/error/'+ body.code ) !== '';
+			const known = typeof body.code === 'string' && /^[a-z][a-z0-9_-]*$/.test( body.code ) === true && Nino.content.getText( '/_admin/error/'+ body.code ) !== '';
 			const line = Nino.admin.backups._line;
 
 			if( line === null || dc.getElementById('backups-message') === null )

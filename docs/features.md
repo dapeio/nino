@@ -549,7 +549,7 @@ namespace Nino\Modules\Hello {
   `Nino.admin.hello`; a taken uri is dropped with a warning.
 - A failure a person can cause carries a **code**: the panel's slug with its hyphens
   written as underscores, then a word (`hello_long`; `my_feature_empty` for
-  `my-feature`), in lower-case letters, digits and underscores. Its sentence is the
+  `my-feature`), in lower-case letters, digits, underscores and hyphens, beginning with a letter (nothing else is looked up). Its sentence is the
   panel's text under `[[/_admin/error/<code>]]` in both languages, `%s` where a
   param goes; `Http::fail()` carries the English message for a log, the code, the
   params and the `field` refused, and `Nino.adminUi.api.errorText()` makes the

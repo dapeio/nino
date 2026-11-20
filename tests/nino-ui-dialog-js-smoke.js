@@ -299,6 +299,88 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 }
 
 
+// --- pickDialog(): groups and pictures ----------------------------------------
+
+{
+	const cls = ( el, name ) => String( el.className ).split(' ').includes( name );
+	const withRects = () => {
+		const w = world();
+		const make = w.doc.createElement;
+		// A layout the document has none of: the tiles stand in a row of four for each group, a group under the one before it
+		w.doc.createElement = tag => Object.assign( make( tag ), { getBoundingClientRect : function() { return this.rect ?? { top : 0, left : 0, width : 0, height : 0 } } } );
+		return w;
+	};
+	const three = ( extra ) => [ 'Alpha', 'Beta', 'Gamma' ].flatMap( ( group, g ) => Array.from( { length : 4 }, ( _, at ) => Object.assign( { value : group[0]+ at, label : group[0]+ at+ ' tile', group : group }, extra ? extra( g, at ) : {} ) ) );
+	const open = ( w, items, extra ) => { w.ui.pickDialog( Object.assign( { title : 'Pick', items : items, search : 'Search', cancel : 'Cancel', onChoose : () => {} }, extra || {} ) ); return last( w ) };
+	const layOut = ( dialog ) => {
+		const groups = findAll( dialog, el => cls( el, 'nino-admin-pick-set' ) );
+		groups.forEach( ( set, g ) => set.children.forEach( ( tile, at ) => { tile.rect = { top : g * 200, left : at * 100, width : 90, height : 90 } } ) );
+	};
+	const rowsOf = dialog => findAll( dialog, el => cls( el, 'nino-admin-pick-item' ) );
+	const key = ( node, name ) => { const event = { prevented : false }; node.dispatchEvent( { type : 'keydown', bubbles : true, key : name, preventDefault : function() { event.prevented = true } } ); return event };
+
+	// Without a group or a picture on any item the dialog is the list it was: the rows stand in the list itself, with nothing else around them
+	const plain = open( world(), Array.from( { length : 3 }, ( _, at ) => ( { value : at, label : 'Item '+ at } ) ) );
+	const plainList = findAll( plain, el => cls( el, 'nino-admin-pick-list' ) )[0];
+	check( 'without a group or a picture on any item the rows stand in the list as they did: buttons of one class, no heading, no group, no picture', plainList.className === 'nino-admin-pick-list' && plainList.children.length === 3 && plainList.children.every( el => el.tagName === 'BUTTON' && el.className === 'nino-admin-pick-item' )
+		&& findAll( plain, el => el.tagName === 'H3' || el.tagName === 'IMG' || el.getAttribute('role') === 'group' ).length === 0 );
+
+	const w = withRects();
+	const dialog = open( w, three() );
+	const groups = findAll( dialog, el => el.getAttribute('role') === 'group' );
+	check( 'items of a group stand under one heading, in the order the groups first appear, each group a role="group" that its heading names',
+		groups.length === 3 && groups.every( box => box.children[0].tagName === 'H3' && box.getAttribute('aria-labelledby') === box.children[0].id ) && groups.map( box => box.children[0].textContent ).join() === 'Alpha,Beta,Gamma'
+		&& groups.every( box => box.children[1].children.length === 4 ) && findAll( groups[1], el => cls( el, 'nino-admin-pick-item' ) ).map( el => el.children[0].textContent ).join() === 'B0 tile,B1 tile,B2 tile,B3 tile' );
+	check( '...a group comes of the first item that has it, however the items are mixed; an item with no group stands under no heading and the rows stay buttons',
+		( () => { const mixed = open( world(), [ { value : 1, label : 'A1', group : 'Alpha' }, { value : 2, label : 'Free' }, { value : 3, label : 'B1', group : 'Beta' }, { value : 4, label : 'A2', group : 'Alpha' } ] );
+			const boxes = findAll( mixed, el => cls( el, 'nino-admin-pick-group' ) ); return boxes.length === 3 && boxes[0].getAttribute('role') === 'group' && boxes[1].getAttribute('role') === null && findAll( boxes[0], el => cls( el, 'nino-admin-pick-item' ) ).length === 2 && rowsOf( mixed ).every( el => el.tagName === 'BUTTON' ) } )() );
+
+	const tiled = open( world(), three( ( g, at ) => ( at === 0 ? { image : '/img/'+ g+ '.webp' } : {} ) ) );
+	const faces = findAll( tiled, el => cls( el, 'nino-admin-pick-image' ) );
+	const pictures = findAll( tiled, el => el.tagName === 'IMG' );
+	check( 'with a picture on an item every item is a tile with a face of its own, the picture is decoration that loads when it comes near, and an item with none has the face alone',
+		faces.length === 12 && rowsOf( tiled ).every( el => cls( el, 'nino-admin-pick-item--tile' ) && cls( el.children[0], 'nino-admin-pick-image' ) ) && pictures.length === 3 && pictures.every( img => img.alt === '' && img.loading === 'lazy' )
+		&& pictures.every( img => img.parentNode.getAttribute('aria-hidden') === 'true' ) && faces.filter( face => face.children.length === 0 ).length === 9 );
+	check( '...and a list with groups and no picture has no tiles', rowsOf( dialog ).every( el => cls( el, 'nino-admin-pick-item--tile' ) === false ) && findAll( dialog, el => cls( el, 'nino-admin-pick-list--tiles' ) ).length === 0 );
+
+	const grid = open( withRects(), three( ( g, at ) => ( { image : '/i/'+ g+ at } ) ) );
+	layOut( grid );
+	const tiles = rowsOf( grid );
+	const at = ( index ) => tiles[index];
+	tiles[1].focus();
+	key( tiles[1], 'ArrowRight' );
+	const right = at( 2 ).focused === true;
+	key( at( 2 ), 'ArrowLeft' );
+	const left = at( 1 ).focused === true;
+	key( at( 1 ), 'ArrowDown' );
+	const down = at( 5 ).focused === true;
+	key( at( 5 ), 'ArrowDown' );
+	const downAgain = at( 9 ).focused === true;
+	key( at( 9 ), 'ArrowDown' );
+	const stays = at( 9 ).focused === true;
+	key( at( 9 ), 'ArrowUp' );
+	const up = at( 5 ).focused === true;
+	key( at( 5 ), 'ArrowRight' ); key( at( 6 ), 'ArrowRight' ); key( at( 7 ), 'ArrowRight' );
+	const over = at( 8 ).focused === true;
+	key( at( 8 ), 'Home' );
+	const home = at( 0 ).focused === true;
+	key( at( 0 ), 'End' );
+	check( 'the arrows walk the tiles in every direction - along a row and, at its end, on to the next group; up and down to the tile over or under; Home and End to the ends - and the groups are no stops',
+		right && left && down && downAgain && stays && up && over && home && at( 11 ).focused === true );
+	tiles[1].focus();
+	key( tiles[1], 'ArrowUp' );
+	check( 'Up from the first line goes to the search, and every row is a button, which Enter and Space press', findAll( grid, el => el.type === 'search' )[0].focused === true && tiles.every( el => el.tagName === 'BUTTON' ) );
+
+	// the search hides a group that has nothing left, and its heading
+	const searched = open( world(), three() );
+	const box = findAll( searched, el => el.type === 'search' )[0];
+	box.value = 'b2';
+	fire( box, 'input' );
+	const boxes = findAll( searched, el => cls( el, 'nino-admin-pick-group' ) );
+	check( 'the search hides a group that has nothing left, heading and all, and shows it again when the words go', boxes.map( el => el.hidden ).join() === 'true,false,true' && ( box.value = '', fire( box, 'input' ), boxes.every( el => el.hidden === false ) ) );
+}
+
+
 // --- propertiesDialog() -----------------------------------------------------
 
 {

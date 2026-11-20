@@ -1261,6 +1261,60 @@ a {
 	user-select: text;
 }
 
+/* Groups and tiles of pickDialog(): a group is a heading over a set of items; with pictures the set is a grid that holds as many tiles as fit a row. A tile is a picture on a
+   surface of a fixed shape - the shape is there before the picture loads, so that nothing jumps - over the name; an item with no picture has the surface alone. The surface
+   is a quiet ground and the picture fills it, cut to it */
+:where(.nino-admin) .nino-admin-pick-group {
+	display: grid;
+	gap: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-pick-group[hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-pick-group-title {
+	margin: var(--nino-admin-space-4) 0 0;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+
+:where(.nino-admin) .nino-admin-pick-list > .nino-admin-pick-group:first-child > .nino-admin-pick-group-title {
+	margin-top: 0;
+}
+
+:where(.nino-admin) .nino-admin-pick-set {
+	display: grid;
+	gap: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-pick-list--tiles .nino-admin-pick-set {
+	grid-template-columns: repeat( auto-fill, minmax( 9.5rem, 1fr ) );
+}
+
+:where(.nino-admin) .nino-admin-pick-item--tile {
+	align-content: start;
+	padding: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-pick-image {
+	display: block;
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+}
+
+:where(.nino-admin) .nino-admin-pick-image > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
 /* The sentence above the rows when the notation was marked and not copied: said in the dialog, where it is read */
 :where(.nino-admin) .nino-admin-pick-marked {
 	margin: 0;
