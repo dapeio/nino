@@ -1315,6 +1315,44 @@ a {
 	object-fit: cover;
 }
 
+/* One tile chosen in each of several groups (Nino.adminUi.tileChoice()): the tiles are the tiles of pickDialog(), the chosen one has the accent round it as the thing it
+   stands for has in the preview, the name and the quiet line of a tile stand over each other, and a line under a heading takes the width of the group */
+:where(.nino-admin) .nino-admin-tilechoice {
+	display: grid;
+	gap: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-tilechoice-title {
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+:where(.nino-admin) .nino-admin-tilechoice-item[aria-checked="true"] {
+	border-color: var(--editor-blue);
+	box-shadow: inset 0 0 0 1px var(--editor-blue);
+	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-tilechoice-item:disabled {
+	opacity: .5;
+	cursor: not-allowed;
+}
+
+:where(.nino-admin) .nino-admin-pick-text {
+	display: grid;
+	gap: var(--nino-admin-space-1);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-tilechoice-hint {
+	display: block;
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-tilechoice-note {
+	display: block;
+	margin: 0;
+}
+
 /* The sentence above the rows when the notation was marked and not copied: said in the dialog, where it is read */
 :where(.nino-admin) .nino-admin-pick-marked {
 	margin: 0;

@@ -5,12 +5,16 @@ declare(strict_types=1);
  *	Nino										A compact filesystembased php framework
  *	markup-perf-smoke.php		Dependency-free smoke test for what a page of 600 calls costs as a template
  *													file: read and drawn from nothing, drawn from the tree that is kept of it, and
- *													what the cost does when the page grows from 150 calls to 600. The times are
- *													reported on every run; the pins are a budget that is far from what is measured
- *													(a slow machine is no reason for a failure) and ratios, which a machine does
- *													not move. The components are probes of the suite's own, the page is the test
- *													page of the measurement that sized the notation: 600 calls as the notation
- *													counted them before, 960 marks, ten to a unit.
+ *													what the work does when the page grows from 150 calls to 600. The pins hold no time
+ *													- a clock is no measure on a machine that is shared - but what the cost is made of:
+ *													how often the text is read into a tree (a tree file that is written is a read), whether
+ *													a page is drawn from the tree that is kept (the file's text is changed behind the
+ *													tree's back, to the same size and the same time, and the page does not show it) or from
+ *													the text (it does), once for the request however often the page is drawn in it, and
+ *													that the calls read and drawn grow with the calls of the page, no faster. The times
+ *													are told on every run and pinned nowhere. The components are probes of the suite's own,
+ *													the page is the test page of the measurement that sized the notation: 600 calls as the
+ *													notation counted them before, 960 marks, ten to a unit.
  *													Runs against an isolated sandbox directory, never touches the real project
  *													data.
  *
@@ -183,99 +187,136 @@ check( 'the page is drawn whole: 120 cards, 60 titles and no call or fill left',
 check( 'the first request wrote the tree and the second is the same page, drawn from it', is_file( $trees. '/'. sha1( '/templates/page-bench.tpl' ). '.php' ) === true && $draw( 'page-bench' ) === $cold );
 check( 'the page is 960 marks of the notation and 600 calls as it counted them before, ten to a unit', preg_match_all( '/^\t*\[[a-z]/m', $big ) === 960 && 60 * 10 === 600 );
 
-echo "Times of a page of 600 calls (median of 30)\n";
+// The files of the kept trees, and a way to tell how often a text was read into a tree: a read writes the tree file, so a file that is written is a read and a file that is
+// left as it was is none. The file is given a time long ago before the draw, and a write is the time it has afterwards
+$treeFile = $trees. '/'. sha1( '/templates/page-bench.tpl' ). '.php';
+$ago = 1000000000;
 
+/**
+ *	How many times the text of the page was read into a tree by a draw: 1 where the kept file was written, 0 where it was left as it was
+ */
+$reads = static function() use ( $treeFile, $ago ): int {
+	clearstatcache();
+	return is_file( $treeFile ) === true && filemtime( $treeFile ) !== $ago ? 1 : 0;
+};
+
+/**
+ *	The page of a template file with another text of the very same size and the very same time as the one the tree was made of: what is drawn from the text shows it, what is
+ *	drawn from the tree does not. The words are changed in place (a padding of 3 is the default one of 2, which has no class: one character)
+ */
+$swapped = static function( string $name ) use ( &$appData ): string {
+	$path = \Nino\Filesystem::path( $appData, '/templates/'. $name. '.tpl' );
+	$text = (string) file_get_contents( $path );
+	$other = str_replace( 'padding="3"', 'padding="2"', $text );
+	file_put_contents( $path, $other );
+	touch( $path, 1767225600 );
+	clearstatcache();
+	return $other;
+};
+
+echo "What a draw of the page of 600 calls is made of\n";
+
+$text = (string) file_get_contents( \Nino\Filesystem::path( $appData, '/templates/page-bench.tpl' ) );
+$swappedText = str_replace( 'padding="3"', 'padding="2"', $text );
+check( 'the swapped text of the page is the same size as the one the tree was made of, and has what the page shows swapped', strlen( $swappedText ) === strlen( $text ) && $swappedText !== $text && substr_count( $cold, 'padding-3' ) === 120  );
+
+// (1) The switch is off: nothing is kept, the text is read at every draw
 $appData['/nino/markup/cache'] = false;
-$read = $median( static fn() => $draw( 'page-bench' ) );
+\Nino\Filesystem::removeDir( $trees );
+$first = $draw( 'page-bench' );
+$swapped( 'page-bench' );
+$second = $draw( 'page-bench' );
 $appData['/nino/markup/cache'] = true;
-$numbers['600 calls, read and drawn, nothing kept (switch off)'] = $read;
+check( 'with the switch off no tree is kept, and every draw reads the text: the page that is drawn after the text changed shows the change', is_file( $treeFile ) === false && $first === $cold && substr_count( $second, 'padding-3' ) === 0 );
 
-$kept = $median( static fn() => $draw( 'page-bench' ), static fn() => \Nino\Filesystem::removeDir( $trees ) );
-$numbers['600 calls, read, drawn and the tree written (first request)'] = $kept;
+// (2) The first request after the folder is emptied reads the text once and keeps the tree
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-bench.tpl', $text );
+touch( \Nino\Filesystem::path( $appData, '/templates/page-bench.tpl' ), 1767225600 );
+\Nino\Filesystem::removeDir( $trees );
+$written = $draw( 'page-bench' );
+check( 'the first request after the folder is emptied reads the text into a tree once and keeps it: one file, the same page', $written === $cold && count( glob( $trees. '/*.php' ) ?: [] ) === 1 && is_file( $treeFile ) === true );
 
-$draw( 'page-bench' );
-$warm = $median( static fn() => $draw( 'page-bench' ) );
-$numbers['600 calls, drawn from the tree that is kept (second request)'] = $warm;
+// (3) The second request is drawn from the tree: the text behind it is changed, same size and time, and the page does not show it; the file of the tree is not written
+touch( $treeFile, $ago );
+$swapped( 'page-bench' );
+$warm = $draw( 'page-bench' );
+check( 'the second request draws the page from the tree that is kept: the text was changed behind it to the same size and time, and the page is the old one, the tree file is not written again', $warm === $cold && $reads() === 0 );
 
-$treeOnly = $median( static function() use ( &$appData, $cache ): void {
-	unset( $appData[$cache] );
-	\Nino\Html::fileTree( $appData, '/templates/page-bench.tpl' );
-} );
-$numbers['600 calls, the tree alone from the file kept'] = $treeOnly;
+// (4) The same request draws the page a second time from what it holds in memory, whatever the file says now
+$appData['/nino/markup/cache'] = true;
+unset( $appData[$cache] );
+\Nino\Html::renderFile( $appData, '/templates/page-bench.tpl', [ 'template' => 'page-bench' ] );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-bench.tpl', $text. ' ' );
+$again = \Nino\Html::renderFile( $appData, '/templates/page-bench.tpl', [ 'template' => 'page-bench' ] );
+check( 'a file is read into a tree once for a request: a page drawn twice in it is drawn twice from the one tree, though the file changed between the two', $again === $cold && count( $appData[$cache]['files'] ) === 1 );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-bench.tpl', $text );
+touch( \Nino\Filesystem::path( $appData, '/templates/page-bench.tpl' ), 1767225600 );
 
-$parseOnly = $median( static function() use ( &$appData, $big ): void {
-	\Nino\Markup::parse( $big, \Nino\Components::containers( $appData ) );
-} );
-$numbers['600 calls, the text read into a tree alone'] = $parseOnly;
-
+// (5) The tree of the file is the tree of the text, and the one that is read: the tree from the file saves the read and nothing is lost
+unset( $appData[$cache] );
+$fromFile = \Nino\Html::fileTree( $appData, '/templates/page-bench.tpl' );
 $tree = \Nino\Markup::parse( $big, \Nino\Components::containers( $appData ) );
-$paint = $median( static function() use ( &$appData, $tree ): void {
-	\Nino\Components::render( $appData, $tree, [ 'template' => 'page-bench' ] );
-} );
-$numbers['600 calls, a tree drawn alone'] = $paint;
-
-foreach( $numbers as $what => $ms )
-	printf( "  %-62s %7.2f ms\n", $what, $ms );
-
-$opcache = function_exists( 'opcache_get_status' ) === true && ( @opcache_get_status( false )['opcache_enabled'] ?? false ) === true;
-printf( "  opcache for this run: %s\n", $opcache === true ? 'on' : 'off' );
-
-echo "\n";
-
-// The budget of the notation is 0.015 ms a call, twice for the reserve: 18 ms for this page, and a quiet machine takes 6 to 8 ms, told above on every
-// run. The pin is ten times the measure, so that the runner of a shared service, several times slower from one run to the next, is no failure
-check( 'a page of 600 calls is read and drawn in at most 70 ms', $read <= 70.0 );
-check( 'and read, drawn and kept in at most 70 ms as well', $kept <= 70.0 );
-
-check( 'a page drawn from the tree that is kept is drawn in at most 70 ms as well', $warm <= 70.0 );
-
-/*	What the tree that is kept saves is the read of the text into a tree (about two fifths of the time of the page, measured
-	here: the number above); what it cannot save is the drawing, which is the rest. Half of the time of the page is not
-	reached - the drawing is more than half of it - and what is is told in the numbers. The load of the file is where
-	opcache holds it, as every request of a site does: without it php reads the file of the tree as source, which takes more
-	than the text takes to be read, and the line says so instead of pinning it	*/
-if( $opcache === true )
-	check( 'with opcache the tree from its file takes at most a tenth of what the text takes to be read into a tree', $treeOnly <= 0.1 * $parseOnly );
-else
-	echo "  (not pinned: opcache is off in this run, and the file of a tree is read as source then)\n";
+check( 'the tree that is kept is the very tree the text is read into: a draw from the file and a draw of the text are one page', $fromFile === $tree && ( static function() use ( &$appData, $tree, $cold ): bool {
+	return \Nino\Components::render( $appData, $tree, [ 'template' => 'page-bench' ] ) === $cold;
+} )() );
 
 echo "\nThe page grows with its calls\n";
 
-/*	Four times the calls, four times the time: the ratio of the best of 30 runs of each size, which the load of the machine does
-	not move, as the two sizes are run one after the other in the same loop	*/
-$grow = static function( bool $cache ) use ( &$appData, $draw ): array {
+/*	Four times the calls, four times the work: counted, not timed. The calls the text is read into, the elements the page is drawn into, and the reads of the file - one for each size, however
+	many calls it has - all follow the calls of the page, with no more than their number; a clock would tell the same with the noise of the machine in it	*/
+$count = static function( string $name ) use ( &$appData, $draw, $pages ): array {
 
-	$appData['/nino/markup/cache'] = $cache;
-	$draw( 'page-small' );
-	$draw( 'page-bench' );
-	$small = $big = [];
+	$tree = \Nino\Markup::parse( $pages[$name], \Nino\Components::containers( $appData ) );
+	$nodes = 0;
+	$walk = static function( array $list ) use ( &$walk, &$nodes ): void {
+		foreach( $list as $node )
+			if( isset( $node['n'] ) === true ) {
+				$nodes++;
+				$walk( (array) ( $node['c'] ?? [] ) );
+			}
+	};
+	$walk( $tree );
+	$html = $draw( $name );
 
-	for( $run = 0; $run < 30; $run++ ) {
-
-		clearstatcache();
-		$started = hrtime( true );
-		$draw( 'page-small' );
-		$middle = hrtime( true );
-		$draw( 'page-bench' );
-		$small[] = ( $middle - $started ) / 1e6;
-		$big[] = ( hrtime( true ) - $middle ) / 1e6;
-	}
-
-	sort( $small );
-	sort( $big );
-	$appData['/nino/markup/cache'] = true;
-
-	return [ $small[0], $big[0], $small[15], $big[15] ];
+	return [ 'calls' => $nodes, 'cards' => substr_count( $html, '<article' ), 'titles' => substr_count( $html, '<h2 class="section-title">' ), 'bytes' => strlen( $html ), 'marks' => preg_match_all( '/^\t*\[[a-z]/m', $pages[$name] ) ];
 };
 
-$growRead = $grow( false );
-$growWarm = $grow( true );
+$small = $count( 'page-small' );
+$bench = $count( 'page-bench' );
 
-printf( "  150 calls, read and drawn: %.2f ms; 600 calls: %.2f ms; times %.2f (median of 30: %.2f ms, %.2f ms, times %.2f)\n", $growRead[0], $growRead[1], $growRead[1] / $growRead[0], $growRead[2], $growRead[3], $growRead[3] / $growRead[2] );
-printf( "  150 calls, from the tree: %.2f ms; 600 calls: %.2f ms; times %.2f (median of 30: %.2f ms, %.2f ms, times %.2f)\n", $growWarm[0], $growWarm[1], $growWarm[1] / $growWarm[0], $growWarm[2], $growWarm[3], $growWarm[3] / $growWarm[2] );
+echo '  150 calls: '. json_encode( $small ). "\n  600 calls: ". json_encode( $bench ). "\n";
 
-check( 'a page of four times the calls takes at most 4.5 times as long, read and drawn', $growRead[1] <= 4.5 * $growRead[0] );
-check( '...and drawn from its tree', $growWarm[1] <= 4.5 * $growWarm[0] );
+check( 'a page of four times the units has four times the calls, four times the cards and titles drawn, and the marks of its text in the same ratio: what is read and what is drawn is counted by the page, no faster',
+	$bench['calls'] === 4 * $small['calls'] && $bench['cards'] === 4 * $small['cards'] && $bench['titles'] === 4 * $small['titles'] && $bench['marks'] === 4 * $small['marks'] && $small['calls'] === 240 );
+check( '...and the bytes it is drawn into follow the calls, within the width of the numbers of the units (s1 .. s60)', $bench['bytes'] > 3.9 * $small['bytes'] && $bench['bytes'] < 4.2 * $small['bytes'] );
+
+// A draw of each size reads the text into a tree once and the second draw not at all: the work of a page of any size is one read and a draw
+$sizes = [];
+
+foreach( [ 'page-small', 'page-bench' ] as $name ) {
+
+	$file = $trees. '/'. sha1( '/templates/'. $name. '.tpl' ). '.php';
+	\Nino\Filesystem::removeDir( $trees );
+	$draw( $name );
+	$sizes[$name] = [ is_file( $file ) === true, ( static function() use ( $file, $ago, $draw, $name ): bool { touch( $file, $ago ); $draw( $name ); clearstatcache(); return filemtime( $file ) === $ago; } )() ];
+}
+
+check( 'a page of either size is read into a tree once and drawn from it after: the tree is written by the first draw and left alone by the second', $sizes === [ 'page-small' => [ true, true ], 'page-bench' => [ true, true ] ] );
+
+// What the clock says is told, not pinned
+$appData['/nino/markup/cache'] = false;
+$told = [ '600 calls, read and drawn, nothing kept (switch off)' => $median( static fn() => $draw( 'page-bench' ) ) ];
+$appData['/nino/markup/cache'] = true;
+$draw( 'page-bench' );
+$told['600 calls, drawn from the tree that is kept (second request)'] = $median( static fn() => $draw( 'page-bench' ) );
+$told['600 calls, the text read into a tree alone'] = $median( static function() use ( &$appData, $big ): void {
+	\Nino\Markup::parse( $big, \Nino\Components::containers( $appData ) );
+} );
+
+echo "\nTold on every run and pinned nowhere (median of 30)\n";
+
+foreach( $told as $what => $ms )
+	printf( "  %-62s %7.2f ms\n", $what, $ms );
 
 echo "\n";
 

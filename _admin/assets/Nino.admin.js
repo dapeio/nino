@@ -2562,7 +2562,7 @@
 		 *	is not (style.css decides). Owns no strings
 		 *
 		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view.
-		 *																	type 'select' takes options [ { value, label } ]; 'check' a tick (value true or false); 'checklist' ticks (options [ { value, label } ], value the list of the ticked); 'locales' a row for each language (locales, values a map, multiline); 'file' (accept, maxBytes); 'code' (rows); 'datetime' (min, max, zone, value an ISO string);
+		 *																	type 'select' takes options [ { value, label } ]; 'check' a tick (value true or false); 'checklist' ticks (options [ { value, label } ], value the list of the ticked); 'tiles' one tile chosen in each of several groups (groups as tileChoice() takes them, value an object group => value); 'locales' a row for each language (locales, values a map, multiline); 'file' (accept, maxBytes); 'code' (rows); 'datetime' (min, max, zone, value an ISO string);
 		 *																	any other type is the type of an <input>. validate( value ) answers the sentence that is wrong with it, or ''; a required field is wrong when it is empty - a tick not ticked, a list with none, a language with no text, no file
 		 *	@param		{Function}	[onInput]				onInput( key, value ) on every change of a field
 		 *
@@ -2607,6 +2607,11 @@
 					readers[field.key] = function() { return label.control.checked === true };
 				} else if( field.type === 'checklist' ) {
 					handles[field.key] = Nino.adminUi.checklist( Object.assign( shared, { options : field.options, value : field.value, onChange : say } ) );
+					label = handles[field.key].el;
+					controls[field.key] = handles[field.key].controls[0] ?? label;
+					readers[field.key] = function() { return handles[field.key].value() };
+				} else if( field.type === 'tiles' ) {
+					handles[field.key] = Nino.adminUi.tileChoice( Object.assign( shared, { groups : field.groups, draw : field.draw, onChange : function( group, value, values ) { say( values ) } } ) );
 					label = handles[field.key].el;
 					controls[field.key] = handles[field.key].controls[0] ?? label;
 					readers[field.key] = function() { return handles[field.key].value() };
@@ -3134,6 +3139,254 @@
 						options.onCancel();
 				},
 			} );
+		},
+
+		/**
+		 *	One tile chosen in each of several groups, then taken over: "the header and the footer of this page", "a look for the day and one for the night".
+		 *	A group is a radiogroup - role="radiogroup", named by its heading - of tiles, the tile of pickDialog() ( a picture on a surface of a fixed shape over
+		 *	the name, a quiet surface where there is no picture ) with the chosen one marked; a tile is a radio. Where the focus stands is one stop of the group - the
+		 *	chosen tile, the first where none is chosen - and Tab goes on to the next group. The arrow keys walk the tiles of the group in every direction and
+		 *	choose the one they come to: Left and Right along the tiles in the order they stand, Up and Down to the tile over or under (the nearest line, and in it the
+		 *	tile whose middle is nearest), Home and End to the ends; they stay in the group and do not wrap. A press chooses a tile. It chooses nothing else and
+		 *	sends nothing: the caller asks value() where it takes the choice over (a dialog's main answer), and onChange tells every change at once.
+		 *
+		 *	It stands as a field of formDialog() and of the fields of a dialog ( type 'tiles', the value an object group => value ), as the content of choiceDialog() ( el ),
+		 *	or free on a page. Each group has a heading with the (?) of its help behind the words and a quiet line under it ( note ); the whole has the same, over the groups, where it
+		 *	has a label. The picture of a tile is an address ( image: alt="", loaded when it comes near ), or what the caller draws into its surface with a hook ( draw ) -
+		 *	called once for each tile, with the surface - a thing that cannot be drawn in one step ( the page in its frame ) is drawn in later into the very same surface, which
+		 *	the handle gives ( faces ). Owns no strings
+		 *
+		 *	@param		{Object}		options					{ key, label, help, note, groups, draw, onChange, className }
+		 *														- key         the name of the field in a form
+		 *														- label       the name of the whole: a heading over the groups, with the (?) of its help; without it the whole has no heading, and its help is not shown
+		 *														- help        the sentence behind the (?) of the whole, note a quiet line under the label
+		 *														- groups      [ { key, label, help, note, value, items } ] - label is the heading of the group, value the value of the tile that is chosen ( none: no tile is ),
+		 *																			items [ { value, label, hint, image, draw, disabled } ] - hint is a quiet line of its own under the name, draw( face, item, group ) the hook of this tile
+		 *														- draw        the hook of every tile that has none of its own
+		 *														- onChange    onChange( groupKey, value, values ) when a tile is chosen by a press or a key
+		 *
+		 *	@return		{Object}										{ el, controls, faces, value(), get( key ), set( key, value ), focus( [key] ) } - value() is an object group key => value ( null for a group in which none is chosen ),
+		 *																			controls the tiles in the order of the groups and the items, faces group key => value => the surface of the tile; set() chooses a tile without calling onChange
+		 */
+		tileChoice : function( options ) {
+
+			const groups = Array.isArray( options.groups ) === true ? options.groups : [];
+			const root = Nino.adminUi.el( 'div', ( options.className || 'nino-admin-field' )+ ' nino-admin-tilechoice' );
+			const controls = [];
+			const faces = {};
+			const sets = {};
+			const setters = {};
+			const state = {};
+			const sentence = function( value ) { return typeof value === 'string' && value !== '' ? value : '' };
+
+			if( options.key )
+				root.dataset.key = options.key;
+
+			// The name of the whole, and what stands under it
+			if( typeof options.label === 'string' && options.label !== '' ) {
+
+				const title = Nino.adminUi.el( 'div', 'nino-admin-tilechoice-title', options.label );
+
+				root.appendChild( title );
+
+				if( sentence( options.help ) !== '' )
+					Nino.adminUi.sectionHelp( title, root, options.help );
+			}
+
+			Nino.adminUi._note( root, options.note );
+
+			const list = Nino.adminUi.el( 'div', 'nino-admin-pick-list nino-admin-pick-list--tiles' );
+			root.appendChild( list );
+
+			// The tile to go to from one with a key: along the order for Left and Right, to the nearest line for Up and Down where the tiles have a place - none, no move
+			const roveTo = function( tiles, at, key ) {
+
+				if( key === 'Home' )
+					return 0;
+
+				if( key === 'End' )
+					return tiles.length - 1;
+
+				if( key === 'ArrowLeft' )
+					return Math.max( 0, at - 1 );
+
+				if( key === 'ArrowRight' )
+					return Math.min( tiles.length - 1, at + 1 );
+
+				const boxes = tiles.map( function( tile ) { return typeof tile.getBoundingClientRect === 'function' ? tile.getBoundingClientRect() : null } );
+
+				if( boxes.some( function( box ) { return box === null || typeof box.top !== 'number' } ) === true )
+					return key === 'ArrowDown' ? Math.min( tiles.length - 1, at + 1 ) : Math.max( 0, at - 1 );
+
+				const down = key === 'ArrowDown';
+				const over = boxes.map( function( box, index ) { return index } ).filter( function( index ) { return down === true ? boxes[index].top > boxes[at].top + 1 : boxes[index].top < boxes[at].top - 1 } );
+
+				if( over.length === 0 )
+					return at;
+
+				const line = over.reduce( function( best, index ) { return down === true ? Math.min( best, boxes[index].top ) : Math.max( best, boxes[index].top ) }, down === true ? Infinity : -Infinity );
+				const middle = function( index ) { return boxes[index].left + boxes[index].width / 2 };
+
+				return over.filter( function( index ) { return Math.abs( boxes[index].top - line ) < 1 } ).reduce( function( best, index ) { return Math.abs( middle( index ) - middle( at ) ) < Math.abs( middle( best ) - middle( at ) ) ? index : best } );
+			};
+
+			groups.forEach( function( group ) {
+
+				const key = String( group.key );
+				const box = Nino.adminUi.el( 'div', 'nino-admin-pick-group' );
+				const title = Nino.adminUi.el( 'h3', 'nino-admin-pick-group-title', group.label ?? '' );
+				const set = Nino.adminUi.el( 'div', 'nino-admin-pick-set' );
+				const tiles = [];
+				const items = Array.isArray( group.items ) === true ? group.items : [];
+
+				box.dataset.group = key;
+				title.id = 'nino-admin-tilechoice-'+ ( ++serial );
+				box.appendChild( title );
+
+				// The help of the group behind the words of its heading: the heading keeps its words, the radiogroup is named by them
+				if( sentence( group.help ) !== '' ) {
+					const help = Nino.adminUi.sectionHelp( title, box, group.help );
+					set.setAttribute( 'aria-labelledby', box.getAttribute( 'aria-labelledby' ) );
+					box.removeAttribute( 'role' );
+					box.removeAttribute( 'aria-labelledby' );
+					help.dataset.group = key;
+				}
+				else
+					set.setAttribute( 'aria-labelledby', title.id );
+
+				set.setAttribute( 'role', 'radiogroup' );
+
+				if( sentence( group.note ) !== '' )
+					box.appendChild( Nino.adminUi.el( 'small', 'nino-admin-hint nino-admin-tilechoice-note', group.note ) );
+
+				box.appendChild( set );
+				list.appendChild( box );
+
+				state[key] = null;
+				faces[key] = {};
+				sets[key] = tiles;
+
+				items.forEach( function( item ) {
+
+					const tile = Nino.adminUi.el( 'button', 'nino-admin-pick-item nino-admin-pick-item--tile nino-admin-tilechoice-item' );
+					const face = Nino.adminUi.el( 'span', 'nino-admin-pick-image' );
+					const text = Nino.adminUi.el( 'span', 'nino-admin-pick-text' );
+					const value = String( item.value );
+
+					tile.type = 'button';
+					tile.setAttribute( 'role', 'radio' );
+					tile.setAttribute( 'aria-checked', 'false' );
+					tile.tabIndex = -1;
+					tile.dataset.value = value;
+					tile.dataset.group = key;
+					tile.disabled = item.disabled === true;
+
+					if( typeof item.image === 'string' && item.image !== '' ) {
+						const picture = dc.createElement('img');
+						picture.src = item.image;
+						picture.alt = '';
+						picture.loading = 'lazy';
+						picture.decoding = 'async';
+						face.appendChild( picture );
+					}
+
+					face.setAttribute( 'aria-hidden', 'true' );
+					text.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-name', String( item.label ?? value ) ) );
+
+					if( sentence( item.hint ) !== '' )
+						text.appendChild( Nino.adminUi.el( 'span', 'nino-admin-pick-line nino-admin-tilechoice-hint', item.hint ) );
+
+					tile.appendChild( face );
+					tile.appendChild( text );
+					faces[key][value] = face;
+					tiles.push( tile );
+					controls.push( tile );
+					set.appendChild( tile );
+
+					const hook = typeof item.draw === 'function' ? item.draw : options.draw;
+
+					if( typeof hook === 'function' )
+						hook( face, item, group );
+				} );
+
+				// The tab stop of a group: the chosen tile, or the first one a press can reach where none is chosen
+				const stop = function() {
+
+					const chosen = tiles.find( function( tile ) { return tile.getAttribute('aria-checked') === 'true' && tile.disabled !== true } );
+					const first = chosen ?? tiles.find( function( tile ) { return tile.disabled !== true } );
+
+					tiles.forEach( function( tile ) { tile.tabIndex = tile === first ? 0 : -1 } );
+				};
+
+				const choose = function( tile, told, focus ) {
+
+					tiles.forEach( function( other ) { other.setAttribute( 'aria-checked', other === tile ? 'true' : 'false' ) } );
+					state[key] = tile === null ? null : tile.dataset.value;
+					stop();
+
+					if( focus === true && tile !== null )
+						tile.focus();
+
+					if( told === true && typeof options.onChange === 'function' )
+						options.onChange( key, state[key], handle.value() );
+				};
+
+				setters[key] = function( value ) {
+					choose( tiles.find( function( tile ) { return value !== null && value !== undefined && tile.dataset.value === String( value ) } ) ?? null, false, false );
+				};
+
+				tiles.forEach( function( tile, at ) {
+
+					tile.addEventListener( 'click', function() {
+						if( state[key] !== tile.dataset.value )
+							choose( tile, true, false );
+						else
+							stop();
+					} );
+
+					tile.addEventListener( 'keydown', function( event ) {
+
+						if( [ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End' ].indexOf( event.key ) === -1 )
+							return;
+
+						event.preventDefault();
+
+						// A tile that cannot be chosen is passed over, in the direction of the key
+						const open = tiles.filter( function( other ) { return other.disabled !== true } );
+						const to = open.indexOf( tile ) === -1 ? -1 : roveTo( open, open.indexOf( tile ), event.key );
+
+						if( to !== -1 && open[to] !== tile )
+							choose( open[to], true, true );
+					} );
+				} );
+
+				choose( tiles.find( function( tile ) { return group.value !== null && group.value !== undefined && tile.dataset.value === String( group.value ) } ) ?? null, false, false );
+			} );
+
+			const handle = {
+				el : root,
+				controls : controls,
+				faces : faces,
+				value : function() {
+					const values = {};
+					groups.forEach( function( group ) { values[String( group.key )] = state[String( group.key )] } );
+					return values;
+				},
+				get : function( key ) { return state[String( key )] ?? null },
+				set : function( key, value ) {
+					if( setters[String( key )] !== undefined )
+						setters[String( key )]( value );
+				},
+				focus : function( key ) {
+					const tiles = key === undefined ? controls : ( sets[String( key )] ?? [] );
+					const stop = tiles.find( function( tile ) { return tile.tabIndex === 0 } ) ?? tiles[0];
+
+					if( stop !== undefined )
+						stop.focus();
+				},
+			};
+
+			return handle;
 		},
 
 		/**
@@ -8226,6 +8479,10 @@
 		 *														- elements    elements( key ) answers the elements of the page that stand for the key
 		 *														- keyAt       keyAt( element ) answers the key of what the element is part of, or null
 		 *														- onHover     called with the key when the pointer comes over a thing of the page, with null when it leaves them; told once for each change
+		 *														- hover       true to show the thing under the pointer as well, quietly: the innermost element of the page that stands for the key of what the pointer is over has a frame of
+		 *																			one pixel on exactly its border box, drawn in two rings - the ground of the workbench inside, its ink outside, so that it is seen on a light page and on a dark one - that goes
+		 *																			when the pointer leaves the page or comes over nothing, and is not drawn where that element is marked already (a marked thing keeps its solid box). The frame
+		 *																			takes no pointer and is no pencil and no "+". Without it the page is marked as it always was; the thing under the pointer is told by onHover either way
 		 *
 		 *	@return		{Object}										{ highlight( keys, [options] ), refresh(), stop() } - highlight() takes a key, a list of them or null, marks those and no others and tells nobody; with { scroll : true } the page rolls to the first of them; refresh() draws the boxes again where the page was laid out again; stop() takes the marks and the listeners away
 		 */
@@ -8238,6 +8495,8 @@
 			let doc = null;
 			let reported = null;
 			let observer = null;
+			// The element the pointer is over, innermost of those that stand for the key it is over: with the option hover it has a quiet frame
+			let under = null;
 			// What is listened to in the page that is there: the page goes when the frame loads another, and these with it
 			const listeners = [];
 
@@ -8259,11 +8518,18 @@
 
 				const win = frame.contentWindow;
 				const rects = [];
+				let quiet = null;
 
 				// Every measure is read before anything is written: reading after a write makes the page lay itself out for each box
+				const marked = [];
+
 				keys.forEach( function( key ) {
-					options.elements( key ).forEach( function( element ) { rects.push( element.getBoundingClientRect() ) } );
+					options.elements( key ).forEach( function( element ) { marked.push( element ); rects.push( element.getBoundingClientRect() ) } );
 				} );
+
+				// The element under the pointer, where it is not marked already and is still in the page
+				if( options.hover === true && under !== null && marked.indexOf( under ) === -1 && under.isConnected !== false )
+					quiet = under.getBoundingClientRect();
 
 				while( layer.firstChild !== null )
 					layer.removeChild( layer.firstChild );
@@ -8280,6 +8546,18 @@
 					box.style.height = rect.height+ 'px';
 					layer.appendChild( box );
 				} );
+
+				if( quiet !== null ) {
+
+					const frameBox = doc.createElement( 'div' );
+
+					frameBox.className = 'hover';
+					frameBox.style.top = quiet.top+ 'px';
+					frameBox.style.left = quiet.left+ 'px';
+					frameBox.style.width = quiet.width+ 'px';
+					frameBox.style.height = quiet.height+ 'px';
+					layer.appendChild( frameBox );
+				}
 
 				if( scroll === true && rects.length > 0 )
 					win.scrollTo( { top : Math.max( 0, rects[0].top + win.scrollY - win.innerHeight / 3 ) } );
@@ -8307,6 +8585,7 @@
 				layer = null;
 				host = null;
 				doc = null;
+				under = null;
 			};
 
 			const listen = function( target, name, fn ) {
@@ -8331,16 +8610,45 @@
 
 				doc = now;
 				layer = now.createElement( 'div' );
-				style.textContent = ':host{all:initial;position:fixed;top:0;left:0;width:0;height:0;z-index:2147483000}.mark{position:absolute;pointer-events:none;box-sizing:border-box;border:2px solid var(--nino-mark);border-radius:3px;background:var(--nino-mark-soft)}';
+				style.textContent = ':host{all:initial;position:fixed;top:0;left:0;width:0;height:0;z-index:2147483000}.mark{position:absolute;pointer-events:none;box-sizing:border-box;border:2px solid var(--nino-mark);border-radius:3px;background:var(--nino-mark-soft)}.hover{position:absolute;pointer-events:none;box-sizing:border-box;border:1px solid var(--nino-hover-ink);box-shadow:inset 0 0 0 1px var(--nino-hover-ground)}';
 				host.style.setProperty( '--nino-mark', tokens === null ? '' : tokens.getPropertyValue( '--editor-blue' ) );
 				host.style.setProperty( '--nino-mark-soft', tokens === null ? '' : tokens.getPropertyValue( '--editor-blue-soft' ) );
+				host.style.setProperty( '--nino-hover-ink', tokens === null ? '' : tokens.getPropertyValue( '--editor-text' ) );
+				host.style.setProperty( '--nino-hover-ground', tokens === null ? '' : tokens.getPropertyValue( '--editor-bg-elevated' ) );
 				host.setAttribute( 'aria-hidden', 'true' );
 				shadow.appendChild( style );
 				shadow.appendChild( layer );
 				now.body.appendChild( host );
 
-				listen( now, 'pointerover', function( ev ) { say( options.keyAt( ev.target ) ?? null ) } );
-				listen( now.documentElement, 'pointerleave', function() { say( null ) } );
+				listen( now, 'pointerover', function( ev ) {
+
+					const key = options.keyAt( ev.target ) ?? null;
+
+					if( options.hover === true ) {
+
+						const before = under;
+						const target = ev.target;
+
+						// Of the elements that stand for the key, the innermost one that has the pointer in it
+						under = key === null ? null : options.elements( key ).filter( function( element ) {
+							return element === target || ( typeof element.contains === 'function' && element.contains( target ) === true );
+						} ).reduce( function( best, element ) { return best !== null && typeof best.contains === 'function' && best.contains( element ) === false ? best : element }, null );
+
+						if( under !== before )
+							paint( false );
+					}
+
+					say( key );
+				} );
+				listen( now.documentElement, 'pointerleave', function() {
+
+					if( under !== null ) {
+						under = null;
+						paint( false );
+					}
+
+					say( null );
+				} );
 				listen( win, 'resize', function() { paint( false ) } );
 
 				// Drawn again when the page has scrolled, once for the frames that come between

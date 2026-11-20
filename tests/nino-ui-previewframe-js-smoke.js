@@ -291,6 +291,96 @@ function page() {
 	check( 'after stop() the marks and the listeners are gone and a load draws nothing', second.doc.body.children.length === 0 && ( fire( second.doc, 'pointerover', { target : second.doc.things.b[0] } ), hovered.join() === 'a' ) );
 }
 
+// The thing under the pointer, quietly: the option hover
+{
+	const first = page();
+	const frame = element( 'iframe' );
+	const hovered = [];
+
+	frame.contentDocument = first.doc;
+	frame.contentWindow = first.win;
+
+	// A thing inside a thing of the same key: the innermost one has the pointer in it
+	const outer = first.doc.things.a[0];
+	const inner = element( 'div' );
+	inner.key = 'a';
+	inner.getBoundingClientRect = function() { return { top : 40, left : 30, width : 100, height : 20 } };
+	outer.appendChild( inner );
+	first.doc.things.a.push( inner );
+	first.doc.things.c = [ outer ];
+
+	const build = function( hover ) {
+		return adminUi.frameMarks( {
+			frame : frame,
+			hover : hover,
+			elements : function( key ) { return frame.contentDocument.things[key] ?? [] },
+			keyAt : function( target ) { return target.key ?? null },
+			onHover : function( key ) { hovered.push( key ) },
+		} );
+	};
+	const layer = function( doc ) { return doc.body.children[doc.body.children.length - 1].shadow.children[1] };
+	const boxes = function() { return layer( first.doc ).children.map( function( box ) { return box.className+ ':'+ box.style.top+ ' '+ box.style.left+ ' '+ box.style.width+ ' '+ box.style.height } ) };
+
+	// Without the option the page is marked as it always was
+	let marks = build( undefined );
+	fire( first.doc, 'pointerover', { target : first.doc.things.b[0] } );
+	check( 'without the option the thing under the pointer has no box, and is told as before', boxes().length === 0 && hovered.join() === 'b' );
+	marks.stop();
+	hovered.length = 0;
+
+	marks = build( true );
+	check( 'with the option nothing is drawn as long as the pointer is over nothing', boxes().length === 0 );
+
+	fire( first.doc, 'pointerover', { target : inner } );
+	check( 'the pointer over a thing draws a frame on the innermost element that stands for the key it is over, on exactly its box, as a box of its own kind - and tells the key as before',
+		boxes().join() === 'hover:40px 30px 100px 20px' && hovered.join() === 'a' );
+
+	fire( first.doc, 'pointerover', { target : first.doc.things.b[0] } );
+	check( 'the frame goes to the next thing the pointer comes over', boxes().join() === 'hover:90px 10px 200px 50px' && hovered.join() === 'a,b' );
+
+	fire( first.doc, 'pointerover', { target : first.doc } );
+	check( 'a pointer over what is no thing takes it away', boxes().length === 0 );
+
+	fire( first.doc, 'pointerover', { target : first.doc.things.b[0] } );
+	first.doc.documentElement.dispatchEvent( { type : 'pointerleave' } );
+	check( 'a pointer that leaves the page takes it away and tells null', boxes().length === 0 && hovered.slice( -1 )[0] === null );
+
+	marks.highlight( 'b' );
+	fire( first.doc, 'pointerover', { target : first.doc.things.b[0] } );
+	check( 'where the thing is the marked one the solid box stays and no frame is drawn on it', boxes().join() === 'mark:90px 10px 200px 50px' );
+
+	fire( first.doc, 'pointerover', { target : inner } );
+	check( 'a marked thing and another under the pointer have both: the solid box first, the quiet frame after it', boxes().join( ' | ' ) === 'mark:90px 10px 200px 50px | hover:40px 30px 100px 20px' );
+
+	// the page scrolls: the frame follows, like the boxes
+	inner.getBoundingClientRect = function() { return { top : 5, left : 30, width : 100, height : 20 } };
+	first.win.dispatchEvent( { type : 'scroll' } );
+	first.win.frames.shift()();
+	check( 'a page that scrolls has the frame drawn where the element is now', boxes()[1] === 'hover:5px 30px 100px 20px' );
+
+	// the element is taken out of the page while the pointer is over it
+	inner.removed = true;
+	marks.refresh();
+	check( 'an element that has left the page has no frame', boxes().length === 1 );
+	inner.removed = false;
+
+	// the colours are the workbench's, read when the page is marked: the ground inside, the ink outside
+	const style = first.doc.body.children[first.doc.body.children.length - 1];
+	check( 'the frame has two rings of the colours of the workbench - the ground of the workbench inside and its ink outside - and the host takes them from the tokens',
+		first.doc.body.children[0].shadow.children[0].textContent.indexOf( 'border:1px solid var(--nino-hover-ink)' ) !== -1 && first.doc.body.children[0].shadow.children[0].textContent.indexOf( 'inset 0 0 0 1px var(--nino-hover-ground)' ) !== -1
+		&& Object.prototype.hasOwnProperty.call( style.style, '--nino-hover-ink' ) === true && Object.prototype.hasOwnProperty.call( style.style, '--nino-hover-ground' ) === true );
+
+	// a page the frame loads has no frame of the page that is gone
+	const second = page();
+	frame.contentDocument = second.doc;
+	frame.contentWindow = second.win;
+	frame.dispatchEvent( { type : 'load' } );
+	check( 'a page the frame loads has no frame from the one before: the marks come back, the pointer is over nothing', layer( second.doc ).children.map( function( box ) { return box.className } ).join() === 'mark' );
+
+	marks.stop();
+	check( 'after stop() the page has no frame', second.doc.body.children.length === 0 );
+}
+
 {
 	const w = build();
 	w.split.frame = element( 'iframe' );
