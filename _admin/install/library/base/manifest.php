@@ -23,7 +23,9 @@
 		'html-header.tpl',
 		'html-footer.tpl',
 		// The site's header and footer markup, written in the components of Basis.
-		// html-header.tpl includes them as [template /templates/frame-header]
+		// html-header.tpl and html-footer.tpl carry them as [[header]] and [[footer]], which
+		// the standard frame fills, or the one a page chose by [frame /templates/frame-header-<word>]
+		// (see \Nino\Modules\Template::doFrame())
 		// rather than carrying them inline, so a project can rewrite either file
 		// without touching the page frame around it - and a missing include
 		// resolves to an empty string, which is exactly the silent no-header a

@@ -38,6 +38,9 @@ namespace Nino {
 		// its frame, the menu inside the frame is six
 		private const int MAX_SOURCE_DEPTH = 20;
 
+		// The calls whose arguments are read as they are written: a fill in one is no fill (\Nino\Modules\Template::doFrame() takes a name and builds a path out of it)
+		private const array LITERAL = [ 'frame' ];
+
 		// The depth of renderSource() calls, and the context of the call being
 		// drawn at the moment (see context())
 		private const string DEPTH = './nino/html/depth';
@@ -1198,7 +1201,8 @@ namespace Nino {
 			if( array_key_exists( $name, (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) === false )
 				return null;
 
-			$args = self::_arguments( $appData, $node, $context );
+			// A call that reads its argument as it is written has no fill put into it (see LITERAL)
+			$args = self::_arguments( $appData, $node, in_array( $name, self::LITERAL, true ) === true ? null : $context );
 
 			// The content a call is handed is the text of its children, which the tree of the call has as nodes already: tree()
 			// answers them for the same text, and a callback that asks for the tree of its content does not read it again

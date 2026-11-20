@@ -48,7 +48,7 @@ function rulesSite( bool $own ): array {
 	\Nino\Features::registerComponents( $appData );
 
 	// The calls of the templates that are no component: the names that the modules and the kernel register
-	foreach( [ 'template', 'assets', 'jstext', 'legal', 'privacy', 'json', 'imagevalues', 'csrf' ] as $shortcode )
+	foreach( [ 'template', 'frame', 'assets', 'jstext', 'legal', 'privacy', 'json', 'imagevalues', 'csrf' ] as $shortcode )
 		\Nino\Html::addShortcode( $appData, $shortcode, static fn(): string => '', null );
 
 	if( $own === false )

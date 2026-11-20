@@ -58,5 +58,5 @@
 
 		<a class="nino-sr-only" href="#nino-main">[[/template/common/navigation/skip]]</a>
 
-		[template /templates/frame-header]
+		[[header]]
   <main id="nino-main" tabindex="-1">

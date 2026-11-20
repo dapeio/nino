@@ -1,7 +1,7 @@
 
 		</main>
 
-		[template /templates/frame-footer]
+		[[footer]]
 
 		[jstext]
 		[assets /.cache/script.js]

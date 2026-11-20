@@ -86,7 +86,7 @@ Not a choice, and not a step: the base unit delivers no look of its own, it swit
 
 | File | What it is |
 |---|---|
-| `templates/frame-header.tpl` | the site's header, written in the components of Basis (`[header-wrap]`), included by `html-header.tpl` through `[template /templates/frame-header]` |
+| `templates/frame-header.tpl` | the site's header, written in the components of Basis (`[header-wrap]`), put into the `[[header]]` of `html-header.tpl`, as the frame a page chose with `[frame /templates/frame-header-<word>]` or as the standard - see development.md, The frame of a page |
 | `templates/frame-footer.tpl` | the site's footer (`[footer-wrap]`), included the same way |
 
 The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
