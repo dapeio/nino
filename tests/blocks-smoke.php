@@ -685,6 +685,150 @@ foreach( [ $own. '/linked-folder', $own. '/linked-file/block.tpl', ninoSandboxDi
 	if( is_link( $link ) === true )
 		unlink( $link );
 
+// --- F. a frame reads the texts of the project ------------------------------------------------------------
+
+echo "\nF. A frame may read the texts of the project and the logo, and nothing else of the project\n";
+
+$frameSite = blocksSite();
+$frame = static function( string $tpl, string $category = 'frame' ): array {
+
+	$words = static fn( string $de, string $en ): array => [ 'de_DE' => $de, 'en_US' => $en ];
+
+	return [
+		'json'	=> json_encode( [ 'name' => $words( 'Rahmen', 'Frame' ), 'description' => $words( 'Ein Rahmen', 'A frame' ), 'category' => $category, 'rank' => 5, 'images' => (object) [] ] ),
+		'tpl'		=> $tpl,
+		'texts'	=> [ 'de_DE' => '{}', 'en_US' => '{}' ],
+	];
+};
+$footer = static fn( string $inside ): string => "[footer-wrap id=\"footer\"]\n\t[footer-col size=\"100\"]\n\t\t". $inside. "\n\t[/footer-col]\n[/footer-wrap]";
+$good = \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( "[footer-logo /logo]\n\t\t[text /project/company/general/description format=\"inline\" size=\"s\"]" ) ) );
+
+check( 'a footer that reads the logo of the site and a text of the project is a block: the standard footer of a site can be one', is_array( $good ) === true && $good['wrap'] === 'footer-wrap' && $good['category'] === 'frame' );
+check( '...it carries the KEY and never the text; the sources it reads are no slot of the block, nor a text of it, so no file of it - the template, the texts, an export - holds what the site says',
+	is_array( $good ) === true && str_contains( $good['source'], '/project/company/general/description' ) === true && $good['slots'] === [] && $good['texts'] === [ 'de_DE' => [], 'en_US' => [] ] );
+
+$header = \Nino\Blocks::validate( $frameSite, 'header', $frame( "[header-wrap id=\"header\"]\n\t[header-logo]\n\t[header-actions]\n\t\t[button /project/company/general/name href=\"page:/contact\"]\n\t[/header-actions]\n[/header-wrap]" ) );
+check( 'a header may do it as well, in any call whose first word is a text', is_array( $header ) === true );
+
+// Every key of the text store is read, whatever root it is under: the owner answers for what a frame shows
+$every = [ '/template/page-x/main/secret', '/template/page-members/main/secret', '/feature/newsletter/confirm/url', '/module/form/info/name', '/project/mail/address/owner', '/project/mail/address/envelope', '/project/mail/color/primary', '/project/company/general/description' ];
+check( 'a frame reads the text of a page - one behind a password too -, the words of a feature and of a module, the mailbox of the forms, the sender and the look of the mails: every key of the four roots of the text store',
+	array_filter( $every, static fn( string $key ): bool => is_array( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text '. $key. ']' ) ) ) ) === false ) === [] );
+
+// ...and the owner can close a prefix again with one entry of FRAME_TEXT_EXCEPT: shown on a copy of the class that has one, in a process of its own
+$copyDir = ninoSandboxDir( $frameSite );
+$blocksCode = (string) file_get_contents( $root. '/_nino/Nino/Blocks/Blocks.php' );
+$closed = str_replace( 'FRAME_TEXT_EXCEPT = [];', "FRAME_TEXT_EXCEPT = [ '/project/mail/' ];", $blocksCode );
+$askScript = <<<'PHP'
+<?php
+require '@ROOT@/tests/harness.php';
+require '@COPY@/BlocksCopy.php';
+$appData = ninoSandbox( 'blocks-copy' );
+$appData['./nino/filesystem/path'] = '@ROOT@';
+$appData['/nino/modules'] = [ '\Nino\Modules\Basis' ];
+$appData['/nino/html/navs'] = [ 'main', 'footer' ];
+\Nino\Features::registerComponents( $appData );
+$words = [ 'de_DE' => 'x', 'en_US' => 'x' ];
+$parts = [
+	'json' => json_encode( [ 'name' => $words, 'description' => $words, 'category' => 'frame', 'rank' => 5, 'images' => (object) [] ] ),
+	'tpl' => '[footer-wrap id="footer"][footer-col size="100"][text @KEY@][/footer-col][/footer-wrap]',
+	'texts' => [ 'de_DE' => '{}', 'en_US' => '{}' ],
+];
+$answer = is_array( \Nino\Blocks::validate( $appData, 'footer', $parts ) ) ? 'read' : 'refused';
+\Nino\Filesystem::removeDir( ninoSandboxDir( $appData ) );
+echo 'ANSWER:'. $answer;
+PHP;
+$ask = static function( string $code, string $key ) use ( $copyDir, $root, $askScript ): string {
+
+	file_put_contents( $copyDir. '/BlocksCopy.php', $code );
+	file_put_contents( $copyDir. '/ask.php', strtr( $askScript, [ '@ROOT@' => $root, '@COPY@' => $copyDir, '@KEY@' => $key ] ) );
+	preg_match( '/ANSWER:(\w+)/', (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $copyDir. '/ask.php' ). ' 2>/dev/null' ), $found );
+
+	return $found[1] ?? '';
+};
+check( 'one prefix in FRAME_TEXT_EXCEPT closes it for a frame: the mailbox is read by the class as it is, and refused by a copy that has /project/mail/ there - and the company text is read by both',
+	$ask( $blocksCode, '/project/mail/address/owner' ) === 'read' && $ask( $closed, '/project/mail/address/owner' ) === 'refused' && $ask( $closed, '/project/company/general/description' ) === 'read' );
+
+// The limit is 200 bytes of the key: the key of 200 is read, one byte more is not
+$edge = static fn( int $length ): string => '/project/company/general/'. str_repeat( 'a', $length - strlen( '/project/company/general/' ) );
+check( 'a key of 200 bytes is read by a frame and one of 201 is not', strlen( $edge( 200 ) ) === 200 && strlen( $edge( 201 ) ) === 201
+	&& is_array( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text '. $edge( 200 ). ']' ) ) ) ) === true && is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text '. $edge( 201 ). ']' ) ) ) ) === true );
+
+$refusedKeys = [];
+
+foreach( [
+	'a way up'							=> '/project/company/../name',
+	'two slashes'						=> '/project//general/name',
+	'a backslash'						=> '/project/company\\general/name',
+	'a control character'		=> "/project/company/general/na\x01me",
+	'a bracket'							=> '/project/company/general/na[[me',
+	'a bracket that closes'	=> '/project/company/general/na]]me',
+	'a space'								=> '/project/company/general/na me',
+	'a capital'							=> '/project/Company/general/name',
+	'a dot'									=> '/project/company/general/na.me',
+	'too few words'					=> '/project/company/name',
+	'too many words'				=> '/project/company/general/name/more',
+	'too long'							=> '/project/company/general/'. str_repeat( 'a', 200 ),
+	'the configuration'			=> '/nino/config/mail/password',
+	'the workbench'					=> '/_admin/error/some/thing',
+	'the system'						=> '/_nino/webpage/home/name',
+	'no root of the text'		=> '/accounts/dev/mail/address',
+	'a field of an element'	=> '.title',
+	'a slot of the block'		=> '~title',
+] as $label => $key )
+	if( is_array( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text '. $key. ']' ) ) ) ) === true )
+		$refusedKeys[] = $label;
+
+check( 'a key of the wrong form or outside the four roots of the text store is read by no frame: a way up, two slashes, a backslash, a control character, a bracket, a space, a capital, a dot, too few or too many words, too long, the configuration, the workbench, the system, no root of the text'
+	. ( $refusedKeys === [] ? '' : ' - taken: '. implode( ', ', $refusedKeys ) ), $refusedKeys === [] );
+
+$notQuite = [];
+
+foreach( [
+	'another picture'								=> $footer( '[footer-logo /logo/other]' ),
+	'a text as a picture'						=> $footer( '[footer-logo /project/company/general/description]' ),
+	'the logo as a text'						=> $footer( '[text /logo]' ),
+	'the logo for a component that is no logo'	=> $footer( '[image /logo]' ),
+	'a text of the project in an attribute'	=> $footer( '[footer-logo /logo alt="/project/company/general/name"]' ),
+	'a text of the project as the address of a link'	=> $footer( '[button ~go href="/project/company/general/name"]' ),
+	'html'													=> $footer( '[html]<b>x</b>[/html]' ),
+	'a textfill'										=> $footer( '[text ~about]' ). '[[/project/company/general/name]]',
+] as $label => $tpl )
+	if( is_array( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $tpl ) ) ) === true )
+		$notQuite[] = $label;
+
+check( 'what a frame may read is the first word of a call and no more: no other picture, no text as a picture, no logo as a text or for another component, no source in an attribute, no html, no textfill'
+	. ( $notQuite === [] ? '' : ' - taken: '. implode( ', ', $notQuite ) ), $notQuite === [] );
+
+$page = static fn( string $inside, string $category = 'content' ): array => $frame( "[section-wrap id=\"probe\"]\n\t[section-row]\n\t\t[section-col]\n\t\t\t". $inside. "\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]", $category );
+check( 'a block of the pages reads none of it: a text of the project and the logo are as refused as they were, whatever its category says',
+	array_filter( [ $page( '[text /project/company/general/description]' ), $page( '[text /project/company/general/description]', 'frame' ), $page( '[image /logo]' ) ], static fn( array $parts ): bool => is_array( \Nino\Blocks::validate( $frameSite, 'probe', $parts ) ) === true ) === []
+	&& is_array( \Nino\Blocks::validate( $frameSite, 'probe', array_merge( $page( '[text ~title]' ), [ 'texts' => [ 'de_DE' => '{"title":"x"}', 'en_US' => '{"title":"x"}' ] ] ) ) ) === true );
+check( 'a footer-wrap whose category is not frame is no block, nor is a section-wrap whose category is frame, with a text of the project or without', is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), 'content' ) ) ) === true
+	&& is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), 'intro' ) ) ) === true && is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), 'misc' ) ) ) === true );
+
+// Drawn: what a page draws for the call, with the same care, and for a key that is not there as a page does - without a word in the log
+\Nino\Html::addFills( $frameSite, [ '/project/company/general/description' => 'Acme <b>Ltd</b> <script>alert(1)</script>' ], '*' );
+ninoWarnings();
+$drawn = is_array( $good ) === true ? basisLessDraw( $frameSite, $good['source'] ) : '';
+$onAPage = basisLessDraw( $frameSite, '[text /project/company/general/description format="inline" size="s"]' );
+check( 'a frame draws the text of the site as a page draws the same call, with the same cleaning: the markup of the text that is allowed stays, a script does not stand', str_contains( $drawn, 'Acme' ) === true && str_contains( $drawn, '<script' ) === false && str_contains( $drawn, $onAPage ) === true );
+
+$absent = blocksSite();
+ninoWarnings();
+$noText = basisLessDraw( $absent, $good['source'] );
+$noTextOnAPage = basisLessDraw( $absent, '[text /project/company/general/description format="inline" size="s"]' );
+check( 'where the site has no such text - a package of another site - the frame is drawn without it, as a page draws a missing text, and nothing is said in the log, once or for each call', str_contains( $noText, $noTextOnAPage ) === true && str_contains( $noText, 'Acme' ) === false && ninoWarnings() === [] );
+
+// What a frame reads, for a tool to show before the block is put in: the keys of its texts and the logo, each once; a block of the pages reads none
+check( 'reads() lists the keys a frame names - texts and logo, sorted, each once - and nothing of the block\'s own slots, and is empty for a block of the pages',
+	is_array( $good ) === true && \Nino\Blocks::reads( $good + [ 'tree' => \Nino\Markup::parse( $good['source'], \Nino\Components::containers( $frameSite ) ) ] ) === [ '/logo', '/project/company/general/description' ]
+	&& \Nino\Blocks::reads( [ 'wrap' => 'footer-wrap', 'tree' => \Nino\Markup::parse( $footer( '[text /project/a/b/c][text /module/x/y/z][text /project/a/b/c][text ~title][text /nino/placeholder/landscape]' ), \Nino\Components::containers( $frameSite ) ) ] ) === [ '/module/x/y/z', '/project/a/b/c' ]
+	&& \Nino\Blocks::reads( [ 'wrap' => 'section-wrap', 'tree' => \Nino\Markup::parse( '[section-wrap id="x"][text /project/a/b/c][/section-wrap]', \Nino\Components::containers( $frameSite ) ) ] ) === [] && \Nino\Blocks::reads( [] ) === [] );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $frameSite ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $absent ) );
+
 \Nino\Filesystem::removeDir( ninoSandboxDir( $looped ) );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $linkSite ) );
 ninoDone( $appData );

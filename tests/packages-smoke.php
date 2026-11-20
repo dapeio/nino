@@ -226,6 +226,17 @@ foreach( $faults as $label => [ $change, $code, $path ] ) {
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'probe/block.tpl' => '[html]x[/html]' ] ) );
 check( 'a package of blocks with a block that is no block is refused with the folder of the block', $problem !== null && $problem['code'] === 'block' && $problem['path'] === 'probe' );
 
+// A frame may read the texts of the project, a block of the pages may not: the package follows the rule of \Nino\Blocks by itself, as a theme or as a package of blocks
+$frameJson = json_encode( [ 'name' => [ 'de_DE' => 'Fuss', 'en_US' => 'Foot' ], 'description' => [ 'de_DE' => 'Ein Fuss', 'en_US' => 'A foot' ], 'category' => 'frame', 'rank' => 20, 'images' => (object) [] ] );
+$frameFiles = static fn( string $tpl, string $json ): array => [ 'block.json' => $json, 'block.tpl' => $tpl, 'text/de_DE.json' => '{}', 'text/en_US.json' => '{}' ];
+$footerTpl = "[footer-wrap id=\"footer\"]\n\t[footer-col size=\"100\"]\n\t\t[footer-logo /logo]\n\t\t[text /project/company/general/description format=\"inline\"]\n\t[/footer-col]\n[/footer-wrap]";
+$withFrame = array_merge( $good, [ 'blocks/footer/block.json' => $frameJson, 'blocks/footer/block.tpl' => $footerTpl, 'blocks/footer/text/de_DE.json' => '{}', 'blocks/footer/text/en_US.json' => '{}' ] );
+$inPage = array_merge( $good, [ 'blocks/footer/block.json' => json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ), 'blocks/footer/block.tpl' => "[section-wrap id=\"footer\"]\n\t[section-row]\n\t\t[section-col]\n\t\t\t[text /project/company/general/description]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]", 'blocks/footer/text/de_DE.json' => '{}', 'blocks/footer/text/en_US.json' => '{}' ] );
+check( 'a theme with a frame that reads a text of the project and the logo is taken, the same source in a block of the pages is refused with the folder of the block, and so is it in a package of blocks',
+	\Nino\Packages::check( $app, 'theme', $withFrame ) === null && ( \Nino\Packages::check( $app, 'theme', $inPage )['code'] ?? '' ) === 'block' && ( \Nino\Packages::check( $app, 'theme', $inPage )['path'] ?? '' ) === 'blocks/footer'
+	&& \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( $footerTpl, $frameJson ), $webp ) ) === null
+	&& ( \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( "[section-wrap id=\"footer\"][section-row][section-col][text /project/company/general/description][/section-col][/section-row][/section-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp ) )['code'] ?? '' ) === 'block' );
+
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'pack.json' => json_encode( [ 'key' => 'probe-pack', 'version' => '1.0.0', 'name' => '<script>x</script>', 'description' => 'Probe' ] ) ] ) );
 check( 'the name of a package of blocks is text as well: a tag in it is refused, and the good name of the same package is none', $problem !== null && $problem['code'] === 'file-markup' && $problem['path'] === 'pack.json' && \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $block, $webp ) ) === null );
 

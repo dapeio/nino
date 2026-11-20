@@ -46,7 +46,13 @@ namespace Nino {
 	 *	  the root free and gives the ones inside the same new beginning, and the words of a call that has an id are the keys below it
 	 *	- a source is ~name, a picture of \Nino\Images::PLACEHOLDERS or the type of elements of \Nino\Elements::PLACEHOLDERS - below which
 	 *	  .field is a field of its model - and nothing else: no key of the project, no slot, no file; a value of an attribute that begins like
-	 *	  a source is the same
+	 *	  a source is the same. A FRAME, a block whose root is a header-wrap or a footer-wrap, may read more, and in the first word of a call
+	 *	  alone: a text key of the text store - the form a person gives a key (\Nino\Text::isGrammarKey(), at most FRAME_KEY_LENGTH bytes), under
+	 *	  one of the four roots /template/, /project/, /feature/ and /module/ (FRAME_TEXT_ALLOWED, with FRAME_TEXT_EXCEPT for what the owner takes out
+	 *	  again) - and, of a logo, the picture /logo or /logo/dark. A textfill is not where a secret is kept, and whoever puts a block on a site is
+	 *	  answerable for what it shows, a block of a package among them; reads() lists what a frame reads. The block carries the KEY, never the
+	 *	  text: what is there is what the page draws, and a key that is not there is a text that is not there. An attribute, a loop, a key of the
+	 *	  configuration, the accounts or the session (/nino, /_nino, /_admin), and every source of a block of the pages are refused
 	 *	- each ~name has a text in every language, and each text is read; a ~name that is a picture has a slot of block.json with a placeholder
 	 *	  of the kernel, and each slot is read. A slot may have a picture of its own, images/<slot>.svg|webp|png|jpg: at most MAX_PICTURE
 	 *	  bytes, MAX_SIDE pixels on a side, of the type its ending says (\Nino\Images::size()), a svg that \Nino\Images::cleanSvg() takes -
@@ -85,6 +91,20 @@ namespace Nino {
 		public const array ROOTS = [ 'section-wrap', 'header-wrap', 'footer-wrap' ];
 
 		// What a block is filed under, in the order a tool lists them; 'frame' is what a header and a footer are
+		// The roots of a frame, which may read the texts of the project and the logo (see _frameReads())
+		private const array FRAME_ROOTS = [ 'header-wrap', 'footer-wrap' ];
+		private const array FRAME_LOGOS = [ 'header-logo', 'footer-logo' ];
+		private const array FRAME_PICTURES = [ '/logo', '/logo/dark' ];
+		private const int FRAME_KEY_LENGTH = 200;
+
+		// The text keys a frame may read, in ONE place: a key must begin with one of FRAME_TEXT_ALLOWED and with none of FRAME_TEXT_EXCEPT. The owner decided (20.11.) that a
+		// frame reads every key of the text store - /template/, /project/, /feature/, /module/ - and that textfills are not where secrets are kept: whoever puts a block on a
+		// site, one of a package too, answers for what it shows (reads() says what a block reads, for a tool to show before it is put in). To close something again put a
+		// prefix into FRAME_TEXT_EXCEPT, a line: /project/mail/ (the mailbox the forms go to, the sender), /template/ (the texts of the pages, those behind a password
+		// or not yet published among them), /feature/newsletter/ (the links with a token a feature puts into a mail while it is drawn)
+		private const array FRAME_TEXT_ALLOWED = [ '/template/', '/project/', '/feature/', '/module/' ];
+		private const array FRAME_TEXT_EXCEPT = [];
+
 		public const array CATEGORIES = [ 'intro', 'content', 'trust', 'offer', 'action', 'contact', 'frame' ];
 
 		// The language a block always has, since it is the one a site that has no text of its own for a language takes
@@ -160,6 +180,45 @@ namespace Nino {
 				$list[$key] = array_diff_key( $block, [ 'texts' => 1, 'source' => 1, 'slots' => 1, 'id' => 1 ] );
 
 			return $list;
+		}
+
+		/**
+		 *	What a block reads of the project: the keys of the texts and the logo it names, as a person who puts it in may look at them first. A frame names
+		 *	its sources in the first word of its calls (see _frameReads()); a block of the pages names none, and its answer is always empty. A source that is a
+		 *	slot of the block (~name), a placeholder of the kernel and a field of a loop are the block's own and are not listed
+		 *
+		 *	@param		array 		$block				A block as get() answers it, with 'wrap' and 'tree'
+		 *
+		 *	@return 	array											The keys, each once, sorted: [ '/logo', '/project/company/general/description' ]
+		 */
+		public static function reads( array $block ): array {
+
+			if( in_array( $block['wrap'] ?? '', self::FRAME_ROOTS, true ) === false || is_array( $block['tree'] ?? null ) === false )
+				return [];
+
+			$keys = [];
+			$walk = static function( array $nodes, int $depth ) use ( &$walk, &$keys ): void {
+
+				if( $depth > \Nino\Markup::MAX_DEPTH )
+					return;
+
+				foreach( $nodes as $node )
+					if( is_array( $node ) === true && isset( $node['n'] ) === true ) {
+
+						$source = $node['s'] ?? null;
+
+						if( is_string( $source ) === true && $source !== '' && $source[0] === '/' && isset( \Nino\Images::PLACEHOLDERS[$source] ) === false && isset( \Nino\Elements::PLACEHOLDERS[$source] ) === false )
+							$keys[$source] = true;
+
+						$walk( is_array( $node['c'] ?? null ) === true ? $node['c'] : [], $depth + 1 );
+					}
+			};
+
+			$walk( $block['tree'], 0 );
+			$keys = array_keys( $keys );
+			sort( $keys );
+
+			return $keys;
 		}
 
 		/**
@@ -1333,7 +1392,8 @@ namespace Nino {
 			$registry = \Nino\Components::components( $appData );
 			$calls = [];
 			$variants = [];
-			$problem = self::_calls( $registry, $nodes, $id, true, null, $calls, $variants );
+			// A frame - a header-wrap or a footer-wrap, which is what the category 'frame' says of a root - may read the texts of the project and the logo
+			$problem = self::_calls( $registry, $nodes, $id, true, null, $calls, $variants, in_array( $root['n'], self::FRAME_ROOTS, true ) );
 
 			if( $problem !== null )
 				return 'block.tpl: '. $problem;
@@ -1381,10 +1441,11 @@ namespace Nino {
 		 *	@param		string|null	$type					The type of elements of the loop the nodes stand in, null outside of one
 		 *	@param		array			&$calls				(reference) name => true
 		 *	@param		array			&$variants		(reference) name => [ the words of its variants but regular ]
+		 *	@param		bool			$frame				The root is a header-wrap or a footer-wrap: the first word of a call may be a text key of the project, and of a logo its picture - see _frameReads()
 		 *
 		 *	@return 	string|null								What is wrong, null where nothing is
 		 */
-		private static function _calls( array $registry, array $nodes, string $root, bool $top, ?string $type, array &$calls, array &$variants ): ?string {
+		private static function _calls( array $registry, array $nodes, string $root, bool $top, ?string $type, array &$calls, array &$variants, bool $frame = false ): ?string {
 
 			foreach( $nodes as $node ) {
 
@@ -1427,7 +1488,7 @@ namespace Nino {
 				$inside = $loop === true ? $node['s'] : $type;
 				$source = is_string( $node['s'] ?? null ) === true ? $node['s'] : '';
 
-				if( $source !== '' && $loop === false && self::_reads( $source, true, $type ) === false )
+				if( $source !== '' && $loop === false && self::_reads( $source, true, $type ) === false && ( $frame === false || self::_frameReads( $source, (string) ( $schema['source'] ?? 'none' ), $name ) === false ) )
 					return 'a source of "'. self::_shown( $name ). '" - '. self::_shown( $source ). ' - is neither ~name, a placeholder of the kernel nor a field of a placeholder type of elements';
 
 				foreach( (array) ( $node['a'] ?? [] ) as $attribute => $value )
@@ -1444,7 +1505,7 @@ namespace Nino {
 
 				if( is_array( $node['c'] ?? null ) === true ) {
 
-					$problem = self::_calls( $registry, $node['c'], $root, false, $inside, $calls, $variants );
+					$problem = self::_calls( $registry, $node['c'], $root, false, $inside, $calls, $variants, $frame );
 
 					if( $problem !== null )
 						return $problem;
@@ -1718,6 +1779,52 @@ namespace Nino {
 			}
 
 			return $defaults;
+		}
+
+		/**
+		 *	Whether a source is one a FRAME may read where a block of the pages may not: of a call whose first word is a text, a key of the text of the project
+		 *	- the form a person gives a key (\Nino\Text::isGrammarKey(): a namespace and three words, so no
+		 *	segment of dots, no bracket, no control character, no backslash, nothing of /nino, /_nino or /_admin) of at most FRAME_KEY_LENGTH bytes, under a prefix
+		 *	of FRAME_TEXT_ALLOWED and under none of FRAME_TEXT_EXCEPT - and of a call
+		 *	of a logo (FRAME_LOGOS) whose first word is a picture, the logo of the site and its dark one. Only the FORM is looked at: a key that is not there is a text that is not
+		 *	there, drawn as the page draws it, since a package comes from another site. Neither is a source of elements, a loop or a key of the
+		 *	configuration, the accounts or the session
+		 *
+		 *	@param		string		$written
+		 *	@param		string		$kind					What the first word of the component is: text, image, link or none
+	 *	@param		string		$component		The name of the component: only a logo reads the picture of the site
+		 *
+		 *	@return 	bool
+		 */
+		private static function _frameReads( string $written, string $kind, string $component ): bool {
+
+			if( $kind === 'image' )
+				return in_array( $component, self::FRAME_LOGOS, true ) === true && in_array( $written, self::FRAME_PICTURES, true );
+
+			return $kind === 'text' && strlen( $written ) <= self::FRAME_KEY_LENGTH && \Nino\Text::isGrammarKey( $written ) && self::_frameKey( $written );
+		}
+
+		/**
+		 *	Whether a text key is under a prefix a frame may read and under none that is left out (FRAME_TEXT_ALLOWED, FRAME_TEXT_EXCEPT)
+		 *
+		 *	@param		string		$key
+		 *
+		 *	@return 	bool
+		 */
+		private static function _frameKey( string $key ): bool {
+
+			/** @var list<string> $except */
+			$except = self::FRAME_TEXT_EXCEPT;
+
+			foreach( $except as $left )
+				if( str_starts_with( $key, $left ) === true )
+					return false;
+
+			foreach( self::FRAME_TEXT_ALLOWED as $prefix )
+				if( str_starts_with( $key, $prefix ) === true )
+					return true;
+
+			return false;
 		}
 
 		/**
