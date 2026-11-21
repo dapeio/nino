@@ -398,6 +398,13 @@ check( 'the written state of a switch is not turned into capitals by the stylesh
 $dashboard = $bare( $read( '_admin/Nino/Modules/Dashboard/assets/admin.css' ) );
 $smallest = $light['--nino-admin-control-icon-small'] ?? '';
 
+// The targets of the blocks of the kernel are 24 px at least by the token, and no rem of its own: the link of a notice, the title of a row that is a link, and the tick that stands alone with its name
+$token = 'var\(--nino-admin-control-icon-small\)';
+check( 'the link of a notice, the title-link of a row of a list and the tick of a field are targets of 24 px by the token of the small control: padding of the inline box for the two links, a minimum height for the label',
+	preg_match( '/\.nino-admin-notice a \{[^}]*padding-block: calc\( \( '. $token. ' - 1em \) \/ 2 \)/', $style ) === 1
+	&& preg_match( '/\.nino-admin-list-copy > strong > a \{[^}]*padding-block: calc\( \( '. $token. ' - 1em \) \/ 2 \)/', $style ) === 1
+	&& preg_match( '/\.nino-admin-field-check \{[^}]*min-height: '. $token. '/', $style ) === 1 );
+
 check( 'a link of the Dashboard is a target of 24 px at least: the token it reads for its height is 24 px or more', preg_match( '/^(\d+)px$/', $smallest, $px ) === 1 && (int) $px[1] >= 24
 	&& preg_match( '/#admin-dashboard-elements a \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1
 	&& preg_match( '/\.admin-dashboard-more \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1 );

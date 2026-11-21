@@ -668,6 +668,8 @@ a {
 	color: var(--editor-blue);
 	font-weight: var(--nino-admin-weight-strong);
 	white-space: nowrap;
+	/* The link that names where it is dealt with is a target of 24px: the room is the padding of the inline box, which takes no room in the line, so the notice does not grow */
+	padding-block: calc( ( var(--nino-admin-control-icon-small) - 1em ) / 2 );
 }
 
 /* The hint that introduces a whole screen rather than one field: a tinted
@@ -2343,6 +2345,16 @@ a {
 /* One tick with its name: the box keeps its own size at the start of the field's column */
 :where(.nino-admin) .nino-admin-field-check > input[type="checkbox"] {
 	justify-self: start;
+}
+
+/* The tick that stands alone with its name is a target of 24px: the box may stay small, the label is the target */
+:where(.nino-admin) .nino-admin-field-check {
+	min-height: var(--nino-admin-control-icon-small);
+}
+
+/* The title of a row that is a link (the Features list): a target of 24px by the padding of the inline box, which takes no room in the line */
+:where(.nino-admin) .nino-admin-list-copy > strong > a {
+	padding-block: calc( ( var(--nino-admin-control-icon-small) - 1em ) / 2 );
 }
 
 /* A list of ticks as a field of a form is a fieldset - a group with a legend for its name - and no card: no frame, no ground, no
