@@ -46,7 +46,13 @@ if( ( $argv[1] ?? '' ) === 'restore-without-backups' ) {
 // the parent made, with no memory pre-check and a memory limit its archive
 // cannot stay under. Prints "survived" when it comes back; the fatal error of
 // the limit is what the parent expects of the first run
-if( ( $argv[1] ?? '' ) === 'daily-backup' ) {
+if( ( $argv[1] ?? '' ) === 'daily-backup' || ( $argv[1] ?? '' ) === 'daily-backup-burn' ) {
+
+	// The second form has a feature in its project whose manifest never ends: the run is ended by the time limit the child was given, wherever the machine is
+	// as fast as it may be (see "The same with the time limit" below)
+	if( $argv[1] === 'daily-backup-burn' )
+		define( 'NINO_FEATURES_DIR', $argv[3] );
+
 	require __DIR__. '/harness.php';
 	$appData = [ './nino/uid' => $argv[2] ];
 	\Nino\AppData::prepare( $appData );
@@ -905,19 +911,19 @@ unlink( $imageDir. '/dies.bin' );
 @unlink( $attemptFile );
 @unlink( $nowDir. '/run.php' );
 
-// The same with the time limit: the request that is ended by it says so in its record, whatever it was doing.
-// Pictures that do not compress keep it busy for longer than the second it has
-$slow = fopen( $imageDir. '/dies.bin', 'wb' );
-for( $i = 0; $i < 9; $i++ )
-	fwrite( $slow, random_bytes( 10 * 1048576 ) );
-fclose( $slow );
+// The same with the time limit: the request that is ended by it says so in its record, whatever it was doing. How long a run takes is a matter of the machine, so the run
+// is not left to be slow: the project has a feature whose manifest is a loop that never ends, which the run reads while it runs, and the limit of one second the request has is the
+// end of it - on a machine that packs a gigabyte in a blink as on one that takes a minute for a megabyte
+$burnDir = $sandbox. '/features';
+@mkdir( $burnDir. '/Burn', 0777, true );
+file_put_contents( $burnDir. '/Burn/feature.php', '<?php while( true ) { $spin = ( $spin ?? 0 ) + 1; }' );
+file_put_contents( $burnDir. '/Burn/Burn.php', '<?php namespace Nino\\Modules { class Burn {} }' );
 @unlink( $attemptFile );
-$timeCommand = escapeshellarg( PHP_BINARY ). ' -d max_execution_time=1 -d sys_temp_dir='. escapeshellarg( $sandbox. '/tmp' ). ' '. escapeshellarg( __FILE__ ). ' daily-backup '. escapeshellarg( $sandbox ). ' 2>&1';
+$timeCommand = escapeshellarg( PHP_BINARY ). ' -d max_execution_time=1 -d sys_temp_dir='. escapeshellarg( $sandbox. '/tmp' ). ' '. escapeshellarg( __FILE__ ). ' daily-backup-burn '. escapeshellarg( $sandbox ). ' '. escapeshellarg( $burnDir ). ' 2>&1';
 $timed = (string) shell_exec( $timeCommand );
 $ended = \Nino\Modules\Backups::stopped( $appData );
 check( 'a request ended by the time limit in the backup leaves a record that names the limit', str_contains( $timed, 'survived' ) === false && ( $ended['cause'] ?? null ) === 'time' && ( $ended['limit'] ?? null ) === 1 && ( $ended['kind'] ?? null ) === 'daily' );
 check( '...and its temporary files are gone too', glob( $sandbox. '/tmp/ninobackup*' ) === [] && is_file( $dailyFile ) === false );
-unlink( $imageDir. '/dies.bin' );
 @unlink( $attemptFile );
 @unlink( $nowDir. '/run.php' );
 rename( $dailyFile. '.kept', $dailyFile );
