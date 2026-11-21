@@ -140,7 +140,6 @@ for( $ready = 0; $ready < 200; $ready++ ) {
 }
 $fetch = static function( string $path ) use ( $port ): array {
 	$socket = stream_socket_client( 'tcp://127.0.0.1:'. $port, $errno, $errstr, 5 );
-	$start = microtime( true );
 	fwrite( $socket, "GET ". $path. " HTTP/1.1\r\nHost: x\r\nAccept-Encoding: gzip\r\nConnection: close\r\n\r\n" );
 	$headers = '';
 	while( ( $line = fgets( $socket ) ) !== false && $line !== "\r\n" )
@@ -148,12 +147,11 @@ $fetch = static function( string $path ) use ( $port ): array {
 	// A client that does what a browser does: stops at the length it was told
 	preg_match( '/^Content-Length: (\d+)/mi', $headers, $length );
 	$body = isset( $length[1] ) === true ? (string) stream_get_contents( $socket, (int) $length[1] ) : (string) stream_get_contents( $socket );
-	$took = microtime( true ) - $start;
 	// Whether the work had written its mark when the client had the whole body: told by the order of the two, and no clock
 	clearstatcache();
 	$worked = is_file( $sandbox. '/served.txt' );
 	fclose( $socket );
-	return [ 'headers' => $headers, 'body' => $body, 'length' => isset( $length[1] ) === true ? (int) $length[1] : null, 'took' => $took, 'worked' => $worked ];
+	return [ 'headers' => $headers, 'body' => $body, 'length' => isset( $length[1] ) === true ? (int) $length[1] : null, 'worked' => $worked ];
 };
 @unlink( $sandbox. '/served.txt' );
 @unlink( $sandbox. '/gate' );
