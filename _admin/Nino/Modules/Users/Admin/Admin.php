@@ -583,8 +583,9 @@ namespace Nino\Modules\Users {
 			// Changing your own account requires re-confirming your current password -
 			// an admin editing someone else's account doesn't need to know their password
 			if( $isSelf === true ) {
-				$storedUser = \Nino\Auth::getUser( $appData, $username );
-				if( $storedUser === false || password_verify( $currentPw, $storedUser['pw'] ) === false ) {
+				// The failed guesses are counted against the account, the sign-in's own counter (see \Nino\Auth::confirmPassword()): a session that is somebody else's
+				// cannot guess the password here without limit, and an account that is cooling down is refused as a wrong password is - no more is told of it
+				if( \Nino\Auth::confirmPassword( $appData, $username, $currentPw ) === false ) {
 					\Nino\Http::fail( $request, 401, 'wrong current password', 'wrong_password', [], 'currentPassword' );
 					return;
 				}

@@ -509,6 +509,142 @@ $appData['/nino/auth/roles'] = [];
 echo "\n";
 
 
+// --- Auth::confirmPassword - the password an account gives to change its own account -------------------
+
+echo "\nAuth::confirmPassword\n";
+
+\Nino\Auth::insertUser( $appData, 'own@example.com', 'correct horse battery staple' );
+\Nino\Auth::insertUser( $appData, 'neighbour@example.com', 'another correct horse' );
+$max = (int) $appData['/nino/auth/maxtries'];
+$bucket = 'confirm:own@example.com';
+$seedTries( [ 'own@example.com' => null, $bucket => null, 'neighbour@example.com' => null, 'confirm:neighbour@example.com' => null, 'ip:127.0.0.1' => null ] );
+
+check( 'the right password is confirmed, and counts nothing', \Nino\Auth::confirmPassword( $appData, 'own@example.com', 'correct horse battery staple' ) === true && $readTries( $bucket ) === null );
+check( 'a wrong password is refused and counts as a failed attempt of the confirmation, in a bucket of its own beside the counters of the sign-in', \Nino\Auth::confirmPassword( $appData, 'own@example.com', 'wrong' ) === false && $readTries( $bucket ) === 1 && $readTries( 'own@example.com' ) === null );
+check( '...and not against the ip: a session that is signed in is no guess of the ip', $readTries( 'ip:127.0.0.1' ) === null );
+\Nino\Auth::confirmPassword( $appData, 'own@example.com', 'correct horse battery staple' );
+check( 'a right password before the limit clears the bucket of the confirmation', $readTries( $bucket ) === null );
+
+// Failed sign-ins from outside, with no session, lock the sign-in of the account and not the confirmation: nobody who is not signed in keeps the owner from changing the password
+for( $guess = 0; $guess < $max; $guess++ )
+	\Nino\Auth::loginUser( $appData, 'own@example.com', 'a stranger\'s guess '. $guess );
+check( 'maxtries failed sign-ins lock the sign-in of the account', $readTries( 'own@example.com' ) < 0 && \Nino\Auth::loginUser( $appData, 'own@example.com', 'correct horse battery staple' ) === false );
+check( '...and the confirmation of its password goes on: the right password is confirmed, and the bucket of the sign-in stays as it is', \Nino\Auth::confirmPassword( $appData, 'own@example.com', 'correct horse battery staple' ) === true && $readTries( 'own@example.com' ) < 0 && $readTries( $bucket ) === null );
+$seedTries( [ 'own@example.com' => null, 'ip:127.0.0.1' => null ] );
+
+$sessionBefore = json_encode( \Nino\Auth::getCurrentUser( $appData ) );
+for( $guess = 0; $guess < $max; $guess++ )
+	\Nino\Auth::confirmPassword( $appData, 'own@example.com', 'wrong '. $guess );
+check( 'maxtries wrong confirmations lock the confirmation: the cooldown is in the bucket of the confirmation', $readTries( $bucket ) < 0 );
+check( '...then the right password is refused as well', \Nino\Auth::confirmPassword( $appData, 'own@example.com', 'correct horse battery staple' ) === false );
+$locked = $readTries( $bucket );
+for( $guess = 0; $guess < $max + 2; $guess++ )
+	\Nino\Auth::confirmPassword( $appData, 'own@example.com', 'more '. $guess );
+check( '...and nothing is counted while it is locked: more guesses, wrong or right, leave the end of the lock where it was, so it cannot be made longer', $readTries( $bucket ) === $locked && $readTries( $bucket ) < 0 );
+check( '...the sign-in of the account is not locked by it: the owner signs in with the right password, and the session that was there stays until then', json_encode( \Nino\Auth::getCurrentUser( $appData ) ) === $sessionBefore && $readTries( 'own@example.com' ) === null && is_array( \Nino\Auth::loginUser( $appData, 'own@example.com', 'correct horse battery staple' ) ) === true );
+\Nino\Auth::logoutUser( $appData );
+check( 'another account is not touched: its buckets are as they were and its password is confirmed', $readTries( 'neighbour@example.com' ) === null && $readTries( 'confirm:neighbour@example.com' ) === null && \Nino\Auth::confirmPassword( $appData, 'neighbour@example.com', 'another correct horse' ) === true );
+
+// The lock runs out: the bucket is seeded as the end of the cooldown has left it, and the password is confirmed again
+$seedTries( [ $bucket => 0 - ( time() - 10 ) ] );
+check( 'a lock that has run out lets the right password through, and a success clears what is left', \Nino\Auth::confirmPassword( $appData, 'own@example.com', 'correct horse battery staple' ) === true && $readTries( $bucket ) === null );
+
+// An account that is lifted of its lock has the confirmation lifted too
+$seedTries( [ $bucket => 0 - ( time() + 3600 ) ] );
+\Nino\Auth::unlock( $appData, 'own@example.com' );
+check( 'unlocking an account lifts the lock of its confirmation as well, and deleting it takes the bucket away', $readTries( $bucket ) === null && ( static function() use ( &$appData, $seedTries, $readTries ): bool {
+	\Nino\Auth::insertUser( $appData, 'gone-soon@example.com', 'correct horse battery staple' );
+	$seedTries( [ 'confirm:gone-soon@example.com' => 2 ] );
+	\Nino\Auth::deleteUser( $appData, 'gone-soon@example.com' );
+	return $readTries( 'confirm:gone-soon@example.com' ) === null;
+} )() );
+
+// An account that is none: refused, no bucket made for it, and the decoy asked all the same: the way is the one the sign-in has, so the file of the decoy is made by it
+$decoyKept = \Nino\Filesystem::path( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' );
+@unlink( $decoyKept );
+unset( $appData['./nino/filesystem/cache'][ \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' ] );
+clearstatcache();
+check( 'a name that is no account is refused, gets no bucket, and the decoy is asked for it: the file that was gone is made', \Nino\Auth::confirmPassword( $appData, 'nobody-at-all@example.com', 'wrong' ) === false && $readTries( 'confirm:nobody-at-all@example.com' ) === null && is_file( $decoyKept ) === true );
+$source = ninoCalls( (string) file_get_contents( __DIR__. '/../_nino/Nino/Auth/Auth.php' ), 'confirmPassword' );
+check( 'exactly one password_verify() on every way, with the decoy asked before it, and nothing else that compares a secret', count( array_keys( $source, 'password_verify', true ) ) === 1 && array_search( 'decoyHash', $source, true ) < array_search( 'password_verify', $source, true )
+	&& array_intersect( $source, [ 'crypt', 'hash_equals', 'md5', 'sha1', 'strcmp', 'password_hash' ] ) === [] );
+
+// --- the decoy that cannot be kept is said in the log ---------------------------------------------------------
+
+echo "\nAuth::decoyHash - a private directory that cannot be written\n";
+
+/**
+ *	A project whose .auth is a file where a directory is meant - the decoy cannot be kept - and, where asked, whose data directory is one as well, so that nothing that is written can be
+ *	(as a directory that is not writable cannot be had as root, the file is what stands for it)
+ */
+$decoySite = static function( string $name, bool $dataToo = false ): array {
+	$site = ninoSandbox( $name );
+	$GLOBALS['decoySites'][] = ninoSandboxDir( $site );
+	$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+	mkdir( ninoSandboxDir( $site ). '/private', 0777, true );
+	file_put_contents( ninoSandboxDir( $site ). '/private/.auth', 'a file, no directory' );
+
+	if( $dataToo === true )
+		file_put_contents( ninoSandboxDir( $site ). '/private/data', 'a file, no directory' );
+
+	$site['/nino/auth/maxtries'] = 3;
+	$site['/nino/auth/cooldown'] = 3600;
+
+	return $site;
+};
+$decoySaid = static fn( array $warnings ): array => array_values( array_filter( $warnings, static fn( string $line ): bool => str_contains( $line, 'decoy hash cannot be kept' ) === true ) );
+
+ninoWarnings();
+$stuck = $decoySite( 'auth-decoy-stuck' );
+$first = \Nino\Auth::decoyHash( $stuck );
+$said = $decoySaid( ninoWarnings() );
+check( 'a decoy that cannot be kept is said in the log, and is the hash of this request all the same', count( $said ) === 1 && password_needs_rehash( $first, PASSWORD_DEFAULT ) === false );
+check( '...with no hash, no password and no account in what is said', str_contains( $said[0] ?? '', $first ) === false && str_contains( $said[0] ?? '', 'example.com' ) === false && str_contains( $said[0] ?? '', '$2y$' ) === false );
+
+// The next attempt of the process and the next request of the hour say nothing more: the counter holds the hour, the key of the process the process
+\Nino\Auth::decoyHash( $stuck );
+check( 'the second attempt of the same request says nothing', $decoySaid( ninoWarnings() ) === [] );
+unset( $stuck['./nino/auth/decoy-said'] );
+\Nino\Auth::decoyHash( $stuck );
+check( 'the next request within the hour says nothing either: the counter that holds the hour is in the data directory', $decoySaid( ninoWarnings() ) === [] );
+
+// Where nothing at all can be written the process is the unit: said once for it, and once more for the next process
+$nothing = $decoySite( 'auth-decoy-nothing', true );
+\Nino\Auth::decoyHash( $nothing );
+$first = $decoySaid( ninoWarnings() );
+\Nino\Auth::decoyHash( $nothing );
+$again = $decoySaid( ninoWarnings() );
+unset( $nothing['./nino/auth/decoy-said'] );
+\Nino\Auth::decoyHash( $nothing );
+$next = $decoySaid( ninoWarnings() );
+check( 'where not even the counter can be written it is said once for the process, and not never: once for the first attempt, none for the second, one for the next process', count( $first ) === 1 && $again === [] && count( $next ) === 1 );
+
+// A decoy that was kept is no news
+$kept = ninoSandbox( 'auth-decoy-kept' );
+$GLOBALS['decoySites'][] = ninoSandboxDir( $kept );
+\Nino\Auth::decoyHash( $kept );
+\Nino\Auth::decoyHash( $kept );
+check( 'a decoy that is kept is said of in no way, at the first attempt or after it', $decoySaid( ninoWarnings() ) === [] );
+
+// The saying hangs on the keeping of the decoy and on nothing the attempt is: a known account, an unknown one and one that is locked get the one same sentence, once each
+$sentences = [];
+
+foreach( [ 'a known account' => [ 'known@example.com', 'wrong' ], 'an account that is none' => [ 'none@example.com', 'wrong' ], 'an account that is locked' => [ 'locked@example.com', 'correct horse battery staple' ] ] as $way => [ $who, $what ] ) {
+
+	$site = $decoySite( 'auth-decoy-way' );
+	$site['./nino/filesystem/path'] = ninoSandboxDir( $site );
+	\Nino\Auth::insertUser( $site, 'known@example.com', 'correct horse battery staple' );
+	\Nino\Auth::insertUser( $site, 'locked@example.com', 'correct horse battery staple' );
+	\Nino\Filesystem::mutate( $site, '/data/auth-tries.php', static fn( array $state ): array => $state + [ 'locked@example.com' => 0 - time() - 3600 ] );
+	ninoWarnings();
+	$answer = \Nino\Auth::loginUser( $site, $who, $what );
+	$sentences[$way] = [ $answer === false, $decoySaid( ninoWarnings() ) ];
+}
+
+check( 'a known account, an account that is none and one that is locked are each refused and each say the same one sentence of the decoy: the saying makes no difference between them', count( $sentences ) === 3
+	&& count( array_unique( array_map( 'json_encode', $sentences ) ) ) === 1 && count( $sentences['a known account'][1] ) === 1 && $sentences['a known account'][0] === true );
+check( '...and recovery says it as the sign-in does: the one decoy, asked before the lock', in_array( 'decoyHash', ninoCalls( (string) file_get_contents( __DIR__. '/../_admin/Admin.php' ), 'verify' ), true ) === true );
+
 // --- Csrf ------------------------------------------------------------
 
 echo "Csrf::getToken / rotateToken / callbackResponse (kernel, required) / Modules\\Csrf::doShortcode (optional)\n";
@@ -777,6 +913,9 @@ authResumeChecks( $appData );
 echo "\n";
 
 // --- Cleanup ------------------------------------------------------------
+
+foreach( $GLOBALS['decoySites'] ?? [] as $decoyDir )
+	\Nino\Filesystem::removeDir( $decoyDir );
 
 ninoDone( $appData );
 

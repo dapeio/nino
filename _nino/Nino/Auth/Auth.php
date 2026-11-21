@@ -57,6 +57,9 @@ namespace Nino {
 		// prefix keeps ip keys from colliding with a mail address.
 		private const string IP_KEY_PREFIX = 'ip:';
 
+		// The bucket of the confirmation of the password in the workbench (confirmPassword()): one for each account, beside the one of the sign-in and with its limits
+		private const string CONFIRM_KEY_PREFIX = 'confirm:';
+
 		// The ip bucket trips at maxtries * this, not at maxtries: a shared
 		// exit ip (office nat, cgnat, a school) is one person mistyping their
 		// password away from locking out everyone behind it otherwise. The
@@ -67,6 +70,10 @@ namespace Nino {
 		// Where the decoy hash is kept: the hash of a random value nobody holds, which every rejected attempt for an account that
 		// is none (or is disabled) is verified against, so that it costs what an attempt for a real account costs - see decoyHash()
 		private const string DECOY_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json';
+
+		// What is said of a decoy that cannot be kept: once in a request (the key in appData), and once an hour for the installation (the counter)
+		private const string DECOY_SAID = './nino/auth/decoy-said';
+		private const string DECOY_COUNTER = 'auth-decoy-notices';
 
 		/**
 		 *	The hash that an attempt with nothing to compare against is verified against: the hash of 32 random bytes that nobody
@@ -94,9 +101,39 @@ namespace Nino {
 				return $hash;
 
 			$hash = password_hash( bin2hex( random_bytes( 32 ) ), PASSWORD_DEFAULT );
-			\Nino\Filesystem::putFileContent( $appData, self::DECOY_PATH, [ 'hash' => $hash ] );
+
+			if( \Nino\Filesystem::putFileContent( $appData, self::DECOY_PATH, [ 'hash' => $hash ] ) === false )
+				self::_sayDecoy( $appData );
 
 			return $hash;
+		}
+
+		/**
+		 *	Say in the log that the decoy cannot be kept: with a private directory that cannot be written every attempt makes a hash of its own - two
+		 *	runs of bcrypt where one is meant - and nobody would be told. It is said once an hour for the installation (\Nino\Feature::count(), a counter
+		 *	beside the others in /data) and, where nothing at all can be written, once for the request. It is said where the decoy is made, before an
+		 *	attempt is told apart from another, so that no account, known or not, locked or not, gets another answer or other work for it; and it holds no
+		 *	hash, no password and no account
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		private static function _sayDecoy( array &$appData ): void {
+
+			if( isset( $appData[self::DECOY_SAID] ) === true )
+				return;
+
+			$appData[self::DECOY_SAID] = true;
+
+			// Said by the first try of the hour; where the counter cannot be written either, the request is the unit
+			if( \Nino\Feature::spent( $appData, self::DECOY_COUNTER, 'decoy', 1 ) === true )
+				return;
+
+			if( \Nino\Feature::count( $appData, self::DECOY_COUNTER, 'decoy', 1, 3600 ) === false && \Nino\Feature::spent( $appData, self::DECOY_COUNTER, 'decoy', 1 ) === true )
+				return;
+
+			trigger_error( 'Auth: the decoy hash cannot be kept in the private directory (.auth is not writable), so every sign-in and recovery attempt makes a hash of its own, which costs it a second run of the hash', E_USER_WARNING );
 		}
 
 		public static function init( array &$appData ): void {
@@ -765,7 +802,47 @@ namespace Nino {
 		}
 
 		/**
-		 *	Lift an account's lock: its tries bucket goes, so the next login
+		 *	Whether the password a signed-in account gives to change its own account is its own. The guesses are counted so that a session that is
+		 *	somebody else's cannot guess the password here without limit: in a bucket of their own for the account ('confirm:<account>', in the file of the
+		 *	counters of the sign-in, with the same maxtries and cooldown) and not in the bucket of the sign-in. A wrong password is a failed attempt of the
+		 *	confirmation; where it is cooling down the answer is no whatever the password is, and nothing is counted, so the lock cannot be made longer by
+		 *	more guesses; a right one clears the bucket of the confirmation and nothing else. Failed sign-ins from outside do not lock the confirmation, and
+		 *	failed confirmations do not lock the sign-in, so nobody who is not signed in can keep the owner from changing the own password, and a session
+		 *	that is somebody else's cannot lock the owner out of signing in. Exactly one password_verify() on every path (the decoy where there is no
+		 *	account, as in loginUser()), so the time of the answer says nothing the sign-in does not. No session is ended by it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account
+		 *	@param		string		$pw						The password it gave
+		 *
+		 *	@return 	bool										Whether it is the password of the account and the confirmation is not cooling down
+		 */
+		public static function confirmPassword( array &$appData, string $username, string $pw ): bool {
+
+			$key			= self::CONFIRM_KEY_PREFIX. $username;
+			$user			= self::getUser( $appData, $username );
+			$cooling	= ( $user !== false && self::_inCooldown( $appData, $key ) === true );
+			$decoy		= self::decoyHash( $appData );
+			$verified	= password_verify( $pw, ( $user !== false ) ? $user['pw'] : $decoy ) === true && $user !== false;
+
+			if( $cooling === true )
+				return false;
+
+			if( $verified === false ) {
+
+				if( $user !== false )
+					self::_registerFailedAttemp( $appData, [ $key ] );
+
+				return false;
+			}
+
+			self::_clearTries( $appData, [ $key ] );
+
+			return true;
+		}
+
+		/**
+		 *	Lift an account's lock: its tries bucket goes - and the one of the confirmation of its password - so the next login
 		 *	counts from zero. Only that account's - a locked client address
 		 *	is left alone, it is not an account and has to run out
 		 *
@@ -791,13 +868,13 @@ namespace Nino {
 
 				$state = is_array( $state ) === true ? $state : [];
 
-				if( isset( $state[$username] ) === false )
-					return null;
+				foreach( [ $username, self::CONFIRM_KEY_PREFIX. $username ] as $key )
+					if( isset( $state[$key] ) === true ) {
+						unset( $state[$key] );
+						$changed = true;
+					}
 
-				unset( $state[$username] );
-				$changed = true;
-
-				return $state;
+				return $changed === true ? $state : null;
 			} );
 
 			return $written === true || ( $ran === true && $changed === false );
@@ -939,10 +1016,10 @@ namespace Nino {
 
 			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $username ): ?array {
 
-				if( isset( $state[$username] ) === false )
+				if( isset( $state[$username] ) === false && isset( $state[self::CONFIRM_KEY_PREFIX. $username] ) === false )
 					return null;
 
-				unset( $state[$username] );
+				unset( $state[$username], $state[self::CONFIRM_KEY_PREFIX. $username] );
 				return $state;
 			} );
 		}

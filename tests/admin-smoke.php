@@ -1329,6 +1329,51 @@ check( 'a plain user only sees themselves in the list', count( $body['users'] ) 
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain2@example.com', 'currentPassword' => 'wrong password' ] );
 check( 'a plain user editing themselves needs the right current password', $status === 401 );
 
+// The guesses at the current password are counted against the account, the counter of the sign-in - one of them was made above
+$triesOf = static function( string $mail ) use ( &$appData ): mixed {
+	clearstatcache();
+	unset( $appData['./nino/filesystem/cache']['/data/auth-tries.php'] );
+	return \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] )[$mail] ?? null;
+};
+$max = (int) $appData['/nino/auth/maxtries'];
+$one = static fn( mixed $entry ): int => is_array( $entry ) === true ? (int) ( $entry['tries'] ?? 0 ) : (int) $entry;
+check( 'a wrong current password is a failed attempt of the confirmation: a bucket of its own beside those of the sign-in holds it', $one( $triesOf( 'confirm:plain@example.com' ) ) === 1 && $triesOf( 'plain@example.com' ) === null );
+
+for( $guess = 2; $guess < $max; $guess++ )
+	callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'currentPassword' => 'wrong '. $guess ] );
+
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'currentPassword' => 'plain password' ] );
+check( 'the right current password before the limit is let through and clears the counter', $status === 200 && $triesOf( 'confirm:plain@example.com' ) === null );
+
+$answers = [];
+for( $guess = 0; $guess < $max; $guess++ )
+	[ $answers[] ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'currentPassword' => 'wrong '. $guess ] );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain-locked@example.com', 'currentPassword' => 'plain password' ] );
+check( 'maxtries wrong guesses lock the changing of the own account: every one of them is the one same refusal - 401, wrong password - and then the right password is refused with that answer too, and changes nothing',
+	count( array_unique( $answers ) ) === 1 && $answers[0] === 401 && $status === 401 && ( $body['code'] ?? '' ) === 'wrong_password' && \Nino\Auth::getUser( $appData, 'plain-locked@example.com' ) === false && \Nino\Auth::getUser( $appData, 'plain@example.com' ) !== false );
+check( '...the sign-in of the account is not locked by it, and the session that is there stays', $triesOf( 'plain@example.com' ) === null && \Nino\Auth::getCurrentUser( $appData ) !== false && \Nino\Auth::getCurrentUser( $appData )['mail'] === 'plain@example.com' );
+check( '...another account is not touched by it', $triesOf( 'confirm:manager@example.com' ) === null && $triesOf( 'manager@example.com' ) === null && $triesOf( 'admin@example.com' ) === null );
+
+// The lock runs out - seeded as the end of the cooldown has left the counter - and the right password is let through
+\Nino\Filesystem::mutate( $appData, '/data/auth-tries.php', static function( array $state ): array {
+	$state['confirm:plain@example.com'] = 0 - ( time() - 10 );
+	return $state;
+} );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'currentPassword' => 'plain password' ] );
+check( 'a lock that has run out lets the right current password through again', $status === 200 && $triesOf( 'confirm:plain@example.com' ) === null );
+
+// Failed sign-ins of strangers lock the sign-in of the account and not the changing of its own account: the owner, signed in, goes on
+$signedIn = \Nino\Auth::getCurrentUser( $appData );
+for( $guess = 0; $guess < $max; $guess++ )
+	\Nino\Auth::loginUser( $appData, 'plain@example.com', 'a stranger\'s guess '. $guess );
+$outside = $triesOf( 'plain@example.com' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'currentPassword' => 'plain password' ] );
+check( 'maxtries failed sign-ins from outside lock the sign-in and not the changing of the own account: the right current password goes through', $outside < 0 && $status === 200 && $triesOf( 'plain@example.com' ) === $outside );
+\Nino\Filesystem::mutate( $appData, '/data/auth-tries.php', static function( array $state ): array {
+	unset( $state['plain@example.com'], $state['ip:127.0.0.1'] );
+	return $state;
+} );
+
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain@example.com', 'mail' => 'plain@example.com', 'pw' => 'short', 'currentPassword' => 'plain password' ] );
 check( 'a new password shorter than eight characters is rejected', $status === 400 );
 
@@ -1349,6 +1394,9 @@ check( 'the signed-in account is marked on its own row, and only there', count( 
 	&& count( array_filter( $body['users'], fn( array $user ): bool => $user['isSelf'] === true ) ) === 1
 	&& array_key_exists( 'self', $body ) === false );
 
+$beforeTries = [ $triesOf( 'confirm:manager@example.com' ), $triesOf( 'confirm:plain2@example.com' ) ];
+callUsers( $appData, 'apiSave', [ 'username' => 'plain2@example.com', 'mail' => 'plain2@example.com', 'currentPassword' => 'a password nobody has' ] );
+check( 'changing another account asks for no current password and counts nothing: neither the manager nor the account has a counter for it', $beforeTries === [ null, null ] && $triesOf( 'confirm:manager@example.com' ) === null && $triesOf( 'confirm:plain2@example.com' ) === null );
 [ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain2@example.com', 'mail' => 'plain3@example.com' ] );
 check( 'a manager can rename another user without knowing their password', $status === 200 && $body['mail'] === 'plain3@example.com' );
 
