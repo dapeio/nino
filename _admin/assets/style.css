@@ -1222,18 +1222,38 @@ a {
 	gap: var(--nino-admin-space-3);
 }
 
+/* The rows of a list touch: the rule between them is the line */
+:where(.nino-admin) .nino-admin-pick-list:not(.nino-admin-pick-list--tiles) {
+	gap: 0;
+}
+
+/* A row of the list is a quiet line - no box and no shadow of its own - with a fine rule between the rows; the surface of the accent comes under the pointer, at the
+   focus and for the one that is chosen. A tile (below) is a card, because its picture needs one */
 :where(.nino-admin) .nino-admin-pick-item {
 	display: grid;
 	gap: var(--nino-admin-space-1);
 	width: 100%;
 	min-height: var(--nino-admin-control-height);
-	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
-	border: 1px solid var(--editor-border);
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
+	border: 0;
 	border-radius: var(--editor-radius-sm);
-	background: var(--editor-bg-elevated);
+	background: transparent;
+	box-shadow: none;
 	color: var(--editor-text);
 	text-align: left;
 	cursor: pointer;
+}
+
+:where(.nino-admin) .nino-admin-pick-item:not(.nino-admin-pick-item--tile) {
+	border-radius: 0;
+}
+
+:where(.nino-admin) .nino-admin-pick-item:not(.nino-admin-pick-item--tile) + .nino-admin-pick-item:not(.nino-admin-pick-item--tile) {
+	border-top: 1px solid var(--editor-separator);
+}
+
+:where(.nino-admin) .nino-admin-pick-item[aria-checked="true"]:not(.nino-admin-pick-item--tile) {
+	background: var(--editor-blue-soft);
 }
 
 :where(.nino-admin) .nino-admin-pick-item:hover {
@@ -1242,11 +1262,12 @@ a {
 
 :where(.nino-admin) .nino-admin-pick-item:focus-visible {
 	outline: 2px solid var(--editor-blue);
-	outline-offset: 2px;
+	outline-offset: -2px;
+	background: var(--editor-blue-soft);
 }
 
 :where(.nino-admin) .nino-admin-pick-name {
-	font-weight: var(--nino-admin-weight-strong);
+	font-weight: var(--nino-admin-weight-medium);
 }
 
 :where(.nino-admin) .nino-admin-pick-line {
@@ -1293,6 +1314,10 @@ a {
 	gap: var(--nino-admin-space-3);
 }
 
+:where(.nino-admin) .nino-admin-pick-list:not(.nino-admin-pick-list--tiles) .nino-admin-pick-set {
+	gap: 0;
+}
+
 :where(.nino-admin) .nino-admin-pick-list--tiles .nino-admin-pick-set {
 	grid-template-columns: repeat( auto-fill, minmax( 9.5rem, 1fr ) );
 }
@@ -1300,6 +1325,16 @@ a {
 :where(.nino-admin) .nino-admin-pick-item--tile {
 	align-content: start;
 	padding: var(--nino-admin-space-3);
+	border: 1px solid var(--editor-border);
+	background: var(--editor-bg-elevated);
+}
+
+:where(.nino-admin) .nino-admin-pick-item--tile:hover {
+	background: var(--editor-blue-soft);
+}
+
+:where(.nino-admin) .nino-admin-pick-item--tile:focus-visible {
+	outline-offset: 2px;
 }
 
 :where(.nino-admin) .nino-admin-pick-image {

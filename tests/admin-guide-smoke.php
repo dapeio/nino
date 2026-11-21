@@ -405,6 +405,16 @@ check( 'the link of a notice, the title-link of a row of a list and the tick of 
 	&& preg_match( '/\.nino-admin-list-copy > strong > a \{[^}]*padding-block: calc\( \( '. $token. ' - 1em \) \/ 2 \)/', $style ) === 1
 	&& preg_match( '/\.nino-admin-field-check \{[^}]*min-height: '. $token. '/', $style ) === 1 );
 
+// The rows of pickDialog() are quiet lines: no box, no shadow and no ground of their own, a fine rule between them, a name of medium weight (the token, at most 600), and the accent only
+// under the pointer, at the focus and for the one that is chosen; a tile keeps its card
+preg_match( '/\.nino-admin-pick-item \{([^}]*)\}/', $style, $row );
+preg_match( '/\.nino-admin-pick-name \{([^}]*)\}/', $style, $name );
+check( 'a row of pickDialog() has no border, no shadow and no ground of its own, a rule between the rows, and a name that is not bold - the weight is the medium one, at most 600',
+	str_contains( $row[1] ?? '', 'border: 0;' ) === true && str_contains( $row[1] ?? '', 'box-shadow: none;' ) === true && str_contains( $row[1] ?? '', 'background: transparent;' ) === true
+	&& preg_match( '/\.nino-admin-pick-item:not\(\.nino-admin-pick-item--tile\) \+ \.nino-admin-pick-item:not\(\.nino-admin-pick-item--tile\) \{[^}]*border-top: 1px solid var\(--editor-separator\)/', $style ) === 1
+	&& str_contains( $name[1] ?? '', 'font-weight: var(--nino-admin-weight-medium);' ) === true && (int) ( $light['--nino-admin-weight-medium'] ?? 999 ) <= 600
+	&& preg_match( '/\.nino-admin-pick-item--tile \{[^}]*border: 1px solid var\(--editor-border\);[^}]*background: var\(--editor-bg-elevated\)/', $style ) === 1 );
+
 check( 'a link of the Dashboard is a target of 24 px at least: the token it reads for its height is 24 px or more', preg_match( '/^(\d+)px$/', $smallest, $px ) === 1 && (int) $px[1] >= 24
 	&& preg_match( '/#admin-dashboard-elements a \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1
 	&& preg_match( '/\.admin-dashboard-more \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1 );
