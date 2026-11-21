@@ -1738,6 +1738,10 @@ check( 'both languages take the same number of params'. ( $placeholders === [] ?
 	&& str_contains( (string) $wordFiles['en_US']['[[/_admin/error/upload_too_large]]'], '%s' ) === true && str_contains( (string) $wordFiles['en_US']['[[/_admin/error/image_too_large]]'], '%s' ) === true );
 check( 'no word carries a live shortcode - the page substitutes a value before the shortcodes run', array_filter( $wordFiles['en_US'] + $wordFiles['de_DE'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ) && preg_match( '/[\\[\\]]/', (string) $v ) === 1, ARRAY_FILTER_USE_BOTH ) === [] );
 
+echo "A tab that names the area of its permission - scope()\n";
+
+pinTabScope( $appData );
+
 echo "The name of an account - its words\n";
 
 pinAccountNameWords();
@@ -1769,4 +1773,350 @@ function pinAccountNameWords(): void {
 	}
 	check( 'every word of the name field is there in both interface languages'. ( $missing === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missing, 0, 6 ) ) ), $missing === [] );
 	check( 'the Users panel names its manual entry for the name', in_array( 'name', \Nino\Modules\Users\Admin::manual(), true ) === true );
+}
+
+/** A tab whose right lies in the area of a feature: scope() makes the shell ask Admin::scoped() for it, and every action of it counts how often it ran */
+class AdminSmokeScopeTab {
+	public static int $ran = 0;
+	public static function actions(): array { return [ 'scopetab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'scopetab', 'Scope tab', 50 ]; }
+	public static function perm(): string { return '/_admin/scopearea/design'; }
+	public static function scope(): string { return '/_admin/scopearea/'; }
+	public static function summary( array &$appData ): array { return [ 'value' => '3', 'label' => 'Scope tab' ]; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		self::$ran++;
+		\Nino\Http::ok( $request, [ 'ran' => self::$ran ] );
+	}
+}
+
+/** The tab beside it that has no scope(): what it always did */
+class AdminSmokePlainTab {
+	public static function actions(): array { return [ 'plaintab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'plaintab', 'Plain tab', 60 ]; }
+	public static function perm(): string { return '/_admin/scopearea/plain'; }
+	public static function summary( array &$appData ): array { return [ 'value' => '4', 'label' => 'Plain tab' ]; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
+/** A tab whose scope() has the wrong shape - no slash at the end - and so counts as having none */
+class AdminSmokeBadScopeTab {
+	public static function actions(): array { return [ 'badscopetab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'badscopetab', 'Bad scope tab', 70 ]; }
+	public static function perm(): string { return '/_admin/scopearea/bad'; }
+	public static function scope(): string { return '/_admin/scopearea'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
+/** A tab naming the area of another panel as its scope(): the door of its panel does not lie there, so it counts as having none */
+class AdminSmokeForeignScopeTab {
+	public static function actions(): array { return [ 'foreignscopetab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'foreignscopetab', 'Foreign scope tab', 71 ]; }
+	public static function perm(): string { return '/_admin/scopearea/foreign'; }
+	public static function scope(): string { return '/_admin/users/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
+/** A tab naming an area nobody has anything in: neither its perm() nor the door lies there */
+class AdminSmokeNowhereTab {
+	public static function actions(): array { return [ 'nowheretab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'nowheretab', 'Nowhere tab', 72 ]; }
+	public static function perm(): string { return '/_admin/scopearea/nowhere'; }
+	public static function scope(): string { return '/_admin/nowhere/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
+/** A tab whose panel's door lies in its scope() but whose own perm() does not */
+class AdminSmokeOutsideTab {
+	public static function actions(): array { return [ 'outsidetab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'outsidetab', 'Outside tab', 75 ]; }
+	public static function perm(): string { return '/_admin/outside/tab'; }
+	public static function scope(): string { return '/_admin/scopearea/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
+/** A tab whose own perm() lies in its scope() but whose panel's door does not */
+class AdminSmokeDoorTab {
+	public static function actions(): array { return [ 'doortab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'doortab', 'Door tab', 50 ]; }
+	public static function perm(): string { return '/_admin/scopearea/doortab'; }
+	public static function scope(): string { return '/_admin/scopearea/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+class AdminSmokeDoorHost {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'doorhost', 'Door host', 93 ]; }
+	public static function perm(): string { return '/_admin/doorout/manage'; }
+	public static function tabs(): array { return [ 'AdminSmokeDoorTab' ]; }
+}
+
+/** Two tabs with the same perm() and a scope() each, in two areas - one of which holds the perm() */
+class AdminSmokeTwinATab {
+	public static function actions(): array { return [ 'twinatab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'twinatab', 'Twin A tab', 73 ]; }
+	public static function perm(): string { return '/_admin/scopearea/twin'; }
+	public static function scope(): string { return '/_admin/scopearea/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+class AdminSmokeTwinBTab {
+	public static function actions(): array { return [ 'twinbtab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'twinbtab', 'Twin B tab', 74 ]; }
+	public static function perm(): string { return '/_admin/scopearea/twin'; }
+	public static function scope(): string { return '/_admin/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
+/** Another panel whose action asks for a fine right no screen names, and a tab of an unrelated panel that names that same right with a scope() of its own */
+class AdminSmokeVictimPanel {
+	public static int $ran = 0;
+	public static function actions(): array { return [ 'victim/fine' => [ self::class, 'apiFine' ] ]; }
+	public static function nav(): array { return [ 'victim', 'Victim', 80 ]; }
+	public static function perm(): string { return '/_admin/victim/manage'; }
+	public static function apiFine( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, '/_admin/victim/secret' ) === false )
+			return;
+		self::$ran++;
+		\Nino\Http::ok( $request );
+	}
+}
+class AdminSmokeClaimTab {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'claimtab', 'Claim tab', 50 ]; }
+	public static function perm(): string { return '/_admin/victim/secret'; }
+	public static function scope(): string { return '/_admin/other/'; }
+}
+class AdminSmokeClaimHost {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'claimhost', 'Claim host', 90 ]; }
+	public static function perm(): string { return '/_admin/other/manage'; }
+	public static function tabs(): array { return [ 'AdminSmokeClaimTab' ]; }
+}
+
+/** Two tabs of two panels with the same perm() and the same scope() */
+class AdminSmokeSharedTabA {
+	public static function actions(): array { return [ 'sharedtaba/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'sharedtaba', 'Shared tab A', 50 ]; }
+	public static function perm(): string { return '/_admin/shared/tab'; }
+	public static function scope(): string { return '/_admin/shared/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+class AdminSmokeSharedTabB {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'sharedtabb', 'Shared tab B', 50 ]; }
+	public static function perm(): string { return '/_admin/shared/tab'; }
+	public static function scope(): string { return '/_admin/shared/'; }
+}
+class AdminSmokeSharedHostA {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'sharedhosta', 'Shared host A', 91 ]; }
+	public static function perm(): string { return '/_admin/shared/a'; }
+	public static function tabs(): array { return [ 'AdminSmokeSharedTabA' ]; }
+}
+class AdminSmokeSharedHostB {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'sharedhostb', 'Shared host B', 92 ]; }
+	public static function perm(): string { return '/_admin/shared/b'; }
+	public static function tabs(): array { return [ 'AdminSmokeSharedTabB' ]; }
+}
+
+/** The panel that carries the tabs, with a door of its own */
+class AdminSmokeScopeHost {
+	public static function actions(): array { return [ 'scopehost/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'scopehost', 'Scope host', 52 ]; }
+	public static function perm(): string { return '/_admin/scopearea/manage'; }
+	public static function tabs(): array { return [ 'AdminSmokeScopeTab', 'AdminSmokePlainTab', 'AdminSmokeBadScopeTab', 'AdminSmokeForeignScopeTab', 'AdminSmokeNowhereTab', 'AdminSmokeTwinATab', 'AdminSmokeTwinBTab', 'AdminSmokeOutsideTab' ]; }
+	public static function apiRun( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+/** The module contributing the host */
+class AdminSmokeScopeModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeScopeHost', 'AdminSmokeVictimPanel', 'AdminSmokeClaimHost', 'AdminSmokeSharedHostA', 'AdminSmokeSharedHostB', 'AdminSmokeDoorHost' ]; }
+}
+
+/** What an account sees and reaches of the scope fixture: the tabs in the rail, the panes drawn, the tiles, and the status of an action of each tab */
+function scopeProbe( array &$appData ): array {
+
+	$visible = \Nino\Admin\Admin::visiblePanels( $appData );
+	$tabs		 = array_keys( $visible['scopehost']['tabs'] ?? [] );
+	$panes	 = \Nino\Admin\Panels::panesHtml( $visible );
+	[ , $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dashboard/summary' );
+	$status = [];
+	foreach( [ 'scopetab', 'plaintab', 'foreignscopetab', 'nowheretab', 'twinatab', 'twinbtab', 'outsidetab', 'doortab', 'victim', 'sharedtaba' ] as $action )
+		[ $status[$action] ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], $action. ( $action === 'victim' ? '/fine' : '/run' ) );
+
+	return [
+		'tabs'		=> $tabs,
+		'rail'		=> isset( $visible['scopehost'] ),
+		'pane'		=> str_contains( $panes, 'id="admin-tab-scopetab"' ),
+		'tile'		=> in_array( 'scopetab', array_column( $body['tiles'] ?? [], 'panel' ), true ),
+		'scoped'	=> $status['scopetab'],
+		'plain'		=> $status['plaintab'],
+		'status'	=> $status,
+		'shared'	=> array_keys( ( $visible['sharedhosta']['tabs'] ?? [] ) + ( $visible['sharedhostb']['tabs'] ?? [] ) ),
+	];
+}
+
+/** The tab with a scope() is checked with Admin::scoped() wherever its right is asked, and a tab without one stays as it was */
+function pinTabScope( array &$appData ): void {
+
+	$data = $appData;
+	$data['/nino/modules'] = [ 'AdminSmokeScopeModule' ];
+
+	ninoWarnings();
+	$registry = \Nino\Admin\Admin::panels( $data );
+	$warnings = ninoWarnings();
+	$tabs = $registry['scopehost']['tabs'] ?? [];
+
+	check( 'a tab names its scope() in the registry, a tab without one has none', ( $tabs['scopetab']['scope'] ?? null ) === '/_admin/scopearea/' && ( $tabs['plaintab']['scope'] ?? null ) === '' );
+	check( 'a scope() that does not end in a slash is a warning naming the tab, and the tab has no scope', ( $tabs['badscopetab']['scope'] ?? null ) === ''
+		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeBadScopeTab' ) && str_contains( $m, 'scope()' ) ) ) === 1 );
+
+	// Only the door: nobody described the area, so the tab is there
+	ninoUser( $data, 'scope-door@example.com', [ '/_admin/scopearea/manage', '/_admin/scopearea/plain' ] );
+	$door = scopeProbe( $data );
+	check( 'an account with only the door sees the tab with a scope, its pane and its tile, and its action runs', in_array( 'scopetab', $door['tabs'], true ) === true && $door['pane'] === true && $door['tile'] === true && $door['scoped'] === 200 );
+
+	// Described, without the tab's right: another right of the area
+	ninoUser( $data, 'scope-content@example.com', [ '/_admin/scopearea/manage', '/_admin/scopearea/plain', '/_admin/scopearea/content/*' ] );
+	$other = scopeProbe( $data );
+	check( 'an account described with another right of the area does not see the tab in the rail', in_array( 'scopetab', $other['tabs'], true ) === false );
+	check( '...the address leads into no pane', $other['pane'] === false );
+	check( '...it has no tile', $other['tile'] === false );
+	check( '...and the action of the tab is refused with 403, without running', $other['scoped'] === 403 && AdminSmokeScopeTab::$ran === 1 );
+
+	// Described with the right
+	ninoUser( $data, 'scope-design@example.com', [ '/_admin/scopearea/manage', '/_admin/scopearea/content/*', '/_admin/scopearea/design' ] );
+	$design = scopeProbe( $data );
+	check( 'an account holding the right sees the tab, its pane and tile, and runs its action', in_array( 'scopetab', $design['tabs'], true ) === true && $design['pane'] === true && $design['tile'] === true && $design['scoped'] === 200 );
+
+	// The tab without a scope() is what it always was: the plain right decides
+	check( 'a tab without scope() is there for the account that holds its right, described or not', in_array( 'plaintab', $other['tabs'], true ) === true && $other['plain'] === 200 );
+	ninoUser( $data, 'scope-nobody@example.com', [ '/_admin/scopearea/manage' ] );
+	$bare = scopeProbe( $data );
+	check( 'a tab without scope() - or with a scope() of the wrong shape - is not given to an account without its right, though the area is not described', in_array( 'plaintab', $bare['tabs'], true ) === false && $bare['plain'] === 403 && in_array( 'badscopetab', $bare['tabs'], true ) === false );
+
+	// The door is part of the rule: scoped() alone would open the tab to an account nobody described in the area
+	foreach( [ 'an account without any right' => [], 'an account with only the right of another panel' => [ '/_admin/elements/manage' ], 'an account described in another panel' => [ '/_admin/elements/manage', '/_admin/elements/services/*' ] ] as $what => $perms ) {
+		$ran = AdminSmokeScopeTab::$ran;
+		ninoUser( $data, 'scope-nodoor'. md5( $what ). '@example.com', $perms );
+		$none = scopeProbe( $data );
+		check( $what. ' gets neither the tab, its pane nor its tile, and its action is refused without running', $none['tabs'] === [] && $none['pane'] === false && $none['tile'] === false && $none['rail'] === false && $none['scoped'] === 403 && AdminSmokeScopeTab::$ran === $ran );
+	}
+
+	// A scope() lies where the permissions do: the area of another panel, or one nobody has anything in, is a plain permission and a warning
+	ninoWarnings();
+	\Nino\Admin\Admin::panels( array_merge( $data, [ '/nino/modules' => [ 'AdminSmokeScopeModule', 'AdminSmokeNoopModule' ] ] ) );
+	$data['./_admin/panels'] = [];
+	$warnings = ninoWarnings();
+	$reaches = static fn( array $names ): int => count( array_filter( $warnings, static fn( string $m ): bool => array_reduce( $names, static fn( bool $all, string $n ): bool => $all && str_contains( $m, $n ), true ) ) );
+	check( 'a scope() of the area of another panel is a warning naming the tab', $reaches( [ 'AdminSmokeForeignScopeTab' ] ) === 1 );
+	check( 'a scope() of an area nobody has anything in is a warning naming the tab', $reaches( [ 'AdminSmokeNowhereTab' ] ) === 1 );
+	check( 'a scope() the door of the panel does not lie in, though the perm() of the tab does, is a warning naming the tab', $reaches( [ 'AdminSmokeDoorTab' ] ) === 1 );
+	check( 'a scope() the perm() of the tab does not lie in, though the door does, is a warning naming the tab', $reaches( [ 'AdminSmokeOutsideTab' ] ) === 1 );
+	ninoUser( $data, 'scope-door2@example.com', [ '/_admin/scopearea/manage' ] );
+	$door = scopeProbe( $data );
+	check( 'both of them are plain permissions: the door does not show them and their actions are refused', in_array( 'foreignscopetab', $door['tabs'], true ) === false && in_array( 'nowheretab', $door['tabs'], true ) === false && in_array( 'outsidetab', $door['tabs'], true ) === false && $door['status']['foreignscopetab'] === 403 && $door['status']['nowheretab'] === 403 && $door['status']['outsidetab'] === 403 );
+	ninoUser( $data, 'scope-outdoor@example.com', [ '/_admin/doorout/manage' ] );
+	$outDoor = scopeProbe( $data );
+	check( 'the door of a panel outside the scope() does not open the tab: it is a plain permission', $outDoor['status']['doortab'] === 403 && $outDoor['pane'] === false );
+	ninoUser( $data, 'scope-right2@example.com', [ '/_admin/scopearea/foreign', '/_admin/scopearea/nowhere' ] );
+	$right = scopeProbe( $data );
+	check( '...and the right opens them', in_array( 'foreignscopetab', $right['tabs'], true ) === true && in_array( 'nowheretab', $right['tabs'], true ) === true && $right['status']['foreignscopetab'] === 200 && $right['status']['nowheretab'] === 200 );
+
+	// An action asks for a permission and not for a tab: a tab of another panel naming the same string never loosens it
+	ninoUser( $data, 'scope-victim@example.com', [ '/_admin/victim/manage' ] );
+	$victim = scopeProbe( $data );
+	check( 'a tab of an unrelated panel that names the right an action asks for does not open that action to an account that holds only its door', $victim['status']['victim'] === 403 && AdminSmokeVictimPanel::$ran === 0 );
+	ninoUser( $data, 'scope-victim2@example.com', [ '/_admin/victim/manage', '/_admin/victim/secret' ] );
+	check( '...and the account that holds the right runs it', scopeProbe( $data )['status']['victim'] === 200 );
+
+	// Two tabs with the same perm() and a scope() each in different areas, and one of two panels: the strict rule on both sides, the rail and the action alike
+	ninoUser( $data, 'scope-twin@example.com', [ '/_admin/scopearea/manage' ] );
+	$twin = scopeProbe( $data );
+	check( 'two tabs with one perm() and two scopes are strict: the door shows neither, and neither action runs', in_array( 'twinatab', $twin['tabs'], true ) === false && in_array( 'twinbtab', $twin['tabs'], true ) === false && $twin['status']['twinatab'] === 403 && $twin['status']['twinbtab'] === 403 );
+	ninoUser( $data, 'scope-twin2@example.com', [ '/_admin/scopearea/manage', '/_admin/scopearea/content/*' ] );
+	$twin = scopeProbe( $data );
+	check( '...whichever area describes the account, rail and action agree', in_array( 'twinatab', $twin['tabs'], true ) === false && in_array( 'twinbtab', $twin['tabs'], true ) === false && $twin['status']['twinatab'] === 403 && $twin['status']['twinbtab'] === 403 );
+	ninoUser( $data, 'scope-twin3@example.com', [ '/_admin/scopearea/twin' ] );
+	$twin = scopeProbe( $data );
+	check( '...and the right opens both', in_array( 'twinatab', $twin['tabs'], true ) === true && in_array( 'twinbtab', $twin['tabs'], true ) === true && $twin['status']['twinatab'] === 200 && $twin['status']['twinbtab'] === 200 );
+	ninoUser( $data, 'scope-shared@example.com', [ '/_admin/shared/a' ] );
+	$shared = scopeProbe( $data );
+	check( 'two tabs of two panels with one perm() and one scope() are strict as well: the door shows none and the action is refused', $shared['shared'] === [] && $shared['status']['sharedtaba'] === 403 );
+
+	// The strict rule where a panel without scope() shares the perm() of a tab with one
+	ninoUser( $data, 'scope-mixed@example.com', [ '/_admin/scopearea/manage' ] );
+	check( 'a panel without scope() that names the perm() of a scoped tab keeps the strict check for the action', ( static function() use ( &$data ): bool {
+		$mixed = $data;
+		$mixed['/nino/modules'] = [ 'AdminSmokeMixedModule' ];
+		[ $status ] = ninoCall( $mixed, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'mixedtab/run' );
+		return $status === 403 && isset( \Nino\Admin\Admin::visiblePanels( $mixed )['mixedhost']['tabs']['mixedtab'] ) === false;
+	} )() );
+}
+
+/** A tab with a scope() whose perm() a plain panel names as well */
+class AdminSmokeMixedTab {
+	public static function actions(): array { return [ 'mixedtab/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'mixedtab', 'Mixed tab', 50 ]; }
+	public static function perm(): string { return '/_admin/scopearea/mixed'; }
+	public static function scope(): string { return '/_admin/scopearea/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+class AdminSmokeMixedHost {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'mixedhost', 'Mixed host', 53 ]; }
+	public static function perm(): string { return '/_admin/scopearea/manage'; }
+	public static function tabs(): array { return [ 'AdminSmokeMixedTab' ]; }
+}
+class AdminSmokeMixedPlain {
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'mixedplain', 'Mixed plain', 54 ]; }
+	public static function perm(): string { return '/_admin/scopearea/mixed'; }
+}
+class AdminSmokeMixedModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeMixedHost', 'AdminSmokeMixedPlain' ]; }
+}
+class AdminSmokeNoopModule {
+	public static function adminPanels( array &$appData ): array { return []; }
 }

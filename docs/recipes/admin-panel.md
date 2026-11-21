@@ -53,6 +53,7 @@ request:
 | `actions()` | yes | `[ 'slug/action' => [ Class::class, 'apiMethod' ], ... ]` |
 | `nav()` | yes | `[ uri, label, weight = 50, group = 'content' ]`, see below |
 | `perm()` | yes in practice | the permission that shows the link and gates the panel's actions; `''` only for a panel every account may use (the Dashboard) |
+| `scope()` | no, tabs only | the prefix of an area both the tab's `perm()` and the `perm()` of its panel (the door) lie in, such as `/_admin/builder/` - it begins and ends with `/` and lies under `/_admin/`. With one the tab is open to an account that holds its `perm()`, or holds the door and was described in no detail in that area (`Admin::isScoped()`); an account with neither gets nothing, in the rail, the tiles and the actions. A scope() the permissions do not lie in is a warning and the tab has a plain `perm()` |
 | `panes()` | no | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
 | `template()` | no | instead of mount points: a `.tpl` rendered whole into the pane through the `[template]` shortcode - project-relative, no extension, no `..` |
 | `layout()` | no | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole pane, the rail folded to its icons) |
@@ -125,6 +126,12 @@ request:
   the pane, the panel's own first. An account holding a tab's permission but
   not the panel's still gets the pane, on that tab alone
   (`Admin::visiblePanels()`, `'own' => false`). A tab has no tabs of its own.
+- A tab may also answer `scope()` beside `perm()`: the area a feature describes
+  its rights in, which the `perm()` of the tab and the `perm()` of its panel (the door) both lie in.
+  The tab is then shown, and its actions run, for an account that holds its `perm()` and for one that
+  holds the door and was described in no detail in the area, so an older account keeps the tab; one
+  without the door and the right gets nothing. The actions follow the same rule only while every
+  screen naming that `perm()` is a tab of the same panel with the same scope.
 - A feature's panel can get a tab it does not name. When an active feature
   declares settings and has a panel, `Panels::collect()` adds one entry to that
   panel - uri `<panel>-settings`, class `\Nino\Modules\Features\Settings`, the

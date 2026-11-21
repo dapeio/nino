@@ -128,7 +128,7 @@ namespace Nino\Modules\Dashboard {
 				if( method_exists( $panel['class'], 'summary' ) === false )
 					continue;
 
-				if( $panel['perm'] !== '' && \Nino\Auth::checkPermission( $appData, $panel['perm'] ) === false )
+				if( \Nino\Admin\Admin::mayUse( $appData, $panel ) === false )
 					continue;
 
 				$tile = $panel['class']::summary( $appData );

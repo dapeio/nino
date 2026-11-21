@@ -350,7 +350,7 @@ namespace Nino\Admin {
 		 */
 		public static function visiblePanels( array &$appData ): array {
 
-			$allowed = static fn( array $panel ): bool => $panel['perm'] === '' || \Nino\Auth::checkPermission( $appData, $panel['perm'] ) === true;
+			$allowed = static fn( array $panel ): bool => self::mayUse( $appData, $panel );
 			$visible = [];
 
 			foreach( self::panels( $appData ) as $uri => $panel ) {
@@ -879,12 +879,90 @@ namespace Nino\Admin {
 			if( self::guard( $appData, $request ) === false )
 				return false;
 
-			if( \Nino\Auth::checkPermission( $appData, $perm ) === false ) {
+			if( self::permitted( $appData, $perm ) === false ) {
 				\Nino\Http::fail( $request, 403, 'not allowed' );
 				return false;
 			}
 
 			return true;
+		}
+
+		/**
+		 *	Whether the current account may use a panel or a tab of the registry:
+		 *	no perm() is everyone's and a perm() is checked with checkPermission().
+		 *	A tab with a scope() has a second way in, the rule the Roles tab uses
+		 *	for an area: the account holds the door - the perm() of the panel the
+		 *	tab sits on - and nobody described it in detail for the scope's area
+		 *	(see isScoped()). An account without the tab's right and without the
+		 *	door gets nothing, and one that was described in the area keeps what
+		 *	it was given. The one place the shell, the dashboard tiles and
+		 *	guardPerm() ask a screen's right
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$panel				A registry entry, see Panels::collect()
+		 *
+		 *	@return 	bool
+		 */
+		public static function mayUse( array &$appData, array $panel ): bool {
+
+			if( $panel['perm'] === '' )
+				return true;
+
+			if( \Nino\Auth::checkPermission( $appData, $panel['perm'] ) === true )
+				return true;
+
+			$scope = (string) ( $panel['scope'] ?? '' );
+			$door	 = (string) ( $panel['door'] ?? '' );
+
+			return $scope !== '' && $door !== ''
+				&& \Nino\Auth::checkPermission( $appData, $door ) === true
+				&& self::isScoped( $appData, $scope ) === false
+				&& self::_soleScope( $appData, $panel ) === true;
+		}
+
+		/**
+		 *	Whether the scope() of a tab is the only claim on its perm(): every
+		 *	screen of the registry that names the same permission is a tab of the
+		 *	same panel with the same scope() (which a tab holds only where its
+		 *	permission lies in it, see collect()). An
+		 *	action asks for a permission, not for a tab, so a permission another
+		 *	panel, another area or a screen without a scope() also names is
+		 *	never loosened by one tab's scope()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$panel				A registry entry with a scope
+		 *
+		 *	@return 	bool
+		 */
+		private static function _soleScope( array &$appData, array $panel ): bool {
+
+			foreach( self::allPanels( $appData ) as $other )
+				if( $other['perm'] === $panel['perm']
+					&& ( (string) ( $other['scope'] ?? '' ) !== (string) $panel['scope'] || $other['parent'] !== $panel['parent'] ) )
+					return false;
+
+			return true;
+		}
+
+		/**
+		 *	Whether the current account holds a permission as an action of the
+		 *	registry's screens asks for it: the way guardPerm() checks it. The
+		 *	screen that names it answers with its own rule (see mayUse()), so what
+		 *	the rail shows and what the action allows are one answer; a
+		 *	permission no screen names is a plain checkPermission()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$perm					The permission an action asks for
+		 *
+		 *	@return 	bool
+		 */
+		public static function permitted( array &$appData, string $perm ): bool {
+
+			foreach( $perm === '' ? [] : self::allPanels( $appData ) as $panel )
+				if( $panel['perm'] === $perm )
+					return self::mayUse( $appData, $panel );
+
+			return \Nino\Auth::checkPermission( $appData, $perm ) === true;
 		}
 
 		/**
@@ -1540,6 +1618,15 @@ namespace Nino\Admin {
 	 *											  actions(): array          'panel/action' => [ class, method ]
 	 *											  nav(): array              [ uri, label, weight = 50, group = 'content' ]
 	 *											  perm(): string            permission gating nav and api, '' = none
+	 *											  scope(): string           a tab's area ('/_admin/builder/'): with one, the
+	 *											                            tab is also open to an account that holds the door
+	 *											                            - the perm() of the panel it sits on - when nobody
+	 *											                            described that account in the area; one that was
+	 *											                            described keeps only what it holds, and one with
+	 *											                            neither the right nor the door gets nothing, in
+	 *											                            the rail, the actions and the tiles. The door and
+	 *											                            the tab's perm() must lie in the area, else it is
+	 *											                            a warning and a plain perm()
 	 *											  panes(): array            mount ids inside the pane, default [ '<uri>-list' ]
 	 *											  template(): string        a .tpl (project-relative, without the
 	 *											                            extension) included into the pane instead
@@ -1693,7 +1780,7 @@ namespace Nino\Admin {
 		 *	@param		array 		$core					The workbench's own panel classes (see Admin::modules())
 		 *	@param		string		$method				What every active module is asked for its panels - 'adminPanels'
 		 *
-		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, head, icon, assets, text, manual, manualFeature, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
+		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, scope, door, panes, template, layout, head, icon, assets, text, manual, manualFeature, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
 		 */
 		public static function collect( array &$appData, array $core, string $method ): array {
 
@@ -1734,6 +1821,12 @@ namespace Nino\Admin {
 				if( $entry === null )
 					continue;
 
+				// A scope() is a tab's: a panel is the door of its area itself
+				if( $entry['scope'] !== '' ) {
+					trigger_error( 'Panel '. $class. ' names a scope(), which only a tab may', E_USER_WARNING );
+					$entry['scope'] = '';
+				}
+
 				// Whether the workbench brought the panel itself or a module
 				// did, which Admin::actions() reads
 				$entry['core'] = in_array( $class, $core, true );
@@ -1754,6 +1847,20 @@ namespace Nino\Admin {
 							continue;
 
 						$tab['parent'] = $entry['uri'];
+						$tab['door']	 = '';
+
+						// A scope() holds only where the tab belongs to the area: the door
+						// of its panel and its own perm() lie in it. Anything else is a
+						// tab with a plain permission
+						if( $tab['scope'] !== '' ) {
+							if( $entry['perm'] !== '' && str_starts_with( $entry['perm'], $tab['scope'] ) === true && str_starts_with( $tab['perm'], $tab['scope'] ) === true )
+								$tab['door'] = $entry['perm'];
+							else {
+								trigger_error( 'Panel '. $tabClass. ' names a scope() \''. $tab['scope']. '\' that its panel\'s permission and its own permission do not lie in', E_USER_WARNING );
+								$tab['scope'] = '';
+							}
+						}
+
 						$tab['core'] = $entry['core'];
 						$taken[$tab['uri']] = $tabClass;
 						$entry['tabs'][$tab['uri']] = $tab;
@@ -1843,6 +1950,8 @@ namespace Nino\Admin {
 						'weight'	=> 1000,
 						'group'		=> 'system',
 						'perm'		=> \Nino\Modules\Features\Settings::perm(),
+						'scope'		=> '',
+						'door'		=> '',
 						'panes'		=> [ \Nino\Modules\Features\Settings::MOUNT_PREFIX. $feature['key'] ],
 						'template'=> '',
 						'layout'	=> $panel['layout'],
@@ -2086,6 +2195,8 @@ namespace Nino\Admin {
 				'weight'	=> (int) ( $nav[2] ?? 50 ),
 				'group'		=> $group,
 				'perm'		=> method_exists( $class, 'perm' ) === true ? (string) $class::perm() : '',
+				'scope'		=> self::_scope( $class ),
+				'door'		=> '',
 				'panes'		=> $panes,
 				'template'=> $template,
 				'layout'	=> $layout,
@@ -2105,6 +2216,34 @@ namespace Nino\Admin {
 				// holds one of its tabs'
 				'own'			=> true,
 			];
+		}
+
+		/**
+		 *	The scope() a panel or tab names, read as a fixed string like its
+		 *	perm(): the prefix of an area ('/_admin/builder/'), beginning and
+		 *	ending with a slash and lying under '/_admin/'. A value of another
+		 *	shape is a warning and the tab is treated as having no scope
+		 *
+		 *	@param		string		$class				The panel class
+		 *
+		 *	@return 	string										The scope, '' for none
+		 */
+		private static function _scope( string $class ): string {
+
+			if( method_exists( $class, 'scope' ) === false )
+				return '';
+
+			$scope = $class::scope();
+
+			if( $scope === '' )
+				return '';
+
+			if( is_string( $scope ) === false || preg_match( '#^/_admin/[A-Za-z0-9_./-]*/$#', $scope ) !== 1 || str_contains( $scope, '..' ) === true || str_contains( $scope, '//' ) === true ) {
+				trigger_error( 'Panel '. $class. ' names a scope() that is no area below /_admin/: \''. ( is_string( $scope ) === true ? $scope : gettype( $scope ) ). '\'', E_USER_WARNING );
+				return '';
+			}
+
+			return $scope;
 		}
 
 		/**
