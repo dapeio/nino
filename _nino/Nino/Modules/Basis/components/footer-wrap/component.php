@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 return [
 	'group'      => 'footer',
-	'label'      => [ 'de_DE' => 'Footer', 'en_US' => 'Footer' ],
+	'label'      => [ 'de_DE' => 'Fußbereich', 'en_US' => 'Footer' ],
 	'icon'       => 'panel-bottom',
 	'in'         => [ 'page' ],
 	'offers'     => [],

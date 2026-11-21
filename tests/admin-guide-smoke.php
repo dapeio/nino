@@ -995,5 +995,38 @@ $dead = array_values( array_diff( array_unique( $own[1] ), $anchors ) );
 check( 'the chapter has links within itself, and each lands on a heading'. ( $dead === [] ? '' : ' - not '. implode( ', ', $dead ) ), $own[1] !== [] && $dead === [] );
 check( 'the agent guide and the panel recipe link to the chapter', str_contains( $read( 'AGENTS.md' ), '(docs/admin-ui.md)' ) === true && str_contains( $read( 'docs/recipes/admin-panel.md' ), '(../admin-ui.md)' ) === true );
 
+// The words for the head and the foot of a page: "Kopfbereich", "Fußbereich" and, for both, "Kopf-/Fußbereich" in German; "Header", "Footer" and "Header/footer" in English. None of the
+// words the workbench and the Basis components show for them is "Rahmen" (but the line round a box, "Rahmenlinie", which is another thing), "Header" or "Footer" in German or "frame" in English
+$words = static function( string $locale ) use ( $read ): array {
+	preg_match_all( "/'\\[\\[(\\/_admin\\/common\\/word\\/[a-z-]+)\\]\\]'\\s*=>\\s*'((?:[^'\\\\]|\\\\.)*)'/", $read( '_admin/text/'. $locale. '.php' ), $found, PREG_SET_ORDER );
+	return array_column( $found, 2, 1 );
+};
+$de = $words( 'de_DE' );
+$en = $words( 'en_US' );
+$basis = $root. '/_nino/Nino/Modules/Basis/';
+$shown = [
+	'de' => [ 'workbench frame' => $de['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $de['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $de['/_admin/common/word/frame-footer'] ?? '', 'workbench header' => $de['/_admin/common/word/header'] ?? '', 'workbench footer' => $de['/_admin/common/word/footer'] ?? '',
+		'component header-wrap' => ( include $basis. 'components/header-wrap/component.php' )['label']['de_DE'], 'component footer-wrap' => ( include $basis. 'components/footer-wrap/component.php' )['label']['de_DE'],
+		'group header' => ( include $basis. 'groups/header/group.php' )['label']['de_DE'], 'group footer' => ( include $basis. 'groups/footer/group.php' )['label']['de_DE'],
+		'block header-line' => json_decode( $read( '_nino/Nino/Modules/Basis/blocks/header-line/block.json' ), true )['name']['de_DE'], 'block footer-columns' => json_decode( $read( '_nino/Nino/Modules/Basis/blocks/footer-columns/block.json' ), true )['name']['de_DE'],
+		'feature basis' => ( include $basis. 'feature.php' )['description']['de_DE'] ],
+	'en' => [ 'workbench header' => $en['/_admin/common/word/header'] ?? '', 'workbench footer' => $en['/_admin/common/word/footer'] ?? '', 'workbench frame' => $en['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $en['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $en['/_admin/common/word/frame-footer'] ?? '',
+		'component header-wrap' => ( include $basis. 'components/header-wrap/component.php' )['label']['en_US'], 'component footer-wrap' => ( include $basis. 'components/footer-wrap/component.php' )['label']['en_US'],
+		'group header' => ( include $basis. 'groups/header/group.php' )['label']['en_US'], 'group footer' => ( include $basis. 'groups/footer/group.php' )['label']['en_US'],
+		'feature basis' => ( include $basis. 'feature.php' )['description']['en_US'] ],
+];
+$wrong = [];
+
+foreach( $shown['de'] as $where => $text )
+	if( $text === '' || preg_match( '/rahmen(?!linie)|header|footer/iu', $text ) === 1 )
+		$wrong[] = 'de '. $where. ': '. $text;
+
+foreach( $shown['en'] as $where => $text )
+	if( $text === '' || preg_match( '/frame/i', $text ) === 1 )
+		$wrong[] = 'en '. $where. ': '. $text;
+
+check( 'the head and the foot of a page are Kopfbereich, Fußbereich and Kopf-/Fußbereich in German - never Rahmen, Header or Footer - and Header, Footer and Header/footer in English, never a frame, in the workbench and in the Basis components, groups, blocks and description'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ),
+	$wrong === [] && $de['/_admin/common/word/frame'] === 'Kopf-/Fußbereich' && $en['/_admin/common/word/frame'] === 'Header/footer' && $de['/_admin/common/word/border'] === 'Rahmenlinie' );
+
 $none = [];
 ninoDone( $none );

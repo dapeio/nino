@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 return [
-	'label' => [ 'de_DE' => 'Header', 'en_US' => 'Header' ],
+	'label' => [ 'de_DE' => 'Kopfbereich', 'en_US' => 'Header' ],
 	'knobs' => [
 		'header-wrap.space' => [ 'token' => '--header-wrap-space', 'label' => [ 'de_DE' => 'Abstand oben und unten', 'en_US' => 'Space above and below' ],
 			'ladder' => [ 'var(--page-space-1)', 'var(--page-space-2)', 'var(--page-space-3)', 'var(--page-space-4)', 'var(--page-space-5)' ] ],

@@ -232,7 +232,7 @@ const focusIn = ( w, level ) => w.dom.doc.activeElement !== null && w.dom.doc.ac
 	check( '...what the builder makes of an id and a property: the left side looked up if it is a word, humanized if not', label( de, 'cta-label' ) === 'Cta · Beschriftung' && label( de, 'hero-image-alt' ) === 'Hero image · Alternativtext' && label( de, 'button-label' ) === 'Schaltfläche · Beschriftung' );
 	check( '...the category of a page nothing routes: "Seite" and what follows', label( de, 'page-posts' ) === 'Seite · Beiträge' && label( de, 'page-protected' ) === 'Seite · Geschützter Bereich' && label( de, 'page-newsletter-unsubscribe' ) === 'Seite · Newsletter-Abmeldung' );
 	check( '...a word that is not in the vocabulary, humanized', label( de, 'tagline' ) === 'Tagline' && label( de, 'get-in-touch' ) === 'Get in touch' && label( en, 'tagline' ) === 'Tagline' );
-	check( 'a group has a word of its own', label( de, 'frame-header' ) === 'Kopfrahmen' && label( de, 'mail-user' ) === 'Mail an den Besucher' && label( de, 'common' ) === 'Allgemeine Wörter' && label( de, 'company' ) === 'Unternehmen' && label( de, 'mail' ) === 'E-Mail-Versand' );
+	check( 'a group has a word of its own', label( de, 'frame-header' ) === workbenchWords( 'de_DE' )['/_admin/common/word/frame-header'] && label( de, 'mail-user' ) === 'Mail an den Besucher' && label( de, 'common' ) === 'Allgemeine Wörter' && label( de, 'company' ) === 'Unternehmen' && label( de, 'mail' ) === 'E-Mail-Versand' );
 	check( 'humanize: capital first letter, hyphens and underscores as spaces', de.U.humanize( 'price_default' ) === 'Price default' && de.U.humanize( 'get-in-touch' ) === 'Get in touch' );
 
 	// isWord: the rule admin-text-smoke holds the shipped keys to, as a function of the workbench - a word, <word>-<number>, or two words with a hyphen between them
@@ -295,7 +295,7 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 	check( 'the others are in groups, in this order: the project, the common words, the building blocks, modules, features, the system, the rest',
 		model.blocks[1].groups.map( g => g.id ).join() === 'project,common,blocks,modules,features,system,other' );
 	check( '...the project in the order of the company, the website, the mail; the blocks and modules by name',
-		JSON.stringify( model.blocks[1].groups[0].rows ) === '["project/company"]' && labels( model.blocks[1].groups[2].rows ).join() === 'Kopfrahmen,Mail an den Besucher' && labels( model.blocks[1].groups[3].rows ).join() === 'Formular' );
+		JSON.stringify( model.blocks[1].groups[0].rows ) === '["project/company"]' && labels( model.blocks[1].groups[2].rows ).join() === workbenchWords( 'de_DE' )['/_admin/common/word/frame-header']+ ',Mail an den Besucher' && labels( model.blocks[1].groups[3].rows ).join() === 'Formular' );
 	check( '...a feature named after its manifest, the system as the words of the panel', labels( model.blocks[1].groups[4].rows ).join() === 'Cookie-Einwilligung' && labels( model.blocks[1].groups[5].rows ).join() === 'Sprachnamen,Seitenangaben ohne Seite' );
 	check( 'a key somebody made up is a row by its first segment, in "Weitere" - the address of the contact page among them', JSON.stringify( model.blocks[1].groups[6].rows ) === '["website"]' && model.rowOf['/website/contact/uri'] === 'website' );
 	check( 'the details of a page without a stored route - a feature\'s - are the system\'s row, a section for each', model.rowOf['/_nino/webpage/blog/name'] === '_nino/webpage'
@@ -389,7 +389,7 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 		&& hits[0].locale === 'de_DE' && hits[0].snippet.filter( p => p.mark ).map( p => p.text ).join() === 'beraten'; } )() );
 	check( '...in the text of another language, which the hit names', ( () => { const hits = search( 'consulting' ); return hits.length === 1 && hits[0].locale === 'en_US' && keysOf( hits )[0] === '/template/page-services/item-1/title'; } )() );
 	check( '...in the key, in the name of the row, the section and the field', keysOf( search( 'banner' ) ).join() === '/feature/consent/banner/title' && keysOf( search( 'eintrag 2' ) ).join() === '/template/page-services/item-2/title'
-		&& keysOf( search( 'kopfrahmen' ) ).join() === '/template/frame-header/navigation/label' && search( 'welcome' ).length === 0 );
+		&& keysOf( search( workbenchWords( 'de_DE' )['/_admin/common/word/frame-header'].toLowerCase() ) ).join() === '/template/frame-header/navigation/label' && search( 'welcome' ).length === 0 );
 	check( 'every word has to occur, in any part of what is searched, in any order', keysOf( search( 'titel eintrag 1' ) ).join() === '/template/page-services/item-1/title' && search( 'beraten consulting' ).length === 0 );
 	check( 'accents and capitals do not matter - on either side', keysOf( search( 'GEWAHR' ) ).join() === '/template/page-services/legal/note' && keysOf( search( 'gewähr' ) ).join() === '/template/page-services/legal/note' && keysOf( search( 'DANKE fur' ) ).join() === '/template/mail-user/intro/title' );
 	check( 'a word that begins with a slash is searched in the key alone', search( '/template/page-services' ).length === 6 && keysOf( search( '/common/' ) ).join() === '/template/common/form/submit,/template/common/label/phone'

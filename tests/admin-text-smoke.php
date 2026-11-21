@@ -709,8 +709,15 @@ check( 'a word is a slug: lower-case words joined by hyphens, one for each slug,
 $featureWords = [ 'month', 'short', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'expired', 'pending', 'requested', 'signup', 'unnamed', 'step' ];
 check( 'the segments of the features\' keys are words in both languages: the months and days, month and short, expired, pending, requested, signup, step and unnamed',
 	array_filter( $featureWords, static fn( string $slug ): bool => trim( $wordFills['en_US'][$slug] ?? '' ) === '' || trim( $wordFills['de_DE'][$slug] ?? '' ) === '' ) === [] );
-check( 'no word is an alias of another: no two slugs share a text in a language', count( array_unique( $wordFills['en_US'] ) ) === count( $words ) && count( array_unique( $wordFills['de_DE'] ) ) === count( $words ) );
-check( 'a word names no key and is no key: no fill, no slash in any of them', array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => preg_match( '/\[\[|\//', $text ) === 1 ) === [] );
+// The head and the foot of a page are one word whether they are a place of a page (header, footer) or the frame of the whole site (frame-header, frame-footer): the same word
+// in both, by decision, so these two slugs are the ones that may share a text - with the slug they name, and with no other
+$aliases = [ 'frame-header' => 'header', 'frame-footer' => 'footer' ];
+$apart = static fn( array $fills ): array => array_diff_key( $fills, $aliases );
+check( 'no word is an alias of another: no two slugs share a text in a language, but frame-header and frame-footer, which are the word of the header and of the footer',
+	count( array_unique( $apart( $wordFills['en_US'] ) ) ) === count( $apart( $wordFills['en_US'] ) ) && count( array_unique( $apart( $wordFills['de_DE'] ) ) ) === count( $apart( $wordFills['de_DE'] ) )
+	&& array_filter( $aliases, static fn( string $base, string $alias ): bool => ( $wordFills['en_US'][$alias] ?? null ) !== ( $wordFills['en_US'][$base] ?? '' ) || ( $wordFills['de_DE'][$alias] ?? null ) !== ( $wordFills['de_DE'][$base] ?? '' ), ARRAY_FILTER_USE_BOTH ) === [] );
+// A text that is a key begins with a slash or holds a fill: a slash inside a compound (Kopf-/Fußbereich, Header/footer) is a word's own
+check( 'a word names no key and is no key: no fill, no slash at the start of a word in any of them', array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => preg_match( '/\[\[|(?<![\p{L}-])\//u', $text ) === 1 ) === [] );
 
 // Every segment of every key the kernel ships is a word, or falls apart into words: a part, a name, the entry of a list,
 // a category that names a group. Excepted are the categories of the page templates with a route - the row of a page is
