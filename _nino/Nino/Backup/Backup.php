@@ -108,6 +108,7 @@ namespace Nino {
 			$assets 		= \Nino\Filesystem::path( $appData, '/assets' );
 			$images 		= \Nino\Filesystem::path( $appData, '/images' );
 			$blocks 		= self::target( $appData, 'blocks' );
+			$themes 		= self::target( $appData, 'themes' );
 			$fonts 			= self::target( $appData, 'fonts' );
 			$data 			= \Nino\Filesystem::path( $appData, '/data' );
 			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
@@ -137,11 +138,12 @@ namespace Nino {
 			// templates are taken, at any depth (see template()): the pages of
 			// the Builder and the frames of Design among them, and which of the
 			// others a person wrote is not something a file says. The blocks the
-			// project wrote itself (private/blocks/) and the fonts that are
+			// project wrote itself (private/blocks/), its own themes
+			// (private/themes/) and the fonts that are
 			// installed (public/fonts/) are carried the same way, each file by the
-			// rule of its directory (see block() and font()) - the work folder an
+			// rule of its directory (see block(), theme() and font()) - the work folder an
 			// install of a font makes beside its target is none of them
-			foreach( [ 'templates' => $templates, 'images' => $images, 'assets' => $assets, 'blocks' => $blocks, 'fonts' => $fonts ] as $archive => $root ) {
+			foreach( [ 'templates' => $templates, 'images' => $images, 'assets' => $assets, 'blocks' => $blocks, 'themes' => $themes, 'fonts' => $fonts ] as $archive => $root ) {
 
 				if( is_dir( $root ) === false )
 					continue;
@@ -165,12 +167,17 @@ namespace Nino {
 					if( $archive === 'blocks' && self::block( $relative ) === false )
 						continue;
 
+					if( $archive === 'themes' && self::theme( $relative ) === false )
+						continue;
+
 					if( $archive === 'fonts' && self::font( $relative ) === false )
 						continue;
 
 					$files[$path] = $archive. '/'. $relative;
 				}
 			}
+
+			$files = self::_withinThemeLimits( $files );
 
 			// The two files a Newsletter keeps: its subscribers, and the removal
 			// record it writes on every unsubscribe (a sha256 per removed
@@ -264,17 +271,58 @@ namespace Nino {
 			return $files;
 		}
 
+		/**
+		 *	The files of the manifest without those of a theme that is more than a theme package may be: more files, or more
+		 *	bytes together, than \Nino\Packages::LIMITS names for a theme. The theme is left out as a whole, with one line in
+		 *	the log that names its key and why, and the backup goes on - a theme that is beyond the limit cannot be read
+		 *	by the themes either. Bounded as it is (400 files, 4 MB a theme), the themes need no place of their own in the
+		 *	check of the memory a backup needs before it packs
+		 *
+		 *	@param		array 		$files				absolute path => path in the archive
+		 *
+		 *	@return 	array
+		 */
+		private static function _withinThemeLimits( array $files ): array {
+
+			$limits = \Nino\Packages::LIMITS[\Nino\Packages::THEME];
+			$count	= [];
+			$bytes	= [];
+
+			foreach( $files as $path => $name )
+				if( str_starts_with( $name, 'themes/' ) === true ) {
+					$key = explode( '/', $name )[1];
+					$count[$key] = ( $count[$key] ?? 0 ) + 1;
+					$bytes[$key] = ( $bytes[$key] ?? 0 ) + (int) @filesize( $path );
+				}
+
+			foreach( $count as $key => $number ) {
+
+				$why = $number > $limits['files'] ? 'more than '. $limits['files']. ' files' : ( $bytes[$key] > $limits['bytes'] ? 'more than '. $limits['bytes']. ' bytes' : '' );
+
+				if( $why === '' )
+					continue;
+
+				trigger_error( 'Backup: the theme "'. $key. '" is left out of the archive, it holds '. $why, E_USER_WARNING );
+
+				foreach( $files as $path => $name )
+					if( str_starts_with( $name, 'themes/'. $key. '/' ) === true )
+						unset( $files[$path] );
+			}
+
+			return $files;
+		}
+
 		// The top-level entries of an archive: manifest() makes no others, and
 		// nino.php is stamp()'s. A restore copies each one into the project, so
 		// an archive that names another would plant a file next to index.php
-		private const array ARCHIVE_DIRS = [ 'text', 'elements', 'templates', 'assets', 'images', 'data', 'blocks', 'fonts' ];
+		private const array ARCHIVE_DIRS = [ 'text', 'elements', 'templates', 'assets', 'images', 'data', 'blocks', 'themes', 'fonts' ];
 		private const array ARCHIVE_FILES = [ 'config.php', 'nino.php' ];
 
 		/**
 		 *	Where a top-level directory of an archive lives in the project. All of them are resolved by their
-		 *	own name (see \Nino\Filesystem::path()) but one: the blocks of the project are below the private
-		 *	root as private/blocks/, and an archive names them blocks/. The one place of the mapping, for the
-		 *	collection and for the restore alike
+		 *	own name (see \Nino\Filesystem::path()) but two: the blocks of the project are below the private
+		 *	root as private/blocks/ and its own themes as private/themes/, and an archive names them blocks/
+		 *	and themes/. The one place of the mapping, for the collection and for the restore alike
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$entry				The directory as the archive names it, eg. 'templates'
@@ -282,7 +330,7 @@ namespace Nino {
 		 *	@return 	string										Absolute path
 		 */
 		public static function target( array &$appData, string $entry ): string {
-			return \Nino\Filesystem::path( $appData, $entry === 'blocks' ? '/private/blocks' : '/'. $entry );
+			return \Nino\Filesystem::path( $appData, in_array( $entry, [ 'blocks', 'themes' ], true ) === true ? '/private/'. $entry : '/'. $entry );
 		}
 
 		/**
@@ -296,6 +344,22 @@ namespace Nino {
 		 */
 		public static function block( string $relative ): bool {
 			return self::_plain( $relative, self::BLOCK_NAME );
+		}
+
+		/**
+		 *	Whether a path below themes/ is a file of a theme the project wrote itself: <key>/ and below it a path of one of
+		 *	the forms of a theme package - theme.json, theme.css, parts/<group>/part.json and part.css, blocks/<block>/...,
+		 *	preview.webp, LICENSE.txt, README.md (see \Nino\Packages::ofTheme(), the rule that package is checked by).
+		 *	Nothing else is a part of the backup, whatever it is called: a file of another form is left out where the backup
+		 *	is made and refused where it is restored. Only ever copied - nothing of the kernel includes or registers a file
+		 *	of that directory. The one rule of what a backup collects there and of what a restore takes
+		 *
+		 *	@param		string		$relative			eg. 'mine/theme.json' or 'mine/parts/colors/part.css'
+		 *
+		 *	@return 	bool
+		 */
+		public static function theme( string $relative ): bool {
+			return \Nino\Packages::ofTheme( $relative );
 		}
 
 		/**
@@ -642,7 +706,7 @@ namespace Nino {
 					return self::_refuse( $relative, 'a file that is no picture' );
 
 				// A svg of a block is read by the kernel as a drawing as well; what a restore puts there is held to the same rule
-				if( ( str_starts_with( $relative, 'images/' ) === true || str_starts_with( $relative, 'blocks/' ) === true ) && preg_match( '/\.svg$/', $name ) === 1 ) {
+				if( ( str_starts_with( $relative, 'images/' ) === true || str_starts_with( $relative, 'blocks/' ) === true || str_starts_with( $relative, 'themes/' ) === true ) && preg_match( '/\.svg$/', $name ) === 1 ) {
 
 					$drawing = @file_get_contents( $item->getPathname() );
 
@@ -652,6 +716,9 @@ namespace Nino {
 
 				if( str_starts_with( $relative, 'blocks/' ) === true && self::block( substr( $relative, 7 ) ) === false )
 					return self::_refuse( $relative, 'a file that is no part of a block' );
+
+				if( str_starts_with( $relative, 'themes/' ) === true && self::theme( substr( $relative, 7 ) ) === false )
+					return self::_refuse( $relative, 'a file that is no part of a theme' );
 
 				if( str_starts_with( $relative, 'fonts/' ) === true && self::font( substr( $relative, 6 ) ) === false )
 					return self::_refuse( $relative, 'a file that is no part of a font' );
@@ -738,12 +805,13 @@ namespace Nino {
 					return 'a file that is no template';
 			}
 
-			if( ( $segments[0] === 'blocks' || $segments[0] === 'fonts' ) && count( $segments ) > 1 && $dir === false ) {
+			if( in_array( $segments[0], [ 'blocks', 'themes', 'fonts' ], true ) === true && count( $segments ) > 1 && $dir === false ) {
 
 				$below = implode( '/', array_slice( $segments, 1 ) );
+				$ok		 = match( $segments[0] ) { 'blocks' => self::block( $below ), 'themes' => self::theme( $below ), default => self::font( $below ) };
 
-				if( ( $segments[0] === 'blocks' ? self::block( $below ) : self::font( $below ) ) === false )
-					return 'a file that is no part of a '. ( $segments[0] === 'blocks' ? 'block' : 'font' );
+				if( $ok === false )
+					return 'a file that is no part of a '. match( $segments[0] ) { 'blocks' => 'block', 'themes' => 'theme', default => 'font' };
 			}
 
 			return null;

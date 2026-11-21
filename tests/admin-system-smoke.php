@@ -1703,6 +1703,92 @@ $empty = is_string( $emptyId ) === true ? $readArchive( $emptyId ) : [ 'blocks/'
 check( 'a project without blocks of its own and without fonts has an archive without them, and the backup does not fail for the folders that are not there',
 	array_filter( array_keys( $empty ), static fn( string $name ): bool => str_starts_with( $name, 'blocks/' ) === true || str_starts_with( $name, 'fonts/' ) === true ) === [] && isset( $empty['templates/page-probe.tpl'] ) === true );
 
+// --- The themes of the project ---------------------------------------------
+//
+// private/themes/ is where the project keeps the themes it made itself, and an archive carries them as themes/ the way it carries
+// blocks/. A restore only copies them: whatever a theme folder holds is data to the kernel, which includes nothing from there
+echo "Themes in an archive\n";
+
+$themesDir	= $sandbox. '/private/themes';
+$ownThemes	= [
+	'mine/theme.json'							=> '{"key":"mine","name":"Mine","version":"1.0.0"}',
+	'mine/theme.css'							=> ":root { --c: #123; }\n",
+	'mine/parts/colors/part.json'	=> '{"id":"colors"}',
+	'mine/blocks/hero/block.tpl'	=> "[section-wrap id=\"hero\"]\n",
+	'mine/README.md'							=> "# Mine\n",
+];
+// What is no form of a theme package: left out of the archive, whatever it is and however large
+$themeCargo	= [ 'mine/cargo.bin' => random_bytes( 20971520 ), 'mine/notes.txt' => "cargo\n", 'mine/a.html' => '<p>x</p>', 'mine/a.js' => 'alert(1)', 'mine/user.ini' => 'x=1', 'mine/blocks/block.tpl' => 'x', 'top.json' => '{}' ];
+$themeNoise	= [
+	$themesDir. '/mine/.building/theme.json'	=> 'the work of a save that is not done',
+	$themesDir. '/mine/shell.php'							=> '<?php echo 1;',
+];
+
+// A theme over the limit of a theme package, by the number of its files and by its bytes: left out as a whole
+$themeBig = [ 'many/theme.json' => '{}', 'heavy/theme.json' => '{}', 'heavy/theme.css' => str_repeat( 'a', \Nino\Packages::LIMITS[\Nino\Packages::THEME]['bytes'] + 1 ) ];
+for( $i = 1; $i <= 400; $i++ )
+	$themeBig['many/blocks/b'. $i. '/block.json'] = '{}';
+
+foreach( array_merge( array_combine( array_map( static fn( string $name ): string => $themesDir. '/'. $name, array_keys( $ownThemes ) ), $ownThemes ), array_combine( array_map( static fn( string $name ): string => $themesDir. '/'. $name, array_keys( $themeCargo ) ), $themeCargo ), array_combine( array_map( static fn( string $name ): string => $themesDir. '/'. $name, array_keys( $themeBig ) ), $themeBig ), $themeNoise ) as $path => $bytes ) {
+	@mkdir( dirname( $path ), 0755, true );
+	file_put_contents( $path, $bytes );
+}
+
+$linked = function_exists( 'symlink' ) === true && @symlink( '/etc/hostname', $themesDir. '/mine/link.json' ) === true && @symlink( '/etc', $themesDir. '/mine/linkdir' ) === true;
+
+ninoWarnings();
+$themeId		= \Nino\Modules\Backups::now( $appData );
+$themeLog		= ninoWarnings();
+$themeEntries = is_string( $themeId ) === true ? $readArchive( $themeId ) : [];
+$themeCarried = array_filter( $themeEntries, static fn( string $name ): bool => str_starts_with( $name, 'themes/' ) === true, ARRAY_FILTER_USE_KEY );
+$themeExpected = array_combine( array_map( static fn( string $name ): string => 'themes/'. $name, array_keys( $ownThemes ) ), $ownThemes );
+ksort( $themeCarried );
+ksort( $themeExpected );
+check( 'an archive carries the themes of the project as themes/<key>/..., byte for byte, in the forms of a theme package - and not a hidden work folder, a script or a link, whatever it points to'. ( $linked === true ? '' : ' (no symlinks here)' ), $themeCarried === $themeExpected && isset( $themeEntries['themes/mine/theme.json'] ) === true );
+
+check( 'a file of no form of a theme package - 20 MB of cargo, a text, a page, a script, a user.ini, a block with no folder, a file beside the keys - is left out, and the backup is made', is_string( $themeId ) === true
+	&& array_filter( array_keys( $themeEntries ), static fn( string $name ): bool => preg_match( '#^themes/(?:mine/(?:cargo|notes|a\.|user)|top)#', $name ) === 1 || $name === 'themes/mine/blocks/block.tpl' ) === [] );
+check( 'a theme over the limit of a theme package, in files or in bytes, is left out as a whole - with one line in the log naming its key and why - and the other theme stays', array_filter( array_keys( $themeEntries ), static fn( string $name ): bool => str_starts_with( $name, 'themes/many/' ) === true || str_starts_with( $name, 'themes/heavy/' ) === true ) === []
+	&& count( array_filter( $themeLog, static fn( string $m ): bool => str_contains( $m, '"many"' ) && str_contains( $m, 'files' ) ) ) === 1 && count( array_filter( $themeLog, static fn( string $m ): bool => str_contains( $m, '"heavy"' ) && str_contains( $m, 'bytes' ) ) ) === 1
+	&& count( array_filter( $themeLog, static fn( string $m ): bool => str_contains( $m, 'left out of the archive' ) ) ) === 2 && isset( $themeEntries['themes/mine/theme.json'] ) === true );
+
+// The theme gone, as on a new server, and a theme written after the archive
+\Nino\Filesystem::removeDir( $themesDir. '/mine' );
+@mkdir( $themesDir. '/late', 0755, true );
+file_put_contents( $themesDir. '/late/theme.json', 'written after the archive' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $themeId ] );
+$themesSame = true;
+foreach( $ownThemes as $name => $bytes )
+	if( @file_get_contents( $themesDir. '/'. $name ) !== $bytes )
+		$themesSame = false;
+check( 'a restore puts a theme that is gone back where the project keeps it - private/themes/ - byte for byte, and no themes/ appears in the root', $status === 200 && ( $body['ok'] ?? false ) === true && $themesSame === true
+	&& is_dir( $sandbox. '/themes' ) === false && is_dir( $sandbox. '/private/private' ) === false && is_file( $themesDir. '/mine/shell.php' ) === false );
+check( '...and leaves a theme that the archive has not', file_get_contents( $themesDir. '/late/theme.json' ) === 'written after the archive' );
+
+// An archive made before the themes were in it: the same format with fewer entries, and what is on disk stays
+$oldThemesId = date( 'Y-m-d' ). '-100004';
+$writeArchive( $oldThemesId, array_diff_key( $themeEntries, $themeCarried ) );
+file_put_contents( $themesDir. '/mine/theme.json', 'kept on disk' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $oldThemesId ] );
+check( 'an archive without themes/ restores as it did and takes nothing away: the themes on disk are as they were', $status === 200 && ( $body['ok'] ?? false ) === true
+	&& file_get_contents( $themesDir. '/mine/theme.json' ) === 'kept on disk' && file_get_contents( $themesDir. '/late/theme.json' ) === 'written after the archive' );
+
+// A script among the themes is refused whatever key the archive was made with
+$themeScriptId = date( 'Y-m-d' ). '-100005';
+$writeArchive( $themeScriptId, array_merge( $themeEntries, [ 'themes/mine/shell.php' => '<?php echo 1;', 'themes/mine/x.php.json' => '{}' ] ) );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $themeScriptId ] );
+check( 'an archive made with the key of the project that holds a script among the themes is refused as well - 422, nothing of it written', $status === 422
+	&& is_file( $themesDir. '/mine/shell.php' ) === false && is_file( $themesDir. '/mine/x.php.json' ) === false && file_get_contents( $themesDir. '/mine/theme.json' ) === 'kept on disk' );
+
+// A project without themes of its own makes an archive without them
+\Nino\Filesystem::removeDir( $themesDir );
+$noThemesId = \Nino\Modules\Backups::now( $appData );
+$noThemes = is_string( $noThemesId ) === true ? $readArchive( $noThemesId ) : [ 'themes/' => 1 ];
+check( 'a project without themes of its own has an archive without them, and the backup does not fail for the folder that is not there', array_filter( array_keys( $noThemes ), static fn( string $name ): bool => str_starts_with( $name, 'themes/' ) === true ) === [] && isset( $noThemes['templates/page-probe.tpl'] ) === true );
+
 // An archive somebody with the key made by hand. Each one carries a good
 // template before the entry that is refused: it is refused as a whole, nothing
 // of it is written, and no snapshot is made for it
@@ -1727,6 +1813,15 @@ $hostile = [
 	'a hidden file'												=> $good. $tarEntry( 'templates/crm-portal/.hidden.tpl', 'x' ),
 	'a directory called like a template'	=> $good. $tarEntry( 'templates/crm-portal/dir.tpl/', '', '5' ),
 	'a template below such a directory'		=> $good. $tarEntry( 'templates/crm-portal/dir.tpl/inner.tpl', 'x' ),
+	'a path with .. below themes/'				=> $good. $tarEntry( 'themes/../x', 'x' ),
+	'a path with .. in a theme'						=> $good. $tarEntry( 'themes/mine/../../x.json', 'x' ),
+	'a script in a theme'									=> $good. $tarEntry( 'themes/mine/evil.php', '<?php' ),
+	'a page in a theme'										=> $good. $tarEntry( 'themes/mine/a.html', '<p>x</p>' ),
+	'a script file in a theme'						=> $good. $tarEntry( 'themes/mine/a.js', 'alert(1)' ),
+	'a user.ini in a theme'								=> $good. $tarEntry( 'themes/mine/user.ini', 'x=1' ),
+	'a file beside the keys of the themes'	=> $good. $tarEntry( 'themes/top.json', '{}' ),
+	'a hidden file in a theme'						=> $good. $tarEntry( 'themes/mine/.hidden.json', 'x' ),
+	'a symbolic link in a theme'					=> $good. $tarEntry( 'themes/mine/sym.json', '', '2', '/etc/hostname' ),
 	'an entry beside the project\'s own'	=> $good. $tarEntry( 'index.php', '<?php' ),
 	'a file where a directory belongs'		=> $good. $tarEntry( 'templates', 'x' ),
 	'a header that is none'								=> $good. $flawed,

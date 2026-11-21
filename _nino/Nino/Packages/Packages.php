@@ -764,6 +764,26 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a path is the path of a file of a theme the project made itself: the key of the theme, a slug of the length
+		 *	a key has, and below it a path one of the forms of a theme names (see _shape()). The same rule that decides what
+		 *	a theme package may hold, for the backup, which carries the folders below private/themes/ and takes what has
+		 *	this form and nothing else
+		 *
+		 *	@param		string		$relative			Below the folder of the themes, eg. 'mine/parts/colors/part.css'
+		 *
+		 *	@return 	bool
+		 */
+		public static function ofTheme( string $relative ): bool {
+
+			if( self::_plain( $relative ) === false )
+				return false;
+
+			[ $key, $path ] = array_pad( explode( '/', $relative, 2 ), 2, '' );
+
+			return $path !== '' && strlen( $key ) <= \Nino\Components::NAME_LENGTH && preg_match( '#^'. self::SLUG. '$#D', $key ) === 1 && self::_shape( self::THEME, $path ) !== null;
+		}
+
+		/**
 		 *	The form a file of a theme or of a package of blocks has, by its path
 		 *
 		 *	@param		string		$kind

@@ -318,6 +318,8 @@ $goodFiles = [
 	'templates/page-x.tpl' => '<h1>x</h1>',
 	'blocks/hero/block.json' => '{"category":"intro"}',
 	'blocks/hero/text/en_US.json' => '{"title":"Hero"}',
+	'themes/mine/theme.json' => '{"key":"mine"}',
+	'themes/mine/blocks/hero/block.tpl' => '[section-wrap]',
 	'fonts/inter/400.woff2' => 'wOF2',
 	'fonts/inter/font.json' => '{"family":"Inter"}',
 	'fonts/inter/LICENSE.txt' => 'SIL Open Font License',
@@ -335,6 +337,7 @@ recoveryKeyFile( $fifth, $crafted() );
 check( 'a crafted archive of nothing but data and pictures - strings with quotes, NUL bytes, umlauts, numbers of every shape, null, nesting, a negative key - is restored: the check is not in the way of what Nino writes', $status === 200 && ( \Nino\Filesystem::getFileContent( $fifth, '/text/global.php', [] )['odd'] ?? '' ) === "quote ' backslash \\ nul \0 line\nbreak umlaut ä emoji 😀" );
 check( '...with the blocks of the project and the installed fonts in it: they come back where the project keeps them, private/blocks/ and public/fonts/,',
 	is_file( $fifthDir. '/private/blocks/hero/text/en_US.json' ) === true && file_get_contents( $fifthDir. '/private/blocks/hero/block.json' ) === '{"category":"intro"}'
+	&& file_get_contents( $fifthDir. '/private/themes/mine/theme.json' ) === '{"key":"mine"}' && file_get_contents( $fifthDir. '/private/themes/mine/blocks/hero/block.tpl' ) === '[section-wrap]' && is_dir( $fifthDir. '/themes' ) === false
 	&& file_get_contents( $fifthDir. '/public/fonts/inter/400.woff2' ) === 'wOF2' && file_get_contents( $fifthDir. '/public/fonts/inter/LICENSE.txt' ) === 'SIL Open Font License' && is_dir( $fifthDir. '/blocks' ) === false );
 
 $marker = sys_get_temp_dir(). '/nino-recovery-key-ran-'. bin2hex( random_bytes( 4 ) );
@@ -396,6 +399,11 @@ $refused = [
 	'a picture without an extension' 											=> [ [ 'images/x' => 'x' ], 'no picture' ],
 	'a php file below a picture directory' 								=> [ [ 'images/elements/a/shell.phar' => $code ], 'no picture' ],
 	'a php file among the blocks' 												=> [ [ 'blocks/hero/shell.php' => $code ], 'no part of a block' ],
+	'a php file among the themes' 												=> [ [ 'themes/mine/shell.php' => $code ], 'no part of a theme' ],
+	'a script name behind the extension in a theme' 			=> [ [ 'themes/mine/x.php.json' => $code ], 'no part of a theme' ],
+	'a page, a script and a user.ini among the themes' 		=> [ [ 'themes/mine/a.html' => '<p>x</p>', 'themes/mine/a.js' => 'alert(1)', 'themes/mine/user.ini' => 'x=1' ], 'no part of a theme' ],
+	'a hidden file among the themes' 											=> [ [ 'themes/mine/.htaccess' => 'x' ], 'no part of a theme' ],
+	'an svg with a script among the themes' 							=> [ [ 'themes/mine/blocks/hero/images/x.svg' => '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' ], 'drawing' ],
 	'a php file among the fonts' 													=> [ [ 'fonts/inter/shell.php' => $code ], 'no part of a font' ],
 	'a script name behind the extension of a font' 			=> [ [ 'fonts/inter/shell.php.woff2' => $code, 'fonts/inter/x.phtml.txt' => $code, 'fonts/inter/x.php5.ttf' => $code ], 'no part of a font' ],
 	'a file of the webserver among the fonts' 						=> [ [ 'fonts/.htaccess' => 'AddType application/x-httpd-php .woff2' ], 'no part of a font' ],
@@ -450,6 +458,12 @@ file_put_contents( $staging. '/config.php', $data( str_repeat( 'x', 3000000 ) ) 
 check( '...a large file passes, and costs a pattern and not a list of tokens', \Nino\Backup::codeRefusal( $staging ) === null );
 file_put_contents( $staging. '/config.php', "<?php return [ 'a' => '". str_repeat( 'x', 3000000 ). "' ]; system('id');" );
 check( '...and code behind a large string is found', \Nino\Backup::codeRefusal( $staging ) !== null );
+file_put_contents( $staging. '/config.php', $data( [ 'a' => 1 ] ) );
+mkdir( $staging. '/themes/mine', 0755, true );
+file_put_contents( $staging. '/themes/mine/theme.json', '{}' );
+check( '...a theme of the project passes', \Nino\Backup::codeRefusal( $staging ) === null );
+file_put_contents( $staging. '/themes/mine/x.php.json', '{}' );
+check( '...and a script name among the themes is refused on the staged tree itself', str_contains( (string) \Nino\Backup::codeRefusal( $staging ), 'no part of a theme' ) );
 \Nino\Filesystem::removeDir( $staging );
 
 \Nino\Filesystem::removeDir( $oldDir );
