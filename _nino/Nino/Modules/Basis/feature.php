@@ -61,7 +61,7 @@ return [
 		'install' => [
 			'text/<locale>.php' => [
 				'en_US' => 'Puts the three words of the menus - Main, Menu, Footer - into the Text panel, for the names of the buttons and lists a screen reader reads.',
-				'de_DE' => 'Bringt die drei Worte der Menüs - Haupt, Menü, Fuß - ins Panel Texte, für die Namen der Knöpfe und Listen, die ein Screenreader liest.',
+				'de_DE' => 'Bringt die drei Worte der Menüs - Haupt, Menü, Fußbereich - ins Panel Texte, für die Namen der Knöpfe und Listen, die ein Screenreader liest.',
 			],
 		],
 	],

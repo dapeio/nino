@@ -6,5 +6,5 @@ declare(strict_types=1);
 return [
 	'[[/module/basis/navigation/primary]]'		=> 'Hauptnavigation',
 	'[[/module/basis/navigation/menu]]'		=> 'Menü',
-	'[[/module/basis/navigation/footer]]'	=> 'Navigation im Fuß',
+	'[[/module/basis/navigation/footer]]'	=> 'Navigation im Fußbereich',
 ];

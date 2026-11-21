@@ -1016,7 +1016,7 @@ $shown = [
 		'component header-wrap' => ( include $basis. 'components/header-wrap/component.php' )['label']['de_DE'], 'component footer-wrap' => ( include $basis. 'components/footer-wrap/component.php' )['label']['de_DE'],
 		'group header' => ( include $basis. 'groups/header/group.php' )['label']['de_DE'], 'group footer' => ( include $basis. 'groups/footer/group.php' )['label']['de_DE'],
 		'block header-line' => json_decode( $read( '_nino/Nino/Modules/Basis/blocks/header-line/block.json' ), true )['name']['de_DE'], 'block footer-columns' => json_decode( $read( '_nino/Nino/Modules/Basis/blocks/footer-columns/block.json' ), true )['name']['de_DE'],
-		'feature basis' => ( include $basis. 'feature.php' )['description']['de_DE'] ],
+		'feature basis' => ( include $basis. 'feature.php' )['description']['de_DE'], 'basis menu footer' => ( include $basis. 'install/text/de_DE.php' )['[[/module/basis/navigation/footer]]'] ],
 	'en' => [ 'workbench header' => $en['/_admin/common/word/header'] ?? '', 'workbench footer' => $en['/_admin/common/word/footer'] ?? '', 'workbench frame' => $en['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $en['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $en['/_admin/common/word/frame-footer'] ?? '',
 		'component header-wrap' => ( include $basis. 'components/header-wrap/component.php' )['label']['en_US'], 'component footer-wrap' => ( include $basis. 'components/footer-wrap/component.php' )['label']['en_US'],
 		'group header' => ( include $basis. 'groups/header/group.php' )['label']['en_US'], 'group footer' => ( include $basis. 'groups/footer/group.php' )['label']['en_US'],
@@ -1033,7 +1033,7 @@ foreach( $shown['en'] as $where => $text )
 		$wrong[] = 'en '. $where. ': '. $text;
 
 check( 'the head and the foot of a page are Kopfbereich, Fußbereich and Kopf-/Fußbereich in German - never Rahmen, Header or Footer - and Header, Footer and Header/footer in English, never a frame, in the workbench and in the Basis components, groups, blocks and description'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ),
-	$wrong === [] && $de['/_admin/common/word/frame'] === 'Kopf-/Fußbereich' && $en['/_admin/common/word/frame'] === 'Header/footer' && $de['/_admin/common/word/border'] === 'Rahmenlinie' );
+	$wrong === [] && str_contains( $shown['de']['basis menu footer'], 'Fußbereich' ) === true && str_contains( (string) file_get_contents( $basis. 'feature.php' ), 'Haupt, Menü, Fußbereich' ) === true && $de['/_admin/common/word/frame'] === 'Kopf-/Fußbereich' && $en['/_admin/common/word/frame'] === 'Header/footer' && $de['/_admin/common/word/border'] === 'Rahmenlinie' );
 
 $none = [];
 ninoDone( $none );
