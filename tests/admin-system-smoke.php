@@ -16,6 +16,24 @@ declare(strict_types=1);
  *	Usage: php tests/admin-system-smoke.php
  */
 
+// The checks of the backup count the files of the system's temp directory before and after - "nothing is left behind" - and that directory is shared: with
+// another run of this suite in another copy, or any other process that makes a ninobackup* or ninorestore* file there, the count moves and a check is red with nothing
+// broken. So the suite runs in a temp directory of its own: it starts itself once more with sys_temp_dir set to a directory that only it makes files in, and
+// takes that directory away when it is done. What the run prints and its exit status are those of the run that does the work
+if( getenv( 'NINO_SMOKE_OWN_TEMP' ) === false && ( $argv[1] ?? '' ) === '' ) {
+
+	$own = sys_get_temp_dir(). '/nino-system-smoke-'. bin2hex( random_bytes( 6 ) );
+	mkdir( $own, 0700 );
+	$run = proc_open( [ PHP_BINARY, '-d', 'sys_temp_dir='. $own, __FILE__ ], [ 0 => STDIN, 1 => STDOUT, 2 => STDERR ], $none, null, array_merge( getenv(), [ 'NINO_SMOKE_OWN_TEMP' => $own ] ) );
+	$code = is_resource( $run ) === true ? proc_close( $run ) : 1;
+
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $own, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST ) as $left )
+		$left->isDir() === true && $left->isLink() === false ? @rmdir( $left->getPathname() ) : @unlink( $left->getPathname() );
+
+	@rmdir( $own );
+	exit( $code );
+}
+
 // Run as a child of itself (see "Recovery::handlePost without a Backups
 // module" below): a kernel whose autoloader refuses the Backups panel, which
 // is the only way to be without that class once this suite has loaded it.
