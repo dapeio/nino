@@ -2403,8 +2403,10 @@ namespace Nino\Admin {
 		// writes it; hash() reads it
 		public const string PASSWORD_PATH = '/.auth/pw.php';
 
-		/*	A hash nothing ever verifies against, for an installation that has
-			none of its own.
+		/*	The hash nothing ever verifies against, for an installation that has
+			none of its own, is \Nino\Auth::decoyHash(): the hash of 32 random bytes nobody
+			kept, made with PASSWORD_DEFAULT by the php that runs, so that its cost is the
+			cost of the hash set() writes now.
 
 			password_verify() is where the time goes - bcrypt at this php's
 			default cost is around 220 ms here - and '$hash !== null &&
@@ -2414,13 +2416,11 @@ namespace Nino\Admin {
 			unauthenticated caller, and the docblock on verify() has claimed
 			since it was written that it is not there.
 
-			Pinned rather than computed, because generating one costs the same
-			as the verify it is there to imitate. Its plaintext is 32 random
-			bytes nobody kept. tests/admin-system-smoke.php compares its algorithm
-			and cost against what password_hash() produces on the php running
-			the tests, so a php that moves the default fails a check instead of
-			quietly reopening the gap.	*/
-		private const string DECOY_HASH = '$2y$12$chyCv/lOYBJvmL3beXveSOsJpcvIbrxZC6uJZw02M5hUz89c3/bAW';
+			It is no constant: the cost password_hash() takes moved with php 8.4,
+			and a constant made for one php is dearer or cheaper than the hashes
+			another stores. It is kept in a file, made once for the installation and
+			again where the php would make it differently, and no password_hash() runs in
+			a rejection that finds it - tests/admin-system-smoke.php holds all of that	*/
 
 		// The attempt counter, next to the credential it guards. A virtual
 		// path (see \Nino\Filesystem::CONTENT_DIR), so it goes through
@@ -2884,7 +2884,10 @@ namespace Nino\Admin {
 			$lockedOut 	= false;
 			$verified 	= false;
 
-			\Nino\Filesystem::mutate( $appData, self::LOCKOUT_PATH, function( mixed $state ) use ( $password, $hash, &$lockedOut, &$verified ): ?array {
+			// Asked on every attempt, before the lock and whatever the file holds: no way is cheaper than the other by a read or a hash
+			$decoy 			= \Nino\Auth::decoyHash( $appData );
+
+			\Nino\Filesystem::mutate( $appData, self::LOCKOUT_PATH, function( mixed $state ) use ( $password, $hash, $decoy, &$lockedOut, &$verified ): ?array {
 
 				// mutate() hands over what the file holds, and $default only covers
 				// a file that is not there: an empty, truncated or unreadable
@@ -2903,9 +2906,9 @@ namespace Nino\Admin {
 				}
 
 				// Always a verify, with or without a hash of its own to verify
-				// against - see DECOY_HASH. The null check comes after it and so
+				// against - see the decoy above. The null check comes after it and so
 				// cannot be skipped: nothing authenticates against the decoy
-				$verified = password_verify( $password, $hash ?? self::DECOY_HASH ) === true && $hash !== null;
+				$verified = password_verify( $password, $hash ?? $decoy ) === true && $hash !== null;
 
 				if( $verified === true )
 					return [ 'tries' => 0, 'until' => 0 ];
@@ -2921,6 +2924,12 @@ namespace Nino\Admin {
 
 			if( $lockedOut === true )
 				return 429;
+
+			// A secret that was stored with another cost than this php hashes with - the installation moved to a newer php - is stored again at the current
+			// one, after it was proven and outside the counter's lock, written atomically as every write of the file is, and only where the file still holds the hash that was checked (a secret that was changed meanwhile stays): what a rejection costs does not
+			// change, and the next successful attempt costs what the decoy costs
+			if( $verified === true && $hash !== null && password_needs_rehash( $hash, PASSWORD_DEFAULT ) === true )
+				self::_rehash( $appData, $hash, password_hash( $password, PASSWORD_DEFAULT ) );
 
 			return $verified === true ? 200 : 401;
 		}
@@ -3028,6 +3037,58 @@ namespace Nino\Admin {
 			if( $hash === '' )
 				return false;
 
+			$path = self::_prepare( $appData );
+
+			if( $path === null )
+				return false;
+
+			$lock = self::_lock( $path );
+
+			try {
+				return self::_store( $path, $hash );
+			}
+			finally {
+				self::_unlock( $lock );
+			}
+		}
+
+		/**
+		 *	Store the secret again at the cost this php hashes with - after the right one was given, and only where the file still holds the hash
+		 *	that was checked: the check and the write are one step under the lock that writeHash() takes, so that a secret that was changed in between
+		 *	(the Users panel, another request) is not put back. Where the file holds another hash nothing is written
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$checked			The hash the password was verified against
+		 *	@param		string		$new					The hash to store: of the same password, made by the php that runs
+		 *
+		 *	@return 	bool										Whether it was stored
+		 */
+		private static function _rehash( array &$appData, string $checked, string $new ): bool {
+
+			$path = self::_prepare( $appData );
+
+			if( $path === null || $new === '' )
+				return false;
+
+			$lock = self::_lock( $path );
+
+			try {
+				return self::hash( $appData ) === $checked && self::_store( $path, $new );
+			}
+			finally {
+				self::_unlock( $lock );
+			}
+		}
+
+		/**
+		 *	The path of the file of the hash, with its directory there and shut to the web
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							Null where the directory cannot be made
+		 */
+		private static function _prepare( array &$appData ): ?string {
+
 			$path = self::path( $appData );
 			$dir 	= dirname( $path );
 
@@ -3035,10 +3096,53 @@ namespace Nino\Admin {
 			// a concurrent request may have created the directory between the
 			// is_dir() and the mkdir()
 			if( is_dir( $dir ) === false && @mkdir( $dir, 0777, true ) === false && is_dir( $dir ) === false )
-				return false;
+				return null;
 
 			self::_denyDirectory( dirname( $dir ) );
 
+			return $path;
+		}
+
+		/**
+		 *	The lock every write of the hash is made under, a file beside it: setting and storing again do not overtake one another
+		 *
+		 *	@param		string		$path
+		 *
+		 *	@return 	resource|null						Null where it cannot be had: the write goes on without it, as the file is written whole in any case
+		 */
+		private static function _lock( string $path ) {
+
+			$lock = @fopen( $path. '.lock', 'c' );
+
+			if( $lock === false )
+				return null;
+
+			@flock( $lock, LOCK_EX );
+
+			return $lock;
+		}
+
+		/**
+		 *	@param		resource|null	$lock
+		 *
+		 *	@return 	void
+		 */
+		private static function _unlock( $lock ): void {
+
+			if( is_resource( $lock ) === false )
+				return;
+
+			@flock( $lock, LOCK_UN );
+			fclose( $lock );
+		}
+
+		/**
+		 *	@param		string		$path
+		 *	@param		string		$hash
+		 *
+		 *	@return 	bool
+		 */
+		private static function _store( string $path, string $hash ): bool {
 			return \Nino\Admin\Admin::writeFileAtomic( $path, self::STUB_PREFIX. $hash. self::STUB_SUFFIX );
 		}
 

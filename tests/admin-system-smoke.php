@@ -55,6 +55,7 @@ if( ( $argv[1] ?? '' ) === 'daily-backup' ) {
 	$appData['./nino/filesystem/contentpath']	= $argv[2]. '/private';
 	$appData['./nino/filesystem/publicpath']	= $argv[2]. '/public';
 	$appData['./nino/backups/memory']					= -1;
+
 	\Nino\Modules\Backups::maybeRun( $appData );
 	echo 'survived';
 	exit;
@@ -179,7 +180,7 @@ foreach( [ 'an empty' => '', 'a truncated' => '{ "tries": ', 'a non-array' => '7
 \Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 
 // How long an answer takes is itself an answer: an installation whose secret file went missing must not reject faster than one that has a secret to reject
-// against - see Recovery::DECOY_HASH. A clock is no proof of that on a machine that does other things as well, so the protection is shown by what it is made of:
+// against - see \\Nino\\Auth::decoyHash(). A clock is no proof of that on a machine that does other things as well, so the protection is shown by what it is made of:
 // the one attempt that is made leaves the same trace with and without a secret, it is one password_verify() whatever the file holds, and the decoy it verifies
 // against is made as the hashes the secret is stored as are (below, once a secret has been stored again)
 $attempt = static function() use ( &$appData ): array {
@@ -195,28 +196,119 @@ $withSecret = $attempt();
 @unlink( \Nino\Admin\Recovery::path( $appData ) );
 $withoutSecret = $attempt();
 
-// The constant is private, so read it out of the source, and so is the one call that verifies against it
+// The decoy is \Nino\Auth::decoyHash(): the one call that verifies against it is in the source of the class
 $adminSource = (string) @file_get_contents( __DIR__. '/../_admin/Admin.php' );
-preg_match( '#DECOY_HASH = \'([^\']+)\'#', $adminSource, $decoy );
-$recovery = substr( $adminSource, (int) strpos( $adminSource, 'class Recovery {' ) );
-check( 'the decoy hash is a bcrypt hash, as the hashes of the secret are', isset( $decoy[1] ) === true && ( password_get_info( $decoy[1] )['algoName'] ?? '' ) === 'bcrypt' );
+$recovery = '<?php '. substr( $adminSource, (int) strpos( $adminSource, 'class Recovery {' ) );
+$verifyCalls = ninoCalls( $recovery, 'verify' );
+$decoyFile = \Nino\Filesystem::path( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' );
+$decoy = (string) ( \Nino\Filesystem::getFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [] )['hash'] ?? '' );
+check( 'the decoy is kept in a file of the private directory after the first attempts, and is a hash of the algorithm and the cost this php hashes with, on every php', is_file( $decoyFile ) === true && $decoy !== '' && password_needs_rehash( $decoy, PASSWORD_DEFAULT ) === false );
 check( 'losing the secret file leaves no stored hash', \Nino\Admin\Recovery::hash( $appData ) === null );
 check( 'so nothing authenticates, least of all against the decoy', \Nino\Admin\Recovery::verify( $appData, 'definitely-the-wrong-password' ) === 401 );
 check( 'and that rejection is the same attempt as one against a real hash: the same answer and the same trace - one try counted - with a secret and without', $withSecret === [ 401, 1 ] && $withoutSecret === [ 401, 1 ] );
-check( 'it is ONE password_verify() whatever the file holds - against the hash of the secret, or the decoy where there is none - and the answer of the decoy can never be yes',
-	substr_count( $recovery, 'password_verify( $' ) === 1 && str_contains( $recovery, 'password_verify( $password, $hash ?? self::DECOY_HASH ) === true && $hash !== null;' ) === true );
+check( 'it is ONE password_verify() whatever the file holds - against the hash of the secret, or the decoy where there is none - read as php reads the source, and no other way of comparing a secret stands in verify()',
+	count( array_keys( $verifyCalls, 'password_verify', true ) ) === 1 && array_intersect( $verifyCalls, [ 'crypt', 'hash_equals', 'md5', 'sha1', 'strcmp' ] ) === [] );
 
 check( 'the secret can be stored again for the rest of the file', \Nino\Admin\Recovery::set( $appData, 'the real password' ) === true );
 $stored = password_get_info( (string) \Nino\Admin\Recovery::hash( $appData ) );
-$decoyInfo = password_get_info( $decoy[1] ?? '' );
-preg_match( '#MIN_PHP_VERSION = \'([0-9.]+)\'#', (string) @file_get_contents( __DIR__. '/../_admin/install/Install.php' ), $minimum );
+$decoyInfo = password_get_info( $decoy );
 
-// The decoy is a constant that is as costly as the hashes of the php Nino requires write: the cost password_hash() takes by default moved with php 8.4. On a php below it
-// the secret is stored cheaper than the decoy is, which no test can change: that is told, and pinned where the php is the one the product asks for
-if( version_compare( PHP_VERSION, $minimum[1] ?? '8.4.0', '>=' ) === true )
-	check( 'the decoy is of the algorithm and the cost of the hash the secret is stored as: nothing is cheaper to reject, or dearer, for a missing secret', ( $stored['algo'] ?? null ) !== null && $stored['algo'] === $decoyInfo['algo'] && ( $stored['options']['cost'] ?? null ) === ( $decoyInfo['options']['cost'] ?? 0 ) );
-else
-	echo '  (not pinned: this php is '. PHP_VERSION. ', Nino asks for '. ( $minimum[1] ?? '8.4.0' ). ' or newer - it stores the secret at cost '. ( $stored['options']['cost'] ?? '?' ). ' and the decoy has cost '. ( $decoyInfo['options']['cost'] ?? '?' ). ")\n";
+// The decoy has the algorithm and the cost of the hash the secret is stored as - on every php, the one that Nino asks for and any below it: the decoy is made by the php that runs
+check( 'the decoy is of the algorithm and the cost of the hash the secret is stored as: nothing is cheaper to reject, or dearer, for a missing secret', ( $stored['algo'] ?? null ) !== null && $stored['algo'] === $decoyInfo['algo'] && ( $stored['options']['cost'] ?? null ) === ( $decoyInfo['options']['cost'] ?? 0 ) );
+
+// It is made once and kept: asked again it is the same hash, and no hash is made for a rejection that finds it
+$again = \Nino\Auth::decoyHash( $appData );
+check( 'the decoy is made once for the installation: the next attempts find it and are verified against it, a rejection makes no hash of its own', $again === $decoy && \Nino\Auth::decoyHash( $appData ) === $decoy );
+check( '...verify() asks for the decoy once, before the lock of the counter, and its only password_hash() is the one that stores the secret again, after the lock was left',
+	count( array_keys( $verifyCalls, 'decoyHash', true ) ) === 1 && array_search( 'decoyHash', $verifyCalls, true ) < array_search( 'mutate', $verifyCalls, true )
+	&& count( array_keys( $verifyCalls, 'password_hash', true ) ) === 1 && array_search( 'password_hash', $verifyCalls, true ) > array_search( 'mutate', $verifyCalls, true ) );
+
+// A kept decoy that this php would make otherwise - another algorithm or cost - is made again, and kept: the one request that makes it makes the next ones right
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [ 'hash' => password_hash( 'x', PASSWORD_BCRYPT, [ 'cost' => 4 ] ) ] );
+$remade = \Nino\Auth::decoyHash( $appData );
+$keptNow = (string) ( \Nino\Filesystem::getFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [] )['hash'] ?? '' );
+check( 'a decoy that was made at another cost - the php was changed - is made again at the cost this php hashes with, and the new one is kept', password_needs_rehash( $remade, PASSWORD_DEFAULT ) === false && $keptNow === $remade && $remade !== $decoy );
+foreach( [ '{ "hash": ', '[]', '{"hash":5}', '{"hash":""}', '{"hash":"not a hash"}' ] as $broken ) {
+	file_put_contents( $decoyFile, $broken );
+	unset( $appData['./nino/filesystem/cache'][ \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' ] );
+	clearstatcache();
+	check( 'a decoy file that holds '. $broken. ' is no decoy: one is made, and kept', password_needs_rehash( \Nino\Auth::decoyHash( $appData ), PASSWORD_DEFAULT ) === false );
+}
+
+// A secret that was stored at another cost - the installation moved to a newer php - costs what its own hash costs to check, and is stored again at the cost of this php once it was proven
+\Nino\Admin\Recovery::writeHash( $appData, password_hash( 'the real password', PASSWORD_BCRYPT, [ 'cost' => 4 ] ) );
+$old = \Nino\Admin\Recovery::hash( $appData );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+$wrong = \Nino\Admin\Recovery::verify( $appData, 'a wrong password' );
+check( 'a wrong guess leaves the secret as it was stored, whatever its cost', $wrong === 401 && \Nino\Admin\Recovery::hash( $appData ) === $old );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+check( 'the right secret is let in, and a hash of another cost is stored again at the cost this php hashes with, written whole and still the secret', \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 200
+	&& \Nino\Admin\Recovery::hash( $appData ) !== $old && password_needs_rehash( (string) \Nino\Admin\Recovery::hash( $appData ), PASSWORD_DEFAULT ) === false && password_verify( 'the real password', (string) \Nino\Admin\Recovery::hash( $appData ) ) === true );
+$current = \Nino\Admin\Recovery::hash( $appData );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+check( '...and a hash that is as it should be is not written again', \Nino\Admin\Recovery::verify( $appData, 'the real password' ) === 200 && \Nino\Admin\Recovery::hash( $appData ) === $current );
+
+// The decoy is asked on the way with a secret as on the way without one - the behaviour, whatever the form of the source: with the secret set and the decoy file gone, one attempt makes it
+@unlink( $decoyFile );
+unset( $appData['./nino/filesystem/cache'][ \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' ] );
+clearstatcache();
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+\Nino\Admin\Recovery::verify( $appData, 'a wrong password' );
+check( 'with a secret set an attempt asks for the decoy as well: the file that was gone is made by it, and a wrong guess is refused', is_file( $decoyFile ) === true && \Nino\Admin\Recovery::hash( $appData ) !== null && \Nino\Admin\Recovery::verify( $appData, 'a wrong password' ) === 401 );
+
+// A decoy whose secret is known lets nobody in where there is no secret
+$knownDecoy = password_hash( 'the known secret', PASSWORD_DEFAULT );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [ 'hash' => $knownDecoy ] );
+$kept = \Nino\Admin\Recovery::hash( $appData );
+@unlink( \Nino\Admin\Recovery::path( $appData ) );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+check( 'a decoy whose secret is known lets nobody in where the secret is missing: the answer is 401', \Nino\Admin\Recovery::verify( $appData, 'the known secret' ) === 401 );
+\Nino\Admin\Recovery::writeHash( $appData, (string) $kept );
+
+// A secret that was changed while a request was proven against the old one stays changed: the storing again is made only where the file still holds the hash that was checked
+$store = new ReflectionMethod( \Nino\Admin\Recovery::class, '_rehash' );
+$checked = password_hash( 'the old secret', PASSWORD_BCRYPT, [ 'cost' => 4 ] );
+\Nino\Admin\Recovery::writeHash( $appData, $checked );
+$changed = password_hash( 'the new secret', PASSWORD_DEFAULT );
+\Nino\Admin\Recovery::writeHash( $appData, $changed );
+$refused = $store->invokeArgs( null, [ &$appData, $checked, password_hash( 'the old secret', PASSWORD_DEFAULT ) ] );
+check( 'a secret that was changed between the check and the storing again stays: nothing is written where the file holds another hash than the one that was checked',
+	$refused === false && \Nino\Admin\Recovery::hash( $appData ) === $changed && password_verify( 'the new secret', (string) \Nino\Admin\Recovery::hash( $appData ) ) === true );
+$next = password_hash( 'the new secret', PASSWORD_DEFAULT );
+check( '...and where the file holds the hash that was checked it is stored', $store->invokeArgs( null, [ &$appData, $changed, $next ] ) === true && \Nino\Admin\Recovery::hash( $appData ) === $next );
+
+// The two writes of the hash - setting and storing again - are made under one lock: a writer waits for the holder of it. The holder writes a mark before it lets go; a writer that is not
+// held back returns before that mark is there (a slow machine can only make the mark be there early, and the check green)
+$lockPath = \Nino\Admin\Recovery::path( $appData ). '.lock';
+$mark = $sandbox. '/lock-released.txt';
+@unlink( $mark );
+$holdCode = '$lock = fopen( $argv[1], "c" ); flock( $lock, LOCK_EX ); echo "held\n"; usleep( 600000 ); file_put_contents( $argv[2], "x" ); flock( $lock, LOCK_UN );';
+$hold = proc_open( [ PHP_BINARY, '-r', $holdCode, $lockPath, $mark ], [ 1 => [ 'pipe', 'w' ] ], $holdPipes );
+$holding = is_resource( $hold ) === true && trim( (string) fgets( $holdPipes[1] ) ) === 'held';
+\Nino\Admin\Recovery::writeHash( $appData, password_hash( 'a secret set while held', PASSWORD_DEFAULT ) );
+$waited = is_file( $mark ) === true;
+$store->invokeArgs( null, [ &$appData, (string) \Nino\Admin\Recovery::hash( $appData ), password_hash( 'x', PASSWORD_DEFAULT ) ] );
+fclose( $holdPipes[1] );
+proc_close( $hold );
+check( 'setting the secret waits for the lock the storing again is made under: the holder had let go when the write returned', $holding === true && $waited === true );
+
+// And end to end: a request that is proven against the old secret while the secret is being changed - the change is written while the request waits for the lock - leaves the new one
+$oldSecret = password_hash( 'the old secret', PASSWORD_BCRYPT, [ 'cost' => 4 ] );
+$newSecret = password_hash( 'the changed secret', PASSWORD_DEFAULT );
+\Nino\Admin\Recovery::writeHash( $appData, $oldSecret );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
+$changeCode = '$lock = fopen( $argv[1], "c" ); flock( $lock, LOCK_EX ); echo "held\n"; usleep( 600000 ); file_put_contents( $argv[2], $argv[3] ); flock( $lock, LOCK_UN );';
+$stub = \Nino\Admin\Recovery::STUB_PREFIX. $newSecret. \Nino\Admin\Recovery::STUB_SUFFIX;
+$change = proc_open( [ PHP_BINARY, '-r', $changeCode, $lockPath, \Nino\Admin\Recovery::path( $appData ), $stub ], [ 1 => [ 'pipe', 'w' ] ], $changePipes );
+$changing = is_resource( $change ) === true && trim( (string) fgets( $changePipes[1] ) ) === 'held';
+$answered = \Nino\Admin\Recovery::verify( $appData, 'the old secret' );
+fclose( $changePipes[1] );
+proc_close( $change );
+clearstatcache();
+check( 'a secret that was changed while a request was proven against the old one stays: the request is let in, and its storing again finds another hash than the one it checked and writes nothing',
+	$changing === true && $answered === 200 && \Nino\Admin\Recovery::hash( $appData ) === $newSecret );
+\Nino\Admin\Recovery::set( $appData, 'the real password' );
+\Nino\Admin\Recovery::set( $appData, 'the real password' );
 \Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/lockout.json', [ 'tries' => 0, 'until' => 0 ] );
 $noMarker = $appData;
 unset( $noMarker['/nino/install/completed'] );

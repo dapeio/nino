@@ -1406,7 +1406,7 @@ A session is started when something writes to it, not on every request: minting 
 
 Authentication is additionally protected by:
 
-- a dummy password hash against measurable differences with unknown users,
+- a decoy password hash against measurable differences with unknown users and with a missing recovery secret - `\Nino\Auth::decoyHash()`: the hash of 32 random bytes made by `PASSWORD_DEFAULT` of the php that runs, kept once for the installation in `private/.auth/decoy.json` and made again where the php would make it differently, so that it always costs what a hash stored now costs; a secret or account hash stored at another cost is stored again at the current one after the password was proven,
 - failure limits per account and IP - the IP being the one `\Nino\Http::getClientIp()` resolves, so a site behind a reverse proxy needs `/nino/http/proxies` set or the whole internet shares one bucket,
 - automatic rehashing of outdated password hashes,
 - random session tokens with limited runtime,

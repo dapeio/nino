@@ -50,6 +50,44 @@ $oldHash = $appData['/nino/auth/user']['test@example.com']['pw'];
 $newHash = $appData['/nino/auth/user']['test@example.com']['pw'];
 check( 'loginUser rotates an outdated password hash', $newHash !== $oldHash && password_verify( 'correct horse battery staple', $newHash ) === true );
 
+// The decoy that an account that is none is verified against: kept for the installation, made by the php that runs, with the cost of the hashes it stores
+$login = ninoCalls( (string) file_get_contents( __DIR__. '/../_nino/Nino/Auth/Auth.php' ), 'loginUser' );
+$decoyFile = \Nino\Filesystem::path( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' );
+\Nino\Auth::loginUser( $appData, 'unknown-for-the-decoy@example.com', 'wrong' );
+$decoy = (string) ( \Nino\Filesystem::getFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [] )['hash'] ?? '' );
+$made = password_get_info( \Nino\Auth::getUser( $appData, 'test@example.com' )['pw'] );
+check( 'the first attempt of an account that is none keeps a decoy in the private directory: the hash of the algorithm and the cost this php hashes with, those of the hash a new account is stored with',
+	is_file( $decoyFile ) === true && $decoy !== '' && password_needs_rehash( $decoy, PASSWORD_DEFAULT ) === false && password_get_info( $decoy )['algo'] === $made['algo'] && ( password_get_info( $decoy )['options']['cost'] ?? 0 ) === ( $made['options']['cost'] ?? 1 ) );
+check( '...it is made once: the next attempts find it', \Nino\Auth::decoyHash( $appData ) === $decoy );
+check( '...loginUser() asks for it once, before the one comparison - read as php reads the source, whatever its form - and the only password_hash() of it comes after the password was proven; no other way of comparing a secret stands in it',
+	count( array_keys( $login, 'decoyHash', true ) ) === 1 && count( array_keys( $login, 'password_verify', true ) ) === 1 && array_search( 'decoyHash', $login, true ) < array_search( 'password_verify', $login, true )
+	&& count( array_keys( $login, 'password_hash', true ) ) === 1 && array_search( 'password_hash', $login, true ) > array_search( '_clearTries', $login, true ) && array_intersect( $login, [ 'crypt', 'hash_equals', 'md5', 'sha1', 'strcmp' ] ) === [] );
+
+// ...and on every way, which is what the behaviour says: the account that exists is asked as the one that does not, so each of them makes the decoy where it is not there
+foreach( [ 'a known account with a wrong password' => [ 'test@example.com', 'a wrong password' ], 'an account that is none' => [ 'none-at-all@example.com', 'a wrong password' ] ] as $way => [ $who, $what ] ) {
+
+	@unlink( $decoyFile );
+	unset( $appData['./nino/filesystem/cache'][ \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json' ] );
+	clearstatcache();
+	$appData['/nino/auth/maxtries'] = 50;
+	\Nino\Auth::loginUser( $appData, $who, $what );
+	check( 'the attempt of '. $way. ' finds no decoy and makes it: the decoy is asked on this way as on the others', is_file( $decoyFile ) === true );
+}
+
+$appData['/nino/auth/maxtries'] = 3;
+
+// A decoy whose secret is known - somebody who can write the file wrote it - lets nobody in: not as an account that is none, not as one that is switched off
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [ 'hash' => password_hash( 'the known secret', PASSWORD_DEFAULT ) ] );
+\Nino\Auth::insertUser( $appData, 'off-for-the-decoy@example.com', 'another secret' );
+\Nino\Auth::setStatus( $appData, 'off-for-the-decoy@example.com', false );
+$sessionBefore = json_encode( \Nino\Auth::getCurrentUser( $appData ) );
+check( 'the decoy lets nobody in, whatever its secret is: an account that is none and one that is switched off are refused with it, and no session is opened',
+	\Nino\Auth::loginUser( $appData, 'none-at-all@example.com', 'the known secret' ) === false && \Nino\Auth::loginUser( $appData, 'off-for-the-decoy@example.com', 'the known secret' ) === false && json_encode( \Nino\Auth::getCurrentUser( $appData ) ) === $sessionBefore );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [ 'hash' => password_hash( 'x', PASSWORD_BCRYPT, [ 'cost' => 4 ] ) ] );
+\Nino\Auth::loginUser( $appData, 'unknown-for-the-decoy@example.com', 'wrong' );
+$remade = (string) ( \Nino\Filesystem::getFileContent( $appData, \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json', [] )['hash'] ?? '' );
+check( 'a decoy of another cost - the php was changed - is made again by the attempt that finds it, at the cost this php hashes with, and kept', $remade !== '' && password_needs_rehash( $remade, PASSWORD_DEFAULT ) === false );
+
 // Cooldown after too many failed attempts (maxtries = 3 in this sandbox)
 \Nino\Auth::loginUser( $appData, 'test@example.com', 'wrong' );
 \Nino\Auth::loginUser( $appData, 'test@example.com', 'wrong' );

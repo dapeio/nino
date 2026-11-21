@@ -64,12 +64,40 @@ namespace Nino {
 		// which needs far more attempts than one user's typos.
 		private const int IP_TRIES_FACTOR = 10;
 
-		// bcrypt hash of a random value nobody holds, verified against when
-		// the account doesn't exist or is disabled. Without it that path
-		// returns before password_verify() ever runs, so an unknown user
-		// answers measurably faster than a known one - and since only known
-		// accounts got a tries entry, the cooldown was an oracle too
-		private const string DUMMY_HASH = '$2y$12$.XrU56roB3Yw28vmlpzZN.I5lpI6kAPVytki6Mo1zm3w.WHYgeczq';
+		// Where the decoy hash is kept: the hash of a random value nobody holds, which every rejected attempt for an account that
+		// is none (or is disabled) is verified against, so that it costs what an attempt for a real account costs - see decoyHash()
+		private const string DECOY_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/decoy.json';
+
+		/**
+		 *	The hash that an attempt with nothing to compare against is verified against: the hash of 32 random bytes that nobody
+		 *	kept, made with PASSWORD_DEFAULT - so with the algorithm and the cost this php hashes with, and with them the cost of the hashes
+		 *	this installation stores now. Without it an unknown account is rejected before password_verify() runs, and one whose decoy
+		 *	costs another than a stored hash is told from a known one by the time of the answer.
+		 *
+		 *	It is made once for an installation and kept in a file of the private directory: a hash is made with the cost of the
+		 *	php that makes it, and one made at every request would put a second hash into the rejection that a stored account does not have.
+		 *	A kept hash that PASSWORD_DEFAULT would make differently - the php was changed, or the default moved - is made again,
+		 *	which is one hash in one request, and asked at the start of every attempt, whichever way it goes, so that the one request is
+		 *	no way to tell an account from none. A hash that cannot be kept is the hash of this request. It is used by loginUser() and by
+		 *	\Nino\Admin\Recovery::verify(), and nothing authenticates against it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function decoyHash( array &$appData ): string {
+
+			$kept = \Nino\Filesystem::getFileContent( $appData, self::DECOY_PATH, [] );
+			$hash = is_array( $kept ) === true ? ( $kept['hash'] ?? null ) : null;
+
+			if( is_string( $hash ) === true && $hash !== '' && password_needs_rehash( $hash, PASSWORD_DEFAULT ) === false )
+				return $hash;
+
+			$hash = password_hash( bin2hex( random_bytes( 32 ) ), PASSWORD_DEFAULT );
+			\Nino\Filesystem::putFileContent( $appData, self::DECOY_PATH, [ 'hash' => $hash ] );
+
+			return $hash;
+		}
 
 		public static function init( array &$appData ): void {
 
@@ -176,14 +204,14 @@ namespace Nino {
 			$cooling	= ( $user !== false && $user['status'] === self::STATUS_ACTIVE && self::_inCooldown( $appData, $username ) === true );
 			$usable		= ( $user !== false && $user['status'] === self::STATUS_ACTIVE && $cooling === false );
 
-			// Exactly one password_verify() on every path. DUMMY_HASH is a
-			// bcrypt hash of a value nobody holds, at the cost PASSWORD_DEFAULT
-			// currently produces - a site whose stored hashes still carry an
-			// older, cheaper cost stays distinguishable in principle; login
-			// rehashes those on the next successful login (see below).
-			$verified = password_verify( $pw, ( $usable === true ) ? $user['pw'] : self::DUMMY_HASH );
+			// Exactly one password_verify() on every path, and no password_hash(): the decoy is the hash of a value nobody holds, at the
+			// cost PASSWORD_DEFAULT produces (see decoyHash(), which is asked on every path, so that none has a read or a hash the others
+			// have not). A stored hash that still carries an older cost is verified at its own cost; login rehashes it on the next
+			// successful login (see below).
+			$decoy = self::decoyHash( $appData );
+			$verified = password_verify( $pw, ( $usable === true ) ? $user['pw'] : $decoy );
 
-			// After the verification, not before it - the point of the dummy
+			// After the verification, not before it - the point of the decoy
 			// hash is that every rejected attempt costs the same
 			if( $cooling === true )
 				return false;

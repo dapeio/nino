@@ -104,6 +104,55 @@ function ninoSandbox( string $name ): array {
 }
 
 /**
+ *	The names a function of a source calls, in the order they stand - read as php reads it (token_get_all), so that how the source is formatted
+ *	and how a call is spelt (a blank, a line, a comment) is no matter. A name is a T_STRING that is followed by a bracket and is no declaration; a
+ *	method or a static call counts by its own name. Where a source holds several functions of the name, the first
+ *
+ *	@param		string		$source				The php of a file (with its <?php)
+ *	@param		string		$function			The name of the function or method
+ *
+ *	@return 	array<int, string>					[] where the function is not there
+ */
+function ninoCalls( string $source, string $function ): array {
+
+	$tokens = array_values( array_filter( token_get_all( $source ), static fn( mixed $token ): bool => is_array( $token ) === false || in_array( $token[0], [ T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ], true ) === false ) );
+	$calls = [];
+
+	foreach( $tokens as $at => $token ) {
+
+		if( is_array( $token ) === false || $token[0] !== T_FUNCTION || is_array( $tokens[$at + 1] ?? null ) === false || $tokens[$at + 1][1] !== $function )
+			continue;
+
+		// The body: from the first { after the signature to its end
+		$depth = 0;
+		$begun = false;
+
+		for( $at += 2; $at < count( $tokens ); $at++ ) {
+
+			$part = $tokens[$at];
+			$text = is_array( $part ) === true ? $part[1] : $part;
+
+			if( $text === '{' || ( is_array( $part ) === true && $part[0] === T_CURLY_OPEN ) || ( is_array( $part ) === true && $part[0] === T_DOLLAR_OPEN_CURLY_BRACES ) ) {
+				$depth++;
+				$begun = true;
+			}
+			else if( $text === '}' ) {
+				$depth--;
+
+				if( $begun === true && $depth === 0 )
+					break;
+			}
+			else if( is_array( $part ) === true && $part[0] === T_STRING && ( $tokens[$at + 1] ?? null ) === '(' )
+				$calls[] = $part[1];
+		}
+
+		return $calls;
+	}
+
+	return [];
+}
+
+/**
  *	The directory a sandbox lives in, with the private/ and public/ halves of
  *	its project below it - to put a file there for the code under test, or to
  *	look at what that code wrote
