@@ -1013,8 +1013,8 @@ check( 'a pattern that is no string or is empty matches nothing, and neither doe
 foreach( [ '/features' => true, '/features/x' => true, '/featured' => false, '/apps' => false, '/app/x' => true, '//features' => true, '/Features' => true, '/DOCS/x' => true, '/_admin' => true, '/_admin/x' => true, '/_nino/x' => true, '/public/a' => true, '/' => false, '/home' => false ] as $reservedUri => $expectReserved )
 	check( 'isReservedUri: '. $reservedUri. ' is '. ( $expectReserved === true ? '' : 'not ' ). 'reserved', \Nino\Http::isReservedUri( $reservedUri ) === $expectReserved );
 // /docs and /history are reserved while the checkout has the directory - judged here against roots of their own, since the checkout this runs in has both
-$withTrees = sys_get_temp_dir(). '/nino-reserved-with-'. uniqid();
-$withoutTrees = sys_get_temp_dir(). '/nino-reserved-without-'. uniqid();
+$withTrees = sys_get_temp_dir(). '/nino-reserved-with-'. bin2hex( random_bytes( 6 ) );
+$withoutTrees = sys_get_temp_dir(). '/nino-reserved-without-'. bin2hex( random_bytes( 6 ) );
 mkdir( $withTrees. '/docs', 0777, true );
 mkdir( $withTrees. '/history', 0777, true );
 mkdir( $withoutTrees, 0777, true );

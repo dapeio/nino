@@ -24,7 +24,7 @@ declare(strict_types=1);
  */
 
 // Before the kernel loads: the features land in a directory of this run's own
-define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-applications-features-'. uniqid() );
+define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-applications-features-'. bin2hex( random_bytes( 6 ) ) );
 mkdir( NINO_FEATURES_DIR, 0755, true );
 
 require __DIR__. '/harness.php';

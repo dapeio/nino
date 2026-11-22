@@ -23,6 +23,16 @@ declare(strict_types=1);
 defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-markup-pages-features-'. getmypid() );
 is_dir( NINO_FEATURES_DIR ) === true || mkdir( NINO_FEATURES_DIR, 0755, true );
 
+// The site of the pages stands in ONE directory, because its path goes into the version of a bundle, and every run removes it and makes it again: a second run of this suite
+// at the same time - in another copy, or one a person starts - takes the site from under the first, and a page is drawn from files that are not its own. The runs take
+// turns: the lock is held until the process ends, and is let go of when it does
+$pagesLock = fopen( sys_get_temp_dir(). '/nino-markup-pages-site.lock', 'c' );
+
+if( $pagesLock === false || flock( $pagesLock, LOCK_EX ) === false ) {
+	fwrite( STDERR, "markup-pages-smoke: the lock of the site of the pages could not be taken\n" );
+	exit( 1 );
+}
+
 require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
 

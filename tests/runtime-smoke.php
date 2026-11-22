@@ -543,7 +543,7 @@ check( '...nor by a password change that follows a rehashing login in the same r
 // under the (perfectly normal) main filesystem path, not configpath - so
 // this exercises mutate()'s own failure, not writeContentData()'s
 // pre-existing "could not lock" check.
-$writeFailDir = sys_get_temp_dir(). '/nino-runtime-smoke-writefail-'. uniqid();
+$writeFailDir = sys_get_temp_dir(). '/nino-runtime-smoke-writefail-'. bin2hex( random_bytes( 6 ) );
 mkdir( $writeFailDir, 0777, true );
 $brokenConfigBase = $writeFailDir. '/not-a-directory';
 file_put_contents( $brokenConfigBase, 'x' );

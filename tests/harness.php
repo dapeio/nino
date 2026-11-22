@@ -82,8 +82,11 @@ function check( string $label, bool $condition ): void {
  */
 function ninoSandbox( string $name ): array {
 
-	$sandbox = sys_get_temp_dir(). '/nino-'. preg_replace( '/[^a-z0-9-]/', '-', strtolower( $name ) ). '-smoke-'. uniqid();
-	mkdir( $sandbox, 0755, true );
+	// A name of random bytes, and a directory that this call made: uniqid() is the clock to the microsecond, and two runs of a suite started at once - in two copies
+	// - get the same one in one start in thirty, and share a sandbox without either knowing. mkdir() says no for a directory that is there, and the name is made again
+	do {
+		$sandbox = sys_get_temp_dir(). '/nino-'. preg_replace( '/[^a-z0-9-]/', '-', strtolower( $name ) ). '-smoke-'. bin2hex( random_bytes( 6 ) );
+	} while( @mkdir( $sandbox, 0755, true ) === false && is_dir( $sandbox ) === true );
 
 	$appData = [ './nino/uid' => $sandbox ];
 	\Nino\AppData::prepare( $appData );

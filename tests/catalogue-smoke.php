@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 // Before the kernel loads: installs land in a directory of this run's own,
 // never in the checkout's features/
-define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-catalogue-features-'. uniqid() );
+define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-catalogue-features-'. bin2hex( random_bytes( 6 ) ) );
 mkdir( NINO_FEATURES_DIR, 0755, true );
 
 require __DIR__. '/harness.php';
@@ -1371,7 +1371,7 @@ check( 'the activity log names it', \Nino\Modules\Features\Admin::log( 'features
 // answer blamed the file permissions for it. The Linked.php beside the
 // manifest is load-bearing - manifest() refuses a feature whose class file
 // is missing, and without it this would fail as an unknown feature
-$linked = sys_get_temp_dir(). '/nino-linked-feature-'. uniqid();
+$linked = sys_get_temp_dir(). '/nino-linked-feature-'. bin2hex( random_bytes( 6 ) );
 mkdir( $linked, 0755, true );
 file_put_contents( $linked. '/feature.php', '<?php return [ \'key\' => \'linked\', \'name\' => \'Linked\', \'version\' => \'1.0.0\' ];' );
 file_put_contents( $linked. '/Linked.php', '<?php namespace Nino\Modules { class Linked { public const string VERSION = \'1.0.0\'; } }' );

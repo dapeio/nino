@@ -355,6 +355,9 @@ $onDisk		= layersBundle( $appData, '/.cache/memory.css', $memory );
 touch( $publicPath, time() - 3600 );
 clearstatcache();
 $before		= $listing();
+// The stamp of the file as it stands now: the bundle was built again above, from the files as they are after the write, and a write in the next second is another time
+// of the file and so another stamp - what the calls below leave of it is compared with this one, and not with the stamp of a bundle made before the write
+$stampNow	= $stampOf( (string) file_get_contents( $publicPath ) );
 
 // A source whose braces do not balance is repaired as a file is, and says so
 $bad		= new ArrayObject();
@@ -387,6 +390,6 @@ check( 'a target that is no stylesheet and one with no files give an empty strin
 	\Nino\Modules\Assets::stylesheet( $appData, '/.cache/script.js' ) === '' && \Nino\Modules\Assets::stylesheet( $appData, '/.cache/nothing.css' ) === '' && \Nino\Modules\Assets::stylesheet( $appData, '' ) === '' );
 
 check( 'the public bundle and the folder it stands in are as they were after all of it: no file written, none touched, the stamp the same',
-	$listing() === $before && (string) file_get_contents( $publicPath ) === $onDisk && $stampOf( $onDisk ) === $stampOf( $plain ) );
+	$listing() === $before && (string) file_get_contents( $publicPath ) === $onDisk && $stampOf( (string) file_get_contents( $publicPath ) ) === $stampNow && $stampNow === $stampOf( $onDisk ) );
 
 ninoDone( $appData );

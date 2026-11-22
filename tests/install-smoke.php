@@ -16,7 +16,7 @@ declare(strict_types=1);
 
 // Before the kernel loads: the features the applications place land in a directory of this
 // run's own, never in the checkout's features/
-define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-install-applications-'. uniqid() );
+define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-install-applications-'. bin2hex( random_bytes( 6 ) ) );
 mkdir( NINO_FEATURES_DIR, 0755, true );
 
 require __DIR__. '/harness.php';
@@ -2210,7 +2210,7 @@ function pinHeaderNamesTheSetWithItsStamp( string $header, string $baseUnit ): v
  */
 function pinSetupLeavesTheStylesheetsOfFeaturesOut(): void {
 
-	$dir = sys_get_temp_dir(). '/nino-install-features-'. uniqid();
+	$dir = sys_get_temp_dir(). '/nino-install-features-'. bin2hex( random_bytes( 6 ) );
 	mkdir( $dir, 0755, true );
 	file_put_contents( $dir. '/run.php', '<?php declare(strict_types=1);
 define( \'NINO_FEATURES_DIR\', '. var_export( __DIR__. '/fixtures/features', true ). ' );

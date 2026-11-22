@@ -2228,7 +2228,7 @@ echo "\n";
 
 echo "Backup/Restore - config.php resolves via configPath, not root (NINO_CONFIG_DIR)\n";
 
-$outSandbox 	= sys_get_temp_dir(). '/nino-dev-smoke-outofweb-'. uniqid();
+$outSandbox 	= sys_get_temp_dir(). '/nino-dev-smoke-outofweb-'. bin2hex( random_bytes( 6 ) );
 $outConfigDir = $outSandbox. '/secret-config';
 
 mkdir( $outSandbox. '/_admin', 0777, true );

@@ -170,7 +170,7 @@ else
 
 		foreach( $blocks[1] as $number => $code ) {
 
-			$file = sys_get_temp_dir(). '/nino-guide-'. uniqid(). '.js';
+			$file = sys_get_temp_dir(). '/nino-guide-'. bin2hex( random_bytes( 6 ) ). '.js';
 
 			if( file_put_contents( $file, $code ) === false ) {
 				$broken[] = $number + 1;

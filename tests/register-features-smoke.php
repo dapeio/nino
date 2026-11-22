@@ -44,7 +44,7 @@ declare(strict_types=1);
 // --- The copy of the kernel, and the directories of this run -----------------------------------
 
 $registerSource	= dirname( __DIR__ );
-$registerWork		= sys_get_temp_dir(). '/nino-register-features-'. uniqid();
+$registerWork		= sys_get_temp_dir(). '/nino-register-features-'. bin2hex( random_bytes( 6 ) );
 $registerKernel	= $registerWork. '/kernel';
 
 /**	rm -rf, before the kernel is loaded to do it	*/
