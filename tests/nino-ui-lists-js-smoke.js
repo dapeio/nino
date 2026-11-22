@@ -121,6 +121,21 @@ bar.input.value = 'ab';
 fire( bar.input, 'input' );
 check( '...and typing is told to the caller', typed.join() === 'ab' );
 
+// filterBar( { filter } ): a select left of the search, in one line, named, and a choice is told to the caller
+const chosen = [];
+const typedAgain = [];
+const both = adminUi.filterBar( { filter : { options : [ { value : '', label : 'All' }, { value : 'own', label : 'Own' } ], value : 'own', label : 'Kind', onChange : function( value ) { chosen.push( value ) } }, search : { label : 'Search', onInput : function( value ) { typedAgain.push( value ) } }, items : [ chip ] } );
+
+check( 'a filter bar with a filter has the select first, the search after it and the chips last, the select named and holding the value it was given',
+	both.select !== null && both.el.children[0] === both.select && both.el.children[1] === both.input && both.el.children[2] === chip && both.select.tagName === 'SELECT'
+	&& both.select.getAttribute('aria-label') === 'Kind' && both.select.children.length === 2 && both.select.value === 'own' && both.el.getAttribute('role') === 'search' );
+both.select.value = '';
+fire( both.select, 'change' );
+both.input.value = 'q';
+fire( both.input, 'input' );
+check( '...a choice and typing are each told to the caller, and the bar filters nothing itself', chosen.length === 1 && chosen[0] === '' && typedAgain.join() === 'q' );
+check( 'a filter bar without a filter has no select', bar.select === null && both.select !== bar.select );
+
 // --- tabs() ---------------------------------------------------------------------------------------------------
 
 const panes = [ element('div'), element('div'), element('div') ];

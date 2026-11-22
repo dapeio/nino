@@ -1766,12 +1766,15 @@ Nino.adminUi.table( {
 } );
 ```
 
-`search : true` is the search of a directory; the field filters the rows that are drawn, over the values of the columns and, where `searchText( row )` answers one, over more text of a row (a key, a description), and a search that finds nothing shows `labels.noMatch` in the empty state of the table. A panel that draws the table again gives the search back with `query` and hears it with `onQuery( query )`. A row that opens (`onRowClick`) draws a "›" at its end, in the column of the actions. A column that holds a sentence says `wrap : true`. A press on a button of a row does not open the row.
+`search : true` is the search of a directory; the field filters the rows that are drawn, over the values of the columns and, where `searchText( row )` answers one, over more text of a row (a key, a description), and a search that finds nothing shows `labels.noMatch` in the empty state of the table. A panel that draws the table again gives the search back with `query` and hears it with `onQuery( query )`. A select that picks a kind stands left of the search, in the same line, as `filter : { options : [ { value, label } ], value, label, onChange( value ) }`: the table does NOT filter by it - it draws and tells, and the panel loads or filters and draws the table again - and under 30 rem the select stands over the search, both of the full width. A row that opens (`onRowClick`) draws a "›" at its end, in the column of the actions. A column that holds a sentence says `wrap : true`. A press on a button of a row does not open the row.
 
 ```js
 // What narrows a list: one bar with a search and chips
 const empty = Nino.adminUi.chip( 'Empty in de_DE', { onToggle : function( on ) { onlyEmpty = on; draw() } } );
 mount.appendChild( Nino.adminUi.filterBar( { search : { label : 'Search texts', onInput : function( query ) { find( query ) } }, items : [ empty ] } ).el );
+
+// The same bar for a list that is no table, cards say: a select of the kind left of the search, which the table's `filter` is made of
+mount.appendChild( Nino.adminUi.filterBar( { filter : { options : [ { value : '', label : 'All themes' }, { value : 'own', label : 'Own themes' } ], value : kind, label : 'Kind of theme', onChange : function( value ) { kind = value; draw() } }, search : { label : 'Search themes', onInput : function( query ) { find( query ) } } } ).el );
 
 // A box for what is not there yet, with the button that makes the first
 mount.appendChild( Nino.adminUi.emptyState( 'No redirects yet.', Nino.adminUi.button( 'New redirect', create, { kind : 'primary' } ) ) );

@@ -3073,6 +3073,20 @@ a {
 	width: auto;
 }
 
+/* The select that picks a kind stands left of the search, in the same line; where the two do not fit - under 30 rem - each takes a line of its own, the select over the
+   search, both of the full width: they grow into the line they wrap to */
+/* The grow of the select is small and the search's large: in a line they share, the search takes what is left; in a line of its own each takes all of it */
+:where(.nino-admin) .nino-admin-filterbar-select {
+	flex: 1 1 12rem;
+	width: auto;
+	min-width: 0;
+	max-width: 100%;
+}
+
+:where(.nino-admin) .nino-admin-filterbar > .nino-admin-filterbar-select ~ .nino-admin-filterbar-input {
+	flex: 1000 1 16rem;
+}
+
 /* A filter that is on or off: aria-pressed says so, the fill and the ring say it to the eye too */
 :where(.nino-admin) .nino-admin-chip {
 	flex: 0 0 auto;
@@ -3144,6 +3158,21 @@ a {
 
 /* The search of a directory (table( { search : true } )): the whole width over the table */
 :where(.nino-admin) .nino-admin-table-toolbar--wide .nino-admin-table-search {
+	max-width: none;
+}
+
+/* table( { filter } ): the select of the filter bar is the first of the toolbar, which wraps where it does not fit; the search takes what is left of the line */
+:where(.nino-admin) .nino-admin-table-toolbar--filtered {
+	flex-wrap: wrap;
+}
+
+:where(.nino-admin) .nino-admin-table-toolbar--filtered .nino-admin-filterbar-select {
+	flex: 1 1 14rem;
+}
+
+:where(.nino-admin) .nino-admin-table-toolbar--filtered .nino-admin-table-search {
+	flex: 1000 1 16rem;
+	min-width: 0;
 	max-width: none;
 }
 

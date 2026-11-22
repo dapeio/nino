@@ -1218,32 +1218,67 @@
 		},
 
 		/**
-		 *	What narrows a list: one bar over it with a search field and, beside it,
-		 *	whatever else narrows it - chips, a select. It wraps where there is no room.
-		 *	The search says its name in the label and the placeholder, which the caller
-		 *	gives. Owns no strings
+		 *	What narrows a list: one bar over it with a select that picks a kind, the search field beside it - to its right, in the same line - and
+		 *	whatever else narrows it - chips. It wraps where there is no room: under 30 rem the select stands over the search, both of the full
+		 *	width. The one place of the bar: table() makes its toolbar of it, and a list that is no table - cards - uses it on its own. The bar
+		 *	filters nothing: it draws, and tells the caller what was chosen and typed, who loads or filters. The search and the select say their
+		 *	names in the labels the caller gives. Owns no strings
 		 *
-		 *	@param		{Object}		options					{ search, items }
-		 *																			search { value, label, placeholder, onInput( value ), id } - left out, the bar has no field
-		 *																			items an array of elements that stand after the field: chip(), a select
+		 *	@param		{Object}		options					{ filter, search, items, className }
+		 *																			filter { value, options, label, onChange( value ), id } - a select left of the search; options [ { value, label } ],
+		 *																			value the one that is chosen (the first by default), label its name for a screen reader (it has no other), left out, the bar has no select
+		 *																			search { value, label, placeholder, onInput( value ), id, className } - left out, the bar has no field; className replaces the
+		 *																			classes of the field
+		 *																			items an array of elements that stand after the field: chip()
+		 *																			className what the bar has besides its own class
 		 *
-		 *	@return		{Object}										{ el, input } - el <div class="nino-admin-filterbar" role="search">, input the search field or null
+		 *	@return		{Object}										{ el, input, select } - el <div class="nino-admin-filterbar" role="search">, input the search field or null, select the select or null
 		 */
 		filterBar : function( options ) {
 
 			options = options || {};
 
-			const bar = Nino.adminUi.el( 'div', 'nino-admin-filterbar' );
+			const bar = Nino.adminUi.el( 'div', 'nino-admin-filterbar'+ ( options.className ? ' '+ options.className : '' ) );
 			bar.setAttribute( 'role', 'search' );
 
 			let input = null;
+			let select = null;
+
+			if( options.filter !== undefined && options.filter !== null ) {
+				const filter = options.filter;
+
+				select = dc.createElement('select');
+				select.className = 'nino-admin-input nino-admin-filterbar-select';
+				select.setAttribute( 'aria-label', filter.label ?? '' );
+
+				if( filter.id )
+					select.id = filter.id;
+
+				( filter.options || [] ).forEach( function( option ) {
+
+					const item = dc.createElement('option');
+					item.value = String( option.value ?? '' );
+					item.textContent = String( option.label ?? option.value ?? '' );
+					select.appendChild( item );
+				} );
+
+				if( filter.value !== undefined && filter.value !== null )
+					select.value = String( filter.value );
+
+				select.addEventListener( 'change', function() {
+					if( typeof filter.onChange === 'function' )
+						filter.onChange( select.value );
+				} );
+
+				bar.appendChild( select );
+			}
 
 			if( options.search !== undefined && options.search !== null ) {
 				const search = options.search;
 
 				input = dc.createElement('input');
 				input.type = 'search';
-				input.className = 'nino-admin-input nino-admin-filterbar-input';
+				input.className = search.className ?? 'nino-admin-input nino-admin-filterbar-input';
 				input.autocomplete = 'off';
 				input.placeholder = search.placeholder ?? search.label ?? '';
 				input.setAttribute( 'aria-label', search.label ?? search.placeholder ?? '' );
@@ -1262,7 +1297,7 @@
 
 			( options.items || [] ).forEach( function( item ) { bar.appendChild( item ) } );
 
-			return { el : bar, input : input };
+			return { el : bar, input : input, select : select };
 		},
 
 		/**
@@ -6221,6 +6256,10 @@
 		 *	@param		{number}		[options.actionsInline]	How many actions stand in a row before a menu takes the rest, 2 or 3 (3 by default): with more
 		 *																					than that the first two stand as they are and the others are in a menu behind "More actions"
 		 *																					(see menuButton()), the one that takes something away last
+		 *	@param		{Object}		[options.filter]			{ options, value, label, onChange( value ), id } - a select left of the search, in the same line (under 30 rem over it, both of the full
+		 *																					width): options [ { value, label } ], value the one chosen, label its name for a screen reader, onChange told the value. The table
+		 *																					does NOT filter by it - the caller gets the value and loads or filters the rows, drawing the table anew or with setRows(). The same bar for a
+		 *																					list that is no table is filterBar( { filter, search } )
 		 *	@param		{Object}		[options.select]			{ actions, label, rowLabel } - the rows can be chosen. A first column of checkboxes, each named by
 		 *																					rowLabel( row ) (the text of the first column by default), and in the head one for the rows of the page
 		 *																					that is shown, with the three states none, some, all of them. With one chosen a bar over the table says how
@@ -6301,27 +6340,32 @@
 			mount.classList.add('nino-admin-table-wrap');
 
 			// --- search -----------------------------------------------
-			const toolbar = dc.createElement('div');
-			toolbar.className = 'nino-admin-table-toolbar'+ ( options.search === true ? ' nino-admin-table-toolbar--wide' : '' );
-
-			const search = dc.createElement('input');
-			search.type = 'search';
-			search.className = 'nino-admin-table-search';
-			search.placeholder = labels.search || '';
-			// A placeholder is not a name: it disappears on the first keystroke
-			// and never reaches the accessibility tree as one. The toolbar has
-			// no room for a visible label, so the box carries the same word the
-			// placeholder shows
-			search.setAttribute( 'aria-label', labels.search || '' );
-			search.value = query;
-			search.addEventListener( 'input', function() {
-				query = search.value;
-				page = 1;
-				draw();
-				if( typeof options.onQuery === 'function' )
-					options.onQuery( query );
+			// The toolbar is the filter bar of the design system: the select that picks a kind, where the caller has one (options.filter), and the search.
+			// The table filters by the search alone; what the select chooses is the caller's to apply, who is told
+			const filtered = typeof options.filter === 'object' && options.filter !== null;
+			const made = Nino.adminUi.filterBar( {
+				filter : filtered === true ? options.filter : null,
+				search : {
+					className : 'nino-admin-table-search',
+					// A placeholder is not a name: it disappears on the first keystroke
+					// and never reaches the accessibility tree as one. The toolbar has
+					// no room for a visible label, so the box carries the same word the
+					// placeholder shows
+					placeholder : labels.search || '',
+					label : labels.search || '',
+					value : query,
+					onInput : function( typed ) {
+						query = typed;
+						page = 1;
+						draw();
+						if( typeof options.onQuery === 'function' )
+							options.onQuery( query );
+					},
+				},
 			} );
-			toolbar.appendChild( search );
+			const toolbar = made.el;
+			// The toolbar is the bar's content - the select and the search - under the table's own classes: it is not a second filter bar of the page
+			toolbar.className = 'nino-admin-table-toolbar'+ ( options.search === true ? ' nino-admin-table-toolbar--wide' : '' )+ ( filtered === true ? ' nino-admin-table-toolbar--filtered' : '' );
 			mount.appendChild( toolbar );
 
 			// --- the bar of the chosen rows ---------------------------------
@@ -6684,7 +6728,7 @@
 				scroller.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 				// The toolbar stays put when a search emptied the table -
 				// hiding it would trap the user with no way to clear the box
-				toolbar.classList.toggle( 'nino-admin-hidden', rows.length === 0 && query === '' );
+				toolbar.classList.toggle( 'nino-admin-hidden', rows.length === 0 && query === '' && filtered === false );
 				empty.classList.toggle( 'nino-admin-hidden', view.total !== 0 );
 				pager.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 

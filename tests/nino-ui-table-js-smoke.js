@@ -188,6 +188,37 @@ ctx.Nino.adminUi.table( {
 const namedSteps = descendants( named ).filter( el => el.className === 'nino-admin-table-step' );
 check( 'a caller\'s own words win over the shared fills', namedSteps[0].getAttribute('aria-label') === 'Zurück' && namedSteps[1].getAttribute('aria-label') === 'Weiter' );
 
+/*	table( { filter } ): a select left of the search, in the same bar. The table does not filter by it - it draws, and tells the caller, who loads or filters	*/
+const told = [];
+const filtered = element('div');
+ctx.Nino.adminUi.table( {
+	mount 	: filtered,
+	columns	: [ { key : 'uri', label : 'Uri', type : 'string' } ],
+	rows 		: [ { uri : '/a' }, { uri : '/b' }, { uri : '/c' } ],
+	labels 	: { search : 'Search blocks', empty : 'Nothing here', noMatch : 'No match' },
+	filter 	: { options : [ { value : '', label : 'All blocks' }, { value : 'own', label : 'Own blocks' } ], value : 'own', label : 'Kind of block', onChange : function( value ) { told.push( value ) } },
+} );
+const filterDrawn = descendants( filtered );
+const filterToolbar = filterDrawn.filter( el => String( el.className ).includes('nino-admin-table-toolbar') )[0];
+const filterSelect = filterDrawn.filter( el => el.tagName === 'SELECT' && String( el.className ).includes('nino-admin-filterbar-select') )[0];
+const filterSearch = filterDrawn.filter( el => el.type === 'search' )[0];
+check( 'a table with a filter has its select in the toolbar, before the search, both named, and the toolbar is made by the filter bar of the design system, under the own classes of the table - not a second filter bar of the page',
+	filterToolbar !== undefined && filterSelect !== undefined && filterSearch !== undefined && filterToolbar.children[0] === filterSelect && filterToolbar.children[1] === filterSearch
+	&& filterToolbar.getAttribute('role') === 'search' && filterToolbar.className.split(' ').includes('nino-admin-filterbar') === false && String( filterToolbar.className ).includes('nino-admin-table-toolbar--filtered')
+	&& filterSelect.getAttribute('aria-label') === 'Kind of block' && filterSearch.getAttribute('aria-label') === 'Search blocks' && filterSearch.className === 'nino-admin-table-search' );
+check( '...the select offers the options and holds the value it was given, and is an ordinary select: a stop of the Tab key, and the arrow keys and Enter are the browser\'s',
+	filterSelect.children.length === 2 && filterSelect.children.map( o => o.value ).join() === ',own' && filterSelect.children.map( o => o.textContent ).join() === 'All blocks,Own blocks' && filterSelect.value === 'own' && filterSelect.tabIndex !== -1 );
+filterSelect.value = '';
+fire( filterSelect, 'change' );
+check( '...a choice is told to the caller, with the value', told.join('|') === '' && told.length === 1 );
+check( '...and the table does not filter by it: every row is still drawn', filterDrawn.filter( el => el.tagName === 'TR' && el.parentNode && el.parentNode.tagName === 'TBODY' ).length === 3 );
+const bare = element('div');
+ctx.Nino.adminUi.table( { mount : bare, columns : [ { key : 'uri', label : 'Uri', type : 'string' } ], rows : [ { uri : '/a' } ], labels : { search : 'Search' } } );
+check( 'a table without a filter has no select in its toolbar and no class of one', descendants( bare ).filter( el => el.tagName === 'SELECT' && String( el.className ).includes('nino-admin-filterbar-select') ).length === 0 && descendants( bare ).filter( el => String( el.className ).includes('nino-admin-table-toolbar--filtered') ).length === 0 );
+const emptied = element('div');
+ctx.Nino.adminUi.table( { mount : emptied, columns : [ { key : 'uri', label : 'Uri', type : 'string' } ], rows : [], labels : { search : 'Search' }, filter : { options : [ { value : 'a', label : 'A' } ], label : 'Kind' } } );
+check( 'a table with a filter keeps its toolbar where a kind has no rows: the way back to the others is there', descendants( emptied ).filter( el => String( el.className ).includes('nino-admin-table-toolbar') )[0].classList.contains('nino-admin-hidden') === false );
+
 /*	Which column the table is ordered by was drawn and not said: a ::after
 	glyph on the sorted header, plus a class. A generated glyph is exactly
 	what a screen reader is not handed, so the header says it in the attribute
