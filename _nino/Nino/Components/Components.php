@@ -58,11 +58,14 @@ namespace Nino {
 	 *
 	 *										Where a tree is drawn from: the context
 	 *
-	 *											[ 'template' => 'page-home', 'scope' => 'hero', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ]
+	 *											[ 'template' => 'page-home', 'scope' => 'hero', 'place' => 'page', 'root' => '', 'element' => null, 'fills' => [], 'depth' => 0 ]
 	 *
 	 *										- the template whose words ~name reads, the id of the nearest
 	 *										ancestor that has one - a call that has one itself reads its own words in
-	 *										it - the place the nodes stand in, the element
+	 *										it - the place the nodes stand in, the outermost component they stand in (the
+	 *										root: 'footer-wrap' for a menu in a column of a row of the foot, where the place is
+	 *										'section-col'; '' for nodes that stand directly on the page - the children of a call
+	 *										get the root of the context, or the name of the call where that is empty), the element
 	 *										of a loop (the shape [ 'uri', 'id', 'element', 'model' ] has), the tokens of the loops the nodes stand
 	 *										in ('fills', [ '[[token]]' => text ]: a textfill with no slash reads them before the
 	 *										element, the call of a shortcode has them put into its arguments, and a string, a text, a link and the
@@ -2287,7 +2290,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$nodes				What \Nino\Markup::parse() answered
-		 *	@param		array			$context			See the class; what is missing is the default: no template, no scope, the place 'page', no element, depth 0
+		 *	@param		array			$context			See the class; what is missing is the default: no template, no scope, the place 'page', no root, no element, depth 0
 		 *
 		 *	@return 	string
 		 */
@@ -2300,6 +2303,7 @@ namespace Nino {
 				'template'	=> is_string( $context['template'] ?? null ) === true ? $context['template'] : '',
 				'scope'			=> is_string( $context['scope'] ?? null ) === true ? $context['scope'] : '',
 				'place'			=> is_string( $context['place'] ?? null ) === true ? $context['place'] : 'page',
+				'root'			=> is_string( $context['root'] ?? null ) === true ? $context['root'] : '',
 				'element'		=> is_array( $element ) === true ? $element : null,
 				'fills'			=> is_array( $context['fills'] ?? null ) === true ? $context['fills'] : [],
 				'depth'			=> is_int( $context['depth'] ?? null ) === true ? max( 0, $context['depth'] ) : 0,
@@ -3019,7 +3023,7 @@ namespace Nino {
 			}
 
 			// 7. The children - 6. an id gives them its scope
-			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'element' => $context['element'], 'fills' => $context['fills'], 'depth' => $context['depth'] + 1 ] + ( $path === null ? [] : [ 'trace' => true, 'path' => $path ] );
+			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'root' => $context['root'] === '' ? $name : $context['root'], 'element' => $context['element'], 'fills' => $context['fills'], 'depth' => $context['depth'] + 1 ] + ( $path === null ? [] : [ 'trace' => true, 'path' => $path ] );
 			$content = '';
 			$slotted = [];
 

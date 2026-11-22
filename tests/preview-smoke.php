@@ -37,6 +37,11 @@ $perm = '/_admin/preview/manage';
 		return \Nino\Components::render( $appData, $context['children'], $context ). \Nino\Components::render( $appData, $context['children'], $context );
 	} );
 
+\Nino\Components::addComponent( $appData, 'rootecho', [ 'label' => 'Root echo', 'in' => [ 'box' ] ],
+	static function( array &$appData, array $args, string $content, array $context ): string {
+		return '<i>root='. $context['root']. ' trace='. var_export( $context['trace'] ?? false, true ). '</i>';
+	} );
+
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/template/page-x/hero/title]]' => 'Hallo', '[[/template/page-x/hero/fresh]]' => 'Neu' ] );
 
 $file = '[box id="hero"][title ~title][/box][rounds][title /template/page-x/hero/title][/rounds]';
@@ -207,6 +212,9 @@ check( 'a visitor, next, has the page of the file', \Nino\Html::renderHtml( $vis
 \Nino\Modules\Template::swap( $appData, '/templates/Page-x', '[title "x"]' );
 \Nino\Modules\Template::swap( $appData, '/templates/page-x.tpl.tpl', '[title "x"]' );
 check( 'a name that is no template of the project\'s own is taken for none', array_keys( $appData['./nino/template/swapped'] ) === [ 'page-x' ] );
+
+\Nino\Modules\Template::swap( $appData, '/templates/page-x', '[rootecho /][box id="hero"][rootecho /][/box]' );
+check( 'a draft that is drawn with the trace has the root in its context all the same: none on the page, the box for what stands in it', str_contains( $draw(), '<i>root= trace=true</i>' ) === true && str_contains( $draw(), '<i>root=box trace=true</i>' ) === true );
 
 echo "\n";
 

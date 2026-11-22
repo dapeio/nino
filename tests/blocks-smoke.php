@@ -213,6 +213,38 @@ foreach( [ 'header-line' => 'header-wrap', 'footer-columns' => 'footer-wrap' ] a
 
 check( 'the header and the footer of the blocks and of the starter site are made of section-row and section-col, and the register finds nothing against any of the four', $frames['header-line'] === [ [], [], true, true ] && $frames['footer-columns'] === [ [], [], true, true ] );
 
+// A component of the test that says the root of the context it is drawn in: put into every column of a frame it is asked there, in the columns of the header and of the footer alike
+$roots = new \ArrayObject();
+\Nino\Components::addComponent( $appData, 'root-echo', [ 'label' => 'Root echo', 'in' => [ 'flow' ], 'offers' => [] ],
+	static function( array &$appData, array $args, string $content, array $context ) use ( $roots ): string {
+		$roots[] = [ $context['root'], $context['place'] ];
+		return '';
+	} );
+
+$beside = static function( array $nodes ) use ( &$beside ): array {
+
+	foreach( $nodes as $at => $node ) {
+
+		if( is_array( $node['c'] ?? null ) === true )
+			$nodes[$at]['c'] = $beside( $node['c'] );
+
+		if( ( $node['n'] ?? '' ) === 'section-col' )
+			$nodes[$at]['c'] = array_merge( (array) ( $nodes[$at]['c'] ?? [] ), [ [ 'n' => 'root-echo', 's' => '', 'a' => [], 'c' => null, 'o' => 0 ] ] );
+	}
+
+	return $nodes;
+};
+$answered = [];
+
+foreach( [ 'header-line' => 'header-wrap', 'footer-columns' => 'footer-wrap' ] as $frameKey => $frameWrap ) {
+
+	$roots->exchangeArray( [] );
+	\Nino\Components::render( $appData, $beside( \Nino\Blocks::get( $appData, $frameKey )['tree'] ), [ 'template' => 'page-x' ] );
+	$answered[$frameKey] = [ array_unique( array_column( $roots->getArrayCopy(), 0 ) ), array_unique( array_column( $roots->getArrayCopy(), 1 ) ) ];
+}
+
+check( 'a column of the header block is drawn under the root header-wrap and one of the footer block under footer-wrap, the place of both being the column', $answered === [ 'header-line' => [ [ 'header-wrap' ], [ 'section-col' ] ], 'footer-columns' => [ [ 'footer-wrap' ], [ 'section-col' ] ] ] );
+
 // --- B. one rule each --------------------------------------------------------------------------------
 
 echo "\nB. What a block must keep\n";

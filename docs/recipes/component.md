@@ -203,6 +203,13 @@ What the register does for the renderer, and what it leaves to it:
   with `\Nino\Html::renderSource()` and `\Nino\Html::context()`, and writes every
   `[` of a value it puts into that text as `&#91;`. A renderer that throws a
   `\Exception` leaves its place empty, and the log says it once.
+- `$context` says where the call stands: `template`, `scope`, `place` (the
+  component it stands in directly: `section-col` for a menu in a column of the
+  foot), `root` (the outermost component it stands in: `footer-wrap` for the same
+  menu, `''` for a call on the page itself), the `element` and `fills` of a
+  loop and `depth`. A renderer that draws itself differently in the head and in
+  the foot reads `root`, not `place`, and a loop that draws its children hands
+  its rounds the context it was given, `root` among the rest.
 - A second text of a call - a caption, an alternative text - is an attribute of
   the type `text`: a reference (`~caption`, a key, `.field`) or the text itself,
   escaped. A component that has an attribute of the type `id` says where its own

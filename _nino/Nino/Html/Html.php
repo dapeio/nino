@@ -328,7 +328,7 @@ namespace Nino {
 
 		/**
 		 *	The context of the call that is being drawn: where a shortcode stands when
-		 *	its callback runs - the template, the scope, the place, the element and
+		 *	its callback runs - the template, the scope, the place, the root, the element and
 		 *	the tokens of a loop it is in, and how deep - so that what it draws itself
 		 *	with renderSource() is drawn in the same place
 		 *
@@ -338,7 +338,7 @@ namespace Nino {
 		 */
 		public static function context( array &$appData ): array {
 
-			return (array) ( $appData[self::CONTEXT] ?? [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ] );
+			return (array) ( $appData[self::CONTEXT] ?? [ 'template' => '', 'scope' => '', 'place' => 'page', 'root' => '', 'element' => null, 'fills' => [], 'depth' => 0 ] );
 		}
 
 		/**

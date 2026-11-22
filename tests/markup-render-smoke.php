@@ -81,8 +81,8 @@ check( 'the fills of the site in the source and in a value are put in before the
 
 $seen->exchangeArray( [] );
 $render( '[probe /a]' );
-check( 'a call is told where it stands: the context of the page has no template, no scope, the place page and depth 0, no element, no tokens', $seen[0][1] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ] );
-check( '...and outside a call there is the context of nothing', \Nino\Html::context( $appData ) === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ] );
+check( 'a call is told where it stands: the context of the page has no template, no scope, the place page, no root and depth 0, no element, no tokens', $seen[0][1] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'root' => '', 'element' => null, 'fills' => [], 'depth' => 0 ] );
+check( '...and outside a call there is the context of nothing', \Nino\Html::context( $appData ) === [ 'template' => '', 'scope' => '', 'place' => 'page', 'root' => '', 'element' => null, 'fills' => [], 'depth' => 0 ] );
 
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-ctx.tpl', '[probe /ctx]' );
 \Nino\Filesystem::putFileContent( $appData, '/templates/plain.name.tpl', '[probe /dot]' );

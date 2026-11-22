@@ -784,11 +784,11 @@ ksort( $args );
 check( 'the arguments: every attribute as a string - a bool 1 or 0, an int its digits, a string, a link and an image escaped, the value for every width of a responsive one - and value, source, class, variant and lang - the slug of the id as the attribute says it, the tag form is the token of a template', $args === [
 	'anchor' => 'z', 'class' => 'probe-echo probe-echo--mode-b probe-echo--size-50 probe-echo--m-size-25 probe-echo--on probe-echo--variant-soft', 'count' => '7', 'flag' => '1', 'href' => '/x', 'label' => 'L&lt;',
 	'lang' => '', 'mode' => 'b', 'on' => '1', 'pic' => '/template/page-x/z/photo', 'quiet' => '0', 'size' => '50', 'source' => '/project/company/general/name', 'tag' => 'h2', 'value' => 'ACME', 'variant' => 'soft' ] );
-check( 'the context it is given is the one the call stands in - the scope above the call and not the one it makes - and the children are drawn one deeper at its place', $given === [ 'template' => 'page-x', 'scope' => 'a', 'place' => 'section-wrap', 'element' => null, 'fills' => [], 'depth' => 1 ] );
+check( 'the context it is given is the one the call stands in - the scope above the call and not the one it makes - and the children are drawn one deeper at its place', $given === [ 'template' => 'page-x', 'scope' => 'a', 'place' => 'section-wrap', 'root' => 'section-wrap', 'element' => null, 'fills' => [], 'depth' => 1 ] );
 $seen->exchangeArray( [] );
 $draw( '[probe-echo ~title][card][probe-echo .title][/card][/probe-echo]', [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'depth' => 3, 'element' => $element ] );
-check( 'the children of a call have its name as their place, one more depth, the scope, the template and the element of the loop', count( $seen ) === 2 && $seen[0][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'card', 'element' => $element, 'fills' => [], 'depth' => 5 ]
-	&& $seen[1][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'element' => $element, 'fills' => [], 'depth' => 3 ] && $seen[1][0]['source'] === '~title' && $seen[1][0]['value'] === 'Hallo &amp; &lt;Welt&gt; [sic]' );
+check( 'the children of a call have its name as their place, one more depth, the scope, the template and the element of the loop', count( $seen ) === 2 && $seen[0][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'card', 'root' => 'probe-echo', 'element' => $element, 'fills' => [], 'depth' => 5 ]
+	&& $seen[1][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'root' => '', 'element' => $element, 'fills' => [], 'depth' => 3 ] && $seen[1][0]['source'] === '~title' && $seen[1][0]['value'] === 'Hallo &amp; &lt;Welt&gt; [sic]' );
 $seen->exchangeArray( [] );
 $draw( '[probe-echo /project/company/general/name size="m:25" /][probe-echo /project/company/general/name size="77 l:50" /]' );
 check( 'the argument of a responsive choice is the value for every width: the default where the call starts with a breakpoint or with a value that is none', $seen[0][0]['size'] === '100' && $seen[1][0]['size'] === '100' && $seen[0][0]['class'] === 'probe-echo probe-echo--m-size-25' && $seen[1][0]['class'] === 'probe-echo probe-echo--l-size-50' );
@@ -1198,10 +1198,10 @@ echo "Depth, and trees nobody read\n";
 
 $seen->exchangeArray( [] );
 \Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ] );
-\Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ], [ 'template' => [ 'x' ], 'scope' => 5, 'place' => null, 'element' => 'x', 'depth' => 'deep' ] );
+\Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ], [ 'template' => [ 'x' ], 'scope' => 5, 'place' => null, 'root' => [ 'x' ], 'element' => 'x', 'depth' => 'deep' ] );
 \Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ], [ 'depth' => -4, 'element' => [ 'x' ] ] );
-check( 'a context with nothing in it is the page: no template, no scope, the place page, no element, depth 0 - and what is of the wrong type is the same', $seen[0][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ]
-	&& $seen[1][2] === $seen[0][2] && $seen[2][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => [ 'x' ], 'fills' => [], 'depth' => 0 ] );
+check( 'a context with nothing in it is the page: no template, no scope, the place page, no root, no element, depth 0 - and what is of the wrong type is the same', $seen[0][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'root' => '', 'element' => null, 'fills' => [], 'depth' => 0 ]
+	&& $seen[1][2] === $seen[0][2] && $seen[2][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'root' => '', 'element' => [ 'x' ], 'fills' => [], 'depth' => 0 ] );
 check( 'a depth below nothing is none: the limit is the same', substr_count( \Nino\Components::render( $appData, [ [ 'n' => 'card', 's' => '', 'a' => [], 'c' => [ [ 'n' => 'card', 's' => '', 'a' => [], 'c' => null, 'o' => 0 ] ], 'o' => 0 ] ], [ 'depth' => -100 ] ), '<article' ) === 2 );
 check( 'a text is drawn as it is: markup, quotes, brackets and all - it is the template\'s own', \Nino\Components::render( $appData, [ [ 't' => '<b class="x">a & [b] [[c]] \\[d]</b>' ] ] ) === '<b class="x">a & [b] [[c]] \\[d]</b>' );
 
@@ -1226,7 +1226,7 @@ check( 'a document of forty levels: the parser stops at sixteen and notes it, th
 $junk = [ 'a', 5, null, [ 't' => [ 'x' ] ], [ 't' => 5 ], [ 'f' => [ 'k' ] ], [ 'f' => '' ], [ 'n' => 5 ], [ 'n' => [ 'card' ] ], [ 'x' => 1 ], [], [ 'n' => 'card' ], [ 'n' => 'card', 'a' => 'x', 's' => 5, 'c' => 'y' ], [ 'n' => 'section-title', 's' => [ 'x' ], 'a' => [ 'text' => 5 ] ],
 	[ 'n' => 'section-title', 'a' => [ 'text' => 'ok', 'tag' => [ 'h1' ] ], 'c' => 5 ], [ 'n' => 'card', 'c' => [ 'a', [ 'n' => 'text', 'a' => [ 'text' => 'in' ] ] ] ] ];
 $said = $logged( static function() use ( &$appData, $junk, &$out ): void {
-	$out = \Nino\Components::render( $appData, $junk, [ 'template' => [ 'x' ], 'scope' => 5, 'place' => null, 'element' => 'x', 'depth' => 'deep' ] );
+	$out = \Nino\Components::render( $appData, $junk, [ 'template' => [ 'x' ], 'scope' => 5, 'place' => null, 'root' => [ 'x' ], 'element' => 'x', 'depth' => 'deep' ] );
 } );
 check( 'a tree built by hand with what no parser makes - nodes that are no array, keys that are no string, a context of the wrong types - is drawn as far as it makes sense and never throws',
 	$out === '<article class="card"></article><article class="card"></article><h2 class="section-title">ok</h2><article class="card"><p class="text">in</p></article>' && $said === [] );
@@ -1702,7 +1702,7 @@ $nodes = $context['children'];
 unset( $context['children'] );
 check( 'the register does not draw what such a component holds: no child is drawn - none of them is asked, and a name nobody registered is not said - the renderer is handed \'\' as the content and the nodes as the children of its context',
 	count( $seen ) === 0 && $said === [] && $handed[0][1] === '' && array_column( $nodes, 'n' ) === [ 'text', 'probe-echo' ] && $nodes[1]['c'][0]['n'] === 'nobody' );
-check( '...and the context to draw them in: the scope its own id makes, the template, the place its name, one deeper, the element and the fills of the call', $context === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'loop', 'element' => null, 'fills' => [], 'depth' => 3 ] );
+check( '...and the context to draw them in: the scope its own id makes, the template, the place its name, the root, one deeper, the element and the fills of the call', $context === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'loop', 'root' => 'loop', 'element' => null, 'fills' => [], 'depth' => 3 ] );
 check( '...so that it draws them as often as it likes, each time in a context of its own', $html === '<ul id="hero"><li><p class="text">'. $title. '</p></li><li><p class="text">'. $title. '</p></li></ul>' );
 $rounds->exchangeArray( [ 'x' ] );
 $html = $draw( '[loop][text ~title][/loop]', [ 'template' => 'page-x', 'scope' => 'hero', 'element' => $element, 'fills' => [ '[[o]]' => 'outer' ] ] );
@@ -1905,6 +1905,57 @@ check( 'a text that is a reference stays one: a field, a key and a ~name are rea
 // The children of a loop in a loop: the round that is nearest wins, and what is in a round is in every call of it
 $inner = $leaf( '[loop][tokened label="[[n]]-[[title]]"][/tokened][/loop]', [ 'template' => 'page-x', 'scope' => 'hero' ] + $loopRound( [ 'title' => 'T' ] ) );
 check( 'a call in the children of a component that draws its children in rounds of its own has the tokens of the round its component hands it - a token of the round outside it is the text it is written as, for the renderer made the fills of the round alone', $inner === '<ul><li><a l="a-[[title]]" c="" h="" p="" m="a" n="3" o="0"></a></li></ul>' );
+
+
+echo "\n";
+
+
+// --- The root of a context ------------------------------------------------------------
+
+echo "The root: the outermost component the nodes stand in\n";
+
+\Nino\Components::addComponent( $appData, 'root-loop', [ 'label' => 'Root loop', 'in' => [ 'page', 'flow' ], 'offers' => [ 'flow' ], 'children' => 'nodes', 'template' => '' ],
+	static function( array &$appData, array $args, string $content, array $context ): string {
+
+		$nodes = $context['children'];
+		unset( $context['children'] );
+
+		return \Nino\Components::render( $appData, $nodes, [ 'fills' => [ '[[n]]' => 'a' ] ] + $context ). \Nino\Components::render( $appData, $nodes, [ 'fills' => [ '[[n]]' => 'b' ] ] + $context );
+	} );
+
+/*	What a shortcode that stands in the tree is handed, and what it draws with that context	*/
+$shortcodeSaw = new \ArrayObject();
+\Nino\Html::addShortcode( $appData, 'root-shortcode', static function( array &$appData, array $args ) use ( $shortcodeSaw ): string {
+
+	$context = \Nino\Html::context( $appData );
+	$shortcodeSaw[] = $context['root'];
+
+	return \Nino\Html::renderSource( $appData, '[probe-echo /project/company/general/name]', $context );
+}, null );
+
+/*	The roots the probes were handed by a draw, in the order they were asked	*/
+$rootsOf = static function( string $source, array $context = [ 'template' => 'page-x' ] ) use ( &$appData, $seen, $shortcodeSaw ): array {
+
+	$seen->exchangeArray( [] );
+	$shortcodeSaw->exchangeArray( [] );
+	\Nino\Components::render( $appData, \Nino\Markup::parse( $source, \Nino\Components::containers( $appData ) ), $context );
+
+	return array_map( static fn( array $call ): string => $call[2]['root'], $seen->getArrayCopy() );
+};
+
+$column = '[section-wrap][section-row][section-col]%s[/section-col][/section-row][/section-wrap]';
+check( 'a call on the page has no root', $rootsOf( '[probe-echo /project/company/general/name]' ) === [ '' ] );
+check( 'a call directly in a wrap has the wrap as its root', $rootsOf( '[section-wrap][probe-echo /project/company/general/name][/section-wrap]' ) === [ 'section-wrap' ] );
+check( 'a call in a column of a row of the wrap has the wrap as its root, and the column as its place', $rootsOf( sprintf( $column, '[probe-echo /project/company/general/name]' ) ) === [ 'section-wrap' ] && $seen[0][2]['place'] === 'section-col' );
+check( 'a loop in that column hands its rounds the root of the wrap, and so does the context the loop is handed', $rootsOf( sprintf( $column, '[root-loop][probe-echo /project/company/general/name][/root-loop]' ) ) === [ 'section-wrap', 'section-wrap' ] && $seen[0][2]['fills'] === [ '[[n]]' => 'a' ] );
+check( 'a shortcode in a column is handed the root of the wrap, and what it draws with its context has it', $rootsOf( sprintf( $column, '[root-shortcode /]' ) ) === [ 'section-wrap' ] && $shortcodeSaw->getArrayCopy() === [ 'section-wrap' ] );
+check( 'a loop on the page is the root of what it draws, the first component of a tree being the outermost', $rootsOf( '[root-loop][probe-echo /project/company/general/name][/root-loop]' ) === [ 'root-loop', 'root-loop' ] );
+
+$given = [ 'template' => 'page-x', 'root' => 'footer-wrap' ];
+check( 'the root a caller gives is the root of everything drawn, in every column and loop, and no wrap in it takes the place of it', $rootsOf( '[probe-echo /project/company/general/name]'. sprintf( $column, '[root-loop][probe-echo /project/company/general/name][/root-loop][root-shortcode /]' ), $given ) === [ 'footer-wrap', 'footer-wrap', 'footer-wrap', 'footer-wrap' ] && $shortcodeSaw->getArrayCopy() === [ 'footer-wrap' ] );
+check( 'a root that is no string is none, as a place that is none is the page', $rootsOf( '[probe-echo /project/company/general/name]', [ 'root' => [ 'footer-wrap' ] ] ) === [ '' ] && $rootsOf( '[probe-echo /project/company/general/name]', [ 'root' => null ] ) === [ '' ] && $rootsOf( '[probe-echo /project/company/general/name]', [ 'root' => 7 ] ) === [ '' ] );
+check( 'a shortcode outside a call is handed the default, and the default has no root', array_key_exists( 'root', \Nino\Html::context( $appData ) ) === true && \Nino\Html::context( $appData )['root'] === '' );
+
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $other ) );
 
