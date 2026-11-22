@@ -949,7 +949,10 @@ namespace Nino\Admin {
 		 *	registry's screens asks for it: the way guardPerm() checks it. The
 		 *	screen that names it answers with its own rule (see mayUse()), so what
 		 *	the rail shows and what the action allows are one answer; a
-		 *	permission no screen names is a plain checkPermission()
+		 *	permission no screen names is a plain checkPermission(). So a string
+		 *	that a tab with a scope() names as its perm() is checked with the rule of
+		 *	that tab, the door without a description included: a fine right is
+		 *	checked behind the door of its own, or with scoped()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$perm					The permission an action asks for

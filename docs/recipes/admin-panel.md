@@ -132,6 +132,9 @@ request:
   holds the door and was described in no detail in the area, so an older account keeps the tab; one
   without the door and the right gets nothing. The actions follow the same rule only while every
   screen naming that `perm()` is a tab of the same panel with the same scope.
+  The other way round, a string that a tab with a `scope()` names as its `perm()` gets the rule of that tab
+  wherever `guardPerm()` checks it, the door without a description included: check a fine right behind
+  the door of its own, or with `Admin::scoped()`, and not with `guardPerm()` of a string a tab names.
 - A feature's panel can get a tab it does not name. When an active feature
   declares settings and has a panel, `Panels::collect()` adds one entry to that
   panel - uri `<panel>-settings`, class `\Nino\Modules\Features\Settings`, the

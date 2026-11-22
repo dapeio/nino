@@ -1956,6 +1956,19 @@ class AdminSmokeSharedHostB {
 	public static function tabs(): array { return [ 'AdminSmokeSharedTabB' ]; }
 }
 
+/** A panel of the top level that names a scope(), which only a tab may: a warning, and a plain perm() */
+class AdminSmokeTopScopePanel {
+	public static function actions(): array { return [ 'topscope/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'topscope', 'Top scope', 55 ]; }
+	public static function perm(): string { return '/_admin/scopearea/top'; }
+	public static function scope(): string { return '/_admin/scopearea/'; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+			return;
+		\Nino\Http::ok( $request );
+	}
+}
+
 /** The panel that carries the tabs, with a door of its own */
 class AdminSmokeScopeHost {
 	public static function actions(): array { return [ 'scopehost/run' => [ self::class, 'apiRun' ] ]; }
@@ -1967,7 +1980,7 @@ class AdminSmokeScopeHost {
 
 /** The module contributing the host */
 class AdminSmokeScopeModule {
-	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeScopeHost', 'AdminSmokeVictimPanel', 'AdminSmokeClaimHost', 'AdminSmokeSharedHostA', 'AdminSmokeSharedHostB', 'AdminSmokeDoorHost' ]; }
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeScopeHost', 'AdminSmokeVictimPanel', 'AdminSmokeClaimHost', 'AdminSmokeSharedHostA', 'AdminSmokeSharedHostB', 'AdminSmokeDoorHost', 'AdminSmokeTopScopePanel' ]; }
 }
 
 /** What an account sees and reaches of the scope fixture: the tabs in the rail, the panes drawn, the tiles, and the status of an action of each tab */
@@ -2008,6 +2021,9 @@ function pinTabScope( array &$appData ): void {
 	check( 'a scope() that does not end in a slash is a warning naming the tab, and the tab has no scope', ( $tabs['badscopetab']['scope'] ?? null ) === ''
 		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeBadScopeTab' ) && str_contains( $m, 'scope()' ) ) ) === 1 );
 
+	check( 'a scope() at a panel of the top level is a warning naming the panel, and the panel has none', ( $registry['topscope']['scope'] ?? null ) === ''
+		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeTopScopePanel' ) && str_contains( $m, 'only a tab may' ) ) ) === 1 );
+
 	// Only the door: nobody described the area, so the tab is there
 	ninoUser( $data, 'scope-door@example.com', [ '/_admin/scopearea/manage', '/_admin/scopearea/plain' ] );
 	$door = scopeProbe( $data );
@@ -2039,6 +2055,13 @@ function pinTabScope( array &$appData ): void {
 		$none = scopeProbe( $data );
 		check( $what. ' gets neither the tab, its pane nor its tile, and its action is refused without running', $none['tabs'] === [] && $none['pane'] === false && $none['tile'] === false && $none['rail'] === false && $none['scoped'] === 403 && AdminSmokeScopeTab::$ran === $ran );
 	}
+
+	ninoUser( $data, 'scope-top-door@example.com', [ '/_admin/scopearea/manage' ] );
+	$topDoor = \Nino\Admin\Admin::visiblePanels( $data );
+	[ $topStatus ] = ninoCall( $data, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'topscope/run' );
+	ninoUser( $data, 'scope-top-right@example.com', [ '/_admin/scopearea/top' ] );
+	[ $topRight ] = ninoCall( $data, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'topscope/run' );
+	check( 'a panel of the top level with a scope() is checked with its plain perm(): the door of an area does not open it, its right does', isset( $topDoor['topscope'] ) === false && $topStatus === 403 && $topRight === 200 );
 
 	// A scope() lies where the permissions do: the area of another panel, or one nobody has anything in, is a plain permission and a warning
 	ninoWarnings();
