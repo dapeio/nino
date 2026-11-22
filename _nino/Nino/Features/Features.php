@@ -2110,17 +2110,9 @@ namespace Nino {
 			// A feature reached through a symlink - a checkout linked into
 			// features/ during development, or a deployment that assembles the
 			// directory out of links - goes by dropping the link, never by
-			// deleting what it points at. removeDir() refuses to follow a link
-			// at all, which is right, but it declined to remove the link either:
-			// the feature stayed where it was, is_dir() followed the link and
-			// still said yes, and the operator was told the web server may not
-			// write there - which was not the reason, and not a thing they could
-			// do anything about. Dropping the link leaves the checkout on the
-			// other side of it alone
-			if( is_link( $dir ) === true )
-				@unlink( $dir );
-			else
-				\Nino\Filesystem::removeDir( $dir );
+			// deleting what it points at: removeDir() unlinks a link and does
+			// not enter it, so the checkout on the other side is left alone
+			\Nino\Filesystem::removeDir( $dir );
 
 			// The path is for the log of the house: the sentence goes to the browser
 			if( is_dir( $dir ) === true ) {

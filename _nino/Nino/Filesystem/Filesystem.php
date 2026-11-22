@@ -832,10 +832,12 @@ namespace Nino {
 
 		/**
 		 *	Delete a file, or a directory with everything in it. Quiet about what
-		 *	is not there, and a link to a directory is neither followed nor
-		 *	removed. It takes an absolute path and checks nothing of what it
-		 *	deletes: the caller has proven the path is its own (see
-		 *	\Nino\Features::remove()).
+		 *	is not there. A link - to a file or to a directory, working or broken,
+		 *	at any depth and as $target itself, with or without a slash or a dot at the
+		 *	end of the path - is removed as the link it is, with
+		 *	unlink(), and never entered, so that what it points at is not touched.
+		 *	It takes an absolute path and checks nothing of what it deletes: the
+		 *	caller has proven the path is its own (see \Nino\Features::remove()).
 		 *
 		 *	@param		string		$target				An absolute path
 		 *
@@ -843,12 +845,31 @@ namespace Nino {
 		 */
 		public static function removeDir( string $target ): void {
 
+			// A path that ends in a slash or in /. names what a link points at, not the link: is_link() resolves it. The slashes and the dots at the end
+			// are taken off, so that the link is the link and the root is none to remove
+			$target = (string) preg_replace( '#(?:/\.?)+$#', '', $target );
+
+			if( $target === '' )
+				return;
+
+			// Before is_file() and is_dir(), which follow a link: a link to a
+			// folder is dropped and never walked, a broken one is dropped as well
+			if( is_link( $target ) ) {
+
+				// A link to a folder is a folder to rmdir() on a system that has
+				// no other way to drop it
+				if( @unlink( $target ) === false )
+					@rmdir( $target );
+
+				return;
+			}
+
 			if( is_file( $target ) ) {
 				@unlink( $target );
 				return;
 			}
 
-			if( ! is_dir( $target ) || is_link( $target ) )
+			if( ! is_dir( $target ) )
 				return;
 
 			// @ throughout: two concurrent cleanups (or a request racing this

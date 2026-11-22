@@ -676,14 +676,58 @@ $features = [];
 $makeFeature( 'alpha' );
 $publish( $app );
 $place( $app, 'alpha' );
-// A link to a directory is neither followed nor removed: the feature's directory is not empty afterwards
-symlink( sys_get_temp_dir(), NINO_FEATURES_DIR. '/Alpha/link' );
+// A directory that cannot be removed, made without touching the file system: a stream wrapper that stands in for "file" only for the one call, passes everything on to the
+// real file system and refuses rmdir() of the one directory. No mode is changed, no attribute set, no link made, and the product has no seam for it
+final class StubbornFiles {
+	public static string $refuse = '';
+	public $context;
+	private $handle;
+	private static function real( callable $run ) {
+		stream_wrapper_restore( 'file' );
+		try { return $run(); }
+		finally { stream_wrapper_unregister( 'file' ); stream_wrapper_register( 'file', self::class ); }
+	}
+	public static function on( string $refuse ): void { self::$refuse = $refuse; stream_wrapper_unregister( 'file' ); stream_wrapper_register( 'file', self::class ); }
+	public static function off(): void { self::$refuse = ''; stream_wrapper_restore( 'file' ); }
+	public function rmdir( string $path, int $options ): bool { return rtrim( $path, '/' ) === self::$refuse ? false : self::real( fn() => @rmdir( $path ) ); }
+	public function unlink( string $path ): bool { return self::real( fn() => @unlink( $path ) ); }
+	public function mkdir( string $path, int $mode, int $options ): bool { return self::real( fn() => @mkdir( $path, $mode, ( $options & STREAM_MKDIR_RECURSIVE ) !== 0 ) ); }
+	public function rename( string $from, string $to ): bool { return self::real( fn() => @rename( $from, $to ) ); }
+	public function url_stat( string $path, int $flags ) { return self::real( fn() => ( $flags & STREAM_URL_STAT_LINK ) !== 0 ? @lstat( $path ) : @stat( $path ) ); }
+	public function dir_opendir( string $path, int $options ): bool { $this->handle = self::real( fn() => @opendir( $path ) ); return $this->handle !== false; }
+	public function dir_readdir() { return readdir( $this->handle ); }
+	public function dir_closedir(): bool { closedir( $this->handle ); return true; }
+	public function dir_rewinddir(): bool { rewinddir( $this->handle ); return true; }
+	public function stream_open( string $path, string $mode, int $options, ?string &$opened ): bool { $this->handle = self::real( fn() => @fopen( $path, $mode ) ); return $this->handle !== false; }
+	public function stream_read( int $count ) { return fread( $this->handle, $count ); }
+	public function stream_write( string $data ) { return fwrite( $this->handle, $data ); }
+	public function stream_eof(): bool { return feof( $this->handle ); }
+	public function stream_tell() { return ftell( $this->handle ); }
+	public function stream_seek( int $offset, int $whence ): bool { return fseek( $this->handle, $offset, $whence ) === 0; }
+	public function stream_flush(): bool { return fflush( $this->handle ); }
+	public function stream_close(): void { fclose( $this->handle ); }
+	public function stream_stat() { return fstat( $this->handle ); }
+	public function stream_lock( int $operation ): bool { return flock( $this->handle, $operation ); }
+	public function stream_truncate( int $size ): bool { return ftruncate( $this->handle, $size ); }
+	public function stream_set_option( int $option, int $arg1, ?int $arg2 ): bool { return false; }
+	public function stream_metadata( string $path, int $option, mixed $value ): bool {
+		return self::real( fn() => match( $option ) { STREAM_META_TOUCH => @touch( $path, ...(array) $value ), STREAM_META_ACCESS => @chmod( $path, (int) $value ), default => false } );
+	}
+}
+mkdir( NINO_FEATURES_DIR. '/Alpha/sub', 0755, true );
+file_put_contents( NINO_FEATURES_DIR. '/Alpha/sub/inner.txt', 'x' );
+StubbornFiles::on( (string) realpath( NINO_FEATURES_DIR. '/Alpha' ) );
 ninoWarnings();
-[ $status, $body ] = $call( $app, 'apiRemove', [ 'key' => 'alpha' ] );
-$warnings = ninoWarnings();
-check( 'a directory that cannot be removed is a 400 with the code of it, without its path', $status === 400 && ( $body['code'] ?? '' ) === 'features_remove_failed' && $leak( $body, $sandbox ) === false );
+try {
+	[ $status, $body ] = $call( $app, 'apiRemove', [ 'key' => 'alpha' ] );
+	$warnings = ninoWarnings();
+}
+finally {
+	StubbornFiles::off();
+}
+check( 'a directory that cannot be removed is a 400 with the code of it, without its path', $status === 400 && ( $body['code'] ?? '' ) === 'features_remove_failed' && $leak( $body, $sandbox ) === false && is_dir( NINO_FEATURES_DIR. '/Alpha' ) === true );
 check( '...and the log of the house has the path, once', count( $warnings ) === 1 && str_contains( $warnings[0], NINO_FEATURES_DIR. '/Alpha' ) === true );
-unlink( NINO_FEATURES_DIR. '/Alpha/link' );
+check( '...what could be removed of the directory is gone and the directory is what stays', is_dir( NINO_FEATURES_DIR. '/Alpha/sub' ) === false );
 \Nino\Filesystem::removeDir( $sandbox );
 
 // The sentences exist in both languages of the workbench

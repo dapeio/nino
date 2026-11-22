@@ -128,4 +128,69 @@ $released = strpos( $body, 'self::unlockFile(', (int) $written );
 check( 'SAFETY: a write drops the compiled copy of the file before it releases the lock, and at no other place',
 	$written !== false && $invalidated !== false && $released !== false && $written < $invalidated && $invalidated < $released && substr_count( $body, 'opcache_invalidate(' ) === 1 );
 
+// --- Filesystem::removeDir - a link is dropped as a link and never entered ---------------
+
+echo "\nFilesystem::removeDir\n";
+
+$cases = $sandbox. '/removedir';
+$outside = $cases. '/outside';
+$makeOutside = static function( string $dir ): void {
+	@mkdir( $dir. '/sub/deeper', 0777, true );
+	file_put_contents( $dir. '/a.txt', 'a' );
+	file_put_contents( $dir. '/sub/b.txt', 'b' );
+	file_put_contents( $dir. '/sub/deeper/c.txt', 'c' );
+};
+$whole = static fn( string $dir ): bool => @file_get_contents( $dir. '/a.txt' ) === 'a' && @file_get_contents( $dir. '/sub/b.txt' ) === 'b' && @file_get_contents( $dir. '/sub/deeper/c.txt' ) === 'c';
+$makeOutside( $outside );
+$linkable = function_exists( 'symlink' ) === true;
+
+// a link to a folder outside, as the folder's own entry
+mkdir( $cases. '/one/inner', 0777, true );
+file_put_contents( $cases. '/one/inner/f.txt', 'f' );
+$linkable && symlink( $outside, $cases. '/one/lnk' );
+\Nino\Filesystem::removeDir( $cases. '/one' );
+check( 'a link to a folder outside is dropped with the folder it stands in, and what it points at is whole', is_dir( $cases. '/one' ) === false && is_link( $cases. '/one/lnk' ) === false && $whole( $outside ) === true );
+
+// a link deep in the tree
+mkdir( $cases. '/two/a/b/c', 0777, true );
+$linkable && symlink( $outside, $cases. '/two/a/b/c/deep' );
+$linkable && symlink( $outside. '/a.txt', $cases. '/two/a/file-link' );
+\Nino\Filesystem::removeDir( $cases. '/two' );
+check( 'a link deep in the tree - to a folder or to a file - is dropped, nothing of the tree stays, and the target is whole', file_exists( $cases. '/two' ) === false && is_link( $cases. '/two' ) === false && $whole( $outside ) === true );
+
+// the path itself is a link
+$linkable && symlink( $outside, $cases. '/self' );
+\Nino\Filesystem::removeDir( $cases. '/self' );
+check( 'a link as the path itself is dropped and not entered: the link is gone, the folder it pointed at is whole', is_link( $cases. '/self' ) === false && file_exists( $cases. '/self' ) === false && $whole( $outside ) === true );
+
+// a link to a file as the path
+$linkable && symlink( $outside. '/a.txt', $cases. '/filelink' );
+\Nino\Filesystem::removeDir( $cases. '/filelink' );
+check( 'a link to a file as the path is dropped and the file stays', is_link( $cases. '/filelink' ) === false && is_file( $outside. '/a.txt' ) === true );
+
+// a broken link, in a tree and as the path
+mkdir( $cases. '/three', 0777, true );
+$linkable && symlink( $cases. '/nowhere', $cases. '/three/broken' );
+$linkable && symlink( $cases. '/nowhere', $cases. '/broken' );
+\Nino\Filesystem::removeDir( $cases. '/three' );
+\Nino\Filesystem::removeDir( $cases. '/broken' );
+check( 'a broken link in a tree and as the path is dropped as well', is_dir( $cases. '/three' ) === false && is_link( $cases. '/three/broken' ) === false && is_link( $cases. '/broken' ) === false );
+
+// the path of a link ends in a slash, in /. or in both: it names what the link points at in the eyes of the file system, and the link is dropped all the same
+foreach( [ '/' => 'slash', '/.' => 'dot', '//' => 'slashes', '/./' => 'dotslash' ] as $end => $name ) {
+	$linkable && symlink( $outside, $cases. '/end-'. $name );
+	\Nino\Filesystem::removeDir( $cases. '/end-'. $name. $end );
+	check( 'a link whose path ends in "'. $end. '" is dropped, and what it points at is whole', is_link( $cases. '/end-'. $name ) === false && file_exists( $cases. '/end-'. $name ) === false && $whole( $outside ) === true );
+}
+
+// what is not there, a file and an ordinary tree: as it was
+\Nino\Filesystem::removeDir( $cases. '/not-there' );
+file_put_contents( $cases. '/plain.txt', 'x' );
+\Nino\Filesystem::removeDir( $cases. '/plain.txt' );
+$makeOutside( $cases. '/tree' );
+\Nino\Filesystem::removeDir( $cases. '/tree' );
+check( 'what is not there is nothing, a file is deleted, and a tree with no link in it is deleted whole', is_file( $cases. '/plain.txt' ) === false && file_exists( $cases. '/tree' ) === false && $whole( $outside ) === true );
+check( ( $linkable === true ? '' : '(no symlinks here) ' ). 'the tree of the targets of the cases was never entered', $whole( $outside ) === true && count( (array) scandir( $outside ) ) === 4 );
+
+
 ninoDone( $appData );
