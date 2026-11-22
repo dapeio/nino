@@ -91,6 +91,12 @@ return [
 	'[[/_admin/error/favicon_svg]]'			=> 'Die SVG-Datei ist kein schlichtes Vektorbild, das übernommen werden kann.',
 	'[[/_admin/error/favicon_no_previous]]'	=> 'Es gibt keinen vorherigen Satz.',
 	'[[/_admin/error/favicon_no_base]]'		=> 'Die Basis-Einheit hat keinen Satz zum Zurücksetzen.',
+	'[[/_admin/error/images_alt_plain]]'	=> 'Ein Alt-Text ist einfacher Text: keine Tags und kein Markup.',
+	'[[/_admin/error/images_alt_long]]'	=> 'Ein Alt-Text hat höchstens %s Zeichen.',
+	'[[/_admin/error/slots_size_large]]'	=> 'Ein Bild dieser Größe kann nicht erzeugt werden: Breite mal Höhe ist höchstens %s Millionen Pixel.',
+	'[[/_admin/error/slots_label]]'	=> 'Die Beschriftung fehlt.',
+	'[[/_admin/error/slots_invalid]]'	=> 'Die Adresse oder die Beschriftung ist nicht gültig.',
+	'[[/_admin/error/slots_exists]]'	=> 'Diese Adresse ist schon vergeben.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/images/manual/intro]]'	=> 'Jedes Bild Deiner Website hat einen festen Platz, einen Bildplatz, mit festen Maßen. Ein hochgeladenes Bild wird darauf zugeschnitten.',

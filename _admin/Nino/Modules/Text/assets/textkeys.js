@@ -1101,6 +1101,61 @@
 		},
 
 		/**
+		 *	The item of a save for one key: where it is written and the text it was read as, so that the server can tell a
+		 *	text that another tab or person wrote since from the one this form was drawn from
+		 *
+		 *	@param		{Object}	entry
+		 *	@param		{string}	locale					The language the form shows
+		 *	@param		{string}	value						The text to write
+		 *
+		 *	@return		{Object}									{ key, locale, value, was }
+		 */
+		saveItem : function( entry, locale, value ) {
+			return { key : entry.key, locale : entry.global === true ? '*' : locale, value : value, was : Nino.admin.textKeys.valueOf( entry, locale ) };
+		},
+
+		/**
+		 *	What a text is called where the panel shows it: the row, the section and the field, "Start page › Hero › Title"
+		 *
+		 *	@param		{Object}	model					What build() made
+		 *	@param		{string}	key
+		 *
+		 *	@return		{string}								'' for a key no row of the model has
+		 */
+		nameOf : function( model, key ) {
+
+			const found = Nino.admin.textKeys.fields( model ).find( function( hit ) { return hit.field.entry.key === key } );
+
+			return found === undefined ? '' : found.path.join(' › ');
+		},
+
+		/**
+		 *	The question that a save of keys asks when another tab or person wrote them since this form was drawn: the
+		 *	kernel's (Nino.adminUi.conflict()). Overwrite sends those items again, once, without the stamp of the text they
+		 *	were read as; Reload drops the work of this tab and shows what is stored; Cancel leaves the keys as they are
+		 *
+		 *	@param		{Array}			changed				The items the server turned down as changed
+		 *	@param		{Object}		options				{ model, opener, onOverwrite( items ), onReload(), onCancel() } - model the rows (build()), to name a text by its place and not by its key alone
+		 *
+		 *	@return		{boolean}									false when a question is already open and this one was not asked
+		 */
+		conflict : function( changed, options ) {
+
+			return Nino.adminUi.conflict( {
+				message			: Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), changed.map( function( item ) {
+					const name = options.model === undefined || options.model === null ? '' : Nino.admin.textKeys.nameOf( options.model, item.key );
+					return name === '' ? item.key : name+ ' ('+ item.key+ ')';
+				} ).join(', ') ),
+				opener			: options.opener,
+				onOverwrite : function() {
+					options.onOverwrite( changed.map( function( item ) { return { key : item.key, locale : item.locale, value : item.value, force : true } } ) );
+				},
+				onReload		: options.onReload,
+				onCancel		: options.onCancel,
+			} );
+		},
+
+		/**
 		 *	The hash parts that name a row, or a key in it
 		 *
 		 *	@param		{string}		row

@@ -163,4 +163,7 @@ return [
 	'[[/_admin/users/manual/deactivate]]'	=> 'Deactivate account blocks the login and keeps the account – not your own. Log out everywhere ends every session of the account.',
 	'[[/_admin/users/manual/lockout]]'	=> 'The Login protection tab sets how many failed logins lock an account, and for how long. Locked accounts are listed there; Lift lock opens one again.',
 	'[[/_admin/users/manual/recovery]]'	=> 'The recovery password is asked for by recovery.php, which restores a backup or sets up an account when nobody can log in any more. It is not a password for logging in.',
+	'[[/_admin/error/users_invalid_name]]'	=> 'The name of the account is not a name.',
+	'[[/_admin/error/users_incomplete]]'	=> 'The name of the account and whether it is active are needed.',
+	'[[/_admin/error/users_own_role]]'	=> 'Your own role is changed by another manager.',
 ];

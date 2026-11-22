@@ -946,7 +946,7 @@ Object.keys( values ).forEach( function( code ) {
 
 `Nino.adminUi.fileField( { key, label, accept, maxBytes, note, button, onChange } )` is the choice of a file as the guide has
 it: a button of the second kind, the name and the size of the chosen file beside it, "Remove", the limits as the `note`. A
-file that is larger than `maxBytes`, or of a type `accept` does not name, is not taken and is said at the field. Enter on the button asks for the picker when the key is let go, as Space does (a picker asked for while the key goes down is refused in a dialog); the release of the Enter that opened the dialog asks for nothing. It uploads
+file that is larger than `maxBytes`, or of a type `accept` does not name, is not taken and is said at the field - the types it takes by their names ("PDF or picture"), not as the picker's notation. Enter on the button asks for the picker when the key is let go, as Space does (a picker asked for while the key goes down is refused in a dialog); the release of the Enter that opened the dialog asks for nothing. It uploads
 nothing: `onChange( file )` hands the `File` over (`null` once it was removed), `value()` answers it, and the view sends it
 the way its model of saving says - at once, with the form, through `Nino.adminUi.api.call()` - and reports it to
 `Nino.admin.dirty`, which does not follow a file by itself.
@@ -962,7 +962,7 @@ midnight and a time without a date is no value; `valid()` answers `''`, `'incomp
 caller words (`error( text )`).
 
 `formDialog()` draws every one of them: a field of its `fields` is `type : 'check'`, `'checklist'` (`options`), `'locales'`
-(`locales`, `multiline`), `'file'` (`accept`, `maxBytes`), `'code'` or `'datetime'`, and `onSubmit( values )` gets a boolean,
+(`locales`, `multiline`), `'file'` (`accept`, `maxBytes`), `'code'` or `'datetime'`; a field that takes text (`'code'` and `'locales'` too) may carry a `placeholder`, an example of what is typed ("#ffffff") that is never the name of the field. `onSubmit( values )` gets a boolean,
 a list, a map of the languages, a `File` or `null`, a text and an ISO string for them. A required field is empty where a tick
 is not ticked, a list has none, a language has no text or there is no file.
 
@@ -1685,7 +1685,7 @@ is both shown and compared stays translatable: send a slug and name it on the
 client (see the Features panel's `_categoryLabel()`), never
 compare against a word a locale file can change.
 
-A date or a moment a panel draws itself is written by `Nino.adminUi.dateText( value, options )` (`_admin/assets/datetext.js`, bundled after `Nino.admin.js`): `value` is a string as the files write it - `2026-11-17`, `2026-11-17 06:02`, a `T` for the space, seconds read and left out - or a `Date`, and the answer is `17.11.2026, 06:02` in a German interface and `2026-11-17, 06:02` in any other one, the date alone for a value that has no time of day, and `''` for what is no moment. A panel never formats a date with the browser's `toLocaleString()`.
+A date or a moment a panel draws itself is written by `Nino.adminUi.dateText( value, options )` (`_admin/assets/Nino.admin.js`): `value` is a string as the files write it - `2026-11-17`, `2026-11-17 06:02`, a `T` for the space, seconds read and left out - or a `Date`, and the answer is `17.11.2026, 06:02` in a German interface and `2026-11-17, 06:02` in any other one, the date alone for a value that has no time of day, and `''` for what is no moment. A panel never formats a date with the browser's `toLocaleString()`.
 
 How a request goes to the server and how a failure is worded is [Saying what happened](#saying-what-happened); a form that holds unsaved input is [Unsaved input](#unsaved-input).
 
@@ -1807,7 +1807,7 @@ const strip = Nino.adminUi.tabs( [ { key : 'one', label : 'Description', panel :
 mount.appendChild( strip.el );
 ```
 
-A chip turns its `aria-pressed` over on a press and then calls `onToggle( pressed )`; the caller draws what it filters. `tabs()` is the block for the tabs of the second level of a view; the tabs of the first level stand in the head of the pane and are not made with it.
+A chip turns its `aria-pressed` over on a press and then calls `onToggle( pressed )`; the caller draws what it filters. `tabs()` is the block for the tabs of the second level of a view; the tabs of the first level stand in the head of the pane and are not made with it. A tab may carry a `badge` (`{ key : 'active', label : 'Active', badge : 12 }`): a count or a short word as the workbench's pill after the label, which is no part of the label, and `strip.badge( 'active', 13 )` says it again in place.
 
 ### Settings screens: accordion, steps, split view and colour field
 
@@ -1826,7 +1826,10 @@ nothing) or, with `multiple`, as many as the person opens; with `collapsible` at
 most one is open: a press on the open head closes it (so the head below it can be
 reached), no head is `aria-disabled`, and none is open at the start unless `open`
 names one. Enter and Space press a
-head, Up and Down walk the heads, Home and End go to the ends; a section's body is
+head, Up and Down walk the heads, Home and End go to the ends; a section may carry a
+`help` - the sentence behind a (?) beside its heading (in a row with it, outside the heading, so that the name of the heading is the title alone), a button of its own that does not open or close the section: it is one more stop for the Tab key behind its head (the
+arrows walk the heads alone, as they do with any composed block), and the head is described by the
+sentence as a field is by its help; a section without `help` is the heading and its button and has no row. A section's body is
 hidden when closed and not removed, and one given as a function is made when it
 first opens. An accordion in the body of a section is the second level - give it
 `level : 4`. With `address` the open section is the address of the panel: a press
@@ -1927,7 +1930,7 @@ or `#rgb`; it is taken as it is typed and reported through `onChange` as
 code of eight digits or `rgb()` is no colour. An empty field is one with the sentence of
 a required field only with `required`, and else no colour and no error. One that is no colour says so at the field (`aria-invalid`, the
 sentence pointed at by `aria-describedby`) and goes to `onInvalid` instead. The
-pure half is `Nino.adminUi.colorModel` - `parse()`, `luminance()`, `contrast()`.
+pure half is `Nino.adminUi.colorModel` - `parse()`, `luminance()`, `contrast()`. In a section of a form that is wide enough its name stands at the left of the code, as the name of every field does, and the sentence of an error under the code; a field with nothing in it has an empty picker, and what the code is described by besides the block's own sentences (its help behind the name) stays.
 
 ```js
 const brand = Nino.adminUi.color( {

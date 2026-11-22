@@ -16,6 +16,8 @@ return [
 	'[[/_admin/language/hint/add]]'			=> 'Legt text/<locale>.php mit jedem Schlüssel der nativen Sprache an, alle leer, bereit zum Übersetzen unter Texte. Eine vorhandene Datei wird nie überschrieben.',
 	'[[/_admin/language/label/keys]]'		=> '%d Textschlüssel',
 	'[[/_admin/language/label/notext]]'	=> 'noch keine text/%s.php',
+	'[[/_admin/language/error/served]]'	=> 'Die Sprache gibt es schon, und sie ist eingeschaltet.',
+	'[[/_admin/language/error/listed]]'	=> '%s steht schon in der Liste. Setze dort den Haken, um sie auszuliefern.',
 	'[[/_admin/language/error/missing]]'	=> 'Noch keine Textdatei für %s – die Seiten dieser Sprache zeigen die Texte der nativen Sprache, bis es eine gibt. Lege sie mit „Sprache hinzufügen“ an (jeder Schlüssel der nativen Sprache, leer), übersetze sie dann unter Texte oder importiere sie unter Übersetzungen – oder kopiere eine vorhandene text/<locale>.php.',
 	'[[/_admin/language/error/id]]'			=> 'Die Sprachkennung ist ungültig: Sie sieht aus wie de_DE – zwei Kleinbuchstaben, ein Unterstrich, zwei Großbuchstaben.',
 	'[[/_admin/language/error/create]]'	=> 'Die Sprachdatei konnte nicht angelegt werden.',
@@ -45,6 +47,9 @@ return [
 	'[[/_admin/translations/confirm/overwrite]]'	=> 'Der Import überschreibt bis zu %d vorhandene Werte in %s.',
 	'[[/_admin/translations/confirm/overwrite-title]]'	=> 'Werte überschreiben',
 	'[[/_admin/translations/msg/importing]]'	=> 'Wird importiert …',
+	'[[/_admin/error/language_none]]'	=> 'Mindestens eine Sprache muss angehakt sein.',
+	'[[/_admin/error/language_native]]'	=> 'Die native Sprache muss eine der angehakten Sprachen sein.',
+	'[[/_admin/error/translations_invalid]]'	=> 'Das ist kein Übersetzungsdokument dieser Website: Format, Version oder Ausgangssprache stimmen nicht mit dem überein, was diese Website exportiert.',
 	'[[/_admin/translations/error/import]]'	=> 'Import fehlgeschlagen.',
 	'[[/_admin/translations/msg/imported]]'	=> '%d Werte nach %s importiert, %n übersprungen.',
 
@@ -54,4 +59,7 @@ return [
 	'[[/_admin/language/manual/native]]'	=> 'Die native Sprache bekommt ein Besucher, der noch nicht gewählt hat; aus ihr wird ein Text genommen, wo eine andere Sprache keinen hat, und in ihr geht Dir die Mail eines Kontaktformulars zu.',
 	'[[/_admin/language/manual/add]]'	=> '„Sprache hinzufügen“ legt die Textdatei mit allen Schlüsseln der nativen Sprache an, alle leer. Übersetze sie unter Texte, hake die Sprache dann hier an und speichere. Das Dashboard zählt, was in jeder Sprache noch zu übersetzen ist.',
 	'[[/_admin/language/manual/translation]]'	=> 'Der Reiter Übersetzungen exportiert alle Texte und Elementwerte der nativen Sprache als JSON für einen Übersetzer und importiert das übersetzte Dokument in eine Sprache, angehakt oder nicht. Ein Import überschreibt passende Werte, ein leerer Wert im Dokument überschreibt nie einen Text, und nichts wird je gelöscht.',
+	'[[/_admin/error/language_no_native]]'	=> 'Es ist keine native Sprache gesetzt, also gibt es keine Schlüssel zum Kopieren.',
+	'[[/_admin/error/language_is_native]]'	=> 'Die native Sprache ist die, aus der die Schlüssel kopiert werden: sie hat ihre eigene Textdatei.',
+	'[[/_admin/error/language_native_empty]]'	=> 'Die Textdatei der nativen Sprache %s hat keine Schlüssel zum Kopieren.',
 ];

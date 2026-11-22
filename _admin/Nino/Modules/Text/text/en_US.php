@@ -25,6 +25,8 @@ return [
 	'[[/_admin/keys/scan/also-hint]]'		=> 'These keys belong to one template and another reads them as well. Nothing is changed. A word several templates read is meant to live in /template/common – move it there yourself if you want to share it.',
 	'[[/_admin/keys/scan/also-line]]'		=> '%s – also read by %s',
 	'[[/_admin/keys/confirm/delete]]'		=> 'Really delete text key “%s”? The value is lost in every language.',
+	'[[/_admin/keys/confirm/rename-title]]'	=> 'Rename text key',
+	'[[/_admin/keys/confirm/rename]]'	=> 'Rename the text key “%s” to “%s”? Templates and code that still call the old name show nothing for it afterwards; the texts move with the key.',
 	'[[/_admin/keys/confirm/delete-title]]'	=> 'Delete text key',
 	'[[/_admin/keys/label/format]]'		=> 'Format',
 	'[[/_admin/keys/format/auto]]'		=> 'Automatic',
@@ -82,6 +84,8 @@ return [
 	'[[/_admin/keys/hint/segment]]'	=> 'Lower-case words of the letters a to z and digits, joined by hyphens.',
 	'[[/_admin/keys/hint/not-a-word]]'	=> 'Not a word of the vocabulary: “%s” is shown as “%s”',
 
+	'[[/_admin/error/text_invalid]]'	=> 'The entry is not valid: the text it was read as has to be a text.',
+	'[[/_admin/text/error/changed]]'	=> 'Changed by another tab or another person since you opened it: %s.',
 	'[[/_admin/text/error/key]]'	=> 'Not saved.',
 	'[[/_admin/text/error/denied]]'	=> 'Your account may not change this text.',
 	'[[/_admin/text/error/some]]'	=> '%d texts were not saved. They stay marked.',

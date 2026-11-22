@@ -322,6 +322,7 @@ console.log('Nino.adminUi.confirm');
 		'/_admin/favicon/confirm/undo' : 'destructive',
 		'/_admin/keys/confirm/convert' : 'destructive',
 		'/_admin/keys/confirm/delete' : 'destructive',
+		'/_admin/keys/confirm/rename' : 'big',
 		'/_admin/features/confirm/remove' : 'destructive',
 		'/_admin/features/confirm/deactivate' : 'big',
 		'/_admin/features/confirm/deactivate-refused' : 'big',

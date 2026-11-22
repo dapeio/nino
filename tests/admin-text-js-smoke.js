@@ -450,7 +450,7 @@ function openedText( response, hash, locale ) {
 	w.Nino.adminUi.fillsDialog = options => { w.dialogs.push( options ); return true };
 	const sent = [], told = [], held = [];
 	w.dialogs = [];
-	const handle = { hold : false, refuse : {}, fail : null };
+	const handle = { hold : false, refuse : {}, fail : null, stored : {} };
 	w.Nino.adminUi.say = sentence => told.push( sentence );
 	const text = w.Nino.admin.text;
 	text._apiCall = ( endpoint, payload, callback ) => {
@@ -463,7 +463,13 @@ function openedText( response, hash, locale ) {
 			if( handle.fail !== null )
 				return callback( handle.fail.status, handle.fail.body );
 			const results = {};
-			payload.items.forEach( item => { results[item.key] = handle.refuse[item.key] ?? { ok : true, value : item.value } } );
+			payload.items.forEach( item => {
+				// As the server does: a text that was read as something other than what is stored now is not written, unless it is forced
+				const changed = item.was !== undefined && item.force !== true && handle.stored[item.locale+ ' '+ item.key] !== undefined && handle.stored[item.locale+ ' '+ item.key] !== item.was;
+				results[item.key] = changed === true ? { ok : false, error : 'changed' } : ( handle.refuse[item.key] ?? { ok : true, value : item.value } );
+				if( results[item.key].ok === true )
+					handle.stored[item.locale+ ' '+ item.key] = item.value;
+			} );
 			callback( 200, { results : results } );
 		};
 		if( handle.hold === true && endpoint === 'savebatch' )
@@ -606,6 +612,33 @@ const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group 
 	check( '...says it with a toast, the line left empty and the form as it was - no jump to the list', t.told.join() === W('/_admin/common/msg/saved') && t.form.querySelector('#text-form-msg').textContent === '' && t.form.classList.contains('admin-hidden') === false && t.registry.text.isDirty() === false );
 	check( '...and tells the shell that texts were written, once, and no template, which the panel does not write', t.touched.join() === 'texts' );
 	check( '...what the server answered is what the model holds', t.text._groups['template/page-services'].find( e => e.key === '/template/page-services/intro/title' ).values.de_DE === 'Leistungen neu' );
+}
+
+{
+	// another tab wrote the key since: the save is turned down, the question is the kernel's, and each answer does what it says
+	const t = openedText( textResponse() );
+	const KEY = '/template/page-services/intro/title';
+	const read = t.text._groups['template/page-services'].find( e => e.key === KEY ).values.de_DE;
+	const questions = [];
+	t.Nino.adminUi.conflict = options => { questions.push( options ); return true };
+	openRow( t, 'template/page-services' );
+	t.handle.stored['de_DE '+ KEY] = 'Fremder Text';
+	typeInto( controlOf( t, KEY ), 'Mein Text' );
+	submitText( t );
+	check( 'a save sends the text each key was read as, beside what is written', writes( t )[0].payload.items.every( i => i.was !== undefined ) && writes( t )[0].payload.items.find( i => i.key === KEY ).was === read && writes( t )[0].payload.items.every( i => i.force === undefined ) );
+	check( '...and a key that was written by another meanwhile asks the question of a refused save, with the key in it, and says nothing was saved: the text stays typed and unsaved', questions.length === 1 && questions[0].message.indexOf( KEY ) !== -1
+		&& t.told.length === 0 && t.registry.text.isDirty() === true && controlOf( t, KEY ).value === 'Mein Text' && t.form.querySelector('#text-form-msg').textContent !== '' );
+	questions[0].onOverwrite();
+	const forced = writes( t ).at(-1).payload.items;
+	check( 'Overwrite writes it again, once, for that key alone and without the text it was read as - and then it is saved', forced.length === 1 && forced[0].key === KEY && forced[0].force === true && forced[0].was === undefined && forced[0].value === 'Mein Text'
+		&& t.handle.stored['de_DE '+ KEY] === 'Mein Text' && t.registry.text.isDirty() === false && t.told.at(-1) === W('/_admin/common/msg/saved') );
+	t.handle.stored['de_DE '+ KEY] = 'Wieder fremd';
+	typeInto( controlOf( t, KEY ), 'Noch einer' );
+	submitText( t );
+	questions.at(-1).onReload();
+	check( 'Reload puts the focus on the field of the text that was turned down, drawn again', t.dom.doc.activeElement === controlOf( t, KEY ) );
+	check( 'the question names the text by its place and by its key', questions.at(-1).message.indexOf( KEY ) !== -1 && questions.at(-1).message.indexOf(' › ') !== -1 );
+	check( 'Reload drops what was typed and shows what is stored', t.sent.filter( c => c.endpoint === 'keys' ).length === 2 && controlOf( t, KEY ).value !== 'Noch einer' && t.registry.text.isDirty() === false );
 }
 
 {
@@ -926,7 +959,7 @@ function openedKeys( response, hash, language ) {
 	w.Nino.adminUi.panelName = () => 'Texte';
 	w.Nino.adminUi.fillsDialog = () => true;
 	const sent = [], told = [], asked = [];
-	const handle = { answer : true, refuse : {}, down : false, hold : false, held : [], listed : 0, scan : { missing : [], alsoUsed : [] } };
+	const handle = { answer : true, refuse : {}, down : false, hold : false, held : [], listed : 0, scan : { missing : [], alsoUsed : [] }, stored : {} };
 	w.Nino.adminUi.say = sentence => told.push( sentence );
 	w.Nino.adminUi.confirm = ( level, options ) => { asked.push( Object.assign( { level : level }, options ) ); options.onChoose( handle.answer ); return true };
 	const keys = w.Nino.admin.keys;
@@ -969,9 +1002,13 @@ function openedKeys( response, hash, language ) {
 		if( endpoint === 'savebatch' ) {
 			const results = {};
 			payload.items.forEach( item => {
-				const refused = handle.refuse['item:'+ item.key];
-				if( refused === undefined )
+				// As the server does: a text that was read as something other than what is stored now is not written, unless it is forced
+				const changed = item.was !== undefined && item.force !== true && handle.stored[item.locale+ ' '+ item.key] !== undefined && handle.stored[item.locale+ ' '+ item.key] !== item.was;
+				const refused = changed === true ? { ok : false, error : 'changed' } : handle.refuse['item:'+ item.key];
+				if( refused === undefined ) {
 					entry( item.key ).values[item.locale] = item.value;
+					handle.stored[item.locale+ ' '+ item.key] = item.value;
+				}
 				results[item.key] = refused ?? { ok : true, value : item.value };
 			} );
 			return callback( 200, { results : results } );
@@ -1082,6 +1119,46 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	check( '...says it as a toast, the line empty, the view and the address as they were - and the form holds no unsaved input', k.told.at(-1) === W('/_admin/common/msg/saved') && k.form.querySelector('#keys-form-msg').textContent === '' && k.keys._currentGroup === 'template/page-services' && k.registry.keys.isDirty() === false
 		&& keyControl( k, KEY ).value === 'Unsere Leistungen' );
 	check( '...and tells the shell that texts were written, once for each request that wrote', k.touched.join() === 'texts' );
+}
+
+{
+	// a key that another tab wrote since is not written over unseen, and the question is the kernel's
+	const k = openedKeys( keysResponse() );
+	opens( k.list ).find( a => keyOf( a ) === 'template/page-services' ).click();
+	const KEY = '/template/page-services/intro/title';
+	const read = k.entry( KEY ).values.de_DE;
+	const questions = [];
+	k.Nino.adminUi.conflict = options => { questions.push( options ); return true };
+	k.handle.stored['de_DE '+ KEY] = 'Fremder Text';
+	typeInto( keyControl( k, KEY ), 'Mein Text' );
+	submitKeys( k );
+	check( 'the text goes with the text it was read as, and a key that was written by another meanwhile asks the question of a refused save', keyWrites( k )[0].payload.items[0].was === read && keyWrites( k )[0].payload.items[0].force === undefined
+		&& questions.length === 1 && questions[0].message.indexOf( KEY ) !== -1 );
+	check( '...the text stays as it was typed, at its field, and unsaved', keyControl( k, KEY ).value === 'Mein Text' && k.registry.keys.isDirty() === true && k.told.length === 0 );
+	// Cancel leaves the typed text at its field, with the focus on it; the keys were read again and show the text of the other tab, which this tab was never
+	// shown as the text it holds: a second save is held to the text this tab read, and asks again
+	questions[0].onCancel();
+	check( 'Cancel puts the focus on the field of the text that was turned down', k.dom.doc.activeElement === keyControl( k, KEY ) );
+	k.entry( KEY ).values.de_DE = 'Fremder Text';
+	submitKeys( k );
+	const second = keyWrites( k ).filter( c => c.endpoint === 'savebatch' ).at(-1).payload.items[0];
+	check( 'a second save after Cancel is sent with the text of the first read, and asks the question again: the text of the other tab is not written over because the keys were read again', second.was === read && questions.length === 2 && k.handle.stored['de_DE '+ KEY] === 'Fremder Text' );
+	check( '...and the question names the text by its place and by its key', questions[1].message.indexOf( KEY ) !== -1 && questions[1].message.indexOf(' › ') !== -1 );
+	questions[1].onOverwrite();
+	const forced = keyWrites( k ).filter( c => c.endpoint === 'savebatch' ).at(-1).payload.items;
+	check( 'Overwrite writes it once more for that key alone, forced and without the text it was read as - and the row is read again, saved', forced.length === 1 && forced[0].force === true && forced[0].was === undefined && k.handle.stored['de_DE '+ KEY] === 'Mein Text'
+		&& k.registry.keys.isDirty() === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
+}
+
+{
+	// a key whose shape changes in the save has no stamp of its text: the text moves with the shape
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services', null, true );
+	const T = '/template/page-services/intro/title';
+	choose( part( settingsOf( k, T ), 'select' ), 'lines' );
+	typeInto( keyControl( k, T ), 'Geändert' );
+	submitKeys( k );
+	check( 'a text written in the save that changes the shape of its key is written without a stamp', keyWrites( k ).filter( c => c.endpoint === 'savebatch' ).every( c => c.payload.items.every( i => i.was === undefined ) ) );
 }
 
 {
@@ -1343,6 +1420,14 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	submitKeys( k );
 	check( 'a key the server refuses - one that is taken - is said at the name field and in the line, with the focus there', k.form.querySelectorAll('.nino-admin-field-error').length === 1 && name.getAttribute('aria-invalid') === 'true' && k.form.querySelector('#keys-form-msg').textContent === F('/_admin/error/keys_exists','/template/page-services/item-1/heading-2') && k.dom.doc.activeElement === name );
 	delete k.handle.refuse.rename;
+	const renames = () => keyWrites( k ).filter( c => c.endpoint === 'rename' ).length;
+	const before = renames();
+	k.handle.answer = false;
+	submitKeys( k );
+	check( 'a rename asks first, at the weight of an identifier that templates may still call by its old name, with both names in the question and the act in the title and the answer', k.asked.at(-1).level === 'big' && k.asked.at(-1).title === W('/_admin/keys/confirm/rename-title') && k.asked.at(-1).yes === W('/_admin/keys/confirm/rename-title')
+		&& k.asked.at(-1).message === F('/_admin/keys/confirm/rename',T,'/template/page-services/item-1/heading-2') );
+	check( '...and No sends nothing: the form stays as it is, the line does not say it is saving', renames() === before && k.keys._view === 'new' && k.form.querySelector('#keys-form-msg').textContent !== W('/_admin/common/status/saving') );
+	k.handle.answer = true;
 	submitKeys( k );
 	check( 'submitting renames the key to the one the segments make', keyWrites( k ).at(-1).endpoint === 'rename' && JSON.stringify( keyWrites( k ).at(-1).payload ) === JSON.stringify( { key : T, newKey : '/template/page-services/item-1/heading-2' } ) );
 	check( '...a write of texts, and of templates too where the key is one a template reads', k.touched.join() === 'texts,templates' );

@@ -407,12 +407,11 @@ check( 'saving posts features/settings with the key and every control by its dat
 	&& posted.payload.fields.limit === '7' && posted.payload.fields.hosts === 'one\ntwo' && posted.payload.fields.apiKey === '' && posted.payload.fields.enabled === true );
 check( 'the line says it is saving, and the checking of the earlier try is gone', line.dataset.state === 'saving' && form.querySelectorAll('[aria-invalid]').length === 0 );
 
-answer( 400, { error : 'limit: must be at most 50', field : 'limit' } );
+answer( 400, { error : 'limit: must be at most 50', code : 'features_settings', field : 'limit', problems : { limit : { code : 'max', params : [ 50 ] } } } );
 check( 'a refusal of the server names its field: that one is marked and has the focus, the sentence stands in the line, and the form is as it was', line.dataset.state === 'error' && byKey.limit.attributes['aria-invalid'] === 'true' && focused() === byKey.limit
-	&& line.textContent.indexOf( 'limit' ) !== -1 && screen.children.length > 0 );
+	&& line.textContent === text('/_admin/error/features_settings') && screen.children.length > 0 );
 
-check( 'the sentence the server gave for that field stands under the field as well, without the name of the setting in front of it', findAll( form, function( el ) { return hasClass( el, 'nino-admin-field-error' ) } ).map( textOf ).join().indexOf( 'must be at most 50' ) !== -1
-	&& findAll( form, function( el ) { return hasClass( el, 'nino-admin-field-error' ) } ).every( function( el ) { return el.textContent.indexOf( 'limit:' ) === -1 } ) );
+check( 'what the server found wrong stands under the field in the interface language, as the guide words it - the name of the setting and what is expected - and not as the English of the kernel', findAll( form, function( el ) { return hasClass( el, 'nino-admin-field-error' ) } ).map( textOf ).join() === Nino.adminUi.format( text('/_admin/features/error/invalid'), 'Limit', Nino.adminUi.format( text('/_admin/features/expect/max'), 50 ) ) );
 byKey.title.focus();
 fire( form, 'submit' );
 const onTheWay = requests.length;

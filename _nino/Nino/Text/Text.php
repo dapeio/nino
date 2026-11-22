@@ -347,11 +347,26 @@ namespace Nino {
 		// switched on. $includeBlacklisted has the same meaning as
 		// entries()'s own parameter: whether a blacklisted key is a valid
 		// save target.
+		//
+		// An item may carry 'was', the text its editor read - a string, an
+		// empty one for a text there was none of: where the file holds
+		// another text by the time the lock is taken - another tab or
+		// another person wrote the key since - the key is not written and its
+		// result says 'changed'. 'force' => true (a bool) writes it over what
+		// is there, once; an item without 'was' is written as it is; one
+		// whose 'was' is no string or whose 'force' is no bool is refused
+		// as 'invalid'. Every item is decided for itself, by the file it
+		// goes to and the text that file holds when the lock is taken: an
+		// item that says 'changed' is not written, the others of the batch
+		// are. The results are one for each key: a key named twice - in two
+		// languages - says 'changed' where either of its items did, and
+		// the other item is written all the same, by its own stamp.
 		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted ): array {
 
 			$results 		= [];
 			$fileChanges = [];
 			$fileKeys 	= [];
+			$fileWas 		= [];
 
 			// entry() rebuilds the full entries() list (global.php + every
 			// locale file) on every call - fine for a single lookup, not for
@@ -372,6 +387,13 @@ namespace Nino {
 					continue;
 				}
 
+				// A stamp is a text - an empty one says "there was none" - and force is a bool: anything else is a faulty entry, written
+				// as little as any other
+				if( ( array_key_exists( 'was', $item ) === true && is_string( $item['was'] ) === false ) || ( array_key_exists( 'force', $item ) === true && is_bool( $item['force'] ) === false ) ) {
+					$results[$key] = [ 'ok' => false, 'error' => 'invalid', 'code' => 'text_invalid' ];
+					continue;
+				}
+
 				if( $entry['global'] === false && in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false ) {
 					$results[$key] = [ 'ok' => false, 'error' => 'invalid locale' ];
 					continue;
@@ -384,21 +406,42 @@ namespace Nino {
 				$fileChanges[$file]['[['. $key. ']]'] = $value;
 				$fileKeys[$file][] = $key;
 
+				if( array_key_exists( 'was', $item ) === true && ( $item['force'] ?? false ) !== true )
+					$fileWas[$file]['[['. $key. ']]'] = (string) $item['was'];
+
 				$results[$key] = [ 'ok' => true, 'value' => $value ];
 			}
 
 			foreach( $fileChanges as $file => $changes ) {
 
-				$written = \Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes ): array {
-					return array_merge( $content, $changes );
+				$changed = [];
+
+				$written = \Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $changes, $fileWas, $file, &$changed ): ?array {
+
+					// What the editor read is compared with what the file holds now, under the lock
+					foreach( $fileWas[$file] ?? [] as $bracket => $was )
+						if( (string) ( is_scalar( $content[$bracket] ?? null ) === true ? $content[$bracket] : '' ) !== $was ) {
+							$changed[$bracket] = true;
+							unset( $changes[$bracket] );
+						}
+
+					return $changes === [] ? null : array_merge( $content, $changes );
 				} );
 
-				// mutate()'s result was previously discarded - every key
-				// destined for this file was reported 'ok' even if the write
-				// itself (lock failure, disk full) never happened
-				if( $written === false )
-					foreach( $fileKeys[$file] as $key )
+				foreach( $fileKeys[$file] as $key ) {
+
+					if( isset( $changed['[['. $key. ']]'] ) === true ) {
+						$results[$key] = [ 'ok' => false, 'error' => 'changed' ];
+						continue;
+					}
+
+					// mutate()'s result was previously discarded - every key
+					// destined for this file was reported 'ok' even if the write
+					// itself (lock failure, disk full) never happened. A file where
+					// every key was left as it was has no write to fail
+					if( $written === false && count( $changed ) < count( $changes ) )
 						$results[$key] = [ 'ok' => false, 'error' => 'could not be written' ];
+				}
 			}
 
 			return $results;

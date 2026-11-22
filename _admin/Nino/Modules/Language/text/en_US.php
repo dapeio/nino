@@ -16,6 +16,8 @@ return [
 	'[[/_admin/language/hint/add]]'			=> 'Creates text/<locale>.php with every key of the native language, all empty, ready to translate under Text. An existing file is never overwritten.',
 	'[[/_admin/language/label/keys]]'		=> '%d text keys',
 	'[[/_admin/language/label/notext]]'	=> 'no text/%s.php yet',
+	'[[/_admin/language/error/served]]'	=> 'The language is there already, and it is on.',
+	'[[/_admin/language/error/listed]]'	=> '%s is already in the list. Tick it there to serve it.',
 	'[[/_admin/language/error/missing]]'	=> 'No text file yet for %s – the pages of this language show the texts of the native language until one exists. Create it with Add language (every key of the native language, empty), then translate it under Text or import it under Translations – or copy an existing text/<locale>.php.',
 	'[[/_admin/language/error/id]]'			=> 'The language id is not valid: it looks like de_DE – two lowercase letters, an underscore, two uppercase ones.',
 	'[[/_admin/language/error/create]]'	=> 'Could not create the language file.',
@@ -45,6 +47,9 @@ return [
 	'[[/_admin/translations/confirm/overwrite]]'	=> 'The import overwrites up to %d existing values in %s.',
 	'[[/_admin/translations/confirm/overwrite-title]]'	=> 'Overwrite values',
 	'[[/_admin/translations/msg/importing]]'	=> 'Importing …',
+	'[[/_admin/error/language_none]]'	=> 'At least one language has to be ticked.',
+	'[[/_admin/error/language_native]]'	=> 'The native language has to be one of the ticked languages.',
+	'[[/_admin/error/translations_invalid]]'	=> 'This is no translation document of this site: its format, its version or its source language is not the one this site exports.',
 	'[[/_admin/translations/error/import]]'	=> 'Import failed.',
 	'[[/_admin/translations/msg/imported]]'	=> '%d values imported into %s, %n skipped.',
 
@@ -54,4 +59,7 @@ return [
 	'[[/_admin/language/manual/native]]'	=> 'The native language is the one a visitor gets who has not chosen yet, the one a text is taken from where another language has none, and the language the mail of a contact form is sent to you in.',
 	'[[/_admin/language/manual/add]]'	=> 'Add language creates its text file with every key of the native language, all empty. Translate them under Text, then tick the language here and save. The Dashboard counts what is still to translate in each language.',
 	'[[/_admin/language/manual/translation]]'	=> 'The Translations tab exports every text and element value of the native language as JSON for a translator, and imports the translated document into a language, one that is ticked or not. An import overwrites matching values, an empty value in the document never overwrites a text, and nothing is ever deleted.',
+	'[[/_admin/error/language_no_native]]'	=> 'No native language is set, so there are no keys to copy.',
+	'[[/_admin/error/language_is_native]]'	=> 'The native language is the one the keys are copied from: it has its own text file.',
+	'[[/_admin/error/language_native_empty]]'	=> 'The text file of the native language %s has no keys to copy.',
 ];

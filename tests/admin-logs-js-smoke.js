@@ -34,7 +34,6 @@ sandbox.window = { Nino : Nino, setTimeout : function() { return 1 }, clearTimeo
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
-load( '_admin/assets/datetext.js', context );
 load( '_admin/Nino/Modules/Logs/assets/admin.js', context );
 
 const panel = Nino.admin.logs;

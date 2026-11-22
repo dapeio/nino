@@ -675,7 +675,7 @@ namespace Nino\Modules\Users {
 			// An array or a number is no name: read as '' it would pass for the
 			// account nobody holds and be answered like any other
 			if( isset( $data['username'] ) === true && is_string( $data['username'] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid username' );
+				\Nino\Http::fail( $request, 400, 'invalid username', 'users_invalid_name', [], 'username' );
 				return;
 			}
 
@@ -753,7 +753,7 @@ namespace Nino\Modules\Users {
 			$active 	= $data['active'] ?? null;
 
 			if( is_string( $username ) === false || is_bool( $active ) === false ) {
-				\Nino\Http::fail( $request, 400, 'username and active are required' );
+				\Nino\Http::fail( $request, 400, 'username and active are required', 'users_incomplete' );
 				return;
 			}
 
@@ -807,7 +807,7 @@ namespace Nino\Modules\Users {
 			$current = \Nino\Auth::getCurrentUser( $appData );
 
 			if( $current !== false && $current['mail'] === $username ) {
-				\Nino\Http::fail( $request, 400, 'cannot change your own role' );
+				\Nino\Http::fail( $request, 400, 'cannot change your own role', 'users_own_role', [], 'role' );
 				return true;
 			}
 

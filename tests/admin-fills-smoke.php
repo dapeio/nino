@@ -136,4 +136,26 @@ $legal = array_values( array_filter( $body['types'] ?? [], static fn( array $typ
 $note = array_values( array_filter( $body['types'] ?? [], static fn( array $type ): bool => $type['type'] === 'note' ) )[0] ?? [];
 check( 'the types list names the one field that takes placeholders, for an account that may change it, with the form', (array) ( $legal['fills'] ?? [] ) === [ 'text' => 'placeholder' ] && (array) ( $note['fills'] ?? [ 'x' ] ) === [] );
 
+// The sentences of the refusals a person can cause - each is a code the server answers with - exist in both languages of the workbench, with
+// as many places for a value as the server gives parameters
+$sentences = [
+	'Images' 		=> [ 'images_alt_plain' => 0, 'images_alt_long' => 1, 'slots_size_large' => 1, 'slots_label' => 0, 'slots_invalid' => 0, 'slots_exists' => 0 ],
+	'Language'	=> [ 'language_none' => 0, 'language_native' => 0, 'translations_invalid' => 0, 'language_no_native' => 0, 'language_is_native' => 0, 'language_native_empty' => 1 ],
+	'Features'	=> [ 'features_settings' => 0, 'features_required_by' => 2 ],
+	'Elements'	=> [ 'types_invalid_key' => 1, 'elements_save_failed' => 0, 'elements_wrong_type' => 1, 'elements_missing_key' => 1, 'elements_value_refused' => 1 ],
+	'Users'			=> [ 'users_invalid_name' => 0, 'users_incomplete' => 0, 'users_own_role' => 0 ],
+	'Text'			=> [ 'text_invalid' => 0 ],
+];
+$lacking = [];
+foreach( $sentences as $module => $codes )
+	foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+		$words = require __DIR__. '/../_admin/Nino/Modules/'. $module. '/text/'. $locale. '.php';
+		foreach( $codes as $code => $places ) {
+			$sentence = $words['[[/_admin/error/'. $code. ']]'] ?? '';
+			if( $sentence === '' || substr_count( $sentence, '%s' ) !== $places )
+				$lacking[] = $locale. ' '. $code;
+		}
+	}
+check( 'every code the server answers a refusal with has its sentence in both languages, with a place for each value it names'. ( $lacking === [] ? '' : ' - lacking: '. implode( ', ', $lacking ) ), $lacking === [] );
+
 ninoDone( $appData );

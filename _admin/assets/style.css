@@ -144,6 +144,9 @@
 	--nino-admin-space-7: 1.25rem;
 	--nino-admin-space-8: 1.5rem;
 	--nino-admin-space-legend: 2.5rem;
+	/* The column the names of the fields of a form stand in, where the form is wide enough for the name at the left (the rules of
+	   fieldset > .nino-admin-field): what an error stands under is the field, so it starts behind this column */
+	--nino-admin-label-column: max( 9rem, 22% );
 	--nino-admin-radius-pill: 999px;
 	--nino-admin-control-height: 38px;
 	--nino-admin-control-small: 30px;
@@ -1605,7 +1608,7 @@ a {
 :where(.nino-admin) fieldset {
 	position: relative;
 	margin: 0 0 var(--nino-admin-space-5);
-	padding: var(--nino-admin-space-legend) var(--nino-admin-space-6) var(--nino-admin-space-1);
+	padding: var(--nino-admin-space-5) var(--nino-admin-space-6) var(--nino-admin-space-1);
 }
 
 :where(.nino-admin) fieldset legend {
@@ -1615,8 +1618,8 @@ a {
 	padding: 0;
 	color: var(--editor-text-secondary);
 }
-:where(.nino-admin) fieldset:has(legend),
-:where(.nino-admin) .nino-admin-checkbox-fieldset:has(legend) {
+:where(.nino-admin) fieldset:has(> legend),
+:where(.nino-admin) .nino-admin-checkbox-fieldset:has(> legend) {
 	padding-top: var(--nino-admin-space-legend);
 }
 
@@ -2048,9 +2051,10 @@ a {
 	gap: var(--nino-admin-space-1);
 }
 
+/* The buttons of a row and the one that adds are targets of 24px at the least (the guide's line for the smallest target) */
 :where(.nino-admin) .nino-admin-stringlist :is(.nino-admin-stringlist-actions, .nino-admin-stringlist-add) > button,
 :where(.nino-admin) .nino-admin-stringlist-add {
-	min-height: auto;
+	min-height: var(--nino-admin-control-icon-small);
 	padding: .1rem var(--nino-admin-space-3);
 	border: 1px solid var(--editor-border);
 	border-radius: var(--editor-radius-sm);
@@ -4487,6 +4491,53 @@ a {
 		min-width: 0;
 	}
 
+	/* The sentence of an error stands under the field, not under its name: after the label it is a row of the section of its own, and starts
+	   where the field does */
+	.nino-admin fieldset > .nino-admin-field-error,
+	.nino-admin fieldset > .nino-admin-fieldgrid > .nino-admin-field-error {
+		margin: 0 0 var(--nino-admin-space-3) calc( var(--nino-admin-label-column) + var(--nino-admin-space-5) );
+	}
+
+	/* The colour block (Nino.adminUi.color()) draws its name above the field. In a form that is wide enough the name stands at the left like the
+	   name of every field, so the block's label gives its parts to the block's own grid: the name, the code, the picker and the surface in one
+	   row, and the sentence of an error and the contrast under the code */
+	.nino-admin fieldset > .nino-admin-color,
+	.nino-admin fieldset > .nino-admin-fieldgrid > .nino-admin-color {
+		grid-template-columns: minmax(9rem, 22%) minmax(0, 1fr) auto auto;
+		gap: 0 var(--nino-admin-space-5);
+		align-items: start;
+		margin: 0;
+		padding: var(--nino-admin-space-3) 0;
+		border-top: 1px solid var(--editor-separator);
+	}
+
+	.nino-admin :is(fieldset > .nino-admin-color, fieldset > .nino-admin-fieldgrid > .nino-admin-color) > .nino-admin-field {
+		display: contents;
+	}
+
+	.nino-admin :is(fieldset > .nino-admin-color, fieldset > .nino-admin-fieldgrid > .nino-admin-color) > .nino-admin-field > span {
+		grid-column: 1;
+		grid-row: 1;
+		margin: var(--nino-admin-space-1) 0 0;
+	}
+
+	.nino-admin :is(fieldset > .nino-admin-color, fieldset > .nino-admin-fieldgrid > .nino-admin-color) .nino-admin-color-hex {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	.nino-admin :is(fieldset > .nino-admin-color, fieldset > .nino-admin-fieldgrid > .nino-admin-color) .nino-admin-color-picker {
+		grid-column: 3;
+	}
+
+	.nino-admin :is(fieldset > .nino-admin-color, fieldset > .nino-admin-fieldgrid > .nino-admin-color) .nino-admin-color-swatch {
+		grid-column: 4;
+	}
+
+	.nino-admin :is(fieldset > .nino-admin-color, fieldset > .nino-admin-fieldgrid > .nino-admin-color) > :is(.nino-admin-field-error, .nino-admin-color-contrast) {
+		grid-column: 2 / -1;
+	}
+
 	.nino-admin .nino-admin-field textarea {
 		min-height: 3.4rem;
 	}
@@ -4534,6 +4585,27 @@ a {
 	color: var(--editor-text);
 	font-weight: var(--nino-admin-weight-strong);
 	text-align: left;
+}
+
+/* A section with a (?): the heading and the button of the help stand in one row. The button of the help lies over the head, left of its arrow, which
+   is where it is in a head without one; the summary keeps clear of it */
+:where(.nino-admin) .nino-admin-accordion-row {
+	position: relative;
+}
+
+:where(.nino-admin) .nino-admin-accordion > .nino-admin-accordion-row:first-child > .nino-admin-accordion-head {
+	border-top: 0;
+}
+
+:where(.nino-admin) .nino-admin-accordion-row > .nino-admin-help {
+	position: absolute;
+	top: 50%;
+	right: calc( var(--nino-admin-space-5) + 1em + var(--nino-admin-space-3) );
+	margin: calc( var(--nino-admin-control-icon-small) / -2 ) 0 0;
+}
+
+:where(.nino-admin) .nino-admin-accordion-row .nino-admin-accordion-summary {
+	margin-right: calc( var(--nino-admin-control-icon-small) + 2 * var(--nino-admin-space-3) );
 }
 
 :where(.nino-admin) .nino-admin-accordion-head.is-open > .nino-admin-accordion-button {
@@ -5679,6 +5751,20 @@ a {
 	padding: 0;
 }
 
+/* A field with nothing in it has no colour to show. The browser paints the swatch of the picker with the colour of its value (black) as a style of
+   its own that no rule of a page outranks, so the swatch is taken out of sight and the hatch is the picker's own ground */
+:where(.nino-admin) .nino-admin-color-picker[data-empty] {
+	background: repeating-linear-gradient(135deg, var(--editor-border) 0 2px, transparent 2px 7px);
+}
+
+:where(.nino-admin) .nino-admin-color-picker[data-empty]::-webkit-color-swatch-wrapper {
+	visibility: hidden;
+}
+
+:where(.nino-admin) .nino-admin-color-picker[data-empty]::-moz-color-swatch {
+	visibility: hidden;
+}
+
 /* One rule each: a selector list with a pseudo-element the browser does not know is dropped whole */
 :where(.nino-admin) .nino-admin-color-picker::-webkit-color-swatch {
 	border: 0;
@@ -6189,13 +6275,6 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	/* A target of 24px, as every control is */
 	min-height: var(--nino-admin-control-icon-small);
 	margin: var(--nino-admin-space-8) auto 0;
-}
-
-#admin-page-wrap .admin-page-label {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 #admin-page-wrap .admin-scan-ignore {

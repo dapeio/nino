@@ -93,8 +93,8 @@ $edge = (int) floor( sqrt( \Nino\Images::MAX_SOURCE_PIXELS ) );
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/large', 'label' => 'Large', 'width' => (string) $edge, 'height' => (string) $edge ] );
 check( 'the largest slot the kernel can still render is accepted', $status === 200 && ( $appData['/nino/html/images']['/home/large']['width'] ?? 0 ) === $edge );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/large', 'label' => 'Large', 'width' => (string) \Nino\Images::MAX_SOURCE_PIXELS, 'height' => '2' ] );
-check( 'apiSave refuses to grow an existing slot past the same budget', $status === 400 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/large', 'label' => 'Large', 'width' => (string) \Nino\Images::MAX_SOURCE_PIXELS, 'height' => '2' ] );
+check( 'apiSave refuses to grow an existing slot past the same budget, with the code of it, the size in million pixels and the field the size is in', $status === 400 && ( $body['code'] ?? null ) === 'slots_size_large' && ( $body['params'] ?? null ) === [ 20.0 ] && ( $body['field'] ?? null ) === 'width' );
 check( '...and leaves the size it had', ( $appData['/nino/html/images']['/home/large']['width'] ?? 0 ) === $edge );
 
 callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/home/large' ] );
@@ -360,6 +360,56 @@ $globalAfterBatch = \Nino\Filesystem::getFileContent( $appData, '/text/global.ph
 $deDEAfterBatch 	= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'the global value actually landed in global.php', $globalAfterBatch['[[/project/company/general/tagline]]'] === 'Immer und ewig' );
 check( 'the per-locale value actually landed in the right locale file', $deDEAfterBatch['[[/template/page-home/welcome/subtitle]]'] === 'Neuer Start' );
+
+// A save that carries the text its editor read does not write over a text another tab wrote since: that key is turned down as changed and
+// stays as the other tab left it, the keys beside it are written, and the same save with 'force' writes it over once
+$deBefore = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'Mein Stand', 'was' => 'Der Text, den dieser Tab gelesen hat' ],
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Zusammen geschrieben', 'was' => 'Immer und ewig' ],
+] ] );
+$globalNow = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'a key whose stored text is not the text its editor read is turned down as changed and keeps what is stored, a key beside it whose text is as it was read is written', $status === 200
+	&& ( $body['results']['/template/page-home/welcome/subtitle']['ok'] ?? null ) === false && ( $body['results']['/template/page-home/welcome/subtitle']['error'] ?? null ) === 'changed'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) === $deBefore && ( $body['results']['/project/company/general/tagline']['ok'] ?? null ) === true && $globalNow['[[/project/company/general/tagline]]'] === 'Zusammen geschrieben' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'Mein Stand', 'was' => 'Der Text, den dieser Tab gelesen hat', 'force' => true ],
+] ] );
+check( '...and the same item forced is written over what is there', ( $body['results']['/template/page-home/welcome/subtitle']['ok'] ?? null ) === true && \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/template/page-home/welcome/subtitle]]'] === 'Mein Stand' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Dritter Stand', 'was' => 'Nicht mehr der Stand' ],
+] ] );
+check( 'the Text panel asks the same: a text read as something other than what is stored is not written', ( $body['results']['/project/company/general/tagline']['error'] ?? null ) === 'changed'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/company/general/tagline]]'] === 'Zusammen geschrieben' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Dritter Stand', 'was' => 'Zusammen geschrieben' ],
+] ] );
+check( '...and one read as what is stored is', ( $body['results']['/project/company/general/tagline']['ok'] ?? null ) === true && \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/company/general/tagline]]'] === 'Dritter Stand' );
+
+// An entry whose stamp is no text, or whose force is no bool, is a faulty entry: refused by its code - no error of the server - and written as little as
+// the others that are sent with it; an empty stamp is a stamp, "there was none", and holds the key to that
+$deFile = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+foreach( [ [ 'a' ], [ 'a' => 1 ], 7, null ] as $faulty ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'X', 'was' => $faulty ] ] ] );
+	if( $status !== 200 || ( $body['results']['/template/page-home/welcome/subtitle']['code'] ?? '' ) !== 'text_invalid' || \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) !== $deFile )
+		break;
+	$faulty = '__ok__';
+}
+check( 'a stamp that is an array, an object, a number or null is refused by its code, with no 500, and nothing is written', $faulty === '__ok__' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'X', 'was' => 'Mein Stand', 'force' => 'yes' ], [ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Zugleich', 'was' => 'Dritter Stand' ] ] ] );
+check( 'a force that is no bool is refused the same way, and the entry beside it is written', ( $body['results']['/template/page-home/welcome/subtitle']['code'] ?? '' ) === 'text_invalid' && ( $body['results']['/project/company/general/tagline']['ok'] ?? null ) === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) === $deFile );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'Y', 'was' => '' ] ] ] );
+check( 'an empty stamp holds a key with a text to "there was none": it is changed', ( $body['results']['/template/page-home/welcome/subtitle']['error'] ?? '' ) === 'changed' && \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) === $deFile );
+// One key in two languages, one of the two stamps stale: the key says changed, the language that was as it was read is written
+$enNow = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$enStored = (string) ( $enNow['[[/template/page-home/welcome/subtitle]]'] ?? '' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'en_US', 'value' => 'EN neu', 'was' => $enStored ],
+	[ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'DE neu', 'was' => 'veraltet' ],
+] ] );
+check( 'one key in two languages, one of them read as something else: the key says changed, that language is not written and the other is', ( $body['results']['/template/page-home/welcome/subtitle']['error'] ?? '' ) === 'changed'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) === $deFile && ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/template/page-home/welcome/subtitle]]'] ?? null ) === 'EN neu' );
 
 // html is auto-detected from a key's *current* value (see _entries()) - create one
 // that already holds a whitelisted tag, so this save actually exercises sanitizeHtml()
@@ -1173,6 +1223,7 @@ check( 'exactly one missing image is reported (deduped, external/data-uri skippe
 check( 'the reported filename is the local one, relative to /images/', ( $body['missing'][0]['filename'] ?? null ) === 'probe.png' );
 check( 'width/height were probed from the real file since the <img> tag had none', ( $body['missing'][0]['width'] ?? null ) === 3 && ( $body['missing'][0]['height'] ?? null ) === 2 );
 check( 'a suggested uri was derived from the filename', ( $body['missing'][0]['suggestedUri'] ?? null ) === '/probe' );
+check( 'the place it was found in is the template that holds it, once however often the tag stands there', ( $body['missing'][0]['files'] ?? null ) === [ 'scan-fixture-img.tpl' ] );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/probe', 'label' => 'Probe', 'width' => '3', 'height' => '2' ] );
 check( 'the suggested slot can actually be created', $status === 200 );

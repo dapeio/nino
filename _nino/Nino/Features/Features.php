@@ -1475,12 +1475,13 @@ namespace Nino {
 		 *	@param		array 		$posted				name => value as posted
 		 *	@param		array 		$current			name => value as stored
 		 *
-		 *	@return 	array										{ values: name => clean value, errors: name => message }
+		 *	@return 	array										{ values: name => clean value, errors: name => message, problems: name => { code, params } for what a client says in its own language }
 		 */
 		public static function validateSettings( array $schema, array $posted, array $current = [] ): array {
 
 			$values = [];
 			$errors = [];
+			$problems = [];
 
 			foreach( $schema as $name => $field ) {
 
@@ -1490,15 +1491,17 @@ namespace Nino {
 					continue;
 				}
 
-				[ $ok, $result ] = self::_clean( $field, $posted[$name], $current[$name] ?? null );
+				[ $ok, $result, $code, $params ] = self::_clean( $field, $posted[$name], $current[$name] ?? null ) + [ 2 => '', 3 => [] ];
 
 				if( $ok === true )
 					$values[$name] = $result;
-				else
+				else {
 					$errors[$name] = $result;
+					$problems[$name] = [ 'code' => $code, 'params' => $params ];
+				}
 			}
 
-			return [ 'values' => $values, 'errors' => $errors ];
+			return [ 'values' => $values, 'errors' => $errors, 'problems' => $problems ];
 		}
 
 		/**
@@ -1508,17 +1511,18 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *	@param		array 		$posted				name => value as posted
+		 *	@param		array 		&$problems		(reference) What a client needs to say each refusal in its own language: name => { code, params }, see validateSettings()
 		 *
 		 *	@return 	array										name => message for every rejected setting; [] when saved
 		 */
-		public static function saveSettings( array &$appData, string $key, array $posted ): array {
+		public static function saveSettings( array &$appData, string $key, array $posted, array &$problems = [] ): array {
 
 			$locked = self::lock( $appData );
 			if( $locked !== true )
 				return [ '' => $locked ];
 
 			try {
-				return self::_saveSettings( $appData, $key, $posted );
+				return self::_saveSettings( $appData, $key, $posted, $problems );
 			}
 			finally {
 				self::unlock( $appData );
@@ -1534,10 +1538,11 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *	@param		array 		$posted				name => posted value
+		 *	@param		array 		&$problems		(reference) name => { code, params } of the rejected settings
 		 *
 		 *	@return 	array										name => message for every rejected setting; [] when saved
 		 */
-		private static function _saveSettings( array &$appData, string $key, array $posted ): array {
+		private static function _saveSettings( array &$appData, string $key, array $posted, array &$problems ): array {
 
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
@@ -1545,14 +1550,15 @@ namespace Nino {
 
 			$errors = [];
 
-			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $feature, $key, $posted, &$errors ): ?array {
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $feature, $key, $posted, &$errors, &$problems ): ?array {
 
 				$state	= is_array( $content[ self::STATE_KEY ] ?? null ) ? $content[ self::STATE_KEY ] : [];
 				$current = is_array( $state[$key]['settings'] ?? null ) ? $state[$key]['settings'] : [];
 
 				$result = self::validateSettings( $feature['settings'], $posted, $current );
 				if( $result['errors'] !== [] ) {
-					$errors = $result['errors'];
+					$errors 	= $result['errors'];
+					$problems	= $result['problems'];
 					return null;
 				}
 
@@ -2730,6 +2736,20 @@ namespace Nino {
 		}
 
 		/**
+		 *	A refused setting: the sentence of the kernel, in English, for a log or a developer, and what a client needs to say it in
+		 *	its own language - the code of what is wrong and the values that belong in the sentence
+		 *
+		 *	@param		string		$message			What is wrong with the value, as 'must be an email address'
+		 *	@param		string		$code					One of bool, whole, min, max, string, length, required, line, email, url, pattern, option, list, items, listline, lines, type
+		 *	@param		array 		$params				The limit the message names, where it names one
+		 *
+		 *	@return 	array										[ false, message, code, params ]
+		 */
+		private static function _problem( string $message, string $code, array $params = [] ): array {
+			return [ false, $message, $code, $params ];
+		}
+
+		/**
 		 *	Coerce and validate one posted value against its schema. Coerce,
 		 *	because a form posts strings: "5" for an int, "true" for a bool.
 		 *	Anything that is not exactly one of the accepted forms is
@@ -2739,7 +2759,7 @@ namespace Nino {
 		 *	@param		mixed			$value				As posted
 		 *	@param		mixed			$current			As stored - what a secret keeps when the form sends ''
 		 *
-		 *	@return 	array										[ true, clean value ] or [ false, message ]
+		 *	@return 	array										[ true, clean value ] or [ false, message, code, params ] - see _problem()
 		 */
 		private static function _clean( array $schema, mixed $value, mixed $current ): array {
 
@@ -2754,7 +2774,7 @@ namespace Nino {
 						return [ true, true ];
 					if( $value === 'false' || $value === 0 || $value === '0' )
 						return [ true, false ];
-					return [ false, 'must be true or false' ];
+					return self::_problem( 'must be true or false', 'bool' );
 
 				case 'int':
 					if( is_string( $value ) === true && preg_match( '/^-?\d+$/', trim( $value ) ) === 1 ) {
@@ -2772,25 +2792,25 @@ namespace Nino {
 						$size		= ltrim( ltrim( $digits, '-' ), '0' );
 
 						if( $size !== '' && $size !== ltrim( (string) $value, '-' ) )
-							return [ false, 'must be a whole number' ];
+							return self::_problem( 'must be a whole number', 'whole' );
 					}
 					if( is_int( $value ) === false )
-						return [ false, 'must be a whole number' ];
+						return self::_problem( 'must be a whole number', 'whole' );
 					if( isset( $schema['min'] ) === true && $value < $schema['min'] )
-						return [ false, 'must be at least '. $schema['min'] ];
+						return self::_problem( 'must be at least '. $schema['min'], 'min', [ $schema['min'] ] );
 					if( isset( $schema['max'] ) === true && $value > $schema['max'] )
-						return [ false, 'must be at most '. $schema['max'] ];
+						return self::_problem( 'must be at most '. $schema['max'], 'max', [ $schema['max'] ] );
 					return [ true, $value ];
 
 				case 'secret':
 					if( $value === null )
 						return [ true, '' ];
 					if( is_string( $value ) === false )
-						return [ false, 'must be a string' ];
+						return self::_problem( 'must be a string', 'string' );
 					if( $value === '' )
 						return [ true, is_string( $current ) ? $current : '' ];
 					if( strlen( $value ) > $schema['maxlength'] )
-						return [ false, 'must be at most '. $schema['maxlength']. ' characters' ];
+						return self::_problem( 'must be at most '. $schema['maxlength']. ' characters', 'length', [ $schema['maxlength'] ] );
 					return [ true, $value ];
 
 				case 'string':
@@ -2798,39 +2818,39 @@ namespace Nino {
 				case 'email':
 				case 'url':
 					if( is_string( $value ) === false )
-						return [ false, 'must be a string' ];
+						return self::_problem( 'must be a string', 'string' );
 					$value = trim( $value );
 					if( strlen( $value ) > $schema['maxlength'] )
-						return [ false, 'must be at most '. $schema['maxlength']. ' characters' ];
+						return self::_problem( 'must be at most '. $schema['maxlength']. ' characters', 'length', [ $schema['maxlength'] ] );
 					if( $value === '' )
-						return $required === true ? [ false, 'is required' ] : [ true, '' ];
+						return $required === true ? self::_problem( 'is required', 'required' ) : [ true, '' ];
 					// A one-line value holds no control character and no line break - not a tab, a null byte or an escape, not U+0085, U+2028 or U+2029. A multi-line
 					// type ('text') keeps its breaks. Read from config.php the same rule applies (see settings()), so a hand edit cannot give a feature a line it
 					// believes is one. Bytes that are no UTF-8 fail the pattern as well
 					if( $schema['type'] === 'string' && preg_match( '/[\x00-\x1F\x7F\x{0080}-\x{009F}\x{2028}\x{2029}]/u', $value ) !== 0 )
-						return [ false, 'must be one line without control characters' ];
+						return self::_problem( 'must be one line without control characters', 'line' );
 					if( $schema['type'] === 'email' && filter_var( $value, FILTER_VALIDATE_EMAIL ) === false )
-						return [ false, 'must be an email address' ];
+						return self::_problem( 'must be an email address', 'email' );
 					if( $schema['type'] === 'url' && ( filter_var( $value, FILTER_VALIDATE_URL ) === false || preg_match( '#^https?://#i', $value ) !== 1 ) )
-						return [ false, 'must be an http(s) url' ];
+						return self::_problem( 'must be an http(s) url', 'url' );
 					if( $schema['type'] === 'string' && isset( $schema['pattern'] ) === true && preg_match( $schema['pattern'], $value ) !== 1 )
-						return [ false, 'does not match the required form' ];
+						return self::_problem( 'does not match the required form', 'pattern' );
 					return [ true, $value ];
 
 				case 'select':
 					if( is_string( $value ) === false )
-						return [ false, 'must be one of the options' ];
+						return self::_problem( 'must be one of the options', 'option' );
 					if( $value === '' )
-						return $required === true ? [ false, 'is required' ] : [ true, '' ];
+						return $required === true ? self::_problem( 'is required', 'required' ) : [ true, '' ];
 					if( isset( $schema['options'][$value] ) === false )
-						return [ false, 'must be one of the options' ];
+						return self::_problem( 'must be one of the options', 'option' );
 					return [ true, $value ];
 
 				case 'lines':
 					if( is_string( $value ) === true )
 						$value = preg_split( '/\r\n|\r|\n/', $value ) ?: [];
 					if( is_array( $value ) === false )
-						return [ false, 'must be a list' ];
+						return self::_problem( 'must be a list', 'list' );
 					/*	Seen as keys rather than in_array() over the list built so
 						far, which walked it once per line - and the length was
 						checked only after the whole post had been walked and
@@ -2843,12 +2863,12 @@ namespace Nino {
 					foreach( $value as $line ) {
 
 						if( is_string( $line ) === false )
-							return [ false, 'must be a list of strings' ];
+							return self::_problem( 'must be a list of strings', 'items' );
 
 						$line = trim( $line );
 
 						if( strlen( $line ) > self::MAX_STRING_LENGTH )
-							return [ false, 'a line must be at most '. self::MAX_STRING_LENGTH. ' characters' ];
+							return self::_problem( 'a line must be at most '. self::MAX_STRING_LENGTH. ' characters', 'listline', [ self::MAX_STRING_LENGTH ] );
 
 						if( $line === '' || isset( $seen[$line] ) === true )
 							continue;
@@ -2857,14 +2877,14 @@ namespace Nino {
 						$lines[]			= $line;
 
 						if( count( $lines ) > self::MAX_LINES )
-							return [ false, 'must be at most '. self::MAX_LINES. ' lines' ];
+							return self::_problem( 'must be at most '. self::MAX_LINES. ' lines', 'lines', [ self::MAX_LINES ] );
 					}
 					if( $lines === [] && $required === true )
-						return [ false, 'is required' ];
+						return self::_problem( 'is required', 'required' );
 					return [ true, $lines ];
 			}
 
-			return [ false, 'unknown type' ];
+			return self::_problem( 'unknown type', 'type' );
 		}
 
 		/**

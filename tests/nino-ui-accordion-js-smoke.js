@@ -325,4 +325,35 @@ examples.forEach( function( code, at ) {
 		failed === null && findAll( panel, function( el ) { return String( el.className ).split(' ').indexOf( wanted[at] ) !== -1 } ).length > 0 );
 } );
 
+// --- the help of a section --------------------------------------------------------
+
+{
+	const plain = build( { open : 'one' } );
+	check( 'a head without help is the heading with the button in it, a child of the accordion, and nothing else: no row, no second child', plain.el.children[0].tagName === 'H3' && plain.el.children[0].className === 'nino-admin-accordion-head is-open' && plain.el.children[0].children.length === 1 );
+
+	const sections = [ { key : 'one', label : 'Groups', help : 'What a group is.', content : element('p') }, { key : 'two', label : 'Brand', help : 'The brand.', content : element('p') }, { key : 'three', label : 'Plain', content : element('p') } ];
+	const helped = build( { sections : sections, open : 'one', collapsible : true } );
+	const row = helped.el.children[0];
+	const heading = row.children[0];
+	const opener = heads( helped )[0];
+	const askOf = at => findAll( helped.el.children[at], function( el ) { return el.tagName === 'BUTTON' && el.className.indexOf('nino-admin-help-button') !== -1 } )[0];
+	const sentence = findAll( row, function( el ) { return el.className === 'nino-admin-help-text' } )[0];
+
+	check( 'a section with help is a row of the heading and the (?), next to each other: the (?) and its sentence are no part of the heading, so its name is the title alone, and the (?) is in no button', row.className === 'nino-admin-accordion-row' && heading.tagName === 'H3' && row.children[1].className.indexOf('nino-admin-help') !== -1
+		&& findAll( heading, function( el ) { return el.className.indexOf('nino-admin-help') !== -1 } ).length === 0 && findAll( opener, function( el ) { return el.tagName === 'BUTTON' } ).length === 0 && findAll( heading, function( el ) { return el.tagName === 'BUTTON' } ).length === 1 );
+	check( '...a section without help stands as a heading beside the rows', helped.el.children[4].tagName === 'H3' );
+	check( '...the head is described by the sentence, and the (?) is named after the section', String( opener.getAttribute('aria-describedby') ).split(' ').indexOf( sentence.id ) !== -1 && String( askOf( 0 ).getAttribute('aria-label') ).indexOf('Groups') !== -1 );
+
+	// A click goes up through its ancestors, as the page's does: whatever listens above the (?) hears it
+	const click = el => { for( let node = el; node !== null && node !== undefined; node = node.parentNode ) fire( node, 'click' ) };
+	// A press on the (?) opens its sentence and turns no section over - of an open one that can be closed, nor of a closed one
+	click( askOf( 0 ) );
+	check( '...a press on the (?) of the open section opens the sentence and leaves the section open, though a press on its head would close it', askOf( 0 ).getAttribute('aria-expanded') === 'true' && helped.get().join() === 'one' && opener.getAttribute('aria-expanded') === 'true' );
+	click( askOf( 2 ) );
+	check( '...and one on the (?) of a closed section does not open it', helped.get().join() === 'one' && heads( helped )[1].getAttribute('aria-expanded') === 'false' );
+	fire( opener, 'click' );
+	check( '...whereas a press on the head does turn it over', helped.get().length === 0 );
+	check( '...the arrows walk the heads alone: the (?) is no head', ( function() { key( opener, 'ArrowDown' ); return heads( helped ).length === 3 } )() );
+}
+
 done();

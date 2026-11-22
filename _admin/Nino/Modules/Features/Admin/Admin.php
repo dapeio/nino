@@ -559,7 +559,8 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
-			$errors = \Nino\Features::saveSettings( $appData, $key, $fields );
+			$problems = [];
+			$errors 	= \Nino\Features::saveSettings( $appData, $key, $fields, $problems );
 
 			if( $errors !== [] ) {
 
@@ -574,7 +575,15 @@ namespace Nino\Modules\Features {
 						$field = (string) $name;
 				}
 
-				\Nino\Http::fail( $request, 400, implode( '; ', $messages ), '', [], $field );
+				// What is wrong with each setting as a code and its limits, for the form to say beside the field in the interface language;
+				// a refusal of the whole form (the lock, an unknown feature) has none and is said by its own sentence
+				if( $problems === [] )
+					\Nino\Http::fail( $request, 400, implode( '; ', $messages ), '', [], $field );
+				else {
+					\Nino\Http::fail( $request, 400, implode( '; ', $messages ), 'features_settings', [], $field );
+					$request['/nino/http/response']['body']['problems'] = $problems;
+				}
+
 				return;
 			}
 
@@ -1364,6 +1373,16 @@ namespace Nino\Modules\Features {
 			$wasOn	= $on === true ? self::_activeKeys( $appData ) : [];
 			$names	= $on === false ? self::_calls( $appData, $key ) : [];
 
+			// Another active feature that requires this one is what keeps it on: said before the kernel is asked, in the interface language, with
+			// the names the panel shows - the kernel's refusal for it is the same rule, and the one it gives is then never another reason
+			// (the lock is held here already, see _changing())
+			$holders = $on === false ? self::_requiredBy( $appData, $key ) : [];
+
+			if( $holders !== [] ) {
+				\Nino\Http::fail( $request, 400, 'feature "'. $key. '" is required by "'. implode( '", "', array_keys( $holders ) ). '"', 'features_required_by', [ \Nino\Features::localized( \Nino\Features::get( $appData, $key )['name'] ?? $key, \Nino\Admin\Admin::sessionLocale( $appData ) ), implode( ', ', $holders ) ] );
+				return;
+			}
+
 			$result = $on === true ? \Nino\Features::activate( $appData, $key ) : \Nino\Features::deactivate( $appData, $key );
 
 			if( $result !== true ) {
@@ -1376,6 +1395,26 @@ namespace Nino\Modules\Features {
 			self::_answer( $appData, $request, $key, $on === true
 				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ) ]
 				: [ 'found' => $names === [] ? [] : self::_occurrences( $appData, $names ), 'privacy' => self::_privacy( $appData, $key ) ] );
+		}
+
+		/**
+		 *	The names of the active features that require a feature: what keeps it from being switched off
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature's key
+		 *
+		 *	@return 	array										key => name in the language of the workbench, [] for none
+		 */
+		private static function _requiredBy( array &$appData, string $key ): array {
+
+			$locale = \Nino\Admin\Admin::sessionLocale( $appData );
+			$names = [];
+
+			foreach( \Nino\Features::all( $appData ) as $other )
+				if( $other['active'] === true && in_array( $key, $other['requires'], true ) === true )
+					$names[ $other['key'] ] = \Nino\Features::localized( $other['name'], $locale );
+
+			return $names;
 		}
 
 		/**

@@ -332,6 +332,9 @@ check( 'two fields with one name are refused at the later one', requests.length 
 typeInto( ofCard( cards()[0], 'own' ), 'Bad Key!' );
 save();
 check( 'a name that is no key is not valid, in the words of the guide, at its field', requests.length === 0 && sentences()[0].textContent === Nino.adminUi.format( text('/_admin/types/error/invalid'), text('/_admin/types/label/fieldname'), text('/_admin/types/expect/key') ) );
+typeInto( ofCard( cards()[0], 'own' ), '.uri' );
+save();
+check( 'a name with a dot in front is refused at its field, in the same words: the keys with a dot belong to the kernel', requests.length === 0 && sentences().length === 1 && sentences()[0].textContent === Nino.adminUi.format( text('/_admin/types/error/invalid'), text('/_admin/types/label/fieldname'), text('/_admin/types/expect/key') ) );
 typeInto( ofCard( cards()[0], 'own' ), 'title' );
 
 // the numbers and the reference

@@ -800,7 +800,7 @@
 				applications	: Nino.content.getText('/_admin/features/tab/applications'),
 			};
 
-			const strip = Nino.adminUi.tabs( TABS.map( function( key ) { return { key : key, label : labels[key] } } ), { id : 'features-tabbutton', active : Nino.admin.features._tab, onSelect : function( key ) {
+			const strip = Nino.adminUi.tabs( TABS.map( function( key ) { return { key : key, label : labels[key], badge : counts[key] } } ), { id : 'features-tabbutton', active : Nino.admin.features._tab, onSelect : function( key ) {
 
 				// The strip stands in the pane's head, above both levels: a tab picked
 				// while a feature's view is open leaves that view, else the list
@@ -834,11 +834,9 @@
 					show();
 			} } );
 
-			// The count of a tab is the chip of the workbench on its button (see Nino.adminUi.tabBadge(), which finds the buttons
-			// of the shell's own strip only); the one panel below the strip, which the four tabs share, is what each of them controls
+			// The one panel below the strip, which the four tabs share, is what each of them controls
 			TABS.forEach( function( key ) {
 				strip.tabs[key].setAttribute( 'aria-controls', 'features-tabpanel' );
-				strip.tabs[key].appendChild( Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-tab-badge', String( counts[key] ) ) );
 			} );
 
 			strip.el.classList.add('nino-admin-tabs--panel');
@@ -3105,8 +3103,9 @@
 		},
 
 		/**
-		 *	The sentence of the server about a setting, under that setting's field as well as in the line of the bar:
-		 *	the kernel words it "<name>: <what is wrong>", and the name is the field it points at
+		 *	What the server found wrong with the settings, said under each field in the interface language and as the guide words it:
+		 *	"<Name> is missing." where nothing was given, "<Name> is not valid: <what is expected>." otherwise. The server says it as a code
+		 *	and the limits that belong in the sentence for every setting that was refused (problems)
 		 *
 		 *	@param		{Element}		form
 		 *	@param		{Object}		feature
@@ -3116,18 +3115,26 @@
 		 */
 		_fieldSentence : function( form, feature, response ) {
 
-			if( response === null || typeof response !== 'object' || typeof response.field !== 'string' || typeof response.error !== 'string' )
+			if( response === null || typeof response !== 'object' || response.problems === null || typeof response.problems !== 'object' )
 				return;
 
-			const field = feature.settings.filter( function( f ) { return f.name === response.field } )[0];
-			const input = Array.prototype.filter.call( form.querySelectorAll('[data-key]'), function( el ) { return el.dataset.key === response.field } )[0];
-			const mine = response.error.split('; ').filter( function( part ) { return part.indexOf( response.field+ ': ' ) === 0 } )[0];
+			Object.keys( response.problems ).forEach( function( name ) {
 
-			if( field === undefined || input === undefined || mine === undefined )
-				return;
+				const problem = response.problems[name];
+				const field = feature.settings.filter( function( f ) { return f.name === name } )[0];
+				const input = Array.prototype.filter.call( form.querySelectorAll('[data-key]'), function( el ) { return el.dataset.key === name } )[0];
 
-			Nino.adminUi.fieldError( input.closest('label') ?? input.parentNode, input, 'features-error-'+ response.field.replace( /[^a-z0-9]+/gi, '-' ),
-				Nino.adminUi.format( Nino.content.getText('/_admin/features/error/invalid'), Nino.adminUi.text( field.label ), mine.slice( response.field.length + 2 ) ) );
+				if( field === undefined || input === undefined || problem === null || typeof problem !== 'object' || typeof problem.code !== 'string' )
+					return;
+
+				const label = Nino.adminUi.text( field.label );
+				const words = Nino.content.getText('/_admin/features/expect/'+ problem.code );
+				const sentence = problem.code === 'required'
+					? Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), label )
+					: Nino.adminUi.format( Nino.content.getText('/_admin/features/error/invalid'), label, Nino.adminUi.format( words, ...( Array.isArray( problem.params ) === true ? problem.params : [] ) ) );
+
+				Nino.adminUi.fieldError( input.closest('label') ?? input.parentNode, input, 'features-error-'+ name.replace( /[^a-z0-9]+/gi, '-' ), sentence );
+			} );
 		},
 
 		/**

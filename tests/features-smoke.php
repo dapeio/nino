@@ -2079,6 +2079,8 @@ $appData['/nino/modules'] = array_values( array_diff( $appData['/nino/modules'],
 [ $status, $body ] = callFeatures( $appData, 'apiSettings', [ 'key' => 'sample', 'fields' => [ 'limit' => '99', 'contact' => 'nope', 'title' => 'Not' ] ] );
 check( 'a bad form is a 400 naming every rejected field, the first of them as the field the answer points at, and nothing is written', $status === 400 && $body['error'] === 'limit: must be at most 50; contact: must be an email address' && ( $body['field'] ?? null ) === 'limit'
 	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['settings']['title'] === 'Again' );
+check( '...and says each refusal as a code with the limit that belongs in its sentence, for every field it names, beside the English for a log, in the words of the workbench for the line', ( $body['code'] ?? null ) === 'features_settings'
+	&& ( $body['problems'] ?? null ) === [ 'limit' => [ 'code' => 'max', 'params' => [ 50 ] ], 'contact' => [ 'code' => 'email', 'params' => [] ] ] );
 
 [ $status, $body ] = callFeatures( $appData, 'apiSettings', [ 'key' => 'sample', 'fields' => [ 'enabled' => false, 'limit' => '12', 'contact' => 'a@example.com', 'mode' => 'safe', 'apiKey' => '', 'hosts' => "x.example\n\ny.example" ] ] );
 $fields = array_column( $body['feature']['settings'] ?? [], null, 'name' );

@@ -1707,7 +1707,7 @@ foreach( $source as $file ) {
 // a restore carries in its answer, where nothing failed and so no Http::fail()
 // names it: the notice of a backup that comes from another version of Nino -
 // and the ones a restore that cannot start or cannot open its archive hands its callers, who pass them on
-foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy', 'backups_key', 'backups_key_wrong' ] as $code )
+foreach( [ 'int_range', 'elements_wrong_type', 'elements_missing_key', 'elements_value_refused', 'text_invalid', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy', 'backups_key', 'backups_key_wrong' ] as $code )
 	$codes[$code] = true;
 
 // The refusals of the recovery page are worded in the table of that page - it has no text files of the project to ask, which may be what is broken - and

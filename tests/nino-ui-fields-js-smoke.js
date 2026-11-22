@@ -132,6 +132,8 @@ console.log( 'Nino.adminUi.checkField, checklist, localeRows, fileField, codeFie
 	check( 'a file that is too large is not taken and is said at the field: what was chosen stays', field.value() === file && errorsIn( field.el ).length === 1 && told.length === 1 );
 	choose( wrong );
 	check( '...so is one of a type the field does not take, and the sentence is said once', field.value() === file && errorsIn( field.el ).length === 1 && told.length === 1 );
+	check( '...in the words of a person: the types it takes by their names - the extension and the kind of file - and not as the notation the picker reads', errorsIn( field.el )[0].textContent === ui.format( text['/_admin/common/error/file-type'], 'PDF '+ text['/_admin/common/filetype/or']+ ' '+ text['/_admin/common/filetype/image'] ) && errorsIn( field.el )[0].textContent.indexOf('image/*') === -1 );
+	check( '...a list is joined by commas and the word for "or" before the last, a subtype by its name', ui._acceptNames('.png,.webp,image/jpeg') === 'PNG, WEBP '+ text['/_admin/common/filetype/or']+ ' JPEG' && ui._acceptNames('image/svg+xml') === 'SVG' && ui._acceptNames('.pdf, .PDF') === 'PDF' );
 	choose( { name : 'photo.JPG', size : 10, type : 'image/jpeg' } );
 	check( '...and a file of the type with another spelling or by a type of its kind is taken, which takes the sentence away', field.value().name === 'photo.JPG' && errorsIn( field.el ).length === 0 && told.length === 2 );
 	fire( remove(), 'click' );

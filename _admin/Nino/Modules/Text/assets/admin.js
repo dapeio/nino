@@ -805,64 +805,134 @@
 				sent[key] = session.get( key ).read();
 
 				// The language the form shows is the language it writes, whatever the workbench says by now
-				return { key : key, locale : entry.global === true ? '*' : locale, value : sent[key] };
+				return Nino.admin.textKeys.saveItem( entry, locale, sent[key] );
 			} );
 
-			text._saving = true;
-			line.saving();
+			// What is written is the items that are given: all of them, and the ones that a conflict was answered with Overwrite for
+			const write = function( items ) {
 
-			text._apiCall( 'savebatch', { items : items }, function( status, response ) {
+				text._saving = true;
+				line.saving();
 
-				text._saving = false;
+				text._apiCall( 'savebatch', { items : items }, function( status, response ) {
 
-				if( status !== 200 || response === null ) {
-					line.error( status, response, '/_admin/common/error/save' );
-					report( false );
-					return;
-				}
+					text._saving = false;
 
-				// Written, whichever of the items a later check turns down
-				Nino.admin.touch( 'texts' );
-
-				const results = response.results ?? {};
-				let first = null;
-				let failed = 0;
-
-				items.forEach( function( item ) {
-
-					const result = results[item.key];
-					const field = session.get( item.key );
-
-					if( result === undefined || result.ok !== true ) {
-						failed++;
-						field.fail( Nino.content.getText( result !== undefined && result.error === 'not allowed' ? '/_admin/text/error/denied' : '/_admin/text/error/key' ) );
-						first = first ?? field;
+					if( status !== 200 || response === null ) {
+						line.error( status, response, '/_admin/common/error/save' );
+						report( false );
 						return;
 					}
 
-					const entry = entries.find( function( e ) { return e.key === item.key } );
-					entry.values[item.locale] = result.value;
+					// Written, whichever of the items a later check turns down
+					Nino.admin.touch( 'texts' );
 
-					// What the server kept is what the field shows - unless more was typed while it was on its way, which is not
-					// in what was sent and stays unsaved
-					if( field.read() === sent[item.key] ) {
-						if( result.value !== sent[item.key] )
-							field.write( result.value );
-						session.capture( item.key );
+					const results = response.results ?? {};
+					const changed = [];
+					let first = null;
+					let failed = 0;
+
+					items.forEach( function( item ) {
+
+						const result = results[item.key];
+						const field = session.get( item.key );
+
+						// Another tab or person wrote the key since: the question below is the answer, the text stays as it was typed
+						if( result !== undefined && result.error === 'changed' ) {
+							changed.push( item );
+							first = first ?? field;
+							return;
+						}
+
+						if( result === undefined || result.ok !== true ) {
+							failed++;
+							field.fail( Nino.content.getText( result !== undefined && result.error === 'not allowed' ? '/_admin/text/error/denied' : '/_admin/text/error/key' ) );
+							first = first ?? field;
+							return;
+						}
+
+						const entry = entries.find( function( e ) { return e.key === item.key } );
+						entry.values[item.locale] = result.value;
+
+						// What the server kept is what the field shows - unless more was typed while it was on its way, which is not
+						// in what was sent and stays unsaved
+						if( field.read() === sent[item.key] ) {
+							if( result.value !== sent[item.key] )
+								field.write( result.value );
+							session.capture( item.key );
+						}
+						else
+							session.capture( item.key, sent[item.key] );
+					} );
+
+					if( changed.length > 0 ) {
+
+						line.fail( Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), changed.map( function( item ) { return item.key } ).join(', ') ) );
+
+						if( Nino.admin.textKeys.conflict( changed, {
+							model			: text._model,
+							opener		: dc.getElementById('text-edit-form').querySelector('.nino-admin-btn-primary'),
+							onOverwrite : function( forced ) { write( forced ) },
+							onReload	: function() { text._reread( report, changed[0].key ) },
+							onCancel	: function() { first.focus(); report( false ) },
+						} ) === false )
+							report( false );
+
+						return;
 					}
-					else
-						session.capture( item.key, sent[item.key] );
-				} );
 
-				if( failed > 0 ) {
-					line.fail( Nino.adminUi.format( Nino.content.getText( failed === 1 ? '/_admin/text/error/one' : '/_admin/text/error/some' ), failed ) );
-					first.focus();
-					report( false );
+					if( failed > 0 ) {
+						line.fail( Nino.adminUi.format( Nino.content.getText( failed === 1 ? '/_admin/text/error/one' : '/_admin/text/error/some' ), failed ) );
+						first.focus();
+						report( false );
+						return;
+					}
+
+					line.saved();
+					report( true );
+				} );
+			};
+
+			write( items );
+		},
+
+		/**
+		 *	Read the keys again and draw the open row from them: what this tab typed is dropped and the row shows what is
+		 *	stored. Ends with done( true ) when it did, done( false ) when the keys could not be read, which the line says
+		 *
+		 *	@param		{Function}	[done]
+		 *	@param		{string}		[key]				The text whose field takes the focus
+		 *
+		 *	@return		void
+		 */
+		_reread : function( done, key ) {
+
+			const text = Nino.admin.text;
+
+			text._apiCall( 'keys', {}, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+
+					if( text._status !== null )
+						text._status.error( status, response, '/_admin/common/error/load' );
+
+					if( typeof done === 'function' )
+						done( false );
+
 					return;
 				}
 
-				line.saved();
-				report( true );
+				text._data = response;
+				text._buildModel();
+				text._renderCategoryList();
+				text._openGroup( text._currentGroup, null );
+
+				// The focus is on the text that was shown again, where the dialog that asked was
+				if( key !== undefined && text._session !== null && text._session.get( key ) !== undefined )
+					text._session.get( key ).focus();
+
+				if( typeof done === 'function' )
+					done( true );
 			} );
 		},
 	};

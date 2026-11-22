@@ -257,12 +257,12 @@ namespace Nino\Modules\Images {
 
 				$text = is_string( $value ) === true ? \Nino\Images::cleanAlt( $value ) : false;
 				if( $text === false ) {
-					\Nino\Http::fail( $request, 400, 'an alt text is plain text' );
+					\Nino\Http::fail( $request, 400, 'an alt text is plain text', 'images_alt_plain', [], 'alt' );
 					return;
 				}
 
 				if( mb_strlen( $text ) > 250 ) {
-					\Nino\Http::fail( $request, 400, 'an alt text is at most 250 characters' );
+					\Nino\Http::fail( $request, 400, 'an alt text is at most 250 characters', 'images_alt_long', [ 250 ], 'alt' );
 					return;
 				}
 			}

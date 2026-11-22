@@ -169,8 +169,13 @@ check( 'a switch posts its state, a number its text, a list its raw lines, the s
 	&& posted.payload.fields.hosts === 'one\ntwo' && posted.payload.fields.apiKey === '' && posted.payload.fields.title === 'Typed' && posted.payload.fields.mode === 'safe' );
 check( 'while it saves the line of the bar says so', line.dataset.state === 'saving' && line.textContent === text('/_admin/common/msg/saving') );
 
-answer( 400, { error : 'limit: must be at most 50' } );
-check( 'a refusal is told in the line of the bar, as an alert, with its status', line.dataset.state === 'error' && line.attributes.role === 'alert' && line.textContent === '(400) limit: must be at most 50' );
+answer( 400, { error : 'limit: must be at most 50', code : 'features_settings', field : 'limit', problems : { limit : { code : 'max', params : [ 50 ] }, title : { code : 'required', params : [] } } } );
+check( 'a refusal is told in the line of the bar, as an alert, in the words of the workbench and without the English of the kernel', line.dataset.state === 'error' && line.attributes.role === 'alert' && line.textContent === text('/_admin/error/features_settings') );
+const sentences = findAll( form, function( el ) { return hasClass( el, 'nino-admin-field-error' ) } ).map( function( el ) { return el.textContent } );
+check( '...and under each setting that was refused, the guide\'s sentence with what is expected: a limit by its words, an empty required one as missing', sentences.length === 2
+	&& sentences.indexOf( Nino.adminUi.format( text('/_admin/features/error/invalid'), Nino.adminUi.text( ENTRY.settings.filter( function( f ) { return f.name === 'limit' } )[0].label ), Nino.adminUi.format( text('/_admin/features/expect/max'), 50 ) ) ) !== -1
+	&& sentences.indexOf( Nino.adminUi.format( text('/_admin/common/error/missing'), Nino.adminUi.text( ENTRY.settings.filter( function( f ) { return f.name === 'title' } )[0].label ) ) ) !== -1 );
+Nino.adminUi.clearFieldErrors( form );
 check( '...on the same form, which keeps what was typed', byTag( sampleTab.mount, 'form' )[0] === form );
 
 fire( form, 'submit' );

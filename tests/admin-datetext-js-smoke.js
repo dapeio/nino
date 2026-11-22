@@ -1,6 +1,6 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	admin-datetext-js-smoke.js	Checks for Nino.adminUi.dateText() (_admin/assets/datetext.js): the one
+ *	admin-datetext-js-smoke.js	Checks for Nino.adminUi.dateText() (_admin/assets/Nino.admin.js): the one
  *													way the workbench writes a date and a time it draws itself, in
  *													the form of the interface language - one form for German and
  *													one for every other language, the clock of the value kept, no
@@ -14,13 +14,13 @@
 const vm = require('vm');
 const { check, done, load } = require( './harness.js' );
 
-/** A page whose interface language is the one given, with the namespace the helper extends */
+/** A page whose interface language is the one given, with the design system of the workbench loaded into it */
 function page( lang ) {
-	const Nino = { adminUi : {} };
-	const sandbox = { Nino : Nino, document : { documentElement : { lang : lang }, body : null } };
-	sandbox.window = { Nino : Nino };
-	load( '_admin/assets/datetext.js', vm.createContext( sandbox ) );
-	return Nino.adminUi;
+	const Nino = { events : { bindCallback : function() {} }, content : { getText : function() { return '' } } };
+	const sandbox = { console : console, Nino : Nino, document : { documentElement : { lang : lang }, body : null } };
+	sandbox.window = sandbox;
+	load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
+	return sandbox.Nino.adminUi;
 }
 
 console.log('Admin dateText');

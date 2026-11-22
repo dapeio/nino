@@ -93,14 +93,6 @@
 	display: inline-block;
 }
 
-/*	The form to narrow to, beside the search box in the shared toolbar. It
-	takes what it needs and never more than its longest option: a select
-	whose text is cut off says nothing about what is selected. */
-.submissions-form {
-	flex: 0 0 auto;
-	width: auto;
-	max-width: 14rem;
-}
 .submissions-entry-message {
 	display: -webkit-box;
 	margin: 0;

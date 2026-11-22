@@ -131,7 +131,6 @@ namespace Nino\Admin {
 			$scripts	= [
 				'/_nino/Nino.js',
 				'/_admin/assets/Nino.admin.js',
-				'/_admin/assets/datetext.js',
 				'/_admin/assets/script.js',
 			];
 

@@ -149,7 +149,7 @@ namespace Nino\Modules\Language {
 				is_array( $translation['text'] ?? null ) === false ||
 				is_array( $translation['elements'] ?? null ) === false
 			) {
-				\Nino\Http::fail( $request, 400, 'invalid or incompatible translation document' );
+				\Nino\Http::fail( $request, 400, 'invalid or incompatible translation document', 'translations_invalid' );
 				return;
 			}
 

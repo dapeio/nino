@@ -114,7 +114,6 @@ namespace Nino\Modules\Language {
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
-				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
 			];
 		}
 
@@ -311,6 +310,7 @@ namespace Nino\Modules\Language {
 				$existing = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $locale. '.php', [] );
 				\Nino\Http::ok( $request, [
 					'locale' 	=> $locale,
+					'name' 		=> self::_nameOf( $appData, $textDir, $locale ),
 					'created'	=> false,
 					'keys' 		=> is_array( $existing ) === true ? count( $existing ) : 0,
 				] );
@@ -318,19 +318,19 @@ namespace Nino\Modules\Language {
 			}
 
 			if( preg_match( self::LOCALE_PATTERN, $native ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'no native language is configured to copy the keys from' );
+				\Nino\Http::fail( $request, 400, 'no native language is configured to copy the keys from', 'language_no_native', [], 'locale' );
 				return;
 			}
 
 			if( $native === $locale ) {
-				\Nino\Http::fail( $request, 400, 'the native language has no text file of its own to copy' );
+				\Nino\Http::fail( $request, 400, 'the native language has no text file of its own to copy', 'language_is_native', [], 'locale' );
 				return;
 			}
 
 			$nativeContent = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $native. '.php', [] );
 
 			if( is_array( $nativeContent ) === false || $nativeContent === [] ) {
-				\Nino\Http::fail( $request, 400, 'the native language '. $native. ' has no text file to copy the keys from' );
+				\Nino\Http::fail( $request, 400, 'the native language '. $native. ' has no text file to copy the keys from', 'language_native_empty', [ $native ], 'locale' );
 				return;
 			}
 
@@ -371,6 +371,7 @@ namespace Nino\Modules\Language {
 
 			\Nino\Http::ok( $request, [
 				'locale' 	=> $locale,
+				'name' 		=> self::_nameOf( $appData, $textDir, $locale ),
 				'created'	=> true,
 				'keys' 		=> count( $skeleton ),
 				'from' 		=> $native,
@@ -400,6 +401,24 @@ namespace Nino\Modules\Language {
 
 				return $global;
 			}, [] );
+		}
+
+		/**
+		 *	The name a language has in global.php, which the workbench's pickers show: what _writeName() wrote, or what somebody
+		 *	wrote before it. The code where there is none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$textDir			Eg. '/text'
+		 *	@param		string		$locale				The language's code
+		 *
+		 *	@return 	string
+		 */
+		private static function _nameOf( array &$appData, string $textDir, string $locale ): string {
+
+			$global = \Nino\Filesystem::getFileContent( $appData, $textDir. '/global.php', [] );
+			$name 	= is_array( $global ) === true ? ( $global['[[/_nino/locale/'. $locale. '/name]]'] ?? '' ) : '';
+
+			return is_string( $name ) === true && trim( $name ) !== '' ? $name : $locale;
 		}
 
 		/**
@@ -458,12 +477,12 @@ namespace Nino\Modules\Language {
 			$native 	= $clean['/nino/locales/native'] ?? ( $appData['/nino/locales/native'] ?? '' );
 
 			if( isset( $clean['/nino/locales/available'] ) === true && $locales === [] ) {
-				\Nino\Http::fail( $request, 400, 'at least one language is required' );
+				\Nino\Http::fail( $request, 400, 'at least one language is required', 'language_none', [], '/nino/locales/available' );
 				return;
 			}
 
 			if( in_array( $native, $locales, true ) === false ) {
-				\Nino\Http::fail( $request, 400, 'the native language must be one of the site\'s languages' );
+				\Nino\Http::fail( $request, 400, 'the native language must be one of the site\'s languages', 'language_native', [], '/nino/locales/native' );
 				return;
 			}
 

@@ -192,9 +192,10 @@ console.log('Admin Language');
 	check( 'a request the server refused is said at the field, in the words it gave, and the dialog can be sent again', a.dialog.open === true && a.input.attributes['aria-invalid'] === 'true' && a.errors()[0].textContent.indexOf( 'refused' ) !== -1 && a.send.disabled === false );
 
 	fire( a.send, 'click' );
-	t.answer( 200, { created : true, keys : 3, from : 'de_DE' } );
+	t.answer( 200, { created : true, keys : 3, from : 'de_DE', name : 'Italiano' } );
 	const added = t.panel._locales.find( function( locale ) { return locale.code === 'it_IT' } );
 	check( 'a language that was made is listed, switched off - a skeleton of empty keys is not served - and the dialog is closed', added !== undefined && added.hasText === true && added.active === false && t.tick('it_IT').checked === false && a.dialog.open === false );
+	check( '...and the workbench names it from now on, as the server named it: a new language is not the bare code until the page is read again', t.localeName('it_IT') === 'Italiano' && t.panel._locales.some( function( locale ) { return locale.code === 'it_IT' } ) === true );
 	check( '...and it is said as a toast, in the words for a language that is left off', t.toasts().length === 1 && t.toasts()[0] === t.said( '/_admin/language/msg/created', t.localeName('it_IT'), 3 ) );
 	check( '...and the form is not unsaved by it: a file is made at once, and Save stores the ticks alone', t.panel.isDirty() === false );
 }
@@ -246,7 +247,13 @@ console.log('Admin Language');
 	t.tick('en_US').checked = false;
 	fire( t.tick('en_US'), 'change' );
 	fire( b.send, 'click' );
-	check( 'a language that is listed and translated is ticked again and nothing is asked of the server', t.requests.length === count && t.tick('en_US').checked === true && b.dialog.open === false );
+	// A language that is on is told it is there; the one that is off is told where to tick it
+	check( '...the sentence for a language that is on does not send anybody to a tick that is set', ( () => { fire( b.send, 'click' ); t.tick('en_US').checked = true; fire( t.tick('en_US'), 'change' ); fire( b.send, 'click' ); return b.errors().length === 1 && b.errors()[0].textContent === text('/_admin/language/error/served') } )() );
+	t.tick('en_US').checked = false;
+	fire( t.tick('en_US'), 'change' );
+	fire( b.send, 'click' );
+		check( 'a language that is listed and translated is refused at the field of the dialog, which stays open: it says so, in the words for a listed language, and nothing is asked of the server and nothing is ticked', t.requests.length === count && t.tick('en_US').checked === false && b.dialog.open === true
+		&& b.input.attributes['aria-invalid'] === 'true' && b.errors().length === 1 && b.errors()[0].textContent === t.said( '/_admin/language/error/listed', 'English (US)' ) );
 }
 
 

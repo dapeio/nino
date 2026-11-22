@@ -459,13 +459,14 @@
 		 *	of the rail. Then the finer permissions - added with three dependent lists, and ticked off again in a
 		 *	list of their own - and a summary of what the role may do.
 		 *
-		 *	Every permission the backend offers is here, the ones no panel is
-		 *	offering right now included - see \Nino\Modules\Users\Admin::permOptions().
-		 *	Those carry the "other" group name instead of a panel label, so a
-		 *	permission from a switched-off module is visible, keepable and
-		 *	removable rather than silently dropped on the next save. A scoped
-		 *	permission the panels list (see _treeLabels()) is named by its place
-		 *	in the tree instead.
+		 *	Every permission the backend offers is here. Of the ones no panel is
+		 *	offering right now (see \Nino\Modules\Users\Admin::permOptions(), the
+		 *	"other" group) the role's own are listed under the "other" group name,
+		 *	as they are written, so a permission from a switched-off module is
+		 *	visible, keepable and removable rather than silently dropped on the
+		 *	next save - what other roles hold is not. A scoped permission the
+		 *	panels list (see _treeLabels()) is named by its place in the tree and
+		 *	stays in the list of the added ones, before and after a save.
 		 *
 		 *	@param		{Array}		perms					The role's current permissions
 		 *
@@ -495,13 +496,17 @@
 			fieldset.appendChild( fullField );
 
 			// A tick for every permission a panel offers, in the groups of the rail and then the ones nobody offers; the
-			// group name goes in front of the list, so that it reads in the order the navigation does
+			// group name goes in front of the list, so that it reads in the order the navigation does. The last group is
+			// no list of what other roles hold: it has the permissions this role carries and no panel offers, outside the
+			// tree (a scoped one the tree names is in the list of the added ones, where it was added)
 			const offered = {};
 			const groups = [];
 
 			roles._groups.forEach( function( group ) {
 
-				const members = roles._permOptions.filter( function( option ) { return option.group === group } );
+				const members = roles._permOptions.filter( function( option ) {
+					return option.group === group && ( group !== 'other' || ( chosen.indexOf( option.perm ) !== -1 && tree[option.perm] === undefined ) );
+				} );
 
 				if( members.length === 0 )
 					return;

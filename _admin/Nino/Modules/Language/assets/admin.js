@@ -356,9 +356,9 @@
 
 		/**
 		 *	Add a locale named in the dialog. A code that is no code was refused
-		 *	by the dialog before it got here, at the field. A language that is
-		 *	listed and translated is switched back on instead of being added
-		 *	twice; any other has its file made first, then its row
+		 *	by the dialog before it got here, at the field, and a language that is
+		 *	listed and translated is refused there as well; any other has its file
+		 *	made first, then its row
 		 *
 		 *	@param		{string}		code
 		 *	@param		{Object}		ctl						The dialog's { close(), fail( key, text ) }
@@ -370,13 +370,11 @@
 			const panel = Nino.admin.language;
 			const existing = panel._locales.find( function( locale ) { return locale.code === code } );
 
-			// Already listed and already translated - switch it back on rather
-			// than adding a duplicate, and leave its file alone
+			// Already listed and already translated: it is in the list, ticked or not, and there is nothing to make - said at the field,
+			// with the dialog left open, and its file is left alone
 			if( existing !== undefined && existing.hasText === true ) {
-				existing.active = true;
-				panel._renderLocaleRows();
-				panel._refreshNative();
-				ctl.close();
+				// A language that is switched off is one tick away; one that is on needs no more than being told it is there
+				ctl.fail( 'code', existing.active === true ? Nino.content.getText('/_admin/language/error/served') : Nino.adminUi.format( Nino.content.getText('/_admin/language/error/listed'), Nino.adminUi.localeName( code ) ) );
 				return;
 			}
 
@@ -396,6 +394,11 @@
 
 				entry.hasText = true;
 				entry.keys 		= response.keys;
+
+				// The workbench keeps the names of its languages in one place: the name this one was given stands there, so that every
+				// block that names a language says it as the server does, before the page is read again
+				if( typeof response.name === 'string' && response.name !== '' )
+					Nino.adminUi.locales.names[code] = response.name;
 
 				// Deliberately left unticked. The file that was just written is a
 				// skeleton of empty keys, so ticking it here would put a language

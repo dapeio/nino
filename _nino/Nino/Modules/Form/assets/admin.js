@@ -188,47 +188,32 @@
 		},
 
 		/**
-		 *	The head above the list: the form to narrow to and the search
-		 *	over what is left. The select is drawn only where there is more
-		 *	than one form to choose between - on the single-form project this
-		 *	framework ships as, it would be a control with one option
+		 *	The head above the list: the form to narrow to - the select of the filter bar, left of the search - and the search
+		 *	over what is left. The select is drawn only where there is more than one form to choose between - on the
+		 *	single-form project this framework ships as, it would be a control with one option
 		 *
 		 *	@return		{Element}							<div class="nino-admin-filterbar">
 		 */
 		_renderHead : function() {
 
-			const items = [];
 			const keys = Object.keys( Nino.admin.submissions._forms );
+			let filter = null;
 
-			if( keys.length > 1 ) {
-
-				const select = dc.createElement('select');
-				select.id = 'submissions-form';
-				select.className = 'nino-admin-input submissions-form';
-				select.setAttribute( 'aria-label', Nino.content.getText('/_admin/submissions/label/form') );
-
-				const all = dc.createElement('option');
-				all.value = '';
-				all.textContent = Nino.content.getText('/_admin/submissions/label/form-all');
-				select.appendChild( all );
-
-				keys.forEach( function( key ) {
-					const option = dc.createElement('option');
-					option.value = key;
-					option.textContent = Nino.admin.submissions._forms[key].name || key;
-					select.appendChild( option );
-				} );
-
-				select.value = Nino.admin.submissions._form;
-				select.addEventListener( 'change', function() {
-					// Same as the search below: which form is picked is a filter
-					// over the cards that are already there
-					Nino.admin.submissions._form = select.value;
-					Nino.admin.submissions._applyFilter();
-				} );
-
-				items.push( select );
-			}
+			if( keys.length > 1 )
+				filter = {
+					id			: 'submissions-form',
+					label		: Nino.content.getText('/_admin/submissions/label/form'),
+					value		: Nino.admin.submissions._form,
+					options	: [ { value : '', label : Nino.content.getText('/_admin/submissions/label/form-all') } ].concat( keys.map( function( key ) {
+						return { value : key, label : Nino.admin.submissions._forms[key].name || key };
+					} ) ),
+					onChange : function( value ) {
+						// Same as the search below: which form is picked is a filter
+						// over the cards that are already there
+						Nino.admin.submissions._form = value;
+						Nino.admin.submissions._applyFilter();
+					},
+				};
 
 			/*	The cards are already in the document, so a keystroke only
 				decides which of them are shown - it does not draw the list
@@ -239,6 +224,7 @@
 				used to put it back afterwards. Nothing is replaced now, so
 				nothing loses it	*/
 			return Nino.adminUi.filterBar( {
+				filter : filter,
 				search : {
 					id			: 'submissions-search',
 					label		: Nino.content.getText('/_admin/submissions/label/search'),
@@ -248,7 +234,6 @@
 						Nino.admin.submissions._applyFilter();
 					},
 				},
-				items : items,
 			} ).el;
 		},
 

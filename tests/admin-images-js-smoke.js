@@ -799,7 +799,9 @@ check( '...and the save reports false', outcome === false );
 // What a template or a file is called is text: a name that is markup draws no element
 slots._renderScanForm( [ { filename : '', src : '<img src=x onerror=1>', suggestedUri : '/x', width : 1, height : 1, files : [ '<b>part</b>.tpl' ] } ] );
 check( 'the path of a finding and the files it was found in are drawn as text: a name that is markup makes no element', findAll( form2, el => el.tagName === 'IMG' || el.tagName === 'B' ).length === 0
-	&& findAll( form2, el => el.tagName === 'LEGEND' )[0].textContent === '<img src=x onerror=1>' );
+	&& findAll( form2, el => el.tagName === 'LEGEND' )[0].textContent === '<img src=x onerror=1>' && findAll( form2, el => el.tagName === 'P' ).some( p => p.textContent === '<b>part</b>.tpl' ) );
+slots._renderScanForm( [ { filename : 'd.png', src : '/images/d.png', suggestedUri : '/d', width : 1, height : 1, files : [ 'page-d.tpl', 'page-e.tpl' ] } ] );
+check( 'the files a finding was found in are said, each by its name, in the order the server named them, and nothing else stands in that place', findAll( form2, el => el.tagName === 'P' && el.textContent.indexOf( '.tpl' ) !== -1 ).map( p => p.textContent ).join('|') === 'page-d.tpl, page-e.tpl' );
 
 // All ignored, and nothing found
 slots._renderScanForm( found.slice( 0, 1 ) );

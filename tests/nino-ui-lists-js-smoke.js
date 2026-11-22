@@ -159,6 +159,17 @@ check( 'the left arrow goes back, and from the first tab it wraps to the last', 
 check( 'a strip wraps into a second row where it does not fit, and never scrolls sideways', strip.el.classList.contains('nino-admin-tabs--wrap') === true
 	&& /\.nino-admin-tabs--wrap \{[^}]*flex-wrap: wrap;/s.test( style ) );
 
+// A tab may carry a pill: the word stays out of the name of the tab, and is said again in place
+const counted = adminUi.tabs( [ { key : 'a', label : 'Alpha', badge : 12 }, { key : 'b', label : 'Beta' }, { key : 'c', label : 'Gamma', badge : 0 } ] );
+const pill = tab => all( tab, 'span' ).filter( function( el ) { return el.classList.contains('nino-admin-badge') && el.classList.contains('nino-admin-tab-badge') } );
+check( 'a tab with a badge has the pill of the workbench after its label, a tab without has none, and a zero is a count like any other',
+	pill( counted.tabs.a ).map( function( el ) { return el.textContent } ).join() === '12' && pill( counted.tabs.b ).length === 0 && pill( counted.tabs.c ).map( function( el ) { return el.textContent } ).join() === '0'
+	&& counted.tabs.a.textContent === 'Alpha' && counted.badge('a') === '12' && counted.badge('b') === '' );
+counted.badge( 'a', 3 );
+counted.badge( 'b', 'new' );
+counted.badge( 'c', null );
+check( '...badge( key, text ) says it again in place: one pill at most, one for a tab that had none, none for an empty word', pill( counted.tabs.a ).map( function( el ) { return el.textContent } ).join() === '3' && pill( counted.tabs.b ).map( function( el ) { return el.textContent } ).join() === 'new' && pill( counted.tabs.c ).length === 0 );
+
 // --- table(): the search, the column of actions, the empty answer ------------------------------------------------
 
 const table = element('div');

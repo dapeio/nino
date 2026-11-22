@@ -92,6 +92,8 @@ $makeFeature( 'gamma' );
 $makeFeature( 'lonely', [], ", 'requires' => [ 'nowhere' ]", [ 'requires' => [] ] );
 // One whose catalogue entry requires alpha: planning its install looks at the features that are there
 $makeFeature( 'needs', [], '', [ 'requires' => [ 'alpha' ] ] );
+// One that requires alpha in its manifest: alpha cannot be switched off while it is on
+$makeFeature( 'needy', [], ", 'requires' => [ 'alpha' ]", [ 'requires' => [ 'alpha' ] ] );
 // A feature whose unit throws when it is switched on: a change that dies in the middle
 $makeFeature( 'boom', [ 'install/manifest.php' => '<?php throw new \\RuntimeException( "the unit of boom" );' ] );
 
@@ -364,6 +366,24 @@ $other = $elsewhere( $app );
 $place( $other, 'gamma', true );
 [ $status ] = $call( $app, 'apiDeactivate', [ 'key' => 'alpha' ] );
 check( 'switching one feature off does not undo what another session switched on meanwhile', $status === 200 && $listed( $app, '\\Nino\\Modules\\Alpha' ) === false && $listed( $app, '\\Nino\\Modules\\Beta' ) === true && $listed( $app, '\\Nino\\Modules\\Gamma' ) === true );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $app ) );
+
+// A feature another one that is on requires is not switched off, and the refusal says who needs it, by the code and the names
+$reset();
+$app = $project( 'change-required-by' );
+$publish( $app );
+$place( $app, 'alpha', true );
+$place( $app, 'needy', true );
+[ $status, $body ] = $call( $app, 'apiDeactivate', [ 'key' => 'alpha' ] );
+check( 'a feature that an active feature requires is refused with the code of it, naming both features by their names in the parameters, and stays on', $status === 400 && ( $body['code'] ?? '' ) === 'features_required_by'
+	&& count( $body['params'] ?? [] ) === 2 && str_contains( (string) $body['params'][1], 'Needy' ) === true && $listed( $app, '\\Nino\\Modules\\Alpha' ) === true );
+$holder = $elsewhere( $app );
+\Nino\Features::lock( $holder );
+[ $status, $body ] = $call( $app, 'apiDeactivate', [ 'key' => 'alpha' ] );
+\Nino\Features::unlock( $holder );
+check( '...and where the lock is held by another the reason is the lock, not the feature that needs it', $status === 409 && ( $body['code'] ?? '' ) === 'features_busy' );
+[ $status, $body ] = $call( $app, 'apiDeactivate', [ 'key' => 'needy' ] );
+check( '...and the one that requires is switched off first, then the other', $status === 200 && $call( $app, 'apiDeactivate', [ 'key' => 'alpha' ] )[0] === 200 );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $app ) );
 echo "\n";
 
@@ -733,7 +753,7 @@ check( '...what could be removed of the directory is gone and the directory is w
 // The sentences exist in both languages of the workbench
 $missing = [];
 foreach( [ 'en_US', 'de_DE' ] as $locale )
-	foreach( [ 'features_busy', 'features_lock_failed', 'features_unknown', 'features_invalid', 'features_install_failed', 'features_install_inactive', 'features_remove_failed', 'features_remove_active', 'features_activate_failed', 'features_deactivate_failed', 'features_reapply_inactive', 'features_reapply_update', 'features_reapply_unit', 'features_reapply_problems', 'features_reapply_requires' ] as $code )
+	foreach( [ 'features_busy', 'features_lock_failed', 'features_unknown', 'features_invalid', 'features_install_failed', 'features_install_inactive', 'features_remove_failed', 'features_remove_active', 'features_activate_failed', 'features_deactivate_failed', 'features_required_by', 'features_reapply_inactive', 'features_reapply_update', 'features_reapply_unit', 'features_reapply_problems', 'features_reapply_requires' ] as $code )
 		if( $word( $locale, '/_admin/error/'. $code, 'x' ) === '' )
 			$missing[] = $locale. ' '. $code;
 check( 'the codes this panel answers a change with have a sentence in both interface languages', $missing === [] );

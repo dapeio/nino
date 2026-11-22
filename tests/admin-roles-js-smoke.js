@@ -94,6 +94,8 @@ const OPTIONS = [
 	{ perm : '/_admin/elements/manage', label : '/_admin/nav/elements', group : 'content', offered : true },
 	{ perm : '/_admin/text/manage', label : '/_admin/nav/text', group : 'content', offered : true },
 	{ perm : '/_admin/old/thing', label : '/_admin/old/thing', group : 'other', offered : false },
+	{ perm : '/_admin/other/thing', label : '/_admin/other/thing', group : 'other', offered : false },
+	{ perm : '/_admin/text/update/page-home/hero/title', label : '/_admin/text/update/page-home/hero/title', group : 'other', offered : false },
 ];
 
 // The Roles tab only reads these three when it draws
@@ -202,10 +204,10 @@ function nameOfTick( parts, perm ) {
 let parts = draw( [ '/_admin/elements/manage' ] );
 let found = lists( parts );
 
-check( 'the permissions are one list of ticks for each group of the rail, in the order roles/list names them, and the group is the name of its list', findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).map( function( el ) { return el.dataset.group } ).join() === 'content,other'
+check( 'the permissions are one list of ticks for each group of the rail, in the order roles/list names them, and the group is the name of its list', findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).map( function( el ) { return el.dataset.group } ).join() === 'content'
 	&& findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).every( function( set ) { return set.tagName === 'FIELDSET' && set.children[0].tagName === 'LEGEND' } ) );
-check( '...every permission offered has its tick, the ones the role holds are ticked, and the other lists are not shown as long as nothing is held', tickOf( parts, '/_admin/elements/manage' ).checked === true && tickOf( parts, '/_admin/text/manage' ).checked === false
-	&& tickOf( parts, '/_admin/old/thing' ) !== null && parts.perms().join() === '/_admin/elements/manage' );
+check( '...every permission offered has its tick, the ones the role holds are ticked, and the list of the permissions nobody offers is not shown as long as the role holds none: what other roles hold is not in it', tickOf( parts, '/_admin/elements/manage' ).checked === true && tickOf( parts, '/_admin/text/manage' ).checked === false
+	&& tickOf( parts, '/_admin/old/thing' ) === null && tickOf( parts, '/_admin/other/thing' ) === null && parts.perms().join() === '/_admin/elements/manage' );
 check( 'full access is a switch, which is no tick of any list', tickOf( parts, '/*' ) === null && parts.fullCheck.type === 'checkbox' && parts.fullCheck.parentNode.className === 'nino-admin-switch' );
 
 tick( parts, '/_admin/text/manage', true );
@@ -289,12 +291,22 @@ check( '...and the tick is still there to take it back, which asks the other way
 parts = draw( [ '/_admin/text/update/page-home/hero/title', '/_admin/old/thing' ] );
 check( 'a held scoped permission is named by the tree, one outside it stands in the list of the permissions nobody offers', nameOfTick( parts, '/_admin/text/update/page-home/hero/title' ) === labels['/_admin/text/update/page-home/hero/title']
 	&& tickOf( parts, '/_admin/old/thing' ).checked === true && findAll( parts.holder, function( el ) { return el.dataset.group === 'other' } )[0].children.some( function( child ) { return child.children.length > 0 && findAll( child, function( el ) { return el === tickOf( parts, '/_admin/old/thing' ) } ).length === 1 } ) );
+// A role is saved with what it holds and drawn again from what the server then lists: the permissions it carries stay where they stood
+const SCOPED = '/_admin/text/update/page-home/hero/title';
+parts = draw( [ SCOPED, '/_admin/old/thing' ] );
+const placed = function( parts, perm ) {
+	const tick = tickOf( parts, perm );
+	const set = tick === null ? undefined : findAll( parts.holder, function( el ) { return el.tagName === 'FIELDSET' && ( el.dataset.group !== undefined || el.id === 'roles-permissions-scoped' ) && findAll( el, function( inner ) { return inner === tick } ).length === 1 } )[0];
+	return set === undefined ? '' : set.dataset.group ?? set.id;
+};
+check( 'what the role carries and no panel offers is in the list of those nobody offers, and what it does not carry is not; a scoped one the tree names is in the list of the added ones, as it was added', placed( parts, '/_admin/old/thing' ) === 'other' && tickOf( parts, '/_admin/other/thing' ) === null && placed( parts, SCOPED ) === 'roles-permissions-scoped' );
+check( '...saved without a change, the role holds what it held, in the order it held it', parts.perms().join() === [ SCOPED, '/_admin/old/thing' ].join() );
 check( 'a role that holds a single permission says what it may do in that panel, in the summary', summary( parts ).some( function( line ) { return line.indexOf( TEXT ) !== -1 } ) );
 
 // The order is the server's, not a copy of it: a group the registry adds
 // reaches the form without a change here
 roles._groups = [ 'other', 'content' ];
-parts = draw( [] );
+parts = draw( [ '/_admin/old/thing' ] );
 check( 'the lists follow the order roles/list names the groups in', findAll( parts.holder, function( el ) { return el.dataset.group !== undefined } ).map( function( el ) { return el.dataset.group } ).join() === 'other,content' );
 roles._groups = [ 'content', 'structure', 'features', 'system', 'other' ];
 

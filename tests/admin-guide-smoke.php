@@ -819,9 +819,8 @@ foreach( $dated as $script ) {
 $shellScripts = $read( '_admin/Admin.php' );
 
 check( 'a date of the panels that show one is written by dateText() and by no formatting of the browser'. ( $ownDates === [] && $noHelper === [] ? '' : ' - '. implode( ', ', array_merge( $ownDates, $noHelper ) ) ), $ownDates === [] && $noHelper === [] );
-check( '...which is a file of its own, bundled after the design system and before the shell and every panel', preg_match( '/^\t\tdateText : function\(/m', $bare( $read( '_admin/assets/datetext.js' ) ) ) === 1
-	&& strpos( $shellScripts, "'/_admin/assets/Nino.admin.js'," ) !== false && strpos( $shellScripts, "'/_admin/assets/datetext.js'," ) !== false && strpos( $shellScripts, "'/_admin/assets/script.js'," ) !== false
-	&& strpos( $shellScripts, "'/_admin/assets/Nino.admin.js'," ) < strpos( $shellScripts, "'/_admin/assets/datetext.js'," ) && strpos( $shellScripts, "'/_admin/assets/datetext.js'," ) < strpos( $shellScripts, "'/_admin/assets/script.js'," ) );
+check( '...which is a block of the design system itself, loaded with it before the shell and every panel', preg_match( '/^\t\tdateText : function\(/m', $bare( $read( '_admin/assets/Nino.admin.js' ) ) ) === 1
+	&& strpos( $shellScripts, "'/_admin/assets/Nino.admin.js'," ) !== false && strpos( $shellScripts, "'/_admin/assets/script.js'," ) !== false && strpos( $shellScripts, "'/_admin/assets/Nino.admin.js'," ) < strpos( $shellScripts, "'/_admin/assets/script.js'," ) );
 
 $unnamed = [];
 
@@ -839,8 +838,8 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 	&& preg_match( '/admin-translation|admin-step-number|nino-admin-card|<h2>/', $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ) ) === 0 );
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Language/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_nino/Nino/Modules/Maintenance/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {

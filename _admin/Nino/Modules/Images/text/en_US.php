@@ -91,6 +91,12 @@ return [
 	'[[/_admin/error/favicon_svg]]'			=> 'The SVG file is not a plain vector picture that can be kept.',
 	'[[/_admin/error/favicon_no_previous]]'	=> 'There is no previous set.',
 	'[[/_admin/error/favicon_no_base]]'		=> 'The base unit has no set to put back.',
+	'[[/_admin/error/images_alt_plain]]'	=> 'An alt text is plain text: no tags and no markup.',
+	'[[/_admin/error/images_alt_long]]'	=> 'An alt text has at most %s characters.',
+	'[[/_admin/error/slots_size_large]]'	=> 'A picture of this size cannot be made: width times height is at most %s million pixels.',
+	'[[/_admin/error/slots_label]]'	=> 'A label is missing.',
+	'[[/_admin/error/slots_invalid]]'	=> 'The uri or the label is not valid.',
+	'[[/_admin/error/slots_exists]]'	=> 'This uri is already taken.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/images/manual/intro]]'	=> 'Every picture of your website has a fixed place, a slot, with fixed measures. A picture you upload is cut to them.',

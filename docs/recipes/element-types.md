@@ -324,6 +324,8 @@ own: the form posts its model, title and numbering under the new uri through
 hand-written default or callback, no `*` defaults, no elements. A patch that
 changes the rename tests the buckets, the refusals and the answer.
 
+Saving a type writes its file again as a whole, even for one change: the title and the model are rebuilt from what the form posts by `cleanModel()`, so the keys of a field stand in the order it writes them and not in the order the file had, and the elements in it stay as they are. The tab refuses a new field whose key starts with a dot (`types_invalid_key`) - `.uri`, `.lang` and the other keys with a dot are what the kernel adds to an element - and a field a hand-written file has under such a key can still be saved.
+
 An `array` field whose value is a list of strings is edited as rows
 (`Nino.adminUi.stringList()`); a list of anything else keeps the JSON field.
 

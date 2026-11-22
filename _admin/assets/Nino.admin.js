@@ -183,6 +183,10 @@
 	// How many strips tabs() has drawn: the stem of the ids of one that was given none
 	let TAB_STRIPS = 0;
 
+	// A moment as the files and the server write it: "2026-11-17", "2026-11-17 06:02", "2026-11-17T06:02:15" - the seconds, where there are
+	// some, are read and left out (see dateText())
+	const MOMENT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::\d{2})?)?$/;
+
 	// The classes of a button's kind: what button() puts on it for `kind`. A button without a kind has none and
 	// looks as the base rule of style.css draws a button
 	const BUTTON_KINDS = {
@@ -1308,10 +1312,11 @@
 		 *	A tab may bring its pane: that one is shown with the tab and the others are
 		 *	hidden, each named by its tab. Owns no strings
 		 *
-		 *	@param		{Array}			items						[ { key, label, panel } ] - panel an Element, optional
+		 *	@param		{Array}			items						[ { key, label, panel, badge } ] - panel an Element, optional; badge a short word or a number - how many of something wait in that tab -
+		 *																			drawn as the workbench's pill after the label (not a part of it, so the label stays the name of the tab) and said again with badge( key, text )
 		 *	@param		{Object}		[options]				{ active, onSelect( key ), label, id } - active the key to start on (the first tab), label the name of the strip for a screen reader, id the stem of the ids of the tabs
 		 *
-		 *	@return		{Object}										{ el, tabs, select( key ) } - el <div role="tablist">, tabs key => button
+		 *	@return		{Object}										{ el, tabs, select( key ), badge( key, [ text ] ) } - el <div role="tablist">, tabs key => button; badge( key, text ) changes the word of the pill of a tab in place, '' or null takes it away, and badge( key ) answers the word it has
 		 */
 		tabs : function( items, options ) {
 
@@ -1344,6 +1349,35 @@
 				buttons[item.key] = button;
 			} );
 
+			// The pill of a tab: one at most, after the label, as the pane's own tabs have it (see tabBadge())
+			const badge = function( key, text ) {
+
+				if( Object.hasOwn( buttons, key ) === false )
+					return '';
+
+				const button = buttons[key];
+				const before = button.querySelector(':scope > .nino-admin-tab-badge');
+
+				if( arguments.length < 2 )
+					return before === null ? '' : before.textContent;
+
+				const word = text === null || text === undefined ? '' : String( text ).trim();
+
+				if( before !== null && word === '' )
+					before.remove();
+				else if( before !== null )
+					before.textContent = word;
+				else if( word !== '' )
+					button.appendChild( Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-tab-badge', word ) );
+
+				return word;
+			};
+
+			( items || [] ).forEach( function( item ) {
+				if( item.badge !== undefined && item.badge !== null )
+					badge( item.key, item.badge );
+			} );
+
 			const show = function( key ) {
 				( items || [] ).forEach( function( item ) {
 					if( item.panel )
@@ -1365,6 +1399,7 @@
 			return {
 				el : bar,
 				tabs : buttons,
+				badge : badge,
 				select : function( key ) {
 					if( Object.hasOwn( buttons, key ) === false )
 						return;
@@ -2596,7 +2631,7 @@
 		 *	of the control where the dialog is wide enough and above it where it
 		 *	is not (style.css decides). Owns no strings
 		 *
-		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view.
+		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, placeholder, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view; placeholder is an example of what is typed ("#ffffff") in a field that takes text - it is never the name of the field.
 		 *																	type 'select' takes options [ { value, label } ]; 'check' a tick (value true or false); 'checklist' ticks (options [ { value, label } ], value the list of the ticked); 'tiles' one tile chosen in each of several groups (groups as tileChoice() takes them, value an object group => value); 'locales' a row for each language (locales, values a map, multiline); 'file' (accept, maxBytes); 'code' (rows); 'datetime' (min, max, zone, value an ISO string);
 		 *																	any other type is the type of an <input>. validate( value ) answers the sentence that is wrong with it, or ''; a required field is wrong when it is empty - a tick not ticked, a list with none, a language with no text, no file
 		 *	@param		{Function}	[onInput]				onInput( key, value ) on every change of a field
@@ -2651,7 +2686,7 @@
 					controls[field.key] = handles[field.key].controls[0] ?? label;
 					readers[field.key] = function() { return handles[field.key].value() };
 				} else if( field.type === 'locales' ) {
-					handles[field.key] = Nino.adminUi.localeRows( Object.assign( shared, { locales : field.locales, work : field.work, values : field.values ?? field.value, multiline : field.multiline, rows : field.rows, maxLength : field.maxLength, onChange : function() { say( handles[field.key].value() ) } } ) );
+					handles[field.key] = Nino.adminUi.localeRows( Object.assign( shared, { locales : field.locales, work : field.work, values : field.values ?? field.value, multiline : field.multiline, rows : field.rows, maxLength : field.maxLength, placeholder : field.placeholder, onChange : function() { say( handles[field.key].value() ) } } ) );
 					label = handles[field.key].el;
 					controls[field.key] = handles[field.key].controls[handles[field.key].locales[0]] ?? label;
 					readers[field.key] = function() { return handles[field.key].value() };
@@ -2661,7 +2696,7 @@
 					controls[field.key] = handles[field.key].button;
 					readers[field.key] = function() { return handles[field.key].value() };
 				} else if( field.type === 'code' ) {
-					label = Nino.adminUi.codeField( Object.assign( shared, { value : field.value, rows : field.rows, maxLength : field.maxLength, onInput : say } ) );
+					label = Nino.adminUi.codeField( Object.assign( shared, { value : field.value, placeholder : field.placeholder, rows : field.rows, maxLength : field.maxLength, onInput : say } ) );
 					controls[field.key] = label.control;
 					readers[field.key] = function() { return label.control.value };
 				} else if( field.type === 'datetime' ) {
@@ -2677,6 +2712,7 @@
 						note			: field.note,
 						type			: field.type,
 						value			: field.value,
+						placeholder	: field.placeholder,
 						required	: field.required,
 						maxLength	: field.maxLength,
 						autocomplete : field.autocomplete ?? 'off',
@@ -5065,7 +5101,7 @@
 		 *	it with its size, "Remove" once there is one, the limits as a note under it, and what is wrong with the
 		 *	file at the field. It does not upload: the caller gets the File (onChange) and sends it when the guide's
 		 *	model of the view says so. A file that is too large or of a type that `accept` does not name is refused
-		 *	at once, said at the field, and not taken. Owns no strings
+		 *	at once, said at the field - the types it takes in words, not as the picker's notation - and not taken. Owns no strings
 		 *
 		 *	@param		{Object}		options		{ key, id, label, help, hint, note, required, accept, maxBytes, button, onChange, className }
 		 *														- accept     the input's accept: a list of .ext and type/* or type/sub, which is also what the chosen file is held to
@@ -5192,7 +5228,7 @@
 
 				if( typeof options.accept === 'string' && options.accept !== '' && Nino.adminUi._accepts( picked, options.accept ) === false ) {
 					input.value = '';
-					handle.error( Nino.adminUi.format( Nino.adminUi.text('/_admin/common/error/file-type'), options.accept ) );
+					handle.error( Nino.adminUi.format( Nino.adminUi.text('/_admin/common/error/file-type'), Nino.adminUi._acceptNames( options.accept ) ) );
 					return;
 				}
 
@@ -5204,6 +5240,42 @@
 			} );
 
 			return handle;
+		},
+
+		/**
+		 *	What an `accept` allows, as a person says it: ".pdf,image/*" is "PDF or picture", "image/svg+xml" is "SVG". An
+		 *	extension and a subtype are written in capitals, a whole kind of file ("image/*") by its word, and the last one is joined
+		 *	with the word for "or" - so that the sentence about a wrong file names what is taken, not the notation of the picker
+		 *
+		 *	@param		{string}		accept
+		 *
+		 *	@return		{string}
+		 */
+		_acceptNames : function( accept ) {
+
+			const names = [];
+
+			String( accept ).split(',').map( function( part ) { return part.trim() } ).filter( function( part ) { return part !== '' } ).forEach( function( part ) {
+
+				let name = '';
+
+				if( part.charAt(0) === '.' )
+					name = part.slice( 1 ).toUpperCase();
+				else if( part.slice( -2 ) === '/*' ) {
+					const kind = Nino.adminUi.text('/_admin/common/filetype/'+ part.slice( 0, -2 ).toLowerCase() );
+					name = kind !== '' && kind.indexOf('/_admin/') !== 0 ? kind : part.slice( 0, -2 );
+				}
+				else
+					name = ( part.split('/')[1] ?? part ).split('+')[0].toUpperCase();
+
+				if( name !== '' && names.indexOf( name ) === -1 )
+					names.push( name );
+			} );
+
+			if( names.length < 2 )
+				return names.join('');
+
+			return names.slice( 0, -1 ).join(', ')+ ' '+ Nino.adminUi.text('/_admin/common/filetype/or')+ ' '+ names[names.length - 1];
 		},
 
 		/**
@@ -5520,6 +5592,55 @@
 				return name+ ' ('+ code+ ')';
 
 			return name;
+		},
+
+		/**
+		 *	The one way the workbench writes a date and a time it draws itself: German as "17.11.2026, 06:02", every other interface language as
+		 *	"2026-11-17, 06:02" - never with seconds, never as the raw ISO string of a file, and not as the formatter of the site's pages writes it
+		 *	(\Nino\Format::datetime() is for visitors, see docs/admin-ui.md, "Words"). A date, and where it has one a time, in the form of the
+		 *	interface language. The clock is the one the value carries: a string is not converted to any zone, a Date is read on the clock of the
+		 *	browser
+		 *
+		 *	@param		{string|Date}		value					"Y-m-d", "Y-m-d H:i", "Y-m-d H:i:s" (a "T" for the space), or a Date
+		 *	@param		{Object}				[options]			{ time, lang } - time false leaves the time of day out of a value that has one, lang the interface language (the page's own by default)
+		 *
+		 *	@return		{string}											'' for a value that is no moment
+		 */
+		dateText : function( value, options ) {
+
+			options = options || {};
+
+			let parts = null;
+
+			if( Object.prototype.toString.call( value ) === '[object Date]' ) {
+				if( Number.isNaN( value.getTime() ) === true )
+					return '';
+
+				parts = [ value.getFullYear(), value.getMonth() + 1, value.getDate(), value.getHours(), value.getMinutes() ].map( function( part ) { return String( part ).padStart( 2, '0' ) } );
+			}
+			else if( typeof value === 'string' ) {
+
+				const found = MOMENT.exec( value.trim() );
+
+				if( found === null )
+					return '';
+
+				// Digits are no date: a month, a day, an hour or a minute that cannot be is no moment
+				if( +found[2] < 1 || +found[2] > 12 || +found[3] < 1 || +found[3] > 31 || ( found[4] !== undefined && ( +found[4] > 23 || +found[5] > 59 ) ) )
+					return '';
+
+				parts = [ found[1], found[2], found[3], found[4], found[5] ];
+			}
+			else
+				return '';
+
+			const lang = typeof options.lang === 'string' ? options.lang : ( dE && dE.lang ? dE.lang : '' );
+			const date = /^de(?:[-_]|$)/i.test( lang ) === true ? parts[2]+ '.'+ parts[1]+ '.'+ parts[0] : parts[0]+ '-'+ parts[1]+ '-'+ parts[2];
+
+			if( parts[3] === undefined || options.time === false )
+				return date;
+
+			return date+ ', '+ parts[3]+ ':'+ parts[4];
 		},
 
 		/**
@@ -7263,7 +7384,7 @@
 		 *
 		 *	@param		{Object}		options					{ id, sections, open, multiple, collapsible, level, address, onToggle }
 		 *														- id          the beginning of the ids it makes, one the page has not
-		 *														- sections    [ { key, label, summary, badge, content } ] - content an Element, or a function that answers one when the section is first opened; summary is read on the closed head, badge a chip beside the label (a state such as "changed")
+		 *														- sections    [ { key, label, summary, badge, help, content } ] - content an Element, or a function that answers one when the section is first opened; summary is read on the closed head, badge a chip beside the label (a state such as "changed"); help the sentence behind a (?) beside the heading of the section, in a row with it and not in it: a button of its own that does not open or close it, one more stop for the Tab key behind the head (the arrow keys walk the heads alone), the sentence described by the head as a field's help is. Without help the head is the button in its heading and nothing more
 		 *														- open        the key open at the start, or an array of them
 		 *														- multiple    several sections may be open
 		 *														- collapsible at most one section is open and a press on it closes it; none may be open, so without open none is at the start. Ignored with multiple
@@ -7398,6 +7519,18 @@
 				[ label, badge, summary, chevron ].forEach( function( piece ) { button.appendChild( piece ) } );
 				heading.appendChild( button );
 
+				// The (?) of the section: a button of its own after the heading - not in it, so that the name of the heading is its title alone, and
+				// not in the button that opens the section, a button in a button being no markup. A press on it does not turn the section over. The
+				// sentence is in the document and describes the button of the head
+				let row = null;
+
+				if( typeof section.help === 'string' && section.help !== '' ) {
+					row = dc.createElement('div');
+					row.className = 'nino-admin-accordion-row';
+					row.appendChild( heading );
+					row.appendChild( Nino.adminUi.fieldHelp( section.help, { field : button, name : section.label } ) );
+				}
+
 				const body = dc.createElement('div');
 				body.id = id+ '-body';
 				body.className = 'nino-admin-accordion-body';
@@ -7424,7 +7557,7 @@
 						parts[next].button.focus();
 				} );
 
-				root.appendChild( heading );
+				root.appendChild( row ?? heading );
 				root.appendChild( body );
 
 				parts.push( { key : section.key, head : heading, button : button, badge : badge, summary : summary, chevron : chevron, body : body, made : false } );
@@ -9985,6 +10118,10 @@
 		 *	own - while the line itself follows the typing; set() tells it at once and shows
 		 *	an error as a typed one would, without telling the caller; against() takes the
 		 *	way of the typing.
+		 *	The name stands at the left of the code in a form that is wide enough, as the name of every field does
+		 *	(see the rules of fieldset > .nino-admin-field in style.css), and above it where there is no room. What the field is
+		 *	described by besides the block's own sentences - the help behind the name, a note - is kept; a field with nothing in it
+		 *	has an empty picker, not a black one.
 		 *	The pure half, parsing and the contrast, is colorModel. Owns no
 		 *	strings, the words of the contrast and of the error apart
 		 *
@@ -10050,10 +10187,19 @@
 			contrast.appendChild( mark );
 			contrast.appendChild( verdict );
 
+			// The identifiers the field is described by that the block did not give it: the caller's. fieldError() replaces them with its own, so they are
+			// taken before it is asked
+			let others = [];
+
+			const foreign = function() {
+				return String( input.getAttribute('aria-describedby') ?? '' ).split(/\s+/).filter( function( token ) { return token !== '' && token !== prefix+ '-error' && token !== contrast.id } );
+			};
+
 			// What the field is described by: its error, and the contrast where that is shown - a
 			// hidden line that is still named is read out with the sentence that says it is stale
 			const describe = function() {
 
+				// What the field is described by that is not the block's - its help, a note, whatever the caller named - stays behind the block's own
 				const ids = [];
 
 				if( root.querySelector('.nino-admin-field-error') !== null )
@@ -10061,6 +10207,11 @@
 
 				if( contrast.hidden === false )
 					ids.push( contrast.id );
+
+				others.concat( foreign() ).forEach( function( token ) {
+					if( ids.indexOf( token ) === -1 )
+						ids.push( token );
+				} );
 
 				if( ids.length === 0 )
 					input.removeAttribute('aria-describedby');
@@ -10120,6 +10271,13 @@
 				}
 
 				swatch.hidden = value === null;
+
+				// A field with nothing in it shows no colour: the picker is drawn empty and not as the black it holds
+				if( value === null && input.value.trim() === '' )
+					picker.setAttribute( 'data-empty', '' );
+				else
+					picker.removeAttribute('data-empty');
+
 				settle( now );
 				describe();
 			};
@@ -10127,6 +10285,7 @@
 			// What is in the field, by hand (typed or picked: the caller is told) or put there (it is not)
 			const typedIn = function( typed, byHand ) {
 
+				others = foreign();
 				clear();
 
 				const parsed = model.parse( typed );

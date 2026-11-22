@@ -67,6 +67,39 @@ check( '...and they are the kernel\'s own list, stated once', defined( '\\Nino\\
 $suffixTypes = $body['suffixTypes'] ?? null;
 check( 'apiList names the types a unit applies to: every field type that renders an input a unit can sit next to', $suffixTypes === array_values( array_diff( \Nino\Modules\Elements\Types::FIELD_TYPES, [ 'boolean', 'image', 'element' ] ) ) );
 
+// A field key with a dot in front is the kernel's ('.uri', '.lang'): refused at the request, a type that holds one already can still be saved
+$typeBytes = (string) file_get_contents( $sandbox. '/private/elements/testtype.php' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ], '.lang' => [ 'type' => 'string' ] ] ] );
+check( 'apiSave refuses a new field whose key starts with a dot, with a code and the key, and writes nothing', $status === 400 && ( $body['code'] ?? null ) === 'types_invalid_key' && ( $body['params'] ?? null ) === [ '.lang' ] && (string) file_get_contents( $sandbox. '/private/elements/testtype.php' ) === $typeBytes );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'dotted', 'title' => 'Dotted', 'model' => [ '.uri' => [ 'type' => 'string' ] ] ] );
+check( 'apiCreate refuses it as well, and no type file is made', $status === 400 && ( $body['code'] ?? null ) === 'types_invalid_key' && is_file( $sandbox. '/private/elements/dotted.php' ) === false );
+// A new key of another form is refused as well, by the same code, naming the field the request posted: a null byte, a blank, markup, a path
+foreach( [ "x\0y" => 'a null byte', 'a b' => 'a blank', '<b>' => 'markup', 'a/../b' => 'a path', 'ä' => 'a letter beyond ascii', 'a.' => '' ] as $odd => $why ) {
+	if( $why === '' ) {
+		[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ], $odd => [ 'type' => 'string' ] ] ] );
+		check( 'a dot inside or at the end of a key is a key', $status === 200 );
+		ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ] ] ] );
+		continue;
+	}
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ], $odd => [ 'type' => 'string' ] ] ] );
+	check( 'a new field key with '. $why. ' is refused with the code, the key and the field of the request', $status === 400 && ( $body['code'] ?? null ) === 'types_invalid_key' && ( $body['field'] ?? null ) === 'model' && ( $body['params'] ?? null ) === [ trim( $odd ) ] );
+}
+// A key has a length: 64 characters are one, 65 are none, and the answer names the first 64 of it and no more
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ], str_repeat( 'k', 65 ) => [ 'type' => 'string' ] ] ] );
+check( 'a new field key of 65 characters is refused, and the answer carries 64 of them', $status === 400 && ( $body['code'] ?? null ) === 'types_invalid_key' && ( $body['params'] ?? null ) === [ str_repeat( 'k', 64 ) ] );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ], str_repeat( 'k', 64 ) => [ 'type' => 'string' ] ] ] );
+check( '...and one of 64 is a key', $status === 200 );
+ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'name' => [ 'type' => 'string', 'locale' => true ] ] ] );
+$typeAfter = (string) file_get_contents( $sandbox. '/private/elements/testtype.php' );
+check( '...and nothing of them reached the type file', str_contains( $typeAfter, "\0" ) === false && str_contains( $typeAfter, 'a b' ) === false && str_contains( $typeAfter, '<b>' ) === false );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'testtype', 'title' => 'Test Type', 'model' => [ 'a b' => [ 'type' => 'string', 'locale' => true ] ], 'renames' => [ 'name' => 'a b' ] ] );
+check( 'a rename to a key of another form is refused as a new key is, and nothing is moved', $status === 400 && ( $body['code'] ?? null ) === 'types_invalid_key' && (string) file_get_contents( $sandbox. '/private/elements/testtype.php' ) === $typeAfter );
+foreach( [ 'de_DE', 'en_US' ] as $lang )
+	check( 'the refusal has its sentence in '. $lang, is_string( ( require __DIR__. '/../_admin/Nino/Modules/Elements/text/'. $lang. '.php' )['[[/_admin/error/types_invalid_key]]'] ?? null ) === true );
+file_put_contents( $sandbox. '/private/elements/handmade.php', '<?php return [ \'title\' => \'Hand\', \'model\' => [ \'.old\' => [ \'type\' => \'string\' ] ], \'*\' => [ \'*\' => [] ] ];' );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' => 'handmade', 'title' => 'Hand 2', 'model' => [ '.old' => [ 'type' => 'string' ] ] ] );
+check( 'a type that holds such a field by hand can still be saved: only a new key is refused', $status === 200 );
+
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiGet' ], [ 'uri' => 'testtype' ] );
 $got = $body ?? [];
 check( 'apiGet returns the real title', $got['title'] === 'Test Type' );
@@ -862,11 +895,13 @@ check( 'a stored 0 is emptied like any other number', $status === 200 && array_k
 $before = $numbersOnDisk();
 [ $status, $body ] = $saveNumbers( 'zero', [ 'order' => '' ], false );
 check( 'an empty text is no number: refused with the wrong type, and nothing is written', $status === 400 && str_contains( (string) ( $body['error'] ?? $body['message'] ?? '' ), 'Wrong var type' ) === true && $numbersOnDisk() === $before );
+check( '...and the refusal has the code of it, the key it is about as its parameter and as its field, for the sentence in the interface language', ( $body['code'] ?? null ) === 'elements_wrong_type' && ( $body['params'] ?? null ) === [ 'order' ] && ( $body['field'] ?? null ) === 'order' );
 [ $status ] = $saveNumbers( 'zero', [ 'order' => 'abc' ], false );
 check( '...as is any other text', $status === 400 && $numbersOnDisk() === $before );
 
 [ $status, $body ] = $saveNumbers( 'nocount', [ 'title' => 'x', 'count' => null ] );
-check( 'a required number sent as null is a missing field on insert', $status === 400 && str_contains( (string) ( $body['error'] ?? $body['message'] ?? '' ), 'Missing required element key \'count\'' ) === true && isset( $numbersOnDisk()['*']['nocount'] ) === false );
+check( 'a required number sent as null is a missing field on insert', $status === 400 && str_contains( (string) ( $body['error'] ?? $body['message'] ?? '' ), 'Missing required element key \'count\'' ) === true && isset( $numbersOnDisk()['*']['nocount'] ) === false
+	&& ( $body['code'] ?? null ) === 'elements_missing_key' && ( $body['field'] ?? null ) === 'count' );
 [ $status ] = $saveNumbers( 'ten', [ 'count' => null ], false );
 check( '...and on update, where the number it held stays', $status === 400 && ( $numbersOnDisk()['*']['ten']['count'] ?? null ) === 1 );
 
@@ -1517,6 +1552,18 @@ $raw = [ 'active' => 1, 'stock' => '7', 'price' => 3 ];
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiSave' ], [ 'type' => $roundtrip['type'], 'uri' => 'legacy', 'locale' => 'de_DE', 'isNew' => false, 'fields' => [ 'title' => 'Neu' ] ] );
 $after = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $roundtrip['type']. '.php', [] );
 check( 'a save of one field of an element written by hand writes that field and no other: what is stored as 1, as \'7\' or not at all stays as it is', $status === 200 && ( $after['*']['legacy'] ?? null ) === $raw && ( $after['de_DE']['legacy']['title'] ?? null ) === 'Neu' && ( $after['de_DE']['legacy']['unknownfield'] ?? null ) === 'x' && array_keys( $after['*']['legacy'] ) === array_keys( $raw ) );
+
+// ...and the switch of a yes or no shows what the kernel delivers of it: the 1 of a hand-written file is on, as true is; 0 and a missing value are off
+foreach( [ 'legacy' => 1, 'zero' => 0, 'word' => 'yes' ] as $handUri => $handValue )
+	\Nino\Filesystem::mutate( $appData, '/elements/'. $roundtrip['type']. '.php', static function( mixed $state ) use ( $handUri, $handValue ): array { $state = (array) $state; $state['*'][$handUri]['active'] = $handValue; return $state; }, [] );
+$handBytes = (string) file_get_contents( $elementFile );
+$shown = [];
+foreach( [ 'legacy', 'zero', 'word', 'hammer' ] as $handUri ) {
+	[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiGet' ], [ 'type' => $roundtrip['type'], 'uri' => $handUri ] );
+	$shown[$handUri] = $body['global']['active'] ?? 'missing';
+}
+check( 'a yes or no is shown as the kernel delivers it: 1 is on, 0 and any other word are off, and a boolean stays what it is', $shown['legacy'] === true && $shown['zero'] === false && $shown['word'] === false && $shown['hammer'] === ( $roundtrip['stored']['global']['active'] ?? null ) );
+check( 'reading the element for the form does not write its file', (string) file_get_contents( $elementFile ) === $handBytes );
 
 // A copy of a type carries the words its fields are called in the element form
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'labelcopy', 'title' => 'L', 'model' => [ 'a' => [ 'type' => 'string', 'label' => [ 'de_DE' => 'Eins', 'en_US' => 'One' ] ], 'b' => [ 'type' => 'string', 'label' => '' ], 'c' => [ 'type' => 'string', 'label' => [ 'de_DE' => 5 ] ] ] ] );

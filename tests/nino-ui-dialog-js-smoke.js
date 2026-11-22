@@ -226,6 +226,22 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 }
 
 
+// --- formDialog(): a field may show an example of what is typed ---------------
+
+{
+	const w = world();
+	w.ui.formDialog( { title : 'Colour', fields : [
+		{ key : 'hex', label : 'Colour', placeholder : '#ffffff' },
+		{ key : 'note', label : 'Note', type : 'code', placeholder : '{ }' },
+		{ key : 'plain', label : 'Plain' },
+	], submit : 'Save', cancel : 'Cancel', onSubmit : () => {} } );
+
+	const dialog = w.dialogs[0];
+	check( 'a text field shows the example it was given, one without has none', tag( dialog, 'input' )[0].placeholder === '#ffffff' && !tag( dialog, 'input' )[1].placeholder );
+	check( '...and so does a field of code', tag( dialog, 'textarea' )[0].placeholder === '{ }' );
+}
+
+
 // --- formDialog(): what was typed is not thrown away silently ---------------
 
 {

@@ -146,20 +146,6 @@
 			const sentence = Nino.adminUi.fieldHelp( help, { field : field.input, name : label } );
 			field.el.children[0].children[0].appendChild( sentence );
 
-			// The block writes what the field is described by - its error and its contrast - at every change, and leaves the sentence
-			// of the help out of it: the sentence is put back behind them, so that it is read at the field whatever was typed
-			const keep = function() {
-
-				const tokens = String( field.input.getAttribute('aria-describedby') ?? '' ).split(/\s+/).filter( function( token ) { return token !== '' } );
-
-				if( tokens.indexOf( sentence.sentenceId ) === -1 )
-					field.input.setAttribute( 'aria-describedby', tokens.concat( [ sentence.sentenceId ] ).join(' ') );
-			};
-
-			field.input.addEventListener( 'input', keep );
-			field.input.addEventListener( 'change', keep );
-			Array.from( field.el.children ).filter( function( part ) { return part.type === 'color' } ).forEach( function( picker ) { picker.addEventListener( 'input', keep ) } );
-
 			return field;
 		},
 

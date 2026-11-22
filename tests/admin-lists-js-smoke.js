@@ -117,8 +117,6 @@ check( 'a row of pressed-state buttons keeps every button in the tab order', swi
 	&& switchButtons.on.listeners.keydown === undefined );
 
 const languageSource = adminAsset( 'Language', 'admin.js' );
-check( 'the one section of the Languages tab has no title of its own, and does not keep the room that a title takes',
-	/#language-form form > fieldset:not\(:has\(> legend\)\) \{[^}]*padding-top: var\(--nino-admin-space-3\);/s.test( adminAsset( 'Language', 'admin.css' ) ) );
 
 /*	The shell shows a panel by calling its showCurrent(), and a panel that
 	builds once gates init() there on `_ready === false`. Language got the

@@ -163,4 +163,7 @@ return [
 	'[[/_admin/users/manual/deactivate]]'	=> '„Konto deaktivieren“ sperrt die Anmeldung und behält das Konto – nicht Dein eigenes. „Überall abmelden“ beendet jede Sitzung des Kontos.',
 	'[[/_admin/users/manual/lockout]]'	=> 'Im Reiter Anmeldeschutz stellst Du ein, nach wie vielen Fehlversuchen ein Konto gesperrt wird und wie lange. Gesperrte Konten stehen dort; „Sperre aufheben“ öffnet eines wieder.',
 	'[[/_admin/users/manual/recovery]]'	=> 'Das Recovery-Passwort verlangt recovery.php, das ein Backup zurückspielt oder ein Konto einrichtet, wenn sich niemand mehr anmelden kann. Es ist kein Passwort zum Anmelden.',
+	'[[/_admin/error/users_invalid_name]]'	=> 'Der Name des Kontos ist kein Name.',
+	'[[/_admin/error/users_incomplete]]'	=> 'Der Name des Kontos und ob es aktiv ist, werden gebraucht.',
+	'[[/_admin/error/users_own_role]]'	=> 'Die eigene Rolle ändert eine andere Verwaltung.',
 ];

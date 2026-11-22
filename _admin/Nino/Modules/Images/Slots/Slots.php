@@ -213,7 +213,7 @@ namespace Nino\Modules\Images {
 			$height = (int) ( $data['height'] ?? 0 );
 
 			if( $label === '' ) {
-				\Nino\Http::fail( $request, 400, 'label is required' );
+				\Nino\Http::fail( $request, 400, 'label is required', 'slots_label', [], 'label' );
 				return;
 			}
 
@@ -221,7 +221,7 @@ namespace Nino\Modules\Images {
 				return;
 
 			if( self::fitsUploadLimit( $width, $height ) === false ) {
-				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce' );
+				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce', 'slots_size_large', [ round( \Nino\Images::MAX_SOURCE_PIXELS / 1000000, 1 ) ], 'width' );
 				return;
 			}
 
@@ -282,7 +282,7 @@ namespace Nino\Modules\Images {
 			$height = (int) ( $data['height'] ?? 0 );
 
 			if( self::isValidUri( $uri ) === false || $label === '' ) {
-				\Nino\Http::fail( $request, 400, 'invalid uri or missing label' );
+				\Nino\Http::fail( $request, 400, 'invalid uri or missing label', 'slots_invalid', [], self::isValidUri( $uri ) === false ? 'uri' : 'label' );
 				return;
 			}
 
@@ -290,12 +290,12 @@ namespace Nino\Modules\Images {
 				return;
 
 			if( self::fitsUploadLimit( $width, $height ) === false ) {
-				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce' );
+				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce', 'slots_size_large', [ round( \Nino\Images::MAX_SOURCE_PIXELS / 1000000, 1 ) ], 'width' );
 				return;
 			}
 
 			if( isset( $appData['/nino/html/images'][$uri] ) === true ) {
-				\Nino\Http::fail( $request, 409, 'slot already exists' );
+				\Nino\Http::fail( $request, 409, 'slot already exists', 'slots_exists', [], 'uri' );
 				return;
 			}
 
@@ -327,7 +327,7 @@ namespace Nino\Modules\Images {
 
 			if( $written === false ) {
 				if( $exists === true )
-					\Nino\Http::fail( $request, 409, 'slot already exists' );
+					\Nino\Http::fail( $request, 409, 'slot already exists', 'slots_exists', [], 'uri' );
 				else
 					\Nino\Http::fail( $request, 500, 'could not save the slot' );
 				return;

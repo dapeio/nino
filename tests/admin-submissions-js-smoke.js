@@ -106,7 +106,6 @@ sandbox.window = {
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
-load( '_admin/assets/datetext.js', context );
 
 load( '_nino/Nino/Modules/Form/assets/admin.js', context );
 
@@ -242,8 +241,8 @@ check( 'the select offers every form, with the entry that turns it off first',
 	byTag( formNow(), 'OPTION' ).map( function( o ) { return o.value } ).join('|') === '|contact|quote'
 	&& byTag( formNow(), 'OPTION' )[0].textContent === text('/_admin/submissions/label/form-all') );
 
-check( 'the select and the search stand in the one filter bar of the design system, the search first', searchNow().parentNode === formNow().parentNode && hasClass( searchNow().parentNode, 'nino-admin-filterbar' )
-	&& searchNow().parentNode.attributes.role === 'search' && searchNow().parentNode.children[0] === searchNow() );
+check( 'the select and the search stand in the one filter bar of the design system, the select left of the search, as the block makes it', searchNow().parentNode === formNow().parentNode && hasClass( searchNow().parentNode, 'nino-admin-filterbar' )
+	&& searchNow().parentNode.attributes.role === 'search' && searchNow().parentNode.children[0] === formNow() && searchNow().parentNode.children[1] === searchNow() && hasClass( formNow(), 'nino-admin-filterbar-select' ) );
 searchNow().value = Nino.adminUi.dateText('2026-09-07 09:00');
 fire( searchNow(), 'input' );
 check( 'the search finds a day as the card shows it, not only as it is stored', cardIds() === 'bbbbbbbbbbbbbbbb' );

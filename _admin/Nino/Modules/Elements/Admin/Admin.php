@@ -412,11 +412,11 @@ namespace Nino\Modules\Elements {
 				$found = true;
 
 				foreach( $globalKeys as $key )
-					$global[$key] = $element[$key] ?? null;
+					$global[$key] = self::shownValue( $model[$key] ?? [], $element[$key] ?? null );
 
 				$locales[$locale] = [];
 				foreach( $localeKeys as $key )
-					$locales[$locale][$key] = $element[$key] ?? null;
+					$locales[$locale][$key] = self::shownValue( $model[$key] ?? [], $element[$key] ?? null );
 			}
 
 			if( $found === false ) {
@@ -429,6 +429,50 @@ namespace Nino\Modules\Elements {
 				'locales' => $locales,
 				'raw' 		=> self::rawBuckets( $typeData, $uri ),
 			] );
+		}
+
+		/**
+		 *	The code of a refusal the kernel words in English when it saves an element: a value of the wrong type, a required key that is missing,
+		 *	a value that is not allowed. The key it is about is the parameter of the sentence and the field of the answer
+		 *
+		 *	@param		string|null		$message		What \Nino\Elements said
+		 *
+		 *	@return 	array|null									[ code, key ], null for a sentence this does not know (a veto of the project's own is its own words)
+		 */
+		private static function _coded( ?string $message ): ?array {
+
+			if( $message === null )
+				return null;
+
+			foreach( [
+				'/^Wrong var type \'(.*?)\' in \'/s'					=> 'elements_wrong_type',
+				'/^Missing required element key \'(.*?)\' in \'/s'	=> 'elements_missing_key',
+				'/^Element value \'(.*?)\' is (?:not whitelisted|blacklisted)\.$/s'	=> 'elements_value_refused',
+			] as $pattern => $code )
+				if( preg_match( $pattern, $message, $found ) === 1 )
+					return [ $code, $found[1] ];
+
+			return null;
+		}
+
+		/**
+		 *	What the form shows of a stored value. A yes or no is shown as the
+		 *	kernel delivers it - the way a query reads it (see
+		 *	\Nino\Elements::queryElements()): on where its text is '1', so the
+		 *	1 of a hand-written file is on as true is, and 0, '' or any other text
+		 *	is off. The file keeps what it holds until the field is changed
+		 *
+		 *	@param		array 		$field				The field's definition in the model
+		 *	@param		mixed			$value				The stored value
+		 *
+		 *	@return 	mixed										A boolean for a yes or no, the value as it is for any other field
+		 */
+		private static function shownValue( array $field, mixed $value ): mixed {
+
+			if( ( $field['type'] ?? '' ) !== 'boolean' || $value === null )
+				return $value;
+
+			return ( is_bool( $value ) === true ? ( $value === true ? '1' : '0' ) : ( is_scalar( $value ) === true ? (string) $value : '0' ) ) === '1';
 		}
 
 		/**
@@ -586,7 +630,7 @@ namespace Nino\Modules\Elements {
 				else
 					\Nino\Images::delete( $appData, $filename );
 				if( self::_refused( $appData, $request, $model ) === false )
-					\Nino\Http::fail( $request, 400, 'save failed' );
+					\Nino\Http::fail( $request, 400, 'save failed', 'elements_save_failed' );
 				return;
 			}
 
@@ -664,7 +708,7 @@ namespace Nino\Modules\Elements {
 
 			if( is_array( \Nino\Elements::updateElement( $appData, $elementUri, [ $key => '' ], $locale ) ) === false ) {
 				if( self::_refused( $appData, $request, $model ) === false )
-					\Nino\Http::fail( $request, 400, 'save failed' );
+					\Nino\Http::fail( $request, 400, 'save failed', 'elements_save_failed' );
 				return;
 			}
 
@@ -892,7 +936,15 @@ namespace Nino\Modules\Elements {
 				if( self::_refused( $appData, $request, $model ) === true )
 					return;
 
-				\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
+				// What the kernel says of a value it refuses is English for a log: a person is told in the interface language, with the
+				// key it is about and the field it stands in
+				$coded = self::_coded( $errorMsg );
+
+				if( $coded !== null )
+					\Nino\Http::fail( $request, 400, (string) $errorMsg, $coded[0], [ $coded[1] ], $coded[1] );
+				else
+					\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
+
 				return;
 			}
 

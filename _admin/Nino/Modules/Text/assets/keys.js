@@ -58,6 +58,10 @@
 		// What the search box holds, whether it is cut down to the keys that are
 		// hidden from the Text panel, and how many hits are drawn
 		_search					: { query : '', hiddenOnly : false, shown : 0 },
+		// The text a key was read as, kept for each key a save was turned down for as changed: the keys are read again after every save, and the
+		// next save is held to the text this tab was shown, not to the one it was never shown. Given up by Overwrite and by Reload, which
+		// are the answers that say what is to be done with the text of the other tab
+		_stamps					: {},
 		// The language the row on screen was drawn in: what it shows and the only one it writes
 		_shownLocale		: null,
 		// What the row on screen knows of its fields (see Nino.admin.textKeys.session()), what it holds
@@ -1345,6 +1349,7 @@
 				refused[key][field] = sentence;
 			};
 			const written = {};
+			const conflicts = [];
 			const queue = shapeKeys.slice();
 
 			// A text that is made shorter in the save that lowers the limit is written first, or the server would refuse a
@@ -1396,6 +1401,11 @@
 					if( failed > 0 ) {
 						if( keys._status !== null )
 							keys._status.fail( Nino.adminUi.format( Nino.content.getText( failed === 1 ? '/_admin/keys/error/one' : '/_admin/keys/error/some' ), failed ) );
+
+						// Another tab or person wrote a key since it was read: the texts stay as they were typed, the question is the kernel's
+						if( conflicts.length > 0 )
+							keys._askConflict( conflicts );
+
 						report( false );
 						return;
 					}
@@ -1410,8 +1420,16 @@
 			const writeTexts = function( wanted, next ) {
 
 				const items = wanted.filter( function( key ) { return refused[key] === undefined } ).map( function( key ) {
+
 					const global = keys._settings[key] === undefined ? false : keys._shapeNow( key ).global;
-					return { key : key, locale : global === true ? '*' : locale, value : typed[key].value };
+					const item = { key : key, locale : global === true ? '*' : locale, value : typed[key].value };
+
+					// The text it was read as, so that a text another tab wrote since is not written over unseen - not for a key whose shape
+					// is changed in this very save, which moves the text where it was read from
+					if( shapeKeys.indexOf( key ) === -1 )
+						item.was = keys._stamps[item.locale+ ' '+ key] ?? Nino.admin.textKeys.valueOf( entries.find( function( e ) { return e.key === key } ), locale );
+
+					return item;
 				} );
 
 				if( items.length === 0 ) {
@@ -1434,10 +1452,19 @@
 					const results = response.results ?? {};
 
 					items.forEach( function( item ) {
-						if( results[item.key] === undefined || results[item.key].ok !== true )
+
+						if( results[item.key] !== undefined && results[item.key].error === 'changed' ) {
+							conflicts.push( item );
+							if( item.was !== undefined )
+								keys._stamps[item.locale+ ' '+ item.key] = item.was;
+							refuse( item.key, 'value', Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), item.key ) );
+						}
+						else if( results[item.key] === undefined || results[item.key].ok !== true )
 							refuse( item.key, 'value', Nino.content.getText('/_admin/text/error/key') );
-						else
+						else {
 							written[item.key] = true;
+							delete keys._stamps[item.locale+ ' '+ item.key];
+						}
 					} );
 
 					next();
@@ -1473,6 +1500,46 @@
 			};
 
 			writeTexts( early, writeShape );
+		},
+
+		/**
+		 *	The question about keys that another tab or person wrote since this row was read (see Nino.admin.textKeys.conflict()):
+		 *	Overwrite writes the typed texts over what is stored, Reload shows what is stored, Cancel leaves them as typed
+		 *
+		 *	@param		{Array}		conflicts				The items the server turned down as changed
+		 *
+		 *	@return		void
+		 */
+		_askConflict : function( conflicts ) {
+
+			const keys = Nino.admin.keys;
+
+			Nino.admin.textKeys.conflict( conflicts, {
+				model			: keys._model,
+				opener		: dc.getElementById('keys-edit-form').querySelector('.nino-admin-btn-primary'),
+				onOverwrite : function( forced ) {
+
+					keys._apiCall( 'savebatch', { items : forced }, function( status, response ) {
+
+						const results = status === 200 && response !== null ? ( response.results ?? {} ) : {};
+
+						if( forced.some( function( item ) { return results[item.key] === undefined || results[item.key].ok !== true } ) === true ) {
+							keys._status.error( status, response, '/_admin/common/error/save' );
+							return;
+						}
+
+						Nino.admin.touch( 'texts' );
+						keys._stamps = {};
+						keys._reload( true, undefined, conflicts[0].key );
+					} );
+				},
+				onReload	: function() {
+					keys._stamps = {};
+					keys._reload( false, undefined, conflicts[0].key );
+				},
+				// The text stays as it was typed, at its field, and the next save asks again
+				onCancel	: function() { keys._session.get( conflicts[0].key ).focus() },
+			} );
 		},
 
 		/**
@@ -1932,8 +1999,6 @@
 			const key 		= keys._composeKey( keys._readSegments() );
 			const from 		= keys._renameFrom;
 
-			line.saving();
-
 			const answered = function( status, response ) {
 
 				if( status !== 200 || response === null ) {
@@ -1986,12 +2051,34 @@
 			};
 
 			if( from !== null ) {
-				keys._apiCall( 'rename', { key : from, newKey : key }, answered );
+
+				// Templates may still call the key by its old name: renaming an identifier is asked about (a key of the system is not renamed here)
+				const asked = Nino.adminUi.confirm( 'big', {
+					title		: Nino.content.getText('/_admin/keys/confirm/rename-title'),
+					message	: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/rename'), from, key ),
+					yes			: Nino.content.getText('/_admin/keys/confirm/rename-title'),
+					no			: Nino.content.getText('/_admin/common/label/cancel'),
+					opener	: dc.getElementById('keys-form-name'),
+					onChoose : function( ok ) {
+						if( ok !== true ) {
+							report( false );
+							return;
+						}
+
+						line.saving();
+						keys._apiCall( 'rename', { key : from, newKey : key }, answered );
+					},
+				} );
+
+				if( asked === false )
+					report( false );
+
 				return;
 			}
 
 			// The text is written in the language this tab shows - said in the request, since another window of the same session may have moved the session's own
 			const value = dc.getElementById('keys-form-new-value').value;
+			line.saving();
 			keys._apiCall( 'create', { key : key, global : dc.getElementById('keys-form-new-global').checked, value : value, values : { [ keys._locale() ] : value } }, answered );
 		},
 

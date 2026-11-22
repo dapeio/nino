@@ -288,4 +288,33 @@ const worded = build( undefined, { text : { invalid : 'No colour', pick : 'Pick'
 type( worded, '#777777' );
 check( 'the words can be said differently', said( worded ) === 'Ratio 4.47 · low at 4.5' && byClass( worded.el, 'nino-admin-color-picker' ).getAttribute('aria-label') === 'Brand – Pick' );
 
+// What the field is described by besides the block's own sentences - the help a caller put behind the name - is kept at every change
+const helped = build();
+helped.input.setAttribute( 'aria-describedby', 'nino-admin-help-77 '+ helped.input.getAttribute('aria-describedby') );
+type( helped, '#000000' );
+type( helped, '#12' );
+check( 'the sentence of a help the caller gave the field stays in what the field is described by, behind the block\'s own: the contrast, then an error and no contrast', helped.input.getAttribute('aria-describedby').split(' ').indexOf('nino-admin-help-77') !== -1 );
+type( helped, '' );
+check( '...and for an emptied field of which nothing is said but the help', helped.input.getAttribute('aria-describedby') === 'nino-admin-help-77' );
+
+// Every identifier the caller named stays, whatever it is called, through a typed code, an error and an emptied field
+const named = build();
+named.input.setAttribute( 'aria-describedby', 'caller-hint '+ named.input.getAttribute('aria-describedby') );
+type( named, '#aabbcc' );
+type( named, '#zz' );
+check( 'an identifier of the caller that is no help and no note stays in what the field is described by, behind the error of the block', named.input.getAttribute('aria-describedby').split(' ').indexOf('caller-hint') !== -1 && named.input.getAttribute('aria-describedby').split(' ')[0].slice( -6 ) === '-error' );
+type( named, '#112233' );
+check( '...and behind the contrast of a colour again', named.input.getAttribute('aria-describedby').split(' ').indexOf('caller-hint') !== -1 );
+
+// A field with nothing in it shows no colour: the picker says it is empty, and the black it holds is not shown
+const empty = build( undefined, { value : '', required : false } );
+const emptyPicker = byClass( empty.el, 'nino-admin-color-picker' );
+check( 'a field with no colour in it has an empty picker, and the surface is not drawn', emptyPicker.hasAttribute('data-empty') === true && byClass( empty.el, 'nino-admin-color-swatch' ).hidden === true );
+type( empty, '#336699' );
+check( '...and a colour that is typed takes the mark away', emptyPicker.hasAttribute('data-empty') === false );
+type( empty, '#33' );
+check( '...and a code that is no colour yet is no empty field: the picker keeps the colour it showed', emptyPicker.hasAttribute('data-empty') === false );
+type( empty, '' );
+check( '...and emptied it is empty again', emptyPicker.hasAttribute('data-empty') === true );
+
 done();

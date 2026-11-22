@@ -25,6 +25,8 @@ return [
 	'[[/_admin/keys/scan/also-hint]]'		=> 'Diese Schlüssel gehören zu einem Template, und ein anderes liest sie ebenfalls. Es wird nichts geändert. Ein Wort, das mehrere Templates lesen, gehört nach /template/common – verschiebe es selbst dorthin, wenn Du es teilen willst.',
 	'[[/_admin/keys/scan/also-line]]'		=> '%s – auch gelesen von %s',
 	'[[/_admin/keys/confirm/delete]]'		=> 'Textschlüssel „%s“ wirklich löschen? Der Wert geht in jeder Sprache verloren.',
+	'[[/_admin/keys/confirm/rename-title]]'	=> 'Textschlüssel umbenennen',
+	'[[/_admin/keys/confirm/rename]]'	=> 'Textschlüssel „%s“ in „%s“ umbenennen? Vorlagen und Code, die weiter den alten Namen rufen, zeigen danach nichts dafür; die Texte ziehen mit dem Schlüssel um.',
 	'[[/_admin/keys/confirm/delete-title]]'	=> 'Textschlüssel löschen',
 	'[[/_admin/keys/label/format]]'		=> 'Format',
 	'[[/_admin/keys/format/auto]]'		=> 'Automatisch',
@@ -82,6 +84,8 @@ return [
 	'[[/_admin/keys/hint/segment]]'	=> 'Kleine Wörter aus den Buchstaben a bis z und Ziffern, durch Bindestriche verbunden.',
 	'[[/_admin/keys/hint/not-a-word]]'	=> 'Kein Wort des Vokabulars: „%s“ wird als „%s“ angezeigt',
 
+	'[[/_admin/error/text_invalid]]'	=> 'Der Eintrag ist nicht gültig: der gelesene Stand muss ein Text sein.',
+	'[[/_admin/text/error/changed]]'	=> 'Seit dem Öffnen in einem anderen Tab oder von einer anderen Person geändert: %s.',
 	'[[/_admin/text/error/key]]'	=> 'Nicht gespeichert.',
 	'[[/_admin/text/error/denied]]'	=> 'Dieser Text darf mit Deinem Konto nicht geändert werden.',
 	'[[/_admin/text/error/some]]'	=> '%d Texte wurden nicht gespeichert. Sie bleiben markiert.',

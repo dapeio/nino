@@ -76,7 +76,6 @@ const window = {
 
 const context = vm.createContext( { console : console, document : document, Nino : Nino, window : window } );
 load( '_admin/assets/Nino.admin.js', context );
-load( '_admin/assets/datetext.js', context );
 load( '_admin/Nino/Modules/Images/assets/favicon.js', context );
 
 const panel = Nino.admin.favicon;

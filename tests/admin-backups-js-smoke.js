@@ -172,7 +172,6 @@ sandbox.window = {
 
 const context = vm.createContext( sandbox );
 load( '_admin/assets/Nino.admin.js', context );
-load( '_admin/assets/datetext.js', context );
 load( '_admin/Nino/Modules/Backups/assets/admin.js', context );
 
 const panel = Nino.admin.backups;

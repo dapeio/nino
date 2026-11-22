@@ -2395,6 +2395,7 @@ check( '...and the languages added below are two it knows and one it does not', 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
 check( 'apiAddLocale creates a text file for a new language', $status === 200 && ( $body['created'] ?? null ) === true );
 check( '...copying the key count of the native language', ( $body['keys'] ?? 0 ) === 2 && ( $body['from'] ?? '' ) === 'de_DE' );
+check( '...and answering the name it has in global.php, which the workbench names the language by from then on', ( $body['name'] ?? null ) === $endonyms['it_IT'] );
 check( '...and names the language, in its own tongue, in global.php: /_nino/locale/<code>/name is the system\'s to write, no editor creates it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === $endonyms['it_IT'] );
 
 $skeleton = \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', false );
@@ -2420,7 +2421,7 @@ check( '...but the inventory now offers it as a translated, inactive language', 
 	return $global;
 } );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
-check( 'apiAddLocale refuses to overwrite an existing translation', $status === 200 && ( $body['created'] ?? null ) === false );
+check( 'apiAddLocale refuses to overwrite an existing translation', $status === 200 && ( $body['created'] ?? null ) === false && ( $body['name'] ?? null ) === 'Lingua italiana' );
 check( '...and keeps the name an editor gave the language since', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === 'Lingua italiana' );
 // A file made by hand or imported has no name: the existing file's answer adds it, and nothing else
 \Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [ '[[/a]]' => 'traduit' ] );
@@ -2731,11 +2732,11 @@ check( '...leaving the previous list untouched', $appData['/nino/locales/availab
 
 // Dropping the currently native language without naming a new one is the same
 // contradiction, just arrived at from the other side
-[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'fr_FR' ] ] ] );
-check( 'apiSave refuses a list that drops the current native language', $status === 400 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'fr_FR' ] ] ] );
+check( 'apiSave refuses a list that drops the current native language, with the code of it', $status === 400 && ( $body['code'] ?? null ) === 'language_native' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [] ] ] );
-check( 'apiSave refuses an empty language list', $status === 400 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [] ] ] );
+check( 'apiSave refuses an empty language list, with the code of it', $status === 400 && ( $body['code'] ?? null ) === 'language_none' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'notalocale' ] ] ] );
 check( 'apiSave refuses a malformed locale id', $status === 400 );
@@ -3222,6 +3223,10 @@ check( '...naming it, so the typo can be found', str_contains( (string) ( $body[
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] ] );
 check( 'apiSave keeps a well-formed permission no panel offers', $status === 200 && $body['perms'] === [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] && $body['users'] === 0 );
 check( 'the role landed in config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles']['reviewer'] === [ 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] ] );
+// A role saved as the form sends it without a change - what it holds, in the order it holds it - stays as it is, byte for byte
+$rolesBefore = serialize( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles'] );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/elements/manage', '/_admin/elements/services/update/title' ] ] );
+check( 'a role saved without a change is byte-equal to what it was', $status === 200 && serialize( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles'] ) === $rolesBefore );
 // The form that makes a new role marks its request: an id that is taken is refused, and the role that holds it is as it was, byte for byte
 $rolesBefore = serialize( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles'] );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Overwritten', 'perms' => [], 'create' => true ] );

@@ -42,6 +42,10 @@ namespace Nino\Modules\Elements {
 		// upload area), not element (a select of elements). Stated here once:
 		// cleanModel() keeps a suffix for these types only, apiList() hands
 		// the list to the type editor, which offers the input for them only
+		// The form of the key of a field: letters, digits, hyphens and underscores, and dots behind the first character. The editor's script asks the
+		// same of a new key (types.js)
+		public const string FIELD_KEY = '/^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/D';
+
 		public const array SUFFIX_TYPES = [ 'string', 'integer', 'double', 'array', 'date', 'datetime' ];
 
 		/**
@@ -497,6 +501,11 @@ namespace Nino\Modules\Elements {
 				$oldModel = $typeData['model'] ?? [];
 				$newModel = self::cleanModel( $data['model'] );
 
+				$refused = self::_refuseKeys( $request, $oldModel, $newModel );
+
+				if( $refused === true )
+					return null;
+
 				if( $renames !== [] ) {
 
 					$refused = self::_refuseRenames( $request, $typeData, $oldModel, $newModel, $renames );
@@ -575,6 +584,32 @@ namespace Nino\Modules\Elements {
 				'renamed' 			=> $renames,
 				'references' 		=> self::_renameReferences( $appData, $typeUri, $renames ),
 			] );
+		}
+
+		/**
+		 *	Refuse a new field whose key is not of the form the editor asks for: at most 64 letters, digits, dots, hyphens and underscores, none of them a
+		 *	dot at the start (FIELD_KEY; the script of the tab holds the same rule). A key with a dot in front is the kernel's - '.uri', '.lang'
+		 *	and '.langs' of an element are what the kernel adds to it, and a field of the same name would be written over by them - and any
+		 *	other character has no place in the name of a field a template fills, a request names and a file stores. A field the type
+		 *	already has under a key that does not fit (written by hand) is not asked about again, so that the type can still be saved
+		 *
+		 *	@param		array 		&$request			(reference) Current server request, where the refusal is said
+		 *	@param		array 		$oldModel			The model the type has
+		 *	@param		array 		$newModel			The cleaned model that is posted
+		 *
+		 *	@return 	bool										True where a field was refused
+		 */
+		private static function _refuseKeys( array &$request, array $oldModel, array $newModel ): bool {
+
+			foreach( array_keys( $newModel ) as $key ) {
+
+				if( preg_match( self::FIELD_KEY, (string) $key ) !== 1 && array_key_exists( $key, $oldModel ) === false ) {
+					\Nino\Http::fail( $request, 400, 'the field key "'. substr( (string) $key, 0, 64 ). '" is not valid: at most 64 letters, digits, dots, hyphens and underscores, no dot at the start', 'types_invalid_key', [ substr( (string) $key, 0, 64 ) ], 'model' );
+					return true;
+				}
+			}
+
+			return false;
 		}
 
 		/**
@@ -899,6 +934,9 @@ namespace Nino\Modules\Elements {
 				\Nino\Http::fail( $request, 400, $danglingReference );
 				return;
 			}
+
+			if( self::_refuseKeys( $request, [], $model ) === true )
+				return;
 
 			$typeData = [
 				'title' 	=> ( $title !== '' ) ? $title : $typeUri,

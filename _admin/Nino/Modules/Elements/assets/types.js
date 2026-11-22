@@ -1527,7 +1527,7 @@
 
 				if( key === '' )
 					problems.push( { field : place, text : missing( text('/_admin/types/label/fieldname') ) } );
-				else if( ( field.originalKey === undefined || key !== field.originalKey ) && /^[A-Za-z0-9_.-]+$/.test( key ) === false )
+				else if( ( field.originalKey === undefined || key !== field.originalKey ) && /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/.test( key ) === false ) // the form of \Nino\Modules\Elements\Types::FIELD_KEY
 					problems.push( { field : place, text : invalid( text('/_admin/types/label/fieldname'), '/_admin/types/expect/key' ) } );
 				else if( Object.prototype.hasOwnProperty.call( seen, key ) === true )
 					problems.push( { field : place, text : Nino.adminUi.format( text('/_admin/types/error/field-twice'), key ) } );
