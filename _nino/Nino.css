@@ -83,9 +83,21 @@
 		the roles again for what stands on it, so that a part never has to know what it stands on. dark is the dark page (the
 		pairs of the palette turn by themselves), alt and tint change the ground, primary takes the ground, the ink and the
 		accent from the first colour of the brand. The selectors meet the word whole, at the end of the value of class or
-		before the next class: --ground-alt is not --ground-alternative. A feature may only say ground as a choice among the
-		five words (\Nino\Features::readComponents() refuses the rest), and no class of Nino's own has --ground- in it	*/
-	:where( [class$="--ground-base"], [class*="--ground-base "], [class$="--ground-alt"], [class*="--ground-alt "], [class$="--ground-tint"], [class*="--ground-tint "], [class$="--ground-dark"], [class*="--ground-dark "] ) {
+		before the next class: --ground-alt is not --ground-alternative. A feature may only say ground as one of the
+		five words, and no class of Nino's own has --ground- in it.
+		A ground with a picture (a child <wrap>-image) is the dark page, --ground-none too: primary takes no brand ink on the
+		veil, alt and tint keep their ground, and the line is the quiet ink (3 : 1 over any picture), for no ground as well	*/
+	:where( [class$="--ground-primary"], [class*="--ground-primary "] ) {
+		--brand-ground: var(--brand-color-1);
+		--brand-ink: var(--brand-on-color-1);
+		--brand-ink-quiet: var(--brand-on-color-1);
+		--brand-line: var(--brand-on-color-1);
+		--brand-accent: var(--brand-on-color-1);
+		--brand-on-accent: var(--brand-color-1);
+		--brand-second: var(--brand-color-2, var(--brand-second-from-1));
+		--brand-on-second: var(--brand-on-color-2, #fff);
+	}
+	:where( [class$="--ground-base"], [class*="--ground-base "], [class$="--ground-alt"], [class*="--ground-alt "], [class$="--ground-tint"], [class*="--ground-tint "], [class$="--ground-dark"], [class*="--ground-dark "], [class*="--ground-"]:has( > [class$="-wrap-image"] ) ) {
 		color-scheme: var(--brand-scheme);
 		--brand-ground: var(--brand-ground-base);
 		--brand-ink: var(--brand-ink-base);
@@ -98,23 +110,14 @@
 	}
 	:where( [class$="--ground-alt"], [class*="--ground-alt "] ) { --brand-ground: var(--brand-ground-alt); }
 	:where( [class$="--ground-tint"], [class*="--ground-tint "] ) { --brand-ground: var(--brand-ground-tint); }
-	:where( [class$="--ground-dark"], [class*="--ground-dark "] ) { color-scheme: dark; }
-	:where( [class$="--ground-primary"], [class*="--ground-primary "] ) {
-		--brand-ground: var(--brand-color-1);
-		--brand-ink: var(--brand-on-color-1);
-		--brand-ink-quiet: var(--brand-on-color-1);
-		--brand-line: var(--brand-on-color-1);
-		--brand-accent: var(--brand-on-color-1);
-		--brand-on-accent: var(--brand-color-1);
-		--brand-second: var(--brand-color-2, var(--brand-second-from-1));
-		--brand-on-second: var(--brand-on-color-2, #fff);
-	}
+	:where( [class$="--ground-dark"], [class*="--ground-dark "], [class*="--ground-"]:has( > [class$="-wrap-image"] ) ) { color-scheme: dark; }
+	:where( :has( > [class$="-wrap-image"] ) ) { --brand-line: var(--brand-ink-quiet-base); }
 	:where( [class$="--ground-base"], [class*="--ground-base "], [class$="--ground-alt"], [class*="--ground-alt "], [class$="--ground-tint"], [class*="--ground-tint "], [class$="--ground-dark"], [class*="--ground-dark "], [class$="--ground-primary"], [class*="--ground-primary "] ) { background-color: var(--brand-ground); color: var(--brand-ink); }
 	/*	Where light-dark() is not known the palette has no value, and the roles of a ground that is dark are written out in the
-		colours of the dark page, so that the words on it stay readable (primary needs none: it takes the brand's own). The
+		colours of the dark page, so that the words on it stay readable. The
 		other grounds are the page's, whatever it shows	*/
 	@supports not ( color: light-dark( #000, #fff ) ) {
-		:where( [class$="--ground-dark"], [class*="--ground-dark "] ) {
+		:where( [class$="--ground-dark"], [class*="--ground-dark "], [class*="--ground-"]:has( > [class$="-wrap-image"] ) ) {
 			--brand-ground: #15171b;
 			--brand-ink: #eceef1;
 			--brand-ink-quiet: #aab0b9;
@@ -124,6 +127,7 @@
 			--brand-second: #969ca6;
 			--brand-on-second: #0f1b2e;
 		}
+		:where( :has( > [class$="-wrap-image"] ) ) { --brand-line: #aab0b9; }
 	}
 
 	/*	The contract of bleed. A component that has the attribute bleed is written <name>--bleed by the register, and its first child

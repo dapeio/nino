@@ -298,6 +298,58 @@ function basisBody( array $rules, string $word, string $at = '' ): string {
 }
 
 /**
+ *	What a css text says about one element, by the rules of the layer nino.reset alone: the declarations of every rule whose selector is a :where( ... ) list the element
+ *	meets, the later rule over the earlier, as none of them has a specificity. An item of the list is made of tests on the class (the end of it, a part of it) and at most one
+ *	:has( > [class$="..."] ) - the shape the contract of the grounds has - and nothing else: an item with a type, another pseudo-class or any other part is met by no element,
+ *	so that a narrower selector shows as a rule that does not apply. A rule of another shape is left out
+ *
+ *	@param		array			$rules				As basisRules() answers
+ *	@param		string		$class				The value of class of the element
+ *	@param		string		$child				The value of class of a child of it, '' where it has none
+ *	@param		string		$at						The at-rule the rules stand in
+ *
+ *	@return 	array											property => value, with no blank in either
+ */
+function basisResolve( array $rules, string $class, string $child = '', string $at = '@layer nino.reset' ): array {
+
+	$flat = static fn( string $text ): string => (string) preg_replace( '/\s+/', '', $text );
+	$tests = static function( string $item, string $text ): bool {
+
+		preg_match_all( '/\[class(\$|\*)="([^"]*)"\]/', $item, $found, PREG_SET_ORDER );
+
+		foreach( $found as [ , $how, $word ] )
+			if( ( $how === '$' ? str_ends_with( $text, $word ) : str_contains( $text, $word ) ) === false )
+				return false;
+
+		return true;
+	};
+	$resolved = [];
+
+	foreach( $rules as $rule ) {
+
+		if( $rule['at'] !== $at || preg_match( '/^:where\( (.*) \)$/', $rule['selector'], $list ) !== 1 )
+			continue;
+
+		$meets = false;
+
+		foreach( explode( ', ', $list[1] ) as $item )
+			if( preg_match( '/^((?:\[class[$*]="[^"]*"\])*)(?::has\( > (\[class\$="[^"]*"\]) \))?$/', $item, $shape ) === 1 && $item !== '' && $tests( $shape[1], $class ) === true
+				&& ( ( $shape[2] ?? '' ) === '' || ( $child !== '' && $tests( $shape[2], $child ) === true ) ) )
+				$meets = true;
+
+		if( $meets === true )
+			foreach( explode( ';', $rule['body'] ) as $declaration )
+				if( str_contains( $declaration, ':' ) === true ) {
+
+					[ $property, $value ] = explode( ':', $declaration, 2 );
+					$resolved[$flat( $property )] = $flat( $value );
+				}
+	}
+
+	return $resolved;
+}
+
+/**
  *	The declarations of the rules whose selector is $selector, inside $at: property => value, with no blank in either and no regard to the blanks of $selector and $at
  *
  *	@param		array			$rules				As basisRules() answers
@@ -957,11 +1009,11 @@ $whole = static fn( string $word ): string => '[class$="--ground-'. $word. '"], 
 $ofRoles = static fn( string $selector ): string => basisBody( array_filter( $rules, static fn( array $rule ): bool => $rule['at'] === '@layer nino.reset' && $rule['selector'] === ':where( '. $selector. ' )' ), ':where', '@layer nino.reset' );
 
 foreach( $grounds as $ground )
-	if( $ofRoles( $whole( $ground ) ) === '' && in_array( $ground, [ 'base' ], true ) === false )
+	if( $ofRoles( $whole( $ground ) ) === '' && in_array( $ground, [ 'base', 'dark' ], true ) === false )
 		$meets[] = 'no rule for '. $ground;
 
 $palette = [ 'ground', 'ink', 'ink-quiet', 'line', 'accent', 'on-accent', 'second', 'on-second' ];
-$page = $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark' ] ) ) );
+$page = $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark' ] ) ). ', [class*="--ground-"]:has( > [class$="-wrap-image"] )' );
 
 foreach( $palette as $role )
 	if( str_contains( $page, '--brand-'. $role. ': var(--brand-'. $role. '-base);' ) === false )
@@ -973,7 +1025,7 @@ if( str_contains( $page, 'color-scheme: var(--brand-scheme);' ) === false )
 $meets = array_merge( $meets,
 	str_contains( $ofRoles( $whole( 'alt' ) ), '--brand-ground: var(--brand-ground-alt);' ) === true ? [] : [ 'alt does not change the ground' ],
 	str_contains( $ofRoles( $whole( 'tint' ) ), '--brand-ground: var(--brand-ground-tint);' ) === true ? [] : [ 'tint does not change the ground' ],
-	$ofRoles( $whole( 'dark' ) ) === 'color-scheme: dark;' ? [] : [ 'dark does not turn the mode' ],
+	$ofRoles( $whole( 'dark' ). ', [class*="--ground-"]:has( > [class$="-wrap-image"] )' ) === 'color-scheme: dark;' ? [] : [ 'dark does not turn the mode' ],
 	array_filter( [ '--brand-ground: var(--brand-color-1);', '--brand-ink: var(--brand-on-color-1);', '--brand-accent: var(--brand-on-color-1);', '--brand-on-accent: var(--brand-color-1);', '--brand-second: var(--brand-color-2,', '--brand-on-second: var(--brand-on-color-2,' ], static fn( string $line ): bool => str_contains( $ofRoles( $whole( 'primary' ) ), $line ) === false ),
 	str_contains( $ofRoles( implode( ', ', array_map( $whole, [ 'base', 'alt', 'tint', 'dark', 'primary' ] ) ) ), 'background-color: var(--brand-ground); color: var(--brand-ink);' ) === true ? [] : [ 'a ground does not paint itself' ] );
 $fallback = basisBody( $rules, '--ground-dark', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' );
@@ -981,6 +1033,39 @@ check( 'the ground of a section and of a column is the class <name>--ground-<wor
 	. ( $meets === [] ? '' : ' - '. implode( '; ', $meets ) ), $meets === [] && $grounds === [ 'base', 'alt', 'tint', 'primary', 'dark' ] && str_contains( $fallback, '--brand-ground: #15171b;' ) && str_contains( $fallback, '--brand-ink: #eceef1;' )
 	&& preg_match( '/\[class\*="--ground-[a-z]+"\]/', $resetLayer ) !== 1 );
 check( 'no class of the old Nino.css has --ground- in it, so the selector meets only what the register writes', preg_match( '/\.nino-[a-z0-9-]*--ground-/', $nino ) !== 1 );
+
+// a ground with a picture in it - the picture a wrap draws, a child <wrap>-image - is the dark page whatever the word is: the roles of the palette, the mode dark, the ground kept where alt and tint say it,
+// and the line the quiet ink, for a wrap that says no ground too; none of it for a ground with no picture and for a child that is no picture
+$shape = [];
+
+foreach( [ 'section-wrap', 'header-wrap', 'footer-wrap' ] as $wrapName )
+	foreach( [ '' => false, ' image="/template/page-basis/hero/background"' => true ] as $attributes => $with )
+		if( ( preg_match( '/^<[a-z]+ class="[^"]*--ground-primary"><div class="([^"]*)">/', basisDraw( $appData, '['. $wrapName. ' ground="primary"'. $attributes. '][/'. $wrapName. ']' ), $drawn ) === 1 && $drawn[1] === $wrapName. '-image' ) !== $with )
+			$shape[] = $wrapName. ( $with === true ? ' with' : ' without' ). ' a picture draws its child as '. ( $drawn[1] ?? 'none' );
+
+$inDark = static fn( array $resolved, string $ground ): bool => ( $resolved['color-scheme'] ?? '' ) === 'dark' && ( $resolved['--brand-ground'] ?? '' ) === 'var(--brand-ground-'. $ground. ')'
+	&& array_filter( [ 'ink', 'ink-quiet', 'accent', 'on-accent', 'second', 'on-second' ], static fn( string $role ): bool => ( $resolved['--brand-'. $role] ?? '' ) !== 'var(--brand-'. $role. '-base)' ) === [] && ( $resolved['--brand-line'] ?? '' ) === 'var(--brand-ink-quiet-base)';
+$pictured = static fn( string $word ): array => basisResolve( $rules, 'x x--ground-'. $word, 'x-wrap-image' );
+$bare = static fn( string $word ): array => basisResolve( $rules, 'x x--ground-'. $word );
+
+foreach( [ 'base', 'alt', 'tint', 'primary', 'dark' ] as $word )
+	if( $inDark( $pictured( $word ), in_array( $word, [ 'alt', 'tint' ], true ) === true ? $word : 'base' ) === false )
+		$shape[] = $word. ' with a picture is not the dark page';
+
+$primaryBare = $bare( 'primary' );
+$shape = array_merge( $shape,
+	( $primaryBare['--brand-ink'] ?? '' ) === 'var(--brand-on-color-1)' && ( $primaryBare['--brand-ground'] ?? '' ) === 'var(--brand-color-1)' && isset( $primaryBare['color-scheme'] ) === false ? [] : [ 'primary with no picture is not the brand' ],
+	$bare( 'alt' )['color-scheme'] === 'var(--brand-scheme)' && $bare( 'tint' )['--brand-ground'] === 'var(--brand-ground-tint)' && ( $bare( 'dark' )['color-scheme'] ?? '' ) === 'dark' ? [] : [ 'a ground with no picture changed' ],
+	basisResolve( $rules, 'x', 'x-wrap-image' ) === [ '--brand-line' => 'var(--brand-ink-quiet-base)' ] && basisResolve( $rules, 'x', 'x-col' ) === [] ? [] : [ 'a picture with no ground says more than its line, or a child that is no picture says it' ],
+	basisResolve( $rules, 'x x--ground-primary', 'x-col' ) === $primaryBare ? [] : [ 'a child that is no picture changes the roles' ],
+	basisResolve( $rules, 'x x--ground-primary', 'x-wrap-image', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' ) === [ '--brand-ground' => '#15171b', '--brand-ink' => '#eceef1', '--brand-ink-quiet' => '#aab0b9', '--brand-line' => '#aab0b9', '--brand-accent' => '#86b6f6',
+		'--brand-on-accent' => '#0f1b2e', '--brand-second' => '#969ca6', '--brand-on-second' => '#0f1b2e' ] && basisResolve( $rules, 'x x--ground-primary', '', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' ) === [] && basisResolve( $rules, 'x', 'x-wrap-image', '@layer nino.reset @supports not ( color: light-dark( #000, #fff ) )' ) === [ '--brand-line' => '#aab0b9' ] ? [] : [ 'the picture ground is not written out where light-dark() is not known' ] );
+check( 'a ground with a picture in it is the dark page whatever the word: Nino.css gives it the roles of the palette and the mode dark, keeps the ground of alt and tint, makes the line the quiet ink (for a wrap with no ground too) and writes the colours out where light-dark() is not known; a ground with no picture and a child that is no picture are not touched, and the wraps draw the picture as a child <wrap>-image'
+	. ( $shape === [] ? '' : ' - '. implode( '; ', $shape ) ), $shape === [] );
+
+// on paper a link in a text is in the ink of the paper, whatever ground it stood on; the screen's accent is untouched
+$textRules = basisRules( (string) file_get_contents( $basisDir. '/groups/text/part/part.css' ) );
+check( 'on paper a link in a text is black, and on a screen it is not touched by the rule', ( basisDeclared( $textRules, '.text a', '@media print' )['color'] ?? '' ) === '#000' && basisDeclared( $textRules, '.text a' ) === [] );
 
 // what the parts do about the mode, the grounds and the picture
 $partRules = [];

@@ -20,3 +20,8 @@
 .spacer--size-5 { height: var(--page-space-6); }
 .spacer--size-6 { height: calc( var(--page-space-6) * 1.5 ); }
 .html { align-self: stretch; }
+
+/*	On paper a link is in the ink of the paper	*/
+@media print {
+	.text a { color: #000; }
+}

@@ -16,7 +16,7 @@
 .section-wrap:where( [class*="--height-"] ) { display: flex; flex-direction: column; justify-content: center; }
 /*	A section with a picture is a dark one: the picture is under a veil and the writing is light, whatever the picture is. The rows that follow the picture say it
 	themselves, which needs no :has(); the section is dark as well where :has() is known. Over a white picture the veil of .75 leaves the ground at 64 of 255:
-	the writing is 8.9 : 1, a quiet button and a link in the accent of the dark page 4.95 : 1, the quiet text of the subtitle 4.75 : 1; .735 is the least that
+	the quiet text of the subtitle is 4.75 : 1, the least; .735 is the least that
 	keeps 4.5 : 1. dim is the stronger veil of .82 (6.2 : 1 at the least)	*/
 .section-wrap-image ~ .section-row { color-scheme: dark; color: var(--brand-ink); }
 .section-wrap:has( > .section-wrap-image ) { color-scheme: dark; }
