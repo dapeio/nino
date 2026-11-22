@@ -8,10 +8,14 @@
 .header-wrap--sticky { position: sticky; top: 0; z-index: 100; }
 /*	The preview of the workbench marks the page it shows (Nino.adminUi.previewFrame()): a header that stays would take the room of the page that is being worked on, so there it scrolls away with the page	*/
 [data-nino-preview="loose"] .header-wrap--sticky { position: static; }
-/*	An open menu that is taller than the window would keep its last entries out of reach under a header that stays, and a header that let go of the page would leave the
-	window with the button on a page that is scrolled. So the header stays and is no taller than the window: where the menu folds and is open, the header scrolls inside
-	itself (dvh where the browser knows it, vh where it does not). A menu that is never collapsed is always open and has no such header; one that is open in a line is no [open] either	*/
-.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { max-height: 100vh; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
+/*	An open menu that is folded - always, under 768 px, or with no ::details-content - is an overlay over the whole window: the header is fixed to it, the page is not pushed, and a taller list scrolls in it	*/
+.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 767.98px) {
+	.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; }
+}
+@supports not selector( ::details-content ) {
+	.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; }
+}
 .header-wrap-inner {
 	display: flex; flex-wrap: wrap; align-items: center; gap: var(--header-nav-gap);
 	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto; padding-block: var(--header-wrap-space);
@@ -34,11 +38,7 @@
 	.header-logo { color-scheme: light dark; }
 }
 
-/*	The menu is a details of the browser, with no script: a button of three bars that opens the list below the line of the header, over the whole width,
-	and pushes the page down. The button stays where it is. Where the browser draws the inside of a details as a part of its own (::details-content),
-	the nav and the details are no boxes and the button and the list are items of the line of the header; a wide screen then shows the list open beside the
-	logo and the actions, in as many lines as it needs, and no button. Where the browser does not, the nav is one box beside the logo, the button stays at
-	every width and the list opens below it - a menu that works	*/
+/*	The menu is a details, with no script: a button that opens the list below the line of the header, as the overlay above. With ::details-content a wide screen shows the list open in the line, with no button, unless it is folded "always"	*/
 .header-nav { margin-inline-start: auto; }
 .header-nav:not( .header-nav--collapse-never ):has( .header-nav-details[open] ) { flex: 1 0 100%; }
 .header-nav-toggle { display: flex; align-items: center; justify-content: center; margin-inline-start: auto; width: 2.75rem; height: 2.75rem; padding: 0; border: var(--page-line) solid var(--brand-line); border-radius: var(--page-radius); background: none; list-style: none; cursor: pointer; }
@@ -49,6 +49,8 @@
 .header-nav-toggle span::before { top: -6px; }
 .header-nav-toggle span::after { top: 6px; }
 .header-nav-list { display: flex; flex-direction: column; margin-top: var(--page-space-2); }
+:where( .header-nav:not( .header-nav--collapse-never ) ) .header-nav-details[open] > .header-nav-list { margin-top: var(--page-space-5); }
+:where( .header-nav:not( .header-nav--collapse-never ) ) .header-nav-details[open] > .header-nav-list a { padding-block: var(--page-space-3); font-size: var(--page-text-5); }
 .header-nav a { display: block; padding-block: var(--page-space-2); color: inherit; overflow-wrap: anywhere; text-decoration: none; }
 .header-nav a:hover, .header-nav a[aria-current] { text-decoration: underline; text-decoration-thickness: 2px; }
 .header-nav--collapse-never .header-nav-toggle { display: none; }
@@ -67,6 +69,7 @@
 		.header-nav:not( .header-nav--collapse-always ) .header-nav-details::details-content { display: block; content-visibility: visible; flex: 1 1 0; }
 		.header-nav:not( .header-nav--collapse-always ) .header-nav-toggle { display: none; }
 		.header-nav:not( .header-nav--collapse-always ) .header-nav-list { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: var(--page-space-1) var(--header-nav-gap); margin-top: 0; }
+		.header-nav:not( .header-nav--collapse-always ) .header-nav-list a { padding-block: var(--page-space-2); font-size: inherit; }
 	}
 }
 

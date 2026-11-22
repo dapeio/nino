@@ -972,12 +972,17 @@ if( count( $dark[2] ) !== 3 || $veil[0] <= 0 || $veil[1] <= $veil[0] || $veil[1]
 if( str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .section-row' ), 'color-scheme: dark; color: var(--brand-ink);' ) === false || str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .section-row', '@supports not ( color: light-dark( #000, #fff ) )' ), 'color: #eceef1;' ) === false )
 	$bad[] = 'a row after a picture does not say it is dark without :has()';
 
-// the header that folds its menu stays with the menu open and is no taller than the window, scrolling inside itself: it never lets go of the page, which would take the button out of a page that is scrolled; the button stays in the line and the list opens below it
-$openHeader = basisBody( $partRules['header'], '.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )' );
-if( str_contains( $openHeader, 'position' ) === true || str_contains( $openHeader, 'max-height: 100vh; max-height: 100dvh;' ) === false || str_contains( $openHeader, 'overflow-y: auto;' ) === false
+// the header that folds its menu lays it over the whole window when it is open - fixed, with every edge at 0, scrolling in itself, the page behind not scrolling with it - and never pushes the page down: in the three places that
+// say "folded" (always, under 768 px, no ::details-content), the entries large by the tokens of the page, the line of the header with the button staying in the line
+$overlay = static fn( string $body ): bool => str_contains( $body, 'position: fixed;' ) === true && str_contains( $body, 'inset: 0;' ) === true && str_contains( $body, 'overflow-y: auto;' ) === true && str_contains( $body, 'overscroll-behavior: contain;' ) === true && str_contains( $body, 'position: static' ) === false && str_contains( $body, 'position: sticky' ) === false;
+$anyOpen = '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )';
+if( $overlay( basisBody( $partRules['header'], '.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] )' ) ) === false
+	|| $overlay( basisBody( $partRules['header'], $anyOpen, '@media (max-width: 767.98px)' ) ) === false || $overlay( basisBody( $partRules['header'], $anyOpen, '@supports not ( selector( ::details-content ) )' ) ) === false && $overlay( basisBody( $partRules['header'], $anyOpen, '@supports not selector( ::details-content )' ) ) === false
+	|| str_contains( $partRules['header'] ? json_encode( $partRules['header'] ) : '', 'header-wrap--sticky:has(' ) === true
+	|| str_contains( basisBody( $partRules['header'], '.header-nav-details[open] > .header-nav-list a' ), 'font-size: var(--page-text-5);' ) === false
 	|| str_contains( basisBody( $partRules['header'], '.header-nav-details', '@supports selector( ::details-content )' ), 'display: contents;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav-details::details-content', '@supports selector( ::details-content )' ), 'flex: 1 0 100%;' ) === false
 	|| str_contains( basisBody( $partRules['header'], '.header-nav-toggle' ), 'margin-inline-start: auto;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav a' ), 'overflow-wrap: anywhere;' ) === false )
-	$bad[] = 'the menu does not keep its button in the line or its header does not stay, with a height of the window at most, open';
+	$bad[] = 'the menu does not keep its button in the line or its open list is no overlay over the window, or it pushes the page';
 
 if( basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )', '@supports not ( color: light-dark( #000, #fff ) )' ) === '' )
 	$bad[] = 'a section with a picture has no colours of its own where light-dark() is not known';
