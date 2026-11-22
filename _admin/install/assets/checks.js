@@ -1,10 +1,13 @@
-
-
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Step 1: environment/permission diagnostics - PHP version,
  *													required extensions, writable directories. See
  *													_admin/install/Install.php's Checks class for what's actually probed.
+ *													The rows are the list of the workbench (Nino.adminUi.list()), each
+ *													with the badge of its state: the word and a sign, never a colour alone.
+ *													What the server answers is a name and a state; the sentence that says
+ *													what an extension is for is the table's (text.js), in the language
+ *													of the page.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -18,6 +21,9 @@
 	Nino.install.checks = {
 
 		_ready : false,
+
+		// The last answer of the server, which a change of the language draws again
+		_data : null,
 
 		/**
 		 *	Run every check and render the result
@@ -34,38 +40,56 @@
 				if( status !== 200 || response === null )
 					return Nino.install.showError( wrap, status, response );
 
-				Nino.install.checks._render( response );
+				Nino.install.checks._data = response;
+				Nino.install.checks._render();
 				Nino.install.checks._ready = true;
 			} );
 		},
 
 		showCurrent : function() {
+
+			const mount = dc.getElementById('checks-recheck');
+
+			// The one button of the step besides the bar: it asks the server again
+			if( mount !== null && mount.children.length === 0 )
+				mount.appendChild( Nino.adminUi.button( Nino.install.t('/_admin/install/checks/recheck'), Nino.install.checks.init, { kind : 'secondary', id : 'checks-refresh' } ) );
+
 			Nino.install.checks.init();
 		},
 
+		retext : function() {
+
+			const button = dc.getElementById('checks-refresh');
+
+			if( button !== null )
+				button.textContent = Nino.install.t('/_admin/install/checks/recheck');
+
+			if( Nino.install.checks._data !== null )
+				Nino.install.checks._render();
+		},
+
 		/**
-		 *	@param		{Object}	data		{ php, extensions, directories }, see Checks::apiRun()
-		 *
 		 *	@return		void
 		 */
-		_render : function( data ) {
+		_render : function() {
 
+			const data = Nino.install.checks._data;
+			const t = Nino.install.t;
 			const wrap = dc.getElementById('checks-results');
 			wrap.innerHTML = '';
 
-			wrap.appendChild( Nino.install.checks._group( 'PHP version', [
-				{ name : 'PHP '+ data.php.version, detail : 'required: >= '+ data.php.required, ok : data.php.ok },
+			wrap.appendChild( Nino.install.checks._group( t('/_admin/install/checks/php'), [
+				{ name : 'PHP '+ data.php.version, detail : t( '/_admin/install/checks/php-required', data.php.required ), ok : data.php.ok },
 			] ) );
 
-			wrap.appendChild( Nino.install.checks._group( 'Extensions', Object.keys( data.extensions ).map( function( name ) {
-				const ext = data.extensions[name];
-				return { name : name, detail : ext.reason, ok : ext.ok };
+			wrap.appendChild( Nino.install.checks._group( t('/_admin/install/checks/extensions'), Object.keys( data.extensions ).map( function( name ) {
+				// What an extension is for is the table's word; an extension the table does not know stands with its name alone
+				return { name : name, detail : t( '/_admin/install/checks/extension-'+ name.toLowerCase() ), ok : data.extensions[name].ok };
 			} ) ) );
 
-			wrap.appendChild( Nino.install.checks._group( 'Directories', Object.keys( data.directories ).map( function( path ) {
+			wrap.appendChild( Nino.install.checks._group( t('/_admin/install/checks/directories'), Object.keys( data.directories ).map( function( path ) {
 				const dir = data.directories[path];
-				const detail = dir.exists ? ( dir.writable ? 'writable' : 'not writable' ) : 'created automatically on first use';
-				return { name : path, detail : detail, ok : dir.ok };
+				return { name : path, detail : t( dir.exists ? ( dir.writable ? '/_admin/install/checks/writable' : '/_admin/install/checks/not-writable' ) : '/_admin/install/checks/created' ), ok : dir.ok };
 			} ) ) );
 		},
 
@@ -77,58 +101,18 @@
 		 */
 		_group : function( title, rows ) {
 
-			const group = dc.createElement('section');
-			group.className = 'install-check-group';
+			const t = Nino.install.t;
 
-			// h2: the wizard's one <h1> is the page's (see page-wizard.tpl) and
-			// a group of checks is a section of the step under it
-			const heading = dc.createElement('h2');
-			heading.className = 'nino-admin-eyebrow';
-			heading.textContent = title;
-			group.appendChild( heading );
-
-			// Diagnostics are read, never opened - the shared grouped list's
-			// dense variant supplies the surface and the row separators
-			const list = dc.createElement('ul');
-			list.className = 'nino-admin-list nino-admin-list-dense';
-			group.appendChild( list );
-
-			rows.forEach( function( row ) {
-
-				const div = dc.createElement('li');
-				div.className = 'install-check-row';
-
-				const left = dc.createElement('div');
-				const name = dc.createElement('span');
-				name.className = 'install-check-row-name';
-				name.textContent = row.name;
-				left.appendChild( name );
-
-				if( row.detail ) {
-					const detail = dc.createElement('span');
-					detail.className = 'install-check-row-detail';
-					detail.textContent = ' – '+ row.detail;
-					left.appendChild( detail );
-				}
-
-				div.appendChild( left );
-
-				const status = dc.createElement('span');
-				status.className = 'install-check-status '+ ( row.ok ? 'install-check-status--ok' : 'install-check-status--fail' );
-				status.textContent = row.ok ? 'OK' : 'FAIL';
-				div.appendChild( status );
-
-				list.appendChild( div );
-			} );
-
-			return group;
+			// Diagnostics are read, never opened: the list of the workbench, a badge at the end of each row says its state
+			return Nino.adminUi.list( rows.map( function( row ) {
+				return {
+					key		: row.name,
+					title	: row.name,
+					detail: row.detail,
+					badge	: { text : t( row.ok ? '/_admin/install/checks/ok' : '/_admin/install/checks/fail' ), state : row.ok ? 'ok' : 'error' },
+				};
+			} ), { title : title } );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', function() {
-		const refresh = dc.getElementById('checks-refresh');
-		if( refresh !== null )
-			refresh.addEventListener( 'click', Nino.install.checks.init );
-	} );
 
 })(window, document, document.documentElement, document.body);

@@ -542,12 +542,12 @@ foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
 // text() directory may hold them, so the whole of the workbench's words is
 // what they are looked up in. A feature the checkout carries is read the same
 // way (the registry above is the kernel's own), and a checkout may carry none.
-// The recovery page is English by design: it has no session to take a
-// language from
+// The recovery page has its words in a table of its own (recovery-text.js): it
+// has no session to take a language from, and no text files to ask
 $askedOutside = [];
 foreach( array_merge( glob( dirname( __DIR__ ). '/_admin/assets/*.js' ) ?: [], glob( dirname( __DIR__ ). '/features/*/assets/*.js' ) ?: [] ) as $script ) {
 
-	if( basename( $script ) === 'recovery.js' )
+	if( in_array( basename( $script ), [ 'recovery.js', 'recovery-text.js', 'locked-text.js', 'pagetext.js' ], true ) === true )
 		continue;
 
 	preg_match_all( "#getText\(\s*'(/_admin/[^']+)'\s*\)#", (string) file_get_contents( $script ), $matches );
@@ -904,9 +904,9 @@ foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 }
 check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/_nino/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 check( 'and every panel stylesheet', in_array( '/app/Dummy/assets/admin.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
-// The login page is no workbench: the kit the panels are built with
-// (Nino.admin.js) is not in its bundle, and neither is any panel's script
-check( 'the login bundle is the framework and the login shell alone', $withModule['/nino/html/assets']['/_admin/.cache/login.js'] === [ '/_nino/Nino.js', '/_admin/assets/login.js' ] );
+// The login page is no workbench: the blocks the panels are built with
+// (Nino.admin.js) are in its bundle, for its two fields, and no panel's script is
+check( 'the login bundle is the framework, the blocks its two fields are drawn with and the login shell - no panel', $withModule['/nino/html/assets']['/_admin/.cache/login.js'] === [ '/_nino/Nino.js', '/_admin/assets/Nino.admin.js', '/_admin/assets/login.js' ] );
 // The registry the form panels report to (Nino.admin.dirty) is defined by the
 // shell script, and every panel registers when its own file loads - so the shell
 // script has to come first in the bundle, and the design system's primitives
@@ -1709,6 +1709,12 @@ foreach( $source as $file ) {
 // and the ones a restore that cannot start or cannot open its archive hands its callers, who pass them on
 foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy', 'backups_key', 'backups_key_wrong' ] as $code )
 	$codes[$code] = true;
+
+// The refusals of the recovery page are worded in the table of that page - it has no text files of the project to ask, which may be what is broken - and
+// tests/page-text-js-smoke.js holds that every one of them has its sentence in both languages, as it does for the wizard's, which are left out above
+foreach( array_keys( $codes ) as $code )
+	if( str_starts_with( $code, 'recovery_' ) === true )
+		unset( $codes[$code] );
 
 $wordFiles = [];
 foreach( [ 'en_US', 'de_DE' ] as $locale ) {

@@ -177,8 +177,8 @@ console.log( 'Nino.admin.workLocale - the language content is edited in\n' );
 	entries.elements.held = true;
 	p.answer( 'discard' );
 	p.choose( p.selects[0], 'de_DE' );
-	check( 'Discard lets it forget, closes the form it held - as a move to another panel does - and then the language moves',
-		entries.elements.discarded === 1 && closed.join() === 'elements' && p.workLocale.current === 'de_DE' && seen.join() === 'en_US,de_DE' );
+	check( 'Discard lets it forget, leaves the form open - the view that follows draws it again in the new language, where a move to another panel closes it - and then the language moves',
+		entries.elements.discarded === 1 && closed.length === 0 && p.workLocale.current === 'de_DE' && seen.join() === 'en_US,de_DE' );
 
 	const before = p.questions.length;
 	p.choose( p.selects[0], 'en_US' );

@@ -1,5 +1,3 @@
-
-
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Step 6, the last one: set the recovery password. Success
@@ -16,6 +14,10 @@
  *													backups are encrypted with - the page shows it first,
  *													once, and goes on only after it was confirmed saved.
  *
+ *													The one main button is the bar's, named for what it leads to:
+ *													the step has no button of its own besides the key's "Copy" and
+ *													"Save as text file". The forms are the blocks of the workbench.
+ *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
  *	@link										https://github.com/dapeio/nino
@@ -30,30 +32,91 @@
 		// The key the workbench keeps the state of its menu under (Nino.admin.rail.STORAGE_KEY)
 		RAIL_KEY : 'nino-admin-rail',
 
-		/**
-		 *	The button that ends the wizard is named for what it leads to: with exactly one
-		 *	application that went through and has an entry point it is "Set up <name>", the
-		 *	name as the applications step shows it, and it leads there; otherwise it ends the
-		 *	wizard and says so
-		 *
-		 *	@return		void
-		 */
+		// The parts of the form that are on the page: { form, pw, pw2 }
+		_ui : null,
+
+		// The key while it is shown, and what the end of the wizard does once it was saved: { key, proceed } - null otherwise,
+		// so that nothing of the key is kept anywhere once the person went on
+		_shown : null,
+
+		// The next steps the page offers beyond the two it always has, kept so that a change of the language words them again
+		_targetList : [],
+
 		showCurrent : function() {
 
-			const button = dc.getElementById('finish-submit');
-			if( button === null )
-				return;
+			if( Nino.install.finish._ui === null )
+				Nino.install.finish._draw();
+		},
+
+		retext : function() {
+
+			const self = Nino.install.finish;
+
+			if( self._ui !== null )
+				Nino.pageText.keep( dc.getElementById('finish-content'), self._draw );
+
+			// The card of the key stands beside the form of the password, not in it: its tick and its sentence are kept the same way
+			if( self._shown !== null )
+				Nino.pageText.keep( dc.getElementById('finish-key-wrap'), self._drawKey );
+
+			self._drawTargets();
+		},
+
+		/**
+		 *	The application the button that ends the wizard is named for: with exactly one application that went through and has an
+		 *	entry point it is that one and the button leads there; otherwise the wizard ends and says so
+		 *
+		 *	@return		{Object|null}									{ key, name } or null
+		 */
+		entry : function() {
 
 			const entries = Nino.install.applications !== undefined ? Nino.install.applications.appliedEntries() : [];
 
-			if( entries.length === 1 ) {
-				button.textContent = 'Set up '+ entries[0].name;
-				button.dataset.application = entries[0].key;
-			}
-			else {
-				button.textContent = 'Finish installation';
-				delete button.dataset.application;
-			}
+			return entries.length === 1 ? entries[0] : null;
+		},
+
+		/**
+		 *	The form of the step: the recovery password, twice
+		 *
+		 *	@return		void
+		 */
+		_draw : function() {
+
+			const t = Nino.install.t;
+			const self = Nino.install.finish;
+			const wrap = dc.getElementById('finish-content');
+
+			wrap.innerHTML = '';
+
+			const form = Nino.adminUi.el( 'form', '' );
+			form.id = 'finish-form';
+			form.noValidate = true;
+
+			const card = Nino.adminUi.el( 'fieldset', '' );
+			const legend = Nino.adminUi.el( 'legend', '', t('/_admin/install/finish/title') );
+			card.appendChild( legend );
+			Nino.adminUi.sectionHelp( legend, card, t('/_admin/install/finish/help') );
+
+			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+			const pw = Nino.adminUi.textField( { key : 'finish-pw', id : 'finish-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/finish/pw'), help : t( '/_admin/install/finish/pw-help', Nino.install.minPassword() ) } );
+			const pw2 = Nino.adminUi.textField( { key : 'finish-pw2', id : 'finish-pw2', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/finish/pw2') } );
+
+			grid.appendChild( pw );
+			grid.appendChild( pw2 );
+			card.appendChild( grid );
+			form.appendChild( card );
+
+			// Enter in a field is the main button of the step: the one of the bar
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.install.next() } );
+			form.addEventListener( 'keydown', function( ev ) {
+				if( ev.key === 'Enter' && ev.target !== null && ev.target.tagName === 'INPUT' ) {
+					ev.preventDefault();
+					Nino.install.next();
+				}
+			} );
+
+			wrap.appendChild( form );
+			self._ui = { form : form, pw : pw, pw2 : pw2 };
 		},
 
 		/**
@@ -109,9 +172,17 @@
 		 */
 		_targets : function( targets ) {
 
+			Nino.install.finish._targetList = targets;
+			Nino.install.finish._drawTargets();
+		},
+
+		_drawTargets : function() {
+
 			const wrap = dc.getElementById('finish-next-steps');
 
-			targets.forEach( function( target ) {
+			Array.prototype.slice.call( wrap.querySelectorAll('[data-application]') ).forEach( function( el ) { el.remove() } );
+
+			Nino.install.finish._targetList.forEach( function( target ) {
 
 				const link = dc.createElement('a');
 				link.className = 'install-next-step install-next-step--application';
@@ -123,13 +194,117 @@
 				copy.className = 'install-next-step-copy';
 
 				const name = dc.createElement('strong');
-				name.textContent = 'Set up '+ target.name;
+				name.textContent = Nino.install.t( '/_admin/install/finish/set-up', target.name );
 				copy.appendChild( name );
 				link.dataset.application = target.key;
 
 				link.appendChild( copy );
 				wrap.appendChild( link );
 			} );
+		},
+
+		/**
+		 *	The recovery key, once: the text itself, the two ways to keep it and the tick that says it was kept. Drawn
+		 *	from what is shown, so that a change of the language words it again without the key going anywhere
+		 *
+		 *	@return		void
+		 */
+		_drawKey : function() {
+
+			const t = Nino.install.t;
+			const self = Nino.install.finish;
+			const shown = self._shown;
+			const wrap = dc.getElementById('finish-key-wrap');
+
+			wrap.innerHTML = '';
+
+			const form = Nino.adminUi.el( 'form', '' );
+			form.id = 'finish-key';
+			form.noValidate = true;
+
+			const card = Nino.adminUi.el( 'fieldset', '' );
+			const legend = Nino.adminUi.el( 'legend', '', t('/_admin/install/finish/key-title') );
+			card.appendChild( legend );
+			Nino.adminUi.sectionHelp( legend, card, t('/_admin/install/finish/key-help') );
+
+			// What has to stay in view: it is shown only now
+			card.appendChild( Nino.adminUi.notice( t('/_admin/install/finish/key-once') ) );
+
+			const label = Nino.adminUi.el( 'p', 'install-key-label', t('/_admin/install/finish/key-label') );
+			label.id = 'finish-key-label';
+			const value = Nino.adminUi.el( 'code', 'install-key-value' );
+			value.id = 'finish-key-value';
+			value.tabIndex = 0;
+			value.setAttribute( 'aria-labelledby', 'finish-key-label' );
+			value.textContent = shown.key;
+
+			card.appendChild( label );
+			card.appendChild( value );
+
+			const line = Nino.adminUi.status( Nino.adminUi.el('p') );
+			line.element.id = 'finish-key-msg';
+
+			const copy = Nino.adminUi.button( t('/_admin/install/finish/key-copy'), function() {
+
+				const failed = t('/_admin/install/finish/key-copy-failed');
+
+				if( wn.navigator && wn.navigator.clipboard && typeof wn.navigator.clipboard.writeText === 'function' )
+					wn.navigator.clipboard.writeText( shown.key ).then( function() { Nino.adminUi.say( t('/_admin/install/finish/key-copied') ) }, function() { line.fail( failed ) } );
+				else
+					line.fail( failed );
+			}, { kind : 'secondary', id : 'finish-key-copy' } );
+
+			const save = Nino.adminUi.button( t('/_admin/install/finish/key-save'), function() {
+
+				// Made in the browser from what is on the screen; the link is gone again at once
+				const url = wn.URL.createObjectURL( new wn.Blob( [ shown.key+ '\n' ], { type : 'text/plain' } ) );
+				const link = dc.createElement('a');
+				link.href = url;
+				link.download = 'nino-recovery-key-'+ ( wn.location.hostname || 'project' ).replace( /[^a-z0-9.-]/gi, '' )+ '.txt';
+				link.click();
+				wn.URL.revokeObjectURL( url );
+				line.idle( t('/_admin/install/finish/key-saved') );
+			}, { kind : 'secondary', id : 'finish-key-save' } );
+
+			const actions = Nino.adminUi.el( 'div', 'nino-admin-actions' );
+			actions.appendChild( copy );
+			actions.appendChild( save );
+			card.appendChild( actions );
+			card.appendChild( line.element );
+
+			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+			const ack = Nino.adminUi.checkField( { key : 'finish-key-ack', id : 'finish-key-ack', required : true, label : t('/_admin/install/finish/key-ack') } );
+			grid.appendChild( ack );
+			card.appendChild( grid );
+
+			const go = Nino.adminUi.button( t('/_admin/install/finish/key-continue'), null, { kind : 'primary', type : 'submit', id : 'finish-key-continue' } );
+			const foot = Nino.adminUi.el( 'div', 'nino-admin-actions nino-admin-actions--end' );
+			foot.appendChild( go );
+			card.appendChild( foot );
+
+			form.appendChild( card );
+
+			form.addEventListener( 'submit', function( ev ) {
+
+				ev.preventDefault();
+				Nino.adminUi.clearFieldErrors( form );
+
+				// The one thing left to say: it is asked for at the tick, and the focus goes there
+				if( ack.control.checked !== true ) {
+					Nino.adminUi.fieldError( ack, ack.control, 'finish-key-error', t('/_admin/install/finish/key-ack-error') );
+					ack.control.focus();
+					return;
+				}
+
+				// Gone from the page, and from what the clipboard and the file buttons would give
+				wn.onbeforeunload = null;
+				value.textContent = '';
+				wrap.innerHTML = '';
+				self._shown = null;
+				shown.proceed();
+			} );
+
+			wrap.appendChild( form );
 		},
 
 		/**
@@ -146,20 +321,11 @@
 		 */
 		_showKey : function( key, proceed ) {
 
-			const panel 	= dc.getElementById('finish-key');
-			const value 	= dc.getElementById('finish-key-value');
-			const note 		= dc.getElementById('finish-key-msg');
-			const ack 		= dc.getElementById('finish-key-ack');
-			const go 			= dc.getElementById('finish-key-continue');
-			const copy 		= dc.getElementById('finish-key-copy');
-			const save 		= dc.getElementById('finish-key-save');
+			const self = Nino.install.finish;
 
-			value.textContent = key;
-			note.textContent = '';
-			ack.checked = false;
-			go.disabled = true;
-			panel.classList.remove('install-hidden');
+			self._shown = { key : key, proceed : proceed };
 			dc.getElementById('install-page-wrap').classList.add('is-complete');
+			self._drawKey();
 
 			wn.onbeforeunload = function( ev ) {
 				ev.preventDefault();
@@ -167,69 +333,59 @@
 				return '';
 			};
 
-			ack.addEventListener( 'change', function() { go.disabled = ack.checked !== true } );
-
-			copy.addEventListener( 'click', function() {
-
-				const failed = 'Could not copy - select the key and copy it by hand.';
-
-				if( wn.navigator && wn.navigator.clipboard && typeof wn.navigator.clipboard.writeText === 'function' )
-					wn.navigator.clipboard.writeText( key ).then( function() { note.textContent = 'Copied.' }, function() { note.textContent = failed } );
-				else
-					note.textContent = failed;
-			} );
-
-			save.addEventListener( 'click', function() {
-
-				// Made in the browser from what is on the screen; the link is gone again at once
-				const url = wn.URL.createObjectURL( new wn.Blob( [ key+ '\n' ], { type : 'text/plain' } ) );
-				const link = dc.createElement('a');
-				link.href = url;
-				link.download = 'nino-recovery-key-'+ ( wn.location.hostname || 'project' ).replace( /[^a-z0-9.-]/gi, '' )+ '.txt';
-				link.click();
-				wn.URL.revokeObjectURL( url );
-				note.textContent = 'Saved as a text file. Keep it apart from your backups.';
-			} );
-
-			panel.addEventListener( 'submit', function( ev ) {
-
-				ev.preventDefault();
-
-				if( ack.checked !== true )
-					return;
-
-				// Gone from the page, and from what the clipboard and the file buttons would give
-				wn.onbeforeunload = null;
-				value.textContent = '';
-				panel.classList.add('install-hidden');
-				proceed();
-			} );
-
-			go.focus();
+			dc.getElementById('finish-key-ack').focus();
 		},
 
-		_submit : function( ev ) {
+		/**
+		 *	The step's one main button, the bar's: check the two passwords at their fields, then end the wizard
+		 *
+		 *	@param		{Function}	callback			Called with ( ok, message ) once the server answered
+		 *
+		 *	@return		void
+		 */
+		submit : function( callback ) {
 
-			ev.preventDefault();
+			const t = Nino.install.t;
+			const self = Nino.install.finish;
+			const ui = self._ui;
+			const pw = ui.pw.querySelector('input');
+			const pw2 = ui.pw2.querySelector('input');
+			const missing = function( key ) { return Nino.adminUi.format( t('/_admin/common/error/missing'), t( key ) ) };
+			const min = Nino.install.minPassword();
 
-			const pw 	= dc.getElementById('finish-pw');
-			const pw2 = dc.getElementById('finish-pw2');
-			const msg = dc.getElementById('finish-msg');
+			Nino.adminUi.clearFieldErrors( ui.form );
 
-			if( pw.value !== pw2.value ) {
-				msg.textContent = 'Passwords do not match.';
+			const problems = [
+				[ pw.value === '' ? missing('/_admin/install/finish/pw') : ( pw.value.length < min ? t( '/_admin/install/error/password-short', min ) : '' ), ui.pw, pw ],
+				[ pw2.value !== pw.value ? t('/_admin/install/error/mismatch') : ( pw2.value === '' ? missing('/_admin/install/finish/pw2') : '' ), ui.pw2, pw2 ],
+			].filter( function( problem ) { return problem[0] !== '' } );
+
+			if( problems.length > 0 ) {
+				problems.forEach( function( problem, at ) { Nino.adminUi.fieldError( problem[1], problem[2], 'finish-error-'+ at, problem[0] ) } );
+				problems[0][2].focus();
+				callback( false, t('/_admin/install/error/fields') );
 				return;
 			}
 
-			msg.textContent = 'Saving …';
+			Nino.install.say( t('/_admin/install/step/saving') );
 
 			// The applications that went through the last step: the server believes
 			// them only as far as their features are on
 			const applications = Nino.install.applications !== undefined ? Nino.install.applications.applied() : [];
 
-			Nino.install.apiCall( 'finish/complete', { password : pw.value, applications : applications }, function( status, response ) {
+			Nino.install.apiCall( 'finish/complete', { password : pw.value, applications : applications, lang : Nino.pageText.language() }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to finish.' );
+
+					const code = response !== null && typeof response === 'object' && typeof response.code === 'string' ? response.code : '';
+
+					if( code === 'install_password_short' ) {
+						Nino.adminUi.fieldError( ui.pw, pw, 'finish-error-0', Nino.install.failure( status, response ) );
+						pw.focus();
+						callback( false, t('/_admin/install/error/fields') );
+						return;
+					}
+
+					callback( false, Nino.install.failure( status, response ) );
 					return;
 				}
 
@@ -243,42 +399,43 @@
 					// points there is a choice; the panel below offers them, and the
 					// login, among the next steps
 					if( response.login === true && targets.length <= 1 ) {
-						msg.textContent = targets.length === 1 ? '' : 'Opening the workbench …';
+						Nino.install.say( targets.length === 1 ? '' : t('/_admin/install/finish/opening') );
 						if( targets.length === 1 )
-							Nino.install.finish._menu( targets[0] );
-						Nino.install.finish._go( Nino.dir+ ( targets.length === 1 ? targets[0].next : '/_admin/' ) );
+							self._menu( targets[0] );
+						self._go( Nino.dir+ ( targets.length === 1 ? targets[0].next : '/_admin/' ) );
 						return;
 					}
 
-					Nino.install.finish._targets( targets );
+					self._targets( targets );
 
 					// Cleared, not left on "Saving …" - the done panel below replaces
-					// the form but not this line, so the finished wizard used to show
-					// "Installation complete" and "Saving …" at the same time
-					msg.textContent = '';
+					// the form but not the line
+					Nino.install.say('');
 
-					dc.getElementById('finish-form').classList.add('install-hidden');
+					dc.getElementById('finish-content').classList.add('install-hidden');
 					dc.getElementById('finish-done').classList.remove('install-hidden');
 					dc.getElementById('install-page-wrap').classList.add('is-complete');
+
+					const heading = dc.getElementById('finish-done').querySelector('h2');
+					if( heading !== null ) {
+						heading.setAttribute( 'tabindex', '-1' );
+						heading.focus();
+					}
 				};
 
 				// The recovery key comes first: the end of the wizard, whichever it is, waits for it
 				if( typeof response.recoveryKey === 'string' && response.recoveryKey !== '' ) {
-					msg.textContent = '';
-					dc.getElementById('finish-form').classList.add('install-hidden');
-					Nino.install.finish._showKey( response.recoveryKey, proceed );
+					Nino.install.say('');
+					dc.getElementById('finish-content').classList.add('install-hidden');
+					self._showKey( response.recoveryKey, proceed );
+					callback( true );
 					return;
 				}
 
 				proceed();
+				callback( true );
 			} );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', function() {
-		const form = dc.getElementById('finish-form');
-		if( form !== null )
-			form.addEventListener( 'submit', Nino.install.finish._submit );
-	} );
 
 })(window, document, document.documentElement, document.body);

@@ -11,12 +11,9 @@ return [
 	'[[/_admin/login/label/user]]'	=> 'E-Mail',
 	'[[/_admin/login/label/pw]]'		=> 'Passwort',
 	'[[/_admin/login/label/submit]]'=> 'Anmelden',
-	'[[/_admin/login/error/user]]'	=> 'E-Mail muss angegeben werden.',
-	'[[/_admin/login/error/pw]]'		=> 'Passwort muss angegeben werden.',
 	'[[/_admin/login/error/wrong]]'	=> 'Prüfe Deine Eingabe oder verständige den Administrator.',
 	'[[/_admin/login/error/endpoint]]'=> 'Der Login-Endpunkt hat mit %s geantwortet - die Zugangsdaten wurden gar nicht geprüft. Das ist eine Serverkonfiguration, kein falsches Passwort.',
 	'[[/_admin/login/error/csrf]]'	=> 'Diese Seite ist zu lange offen, ihr Sitzungs-Token gilt nicht mehr. Lade die Seite neu und melde Dich erneut an.',
-	'[[/_admin/login/msg/welcome]]'	=> 'Gib Deine E-Mail und Dein Passwort an:',
 	'[[/_admin/login/msg/pending]]'	=> 'Eingabe wird geprüft.',
 
 	'[[/_admin/user/logout]]'				=> 'Abmelden',

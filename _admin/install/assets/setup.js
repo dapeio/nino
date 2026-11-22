@@ -1,5 +1,3 @@
-
-
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Step 2, "Languages": pick the available locales and a
@@ -18,6 +16,10 @@
  *													(script.js) rather than its own save button - apply()
  *													is exposed for Next to call, not wired to a button.
  *
+ *													The fields are the blocks of the workbench: a list of ticks for the
+ *													languages and for the modules, a select for the native language. A
+ *													language is named as the workbench names one ("Deutsch", "English (US)").
+ *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
  *	@link										https://github.com/dapeio/nino
@@ -32,16 +34,22 @@
 		_ready 		: false,
 		_library 	: null,
 
+		// What is ticked and chosen, kept between two drawings: { locales, native, modules }, null until the person or the library says
+		_state		: null,
+
+		// The parts that are on the page: { locales, native, modules }
+		_ui				: null,
+
 		/**
 		 *	Load the library's available locales/modules - each flagged
 		 *	with whether it's currently active - and render one pre-checked
-		 *	checkbox list per group
+		 *	list of ticks per group
 		 *
 		 *	@return		void
 		 */
 		init : function() {
 
-			const wrap = dc.getElementById('setup-locales');
+			const wrap = dc.getElementById('setup-content');
 			if( wrap === null )
 				return;
 
@@ -49,7 +57,14 @@
 				if( status !== 200 || response === null )
 					return Nino.install.showError( wrap, status, response );
 
-				Nino.install.setup._library = response;
+				const lib = response;
+
+				Nino.install.setup._library = lib;
+				Nino.install.setup._state = {
+					locales	: lib.locales.filter( function( code ) { return lib.activeLocales.indexOf( code ) !== -1 } ),
+					native	: lib.nativeLocale,
+					modules	: Object.keys( lib.modules ).filter( function( key ) { return lib.modules[key].active === true } ),
+				};
 				Nino.install.setup._render();
 				Nino.install.setup._ready = true;
 			} );
@@ -60,144 +75,133 @@
 				Nino.install.setup.init();
 		},
 
+		retext : function() {
+			if( Nino.install.setup._library !== null )
+				Nino.pageText.keep( dc.getElementById('setup-content'), Nino.install.setup._render );
+		},
+
+		/**
+		 *	What is ticked and chosen now, read from the page into the state: before a change of the language
+		 *	draws the fields again, and before the choice is sent
+		 *
+		 *	@return		void
+		 */
+		_collect : function() {
+
+			const ui = Nino.install.setup._ui;
+
+			if( ui === null )
+				return;
+
+			Nino.install.setup._state = {
+				locales	: ui.locales.value(),
+				native	: ui.native.querySelector('select').value,
+				modules	: ui.modules === null ? Nino.install.setup._state.modules : ui.modules.value(),
+			};
+		},
+
 		_render : function() {
 
+			Nino.install.setup._collect();
+
+			const t = Nino.install.t;
 			const lib = Nino.install.setup._library;
+			const state = Nino.install.setup._state;
+			const wrap = dc.getElementById('setup-content');
+			const ui = { modules : null };
 
-			Nino.install.setup._renderList( 'setup-locales', lib.locales.map( function( code ) {
-				return { key : code, label : code, active : lib.activeLocales.indexOf( code ) !== -1 };
-			} ), 'locale' );
+			wrap.innerHTML = '';
 
-			// Navigation, the contact form and the locale picker are always on
-			// (see Setup::ALWAYS_MODULES), so the picker only ever offers what a
-			// project or the library brings of its own - and a checkout brings
-			// nothing: the card stays hidden until there is something to pick
+			// Languages: the ticks, and the native one among the ticked
+			const card = Nino.adminUi.el( 'fieldset', '' );
+			const legend = Nino.adminUi.el( 'legend', '', t('/_admin/install/setup/title-languages') );
+			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+
+			card.id = 'setup-languages';
+			card.appendChild( legend );
+			Nino.adminUi.sectionHelp( legend, card, t('/_admin/install/setup/help-languages') );
+
+			ui.locales = Nino.adminUi.checklist( {
+				key			: 'locale',
+				label		: t('/_admin/install/setup/locales'),
+				help		: t('/_admin/install/setup/locales-help'),
+				required: true,
+				options	: lib.locales.map( function( code ) { return { value : code, label : Nino.install.localeName( code, lib.locales ) } } ),
+				value		: state.locales,
+				onChange: function() { Nino.install.setup._refreshNative() },
+			} );
+
+			ui.native = Nino.install.setup._nativeField( state.locales, state.native );
+
+			grid.appendChild( ui.locales.el );
+			grid.appendChild( ui.native );
+			card.appendChild( grid );
+			wrap.appendChild( card );
+
+			// Modules: nothing in a checkout - the card is there only where the library or the project brings one
 			const moduleKeys = Object.keys( lib.modules );
-			const moduleCard = document.getElementById( 'setup-modules-card' );
-			if( moduleCard !== null )
-				moduleCard.classList.toggle( 'install-hidden', moduleKeys.length === 0 );
 
-			Nino.install.setup._renderList( 'setup-modules', moduleKeys.map( function( key ) {
-				return Object.assign( { key : key }, lib.modules[key] );
-			} ), 'module' );
+			if( moduleKeys.length > 0 ) {
 
-			Nino.install.setup._renderNativeLocale( lib.nativeLocale );
+				const modules = Nino.adminUi.el( 'fieldset', '' );
+				const modulesLegend = Nino.adminUi.el( 'legend', '', t('/_admin/install/setup/title-modules') );
+				const modulesGrid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+
+				modules.id = 'setup-modules-card';
+				modules.appendChild( modulesLegend );
+				Nino.adminUi.sectionHelp( modulesLegend, modules, t('/_admin/install/setup/help-modules') );
+
+				ui.modules = Nino.adminUi.checklist( {
+					key			: 'module',
+					label		: t('/_admin/install/setup/modules'),
+					options	: moduleKeys.map( function( key ) {
+						const needs = ( lib.modules[key].requiresModules || [] ).join( ', ' );
+						return { value : key, label : lib.modules[key].label || key, state : needs === '' ? undefined : t( '/_admin/install/setup/requires', needs ) };
+					} ),
+					value		: state.modules,
+				} );
+
+				modulesGrid.appendChild( ui.modules.el );
+				modules.appendChild( modulesGrid );
+				wrap.appendChild( modules );
+			}
+
+			Nino.install.setup._ui = ui;
 		},
 
 		/**
-		 *	Build the "Native Locale" <select> - only ever offers whichever
-		 *	locales are currently checked above, kept in sync by a change
-		 *	listener _renderList() attaches to every locale checkbox (see
-		 *	_refreshNativeLocale())
+		 *	The select of the native language: only offers whichever locales are ticked
 		 *
-		 *	@param		{string|null}	nativeLocale	Setup::apiLibrary()'s current '/nino/locales/native'
+		 *	@param		{Array<string>}	picked				The ticked locales
+		 *	@param		{string|null}		current				Selected if it is still among them
 		 *
-		 *	@return		void
+		 *	@return		{Element}
 		 */
-		_renderNativeLocale : function( nativeLocale ) {
+		_nativeField : function( picked, current ) {
 
-			const wrap = dc.getElementById('setup-native-locale');
-			if( wrap === null )
-				return;
-
-			const select = dc.createElement('select');
-			select.id = 'setup-native-locale-select';
-
-			wrap.innerHTML = '';
-			wrap.appendChild( select );
-
-			Nino.install.setup._refreshNativeLocale( nativeLocale );
-		},
-
-		/**
-		 *	Rebuild the Native Locale <select>'s options from whichever
-		 *	locale checkboxes are currently checked - called on init (with
-		 *	the persisted native locale as $preferred) and again every time
-		 *	a locale checkbox is toggled (with no $preferred, so the
-		 *	currently-selected option carries over if it's still available)
-		 *
-		 *	@param		{string}	[preferred]		Selected if still among the checked locales
-		 *
-		 *	@return		void
-		 */
-		_refreshNativeLocale : function( preferred ) {
-
-			const select = dc.getElementById('setup-native-locale-select');
-			if( select === null )
-				return;
-
-			const current = ( preferred !== undefined && preferred !== null ) ? preferred : select.value;
-			const picked 	= Nino.install.setup._picked( 'locale' );
-
-			select.innerHTML = '';
-			picked.forEach( function( code ) {
-				const option = dc.createElement('option');
-				option.value = code;
-				option.textContent = code;
-				option.selected = code === current;
-				select.appendChild( option );
-			} );
-
-			// Nothing checked (yet) leaves the select empty until at least
-			// one locale is - "Next" rejects an empty locale selection
-			// either way, see Setup::apiApply()'s docblock
-			if( picked.indexOf( current ) === -1 && picked.length > 0 )
-				select.value = picked[0];
-		},
-
-		/**
-		 *	@param		{string}	containerId
-		 *	@param		{Array}		items				[ { key, label, active, requiresModules? }, ... ]
-		 *	@param		{string}	kind				'locale' | 'module' - tags each checkbox for apply()
-		 *
-		 *	@return		void
-		 */
-		_renderList : function( containerId, items, kind ) {
-
-			const wrap = dc.getElementById( containerId );
-			wrap.innerHTML = '';
-
-			items.forEach( function( item ) {
-
-				// One .nino-admin-checklist row: the label is the row, and the
-				// module requirement is its trailing state - the wrapper this
-				// used to carry stacked a second row height on top of the
-				// shared one and made a short list read as a sparse page
-				const label = dc.createElement('label');
-
-				const input = dc.createElement('input');
-				input.type = 'checkbox';
-				input.value = item.key;
-				input.checked = item.active === true;
-				input.dataset.kind = kind;
-				if( kind === 'locale' )
-					input.addEventListener( 'change', function() { Nino.install.setup._refreshNativeLocale() } );
-				label.appendChild( input );
-
-				const span = dc.createElement('span');
-				span.textContent = item.label || item.key;
-				label.appendChild( span );
-
-				if( ( item.requiresModules || [] ).length > 0 ) {
-					const hint = dc.createElement('span');
-					hint.className = 'nino-admin-checklist-state';
-					hint.textContent = 'requires modules: '+ item.requiresModules.join( ', ' );
-					label.appendChild( hint );
-				}
-
-				wrap.appendChild( label );
+			return Nino.adminUi.selectField( {
+				key			: 'native',
+				id			: 'setup-native-locale-select',
+				label		: Nino.install.t('/_admin/install/setup/native'),
+				help		: Nino.install.t('/_admin/install/setup/native-help'),
+				options	: picked.map( function( code ) { return { value : code, label : Nino.install.localeName( code, picked ) } } ),
+				value		: picked.indexOf( current ) !== -1 ? current : ( picked[0] ?? '' ),
 			} );
 		},
 
 		/**
-		 *	Collect every checked box of one kind
+		 *	Rebuild the select of the native language from the locales ticked now: the one chosen stays if it is
+		 *	still among them - called every time a tick of a language changes
 		 *
-		 *	@param		{string}	kind				'locale' | 'module'
-		 *
-		 *	@return		{Array}
+		 *	@return		void
 		 */
-		_picked : function( kind ) {
-			return Array.prototype.slice.call( dc.querySelectorAll( 'input[data-kind="'+ kind+ '"]:checked' ) ).map( function( el ) { return el.value } );
+		_refreshNative : function() {
+
+			const ui = Nino.install.setup._ui;
+			const fresh = Nino.install.setup._nativeField( ui.locales.value(), ui.native.querySelector('select').value );
+
+			ui.native.replaceWith( fresh );
+			ui.native = fresh;
 		},
 
 		/**
@@ -210,31 +214,51 @@
 		 */
 		apply : function( callback ) {
 
-			const msg = dc.getElementById('setup-msg');
+			const t = Nino.install.t;
 
 			if( Nino.install.setup._ready !== true ) {
-				msg.textContent = 'Setup options are still loading.';
+				Nino.install.say( t('/_admin/install/setup/loading'), true );
 				callback( false );
 				return;
 			}
 
-			msg.textContent = 'Applying …';
+			Nino.install.setup._collect();
+			Nino.adminUi.clearFieldErrors( dc.getElementById('setup-content') );
 
-			const nativeSelect = dc.getElementById('setup-native-locale-select');
+			const ui = Nino.install.setup._ui;
+			const state = Nino.install.setup._state;
+
+			// One language at least, said at the list of them: a project without one has nothing to say its text in
+			if( state.locales.length === 0 ) {
+				ui.locales.error( Nino.adminUi.format( t('/_admin/common/error/missing'), t('/_admin/install/setup/locales') ) );
+				Nino.install.say( t('/_admin/install/error/fields'), true );
+				ui.locales.focus();
+				callback( false );
+				return;
+			}
+
+			Nino.install.say( t('/_admin/install/setup/applying') );
 
 			Nino.install.apiCall( 'setup/apply', {
-				locales : Nino.install.setup._picked( 'locale' ),
-				native 	: ( nativeSelect !== null ) ? nativeSelect.value : '',
-				modules : Nino.install.setup._picked( 'module' ),
+				locales : state.locales,
+				native 	: state.native,
+				modules : state.modules,
 			}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to apply.' );
+
+					// The refusal about the languages is about the list of them: said there, and in the line
+					if( response !== null && typeof response === 'object' && response.code === 'install_locales' ) {
+						ui.locales.error( Nino.install.failure( status, response ) );
+						ui.locales.focus();
+						Nino.install.say( t('/_admin/install/error/fields'), true );
+					}
+					else
+						Nino.install.say( Nino.install.failure( status, response ), true );
+
 					callback( false );
 					return;
 				}
-
-				msg.textContent = 'Applied - modules: '+ ( response.modules.join( ', ' ) || 'none' )+ '.';
 
 				// This step's own active state, PersonalInfos' key list and the
 				// applications' names (in the native language) are all

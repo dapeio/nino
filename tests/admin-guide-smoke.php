@@ -638,6 +638,107 @@ check( 'the permissions of a role are lists of ticks, not the picker with its sm
 check( '...a row of such a list is at least 28 px high: its rule reads the height of a control, and that token is 28 px or more', preg_match( '/min-height: var\(--nino-admin-control-height\)/', $rowRule ) === 1
 	&& preg_match( '/^(\d+)px$/', $light['--nino-admin-control-height'] ?? '', $rowHeight ) === 1 && (int) $rowHeight[1] >= 28 );
 check( '...and full access is a switch', str_contains( $rolesScript, 'adminUi.switchField(' ) === true );
+// --- the pages that stand beside the workbench: the login, the setup wizard and the recovery page ----------------------------------
+
+/*	The three pages outside the panels keep the chapter as the panels do, held by structure: every form is novalidate and its fields, its buttons and its dialogs are
+	the blocks of the workbench - the browser's own checking, question and bar never appear -, what is wrong is said at the field with fieldError() and the focus goes
+	there, an explanation stands behind the (?) and no open paragraph over a field, the wizard's bar is actionBar(), and the sheet of the wizard names type, weight and space
+	only through the tokens. Their words are one table each (tests/page-text-js-smoke.js holds that no sentence stands in a script or a template). The one thing the wizard
+	draws by hand is the choice of an application, which is a radio group of rows with a description for which the workbench has no block: applications.js is left out of
+	the list of scripts that draw no input of their own, and is the only one that may write a hint of its own, for what a locked choice says	*/
+$pageScripts = [
+	'_admin/assets/login.js', '_admin/assets/recovery.js', '_admin/assets/pagetext.js',
+	'_admin/install/assets/script.js', '_admin/install/assets/checks.js', '_admin/install/assets/setup.js', '_admin/install/assets/personalinfos.js', '_admin/install/assets/accounts.js',
+	'_admin/install/assets/applications.js', '_admin/install/assets/finish.js',
+];
+$pageTemplates = [ '_admin/templates/page-login.tpl', '_admin/templates/page-recovery.tpl', '_admin/install/templates/page-wizard.tpl', '_admin/install/templates/page-locked.tpl' ];
+$pageForms = [ '_admin/assets/login.js', '_admin/assets/recovery.js', '_admin/install/assets/accounts.js', '_admin/install/assets/finish.js' ];
+
+$ownControls = [];
+$browserAsks = [];
+$notNovalidate = [];
+$unchecked = [];
+$ownButtons = [];
+$hinted = [];
+
+foreach( $pageScripts as $script ) {
+
+	$source = $comments( $read( $script ) );
+	$source = (string) preg_replace( '~^\s*//.*$~m', '', $source );
+
+	// A field, a select and a button that a script makes by hand is none of the blocks - but for the rows of the choice of an application, of which there is no block
+	if( $script !== '_admin/install/assets/applications.js' && preg_match( "/createElement\(\s*'(label|input|select|textarea|button)'\s*\)/", $source ) === 1 )
+		$ownControls[] = $script;
+
+	if( preg_match( "/createElement\(\s*'(button)'\s*\)/", $source ) === 1 && $script !== '_admin/install/assets/applications.js' )
+		$ownButtons[] = $script;
+
+	// The questions and the dialogs of the browser, and a dialog of the page's own
+	if( preg_match( '/(?<![\w.])(confirm|alert|prompt)\s*\(|window\.(confirm|alert|prompt)\s*\(|createElement\(\s*\'dialog\'\s*\)|\.showModal\(/', $source ) === 1 )
+		$browserAsks[] = $script;
+
+	// A class of a button, a bar or a hint that is written in a script
+	if( preg_match( '/nino-admin-(actionbar|btn-primary|btn-danger|btn-secondary)/', $source ) === 1 || ( $script !== '_admin/install/assets/applications.js' && preg_match( '/adminUi\.hint\(|nino-admin-hint/', $source ) === 1 ) )
+		$hinted[] = $script;
+}
+
+foreach( $pageForms as $script ) {
+
+	$source = $comments( $read( $script ) );
+	$forms = preg_match_all( "/(createElement\(\s*'form'\s*\)|adminUi\.el\(\s*'form')/", $source );
+
+	// The form of the login is the template's, and its script draws none; every form a script draws is held by the browser to nothing
+	if( $forms > 0 && substr_count( $source, 'noValidate = true' ) < $forms )
+		$notNovalidate[] = $script;
+
+	if( str_contains( $source, 'adminUi.fieldError(' ) === false || str_contains( $source, 'adminUi.clearFieldErrors(' ) === false )
+		$unchecked[] = $script;
+}
+
+foreach( $pageTemplates as $template ) {
+
+	$markup = (string) preg_replace( '/<!--.*?-->/s', '', $read( $template ) );
+
+	preg_match_all( '/<form\b[^>]*>/', $markup, $formTags );
+	foreach( $formTags[0] as $tag )
+		if( str_contains( $tag, 'novalidate' ) === false )
+			$notNovalidate[] = $template;
+
+	// A control the browser checks, a dialog of the page's own, a bar and a button written into the markup
+	if( preg_match( '/\srequired[\s>=]|\sminlength=|<dialog\b|nino-admin-actionbar|<button\b/', $markup ) === 1 )
+		$ownControls[] = $template;
+}
+
+check( 'the scripts and templates of the login, the wizard and the recovery page draw no field, select or button of their own, and write no required, no minlength, no <dialog> and no bar'. ( $ownControls === [] ? '' : ' - '. implode( ', ', array_unique( $ownControls ) ) ), $ownControls === [] );
+check( '...ask nothing with the browser\'s confirm(), alert() or prompt() and draw no dialog of their own: a question is the block\'s'. ( $browserAsks === [] ? '' : ' - '. implode( ', ', $browserAsks ) ), $browserAsks === [] );
+check( '...every form they have is novalidate, in the template or by the script that draws it'. ( $notNovalidate === [] ? '' : ' - '. implode( ', ', array_unique( $notNovalidate ) ) ), $notNovalidate === [] );
+check( '...the forms say what is wrong under the field with fieldError() and clear it again'. ( $unchecked === [] ? '' : ' - not '. implode( ', ', $unchecked ) ), $unchecked === [] );
+check( '...name no class of a button or a bar, and write no hint of their own but the one of the choice of an application that is locked'. ( $hinted === [] ? '' : ' - '. implode( ', ', $hinted ) ), $hinted === [] );
+
+$wizardScript = $comments( $read( '_admin/install/assets/script.js' ) );
+check( 'the bar of the wizard is the block of the workbench: drawn by the script with actionBar(), with its line, Back as the button of the second kind and one main button; the template draws none', str_contains( $wizardScript, 'adminUi.actionBar(' ) === true
+	&& preg_match( "/kind\s*:\s*'secondary'.*?id\s*:\s*'install-back'/s", $wizardScript ) === 1 && substr_count( $wizardScript, "kind : 'primary'" ) === 1 && str_contains( $read( '_admin/install/templates/page-wizard.tpl' ), 'actionbar' ) === false );
+check( '...the language of every page is a picker of the blocks - a button of the kind of a link - at the top right, and a page outside the workbench carries the scope root on its body, so that the blocks of a dialog are drawn as they are in the workbench',
+	str_contains( $comments( $read( '_admin/assets/pagetext.js' ) ), "kind : 'link'" ) === true && array_filter( [ '_admin/templates/page-recovery.tpl', '_admin/install/templates/page-wizard.tpl', '_admin/install/templates/page-locked.tpl' ], fn( string $t ): bool => str_contains( $read( $t ), '<body class="nino-admin">' ) === false || str_contains( $read( $t ), 'id="page-language-mount"' ) === false ) === [] );
+check( '...every step of the wizard and every section of the recovery page names itself by a heading or a legend and keeps its explanation behind the (?) of it: sectionHelp() is called where a card is drawn', substr_count( $comments( $read( '_admin/install/assets/setup.js' ) ), 'sectionHelp(' ) >= 2
+	&& str_contains( $comments( $read( '_admin/assets/recovery.js' ) ), 'sectionHelp(' ) === true && str_contains( $comments( $read( '_admin/install/assets/accounts.js' ) ), 'sectionHelp(' ) === true && str_contains( $comments( $read( '_admin/install/assets/finish.js' ) ), 'sectionHelp(' ) === true );
+check( '...the session dialog of the shell is the dialog of the blocks: no <dialog> in the page of the workbench, and the script asks choiceDialog() for it', str_contains( $read( '_admin/templates/page-index.tpl' ), '<dialog' ) === false && str_contains( $read( '_admin/assets/script.js' ), 'adminUi.choiceDialog(' ) === true
+	&& str_contains( $read( '_admin/assets/script.js' ), 'admin-session-dialog' ) === false );
+
+/*	The targets of the pages outside the workbench, and the tabs of the head, held by their rules: a link-button, the way back of the recovery page and the language select of the
+	login are 24 px at least by the token, and the tabs of the first level wrap into a second row where they do not fit and never scroll sideways - at 390 px the fourth tab of
+	the Users panel, "Recovery password", was cut off at the edge of a strip that scrolled */
+check( 'a link-button, a link in a row of buttons and the language select of the login are targets of 24 px by the token of the small control - and the token is 24 px or more',
+	str_contains( $sortRule( ':where(.nino-admin) .nino-admin-linkbutton' ), 'min-height: var(--nino-admin-control-icon-small)' ) === true && str_contains( $sortRule( ':where(.nino-admin) .nino-admin-actions > a' ), 'min-height: var(--nino-admin-control-icon-small)' ) === true
+	&& str_contains( $sortRule( '#form-login #admin-localepicker' ), 'min-height: var(--nino-admin-control-icon-small)' ) === true && preg_match( '/^(\d+)px$/', $light['--nino-admin-control-icon-small'] ?? '', $smallTarget ) === 1 && (int) $smallTarget[1] >= 24 );
+$headTabs = $bare( $read( '_admin/assets/style.css' ) );
+preg_match( '/#admin-content-wrap > \[data-panel\] > \.admin-panel-head > \.admin-panel-tabs \{([^}]*)\}/', $headTabs, $headTabRule );
+check( 'the tabs of the first level, in the head of a panel, wrap into a second row and the strip does not scroll sideways', isset( $headTabRule[1] ) === true && str_contains( $headTabRule[1], 'flex-wrap: wrap' ) === true && str_contains( $headTabRule[1], 'overflow-x' ) === false );
+check( 'the strip of the steps of the wizard wraps as well, and its steps break their words where there is no room instead of being cut: nothing scrolls sideways', preg_match( '/#install-page-wrap #install-nav-wrap \{[^}]*flex-wrap: wrap;[^}]*overflow-x: visible/s', $read( '_admin/install/assets/style.css' ) ) === 1 );
+
+[ , , $wizardStray ] = $strays( $bare( $read( '_admin/install/assets/style.css' ) ), [] );
+check( 'the stylesheet of the wizard names type, weight and space only through the tokens'. ( $wizardStray === [] ? '' : ' - '. implode( '; ', array_slice( $wizardStray, 0, 6 ) ) ), $wizardStray === [] );
+
 // --- the panels of the kernel that have gone over to the guide: Backups, Config, Maintenance, Language, Translations, Log, Requests, Dashboard ---
 
 /*	The forms and lists of these eight, and of Routes and Navigations, keep to what the guide asks of a panel, held by structure: the bar of a form or a list is the block's and its

@@ -317,6 +317,8 @@ function reflect( el, name, value ) {
  *
  *	@return		{Object}
  */
+const markupWrites = [];
+
 function element( tag ) {
 
 	const el = {
@@ -503,10 +505,15 @@ function element( tag ) {
 		},
 	} );
 
-	// Assigning innerHTML empties the element; the markup itself is not parsed
+	// Assigning innerHTML empties the element; the markup itself is not parsed, but every assignment of something is written down in markupWrites,
+	// for a suite that holds that what a person typed is never written as markup
 	Object.defineProperty( el, 'innerHTML', {
 		get : function() { return '' },
-		set : function() { el.children.length = 0 },
+		set : function( html ) {
+			if( String( html ) !== '' )
+				markupWrites.push( { tag : el.tagName, html : String( html ) } );
+			el.children.length = 0;
+		},
 	} );
 
 	Object.defineProperty( el, 'firstChild', { get : function() { return el.children[0] ?? null } } );
@@ -541,4 +548,4 @@ function documentOf( mount ) {
 	};
 }
 
-module.exports = { check, done, source, fills, load, classList, element, findAll, fire, matches, documentOf };
+module.exports = { markupWrites, check, done, source, fills, load, classList, element, findAll, fire, matches, documentOf };

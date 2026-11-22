@@ -1703,7 +1703,30 @@ end - it renders the whole workbench in both interface languages and fails on an
 `[[fill]]` that came out the other side unresolved, which is the only version a
 key its regexes do not recognise cannot slip past. A schema two surfaces share keeps its English as the
 fallback, and the panel looks for a fill of its own first. The recovery page
-and the setup wizard are English by design.
+and the setup wizard are not panels and have no fills to ask - the project is
+what the wizard makes, and the recovery page has to work when the project's
+text is what is broken: they speak German or English, German first, from one
+fixed table each with the same keys in both (`_admin/install/assets/text.js`,
+`_admin/assets/recovery-text.js`, registered with `Nino.pageText`,
+`_admin/assets/pagetext.js`). A template marks what it writes with
+`data-text="<key>"` (also `data-label` and `data-title`), a script writes
+`Nino.pageText.t( key, ...params )`, and a refusal of the server comes back as a
+code - `Nino.pageText.failure( status, response )` finds its sentence under
+`/_admin/page/error/<code>` with the underscores of the code written as
+hyphens, and says one general sentence with the status for a code that has no
+sentence, never the server's own English. The language is one of two
+(`Nino.pageText.LANGUAGES`, an allow-list that never reaches markup or a path),
+chosen by the button at the top right and kept in the browser's storage under
+one key, with no cookie. The choice itself is not sent: the one thing the pages
+send of it is `lang` (`de` or `en`, an allow-list on the server that anything
+else falls out of) with the requests that ask the catalogue of applications for
+names, so that the names come in the language of the page; it is kept nowhere.
+A step that writes words by hand redraws them in `retext()` and keeps what was typed
+(`Nino.pageText.keep()`). The words of the blocks of the workbench
+(`/_admin/common/...`) are in each table as the workbench writes them, and a test
+holds them equal. `tests/page-text-js-smoke.js` fails on a key one language lacks,
+on an empty sentence, on a sentence that stands in a script or a template, and
+on a code of the server without a sentence.
 
 ### The shared data table
 

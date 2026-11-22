@@ -905,7 +905,8 @@ check( 'a webpage\'s own meta key is left out too, despite existing in text/*.ph
 // them, not even where a project's text still holds one
 check( 'a social network\'s address is not asked for: the base unit ships no such key', array_search( '/project/company/social/instagram', $personalInfosKeys, true ) === false );
 
-$personalInfosLabels = array_column( $personalInfosEntries, 'label', 'key' );
+$personalInfosLabels = array_column( array_map( static fn( array $entry ): array => [ 'key' => $entry['key'], 'label' => $entry['labels']['en'] ], $personalInfosEntries ), 'label', 'key' );
+$personalInfosGerman = array_column( array_map( static fn( array $entry ): array => [ 'key' => $entry['key'], 'label' => $entry['labels']['de'] ], $personalInfosEntries ), 'label', 'key' );
 check( 'derives a friendly label from the category and the name, each as the English vocabulary of the workbench says it', $personalInfosLabels['/project/company/general/name'] === 'Company › Name' );
 check( '...also for a key of the website', $personalInfosLabels['/project/website/general/author'] === 'Website › Author' );
 check( '...and an address, spelled right', $personalInfosLabels['/project/company/contact/address'] === 'Company › Address' );
@@ -913,6 +914,13 @@ check( '...the words of the vocabulary as they are written there, not capitalize
 check( 'every label of the step is made of words of the vocabulary', array_filter( $personalInfosLabels, static function( string $label ): bool {
 	$english = include __DIR__. '/../_admin/text/en_US.php';
 	return count( array_filter( explode( ' › ', $label ), static fn( string $word ): bool => in_array( $word, $english, true ) === false ) ) > 0;
+} ) === [] );
+check( 'the step gives each label in German as well, from the German vocabulary of the workbench: the wizard speaks both, and the entry has the two under one name', $personalInfosGerman['/project/company/general/name'] === 'Unternehmen › Name'
+	&& $personalInfosGerman['/project/company/contact/address'] === 'Unternehmen › Adresse' && $personalInfosGerman['/project/website/general/url'] === 'Website › URL' && $personalInfosGerman['/project/website/general/host'] === 'Website › Hosting'
+	&& array_filter( $personalInfosEntries, static fn( array $entry ): bool => array_keys( $entry['labels'] ) !== [ 'de', 'en' ] || isset( $entry['label'] ) === true ) === [] );
+check( '...and every German label is made of words of the German vocabulary', array_filter( $personalInfosGerman, static function( string $label ): bool {
+	$german = include __DIR__. '/../_admin/text/de_DE.php';
+	return count( array_filter( explode( ' › ', $label ), static fn( string $word ): bool => in_array( $word, $german, true ) === false ) ) > 0;
 } ) === [] );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Install\PersonalInfos::class, 'apiSaveBatch' ], [ 'items' => [
@@ -969,18 +977,14 @@ check( 'the replaced account uses the new password', \Nino\Auth::loginUser( $app
 \Nino\Auth::logoutUser( $appData );
 
 /*	The rule the form names up front is the rule the server enforces. The
-	number is read from the wizard's own template - the label and the
-	minlength of all four password fields - and tried against the public
-	API either side of it, so neither half can move alone	*/
-$wizardTemplate = (string) file_get_contents( __DIR__. '/../_admin/install/templates/page-wizard.tpl' );
-$pwLengths = [];
-foreach( [ 'accounts-add-pw', 'accounts-add-pw2', 'finish-pw', 'finish-pw2' ] as $pwField )
-	$pwLengths[ $pwField ] = preg_match( '/<input id="'. $pwField. '"[^>]*minlength="(\d+)"/', $wizardTemplate, $pwMatch ) === 1 ? (int) $pwMatch[1] : 0;
-$minPw = $pwLengths['accounts-add-pw'];
-check( 'the wizard\'s four password fields carry one and the same minlength', $minPw > 0 && count( array_unique( $pwLengths ) ) === 1 );
-check( '...and both password labels name that number', preg_match( '/<span>Password \(at least '. $minPw. ' characters\)<\/span>/', $wizardTemplate ) === 1
-	&& preg_match( '/<span>New recovery password \(at least '. $minPw. ' characters\)<\/span>/', $wizardTemplate ) === 1 );
-check( 'the Accounts step asks for the password twice', str_contains( $wizardTemplate, 'for="accounts-add-pw2"' ) === true );
+	number is the one the wizard's page states, read from the page as the
+	kernel draws it - the scripts take it from there - and tried against the
+	public API either side of it, so neither half can move alone	*/
+$wizardRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '' ] ];
+\Nino\Install\Install::handleGet( $appData, $wizardRequest );
+$minPw = (int) ( \Nino\Html::getFills( $appData )['[[/_admin/install/min-password]]'] ?? 0 );
+check( 'the wizard\'s page states the length of a password - a fill of the page, the scripts take it from there - and it is the one the server enforces', $minPw > 0 && $minPw === \Nino\Admin\Recovery::MIN_PW_LENGTH );
+check( '...the template carries it on the page\'s root, where the scripts read it', str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/templates/page-wizard.tpl' ), 'id="install-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-checks" data-dir="[[/nino/dir]]" data-min-password="[[/_admin/install/min-password]]"' ) === true );
 
 /*	One minimum for every password the workbench and the wizard set:
 	Recovery::MIN_PW_LENGTH. No class keeps a copy of its own, and every form,
@@ -991,8 +995,6 @@ foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( __DIR__.
 		$minPwDeclared += preg_match_all( '/const\s+int\s+MIN_PW_LENGTH\b/', (string) file_get_contents( $phpFile->getPathname() ) );
 $minPwShown = [];
 foreach( [
-	'templates/page-recovery.tpl' 						=> '/(?:minlength="|at least )(\d+)/',
-	'install/templates/page-wizard.tpl' 				=> '/(?:minlength="|at least )(\d+)/',
 	'Nino/Modules/Users/assets/admin.js' 			=> '/minLength\s*[=:]\s*(\d+)/',
 	'Nino/Modules/Users/assets/recoverypw.js' 	=> '/minLength\s*[=:]\s*(\d+)/',
 	'Nino/Modules/Users/text/en_US.php' 				=> '/at least (\d+) characters/',
@@ -1001,7 +1003,12 @@ foreach( [
 	preg_match_all( $minPwPattern, (string) file_get_contents( __DIR__. '/../_admin/'. $minPwFile ), $minPwMatch );
 	$minPwShown[$minPwFile] = array_values( array_unique( array_map( 'intval', $minPwMatch[1] ) ) );
 }
-check( 'one minimum password length, Recovery::MIN_PW_LENGTH, declared once and named by every form, script and label', $minPwDeclared === 1
+$recoveryRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '' ] ];
+\Nino\Admin\Recovery::handleGet( $appData, $recoveryRequest );
+$minPwShown['the recovery page'] = [ (int) ( \Nino\Html::getFills( $appData )['[[/_admin/recovery/min-password]]'] ?? 0 ) ];
+check( 'the recovery page states the length of a password as well, in its template where the script reads it', str_contains( (string) file_get_contents( __DIR__. '/../_admin/templates/page-recovery.tpl' ), 'data-min-password="[[/_admin/recovery/min-password]]"' ) === true );
+$minPwShown['the wizard'] = [ $minPw ];
+check( 'one minimum password length, Recovery::MIN_PW_LENGTH, declared once and named by every form, script, label and page the two pages are drawn from', $minPwDeclared === 1
 	&& array_filter( $minPwShown, static fn( array $numbers ): bool => $numbers !== [ \Nino\Admin\Recovery::MIN_PW_LENGTH ] ) === [] );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
@@ -1009,6 +1016,28 @@ check( 'a password one character below the rule the form shows is refused by the
 
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', $minPw ) ] );
 check( '...and one of exactly that length is accepted', $status === 200 );
+
+/*	The refusals of the wizard are codes, which the page words in the language it speaks: a code is one of a fixed few and carries nothing of what was
+	typed - not an address, not a markup, not a length of a password - and the sentence of the server beside it is the English of a log, never what the page shows	*/
+$hostile = '"><script>alert(1)</script>@example.com';
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => $hostile, 'pw' => 'a-long-enough-password' ] );
+check( 'an address that is none is refused with a code of the fixed few, and nothing of what was typed is in the code or in the sentence', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail' && ( $body['params'] ?? [] ) === [] && preg_match( '/^[a-z]+(_[a-z]+)*$/D', $body['code'] ) === 1
+	&& str_contains( (string) ( $body['error'] ?? '' ), 'script' ) === false );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => '<b>x' ] );
+check( '...a password that is too short is refused with a code, which says nothing of the password, and its length is the page\'s to state', $status === 400 && ( $body['code'] ?? '' ) === 'install_password_short' && str_contains( (string) ( $body['error'] ?? '' ), '<b>' ) === false && ( $body['params'] ?? [] ) === [] );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Install::class, 'handlePost' ], [], '../../etc/<b>passwd' );
+check( '...and an action that is none, whatever its name, is answered with the code of an unknown action and not with its name', $status === 404 && ( $body['code'] ?? '' ) === 'install_action' && ( $body['params'] ?? [] ) === [] && str_contains( json_encode( $body ), 'passwd' ) === false );
+
+/*	The language the page speaks and asks the catalogue in is one of two: German, else the language the catalogue requires. A value that is none of them -
+	a path, a markup, another case, a list, a locale of the workbench - is the second, and nothing of it is used	*/
+$locale = new \ReflectionMethod( \Nino\Install\Applications::class, '_locale' );
+$localeFor = static function( mixed $lang ) use ( $locale ): string {
+	$_POST['data'] = json_encode( [ 'lang' => $lang ] );
+	return (string) $locale->invoke( null );
+};
+check( 'German asked for is German, and English is the language of the catalogue', $localeFor( 'de' ) === \Nino\Applications::LOCALE_GERMAN && $localeFor( 'en' ) === \Nino\Applications::LOCALE );
+check( '...and no other value is believed: a path, a markup, another case, a locale of the workbench, a list, a number, nothing', array_filter( [ '../../etc/passwd', '"><script>x</script>', 'DE', 'de_DE', 'de ', '', null, [ 'de' ], 7, true ], static fn( mixed $lang ): bool => $localeFor( $lang ) !== \Nino\Applications::LOCALE ) === [] );
+unset( $_POST['data'] );
 
 echo "\n";
 

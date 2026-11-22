@@ -96,8 +96,12 @@ namespace Nino\Install {
 		 */
 		public static function handleGet( array &$appData, array &$request ): void {
 
-			if( \Nino\Admin\Admin::isInstalled( $appData ) === false )
+			if( \Nino\Admin\Admin::isInstalled( $appData ) === false ) {
+
+				// The length a password must have, for the forms that name it: the page has no text file to ask
+				\Nino\Html::addFills( $appData, [ '[[/_admin/install/min-password]]' => (string) \Nino\Admin\Recovery::MIN_PW_LENGTH ], '*' );
 				return;
+			}
 
 			$request['/nino/http/response']['body'] = '[template /_admin/install/templates/page-locked]';
 		}
@@ -130,7 +134,7 @@ namespace Nino\Install {
 				$actions += $module::actions();
 
 			if( isset( $actions[$action] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown action' );
+				\Nino\Http::fail( $request, 404, 'unknown action', 'install_action' );
 				return;
 			}
 
@@ -157,7 +161,7 @@ namespace Nino\Install {
 				return false;
 
 			if( \Nino\Admin\Admin::isInstalled( $appData ) === true ) {
-				\Nino\Http::fail( $request, 423, 'already installed' );
+				\Nino\Http::fail( $request, 423, 'already installed', 'install_installed' );
 				return false;
 			}
 
@@ -694,7 +698,7 @@ namespace Nino\Install {
 			) ) );
 
 			if( count( $locales ) === 0 ) {
-				\Nino\Http::fail( $request, 400, 'select at least one locale' );
+				\Nino\Http::fail( $request, 400, 'select at least one locale', 'install_locales' );
 				return;
 			}
 
@@ -791,14 +795,14 @@ namespace Nino\Install {
 				picks up whole	*/
 			$applied = \Nino\Features::applyUnit( $appData, self::LIBRARY. '/base', $locales, $routes, $blacklist, $config, true );
 			if( $applied !== true ) {
-				\Nino\Http::fail( $request, 500, 'the base unit could not be applied: '. $applied );
+				\Nino\Http::fail( $request, 500, 'the base unit could not be applied: '. $applied, 'install_unit' );
 				return;
 			}
 
 			foreach( $modules as $key ) {
 				$applied = \Nino\Features::applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config, true );
 				if( $applied !== true ) {
-					\Nino\Http::fail( $request, 500, 'the unit "'. $key. '" could not be applied: '. $applied );
+					\Nino\Http::fail( $request, 500, 'the unit "'. $key. '" could not be applied: '. $applied, 'install_unit' );
 					return;
 				}
 			}
@@ -810,7 +814,7 @@ namespace Nino\Install {
 				$names['[[/_nino/locale/'. $locale. '/name]]'] = \Nino\Locales::ENDONYMS[$locale] ?? $locale;
 
 			if( \Nino\Features::mergeText( $appData, '/text/global.php', $names, false ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not write /text/global.php' );
+				\Nino\Http::fail( $request, 500, 'could not write /text/global.php', 'install_text_write' );
 				return;
 			}
 
@@ -839,7 +843,7 @@ namespace Nino\Install {
 				$activated = \Nino\Features::activate( $appData, (string) $feature );
 
 				if( $activated !== true ) {
-					\Nino\Http::fail( $request, 500, 'the feature "'. $feature. '" could not be switched on: '. $activated );
+					\Nino\Http::fail( $request, 500, 'the feature "'. $feature. '" could not be switched on: '. $activated, 'install_feature_on' );
 					return;
 				}
 			}
@@ -995,10 +999,13 @@ namespace Nino\Install {
 		// internals
 		private const string BASE_TEXT_DIR = __DIR__. '/library/base/text';
 
-		// The workbench's own English words, which hold the vocabulary of a key's
-		// segments (/_admin/common/word/<slug>). The wizard publishes no [jstext],
-		// so it reads the file itself
-		private const string WORDS_FILE = __DIR__. '/../text/en_US.php';
+		// The workbench's own words, which hold the vocabulary of a key's segments
+		// (/_admin/common/word/<slug>) in the two languages the wizard speaks. The
+		// wizard publishes no [jstext], so it reads the files itself
+		private const array WORDS_FILES = [
+			'de' => __DIR__. '/../text/de_DE.php',
+			'en' => __DIR__. '/../text/en_US.php',
+		];
 
 		// Only these two prefixes are in scope - see this class's docblock.
 		// The technical /project/website/html/* values and the mails' look
@@ -1019,7 +1026,8 @@ namespace Nino\Install {
 
 		/**
 		 *	List "base"'s /project/company/* and /project/website/general/*
-		 *	text keys with their current value(s) and a friendly label -
+		 *	text keys with their current value(s) and a friendly label in each
+		 *	language of the wizard ('labels') -
 		 *	everything else (see this class's docblock, including
 		 *	blacklisted/technical keys) is left out
 		 *
@@ -1038,7 +1046,7 @@ namespace Nino\Install {
 			) );
 
 			foreach( $entries as &$entry )
-				$entry['label'] = self::_label( $entry['key'] );
+				$entry['labels'] = [ 'de' => self::_label( $entry['key'], 'de' ), 'en' => self::_label( $entry['key'], 'en' ) ];
 			unset( $entry );
 
 			\Nino\Http::ok( $request, [
@@ -1074,39 +1082,41 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	'/project/company/contact/address' -> 'Company › Address',
-		 *	'/project/website/general/url' -> 'Website › URL' - the category and
-		 *	the name, each as the vocabulary of the workbench says it in English
-		 *	(see _word()), no hardcoded per-key lookup table to keep in sync with
-		 *	the library's own key names. English like the whole wizard
+		 *	'/project/company/contact/address' -> 'Company › Address' (de: 'Unternehmen
+		 *	› Adresse'), '/project/website/general/url' -> 'Website › URL' - the category
+		 *	and the name, each as the vocabulary of the workbench says it in the language
+		 *	(see _word()), no hardcoded per-key lookup table to keep in sync with the
+		 *	library's own key names
 		 *
 		 *	@param		string		$key
+		 *	@param		string		$language			'de' or 'en'
 		 *
 		 *	@return 	string
 		 */
-		private static function _label( string $key ): string {
+		private static function _label( string $key, string $language ): string {
 
 			$segments = explode( '/', trim( $key, '/' ) );
 
-			return self::_word( $segments[1] ?? '' ). ' › '. self::_word( $segments[3] ?? '' );
+			return self::_word( $segments[1] ?? '', $language ). ' › '. self::_word( $segments[3] ?? '', $language );
 		}
 
 		/**
-		 *	One segment of a key as the English vocabulary of the workbench names
-		 *	it: 'company' is "Company", 'url' is "URL". A slug the vocabulary has
-		 *	no word for is capitalized with its hyphens as spaces
+		 *	One segment of a key as the vocabulary of the workbench names it in a
+		 *	language: 'company' is "Company", 'url' is "URL". A slug the vocabulary
+		 *	has no word for is capitalized with its hyphens as spaces
 		 *
 		 *	@param		string		$slug
+		 *	@param		string		$language			'de' or 'en'
 		 *
 		 *	@return 	string
 		 */
-		private static function _word( string $slug ): string {
+		private static function _word( string $slug, string $language ): string {
 
-			static $words = null;
+			static $words = [];
 
-			$words ??= is_file( self::WORDS_FILE ) === true ? (array) ( include self::WORDS_FILE ) : [];
+			$words[$language] ??= is_file( self::WORDS_FILES[$language] ) === true ? (array) ( include self::WORDS_FILES[$language] ) : [];
 
-			return (string) ( $words['[[/_admin/common/word/'. $slug. ']]'] ?? ucfirst( str_replace( '-', ' ', $slug ) ) );
+			return (string) ( $words[$language]['[[/_admin/common/word/'. $slug. ']]'] ?? ucfirst( str_replace( '-', ' ', $slug ) ) );
 		}
 
 		/**
@@ -1209,12 +1219,12 @@ namespace Nino\Install {
 			$pw 	= \Nino\Admin\Admin::postString( $data, 'pw' );
 
 			if( filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid email address' );
+				\Nino\Http::fail( $request, 400, 'invalid email address', 'install_mail' );
 				return;
 			}
 
 			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters' );
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'install_password_short' );
 				return;
 			}
 
@@ -1334,6 +1344,18 @@ namespace Nino\Install {
 		}
 
 		/**
+		 *	The language the names and descriptions of the applications and of their features are asked for in: the
+		 *	one the page speaks, which it posts as 'lang'. An allow-list of two: German, else the language the catalogue
+		 *	requires of every text (\Nino\Applications::LOCALE) - a value that is none of them, a path or a markup
+		 *	among them, is the second
+		 *
+		 *	@return 	string										A locale
+		 */
+		private static function _locale(): string {
+			return \Nino\Admin\Admin::postString( \Nino\Install\Install::postData(), 'lang' ) === 'de' ? \Nino\Applications::LOCALE_GERMAN : \Nino\Applications::LOCALE;
+		}
+
+		/**
 		 *	What the step shows: the applications of the official catalogue that
 		 *	fit this kernel - key, name, description, the features each one
 		 *	switches on and whether it provides the start page ('start') - or why
@@ -1384,8 +1406,10 @@ namespace Nino\Install {
 			$answer['startApplied'] = self::_startApplied( $appData, $offered );
 			$answer['applications'] = self::_describe( $appData, $catalogue, $offered );
 
-			if( $answer['applications'] === [] )
+			if( $answer['applications'] === [] ) {
+				$answer['reason']		= 'install_none';
 				$answer['message'] = 'The official catalogue offers no application for this version of Nino.';
+			}
 
 			\Nino\Http::ok( $request, $answer );
 		}
@@ -1406,7 +1430,7 @@ namespace Nino\Install {
 			if( $plan === null )
 				return;
 
-			$locale	= \Nino\Applications::LOCALE;
+			$locale	= self::_locale();
 			$offers	= \Nino\Catalogue::offers( $appData, $plan['catalogue'], \Nino\Packages::FEATURE );
 
 			\Nino\Http::ok( $request, [ 'features' => array_map(
@@ -1464,7 +1488,7 @@ namespace Nino\Install {
 			}
 
 			if( $result['status'] === 500 ) {
-				\Nino\Http::fail( $request, 500, $result['reason'] );
+				\Nino\Http::fail( $request, 500, $result['reason'], 'install_feature_error' );
 				return;
 			}
 
@@ -1545,7 +1569,7 @@ namespace Nino\Install {
 		 */
 		public static function targets( array &$appData, array $applied ): array {
 
-			$locale		= \Nino\Applications::LOCALE;
+			$locale		= self::_locale();
 			$targets	= [];
 
 			foreach( $applied as $application )
@@ -1694,7 +1718,7 @@ namespace Nino\Install {
 		 */
 		private static function _describe( array &$appData, array $catalogue, array $offered ): array {
 
-			$locale	= \Nino\Applications::LOCALE;
+			$locale	= self::_locale();
 			$offers	= \Nino\Catalogue::offers( $appData, $catalogue, \Nino\Packages::FEATURE );
 			$list		= [];
 
@@ -2148,12 +2172,12 @@ namespace Nino\Install {
 			$users	= \Nino\Install\Accounts::usableUsers( $appData );
 
 			if( count( $users ) === 0 ) {
-				\Nino\Http::fail( $request, 409, 'create at least one account first' );
+				\Nino\Http::fail( $request, 409, 'create at least one account first', 'install_no_account' );
 				return;
 			}
 
 			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters' );
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'install_password_short' );
 				return;
 			}
 
@@ -2175,7 +2199,7 @@ namespace Nino\Install {
 
 			$pages = \Nino\Install\StarterPages::apply( $appData, $own );
 			if( $pages !== true ) {
-				\Nino\Http::fail( $request, 500, $pages );
+				\Nino\Http::fail( $request, 500, $pages, 'install_pages' );
 				return;
 			}
 
@@ -2191,7 +2215,7 @@ namespace Nino\Install {
 
 					$replayed = \Nino\Features::activate( $appData, $featureKey );
 					if( $replayed !== true ) {
-						\Nino\Http::fail( $request, 500, 'could not apply the feature "'. $featureKey. '": '. $replayed );
+						\Nino\Http::fail( $request, 500, 'could not apply the feature "'. $featureKey. '": '. $replayed, 'install_feature_replay' );
 						return;
 					}
 				}
@@ -2207,13 +2231,13 @@ namespace Nino\Install {
 				$recoveryKey = \Nino\Modules\Backups::recoveryKey( $appData );
 
 				if( $recoveryKey === false ) {
-					\Nino\Http::fail( $request, 500, 'the backup key could not be created - check the file permissions of config.php and the private directory' );
+					\Nino\Http::fail( $request, 500, 'the backup key could not be created - check the file permissions of config.php and the private directory', 'install_backup_key' );
 					return;
 				}
 			}
 
 			if( \Nino\Admin\Recovery::set( $appData, $pw ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Recovery::PASSWORD_PATH. ' under the private directory - check its file permissions' );
+				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Recovery::PASSWORD_PATH. ' under the private directory - check its file permissions', 'install_recovery_write' );
 				return;
 			}
 

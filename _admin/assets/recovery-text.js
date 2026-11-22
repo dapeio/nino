@@ -1,0 +1,251 @@
+/**
+ *	Nino										A compact filesystembased php framework
+ *	recovery-text.js				Every sentence of the recovery page (_admin/templates/page-recovery.tpl and
+ *													recovery.js) in German and in English, under the same keys: the page has no text
+ *													fills of the project - they may be what is broken - so this table is its one place
+ *													for what its markup writes (data-text) and what its script draws. Keys are
+ *													/_admin/recovery/<part>/<name>; a refusal of the server is the key
+ *													/_admin/page/error/<code>, the code's underscores written as hyphens, and a code with
+ *													no key here is the general sentence. The words under /_admin/common/ are the ones
+ *													the blocks of the workbench look up; they are the workbench's own words.
+ *													German is the default, the address is "Du".
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+( function(wn,dc,dE,bd) {
+
+	wn.Nino.recovery = wn.Nino.recovery || {};
+
+	Nino.recovery.text = {
+
+		de : {
+
+			'/_admin/page/title'								: 'Wiederherstellung',
+			'/_admin/page/language-other'				: 'English',
+			'/_admin/page/error/failed'					: 'Die Anfrage ist fehlgeschlagen (Status %s).',
+
+			'/_admin/recovery/title/page'				: 'Wiederherstellung',
+			'/_admin/recovery/label/back'				: 'Zurück zu /_admin',
+			'/_admin/recovery/label/close'			: 'Wiederherstellung schließen',
+
+			'/_admin/recovery/login/pw'					: 'Recovery-Passwort',
+			'/_admin/recovery/login/pw-help'		: 'Das Recovery-Passwort, das Du im Assistenten festgelegt hast. Es ist keine Anmeldung: Es öffnet diese Seite, wenn die Konten selbst kaputt sind.',
+			'/_admin/recovery/login/submit'			: 'Weiter',
+			'/_admin/recovery/login/checking'		: 'Wird geprüft …',
+
+			'/_admin/recovery/restore/title'		: 'Backup wiederherstellen',
+			'/_admin/recovery/restore/help'			: 'Jede Wiederherstellung sichert zuerst den jetzigen Stand, damit auch eine falsche Wahl wieder rückgängig zu machen ist.',
+			'/_admin/recovery/restore/key'			: 'Recovery-Key des Archivs',
+			'/_admin/recovery/restore/key-help'	: 'Nur für ein Archiv eines anderen Projekts: der Recovery-Key, den der Assistent gezeigt hat, als jenes Projekt installiert wurde. Er gilt für diese eine Wiederherstellung, wird nicht gespeichert und nicht protokolliert. Ein Archiv dieses Projekts braucht keinen.',
+			'/_admin/recovery/restore/key-show'	: 'Recovery-Key anzeigen',
+			'/_admin/recovery/restore/archives'	: 'Archive auf diesem Server',
+			'/_admin/recovery/restore/none'			: 'Noch kein Backup vorhanden.',
+			'/_admin/recovery/restore/action'		: 'Wiederherstellen',
+			'/_admin/recovery/restore/confirm-title'	: 'Backup wiederherstellen',
+			'/_admin/recovery/restore/confirm'	: 'Das Backup vom %s wird wiederhergestellt. Der jetzige Stand wird vorher gesichert.',
+			'/_admin/recovery/restore/busy'			: 'Wird wiederhergestellt …',
+			'/_admin/recovery/restore/done'			: 'Das Backup vom %s wurde wiederhergestellt.',
+			'/_admin/recovery/restore/notice'		: 'Das Backup stammt aus Nino %s, hier läuft %s.',
+
+			'/_admin/recovery/file/title'				: 'Archiv aus einer Datei',
+			'/_admin/recovery/file/label'				: 'Archivdatei',
+			'/_admin/recovery/file/help'				: 'Braucht den Recovery-Key oben. Die Datei wird nur für diese Wiederherstellung benutzt und danach gelöscht.',
+			'/_admin/recovery/file/note'				: 'Eine Datei, die größer ist, als dieser Server im Upload annimmt, legst Du per SFTP in private/.backups, unter ihrem Datum als Namen (2026-11-15-120000-manual.php), und stellst sie aus der Liste oben wieder her.',
+			'/_admin/recovery/file/action'			: 'Aus der Datei wiederherstellen',
+			'/_admin/recovery/file/confirm-title'	: 'Archiv wiederherstellen',
+			'/_admin/recovery/file/confirm'			: 'Das Archiv aus dieser Datei wird wiederhergestellt. Der jetzige Stand wird vorher gesichert.',
+			'/_admin/recovery/file/busy'				: 'Wird hochgeladen und wiederhergestellt …',
+			'/_admin/recovery/file/done'				: 'Archiv wiederhergestellt.',
+
+			'/_admin/recovery/reset/title'			: 'Passwort setzen',
+			'/_admin/recovery/reset/help'				: 'Das Konto bekommt das neue Passwort, wird überall abgemeldet und entsperrt und aktiviert, falls es gesperrt oder deaktiviert war.',
+			'/_admin/recovery/reset/account'		: 'Konto',
+			'/_admin/recovery/reset/accounts-none'	: 'Keine Konten',
+			'/_admin/recovery/reset/pw'					: 'Neues Passwort',
+			'/_admin/recovery/reset/pw-help'		: 'Mindestens %s Zeichen.',
+			'/_admin/recovery/reset/action'			: 'Passwort setzen',
+			'/_admin/recovery/reset/busy'				: 'Wird gespeichert …',
+			'/_admin/recovery/reset/done'				: 'Passwort gesetzt, alle Sitzungen des Kontos abgemeldet.',
+
+			'/_admin/recovery/create/title'			: 'Konto mit Vollzugriff anlegen',
+			'/_admin/recovery/create/help'			: 'Für den Fall, dass sich mit keinem Konto mehr anmelden lässt. Das neue Konto darf alles; von hier aus ist das nicht rückgängig zu machen.',
+			'/_admin/recovery/create/mail'			: 'E-Mail',
+			'/_admin/recovery/create/pw'				: 'Passwort',
+			'/_admin/recovery/create/pw-help'		: 'Mindestens %s Zeichen.',
+			'/_admin/recovery/create/repeat'		: 'Passwort wiederholen',
+			'/_admin/recovery/create/action'		: 'Konto anlegen',
+			'/_admin/recovery/create/confirm-title'	: 'Konto mit Vollzugriff anlegen',
+			'/_admin/recovery/create/confirm'		: 'Für %s wird ein Konto mit Vollzugriff angelegt.',
+			'/_admin/recovery/create/busy'			: 'Wird gespeichert …',
+			'/_admin/recovery/create/done'			: 'Konto mit Vollzugriff angelegt.',
+
+			'/_admin/recovery/error/mismatch'		: 'Die Wiederholung stimmt nicht mit dem Passwort überein.',
+			'/_admin/recovery/error/short'			: 'Das Passwort braucht mindestens %s Zeichen.',
+			'/_admin/recovery/error/mail'				: 'E-Mail ist ungültig: Gib eine Adresse wie name@example.org ein.',
+			'/_admin/recovery/error/file'				: 'Archivdatei fehlt.',
+
+			'/_admin/page/error/recovery-wrong'				: 'Das Recovery-Passwort ist ungültig.',
+			'/_admin/page/error/recovery-tries'				: 'Zu viele Versuche. Versuche es später noch einmal.',
+			'/_admin/page/error/recovery-closed'			: 'Die Wiederherstellung ist nicht geöffnet. Lade die Seite neu und gib das Recovery-Passwort ein.',
+			'/_admin/page/error/recovery-no-backups'	: 'Dieses Projekt hat das Modul Backups nicht, also keine Backups, die sich wiederherstellen lassen.',
+			'/_admin/page/error/recovery-date'				: 'Dieses Datum gehört zu keinem Backup.',
+			'/_admin/page/error/recovery-action'			: 'Diese Aktion gibt es nicht.',
+			'/_admin/page/error/recovery-unknown-account'	: 'Dieses Konto gibt es nicht.',
+			'/_admin/page/error/recovery-update'			: 'Das Konto ließ sich nicht ändern.',
+			'/_admin/page/error/recovery-unlock'			: 'Das Passwort ist gesetzt und alle Sitzungen sind beendet, aber die Sperre des Kontos ließ sich nicht aufheben.',
+			'/_admin/page/error/recovery-confirm'			: 'Die Bestätigung fehlt.',
+			'/_admin/page/error/recovery-exists'			: 'Für diese Adresse gibt es schon ein Konto. Setze dafür oben ein Passwort.',
+			'/_admin/page/error/recovery-create'			: 'Das Konto ließ sich nicht anlegen.',
+			'/_admin/page/error/recovery-mail'				: 'E-Mail ist ungültig: Gib eine Adresse wie name@example.org ein.',
+			'/_admin/page/error/recovery-password-short'	: 'Das Passwort braucht mindestens %s Zeichen.',
+			'/_admin/page/error/backups-write'				: 'Für die Wiederherstellung war kein Platz mehr, im Temp-Ordner oder dort, wo die Backups liegen, oder eine Datei ließ sich nicht schreiben.',
+			'/_admin/page/error/backups-busy'					: 'Ein Backup oder eine Wiederherstellung läuft gerade. Versuche es gleich noch einmal.',
+			'/_admin/page/error/backups-gone'					: 'Dieses Archiv gibt es nicht mehr. Lade die Seite neu.',
+			'/_admin/page/error/backups-too-large'		: 'Das Archiv ist größer, als dieser Server im Upload annimmt (PHP-Limit: %s MB). Lege die Datei per SFTP in private/.backups, unter ihrem Datum als Namen.',
+			'/_admin/page/error/backups-upload-name'	: 'Der Dateiname ist keiner eines Backups. Behalte den Namen des Herunterladens bei, der auf ein Datum wie 2026-11-15 oder 2026-11-15-120000-manual und .php endet.',
+			'/_admin/page/error/backups-upload-exists'	: 'Ein Backup %s gibt es schon; nichts wird überschrieben.',
+			'/_admin/page/error/backups-upload-format'	: 'Die Datei ist kein Nino-Backup: Sie wurde nach dem Herunterladen verändert oder ist keines.',
+			'/_admin/page/error/backups-upload-key'		: 'Der Recovery-Key dieses Projekts öffnet das Archiv nicht: Gib den Recovery-Key des Archivs ein.',
+			'/_admin/page/error/backups-upload-nokey'	: 'Dieses Projekt hat noch keinen Recovery-Key, ein Archiv lässt sich deshalb nicht prüfen. Gib den Recovery-Key des Archivs ein.',
+			'/_admin/page/error/backups-key'					: 'Der Recovery-Key dieses Projekts öffnet dieses Archiv nicht: Es stammt aus einem anderen Projekt oder ist beschädigt. Gib den Recovery-Key des Archivs ein.',
+			'/_admin/page/error/backups-key-wrong'		: 'Dieser Recovery-Key öffnet das Archiv nicht: Es ist ein anderer Recovery-Key, oder das Archiv ist beschädigt.',
+			'/_admin/page/error/backups-key-missing'	: 'Gib den Recovery-Key des Archivs ein.',
+			'/_admin/page/error/backups-key-format'		: 'Das ist kein Recovery-Key: Er ist 44 Zeichen lang und endet auf =.',
+			'/_admin/page/error/backups-key-tries'		: 'Zu viele Versuche mit einem Recovery-Key. Versuche es später noch einmal.',
+			'/_admin/page/error/backups-upload-memory'	: 'Die Speichergrenze dieses Servers reicht nicht, um das Archiv zu öffnen (etwa %s MB nötig, Grenze %s MB). Erhöhe zuerst memory_limit.',
+			'/_admin/page/error/upload-too-large'			: 'Die Datei ist größer, als der Server im Upload annimmt (%s MB).',
+			'/_admin/page/error/upload-partial'				: 'Die Datei wurde nur zum Teil hochgeladen. Versuche es noch einmal.',
+			'/_admin/page/error/upload-missing'				: 'Es wurde keine Datei hochgeladen.',
+			'/_admin/page/error/upload-server'				: 'Der Server konnte den Upload nicht ablegen.',
+
+			'/_admin/common/label/help-for'			: 'Hilfe zu %s',
+			'/_admin/common/label/file-choose'	: 'Datei wählen',
+			'/_admin/common/label/file-none'		: 'Keine Datei gewählt',
+			'/_admin/common/label/remove'				: 'Entfernen',
+			'/_admin/common/label/close'				: 'Schließen',
+			'/_admin/common/label/cancel'				: 'Abbrechen',
+			'/_admin/common/error/file-too-large'	: 'Die Datei ist größer als %s MB.',
+			'/_admin/common/error/file-type'		: 'Die Datei hat keinen Typ, den dieses Feld annimmt (%s).',
+			'/_admin/common/error/missing'			: '%s fehlt.',
+			'/_admin/common/unit/decimal'				: ',',
+		},
+
+		en : {
+
+			'/_admin/page/title'								: 'Recovery',
+			'/_admin/page/language-other'				: 'Deutsch',
+			'/_admin/page/error/failed'					: 'The request failed (status %s).',
+
+			'/_admin/recovery/title/page'				: 'Recovery',
+			'/_admin/recovery/label/back'				: 'Back to /_admin',
+			'/_admin/recovery/label/close'			: 'Close recovery',
+
+			'/_admin/recovery/login/pw'					: 'Recovery password',
+			'/_admin/recovery/login/pw-help'		: 'The recovery password set during setup. It is no login: it opens this page when the accounts themselves are what is broken.',
+			'/_admin/recovery/login/submit'			: 'Continue',
+			'/_admin/recovery/login/checking'		: 'Checking …',
+
+			'/_admin/recovery/restore/title'		: 'Restore a backup',
+			'/_admin/recovery/restore/help'			: 'Every restore first snapshots the current state, so a wrong pick can itself be undone.',
+			'/_admin/recovery/restore/key'			: 'Recovery key of the archive',
+			'/_admin/recovery/restore/key-help'	: 'Only for an archive of another project: the key the setup wizard showed when that project was installed. It is used for this one restore, and it is not stored and not logged. An archive of this project needs none.',
+			'/_admin/recovery/restore/key-show'	: 'Show the key',
+			'/_admin/recovery/restore/archives'	: 'Archives on this server',
+			'/_admin/recovery/restore/none'			: 'No backups on file.',
+			'/_admin/recovery/restore/action'		: 'Restore',
+			'/_admin/recovery/restore/confirm-title'	: 'Restore backup',
+			'/_admin/recovery/restore/confirm'	: 'The backup of %s is restored. The current state is snapshotted first.',
+			'/_admin/recovery/restore/busy'			: 'Restoring …',
+			'/_admin/recovery/restore/done'			: 'Restored the backup of %s.',
+			'/_admin/recovery/restore/notice'		: 'The backup comes from Nino %s; this is %s.',
+
+			'/_admin/recovery/file/title'				: 'An archive from a file',
+			'/_admin/recovery/file/label'				: 'Archive file',
+			'/_admin/recovery/file/help'				: 'Needs the recovery key above. The file is used for this restore alone and is deleted afterwards.',
+			'/_admin/recovery/file/note'				: 'A file larger than the server takes in an upload goes into private/.backups by SFTP, under its date as the name (2026-11-15-120000-manual.php), and is restored from the list above.',
+			'/_admin/recovery/file/action'			: 'Restore from the file',
+			'/_admin/recovery/file/confirm-title'	: 'Restore archive',
+			'/_admin/recovery/file/confirm'			: 'The archive in this file is restored. The current state is snapshotted first.',
+			'/_admin/recovery/file/busy'				: 'Uploading and restoring …',
+			'/_admin/recovery/file/done'				: 'Restored the archive.',
+
+			'/_admin/recovery/reset/title'			: 'Set a password',
+			'/_admin/recovery/reset/help'				: 'The account gets the new password, is logged out everywhere, and is unlocked and activated if it was locked or deactivated.',
+			'/_admin/recovery/reset/account'		: 'Account',
+			'/_admin/recovery/reset/accounts-none'	: 'No accounts',
+			'/_admin/recovery/reset/pw'					: 'New password',
+			'/_admin/recovery/reset/pw-help'		: 'At least %s characters.',
+			'/_admin/recovery/reset/action'			: 'Set password',
+			'/_admin/recovery/reset/busy'				: 'Saving …',
+			'/_admin/recovery/reset/done'				: 'Password set, every session of this account logged out.',
+
+			'/_admin/recovery/create/title'			: 'Create a full-access account',
+			'/_admin/recovery/create/help'			: 'For when no account is left to log in with. The new account can do everything, and this cannot be undone from here.',
+			'/_admin/recovery/create/mail'			: 'Email',
+			'/_admin/recovery/create/pw'				: 'Password',
+			'/_admin/recovery/create/pw-help'		: 'At least %s characters.',
+			'/_admin/recovery/create/repeat'		: 'Repeat the password',
+			'/_admin/recovery/create/action'		: 'Create account',
+			'/_admin/recovery/create/confirm-title'	: 'Create full-access account',
+			'/_admin/recovery/create/confirm'		: 'An account with full access is created for %s.',
+			'/_admin/recovery/create/busy'			: 'Saving …',
+			'/_admin/recovery/create/done'			: 'Account created with full access.',
+
+			'/_admin/recovery/error/mismatch'		: 'The repeat does not match the password.',
+			'/_admin/recovery/error/short'			: 'The password needs at least %s characters.',
+			'/_admin/recovery/error/mail'				: 'Email is not valid: type an address like name@example.org.',
+			'/_admin/recovery/error/file'				: 'Archive file is missing.',
+
+			'/_admin/page/error/recovery-wrong'				: 'The recovery password is not valid.',
+			'/_admin/page/error/recovery-tries'				: 'Too many attempts. Try again later.',
+			'/_admin/page/error/recovery-closed'			: 'Recovery is not open. Reload the page and type the recovery password.',
+			'/_admin/page/error/recovery-no-backups'	: 'This project has no backups module, so there are no backups to restore.',
+			'/_admin/page/error/recovery-date'				: 'That date belongs to no backup.',
+			'/_admin/page/error/recovery-action'			: 'There is no such action.',
+			'/_admin/page/error/recovery-unknown-account'	: 'There is no such account.',
+			'/_admin/page/error/recovery-update'			: 'The account could not be changed.',
+			'/_admin/page/error/recovery-unlock'			: 'The password is set and every session ended, but the lock of the account could not be lifted.',
+			'/_admin/page/error/recovery-confirm'			: 'The confirmation is missing.',
+			'/_admin/page/error/recovery-exists'			: 'There is an account for this address already. Set a password for it above.',
+			'/_admin/page/error/recovery-create'			: 'The account could not be created.',
+			'/_admin/page/error/recovery-mail'				: 'Email is not valid: type an address like name@example.org.',
+			'/_admin/page/error/recovery-password-short'	: 'The password needs at least %s characters.',
+			'/_admin/page/error/backups-write'				: 'There was no room left for the restore, in the temporary directory or where the backups are kept, or a file could not be written.',
+			'/_admin/page/error/backups-busy'					: 'A backup or a restore is running. Try again in a moment.',
+			'/_admin/page/error/backups-gone'					: 'That archive is no longer there. Reload the page.',
+			'/_admin/page/error/backups-too-large'		: 'The archive is larger than this server accepts in an upload (PHP limit: %s MB). Put the file into private/.backups by SFTP, under its date as the name.',
+			'/_admin/page/error/backups-upload-name'	: 'The file name is none of a backup. Keep the name the download gave it, ending in a date such as 2026-11-15 or 2026-11-15-120000-manual and .php.',
+			'/_admin/page/error/backups-upload-exists'	: 'There is a backup %s already; nothing is overwritten.',
+			'/_admin/page/error/backups-upload-format'	: 'The file is no backup of Nino: it was changed after the download, or it is not one.',
+			'/_admin/page/error/backups-upload-key'		: 'This project’s key does not open the archive: type the recovery key of the archive.',
+			'/_admin/page/error/backups-upload-nokey'	: 'This project has no backup key yet, so an archive cannot be checked. Type the recovery key of the archive.',
+			'/_admin/page/error/backups-key'					: 'This project’s key does not open this archive: it comes from another project, or it is damaged. Type the recovery key of the archive.',
+			'/_admin/page/error/backups-key-wrong'		: 'This key does not open the archive: it is another key, or the archive is damaged.',
+			'/_admin/page/error/backups-key-missing'	: 'Type the recovery key of the archive.',
+			'/_admin/page/error/backups-key-format'		: 'That is no recovery key: it is 44 characters long and ends in =.',
+			'/_admin/page/error/backups-key-tries'		: 'Too many attempts with a recovery key. Try again later.',
+			'/_admin/page/error/backups-upload-memory'	: 'The memory limit of this server does not carry opening this archive (about %s MB needed, limit %s MB). Raise memory_limit first.',
+			'/_admin/page/error/upload-too-large'			: 'The file is larger than the server accepts in an upload (%s MB).',
+			'/_admin/page/error/upload-partial'				: 'The file was only partly uploaded. Try again.',
+			'/_admin/page/error/upload-missing'				: 'No file was uploaded.',
+			'/_admin/page/error/upload-server'				: 'The server could not store the upload.',
+
+			'/_admin/common/label/help-for'			: 'Help for %s',
+			'/_admin/common/label/file-choose'	: 'Choose file',
+			'/_admin/common/label/file-none'		: 'No file chosen',
+			'/_admin/common/label/remove'				: 'Remove',
+			'/_admin/common/label/close'				: 'Close',
+			'/_admin/common/label/cancel'				: 'Cancel',
+			'/_admin/common/error/file-too-large'	: 'The file is larger than %s MB.',
+			'/_admin/common/error/file-type'		: 'The file is not of a type this field takes (%s).',
+			'/_admin/common/error/missing'			: '%s is missing.',
+			'/_admin/common/unit/decimal'				: '.',
+		},
+	};
+
+	Nino.pageText.register( Nino.recovery.text );
+
+})(window, document, document.documentElement, document.body);

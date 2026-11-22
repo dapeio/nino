@@ -440,7 +440,8 @@ a {
    2.2 SC 2.5.8): "Log out" is one line of .82rem text, which is 19px tall on
    its own. */
 :where(.nino-admin) .nino-admin-linkbutton {
-	min-height: 1.5rem;
+	/* A target of 24px, as the guide asks of a link in a text: 1.5rem of the 15px root is 22.5px */
+	min-height: var(--nino-admin-control-icon-small);
 	padding: 0;
 	border-radius: 0;
 	background: none;
@@ -824,6 +825,13 @@ a {
 
 :where(.nino-admin) .nino-admin-actions--end {
 	justify-content: flex-end;
+}
+
+/* A link in the row is a target of 24px like the buttons beside it (the recovery page's way back) */
+:where(.nino-admin) .nino-admin-actions > a {
+	display: inline-flex;
+	align-items: center;
+	min-height: var(--nino-admin-control-icon-small);
 }
 
 :where(.nino-admin) .nino-admin-actions--between {
@@ -3968,6 +3976,32 @@ a {
 	letter-spacing: -.035em;
 }
 
+/* A card of the sign-in with fields: wide enough for the label at the left of its field, as everywhere (from 48rem the
+   label stands beside the field), and the tools of the recovery page, whose cards are the wider page itself */
+.nino-admin-auth--form {
+	width: min(100% - 2rem, 34rem);
+}
+
+.nino-admin-auth--tools {
+	width: min(100% - 2rem, 46rem);
+}
+
+/* The fields of a card are one group without a frame of their own: the card is the frame */
+.nino-admin-auth-card > fieldset {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+}
+
+/* The choice of the language of a page outside the workbench, at its top right: a quiet link of the language the page can be read in instead */
+.nino-admin-pagelang {
+	display: flex;
+	justify-content: flex-end;
+	padding: var(--nino-admin-space-4) var(--nino-admin-space-6) 0;
+}
+
 /* ------------------------------------------------------ The follow window */
 
 /*	A bar and the frame below it, the frame taking what is left of the height:
@@ -5835,11 +5869,13 @@ a {
 #admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-tabs {
 	display: flex;
 	flex: 1 1 auto;
+	/* The tabs of the first level wrap into a second row where they do not fit - at 390px the fourth of the Users panel, "Recovery password",
+	   was cut off at the edge of a strip that scrolled - and the strip never scrolls sideways */
+	flex-wrap: wrap;
 	gap: var(--nino-admin-space-1);
 	min-width: 0;
 	margin: 0;
 	padding: 0;
-	overflow-x: auto;
 	border-bottom: 0;
 	align-self: flex-end;
 }
@@ -6150,31 +6186,9 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 
 #form-login #admin-localepicker {
 	display: block;
+	/* A target of 24px, as every control is */
+	min-height: var(--nino-admin-control-icon-small);
 	margin: var(--nino-admin-space-8) auto 0;
-}
-#form-login #form-message {
-	margin: 0 0 var(--nino-admin-space-7);
-}
-#form-login #submit {
-	width: 100%;
-	margin-top: var(--nino-admin-space-3);
-}
-#form-message {
-	min-height: 1.2rem;
-	color: var(--editor-text-secondary);
-	font-size: var(--nino-admin-text-sm);
-}
-#form-message.pending {
-	color: var(--editor-blue);
-}
-#form-message.error {
-	color: var(--editor-red-ink);
-}
-/*	Login is the one screen that marks the offending field itself: there is no
- *	per-field error text to read, only "that pair was wrong" */
-#form-login input.error {
-	border-color: var(--editor-red);
-	box-shadow: 0 0 0 3px var(--editor-red-soft);
 }
 
 #admin-page-wrap .admin-page-label {

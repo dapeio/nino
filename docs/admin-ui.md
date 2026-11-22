@@ -277,7 +277,7 @@ One word per thing. The fills are in `/_admin/common/label/*`; a panel takes the
 
 Form: the German address is "Du/Dein/Dir" with a capital. Buttons and titles are in sentence case, without a full stop and without "..." (German: the verb in the infinitive at the end - "Route löschen"; English: the verb first - "Delete route"). Sentences end with a full stop. The ellipsis of a loading sentence is a space and "...". Quotation marks are „...“ in German, “...” in English. No raw key, type name or code stands as the only word: first the word, then the identifier in `code`. Every word is a fill, in both languages.
 
-The setup wizard and the recovery page are bilingual: German is the default, English is offered at the top right, and the choice holds for the run. They use the same list of words and the same blocks.
+The setup wizard and the recovery page are bilingual: German is the default, English is offered at the top right, and the choice holds for every step and over a reload (one entry of the browser's storage, a value of an allow-list of two). They have no fills of the project to ask, so each has one table of its sentences with the same keys in both languages, and a refusal of the server is a code that table words. They use the same list of words and the same blocks as the panels - the dialog of a question, the fields, the buttons, the bar of the wizard - and the login and the session dialog of the workbench do too.
 
 ## Narrow widths
 
@@ -325,7 +325,7 @@ Space is for `padding`, `margin` and `gap`. A value is the nearest step (a tie g
 
 Each exception stands at its place in `style.css` with a comment, and the test names it by selector, property and value.
 
-**Where the rule holds.** The rule is kept by `_admin/assets/style.css`, and the test holds it there. The stylesheets of the kernel's panels (`_admin/Nino/Modules/*/assets`), the wizard's and those of the features still write sizes of their own: each is brought to the tokens by the change that brings its panel to this chapter, and from then on the same test holds it.
+**Where the rule holds.** The rule is kept by `_admin/assets/style.css`, and the test holds it there. The stylesheets of the kernel's panels (`_admin/Nino/Modules/*/assets`) and those of the features still write sizes of their own: each is brought to the tokens by the change that brings its panel to this chapter, and from then on the same test holds it.
 
 What is drawn on the website itself (the bar of a block in the page editor) MUST read the same tokens: the block hands them on as custom properties into its shadow DOM and keeps no colour, size or radius of its own.
 
@@ -387,4 +387,4 @@ For every review of a view. A line marked **[T]** can be held as a structural te
 
 ## What the tests pin
 
-`tests/admin-guide-smoke.php` reads the sources of the workbench and holds what can be held by structure, never by words: every `--nino-admin-*` token that a stylesheet or script of `_admin` reads is declared, every `nino-admin-*` class that a script of `_admin` uses has a rule in `style.css`, and `style.css` names type and space only through the tokens, apart from the exceptions above. A rule of this chapter that can be held by structure is added to that suite in the change that brings the block it needs.
+`tests/admin-guide-smoke.php` reads the sources of the workbench and holds what can be held by structure, never by words: every `--nino-admin-*` token that a stylesheet or script of `_admin` reads is declared, every `nino-admin-*` class that a script of `_admin` uses has a rule in `style.css`, and `style.css` names type and space only through the tokens, apart from the exceptions above; the login, the wizard and the recovery page are held to the forms, the dialogs and the bar of the blocks, and the stylesheet of the wizard to the tokens. A rule of this chapter that can be held by structure is added to that suite in the change that brings the block it needs.

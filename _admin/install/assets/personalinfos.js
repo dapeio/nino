@@ -1,5 +1,3 @@
-
-
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Step 3: bulk-fill the /project/company/* and
@@ -7,16 +5,17 @@
  *													has (global.php + per-locale
  *													text/<locale>.php) in one form instead of clicking through
  *													_admin's Text panel one key at a time - each with a
- *													friendly label instead of its raw key, see
+ *													friendly label instead of its raw key, which the server
+ *													gives in both languages of the wizard, see
  *													_admin/install/Install.php's PersonalInfos class. Same shape as
  *													the Text panel's own assets/admin.js and its category
  *													form: every global key on top in one fieldset, every
- *													locale-scoped key below behind a locale <select>,
+ *													locale-scoped key below behind a language <select>,
  *													in-memory _localeValues preserving
  *													unsaved edits across a locale switch. Driven by the shared
  *													Back/Next bar (script.js) rather than its own save button -
  *													save() is exposed for Next to call, not wired to a button
- *													here.
+ *													here. The fields are the blocks of the workbench.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -34,6 +33,7 @@
 		_locales 				: [],
 		_selectedLocale : null,
 		_localeValues 	: {},
+		_globalValues 	: {},
 		_fieldEls 			: {},
 
 		// Fixed display order for the handful of keys base/text/*.php
@@ -72,6 +72,7 @@
 				Nino.install.personalinfos._locales 				= response.locales;
 				Nino.install.personalinfos._selectedLocale = response.locales[0] ?? null;
 				Nino.install.personalinfos._localeValues 	= {};
+				Nino.install.personalinfos._globalValues 	= {};
 				Nino.install.personalinfos._render();
 				Nino.install.personalinfos._ready = true;
 			} );
@@ -80,6 +81,11 @@
 		showCurrent : function() {
 			if( Nino.install.personalinfos._ready === false )
 				Nino.install.personalinfos.init();
+		},
+
+		retext : function() {
+			if( Nino.install.personalinfos._ready === true )
+				Nino.install.personalinfos._render();
 		},
 
 		/**
@@ -103,7 +109,8 @@
 
 		/**
 		 *	Render one key as a labeled field - <textarea> only for
-		 *	TEXTAREA_KEYS, a single-line <input> otherwise
+		 *	TEXTAREA_KEYS, a single-line <input> otherwise. The label is the one the server
+		 *	gives in the language of the page
 		 *
 		 *	@param		{Object}	entry					Key entry
 		 *	@param		{string}	value					Current value
@@ -112,47 +119,49 @@
 		 */
 		_renderKeyField : function( entry, value ) {
 
-			const label = dc.createElement('label');
-			label.className = 'nino-admin-field';
-
-			const span = dc.createElement('span');
-			span.textContent = entry.label;
-			label.appendChild( span );
-
 			const multiline = Nino.install.personalinfos.TEXTAREA_KEYS.indexOf( entry.key ) !== -1;
-			const field = dc.createElement( multiline ? 'textarea' : 'input' );
-			if( multiline === true )
-				field.rows = 2;
-			else
-				field.type = 'text';
-			field.dataset.key = entry.key;
-			field.value = value ?? '';
+			const options = { key : entry.key, label : entry.labels[ Nino.pageText.language() ] ?? '', value : value ?? '' };
+			const label = multiline === true ? Nino.adminUi.textareaField( Object.assign( options, { rows : 2 } ) ) : Nino.adminUi.textField( options );
 
-			Nino.install.personalinfos._fieldEls[entry.key] = field;
-			label.appendChild( field );
+			Nino.install.personalinfos._fieldEls[entry.key] = label.querySelector( multiline === true ? 'textarea' : 'input' );
 
 			return label;
 		},
 
 		/**
-		 *	Snapshot the currently visible locale-scoped fields into
-		 *	_localeValues before switching locale (or before saving)
+		 *	Snapshot the currently visible fields into _globalValues and
+		 *	_localeValues before switching locale, before saving or before they
+		 *	are drawn again in another language
 		 *
 		 *	@return		void
 		 */
 		_storeVisibleLocaleFields : function() {
 
-			const entries = Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === false } );
-			if( entries.length === 0 || Nino.install.personalinfos._selectedLocale === null )
-				return;
+			const self = Nino.install.personalinfos;
 
-			const values = {};
-			entries.forEach( function( entry ) {
-				const el = Nino.install.personalinfos._fieldEls[entry.key];
-				values[entry.key] = ( el !== undefined ) ? el.value : '';
+			self._sortedEntries( function( e ) { return e.global === true } ).forEach( function( entry ) {
+				const el = self._fieldEls[entry.key];
+				if( el !== undefined )
+					self._globalValues[entry.key] = el.value;
 			} );
 
-			Nino.install.personalinfos._localeValues[Nino.install.personalinfos._selectedLocale] = values;
+			const entries = self._sortedEntries( function( e ) { return e.global === false } );
+			if( entries.length === 0 || self._selectedLocale === null )
+				return;
+
+			// Only what is drawn is taken: the first drawing has no field yet, and an empty value taken for one would go before the one the server gave
+			const values = Object.assign( {}, self._localeValues[self._selectedLocale] ?? {} );
+			let drawn = false;
+			entries.forEach( function( entry ) {
+				const el = self._fieldEls[entry.key];
+				if( el === undefined )
+					return;
+				values[entry.key] = el.value;
+				drawn = true;
+			} );
+
+			if( drawn === true )
+				self._localeValues[self._selectedLocale] = values;
 		},
 
 		/**
@@ -176,71 +185,77 @@
 
 		/**
 		 *	Render the whole form: every global key in one fieldset, every
-		 *	locale-scoped key below behind a locale <select> - same shape as
+		 *	locale-scoped key below behind a language <select> - same shape as
 		 *	the Text panel's own _renderGroupForm() (its assets/admin.js)
 		 *
 		 *	@return		void
 		 */
 		_render : function() {
 
-			Nino.install.personalinfos._fieldEls = {};
+			const self = Nino.install.personalinfos;
+			const t = Nino.install.t;
+
+			self._storeVisibleLocaleFields();
+			self._fieldEls = {};
 
 			const wrap = dc.getElementById('personalinfos-list');
 			wrap.innerHTML = '';
 
-			const globalEntries = Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === true } );
-			const localeEntries = Nino.install.personalinfos._sortedEntries( function( e ) { return e.global === false } );
+			const globalEntries = self._sortedEntries( function( e ) { return e.global === true } );
+			const localeEntries = self._sortedEntries( function( e ) { return e.global === false } );
 
 			if( globalEntries.length > 0 ) {
 
-				const globalWrap = dc.createElement('fieldset');
+				const globalWrap = Nino.adminUi.el( 'fieldset', '' );
 				globalWrap.id = 'personalinfos-form-global';
 
-				const legend = dc.createElement('legend');
-				legend.textContent = 'Global';
+				const legend = Nino.adminUi.el( 'legend', '', t('/_admin/install/personalinfos/title-global') );
 				globalWrap.appendChild( legend );
+				Nino.adminUi.sectionHelp( legend, globalWrap, t('/_admin/install/personalinfos/help-global') );
 
+				const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
 				globalEntries.forEach( function( entry ) {
-					globalWrap.appendChild( Nino.install.personalinfos._renderKeyField( entry, entry.values['*'] ?? '' ) );
+					grid.appendChild( self._renderKeyField( entry, self._globalValues[entry.key] ?? entry.values['*'] ?? '' ) );
 				} );
+				globalWrap.appendChild( grid );
 
 				wrap.appendChild( globalWrap );
 			}
 
 			if( localeEntries.length > 0 ) {
 
-				const localeWrap = dc.createElement('fieldset');
+				const localeWrap = Nino.adminUi.el( 'fieldset', '' );
 				localeWrap.id = 'personalinfos-form-locale';
 
-				const legend = dc.createElement('legend');
-				legend.textContent = 'Per Language';
+				const legend = Nino.adminUi.el( 'legend', '', t('/_admin/install/personalinfos/title-locale') );
 				localeWrap.appendChild( legend );
+				Nino.adminUi.sectionHelp( legend, localeWrap, t('/_admin/install/personalinfos/help-locale') );
 
-				const select = dc.createElement('select');
-				select.id = 'personalinfos-locale-select';
-				select.className = 'nino-admin-locale-select nino-admin-locale-select--corner';
-				Nino.install.personalinfos._locales.forEach( function( locale ) {
-					const option = dc.createElement('option');
-					option.value = locale;
-					option.textContent = locale;
-					option.selected = ( locale === Nino.install.personalinfos._selectedLocale );
-					select.appendChild( option );
-				} );
-				select.addEventListener( 'change', function() {
-					Nino.install.personalinfos._storeVisibleLocaleFields();
-					Nino.install.personalinfos._selectedLocale = select.value;
-					Nino.install.personalinfos._renderLocaleFields();
-				} );
-				localeWrap.appendChild( select );
+				const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
 
-				const fieldsWrap = dc.createElement('div');
+				// The language the fields below are in: the names are the workbench's, the one chosen stays where the page is drawn again
+				const select = Nino.adminUi.selectField( {
+					key			: 'personalinfos-locale',
+					id			: 'personalinfos-locale-select',
+					label		: t('/_admin/install/personalinfos/language'),
+					options	: self._locales.map( function( locale ) { return { value : locale, label : Nino.install.localeName( locale, self._locales ) } } ),
+					value		: self._selectedLocale,
+					onChange: function( value ) {
+						self._storeVisibleLocaleFields();
+						self._selectedLocale = value;
+						self._renderLocaleFields();
+					},
+				} );
+				grid.appendChild( select );
+
+				const fieldsWrap = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
 				fieldsWrap.id = 'personalinfos-form-locale-fields';
-				fieldsWrap.className = 'nino-admin-fieldgrid';
+				localeWrap.appendChild( grid );
 				localeWrap.appendChild( fieldsWrap );
 
 				wrap.appendChild( localeWrap );
 
-				Nino.install.personalinfos._renderLocaleFields();
+				self._renderLocaleFields();
 			}
 		},
 
@@ -285,23 +300,23 @@
 		 */
 		save : function( callback ) {
 
-			const msg = dc.getElementById('personalinfos-msg');
+			const t = Nino.install.t;
 
 			if( Nino.install.personalinfos._ready !== true ) {
-				msg.textContent = 'Personal Infos are still loading.';
+				Nino.install.say( t('/_admin/install/personalinfos/loading'), true );
 				callback( false );
 				return;
 			}
 
 			Nino.install.personalinfos._storeVisibleLocaleFields();
 
-			msg.textContent = 'Saving …';
+			Nino.install.say( t('/_admin/install/step/saving') );
 
 			const items = Nino.install.personalinfos._saveItems();
 
 			Nino.install.apiCall( 'personalinfos/savebatch', { items : items }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to save.' );
+					Nino.install.say( Nino.install.failure( status, response ), true );
 					callback( false );
 					return;
 				}
@@ -309,12 +324,11 @@
 				const failed = Object.keys( response.results ).filter( function( key ) { return response.results[key].ok === false } );
 
 				if( failed.length > 0 ) {
-					msg.textContent = failed.length+ ' key(s) failed to save.';
+					Nino.install.say( t( '/_admin/install/personalinfos/failed', failed.length ), true );
 					callback( false );
 					return;
 				}
 
-				msg.textContent = 'Saved.';
 				callback( true );
 			} );
 		},

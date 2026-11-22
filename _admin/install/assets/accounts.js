@@ -1,5 +1,3 @@
-
-
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Step 4: create the first _admin account(s). See
@@ -7,7 +5,11 @@
  *													its own repeatable action (unlike every step before it, more than
  *													one submit here is the normal case) - only the
  *													precondition for the shared Next button (at least one
- *													account exists) is exposed, as checkCanAdvance()
+ *													account exists) is exposed, as checkCanAdvance(). What is typed
+ *													into the form when Next is pressed is the account the person means
+ *													to create: it is created first, as Enter in a field does.
+ *													The form is made of the blocks of the workbench, and what is wrong
+ *													is said at the field it is about.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -20,14 +22,87 @@
 
 	Nino.install.accounts = {
 
+		// The accounts the server named last, which a change of the language draws again
+		_users : null,
+
+		// The parts of the form that are on the page: { form, mail, pw, pw2 } - the labels of the fields
+		_ui : null,
+
 		showCurrent : function() {
+
+			if( Nino.install.accounts._ui === null )
+				Nino.install.accounts._draw();
+
 			Nino.install.accounts._refreshList();
+		},
+
+		retext : function() {
+			if( Nino.install.accounts._ui !== null )
+				Nino.pageText.keep( dc.getElementById('accounts-content'), Nino.install.accounts._draw );
+		},
+
+		/**
+		 *	Draw the form of the step, and the list of the accounts again where it is known
+		 *
+		 *	@return		void
+		 */
+		_draw : function() {
+
+			const t = Nino.install.t;
+			const self = Nino.install.accounts;
+			const wrap = dc.getElementById('accounts-content');
+
+			wrap.innerHTML = '';
+
+			const list = Nino.adminUi.el( 'div', '' );
+			list.id = 'accounts-list';
+
+			const form = Nino.adminUi.el( 'form', '' );
+			form.id = 'accounts-add-form';
+			form.noValidate = true;
+
+			const card = Nino.adminUi.el( 'fieldset', '' );
+			const legend = Nino.adminUi.el( 'legend', '', t('/_admin/install/accounts/title') );
+			card.appendChild( legend );
+			Nino.adminUi.sectionHelp( legend, card, t('/_admin/install/accounts/help') );
+
+			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
+			const mail = Nino.adminUi.textField( { key : 'accounts-mail', id : 'accounts-add-mail', type : 'email', autocomplete : 'off', required : true, label : t('/_admin/install/accounts/mail') } );
+			const pw = Nino.adminUi.textField( { key : 'accounts-pw', id : 'accounts-add-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw'), help : t( '/_admin/install/accounts/pw-help', Nino.install.minPassword() ) } );
+			const pw2 = Nino.adminUi.textField( { key : 'accounts-pw2', id : 'accounts-add-pw2', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw2') } );
+
+			grid.appendChild( mail );
+			grid.appendChild( pw );
+			grid.appendChild( pw2 );
+			card.appendChild( grid );
+
+			// The step's own action, repeatable: the account is made and the form is ready for the next. Enter in a field does the same
+			const actions = Nino.adminUi.el( 'div', 'nino-admin-actions nino-admin-actions--end' );
+			actions.appendChild( Nino.adminUi.button( t('/_admin/install/accounts/create'), function() { self._create( function() {} ) }, { kind : 'secondary', id : 'accounts-add-submit' } ) );
+			card.appendChild( actions );
+
+			form.appendChild( card );
+			form.addEventListener( 'keydown', function( ev ) {
+				if( ev.key === 'Enter' && ev.target !== null && ev.target.tagName === 'INPUT' ) {
+					ev.preventDefault();
+					self._create( function() {} );
+				}
+			} );
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault() } );
+
+			wrap.appendChild( list );
+			wrap.appendChild( form );
+
+			self._ui = { form : form, mail : mail, pw : pw, pw2 : pw2 };
+
+			if( self._users !== null )
+				self._render( self._users );
 		},
 
 		/**
 		 *	The shared Next button's precondition for this step - refreshes
 		 *	the account list first, so it's accurate even if this is the
-		 *	very first time the step has been shown
+		 *	very first time the step has been shown. An account that is typed and not yet made is made first
 		 *
 		 *	@param		{Function}	callback			Called with ( canAdvance, message )
 		 *
@@ -35,17 +110,36 @@
 		 */
 		checkCanAdvance : function( callback ) {
 
+			const self = Nino.install.accounts;
+
+			if( self._typed() === true ) {
+				self._create( callback );
+				return;
+			}
+
 			Nino.install.apiCall( 'accounts/list', {}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					callback( false, 'Could not check for an admin account.' );
+					callback( false, Nino.install.failure( status, response ) );
 					return;
 				}
 
-				Nino.install.accounts._render( response.users );
+				self._render( response.users );
 
-				callback( response.users.length > 0, 'Create at least one admin account first.' );
+				callback( response.users.length > 0, Nino.install.t('/_admin/install/accounts/none-yet') );
 			} );
+		},
+
+		/**
+		 *	Whether anything is typed into the form
+		 *
+		 *	@return		{boolean}
+		 */
+		_typed : function() {
+
+			const ui = Nino.install.accounts._ui;
+
+			return ui !== null && [ ui.mail, ui.pw, ui.pw2 ].some( function( field ) { return field.querySelector('input').value !== '' } );
 		},
 
 		_refreshList : function() {
@@ -68,49 +162,74 @@
 		 */
 		_render : function( users ) {
 
+			const t = Nino.install.t;
 			const wrap = dc.getElementById('accounts-list');
+
+			Nino.install.accounts._users = users;
 			wrap.innerHTML = '';
 
 			if( users.length === 0 ) {
-				const p = dc.createElement('p');
-				p.className = 'nino-admin-hint';
-				p.textContent = 'No admin account yet.';
-				wrap.appendChild( p );
+				wrap.appendChild( Nino.adminUi.emptyState( t('/_admin/install/accounts/none') ) );
 				return;
 			}
 
-			// Rows that are read rather than opened - the shared grouped list's
-			// dense variant, same as /_admin's log and submission lists
-			const ul = dc.createElement('ul');
-			ul.className = 'nino-admin-list nino-admin-list-dense';
-			users.forEach( function( mail ) {
-				const li = dc.createElement('li');
-				li.className = 'install-accounts-row';
-				li.textContent = mail;
-				ul.appendChild( li );
-			} );
-			wrap.appendChild( ul );
+			// Rows that are read rather than opened: the list of the workbench
+			wrap.appendChild( Nino.adminUi.list( users.map( function( mail ) { return { key : mail, title : mail } } ), { title : t('/_admin/install/accounts/created') } ) );
 		},
 
-		_create : function( ev ) {
+		/**
+		 *	Make the account that is typed: checked at the fields first - what is wrong is said where it is, and the focus
+		 *	goes to the first - then sent
+		 *
+		 *	@param		{Function}	done					Called with ( ok, sentence ) once it is made or refused: the sentence is what the bar says of a refusal, the one of the server's code among them
+		 *
+		 *	@return		void
+		 */
+		_create : function( done ) {
 
-			ev.preventDefault();
+			const t = Nino.install.t;
+			const ui = Nino.install.accounts._ui;
+			const mail = ui.mail.querySelector('input');
+			const pw = ui.pw.querySelector('input');
+			const pw2 = ui.pw2.querySelector('input');
+			const missing = function( key ) { return Nino.adminUi.format( t('/_admin/common/error/missing'), t( key ) ) };
 
-			const mail = dc.getElementById('accounts-add-mail');
-			const pw 		= dc.getElementById('accounts-add-pw');
-			const pw2 	= dc.getElementById('accounts-add-pw2');
-			const msg 	= dc.getElementById('accounts-add-msg');
+			Nino.adminUi.clearFieldErrors( ui.form );
+			Nino.install.say('');
 
-			if( pw.value !== pw2.value ) {
-				msg.textContent = 'Passwords do not match.';
+			const min = Nino.install.minPassword();
+			const problems = [
+				[ mail.value.trim() === '' ? missing('/_admin/install/accounts/mail') : '', ui.mail, mail ],
+				[ pw.value === '' ? missing('/_admin/install/accounts/pw') : ( pw.value.length < min ? t( '/_admin/install/error/password-short', min ) : '' ), ui.pw, pw ],
+				[ pw2.value !== pw.value ? t('/_admin/install/error/mismatch') : ( pw2.value === '' ? missing('/_admin/install/accounts/pw2') : '' ), ui.pw2, pw2 ],
+			].filter( function( problem ) { return problem[0] !== '' } );
+
+			if( problems.length > 0 ) {
+				problems.forEach( function( problem, at ) { Nino.adminUi.fieldError( problem[1], problem[2], 'accounts-error-'+ at, problem[0] ) } );
+				Nino.install.say( t('/_admin/install/error/fields'), true );
+				problems[0][2].focus();
+				done( false, t('/_admin/install/error/fields') );
 				return;
 			}
 
-			msg.textContent = 'Creating …';
+			Nino.install.say( t('/_admin/install/accounts/creating') );
 
 			Nino.install.apiCall( 'accounts/create', { mail : mail.value, pw : pw.value }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to create.' );
+
+					const code = response !== null && typeof response === 'object' && typeof response.code === 'string' ? response.code : '';
+					const field = code === 'install_mail' ? [ ui.mail, mail ] : ( code === 'install_password_short' ? [ ui.pw, pw ] : null );
+
+					// A refusal about a value is said at the field of it, and the line says that something is to be fixed; any other is said in the line, as the server's code is worded
+					const sentence = field !== null ? t('/_admin/install/error/fields') : Nino.install.failure( status, response );
+
+					if( field !== null ) {
+						Nino.adminUi.fieldError( field[0], field[1], 'accounts-error-0', Nino.install.failure( status, response ) );
+						field[1].focus();
+					}
+
+					Nino.install.say( sentence, true );
+					done( false, sentence );
 					return;
 				}
 
@@ -121,19 +240,16 @@
 				if( csrf !== null && typeof response.csrf === 'string' )
 					csrf.value = response.csrf;
 
-				msg.textContent = 'Created.';
+				Nino.install.say('');
+				Nino.adminUi.say( t('/_admin/install/accounts/created-msg') );
 				mail.value = '';
 				pw.value = '';
 				pw2.value = '';
+				mail.focus();
 				Nino.install.accounts._render( response.users );
+				done( true );
 			} );
 		},
 	};
-
-	Nino.events.bindCallback( 'ready', function() {
-		const form = dc.getElementById('accounts-add-form');
-		if( form !== null )
-			form.addEventListener( 'submit', Nino.install.accounts._create );
-	} );
 
 })(window, document, document.documentElement, document.body);

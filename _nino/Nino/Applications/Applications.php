@@ -43,12 +43,16 @@ namespace Nino {
 	class Applications {
 
 		/**
-		 *	The language the setup wizard speaks, and so the one it shows the names and
-		 *	descriptions of applications and of their features in, whatever the project's
-		 *	language is: the catalogue requires it of every text, and a text that lacks
-		 *	it falls back as \Nino\Features::localized() does everywhere
+		 *	The language the catalogue requires of every text, and so the one the setup
+		 *	wizard shows the names and descriptions of applications and of their features
+		 *	in, whatever the project's language is, unless the page speaks German: then
+		 *	it asks for those, and a text that lacks them falls back to this one as
+		 *	\Nino\Features::localized() does everywhere
 		 */
 		public const string LOCALE = 'en_US';
+
+		/**	The language the wizard asks the catalogue's texts in where its page speaks German	*/
+		public const string LOCALE_GERMAN = 'de_DE';
 
 		/**
 		 *	What an application's "menu" says when the workbench is to open on it with the

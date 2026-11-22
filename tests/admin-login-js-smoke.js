@@ -1,121 +1,70 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	admin-login-js-smoke.js	What the workbench login says when it fails. Only a 401
- *													means the credential pair was read and refused; every
+ *	admin-login-js-smoke.js	What the workbench login says when it fails, and where. Only a
+ *													401 means the credential pair was read and refused; every
  *													other answer never reached that point, and telling the
  *													operator to check their input then sends the one
  *													person who can fix it looking in the wrong place (see
  *													docs/deployment.md, "The login form is refused and
- *													the password is right").
+ *													the password is right"). What is wrong stands at the field:
+ *													a sentence under it, the field marked aria-invalid and
+ *													pointed at the sentence, the focus on it - the fields are the
+ *													blocks of the workbench and the form checks itself, not the
+ *													browser.
  *
  *	Usage: node tests/admin-login-js-smoke.js
  */
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-const { check, done, load } = require( './harness.js' );
+const { markupWrites, check, done, load, source, fills, element, documentOf, findAll, fire } = require( './harness.js' );
 
-// The two messages, read out of the shipped text file rather than written
+// The sentences, read out of the shipped text files rather than written
 // here - a key login.js asks for and no locale carries renders as an empty
 // string, which is the failure this test exists to notice
-const textFile	= fs.readFileSync( path.join( __dirname, '../_admin/text/en_US.php' ), 'utf8' );
-const textKey		= function( key ) {
-	const match = textFile.match( new RegExp( "'\\[\\[" + key.replace( /\//g, '\\/' ) + "\\]\\]'\\s*=>\\s*'([^']*)'" ) );
-	return match === null ? null : match[1];
-};
+const en = fills('_admin/text/en_US.php');
+const de = fills('_admin/text/de_DE.php');
 
-const WRONG			= textKey('/_admin/login/error/wrong');
-const ENDPOINT	= textKey('/_admin/login/error/endpoint');
-const CSRF			= textKey('/_admin/login/error/csrf');
+const KEYS = [ '/_admin/login/label/user', '/_admin/login/label/pw', '/_admin/login/label/submit', '/_admin/login/error/wrong', '/_admin/login/error/endpoint', '/_admin/login/error/csrf', '/_admin/login/msg/pending', '/_admin/common/error/missing' ];
+const WRONG = en['/_admin/login/error/wrong'];
+const ENDPOINT = en['/_admin/login/error/endpoint'];
+const CSRF = en['/_admin/login/error/csrf'];
 
-check( 'en_US carries the wrong-credentials message', typeof WRONG === 'string' && WRONG !== '' );
-check( 'en_US carries the endpoint message', typeof ENDPOINT === 'string' && ENDPOINT !== '' );
-check( '...and the endpoint message has a place for the status code', ENDPOINT !== null && ENDPOINT.indexOf('%s') !== -1 );
-check( 'en_US carries the stale-token message, and it asks for a reload rather than a status code', typeof CSRF === 'string' && CSRF !== '' && CSRF.indexOf('%s') === -1 );
+check( 'both languages carry every sentence the form says, and the endpoint one has a place for the status code and the stale-token one asks for a reload and has none',
+	KEYS.every( key => en[key] !== undefined && en[key] !== '' && de[key] !== undefined && de[key] !== '' ) && ENDPOINT.indexOf('%s') !== -1 && de['/_admin/login/error/endpoint'].indexOf('%s') !== -1 && CSRF.indexOf('%s') === -1 );
+check( '...and the sentences that were said above the form of the old build are gone: the form says what is missing with the one wording of the workbench', [ '/_admin/login/error/user', '/_admin/login/error/pw', '/_admin/login/msg/welcome' ].every( key => en[key] === undefined && de[key] === undefined ) );
 
-const de = fs.readFileSync( path.join( __dirname, '../_admin/text/de_DE.php' ), 'utf8' );
-check( 'de_DE carries it too', de.indexOf('[[/_admin/login/error/endpoint]]') !== -1 && de.indexOf('%s') !== -1 );
-check( '...and the stale-token message as well', de.indexOf('[[/_admin/login/error/csrf]]') !== -1 );
+// --- the page, as the template has it ---------------------------------------------------
 
-// The form's dom, reduced to the five ids login.js reaches for. The class
-// list is a real one, because what the form leaves on a field between two
-// attempts is half of what this test is about
-function field() {
+const page = element('div');
+const form = element('form');
+form.id = 'form-login';
+const holder = element('fieldset');
+holder.id = 'login-fields';
+const picker = element('select');
+picker.id = 'admin-localepicker';
+const pickerOption = element('option');
+pickerOption.value = '?locale=de_DE';
+picker.appendChild( pickerOption );
+form.appendChild( holder );
+form.appendChild( picker );
+page.appendChild( form );
 
-	const classes = [];
-	const node = {
-		value : '', textContent : '',
-		// A message is text a person typed in the Text panel; the form writes it
-		// as a text node, and the stub notes the day it is written as markup
-		markup : false,
-		set innerHTML( html ) { this.markup = true; this.textContent = html },
-		// A refused field says so twice: the outline the stylesheet paints and
-		// the aria-invalid a screen reader reads out, so the stub carries
-		// attributes as well as classes
-		attributes : {},
-		classList : {
-			add : function( name ) { if( classes.indexOf( name ) === -1 ) classes.push( name ) },
-			remove : function( name ) {
-				const at = classes.indexOf( name );
-				if( at !== -1 ) classes.splice( at, 1 );
-			},
-			contains : function( name ) { return classes.indexOf( name ) !== -1 },
-		},
-		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
-		removeAttribute : function( name ) { delete this.attributes[name] },
-		getAttribute : function( name ) { return this.attributes[name] ?? null },
-		focus : function() {},
-		addEventListener : function( type, fn ) { this.handler = fn },
-	};
-
-	// className and classList are two views of one list in a browser, and
-	// login.js writes through both of them
-	Object.defineProperty( node, 'className', {
-		get : function() { return classes.join(' ') },
-		set : function( value ) {
-			classes.length = 0;
-			String( value ).split(/\s+/).forEach( function( name ) { if( name !== '' ) classes.push( name ) } );
-		},
-	} );
-
-	return node;
-}
-
-const el = {
-	'form-message'	: field(),
-	'input-user'		: field(),
-	'input-pw'			: field(),
-	'submit'				: field(),
-	'form-login'		: field(),
-	'admin-localepicker' : field(),
-};
-
-el['input-user'].value	= 'editor@example.com';
-el['input-pw'].value		= 'correct horse battery staple';
-
-const documentElement = { clientHeight : 640, clientWidth : 1024, scrollLeft : 0, scrollTop : 0, style : {}, classList : { add : function() {}, remove : function() {} } };
-const body = { classList : { add : function() {}, remove : function() {} }, scrollLeft : 0, scrollTop : 0 };
-const document = {
-	body : body,
-	documentElement : documentElement,
+const doc = Object.assign( documentOf( page ), {
+	documentElement : { clientHeight : 640, clientWidth : 1024, scrollLeft : 0, scrollTop : 0, style : {}, classList : { add : function() {}, remove : function() {} } },
+	body : element('body'),
 	cookie : '',
 	readyState : 'complete',
-	getElementById : function( id ) { return el[id] || null },
-	querySelector : function() { return null },
-	querySelectorAll : function() { return [] },
-	createElement : function() { return { classList : { add : function() {} }, style : {}, setAttribute : function() {}, appendChild : function() {} } },
 	addEventListener : function() {},
-};
+} );
 
 const replaced = [];
 let reloads = 0;
 
 const sandbox = {
 	console : console,
-	document : document,
+	document : doc,
 	navigator : { userAgent : 'node', language : 'en-US' },
 	location : { pathname : '/_admin', origin : 'https://example.com', search : '', hash : '#elements/team', href : 'https://example.com/_admin', replace : function( uri ) { replaced.push( uri ) }, reload : function() { reloads++ } },
 	XMLHttpRequest : function() {},
@@ -127,28 +76,39 @@ const sandbox = {
 	addEventListener : function() {},
 	matchMedia : function() { return { matches : false, addEventListener : function() {} } },
 	// What the [jstext] shortcode puts on the page, keyed the way it keys it
-	NinoJstext : {
-		'/_admin/login/error/user'		: 'Email is required.',
-		'/_admin/login/error/pw'			: 'Password is required.',
-		'/_admin/login/error/wrong'		: WRONG,
-		'/_admin/login/error/endpoint': ENDPOINT,
-		'/_admin/login/error/csrf'		: CSRF,
-		'/_admin/login/msg/pending'		: 'Checking.',
-	},
+	NinoJstext : en,
 };
 sandbox.window = sandbox;
 sandbox.self = sandbox;
 
 const context = vm.createContext( sandbox );
 load( '_nino/Nino.js', context );
+load( '_admin/assets/Nino.admin.js', context );
 load( '_admin/assets/login.js', context );
 
 check( 'login.js boots and takes the Nino.admin slot', typeof sandbox.Nino.admin.onReady === 'function' );
 
 sandbox.Nino.admin.onReady();
-check( 'it wired the form up', typeof el['form-login'].handler === 'function' );
 
-// Drive one login attempt and hand back the message the form ended up with.
+const input = id => findAll( form, el => el.id === id )[0];
+const label = id => input( id ).parentNode;
+const errors = () => findAll( form, el => el.className === 'nino-admin-field-error' );
+const submit = input('submit');
+const submitForm = () => fire( form, 'submit' );
+
+check( 'it drew the two fields and the one main button with the blocks of the workbench: a label with its star, an input of the kind of its value, a submit button of the kind of the main one', input('input-user') !== undefined && input('input-pw') !== undefined
+	&& input('input-user').type === 'email' && input('input-pw').type === 'password' && input('input-user').autocomplete === 'username' && input('input-pw').autocomplete === 'current-password'
+	&& label('input-user').tagName === 'LABEL' && label('input-user').className === 'nino-admin-field' && findAll( label('input-pw'), el => el.className === 'nino-admin-required' ).length === 1
+	&& submit.type === 'submit' && submit.className.includes('nino-admin-btn-primary') && submit.textContent === en['/_admin/login/label/submit'] );
+check( '...the fields are the grid of a form, so that the label stands at the left of its field where there is room', findAll( holder, el => el.className === 'nino-admin-fieldgrid' ).length === 1 && findAll( holder, el => el.className === 'nino-admin-fieldgrid' )[0].children.length === 2 );
+check( '...the labels are the words of the text file, and the focus is in the first field', findAll( label('input-user'), el => el.tagName === '#TEXT' )[0].textContent === en['/_admin/login/label/user'] && input('input-user').focused === true );
+check( '...the form is checked by the page and never by the browser: the template carries novalidate, and the fields have no pattern of their own', source('_admin/templates/page-login.tpl').includes('novalidate') === true );
+check( '...no message of the form is written as markup', findAll( form, el => el.tagName === 'P' ).length === 1 );
+
+const line = findAll( form, el => el.id === 'form-message' )[0];
+check( '...and the line that says a request is on its way is a status the screen reader hears, empty until then', line !== undefined && line.getAttribute('role') === 'status' && line.getAttribute('aria-live') === 'polite' && line.textContent === '' );
+
+// Drive one login attempt and hand back the sentence the form ended up with at its fields.
 // The request itself is stubbed at Nino.http.sendRequest, so what is under
 // test is the branch login.js takes on the answer - not the xhr
 let sentTo = '';
@@ -164,12 +124,16 @@ function attempt( status, policy ) {
 			},
 		} );
 	};
-	el['form-message'].textContent = '';
-	el['form-login'].handler( { preventDefault : function() {} } );
-	return el['form-message'].textContent;
+	submitForm();
+	return errors().map( el => el.textContent ).join('|');
 }
 
+input('input-user').value = 'editor@example.com';
+input('input-pw').value = 'correct horse battery staple';
+
 check( 'a 401 is the one answer that means the password was wrong', attempt( 401 ) === WRONG );
+check( '...it is said at the password field, which is marked in words as well as with a colour and which the focus is on', input('input-pw').getAttribute('aria-invalid') === 'true' && input('input-user').getAttribute('aria-invalid') === null
+	&& input('input-pw').getAttribute('aria-describedby') === errors()[0].id && input('input-pw').focused === true );
 check( '...and it is sent to the login endpoint', sentTo === '/.nino/auth/login' );
 
 /*	A deep link survives the login: the page is loaded again where it stands -
@@ -178,14 +142,15 @@ check( '...and it is sent to the login endpoint', sentTo === '/.nino/auth/login'
 	fragment would be a navigation inside the document that requests nothing
 	(the form would stay on screen), and a redirect parameter would be an open
 	redirect to guard	*/
-attempt( 200 );
+sandbox.Nino.http.sendRequest = function( uri, method, callback ) { callback( { status : 200 } ) };
+submitForm();
 check( 'a login the server accepts loads the page again, wherever it was', reloads === 1 && replaced.length === 0 );
 check( '...and the hash is still the one it came with', sandbox.location.hash === '#elements/team' );
 check( '...while a refused one reloads nothing', ( attempt( 401 ), reloads === 1 ) );
 
 // The language picker: another language is another load of the same page
-el['admin-localepicker'].value = '?locale=de_DE';
-el['admin-localepicker'].handler();
+picker.value = '?locale=de_DE';
+fire( picker, 'change' );
 check( 'the language picker keeps the hash, so the person comes back to the page they were on', sandbox.location.href === '?locale=de_DE#elements/team' );
 
 /*	Everything below is a server that answered before Nino could read the pair.
@@ -210,50 +175,40 @@ check( '...and the header alone never excuses another status', attempt( 404, "de
 	&& attempt( 500, "default-src 'self'" ) === ENDPOINT.replace( '%s', '500' ) );
 check( '...nor turns a 401 into anything but a wrong password', attempt( 401, "default-src 'self'" ) === WRONG );
 
+// What is wrong with a field is said at that field, before any request, in the words of the workbench
+const sentBefore = [];
+sandbox.Nino.http.sendRequest = function() { sentBefore.push( 1 ) };
 
-// The two field guards in front of all of that are unchanged
-el['input-user'].value = '';
-check( 'an empty email is still caught before any request', attempt( 401 ) === sandbox.NinoJstext['/_admin/login/error/user'] );
-check( '...and the empty field is the one marked', el['input-user'].classList.contains('error') === true
-	&& el['input-pw'].classList.contains('error') === false );
-el['input-user'].value = 'editor@example.com';
-el['input-pw'].value = '';
-check( 'an empty password too', attempt( 401 ) === sandbox.NinoJstext['/_admin/login/error/pw'] );
+input('input-user').value = '';
+input('input-pw').value = 'x';
+submitForm();
+check( 'an empty email is caught before any request, at its own field, in the one wording of the workbench for what is missing', sentBefore.length === 0
+	&& errors().map( el => el.textContent ).join('|') === en['/_admin/common/error/missing'].replace( '%s', en['/_admin/login/label/user'] )
+	&& input('input-user').getAttribute('aria-invalid') === 'true' && input('input-pw').getAttribute('aria-invalid') === null && input('input-user').focused === true );
+
+input('input-user').value = 'editor@example.com';
+input('input-pw').value = '';
+submitForm();
+check( '...and an empty password at its', sentBefore.length === 0 && errors().map( el => el.textContent ).join('|') === en['/_admin/common/error/missing'].replace( '%s', en['/_admin/login/label/pw'] ) && input('input-pw').focused === true );
 
 /*	The mark belongs to the attempt, not to the form: the email that was empty
-	a moment ago has been filled in, so nothing may still point at it	*/
-check( 'the field that was filled in loses the outline it was given', el['input-user'].classList.contains('error') === false );
-check( '...and the one that is empty now has it instead', el['input-pw'].classList.contains('error') === true );
+	a moment ago has been filled in, so nothing may still point at it, and the
+	sentence of the attempt before is gone - one sentence at a time	*/
+check( 'the field that was filled in carries no mark and no sentence of an attempt before, and only the one that is wrong now is marked', errors().length === 1 && input('input-user').getAttribute('aria-invalid') === null
+	&& input('input-user').getAttribute('aria-describedby') === null && input('input-pw').getAttribute('aria-invalid') === 'true' );
 
-/*	The outline is a colour, and a colour is the one thing a screen reader is
-	never told and a colour-blind operator may not see. The mark is also a
-	word - aria-invalid on the field the form refused - and it comes off with
-	the outline, or the next attempt points at a field that is fine now	*/
-check( 'the refused field is marked in words, not only with a colour', el['input-pw'].getAttribute('aria-invalid') === 'true' );
-check( '...and the field that was filled in carries no mark at all', el['input-user'].getAttribute('aria-invalid') === null );
-
-/*	The sentence that says why is written into #form-message, which the login
-	template declares as a live region - without that, every message this file
-	writes after a submit is a message a screen reader never hears	*/
-const loginTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-login.tpl' ), 'utf8' );
-check( 'the message the form writes into is announced when it changes', /<p id="form-message"[^>]*role="status"[^>]*aria-live="polite"/.test( loginTemplate ) );
-
-// Both filled in again: a submit that reaches the server leaves neither
-// field marked, and the message says only that the request is running
-el['input-pw'].value = 'correct horse battery staple';
-sandbox.Nino.http.sendRequest = function() {};
-el['form-login'].handler( { preventDefault : function() {} } );
-check( 'a submit that gets past the guards clears both outlines', el['input-user'].classList.contains('error') === false
-	&& el['input-pw'].classList.contains('error') === false );
-check( '...and says the request is pending, and nothing else', el['form-message'].className === 'pending' );
+// Both filled in again: a submit that reaches the server leaves nothing marked, and says that the request is pending
+input('input-pw').value = 'correct horse battery staple';
+submitForm();
+check( 'a submit that gets past the checks clears every sentence and mark', errors().length === 0 && input('input-pw').getAttribute('aria-invalid') === null && input('input-pw').getAttribute('aria-describedby') === null );
+check( '...and the line says the request is pending, in the words of the text file, and nothing else', line.textContent === en['/_admin/login/msg/pending'] );
 
 // ...and once the answer is in, the request is over with it
 attempt( 401 );
-check( 'the answer replaces the pending state rather than joining it', el['form-message'].className === 'error' );
+check( 'the answer takes the pending sentence away rather than leaving it beside the refusal', line.textContent === '' && errors().length === 1 );
 
-// Every message above - a missing field, the pending state, each answer - was
-// written as text
-check( '...and no message of the form is written as markup', el['form-message'].markup === false );
+// The words are written as text, never as markup
+check( '...and nothing a person typed or the server said is written as markup: no element of the page was given anything but nothing as its innerHTML, in the whole run', markupWrites.length === 0 );
 
 // Nino.js leaves its ready callback behind, one millisecond out, and that one
 // reaches for an Event this context has not got: the suite ends here

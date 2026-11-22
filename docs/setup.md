@@ -6,7 +6,7 @@ This manual explains the decisions and writing processes of the six steps of the
 
 ## When the Wizard Runs
 
-Until its last step has been completed, `/_admin` answers with the wizard instead of the login. It lives in `_admin/install/` and is intended for one-time initial setup. It:
+Until its last step has been completed, `/_admin` answers with the wizard instead of the login. It lives in `_admin/install/` and is intended for one-time initial setup. It speaks German and English, German first: the choice stands at the top right, holds for every step and over a reload, and is kept in the browser alone (one entry of its storage, no cookie), so a project that is not yet there has nothing to ask for it. Every sentence is in one table with both languages (`install/assets/text.js`), and what the server refuses comes back as a code that table words in the language chosen. It:
 
 - checks PHP and write permissions;
 - sets languages and modules;
@@ -107,7 +107,7 @@ The wizard asks no question about the look. A project turns it afterwards: `asse
 
 ## 3. Personal Information
 
-This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/project/company/` and `/project/website/general/` - the technical `/project/website/html/` values and the look of the mails are outside both - each labelled by its category and its name ("Company › Address", "Website › URL"), in English like the whole wizard. All of them can be edited later in the workbench's Text panel.
+This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/project/company/` and `/project/website/general/` - the technical `/project/website/html/` values and the look of the mails are outside both - each labelled by its category and its name ("Company › Address", "Website › URL"; "Unternehmen › Adresse" in German), in the language the wizard is read in. All of them can be edited later in the workbench's Text panel.
 
 Language-independent, in the order the form shows them:
 
@@ -127,12 +127,12 @@ The links to the site's profiles elsewhere - Instagram, YouTube and the like - a
 
 ## 4. Accounts
 
-This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. Submit again for a second one, then continue. Editor accounts with fewer rights are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.
+This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. **Create account** makes one and leaves the form ready for a second, then continue; what is typed into the form when **Next** is pressed is created first, as Enter in a field does. Editor accounts with fewer rights are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.
 
 Provide:
 
 - a valid **email address**;
-- a **password** with at least 8 characters, entered twice - the form names the rule in the field's label.
+- a **password** with at least 8 characters, entered twice - the rule stands behind the (?) of the field, and a password that is too short or a repeat that differs is said under its field, with the focus on it, before anything is sent.
 
 Both can be changed later under **Users**. The accounts live in `config.php` under `/nino/auth/user`.
 
@@ -142,7 +142,7 @@ Each account is signed in to your browser as you create it. Whether that sign-in
 
 An **application** is a short, named set of features from Nino's [catalogue](_admin.md#the-catalogue) with a place to continue in: *Website*, *Blog*, later others - each one only worth having as a whole. The step is the one place the wizard reaches the network, and only when you reach it, which is not before the first account exists: an index is fetched and a package unpacked once somebody has proved to be able to log in.
 
-*Without an application* is the default, and the way ahead whatever the catalogue answers. What the step offers is the applications of the **official** catalogue - the address and the key built into the kernel - that fit this version of Nino, each with its name, what it is for and the features it switches on. A project whose `config.php` names another catalogue address or key, or switches the catalogue off (`/nino/catalogue/url`, `/nino/catalogue/key`), gets none, and the step says so in a sentence; the Features panel is where such a catalogue is used, and its [Applications tab](_admin.md#the-panel) sets an application of it up after the installation. Nothing a request carries changes which catalogue the step reads. The wizard is English, and so are the names and descriptions of the applications and the names of their features it shows, whatever language the project has: the catalogue gives every text in English, and a text that lacks it falls back as everywhere in the catalogue. The Features panel shows them in the language of the workbench.
+*Without an application* is the default, and the way ahead whatever the catalogue answers. What the step offers is the applications of the **official** catalogue - the address and the key built into the kernel - that fit this version of Nino, each with its name, what it is for and the features it switches on. A project whose `config.php` names another catalogue address or key, or switches the catalogue off (`/nino/catalogue/url`, `/nino/catalogue/key`), gets none, and the step says so in a sentence; the Features panel is where such a catalogue is used, and its [Applications tab](_admin.md#the-panel) sets an application of it up after the installation. Nothing a request carries changes which catalogue the step reads. The names and descriptions of the applications and the names of their features it shows are the catalogue's own: it gives every text in English, the wizard asks for them in German where its page speaks German, and a text that lacks that falls back to English as everywhere in the catalogue. The Features panel shows them in the language of the workbench.
 
 An application says who provides the start page of the site (`start` in the index): `starter` - the starter pages the wizard creates, see [Finish](#6-finish) -, `own` - the application brings its own through a feature - or nothing. Those that say something exclude each other and are a radio group (*None*, then one of them); the others are checkboxes, and any number of them goes with the one chosen above. The Website and the vCard, say, cannot both own the start page, and a Website and a CRM can share one instance.
 
@@ -162,9 +162,9 @@ The last step creates the starter pages, sets the **recovery password**, makes t
 
 Provide:
 
-- a **password** with at least 8 characters, entered twice - the form names the rule in the field's label.
+- a **password** with at least 8 characters, entered twice - the rule stands behind the (?) of the field, and what is wrong is said under the field.
 
-Its hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps the wizard locked, so losing the password file does not hand it back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/` and the modules wholesale.
+The one main button of the bar names itself for what it leads to: **Finish installation**, or - where exactly one application that was set up has an entry point - **Set up <name>**. Its hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps the wizard locked, so losing the password file does not hand it back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/` and the modules wholesale.
 
 If completion fails, check the write permissions of the `private/` directory. After this step the wizard is locked and cannot be reopened short of clearing `/nino/install/completed` and removing the stored secret.
 

@@ -661,8 +661,10 @@
 			 *	The choice in the rail. It asks first when a view that follows the
 			 *	language holds unsaved input - Save, Discard or Cancel, as every exit
 			 *	of the workbench does (dirty.guard()). Cancel keeps the language, and the
-			 *	rail shows it again. Discard also closes the forms it threw away, the
-			 *	way a move to another panel does, before the language moves. A view that
+			 *	rail shows it again. Discard throws the input away and the language
+			 *	moves: the form that was open stays open and is drawn again in the new
+			 *	language, from what is saved, by the view that follows - it is not
+			 *	closed, which is what a move to another panel does. A view that
 			 *	is bound to a language (bind()) is asked about as well and, on screen,
 			 *	loaded anew. While a view that follows is saving, the choice is not
 			 *	taken, and says so
@@ -691,20 +693,15 @@
 					return;
 				}
 
-				const held = Nino.admin.dirty.dirtyNames( names );
-
 				// A view that is bound to a language and on screen is drawn anew by loading the page: the server has the new language first
 				const reloads = Nino.admin.workLocale._bound.indexOf( Nino.admin.router.current().panel ) !== -1;
 
-				Nino.admin.dirty.guard( names, function( answered ) {
+				Nino.admin.dirty.guard( names, function() {
 
 					if( reloads === true ) {
 						Nino.adminUi.api.call( 'admin/locale', { locale : locale }, function() { wn.location.reload() } );
 						return;
 					}
-
-					if( answered === 'discard' )
-						held.forEach( Nino.admin.dirty._close );
 
 					Nino.admin.workLocale.set( locale );
 				}, Nino.admin.workLocale._show, reloads );
@@ -1656,6 +1653,13 @@
 		 *	waited are sent again - with the same account - or not; this is
 		 *	the dialog and the login that stand between.
 		 *
+		 *	The dialog is the one of the design system (Nino.adminUi.choiceDialog()),
+		 *	drawn when it is needed: the two fields are the blocks of a form, what is
+		 *	wrong with the login is said at the field, and the answers stand in a row,
+		 *	Close at the left of the one that goes on. Escape is the answer that does
+		 *	nothing: while a login can still bring the waiting requests back it does not
+		 *	give them up - Close does.
+		 *
 		 *	The login is posted from here rather than through Nino.auth.login(),
 		 *	which redirects on success: the page must stay exactly as it is.
 		 *	It goes out with the token of the anonymous session the api just
@@ -1670,6 +1674,9 @@
 			// Why the dialog was opened last: whether Escape may close it
 			_reason : 'expired',
 
+			// The dialog while it is open: { handle, form, user, pw }, else null
+			_shown : null,
+
 			/**
 			 *	Register the dialog with the api - if the page has one. A shell
 			 *	without it simply gets a session failure handed back like any
@@ -1679,47 +1686,10 @@
 			 */
 			init : function() {
 
-				const el = Nino.admin.sessionDialog._elements();
-
-				if( el === null || typeof Nino.adminUi !== 'object' || typeof Nino.adminUi.api !== 'object' || typeof Nino.adminUi.api.onSessionLost !== 'function' )
+				if( typeof Nino.adminUi !== 'object' || typeof Nino.adminUi.api !== 'object' || typeof Nino.adminUi.api.onSessionLost !== 'function' || typeof Nino.adminUi.choiceDialog !== 'function' )
 					return;
 
-				// Escape would give up the requests that wait for a login; while one
-				// can still bring them back it does not. Where it cannot (another
-				// account, or nothing waits any more) the dialog may be closed
-				el.dialog.addEventListener( 'cancel', function( ev ) {
-					if( Nino.admin.sessionDialog._reason === 'expired' && Nino.adminUi.api.waiting() === true )
-						ev.preventDefault();
-				} );
-
-				// However it was closed, the requests that waited are told: the
-				// panels show their error and give their forms back, and the input
-				// can be copied out
-				el.dialog.addEventListener( 'close', function() {
-					el.pw.value = '';
-					Nino.adminUi.api.dismiss();
-				} );
-				el.close.addEventListener( 'click', function() { Nino.admin.sessionDialog._close( el ) } );
-				el.reload.addEventListener( 'click', function() { wn.location.reload() } );
-				el.form.addEventListener( 'submit', function( ev ) {
-					ev.preventDefault();
-					Nino.admin.sessionDialog._login( el, Nino.admin.sessionDialog._check );
-				} );
-
 				Nino.adminUi.api.onSessionLost( Nino.admin.sessionDialog._open );
-			},
-
-			/**
-			 *	The dialog's parts, or null where the page has none
-			 *
-			 *	@return		{Object|null}
-			 */
-			_elements : function() {
-
-				const get = function( name ) { return dc.getElementById( 'admin-session-'+ name ) };
-				const el = { dialog : get('dialog'), form : get('form'), title : get('title'), text : get('text'), user : get('user'), pw : get('pw'), msg : get('msg'), submit : get('submit'), reload : get('reload'), close : get('close') };
-
-				return Object.keys( el ).every( function( name ) { return el[name] !== null && typeof el[name] !== 'undefined' } ) ? el : null;
 			},
 
 			/**
@@ -1735,65 +1705,132 @@
 			 */
 			_open : function( check, reason ) {
 
-				const el = Nino.admin.sessionDialog._elements();
+				const sd = Nino.admin.sessionDialog;
 				const other = reason === 'other';
+				const text = function( key ) { return Nino.content.getText( key ) };
 
-				Nino.admin.sessionDialog._check = check;
-				Nino.admin.sessionDialog._reason = reason;
+				sd._check = check;
 
-				el.title.textContent = Nino.content.getText( other ? '/_admin/common/session/other_title' : '/_admin/common/session/title' );
-				el.text.textContent = Nino.content.getText( other ? '/_admin/common/session/other' : '/_admin/common/session/expired' );
-				el.user.parentNode.hidden = other;
-				el.pw.parentNode.hidden = other;
-				el.submit.hidden = other;
-				el.msg.textContent = '';
-
-				if( el.dialog.open !== true ) {
-					if( typeof el.dialog.showModal === 'function' )
-						el.dialog.showModal();
-					else
-						el.dialog.setAttribute( 'open', '' );
-				}
-
-				( other ? el.reload : el.user ).focus();
-			},
-
-			/**
-			 *	Close the dialog without a login: the requests that waited are
-			 *	released by the dialog's close (see init()), or here where the
-			 *	browser has no dialog element to fire one
-			 *
-			 *	@param		{Object}		el
-			 *
-			 *	@return		void
-			 */
-			_close : function( el ) {
-
-				if( typeof el.dialog.close === 'function' ) {
-					el.dialog.close();
+				// Open for the same reason already: it has the new check, and stays as it is
+				if( sd._shown !== null && sd._reason === reason )
 					return;
+
+				// Open for another reason: it is taken away without a word to the api, whose requests wait for this one
+				if( sd._shown !== null ) {
+					const old = sd._shown;
+					sd._shown = null;
+					old.handle.close( 'swap' );
 				}
 
-				el.dialog.removeAttribute('open');
-				el.pw.value = '';
-				Nino.adminUi.api.dismiss();
+				sd._reason = reason;
+
+				const form = Nino.adminUi.el( 'form', 'nino-admin-dialog-form' );
+				form.noValidate = true;
+				form.appendChild( Nino.adminUi.el( 'p', '', text( other ? '/_admin/common/session/other' : '/_admin/common/session/expired' ) ) );
+
+				const shown = { handle : null, form : form, user : null, pw : null };
+
+				if( other === false ) {
+
+					const fields = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+					shown.user = Nino.adminUi.textField( { key : 'user', id : 'admin-session-user', type : 'email', autocomplete : 'username', required : true, label : text('/_admin/common/session/user') } );
+					shown.pw = Nino.adminUi.textField( { key : 'pw', id : 'admin-session-pw', type : 'password', autocomplete : 'current-password', required : true, label : text('/_admin/common/session/pw') } );
+					fields.appendChild( shown.user );
+					fields.appendChild( shown.pw );
+					form.appendChild( fields );
+
+					// Enter in a field is the answer that goes on
+					form.addEventListener( 'keydown', function( ev ) {
+						if( ev.key === 'Enter' && ev.target !== null && ev.target.tagName === 'INPUT' ) {
+							ev.preventDefault();
+							shown.handle.close( 'login', true );
+						}
+					} );
+				}
+
+				Nino.adminUi.choiceDialog( {
+					title		: text( other ? '/_admin/common/session/other_title' : '/_admin/common/session/title' ),
+					message	: text( other ? '/_admin/common/session/other' : '/_admin/common/session/expired' ),
+					content	: form,
+					size		: other ? 'narrow' : 'form',
+					nested	: true,
+					refuseWithoutDialog : true,
+					focus		: other ? undefined : shown.user.querySelector('input'),
+					// Escape is an answer of its own, 'stay', which no button shows: it closes the dialog where nothing waits and does nothing where a login can still bring the requests back
+					escape	: 'stay',
+					choices	: [
+						{ value : 'close', label : text('/_admin/common/session/close'), kind : 'secondary' },
+						{ value : 'stay', label : text('/_admin/common/session/close'), kind : 'secondary' },
+						// Where the session ended the page can also be loaded again, as before: a second way out that asks for nothing, beside the login
+						{ value : 'reload', label : text('/_admin/common/session/reload'), kind : other ? 'primary' : 'secondary' },
+					].concat( other ? [] : [ { value : 'login', label : text('/_admin/common/session/submit'), kind : 'primary' } ] ),
+					guard		: function( value, handle ) {
+
+						if( value === 'reload' ) {
+							wn.location.reload();
+							return false;
+						}
+
+						if( value === 'login' ) {
+							sd._login( shown, sd._check );
+							return false;
+						}
+
+						// Escape does not give up the requests that wait while a login can still bring them back; Close does
+						return value === 'stay' && sd._reason === 'expired' && Nino.adminUi.api.waiting() === true ? false : true;
+					},
+					onOpen	: function( handle ) {
+						shown.handle = handle;
+						sd._shown = shown;
+						handle.buttons.stay.hidden = true;
+					},
+					onChoose : function( value ) {
+
+						// A dialog taken away for another one is no answer: the requests still wait
+						if( value === 'swap' )
+							return;
+
+						sd._shown = null;
+
+						// However it was closed, the requests that waited are told: the panels show their error and give their
+						// forms back, and the input can be copied out
+						Nino.adminUi.api.dismiss();
+					},
+				} );
 			},
 
 			/**
 			 *	Log in from the dialog, then let the api ask again whose session
-			 *	this is
+			 *	this is. What is wrong is said at the field it is about: a field that is empty at its own, the
+			 *	refusal of the login and the status of any other answer at the password
 			 *
-			 *	@param		{Object}		el
+			 *	@param		{Object}		shown					The open dialog: { handle, form, user, pw }
 			 *	@param		{Function}	check
 			 *
 			 *	@return		void
 			 */
-			_login : function( el, check ) {
+			_login : function( shown, check ) {
 
-				const say = function( key, ...params ) { el.msg.textContent = Nino.adminUi.format( Nino.content.getText( key ), ...params ) };
+				const text = function( key ) { return Nino.content.getText( key ) };
+				const user = shown.user.querySelector('input');
+				const pw = shown.pw.querySelector('input');
+				const go = shown.handle.buttons.login;
 
-				if( el.user.value === '' || el.pw.value === '' ) {
-					say( '/_admin/common/session/wrong' );
+				const refuse = function( field, control, sentence ) {
+					Nino.adminUi.fieldError( field, control, 'admin-session-error', sentence );
+					control.focus();
+				};
+				const say = function( key, ...params ) { refuse( shown.pw, pw, Nino.adminUi.format( text( key ), ...params ) ) };
+
+				Nino.adminUi.clearFieldErrors( shown.form );
+
+				if( user.value === '' ) {
+					refuse( shown.user, user, Nino.adminUi.format( text('/_admin/common/error/missing'), text('/_admin/common/session/user') ) );
+					return;
+				}
+
+				if( pw.value === '' ) {
+					refuse( shown.pw, pw, Nino.adminUi.format( text('/_admin/common/error/missing'), text('/_admin/common/session/pw') ) );
 					return;
 				}
 
@@ -1803,10 +1840,10 @@
 				const ask = function( loginStatus ) {
 					check( function( outcome, status ) {
 
-						el.submit.disabled = false;
+						go.disabled = false;
 
 						if( outcome === 'resumed' )
-							el.dialog.close();
+							shown.handle.close( 'resumed' );
 						else if( outcome === 'failed' )
 							say( '/_admin/common/session/error', status );
 						else if( outcome === 'expired' )
@@ -1814,8 +1851,7 @@
 					} );
 				};
 
-				el.msg.textContent = '';
-				el.submit.disabled = true;
+				go.disabled = true;
 
 				Nino.http.sendRequest( Nino.dir+ '/.nino/auth/login', 'POST', function( xhr ) {
 
@@ -1829,7 +1865,7 @@
 					}
 
 					if( xhr.status !== 200 ) {
-						el.submit.disabled = false;
+						go.disabled = false;
 						if( xhr.status === 401 )
 							say( '/_admin/common/session/wrong' );
 						else
@@ -1839,9 +1875,9 @@
 
 					// Signing in rotated the session and its token; the api asks for
 					// both again and sends the waiting requests with them
-					el.pw.value = '';
+					pw.value = '';
 					ask( xhr.status );
-				}, {}, { user : el.user.value, pw : el.pw.value } );
+				}, {}, { user : user.value, pw : pw.value } );
 			},
 		},
 

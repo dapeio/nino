@@ -145,9 +145,11 @@ namespace Nino\Admin {
 			$appData['/nino/html/assets']['/_admin/.cache/style.css'] = array_values( array_unique( $styles ) );
 			$appData['/nino/html/assets']['/_admin/.cache/script.js'] = array_values( array_unique( $scripts ) );
 			// The login page is no workbench: the framework and its own
-			// shell, without the kit the panels are built with
+			// shell, with the blocks its two fields are drawn with and
+			// without the panels built on them
 			$appData['/nino/html/assets']['/_admin/.cache/login.js'] = [
 				'/_nino/Nino.js',
+				'/_admin/assets/Nino.admin.js',
 				'/_admin/assets/login.js',
 			];
 			// The follow window is no workbench either: no rail, no panels, so
@@ -2647,8 +2649,9 @@ namespace Nino\Admin {
 
 		/**
 		 *	Tell the page whether the gate is open - the one thing it renders
-		 *	differently. The tools' markup is in the page either way; what
-		 *	they do is guarded server-side by handlePost()
+		 *	differently - and the length a password has to have. The tools'
+		 *	markup is in the page either way; what they do is guarded
+		 *	server-side by handlePost()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2657,7 +2660,11 @@ namespace Nino\Admin {
 		 */
 		public static function handleGet( array &$appData, array &$request ): void {
 
-			\Nino\Html::addFills( $appData, [ '[[/_admin/recovery/open]]' => self::isOpen( $appData ) === true ? '1' : '0' ], '*' );
+			// The length a password must have, for the forms that name it: the page cannot ask a text file, which may be what is broken
+			\Nino\Html::addFills( $appData, [
+				'[[/_admin/recovery/open]]'					=> self::isOpen( $appData ) === true ? '1' : '0',
+				'[[/_admin/recovery/min-password]]'	=> (string) self::MIN_PW_LENGTH,
+			], '*' );
 		}
 
 		/**
@@ -2687,7 +2694,7 @@ namespace Nino\Admin {
 				$status = self::verify( $appData, Admin::postString( $data, 'password' ) );
 
 				if( $status !== 200 ) {
-					\Nino\Http::fail( $request, $status, $status === 429 ? 'too many attempts' : 'wrong password' );
+					\Nino\Http::fail( $request, $status, $status === 429 ? 'too many attempts' : 'wrong password', $status === 429 ? 'recovery_tries' : 'recovery_wrong' );
 					return;
 				}
 
@@ -2703,7 +2710,7 @@ namespace Nino\Admin {
 			}
 
 			if( self::isOpen( $appData ) === false ) {
-				\Nino\Http::fail( $request, 401, 'not logged in' );
+				\Nino\Http::fail( $request, 401, 'not logged in', 'recovery_closed' );
 				return;
 			}
 
@@ -2733,7 +2740,7 @@ namespace Nino\Admin {
 					// module, and a delivery without it has to be told 501 here
 					// rather than fall over that read
 					if( class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === false ) {
-						\Nino\Http::fail( $request, 501, 'no backups module' );
+						\Nino\Http::fail( $request, 501, 'no backups module', 'recovery_no_backups' );
 						return;
 					}
 					// The same shapes the panel offers, snapshots included (see
@@ -2741,7 +2748,7 @@ namespace Nino\Admin {
 					// the door that is open when nothing else is, so the way
 					// back out of a wrong restore has to fit through it too
 					if( preg_match( \Nino\Modules\Backups\Admin::ID_PATTERN, $date ) !== 1 ) {
-						\Nino\Http::fail( $request, 400, 'invalid date' );
+						\Nino\Http::fail( $request, 400, 'invalid date', 'recovery_date' );
 						return;
 					}
 					// An archive of another project is opened with the key it was made with, which is typed
@@ -2759,7 +2766,7 @@ namespace Nino\Admin {
 					// way for a project that has no archive of its own to restore - the one that was installed
 					// to take the place of a lost one - without a way to put a file where the list can see it
 					if( class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === false ) {
-						\Nino\Http::fail( $request, 501, 'no backups module' );
+						\Nino\Http::fail( $request, 501, 'no backups module', 'recovery_no_backups' );
 						return;
 					}
 					$failure = Admin::uploadError( $_FILES['file'] ?? null );
@@ -2788,7 +2795,7 @@ namespace Nino\Admin {
 					return;
 			}
 
-			\Nino\Http::fail( $request, 404, 'unknown action' );
+			\Nino\Http::fail( $request, 404, 'unknown action', 'recovery_action' );
 		}
 
 		// The key attempts: the one counter of a typed archive key, for every client together. A key is
@@ -2904,12 +2911,12 @@ namespace Nino\Admin {
 			$user = \Nino\Auth::getUser( $appData, $mail );
 
 			if( $user === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown account' );
+				\Nino\Http::fail( $request, 404, 'unknown account', 'recovery_unknown_account' );
 				return;
 			}
 
 			if( \Nino\Auth::updateUser( $appData, $mail, $mail, $pw ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not update the account' );
+				\Nino\Http::fail( $request, 500, 'could not update the account', 'recovery_update' );
 				return;
 			}
 
@@ -2920,7 +2927,7 @@ namespace Nino\Admin {
 			Admin::record( $appData, self::LOG_ACTOR, 'Reset Password '. $mail );
 
 			if( \Nino\Auth::unlock( $appData, $mail ) === false ) {
-				\Nino\Http::fail( $request, 500, 'the password was set and every session ended, but the lock of the account could not be lifted' );
+				\Nino\Http::fail( $request, 500, 'the password was set and every session ended, but the lock of the account could not be lifted', 'recovery_unlock' );
 				return;
 			}
 
@@ -2949,7 +2956,7 @@ namespace Nino\Admin {
 			$pw 	= Admin::postString( $data, 'pw' );
 
 			if( ( $data['confirm'] ?? false ) !== true ) {
-				\Nino\Http::fail( $request, 400, 'confirmation required' );
+				\Nino\Http::fail( $request, 400, 'confirmation required', 'recovery_confirm' );
 				return;
 			}
 
@@ -2957,7 +2964,7 @@ namespace Nino\Admin {
 				return;
 
 			if( \Nino\Auth::getUser( $appData, $mail ) !== false ) {
-				\Nino\Http::fail( $request, 409, 'account exists - use reset' );
+				\Nino\Http::fail( $request, 409, 'account exists - use reset', 'recovery_exists' );
 				return;
 			}
 
@@ -2967,7 +2974,7 @@ namespace Nino\Admin {
 			$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
 
 			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ], $role ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not create the account' );
+				\Nino\Http::fail( $request, 500, 'could not create the account', 'recovery_create' );
 				return;
 			}
 
@@ -2989,12 +2996,12 @@ namespace Nino\Admin {
 		private static function _validateMailPw( array &$request, string $mail, string $pw ): bool {
 
 			if( $mail === '' || filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid mail' );
+				\Nino\Http::fail( $request, 400, 'invalid mail', 'recovery_mail' );
 				return false;
 			}
 
 			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'recovery_password_short' );
 				return false;
 			}
 

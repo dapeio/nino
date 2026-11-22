@@ -2911,6 +2911,19 @@ check( 'the account to reset has a session of its own', count( \Nino\Auth::getUs
 check( 'reset for an address that has no account is 404 and creates nothing', $status === 404 && array_keys( $appData['/nino/auth/user'] ) === $accountsBefore );
 [ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'not a mail', 'pw' => 'a new password' ] );
 check( '...400 for a bad address', $status === 400 );
+/*	What the recovery page refuses it refuses with a code of a fixed few, which the page words in the language it speaks: the code carries nothing of what was typed
+	- not the address, not a markup, not a length - and the English beside it is for a log	*/
+$hostileMail = '"><script>alert(1)</script>';
+[ $status, $body ] = $recoveryCall( 'recovery/reset', [ 'mail' => $hostileMail, 'pw' => 'a new password' ] );
+check( 'a refusal of the page is a code of the fixed few and nothing the person typed is in it: an address that is none', $status === 400 && ( $body['code'] ?? '' ) === 'recovery_mail' && str_contains( json_encode( $body ), 'script' ) === false );
+[ $status, $body ] = $recoveryCall( 'recovery/create', [ 'mail' => 'x'. $hostileMail. '@example.com', 'pw' => '<b>x', 'confirm' => true ] );
+check( '...the same where an account is to be created: the code is that of an address that is none, with nothing in it', $status === 400 && ( $body['code'] ?? '' ) === 'recovery_mail' && ( $body['params'] ?? [] ) === [] );
+[ $status, $body ] = $recoveryCall( 'recovery/<b>nope', [] );
+check( '...an action that is none, whatever its name, is "recovery_action" and its name is not in the answer', $status === 404 && ( $body['code'] ?? '' ) === 'recovery_action' && str_contains( json_encode( $body ), 'nope' ) === false );
+[ $status, $body ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => '<b>x' ] );
+check( '...a password under the minimum is "recovery_password_short" with no params: the page knows the length', $status === 400 && ( $body['code'] ?? '' ) === 'recovery_password_short' && ( $body['params'] ?? [] ) === [] && str_contains( (string) ( $body['error'] ?? '' ), '<b>' ) === false );
+[ $status, $body ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'x' ], false );
+check( '...and an answer to a page whose gate is shut is "recovery_closed"', $status === 401 && ( $body['code'] ?? '' ) === 'recovery_closed' );
 [ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'short' ] );
 check( '...400 for a password under the minimum, and the account keeps its own', $status === 400 && password_verify( 'the old password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
 

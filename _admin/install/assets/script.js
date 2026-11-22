@@ -1,5 +1,3 @@
-
-
 /**
  *	Nino										A compact filesystembased php framework
  *	Install									Setup wizard frontend: a strictly linear Back/Next flow
@@ -18,7 +16,14 @@
  *													Accounts just checks an account exists, Applications
  *													places the applications picked) and advances, replacing
  *													what used to be each step's own save button. A step with nothing to commit
- *													(Checks) just advances.
+ *													(Checks) just advances. On the last step the same button ends the wizard.
+ *
+ *													The wizard speaks German or English (pagetext.js, text.js): every
+ *													sentence is a key of that table, and a step draws what it writes
+ *													by hand again, through its retext(), when the language is changed.
+ *													The bar at the foot is the block of the workbench (Nino.adminUi.actionBar()):
+ *													its line says how the last action went, "Back" is the quiet button
+ *													beside the one main button.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -27,7 +32,7 @@
 
 ( function(wn,dc,dE,bd) {
 
-	wn.Nino.install = {
+	wn.Nino.install = Object.assign( wn.Nino.install || {}, {
 
 		// Linear order - index also drives Back/Next's hidden state (first/last step)
 		STEPS : [
@@ -42,11 +47,101 @@
 		_index : 0,
 		_busy 	: false,
 
+		// The last sentence a step said as an error: Next says it again where the step calls back with none of its own
+		_said 	: '',
+
+		// The bar at the foot: { el, line, primary, secondary }, drawn by onReady()
+		bar : null,
+
+		/**
+		 *	A sentence of the table, in the language of the page
+		 *
+		 *	@param		{string}		key
+		 *	@param		{...*}			params
+		 *
+		 *	@return		{string}
+		 */
+		t : function( key, ...params ) {
+			return Nino.pageText.t( key, ...params );
+		},
+
+		/**
+		 *	A language as the workbench names it, which here is the word the table has for its code
+		 *	("Deutsch", "English (US)"): the one block that writes a name, Nino.adminUi.localeName(), is told it
+		 *
+		 *	@param		{string}				code
+		 *	@param		{Array<string>}	[among]				The codes that stand together
+		 *
+		 *	@return		{string}
+		 */
+		localeName : function( code, among ) {
+
+			const name = Nino.install.t( '/_admin/install/locale/'+ code.toLowerCase().replace( '_', '-' ) );
+
+			if( name !== '' )
+				Nino.adminUi.locales.names[code] = name;
+
+			return Nino.adminUi.localeName( code, among );
+		},
+
+		/**
+		 *	The length a password must have, which the server states in the page and enforces itself
+		 *
+		 *	@return		{number}
+		 */
+		minPassword : function() {
+
+			const wrap = dc.getElementById('install-page-wrap');
+			const min = wrap === null ? 0 : parseInt( wrap.dataset.minPassword, 10 );
+
+			return Number.isInteger( min ) === true && min > 0 ? min : 0;
+		},
+
+		/**
+		 *	What a refusal says, in the language of the page: the sentence of its code, or the general one. A
+		 *	refusal about the length of a password has the length to say
+		 *
+		 *	@param		{number}		status
+		 *	@param		{*}					response
+		 *
+		 *	@return		{string}
+		 */
+		failure : function( status, response ) {
+			return Nino.pageText.failure( status, response, Nino.install.minPassword() );
+		},
+
+		/**
+		 *	Say what the last action did in the line of the bar: what is under way, or - with `error` - why it failed. An
+		 *	error stays until the next thing is said
+		 *
+		 *	@param		{string}		text					'' empties the line
+		 *	@param		{boolean}		[error]
+		 *
+		 *	@return		void
+		 */
+		say : function( text, error ) {
+
+			const bar = Nino.install.bar;
+
+			if( bar === null )
+				return;
+
+			// What a step said as an error is what Next says when the step then calls back without a sentence of its own
+			if( error === true )
+				Nino.install._said = text;
+
+			if( error === true )
+				bar.line.fail( text );
+			else
+				bar.line.idle( text );
+		},
+
 		/**
 		 *	Lock both shared navigation controls around one asynchronous commit.
 		 *	Keeping Back active while Next was pending let the mutable _index move
 		 *	under the response callback, so a successful save advanced from the
-		 *	wrong step.
+		 *	wrong step. The picker of the language waits as well: what a step writes
+		 *	by hand is drawn again for the language, and not in the middle of a request.
 		 *
 		 *	@param		{boolean}	busy
 		 *
@@ -56,27 +151,31 @@
 			Nino.install._busy = busy;
 			const backBtn = dc.getElementById('install-back');
 			const nextBtn = dc.getElementById('install-next');
+			const picker = dc.getElementById('page-language');
 			if( backBtn !== null ) backBtn.disabled = busy;
 			if( nextBtn !== null ) nextBtn.disabled = busy;
+			if( picker !== null ) picker.disabled = busy;
 		},
 
 		/**
 		 *	Show one step by index: swap the visible pane, update the nav's
 		 *	progress highlight and the Back/Next buttons' visibility, and
-		 *	let the step's own module load/refresh itself
+		 *	let the step's own module load/refresh itself. The focus goes to the
+		 *	heading of the step, as it does after any change of view
 		 *
 		 *	@param		{number}	index
+		 *	@param		{boolean}	[focus]				Whether the focus goes to the heading of the step: not for the first, which is the page itself
 		 *
 		 *	@return		void
 		 */
-		showStep : function( index ) {
+		showStep : function( index, focus ) {
 
 			const step = Nino.install.STEPS[index];
 			if( step === undefined )
 				return;
 
 			Nino.install._index = index;
-			dc.getElementById('install-actions-msg').textContent = '';
+			Nino.install.say('');
 
 			// Swap the state class without touching the rest: the shell also
 			// carries its design-system classes (see _admin/assets/style.css), and
@@ -103,17 +202,50 @@
 				if( i === index )
 					nav.setAttribute( 'aria-current', 'step' );
 				else
-					nav.removeAttribute( 'aria-current' );
+					nav.removeAttribute('aria-current');
 			} );
 
-			dc.getElementById('install-back').classList.toggle( 'install-hidden', index === 0 );
-			// Finish keeps its own form/button in place of "Next" - there is
-			// nothing left to advance to
-			dc.getElementById('install-next').classList.toggle( 'install-hidden', index === Nino.install.STEPS.length - 1 );
+			Nino.install._paintBar();
 
 			const mod = Nino.install[step.key];
 			if( mod !== undefined && typeof mod.showCurrent === 'function' )
 				mod.showCurrent();
+
+			if( focus === true ) {
+				const heading = dc.getElementById('install-content-'+ step.key).querySelector('h2');
+				if( heading !== null ) {
+					heading.setAttribute( 'tabindex', '-1' );
+					heading.focus();
+				}
+			}
+		},
+
+		/**
+		 *	What the bar says for the step that is shown: Back is there from the second step on, and the main button
+		 *	is "Next" - on the last step it ends the wizard
+		 *
+		 *	@return		void
+		 */
+		_paintBar : function() {
+
+			const bar = Nino.install.bar;
+
+			if( bar === null )
+				return;
+
+			const last = Nino.install._index === Nino.install.STEPS.length - 1;
+			const entry = last === true && Nino.install.finish !== undefined ? Nino.install.finish.entry() : null;
+
+			bar.secondary.classList.toggle( 'install-hidden', Nino.install._index === 0 );
+			bar.secondary.textContent = Nino.install.t('/_admin/install/label/back');
+
+			// The last step's button ends the wizard, and is named for the application it leads to where there is exactly one
+			bar.primary.textContent = entry !== null ? Nino.install.t( '/_admin/install/finish/set-up', entry.name ) : Nino.install.t( last === true ? '/_admin/install/finish/submit' : '/_admin/install/label/next' );
+
+			if( entry !== null )
+				bar.primary.dataset.application = entry.key;
+			else
+				delete bar.primary.dataset.application;
 		},
 
 		back : function() {
@@ -122,7 +254,7 @@
 				return;
 
 			if( Nino.install._index > 0 )
-				Nino.install.showStep( Nino.install._index - 1 );
+				Nino.install.showStep( Nino.install._index - 1, true );
 		},
 
 		next : function() {
@@ -134,17 +266,20 @@
 			const step 		= Nino.install.STEPS[currentIndex];
 
 			Nino.install._setBusy( true );
+			Nino.install._said = '';
 
 			Nino.install._commitStep( step.key, function( ok, message ) {
 
 				Nino.install._setBusy( false );
 
 				if( ok === false ) {
-					dc.getElementById('install-actions-msg').textContent = message || 'Please fix the error above before continuing.';
+					Nino.install.say( message || Nino.install._said || Nino.install.t('/_admin/install/error/step'), true );
 					return;
 				}
 
-				Nino.install.showStep( currentIndex + 1 );
+				// The last step ends the wizard itself: there is no step after it to show
+				if( currentIndex + 1 < Nino.install.STEPS.length )
+					Nino.install.showStep( currentIndex + 1, true );
 			} );
 		},
 
@@ -161,7 +296,7 @@
 		_commitStep : function( key, callback ) {
 
 			if( key === 'checks' && Nino.install.checks !== undefined && Nino.install.checks._ready !== true )
-				return callback( false, 'Environment checks are still running.' );
+				return callback( false, Nino.install.t('/_admin/install/checks/running') );
 
 			if( key === 'setup' && Nino.install.setup !== undefined )
 				return Nino.install.setup.apply( function( ok ) { callback( ok ) } );
@@ -174,6 +309,9 @@
 
 			if( key === 'applications' && Nino.install.applications !== undefined )
 				return Nino.install.applications.apply( callback );
+
+			if( key === 'finish' && Nino.install.finish !== undefined )
+				return Nino.install.finish.submit( callback );
 
 			callback( true );
 		},
@@ -195,7 +333,8 @@
 		},
 
 		/**
-		 *	Show a failed request's status/error in a container
+		 *	Show a failed request in a container, in place of what was to be shown there: the sentence of the
+		 *	refusal in the language of the page
 		 *
 		 *	@param		{Element}		container
 		 *	@param		{number}		status
@@ -205,14 +344,30 @@
 		 */
 		showError : function( container, status, response ) {
 			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Request failed.' );
-			container.appendChild( p );
+			container.appendChild( Nino.adminUi.el( 'p', 'nino-admin-error', Nino.install.failure( status, response ) ) );
 		},
 
 		/**
-		 *	Wire up the wizard shell: Back/Next clicks + the first step's load
+		 *	The language was changed: the words the template carries are written by pagetext.js, and each step
+		 *	that drew words by hand draws them again, with what was typed kept
+		 *
+		 *	@return		void
+		 */
+		retext : function() {
+
+			Nino.install._paintBar();
+
+			Nino.install.STEPS.forEach( function( step ) {
+
+				const mod = Nino.install[step.key];
+
+				if( mod !== undefined && typeof mod.retext === 'function' )
+					mod.retext();
+			} );
+		},
+
+		/**
+		 *	Wire up the wizard shell: the bar at the foot, the language and the first step's load
 		 *
 		 *	@return		void
 		 */
@@ -222,12 +377,17 @@
 			if( wrap === null )
 				return;
 
-			dc.getElementById('install-back').addEventListener( 'click', Nino.install.back );
-			dc.getElementById('install-next').addEventListener( 'click', Nino.install.next );
+			const back = Nino.adminUi.button( '', Nino.install.back, { kind : 'secondary', id : 'install-back' } );
+			const next = Nino.adminUi.button( '', Nino.install.next, { kind : 'primary', id : 'install-next' } );
+			const bar = Nino.adminUi.actionBar( { id : 'install-actions-wrap', status : { fresh : true }, secondary : [ back ], primary : next } );
 
-			Nino.install.showStep( 0 );
+			wrap.appendChild( bar.el );
+			Nino.install.bar = { el : bar.el, line : bar.line, secondary : back, primary : next };
+			Nino.pageText.onChange( Nino.install.retext );
+
+			Nino.install.showStep( 0, false );
 		},
-	};
+	} );
 
 	Nino.events.bindCallback( 'ready', Nino.install.onReady );
 

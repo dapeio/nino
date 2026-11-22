@@ -10,12 +10,9 @@ return [
 	'[[/_admin/login/label/user]]'	=> 'Email',
 	'[[/_admin/login/label/pw]]'		=> 'Password',
 	'[[/_admin/login/label/submit]]'=> 'Log in',
-	'[[/_admin/login/error/user]]'	=> 'Email is required.',
-	'[[/_admin/login/error/pw]]'		=> 'Password is required.',
 	'[[/_admin/login/error/wrong]]'	=> 'Check your input or contact the administrator.',
 	'[[/_admin/login/error/endpoint]]'=> 'The login endpoint answered %s - the credentials were never checked. That is a server configuration, not a wrong password.',
 	'[[/_admin/login/error/csrf]]'	=> 'This page has been open too long and its session token is no longer valid. Reload the page and log in again.',
-	'[[/_admin/login/msg/welcome]]'	=> 'Enter your email and password:',
 	'[[/_admin/login/msg/pending]]'	=> 'Checking your input.',
 
 	'[[/_admin/user/logout]]'				=> 'Log out',

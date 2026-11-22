@@ -321,8 +321,8 @@ check( 'a clickable table row draws its own ring, inside the row the scroller wo
 	const foldedHidden = /\.nino-admin-shell--folded :is\(([^)]*)\) \{[^}]*display: none;/.exec( sharedCss );
 	check( 'a folded rail does not take the label of its links out of the accessibility tree: it is hidden the way .nino-admin-sr-only hides, and display: none is for the rest',
 		foldedHidden !== null && foldedHidden[1].includes('nino-admin-nav-label') === false && /\.nino-admin-shell--folded \.nino-admin-nav-label \{[^}]*clip-path: inset\(50%\);/s.test( sharedCss ) );
-	check( 'the strip of tabs in a pane\'s head scrolls on its own, and the toolbar of a rich text field wraps - at 390 px neither lets the page scroll sideways',
-		/> \.admin-panel-head > \.admin-panel-tabs \{[^}]*overflow-x: auto;/s.test( workbenchCss ) && /\.nino-admin-richtext-toolbar \{[^}]*flex-wrap: wrap;/s.test( sharedCss ) );
+	check( 'the strip of tabs in a pane\'s head and the toolbar of a rich text field wrap - at 390 px neither lets the page scroll sideways, and neither cuts a tab off at the edge of a strip',
+		/> \.admin-panel-head > \.admin-panel-tabs \{[^}]*flex-wrap: wrap;/s.test( workbenchCss ) && !/> \.admin-panel-head > \.admin-panel-tabs \{[^}]*overflow-x:/s.test( workbenchCss ) && /\.nino-admin-richtext-toolbar \{[^}]*flex-wrap: wrap;/s.test( sharedCss ) );
 }
 
 // The shell's two pages: the first stop, the landmark it points at, a disclosure that promises no menu, and a form inside a main
@@ -648,7 +648,7 @@ templateFiles.forEach( function( file ) {
 		if( writtenMessageIds.has( tag[1] ) === true && /role="(status|alert)"/.test( tag[0] ) === false )
 			mutedMessages.push( file+ ' #'+ tag[1] );
 } );
-check( 'the sweep found the message paragraphs to hold', writtenMessageIds.has('form-message') && writtenMessageIds.has('install-actions-msg') && writtenMessageIds.size >= 5 );
+check( 'no page script looks a message paragraph up by id any more: the pages outside the workbench draw their lines with the status block, which carries its role itself', writtenMessageIds.size === 0 || ( writtenMessageIds.has('form-message') && mutedMessages.length === 0 ) );
 
 /*	An action is a button and a place is a link (AGENTS.md, "Templates"). The
 	rail's "Log out" and the recovery page's "Close recovery" were written as
@@ -698,7 +698,7 @@ check( 'the design system has a heading that is there for whoever is not looking
 	hit: "Log out" is one line of .82rem type, 19px tall, under the 24px the
 	pointer rule asks for (WCAG 2.2 SC 2.5.8)	*/
 check( 'the design system gives a text-shaped action a hit area rather than a line height',
-	/:where\(\.nino-admin\) \.nino-admin-linkbutton \{[^}]*min-height: 1\.5rem;/s.test( shared ) );
+	/:where\(\.nino-admin\) \.nino-admin-linkbutton \{[^}]*min-height: var\(--nino-admin-control-icon-small\);/s.test( shared ) );
 
 /*	A button whose face is a glyph has to be called something, and `title` is
 	not that something: it is the weakest source the accessibility tree
