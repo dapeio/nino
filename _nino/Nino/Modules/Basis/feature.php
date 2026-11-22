@@ -12,12 +12,12 @@ return [
 	'manual'			=> [
 		'shortcodes' => [
 			'[header-wrap]' => [
-				'en_US' => 'The header of the page, with [header-logo], [header-nav] and [header-actions] in it; sticky keeps it at the top.',
-				'de_DE' => 'Der Kopf der Seite, darin [header-logo], [header-nav] und [header-actions]; sticky hält ihn oben fest.',
+				'en_US' => 'The header of the page, built like a section of [section-row]s and [section-col]s with [header-logo], [header-nav] and a button in them (or of [header-logo], [header-nav] and [header-actions] directly); ground, image, picture, dim and height are its own, and sticky keeps it at the top.',
+				'de_DE' => 'Der Kopf der Seite, wie ein Abschnitt aus [section-row]-Zeilen und [section-col]-Spalten gebaut, darin [header-logo], [header-nav] und ein Button (oder [header-logo], [header-nav] und [header-actions] direkt); Grund, Bild, Bild zeigen oder verbergen, Abdunkeln und Höhe sind seine eigenen, sticky hält ihn oben fest.',
 			],
 			'[footer-wrap]' => [
-				'en_US' => 'The foot of the page, with [footer-col]s - a [footer-logo], a [footer-nav] and what flows - and one [footer-legal] for the legal pages and the languages.',
-				'de_DE' => 'Der Fuß der Seite, mit [footer-col]-Spalten - [footer-logo], [footer-nav] und Fließendes - und einem [footer-legal] für die Rechtstexte und die Sprachen.',
+				'en_US' => 'The foot of the page, built like a section of [section-row]s and [section-col]s - a [footer-logo], a [footer-nav] and what flows - or of [footer-col]s, with one [footer-legal] for the legal pages and the languages; ground, image, picture, dim and height are its own.',
+				'de_DE' => 'Der Fuß der Seite, wie ein Abschnitt aus [section-row]-Zeilen und [section-col]-Spalten gebaut - [footer-logo], [footer-nav] und Fließendes - oder aus [footer-col]-Spalten, mit einem [footer-legal] für die Rechtstexte und die Sprachen; Grund, Bild, Bild zeigen oder verbergen, Abdunkeln und Höhe sind seine eigenen.',
 			],
 			'[section-wrap]' => [
 				'en_US' => 'A section of the page, with [section-row]s of [section-col]s; ground, image, picture (show or hide it), dim and height are its own.',

@@ -29,6 +29,10 @@ namespace Nino {
 	 *											'offers'		the places it offers to what it holds - present, even as [],
 	 *																	makes it a container; its own name is always one of them
 	 *											'once'			true: once in a container, which the caller of a tool enforces
+	 *											'deep'			a container only: places it offers to every container of the flow below it, however deep
+	 *																	(a column of a row, a card in it: the place header of a header-wrap), except below a container
+	 *																	of the flow that names it in its own 'in' - a part of its own, which keeps what it offers - and
+	 *																	in that part's own flow. allowed() without a path does not know them, offer() and check() do
 	 *											'source'		text, image, link or none (the default): what its first word is
 	 *											'format'		for a text: plain (the default), inline, lines or blocks; an attribute named
 	 *																	format - a choice among them - says it for each call
@@ -165,7 +169,7 @@ namespace Nino {
 		public const array RESERVED = [ 'value', 'source', 'content', 'class', 'text', 'variant', 'lang' ];
 
 		// The keys of a schema and of an attribute, which is all validate() accepts
-		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
+		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'deep', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input', 'labels' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
@@ -1619,6 +1623,25 @@ namespace Nino {
 					$clean['through'] = true;
 			}
 
+			if( array_key_exists( 'deep', $schema ) === true ) {
+
+				if( isset( $clean['offers'] ) === false )
+					return $what. ': "deep" is for a container: it needs "offers"';
+
+				$places = self::_places( $schema['deep'] );
+
+				if( is_string( $places ) === true )
+					return $what. ': "deep" '. $places;
+
+				if( $places === [] )
+					return $what. ': "deep" lists at least one place';
+
+				if( array_intersect( $places, self::PLACES ) !== [] )
+					return $what. ': "deep" is for the places of a feature: '. implode( ' and ', self::PLACES ). ' are the kernel\'s';
+
+				$clean['deep'] = $places;
+			}
+
 			if( isset( $schema['children'] ) === true ) {
 
 				if( $schema['children'] !== 'nodes' )
@@ -1843,8 +1866,9 @@ namespace Nino {
 		}
 
 		/**
-		 *	What may be put at a place, and what may not and why: each component that allowed() names for the container,
-		 *	with true where it may be put and the reason where it may not
+		 *	What may be put at a place, and what may not and why: each component that allowed() names for the container and, where
+		 *	a container above the path has a 'deep' place the container takes, each one that stands in it, in the order the components were
+		 *	registered whichever way it comes, with true where it may be put and the reason where it may not
 		 *
 		 *	- CODE_SELF: a container for the flow does not stand in itself, no card in a card, however far up the other one is; nor
 		 *	  does one that is 'through'
@@ -1863,7 +1887,7 @@ namespace Nino {
 		 *	@param		array			$path					The names from the page to the container
 		 *	@param		array			$siblings			The nodes the container holds
 		 *
-		 *	@return 	array										name => true, or name => the reason, in the order allowed() gives
+		 *	@return 	array										name => true, or name => the reason, in the order the components were registered
 		 */
 		public static function offer( array &$appData, array $path, array $siblings ): array {
 
@@ -2007,12 +2031,42 @@ namespace Nino {
 		 *	@param		array			$registry
 		 *	@param		array			$path
 		 *
-		 *	@return 	array										The names, in the order allowed() gives
+		 *	@return 	array										The names, in the order the components were registered: those allowed() gives, and those of a 'deep' place
 		 */
 		private static function _letIn( array &$appData, array $registry, array $path ): array {
 
-			$names = self::allowed( $appData, self::_parent( $registry, $path ) );
+			$parent = self::_parent( $registry, $path );
+			$names = self::allowed( $appData, $parent );
 			$last = $path === [] ? '' : $path[count( $path ) - 1];
+
+			// The places a container further up offers to every container of the flow below it - except where a container of the flow between
+			// them, the one the component stands in included, names that container in its 'in': it is one of its own parts, and what stands in
+			// a part of it keeps what the part offers
+			$deep = [];
+
+			// The container the component stands in is below none of its own places: only what stands above it on the path offers one
+			$above = (int) array_search( $parent, array_reverse( $path, true ), true );
+
+			if( $parent !== '' && in_array( 'flow', (array) ( $registry[$parent]['offers'] ?? [] ), true ) === true )
+				foreach( $path as $at => $step ) {
+
+					if( $at >= $above || isset( $registry[$step]['deep'] ) === false )
+						continue;
+
+					$part = false;
+
+					foreach( array_slice( $path, $at + 1 ) as $between )
+						if( in_array( 'flow', (array) ( $registry[$between]['offers'] ?? [] ), true ) === true && in_array( $step, (array) ( $registry[$between]['in'] ?? [] ), true ) === true )
+							$part = true;
+
+					if( $part === false )
+						$deep = array_merge( $deep, $registry[$step]['deep'] );
+				}
+
+			if( $deep !== [] )
+				$names = array_keys( array_filter( $registry, static fn( array $schema, string|int $name ): bool => in_array( (string) $name, $names, true ) === true || array_intersect( $schema['in'], $deep ) !== [], ARRAY_FILTER_USE_BOTH ) );
+
+			$names = array_map( 'strval', $names );
 
 			if( ( $registry[$last]['through'] ?? false ) !== true )
 				return $names;

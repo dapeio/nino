@@ -200,6 +200,19 @@ $cards = \Nino\Blocks::get( $appData, 'three-columns' );
 check( 'the sources of a block are named by the id above them: the words of the root by their name, those of a call with an id by the part of that id behind the root and the name', array_column( $cards['slots'], 'name' ) === [ 'title', 'text', 'a-title', 'a-text', 'b-title', 'b-text', 'c-title', 'c-text' ]
 	&& $cards['slots'][2]['scope'] === 'a' && $cards['slots'][2]['source'] === '~title' && array_keys( $cards['texts'] ) === [ 'de_DE', 'en_US' ] && \Nino\Blocks::get( $appData, 'nobody' ) === null );
 
+// The frames are made of rows and columns as a page is: the register finds nothing against them, nor against the templates of the starter site, and each holds its row
+$frames = [];
+
+foreach( [ 'header-line' => 'header-wrap', 'footer-columns' => 'footer-wrap' ] as $frameKey => $frameWrap ) {
+
+	$frame = \Nino\Blocks::get( $appData, $frameKey );
+	$starter = (string) file_get_contents( $root. '/_admin/install/library/base/templates/frame-'. ( $frameWrap === 'header-wrap' ? 'header' : 'footer' ). '.tpl' );
+	$frames[$frameKey] = [ \Nino\Components::check( $appData, $frame['tree'] ), \Nino\Components::check( $appData, \Nino\Markup::parse( $starter, \Nino\Components::containers( $appData ) ) ),
+		str_contains( $frame['source'], '[section-row' ), str_contains( $starter, '[section-row' ) ];
+}
+
+check( 'the header and the footer of the blocks and of the starter site are made of section-row and section-col, and the register finds nothing against any of the four', $frames['header-line'] === [ [], [], true, true ] && $frames['footer-columns'] === [ [], [], true, true ] );
+
 // --- B. one rule each --------------------------------------------------------------------------------
 
 echo "\nB. What a block must keep\n";

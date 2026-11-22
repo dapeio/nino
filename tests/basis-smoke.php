@@ -297,6 +297,32 @@ function basisBody( array $rules, string $word, string $at = '' ): string {
 	return implode( ' ', $bodies );
 }
 
+/**
+ *	The declarations of the rules whose selector is $selector, inside $at: property => value, with no blank in either and no regard to the blanks of $selector and $at
+ *
+ *	@param		array			$rules				As basisRules() answers
+ *	@param		string		$selector
+ *	@param		string		$at
+ *
+ *	@return 	array
+ */
+function basisDeclared( array $rules, string $selector, string $at = '' ): array {
+
+	$flat = static fn( string $text ): string => (string) preg_replace( '/\s+/', '', $text );
+	$found = [];
+
+	foreach( $rules as $rule )
+		if( $flat( $rule['at'] ) === $flat( $at ) && $flat( $rule['selector'] ) === $flat( $selector ) )
+			foreach( explode( ';', $rule['body'] ) as $declaration )
+				if( str_contains( $declaration, ':' ) === true ) {
+
+					[ $property, $value ] = explode( ':', $declaration, 2 );
+					$found[$flat( $property )] = $flat( $value );
+				}
+
+	return $found;
+}
+
 /**	The contrast of two colours given as [ r, g, b ], 1 to 21	*/
 function basisContrast( array $one, array $two ): float {
 
@@ -412,11 +438,11 @@ check( 'the icons the register accepts are the icons the script of the workbench
 // what a tool offers where: the nine that hold something
 $holds = [
 	''							=> [ 'footer-wrap', 'header-wrap', 'html', 'section-wrap' ],
-	'header-wrap'		=> [ 'header-actions', 'header-logo', 'header-nav' ],
+	'header-wrap'		=> [ 'header-actions', 'header-logo', 'header-nav', 'section-row' ],
 	'section-wrap'	=> [ 'section-row' ],
 	'section-row'		=> [ 'section-col' ],
 	'section-col'		=> [ 'button', 'button-group', 'html', 'image', 'section-subtitle', 'section-title', 'spacer', 'text' ],
-	'footer-wrap'		=> [ 'footer-col', 'footer-legal' ],
+	'footer-wrap'		=> [ 'footer-col', 'footer-legal', 'section-row' ],
 	'footer-col'		=> [ 'button', 'button-group', 'footer-logo', 'footer-nav', 'html', 'image', 'spacer', 'text' ],
 	'button-group'	=> [ 'button' ],
 	'html'					=> [],
@@ -452,7 +478,7 @@ check( 'header-logo, header-nav and footer-legal are once, and the column has th
 
 $renderers = array_keys( (array) $appData[\Nino\Components::RENDERERS] );
 sort( $renderers );
-check( 'ten of the twenty have a renderer, the ones that compute; the others are drawn from their template alone', $renderers === [ 'button', 'footer-legal', 'footer-logo', 'footer-nav', 'header-logo', 'header-nav', 'html', 'image', 'section-title', 'section-wrap' ] );
+check( 'twelve of the twenty have a renderer, the ones that compute; the others are drawn from their template alone', $renderers === [ 'button', 'footer-legal', 'footer-logo', 'footer-nav', 'footer-wrap', 'header-logo', 'header-nav', 'header-wrap', 'html', 'image', 'section-title', 'section-wrap' ] );
 
 // the feature: delivered, listed, off, with no script, and nothing of the kernel names it
 $manifestWarnings = ninoWarnings();
@@ -663,6 +689,71 @@ check( 'the menu of the footer is a list named by the word of the feature, or by
 	&& str_contains( $draw( '[header-nav label="Haupt"]' ), 'aria-label="Haupt"' ) && str_contains( $draw( '[header-nav]' ), 'aria-label="Hauptnavigation"' ) );
 check( 'the foot of the page: the year and the company, the legal pages, the languages with the current one marked and each one in its own', $draw( '[footer-legal]' )
 	=== '<div class="footer-legal"><p class="footer-legal-copyright">&copy; 2026 Muster &amp; Söhne</p><ul class="footer-legal-pages"><li><a href="/imprint">Impressum</a></li><li><a href="/privacy">Datenschutz</a></li></ul><ul class="footer-legal-locales"><li><a href="?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE" aria-current="true">Deutsch</a></li><li><a href="?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English</a></li></ul></div>' );
+
+// The markup stored before the wraps took rows - the parts of a header directly in the header, the columns of the footer - is drawn byte for byte as it was: each source with the output the kernel before the rows gave it
+$stored = [
+	'header' => [ "[header-wrap id=\"header\" sticky]\n\t[header-logo]\n\t[header-nav menu=\"main\"]\n\t[header-actions]\n\t\t[button text=\"Kontakt\" href=\"page:/contact\" size=\"s\"]\n\t[/header-actions]\n[/header-wrap]",
+		"<header id=\"header\" class=\"header-wrap header-wrap--sticky\"><div class=\"header-wrap-inner\"><a class=\"header-logo\" href=\"/\"><img class=\"header-logo-light\" src=\"/public/images/logo.png\" width=\"160\" height=\"48\" alt=\"\"><img class=\"header-logo-dark\" src=\"/public/images/logo-dark.png\" width=\"160\" height=\"48\" alt=\"\"><span class=\"header-logo-name\">Muster &amp; Söhne</span></a><nav class=\"header-nav\" aria-label=\"Hauptnavigation\"><details class=\"header-nav-details\"><summary class=\"header-nav-toggle\" aria-label=\"Menü\"><span aria-hidden=\"true\"></span></summary><ul class=\"header-nav-list\"><li><a href=\"/\" aria-current=\"page\">Start</a></li><li><a href=\"/contact\">Kontakt</a></li><li><a href=\"/about\">Über uns</a></li></ul></details></nav><div class=\"header-actions\">\n\t\t<a class=\"button button--size-s\" href=\"/contact\">Kontakt</a>\n\t</div>\n\t\n\t\n\t\n</div></header>" ],
+	'header-nav-never' => [ "[header-wrap][header-logo light=\"/empty\" dark=\"/empty\" href=\"/start\"][header-nav collapse=\"never\" label=\"Haupt\"][/header-wrap]",
+		"<header class=\"header-wrap\"><div class=\"header-wrap-inner\"><a class=\"header-logo\" href=\"/start\"><span class=\"header-logo-name\">Muster &amp; Söhne</span></a><nav class=\"header-nav header-nav--collapse-never\" aria-label=\"Haupt\"><details class=\"header-nav-details\" open><summary class=\"header-nav-toggle\" aria-label=\"Menü\"><span aria-hidden=\"true\"></span></summary><ul class=\"header-nav-list\"><li><a href=\"/\" aria-current=\"page\">Start</a></li><li><a href=\"/contact\">Kontakt</a></li><li><a href=\"/about\">Über uns</a></li></ul></details></nav></div></header>" ],
+	'header-empty' => [ "[header-wrap][/header-wrap]",
+		"<header class=\"header-wrap\"><div class=\"header-wrap-inner\"></div></header>" ],
+	'footer' => [ "[footer-wrap id=\"footer\"]\n\t[footer-col size=\"100 m:50\"]\n\t\t[footer-logo /logo alt=\"L\"]\n\t\t[text text=\"Hallo\" format=\"inline\" size=\"s\"]\n\t[/footer-col]\n\t[footer-col size=\"100 m:50\"]\n\t\t[footer-nav menu=\"footer\"]\n\t[/footer-col]\n\t[footer-legal]\n[/footer-wrap]",
+		"<footer id=\"footer\" class=\"footer-wrap\"><div class=\"footer-wrap-inner\">\n\t<div class=\"footer-col footer-col--m-size-50\">\n\t\t<span class=\"footer-logo\"><img src=\"/public/images/logo.png\" width=\"160\" height=\"48\" alt=\"L\" loading=\"lazy\" decoding=\"async\"></span>\n\t\t<div class=\"text text--size-s\">Hallo</div>\n\t</div>\n\t<div class=\"footer-col footer-col--m-size-50\">\n\t\t<nav class=\"footer-nav\" aria-label=\"Navigation im Fußbereich\"><ul><li><a href=\"/contact\">Kontakt</a></li><li><a href=\"/about\">Über uns</a></li></ul></nav>\n\t</div>\n\t\n</div><div class=\"footer-legal\"><p class=\"footer-legal-copyright\">&copy; 2026 Muster &amp; Söhne</p><ul class=\"footer-legal-pages\"><li><a href=\"/imprint\">Impressum</a></li><li><a href=\"/privacy\">Datenschutz</a></li></ul><ul class=\"footer-legal-locales\"><li><a href=\"?/_nino/localepicker/current=de_DE\" lang=\"de-DE\" hreflang=\"de-DE\" aria-current=\"true\">Deutsch</a></li><li><a href=\"?/_nino/localepicker/current=en_US\" lang=\"en-US\" hreflang=\"en-US\">English</a></li></ul></div></footer>" ],
+	'footer-empty' => [ "[footer-wrap][/footer-wrap]",
+		"<footer class=\"footer-wrap\"><div class=\"footer-wrap-inner\"></div></footer>" ],
+	'footer-legal-only' => [ "[footer-wrap][footer-legal][/footer-wrap]",
+		"<footer class=\"footer-wrap\"><div class=\"footer-wrap-inner\"></div><div class=\"footer-legal\"><p class=\"footer-legal-copyright\">&copy; 2026 Muster &amp; Söhne</p><ul class=\"footer-legal-pages\"><li><a href=\"/imprint\">Impressum</a></li><li><a href=\"/privacy\">Datenschutz</a></li></ul><ul class=\"footer-legal-locales\"><li><a href=\"?/_nino/localepicker/current=de_DE\" lang=\"de-DE\" hreflang=\"de-DE\" aria-current=\"true\">Deutsch</a></li><li><a href=\"?/_nino/localepicker/current=en_US\" lang=\"en-US\" hreflang=\"en-US\">English</a></li></ul></div></footer>" ],
+];
+$storedWrong = [];
+
+foreach( $stored as $storedName => [ $storedSource, $storedHtml ] )
+	if( $draw( $storedSource ) !== $storedHtml )
+		$storedWrong[] = $storedName;
+
+check( 'the old markup of a header and of a footer - parts in the wrap, footer-col - is drawn as it always was, byte for byte ('. count( $stored ). ' sources)'. ( $storedWrong === [] ? '' : ' - '. implode( ', ', $storedWrong ) ), $storedWrong === [] );
+
+// A header and a footer made of rows, as a page is: the rows stand beside the inner box of the old line, after it, and in the footer before the legal line wherever it is written
+$logoHtml = $draw( '[header-logo]' );
+check( 'a header of rows holds its rows outside the inner box of the old line - the box stays, empty, in front of them - and the parts of a column are drawn where they stand',
+	$draw( '[header-wrap id="h"][section-row][section-col size="auto"][header-logo][/section-col][section-col size="fill" align="end"][header-nav][/section-col][/section-row][/header-wrap]' )
+	=== '<header id="h" class="header-wrap"><div class="header-wrap-inner"></div><div class="section-row"><div class="section-col section-col--size-auto">'. $logoHtml. '</div><div class="section-col section-col--size-fill section-col--align-end">'. $draw( '[header-nav]' ). '</div></div></header>' );
+check( 'a footer of rows has them after the inner box and before the legal line, whichever of them is written first',
+	$draw( '[footer-wrap][footer-legal][section-row][section-col]x[/section-col][/section-row][/footer-wrap]' ) === '<footer class="footer-wrap"><div class="footer-wrap-inner"></div><div class="section-row"><div class="section-col">x</div></div>'. $draw( '[footer-legal]' ). '</footer>'
+	&& $draw( '[footer-wrap][section-row][/section-row][footer-col][/footer-col][footer-legal][/footer-wrap]' ) === '<footer class="footer-wrap"><div class="footer-wrap-inner"><div class="footer-col"></div></div><div class="section-row"></div>'. $draw( '[footer-legal]' ). '</footer>' );
+
+// The wraps have what a section has: a ground, a picture behind the content, picture on or off, dim, a height - and nothing of it where the call says none
+$behind = static fn( string $wrap, string $call ): string => $draw( '['. $wrap. ' '. $call. '][/'. $wrap. ']' );
+$pictured = [];
+
+foreach( [ 'header-wrap', 'footer-wrap', 'section-wrap' ] as $wrapName ) {
+
+	$bare = $behind( $wrapName, '' );
+	$image = '<div class="'. $wrapName. '-image"><img class="'. $wrapName. '-picture" src="/public/images/hero.jpg" width="1600" height="900" alt="" decoding="async"></div>';
+
+	if( $behind( $wrapName, 'image="/template/page-basis/hero/background" dim height="60"' ) !== substr( $bare, 0, strpos( $bare, 'class="' ) + 7 + strlen( $wrapName ) ). ' '. $wrapName. '--dim '. $wrapName. '--height-60">'. $image. substr( $bare, strpos( $bare, '>', 5 ) + 1 ) )
+		$pictured[] = $wrapName. ' with a picture';
+
+	if( $behind( $wrapName, 'image="/template/page-basis/hero/background" picture="off"' ) !== substr( $bare, 0, strpos( $bare, 'class="' ) + 7 + strlen( $wrapName ) ). ' '. $wrapName. '--picture-off">'. substr( $bare, strpos( $bare, '>', 5 ) + 1 ) )
+		$pictured[] = $wrapName. ' with the picture off';
+
+	if( $behind( $wrapName, 'ground="base" picture="on" height="auto"' ) !== $bare && $wrapName !== 'footer-wrap' )
+		$pictured[] = $wrapName. ' with the defaults written';
+
+	// A picture that is none: a way out of the folder, an address of another site, a slot nobody has - the wrap draws what it draws without one, as the section does
+	foreach( [ '../../private/config.php', '//evil.example/x.png', 'https://evil.example/x.png', '/nobody/here', "a\0b.jpg" ] as $hostile )
+		if( $behind( $wrapName, 'image="'. $hostile. '"' ) !== $bare )
+			$pictured[] = $wrapName. ' with the picture '. $hostile;
+}
+
+check( 'a header, a footer and a section draw a picture behind their content, under the classes of their own wrap, dim and a height as classes, no picture where it is off, and none for a source that is a way out, an address of another site or a slot nobody has'. ( $pictured === [] ? '' : ' - '. implode( '; ', $pictured ) ), $pictured === [] );
+check( 'the ground of a header is the section\'s ground: the default writes no class, the other four do; the ground of a footer is alt where it says none, and base is a class there',
+	$behind( 'header-wrap', 'ground="base"' ) === $behind( 'header-wrap', '' ) && str_contains( $behind( 'header-wrap', 'ground="dark"' ), 'header-wrap header-wrap--ground-dark' ) && str_contains( $behind( 'header-wrap', 'ground="primary"' ), '--ground-primary' )
+	&& $behind( 'footer-wrap', 'ground="alt"' ) === $behind( 'footer-wrap', '' ) && str_contains( $behind( 'footer-wrap', 'ground="base"' ), 'footer-wrap footer-wrap--ground-base' ) && str_contains( $behind( 'footer-wrap', 'ground="tint"' ), '--ground-tint' )
+	&& $schemas['header-wrap']['attributes']['ground']['default'] === 'base' && $schemas['footer-wrap']['attributes']['ground']['default'] === 'alt'
+	&& array_diff_key( $schemas['section-wrap']['attributes'], [ 'id' => 1, 'ground' => 1 ] ) === array_diff_key( $schemas['header-wrap']['attributes'], [ 'id' => 1, 'sticky' => 1, 'ground' => 1 ] )
+	&& array_diff_key( $schemas['section-wrap']['attributes'], [ 'id' => 1, 'ground' => 1 ] ) === array_diff_key( $schemas['footer-wrap']['attributes'], [ 'id' => 1, 'ground' => 1 ] )
+	&& array_diff_key( $schemas['section-wrap']['attributes']['ground'], [ 'default' => 1 ] ) === array_diff_key( $schemas['footer-wrap']['attributes']['ground'], [ 'default' => 1 ] ) );
 
 // where the project says nothing: the right to see it
 $one = basisSite();
@@ -899,22 +990,16 @@ $css = [ 'header' => (string) file_get_contents( $basisDir. '/groups/header/part
 $bad = [];
 
 // the mode of the device reaches a header, a footer and a section that has no ground, and does not take the dark ground its mode from it
-foreach( [ 'header' => '.header-wrap { ', 'footer' => '.footer-wrap { ' ] as $partGroup => $selector ) {
+foreach( [ 'header' => '.header-wrap', 'footer' => '.footer-wrap', 'section' => '.section-wrap' ] as $partGroup => $wrapSelector ) {
 
-	$body = basisBody( array_filter( $partRules[$partGroup], static fn( array $rule ): bool => $rule['selector'] === trim( $selector, ' {' ) ), trim( $selector, ' {' ) );
+	$wrap = array_values( array_filter( $partRules[$partGroup], static fn( array $rule ): bool => $rule['at'] === '' && str_starts_with( $rule['selector'], $wrapSelector. ':not(' ) ) );
 
-	if( str_contains( $body, 'color-scheme: var(--brand-scheme);' ) === false )
-		$bad[] = $partGroup. ' has no mode of its own';
+	if( count( $wrap ) !== 1 || str_contains( $wrap[0]['body'], 'color-scheme: var(--brand-scheme);' ) === false || str_contains( $wrap[0]['selector'], '[class$="--ground-dark"]' ) === false || str_contains( $wrap[0]['selector'], '[class*="--ground-dark "]' ) === false )
+		$bad[] = $partGroup. ' that is not dark has no mode of its own, or it takes the one of the dark ground';
+
+	if( str_contains( basisBody( $partRules[$partGroup], $wrapSelector. ':has( > '. $wrapSelector. '-image )' ), 'color-scheme: dark;' ) === false )
+		$bad[] = $partGroup. ' with a picture is not dark';
 }
-
-$wrap = array_values( array_filter( $partRules['section'], static fn( array $rule ): bool => $rule['at'] === '' && str_starts_with( $rule['selector'], '.section-wrap:not(' ) ) );
-$veiled = basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )' );
-
-if( count( $wrap ) !== 1 || str_contains( $wrap[0]['body'], 'color-scheme: var(--brand-scheme);' ) === false || str_contains( $wrap[0]['selector'], '[class$="--ground-dark"]' ) === false || str_contains( $wrap[0]['selector'], '[class*="--ground-dark "]' ) === false )
-	$bad[] = 'a section that is not dark has no mode of its own, or it takes the one of the dark ground';
-
-if( str_contains( $veiled, 'color-scheme: dark;' ) === false )
-	$bad[] = 'a section with a picture is not dark';
 
 // a card that is a link: the link of its title covers it and nothing else does; what is in the card is above the cover and has its own focus
 $cover = basisBody( $partRules['section'], '.section-col--link > .section-title a::after' );
@@ -1169,6 +1254,80 @@ foreach( [ 'header' => '.header-wrap', 'footer' => '.footer-wrap', 'section' => 
 
 check( 'the parts: the mode of the device reaches header, footer and a section; a card that is a link is covered by the link of its title alone; reverse turns wrapped rows; the picture of a section is under a veil that is legible over white ('. sprintf( '%.1f', $weakest ). ' : 1); the logo and the menu fall back; paper is dark on white'
 	. ( $bad === [] ? '' : ' - '. implode( '; ', $bad ) ), $bad === [] );
+
+// the header and the footer are built like a section: the same veil over a picture behind them (.75, and .82 with dim), the same three heights with the content in the middle, no picture on paper.
+// What a rule says is read as rule: selector to declarations, with no regard to the blanks in either
+$wrapBad = [];
+$flat = static fn( string $text ): string => (string) preg_replace( '/\s+/', '', $text );
+$says = static fn( string $group, string $selector, string $property, string $at = '' ): ?string => basisDeclared( $partRules[$group], $selector, $at )[$flat( $property )] ?? null;
+
+foreach( [ 'header' => '.header-wrap', 'footer' => '.footer-wrap' ] as $wrapGroup => $wrapClass ) {
+
+	foreach( [ $wrapClass. '-image::after' => '.75', $wrapClass. '--dim > '. $wrapClass. '-image::after' => '.82' ] as $veilOf => $strength )
+		if( $says( $wrapGroup, $veilOf, 'background' ) !== $flat( 'rgb( 0 0 0 / '. $strength. ' )' ) )
+			$wrapBad[] = $wrapGroup. ' has no veil of '. $strength. ' over its picture';
+
+	foreach( [ '60' => '60vh', '80' => '80vh', '100' => '100svh' ] as $heightOf => $declared )
+		if( $says( $wrapGroup, $wrapClass. '--height-'. $heightOf, 'min-height' ) !== $declared )
+			$wrapBad[] = $wrapGroup. ' has not the height '. $heightOf;
+
+	if( $says( $wrapGroup, $wrapClass. ':where( [class*="--height-"] )', 'justify-content' ) !== 'center' )
+		$wrapBad[] = $wrapGroup. ' does not put its content in the middle of a height';
+
+	if( $says( $wrapGroup, $wrapClass. '-image', 'display', '@media print' ) !== 'none' )
+		$wrapBad[] = $wrapGroup. ' prints its picture';
+
+	// the picture stands first and what is positioned after it is above it: the header is no stacking context, so that what a menu lays over the page below stays over it
+	if( $says( $wrapGroup, $wrapClass, 'isolation' ) !== null || $says( $wrapGroup, $wrapClass. ':has( > '. $wrapClass. '-image )', 'isolation' ) !== null || $says( $wrapGroup, $wrapClass. '-image', 'z-index' ) !== null
+		|| $says( $wrapGroup, $wrapClass, 'position' ) !== 'relative' || $says( $wrapGroup, $wrapClass. '-image', 'position' ) !== 'absolute'
+		|| ( $says( $wrapGroup, $wrapClass. '-inner', 'position' ) ?? $says( $wrapGroup, $wrapClass. '-inner, .footer-legal', 'position' ) ) !== 'relative' )
+		$wrapBad[] = $wrapGroup. ' is a stacking context, or does not keep its picture under what stands in it';
+}
+
+// a footer with no ground stands on the ground alt, one with a ground on the ground it says; the space above and below belongs to the header as it does to the footer
+if( $says( 'footer', '.footer-wrap', 'background-color' ) !== 'var(--brand-ground-alt)' || $says( 'footer', '.footer-wrap:where( [class*="--ground-"] )', 'background-color' ) !== 'var(--brand-ground)'
+	|| $says( 'header', '.header-wrap', 'padding-block' ) !== 'var(--header-wrap-space)' || str_contains( implode( ' ', array_keys( basisDeclared( $partRules['header'], '.header-wrap-inner' ) ) ), 'padding' ) === true )
+	$wrapBad[] = 'a footer with no ground is not on the ground alt, or the space of the header is not the header\'s';
+
+// a menu in a column of a row: the button stands where the column puts it - the margin that pushes it to the end is for the old line alone -, the open list is laid under the row, over the width
+// of the row, and the row is what it is laid under; the header that is open and has a height keeps its line at the top; the box of the open list has no room of its own in the column
+$columnOf = ':where( .header-nav:not( .header-nav--collapse-never, .header-wrap-inner .header-nav ) ) .header-nav-details[open]';
+
+if( $says( 'header', $columnOf. ' > .header-nav-list', 'position' ) !== 'absolute' || $says( 'header', $columnOf. ' > .header-nav-list', 'inset-inline' ) !== '0' || $says( 'header', $columnOf. ' > .header-nav-list', 'top' ) !== $flat( 'calc( 100% + var(--header-nav-gap) )' )
+	|| $says( 'header', '.header-nav-toggle', 'margin-inline-start' ) !== null
+	|| $says( 'header', '.header-wrap-inner .header-nav-toggle', 'margin-inline-start' ) !== 'auto' || $says( 'header', '.header-wrap-inner > .header-nav', 'margin-inline-start' ) !== 'auto'
+	|| $says( 'section', '.section-row', 'position' ) !== 'relative'
+	|| $says( 'header', '.header-nav:not( .header-nav--collapse-always ) .header-nav-list', 'position', '@media (min-width: 768px) @supports selector( ::details-content )' ) !== 'static' )
+	$wrapBad[] = 'a menu in a column does not lay its open list under the row, or keeps the margin of the old line';
+
+if( $says( 'header', $columnOf. '::details-content', 'display', '@supports selector( ::details-content )' ) !== 'contents' )
+	$wrapBad[] = 'the box of the open list of a menu in a column takes room of its own in the column';
+
+foreach( [ [ '.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] )', '' ], [ '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )', '@media (max-width: 767.98px)' ], [ '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )', '@supports not selector( ::details-content )' ] ] as [ $overlayOf, $overlayAt ] )
+	if( $says( 'header', $overlayOf, 'justify-content', $overlayAt ) !== 'start' || $says( 'header', $overlayOf, 'position', $overlayAt ) !== 'fixed' )
+		$wrapBad[] = 'the header that is open does not keep its line at the top where it has a height ('. ( $overlayAt === '' ? 'always' : $overlayAt ). ')';
+
+// a column is as wide as its content, or takes the rest of the row, at every width: a size that is a number gives the share of the row back
+$colFlex = [ '' => '' , 'm' => '@media (min-width: 768px)', 'l' => '@media (min-width: 1024px)' ];
+
+foreach( $colFlex as $width => $colAt ) {
+
+	$prefix = $width === '' ? '' : $width. '-';
+
+	// at the widest the two weigh two classes, as the rule that gives a number of the middle width its share back does: the later one wins, so that "50 m:25 l:fill" fills
+	$heavy = $width === 'l' ? '.section-col' : '';
+
+	if( $says( 'section', $heavy. '.section-col--'. $prefix. 'size-auto', 'flex', $colAt ) !== '01auto' || $says( 'section', $heavy. '.section-col--'. $prefix. 'size-fill', 'flex', $colAt ) !== '110' )
+		$wrapBad[] = 'a column of size '. $prefix. 'auto or '. $prefix. 'fill is not as wide as its content or the rest of the row';
+
+	if( $width !== '' && $says( 'section', '.section-col:where( [class*="--'. $prefix. 'size-"] ):not( .section-col--'. $prefix. 'size-auto, .section-col--'. $prefix. 'size-fill )', 'flex', $colAt ) !== '00var(--section-col--w)' )
+		$wrapBad[] = 'a column of a size '. $prefix. 'that is a number does not take the share of the row back from auto or fill';
+}
+
+if( $says( 'section', '.section-col', 'flex' ) !== '00var(--section-col--w)' || str_contains( (string) $says( 'section', '.section-col', '--section-col--w' ), 'var(--section-col--n)' ) === false )
+	$wrapBad[] = 'a column has not the share of the row as its width';
+
+check( 'the parts of the header and of the footer: the veil, the heights, the picture behind the rows and no stacking context, no picture on paper, the ground alt of a footer, the open list of a menu in a column, the header that is open with a height and the columns auto and fill at every width'. ( $wrapBad === [] ? '' : ' - '. implode( '; ', $wrapBad ) ), $wrapBad === [] );
 
 // an element - a, p, li, img - is met only below a component that holds nothing: a container never styles what the page put into it
 $leaves = array_keys( array_filter( $schemas, static fn( array $schema ): bool => isset( $schema['offers'] ) === false ) );
@@ -1619,7 +1778,7 @@ ninoWarnings();
 // sizes
 $total = $bytes;
 $parts = array_map( static fn( string $group ): int => (int) filesize( $basisDir. '/groups/'. $group. '/part/part.css' ), array_keys( $read['groups'] ) );
-check( 'the six standard parts are 26 KB together at most ('. $total. ' bytes: '. implode( ', ', $parts ). ')', $total <= 26624 && count( $parts ) === 6 );
+check( 'the six standard parts are 32 KB together at most ('. $total. ' bytes: '. implode( ', ', $parts ). ')', $total <= 32768 && count( $parts ) === 6 );
 
 $listing = [];
 foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $basisDir, \FilesystemIterator::SKIP_DOTS ) ) as $file )

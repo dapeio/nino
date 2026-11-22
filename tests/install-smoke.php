@@ -522,8 +522,8 @@ check( 'the first element of the body of a page is a skip link to the main part,
 	preg_match( '/<body>\s*<a class="nino-sr-only" href="#nino-main">\[\[\/template\/common\/navigation\/skip\]\]<\/a>/', $documentHead ) === 1
 	&& substr_count( $documentHead, 'id="nino-main"' ) === 1 && preg_match( '/<main id="nino-main" tabindex="-1">/', $documentHead ) === 1 );
 check( '...and the frames of the base unit are written in the components of Basis alone: a header with its logo, its menu and its action, a footer with its columns and its legal line, and no class of Nino\'s own',
-	preg_match( '/^\[header-wrap\b.*\[header-logo\].*\[header-nav menu="main"\].*\[header-actions\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ) ) === 1
-	&& preg_match( '/^\[footer-wrap\b.*\[footer-col\b.*\[footer-nav menu="footer"\].*\[footer-legal\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ) ) === 1
+	preg_match( '/^\[header-wrap\b.*\[section-row\b.*\[header-logo\].*\[header-nav menu="main"\].*\[button\b/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ) ) === 1
+	&& preg_match( '/^\[footer-wrap\b.*\[section-row\b.*\[section-col\b.*\[footer-nav menu="footer"\].*\[footer-legal\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ) ) === 1
 	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ). (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ), 'nino-' ) === false );
 $contactPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/contact/templates/page-contact.tpl' );
 check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and a form without a script keeps the check of the browser, so the markup has no novalidate',
@@ -2098,7 +2098,7 @@ ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
 check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
 // The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the standard parts of Basis,
-// the look of the form and the project's own stylesheet, in at most 40 KB, and the reset alone in at most 12 KB
+// the look of the form and the project's own stylesheet, in at most 60 KB, and the reset alone in at most 12 KB
 $keysBuilt = $keysApp;
 $keysBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
 $keysBuilt['/nino/html/assets'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/html/assets'];
@@ -2110,8 +2110,8 @@ $keysBuilt['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/conf
 \Nino\Features::registerParts( $keysBuilt );
 \Nino\Modules\Assets::doShortcode( $keysBuilt, [ '/.cache/style.css' ] );
 $keysBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, '/.cache/style.css' ) );
-check( 'the style bundle of a fresh starter site is the reset, the standard parts of Basis, the look of the form and the project\'s own stylesheet, and it is at most 40 KB; Nino.css alone is at most 12 KB',
-	strlen( $keysBundle ) > 20000 && strlen( $keysBundle ) <= 40 * 1024 && str_contains( $keysBundle, '.header-wrap' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
+check( 'the style bundle of a fresh starter site is the reset, the standard parts of Basis, the look of the form and the project\'s own stylesheet, and it is at most 60 KB; Nino.css alone is at most 12 KB',
+	strlen( $keysBundle ) > 20000 && strlen( $keysBundle ) <= 60 * 1024 && str_contains( $keysBundle, '.header-wrap' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
 	&& filesize( dirname( __DIR__ ). '/_nino/Nino.css' ) <= 12 * 1024 );
 // The scans of the workbench read the words and the pictures of a page of Basis through the register: ~title under the id of its section is a key read, image="~background" a place of a picture
 $keysApp['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];

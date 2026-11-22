@@ -5,7 +5,7 @@ return [
 	'group'      => 'header',
 	'label'      => [ 'de_DE' => 'Menü', 'en_US' => 'Menu' ],
 	'icon'       => 'menu',
-	'in'         => [ 'header-wrap' ],
+	'in'         => [ 'header-wrap', 'header' ],
 	'once'       => true,
 	'attributes' => [
 		'menu'     => [ 'type' => 'choice', 'options' => '\\Nino\\Modules\\Basis::menus', 'default' => 'main', 'class' => false, 'label' => [ 'de_DE' => 'Navigation', 'en_US' => 'Navigation' ] ],

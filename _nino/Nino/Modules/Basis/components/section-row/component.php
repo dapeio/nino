@@ -5,7 +5,7 @@ return [
 	'group'      => 'section',
 	'label'      => [ 'de_DE' => 'Zeile', 'en_US' => 'Row' ],
 	'icon'       => 'rows-2',
-	'in'         => [ 'section-wrap' ],
+	'in'         => [ 'section-wrap', 'header-wrap', 'footer-wrap' ],
 	'offers'     => [],
 	'attributes' => [
 		'width'   => [ 'type' => 'choice', 'options' => [ 'regular', 'narrow', 'wide', 'full' ], 'labels' => [ 'regular' => [ 'de_DE' => 'Standard', 'en_US' => 'Default' ], 'narrow' => [ 'de_DE' => 'Schmal', 'en_US' => 'Narrow' ], 'wide' => [ 'de_DE' => 'Breit', 'en_US' => 'Wide' ], 'full' => [ 'de_DE' => 'Volle Breite', 'en_US' => 'Full width' ] ], 'default' => 'regular', 'label' => [ 'de_DE' => 'Breite', 'en_US' => 'Width' ] ],

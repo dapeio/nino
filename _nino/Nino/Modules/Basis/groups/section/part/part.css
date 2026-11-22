@@ -24,11 +24,11 @@
 .section-wrap-picture { width: 100%; height: 100%; object-fit: cover; }
 .section-wrap-image::after { content: ""; position: absolute; inset: 0; background: rgb( 0 0 0 / .75 ); }
 .section-wrap--dim > .section-wrap-image::after { background: rgb( 0 0 0 / .82 ); }
-.section-wrap > .section-row { position: relative; }
 
+/*	The row is positioned: it stands above the picture of a section, a header or a footer, and the open list of a menu in a column of a header (the part of header) is laid under it, over its width	*/
 .section-row {
 	--section-row--f: 1; --section-row--space: calc( var(--section-row-gap) * var(--section-row--f) );
-	display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--section-row--space);
+	position: relative; display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--section-row--space);
 	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto;
 }
 .section-row + .section-row { margin-top: var(--section-row--space); }
@@ -51,7 +51,7 @@
 /*	A column is as wide as its share of the row less its share of the gaps: --section-col--n is how many of it fill a row	*/
 .section-col {
 	--section-col--n: 1; --section-col--f: 1; --section-col--inset: calc( var(--section-col-pad) * var(--section-col--f) );
-	flex: 0 0 calc( 100% / var(--section-col--n) - var(--section-row--space) * ( var(--section-col--n) - 1 ) / var(--section-col--n) );
+	--section-col--w: calc( 100% / var(--section-col--n) - var(--section-row--space) * ( var(--section-col--n) - 1 ) / var(--section-col--n) ); flex: 0 0 var(--section-col--w);
 	min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--section-title-space);
 }
 .section-col > * { max-width: 100%; }
@@ -62,6 +62,9 @@
 .section-col--size-25 { --section-col--n: 4; }
 .section-col--size-20 { --section-col--n: 5; }
 .section-col--size-16 { --section-col--n: 6; }
+/*	auto and fill are a size at every width as the others are: a size of a width that is a number gives the share of the row back (the second rule of each width)	*/
+.section-col--size-auto { flex: 0 1 auto; }
+.section-col--size-fill { flex: 1 1 0; }
 .section-col--align-center { align-items: center; text-align: center; }
 .section-col--align-end { align-items: flex-end; text-align: end; }
 .section-col--hide-on { display: none; }
@@ -100,6 +103,9 @@
 @media (min-width: 768px) {
 	.section-row--m-reverse-on { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
 	.section-row--m-reverse-off { flex-direction: row; flex-wrap: wrap; }
+	.section-col--m-size-auto { flex: 0 1 auto; }
+	.section-col--m-size-fill { flex: 1 1 0; }
+	.section-col:where( [class*="--m-size-"] ):not( .section-col--m-size-auto, .section-col--m-size-fill ) { flex: 0 0 var(--section-col--w); }
 	.section-col--m-size-100 { --section-col--n: 1; }
 	.section-col--m-size-75 { --section-col--n: 1.3333; }
 	.section-col--m-size-66 { --section-col--n: 1.5; }
@@ -117,6 +123,10 @@
 @media (min-width: 1024px) {
 	.section-row--l-reverse-on { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
 	.section-row--l-reverse-off { flex-direction: row; flex-wrap: wrap; }
+	/*	Two classes, as the rule above that gives a number of the middle width its share back: the later one wins, so that "50 m:25 l:fill" fills here	*/
+	.section-col.section-col--l-size-auto { flex: 0 1 auto; }
+	.section-col.section-col--l-size-fill { flex: 1 1 0; }
+	.section-col:where( [class*="--l-size-"] ):not( .section-col--l-size-auto, .section-col--l-size-fill ) { flex: 0 0 var(--section-col--w); }
 	.section-col--l-size-100 { --section-col--n: 1; }
 	.section-col--l-size-75 { --section-col--n: 1.3333; }
 	.section-col--l-size-66 { --section-col--n: 1.5; }

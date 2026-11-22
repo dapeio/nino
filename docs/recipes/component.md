@@ -76,7 +76,12 @@ return [
 ```
 
 `in` says where a tool offers the component - `page` is the page itself, `flow`
-the flow of content - and changes nothing about the drawing. `source` says that
+the flow of content - and changes nothing about the drawing. A container may add
+`'deep' => [ 'place' ]`: the places it offers to every container of the flow below it,
+however deep - a column of a row, a card in a column -, so that a component that names the
+place in its `in` stands in each of them and in no container of a page - `header-wrap` does so for
+`header-logo`. The parts of the container itself, which name it in their `in`, and what stands in
+them are left out. `source` says that
 the first word of a call is a text. An attribute has a `type` and a `default`,
 and every attribute needs one. The markup is the file beside the schema; a
 schema that names a template itself does not belong in a folder:

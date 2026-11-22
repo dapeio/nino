@@ -18,12 +18,12 @@ namespace Nino\Modules {
 	 *										with a standard look. A feature that is delivered with the kernel and switched off
 	 *
 	 *										What this class holds is what the schemas of components/ cannot say: the renderers
-	 *										of the ten components that compute (a picture looked up, the entries of a menu, a link
+	 *										of the twelve components that compute (a picture looked up, the entries of a menu, a link
 	 *										that is none, a text that is cleaned) and the options of the attribute that names
 	 *										a menu. The kernel reads the folders, registers the components and puts the standard
 	 *										part of each group into the style bundle (\Nino\Features::registerComponents(),
 	 *										registerParts()); there is nothing to register here, so there is no init(). The other
-	 *										ten components are drawn from their template alone.
+	 *										eight components are drawn from their template alone.
 	 *
 	 *										A renderer has the template of its component filled by \Nino\Components::fill() and
 	 *										gives it the tokens it made - markup that is there only sometimes, written once as a
@@ -47,7 +47,7 @@ namespace Nino\Modules {
 		public static array $html = [
 			'img'					=> '<img src="[[src]]"[[size]] alt="[[alt]]" loading="lazy" decoding="async">',
 			'logo'				=> '<img class="header-logo-[[ground]]" src="[[src]]"[[size]] alt="">',
-			'background'	=> '<div class="section-wrap-image"><img class="section-wrap-picture" src="[[src]]"[[size]] alt="" decoding="async"></div>',
+			'background'	=> '<div class="[[wrap]]-image"><img class="[[wrap]]-picture" src="[[src]]"[[size]] alt="" decoding="async"></div>',
 			'size'				=> ' width="[[width]]" height="[[height]]"',
 			'link'				=> '<a href="[[href]]">',
 			'a'						=> ' href="[[href]]"[[blank]]',
@@ -313,6 +313,34 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	Replace header-wrap: the picture behind the content, as the section has it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by the register
+		 *	@param		string		$content			What the children drew
+		 *	@param		array			$context			The place the call stands in
+		 *
+		 *	@return 	string
+		 */
+		public static function componentHeaderWrap( array &$appData, array $args, string $content, array $context ): string {
+			return self::_wrap( $appData, 'header-wrap', $args, $content, $context );
+		}
+
+		/**
+		 *	Replace footer-wrap: the picture behind the content, as the section has it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by the register
+		 *	@param		string		$content			What the children drew
+		 *	@param		array			$context			The place the call stands in
+		 *
+		 *	@return 	string
+		 */
+		public static function componentFooterWrap( array &$appData, array $args, string $content, array $context ): string {
+			return self::_wrap( $appData, 'footer-wrap', $args, $content, $context );
+		}
+
+		/**
 		 *	Replace section-wrap: the picture behind the content, where the call names one, it has a file and picture is not off
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -323,11 +351,27 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentSectionWrap( array &$appData, array $args, string $content, array $context ): string {
+			return self::_wrap( $appData, 'section-wrap', $args, $content, $context );
+		}
+
+		/**
+		 *	The one place the three wraps are drawn: the picture behind the content, with the classes of the wrap that has it, so that the
+		 *	standard part of each group stands for itself
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$wrap					header-wrap, footer-wrap or section-wrap
+		 *	@param		array			$args					The arguments made ready by the register
+		 *	@param		string		$content			What the children drew
+		 *	@param		array			$context			The place the call stands in
+		 *
+		 *	@return 	string
+		 */
+		private static function _wrap( array &$appData, string $wrap, array $args, string $content, array $context ): string {
 
 			$picture = $args['picture'] === 'off' ? null : self::_picture( $appData, $args['image'], $context );
 
-			return \Nino\Components::fill( $appData, 'section-wrap', $args, $content, [
-				'[[picture]]' => $picture === null ? '' : strtr( self::$html['background'], [ '[[src]]' => $picture['src'], '[[size]]' => $picture['size'] ] ),
+			return \Nino\Components::fill( $appData, $wrap, $args, $content, [
+				'[[picture]]' => $picture === null ? '' : strtr( self::$html['background'], [ '[[wrap]]' => $wrap, '[[src]]' => $picture['src'], '[[size]]' => $picture['size'] ] ),
 			] );
 		}
 

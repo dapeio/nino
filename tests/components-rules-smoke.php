@@ -91,7 +91,7 @@ $basis = rulesSite( false );
 
 echo "A. offer(): where a component may be put\n";
 
-// The way from the page to each container of basis: the first chain that allowed() gives
+// The way from the page to each container of basis: the first chain that allowed() gives - through a section: what a wrap with a 'deep' place adds to the rows below it is for offer() alone
 $chains = [ '' => [] ];
 $containers = \Nino\Components::containers( $basis );
 $queue = [ [] ];
@@ -101,7 +101,7 @@ while( $queue !== [] ) {
 	$path = array_shift( $queue );
 
 	foreach( \Nino\Components::allowed( $basis, $path === [] ? '' : $path[count( $path ) - 1] ) as $name )
-		if( isset( $chains[$name] ) === false && isset( $containers[$name] ) === true && $containers[$name] === true ) {
+		if( isset( $chains[$name] ) === false && isset( $containers[$name] ) === true && $containers[$name] === true && ( $name !== 'section-row' || in_array( $path[count( $path ) - 1] ?? '', [ 'header-wrap', 'footer-wrap' ], true ) === false ) ) {
 			$chains[$name] = array_merge( $path, [ $name ] );
 			$queue[] = $chains[$name];
 		}
@@ -123,6 +123,61 @@ foreach( array_keys( $containers, true, true ) as $container ) {
 
 check( 'for each container of basis offer() names what allowed() names, each one true and html the reason html'. ( $differs === [] ? '' : ' - '. implode( ', ', $differs ) ), $differs === [] && count( $chains ) >= 8 );
 check( 'the page offers the same as the empty path', array_keys( \Nino\Components::offer( $appData, [], [] ) ) === \Nino\Components::allowed( $appData, '' ) );
+
+// A place a container offers to every container of the flow below it, however deep: the logo and the menu of a header stand in its columns, and in no other
+$notes = [];
+$ofHere = static fn( array $path ): array => array_keys( array_filter( \Nino\Components::offer( $basis, $path, [] ), static fn( mixed $answer ): bool => $answer === true ) );
+$parts = static fn( array $path ): array => array_values( array_intersect( $ofHere( $path ), [ 'header-logo', 'header-nav', 'footer-logo', 'footer-nav' ] ) );
+check( 'deep: the logo and the menu of the header are offered in a column below the header - and the logo and the menu of the footer in one below the footer - and in no column of a section',
+	$parts( [ 'header-wrap', 'section-row', 'section-col' ] ) === [ 'header-logo', 'header-nav' ] && $parts( [ 'footer-wrap', 'section-row', 'section-col' ] ) === [ 'footer-logo', 'footer-nav' ]
+	&& $parts( [ 'section-wrap', 'section-row', 'section-col' ] ) === [] );
+check( 'deep: the places go to a container of the flow and to nothing else: not to a row, not to the parts that name the header in their own in (they keep what they offer), and the own column of the footer keeps its logo',
+	$parts( [ 'header-wrap', 'section-row' ] ) === [] && $parts( [ 'header-wrap', 'header-actions' ] ) === [] && $parts( [ 'footer-wrap', 'footer-col' ] ) === [ 'footer-logo', 'footer-nav' ] && $parts( [ 'header-wrap' ] ) === [ 'header-logo', 'header-nav' ] );
+// ...but not below a part of the container itself: a container of the flow in header-actions or in footer-col is no column of a row, and keeps what it had
+$ofOwn = static fn( array $path ): array => array_values( array_intersect( array_keys( array_filter( \Nino\Components::offer( $appData, $path, [] ), static fn( mixed $answer ): bool => $answer === true ) ), [ 'header-logo', 'header-nav', 'footer-logo', 'footer-nav' ] ) );
+check( 'deep: a container of the flow below header-actions or below footer-col is offered no part of the header or the footer, and one below a column of a row is - and check() finds the part there at the wrong place, or not',
+	$ofOwn( [ 'header-wrap', 'header-actions', 'rule-card' ] ) === [] && $ofOwn( [ 'footer-wrap', 'footer-col', 'rule-card' ] ) === [] && $ofOwn( [ 'footer-wrap', 'footer-col', 'rule-card', 'rule-deep' ] ) === []
+	&& $ofOwn( [ 'header-wrap', 'section-row', 'section-col', 'rule-card' ] ) === [ 'header-logo', 'header-nav' ] && $ofOwn( [ 'footer-wrap', 'section-row', 'section-col', 'rule-card', 'rule-deep' ] ) === [ 'footer-logo', 'footer-nav' ]
+	&& rulesCodes( $appData, '[header-wrap][header-actions][rule-card][header-logo /][/rule-card][/header-actions][/header-wrap]' ) === [ '0.0.0.0' => [ 'place' ] ]
+	&& rulesCodes( $appData, '[footer-wrap][footer-col][rule-card][footer-nav /][/rule-card][/footer-col][/footer-wrap]' ) === [ '0.0.0.0' => [ 'place' ] ]
+	&& rulesCodes( $appData, '[header-wrap][section-row][section-col][rule-card][header-logo /][/rule-card][/section-col][/section-row][/header-wrap]' ) === [] );
+
+// A container of the flow that offers a place deep offers it below itself and not in itself: the part stands in what the container holds, however deep, and not beside it
+\Nino\Components::addComponent( $appData, 'rule-owner', [ 'label' => 'Owner', 'in' => [ 'flow' ], 'offers' => [ 'flow' ], 'deep' => [ 'rule-place' ], 'template' => '<div>[[content]]</div>' ] );
+\Nino\Components::addComponent( $appData, 'rule-part', [ 'label' => 'Part', 'in' => [ 'rule-place' ], 'template' => '<i></i>' ] );
+$ownerHolds = static fn( array $path ): bool => ( \Nino\Components::offer( $appData, $path, [] )['rule-part'] ?? null ) === true;
+check( 'deep: a container of the flow offers its deep place to the containers of the flow below it and not to itself, and check() finds the part directly in it at the wrong place',
+	$ownerHolds( [ 'section-wrap', 'section-row', 'section-col', 'rule-owner' ] ) === false && $ownerHolds( [ 'section-wrap', 'section-row', 'section-col', 'rule-owner', 'rule-card' ] ) === true
+	&& $ownerHolds( [ 'section-wrap', 'section-row', 'section-col' ] ) === false
+	&& rulesCodes( $appData, '[section-wrap][section-row][section-col][rule-owner][rule-part /][/rule-owner][/section-col][/section-row][/section-wrap]' ) === [ '0.0.0.0.0' => [ 'place' ] ]
+	&& rulesCodes( $appData, '[section-wrap][section-row][section-col][rule-owner][rule-card][rule-part /][/rule-card][/rule-owner][/section-col][/section-row][/section-wrap]' ) === [] );
+
+// the order is the one the components were registered in, whether a name comes by the container or by a deep place
+$registered = array_keys( \Nino\Components::components( $basis ) );
+$inOrder = true;
+
+foreach( [ [ 'header-wrap', 'section-row', 'section-col' ], [ 'footer-wrap', 'section-row', 'section-col' ], [ 'header-wrap' ], [ 'section-wrap', 'section-row', 'section-col' ] ] as $orderPath ) {
+
+	$names = array_keys( \Nino\Components::offer( $basis, $orderPath, [] ) );
+	$inOrder = $inOrder && $names === array_values( array_intersect( $registered, $names ) );
+}
+
+check( 'offer() names the components in the order they were registered in, the ones of a deep place among them', $inOrder === true && in_array( 'header-logo', array_keys( \Nino\Components::offer( $basis, [ 'header-wrap', 'section-row', 'section-col' ], [] ) ), true ) === true );
+
+$deepOnce = \Nino\Components::offer( $basis, [ 'header-wrap', 'section-row', 'section-col' ], \Nino\Markup::parse( '[header-logo /]', \Nino\Components::containers( $basis ), $notes ) );
+check( 'deep: once is a rule of the container, so that two columns have a menu each', $deepOnce['header-logo'] === 'once' && $deepOnce['header-nav'] === true
+	&& \Nino\Components::offer( $basis, [ 'header-wrap', 'section-row', 'section-col' ], [] )['header-logo'] === true );
+check( 'deep: check() finds a logo in a column of a section at the wrong place, and none in a column of the header or of the footer for the footer logo',
+	rulesCodes( $basis, '[section-wrap][section-row][section-col][header-logo /][/section-col][/section-row][/section-wrap]' ) === [ '0.0.0.0' => [ 'place' ] ]
+	&& rulesCodes( $basis, '[header-wrap][section-row][section-col][header-logo /][header-nav /][/section-col][section-col][header-nav /][/section-col][/section-row][/header-wrap]' ) === []
+	&& rulesCodes( $basis, '[footer-wrap][section-row][section-col][footer-logo /][footer-nav /][/section-col][/section-row][/footer-wrap]' ) === []
+	&& rulesCodes( $basis, '[footer-wrap][section-row][section-col][header-logo /][/section-col][/section-row][/footer-wrap]' ) === [ '0.0.0.0' => [ 'place' ] ] );
+
+$schemaOf = static fn( array $more ): array|string => \Nino\Components::validate( 'deep-probe', [ 'label' => 'x', 'offers' => [ 'flow' ] ] + $more );
+check( 'deep: a schema names it for a container, as a list of places that is not empty; it is kept as it is, and what is wrong with it is refused',
+	is_array( $schemaOf( [ 'deep' => [ 'place' ] ] ) ) === true && $schemaOf( [ 'deep' => [ 'place' ] ] )['deep'] === [ 'place' ] && \Nino\Components::validate( 'deep-probe', $schemaOf( [ 'deep' => [ 'place' ] ] ) ) === $schemaOf( [ 'deep' => [ 'place' ] ] )
+	&& array_filter( [ $schemaOf( [ 'deep' => 'place' ] ), $schemaOf( [ 'deep' => [] ] ), $schemaOf( [ 'deep' => [ 'Place' ] ] ), $schemaOf( [ 'deep' => [ 'a', 'a' ] ] ), $schemaOf( [ 'deep' => [ 1 ] ] ), \Nino\Components::validate( 'deep-probe', [ 'label' => 'x', 'deep' => [ 'place' ] ] ) ], 'is_string' ) !== []
+	&& count( array_filter( [ $schemaOf( [ 'deep' => 'place' ] ), $schemaOf( [ 'deep' => [] ] ), $schemaOf( [ 'deep' => [ 'Place' ] ] ), $schemaOf( [ 'deep' => [ 'a', 'a' ] ] ), $schemaOf( [ 'deep' => [ 1 ] ] ), \Nino\Components::validate( 'deep-probe', [ 'label' => 'x', 'deep' => [ 'place' ] ] ), $schemaOf( [ 'deep' => null ] ), $schemaOf( [ 'deep' => [ 'page' ] ] ), $schemaOf( [ 'deep' => [ 'ok', 'flow' ] ] ) ], 'is_string' ) ) === 9 );
 
 $notes = [];
 $once = \Nino\Components::offer( $appData, [ 'header-wrap' ], \Nino\Markup::parse( '[header-logo][header-nav /]', \Nino\Components::containers( $appData ), $notes ) );
