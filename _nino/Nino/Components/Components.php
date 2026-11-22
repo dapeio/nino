@@ -627,8 +627,133 @@ namespace Nino {
 		 */
 		public static function partProblems( string $css, array $components ): array {
 
-			return self::_problems( $css, $components );
+			return array_values( array_unique( array_column( self::_problems( $css, $components ), 'text' ) ) );
 		}
+
+		/**
+		 *	What a stylesheet of a part or of a theme can do wrong, by code: the English sentence for the log, with %s where a name goes. A finding is
+		 *	[ 'code' => a key of this list, 'params' => what the sentence puts in, 'text' => the sentence, 'line' => the line of the css or null ], so that a
+		 *	tool can say it in its own words by the code and the params and keep the sentence as the fallback
+		 */
+		public const array CSS_WHY = [
+			'unreadable'			=> 'cannot be read: a string or a comment is never closed, or it is too long for the check',
+			'braces'					=> 'cannot be read: its braces do not balance, or it is nested too deep',
+			'escape'					=> 'uses an escape (a backslash), which a part has no use for',
+			'token-set'				=> 'sets %s, which is no token of its own components',
+			'token-read'			=> 'reads %s, which is no token of the brand, of the page or of its own components',
+			'important'				=> 'uses !important',
+			'url'							=> 'uses url()',
+			'loads'						=> 'loads from outside: it uses image-set() or src()',
+			'picture'					=> 'uses image(), element() or cross-fade(), which take a picture from outside or from another element',
+			'at'							=> 'uses @%s',
+			'selector-deep'		=> 'has a selector with functions nested too deep: %s',
+			'selector-empty'	=> 'has an empty selector',
+			'selector-brackets'	=> 'has a selector whose brackets do not close: %s',
+			'selector-more'		=> 'meets more than classes - an element, an id, the universal selector, an attribute selector or a class that is not written like the ones of the components: %s',
+			'selector-noclass'	=> 'has a part of a selector with no class of its own: %s',
+			'selector-nth'		=> 'has a :%s() that is not read: %s',
+			'selector-function'	=> 'uses :%s(), which a theme.css has no use for: %s',
+			'class-foreign'		=> 'meets the class .%s, which is no class of its own components',
+			'id'							=> 'meets an id: %s',
+			'attribute-class'	=> 'meets the classes of the page by an attribute selector: %s',
+			'selector-own'		=> 'has a selector with no class of its own components: %s',
+			'markup'					=> 'holds "%s", which would end or open markup where the css is put',
+			'font-face'				=> 'uses @font-face',
+			'expression'			=> 'uses expression()',
+			'binding'					=> 'uses -moz-binding or behavior',
+			'src-property'		=> 'sets src, which loads a file or a font from outside: a theme has no use for it',
+			'page'						=> 'uses @page, which sets what a printed page looks like and is the page\'s, not a theme\'s',
+			'attr'						=> 'uses attr(), which reads the markup of the page into the css and can take a file from it',
+			'control'					=> 'holds a control character (code %s), which no css has a use for',
+		];
+
+		/**
+		 *	One finding of a stylesheet, by its code (see CSS_WHY)
+		 *
+		 *	@param		string		$code
+		 *	@param		array			$params				What the sentence puts in, in the order of its %s
+		 *
+		 *	@return 	array											[ 'code', 'params', 'text', 'line' => null ]
+		 */
+		private static function _found( string $code, array $params = [] ): array {
+			return [ 'code' => $code, 'params' => $params, 'text' => vsprintf( self::CSS_WHY[$code], $params ), 'line' => null ];
+		}
+
+		/**
+		 *	The findings of a list, one for each code and params, the first line standing
+		 *
+		 *	@param		array			$findings
+		 *
+		 *	@return 	array
+		 */
+		private static function _unique( array $findings ): array {
+
+			$seen = [];
+
+			// One finding for each place: the same thing wrong in two lines is two findings, each with its line. At most FINDINGS of them
+			foreach( $findings as $found ) {
+
+				$seen[$found['code']. "\0". implode( "\0", $found['params'] ). "\0". (string) $found['line']] ??= $found;
+
+				if( count( $seen ) >= self::FINDINGS )
+					break;
+			}
+
+			return array_values( $seen );
+		}
+
+		// How many findings of one stylesheet are told at most: a stylesheet that is wrong in thousands of places is refused with the first of them
+		public const int FINDINGS = 500;
+
+		/**
+		 *	Where the lines of a text begin: the offsets after each line break, a lone CR, CRLF and LF alike. Made once for a text and
+		 *	asked with lineOf()
+		 *
+		 *	@param		string		$text
+		 *
+		 *	@return 	array<int, int>								Offsets, the first is 0
+		 */
+		private static function _starts( string $text ): array {
+
+			$starts = [ 0 ];
+
+			if( preg_match_all( '/\r\n|\r|\n/', $text, $breaks, PREG_OFFSET_CAPTURE ) > 0 )
+				foreach( $breaks[0] as [ $break, $offset ] )
+					$starts[] = $offset + strlen( $break );
+
+			return $starts;
+		}
+
+		/**
+		 *	The line an offset stands on, by a binary search in the line starts of the text
+		 *
+		 *	@param		array			$starts				See _starts()
+		 *	@param		int				$offset
+		 *
+		 *	@return 	int												1 for the first line
+		 */
+		private static function _lineOf( array $starts, int $offset ): int {
+
+			$low = 0;
+			$high = count( $starts ) - 1;
+
+			while( $low < $high ) {
+
+				$middle = intdiv( $low + $high + 1, 2 );
+
+				if( $starts[$middle] <= $offset )
+					$low = $middle;
+				else
+					$high = $middle - 1;
+			}
+
+			return $low + 1;
+		}
+
+		/**
+		 *	Whether the theme rule is the one that is asked: a few more things than a part's rule refuses (src, @page, attr())
+		 */
+		private static bool $themeRule = false;
 
 		/**
 		 *	The check of partProblems() and themeProblems()
@@ -641,32 +766,54 @@ namespace Nino {
 		private static function _problems( string $css, ?array $components ): array {
 
 			$problems = [];
-			$escaped = false;
+			$escapedAt = null;
 
-			// Comments become a blank, a string is what it is without its text, a backslash outside of one is said
-			$plain = preg_replace_callback( '~/\*.*?\*/|"(?:[^"\\\\\n]|\\\\.)*"|\'(?:[^\'\\\\\n]|\\\\.)*\'|\\\\~s', static function( array $found ) use ( &$escaped ): string {
+			// Comments become a blank, a string is what it is without its text, a backslash outside of one is said. What they held of line breaks stays,
+			// a break for each, so that an offset of the result is on the line it was on
+			$plain = preg_replace_callback( '~/\*.*?\*/|"(?:[^"\\\\\n]|\\\\.)*"|\'(?:[^\'\\\\\n]|\\\\.)*\'|\\\\~s', static function( array $found ) use ( &$escapedAt ): string {
 
-				if( $found[0] === '\\' )
-					$escaped = true;
+				if( $found[0][0] === '\\' && $escapedAt === null )
+					$escapedAt = $found[0][1];
 
-				return $found[0][0] === '/' || $found[0] === '\\' ? ' ' : "\x01";
-			}, $css );
+				$breaks = (string) str_repeat( "\n", preg_match_all( '/\r\n|\r|\n/', $found[0][0] ) ?: 0 );
 
-			if( $plain === null || preg_match( '/["\']|\/\*/', $plain ) === 1 )
-				return [ 'cannot be read: a string or a comment is never closed, or it is too long for the check' ];
+				return $found[0][0][0] === '/' ? ' '. $breaks : ( $found[0][0] === '\\' ? ' ' : "\x01". $breaks );
+			}, $css, -1, $count, PREG_OFFSET_CAPTURE );
 
-			if( $escaped === true )
-				$problems[] = 'uses an escape (a backslash), which a part has no use for';
+			$starts = self::_starts( $css );
+
+			if( $plain === null ) {
+				$found = self::_found( 'unreadable' );
+				$found['line'] = 1;
+				return [ $found ];
+			}
+
+			$plainStarts = self::_starts( $plain );
+
+			if( preg_match( '/["\']|\/\*/', $plain, $open, PREG_OFFSET_CAPTURE ) === 1 ) {
+				$found = self::_found( 'unreadable' );
+				$found['line'] = self::_lineOf( $plainStarts, $open[0][1] );
+				return [ $found ];
+			}
+
+			if( $escapedAt !== null ) {
+				$found = self::_found( 'escape' );
+				$found['line'] = self::_lineOf( $starts, $escapedAt );
+				$problems[] = $found;
+			}
 
 			$items = [];
 			$at = 0;
 
-			if( self::_blocks( $plain, $at, 0, $items ) === false || $at < strlen( $plain ) )
-				return array_merge( $problems, [ 'cannot be read: its braces do not balance, or it is nested too deep' ] );
+			if( self::_blocks( $plain, $at, 0, $items ) === false || $at < strlen( $plain ) ) {
+				$found = self::_found( 'braces' );
+				$found['line'] = self::_lineOf( $plainStarts, max( 0, min( $at, strlen( $plain ) - 1 ) ) );
+				return array_merge( $problems, [ $found ] );
+			}
 
-			self::_checkPart( $items, $components, false, $problems );
+			self::_checkPart( $items, $components, false, $problems, false, $plainStarts );
 
-			return array_values( array_unique( $problems ) );
+			return self::_unique( $problems );
 		}
 
 		/**
@@ -689,8 +836,14 @@ namespace Nino {
 		 *	- no @font-face: a font is the business of the Typefaces, not of a stylesheet that is checked for what it loads
 		 *	- no "</" and no "<!--" anywhere, comments and strings too: put in a style element, the first ends it and the page after it is the css's
 		 *	- no expression(), -moz-binding or behavior: the old ways to run a script from css
+		 *	- no src: (the property that loads a file or a font from outside a @font-face, which is refused anyway), no @page (what a printed page looks like is the page's), no
+		 *	  attr() (it reads the markup of the page into the css and can take a file from it) and no control character but a tab and the line breaks. @keyframes are allowed:
+		 *	  their steps are declarations held to this same rule, they load nothing and act only through the classes that name the animation
 		 *
-		 *	What is found is said with the line it stands on where that is known
+		 *	- the at-rules are a list of what may stand: @media, @supports, @container and the steps of @keyframes. Any other - @view-transition, which acts on the whole
+		 *	  website, among them, and one that CSS brings later - is refused until it is thought through. A part keeps the list of what it has none of
+		 *
+		 *	What is found is said with the line of the place it stands on, a finding for each place (see themeFindings() for the code and the params of each sentence)
 		 *
 		 *	@param		string		$css					The text of theme.css
 		 *
@@ -698,20 +851,64 @@ namespace Nino {
 		 */
 		public static function themeProblems( string $css ): array {
 
-			$problems = [];
-			$line = static fn( string $text, int $offset ): int => 1 + substr_count( substr( $text, 0, $offset ), "\n" );
+			$sentences = [];
 
-			if( preg_match( '/<\/|<!--/', $css, $found, PREG_OFFSET_CAPTURE ) === 1 )
-				$problems[] = 'holds "'. $found[0][0]. '" (line '. $line( $css, $found[0][1] ). '), which would end or open markup where the css is put';
+			foreach( self::themeFindings( $css ) as $found )
+				$sentences[] = $found['code'] === 'markup' ? vsprintf( 'holds "%s" (line %s), which would end or open markup where the css is put', [ $found['params'][0], $found['line'] ] )
+					: $found['text']. ( $found['line'] !== null ? ' (line '. $found['line']. ')' : '' );
 
-			// Without its comments - their lines kept - what a comment says is not what the css does
-			$bare = (string) preg_replace_callback( '~/\*.*?\*/~s', static fn( array $comment ): string => ' '. str_repeat( "\n", substr_count( $comment[0], "\n" ) ), $css );
+			return array_values( array_unique( $sentences ) );
+		}
 
-			foreach( [ '/@font-face\b/i' => 'uses @font-face', '/(?<![A-Za-z0-9_-])expression\s*\(/i' => 'uses expression()', '/-moz-binding\b|(?<![A-Za-z0-9_-])behavior\s*:/i' => 'uses -moz-binding or behavior' ] as $pattern => $sentence )
-				if( preg_match( $pattern, $bare, $found, PREG_OFFSET_CAPTURE ) === 1 )
-					$problems[] = $sentence. ' (line '. $line( $bare, $found[0][1] ). ')';
+		/**
+		 *	What the css of a theme does wrong, as findings: the rule of themeProblems() with a code, the params of its sentence, the English sentence and the
+		 *	line of the css it stands on - [ 'code' => a key of CSS_WHY, 'params' => [ ... ], 'text' => the sentence, 'line' => int|null ], one for each code and
+		 *	params - so that a tool says it in its own words and keeps the sentence for the log. A theme.css has no use for src:, @page, attr() and control
+		 *	characters besides what a part has none of: it loads nothing, sets no mark of the brand or the page, and acts through classes alone. @keyframes stay
+		 *	(they hold declarations that are held to the same rule, load nothing, and act only through the classes that name the animation)
+		 *
+		 *	@param		string		$css					The text of theme.css
+		 *
+		 *	@return 	array										[] where it keeps the rule
+		 */
+		public static function themeFindings( string $css ): array {
 
-			return array_values( array_unique( array_merge( $problems, self::_problems( $css, null ) ) ) );
+			$findings = [];
+			$put = static function( string $code, array $params, string $text, string $pattern ) use ( &$findings ): void {
+
+				if( preg_match_all( $pattern, $text, $found, PREG_OFFSET_CAPTURE ) < 1 )
+					return;
+
+				$starts = self::_starts( $text );
+
+				foreach( array_slice( $found[0], 0, self::FINDINGS ) as [ $match, $offset ] ) {
+
+					$one = self::_found( $code, $code === 'markup' ? [ $match ] : ( $code === 'control' ? [ (string) ord( $match ) ] : $params ) );
+					$one['line'] = self::_lineOf( $starts, $offset );
+					$findings[] = $one;
+				}
+			};
+
+			$put( 'markup', [], $css, '/<\/|<!--/' );
+			$put( 'control', [], $css, '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/' );
+
+			// Without its comments - their line breaks kept - what a comment says is not what the css does
+			$bare = (string) preg_replace_callback( '~/\*.*?\*/~s', static fn( array $comment ): string => ' '. str_repeat( "\n", preg_match_all( '/\r\n|\r|\n/', $comment[0] ) ?: 0 ), $css );
+
+			$put( 'font-face', [], $bare, '/@font-face\b/i' );
+			$put( 'expression', [], $bare, '/(?<![A-Za-z0-9_-])expression\s*\(/i' );
+			$put( 'binding', [], $bare, '/-moz-binding\b|(?<![A-Za-z0-9_-])behavior\s*:/i' );
+
+			self::$themeRule = true;
+
+			try {
+				$findings = array_merge( $findings, self::_problems( $css, null ) );
+			}
+			finally {
+				self::$themeRule = false;
+			}
+
+			return self::_unique( $findings );
 		}
 
 		/**
@@ -735,12 +932,13 @@ namespace Nino {
 
 				$stop = strcspn( $css, ';{}', $at );
 				$text = trim( substr( $css, $at, $stop ) );
+				$from = $at + strspn( $css, " \t\n\r\f", $at );
 				$at += $stop;
 
 				if( $at >= $length ) {
 
 					if( $text !== '' )
-						$items[] = [ 'declaration' => $text ];
+						$items[] = [ 'declaration' => $text, 'at' => $from ];
 
 					return $depth === 0;
 				}
@@ -750,7 +948,7 @@ namespace Nino {
 				if( $mark === '}' ) {
 
 					if( $text !== '' )
-						$items[] = [ 'declaration' => $text ];
+						$items[] = [ 'declaration' => $text, 'at' => $from ];
 
 					return $depth > 0;
 				}
@@ -758,7 +956,7 @@ namespace Nino {
 				if( $mark === ';' ) {
 
 					if( $text !== '' )
-						$items[] = [ 'declaration' => $text ];
+						$items[] = [ 'declaration' => $text, 'at' => $from ];
 
 					continue;
 				}
@@ -768,7 +966,7 @@ namespace Nino {
 				if( self::_blocks( $css, $at, $depth + 1, $inside ) === false )
 					return false;
 
-				$items[] = [ 'rule' => $text, 'in' => $inside ];
+				$items[] = [ 'rule' => $text, 'in' => $inside, 'at' => $from ];
 			}
 
 			return $depth === 0;
@@ -785,13 +983,16 @@ namespace Nino {
 		 *
 		 *	@return 	void
 		 */
-		private static function _checkPart( array $items, ?array $components, bool $keyframes, array &$problems, bool $owned = false ): void {
+		private static function _checkPart( array $items, ?array $components, bool $keyframes, array &$problems, bool $owned = false, array $starts = [ 0 ] ): void {
 
 			foreach( $items as $item ) {
+
+				$before = count( $problems );
 
 				if( isset( $item['declaration'] ) === true ) {
 
 					self::_checkDeclaration( $item['declaration'], $components, $problems );
+					self::_tag( $problems, $before, $starts, $item['at'], $item['declaration'] );
 					continue;
 				}
 
@@ -800,15 +1001,72 @@ namespace Nino {
 				if( str_starts_with( $prelude, '@' ) === true ) {
 
 					self::_checkAt( $prelude, $problems );
-					self::_checkPart( $item['in'], $components, preg_match( '/^@(?:-[a-z]+-)?keyframes\b/i', $prelude ) === 1, $problems, $owned );
+					self::_tag( $problems, $before, $starts, $item['at'], $prelude );
+					self::_checkPart( $item['in'], $components, preg_match( '/^@(?:-[a-z]+-)?keyframes\b/i', $prelude ) === 1, $problems, $owned, $starts );
 					continue;
 				}
 
 				// A rule nested in this one stands on its elements with &: that holds where this rule is the part's own
 				$inner = $keyframes === false ? self::_checkSelector( $prelude, $components, $problems, $owned ) : false;
 
-				self::_checkPart( $item['in'], $components, false, $problems, $inner );
+				self::_tag( $problems, $before, $starts, $item['at'], $prelude );
+				self::_checkPart( $item['in'], $components, false, $problems, $inner, $starts );
 			}
+		}
+
+		/**
+		 *	Give the findings a statement made - from $from on - the line of the place they stand on in it: where the thing that is wrong is, not where the
+		 *	statement begins (the url() in the fourth line of a value, the element in the third line of a selector)
+		 *
+		 *	@param		array			$problems			(reference)
+		 *	@param		int				$from					The index of the first finding of the statement
+		 *	@param		array			$starts				The line starts of the css the offsets are of, see _starts()
+		 *	@param		int				$at						Where the statement starts
+		 *	@param		string		$text					The statement: the declaration, or the prelude of a rule
+		 *
+		 *	@return 	void
+		 */
+		private static function _tag( array &$problems, int $from, array $starts, int $at, string $text ): void {
+
+			for( $i = $from; $i < count( $problems ); $i++ )
+				if( $problems[$i]['line'] === null )
+					$problems[$i]['line'] = self::_lineOf( $starts, $at + self::_place( $problems[$i], $text ) );
+		}
+
+		/**
+		 *	Where in its statement a finding stands: the first place that shows what the finding says, 0 where it says nothing of a place
+		 *
+		 *	@param		array			$found
+		 *	@param		string		$text
+		 *
+		 *	@return 	int
+		 */
+		private static function _place( array $found, string $text ): int {
+
+			$patterns = [
+				'url'				=> '/(?<![A-Za-z0-9_])url\s*\(/i',
+				'loads'			=> '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:image-set|src)\s*\(/i',
+				'picture'		=> '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:image|element|cross-fade)\s*\(/i',
+				'important'	=> '/!\s*important/i',
+				'attr'			=> '/(?<![A-Za-z0-9_-])attr\s*\(/i',
+			];
+
+			if( isset( $patterns[$found['code']] ) === true )
+				return preg_match( $patterns[$found['code']], $text, $at, PREG_OFFSET_CAPTURE ) === 1 ? $at[0][1] : 0;
+
+			// What the finding names: a token that is read, the compound of a selector, the class, the id
+			$name = match( $found['code'] ) {
+				'token-read'										=> (string) ( $found['params'][0] ?? '' ),
+				'selector-deep', 'selector-brackets', 'selector-more', 'selector-noclass', 'selector-own', 'attribute-class', 'selector-function', 'selector-nth' => (string) end( $found['params'] ),
+				'class-foreign'									=> '.'. (string) ( $found['params'][0] ?? '' ),
+				'id'														=> '#',
+				default													=> '',
+			};
+
+			$name = preg_replace( '/\.\.\.$/', '', $name );
+			$at = $name === '' || $name === null ? false : strpos( $text, $name );
+
+			return $at === false ? 0 : $at;
 		}
 
 		/**
@@ -837,22 +1095,33 @@ namespace Nino {
 			$value = substr( $text, $colon + 1 );
 
 			if( str_starts_with( $property, '--' ) === true && self::_ownToken( $property, $components ) === false )
-				$problems[] = 'sets '. self::_shown( $property ). ', which is no token of its own components';
+				$problems[] = self::_found( 'token-set', [ self::_shown( $property ) ] );
+
+			// What a theme has no use for besides: src, which loads, and attr(), which reads the page's markup into the css and can take a file from it
+			// (a @keyframes stays: its steps hold declarations that are held to this same rule, load nothing, and act only through the classes that name the animation)
+			if( self::$themeRule === true ) {
+
+				if( strtolower( $property ) === 'src' )
+					$problems[] = self::_found( 'src-property' );
+
+				if( preg_match( '/(?<![A-Za-z0-9_-])attr\s*\(/i', $value ) === 1 )
+					$problems[] = self::_found( 'attr' );
+			}
 
 			if( preg_match( '/!\s*important/i', $value ) === 1 )
-				$problems[] = 'uses !important';
+				$problems[] = self::_found( 'important' );
 
 			if( preg_match( '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:url|image-set|src)\s*\(/i', $value ) === 1 )
-				$problems[] = preg_match( '/(?<![A-Za-z0-9_])url\s*\(/i', $value ) === 1 ? 'uses url()' : 'loads from outside: it uses image-set() or src()';
+				$problems[] = self::_found( preg_match( '/(?<![A-Za-z0-9_])url\s*\(/i', $value ) === 1 ? 'url' : 'loads' );
 
 			// What may load one day, or shows another element of the page as a picture
 			if( preg_match( '/(?<![A-Za-z0-9_])(?:-[a-z]+-)?(?:image|element|cross-fade)\s*\(/i', $value ) === 1 )
-				$problems[] = 'uses image(), element() or cross-fade(), which take a picture from outside or from another element';
+				$problems[] = self::_found( 'picture' );
 
 			if( preg_match_all( '/(?<![A-Za-z0-9_-])var\(\s*(--[^\s,)]*)/i', $value, $read ) > 0 )
 				foreach( array_unique( $read[1] ) as $token )
 					if( str_starts_with( $token, '--brand-' ) === false && str_starts_with( $token, '--page-' ) === false && self::_ownToken( $token, $components ) === false )
-						$problems[] = 'reads '. self::_shown( $token ). ', which is no token of the brand, of the page or of its own components';
+						$problems[] = self::_found( 'token-read', [ self::_shown( $token ) ] );
 		}
 
 		/**
@@ -865,8 +1134,27 @@ namespace Nino {
 		 */
 		private static function _checkAt( string $prelude, array &$problems ): void {
 
-			if( preg_match( '/^@([A-Za-z-]+)/', $prelude, $name ) === 1 && in_array( strtolower( $name[1] ), [ 'import', 'layer', 'namespace', 'charset', 'property' ], true ) === true )
-				$problems[] = 'uses @'. strtolower( $name[1] );
+			$name = preg_match( '/^@([A-Za-z-]*)/', $prelude, $found ) === 1 ? strtolower( $found[1] ) : '';
+
+			// A part keeps the list of what it has none of
+			if( self::$themeRule === false ) {
+
+				if( in_array( $name, [ 'import', 'layer', 'namespace', 'charset', 'property' ], true ) === true )
+					$problems[] = self::_found( 'at', [ $name ] );
+
+				return;
+			}
+
+			// A theme has a list of what may stand, and nothing else does: a rule that CSS brings later is none of a theme's until it is thought through. The
+			// conditions of a rule (@media, @supports, @container) and the steps of an animation, which load nothing and act through the classes that name them.
+			// @page is the page's, and is told by its own sentence
+			if( in_array( $name, [ 'media', 'supports', 'container' ], true ) === true || preg_match( '/^(?:-[a-z]+-)?keyframes$/', $name ) === 1 )
+				return;
+
+			if( $name === 'page' )
+				$problems[] = self::_found( 'page' );
+			else
+				$problems[] = self::_found( 'at', [ $name === '' ? self::_shown( $prelude ) : $name ] );
 		}
 
 		/**
@@ -944,7 +1232,7 @@ namespace Nino {
 		private static function _checkThemeComplex( string $selector, bool $owned, array &$problems, int $depth ): void {
 
 			if( $depth > 4 ) {
-				$problems[] = 'has a selector with functions nested too deep: '. self::_shown( $selector );
+				$problems[] = self::_found( 'selector-deep', [ self::_shown( $selector ) ] );
 				return;
 			}
 
@@ -971,7 +1259,7 @@ namespace Nino {
 			$compounds = array_values( array_filter( $compounds, static fn( string $compound ): bool => $compound !== '' ) );
 
 			if( $compounds === [] )
-				$problems[] = 'has an empty selector';
+				$problems[] = self::_found( 'selector-empty' );
 
 			foreach( $compounds as $compound )
 				self::_checkThemeCompound( $compound, $owned, $problems, $depth );
@@ -1022,16 +1310,16 @@ namespace Nino {
 			}
 
 			if( $level !== 0 ) {
-				$problems[] = 'has a selector whose brackets do not close: '. self::_shown( $compound );
+				$problems[] = self::_found( 'selector-brackets', [ self::_shown( $compound ) ] );
 				return;
 			}
 
 			$rest = (string) preg_replace( [ '/\.[a-z][a-z0-9_-]*/', '/::?[A-Za-z][A-Za-z-]*(?:\(\))?/', '/&/' ], '', $top );
 
 			if( $rest !== '' )
-				$problems[] = 'meets more than classes - an element, an id, the universal selector, an attribute selector or a class that is not written like the ones of the components: '. self::_shown( $compound );
+				$problems[] = self::_found( 'selector-more', [ self::_shown( $compound ) ] );
 			else if( preg_match( '/\.[a-z]/', $top ) !== 1 && ( $owned === false || str_contains( $top, '&' ) === false ) )
-				$problems[] = 'has a part of a selector with no class of its own: '. self::_shown( $compound );
+				$problems[] = self::_found( 'selector-noclass', [ self::_shown( $compound ) ] );
 
 			foreach( $calls as [ $name, $body ] ) {
 
@@ -1042,7 +1330,7 @@ namespace Nino {
 					$parts = preg_split( '/\s+of\s+/i', $body, 2 );
 
 					if( preg_match( '/^\s*(?:even|odd|[+-]?\d*n?(?:\s*[+-]\s*\d+)?)\s*$/i', (string) $parts[0] ) !== 1 )
-						$problems[] = 'has a :'. $name. '() that is not read: '. self::_shown( $compound );
+						$problems[] = self::_found( 'selector-nth', [ $name, self::_shown( $compound ) ] );
 
 					$arguments = isset( $parts[1] ) === true ? self::_list( $parts[1] ) : [];
 				}
@@ -1051,7 +1339,7 @@ namespace Nino {
 				else if( in_array( $name, [ 'lang', 'dir' ], true ) === true && preg_match( '/^\s*[A-Za-z0-9-]+\s*$/', $body ) === 1 )
 					$arguments = [];
 				else {
-					$problems[] = 'uses :'. self::_shown( $name ). '(), which a theme.css has no use for: '. self::_shown( $compound );
+					$problems[] = self::_found( 'selector-function', [ self::_shown( $name ), self::_shown( $compound ) ] );
 					$arguments = [];
 				}
 
@@ -1103,17 +1391,17 @@ namespace Nino {
 						$foreign = true;
 
 					if( $own === false )
-						$problems[] = 'meets the class .'. self::_shown( $class ). ', which is no class of its own components';
+						$problems[] = self::_found( 'class-foreign', [ self::_shown( $class ) ] );
 				}
 
 				if( preg_match( '/#[A-Za-z_-]/', $selector ) === 1 )
-					$problems[] = 'meets an id: '. self::_shown( $selector );
+					$problems[] = self::_found( 'id', [ self::_shown( $selector ) ] );
 
 				// An attribute selector on class is a way round the rule - [class*="section"] meets what it likes - but for
 				// one that only narrows an element the part owns: .section-col:where( [class*="--ground-"] ) is the column
 				// with a ground, and meets no element that .section-col does not meet
 				if( preg_match( '/\[\s*(?:[A-Za-z0-9_|*-]*\|)?class\b/i', $selector ) === 1 && self::_narrows( $selector, $components ) === false )
-					$problems[] = 'meets the classes of the page by an attribute selector: '. self::_shown( $selector );
+					$problems[] = self::_found( 'attribute-class', [ self::_shown( $selector ) ] );
 
 				// The element the selector speaks of first has to be the part's own: a class of its components at the top of
 				// the selector, outside every function - *:not(.own) and :is(body, .own) name the class and meet the page -
@@ -1145,7 +1433,7 @@ namespace Nino {
 					$all = false;
 
 					if( $foreign === false )
-						$problems[] = 'has a selector with no class of its own components: '. self::_shown( $selector );
+						$problems[] = self::_found( 'selector-own', [ self::_shown( $selector ) ] );
 				}
 			}
 

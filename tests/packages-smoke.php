@@ -452,6 +452,93 @@ check( 'a theme.css that uses @font-face, behavior, -moz-binding or expression()
 check( '...what a comment says is no use of it: @font-face, behavior:, -moz-binding and expression( in a comment are taken, whatever the case',
 	\Nino\Components::themeProblems( "/* @font-face { } behavior: x; -moz-binding: y; expression( 1 ) */\n.a { color: red; }\n/* a\n@FONT-FACE */" ) === []);
 
+// What a theme.css has no use for besides: src, @page, attr() and control characters - in every spelling, in every place a rule can stand, below a comment, as an escape
+$wrong = [];
+
+foreach( [
+	'src'																=> [ ".a { src: local(x); }", 'src-property' ],
+	'SRC in capitals'										=> [ ".a { SRC : local(x); }", 'src-property' ],
+	'src in @media'											=> [ "@media (min-width: 1px) { .a { src: x; } }", 'src-property' ],
+	'src in @supports'									=> [ "@supports (display: grid) { .a { src: x; } }", 'src-property' ],
+	'src in @container'									=> [ "@container (min-width: 1px) { .a { src: x; } }", 'src-property' ],
+	'src in a nesting'									=> [ ".a { .b { src: x; } }", 'src-property' ],
+	'src in a nesting with &'						=> [ ".a { & > .b { src: x; } }", 'src-property' ],
+	'src in :is() rule'									=> [ ".a:is(.b, .c) { src: x; } ", 'src-property' ],
+	'src in @keyframes'									=> [ "@keyframes k { from { src: x; } to { opacity: 1; } }", 'src-property' ],
+	'src below a comment'								=> [ "/* src: a */\n.a { color: red; }\n/* b */ .b { src: x; }", 'src-property' ],
+	'@page'															=> [ "@page { margin: 0; }", 'page' ],
+	'@PAGE with a selector'							=> [ "@PAGE :first { margin: 0; }", 'page' ],
+	'@page in @media'										=> [ "@media print { @page { margin: 0; } }", 'page' ],
+	'attr()'														=> [ ".a::after { content: attr(data-x); }", 'attr' ],
+	'ATTR() in capitals'								=> [ ".a::after { content: ATTR( data-x ); }", 'attr' ],
+	'attr() in @media'									=> [ "@media (min-width: 1px) { .a::after { content: attr(title); } }", 'attr' ],
+	'attr() as a fallback in var()'			=> [ ".a { width: var(--page-size, attr(data-w px)); }", 'attr' ],
+	'a control character'								=> [ ".a { color: red; }\n.b { color: \x01red; }", 'control' ],
+	'a form feed'												=> [ ".a { color: red; }\x0C", 'control' ],
+	'DEL'																=> [ ".a { color: red; \x7F}", 'control' ],
+] as $label => [ $text, $code ] )
+	if( in_array( $code, array_column( \Nino\Components::themeFindings( $text ), 'code' ), true ) === false )
+		$wrong[] = $label;
+
+check( 'a theme.css that sets src, uses @page or attr(), or holds a control character, is refused in any case of letters and any place a rule can stand'. ( $wrong === [] ? '' : ' - taken: '. implode( ', ', $wrong ) ), $wrong === [] );
+
+check( '...what a comment or a string says is no use of it, and tab, line breaks, @keyframes and the rest of a theme stay', \Nino\Components::themeProblems( "/* src: x; @page { } attr(x) */\n.a { color: red;\t}\r\n.a::after { content: \"src: attr(x) @page\"; animation: k 1s; }\n@keyframes k { from { opacity: 0; } to { opacity: 1; } }" ) === [] );
+
+// The finding says its line, a code and what goes into the sentence; the sentences of themeProblems stay as they were, with the line where it is known
+$found = \Nino\Components::themeFindings( ".a { color: red; }\n\n/* two\nlines */\n.b {\n  color: red;\n  src: x;\n}\n.a::after { content: attr(x); }" );
+$byCode = array_column( $found, null, 'code' );
+check( 'every finding of a theme.css carries its code, its params, a sentence and the line of the statement it stands on, whatever the comments before it', ( $byCode['src-property']['line'] ?? 0 ) === 7 && ( $byCode['attr']['line'] ?? 0 ) === 9
+	&& array_keys( $found[0] ) === [ 'code', 'params', 'text', 'line' ] && isset( \Nino\Components::CSS_WHY[$found[0]['code']] ) === true );
+$ids = \Nino\Components::themeFindings( "a { color: red; }\n\n#x .b { color: red; }" );
+check( '...a selector that is wrong says its line and its shown name as a param, and the sentence of themeProblems has the line behind it', ( $ids[0]['line'] ?? 0 ) === 1 && count( $ids ) >= 1
+	&& str_contains( implode( ' ', \Nino\Components::themeProblems( "a { color: red; }\n\n.b {\n  src: x;\n}" ) ), 'sets src' ) === true && str_contains( implode( ' ', \Nino\Components::themeProblems( "a { color: red; }\n\n.b {\n  src: x;\n}" ) ), '(line 4)' ) === true
+	&& \Nino\Components::themeProblems( "</style>" ) === [ 'holds "</" (line 1), which would end or open markup where the css is put' ] );
+// The line of every finding, wherever it stands: the place of the thing that is wrong, a lone CR as a break, an escape, a brace that does not close, a string that is not closed
+$lines = static function( string $css ): array {
+	$all = [];
+	foreach( \Nino\Components::themeFindings( $css ) as $found )
+		$all[] = $found['code']. '@'. var_export( $found['line'], true );
+	return $all;
+};
+check( 'the line of a finding is the line of its place and not of the beginning of its statement: a url() in the fourth line of a value, an element in the third line of a selector, an attr() after a url in a value',
+	$lines( ".a {\n  background:\n    red\n    url(x);\n}" ) === [ 'url@4' ] && in_array( 'selector-more@3', $lines( ".a,\n.b,\ndiv { color: red; }" ), true ) === true
+	&& $lines( ".a {\n  content: 'x'\n    attr(t);\n}" ) === [ 'attr@3' ] );
+check( '...a lone CR is a line break as CRLF and LF are, and a comment or a string keeps the breaks it holds', $lines( ".a { color: red; }\r.b { color: red; }\r\r@page { }" ) === [ 'page@4' ] && $lines( ".a { color: red; }\r\n/* x\r y */\r\n@page { }" ) === [ 'page@4' ]
+	&& $lines( ".a { content: 'a\\\nb'; }\n@page { }" ) === [ 'page@3' ] );
+check( '...an escape, a brace that does not close, a brace that is not opened and a string or comment that is not closed say the line they are found on', $lines( ".a { color: red; }\n\n.b { c: d\\e; }" ) === [ 'escape@3' ]
+	&& $lines( ".a { color: red; }\n.b {\n  color: red;\n" ) === [ 'braces@3' ] && $lines( ".a { color: red; }\n}\n" ) === [ 'braces@2' ]
+	&& $lines( ".a { color: red; }\n\n.b { content: 'open;\n}" ) === [ 'unreadable@3' ] && $lines( ".a { color: red; }\n/* open\n\n" ) === [ 'unreadable@2' ] );
+check( '...the same thing wrong in several places is a finding for each, with its line - the theme panel is told the lines one by one - and a sentence of themeProblems for each line',
+	$lines( ".a { src: x; }\n.b { src: y; }\n.c { color: red; }\n.d { src: z; }" ) === [ 'src-property@1', 'src-property@2', 'src-property@4' ]
+	&& \Nino\Components::themeProblems( ".a { src: x; }\n.b { src: y; }" ) === [ 'sets src, which loads a file or a font from outside: a theme has no use for it (line 1)', 'sets src, which loads a file or a font from outside: a theme has no use for it (line 2)' ] );
+
+// A big input with many findings is told right, and the lines are found in a table made once: the helper that finds them does not count from the top for each finding
+$big = '';
+for( $i = 1; $i <= 3000; $i++ )
+	$big .= ( $i % 3 === 0 ? ".r$i { src: x; }\n" : ".r$i { color: red; }\n" );
+$bigFound = \Nino\Components::themeFindings( $big );
+check( 'a stylesheet with a thousand lines wrong is told up to the limit of findings, each with its right line, and the lines come from a table that is made once for the text',
+	count( $bigFound ) === \Nino\Components::FINDINGS && $bigFound[0]['line'] === 3 && $bigFound[1]['line'] === 6 && $bigFound[\Nino\Components::FINDINGS - 1]['line'] === 3 * \Nino\Components::FINDINGS
+	&& ( static function(): bool {
+		$method = new \ReflectionMethod( \Nino\Components::class, '_tag' );
+		$body = implode( '', array_slice( (array) file( (string) $method->getFileName() ), $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1 ) );
+		return str_contains( $body, 'substr_count' ) === false && str_contains( $body, '_lineOf( $starts' ) === true;
+	} )() );
+
+// The at-rules are a list of what may stand
+$wrong = [];
+foreach( [ '@media (min-width: 1px) { .a { color: red; } }', '@supports (display: grid) { .a { display: grid; } }', '@container (min-width: 1px) { .a { color: red; } }', '@keyframes k { from { opacity: 0; } to { opacity: 1; } }', '@-webkit-keyframes k { from { opacity: 0; } }' ] as $text )
+	if( \Nino\Components::themeProblems( $text ) !== [] || \Nino\Components::partProblems( $text, [ 'a' ] ) !== [] )
+		$wrong[] = $text;
+foreach( [ '@view-transition { navigation: auto; }', '@counter-style x { symbols: "a"; }', '@font-feature-values x { }', '@position-try --x { }', '@scope (.a) { .b { color: red; } }', '@starting-style { .a { opacity: 0; } }', '@layer x { .a { color: red; } }', '@import "x";', '@FONT-FACE { }', '@ { }', '@unknown-rule { }' ] as $text )
+	if( \Nino\Components::themeProblems( $text ) === [] )
+		$wrong[] = $text;
+check( 'a theme.css has the conditions of a rule and the steps of an animation among its at-rules, and any other at-rule - @view-transition, which acts on the whole website, as much as one that is not yet thought of - is refused'. ( $wrong === [] ? '' : ' - taken wrong: '. implode( ' | ', $wrong ) ), $wrong === [] );
+check( '...a part keeps the list of what it has none of - @font-face and @view-transition stand in it as they did - and the line of an at-rule is the line it stands on', \Nino\Components::partProblems( '@view-transition { navigation: auto; } @font-face { font-family: "O"; src: local("O"); }', [ 'a' ] ) === [] && \Nino\Components::partProblems( '@import "x";', [ 'a' ] ) === [ 'uses @import' ]
+	&& $lines( ".a { color: red; }\n\n@view-transition { navigation: auto; }" ) === [ 'at@3' ] && $lines( ".a { color: red; }\n@media print {\n  @page { }\n}" ) === [ 'page@3' ] && $lines( "@import 'x';\n.a { color: red; }\n@layer y;" ) === [ 'at@1', 'at@3' ] );
+
+check( 'a part.css is not held to what only a theme.css is: src and attr() stand in a part as they did', \Nino\Components::partProblems( '.probe::after { content: attr(data-x); }', [ 'probe' ] ) === [] && \Nino\Components::partProblems( '.probe { x: y; }', [ 'probe' ] ) === [] );
+
 // part.css: the same list of what loads, and no @property; a part keeps its own rule over the classes of its group
 $wrong = [];
 
