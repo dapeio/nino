@@ -8,9 +8,10 @@
 .header-wrap--sticky { position: sticky; top: 0; z-index: 100; }
 /*	The preview of the workbench marks the page it shows (Nino.adminUi.previewFrame()): a header that stays would take the room of the page that is being worked on, so there it scrolls away with the page	*/
 [data-nino-preview="loose"] .header-wrap--sticky { position: static; }
-/*	An open menu that is taller than the window would keep its last entries out of reach under a header that stays: where the menu folds, the header scrolls away with the page.
-	A menu that is never collapsed is always open and has no such header; one that is open in a line is no [open] either */
-.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { position: static; }
+/*	An open menu that is taller than the window would keep its last entries out of reach under a header that stays, and a header that let go of the page would leave the
+	window with the button on a page that is scrolled. So the header stays and is no taller than the window: where the menu folds and is open, the header scrolls inside
+	itself (dvh where the browser knows it, vh where it does not). A menu that is never collapsed is always open and has no such header; one that is open in a line is no [open] either	*/
+.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { max-height: 100vh; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
 .header-wrap-inner {
 	display: flex; flex-wrap: wrap; align-items: center; gap: var(--header-nav-gap);
 	width: min( 100% - 2 * var(--page-space-3), var(--page-width) ); margin-inline: auto; padding-block: var(--header-wrap-space);

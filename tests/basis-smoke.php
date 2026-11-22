@@ -972,11 +972,12 @@ if( count( $dark[2] ) !== 3 || $veil[0] <= 0 || $veil[1] <= $veil[0] || $veil[1]
 if( str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .section-row' ), 'color-scheme: dark; color: var(--brand-ink);' ) === false || str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .section-row', '@supports not ( color: light-dark( #000, #fff ) )' ), 'color: #eceef1;' ) === false )
 	$bad[] = 'a row after a picture does not say it is dark without :has()';
 
-// the header that folds its menu scrolls away when the menu is open; the button stays in the line and the list opens below it
-if( str_contains( basisBody( $partRules['header'], '.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )' ), 'position: static;' ) === false
+// the header that folds its menu stays with the menu open and is no taller than the window, scrolling inside itself: it never lets go of the page, which would take the button out of a page that is scrolled; the button stays in the line and the list opens below it
+$openHeader = basisBody( $partRules['header'], '.header-wrap--sticky:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )' );
+if( str_contains( $openHeader, 'position' ) === true || str_contains( $openHeader, 'max-height: 100vh; max-height: 100dvh;' ) === false || str_contains( $openHeader, 'overflow-y: auto;' ) === false
 	|| str_contains( basisBody( $partRules['header'], '.header-nav-details', '@supports selector( ::details-content )' ), 'display: contents;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav-details::details-content', '@supports selector( ::details-content )' ), 'flex: 1 0 100%;' ) === false
 	|| str_contains( basisBody( $partRules['header'], '.header-nav-toggle' ), 'margin-inline-start: auto;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav a' ), 'overflow-wrap: anywhere;' ) === false )
-	$bad[] = 'the menu does not keep its button in the line or its header does not scroll away open';
+	$bad[] = 'the menu does not keep its button in the line or its header does not stay, with a height of the window at most, open';
 
 if( basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )', '@supports not ( color: light-dark( #000, #fff ) )' ) === '' )
 	$bad[] = 'a section with a picture has no colours of its own where light-dark() is not known';
