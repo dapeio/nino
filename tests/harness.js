@@ -21,7 +21,7 @@
  *									fills( relative )					The [[/key]] => 'value' lines of a text file
  *									load( relative, context, filename )	A script of the checkout, run in a context
  *									classList( el, initial )			A class list over a Set, one with className
- *									element( tag )						An element stand-in: tree, listeners, matcher, isConnected
+ *									element( tag )						An element stand-in: tree, listeners, matcher, isConnected, toggleAttribute
  *									findAll( root, predicate )			Every descendant the predicate accepts
  *									fire( el, name, event )				Calls the listeners of an event
  *									matches( el, selector )				Whether an element answers a selector
@@ -302,6 +302,8 @@ function reflect( el, name, value ) {
 		el.id = value ?? '';
 	else if( name === 'class' )
 		el.className = value ?? '';
+	else if( name === 'inert' )
+		el.inert = value !== null;
 	else if( name.indexOf('data-') === 0 && value === null )
 		delete el.dataset[datasetKey( name )];
 	else if( name.indexOf('data-') === 0 )
@@ -338,6 +340,7 @@ function element( tag ) {
 		selected : false,
 		disabled : false,
 		hidden : false,
+		inert : false,
 		tabIndex : 0,
 		focused : false,
 		selectionStart : 0,
@@ -401,6 +404,14 @@ function element( tag ) {
 		},
 		getAttribute : function( name ) { return el.attributes[name] ?? null },
 		hasAttribute : function( name ) { return name in el.attributes },
+		toggleAttribute : function( name, force ) {
+			const on = force === undefined ? !( name in el.attributes ) : force === true;
+			if( on === true )
+				el.setAttribute( name, '' );
+			else
+				el.removeAttribute( name );
+			return on;
+		},
 		removeAttribute : function( name ) {
 			delete el.attributes[name];
 			reflect( el, name, null );

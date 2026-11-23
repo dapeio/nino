@@ -8,7 +8,7 @@ declare(strict_types=1);
  *
  *										A. the folders: twenty schemas read and accepted, each as clean as validate() makes it, the places they
  *										   offer, the six groups, the standard parts that keep the rule of mixing; the feature is delivered, listed,
- *										   off, with no script, and nothing in the kernel names it
+ *										   off, with the one script of its menu, and nothing in the kernel names it
  *										B. what every component draws: the classes of every value of every attribute, computed from the schema;
  *										   the markup of each one, the pictures, the menus, the links that are none; the fall-back rules
  *										C. the contract of group, part, ladder and token: the seven things a group keeps, the tokens that Nino.css
@@ -532,7 +532,7 @@ $renderers = array_keys( (array) $appData[\Nino\Components::RENDERERS] );
 sort( $renderers );
 check( 'twelve of the twenty have a renderer, the ones that compute; the others are drawn from their template alone', $renderers === [ 'button', 'footer-legal', 'footer-logo', 'footer-nav', 'footer-wrap', 'header-logo', 'header-nav', 'header-wrap', 'html', 'image', 'section-title', 'section-wrap' ] );
 
-// the feature: delivered, listed, off, with no script, and nothing of the kernel names it
+// the feature: delivered, listed, off, with one script, and nothing of the kernel names it
 $manifestWarnings = ninoWarnings();
 $all = \Nino\Features::all( $appData );
 check( 'the feature is delivered with the kernel: listed with shipped true, off, its class the module of its directory, its manifest read with no warning', isset( $all['basis'] ) === true && $all['basis']['shipped'] === true
@@ -547,14 +547,14 @@ $mentions = [];
 foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__ ). '/_nino', \FilesystemIterator::SKIP_DOTS ) ) as $file ) {
 
 	if( str_starts_with( $file->getPathname(), $basisDir. '/' ) === true )
-		$scripts[] = $file->getExtension() === 'js' ? $file->getPathname() : null;
+		$scripts[] = $file->getExtension() === 'js' ? substr( $file->getPathname(), strlen( $basisDir ) ) : null;
 	else if( $file->getExtension() === 'php' && preg_match( '/Modules\\\\+Basis\b/', (string) file_get_contents( $file->getPathname() ) ) === 1 )
 		$mentions[] = $file->getPathname();
 }
 foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( dirname( __DIR__ ). '/_admin', \FilesystemIterator::SKIP_DOTS ) ) as $file )
 	if( $file->getExtension() === 'php' && preg_match( '/Modules\\\\+Basis\b/', (string) file_get_contents( $file->getPathname() ) ) === 1 )
 		$mentions[] = $file->getPathname();
-check( 'no file of the feature is a script, and no file of the kernel or of the workbench names the class: nothing uses it'. ( $mentions === [] ? '' : ' - '. implode( ', ', $mentions ) ), array_filter( $scripts ) === [] && $mentions === [] );
+check( 'the one script of the feature is the one of its menu, and no file of the kernel or of the workbench names the class: nothing uses it'. ( $mentions === [] ? '' : ' - '. implode( ', ', $mentions ) ), array_values( array_filter( $scripts ) ) === [ '/assets/header-nav.js' ] && $mentions === [] );
 
 // the cache of the register: a request that finds it as it was includes no component.php and no group.php - a process of its own says what it included
 $warm = ninoSandbox( 'basis-warm' );
@@ -1860,6 +1860,47 @@ check( 'it has nothing to remove: Remove is refused for a feature of the kernel,
 ninoWarnings();
 \Nino\Filesystem::removeDir( ninoSandboxDir( $project ) );
 
+// the script of the menu: a boot with Basis on lists it in the script bundle of the site, the bundle that is built carries it, and a boot with Basis off does neither
+$bootSandbox = ninoSandbox( 'basis-script' );
+$bootDir = ninoSandboxDir( $bootSandbox );
+$bootScript = static function( array $modules ) use ( $bootDir ): array {
+
+	$run = $bootDir. '/run-'. count( $modules );
+	mkdir( $run. '/private', 0755, true );
+	file_put_contents( $run. '/private/config.php', '<?php return '. var_export( [
+		'/nino/modules'							=> $modules,
+		'/nino/locales/available'		=> [ 'de_DE', 'en_US' ],
+		'/nino/locales/native'			=> 'de_DE',
+		'/nino/install/completed'		=> true,
+	], true ). ';' );
+	file_put_contents( $run. '/boot.php', '<?php declare(strict_types=1);
+define( \'NINO_FEATURES_DIR\', '. var_export( NINO_FEATURES_DIR, true ). ' );
+define( \'NINO_PRIVATE_DIR\', '. var_export( $run. '/private', true ). ' );
+require '. var_export( dirname( __DIR__ ). '/_nino/Nino.php', true ). ';
+$appData = \\Nino\\init();
+echo json_encode( $appData[\'/nino/html/assets\'][\'/.cache/script.js\'] ?? [] );' );
+
+	return json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $run. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
+};
+$scriptsOn = $bootScript( [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Basis' ] );
+$scriptsOff = $bootScript( [ '\\Nino\\Modules\\Assets' ] );
+
+// The bundle those lists make, written where the sandbox keeps its public files
+$scriptBundle = static function( array $files ) use ( $bootSandbox ): string {
+
+	$site = $bootSandbox;
+	$site['./nino/filesystem/path'] = dirname( __DIR__ );
+	$site['/nino/html/assets'] = [ '/.cache/script.js' => $files ];
+	\Nino\Modules\Assets::doShortcode( $site, [ '/.cache/script.js' ] );
+
+	return (string) file_get_contents( \Nino\Filesystem::path( $site, '/.cache/script.js' ) );
+};
+$menuScript = trim( (string) file_get_contents( $basisDir. '/assets/header-nav.js' ) );
+check( 'a boot with Basis on lists the script of the menu in the script bundle, behind Nino.js, once, and the bundle that is built from the list carries it',
+	$scriptsOn === [ '/_nino/Nino.js', '/_nino/Nino/Modules/Basis/assets/header-nav.js' ] && str_contains( $scriptBundle( $scriptsOn ), $menuScript ) === true );
+check( '...and a boot with Basis off lists it nowhere, and the bundle of that list has none of it', $scriptsOff === [ '/_nino/Nino.js' ] && str_contains( $scriptBundle( $scriptsOff ), 'header-nav-details' ) === false );
+\Nino\Filesystem::removeDir( $bootDir );
+
 // sizes
 $total = $bytes;
 $parts = array_map( static fn( string $group ): int => (int) filesize( $basisDir. '/groups/'. $group. '/part/part.css' ), array_keys( $read['groups'] ) );
@@ -1868,7 +1909,7 @@ check( 'the six standard parts are 32 KB together at most ('. $total. ' bytes: '
 $listing = [];
 foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $basisDir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
 	$listing[] = $file->getExtension();
-check( 'the feature brings no script, and its parts no font or image: a file of css, php, json or a template, and nothing else', array_diff( array_unique( $listing ), [ 'php', 'tpl', 'css', 'json' ] ) === [] );
+check( 'the feature brings one script, and its parts no font or image: a file of css, php, json, a template and that script, and nothing else', array_diff( array_unique( $listing ), [ 'php', 'tpl', 'css', 'json', 'js' ] ) === [] && count( array_filter( $listing, static fn( string $extension ): bool => $extension === 'js' ) ) === 1 );
 
 // the table of docs/features.md is worked out of the schemas
 $docs = (string) file_get_contents( dirname( __DIR__ ). '/docs/features.md' );

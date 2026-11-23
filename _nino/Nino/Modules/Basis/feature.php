@@ -65,6 +65,7 @@ return [
 			],
 		],
 	],
+	'assets'			=> [ '/_nino/Nino/Modules/Basis/assets/header-nav.js' ],
 	'category'		=> 'content',
 	'version'			=> '1.0.0',
 ];
