@@ -279,10 +279,12 @@ form, one string or a `locale => string` map, is still read; do not write it.
 
 One category per feature, the coarse "what is this for" the Features panel groups
 and filters by (`\Nino\Features::CATEGORIES`). Where a feature could sit in two,
-take the first that fits: `security` (it protects access or touches personal data),
-`marketing` (being found or measured), `communication` (messages with people),
-`content` (it brings content or makes it reachable), `ui` (it only changes how
-existing things look); what is left is `system`. Any slug passes
+take the first that fits: `business` (a tool for running the business itself -
+customers, cases, billing - whatever else it touches), `security` (it protects
+access or touches personal data), `marketing` (being found or measured),
+`communication` (messages with people), `content` (it brings content or makes it
+reachable), `ui` (it only changes how existing things look); what is left is
+`system`. Any slug passes
 (`/^[a-z][a-z0-9-]{0,23}$/`), so a feature written for a newer catalogue stays
 installable; a manifest without `category` is valid.
 

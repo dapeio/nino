@@ -229,11 +229,17 @@ check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' =
 // only something that is not a slug at all is refused
 check( 'a category is optional and defaults to none', \Nino\Features::manifest( $manifestDir. '/Mini' )['category'] === '' );
 check( 'one of the published categories is kept', \Nino\Features::manifest( writeManifest( $manifestDir, 'Filed', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'security' ] ) )['category'] === 'security'
-	&& \Nino\Features::CATEGORIES === [ 'content', 'ui', 'communication', 'marketing', 'security', 'system' ] );
+	&& \Nino\Features::CATEGORIES === [ 'content', 'ui', 'communication', 'marketing', 'security', 'business', 'system' ] );
 check( 'and so is one this kernel does not publish - a later catalogue files features under names this one cannot know', \Nino\Features::manifest( writeManifest( $manifestDir, 'Later', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'commerce' ] ) )['category'] === 'commerce'
 	&& ninoWarnings() === [] );
 check( 'a category that is not a slug is refused, and the message names the vocabulary', manifestFails( $manifestDir, 'BadCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'UI Effects' ], '"category"' )
-	&& manifestFails( $manifestDir, 'ArrayCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => [ 'security' ] ], 'security, system' ) );
+	&& manifestFails( $manifestDir, 'ArrayCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => [ 'security' ] ], 'security, business, system' ) );
+// The panel words every published category in both languages of the workbench: a category without its line is shown as its slug
+$categoryWords = [ 'de_DE' => include __DIR__. '/../_admin/Nino/Modules/Features/text/de_DE.php', 'en_US' => include __DIR__. '/../_admin/Nino/Modules/Features/text/en_US.php' ];
+check( 'every published category has its line in the two languages of the Features panel, and a word of its own in each', array_filter( $categoryWords, static function( array $words ): bool {
+	$lines = array_map( static fn( string $slug ): string => (string) ( $words[ '[[/_admin/features/category/'. $slug. ']]' ] ?? '' ), \Nino\Features::CATEGORIES );
+	return in_array( '', $lines, true ) === true || count( array_unique( $lines ) ) !== count( $lines );
+} ) === [] );
 // The maturity is free text, a word beside the name: one string or one per
 // locale, short, and optional
 check( 'a maturity is optional and defaults to none', \Nino\Features::manifest( $manifestDir. '/Mini' )['maturity'] === '' );

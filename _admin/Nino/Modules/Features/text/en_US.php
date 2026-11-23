@@ -24,6 +24,7 @@ return [
 	'[[/_admin/features/category/communication]]'	=> 'Communication',
 	'[[/_admin/features/category/marketing]]'	=> 'Marketing & Analytics',
 	'[[/_admin/features/category/security]]'	=> 'Security & Privacy',
+	'[[/_admin/features/category/business]]'	=> 'Business',
 	'[[/_admin/features/category/system]]'		=> 'System & Operations',
 	'[[/_admin/features/category/none]]'			=> 'Uncategorized',
 	'[[/_admin/features/hint/nomatch]]'			=> 'No features found.',

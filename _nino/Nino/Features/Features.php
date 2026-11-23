@@ -123,7 +123,7 @@ namespace Nino {
 		// category costs a catalogue release, not a Nino release. What keeps
 		// the vocabulary a vocabulary is the publishing side: the catalogue's
 		// build step only ever publishes these.
-		public const array CATEGORIES = [ 'content', 'ui', 'communication', 'marketing', 'security', 'system' ];
+		public const array CATEGORIES = [ 'content', 'ui', 'communication', 'marketing', 'security', 'business', 'system' ];
 
 		/*	What a feature key, a category and a version look like. Public
 			because they are not this class's private business: \Nino\Catalogue
