@@ -144,7 +144,7 @@ namespace Nino {
 
 			// A request the csrf guard refused is answered with its 403 and
 			// changes nothing, a switch asked for in its query string included
-			if( \Nino\Form::blocked( $request ) === true )
+			if( \Nino\Csrf::blocked( $request ) === true )
 				return;
 
 			// Catch locale change. parse_str() legitimately creates arrays for a

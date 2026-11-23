@@ -25,6 +25,9 @@ namespace Nino\Modules {
 
 	class Csrf {
 
+		// The callback that is told each time a token field is drawn: the field, as the page gets it. Nothing it answers is read
+		public const string FIELD = '/nino/csrf/field';
+
 		/*	The one fragment this module renders, declared once rather than
 			built inside doShortcode(). Being a property is the point: it is
 			then one place to read, and a project that needs a different field
@@ -57,11 +60,18 @@ namespace Nino\Modules {
 		 */
 		public static function doShortcode( array &$appData, array $args ): string {
 
-			return str_replace(
+			$field = str_replace(
 				'[[token]]',
 				htmlspecialchars( \Nino\Csrf::getToken( $appData ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
 				self::$html['input']
 			);
+
+			// A page that carries a token field has a form that posts: the callbacks of FIELD hear of it, and what they
+			// answer is not read - the module Form is the one that listens, to load the script and the stylesheet of forms
+			$told = $field;
+			\Nino\Callbacks::doCallbacks( $appData, self::FIELD, $told );
+
+			return $field;
 		}
 	}
 

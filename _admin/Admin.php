@@ -575,7 +575,7 @@ namespace Nino\Admin {
 			// and say what it was, because the csrf guard answers a bare 403
 			// and a page that outlived its session reads that as "not allowed"
 			if( $request['/nino/http/response']['statusCode'] !== 200 ) {
-				if( \Nino\Form::blocked( $request ) === true )
+				if( \Nino\Csrf::blocked( $request ) === true )
 					self::_failBlocked( $request );
 				return;
 			}

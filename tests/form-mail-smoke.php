@@ -1383,14 +1383,16 @@ echo "Modules\\Form - its look and its script, and the form that works without a
 
 $formPage = ninoSandbox( 'form-assets' );
 \Nino\Modules\Form::init( $formPage );
-$formStyles = $formPage['/nino/html/assets']['/.cache/style.css'] ?? [];
-$formScripts = $formPage['/nino/html/assets']['/.cache/script.js'] ?? [];
+$formStyles = $formPage['/nino/html/assets'][\Nino\Modules\Form::STYLE] ?? [];
+$formScripts = $formPage['/nino/html/assets'][\Nino\Modules\Form::SCRIPT] ?? [];
 $formCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/assets/form.css' );
 $formJs = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/assets/form.js' );
-check( 'the module puts its stylesheet in the style bundle and its script in the script bundle, once each, behind the kernel\'s own', in_array( '/_nino/Nino/Modules/Form/assets/form.css', $formStyles, true ) === true
-	&& in_array( '/_nino/Nino/Modules/Form/assets/form.js', $formScripts, true ) === true && count( array_keys( $formStyles, '/_nino/Nino/Modules/Form/assets/form.css', true ) ) === 1 && is_file( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/assets/form.css' ) === true );
+check( 'the module has its stylesheet and its script as bundles of their own, once each - and puts nothing in the style bundle and the script bundle of the site', $formStyles === [ '/_nino/Nino/Modules/Form/assets/form.css' ]
+	&& $formScripts === [ '/_nino/Nino/Modules/Form/assets/form.js' ] && is_file( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/assets/form.css' ) === true
+	&& isset( $formPage['/nino/html/assets']['/.cache/style.css'] ) === false && isset( $formPage['/nino/html/assets']['/.cache/script.js'] ) === false );
 \Nino\Modules\Form::init( $formPage );
-check( '...and a second init puts nothing in twice', count( array_keys( $formPage['/nino/html/assets']['/.cache/style.css'], '/_nino/Nino/Modules/Form/assets/form.css', true ) ) === 1 && count( array_keys( $formPage['/nino/html/assets']['/.cache/script.js'], '/_nino/Nino/Modules/Form/assets/form.js', true ) ) === 1 );
+check( '...and a second init puts nothing in twice', $formPage['/nino/html/assets'][\Nino\Modules\Form::STYLE] === $formStyles && $formPage['/nino/html/assets'][\Nino\Modules\Form::SCRIPT] === $formScripts
+	&& $formPage['./nino/assets/followers'] === [ '/.cache/style.css' => [ \Nino\Modules\Form::STYLE ], '/.cache/script.js' => [ \Nino\Modules\Form::SCRIPT ] ] );
 check( 'the look of the form reads the tokens of the brand and of the page and its own, so that it stands on a site with no feature: no variable of another family, no !important',
 	preg_match_all( '/var\(\s*(--[a-z0-9-]+)/', $formCss, $formVars ) > 0 && array_filter( array_unique( $formVars[1] ), static fn( string $name ): bool => preg_match( '/^--(?:brand|page|nino-form)-/', $name ) !== 1 ) === []
 	&& str_contains( $formCss, '!important' ) === false && strlen( $formCss ) < 3000 );

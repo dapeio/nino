@@ -237,6 +237,9 @@ CSRF protection is active by default. A state-changing browser route MUST keep
 it active and its form MUST render `[csrf]`. Use `'csrf' => false` only when a
 documented alternative verifier, such as a cryptographic webhook signature, is
 implemented and tested.
+The `[csrf]` of a form also tells the module Form that the page has a form, and the
+stylesheet and the script of forms are linked for such a page only
+([Forms](docs/development.md#forms)).
 
 ### Persistence and concurrency rules
 

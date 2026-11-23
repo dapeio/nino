@@ -593,13 +593,14 @@ function jstextTable( array &$appData ): array {
 	return json_decode( $found[1] ?? '[]', true ) ?? [];
 }
 
+check( 'the inline block of a page that draws no form carries none of the site\'s words: nothing publishes them', jstextTable( $appData ) === [] );
+\Nino\Modules\Form::draws( $appData );
 $jstextTable = jstextTable( $appData );
-check( 'the inline block carries the words the shipped scripts ask for', ( $jstextTable['/module/form/info/success'] ?? null ) === 'Danke!' );
+check( 'the inline block of a page that draws a form carries the words the shipped scripts ask for', ( $jstextTable['/module/form/info/success'] ?? null ) === 'Danke!' );
 check( '...and not the mailbox a form delivers to, nor the rest of the site\'s text', isset( $jstextTable['/project/mail/address/owner'] ) === false
 	&& isset( $jstextTable['/project/company/contact/street'] ) === false );
-// What the module publishes when nobody asked for more is its private DEFAULT_KEYS,
-// and the public script's words are read against exactly those
-$jstextGroups = ( new ReflectionClassConstant( '\Nino\Modules\Jstext', 'DEFAULT_KEYS' ) )->getValue();
+// What the Form module publishes for a page that draws a form is its WORDS, and the public script's words are read against exactly those
+$jstextGroups = ( new ReflectionClassConstant( '\Nino\Modules\Form', 'WORDS' ) )->getValue();
 check( 'the two groups are the form\'s messages and the newsletter\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false
 	&& $jstextGroups === [ '/module/form/info/', '/feature/newsletter/info/' ] );
 // ... in getText( '/group/...' ) and in the prefixes a form is given where its markup names none

@@ -28,22 +28,20 @@ namespace Nino\Modules {
 				'script'	=> '<script nonce="[[nonce]]">NinoJstext=[[content]];</script>',
 			];
 
-		/*	Which text keys the inline block carries. It used to carry every
-			fill the site has, on every page that renders [jstext] - the legal
-			copy, the addresses, and '/project/mail/address/owner', which is the mailbox a
-			contact form delivers to. The scripts reading it ask for two groups
-			(see Modules/Form/assets/form.js: its handler reads the Form module's words for a
-			.nino-form and the Newsletter feature's for a .nino-newsletter-form), so those two are what it carries. The
-			words of a form that names its own prefix in data-form-texts are the
-			feature's to publish().
+		/*	Which text keys the inline block carries: not every fill the site
+			has - the legal copy, the addresses, and '/project/mail/address/owner', which is
+			the mailbox a contact form delivers to, are no business of a script - but the
+			prefixes config.php names under '/nino/jstext/keys' and the ones a module or a
+			feature serving the request registers with publish(). The Form module does for
+			a page that draws a form (Modules\Form::draws(): the words form.js reads for a
+			.nino-form and for the Newsletter feature's signup), so a page without a form
+			carries none of them. The words of a form that names its own prefix in
+			data-form-texts are the feature's to publish().
 
-			A project whose own script reads another fill names its prefix under
-			'/nino/jstext/keys' in config.php; a module or a feature serving a
-			request registers one with publish(). A key under a published prefix
-			is public - it is in the source of every page that renders the block	*/
+			A project whose own script reads another fill names its prefix in config.php.
+			A key under a published prefix is public - it is in the source of every page
+			that renders the block	*/
 		public const string KEYS = '/nino/jstext/keys';
-
-		private const array DEFAULT_KEYS = [ '/module/form/info/', '/feature/newsletter/info/' ];
 
 		/**
 		 *	Module initiating
@@ -61,7 +59,10 @@ namespace Nino\Modules {
 			// swaps it by its raw string, finds every copy of it
 			$appData['./nino/jstext/nonce'] = bin2hex( random_bytes( 16 ) );
 
-			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doShortcode' ], false );
+			// The block is written when the page is finished, so that a word a form publishes while it is drawn is in it
+			// wherever the page puts [jstext]: the shortcode leaves a mark, callbackRender() puts the block in its place
+			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doMark' ], false );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/html/render', [ self::class, 'callbackRender' ] );
 
 			// Priority 0, ahead of everything that can end a request from inside
 			// this same callback: Modules\Maintenance answers at 1 and exits
@@ -105,8 +106,8 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Every prefix the inline block carries: the three the shipped scripts
-		 *	read, what config.php adds, and what this request registered
+		 *	Every prefix the inline block carries: what config.php names and what
+		 *	this request registered
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -118,12 +119,46 @@ namespace Nino\Modules {
 			$published	= is_array( $appData['./nino/jstext/keys'] ?? null ) === true ? $appData['./nino/jstext/keys'] : [];
 
 			return array_values( array_unique( array_merge(
-				self::DEFAULT_KEYS,
 				array_values( array_filter( $configured, 'is_string' ) ),
 				array_values( array_filter( $published, 'is_string' ) )
 			) ) );
 		}
 
+
+		/**
+		 *	The mark that stands where the block will be: a comment with a token of this request, made from random bytes so
+		 *	that no text of a page can write one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments
+		 *
+		 *	@return 	string
+		 */
+		public static function doMark( array &$appData, array $args ): string {
+
+			if( ( $appData['./nino/jstext/mark'] ?? '' ) === '' )
+				$appData['./nino/jstext/mark'] = bin2hex( random_bytes( 8 ) );
+
+			return '<!--nino-jstext-'. $appData['./nino/jstext/mark']. '-->';
+		}
+
+		/**
+		 *	Finish the page: the block stands where the marks are, with the words published until now
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$html					The finished page
+		 *
+		 *	@return 	string
+		 */
+		public static function callbackRender( array &$appData, string $html ): string {
+
+			$mark = '<!--nino-jstext-'. ( $appData['./nino/jstext/mark'] ?? '' ). '-->';
+
+			if( $mark === '<!--nino-jstext--->' || str_contains( $html, $mark ) === false )
+				return $html;
+
+			return str_replace( $mark, self::doShortcode( $appData, [] ), $html );
+		}
 
 		/**
 		 *	Replace shortcode

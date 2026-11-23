@@ -174,6 +174,9 @@ namespace Nino\Modules {
 		 */
 		public static function _prepare( array &$appData, array &$request ): bool {
 
+			// The lists as they stand before the page is drawn: a shortcode that adds a file while it draws is no change of the lists
+			$appData['./nino/cache/assets'] = self::_assets( $appData );
+
 			if( self::_servable( $appData, $request ) === false )
 				return false;
 
@@ -182,6 +185,15 @@ namespace Nino\Modules {
 
 			if( is_array( $entry ) === false || is_string( $entry['body'] ?? null ) === false )
 				return false;
+
+			// A page stored with other bundle lists than this request has - after an update that moved files from one bundle
+			// to another, or added a bundle - names the files of that time, and a form drawn from it has no look and no script.
+			// It is drawn again. The entry goes right away, like one past its lifetime below: a page that is not stored a second
+			// time - its route is gone, or it is not servable any more - would leave it lying until the whole cache is dropped
+			if( ( $entry['assets'] ?? null ) !== $appData['./nino/cache/assets'] ) {
+				@unlink( \Nino\Filesystem::path( $appData, $path ) );
+				return false;
+			}
 
 			// An entry past its lifetime goes now rather than being read and
 			// rejected on every request until something drops the whole cache
@@ -289,6 +301,7 @@ namespace Nino\Modules {
 			\Nino\Filesystem::putFileContent( $appData, self::DIR. '/'. self::_key( $request ). '.php', [
 				'expires'	=> $expires,
 				'locale'	=> (string) ( $request['/nino/http/response']['locale'] ?? '' ),
+				'assets'	=> $appData['./nino/cache/assets'] ?? self::_assets( $appData ),
 				'body' 		=> self::_stamp( $appData, $body, true ),
 				'csp' 		=> is_string( $policy ) === true ? self::_stamp( $appData, $policy, true ) : '',
 			] );
@@ -429,6 +442,18 @@ namespace Nino\Modules {
 					return true;
 
 			return false;
+		}
+
+		/**
+		 *	The bundle lists of this request as a stamp: what every page links is named by them, and they follow the code
+		 *	that registers them as well as the configuration
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		private static function _assets( array &$appData ): string {
+			return sha1( serialize( [ $appData['/nino/html/assets'] ?? [], $appData['./nino/assets/followers'] ?? [] ] ) );
 		}
 
 		/**

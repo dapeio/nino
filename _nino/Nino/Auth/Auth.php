@@ -172,7 +172,7 @@ namespace Nino {
 
 		public static function callbackLoginResponse( array &$appData, array &$request ): void {
 
-			if( \Nino\Form::blocked( $request ) === true )
+			if( \Nino\Csrf::blocked( $request ) === true )
 				return;
 
 			// The attempt's own result, not who is signed in afterwards.
@@ -197,7 +197,7 @@ namespace Nino {
 
 		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
 
-			if( \Nino\Form::blocked( $request ) === true )
+			if( \Nino\Csrf::blocked( $request ) === true )
 				return;
 
 			self::logoutUser( $appData );

@@ -32,11 +32,20 @@ namespace Nino\Modules {
 		 */
 		public const string LAYERS = '@layer nino.reset, nino.components, nino.theme, project;';
 
+		// What follow() and need() keep for a request, and the token of the marks doShortcode() leaves behind a link
+		private const string FOLLOWERS	= './nino/assets/followers';
+		private const string NEEDED			= './nino/assets/needed';
+		private const string MARK				= './nino/assets/mark';
+
+		// The tag that loads a bundle, by the kind of file. A callback of '/nino/shortcodes/assets/output/...' may answer another one,
+		// which stays the template of $_template for the rest of the process (see _link()); this is the one that is always the plain tag
+		private const array LINKS = [
+			'css'							=> '<link rel="stylesheet" href="[[filename]]" type="text/css" />',
+			'js'							=> '<script src="[[filename]]"></script>',
+		];
+
 		private static
-			$_template				= [
-				'css'							=> '<link rel="stylesheet" href="[[filename]]" type="text/css" />',
-				'js'							=> '<script src="[[filename]]"></script>',
-			],
+			$_template				= self::LINKS,
 			$_minifyRegex 		= [
 				'css'							=> [
 					[
@@ -92,6 +101,94 @@ namespace Nino\Modules {
 		 */
 		public static function init( array &$appData ): void {
 			\Nino\Html::addShortcode( $appData, 'assets', [ self::class, 'doShortcode' ], false );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/html/render', [ self::class, 'callbackRender' ] );
+		}
+
+		/**
+		 *	Let a bundle follow another one on the pages that ask for it: where a template writes the link of $after
+		 *	(the style bundle in the head, the script bundle at the end), the link of $bundle stands behind it - if
+		 *	need() has been called for $bundle by the time the page is finished, and not at all if it has not. This is
+		 *	how a bundle is loaded only by the pages that use it, without a template naming it: the head of a page is
+		 *	drawn before the body that decides.
+		 *
+		 *	The bundle is a bundle like any other - its files are listed with \Nino\Html::addAsset() under its own
+		 *	name, and it is built, stamped and cached as the others are. A bundle with no files has no link. Called
+		 *	from an init(), once for a request; a second call with the same pair adds nothing.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$after				The bundle whose link it follows, as the shortcode names it: '/.cache/style.css'
+		 *	@param		string		$bundle				The bundle that follows, the same kind of file: '/.cache/form.css'
+		 *
+		 *	@return 	void
+		 */
+		public static function follow( array &$appData, string $after, string $bundle ): void {
+
+			if( in_array( $bundle, $appData[self::FOLLOWERS][$after] ?? [], true ) === false )
+				$appData[self::FOLLOWERS][$after][] = $bundle;
+		}
+
+		/**
+		 *	Say that the page of this request uses a bundle that follows another one (see follow()): its link is written
+		 *	when the page is finished, wherever the page named the bundle it follows. Any time while the page is drawn
+		 *	- the template that comes first need not know what comes after it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$bundle				The bundle, as follow() has it
+		 *
+		 *	@return 	void
+		 */
+		public static function need( array &$appData, string $bundle ): void {
+			$appData[self::NEEDED][$bundle] = true;
+		}
+
+		/**
+		 *	Finish the page: the mark that doShortcode() left behind a link becomes the link of the bundle that follows
+		 *	it where the page needs that bundle, and nothing where it does not. A callback of '/nino/html/render', so
+		 *	it runs once the whole page is drawn - and sees no mark in a piece of html that is no page
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$html					The finished page
+		 *
+		 *	@return 	string
+		 */
+		public static function callbackRender( array &$appData, string $html ): string {
+
+			$token = $appData[self::MARK] ?? '';
+
+			if( $token === '' )
+				return $html;
+
+			foreach( $appData[self::FOLLOWERS] ?? [] as $bundles )
+				foreach( $bundles as $bundle ) {
+
+					$mark	= self::_mark( $token, $bundle );
+					$at		= strpos( $html, $mark );
+
+					if( $at === false )
+						continue;
+
+					// A bundle with no files has no link: a request for a file that is not there only fails. The first
+					// mark takes the link, a second call of the same bundle in the page is none
+					$link	= ( $appData[self::NEEDED][$bundle] ?? false ) === true && \Nino\Html::getAssets( $appData, $bundle ) !== [] ? self::_link( $appData, $bundle, false ) : '';
+					$html	= substr_replace( $html, $link, $at, strlen( $mark ) );
+					$html	= str_replace( $mark, '', $html );
+				}
+
+			return $html;
+		}
+
+		/**
+		 *	What stands in the page where the link of a following bundle will be: a comment that holds a token of this
+		 *	request. The token is made when the first mark is, from random bytes, so that nothing a page is made of
+		 *	- a text of the editor, the value of a field - can write a mark of its own
+		 *
+		 *	@param		string		$token				The token of the request
+		 *	@param		string		$bundle				The bundle that follows
+		 *
+		 *	@return 	string
+		 */
+		private static function _mark( string $token, string $bundle ): string {
+			return '<!--nino-bundle-'. $token. ' '. $bundle. '-->';
 		}
 
 
@@ -106,7 +203,35 @@ namespace Nino\Modules {
 		 */
 		public static function doShortcode( array &$appData, array $args ): string {
 
-			$targetFile		= $args[0] ?? '';
+			$targetFile	= $args[0] ?? '';
+			$link				= self::_link( $appData, $targetFile );
+
+			// The bundles that follow this one wait for the end of the page, where it is known whether it needs them
+			if( $link !== '' && isset( $appData[self::FOLLOWERS][$targetFile] ) === true ) {
+
+				if( ( $appData[self::MARK] ?? '' ) === '' )
+					$appData[self::MARK] = bin2hex( random_bytes( 8 ) );
+
+				foreach( $appData[self::FOLLOWERS][$targetFile] as $bundle )
+					$link .= self::_mark( $appData[self::MARK], $bundle );
+			}
+
+			return $link;
+		}
+
+		/**
+		 *	The tag that loads a bundle: the bundle is built first where its files changed
+		 *
+		 *	@param		array 		&$appData					(reference) Array with current app data
+		 *	@param		string		$targetFile				The bundle as the shortcode names it, eg. '/.cache/style.css'
+		 *	@param		bool			$asked						Whether the callbacks of '/nino/shortcodes/assets/output/...' may change the tag. They are written for the bundle a
+		 *																			template names - a preview that puts its own stylesheet in the place of the link, a page that has no script - and
+		 *																			the link of a bundle that follows another is the plain one: such a callback would draw its answer a second time
+		 *
+		 *	@return 	string											Rendered html code, '' for a name that is no bundle
+		 */
+		private static function _link( array &$appData, string $targetFile, bool $asked = true ): string {
+
 			$pathinfo			= pathinfo( $targetFile );
 			$assetFiles 	= \Nino\Html::getAssets( $appData, $targetFile );
 
@@ -120,7 +245,9 @@ namespace Nino\Modules {
 				self::_createCachefile( $appData, $pathinfo, $assetFiles );
 
 			// Fill template
-			$content	= \Nino\Callbacks::doCallbacks( $appData, '/nino/shortcodes/assets/output/'. $pathinfo['extension'], self::$_template[$pathinfo['extension']] );
+			$content	= $asked === true
+				? \Nino\Callbacks::doCallbacks( $appData, '/nino/shortcodes/assets/output/'. $pathinfo['extension'], self::$_template[$pathinfo['extension']] )
+				: self::LINKS[$pathinfo['extension']];
 
 			/*	The url carries the bundle's own hash - the sha1
 				_createCachefile() writes into its first line, read back here

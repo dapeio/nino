@@ -2185,8 +2185,9 @@ foreach( [ '/private/templates', '/public/images', '/private/text', '/private/as
 ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
 check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
-// The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the look of the form and the
-// stylesheet of the site, and no rule of the part of a feature - no feature is on, so no group is registered
+// The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset and the
+// stylesheet of the site, and no rule of the part of a feature - no feature is on, so no group is registered. The look of the form is a bundle of its own,
+// which the pages that draw a form link
 $keysBuilt = $keysApp;
 $keysBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
 $keysBuilt['/nino/html/assets'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/html/assets'];
@@ -2197,15 +2198,17 @@ $keysBuilt['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/conf
 \Nino\Features::registerComponents( $keysBuilt );
 \Nino\Features::registerParts( $keysBuilt );
 \Nino\Modules\Assets::doShortcode( $keysBuilt, [ '/.cache/style.css' ] );
+\Nino\Modules\Assets::doShortcode( $keysBuilt, [ \Nino\Modules\Form::STYLE ] );
 $keysBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, '/.cache/style.css' ) );
+$keysFormBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, \Nino\Modules\Form::STYLE ) );
 $partCss = '';
 foreach( glob( __DIR__. '/fixtures/kit/Kit/groups/*/part/part.css' ) ?: [] as $file )
 	$partCss .= (string) file_get_contents( $file );
 // The lines of the parts that are the parts' alone: a line the reset or the site's own stylesheet says as well is no mark of a feature
 $sharedCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' ). $baseCss;
 $partRules = array_filter( array_map( 'trim', explode( "\n", $partCss ) ), static fn( string $line ): bool => strlen( $line ) > 30 && preg_match( '/^[.a-z:][^{]*\{.*\}$/', $line ) === 1 && str_contains( $sharedCss, $line ) === false );
-check( 'the style bundle of a fresh starter site is the reset, the look of the form and the stylesheet of the site: no group of a feature is registered, it carries no line of a part of one ('. count( $partRules ). ' lines of the parts of the test feature looked for), and it is at most 22 KB (21422 bytes measured); Nino.css alone is at most 12 KB',
-	strlen( $keysBundle ) > 15000 && strlen( $keysBundle ) <= 22 * 1024 && str_contains( $keysBundle, '.site-header' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
+check( 'the style bundle of a fresh starter site is the reset and the stylesheet of the site: no look of the form, no group of a feature is registered, it carries no line of a part of one ('. count( $partRules ). ' lines of the parts of the test feature looked for), and it is at most 20 KB (19203 bytes measured); Nino.css alone is at most 12 KB; the look of the form is the bundle of the module',
+	strlen( $keysBundle ) > 15000 && strlen( $keysBundle ) <= 20 * 1024 && str_contains( $keysBundle, '.site-header' ) === true && str_contains( $keysBundle, '.nino-form' ) === false && str_contains( $keysFormBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
 	&& \Nino\Components::groups( $keysBuilt ) === [] && count( $partRules ) > 10 && array_filter( $partRules, static fn( string $line ): bool => str_contains( $keysBundle, $line ) === true ) === []
 	&& filesize( dirname( __DIR__ ). '/_nino/Nino.css' ) <= 12 * 1024 );
 $keysApp['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];

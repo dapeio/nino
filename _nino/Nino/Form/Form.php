@@ -43,9 +43,6 @@ namespace Nino {
 	 */
 	class Form {
 
-		// How often blocked() answered true since watched( true ) - see there
-		private static int $_asked = 0;
-
 		// What one posted value may carry - a field is a line or a message,
 		// never an upload
 		public const int MAX_FIELD_LENGTH = 1000;
@@ -536,47 +533,29 @@ namespace Nino {
 		}
 
 		/**
-		 *	Whether the CSRF guard refused this request: \Nino\Csrf sets the flag
-		 *	'./nino/csrf/blocked' beside the 403 it answers, and it stays set -
-		 *	a later callback that resets the status leaves the flag standing,
-		 *	which is what it is for. Every callback that writes or sends on a
-		 *	state-changing request asks it first; \Nino\Http::response() notes
-		 *	whether a route callback did, and overrules and logs one that
-		 *	answered a refused post without. The status check beside it is
-		 *	another question: it says whether an earlier callback refused for
-		 *	any reason at all.
-		 *
-		 *	This class and not \Nino\Modules\Form, which owns the route.
+		 *	Whether the CSRF guard refused this request. The answer is \Nino\Csrf::blocked()'s, which every response
+		 *	of the kernel asks and which is why it lives there: this class is the engine of the contact form and loads
+		 *	where a form is drawn or posted, not on every page. A callback of a route that writes or sends on a
+		 *	state-changing request asks it first, from here or from there - the two count as one
 		 *
 		 *	@param		array 		$request			Current server request
 		 *
 		 *	@return 	bool
 		 */
 		public static function blocked( array $request ): bool {
-
-			$refused = ( $request['./nino/csrf/blocked'] ?? false ) === true;
-
-			if( $refused === true )
-				self::$_asked++;
-
-			return $refused;
+			return \Nino\Csrf::blocked( $request );
 		}
 
 		/**
-		 *	Start counting the asks of blocked() about a refused request, and
-		 *	say whether it has been asked since: for \Nino\Http::response(),
-		 *	which watches the callbacks of a route that a refused post reaches
+		 *	Start counting the asks of blocked() about a refused request, and say whether it has been asked since:
+		 *	\Nino\Csrf::watched()
 		 *
 		 *	@param		bool			$start				True to start over, false to read
 		 *
 		 *	@return 	bool										Whether blocked() was asked about a refused request since the start
 		 */
 		public static function watched( bool $start ): bool {
-
-			if( $start === true )
-				self::$_asked = 0;
-
-			return self::$_asked > 0;
+			return \Nino\Csrf::watched( $start );
 		}
 
 		/**

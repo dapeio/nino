@@ -142,6 +142,14 @@ feature is listed in `/nino/modules`, `\Nino\Features::registerAssets()` adds ev
 `.css` to the style bundle and every `.js` to the script bundle at every boot, ahead
 of any module's `init()`, once each and in the order listed. A file for another
 bundle goes through `\Nino\Html::addAsset()`.
+A bundle that is loaded by the pages that need it and no other - the form module's
+stylesheet and script are one - follows the style bundle or the script bundle:
+`\Nino\Modules\Assets::follow()` in the `init()` and `\Nino\Modules\Assets::need()` on
+the page that uses it, see [Assets Are Not Templates](development.md#assets-are-not-templates).
+The form of a feature needs neither: the `[csrf]` of its markup says that the page has
+a form, and the module Form links its stylesheet and its script, and carries the words
+of the script, for that page - see [Forms](development.md#forms). A feature that draws
+a form without `[csrf]` calls `\Nino\Modules\Form::draws( $appData )`.
 
 A bundle has one order, whichever file it holds and whoever adds it: the kernel's
 files first (`Nino.css`, `Nino.js`), then what features and modules add, in the order
@@ -420,7 +428,7 @@ The kernel classes a feature calls, by home:
 | `\Nino\Components` | `addComponent( $appData, $name, $schema, $renderer )` a component by schema, `validate()`, `components()`, `allowed()`, `fill()` the template of a component filled by its renderer, `escape()` a value into html or an attribute, `sources()` the keys and the pictures a source reads, `groups()` the groups of the features that bring components in folders, `validateGroup()`, `partProblems()` what a standard part does against the rule of mixing (see [The Register of Components](development.md#the-register-of-components) and [A feature's components](development.md#a-features-components)) |
 | `\Nino\Text` | `entries()`, `entry()`, `isGrammarKey()`, `sanitizeValue()`, `put()`, `values()`: the project's texts and their keys; `fills( $appData, $form, $locale )`: the textfills a field may take - `textfill` or `placeholder` - each with its notation and its value in a language |
 | `\Nino\Preview` | `issue()` a draft with a token for the session, `held()` the draft a request may have, `active()` whether this request holds one, `tidy()`; with `\Nino\Modules\Template::swap()` a template that is drawn in place of its file for that request (see [A draft for a preview](development.md#a-draft-for-a-preview)) |
-| `\Nino\Form` | `forms()`, `form()`, `posted()`, `validate()`, `entries()`; `blocked()` **1.8** whether the CSRF guard refused the request |
+| `\Nino\Form` | `forms()`, `form()`, `posted()`, `validate()`, `entries()`; `blocked()` **1.8** whether the CSRF guard refused the request (`\Nino\Csrf::blocked()` is the same question; the engine itself is loaded where a form is built or posted, not for every page); `\Nino\Modules\Form::draws()` says that the page has a form where it has no `[csrf]` |
 | `\Nino\Images` | `getUrl()`, `getSlot()`, `getSlots()`, `setSlotFilename()`, `setSlotAlt()`, `putSlot()`, `dropSlot()`, `cleanAlt()`, `process()`, `fit()`, `limits()`, `reject()`, `read()`, `restore()`, `delete()` |
 | `\Nino\Mail` | `send()`; `rateLimited()` **1.8** whether the last send was refused by the cap per address; `sendSystem()` (from the kernel that has it) `sendAll()` for a mail the system sends on its own account - a report to the owner that a page request set off - which neither counts against the cap of the client that made the request nor is refused by it, and has a cap of its own for the whole site, `SYSTEM_CAP` units an hour, all the addresses of one call being one unit and the first that does not take the mail ending the call |
 | `\Nino\Format` | **1.12**: `add()` a formatter by its name, `registered()`, `options()`, `apply()` a formatter on a raw value, `words()`, `amount()`, and the built-in `number()`, `currency()`, `percent()`, `date()`, `dateLong()`, `datetime()` and `time()` |

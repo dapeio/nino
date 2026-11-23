@@ -17,12 +17,61 @@ namespace Nino {
 
 	class Csrf {
 
+		// How often blocked() answered true since watched( true ) - see there
+		private static int $_asked = 0;
+
 		// Registers the response-side check that runs for every non-safe
 		// request, whether or not the optional Modules\Csrf (the shortcode)
 		// is enabled - called unconditionally from \Nino\init(), same as
 		// Auth::init()
 		public static function init( array &$appData ): void {
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 1 );
+		}
+
+		/**
+		 *	Whether the CSRF guard refused this request: callbackResponse() sets the flag
+		 *	'./nino/csrf/blocked' beside the 403 it answers, and it stays set -
+		 *	a later callback that resets the status leaves the flag standing,
+		 *	which is what it is for. Every callback that writes or sends on a
+		 *	state-changing request asks it first; \Nino\Http::response() notes
+		 *	whether a route callback did, and overrules and logs one that
+		 *	answered a refused post without. The status check beside it is
+		 *	another question: it says whether an earlier callback refused for
+		 *	any reason at all.
+		 *
+		 *	It is here and not in \Nino\Form, which holds the contact form's engine: every
+		 *	response asks, and a page that has no form has no use for that class.
+		 *	\Nino\Form::blocked() is the same question, for the callbacks of a route.
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	bool
+		 */
+		public static function blocked( array $request ): bool {
+
+			$refused = ( $request['./nino/csrf/blocked'] ?? false ) === true;
+
+			if( $refused === true )
+				self::$_asked++;
+
+			return $refused;
+		}
+
+		/**
+		 *	Start counting the asks of blocked() about a refused request, and
+		 *	say whether it has been asked since: for \Nino\Http::response(),
+		 *	which watches the callbacks of a route that a refused post reaches
+		 *
+		 *	@param		bool			$start				True to start over, false to read
+		 *
+		 *	@return 	bool										Whether blocked() was asked about a refused request since the start
+		 */
+		public static function watched( bool $start ): bool {
+
+			if( $start === true )
+				self::$_asked = 0;
+
+			return self::$_asked > 0;
 		}
 
 		// Return the current session's csrf token, creating one if missing
