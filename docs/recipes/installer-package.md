@@ -107,6 +107,7 @@ Supported unit keys in the current installer:
 | `elements` | Elements added to element types, add-only: `type uri => file below the unit`, e.g. `'privacy' => 'elements/privacy.php'` - see below |
 | `navs` | Menus the wizard creates when the project does not have them: `nav key => [ Element-URI, ... ]`, e.g. `'legal' => [ '/legal/imprint', '/legal/privacy' ]` - see below |
 | `blacklist` | Text keys merged into `text/blacklist.php` |
+| `whenNoPages` | `true`: a feature's unit is applied as a whole where the project has no page yet, and not at all where it has one - see [the install unit](../features.md#the-install-unit) |
 | `config` | Top-level defaults written only when absent - a key `\Nino\AppData::DEFAULTS` sets is never absent, so a unit does not restate a framework default |
 
 Do not add decorative manifest keys and assume the installer uses them. If new

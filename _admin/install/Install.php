@@ -1879,7 +1879,7 @@ namespace Nino\Install {
 			}
 			else
 				foreach( $routes as $routeKey => $route )
-					if( is_string( $routeKey ) === true && is_array( $route ) === true && self::_isPageRoute( $routeKey, $route ) === true )
+					if( is_string( $routeKey ) === true && is_array( $route ) === true && \Nino\Pages::isPageRoute( $routeKey, $route ) === true )
 						return true;
 
 			$locales	= $appData['/nino/locales/available'] ?? [];
@@ -1921,22 +1921,6 @@ namespace Nino\Install {
 				} );
 
 			return true;
-		}
-
-		/**
-		 *	A page is a GET route rendering a templates/page-*.tpl file - the
-		 *	criterion the Routes panel lists pages by, and the one thing that
-		 *	keeps robots.txt and the sitemap out of a page list
-		 *
-		 *	@param		string		$routeKey			Eg. 'GET://contact'
-		 *	@param		array 		$route
-		 *
-		 *	@return 	bool
-		 */
-		private static function _isPageRoute( string $routeKey, array $route ): bool {
-
-			return str_starts_with( $routeKey, 'GET://' ) === true
-				&& preg_match( '~^\[template /templates/page-~', trim( (string) ( $route['body'] ?? '' ) ) ) === 1;
 		}
 
 		/**
@@ -2222,29 +2206,39 @@ namespace Nino\Install {
 			// the 404 page alone: it brings no page for an address that is not there
 			$own = count( array_filter( $applied, static fn( array $application ): bool => $application['start'] === 'own' ) ) > 0;
 
+			// What an application that does not start with the starter pages switched on has its install units applied
+			// add-only once more: a round of another application may have reserved the start page and left it out of
+			// a feature that is on, and the project is not to end without one. The features of the application that
+			// provides the start page go before the starter pages are made: the 404 page of the starter is a page, and
+			// the unit of a feature that is the start of a site is left out where the project has one
+			$replay = static function( array $group ) use ( &$appData, &$request ): bool {
+
+				foreach( $group as $application ) {
+
+					foreach( \Nino\Applications::features( [ $application ] ) as $featureKey ) {
+
+						$replayed = \Nino\Features::activate( $appData, $featureKey );
+						if( $replayed !== true ) {
+							\Nino\Http::fail( $request, 500, 'could not apply the feature "'. $featureKey. '": '. $replayed, 'install_feature_replay' );
+							return false;
+						}
+					}
+				}
+
+				return true;
+			};
+
+			if( $replay( array_filter( $applied, static fn( array $application ): bool => $application['start'] === 'own' ) ) === false )
+				return;
+
 			$pages = \Nino\Install\StarterPages::apply( $appData, $own );
 			if( $pages !== true ) {
 				\Nino\Http::fail( $request, 500, $pages, 'install_pages' );
 				return;
 			}
 
-			// What an application that does not start with the starter pages switched on has its install units applied
-			// add-only once more: a round of another application may have reserved the start page and left it out of
-			// a feature that is on, and the project is not to end without one
-			foreach( $applied as $application ) {
-
-				if( $application['start'] === 'starter' )
-					continue;
-
-				foreach( \Nino\Applications::features( [ $application ] ) as $featureKey ) {
-
-					$replayed = \Nino\Features::activate( $appData, $featureKey );
-					if( $replayed !== true ) {
-						\Nino\Http::fail( $request, 500, 'could not apply the feature "'. $featureKey. '": '. $replayed, 'install_feature_replay' );
-						return;
-					}
-				}
-			}
+			if( $replay( array_filter( $applied, static fn( array $application ): bool => $application['start'] === null ) ) === false )
+				return;
 
 			// The recovery key, which the answer carries and nothing else does: it has to stand before the project
 			// counts as installed (a failure leaves the wizard open), and it is the key the archives are made with.

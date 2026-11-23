@@ -598,6 +598,14 @@ answer( 200, { switchedOn : [] } );
 check( 'an update asks at level big and posts the one action an update is, saying "<name> is updated"', asked[0].level === 'big' && asked[0].options.title === text('/_admin/features/confirm/update-title')
 	&& requests[requests.length - 1].action === 'features/activate' && kept[kept.length - 1].text === text('/_admin/features/msg/updated').replace( '%s', 'Plain' ) );
 
+// ...and where the unit of the feature was left out because the project has pages, the sentence for it follows the one of the update, with the name of the feature
+panel._renderPanel();
+fire( byTag( row( mount, 'plain' ), 'button' )[0], 'click' );
+answer( 200, { switchedOn : [], skipped : [ { key : 'plain', name : 'Plain' } ] } );
+check( 'an activation or an update that left the unit out says so after its own sentence: the project has pages already and the feature placed nothing',
+	kept[kept.length - 1].text === text('/_admin/features/msg/updated').replace( '%s', 'Plain' ) + ' ' + text('/_admin/features/msg/unit-skipped').replace( '%s', 'Plain' )
+	&& panel._skippedText( [] ) === '' && panel._skippedText( undefined ) === '' );
+
 // Uninstall: destructive, says what goes and what stays, then the list is read again and the row after it takes the focus
 toInactive();
 asked.length = 0;
@@ -675,6 +683,10 @@ check( 'a refusal stands in the line of the bar, not in a toast', toasts.length 
 fire( reapply, 'click' );
 answer( 200, { applied : { templates : { added : 1, present : 0 } } } );
 check( 'what it did is a toast', toasts.join() === text('/_admin/features/msg/reapplied').replace( '%s', text('/_admin/features/label/unit-templates')+ ': 1' ).replace( '%s', text('/_admin/features/label/unit-nothing') ) );
+toasts.length = 0;
+fire( reapply, 'click' );
+answer( 200, { applied : { skipped : 'pages', templates : { added : 0, present : 0 } } } );
+check( 'a unit that was left out because the project has pages says so, with the name of the feature, and not that it placed nothing', toasts.length === 1 && toasts[0] === text('/_admin/features/msg/unit-skipped').replace( '%s', 'Beispiel-Feature' ) );
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
 
 // --- the catalogue

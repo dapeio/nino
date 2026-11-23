@@ -624,7 +624,7 @@ template and icon are the [panel recipe](recipes/admin-panel.md).
 [Library Format](setup.md#library-format) the files). An activation reads `routes`,
 `templates`, `files`, `elementTypes`, `elements`, `blacklist` and `config` from it,
 and `text/global.php` and `text/<locale>.php` for every available locale; `key`,
-`imageSlots` besides; `label`, `moduleClass`, `requiresModules`, `preset` and
+`imageSlots` and `whenNoPages` besides; `label`, `moduleClass`, `requiresModules`, `preset` and
 `navs` are the wizard's alone. The unit of `Hello`, `features/Hello/install/manifest.php`, copies
 the template of the page `/hello` and adds a section of the privacy policy:
 
@@ -681,6 +681,17 @@ or removing it leaves the places where they are, as it leaves the templates and 
 English, else the first. A type file that is in the project is the project's - the copy is
 add-only - and a project names a field in a language of its own with the text
 `/_admin/elements/field/<type>/<key>`, which comes first.
+
+**The start of a site.** A unit that says `'whenNoPages' => true` brings the start of a site - its pages, its header
+and footer, its menus - and is applied as a whole or not at all: where the project has a page already, an activation
+(the first, each update, a re-activation, **Apply content again**) places nothing of it - no route, file, template,
+picture place, word, type, element, blacklist key or default - and the activation itself goes through. A page is what
+the Routes panel lists as one: a stored GET route whose body draws a template `/templates/page-*` (`\Nino\Pages::isPageRoute()`,
+read from the routes `config.php` holds, so the legal pages, which the module registers at run time, and `robots.txt`, `sitemap.xml`
+and `llms.txt` are none, and neither is a route that answers with an error status, a 404 page: a site that has only that has not begun). The decision is made once, before anything is written, against what the project had before the unit: the
+unit's own routes do not count against it. A project without a page gets the unit as any other, and the setup wizard, which applies
+a unit with overwrite, ignores the key. The report of the application (see `\Nino\Features::applyUnit()`) says it with `'skipped' => 'pages'`
+and every count 0, and the panel says it after **Apply content again**, after an activation, after an installation and after an update, and the log of the actions holds it: "The project has pages already; <feature> placed nothing."
 
 A feature that processes personal data brings its own section of the privacy policy
 with the `elements` key, a map of an element type's uri to a file of the unit. The

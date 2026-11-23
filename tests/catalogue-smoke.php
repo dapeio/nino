@@ -1114,7 +1114,7 @@ $requests = [];
 	request the panel makes next - 'activated' for one that was
 	not there at all. Leaving it in the Inactive tab made one intention take
 	two presses.	*/
-check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required', 'switchedOn' ] && $body['pending'] === false && $body['activated'] === true && $body['required'] === []
+check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required', 'switchedOn', 'skipped' ] && $body['skipped'] === [] && $body['pending'] === false && $body['activated'] === true && $body['required'] === []
 	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'dependents', 'circle', 'problems', 'components', 'calledIn', 'unit', 'data', 'settings', 'settingsTab' ]
 	&& $body['switchedOn'] === [ [ 'key' => 'extra', 'name' => 'Extra' ] ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === true && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
@@ -1182,7 +1182,7 @@ check( 'before: on disk as 1.1.0, recorded as 1.0.0, an update waiting', \Nino\F
 	was current. The class in memory stays the old one for the rest of this
 	process; that is the condition itself, not an artefact of the test	*/
 [ $status, $body ] = callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.2.0' ] );
-check( 'updating an active feature places the new version and answers that the update is pending: on disk 1.2.0, still recorded 1.0.0, update waiting, still active', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required', 'switchedOn' ] && $body['pending'] === true && $body['activated'] === false && $body['switchedOn'] === []
+check( 'updating an active feature places the new version and answers that the update is pending: on disk 1.2.0, still recorded 1.0.0, update waiting, still active', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required', 'switchedOn', 'skipped' ] && $body['skipped'] === [] && $body['pending'] === true && $body['activated'] === false && $body['switchedOn'] === []
 	&& $body['feature']['version'] === '1.2.0' && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === true && $body['feature']['active'] === true && $body['feature']['problems'] === [] );
 check( 'the files are the new ones, the class still in the module list', in_array( '\\Nino\\Modules\\Helper', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'], true ) === true
 	&& str_contains( (string) file_get_contents( NINO_FEATURES_DIR. '/Helper/feature.php' ), '1.2.0' ) && stagingClean( $staging ) === true );

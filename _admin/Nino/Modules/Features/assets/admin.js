@@ -2216,7 +2216,7 @@
 				// The panel a feature brings only appears - or goes - once the
 				// shell is built again, on the level it was pressed on
 				Nino.admin.features._reload(
-					what === 'update' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/updated'), feature.name ) : Nino.admin.features._activatedText( feature.name, response.switchedOn || [], feature.key ),
+					( what === 'update' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/updated'), feature.name ) : Nino.admin.features._activatedText( feature.name, response.switchedOn || [], feature.key ) )+ Nino.admin.features._skippedText( response.skipped ),
 					{ focus : what === 'activate' ? Nino.admin.features._nextToActivate( feature.key ) : '', parts : inView === true ? [ feature.key ] : undefined }
 				);
 			} );
@@ -2301,9 +2301,9 @@
 					? ( response.switchedOn || [] ).filter( function( entry ) { return entry.key !== offer.key } ).map( function( entry ) { return entry.name } )
 					: ( response.required || [] );
 
-				const said = required.length === 0
+				const said = ( required.length === 0
 					? Nino.content.getText('/_admin/features/msg/'+ word )
-					: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/'+ word+ '-with'), required.join( ', ' ) );
+					: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/'+ word+ '-with'), required.join( ', ' ) ) )+ Nino.admin.features._skippedText( response.skipped );
 
 				/*	Said as a toast rather than written onto the row it was pressed
 					on, because that row is gone by the time anybody could read it: an
@@ -2685,7 +2685,7 @@
 
 						Nino.admin.features._free( ctx );
 						ctx.line.idle( '' );
-						Nino.adminUi.say( Nino.admin.features._appliedText( response.applied || {} ) );
+						Nino.adminUi.say( Nino.admin.features._appliedText( response.applied || {}, feature.name ) );
 						button.focus();
 					} );
 				},
@@ -2693,15 +2693,34 @@
 		},
 
 		/**
+		 *	What an activation, an installation or an update says besides what it did, where the unit of a feature was left out because the project has pages: the sentence of the
+		 *	panel for each feature, after a blank - and nothing where no unit was left out
+		 *
+		 *	@param		{Array}		skipped			[ { key, name } ], as the panel answered it
+		 *
+		 *	@return		{string}
+		 */
+		_skippedText : function( skipped ) {
+
+			return Array.isArray( skipped ) === false ? '' : skipped.map( function( entry ) {
+				return ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/unit-skipped'), entry.name );
+			} ).join('');
+		},
+
+		/**
 		 *	"... Placed: templates: 1, texts: 4. Already there: routes: 2." - what an
 		 *	application of the unit did, by the kinds that have anything to
 		 *	say on each side, in the words of the interface language
 		 *
-		 *	@param		{Object}	applied			kind => { added, present }, as the panel answered it
+		 *	@param		{Object}	applied			kind => { added, present }, as the panel answered it - and 'skipped' where the unit was left out because the project has a page
+		 *	@param		{string}	[name]			The feature, for the sentence of a unit that was left out
 		 *
 		 *	@return		{string}
 		 */
-		_appliedText : function( applied ) {
+		_appliedText : function( applied, name ) {
+
+			if( applied.skipped === 'pages' )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/unit-skipped'), name === undefined ? '' : name );
 
 			// Literal lookups, as the tabs have: a fill that only a built key
 			// names is invisible to the static check every panel script is held to

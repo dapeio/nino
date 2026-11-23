@@ -712,9 +712,11 @@ namespace Nino\Modules\Features {
 				What it requires comes with it either way - activate() walks the
 				requirements itself, so a feature that pulled two others in with it
 				is switched on together with them	*/
+			$report = [];
+
 			if( $isNew === true ) {
 
-				$result = \Nino\Features::activate( $appData, $key );
+				$result = \Nino\Features::activate( $appData, $key, [], $report );
 
 				// The directory is already the new one, and that is the half a
 				// failure here must still report: the list would otherwise show a
@@ -763,6 +765,7 @@ namespace Nino\Modules\Features {
 				// requirement already in the directory but switched off is not
 				// placed and is switched on all the same
 				'switchedOn'	=> $isNew === true ? self::_switchedOn( $appData, $wasOn, $key ) : [],
+				'skipped'		=> $isNew === true ? self::_skipped( $appData, $key, $report ) : [],
 			] );
 		}
 
@@ -923,12 +926,16 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
+			$skipped = [];
+
 			foreach( (array) ( $appData['./nino/catalogue/placed'] ?? [] ) as $placed ) {
 
 				if( $placed['kind'] !== \Nino\Packages::FEATURE || in_array( $placed['key'], $had, true ) === true )
 					continue;
 
-				$activated = \Nino\Features::activate( $appData, $placed['key'] );
+				$unitReport = [];
+				$activated = \Nino\Features::activate( $appData, $placed['key'], [], $unitReport );
+				$skipped = array_merge( $skipped, self::_skipped( $appData, $placed['key'], $unitReport ) );
 
 				if( $activated !== true ) {
 
@@ -947,6 +954,7 @@ namespace Nino\Modules\Features {
 				'package'		=> $offer === null ? null : self::_package( $offer, \Nino\Admin\Admin::sessionLocale( $appData ) ),
 				'placed'		=> array_values( (array) ( $appData['./nino/catalogue/placed'] ?? [] ) ),
 				'switchedOn'	=> self::_switchedOn( $appData, $wasOn, $key ),
+				'skipped'		=> $skipped,
 			] );
 		}
 
@@ -1379,7 +1387,8 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
-			$result = $on === true ? \Nino\Features::activate( $appData, $key ) : \Nino\Features::deactivate( $appData, $key );
+			$report = [];
+			$result = $on === true ? \Nino\Features::activate( $appData, $key, [], $report ) : \Nino\Features::deactivate( $appData, $key );
 
 			if( $result !== true ) {
 				\Nino\Http::fail( $request, 400, $result, $on === true ? 'features_activate_failed' : 'features_deactivate_failed', [ $result ] );
@@ -1389,7 +1398,7 @@ namespace Nino\Modules\Features {
 			// An update is activating again, and can switch on a requirement the
 			// new version added - so this is not empty only for a first Activate
 			self::_answer( $appData, $request, $key, $on === true
-				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ) ]
+				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ), 'skipped' => self::_skipped( $appData, $key, $report ) ]
 				: [ 'found' => $names === [] ? [] : self::_occurrences( $appData, $names ), 'privacy' => self::_privacy( $appData, $key ) ] );
 		}
 
@@ -1449,6 +1458,28 @@ namespace Nino\Modules\Features {
 					$keys[] = $feature['key'];
 
 			return $keys;
+		}
+
+		/**
+		 *	The feature whose unit was left out because the project has pages ('whenNoPages', see \Nino\Features::applyUnit()): said in the answer, so that the panel tells
+		 *	that the activation placed nothing, and held in the log of the actions, where the feature's own words are not read
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature
+		 *	@param		array|null	$report				The report of the application of the unit
+		 *
+		 *	@return 	array										[ { key, name } ] - empty where the unit was applied
+		 */
+		private static function _skipped( array &$appData, string $key, ?array $report ): array {
+
+			if( ( $report['skipped'] ?? '' ) !== 'pages' )
+				return [];
+
+			$actor = \Nino\Auth::getCurrentUser( $appData );
+			if( $actor !== false )
+				\Nino\Admin\Admin::record( $appData, $actor['mail'], 'The unit of feature "'. $key. '" was left out: the project has pages' );
+
+			return [ [ 'key' => $key, 'name' => \Nino\Features::localized( \Nino\Features::get( $appData, $key )['name'] ?? $key, \Nino\Admin\Admin::sessionLocale( $appData ) ) ] ];
 		}
 
 		/**

@@ -2601,7 +2601,7 @@ namespace Nino {
 		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
 		 *	@param		array 		&$config			(reference) Collected config defaults, key => value, for the caller to write
 		 *	@param		bool			$overwrite		Whether the unit replaces what the project has
-		 *	@param		array|null	&$report		(reference) What the unit added and what the project had already, kind by kind: 'routes', 'files', 'templates', 'types', 'slots', 'elements' and 'texts', each { added, present } - read before each is placed, so that a second run says it added nothing. What $overwrite replaces counts as added
+		 *	@param		array|null	&$report		(reference) What the unit added and what the project had already, kind by kind: 'routes', 'files', 'templates', 'types', 'slots', 'elements' and 'texts', each { added, present } - read before each is placed, so that a second run says it added nothing. What $overwrite replaces counts as added. A unit that was left out because the project has a page (see 'whenNoPages') adds 'skipped' => 'pages' and every count is 0
 		 *	@param		bool			$reapply			The unit is applied to a feature that is on already: elements are content, and one the project deleted is not brought back, so the elements of a type the project had before this run are not seeded - a type it did not have comes with its elements
 		 *
 		 *	@return 	true|string							true, or the first file the unit could not
@@ -2619,6 +2619,16 @@ namespace Nino {
 				$hadTypes[ trim( (string) $typeName, '/' ) ] = \Nino\Filesystem::fileExists( $appData, '/elements/'. trim( (string) $typeName, '/' ). '.php' );
 
 			$report	= array_fill_keys( [ 'routes', 'files', 'templates', 'types', 'slots', 'elements', 'texts' ], [ 'added' => 0, 'present' => 0 ] );
+
+			/*	A unit that says 'whenNoPages' is the start of a site, and a project that has a page has begun one: decided once, against the routes the
+				project had before the unit, and before anything is written - the unit's own routes do not count against it, and a page that answers with an error status, a 404 page, is no page that a site has begun with. Nothing of it is placed
+				then, no route, file, template, picture place, text, type, element, blacklist key or default, and the activation goes on without it	*/
+			if( $overwrite === false && ( $manifest['whenNoPages'] ?? false ) === true )
+				foreach( $routes as $routeKey => $route )
+					if( is_array( $route ) === true && \Nino\Pages::isPageRoute( (string) $routeKey, $route ) === true && (int) ( $route['statusCode'] ?? 200 ) < 400 ) {
+						$report['skipped'] = 'pages';
+						return true;
+					}
 
 			foreach( ( $manifest['routes'] ?? [] ) as $routeKey => $route ) {
 				if( isset( $route['locale'] ) === true && in_array( $route['locale'], $locales, true ) === false )

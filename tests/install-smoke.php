@@ -1139,10 +1139,12 @@ $appFeature = static function( string $key, array $files = [] ) use ( $appTar, &
 };
 
 /*	A feature whose install unit takes the start page where the project has no route for it, the way
-	a card or a landing page does: add-only, the address of its own page as the unit's Element-URI	*/
+	a card or a landing page does: add-only, the address of its own page as the unit's Element-URI. It is the start of a site (whenNoPages):
+	it is applied where the project has no page - and the wizard has written none by the time it places the features of an application,
+	robots.txt, the sitemap and llms.txt being none - and not at all where it has one	*/
 $probeFiles = [
 	'Probe/install/'								=> null,
-	'Probe/install/manifest.php'		=> '<?php return [ \'routes\' => [ \'GET://\' => [ \'uri\' => \'/probe\', \'body\' => \'[template /templates/page-probe]\' ] ], \'templates\' => [ \'page-probe.tpl\' ] ];',
+	'Probe/install/manifest.php'		=> '<?php return [ \'whenNoPages\' => true, \'routes\' => [ \'GET://\' => [ \'uri\' => \'/probe\', \'body\' => \'[template /templates/page-probe]\' ] ], \'templates\' => [ \'page-probe.tpl\' ] ];',
 	'Probe/install/templates/'			=> null,
 	'Probe/install/templates/page-probe.tpl'	=> 'probe',
 ];
