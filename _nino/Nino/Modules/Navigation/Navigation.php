@@ -159,12 +159,11 @@ namespace Nino\Modules {
 
 				// A hand-written line stays what its author wrote - drawn, each of its three parts as the source it is
 				$element		= explode( ':', $line, 3 );
-				$uri				= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
 				$element[0]	= $draw( trim( $element[0] ) );
 				$title			= $draw( $element[1] ?? '' );
 				$attributes	= $draw( $element[2] ?? '' );
 
-				$attributes	.= ( $uri === $element[0] ) ? self::CURRENT : '';
+				$attributes	.= \Nino\Http::isShown( $appData, $element[0] ) === true ? self::CURRENT : '';
 				$href				= self::_address( $dir, $element[0] );
 				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $href, $attributes, $title ], self::$html['li'] );
 			}
@@ -202,7 +201,6 @@ namespace Nino\Modules {
 		public static function entries( array &$appData, string $nav ): array {
 
 			$dir		= rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
-			$shown	= \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] ?? '/';
 			$entries	= [];
 
 			foreach( self::routeLines( $appData, $nav ) as $line ) {
@@ -222,7 +220,7 @@ namespace Nino\Modules {
 
 				$address = trim( $address );
 
-				$entries[] = [ 'href' => self::_address( $dir, $address ), 'title' => $title, 'current' => $shown === $address ];
+				$entries[] = [ 'href' => self::_address( $dir, $address ), 'title' => $title, 'current' => \Nino\Http::isShown( $appData, $address ) ];
 			}
 
 			return $entries;

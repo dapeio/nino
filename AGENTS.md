@@ -289,6 +289,8 @@ The forms a template writes:
 - Loop: `[elements /services sort="title"]...[/elements]` - what stands between the tags is drawn once for each element, and a component in it reads a field of the element as its source, `[section-title .title]`
 - Element-local field: `[[title]]` only inside `[element]` or `[elements]`; `[[.id]]` is the number in the loop, `[[.uri]]` the element's uri `/<type>/<name>`, `[[.slug]]` the name alone - the last segment of the uri, what a link to a page of the element (`/blog/[[.slug]]`) needs; `[[.lang]]`, in `[elements]`, is the lang attribute of the language the text was taken from
 - CSRF field: `[csrf]`
+- Link to a page of the site: `[link /contact class="button"]Contact[/link]`, the start page `[link class="brand"]...[/link]` (a link with no target), or `[link /_nino/webpage/contact/uri]...[/link]` where the address is the text of a key in each language - an `<a>` that carries `aria-current="page"` on the page that is shown (the rule `[navigation]` uses); a target that is no path of the site draws no link
+- Picture, else text: `[imagevalues /logo]<img src="[[src]]" alt="[[alt]]">[else][[/project/company/general/name]][/imagevalues]` - what stands after `[else]` is drawn where the slot has no picture
 
 Escape at the output context:
 

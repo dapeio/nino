@@ -46,6 +46,26 @@ namespace Nino {
 		private const string DEPTH = './nino/html/depth';
 		private const string CONTEXT = './nino/html/context';
 
+		// The attributes [link] takes, in the order it writes them, and the words a target may be. A call that names any other attribute
+		// loses that attribute: the address is the call's source and nothing else, and what stands in an event, a style or the mark of the
+		// page that is shown is the template's to say, not the call's
+		private const array LINK_ATTRIBUTES = [ 'class', 'id', 'title', 'rel', 'target', 'aria-label', 'hreflang' ];
+		private const array LINK_TARGETS = [ '_blank', '_self', '_parent', '_top' ];
+
+		// What a target may be made of besides being a path of the site (\Nino\Http::isSitePath(), the one definition the kernel has): it is written
+		// into an attribute, so it holds the characters of an address that need no escaping but the ampersand and the apostrophe - none of a quote,
+		// an angle bracket, a bracket, a backslash, a blank, a control character or a letter that is no ASCII - and at most MAX_LINK_BYTES of them
+		private const string LINK_PATH = '#^/[A-Za-z0-9._~!$&\'()*+,;=:@%/?\#-]*+$#D';
+
+		// A segment that is a dot or two, spelt out or with its dots encoded: it climbs out of the directory the project is served from, or it is
+		// a way to make a path of '//' out of '/./' (/.//host) for a server that normalizes
+		private const string LINK_CLIMB = '#(?:^|/)(?:\.|%2e){1,2}(?:[/?\#]|$)#i';
+
+		public const int MAX_LINK_BYTES = 2048;
+
+		// Set while the content of a [link] is drawn: a link inside a link is not drawn as one
+		private const string LINKING = './nino/html/linking';
+
 		// How many trees the request keeps: the templates of a page are a few dozen, and a text that is made for each
 		// element of a loop is read and drawn without being kept (measured: a stack of 1000 elements kept 2001 trees, 8 MB)
 		public const int MAX_TREES = 256;
@@ -86,13 +106,14 @@ namespace Nino {
 
 		// The shortcodes the kernel provides itself. Called unconditionally
 		// from \Nino\init(), same as Csrf::init() - the base templates use
-		// [json] in their schema.org block and [imagevalues] in the head of the
-		// page, so they have to be there whichever optional modules a project
-		// has enabled (or removed).
+		// [json] in their schema.org block, [imagevalues] in the head of the
+		// page and [link] for the entries of a menu, so they have to be there
+		// whichever optional modules a project has enabled (or removed).
 		public static function init( array &$appData ): void {
 
 			self::addShortcode( $appData, 'json', [ self::class, 'doJsonShortcode' ], false );
 			self::addShortcode( $appData, 'imagevalues', [ self::class, 'doImageValuesShortcode' ], true );
+			self::addShortcode( $appData, 'link', [ self::class, 'doLinkShortcode' ], true );
 		}
 
 		public static function response( array &$appData, array &$request ): void {
@@ -174,6 +195,16 @@ namespace Nino {
 		 *	stands inside another, the tokens of the outer one stay visible and the ones of this picture win
 		 *	over them; a picture that is not there draws nothing, and the outer tokens are not changed by it.
 		 *
+		 *	[else] on the top level of the content divides it: what stands before it is drawn for a picture, what
+		 *	stands after it for none - drawn as html+ with the context of the call and without the tokens of a
+		 *	picture - so that the logo and the name of the company are one call:
+		 *	[imagevalues /logo]<img src="[[src]]" alt="">[else][[/project/company/general/name]][/imagevalues].
+		 *	Only a call that is named else and has neither a source nor an attribute is the mark, the first one
+		 *	counts, and the content of another [imagevalues] inside it has its own. A page that has a [/else]
+		 *	somewhere reads every [else] of it as a container, which is no mark. What stands in a value - the
+		 *	alt text of a picture, a fill - is never read for a call and is never a mark. Without a mark the
+		 *	content is drawn as it always was.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments, $args[0] is the slot or the field, $args['content'] what is drawn
 		 *
@@ -189,8 +220,11 @@ namespace Nino {
 			$context = self::context( $appData );
 			$picture = \Nino\Images::picture( $appData, (string) ( $args[0] ?? '' ), is_array( $context['element'] ?? null ) === true ? $context['element'] : null );
 
+			// The content in two parts where it has the mark: the nodes it was made of are the ones the call holds, and are not read again
+			$parts = str_contains( $content, '[else' ) === true ? self::_divided( self::tree( $appData, $content, false ) ) : null;
+
 			if( $picture === null )
-				return '';
+				return $parts === null ? '' : self::_drawNodes( $appData, $parts[1], $context );
 
 			// The absolute address is the website's, which carries the directory, and the path of the file
 			// without the one the picture's own address starts with
@@ -208,7 +242,193 @@ namespace Nino {
 			foreach( $values as $token => $value )
 				$context['fills'][$token] = \Nino\Components::escape( $value );
 
-			return self::renderSource( $appData, $content, $context, false );
+			return $parts === null ? self::renderSource( $appData, $content, $context, false ) : self::_drawNodes( $appData, $parts[0], $context );
+		}
+
+		/**
+		 *	The nodes of the content of [imagevalues] on either side of its mark: the first call on the top level that is named else and has
+		 *	no source, no attribute and no content of its own - a container of that name is none
+		 *
+		 *	@param		array			$nodes				The nodes of the content
+		 *
+		 *	@return 	array|null								[ the nodes before the mark, the nodes after it ]; null where there is no mark
+		 */
+		private static function _divided( array $nodes ): ?array {
+
+			foreach( $nodes as $at => $node )
+				if( ( $node['n'] ?? null ) === 'else' && ( $node['s'] ?? null ) === '' && ( $node['a'] ?? null ) === [] && array_key_exists( 'c', $node ) === true && $node['c'] === null )
+					return [ array_slice( $nodes, 0, $at ), array_slice( $nodes, $at + 1 ) ];
+
+			return null;
+		}
+
+		/**
+		 *	Draw nodes the way renderSource() draws a source, one level deeper than the call that holds them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$nodes				What \Nino\Markup::parse() answered, or a part of it
+		 *	@param		array			$context			See renderSource()
+		 *
+		 *	@return 	string
+		 */
+		private static function _drawNodes( array &$appData, array $nodes, array $context ): string {
+
+			if( $nodes === [] )
+				return '';
+
+			$depth = self::_enter( $appData );
+
+			if( $depth === null )
+				return '';
+
+			try {
+				return \Nino\Components::render( $appData, $nodes, $context );
+			}
+			finally {
+				$appData[self::DEPTH] = $depth;
+			}
+		}
+
+		/**
+		 *	[link /contact class="button"]Contact[/link] - an <a> to a page of the site, which says that it is the one that is shown:
+		 *	aria-current="page" where the address is the page of the request, by the rule that [navigation] marks its entry with
+		 *	(\Nino\Http::isShown()). It is the page itself and never a page above or below it, and never an address with a '?query' or an
+		 *	'#anchor': a menu of page numbers has one page that is current, and a line of [navigation] with such an address is not marked either.
+		 *
+		 *	The start page is [link]...[/link], a link with no target - it can have attributes: [link class="brand"]. (A lone '/' ends a leaf
+		 *	of the notation, so [link /] is a leaf, and it is said in the log.) The target is the source, a path of the site: a slash and the
+		 *	characters of an address, with the directory the project is served from put in front of it and nothing else, and a '?query' and
+		 *	an '#anchor' behind it, which are written behind the address, escaped. A source that is the key of a text - the starter pages
+		 *	have the address of each page in one, '/_nino/webpage/contact/uri' - is the text of the key in the language of the page, read as
+		 *	the path it is. A fill cannot stand at the start of a source: [link [[/_nino/webpage/contact/uri]]] is no call, and
+		 *	[link /[[...]]] writes a second slash. A target that is no path of the site (\Nino\Http::isSitePath(), and a character an
+		 *	address needs no escaping for, no segment of one or two dots, at most MAX_LINK_BYTES) draws no link: the content stands where the
+		 *	link would, as it is drawn without one, and the log says so once for a request. A link that has no content draws nothing and says
+		 *	so as well. An address beyond the site is an <a> that the template writes by hand.
+		 *
+		 *	The attributes are the ones of LINK_ATTRIBUTES, each written once and escaped as a value is everywhere, a blank one not at all;
+		 *	'target' is one of LINK_TARGETS, and '_blank' puts 'noopener' in 'rel' where the call does not name it. Every other word -
+		 *	href, an event, style, aria-current - is not read.
+		 *
+		 *	The content is html+ and is drawn as that of [imagevalues] is, with the context of the call. A [link] inside a [link] draws its
+		 *	content and no <a>: an anchor in an anchor is no html.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments, $args[0] is the target, $args['content'] what is drawn
+		 *
+		 *	@return 	string									Rendered html
+		 */
+		public static function doLinkShortcode( array &$appData, array $args ): string {
+
+			$content = (string) ( $args['content'] ?? '' );
+			$context = self::context( $appData );
+
+			if( $content === '' ) {
+
+				self::_linkSaid( $appData, 'words', $context, '' );
+				return '';
+			}
+
+			if( ( $appData[self::LINKING] ?? false ) === true )
+				return self::renderSource( $appData, $content, $context, false );
+
+			// A source begins with ~, / or . - a link with no word at all goes to the start page. Any other first word is a target that was meant and is none - a path
+			// without its slash, a name - and never the start page: the words stand without a link, and the log says so
+			$first = is_string( $args[0] ?? null ) === true ? $args[0] : '';
+			$written = $first !== '' && strpbrk( $first[0], '~./' ) !== false ? $first : null;
+			$target = $written === null ? ( isset( $args[0] ) === true ? null : [ '/', '' ] ) : self::_linkPath( $appData, $written );
+
+			if( $target === null ) {
+
+				self::_linkSaid( $appData, 'target', $context, $first );
+				return self::renderSource( $appData, $content, $context, false );
+			}
+
+			$appData[self::LINKING] = true;
+
+			try {
+				$inner = self::renderSource( $appData, $content, $context, false );
+			}
+			finally {
+				unset( $appData[self::LINKING] );
+			}
+
+			if( trim( $inner ) === '' ) {
+
+				self::_linkSaid( $appData, 'words', $context, '' );
+				return '';
+			}
+
+			$attributes = [];
+
+			foreach( self::LINK_ATTRIBUTES as $name ) {
+
+				$value = is_string( $args[$name] ?? null ) === true ? trim( html_entity_decode( $args[$name], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) : '';
+
+				if( $value !== '' && ( $name !== 'target' || in_array( $value, self::LINK_TARGETS, true ) === true ) )
+					$attributes[$name] = $value;
+			}
+
+			// A page that is opened in a window of its own has no hold on the page that opened it. rel is a list of words, divided at any blank
+			if( ( $attributes['target'] ?? '' ) === '_blank' && in_array( 'noopener', preg_split( '/\s+/', strtolower( $attributes['rel'] ?? '' ), -1, PREG_SPLIT_NO_EMPTY ) ?: [], true ) === false )
+				$attributes['rel'] = trim( ( $attributes['rel'] ?? '' ). ' noopener' );
+
+			// The page is the path, and only an address with no query and no anchor is the page: [link /list?page=2] is one of three links of a pager
+			$tag = '<a href="'. \Nino\Components::escape( rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). $target[0]. $target[1] ). '"'. ( $target[1] === '' && \Nino\Http::isShown( $appData, $target[0] ) === true ? ' aria-current="page"' : '' );
+
+			foreach( self::LINK_ATTRIBUTES as $name )
+				if( isset( $attributes[$name] ) === true )
+					$tag .= ' '. $name. '="'. \Nino\Components::escape( $attributes[$name] ). '"';
+
+			return $tag. '>'. $inner. '</a>';
+		}
+
+		/**
+		 *	The path of the site a [link] goes to, from what is written as its source
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$written			The source with its fills put in
+		 *
+		 *	@return 	array|null								[ the path as the routes write it, what follows it: '?query', '#anchor', both or '' ]; null for a target that is none
+		 */
+		private static function _linkPath( array &$appData, string $written ): ?array {
+
+			// The key of a text is its text; any other source is what it is written as. Both are read with their entities, as a stored text has them
+			$text = $written !== '' && $written[0] === '/' ? self::resolveTextfill( $appData, $written ) : null;
+			$path = html_entity_decode( $text === null ? $written : trim( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+			if( strlen( $path ) > self::MAX_LINK_BYTES || \Nino\Http::isSitePath( $path ) === false || preg_match( self::LINK_PATH, $path ) !== 1 || preg_match( self::LINK_CLIMB, $path ) === 1 )
+				return null;
+
+			$cut = strcspn( $path, '?#' );
+
+			return [ substr( $path, 0, $cut ), substr( $path, $cut ) ];
+		}
+
+		/**
+		 *	Say once for a request that a [link] was written wrong: a target that is none, or no words. What stands in the line is the template the
+		 *	call stands in and a target cut to 40 characters, every one that is not a printable ASCII character a '?': the target is what a
+		 *	person typed, as long and as strange as they like
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$what					'target' or 'words'
+		 *	@param		array			$context			See context()
+		 *	@param		string		$written			The target as it was written
+		 *
+		 *	@return 	void
+		 */
+		private static function _linkSaid( array &$appData, string $what, array $context, string $written ): void {
+
+			if( isset( $appData[self::LINKING. '/said'][$what] ) === true )
+				return;
+
+			$appData[self::LINKING. '/said'][$what] = true;
+			$where = $context['template'] === '' ? 'a page' : 'the template "'. preg_replace( '/[^\x20-\x7E]/', '?', substr( $context['template'], 0, 60 ) ). '"';
+
+			if( $what === 'target' )
+				trigger_error( 'Html::doLinkShortcode(): the [link] in '. $where. ' has no path of the site as its target ("'. preg_replace( '/[^\x20-\x7E]/', '?', substr( $written, 0, 40 ) ). '"); its words stand without a link. The link to the start page is [link]...[/link]', E_USER_NOTICE );
+			else
+				trigger_error( 'Html::doLinkShortcode(): the [link] in '. $where. ' has no words to draw, so nothing is drawn. A lone slash ends a leaf of the notation: [link /] is no link to the start page, which is [link]...[/link]', E_USER_NOTICE );
 		}
 
 		/**

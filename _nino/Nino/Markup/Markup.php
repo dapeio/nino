@@ -121,10 +121,11 @@ namespace Nino {
 		// takes fewer names for its attributes (Components::validate(): [a-z][a-zA-Z0-9]*)
 		private const string ATTRIBUTE = '[A-Za-z][A-Za-z0-9_-]*+';
 
-		// The source of a call, and a switch that is written like one: ~title, /a/b/c/d, .field, /templates/page-x.[[/nino/http/response/locale]].
-		// A key, the ~ of a relative one, and textfills, which a mark takes whole: their ]] is not the end of the mark.
-		// At least one character behind the first, so that the / of ' /]' is none
-		private const string SOURCE = '[~./](?:[A-Za-z0-9_./:~-]++|\[\['. self::KEY_CHAR. '++\]\])++';
+		// The source of a call, and a switch that is written like one: ~title, /a/b/c/d, .field, /templates/page-x.[[/nino/http/response/locale]],
+		// /contact?q=x#top. A key, the ~ of a relative one, and textfills, which a mark takes whole: their ]] is not the end of the mark.
+		// At least one character behind the first, so that the / of ' /]' is none; the characters of a query and an anchor stand in it
+		// ('?', '#', '&', '=', '%', '+') and no others: none of them ends a word or a mark
+		private const string SOURCE = '[~./](?:[A-Za-z0-9_./:~?\\#&=%+-]++|\[\['. self::KEY_CHAR. '++\]\])++';
 
 		// What stands between two double quotes: no line break, \" and \\ and any other \x as they are, no quote that is not masked.
 		// Written as a loop that unrolls (normal*+ (special normal*+)*+), the one shape that needs no memory per character

@@ -1294,6 +1294,23 @@ namespace Nino {
 			return $appData['./nino/http/requests'][$offset] ?? false;
 		}
 
+		/**
+		 *	Whether a path of the site is the page the request asks for: the path as the routes write it -
+		 *	'/contact', without the directory the project is served from - and the request path as
+		 *	cleanUri() leaves it (no query, no slash at the end, '/' for the root), compared letter for letter. A
+		 *	menu marks its entry of the shown page with it (\Nino\Modules\Navigation), and so does a link
+		 *	(\Nino\Html::doLinkShortcode()): the one rule, so that the two never differ. Where there is no
+		 *	request the page is the root
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$path					eg. '/contact'
+		 *
+		 *	@return 	bool
+		 */
+		public static function isShown( array &$appData, string $path ): bool {
+			return ( self::getRequest( $appData )['/nino/http/request']['uri'] ?? '/' ) === $path;
+		}
+
 		// Return clean uri
 		/**
 		 *	The request path as the routes know it: without the directory the
