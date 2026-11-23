@@ -338,9 +338,10 @@ namespace Nino\Install {
 	 *												merged into the real /text files - see docs/setup.md's
 	 *												Library format section. The site's look is not a choice
 	 *												here: the starter site is plain html with a stylesheet of
-	 *												its own (the base unit's assets/style.css, the project's
-	 *												layer, which a theme does not overrule - the project turns
-	 *												its look there).
+	 *												its own (assets/style.css, the project's layer, which a theme
+	 *												does not overrule - the project turns its look there). This
+	 *												step writes it empty; the frame unit's stylesheet, the
+	 *												site's rules, comes with the frames in the last step.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -349,7 +350,7 @@ namespace Nino\Install {
 	class Setup {
 
 		// The css bundle this step seeds, and what goes into it: style.css is the
-		// project's own, the stylesheet of the starter site
+		// project's own - empty here, the stylesheet of the starter site is written with its frames
 		private const string BUNDLE_KEY = '/.cache/style.css';
 		private const array BASE_STYLESHEETS = [ '/assets/style.css' ];
 

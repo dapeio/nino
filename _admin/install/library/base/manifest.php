@@ -17,7 +17,7 @@
 		],
 	],
 	/*	The features the wizard switches on with this unit: none. The starter site is plain html, drawn by the kernel alone - the header and the footer
-		of the frame unit, the pages of library/pages, and this unit's style.css - and a feature is switched on in the Features panel or by an application	*/
+		and the stylesheet of the frame unit, the pages of library/pages - and a feature is switched on in the Features panel or by an application	*/
 	'features' => [],
 	'templates' => [
 		'html-header.tpl',

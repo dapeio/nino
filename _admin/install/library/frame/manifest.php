@@ -9,4 +9,7 @@
 		'frame-header.tpl',
 		'frame-footer.tpl',
 	],
+	/*	The stylesheet the two frames and the pages are written against: the classes they use (site-header, hero, card) are defined in it. It replaces the project's own
+		stylesheet, which the base unit ships empty - so a site whose start page an application provides has none of its rules	*/
+	'files' => [ 'assets' ],
 ];

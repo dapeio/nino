@@ -73,8 +73,8 @@ const WIDTH_CLASS = /^nino-grid-(?:(?:s|m|l|xl)-)?(?:25|33|50|66|75|100)$/;
 const CLASS_NAME = /^nino-[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?$/;
 
 /* The classes of the site belong to the site: a class of a library template that is no class of the kernel (nino-*) is defined in the stylesheet of the
- * library, the base unit's assets/style.css. */
-const STYLESHEET = fs.readFileSync( path.join( LIBRARY, 'base/assets/style.css' ), 'utf8' );
+ * library, the frame unit's assets/style.css. */
+const STYLESHEET = fs.readFileSync( path.join( LIBRARY, 'frame/assets/style.css' ), 'utf8' );
 const siteClasses = new Set( Array.from( STYLESHEET.matchAll( /\.([A-Za-z_][\w-]*)/g ), function( match ) { return match[1]; } ) );
 
 function tokenize( source ) {

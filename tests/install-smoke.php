@@ -2029,9 +2029,12 @@ $baseUnit 	= $realRoot. '/_admin/install/library/base';
 $baseFiles 	= (array) ( ( include $baseUnit. '/manifest.php' )['files'] ?? [] );
 $baseCss		= (string) file_get_contents( $baseUnit. '/assets/style.css' );
 
-check( 'the base unit ships the stylesheet of the starter site - it begins with the comment that says it is the site\'s own - and copies the directory it is in, and no theme, no webfont and no directory of fonts', is_file( $baseUnit. '/assets/style.css' ) === true
+check( 'the base unit ships the project\'s own stylesheet empty - a comment that says it is the site\'s own and no rule - and copies the directory it is in, and no theme, no webfont and no directory of fonts', is_file( $baseUnit. '/assets/style.css' ) === true
 	&& str_starts_with( $baseCss, '/*' ) === true && str_contains( substr( $baseCss, 0, strpos( $baseCss, '*/' ) ), 'This site\'s own stylesheet' ) === true
-	&& in_array( 'assets', $baseFiles, true ) === true && is_file( $baseUnit. '/assets/theme.css' ) === false && is_dir( $baseUnit. '/fonts' ) === false && in_array( 'fonts', $baseFiles, true ) === false );
+	&& trim( (string) preg_replace( '~/\*.*?\*/~s', '', $baseCss ) ) === '' && in_array( 'assets', $baseFiles, true ) === true && is_file( $baseUnit. '/assets/theme.css' ) === false && is_dir( $baseUnit. '/fonts' ) === false && in_array( 'fonts', $baseFiles, true ) === false );
+$frameUnit = $realRoot. '/_admin/install/library/frame';
+check( '...and the stylesheet of the starter site is the frame unit\'s: it holds the rules, begins with the same comment and is copied with the frames', is_file( $frameUnit. '/assets/style.css' ) === true && str_contains( (string) file_get_contents( $frameUnit. '/assets/style.css' ), '.site-header' ) === true
+	&& in_array( 'assets', (array) ( ( include $frameUnit. '/manifest.php' )['files'] ?? [] ), true ) === true );
 check( '...and switches no feature on: the starter site is plain html', ( ( include $baseUnit. '/manifest.php' )['features'] ?? null ) === [] );
 
 /*	And the mailbox every mail this framework sends is addressed from.

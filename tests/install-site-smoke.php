@@ -27,10 +27,11 @@ $ignored = ninoWarnings();
  *	@param		string		$locale				The one language
  *	@param		bool			$own					Whether an application provides the start page: no header, no footer, no starter page but the 404
  *	@param		string		$name					The name of the company, which may be empty
+ *	@param		string		$stylesheet		What the operator wrote into assets/style.css between the Setup step and the last one, '' for nothing
  *
  *	@return 	string										The directory of the project
  */
-function siteProject( string $locale, bool $own, string $name = 'Muster & Söhne GmbH' ): string {
+function siteProject( string $locale, bool $own, string $name = 'Muster & Söhne GmbH', string $stylesheet = '' ): string {
 
 	$appData = ninoSandbox( 'install-site' );
 	$sandbox = ninoSandboxDir( $appData );
@@ -50,6 +51,9 @@ function siteProject( string $locale, bool $own, string $name = 'Muster & Söhne
 
 	if( $status !== 200 )
 		throw new \RuntimeException( 'Setup::apiApply: '. $status. ' '. json_encode( $body ) );
+
+	if( $stylesheet !== '' )
+		file_put_contents( $sandbox. '/private/assets/style.css', $stylesheet );
 
 	$applied = \Nino\Install\StarterPages::apply( $appData, $own );
 
@@ -189,6 +193,9 @@ foreach( [ 'de_DE' => [ 'de', [ '/', '/contact', '/impressum', '/datenschutz' ],
 	$bundle = (string) @file_get_contents( \Nino\Filesystem::path( $built, '/.cache/style.css' ) );
 	check( 'the style bundle of the fresh site is the reset, the look of the form and the stylesheet of the site, and at most 22 KB', strlen( $bundle ) > 15000 && strlen( $bundle ) <= 22 * 1024 && str_contains( $bundle, '.site-header' ) === true && str_contains( $bundle, '.header-wrap' ) === false );
 
+	check( 'the stylesheet of the project is the one of the frame unit - the last step writes it with the header and the footer - and is in the bundle, whole', md5_file( $site. '/private/assets/style.css' ) === md5_file( dirname( __DIR__ ). '/_admin/install/library/frame/assets/style.css' )
+		&& str_contains( $bundle, (string) file_get_contents( dirname( __DIR__ ). '/_admin/install/library/frame/assets/style.css' ) ) === true );
+
 	$noticed = ninoWarnings();
 	check( 'the log has no notice and no warning from setting the project up and drawing any of its pages'. ( $noticed === [] ? '' : ' - '. substr( implode( ' | ', array_unique( $noticed ) ), 0, 300 ) ), $noticed === [] );
 	echo "\n";
@@ -243,6 +250,25 @@ check( 'with an application that provides the start page the project has no head
 	is_file( $own. '/private/templates/frame-header.tpl' ) === false && is_file( $own. '/private/templates/frame-footer.tpl' ) === false
 	&& array_column( $ownVisits, 0 ) === [ 404, 200 ] && substr_count( $ownVisits['/nowhere'][1], '<main' ) === 1 && substr_count( $ownVisits['/impressum'][1], '<main' ) === 1
 	&& str_contains( implode( '', array_column( $ownVisits, 1 ) ), '<header' ) === false && str_contains( implode( '', array_column( $ownVisits, 1 ) ), '<footer' ) === false && $ownLog === [] );
+
+// The stylesheet of the html site belongs to its header and footer: where an application provides the start page the project keeps the empty one the Setup step wrote
+$baseCss = (string) file_get_contents( dirname( __DIR__ ). '/_admin/install/library/base/assets/style.css' );
+$ownBuilt = siteBoot( $own );
+$ownBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
+\Nino\Modules\Assets::doShortcode( $ownBuilt, [ '/.cache/style.css' ] );
+$ownBundle = (string) @file_get_contents( \Nino\Filesystem::path( $ownBuilt, '/.cache/style.css' ) );
+$ownConfig = \Nino\Filesystem::getFileContent( $ownBuilt, '/config.php', [] );
+check( 'with an application that provides the start page the stylesheet of the project is the empty one of the base unit - a comment and no rule - and the bundle holds no rule of the html site: no header, no menu, no title area, no footer',
+	(string) file_get_contents( $own. '/private/assets/style.css' ) === $baseCss && preg_match( '/^\/\*[^*]*(?:\*(?!\/)[^*]*)*\*\/\s*$/', $baseCss ) === 1
+	&& ( $ownConfig['/nino/html/assets']['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/assets/style.css' ]
+	&& array_filter( [ '.site-header', '.site-footer', '.footer-cols', '.site-nav', '.hero', '.brand' ], static fn( string $selector ): bool => str_contains( $ownBundle, $selector ) === true ) === [] && strlen( $ownBundle ) > 10000 );
+
+// What the operator wrote there between the two steps: with an application that provides the start page it stays; with the starter pages the library wins, as the frames do
+$mine = "/* mine */\n.mine { color: red; }\n";
+$keptOwn = siteProject( 'de_DE', true, 'Muster & Söhne GmbH', $mine );
+$keptStarter = siteProject( 'de_DE', false, 'Muster & Söhne GmbH', $mine );
+check( 'a stylesheet the operator changed between the steps stays where an application provides the start page, and is replaced by the stylesheet of the html site where the starter pages are written',
+	(string) file_get_contents( $keptOwn. '/private/assets/style.css' ) === $mine && md5_file( $keptStarter. '/private/assets/style.css' ) === md5_file( dirname( __DIR__ ). '/_admin/install/library/frame/assets/style.css' ) );
 
 $empty = [];
 ninoDone( $empty );
