@@ -119,7 +119,8 @@ request:
 - A tab is a full panel class - `actions()`, `nav()`, `perm()`, `panes()`,
   `assets()` - whose uri is unique across panels and tabs alike. It is never
   a rail entry: its `nav()` group only says where its permission is listed,
-  its weight orders the strip. The shell selects it through `#<uri>`, shows
+  its weight orders the strip. The shell selects it through its address `#<panel>/<tab>`
+  (the tab is its uri without the name of the panel in front), shows
   `admin-tab-<uri>` and calls `Nino.admin.<uri>.showCurrent()` exactly like a
   panel; `Nino.admin.router.exists()` knows both kinds.
 - The strip is rendered only when the account holds more than one screen of
@@ -672,6 +673,22 @@ address through the router as well. What goes with a level - a redraw, a
 refresh, a dropped working copy - stays with the panel. The url hash is the
 panel's to deep-link into: `Nino.admin.router.set( 'catalog', [ id ] )` while
 the panel is on screen, `Nino.admin.router.current()` to read it back on load.
+What the router writes for it is `#catalog/catalog/<id>`: the one form of
+[Addresses](../admin-ui.md#addresses), `#<panel>/<tab>/<part>`, where the own
+screen of a panel is its first tab named like the panel and a tab is
+named by its uri without the panel's name in front. A panel names a screen by its
+uri, as it always has (`'catalog'`, `'catalog-frames'`), and passes the parts: a
+word the panel says as `Nino.admin.router.word( 'new' )`, and a key - any string -
+as ONE part however many slashes it holds, never `key.split('/')`, never `'#'+ ...`.
+A key is always encoded, an at sign in it too: the element called `@new` is
+`%40new`, and `@new` is the form that makes one. `current()` answers
+`{ panel, parts, known }`: the screen the address names, its parts, and whether the
+address was one the router could read whole; a part is read with
+`Nino.admin.router.isWord( parts, at, 'new' )` and never compared with `'@new'`,
+which a key can be. A part that is no part ends the parts there; a part the panel
+does not know - a thing that is gone, a word it does not have - is its list, and
+the address is written over by the one the screen has.
+A panel on the server's side asks `\Nino\AdminAddress::of( 'catalog', [ $id ] )`.
 
 The address is also what the browser's Back and Forward walk, so a panel that
 deep-links has three more things to do. `set()` replaces the entry the browser
@@ -685,8 +702,8 @@ rail, the tabs and the phone's select (`selectTab( panel, tab, true )`); the
 page load, the arrow keys of a tab strip and a step through the history only
 replace. The address of the panel itself, `#catalog`, is its own screen: for a
 pane with tabs the shell opens the first tab, whichever was open last, and
-`#<tab>` opens that tab - only the rail, and the phone's select, come back to
-the tab last open. And `showCurrent()` follows the hash: when `router.current().panel`
+`#catalog/<tab>` opens that tab - only the rail, and the phone's select, come
+back to the tab last open. And `showCurrent()` follows the hash: when `router.current().panel`
 names this panel, the level its parts name is shown - a step through the
 history changes the address and nothing else - and a hash that names another
 panel (a click on the rail) keeps the level in memory, as before. Leaving an

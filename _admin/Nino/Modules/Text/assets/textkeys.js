@@ -656,31 +656,24 @@
 		},
 
 		/**
-		 *	What a hash behind #text or #keys names: a key (without its leading
-		 *	slash) - the row that holds it, and the key - or a row, or the start of
-		 *	a key a row holds
+		 *	What the parts of an address behind the Text or the Keys screen name: a
+		 *	row - its id is the first part - and, as the second, a key of it. A key
+		 *	the row does not hold is no key: the row is what is named
 		 *
 		 *	@param		{Object}	model
-		 *	@param		{Array}		parts									The hash behind the panel's name, split at the slashes
+		 *	@param		{Array}		parts									The address behind the screen's name: [ row ] or [ row, key ]
 		 *
 		 *	@return		{Object|null}							{ row, key } - key null for a row - or null
 		 */
 		resolve : function( model, parts ) {
 
-			const path = parts.join('/');
-
-			if( path === '' )
+			if( parts.length < 1 || parts.length > 2 || model.rows[parts[0]] === undefined )
 				return null;
 
-			if( model.rowOf['/'+ path] !== undefined )
-				return { row : model.rowOf['/'+ path], key : '/'+ path };
+			if( parts.length === 2 && model.rowOf[parts[1]] === parts[0] )
+				return { row : parts[0], key : parts[1] };
 
-			if( model.rows[path] !== undefined )
-				return { row : path, key : null };
-
-			const under = Object.keys( model.rowOf ).filter( function( key ) { return key.indexOf( '/'+ path+ '/' ) === 0 } ).sort()[0];
-
-			return under === undefined ? null : { row : model.rowOf[under], key : null };
+			return { row : parts[0], key : null };
 		},
 
 		/**
@@ -1156,7 +1149,7 @@
 		},
 
 		/**
-		 *	The hash parts that name a row, or a key in it
+		 *	The parts of an address that name a row, or a key in it: the row's id and the key, each one part
 		 *
 		 *	@param		{string}		row
 		 *	@param		{string|null}	[key]
@@ -1164,7 +1157,7 @@
 		 *	@return		{Array}
 		 */
 		hashParts : function( row, key ) {
-			return ( key ?? null ) !== null ? key.split('/').filter( Boolean ) : row.split('/');
+			return ( key ?? null ) !== null ? [ row, key ] : [ row ];
 		},
 	};
 

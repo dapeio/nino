@@ -172,7 +172,7 @@ namespace Nino\Modules\Dashboard {
 			// before the notices it causes (the pages of the legal texts that no menu draws): the Features panel has the same sentence
 			if( class_exists( '\\Nino\\Modules\\Features\\Admin' ) === true && ( $everyone === true || \Nino\Auth::checkPermission( $appData, \Nino\Modules\Features\Admin::MANAGE_PERM ) === true ) )
 				foreach( \Nino\Features::missing( $appData ) as $name )
-					$notices[] = [ 'key' => 'feature-missing:'. $name, 'text' => '/_admin/dashboard/notice/feature-missing', 'values' => [ $name ], 'link' => '#features' ];
+					$notices[] = [ 'key' => 'feature-missing:'. $name, 'text' => '/_admin/dashboard/notice/feature-missing', 'values' => [ $name ], 'link' => \Nino\AdminAddress::of( 'features' ) ];
 
 			if( $failure !== null )
 				$notices[] = [ 'key' => 'mail', 'text' => '/_admin/dashboard/notice/mail', 'values' => [ $failure['since'], (string) $failure['count'] ], 'link' => '' ];
@@ -180,7 +180,7 @@ namespace Nino\Modules\Dashboard {
 			if( class_exists( '\\Nino\\Modules\\Text\\Admin' ) === true
 				&& ( $everyone === true || \Nino\Auth::checkPermission( $appData, \Nino\Modules\Text\Admin::MANAGE_PERM ) === true ) )
 				foreach( \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) as $locale => $count )
-					$notices[] = [ 'key' => 'untranslated:'. $locale, 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ (string) $count, (string) $locale ], 'link' => '#text' ];
+					$notices[] = [ 'key' => 'untranslated:'. $locale, 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ (string) $count, (string) $locale ], 'link' => \Nino\AdminAddress::of( 'text' ) ];
 
 			// What is wrong with the imprint and the privacy policy - a placeholder
 			// with no value, a language without a path, a page in no menu - is the

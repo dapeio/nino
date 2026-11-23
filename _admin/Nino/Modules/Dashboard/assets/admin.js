@@ -237,7 +237,7 @@
 		_tile : function( panel, value, label ) {
 
 			const a = dc.createElement('a');
-			a.href = '#'+ panel;
+			a.href = Nino.admin.router.href( panel, [] );
 			a.className = 'nino-admin-tile nino-admin-tile--'+ panel;
 
 			const val = dc.createElement('span');
@@ -286,7 +286,7 @@
 				const li = dc.createElement('li');
 
 				const a = dc.createElement('a');
-				a.href = '#elements/'+ e.type;
+				a.href = Nino.admin.router.href( 'elements', [ e.type ] );
 
 				const row = dc.createElement('span');
 				row.className = 'nino-admin-meter-row';
@@ -372,7 +372,7 @@
 			section.appendChild( ul );
 
 			const more = dc.createElement('a');
-			more.href = '#logs';
+			more.href = Nino.admin.router.href( 'logs', [] );
 			more.className = 'nino-admin-linkbutton admin-dashboard-more';
 			more.textContent = Nino.content.getText('/_admin/dashboard/label/all');
 			section.appendChild( more );

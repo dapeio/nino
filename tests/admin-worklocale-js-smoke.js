@@ -57,7 +57,15 @@ function page( options ) {
 
 	const posted = [];
 	const reloaded = [];
-	const sandbox = { console : console, location : { hash : '', reload : function() { reloaded.push( sandbox.location.hash ) } }, history : { replaceState : function() {} }, document : documentOf( root ) };
+	const doc = documentOf( root );
+	// The panes the page has, which the router reads the address by: a builder and a text panel
+	const query = doc.querySelectorAll;
+	doc.querySelectorAll = function( selector ) {
+		return selector === '#admin-content-wrap > [data-panel]'
+			? [ 'builder', 'text' ].map( function( panel ) { return { dataset : { panel : panel }, querySelectorAll : function() { return [] } } } )
+			: query( selector );
+	};
+	const sandbox = { console : console, location : { hash : '', reload : function() { reloaded.push( sandbox.location.hash ) } }, history : { replaceState : function() {} }, document : doc };
 	sandbox.window = sandbox;
 	sandbox.Nino = {
 		events : { bindCallback : function() {} },
@@ -193,7 +201,7 @@ console.log( 'Nino.admin.workLocale - the language content is edited in\n' );
 	const entry = { held : true, discarded : 0 };
 	p.admin.dirty.register( 'builder', { isDirty : function() { return entry.held }, discard : function() { entry.discarded++; entry.held = false } } );
 	p.workLocale.bind( 'builder' );
-	p.sandbox.location.hash = '#builder/home';
+	p.sandbox.location.hash = '#builder/builder/home';
 
 	p.answer( 'cancel' );
 	p.choose( p.selects[0], 'en_US' );
@@ -203,7 +211,7 @@ console.log( 'Nino.admin.workLocale - the language content is edited in\n' );
 	p.answer( 'discard' );
 	p.choose( p.selects[0], 'en_US' );
 	check( '...and with it on screen the page is loaded anew, in the language the server holds by then - never a view that shows one and writes the other',
-		p.posted.join() === 'admin/locale en_US' && p.reloaded.join() === '#builder/home' && entry.discarded === 1 );
+		p.posted.join() === 'admin/locale en_US' && p.reloaded.join() === '#builder/builder/home' && entry.discarded === 1 );
 
 	const away = page();
 	away.workLocale.init();
@@ -216,7 +224,7 @@ console.log( 'Nino.admin.workLocale - the language content is edited in\n' );
 	const clean = page();
 	clean.workLocale.init();
 	clean.workLocale.bind( 'builder' );
-	clean.sandbox.location.hash = '#builder/home';
+	clean.sandbox.location.hash = '#builder/builder/home';
 	clean.choose( clean.selects[0], 'en_US' );
 	check( 'on screen and with nothing unsaved it is loaded anew all the same: what it shows has to be in the new language', clean.reloaded.length === 1 && clean.questions.length === 0 );
 }

@@ -28,7 +28,10 @@
 const vm 		= require('vm');
 const fs 		= require('fs');
 const path 	= require('path');
-const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire, shellRouter } = require( './harness.js' );
+
+// What the panel writes into the address goes through the router's own codec: every state written, every link drawn, is read back
+const codec = shellRouter();
 
 const fixture = JSON.parse( fs.readFileSync( path.join( __dirname, 'fixtures/admin/elements-roundtrip.json' ), 'utf8' ) );
 
@@ -93,10 +96,10 @@ const Nino = {
 		elements : { invalidate : function() { invalidated.push( 'elements' ) } },
 		router : {
 			current : function() { return hash },
-			go : function( panel, parts ) { moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
-			set : function( panel, parts ) { written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+			go : function( panel, parts ) { codec.check( panel, parts ); moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+			set : function( panel, parts ) { codec.check( panel, parts ); written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
 			leave : function( names, open, proceed ) { proceed() },
-			href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') },
+			href : function( name, parts ) { return codec.check( name, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
 		},
 		dirty : {
 			watchForm : function( name, getter, save ) { watched.push( { name : name, getter : getter, save : save } ) },
@@ -201,7 +204,7 @@ panel.init();
 check( 'the panel asks for the types', requests.length === 1 && requests[0].action === 'types/list' );
 answer( 200, TYPELIST );
 check( 'the types are the rows of the block, a link each that writes its address, the title over the number of its fields and the identifier, quietly', rows().length === 2
-	&& findAll( rows()[0], function( el ) { return el.classList.contains('nino-admin-row-open') } )[0].href === '#types/roundtrip' && findAll( rows()[0], function( el ) { return el.tagName === 'STRONG' } )[0].textContent === 'Round trip'
+	&& findAll( rows()[0], function( el ) { return el.classList.contains('nino-admin-row-open') } )[0].href === '#elements/types/roundtrip' && findAll( rows()[0], function( el ) { return el.tagName === 'STRONG' } )[0].textContent === 'Round trip'
 	&& findAll( rows()[0], function( el ) { return el.tagName === 'SMALL' } )[0].textContent === Object.keys( MODEL ).length+ ' fields · /roundtrip' && findAll( rows()[1], function( el ) { return el.tagName === 'SMALL' } )[0].textContent === '1 field · /roundmaker' );
 const listBar = findAll( list, function( el ) { return el.classList.contains('nino-admin-actionbar') } )[0];
 check( 'New element type is the one main button of the bar of the list, and no unsaved note stands over the list', listBar.children.length === 1 && listBar.children[0].textContent === text('/_admin/types/label/new') && listBar.children[0].classList.contains('nino-admin-btn-primary')
@@ -356,7 +359,7 @@ check( 'how many a list of references may hold is shut until it is a list, and 0
 
 forget();
 panel._openForm( null );
-check( 'a new type has the address #types/@new, an identifier as its first field, required, and the main button creates it; there is no Delete and no copy of what does not exist', written.at(-1) === '["types","@new"]'
+check( 'a new type has the address #elements/types/@new, an identifier as its first field, required, and the main button creates it; there is no Delete and no copy of what does not exist', written.at(-1) === '["types",{"word":"@new"}]'
 	&& findAll( form, function( el ) { return el.id === 'types-form-uri' } )[0].attributes['aria-required'] === 'true' && primary().textContent === text('/_admin/types/label/create') && danger() === undefined && barButtons().length === 1 && cards().length === 0 );
 save();
 check( 'the identifier is the first thing a save asks for', requests.length === 0 && sentences()[0].textContent === Nino.adminUi.format( text('/_admin/common/error/missing'), text('/_admin/types/label/uri') ) && active === findAll( form, function( el ) { return el.id === 'types-form-uri' } )[0] );
@@ -467,9 +470,12 @@ forget();
 forget();
 panel._restore( [ 'new' ] );
 check( 'a type called new is no new type: the address names a type the list does not have, so nothing opens', panel._isNew === false && requests.length === 0 );
-panel._restore( [ '@new' ] );
+panel._restore( codec.parts( { key : '@new' } ) );
+panel._follow( codec.parts( { key : '@new' } ) );
+check( 'the key @new is no new type - it is read as a key, the address names a type the list does not have - and no blank form is opened for it, on a load and on a step through the history', panel._isNew === false && requests.length === 0 );
+panel._restore( codec.parts( '@new' ) );
 check( 'the first load opens the blank form for @new', panel._isNew === true );
-panel._follow( [ '@new' ] );
+panel._follow( codec.parts( '@new' ) );
 check( 'an address that names a new type opens a blank form, and a type of that name - there may be one called new - is asked for like any other', requests.length === 0 && panel._isNew === true );
 panel._follow( [ 'roundmaker' ] );
 check( 'an address that names a type opens it', requests.at(-1).action === 'types/get' && requests.at(-1).payload.uri === 'roundmaker' );
@@ -486,5 +492,8 @@ const used = new Set( ( script.match( /'\/_admin\/types\/[a-z0-9\/-]+'/g ) || []
 [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ].forEach( function( kind ) { used.add( '/_admin/types/option/type/'+ kind ) } );
 const missing = [ ...used ].filter( function( key ) { return ( key in moduleEn ) === false || ( key in moduleDe ) === false } );
 check( 'every word of the tab is a fill in English and in German'+ ( missing.length === 0 ? '' : ' - not '+ missing.join(', ') ), used.size > 40 && missing.length === 0 );
+
+check( 'every address the tab wrote or drew - the types, a type, a new one - is read back by the router as the same screen and the same parts', codec.written.length > 4 && codec.mismatches.length === 0
+	&& codec.written.some( written => ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.parts.length === 1 && written.parts[0] !== '@new' ) );
 
 done();

@@ -11,8 +11,9 @@
  *													it is hidden from the Text panel. All of it is saved
  *													with the one Save of the row. A key is renamed and
  *													deleted from its own row. Every view has its address:
- *													#keys, #keys/<row>, #keys/<key>, #keys/@new,
- *													#keys/@rename/<key> and #keys/@scan - the form that
+ *													#text/keys, #text/keys/<row>, #text/keys/<row>/<key>,
+ *													#text/keys/@new, #text/keys/@rename/<key> and
+ *													#text/keys/@scan - the form that
  *													creates or renames a key, which asks for it segment by
  *													segment: /<namespace>/<category>/<part>/<name>.
  *
@@ -183,14 +184,14 @@
 
 			const keys = Nino.admin.keys;
 
-			if( parts[0] === '@new' && parts.length === 1 )
+			if( Nino.admin.router.isWord( parts, 0, 'new' ) === true && parts.length === 1 )
 				return { view : 'new', key : null };
 
-			if( parts[0] === '@scan' && parts.length === 1 )
+			if( Nino.admin.router.isWord( parts, 0, 'scan' ) === true && parts.length === 1 )
 				return { view : 'scan' };
 
-			if( parts[0] === '@rename' )
-				return parts.length > 1 && keys._renamable( '/'+ parts.slice( 1 ).join('/') ) === true ? { view : 'new', key : '/'+ parts.slice( 1 ).join('/') } : null;
+			if( Nino.admin.router.isWord( parts, 0, 'rename' ) === true )
+				return parts.length === 2 && keys._renamable( parts[1] ) === true ? { view : 'new', key : parts[1] } : null;
 
 			const group = keys._model === null ? null : Nino.admin.textKeys.resolve( keys._model, parts );
 
@@ -360,10 +361,10 @@
 			const keys = Nino.admin.keys;
 
 			if( keys._view === 'scan' )
-				return [ '@scan' ];
+				return [ Nino.admin.router.word('scan') ];
 
 			if( keys._view === 'new' )
-				return keys._renameFrom === null ? [ '@new' ] : [ '@rename' ].concat( keys._renameFrom.split('/').filter( Boolean ) );
+				return keys._renameFrom === null ? [ Nino.admin.router.word('new') ] : [ Nino.admin.router.word('rename'), keys._renameFrom ];
 
 			return Nino.admin.textKeys.hashParts( keys._currentGroup, keys._focusKey );
 		},
@@ -583,12 +584,12 @@
 			Nino.admin.keys._renderBody();
 
 			const scanBtn = Nino.adminUi.button( Nino.content.getText('/_admin/keys/label/scan'), function() {
-				Nino.admin.router.go( 'keys', [ '@scan' ] );
+				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('scan') ] );
 				Nino.admin.keys._openScanForm( scanBtn, true );
 			}, { kind : 'secondary' } );
 
 			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/keys/label/new'), function() {
-				Nino.admin.router.go( 'keys', [ '@new' ] );
+				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('new') ] );
 				Nino.admin.keys._openNewKeyForm( null, addBtn, true );
 			} );
 
@@ -889,7 +890,7 @@
 		_rename : function( key, opener ) {
 
 			Nino.admin.keys._guard( function() {
-				Nino.admin.router.go( 'keys', [ '@rename' ].concat( key.split('/').filter( Boolean ) ) );
+				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('rename'), key ] );
 				Nino.admin.keys._openNewKeyForm( key, opener, true );
 			} );
 		},

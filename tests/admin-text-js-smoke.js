@@ -26,7 +26,10 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-const { check, done, fills, load } = require( './harness.js' );
+const { check, done, fills, load, shellRouter } = require( './harness.js' );
+
+// What the panels write into the address goes through the router's own codec: every state written, every link drawn, is read back
+const codec = shellRouter();
 
 // ============================================================================
 // Finding and reading texts: the names of a key, the rows they fall into, the
@@ -173,7 +176,7 @@ function world( locale, hash, session ) {
 		admin : {
 			touch : topic => { touched.push( topic ); stamps[topic] = ( stamps[topic] ?? 0 ) + 1 },
 			stamp : topic => stamps[topic] ?? 0,
-			router : { set : ( p, parts ) => calls.push( 'set '+ [ p ].concat( parts ).join('/') ), go : ( p, parts ) => calls.push( 'go '+ [ p ].concat( parts ).join('/') ), current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed(), href : ( p, parts ) => '#'+ [ p ].concat( parts ).map( encodeURIComponent ).join('/') },
+			router : { set : ( p, parts ) => { codec.check( p, parts ); calls.push( 'set '+ [ p ].concat( parts ).join('/') ) }, go : ( p, parts ) => { codec.check( p, parts ); calls.push( 'go '+ [ p ].concat( parts ).join('/') ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord, current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed(), href : ( p, parts ) => codec.check( p, parts ) },
 			// The one source of the content language: set() moves it and calls the views that follow it, as the shell does
 			workLocale : ( followers => ( { current : session === undefined ? locale : session, follow : ( name, handler ) => followers.push( handler ), set : code => { calls.push( 'locale '+ code ); box.Nino.admin.workLocale.current = code; followers.forEach( handler => handler( code ) ) }, choose : code => box.Nino.admin.workLocale.set( code ) } ) )( [] ),
 			// The shell's registry of unsaved input: what the panels register under their names, and how often they asked it to look again
@@ -374,7 +377,7 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 		&& w.T.rowLabel( model, model.rows['feature/constructor'] ) === 'Constructor' && w.T.rowLabel( model, model.rows['module/constructor'] ) === 'Constructor' );
 	check( '...and the search finds them, for any query', [ '', 'a', 'konstrukteur', 'constructor', '/toString' ].every( q => Array.isArray( w.T.search( model, { query : q, locale : 'de_DE' } ) ) ) && w.T.search( model, { query : 'konstrukteur', locale : 'de_DE' } ).length === 1
 		&& w.T.search( model, { query : '', locale : 'de_DE' } ).length === entries.length );
-	check( '...and an address that names them resolves', w.T.resolve( model, [ 'project', 'shop', 'constructor', 'name' ] ).row === 'project/shop' && w.T.resolve( model, [ 'constructor' ] ).row === 'constructor' && w.T.resolve( model, [ 'toString' ] ).row === 'toString' );
+	check( '...and an address that names them resolves', w.T.resolve( model, [ 'project/shop', '/project/shop/constructor/name' ] ).row === 'project/shop' && w.T.resolve( model, [ 'constructor' ] ).row === 'constructor' && w.T.resolve( model, [ 'toString' ] ).row === 'toString' );
 }
 
 // --- the search ------------------------------------------------------------------------
@@ -418,13 +421,15 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 	check( 'plain: tags and entities gone, the end of a paragraph a space', w.T.plain( '<p>Eins</p><p>Zwei &amp; <strong>drei</strong>&nbsp;vier</p>' ) === 'Eins Zwei & drei vier' );
 
 	// The hash
-	check( 'resolve: a key, a row, the start of a key', JSON.stringify( w.T.resolve( model, [ 'template', 'page-services', 'item-1', 'title' ] ) ) === '{"row":"template/page-services","key":"/template/page-services/item-1/title"}'
-		&& JSON.stringify( w.T.resolve( model, [ 'template', 'page-services' ] ) ) === '{"row":"template/page-services","key":null}'
-		&& w.T.resolve( model, [ 'project', 'company', 'general' ] ).row === 'project/company' && w.T.resolve( model, [ 'nothing' ] ) === null && w.T.resolve( model, [] ) === null );
-	check( '...the deep links of the concept: a text of the home page, the details of a page', w.T.resolve( model, [ 'template', 'page-services', 'intro', 'title' ] ).row === 'template/page-services'
-		&& JSON.stringify( w.T.resolve( model, [ '_nino', 'webpage', 'services', 'title' ] ) ) === '{"row":"template/page-services","key":"/_nino/webpage/services/title"}'
-		&& w.T.resolve( model, [ '_nino', 'webpage', 'blog', 'name' ] ).row === '_nino/webpage' );
-	check( 'hashParts: a row as its path, a key without its leading slash', JSON.stringify( w.T.hashParts( 'template/page-services' ) ) === '["template","page-services"]' && JSON.stringify( w.T.hashParts( 'x', '/a/b/c' ) ) === '["a","b","c"]' );
+	check( 'resolve: a key of a row, a row, a row with a key it does not hold', JSON.stringify( w.T.resolve( model, [ 'template/page-services', '/template/page-services/item-1/title' ] ) ) === '{"row":"template/page-services","key":"/template/page-services/item-1/title"}'
+		&& JSON.stringify( w.T.resolve( model, [ 'template/page-services' ] ) ) === '{"row":"template/page-services","key":null}'
+		&& JSON.stringify( w.T.resolve( model, [ 'project/company', '/template/page-services/item-1/title' ] ) ) === '{"row":"project/company","key":null}' && w.T.resolve( model, [ 'nothing' ] ) === null && w.T.resolve( model, [] ) === null );
+	check( '...what is no row and key is nothing: the segments of a row, the start of a key, a third part', w.T.resolve( model, [ 'template', 'page-services' ] ) === null && w.T.resolve( model, [ '/template/page-services/item-1/title' ] ) === null
+		&& w.T.resolve( model, [ 'template/page-services', '/template/page-services/item-1/title', 'x' ] ) === null );
+	check( '...the deep links of the concept: a text of the home page, the details of a page', w.T.resolve( model, [ 'template/page-services', '/template/page-services/intro/title' ] ).row === 'template/page-services'
+		&& JSON.stringify( w.T.resolve( model, [ 'template/page-services', '/_nino/webpage/services/title' ] ) ) === '{"row":"template/page-services","key":"/_nino/webpage/services/title"}'
+		&& w.T.resolve( model, [ '_nino/webpage', '/_nino/webpage/blog/name' ] ).row === '_nino/webpage' );
+	check( 'hashParts: the row\'s id, and the key as it is - each one part, whatever slashes it holds', JSON.stringify( w.T.hashParts( 'template/page-services' ) ) === '["template/page-services"]' && JSON.stringify( w.T.hashParts( 'x', '/a/b/c' ) ) === '["x","/a/b/c"]' );
 }
 // --- the Text panel: the list, the search, the form ------------------------------------
 
@@ -499,7 +504,7 @@ const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group 
 	check( '...a row for each page, named after the route, and one for each group of the others - the rows of the workbench\'s list', rows.length === Object.keys( t.text._model.rows ).length && keyOf( rows[0] ) === 'template/page-services'
 		&& rows.map( r => r.querySelector('strong').textContent ).slice( 0, 2 ).join() === 'Leistungen,Rechtliches' && t.list.querySelectorAll('li').every( li => li.classList.contains('nino-admin-list-row') ) );
 	check( '...with what it holds as its line: how many keys and the beginning of their texts', rows[0].querySelector('small').textContent.startsWith( '(9) ' ) );
-	check( 'every row is a link to an address of its own, which writes it when it is pressed', rows.every( r => r.tagName === 'a' && r.href === '#text/'+ keyOf( r ).split('/').join('/') ) );
+	check( 'every row is a link to an address of its own, which writes it when it is pressed', rows.every( r => r.tagName === 'a' && r.href === '#text/text/'+ encodeURIComponent( keyOf( r ) ) ) );
 	check( 'the bar of the list has the search and the filter and no switch of a language: the language is the workbench\'s', t.list.querySelector('#text-search').getAttribute('aria-label') === W('/_admin/text/label/search')
 		&& t.list.querySelectorAll('select').length === 0 && t.list.querySelector('.nino-admin-filterbar') !== null && t.list.querySelector('#text-list-empty').classList.contains('nino-admin-chip') );
 	check( '...and the filter names the language the way the workbench does, and is off', t.list.querySelector('#text-list-empty').textContent === F('/_admin/text/label/empty-in','de_DE') && t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'false' );
@@ -518,7 +523,7 @@ const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group 
 	check( 'a search replaces the rows by hits, the rows of the list again: the path, the piece of text with the word marked, the key behind it', opens( t.list ).length === 1 && t.list.querySelectorAll('li').length === 1
 		&& t.list.querySelector('strong').textContent === 'Leistungen › Eintrag 1 › Text' && t.list.querySelector('mark')?.textContent === 'beraten' && t.list.querySelector('.admin-text-hit-key').textContent === '/template/page-services/item-1/text'
 		&& t.list.querySelector('small').textContent.startsWith( 'Wir ' ) );
-	check( '...each a link to the row of the key, at its own address', opens( t.list )[0].href === '#text/template/page-services/item-1/text' );
+	check( '...each a link to the row of the key, at its own address', opens( t.list )[0].href === '#text/text/template%2Fpage-services/%2Ftemplate%2Fpage-services%2Fitem-1%2Ftext' );
 	check( '...and says how many there are, where a screen reader hears it', t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/result',1) && t.list.querySelector('#text-list-status').getAttribute('aria-live') === 'polite' );
 	check( 'a hit in the language on screen has no code of a language', t.list.querySelectorAll('.nino-admin-row-actions').length === 0 );
 	box.value = 'xyzzy';
@@ -555,7 +560,7 @@ const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group 
 	opens( t.list )[0].click();
 	const field = fieldOf( t, '/template/page-services/item-1/text' );
 	check( 'a hit opens its row at the field - the address names the key, the field is marked and scrolled to', t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false && t.list.classList.contains('admin-hidden') === true
-		&& t.calls.includes( 'go text/template/page-services/item-1/text' ) && t.calls.includes( 'set text/template/page-services/item-1/text' ) && field.classList.contains('is-found') && field.scrolled === true );
+		&& t.calls.includes( 'go text/template/page-services//template/page-services/item-1/text' ) && t.calls.includes( 'set text/template/page-services//template/page-services/item-1/text' ) && field.classList.contains('is-found') && field.scrolled === true );
 }
 
 {
@@ -824,22 +829,22 @@ const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group 
 
 {
 	// deep links: a key, the details of a page
-	const t = openedText( textResponse(), { panel : 'text', parts : [ 'template', 'page-services', 'item-2', 'title' ] } );
+	const t = openedText( textResponse(), { panel : 'text', parts : [ 'template/page-services', '/template/page-services/item-2/title' ] } );
 	check( 'a hash that names a key opens the row that holds it, at that key, when the panel loads', t.text._currentGroup === 'template/page-services' && t.text._focusKey === '/template/page-services/item-2/title'
 		&& t.form.querySelector('[data-key="/template/page-services/item-2/title"]').classList.contains('is-found') && t.list.classList.contains('admin-hidden') );
-	const details = openedText( textResponse(), { panel : 'text', parts : [ '_nino', 'webpage', 'services', 'title' ] } );
+	const details = openedText( textResponse(), { panel : 'text', parts : [ 'template/page-services', '/_nino/webpage/services/title' ] } );
 	check( '...also the details of a page, which are in the form of the page', details.text._currentGroup === 'template/page-services' && details.text._focusKey === '/_nino/webpage/services/title' );
 	// the hash moves to another key of the row that is open: that field is shown, and the address keeps it
-	const moving = { panel : 'text', parts : [ 'template', 'page-services', 'item-2', 'title' ] };
+	const moving = { panel : 'text', parts : [ 'template/page-services', '/template/page-services/item-2/title' ] };
 	const open = openedText( textResponse(), moving );
-	moving.parts = [ 'template', 'page-services', 'intro', 'text' ];
+	moving.parts = [ 'template/page-services', '/template/page-services/intro/text' ];
 	open.calls.length = 0;
 	open.text.showCurrent();
 	check( 'a hash that names another key of the row that is open focuses that key and the address keeps it', open.text._focusKey === '/template/page-services/intro/text'
-		&& open.form.querySelector('[data-key="/template/page-services/intro/text"]').classList.contains('is-found') && open.calls.at(-1) === 'set text/template/page-services/intro/text' );
+		&& open.form.querySelector('[data-key="/template/page-services/intro/text"]').classList.contains('is-found') && open.calls.at(-1) === 'set text/template/page-services//template/page-services/intro/text' );
 	const other = openedText( textResponse(), { panel : 'images', parts : [ 'x' ] } );
 	check( 'the hash of another panel leaves the list', other.text._currentGroup === null && other.list.classList.contains('admin-hidden') === false );
-	const unknown = openedText( textResponse(), { panel : 'text', parts : [ 'template', 'page-nope' ] } );
+	const unknown = openedText( textResponse(), { panel : 'text', parts : [ 'template/page-nope' ] } );
 	check( 'a row there is not is the list', unknown.text._currentGroup === null && unknown.list.classList.contains('admin-hidden') === false );
 }
 
@@ -1045,7 +1050,7 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	const text = openedText( textResponse() );
 
 	check( 'the Keys tab has the groups of the Text panel as the list of the workbench - with the hidden keys and the words of the workbench, which it exists to show - each a link with an address of its own', k.list.querySelectorAll('ul.nino-admin-list').length > 0
-		&& opens( k.list ).some( a => keyOf( a ) === '_admin' ) && opens( k.list ).some( a => keyOf( a ) === 'project/mail' ) && opens( k.list ).every( a => a.tagName === 'a' && a.href === '#keys/'+ keyOf( a ) )
+		&& opens( k.list ).some( a => keyOf( a ) === '_admin' ) && opens( k.list ).some( a => keyOf( a ) === 'project/mail' ) && opens( k.list ).every( a => a.tagName === 'a' && a.href === '#text/keys/'+ encodeURIComponent( keyOf( a ) ) )
 		&& k.list.querySelectorAll('li').every( li => li.classList.contains('nino-admin-list-row') ) );
 	const nameOf = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group ).querySelector('strong').textContent;
 	check( '...and a group has the one name in both tabs: the pages by their routes, the others by the words of the vocabulary - "Leistungen", not "Page services"',
@@ -1060,7 +1065,7 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	check( 'the search is the Text panel\'s, with a chip of the workbench for the hidden keys', box.getAttribute('aria-label') === W('/_admin/text/label/search') && k.list.querySelector('#keys-list-hidden').classList.contains('nino-admin-chip') && k.list.querySelector('#keys-list-hidden').textContent === W('/_admin/keys/label/hidden-only') );
 	box.value = 'netzwerk';
 	box.fire('input');
-	check( 'it finds a hidden key as well, as a row of the list', k.list.querySelectorAll('li').length === 1 && k.list.querySelector('.admin-text-hit-key').textContent === '/_admin/elements/field/social/title' && opens( k.list )[0].href === '#keys/_admin/elements/field/social/title' );
+	check( 'it finds a hidden key as well, as a row of the list', k.list.querySelectorAll('li').length === 1 && k.list.querySelector('.admin-text-hit-key').textContent === '/_admin/elements/field/social/title' && opens( k.list )[0].href === '#text/keys/_admin/%2F_admin%2Felements%2Ffield%2Fsocial%2Ftitle' );
 	box.value = '';
 	box.fire('input');
 	k.list.querySelector('#keys-list-hidden').click();
@@ -1075,7 +1080,7 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	box.fire('input');
 	k.calls.length = 0;
 	opens( k.list )[0].click();
-	check( 'a hit opens the row at the key: the address names it, the field is marked', k.keys._currentGroup === 'template/page-services' && k.calls.includes('go keys/template/page-services/item-1/title') && k.calls.includes('set keys/template/page-services/item-1/title')
+	check( 'a hit opens the row at the key: the address names it, the field is marked', k.keys._currentGroup === 'template/page-services' && k.calls.includes('go keys/template/page-services//template/page-services/item-1/title') && k.calls.includes('set keys/template/page-services//template/page-services/item-1/title')
 		&& k.form.querySelector('[data-key="/template/page-services/item-1/title"]').classList.contains('is-found') && k.keys._view === 'group' );
 }
 
@@ -1396,13 +1401,13 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	rowButtons( settingsOf( k, T ) )[0].click();
 	const control = id => k.form.querySelector( '#'+ id );
 	const options = id => control( id ).children.filter( c => c.tagName === 'option' ).map( o => o.value );
-	check( 'Rename opens the form of a rename at its address, with the four segments of the key', k.keys._view === 'new' && k.keys._renameFrom === T && k.calls.includes('go keys/@rename/template/page-services/item-1/title') && k.calls.includes('set keys/@rename/template/page-services/item-1/title')
+	check( 'Rename opens the form of a rename at its address, with the four segments of the key in its fields', k.keys._view === 'new' && k.keys._renameFrom === T && k.calls.includes('go keys/@rename//template/page-services/item-1/title') && k.calls.includes('set keys/@rename//template/page-services/item-1/title')
 		&& control('keys-form-namespace').value === 'template' && control('keys-form-category').value === 'page-services' && control('keys-form-part').value === 'item-1' && control('keys-form-name').value === 'title' );
 	check( '...the title says it and the main button says it - one main button, not locked', k.form.querySelector('.nino-admin-contextbar-title').textContent === W('/_admin/keys/label/rename-title') && k.form.querySelectorAll('.nino-admin-btn-primary').length === 1
 		&& k.form.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/rename-title') && k.form.querySelector('.nino-admin-btn-primary').disabled === false && k.form.querySelector('form').noValidate === true );
 	check( '...a namespace other than /project is unlocked, so the choice has them all; the category is a choice of what there is', options('keys-form-namespace').join() === 'project,template,feature,module' && options('keys-form-category').join() === 'common,frame-header,page-services'
 		&& control('keys-form-preview').textContent === T && control('keys-form-new-value') === null );
-	check( 'the form is in the address of the tab, and Back shows the list', k.keys._parts().join() === '@rename,template,page-services,item-1,title' );
+	check( 'the form is in the address of the tab, and Back shows the list', JSON.stringify( k.keys._parts() ) === '[{"word":"@rename"},"/template/page-services/item-1/title"]' );
 
 	submitKeys( k );
 	check( 'a key that is not changed is no rename: the line says so, nothing is sent, the focus is at the name', keyWrites( k ).length === 0 && k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/unchanged') && k.dom.doc.activeElement === control('keys-form-name') );
@@ -1431,7 +1436,7 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	submitKeys( k );
 	check( 'submitting renames the key to the one the segments make', keyWrites( k ).at(-1).endpoint === 'rename' && JSON.stringify( keyWrites( k ).at(-1).payload ) === JSON.stringify( { key : T, newKey : '/template/page-services/item-1/heading-2' } ) );
 	check( '...a write of texts, and of templates too where the key is one a template reads', k.touched.join() === 'texts,templates' );
-	check( '...and the key has its place: its row is open at it, at its address, as a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'template/page-services' && k.calls.at(-1).indexOf( 'set keys/template/page-services/item-1/heading-2' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved') );
+	check( '...and the key has its place: its row is open at it, at its address, as a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'template/page-services' && k.calls.at(-1).indexOf( 'set keys/template/page-services//template/page-services/item-1/heading-2' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved') );
 }
 
 {
@@ -1471,7 +1476,7 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	check( 'the form is unsaved input once something is typed', k.registry.keys.isDirty() === true );
 	submitKeys( k );
 	check( 'sent, the form makes the key from its segments, with the starting value in the language of the workbench', keyWrites( k )[0].endpoint === 'create' && JSON.stringify( keyWrites( k )[0].payload ) === JSON.stringify( { key : '/project/company/tester/zzz-name', global : false, value : 'Hallo Welt', values : { de_DE : 'Hallo Welt' } } ) );
-	check( '...the new key is open in its row, at its address, with the cursor in it, and a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'project/company' && k.calls.at(-1).indexOf( 'set keys/project/company/tester/zzz-name' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved')
+	check( '...the new key is open in its row, at its address, with the cursor in it, and a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'project/company' && k.calls.at(-1).indexOf( 'set keys/project/company//project/company/tester/zzz-name' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved')
 		&& k.form.querySelector('[data-key="/project/company/tester/zzz-name"]') !== null );
 }
 
@@ -1528,10 +1533,11 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 	// the address of a view of the tab
 	const k = openedKeys( keysResponse() );
 	const target = parts => JSON.stringify( k.keys._target( parts ) );
-	check( 'an address names a row, a key in it, the form of a new key, the scan, or the rename of a key that can be renamed', target( [ 'template', 'page-services' ] ) === '{"view":"group","row":"template/page-services","key":null}'
-		&& target( [ 'template', 'page-services', 'intro', 'title' ] ) === '{"view":"group","row":"template/page-services","key":"/template/page-services/intro/title"}' && target( [ '@new' ] ) === '{"view":"new","key":null}' && target( [ '@scan' ] ) === '{"view":"scan"}'
-		&& target( [ '@rename', 'template', 'page-services', 'intro', 'title' ] ) === '{"view":"new","key":"/template/page-services/intro/title"}' );
-	check( '...and what is not there is the list: a rename of a key that is not there or of one of the system, an at sign with more behind it, a row nobody has', k.keys._target( [ '@rename', 'template', 'nope', 'a', 'b' ] ) === null && k.keys._target( [ '@rename', '_nino', 'webpage', 'services', 'title' ] ) === null
+	check( 'an address names a row, a key in it, the form of a new key, the scan, or the rename of a key that can be renamed', target( [ 'template/page-services' ] ) === '{"view":"group","row":"template/page-services","key":null}'
+		&& target( [ 'template/page-services', '/template/page-services/intro/title' ] ) === '{"view":"group","row":"template/page-services","key":"/template/page-services/intro/title"}' && target( [ '@new' ] ) === '{"view":"new","key":null}' && target( [ '@scan' ] ) === '{"view":"scan"}'
+		&& target( [ '@rename', '/template/page-services/intro/title' ] ) === '{"view":"new","key":"/template/page-services/intro/title"}' );
+	check( 'the address read by the router: @rename and a key is the rename of that key, %40rename and a key is no rename - a row called @rename is none', JSON.stringify( k.keys._target( codec.read( '#text/keys/@rename/%2Ftemplate%2Fpage-services%2Fintro%2Ftitle' ).parts ) ) === '{"view":"new","key":"/template/page-services/intro/title"}' );
+	check( '...and what is not there is the list: a rename of a key that is not there or of one of the system, an at sign with more behind it, a row nobody has', k.keys._target( [ '@rename', '/template/nope/a/b' ] ) === null && k.keys._target( [ '@rename', '/_nino/webpage/services/title' ] ) === null && k.keys._target( [ '@rename', 'template', 'page-services', 'intro', 'title' ] ) === null && k.keys._target( [ '@rename', '/template/page-services/intro/title', 'more' ] ) === null && k.keys._target( codec.read( '#text/keys/%40rename/%2Ftemplate%2Fpage-services%2Fintro%2Ftitle' ).parts ) === null
 		&& k.keys._target( [ '@new', 'x' ] ) === null && k.keys._target( [ '@scan', 'x' ] ) === null && k.keys._target( [ 'nothing' ] ) === null && k.keys._target( [ '@rename' ] ) === null );
 }
 
@@ -1612,4 +1618,8 @@ const tick = box => { box.checked = box.checked === false; box.fire('change') };
 		check( locale+ ': every word of a format and of its conversion is there', [ 'auto', 'plain', 'inline', 'lines', 'blocks' ].every( f => words['/_admin/keys/format/'+ f] !== undefined ) && [ 'plain', 'inline', 'lines' ].every( f => words['/_admin/keys/convert/'+ f] !== undefined ) );
 	} );
 }
+check( 'every address the Text and Keys panels wrote or drew - a row, a key of it, a new key, a rename, the scan - is read back by the router as the same screen and the same parts', codec.written.length > 10 && codec.mismatches.length === 0
+	&& codec.written.some( written => written.screen === 'text' && written.parts.length === 2 ) && codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@rename' ) && written.parts.length === 2 )
+	&& codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@scan' ) ) );
+
 done();

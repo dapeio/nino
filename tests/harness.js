@@ -26,6 +26,8 @@
  *									fire( el, name, event )				Calls the listeners of an event
  *									matches( el, selector )				Whether an element answers a selector
  *									documentOf( mount )					A document stand-in over one mount element
+ *									shellRouter( structure )			The real router of the workbench shell over a page that has the panels and tabs of the structure, a history that is numbered
+ *									addressFixture()					The table both languages write addresses by: tests/fixtures/addresses.json
  *
  *	Usage: require it from tests/<name>-js-smoke.js and run that with node.
  */
@@ -560,4 +562,138 @@ function documentOf( mount ) {
 	};
 }
 
-module.exports = { markupWrites, check, done, source, fills, load, classList, element, findAll, fire, matches, documentOf };
+// --- the router of the workbench shell, for the suites that write addresses --
+
+/**
+ *	The structure of the workbench as the shell renders it, which tests/fixtures/addresses.json
+ *	holds: panel => [ [ screen, tab ], ... ], an empty list for a panel with no tabs
+ *
+ *	@return		{Object}
+ */
+function addressFixture() {
+	return JSON.parse( source( 'tests/fixtures/addresses.json' ) );
+}
+
+/**
+ *	The real router (_admin/assets/script.js) over a page stand-in that has the panes
+ *	of a structure, a location and a history that numbers its entries. A suite that
+ *	writes addresses takes its codec from here instead of writing one of its own:
+ *	href() is what the router writes, read() reads an address as the router does,
+ *	and check() writes a state and reads it back - a state a panel wrote that does
+ *	not come back as the same screen and the same parts is in `mismatches`
+ *
+ *	@param		{Object}	[structure]		panel => [ [ screen, tab ], ... ]; the structure of the fixture where left out
+ *
+ *	@return		{Object}							{ router, box, entries, states, panes, index, mismatches, written, href, read, check, show, stub }
+ */
+function shellRouter( structure ) {
+
+	structure = structure ?? addressFixture().structure;
+
+	const panes = Object.keys( structure ).map( function( panel ) {
+		const tabs = structure[panel].map( function( tab ) { return { dataset : { tab : tab[0], addressTab : tab[1] } } } );
+		return { dataset : { panel : panel }, querySelectorAll : function() { return tabs } };
+	} );
+	const ids = new Set( [ 'admin-page-wrap' ] );
+
+	Object.keys( structure ).forEach( function( panel ) {
+		ids.add( 'admin-content-'+ panel );
+		structure[panel].forEach( function( tab ) { ids.add( 'admin-tab-'+ tab[0] ) } );
+	} );
+
+	let on = '';
+	const wrap = { classList : { contains : function( name ) { return name === 'show-'+ on } } };
+	const entries = [ '' ];
+	const states = [ null ];
+	let at = 0;
+
+	const box = {
+		console : console,
+		location : { hash : '' },
+		history : {
+			went : [],
+			states : states,
+			get state() { return states[at] },
+			pushState : function( state, title, url ) { entries.splice( at + 1 ); states.splice( at + 1 ); entries.push( url ); states.push( state ); at++; box.location.hash = url },
+			replaceState : function( state, title, url ) { if( url !== undefined ) { entries[at] = url; box.location.hash = url } states[at] = state },
+			go : function( delta ) { this.went.push( delta ) },
+		},
+		document : {
+			documentElement : null,
+			body : null,
+			getElementById : function( id ) { return id === 'admin-page-wrap' ? wrap : ( ids.has( id ) ? {} : null ) },
+			querySelectorAll : function( selector ) { return selector === '#admin-content-wrap > [data-panel]' ? panes : [] },
+		},
+	};
+
+	box.window = box;
+	box.Nino = { events : { bindCallback : function() {} } };
+
+	load( '_admin/assets/script.js', vm.createContext( box ) );
+
+	const router = box.Nino.admin.router;
+	const out = { router, box, entries, states, panes, mismatches : [], written : [], index : function() { return at } };
+
+	// The screen on show: what set() and go() ask of the page before they write
+	out.show = function( screen ) { on = screen };
+
+	out.href = function( screen, parts ) { return router.href( screen, parts ) };
+	// The parts of an address as the router reads them, for a suite that feeds a panel what the address says: a string that is
+	// an at sign and a lowercase word is the word, any other string a key, and { key : '@new' } the key that reads like the word
+	out.parts = function() {
+		const items = Array.from( arguments ).map( item => typeof item === 'object' ? item.key : ( /^@[a-z][a-z0-9-]*$/.test( item ) === true ? router.word( item.slice( 1 ) ) : item ) );
+		return out.read( router.href( 'dashboard', items ) ).parts;
+	};
+	out.word = function( name ) { return router.word( name ) };
+	out.wordOf = function( parts, at ) { return router.wordOf( parts, at ) };
+	out.isWord = function( parts, at, name ) { return router.isWord( parts, at, name ) };
+
+	// An address read as the router reads it, whatever the bar shows
+	out.read = function( hash ) {
+		const was = box.location.hash;
+		box.location.hash = hash;
+		try {
+			return router.current();
+		} finally {
+			box.location.hash = was;
+		}
+	};
+
+	// A state written and read back
+	out.check = function( screen, parts ) {
+
+		const hash = router.href( screen, parts );
+		const back = out.read( hash );
+		// A word is written as an object (router.word()) and read back as a part that says it is one
+		const isWord = part => typeof part === 'object' && part !== null;
+		const expected = ( parts ?? [] ).map( part => isWord( part ) === true ? part.word : String( part ) );
+		const same = back.panel === screen && back.known === true && JSON.stringify( back.parts ) === JSON.stringify( expected )
+			&& JSON.stringify( back.parts.words ) === JSON.stringify( ( parts ?? [] ).map( isWord ) );
+
+		out.written.push( { screen, parts, hash } );
+
+		if( same === false )
+			out.mismatches.push( { screen, parts, hash, back } );
+
+		return hash;
+	};
+
+	// The router a panel suite hands the panel: it writes through the codec - so that every state the panel
+	// writes, and every link it draws, is checked to be read back - and answers what `extras` replaces
+	out.stub = function( extras ) {
+		return Object.assign( {
+			go : function( screen, parts ) { out.check( screen, parts ) },
+			set : function( screen, parts ) { out.check( screen, parts ) },
+			href : function( screen, parts ) { return out.check( screen, parts ) },
+			current : function() { return { panel : '', parts : [], known : false } },
+			word : function( name ) { return router.word( name ) },
+			wordOf : function( parts, at ) { return router.wordOf( parts, at ) },
+			isWord : function( parts, at, name ) { return router.isWord( parts, at, name ) },
+			leave : function( names, leaving, proceed ) { proceed() },
+		}, extras );
+	};
+
+	return out;
+}
+
+module.exports = { markupWrites, check, done, source, fills, load, classList, element, findAll, fire, matches, documentOf, shellRouter, addressFixture };

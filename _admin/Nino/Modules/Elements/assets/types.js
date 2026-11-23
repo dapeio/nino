@@ -13,8 +13,8 @@
  *													and a type duplicated, see _duplicate().
  *
  *													Every view has an address that survives a reload: the types
- *													(#types), one type (#types/<uri>) and a new one
- *													(#types/@new). A form is built from the blocks of the
+ *													(#elements/types), one type (#elements/types/<uri>) and
+ *													a new one (#elements/types/@new). A form is built from the blocks of the
  *													workbench with the label at the left of the field, checks
  *													itself (novalidate) and says what is wrong at the field - the
  *													answer of the server too, where it names one. A field of the
@@ -172,7 +172,7 @@
 		 */
 		_restore : function( parts ) {
 
-			if( parts[0] === '@new' && parts.length === 1 ) {
+			if( Nino.admin.router.isWord( parts, 0, 'new' ) === true && parts.length === 1 ) {
 				Nino.admin.types._openForm( null );
 				return;
 			}
@@ -226,7 +226,7 @@
 			}
 
 			const open = dc.getElementById('types-form').classList.contains('admin-hidden') === false;
-			const isNew = parts.length === 1 && parts[0] === '@new';
+			const isNew = parts.length === 1 && Nino.admin.router.isWord( parts, 0, 'new' ) === true;
 			const known = parts.length === 1 && isNew === false && Nino.admin.types._types.some( function( type ) { return type.uri === parts[0] } ) === true;
 
 			// Already on the level the address names
@@ -297,7 +297,7 @@
 		 *	@return		void
 		 */
 		_showForm : function( opened ) {
-			Nino.admin.router.set( 'types', [ Nino.admin.types._isNew === true ? '@new' : Nino.admin.types._currentUri ] );
+			Nino.admin.router.set( 'types', [ Nino.admin.types._isNew === true ? Nino.admin.router.word('new') : Nino.admin.types._currentUri ] );
 			Nino.adminUi.showLevel( 'types-form', opened === true ? {} : { focus : false } );
 		},
 
@@ -355,7 +355,7 @@
 				} ), { label : Nino.content.getText('/_admin/nav/types') } ) );
 
 			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/types/label/new'), function() {
-				Nino.admin.router.go( 'types', [ '@new' ] );
+				Nino.admin.router.go( 'types', [ Nino.admin.router.word('new') ] );
 				Nino.admin.types._openForm( null, addBtn, true );
 			} );
 			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : addBtn } ).el );

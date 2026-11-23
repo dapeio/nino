@@ -20,7 +20,10 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, source, fills, load, element, findAll, fire, documentOf } = require( './harness.js' );
+const { check, done, source, fills, load, element, findAll, fire, documentOf, shellRouter } = require( './harness.js' );
+
+// What the panels write into the address goes through the router's own codec: every state written is read back
+const codec = shellRouter();
 
 const moduleEn	= fills('_admin/Nino/Modules/Images/text/en_US.php');
 const moduleDe	= fills('_admin/Nino/Modules/Images/text/de_DE.php');
@@ -75,9 +78,9 @@ function page( levels, panel, scripts ) {
 	};
 
 	const router = {
-		set : function( name, parts ) { out.routed.push( 'set '+ [ name ].concat( parts ).join('/') ) },
-		go : function( name, parts ) { out.routed.push( 'go '+ [ name ].concat( parts ).join('/') ) },
-		href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') },
+		set : function( name, parts ) { codec.check( name, parts ); out.routed.push( 'set '+ [ name ].concat( parts ).join('/') ) },
+		go : function( name, parts ) { codec.check( name, parts ); out.routed.push( 'go '+ [ name ].concat( parts ).join('/') ) },
+		href : function( name, parts ) { return codec.check( name, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
 		current : function() { return out.hash },
 		leave : function( names, leaving, proceed, resync ) { if( leaving === true ) return registry.guard( names, proceed, resync ); proceed() },
 	};
@@ -183,8 +186,8 @@ images._renderCategoryList();
 
 const rows = findAll( grouping.levels['images-list'], function( el ) { return has( el, 'nino-admin-list-row' ) } );
 const links = findAll( grouping.levels['images-list'], function( el ) { return el.tagName === 'A' && has( el, 'nino-admin-row-open' ) } );
-check( 'every category is a row of the list block, a real link with the address of the category - the segments of its name', rows.length === 2 && links.length === 2
-	&& links.map( link => link.href ).join() === '#images/logo,#images/template/page-home' );
+check( 'every category is a row of the list block, a real link with the address of the category - its name as one part', rows.length === 2 && links.length === 2
+	&& links.map( link => link.href ).join() === '#images/images/logo,#images/images/template%2Fpage-home' );
 check( '...and no row of its own: the old list class and its chevron are not drawn', findAll( grouping.levels['images-list'], function( el ) { return has( el, 'admin-type-btn' ) || has( el, 'admin-view-button-chev' ) } ).length === 0 );
 check( '...the label of a row is the vocabulary\'s word for the category, as the Text panel says it', rows.every( row => findAll( row, el => el.tagName === 'STRONG' )[0].textContent === grouping.Nino.adminUi.slugLabel( row.dataset.row.split('/').pop() ) ) );
 
@@ -193,7 +196,7 @@ images._renderCategoryList();
 const emptyBox = byClass( grouping.levels['images-list'], 'nino-admin-empty' )[0];
 check( 'no slots at all is an empty state with the next step as a button, never a bare sentence', emptyBox !== undefined && buttonsOf( emptyBox ).length === 1 );
 fire( buttonsOf( emptyBox )[0], 'click' );
-check( '...the button goes to the tab that makes slots', grouping.window.location.hash === '#slots' );
+check( '...the button goes to the tab that makes slots', grouping.window.location.hash === '#images/slots' );
 
 
 // --- a category: the form of its slots --------------------------------------------------
@@ -492,21 +495,21 @@ images._renderCategoryList();
 
 grouping.routed.length = 0;
 images._openGroup( 'template/page-home', true );
-check( 'opening a category is a step Back returns to: the address is pushed before the form writes it - and a category with a slash in its name is written as its segments', grouping.routed.join() === 'go images/template/page-home,set images/template/page-home' );
+check( 'opening a category is a step Back returns to: the address is pushed before the form writes it - and a category with a slash in its name is written as ONE part', grouping.routed.join() === 'go images/template/page-home,set images/template/page-home' );
 check( '...the form is drawn, and the focus goes into it', grouping.levels['images-form'].classList.contains('admin-hidden') === false && grouping.levels['images-list'].classList.contains('admin-hidden') === true && grouping.focused() !== null );
 
 const back = byClass( grouping.levels['images-form'], 'nino-admin-back-link' )[0];
 grouping.routed.length = 0;
 fire( back, 'click' );
 check( 'the back link adds an entry as well, and shows the list with the focus on the row that was opened', grouping.routed.join() === 'go images,set images' && grouping.levels['images-list'].classList.contains('admin-hidden') === false
-	&& grouping.focused() === findAll( grouping.levels['images-list'], el => el.tagName === 'A' && el.dataset !== undefined && el.href === '#images/template/page-home' )[0] );
+	&& grouping.focused() === findAll( grouping.levels['images-list'], el => el.tagName === 'A' && el.dataset !== undefined && el.href === '#images/images/template%2Fpage-home' )[0] );
 
 // What an address of a step through the history names
 const follow = function( hash ) { grouping.hash = hash; grouping.routed.length = 0; images.showCurrent() };
+follow( { panel : 'images', parts : [ 'template/page-home' ] } );
+check( 'a hash of one part opens that category', images._currentGroup === 'template/page-home' && grouping.levels['images-form'].classList.contains('admin-hidden') === false );
 follow( { panel : 'images', parts : [ 'template', 'page-home' ] } );
-check( 'a hash of segments opens that category', images._currentGroup === 'template/page-home' && grouping.levels['images-form'].classList.contains('admin-hidden') === false );
-follow( { panel : 'images', parts : [ 'template%2Fpage-home' ].map( decodeURIComponent ) } );
-check( '...and so does the group written as one part, as an address was written before', images._currentGroup === 'template/page-home' );
+check( '...the group in its segments is no address of it any more: the list', grouping.levels['images-form'].classList.contains('admin-hidden') === true && grouping.levels['images-list'].classList.contains('admin-hidden') === false );
 follow( { panel : 'images', parts : [] } );
 check( 'a hash that names the list shows it', grouping.levels['images-form'].classList.contains('admin-hidden') === true && grouping.levels['images-list'].classList.contains('admin-hidden') === false && grouping.routed.join() === 'set images' );
 follow( { panel : 'images', parts : [ 'nope' ] } );
@@ -531,11 +534,11 @@ check( 'a hash that names another panel (a click on the rail) keeps the level in
 images._ready = false;
 grouping.levels['images-form'].classList.add('admin-hidden');
 grouping.levels['images-list'].classList.remove('admin-hidden');
-grouping.hash = { panel : 'images', parts : [ 'template', 'page-home' ] };
+grouping.hash = { panel : 'images', parts : [ 'template/page-home' ] };
 grouping.requests.length = 0;
 images.init();
 grouping.answer( 200, { slots : [ slot( { uri : '/template/page-home/hero/image' } ) ], locales : [ 'de_DE', 'en_US' ] } );
-check( 'a reload on #images/template/page-home opens the category once the slots are in', images._currentGroup === 'template/page-home' && grouping.levels['images-form'].classList.contains('admin-hidden') === false && grouping.requests.length === 1 );
+check( 'a reload on #images/images/template%2Fpage-home opens the category once the slots are in', images._currentGroup === 'template/page-home' && grouping.levels['images-form'].classList.contains('admin-hidden') === false && grouping.requests.length === 1 );
 
 // The templates written since the slots were read
 images._ready = true;
@@ -598,7 +601,7 @@ tab.answer( 200, { slots : catalogue } );
 check( '...and shows the list when no address names another view', slots._ready === true && list.classList.contains('admin-hidden') === false && tab.routed[tab.routed.length - 1] === 'set slots' );
 
 const slotLinks = findAll( list, el => el.tagName === 'A' && has( el, 'nino-admin-row-open' ) );
-check( 'every slot is a row of the list block - a link with its address, the segments of its uri - and no row is a button to nowhere', slotLinks.map( l => l.href ).join() === '#slots/logo,#slots/logo/dark,#slots/template/page-home/hero/background'
+check( 'every slot is a row of the list block - a link with its address, its uri as one part - and no row is a button to nowhere', slotLinks.map( l => l.href ).join() === '#images/slots/%2Flogo,#images/slots/%2Flogo%2Fdark,#images/slots/%2Ftemplate%2Fpage-home%2Fhero%2Fbackground'
 	&& findAll( list, el => has( el, 'nino-admin-list-row' ) ).length === 3 && findAll( list, el => el.tagName === 'BUTTON' && has( el, 'nino-admin-row-open' ) ).length === 0 );
 check( '...two lines each: the label over the uri and the size', findAll( list, el => el.tagName === 'SMALL' ).map( s => s.textContent.indexOf( ' × ' ) !== -1 ).every( Boolean ) && findAll( list, el => el.tagName === 'SMALL' ).length === 3 );
 const pills = findAll( list, el => has( el, 'nino-admin-badge' ) );
@@ -609,7 +612,7 @@ check( 'the list has its bar: the scan beside "New image slot", which is the one
 
 tab.routed.length = 0;
 fire( slotLinks[0], 'click' );
-check( 'opening a slot is a step Back returns to: it writes its address, shows the form and moves the focus into it', tab.routed.join() === 'go slots/logo,set slots/logo' && form2.classList.contains('admin-hidden') === false
+check( 'opening a slot is a step Back returns to: it writes its address, shows the form and moves the focus into it', tab.routed.join() === 'go slots//logo,set slots//logo' && form2.classList.contains('admin-hidden') === false
 	&& list.classList.contains('admin-hidden') === true && tab.focused() !== null );
 
 const edit = findAll( form2, el => el.tagName === 'FORM' )[0];
@@ -675,7 +678,7 @@ slots._slots = catalogue;
 tab.routed.length = 0;
 const add = buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] ).find( b => has( b, 'nino-admin-btn-primary' ) );
 fire( add, 'click' );
-check( 'New image slot opens an empty form at the address #slots/new', tab.routed.join() === 'go slots/new,set slots/new' && inputs().uri.disabled === false && inputs().uri.value === '' && tab.focused() === inputs().uri );
+check( 'New image slot opens an empty form at the address #images/slots/@new', tab.routed.join() === 'go slots/@new,set slots/@new' && inputs().uri.disabled === false && inputs().uri.value === '' && tab.focused() === inputs().uri );
 const bar2 = byClass( form2, 'nino-admin-actionbar' )[0];
 check( '...with no Delete - the bar holds the state and the one main button, worded as a view that creates' , has( bar2.children[0], 'nino-admin-badge' ) === true && bar2.children[bar2.children.length - 1].textContent === text('/_admin/slots/label/create') );
 
@@ -700,23 +703,29 @@ tab.answer( 200, {} );
 tab.routed.length = 0;
 tab.answer( 200, { slots : catalogue.concat( [ { uri : '/new-slot', label : 'X', width : 10, height : 10, hasImage : false, usage : { templates : [], pages : [] } } ] ) } );
 check( 'a slot that was made is the one on the form from then on: its uri fixed, Delete in the bar, its address written over the one of the new form', inputs().uri.disabled === true && inputs().uri.value === '/new-slot'
-	&& tab.routed.indexOf( 'set slots/new-slot' ) !== -1 && has( byClass( form2, 'nino-admin-actionbar' )[0].children[0], 'nino-admin-btn-danger' ) && slots._isNew === false );
+	&& tab.routed.indexOf( 'set slots//new-slot' ) !== -1 && has( byClass( form2, 'nino-admin-actionbar' )[0].children[0], 'nino-admin-btn-danger' ) && slots._isNew === false );
 
 // The address
 tab.hash = { panel : 'slots', parts : [] };
 slots.showCurrent();
 check( 'an address that names the list shows it', list.classList.contains('admin-hidden') === false && form2.classList.contains('admin-hidden') === true );
-tab.hash = { panel : 'slots', parts : [ 'logo', 'dark' ] };
+tab.hash = { panel : 'slots', parts : [ '/logo/dark' ] };
 slots.showCurrent();
-check( 'an address of the segments of a uri opens that slot', form2.classList.contains('admin-hidden') === false && slots._current.uri === '/logo/dark' );
-tab.hash = { panel : 'slots', parts : [ 'new' ] };
+check( 'an address of a uri as one part opens that slot', form2.classList.contains('admin-hidden') === false && slots._current.uri === '/logo/dark' );
+tab.hash = { panel : 'slots', parts : codec.parts( { key : '@new' } ) };
 slots.showCurrent();
-check( '...#slots/new the form of a new one', slots._isNew === true && form2.classList.contains('admin-hidden') === false );
+check( '...%40new is the key @new, which is no slot and no form that makes one: the list', slots._isNew === false && form2.classList.contains('admin-hidden') === true );
+tab.hash = { panel : 'slots', parts : codec.parts( { key : '@scan' } ) };
+slots.showCurrent();
+check( '...and %40scan is no scan', form2.classList.contains('admin-hidden') === true && slots._scanning !== true );
+tab.hash = { panel : 'slots', parts : codec.parts( '@new' ) };
+slots.showCurrent();
+check( '...@new the form of a new one', slots._isNew === true && form2.classList.contains('admin-hidden') === false );
 tab.hash = { panel : 'slots', parts : [ 'nope' ] };
 slots.showCurrent();
 check( '...and a slot there is none of is the list', form2.classList.contains('admin-hidden') === true );
 check( 'the slot a person types into a new form and leaves asks first, as every form does', ( function() {
-	tab.hash = { panel : 'slots', parts : [ 'new' ] };
+	tab.hash = { panel : 'slots', parts : codec.parts( '@new' ) };
 	slots.showCurrent();
 	tab.registry._entries.slots.isDirty = function() { return true };
 	tab.asked.length = 0;
@@ -726,8 +735,8 @@ check( 'the slot a person types into a new form and leaves asks first, as every 
 	tab.registry._entries.slots.isDirty = function() { return false };
 	return asked;
 } )() );
-check( 'the one uri that would read as a view of the tab is written as one part, and is read back', slots._slotParts('/scan').join() === '/scan' && slots._slotParts('/logo/dark').join() === 'logo,dark'
-	&& slots._slotAt( [ '/scan' ] ) === null && slots._slotAt( [ 'logo', 'dark' ] ).uri === '/logo/dark' );
+check( 'a slot is named by its uri as one part: the segments of it name none, and a word with an at sign names no slot', slots._slotAt( [ '/logo/dark' ] ).uri === '/logo/dark'
+	&& slots._slotAt( [ 'logo', 'dark' ] ) === null && slots._slotAt( [ '@scan' ] ) === null && slots._slotAt( [ '@new' ] ) === null );
 tab.registry._entries.slots.isDirty = function() { return false };
 
 
@@ -740,7 +749,7 @@ slots.showCurrent();
 const scanButton = buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] ).find( b => has( b, 'nino-admin-btn-secondary' ) );
 tab.routed.length = 0;
 fire( scanButton, 'click' );
-check( 'the scan has an address of its own and opens in the form level, waiting for the server with the focus in the view', tab.routed.join() === 'go slots/scan,set slots/scan' && tab.requests[0].action === 'slots/scan' && form2.classList.contains('admin-hidden') === false
+check( 'the scan has an address of its own and opens in the form level, waiting for the server with the focus in the view', tab.routed.join() === 'go slots/@scan,set slots/@scan' && tab.requests[0].action === 'slots/scan' && form2.classList.contains('admin-hidden') === false
 	&& findAll( form2, el => el.attributes['aria-busy'] === 'true' ).length === 1 );
 
 const found = [
@@ -825,6 +834,10 @@ check( 'an answer to a scan whose view was left has nowhere to go: nothing is dr
 const slotsSource = source('_admin/Nino/Modules/Images/assets/slots.js');
 check( 'the tab asks nothing with the browser\'s own dialogs', /\b(alert|confirm|prompt)\s*\(/.test( slotsSource.replace( /\/\*[\s\S]*?\*\//g, '' ).replace( /Nino\.adminUi\.confirm\(/g, '' ) ) === false );
 check( 'nothing the tab is told is written as markup - innerHTML is only ever emptied', ( slotsSource.match( /innerHTML[^\n]*/g ) || [] ).every( function( use ) { return /^innerHTML = '';$/.test( use ) } ) );
+
+check( 'every address the two panels wrote or drew - the categories, the slots, the new slot, the scan - is read back by the router as the same screen and the same parts', codec.written.length > 8 && codec.mismatches.length === 0
+	&& codec.written.some( written => written.screen === 'slots' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.screen === 'slots' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@scan' ) )
+	&& codec.written.some( written => written.screen === 'images' && written.parts[0] === 'template/page-home' ) && codec.written.filter( written => written.screen === 'images' || written.screen === 'slots' ).every( written => written.parts.length <= 1 ) );
 
 done();
 

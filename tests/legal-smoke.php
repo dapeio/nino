@@ -652,7 +652,7 @@ $findings = \Nino\Modules\Legal::check( $clean );
 $byKind = [];
 foreach( $findings as $finding )
 	$byKind[ $finding['kind'] ][] = $finding;
-check( 'unknown: a placeholder without a value, with the section and the language', ( $byKind['unknown'][0]['values'] ?? null ) === [ '#/project/company/contact/fax#', 'Hosting', 'de_DE' ] && ( $byKind['unknown'][0]['link'] ?? null ) === '#elements/privacy/hosting' );
+check( 'unknown: a placeholder without a value, with the section and the language', ( $byKind['unknown'][0]['values'] ?? null ) === [ '#/project/company/contact/fax#', 'Hosting', 'de_DE' ] && ( $byKind['unknown'][0]['link'] ?? null ) === '#elements/elements/privacy/hosting' );
 check( 'empty: a placeholder whose value is empty', ( $byKind['empty'][0]['values'] ?? null ) === [ '#/project/company/contact/mobile#', 'Hosting', 'de_DE' ] );
 check( 'ignored: something that looks like a placeholder and is never replaced', ( $byKind['ignored'][0]['values'] ?? null ) === [ '#/project/mail/address/owner#', 'Hosting', 'de_DE' ] );
 check( 'the same finding is said once, whatever the number of languages that find it', count( $byKind['unknown'] ?? [] ) === 1 && array_sum( array_map( 'count', $byKind ) ) === 3 );
@@ -679,7 +679,7 @@ check( 'a placeholder for a runtime fill is no unknown one, and a value that res
 }, [] );
 unset( $clean['./nino/elements/cache'] );
 $translation = array_values( array_filter( \Nino\Modules\Legal::check( $clean ), static fn( array $finding ): bool => $finding['kind'] === 'translation' ) );
-check( 'translation: a section with neither title nor text in a language, named by its title in the native language', count( $translation ) === 1 && $translation[0]['values'] === [ 'Deine Rechte', 'en_US' ] && $translation[0]['link'] === '#elements/privacy/rights' );
+check( 'translation: a section with neither title nor text in a language, named by its title in the native language', count( $translation ) === 1 && $translation[0]['values'] === [ 'Deine Rechte', 'en_US' ] && $translation[0]['link'] === '#elements/elements/privacy/rights' );
 \Nino\Filesystem::mutate( $clean, '/elements/privacy.php', static function( array $type ): array {
 	$type['en_US']['rights'] = [ 'title' => 'Your rights', 'text' => '<p>Rights.</p>' ];
 	return $type;
@@ -763,7 +763,7 @@ check( 'a feature that is off and has no section in the project is nothing to te
 check( 'switching it on brings its sections, and nothing is to be told', \Nino\Features::activate( $clean, 'sample' ) === true && $sampleKinds( $clean ) === [] );
 \Nino\Features::deactivate( $clean, 'sample' );
 $off = $sampleKinds( $clean );
-check( 'feature: switched off, its sections are still to be seen - the finding names it and them', count( $off ) === 1 && $off[0]['kind'] === 'feature' && $off[0]['values'][1] === 'Beispiel, Beispiel mehr' && $off[0]['link'] === '#elements/privacy' );
+check( 'feature: switched off, its sections are still to be seen - the finding names it and them', count( $off ) === 1 && $off[0]['kind'] === 'feature' && $off[0]['values'][1] === 'Beispiel, Beispiel mehr' && $off[0]['link'] === '#elements/elements/privacy' );
 \Nino\Features::activate( $clean, 'sample' );
 \Nino\Elements::updateElement( $clean, '/privacy/sample', [ 'hidden' => true ], '*' );
 \Nino\Elements::updateElement( $clean, '/privacy/sample-more', [ 'hidden' => true ], '*' );
@@ -776,7 +776,7 @@ $many = legalProject( 'legal-many' );
 \Nino\Elements::updateElement( $many, '/privacy/hosting', [ 'text' => '<p>'. implode( ' ', array_map( static fn( int $n ): string => '#/project/company/contact/x'. $n. '#', range( 1, 11 ) ) ). '</p>' ], 'de_DE' );
 $notices = \Nino\Modules\Legal::notices( $many );
 check( 'notices() are the findings as the dashboard shows them: a text key, the values, a link - eight of them, then one that counts the rest', count( $notices ) === 9
-	&& $notices[0]['text'] === '/_admin/dashboard/notice/legal-unknown' && $notices[0]['values'][0] === '#/project/company/contact/x1#' && $notices[0]['link'] === '#elements/privacy/hosting'
+	&& $notices[0]['text'] === '/_admin/dashboard/notice/legal-unknown' && $notices[0]['values'][0] === '#/project/company/contact/x1#' && $notices[0]['link'] === '#elements/elements/privacy/hosting'
 	&& $notices[8] === [ 'text' => '/_admin/dashboard/notice/legal-more', 'values' => [ '3' ], 'link' => '' ] );
 $wordsEnglish = include __DIR__. '/../_admin/Nino/Modules/Dashboard/text/en_US.php';
 $wordsGerman = include __DIR__. '/../_admin/Nino/Modules/Dashboard/text/de_DE.php';

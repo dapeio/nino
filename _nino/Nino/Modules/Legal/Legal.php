@@ -581,7 +581,7 @@ namespace Nino\Modules {
 					$model		= \Nino\Filesystem::fileExists( $appData, '/elements/'. $type. '.php' ) === true ? \Nino\Elements::getElementModel( $appData, '/'. $type ) : [];
 
 					if( $model === [] ) {
-						$findings[] = [ 'kind' => 'nothing', 'values' => [ $type, self::_unitFile( $type ) ], 'link' => '#elements/'. $type ];
+						$findings[] = [ 'kind' => 'nothing', 'values' => [ $type, self::_unitFile( $type ) ], 'link' => \Nino\AdminAddress::of( 'elements', [ $type ] ) ];
 						continue;
 					}
 
@@ -600,7 +600,7 @@ namespace Nino\Modules {
 
 							$id = \Nino\Elements::getElementUriFromUri( $element['.uri'] );
 							$sections[$id] = true;
-							$link = '#elements/'. $type. '/'. $id;
+							$link = \Nino\AdminAddress::of( 'elements', [ $type, $id ] );
 
 							if( (string) ( $element['title'] ?? '' ) === '' && (string) ( $element['text'] ?? '' ) === '' )
 								$findings[] = [ 'kind' => 'translation', 'values' => [ self::_title( $element, $id, $native, $appData ), $locale ], 'link' => $link ];
@@ -617,7 +617,7 @@ namespace Nino\Modules {
 					}
 
 					if( $sections === [] )
-						$findings[] = [ 'kind' => 'nothing', 'values' => [ $type, self::_unitFile( $type ) ], 'link' => '#elements/'. $type ];
+						$findings[] = [ 'kind' => 'nothing', 'values' => [ $type, self::_unitFile( $type ) ], 'link' => \Nino\AdminAddress::of( 'elements', [ $type ] ) ];
 				}
 
 				\Nino\Locales::useLocale( $appData, $current );
@@ -1108,7 +1108,7 @@ namespace Nino\Modules {
 				if( $missing !== [] ) {
 					\Nino\Locales::useLocale( $appData, $native );
 					$name = \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $definition['uri']. '/name' );
-					$findings[] = [ 'kind' => 'nav', 'values' => [ $name !== '' ? $name : $definition['uri'], implode( ', ', $missing ) ], 'link' => '#navs' ];
+					$findings[] = [ 'kind' => 'nav', 'values' => [ $name !== '' ? $name : $definition['uri'], implode( ', ', $missing ) ], 'link' => \Nino\AdminAddress::of( 'navs' ) ];
 				}
 			}
 
@@ -1213,10 +1213,10 @@ namespace Nino\Modules {
 				$sections		= self::contributions( $appData, (string) $key );
 
 				if( $feature['active'] === false && $sections !== [] )
-					$findings[] = [ 'kind' => 'feature', 'values' => [ $name, implode( ', ', array_column( $sections, 'title' ) ) ], 'link' => '#elements/privacy' ];
+					$findings[] = [ 'kind' => 'feature', 'values' => [ $name, implode( ', ', array_column( $sections, 'title' ) ) ], 'link' => \Nino\AdminAddress::of( 'elements', [ 'privacy' ] ) ];
 
 				if( $feature['active'] === true && $sections === [] )
-					$findings[] = [ 'kind' => 'undescribed', 'values' => [ $name ], 'link' => '#elements/privacy' ];
+					$findings[] = [ 'kind' => 'undescribed', 'values' => [ $name ], 'link' => \Nino\AdminAddress::of( 'elements', [ 'privacy' ] ) ];
 			}
 
 			return $findings;

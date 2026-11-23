@@ -1,0 +1,361 @@
+{
+	"structure": {
+		"dashboard": [],
+		"elements": [
+			[
+				"elements",
+				"elements"
+			],
+			[
+				"types",
+				"types"
+			]
+		],
+		"text": [
+			[
+				"text",
+				"text"
+			],
+			[
+				"keys",
+				"keys"
+			]
+		],
+		"images": [
+			[
+				"images",
+				"images"
+			],
+			[
+				"slots",
+				"slots"
+			],
+			[
+				"favicon",
+				"favicon"
+			]
+		],
+		"submissions": [],
+		"logs": [],
+		"routes": [],
+		"navs": [],
+		"users": [
+			[
+				"users",
+				"users"
+			],
+			[
+				"roles",
+				"roles"
+			],
+			[
+				"lockout",
+				"lockout"
+			],
+			[
+				"recoverypw",
+				"recoverypw"
+			]
+		],
+		"language": [
+			[
+				"language",
+				"language"
+			],
+			[
+				"translations",
+				"translations"
+			]
+		],
+		"backups": [],
+		"features": [],
+		"maintenance": [],
+		"config": []
+	},
+	"cases": [
+		{
+			"screen": "dashboard",
+			"parts": [],
+			"hash": "#dashboard"
+		},
+		{
+			"screen": "elements",
+			"parts": [],
+			"hash": "#elements"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog"
+			],
+			"hash": "#elements/elements/blog"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"post-1"
+			],
+			"hash": "#elements/elements/blog/post-1"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				{
+					"word": "new"
+				}
+			],
+			"hash": "#elements/elements/blog/@new"
+		},
+		{
+			"screen": "types",
+			"parts": [],
+			"hash": "#elements/types"
+		},
+		{
+			"screen": "types",
+			"parts": [
+				"blog"
+			],
+			"hash": "#elements/types/blog"
+		},
+		{
+			"screen": "types",
+			"parts": [
+				{
+					"word": "new"
+				}
+			],
+			"hash": "#elements/types/@new"
+		},
+		{
+			"screen": "roles",
+			"parts": [
+				"new"
+			],
+			"hash": "#users/roles/new"
+		},
+		{
+			"screen": "roles",
+			"parts": [
+				{
+					"word": "new"
+				}
+			],
+			"hash": "#users/roles/@new"
+		},
+		{
+			"screen": "users",
+			"parts": [
+				"ada@example.com"
+			],
+			"hash": "#users/users/ada%40example.com"
+		},
+		{
+			"screen": "users",
+			"parts": [],
+			"hash": "#users"
+		},
+		{
+			"screen": "lockout",
+			"parts": [],
+			"hash": "#users/lockout"
+		},
+		{
+			"screen": "slots",
+			"parts": [
+				"/logo/dark"
+			],
+			"hash": "#images/slots/%2Flogo%2Fdark"
+		},
+		{
+			"screen": "slots",
+			"parts": [
+				"/new"
+			],
+			"hash": "#images/slots/%2Fnew"
+		},
+		{
+			"screen": "slots",
+			"parts": [
+				{
+					"word": "scan"
+				}
+			],
+			"hash": "#images/slots/@scan"
+		},
+		{
+			"screen": "images",
+			"parts": [
+				"template/page-home"
+			],
+			"hash": "#images/images/template%2Fpage-home"
+		},
+		{
+			"screen": "favicon",
+			"parts": [],
+			"hash": "#images/favicon"
+		},
+		{
+			"screen": "text",
+			"parts": [
+				"template/page-home",
+				"/template/page-home/welcome/title"
+			],
+			"hash": "#text/text/template%2Fpage-home/%2Ftemplate%2Fpage-home%2Fwelcome%2Ftitle"
+		},
+		{
+			"screen": "keys",
+			"parts": [
+				{
+					"word": "rename"
+				},
+				"/project/company/general/name"
+			],
+			"hash": "#text/keys/@rename/%2Fproject%2Fcompany%2Fgeneral%2Fname"
+		},
+		{
+			"screen": "routes",
+			"parts": [
+				"/über uns"
+			],
+			"hash": "#routes/routes/%2F%C3%BCber%20uns"
+		},
+		{
+			"screen": "routes",
+			"parts": [
+				{
+					"word": "feature"
+				},
+				"/shop"
+			],
+			"hash": "#routes/routes/@feature/%2Fshop"
+		},
+		{
+			"screen": "features",
+			"parts": [
+				{
+					"word": "inactive"
+				}
+			],
+			"hash": "#features/features/@inactive"
+		},
+		{
+			"screen": "navs",
+			"parts": [
+				"footer"
+			],
+			"hash": "#navs/navs/footer"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"@weird key"
+			],
+			"hash": "#elements/elements/blog/%40weird%20key"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"@New"
+			],
+			"hash": "#elements/elements/blog/%40New"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"@"
+			],
+			"hash": "#elements/elements/blog/%40"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"50%"
+			],
+			"hash": "#elements/elements/blog/50%25"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"a!'()*~._-b"
+			],
+			"hash": "#elements/elements/blog/a!'()*~._-b"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"a#b?c&d=e+f"
+			],
+			"hash": "#elements/elements/blog/a%23b%3Fc%26d%3De%2Bf"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"äöü ß 😀"
+			],
+			"hash": "#elements/elements/blog/%C3%A4%C3%B6%C3%BC%20%C3%9F%20%F0%9F%98%80"
+		},
+		{
+			"screen": "elements",
+			"parts": [
+				"blog",
+				"@new"
+			],
+			"hash": "#elements/elements/blog/%40new"
+		},
+		{
+			"screen": "roles",
+			"parts": [
+				"@scan"
+			],
+			"hash": "#users/roles/%40scan"
+		}
+	],
+	"wordObjects": [
+		{
+			"object": {
+				"word": "@new"
+			},
+			"segment": "@new"
+		},
+		{
+			"object": {
+				"word": "new"
+			},
+			"segment": "new"
+		},
+		{
+			"object": {
+				"word": "@New"
+			},
+			"segment": "%40New"
+		},
+		{
+			"object": {
+				"word": "x/y"
+			},
+			"segment": "x%2Fy"
+		},
+		{
+			"object": {
+				"word": "@a b"
+			},
+			"segment": "%40a%20b"
+		},
+		{
+			"object": {
+				"word": "@new/x"
+			},
+			"segment": "%40new%2Fx"
+		}
+	]
+}

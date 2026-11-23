@@ -10,8 +10,9 @@
  *													currently fills a slot). Same split as types.js and the
  *													Elements panel. Never touches a slot's filename. A row
  *													also says when no page shows its slot. Every view has its
- *													address: #slots, #slots/new, #slots/scan and
- *													#slots/<the segments of the slot's uri>. The form is the
+ *													address: #images/slots, #images/slots/@new,
+ *													#images/slots/@scan and #images/slots/<the slot's uri,
+ *													one part>. The form is the
  *													guide's first model - a bar with Delete at its left, the state
  *													and one main button - and stays after a save; what is wrong is
  *													said at the field, and what went well is a toast.
@@ -72,10 +73,10 @@
 
 				if( hash.panel === 'slots' && hash.parts.length > 0 ) {
 
-					if( hash.parts[0] === 'new' && hash.parts.length === 1 )
+					if( Nino.admin.router.isWord( hash.parts, 0, 'new' ) === true && hash.parts.length === 1 )
 						return Nino.admin.slots._openSlot( null );
 
-					if( hash.parts[0] === 'scan' && hash.parts.length === 1 )
+					if( Nino.admin.router.isWord( hash.parts, 0, 'scan' ) === true && hash.parts.length === 1 )
 						return Nino.admin.slots._openScan();
 
 					const slot = Nino.admin.slots._slotAt( hash.parts );
@@ -173,8 +174,8 @@
 			const slots = Nino.admin.slots;
 			const open = dc.getElementById('slots-form').classList.contains('admin-hidden') === false;
 			const scanning = slots._scanRows !== null || slots._scanning === true;
-			const create = parts.length === 1 && parts[0] === 'new';
-			const scan = parts.length === 1 && parts[0] === 'scan';
+			const create = parts.length === 1 && Nino.admin.router.isWord( parts, 0, 'new' ) === true;
+			const scan = parts.length === 1 && Nino.admin.router.isWord( parts, 0, 'scan' ) === true;
 			const slot = create === true || scan === true || parts.length === 0 ? null : slots._slotAt( parts );
 
 			let there;
@@ -206,29 +207,14 @@
 		},
 
 		/**
-		 *	The parts of the address of a slot: the segments of its uri. The one uri that would read as a view of the
-		 *	tab - /new, /scan, which the server takes as any other - is one part, as it is written
-		 *
-		 *	@param		{string}	uri
-		 *
-		 *	@return		{Array<string>}
-		 */
-		_slotParts : function( uri ) {
-			return uri === '/new' || uri === '/scan' ? [ uri ] : String( uri ).split('/').filter( Boolean );
-		},
-
-		/**
-		 *	The slot an address names, or null
+		 *	The slot an address names, or null: its uri is the one part, whatever it holds
 		 *
 		 *	@param		{Array}		parts					The hash behind the tab's name
 		 *
 		 *	@return		{Object|null}
 		 */
 		_slotAt : function( parts ) {
-
-			const uri = parts.length === 1 && parts[0].charAt(0) === '/' ? parts[0] : '/'+ parts.join('/');
-
-			return Nino.admin.slots._slots.find( function( slot ) { return slot.uri === uri } ) ?? null;
+			return parts.length !== 1 ? null : Nino.admin.slots._slots.find( function( slot ) { return slot.uri === parts[0] } ) ?? null;
 		},
 
 		/**
@@ -284,12 +270,12 @@
 		_showForm : function( opened ) {
 
 			const slots = Nino.admin.slots;
-			let parts = [ 'new' ];
+			let parts = [ Nino.admin.router.word('new') ];
 
 			if( slots._scanRows !== null || slots._scanning === true )
-				parts = [ 'scan' ];
+				parts = [ Nino.admin.router.word('scan') ];
 			else if( slots._isNew === false && slots._current !== null )
-				parts = slots._slotParts( slots._current.uri );
+				parts = [ slots._current.uri ];
 
 			Nino.admin.router.set( 'slots', parts );
 
@@ -367,19 +353,19 @@
 						title		: slot.label,
 						detail	: slot.uri+ ' · '+ slot.width+ ' × '+ slot.height+ ' px'+ ( unused === true ? Nino.admin.slots._templatesLabel( slot ) : '' ),
 						badge		: unused === true ? { text : Nino.content.getText('/_admin/slots/label/unused'), state : 'warn' } : ( slot.hasImage ? undefined : { text : Nino.content.getText('/_admin/slots/label/noimage'), state : 'muted' } ),
-						href		: Nino.admin.router.href( 'slots', Nino.admin.slots._slotParts( slot.uri ) ),
-						onOpen	: function() { Nino.admin.router.go( 'slots', Nino.admin.slots._slotParts( slot.uri ) ); Nino.admin.slots._openSlot( slot.uri, true ) },
+						href		: Nino.admin.router.href( 'slots', [ slot.uri ] ),
+						onOpen	: function() { Nino.admin.router.go( 'slots', [ slot.uri ] ); Nino.admin.slots._openSlot( slot.uri, true ) },
 					};
 				} ), { label : Nino.content.getText('/_admin/nav/slots') } ) );
 
 			const add = Nino.adminUi.button( Nino.content.getText('/_admin/slots/label/new'), function() {
-				Nino.admin.router.go( 'slots', [ 'new' ] );
+				Nino.admin.router.go( 'slots', [ Nino.admin.router.word('new') ] );
 				Nino.admin.slots._opener = add;
 				Nino.admin.slots._openSlot( null, true );
 			} );
 
 			const scan = Nino.adminUi.button( Nino.content.getText('/_admin/slots/label/scan'), function() {
-				Nino.admin.router.go( 'slots', [ 'scan' ] );
+				Nino.admin.router.go( 'slots', [ Nino.admin.router.word('scan') ] );
 				Nino.admin.slots._opener = scan;
 				Nino.admin.slots._openScan( true );
 			}, { kind : 'secondary' } );

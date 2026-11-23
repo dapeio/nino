@@ -19,7 +19,8 @@ const sandbox = {
 	history : { replaceState : function() {} },
 	// The shell rendered one pane (users) holding one tab pane (roles) - the
 	// DOM is the router's list of panels, see router.exists()
-	document : { documentElement : null, body : null, getElementById : function( id ) { return [ 'admin-content-users', 'admin-tab-roles' ].indexOf( id ) !== -1 ? {} : null } },
+	document : { documentElement : null, body : null, getElementById : function( id ) { return [ 'admin-content-users', 'admin-tab-roles' ].indexOf( id ) !== -1 ? {} : null },
+		querySelectorAll : function( selector ) { return selector === '#admin-content-wrap > [data-panel]' ? [ { dataset : { panel : 'users' }, querySelectorAll : function() { return [ { dataset : { tab : 'users', addressTab : 'users' } }, { dataset : { tab : 'roles', addressTab : 'roles' } } ] } } ] : [] } },
 };
 sandbox.window = sandbox;
 sandbox.Nino = {
@@ -30,13 +31,13 @@ load( '_admin/assets/script.js', vm.createContext( sandbox ) );
 
 const editor = sandbox.Nino.admin;
 
-sandbox.location.hash = '#elements/demo%20type/item';
+sandbox.location.hash = '#users/roles/demo%20type/item';
 let route = editor.router.current();
-check( 'valid hash components are decoded', route.panel === 'elements' && route.parts[0] === 'demo type' && route.parts[1] === 'item' );
+check( 'valid hash components are decoded: the screen the address names, then its parts', route.panel === 'roles' && route.parts[0] === 'demo type' && route.parts[1] === 'item' && route.known === true );
 
-sandbox.location.hash = '#elements/bad%hash';
+sandbox.location.hash = '#users/roles/bad%hash';
 route = editor.router.current();
-check( 'a malformed percent escape falls back safely', route.panel === '' && route.parts.length === 0 );
+check( 'a malformed percent escape falls back safely: that part and what follows are dropped, the screen stays', route.panel === 'roles' && route.parts.length === 0 && route.known === true );
 
 check( 'a pane the shell rendered is a panel the router knows', editor.router.exists('users') === true );
 check( 'a tab of a pane is a panel of its own to the router', editor.router.exists('roles') === true );
@@ -282,6 +283,8 @@ railNav.setAttribute( 'aria-label', 'Navigation' );
 
 const rolesTab = node( 'admin-tabbutton-roles', { tab : 'roles' } );
 const lockoutTab = node( 'admin-tabbutton-lockout', { tab : 'lockout' } );
+// The label of a tab is the first thing of its button: a text, and a badge behind it where there is one
+[ [ rolesTab, 'Roles' ], [ lockoutTab, 'Lockout' ] ].forEach( function( pair ) { const word = node( '', {} ); word.textContent = pair[1]; pair[0].children.push( word ); word.parent = pair[0] } );
 const strip = node( '', {} );
 strip.isStrip = true;
 strip.classList.add('admin-panel-tabs');
@@ -302,8 +305,8 @@ title.parent = head;
 strip.parent = head;
 actions.parent = head;
 
-const rolesPane = node( 'admin-tab-roles', { tab : 'roles' } );
-const lockoutPane = node( 'admin-tab-lockout', { tab : 'lockout' } );
+const rolesPane = node( 'admin-tab-roles', { tab : 'roles', addressTab : 'roles' } );
+const lockoutPane = node( 'admin-tab-lockout', { tab : 'lockout', addressTab : 'lockout' } );
 const usersPane = node( 'admin-content-users', { panel : 'users', layout : 'page' } );
 usersPane.children = [ head, rolesPane, lockoutPane ];
 head.parent = usersPane;
@@ -375,6 +378,7 @@ const shell = {
 	clearTimeout : function() {},
 	document : {
 		documentElement : null, body : null,
+		title : 'Admin | Site',
 		get activeElement() { return focusedNode },
 		getElementById : function( id ) { return shellNodes[id] ?? null },
 		createElement : function( tag ) { return fakeElement( tag ) },
@@ -422,7 +426,7 @@ load( '_admin/assets/Nino.admin.js', shellContext );
 load( '_admin/assets/script.js', shellContext );
 shell.Nino.admin.onReady();
 
-check( 'the page load selects the panel the hash names without adding an entry - the address is only made true to the screen', browser.entries.join() === '#roles' && browser.at === 0 );
+check( 'the page load selects the panel the hash names without adding an entry - the address is only made true to the screen', browser.entries.join() === '#users' && browser.at === 0 );
 check( 'the rail says which panel is open rather than only painting it', railLinks.users.getAttribute('aria-current') === 'page' );
 check( '...and no other link claims to be the current page', railLinks.dashboard.getAttribute('aria-current') === null );
 railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
@@ -435,9 +439,11 @@ check( 'a panel without a head to name it leaves the focus where the click put i
 	and a reload went back to Images. The shell writes the bare name after
 	every switch the panel's own script did not settle	*/
 check( 'a panel opened from the rail writes its name into the address', shell.location.hash === '#dashboard' );
+check( '...and into the title of the document: a panel with no tabs is its name, then the title the page was loaded with', shell.document.title === 'Dashboard | Admin | Site' );
 railLinks.users.listeners.click( { preventDefault : function() {} } );
-check( '...and a pane with tabs writes the tab that is open', shell.location.hash === '#roles' );
+check( '...and a pane with tabs writes the tab that is open', shell.location.hash === '#users' );
 check( 'a panel opened from the rail starts at its name: the title has the focus, and is no stop of the Tab key', title.focused === true && title.getAttribute('tabindex') === '-1' );
+check( 'the title of the document follows the screen on show: the name of the tab, the name of its panel, then the title the page was loaded with', shell.document.title === 'Roles - Users | Admin | Site' );
 
 /*	The skip link jumps to the pane and writes no address - an anchor jump
 	would be answered by the router as a panel of that name	*/
@@ -470,23 +476,24 @@ check( 'a pane strip starts with exactly one tab selected and one tab stop', rol
 rolesTab.listeners.keydown( { key : 'ArrowRight', preventDefault : function() {} } );
 check( 'an arrow key opens the next tab of a pane strip', lockoutTab.getAttribute('aria-selected') === 'true'
 	&& lockoutPane.hidden === false && rolesPane.hidden === true && lockoutTab.focused === true );
-check( '...and the address names the tab now open', shell.location.hash === '#lockout' );
+check( '...and the address names the tab now open', shell.location.hash === '#users/lockout' );
+check( '...and so does the title of the document', shell.document.title === 'Lockout - Users | Admin | Site' );
 
 /*	What Back and Forward walk is the workbench. A move the person makes -
 	the rail, a tab - adds an entry; whatever only keeps the address true to
 	the screen (the page load above, the arrow keys, a panel showing its level
 	again) replaces the one it is on, or the history would fill with steps
 	nobody took	*/
-check( 'each click on the rail added one entry; the arrow keys replaced the one they were on', browser.entries.join() === '#roles,#dashboard,#lockout' && browser.at === 2 );
+check( 'each click on the rail added one entry; the arrow keys replaced the one they were on', browser.entries.join() === '#users,#dashboard,#users/lockout' && browser.at === 2 );
 
 rolesTab.listeners.click();
-check( 'a click on a tab adds an entry', browser.entries.join() === '#roles,#dashboard,#lockout,#roles' && browser.at === 3 );
+check( 'a click on a tab adds an entry', browser.entries.join() === '#users,#dashboard,#users/lockout,#users' && browser.at === 3 );
 
 // A panel that writes its level while it is shown (the Dashboard, the drill-down panels) is
 // settled before the shell looks: the switch is still one entry, and the one before it is kept
 shell.Nino.admin.dashboard = { showCurrent : function() { shell.Nino.admin.router.set( 'dashboard', [] ) } };
 railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
-check( 'a panel that writes the address itself while it is shown still yields exactly one entry, and the previous one survives', browser.entries.join() === '#roles,#dashboard,#lockout,#roles,#dashboard' && browser.at === 4 );
+check( 'a panel that writes the address itself while it is shown still yields exactly one entry, and the previous one survives', browser.entries.join() === '#users,#dashboard,#users/lockout,#users,#dashboard' && browser.at === 4 );
 
 let defaultsPrevented = 0;
 const before = browser.entries.join();
@@ -532,7 +539,7 @@ check( 'selecting a panel opens its group - and only that one', railLinks.dashbo
 navSelect.value = 'users';
 navSelect.listeners.change();
 check( 'a change of the select opens that panel as a person\'s own move: one entry, its group open', railLinks.users.getAttribute('aria-current') === 'page'
-	&& browser.entries[browser.entries.length - 1] === '#roles' && browser.entries.length === 6 && railLinks.users.classList.contains('nino-admin-nav-collapsed') === false && storage[GROUPS_KEY] === undefined );
+	&& browser.entries[browser.entries.length - 1] === '#users' && browser.entries.length === 6 && railLinks.users.classList.contains('nino-admin-nav-collapsed') === false && storage[GROUPS_KEY] === undefined );
 
 /*	The address of a panel is its own screen. #<panel> - typed, linked, or written by the back link of a panel - opens the
 	first tab of the pane, whichever was open last; #<tab> opens that tab. The rail is the way back to where one was: its
@@ -552,35 +559,48 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	const clickRail = function( link ) { link.listeners.click( { preventDefault : function() {} } ) };
 
 	lockoutTab.listeners.click();
-	check( 'the second tab of the pane is open and its address is written', openTab() === 'lockout' && shell.location.hash === '#lockout' );
+	check( 'the second tab of the pane is open and its address is written', openTab() === 'lockout' && shell.location.hash === '#users/lockout' );
 
 	clickRail( railLinks.dashboard );
 	typed( '#users' );
 	check( 'the address of a panel with tabs opens its first tab, not the one open last: the panel\'s own screen', openTab() === 'roles' && railLinks.users.getAttribute('aria-current') === 'page' );
 	check( '...the strip says so, and the address becomes the first tab\'s', rolesTab.getAttribute('aria-selected') === 'true' && lockoutTab.getAttribute('aria-selected') === 'false'
-		&& rolesTab.tabIndex === 0 && lockoutTab.tabIndex === -1 && shell.location.hash === '#roles' );
+		&& rolesTab.tabIndex === 0 && lockoutTab.tabIndex === -1 && shell.location.hash === '#users' );
 
 	lockoutTab.listeners.click();
 	typed( '#users' );
-	check( '...also with the panel on screen, on its second tab: a link to the panel or its back link says the panel', openTab() === 'roles' && shell.location.hash === '#roles' );
+	check( '...also with the panel on screen, on its second tab: a link to the panel or its back link says the panel', openTab() === 'roles' && shell.location.hash === '#users' );
 
 	clickRail( railLinks.dashboard );
+	typed( '#users/lockout' );
+	check( 'the address of a tab opens that tab', openTab() === 'lockout' && railLinks.users.getAttribute('aria-current') === 'page' && shell.location.hash === '#users/lockout' );
+
+	// What is no address of the workbench opens its start - and the address is made true to it, never left as it was typed
+	typed( '#users/nope/x' );
+	check( 'a panel with a tab it has not opens the panel as it starts, and the address says the panel', openTab() === 'roles' && railLinks.users.getAttribute('aria-current') === 'page' && shell.location.hash === '#users' );
+	typed( '#nosuch/lockout' );
+	check( 'a panel the page has not opens the first panel of the rail and writes its address', railLinks.dashboard.getAttribute('aria-current') === 'page' && shell.location.hash === '#dashboard' );
 	typed( '#lockout' );
-	check( 'the address of a tab opens that tab', openTab() === 'lockout' && railLinks.users.getAttribute('aria-current') === 'page' && shell.location.hash === '#lockout' );
+	check( 'the address of a tab with no panel in front of it is not read any more: the first panel', railLinks.dashboard.getAttribute('aria-current') === 'page' && shell.location.hash === '#dashboard' );
+	typed( '#users/lockout/%00' );
+	check( 'a part with a control character in it is dropped with what follows it: the tab stays, and its address is its own', openTab() === 'lockout' && railLinks.users.getAttribute('aria-current') === 'page' && shell.location.hash === '#users/lockout/%00' );
+	typed( '#users//lockout' );
+	check( 'an empty segment in the place of a tab is a panel as it starts: the address is made true', openTab() === 'roles' && railLinks.users.getAttribute('aria-current') === 'page' && shell.location.hash === '#users' );
+	typed( '#users/lockout' );
 
 	clickRail( railLinks.dashboard );
 	clickRail( railLinks.users );
-	check( 'the rail opens the tab last open, and writes its address', openTab() === 'lockout' && shell.location.hash === '#lockout' );
+	check( 'the rail opens the tab last open, and writes its address', openTab() === 'lockout' && shell.location.hash === '#users/lockout' );
 
 	navSelect.value = 'dashboard';
 	navSelect.listeners.change();
 	navSelect.value = 'users';
 	navSelect.listeners.change();
-	check( '...so does the select that stands for the rail on a phone', openTab() === 'lockout' && shell.location.hash === '#lockout' && railLinks.users.getAttribute('aria-current') === 'page' );
+	check( '...so does the select that stands for the rail on a phone', openTab() === 'lockout' && shell.location.hash === '#users/lockout' && railLinks.users.getAttribute('aria-current') === 'page' );
 
 	// What the checks below find, as before: the pane on its first tab
 	rolesTab.listeners.click();
-	check( 'a click on the first tab is the way back to where the checks below start', openTab() === 'roles' && shell.location.hash === '#roles' );
+	check( 'a click on the first tab is the way back to where the checks below start', openTab() === 'roles' && shell.location.hash === '#users' );
 }
 
 /*	A word on the button of a tab (Nino.adminUi.tabBadge()) stays through every move of the shell: the strip is rendered by the
@@ -665,7 +685,7 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	check( 'Cancel takes the step back with history.go() - one entry forward - and does not write the form\'s address over the entry the browser is on', browser.traversals.join() === '1' && browser.entries.join() === walked.join() && shell.location.hash === '#dashboard' );
 	check( '...the panel showing its level again writes nothing while the traversal is on its way', router._undoing !== null );
 	browser.arrive();
-	check( 'the traversal arrives on the form\'s entry, the list entry before it is as it was, and the address is the form\'s', browser.at === formEntry && browser.entries.join() === walked.join() && shell.location.hash === '#dashboard/form' );
+	check( 'the traversal arrives on the form\'s entry, the list entry before it is as it was, and the address is the form\'s', browser.at === formEntry && browser.entries.join() === walked.join() && shell.location.hash === '#dashboard/dashboard/form' );
 	check( '...and the hashchange it caused is not followed: no second question, nothing asked of the panel', questions.length === 1 && router._undoing === null && router._index === formEntry && router._settled === formEntry );
 
 	browser.step( -1 );
@@ -686,15 +706,15 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	questions[0].cancel();
 	check( 'a step of two entries is taken back by two', questions.length === 1 && browser.traversals.join() === '2' );
 	browser.arrive();
-	check( '...and lands where the screen is', browser.at === third && browser.entries.join() === manyEntries.join() && shell.location.hash === '#dashboard/third' && questions.length === 1 );
+	check( '...and lands where the screen is', browser.at === third && browser.entries.join() === manyEntries.join() && shell.location.hash === '#dashboard/dashboard/third' && questions.length === 1 );
 
 	// A save is running: the panel stays where it is and says so
 	saving = true;
 	questions.length = 0;
 	browser.step( -1 );
-	check( 'a panel that will not follow because a save runs refuses the step through router.refuse(): taken back, no question', questions.length === 0 && browser.traversals.join() === '1' && shell.location.hash === '#dashboard/second' && browser.entries.join() === manyEntries.join() );
+	check( 'a panel that will not follow because a save runs refuses the step through router.refuse(): taken back, no question', questions.length === 0 && browser.traversals.join() === '1' && shell.location.hash === '#dashboard/dashboard/second' && browser.entries.join() === manyEntries.join() );
 	browser.arrive();
-	check( '...and the entry is the one the screen shows', browser.at === third && shell.location.hash === '#dashboard/third' && browser.entries.join() === manyEntries.join() );
+	check( '...and the entry is the one the screen shows', browser.at === third && shell.location.hash === '#dashboard/dashboard/third' && browser.entries.join() === manyEntries.join() );
 	saving = false;
 
 	// A traversal that never arrives does not keep the address shut for good
@@ -711,15 +731,15 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	// An entry the browser made itself - an address typed - is numbered when it is met. The one before the stamping cannot be measured: that refusal keeps the old way
 	browser.entries.splice( browser.at + 1 );
 	browser.states.splice( browser.at + 1 );
-	browser.entries.push( '#dashboard/typed' );
+	browser.entries.push( '#dashboard/dashboard/typed' );
 	browser.states.push( null );
 	browser.at++;
-	shell.location.hash = '#dashboard/typed';
+	shell.location.hash = '#dashboard/dashboard/typed';
 	questions.length = 0;
 	windowListeners.hashchange();
 	check( 'an address typed by hand becomes an entry that is numbered, and is followed like any other', browser.states[browser.at] !== null && browser.states[browser.at].nino === third + 1 && questions.length === 1 );
 	questions[0].cancel();
-	check( 'refusing it is a step that is not measured - it came as a new entry, not as a move along the old ones - so the old way stands: the form\'s address over it', browser.traversals.length === 0 && browser.entries[browser.at] === '#dashboard/third' );
+	check( 'refusing it is a step that is not measured - it came as a new entry, not as a move along the old ones - so the old way stands: the form\'s address over it', browser.traversals.length === 0 && browser.entries[browser.at] === '#dashboard/dashboard/third' );
 
 	// A shell without the numbers (an entry written by an older workbench) is followed without them
 	const stamped = browser.states[browser.at];
@@ -767,7 +787,7 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 		&& asked[0].title === '/_admin/common/dirty/title' && asked[0].message === '/_admin/common/confirm/unsaved' && asked[0].choices.map( function( choice ) { return choice.value } ).join() === 'discard,cancel,save' );
 	check( '...and it has not moved: the panel stays, the link stays the current one, the form has its input', current() === 'users' && unsaved.users === true && happened.length === 0 );
 	asked[0].onChoose('cancel');
-	check( 'Cancel keeps the panel and the rail as it was', current() === 'users' && navSelect.value === 'users' && unsaved.users === true && happened.length === 0 && shell.location.hash === '#roles' );
+	check( 'Cancel keeps the panel and the rail as it was', current() === 'users' && navSelect.value === 'users' && unsaved.users === true && happened.length === 0 && shell.location.hash === '#users' );
 
 	click( railLinks.dashboard );
 	asked[1].onChoose('discard');
@@ -839,16 +859,16 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	windowListeners.hashchange();
 	check( 'an address typed for another panel asks too, and has not moved the panel', asked.length === before + 2 && current() === 'users' && browser.traversals.length === 0 );
 	asked[before + 1].onChoose('cancel');
-	check( 'Cancel on it writes the panel on screen back into the address, where the panel writes none of its own', shell.location.hash === '#roles' && browser.entries[browser.at] === '#roles' );
+	check( 'Cancel on it writes the panel on screen back into the address, where the panel writes none of its own', shell.location.hash === '#users' && browser.entries[browser.at] === '#users' );
 	check( '...with the rail and the select on it, and the history left alone', current() === 'users' && navSelect.value === 'users' && browser.traversals.length === 0 && unsaved.users === true );
 
 	// ...and where the address had a level of the panel's own, it is that one that comes back - the panel's name is not where the screen stood
-	shell.history.replaceState( browser.states[browser.at], '', '#roles/ada' );
+	shell.history.replaceState( browser.states[browser.at], '', '#users/roles/ada' );
 	shell.location.hash = '#dashboard';
-	windowListeners.hashchange( { oldURL : 'http://localhost:8080/_admin/#roles/ada' } );
+	windowListeners.hashchange( { oldURL : 'http://localhost:8080/_admin/#users/roles/ada' } );
 	check( 'an address typed over a level of the panel asks too', asked.length === before + 3 && current() === 'users' && browser.traversals.length === 0 );
 	asked[before + 2].onChoose('cancel');
-	check( 'Cancel on it puts back the address that stood there, the level and all, over the entry the typing made', shell.location.hash === '#roles/ada' && browser.entries[browser.at] === '#roles/ada' && browser.entries.length === browser.at + 1 );
+	check( 'Cancel on it puts back the address that stood there, the level and all, over the entry the typing made', shell.location.hash === '#users/roles/ada' && browser.entries[browser.at] === '#users/roles/ada' && browser.entries.length === browser.at + 1 );
 	check( '...with the panel on screen, its input and the history left alone', current() === 'users' && unsaved.users === true && browser.traversals.length === 0 );
 
 	// The address that was typed or followed is not kept past the hashchange that carried it
@@ -1000,8 +1020,8 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	paneHead.classList.add('admin-panel-head');
 	paneHead.children = [ tabStrip ];
 	tabStrip.parent = paneHead;
-	const screenPane = node( 'admin-tab-sites', { tab : 'sites' } );
-	const archivePane = node( 'admin-tab-archive', { tab : 'archive' } );
+	const screenPane = node( 'admin-tab-sites', { tab : 'sites', addressTab : 'sites' } );
+	const archivePane = node( 'admin-tab-archive', { tab : 'archive', addressTab : 'archive' } );
 	const sitesPane = node( 'admin-content-sites', { panel : 'sites', layout : 'page' } );
 	sitesPane.children = [ paneHead, screenPane, archivePane ];
 	[ paneHead, screenPane, archivePane ].forEach( function( child ) { child.parent = sitesPane } );
@@ -1915,7 +1935,7 @@ shellDirty._leaving = false;
 shellDirty._entries.probe.isDirty = function() { return false };
 shell.location.hash = '#x';
 shellDirty._show('roles');
-check( 'a panel or tab that failed to save is brought on screen by its name - a tab of a pane first, since \'roles\' is a tab of the Users pane', shell.location.hash === '#roles' );
+check( 'a panel or tab that failed to save is brought on screen by its name - a tab of a pane first, since \'roles\' is a tab of the Users pane', shell.location.hash === '#users' );
 shellDirty._show('dashboard');
 check( '...a panel by its own', shell.location.hash === '#dashboard' );
 let keptDuring = null;
@@ -2115,6 +2135,8 @@ function manualWorld() {
 			getElementById : function( id ) { return modeNodes[id] ?? null },
 			// The dialog of a question, where one is open
 			querySelector : function( selector ) { return selector === 'dialog[open]' ? modeDialog.open : null },
+			// The one pane the page has: Users
+			querySelectorAll : function( selector ) { return selector === '#admin-content-wrap > [data-panel]' ? [ { dataset : { panel : 'users' }, querySelectorAll : function() { return [] } } ] : [] },
 			createElement : function() { return node( '', {} ) },
 			addEventListener : function( type, fn ) { ( modeListeners[type] = modeListeners[type] ?? [] ).push( fn ) },
 		},

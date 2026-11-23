@@ -140,7 +140,7 @@
 				return;
 
 			const notice = Nino.adminUi.notice( Nino.content.getText('/_admin/maintenance/banner/text'), {
-				href	: '#maintenance',
+				href	: Nino.admin.router.href( 'maintenance', [] ),
 				label	: Nino.content.getText('/_admin/maintenance/banner/link'),
 			} );
 			notice.id = 'maintenance-banner';

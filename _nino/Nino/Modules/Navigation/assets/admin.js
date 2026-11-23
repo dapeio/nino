@@ -8,8 +8,8 @@
  *													there a page only ever sees its own membership.
  *
  *													List + drill-down shape follows the Routes panel's admin.js closely,
- *													and so do the addresses: #navs is the list, #navs/new a new menu and
- *													#navs/<key> one menu. A menu has a name, which is optional, and its
+ *													and so do the addresses: #navs is the list, #navs/navs/@new a new menu and
+ *													#navs/navs/<key> one menu. A menu has a name, which is optional, and its
  *													key, which a template asks for; the list shows the name first and the key
  *													quietly beside it, a menu without a name shows its key. One menu is a
  *													working copy. The detail level's rows (up, down, remove) and Add
@@ -164,7 +164,7 @@
 		 */
 		_target : function( parts ) {
 
-			if( parts.length === 1 && parts[0] === '@new' )
+			if( parts.length === 1 && Nino.admin.router.isWord( parts, 0, 'new' ) === true )
 				return { nav : null };
 
 			const nav = parts.length === 1 ? Nino.admin.navs._find( parts[0] ) : null;
@@ -304,7 +304,7 @@
 		 */
 		_showForm : function( opened ) {
 
-			Nino.admin.router.set( 'navs', Nino.admin.navs._isNew === true ? [ '@new' ] : [ Nino.admin.navs._currentKey ] );
+			Nino.admin.router.set( 'navs', Nino.admin.navs._isNew === true ? [ Nino.admin.router.word('new') ] : [ Nino.admin.navs._currentKey ] );
 			Nino.adminUi.showLevel( 'navs-form', opened === true ? {} : { focus : false } );
 		},
 
@@ -390,7 +390,7 @@
 				} ), { label : Nino.content.getText('/_admin/nav/navs') } ) );
 
 			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/navs/label/new'), function() {
-				Nino.admin.router.go( 'navs', [ '@new' ] );
+				Nino.admin.router.go( 'navs', [ Nino.admin.router.word('new') ] );
 				Nino.admin.navs._open( { nav : null }, true, addBtn );
 			} );
 			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : addBtn } ).el );

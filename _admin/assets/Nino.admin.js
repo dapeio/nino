@@ -1418,7 +1418,7 @@
 		 *	language; the text is set as text, never as markup
 		 *
 		 *	@param		{string}		message
-		 *	@param		{Object}		[link]					{ href, label } - drawn only for an href that is a #panel of the workbench
+		 *	@param		{Object}		[link]					{ href, label } - drawn only for an href that is an address of the workbench, #panel/tab/part (see Nino.admin.router)
 		 *
 		 *	@return		{Element}
 		 */
@@ -1429,7 +1429,7 @@
 			notice.setAttribute( 'role', 'status' );
 			notice.textContent = message;
 
-			if( typeof link === 'object' && link !== null && /^#[a-z][a-z0-9\/_-]*$/.test( String( link.href ) ) === true ) {
+			if( typeof link === 'object' && link !== null && /^#[a-z][a-z0-9-]*(?:\/(?:@[a-z][a-z0-9-]*|(?:[A-Za-z0-9._~!*'()-]|%[0-9A-Fa-f]{2})+))*$/.test( String( link.href ) ) === true ) {
 				const a = dc.createElement('a');
 				a.href = link.href;
 				a.textContent = String( link.label ?? '' );

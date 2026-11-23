@@ -12,7 +12,7 @@
  *													deactivate and activate accounts and delete them. The
  *													list says which accounts are deactivated or locked and
  *													when each logged in last. Every view has its address:
- *													#users, #users/new and #users/<mail>. What a role grants
+ *													#users, #users/users/@new and #users/users/<mail>. What a role grants
  *													is the roles tab beside this one (roles.js), lifting a
  *													lock the login protection tab (lockout.js). An account
  *													that holds a permission the signed-in one does not is
@@ -74,7 +74,7 @@
 				Nino.admin.users._ready = true;
 
 				// The address of the new-account form works on a fresh load as it does after a click: for an account that may create
-				if( hash.panel === 'users' && hash.parts[0] === 'new' && Nino.admin.users._canManage === true )
+				if( hash.panel === 'users' && Nino.admin.router.isWord( hash.parts, 0, 'new' ) === true && Nino.admin.users._canManage === true )
 					return Nino.admin.users._renderCreateForm();
 
 				const target = hash.panel === 'users' && hash.parts.length > 0
@@ -132,7 +132,7 @@
 		/**
 		 *	Move to the level the hash names, if it is not the one on screen:
 		 *	the new-account form, an account's form or the list. An account the
-		 *	list does not hold - and 'new' for one who may not create - is the
+		 *	list does not hold - and '@new' for one who may not create - is the
 		 *	list. Leaving a form with unsaved input asks first (see
 		 *	Nino.admin.router.leave())
 		 *
@@ -145,7 +145,7 @@
 			const open = dc.getElementById('users-form').classList.contains('admin-hidden') === false;
 			const current = Nino.admin.users._currentUser;
 			const user = parts.length === 0 ? undefined : Nino.admin.users._users.find( function( u ) { return u.mail === parts[0] } );
-			const create = parts[0] === 'new' && user === undefined && Nino.admin.users._canManage === true;
+			const create = Nino.admin.router.isWord( parts, 0, 'new' ) === true && user === undefined && Nino.admin.users._canManage === true;
 
 			if( create === true ? ( open === true && current === null ) : ( user === undefined ? open === false : ( open === true && current !== null && current.mail === user.mail ) ) )
 				return false;
@@ -215,7 +215,7 @@
 		 *	@return		void
 		 */
 		_showForm : function( opened ) {
-			Nino.admin.router.set( 'users', [ Nino.admin.users._currentUser === null ? 'new' : Nino.admin.users._currentUser.mail ] );
+			Nino.admin.router.set( 'users', [ Nino.admin.users._currentUser === null ? Nino.admin.router.word('new') : Nino.admin.users._currentUser.mail ] );
 			Nino.adminUi.showLevel( 'users-form', opened === true ? {} : { focus : false } );
 		},
 
@@ -564,7 +564,7 @@
 			} ), { label : Nino.content.getText('/_admin/nav/user') } ) );
 
 			if( Nino.admin.users._canManage === true ) {
-				const add = Nino.adminUi.button( Nino.content.getText('/_admin/users/label/new'), function() { Nino.admin.router.go( 'users', [ 'new' ] ); Nino.admin.users._renderCreateForm( add ) } );
+				const add = Nino.adminUi.button( Nino.content.getText('/_admin/users/label/new'), function() { Nino.admin.router.go( 'users', [ Nino.admin.router.word('new') ] ); Nino.admin.users._renderCreateForm( add ) } );
 				wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : add } ).el );
 			}
 		},
@@ -661,7 +661,7 @@
 				Nino.admin.users._create();
 			} );
 			wrap.appendChild( form );
-			Nino.admin.router.set( 'users', [ 'new' ] );
+			Nino.admin.router.set( 'users', [ Nino.admin.router.word('new') ] );
 			Nino.adminUi.showLevel( 'users-form', { focus : mailInput } );
 
 			// What the form holds now is what is saved

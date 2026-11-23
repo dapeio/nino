@@ -18,7 +18,10 @@
 'use strict';
 
 const vm 		= require('vm');
-const { check, done, fills, load, element, findAll } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, shellRouter } = require( './harness.js' );
+
+// The link of the notice is written by the router's own codec
+const codec = shellRouter();
 
 function banners( root ) {
 	return findAll( root, function( el ) { return el.id === 'maintenance-banner' } );
@@ -66,7 +69,7 @@ function present( withForm ) {
 }
 
 const Nino = {
-	admin : {},
+	admin : { router : codec.stub() },
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
 		requests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } );

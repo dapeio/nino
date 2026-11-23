@@ -19,7 +19,11 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, source, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, source, fills, load, element, findAll, fire, shellRouter, addressFixture } = require( './harness.js' );
+
+// What the panel writes into the address goes through the router's own codec: every state written, every link drawn, is read back
+// ...over the workbench of the fixture and a feature's panel with its settings tab, which the panel links to
+const codec = shellRouter( Object.assign( {}, addressFixture().structure, { panelled : [ [ 'panelled', 'panelled' ], [ 'panelled-settings', 'settings' ] ] } ) );
 
 function textNode( text ) {
 	return Object.assign( element('#text'), { nodeType : 3, textContent : String( text ) } );
@@ -108,9 +112,9 @@ const Nino = {
 	admin : {
 		router : {
 			current : function() { return hash },
-			set : function( panel, parts ) { writes.push( 'set '+ [ panel ].concat( parts ).join('/') ) },
-			go : function( panel, parts ) { writes.push( 'go '+ [ panel ].concat( parts ).join('/') ); hash = { panel : panel, parts : parts } },
-			href : function( panel, parts ) { return '#'+ [ panel ].concat( parts ).join('/') },
+			set : function( panel, parts ) { codec.check( panel, parts ); writes.push( 'set '+ [ panel ].concat( parts ).join('/') ) },
+			go : function( panel, parts ) { codec.check( panel, parts ); writes.push( 'go '+ [ panel ].concat( parts ).join('/') ); hash = { panel : panel, parts : parts } },
+			href : function( panel, parts ) { return codec.check( panel, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
 			leave : function( names, leaving, proceed, resync ) { left.push( { names : names, leaving : leaving } ); if( leaveAnswer === true ) proceed(); else resync() },
 		},
 	},
@@ -348,7 +352,7 @@ fire( category(), 'change' );
 
 const sampleRow = row( mount, 'sample' );
 const link = byTag( sampleRow, 'a' )[0];
-check( 'the name of a row that opens is a link to the address of the feature, which is how the keyboard opens a row', link !== undefined && link.href === '#features/sample' && link.textContent === 'Beispiel-Feature' );
+check( 'the name of a row that opens is a link to the address of the feature, which is how the keyboard opens a row', link !== undefined && link.href === '#features/features/sample' && link.textContent === 'Beispiel-Feature' );
 writes.length = 0;
 fire( link, 'click' );
 check( 'opening it is the person\'s own move written into the address, then the view is on: the list hidden, the view shown, and the category with the list', writes[0] === 'go features/sample'
@@ -510,7 +514,7 @@ check( 'where a feature has a panel of its own, the settings are edited there: i
 	panel._features.push( entry );
 	panel._openFeature = 'panelled';
 	panel._renderDetail();
-	const ok = byTag( screen, 'fieldset' ).length === 0 && byTag( screen, 'a' ).some( function( el ) { return el.href === '#panelled-settings' } )
+	const ok = byTag( screen, 'fieldset' ).length === 0 && byTag( screen, 'a' ).some( function( el ) { return el.href === '#panelled/settings' } )
 		&& byTag( findAll( screen, function( el ) { return hasClass( el, 'nino-admin-actionbar' ) } )[0], 'button' ).filter( function( el ) { return el.type === 'submit' } ).length === 0;
 	panel._features.pop();
 	panel._openFeature = 'plain';
@@ -782,7 +786,7 @@ check( 'the same for the applications', words( emptyOf() ) === text('/_admin/fea
 	const offButton = byTag( findAll( screen, function( el ) { return hasClass( el, 'nino-admin-actionbar' ) } )[0], 'button' ).filter( function( el ) { return el.textContent === text('/_admin/features/label/deactivate') } )[0];
 	fire( offButton, 'click' );
 	answer( 200, { found : [], privacy : [] } );
-	check( 'Deactivate in the view of a feature builds the page again on the address of that feature, as Activate does - a feature that is off has a view', sandbox.window.location.hash === '#features/sample' );
+	check( 'Deactivate in the view of a feature builds the page again on the address of that feature, as Activate does - a feature that is off has a view', sandbox.window.location.hash === '#features/features/sample' );
 	panel._openFeature = '';
 	panel._renderPanel();
 }
@@ -791,7 +795,10 @@ check( 'the same for the applications', words( emptyOf() ) === text('/_admin/fea
 {
 	const named = Object.assign( {}, FEATURES[1], { key : 'active', name : 'Active feature', update : false } );
 	panel._features.push( named );
-	check( '#features/active is the view of the feature `active`, #features/@active the tab - and the address of the view is the key', panel._named( [ 'active' ] ).key === 'active' && panel._named( [ '@active' ] ).key === ''
+	check( 'a word is read as a word and a key that reads like it as a key: @inactive is the Inactive tab, %40inactive the key @inactive of a feature that is not there', JSON.stringify( panel._named( codec.parts( '@inactive' ) ) ) === '{"tab":"inactive","key":""}'
+	&& JSON.stringify( panel._named( codec.parts( { key : '@inactive' } ) ) ) === '{"tab":"active","key":"@inactive"}' );
+check( 'a word that names no tab names nothing: the list on its first tab, no view of a feature called by it', panel._named( [ '@bogus' ] ).key === '' && panel._named( [ '@bogus' ] ).tab === 'active' );
+check( '#features/active is the view of the feature `active`, #features/@active the tab - and the address of the view is the key', panel._named( [ 'active' ] ).key === 'active' && panel._named( [ '@active' ] ).key === ''
 		&& panel._named( [ '@inactive' ] ).tab === 'inactive' && ( panel._openFeature = 'active', panel._tabParts().join() === 'active' ) );
 	panel._openFeature = '';
 	panel._features.pop();
@@ -878,5 +885,8 @@ check( 'the last feature on builds the workbench again and keeps the sentence fo
 const css = source('_admin/Nino/Modules/Features/assets/admin.css');
 check( 'the stylesheet is bundled by the panel and writes no size of type, weight or space of its own', admin.includes( "'/assets/admin.css'" ) && css.includes( '@layer nino.tool {' )
 	&& /font-size|font-weight/.test( css.replace( /\/\*[\s\S]*?\*\//g, '' ) ) === false && /(margin|padding|gap)[a-z-]*:[^;]*\d+(\.\d+)?(rem|px)/.test( css.replace( /\/\*[\s\S]*?\*\//g, '' ) ) === false );
+
+check( 'every address the panel wrote or drew - the tabs of the list, the view of a feature - is read back by the router as the same screen and the same parts', codec.written.length > 3 && codec.mismatches.length === 0
+	&& codec.written.some( written => ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@inactive' ) ) && codec.written.some( written => written.parts[0] === 'sample' ) && codec.written.some( written => written.screen === 'panelled-settings' && written.hash === '#panelled/settings' ) );
 
 done();

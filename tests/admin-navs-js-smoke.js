@@ -23,7 +23,10 @@
 
 const vm 		= require('vm');
 const fs 		= require('fs');
-const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire, shellRouter } = require( './harness.js' );
+
+// What the panel writes into the address goes through the router's own codec: every state written, every link drawn, is read back
+const codec = shellRouter();
 
 // --- the words -------------------------------------------------------------
 
@@ -79,10 +82,10 @@ function build( shell, hash ) {
 			touch : function( topic ) { touched.push( topic ) }, stamp : function() { return 0 },
 			router : {
 				current : function() { return box.hash },
-				go : function( panel, parts ) { moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
-				set : function( panel, parts ) { written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+				go : function( panel, parts ) { codec.check( panel, parts ); moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+				set : function( panel, parts ) { codec.check( panel, parts ); written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
 				leave : function( names, open, proceed, resync ) { leaves.push( { open : open, proceed : proceed, resync : resync } ) },
-				href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') },
+				href : function( name, parts ) { return codec.check( name, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
 			},
 		},
 		events : { bindCallback : function() {} },
@@ -197,7 +200,7 @@ console.log('Admin Navigations');
 	t.answer( 200, payload( [ '/', '/about' ], 'Hauptmenü' ) );
 	check( 'a menu is a row: its name over its key and the number of its entries, quietly', t.menus().length === 2 && t.menuTitle( t.menus()[0] ) === 'Hauptmenü' && t.menuDetail( t.menus()[0] ) === 'main · '+ text('/_admin/navs/list/entries').replace( '%d', '2' ) );
 	check( '...a menu without a name is shown by its key, and says only how many entries it has', t.menuTitle( t.menus()[1] ) === 'footer' && t.menuDetail( t.menus()[1] ) === text('/_admin/navs/list/entries-none') && text('/_admin/navs/list/entries-none') !== '' );
-	check( '...a row is a link with the address of its menu, which the click opens through the router', t.menus().every( function( li ) { return t.link( li ).tagName === 'A' && t.link( li ).href === '#navs/'+ li.dataset.row } ) );
+	check( '...a row is a link with the address of its menu, which the click opens through the router', t.menus().every( function( li ) { return t.link( li ).tagName === 'A' && t.link( li ).href === '#navs/navs/'+ li.dataset.row } ) );
 	check( 'a list that is read shows the list, at its address', t.list.classList.contains('admin-hidden') === false && t.form.classList.contains('admin-hidden') === true && t.written.at(-1) === '["navs"]' );
 	check( '...and the New navigation button is the one main button of the list', t.newButton() !== undefined && t.newButton().textContent === text('/_admin/navs/label/new') );
 
@@ -229,14 +232,30 @@ console.log('Admin Navigations');
 	t.answer( 200, payload( [ '/' ] ) );
 	check( 'the main button of a form that creates is worded as creating, another fill than Save', t.barButtons().at(-1).textContent === text('/_admin/navs/label/create') && text('/_admin/navs/label/create') !== text('/_admin/common/label/save') && text('/_admin/navs/label/create') !== '' );
 	check( 'a fresh load on #navs/@new opens the form of a new menu: an empty key, no running order yet, nothing to delete', t.form.classList.contains('admin-hidden') === false && t.field('navs-form-key').value === '' && t.entries().length === 0
-		&& t.field('navs-form-add') === undefined && t.barButtons().length === 1 && t.written.at(-1) === '["navs","@new"]' );
+		&& t.field('navs-form-add') === undefined && t.barButtons().length === 1 && t.written.at(-1) === '["navs",{"word":"@new"}]' );
+}
+
+// A menu whose key reads @new: the key %40new opens that menu, the word @new the form that makes one - what the panel wrote is read by the router, and what the router read is what the panel opens
+{
+	const open = ( hash, navs ) => {
+		const read = codec.read( hash );
+		const t = build( null, { panel : 'navs', parts : read.parts } );
+		t.panel.init();
+		t.answer( 200, { navs : navs, routes : ROUTES } );
+		return t;
+	};
+	const navs = [ { key : '@new', name : '', entries : [] }, { key : 'new', name : '', entries : [] } ];
+	const t = open( '#navs/navs/%40new', navs );
+	check( 'the menu @new is a link to %40new, and a fresh load on that address opens that menu - no form that makes one', t.menus().length === 2 && t.link( t.menus()[0] ).href === '#navs/navs/%40new' && t.field('navs-form-key').value === '@new' && t.field('navs-form-add') !== undefined );
+	const w = open( '#navs/navs/@new', navs );
+	check( '...and the word @new opens the form that makes a menu: an empty key, nothing to delete', w.field('navs-form-key').value === '' );
 }
 
 {
 	const t = build( null, { panel : 'navs', parts : [ 'new' ] } );
 	t.panel.init();
 	t.answer( 200, { navs : [ { key : 'new', name : '', entries : [] } ], routes : ROUTES } );
-	check( 'a menu called new has an address of its own: a fresh load on #navs/new opens that menu, not the form of a new one', t.menus()[0].dataset.row === 'new' && t.link( t.menus()[0] ).href === '#navs/new'
+	check( 'a menu called new has an address of its own: a fresh load on #navs/navs/new opens that menu, not the form of a new one', t.menus()[0].dataset.row === 'new' && t.link( t.menus()[0] ).href === '#navs/navs/new'
 		&& t.field('navs-form-key').value === 'new' && t.field('navs-form-add') !== undefined );
 }
 
@@ -260,7 +279,7 @@ console.log('Admin Navigations');
 	check( 'Back shows the list, writes its address and puts the focus on the row that was opened', t.form.classList.contains('admin-hidden') === true && t.link( t.menus()[1] ).focused === true && t.moved.at(-1) === '["navs"]' && t.panel._currentKey === null );
 
 	fire( t.newButton(), 'click' );
-	check( 'a new menu opens the same way, at #navs/@new', t.moved.at(-1) === '["navs","@new"]' && findAll( t.form, function( el ) { return el.focused === true } ).length === 1 );
+	check( 'a new menu opens the same way, at #navs/@new', t.moved.at(-1) === '["navs",{"word":"@new"}]' && findAll( t.form, function( el ) { return el.focused === true } ).length === 1 );
 	fire( t.back(), 'click' );
 	check( '...and Back returns to the New navigation button', t.newButton().focused === true );
 
@@ -605,5 +624,8 @@ console.log('Admin Navigations');
 	registered.navs.save( function( ok ) { outcomes.push( ok ) } );
 	check( 'one with no key ends in false as well, without a request', outcomes.join() === 'false,true,false' && t.requests.at(-1).action === 'navs/save' && t.errors().length === 1 );
 }
+
+check( 'every address the panel wrote or drew - the list, a menu, a new one - is read back by the router as the same screen and the same parts', codec.written.length > 4 && codec.mismatches.length === 0
+	&& codec.written.some( written => ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.parts[0] === 'footer' ) );
 
 done();

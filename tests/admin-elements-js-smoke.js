@@ -26,7 +26,10 @@
 const vm 		= require('vm');
 const fs 		= require('fs');
 const path 	= require('path');
-const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire, shellRouter } = require( './harness.js' );
+
+// What the panel writes into the address goes through the router's own codec: every state written, every link drawn, is read back
+const codec = shellRouter();
 
 const fixture = JSON.parse( fs.readFileSync( path.join( __dirname, 'fixtures/admin/elements-roundtrip.json' ), 'utf8' ) );
 
@@ -109,10 +112,10 @@ const Nino = {
 		} },
 		router : {
 			current : function() { return hash },
-			go : function( panel, parts ) { moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
-			set : function( panel, parts ) { written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+			go : function( panel, parts ) { codec.check( panel, parts ); moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+			set : function( panel, parts ) { codec.check( panel, parts ); written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
 			leave : function( names, open, proceed ) { proceed() },
-			href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') },
+			href : function( name, parts ) { return codec.check( name, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
 		},
 		dirty : {
 			register : function( name, entry ) { registered[name] = entry },
@@ -229,7 +232,7 @@ check( 'the panel asks for the types', requests.length === 1 && requests[0].acti
 answer( 200, { types : TYPES, locales : [ 'de_DE', 'en_US' ], selectedLocale : 'de_DE' } );
 
 check( 'the types are the rows of the block, a link each that writes the address of its list', rows( types ).length === 2
-	&& findAll( rows( types )[0], function( el ) { return el.classList.contains('nino-admin-row-open') } )[0].href === '#elements/roundtrip' && findAll( rows( types )[0], function( el ) { return el.tagName === 'STRONG' } )[0].textContent === 'Round trip' );
+	&& findAll( rows( types )[0], function( el ) { return el.classList.contains('nino-admin-row-open') } )[0].href === '#elements/elements/roundtrip' && findAll( rows( types )[0], function( el ) { return el.tagName === 'STRONG' } )[0].textContent === 'Round trip' );
 check( '...whose second line says how many elements the type holds and its identifier, quietly', findAll( rows( types )[0], function( el ) { return el.tagName === 'SMALL' } )[0].textContent === text('/_admin/elements/label/element-one')+ ' · /roundtrip'
 	&& findAll( rows( types )[1], function( el ) { return el.tagName === 'SMALL' } )[0].textContent === '0 elements · /plain' );
 check( '...and none of them is a button of a class of its own: the block draws them', findAll( types, function( el ) { return el.classList.contains('admin-type-btn') } ).length === 0 );
@@ -440,7 +443,7 @@ check( 'a failure that names no field is said in the line of the bar alone', sen
 
 forget();
 panel._visit( null );
-check( 'a new element has the address #elements/<type>/@new, never one that an element called new could have', moved.at(-1) === '["elements","roundtrip","@new"]' );
+check( 'a new element has the address #elements/elements/<type>/@new, never one that an element called new could have', moved.at(-1) === '["elements","roundtrip",{"word":"@new"}]' );
 settle();
 check( '...the Element URI is the first field, required, with its help behind a (?), and the main button creates the element', datum('.uri') !== undefined && datum('.uri').attributes['aria-required'] === 'true' && primary().textContent === text('/_admin/elements/label/create')
 	&& danger() === undefined && barButtons().some( function( el ) { return el.textContent === text('/_admin/elements/label/create-again') } ) );
@@ -480,7 +483,7 @@ answer( 200, { global : stored().global, locales : { de_DE : stored().locales.de
 settle();
 forget();
 fire( barButtons().find( function( el ) { return el.textContent === text('/_admin/elements/label/duplicate') } ), 'click' );
-check( 'the copy is asked about unsaved input first and then is a new form that carries the values, with no uri of its own', guarded.join() === 'elements' && datum('.uri') !== undefined && datum('.uri').value === '' && datum('title').value === 'Hammer' && moved.at(-1) === '["elements","roundtrip","@new"]' );
+check( 'the copy is asked about unsaved input first and then is a new form that carries the values, with no uri of its own', guarded.join() === 'elements' && datum('.uri') !== undefined && datum('.uri').value === '' && datum('title').value === 'Hammer' && moved.at(-1) === '["elements","roundtrip",{"word":"@new"}]' );
 check( '...it counts as unsaved input, and the line says that it is a copy', panel.isDirty() === true && lineState().textContent === text('/_admin/elements/msg/duplicated') );
 type( datum('.uri'), 'hammer-copy' );
 forget();
@@ -528,6 +531,7 @@ forget();
 panel._follow( [ 'roundtrip', '@new' ] );
 settle();
 check( 'an address that names a new element opens a blank form, and one that names an element opens it', panel._isNew === true && findAll( form, function( el ) { return el.dataset.field === '.uri' } ).length === 1 );
+panel._elements = [ { uri : 'new', label : 'An element called new' } ];
 panel._follow( [ 'roundtrip', 'new' ] );
 check( 'new is a name like any other: an element of that name is asked for, never a blank form', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === 'new' );
 answer( 404, { error : 'element not found' } );
@@ -652,10 +656,127 @@ delete moduleEn['/_admin/elements/field/locked/price'];
 // --- an element the address names and the type has not ----------------------------------------------------------
 
 forget();
-panel._follow( [ 'locked', 'nope' ] );
+panel._openForm( 'nope' );
 answer( 404, { error : 'element not found' } );
 check( 'an element that does not exist is a box that says so under the way back to the list, and its address stays the one that was asked for - never null', findAll( form, function( el ) { return el.classList.contains('nino-admin-empty') } ).length === 1
 	&& backLink() !== undefined && written.at(-1) === '["elements","locked","nope"]' && form.classList.contains('admin-hidden') === false );
+
+// An address that names an element the list of the type does not hold: the list is read once more, since the element may have been made since
+// (by another window, by a colleague) - and only the list that was read just now says it is not there. The element is never asked for
+const emptyBox = () => findAll( form, function( el ) { return el.classList.contains('nino-admin-empty') } ).length === 1;
+forget();
+panel._follow( [ 'locked', 'nobody' ] );
+check( 'an element the list does not hold, named by the address, is looked for in the list once more: one request, the list, and the element is not asked for', requests.length === 1 && requests[0].action === 'elements/list' && panel._pendingUri === 'nobody' );
+answer( 200, { elements : [ { uri : 'other', label : 'Other' } ], columns : [] } );
+check( '...and the list that was read says it is not there: the box, no request for the element, the address kept as it was typed', requests.every( request => request.action !== 'elements/get' ) && panel._pendingUri === undefined && emptyBox() === true
+	&& backLink() !== undefined && written.at(-1) === '["elements","locked","nobody"]' && form.classList.contains('admin-hidden') === false );
+forget();
+panel._follow( [ 'locked', 'fresh' ] );
+answer( 200, { elements : [ { uri : 'other', label : 'Other' }, { uri : 'fresh', label : 'Made a minute ago' } ], columns : [] } );
+check( 'an element made since the list was read opens, as one the list has: the list is read again and then the element asked for - no box, no 404', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === 'fresh' && panel._pendingUri === undefined );
+answer( 404, { error : 'not found' } );
+
+// A list that is still on its way is waited for: the address is looked for in the list that comes, and no second list is asked for
+forget();
+panel._currentType = null;
+panel._follow( [ 'locked', 'other' ] );
+check( '...where the type is read first (a reload), the list of it is the only request, and the element is neither asked for nor said to be missing before it is here', requests.length === 1 && requests[0].action === 'elements/list' && panel._pendingUri === 'other' && emptyBox() === false );
+panel._follow( [ 'locked', 'later' ] );
+check( '...an address that changes while the list is on its way is looked for in that list: no further request', requests.length === 1 && panel._pendingUri === 'later' );
+answer( 200, { elements : [ { uri : 'other', label : 'Other' }, { uri : 'later', label : 'Later' } ], columns : [] } );
+check( '...and the last one named is opened from it', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === 'later' );
+answer( 404, { error : 'not found' } );
+
+// A list that was on its way when the address went back to the types is not waited for: nothing is left loading
+forget();
+panel._currentType = 'locked';
+panel._selectType( 'locked', LOCKED, 'Locked' );
+check( 'a list asked for is on its way', panel._listLoading === true );
+panel._follow( [] );
+check( '...and the address that goes back to the types drops it: the list is no longer waited for, and the type picked next is not left waiting for an answer that falls away', panel._listLoading === false );
+
+// The list that is read again for an address the list does not hold is not drawn over a level the person has gone back to: nothing of it is
+// opened, no box is drawn, and no address is written over the entry the person returned to
+const showList = function() { panel._isNew = false; panel._currentUri = null; form.classList.add('admin-hidden'); types.classList.add('admin-hidden'); list.classList.remove('admin-hidden'); forget() };
+const backTo = function( parts, level ) {
+	forget();
+	panel._currentType = 'locked';
+	panel._elements = [ { uri : 'other', label : 'Other' } ];
+	panel._listLoading = false;
+	showList();
+	panel._follow( [ 'locked', 'nosuch' ] );
+	const refresh = requests.at(-1);
+	const asked = requests.length;
+	written.length = 0;
+	panel._follow( parts );
+	refresh.callback( { status : 200, responseJSON : { elements : [ { uri : 'other', label : 'Other' } ], columns : [] } } );
+	return { asked : asked, level : level() };
+};
+const onList = () => list.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true;
+const gone = backTo( [ 'locked' ], onList );
+check( 'back to the list while the list is read again for an element that is not there: the list stays, no box is drawn over it, and nothing writes the address of that element over the entry the person returned to',
+	gone.asked === 1 && gone.level === true && emptyBox() === false && written.every( entry => entry.indexOf( 'nosuch' ) === -1 ) && panel._pendingUri === undefined && panel._listLoading === false );
+const away = backTo( [], () => types.classList.contains('admin-hidden') === false );
+check( '...and back to the types the same: the types stay, nothing of the list that was dropped is shown, and the next type picked waits for nothing', away.level === true && emptyBox() === false && written.every( entry => entry.indexOf( 'nosuch' ) === -1 ) && panel._pendingUri === undefined && panel._listLoading === false );
+
+// A list that cannot be read says nothing of the element: the server is asked for it, and what it answers is the answer; no list is left loading
+forget();
+panel._currentType = 'locked';
+panel._elements = [ { uri : 'other', label : 'Other' } ];
+panel._listLoading = false;
+showList();
+panel._follow( [ 'locked', 'asked' ] );
+answer( 500, { error : 'broken' } );
+check( 'the list read again for an address fails (500): it is not taken for an answer - the element is asked for, and nothing is left loading', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === 'asked' && panel._listLoading === false && panel._pendingUri === undefined );
+answer( 404, { error : 'not found' } );
+check( '...and the server\'s 404 is the box that says it is not there', emptyBox() === true );
+showList();
+panel._follow( [ 'locked', 'asked' ] );
+answer( 0, null );
+check( '...so is a request that never got an answer (no status): the element is asked for', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === 'asked' && panel._listLoading === false );
+answer( 200, { global : {}, locales : { de_DE : { title : 'Asked' } }, raw : {} } );
+
+// What was on its way to being opened is not what the address names any more: a late answer draws nothing over the box
+forget();
+panel._openForm( 'slow' );
+const slow = requests.at(-1);
+panel._follow( [ 'locked', 'nobody' ] );
+answer( 200, { elements : [ { uri : 'other', label : 'Other' } ], columns : [] } );
+slow.callback( { status : 200, responseJSON : { global : {}, locales : { de_DE : { title : 'Slow' } }, raw : {} } } );
+check( 'an element still being read when the address names one that is not there does not draw its form over the box', emptyBox() === true && panel._currentUri === null );
+
+// An element whose uri reads @new, and one called new: the word @new is the form that makes an element, %40new the key of the element that is
+// called that, and new its own key. What the panel writes is read back by the router, and the panel opens what the router read
+panel._types = [ { type : 'roundtrip', title : 'Round trip', model : MODEL } ];
+panel._currentType = 'roundtrip';
+panel._elements = [ { uri : '@new', label : 'At new' }, { uri : 'new', label : 'New' }, { uri : 'hammer', label : 'Hammer' } ];
+const reread = function( hash ) {
+	const read = codec.read( hash );
+	panel._follow( read.parts );
+	return read;
+};
+const toList = function() { panel._isNew = false; panel._currentUri = null; form.classList.add('admin-hidden'); list.classList.remove('admin-hidden'); types.classList.add('admin-hidden'); forget() };
+
+toList();
+panel._visit( '@new' );
+const keyHash = codec.href( 'elements', [ 'roundtrip', '@new' ] );
+check( 'the element whose uri reads @new is written as its key, %40new, and the form that makes one as the word', keyHash === '#elements/elements/roundtrip/%40new' && codec.href( 'elements', [ 'roundtrip', codec.word('new') ] ) === '#elements/elements/roundtrip/@new'
+	&& requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === '@new' );
+toList();
+reread( keyHash );
+check( '...read back by the router and followed by the panel, %40new asks for the element @new and opens no blank form', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === '@new' && panel._isNew === false );
+toList();
+reread( '#elements/elements/roundtrip/@new' );
+check( '...@new opens the blank form of a new element, no element is asked for', requests.every( request => request.action !== 'elements/get' ) && panel._isNew === true );
+toList();
+reread( '#elements/elements/roundtrip/new' );
+check( '...and an element called new is an element: asked for as that, never a blank form', requests.at(-1).action === 'elements/get' && requests.at(-1).payload.uri === 'new' && panel._isNew === false );
+toList();
+reread( '#elements/elements/roundtrip/%40new' );
+answer( 200, { global : stored().global, locales : stored().locales, raw : {} } );
+settle();
+check( '...once it is open the element @new is the element on the form, with the address it was opened at: a save writes THAT element and makes no second one', panel._currentUri === '@new' && panel._isNew === false
+	&& written.at(-1) === JSON.stringify( [ 'elements', 'roundtrip', '@new' ] ) );
 
 // --- text is text ---------------------------------------------------------------------------------------
 
@@ -670,5 +791,8 @@ const used = new Set( ( script.match( /'\/_admin\/elements\/[a-z0-9\/-]+'/g ) ||
 [ '/_admin/elements/label/prev', '/_admin/elements/label/next' ].forEach( function( key ) { used.add( key ) } );
 const missing = [ ...used ].filter( function( key ) { return ( key in moduleEn ) === false || ( key in moduleDe ) === false } );
 check( 'every word of the panel is a fill in English and in German'+ ( missing.length === 0 ? '' : ' - not '+ missing.join(', ') ), used.size > 40 && missing.length === 0 );
+
+check( 'every address the panel wrote or drew - the types, a type, an element, a new one - is read back by the router as the same screen and the same parts', codec.written.length > 4 && codec.mismatches.length === 0
+	&& codec.written.some( written => ( typeof written.parts[1] === 'object' && String( written.parts[1] ) === '@new' ) ) && codec.written.some( written => written.parts.length === 2 && written.parts[1] !== '@new' ) );
 
 done();

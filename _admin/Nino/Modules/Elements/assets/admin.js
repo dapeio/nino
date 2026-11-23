@@ -11,8 +11,9 @@
  *
  *													Every view has an address that survives a reload: the
  *													types (#elements), the elements of a type
- *													(#elements/<type>), one element (#elements/<type>/<uri>)
- *													and a new one (#elements/<type>/@new - an at sign no
+ *													(#elements/elements/<type>), one element
+ *													(#elements/elements/<type>/<uri>)
+ *													and a new one (#elements/elements/<type>/@new - an at sign no
  *													element name has, so that an element called new keeps its
  *													own address). A form shows the language the whole workbench
  *													edits content in (Nino.admin.workLocale) and no other: it
@@ -91,6 +92,9 @@
 		// show up in the very next form that points at it
 		_referenceOptions	: {},
 		_pendingUri			: undefined,
+
+		// Whether a list of the current type is on its way (elements/list): what an address names is looked for in it when it arrives
+		_listLoading		: false,
 		// The buckets the open element is stored in ('*' and one per locale),
 		// as apiGet() sent them - read-only, for the raw drawer at the foot of
 		// the form
@@ -230,9 +234,12 @@
 			const type = parts.length === 0 ? undefined : Nino.admin.elements._types.find( function( t ) { return t.type === parts[0] } );
 			const uri = type === undefined || parts.length < 2 ? undefined : parts[1];
 
+			// The form of a new element is the word @new; an element whose uri reads @new is an element and has the key %40new
+			const isNew = uri !== undefined && Nino.admin.router.isWord( parts, 1, 'new' ) === true;
+
 			if( type === undefined ? ( form === false && list === false ) : ( uri === undefined
 				? ( list === true && current === type.type )
-				: ( form === true && current === type.type && ( uri === '@new' ? Nino.admin.elements._isNew === true : ( Nino.admin.elements._isNew === false && Nino.admin.elements._currentUri === uri ) ) ) ) ) {
+				: ( form === true && current === type.type && ( isNew === true ? Nino.admin.elements._isNew === true : ( Nino.admin.elements._isNew === false && Nino.admin.elements._currentUri === uri ) ) ) ) ) {
 
 				// Already on the level the address names - but a request for a
 				// deeper one may still be on its way (an element opened from the
@@ -257,7 +264,7 @@
 				}
 
 				if( current === type.type && uri !== undefined ) {
-					Nino.admin.elements._openForm( uri === '@new' ? null : uri );
+					Nino.admin.elements._openAt( isNew === true ? null : uri );
 					return;
 				}
 
@@ -270,7 +277,7 @@
 					return;
 				}
 
-				Nino.admin.elements._pendingUri = uri;
+				Nino.admin.elements._pendingUri = isNew === true ? null : uri;
 				Nino.admin.elements._selectType( type.type, type.model, type.title );
 			}, Nino.admin.elements._showLevel );
 
@@ -289,11 +296,16 @@
 		 */
 		_dropRequests : function( form, list ) {
 
-			if( form === true )
+			// What an address asked for while the list was on its way is not what the address names now: it is not opened from the list that comes
+			if( form === true ) {
 				++Nino.admin.elements._formRequest;
+				Nino.admin.elements._pendingUri = undefined;
+			}
 
-			if( list === true )
+			if( list === true ) {
 				++Nino.admin.elements._listRequest;
+				Nino.admin.elements._listLoading = false;
+			}
 		},
 
 		/**
@@ -311,7 +323,7 @@
 				return;
 
 			Nino.admin.elements._opener = opener ?? null;
-			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, uri === null ? '@new' : uri ] );
+			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, uri === null ? Nino.admin.router.word('new') : uri ] );
 			Nino.admin.elements._openForm( uri, undefined, true );
 		},
 
@@ -364,6 +376,7 @@
 			Nino.admin.elements._elements					= [];
 			Nino.admin.elements._referenceOptions	= {};
 			Nino.admin.elements._pendingUri				= undefined;
+			Nino.admin.elements._listLoading			= false;
 			Nino.admin.elements._types						= [];
 			Nino.admin.elements._fields						= {};
 			Nino.admin.elements._resetEdits();
@@ -400,7 +413,8 @@
 			if( type === undefined )
 				return false;
 
-			Nino.admin.elements._pendingUri = hash.parts.length > 1 ? hash.parts[1] : undefined;
+			// undefined: no element named; null: the form of a new one; a string: the uri of an element
+			Nino.admin.elements._pendingUri = hash.parts.length < 2 ? undefined : ( Nino.admin.router.isWord( hash.parts, 1, 'new' ) === true ? null : hash.parts[1] );
 			Nino.admin.elements._selectType( type.type, type.model, type.title );
 			return true;
 		},
@@ -511,7 +525,7 @@
 		 *	@return		void
 		 */
 		_showFormView : function( opened ) {
-			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, Nino.admin.elements._isNew ? '@new' : Nino.admin.elements._currentUri ] );
+			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, Nino.admin.elements._isNew ? Nino.admin.router.word('new') : Nino.admin.elements._currentUri ] );
 			Nino.adminUi.showLevel( 'elements-form', opened === true ? {} : { focus : false } );
 		},
 
@@ -778,6 +792,7 @@
 
 			const requestId = ++Nino.admin.elements._listRequest;
 			++Nino.admin.elements._formRequest; // invalidate an element still loading
+			Nino.admin.elements._listLoading = true;
 			Nino.admin.elements._currentType 			= type;
 			Nino.admin.elements._currentTypeTitle	= title;
 			Nino.admin.elements._currentModel			= model;
@@ -791,6 +806,7 @@
 			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.elements._workingLocale( '' ) }, function( status, response ) {
 				if( requestId !== Nino.admin.elements._listRequest || type !== Nino.admin.elements._currentType )
 					return;
+				Nino.admin.elements._listLoading = false;
 				// Shown as well as written: this runs while the type picker is the
 				// visible level, so the pane the message lands in is still hidden
 				// - exactly as _openForm()'s own error path handles it below
@@ -802,25 +818,103 @@
 				Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
 				Nino.admin.elements._showList( opened === true ? null : undefined );
 
-				const pendingUri = Nino.admin.elements._pendingUri;
-				Nino.admin.elements._pendingUri = undefined;
-				if( pendingUri !== undefined )
-					Nino.admin.elements._openForm( pendingUri === '@new' ? null : pendingUri );
+				Nino.admin.elements._openPending();
 			} );
 		},
 
 		/**
+		 *	Open what an address names in the current type: the blank form, or an element. An element the
+		 *	list does not hold is looked for in the list once more - it may have been made since the list was
+		 *	read, by another window or another person - and only the list that was read just now says it is
+		 *	not there, with the box that says so. A list that is still on its way is waited for
+		 *
+		 *	@param		{string|null}	uri						An element's uri, null for the form of a new one
+		 *
+		 *	@return		void
+		 */
+		_openAt : function( uri ) {
+
+			const elements = Nino.admin.elements;
+
+			if( uri === null || ( elements._listLoading === false && elements._holds( uri ) === true ) )
+				return elements._openForm( uri );
+
+			elements._pendingUri = uri;
+
+			if( elements._listLoading === false )
+				elements._refreshList();
+		},
+
+		/**
+		 *	Whether the list of the current type, as it was read, has the element
+		 *
+		 *	@param		{string}	uri
+		 *
+		 *	@return		{boolean}
+		 */
+		_holds : function( uri ) {
+			return Nino.admin.elements._elements.some( function( element ) { return element.uri === uri } );
+		},
+
+		/**
+		 *	What the address asked for while the list was on its way is opened now that the list is here: the
+		 *	form of a new element, an element the list has, or - for one it has not - the box that says it is not
+		 *	there. The element is not asked for: the list is the answer, and it was read after the address
+		 *
+		 *	@return		void
+		 */
+		_openPending : function() {
+
+			const elements = Nino.admin.elements;
+			const pending = elements._pendingUri;
+
+			elements._pendingUri = undefined;
+
+			if( pending === undefined )
+				return;
+
+			if( pending === null || elements._holds( pending ) === true )
+				return elements._openForm( pending );
+
+			// An element that was on its way to being opened is not the one the address names now
+			++elements._formRequest;
+			elements._showMissing( pending, false );
+		},
+
+		/**
 		 *	Read the current type's list again - after a save, or when the
-		 *	workbench's content locale moved on since the list was read - and
-		 *	draw it, leaving whatever is on screen alone if the answer is late
+		 *	workbench's content locale moved on since the list was read, or because an
+		 *	address names an element the list has not - and draw it, leaving whatever is
+		 *	on screen alone if the answer is late. What an address asked for is opened
+		 *	from the list that comes
 		 *
 		 *	@return		void
 		 */
 		_refreshList : function() {
+
 			const type = Nino.admin.elements._currentType;
+			const requestId = ++Nino.admin.elements._listRequest;
+
+			Nino.admin.elements._listLoading = true;
+
 			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.elements._workingLocale( '' ) }, function( status, response ) {
-				if( status === 200 && response !== null && type === Nino.admin.elements._currentType )
-					Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
+
+				if( requestId !== Nino.admin.elements._listRequest || type !== Nino.admin.elements._currentType )
+					return;
+
+				Nino.admin.elements._listLoading = false;
+
+				// A list that could not be read says nothing of the element: the server is asked for it
+				if( status !== 200 || response === null ) {
+					const asked = Nino.admin.elements._pendingUri;
+					Nino.admin.elements._pendingUri = undefined;
+					if( asked !== undefined )
+						Nino.admin.elements._openForm( asked );
+					return;
+				}
+
+				Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
+				Nino.admin.elements._openPending();
 			} );
 		},
 
@@ -1053,6 +1147,42 @@
 		},
 
 		/**
+		 *	An element that cannot be read - one the address names and the type has not - says so in place of the
+		 *	form, under the way back to the list, and its address stays the one that was asked for
+		 *
+		 *	@param		{string}		uri
+		 *	@param		{boolean}		opened			The person opened it: the focus goes there. Otherwise it is shown as it stands, by the address
+		 *	@param		{number}		[status]		What the server answered where it was asked: 404 for the box, another for its error. Left out, the box
+		 *	@param		{*}					[response]
+		 *
+		 *	@return		void
+		 */
+		_showMissing : function( uri, opened, status, response ) {
+
+			const type = Nino.admin.elements._currentType;
+
+			Nino.admin.elements._isNew = false;
+			Nino.admin.elements._currentUri = null;
+			Nino.admin.elements._fields = {};
+			Nino.admin.elements._status = null;
+			Nino.admin.elements._destroyHtmlEditors();
+
+			const wrap = dc.getElementById('elements-form');
+			if( status === undefined || status === 404 ) {
+				wrap.innerHTML = '';
+				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/elements/error/unknown') ) );
+			}
+			else
+				Nino.admin.elements._showError( wrap, status, response );
+			wrap.insertBefore( Nino.adminUi.contextBar( { back : { to : Nino.admin.elements._currentTypeTitle, onClick : function() {
+				Nino.admin.router.go( 'elements', [ type ] );
+				Nino.admin.elements._showList( null );
+			} } } ), wrap.firstChild );
+			Nino.admin.router.set( 'elements', [ type, uri ] );
+			Nino.adminUi.showLevel( 'elements-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
 		 *	Open the edit form for an existing element, or a blank one for a new element
 		 *
 		 *	@param		{string|null}	uri			Element uri, or null to create a new one
@@ -1095,23 +1225,7 @@
 				// An element that cannot be read - one the address names and the type has not - says so in place of the form,
 				// under the way back to the list, and its address stays the one that was asked for
 				if( status !== 200 || response === null ) {
-					Nino.admin.elements._isNew = false;
-					Nino.admin.elements._currentUri = null;
-					Nino.admin.elements._fields = {};
-					Nino.admin.elements._status = null;
-					const wrap = dc.getElementById('elements-form');
-					if( status === 404 ) {
-						wrap.innerHTML = '';
-						wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/elements/error/unknown') ) );
-					}
-					else
-						Nino.admin.elements._showError( wrap, status, response );
-					wrap.insertBefore( Nino.adminUi.contextBar( { back : { to : Nino.admin.elements._currentTypeTitle, onClick : function() {
-						Nino.admin.router.go( 'elements', [ type ] );
-						Nino.admin.elements._showList( null );
-					} } } ), wrap.firstChild );
-					Nino.admin.router.set( 'elements', [ type, uri ] );
-					Nino.adminUi.showLevel( 'elements-form', opened === true ? {} : { focus : false } );
+					Nino.admin.elements._showMissing( uri, opened === true, status, response );
 					return;
 				}
 
@@ -3048,7 +3162,7 @@
 			Nino.admin.elements._copy 					= true;
 
 			Nino.admin.elements._renderForm();
-			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, '@new' ] );
+			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, Nino.admin.router.word('new') ] );
 
 			// A copy nobody has saved yet is the one state "unsaved" is for
 			Nino.admin.elements._status.dirty( Nino.content.getText('/_admin/elements/msg/duplicated') );

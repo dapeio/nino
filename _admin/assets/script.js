@@ -18,12 +18,46 @@
 
 ( function(wn,dc,dE,bd) {
 
+	// A word of an address: an at sign and a lowercase word. What the server writes the same way
+	// (\Nino\AdminAddress::WORD)
+	const WORD = /^@[a-z][a-z0-9-]*$/;
+
+	// The longest address that is read; a longer one is no address
+	const MAX = 4096;
+
 	wn.Nino.admin = {
 
 		/**
 		 *	Minimal url-hash "router": lets a panel persist which drill-down
 		 *	level it's on into the hash, so a refresh restores the exact view
-		 *	instead of resetting to the panel's top level. Uses
+		 *	instead of resetting to the panel's top level.
+		 *
+		 *	The address is the one place this file writes and reads, in one
+		 *	form for every panel:
+		 *
+		 *	  #<panel>													the panel, on its first screen, as it starts
+		 *	  #<panel>/<tab>									a screen of the panel, as it starts
+		 *	  #<panel>/<tab>/<part>[/<part>...]	a state of that screen
+		 *
+		 *	A panel's own screen is its first tab, named like the panel
+		 *	(#elements/elements/blog); a tab is named by its uri without
+		 *	the panel's name in front (#builder/frames for builder-frames) - the
+		 *	server renders the name as data-address-tab (see Panels::panesHtml()). A
+		 *	part is a word - what the workbench says, made by word( 'new' ) and
+		 *	written @new, an at sign and a lowercase word - or a key: any string,
+		 *	always ONE segment, percent-encoded, a slash in it %2F and every at sign
+		 *	in it %40, so that a key that reads @new is %40new and never the word.
+		 *	Where it reads, the router tells them apart at the segment as it is
+		 *	written (see current(), isWord()). The panels name a screen by its uri
+		 *	as before - router.href( 'types', [ router.word( 'new' ) ] ) is
+		 *	#elements/types/@new - and read the same two things back from
+		 *	current(): { panel : the screen, parts, known }. An address in any
+		 *	other form - a panel the page has not, one longer than MAX - is read as
+		 *	no address, a tab the page has not as the panel's own start, and a part
+		 *	that is no part (a stray slash, a control character) ends the parts
+		 *	there.
+		 *
+		 *	Uses
 		 *	history.replaceState and pushState (not location.hash=) so it never
 		 *	scroll-jumps and never fires its own hashchange event.
 		 *
@@ -108,20 +142,188 @@
 			},
 
 			/**
-			 *	Read the current #hash into { panel, parts[] }
+			 *	The screens the page has, panel by panel: the panel's own screen and
+			 *	its tabs as the server rendered them (see Panels::panesHtml()) - the
+			 *	DOM is the registry. A pane without tab panes is one screen, named
+			 *	like the panel. Only a pane's direct children count: a panel's own
+			 *	markup may use data-tab for its own purposes
+			 *
+			 *	@return		{Object}									panel => [ { screen, tab }, ... ], the first the one the panel opens on
+			 */
+			_screens : function() {
+
+				// No prototype: an address that says toString or constructor names no panel
+				const map = Object.create( null );
+
+				dc.querySelectorAll('#admin-content-wrap > [data-panel]').forEach( function( pane ) {
+
+					const tabs = Array.from( pane.querySelectorAll(':scope > div[data-tab]') );
+
+					map[pane.dataset.panel] = tabs.length === 0
+						? [ { screen : pane.dataset.panel, tab : pane.dataset.panel } ]
+						: tabs.map( function( tab ) { return { screen : tab.dataset.tab, tab : tab.dataset.addressTab } } );
+				} );
+
+				return map;
+			},
+
+			/**
+			 *	Where a screen sits: the panel it is on, its name in an address and
+			 *	whether it is the one the panel opens on
+			 *
+			 *	@param		{string}	screen				A panel's or a tab's uri
+			 *
+			 *	@return		{Object|null}						{ panel, tab, first }, null for a screen the page has not
+			 */
+			_locate : function( screen ) {
+
+				const map = Nino.admin.router._screens();
+
+				for( const panel of Object.keys( map ) ) {
+
+					const at = map[panel].findIndex( function( entry ) { return entry.screen === screen } );
+
+					if( at !== -1 )
+						return { panel : panel, tab : map[panel][at].tab, first : at === 0 };
+				}
+
+				return null;
+			},
+
+			/**
+			 *	A word, as a panel writes one into an address: router.word( 'new' ) is
+			 *	the thing the workbench says, written @new. It is an object and no string
+			 *	because a string is a key - a key that reads @new is a key and is written
+			 *	%40new. A name that is no lowercase word is none
+			 *
+			 *	@param		{string}	name					Without the at sign
+			 *
+			 *	@return		{Object}									{ word : '@new' }
+			 */
+			word : function( name ) {
+
+				if( WORD.test( '@'+ name ) === false )
+					throw new Error( 'not a word of an address: '+ name );
+
+				// Printed, it is the word it says: a panel's log of what it wrote reads @new
+				return { word : '@'+ name, toString : function() { return this.word } };
+			},
+
+			/**
+			 *	The word a part of a read address is, '' for a key: the segment was written
+			 *	@word and not percent-encoded. Parts that did not come from current() - an
+			 *	array a caller made - have no say in it, and a string that looks like a
+			 *	word is one there
+			 *
+			 *	@param		{Array}		parts					current().parts
+			 *	@param		{number}	at
+			 *
+			 *	@return		{string}									'@new', or ''
+			 */
+			wordOf : function( parts, at ) {
+				return typeof parts[at] === 'string' && WORD.test( parts[at] ) === true && ( parts.words === undefined || parts.words[at] === true ) ? parts[at] : '';
+			},
+
+			/**
+			 *	Whether a part of a read address is the word of that name
+			 *
+			 *	@param		{Array}		parts					current().parts
+			 *	@param		{number}	at
+			 *	@param		{string}	name					Without the at sign
+			 *
+			 *	@return		{boolean}
+			 */
+			isWord : function( parts, at, name ) {
+				return Nino.admin.router.wordOf( parts, at ) === '@'+ name;
+			},
+
+			/**
+			 *	One part as it goes into an address: a word (see word()) as it is, a
+			 *	key percent-encoded - one segment, whatever it holds, an at sign in it
+			 *	too
+			 *
+			 *	@param		{*}		part
+			 *
+			 *	@return		{string}
+			 */
+			_segment : function( part ) {
+
+				// An object that says it is a word is one where it is a word (see word()); where it is not it is a key, the text it says
+				if( typeof part === 'object' && part !== null && typeof part.word === 'string' )
+					return WORD.test( part.word ) === true ? part.word : encodeURIComponent( part.word );
+
+				return encodeURIComponent( String( part ) );
+			},
+
+			/**
+			 *	Read the current #hash into { panel, parts[], known }: the screen the
+			 *	address names - the uri of the tab, or of the panel for its own
+			 *	screen - and the parts behind its name. A segment written @word is a
+			 *	word and keeps its at sign; every other is a key and is decoded, so
+			 *	that %40new is the key @new - parts.words says which is which (see
+			 *	isWord()). The panel and the tab are read as they are written. A part
+			 *	that is no part - an empty segment, a control character, a stray % - ends
+			 *	the parts there: what stands before it is read, what stands behind it is
+			 *	dropped. An address the page has no panel for, or one longer than MAX, is
+			 *	no address: { panel : '', parts : [], known : false }; a panel with a tab
+			 *	it does not have is the panel's own start, known false, so that the shell
+			 *	writes the true address over it
 			 *
 			 *	@return		{Object}
 			 */
 			current : function() {
+
+				// The parts of an address say which of them are words (see isWord()): none, for one that has none
+				const noParts = function() { return Object.defineProperty( [], 'words', { value : [], enumerable : false } ) };
+				const none = { panel : '', parts : noParts(), known : false };
 				const raw = wn.location.hash.replace(/^#/, '');
-				try {
-					const parts = raw === '' ? [] : raw.split('/').map( function(p) { return decodeURIComponent(p) } );
-					return { panel : parts[0] ?? '', parts : parts.slice(1) };
-				} catch(e) {
-					// A hand-edited hash with a stray '%' must not abort all editor
-					// initialization with decodeURIComponent()'s URIError.
-					return { panel : '', parts : [] };
+
+				if( raw === '' || raw.length > MAX )
+					return none;
+
+				const segments = raw.split('/');
+				const screens = Nino.admin.router._screens()[segments[0]];
+
+				if( screens === undefined )
+					return none;
+
+				if( segments.length === 1 )
+					return { panel : screens[0].screen, parts : noParts(), known : true };
+
+				const named = screens.find( function( entry ) { return entry.tab === segments[1] } );
+
+				if( named === undefined )
+					return { panel : screens[0].screen, parts : noParts(), known : false };
+
+				const parts = [];
+				const words = [];
+
+				for( const segment of segments.slice(2) ) {
+
+					let part;
+
+					if( WORD.test( segment ) === true )
+						part = segment;
+					else {
+						try {
+							part = decodeURIComponent( segment );
+						} catch(e) {
+							// A hand-edited hash with a stray '%' must not abort all editor
+							// initialization with decodeURIComponent()'s URIError.
+							break;
+						}
+					}
+
+					if( part === '' || /[\u0000-\u001f\u007f]/.test( part ) === true )
+						break;
+
+					parts.push( part );
+					words.push( part === segment && WORD.test( segment ) === true );
 				}
+
+				Object.defineProperty( parts, 'words', { value : words, enumerable : false } );
+
+				return { panel : named.screen, parts : parts, known : true };
 			},
 
 			/**
@@ -136,15 +338,26 @@
 			},
 
 			/**
-			 *	The hash for #panel/part/part/...
+			 *	The hash of a screen and a state of it: #panel for the panel's own
+			 *	screen as it starts, #panel/tab for another, and the parts behind
+			 *	the name of the tab. Written here and nowhere else
 			 *
-			 *	@param		{string}	panel
-			 *	@param		{Array}		[parts]
+			 *	@param		{string}	screen				The uri of the panel, or of its tab
+			 *	@param		{Array}		[parts]				Words and keys
 			 *
 			 *	@return		{string}
 			 */
-			_hash : function( panel, parts ) {
-				return '#'+ [ panel ].concat( parts || [] ).map( encodeURIComponent ).join('/');
+			_hash : function( screen, parts ) {
+
+				const router = Nino.admin.router;
+				const at = router._locate( screen );
+				const rest = ( parts || [] ).map( router._segment );
+
+				// A screen the page has not has no address of a panel: it is written as it is named
+				if( at === null )
+					return '#'+ [ screen ].concat( rest ).join('/');
+
+				return '#'+ ( rest.length === 0 && at.first === true ? [ at.panel ] : [ at.panel, at.tab ].concat( rest ) ).join('/');
 			},
 
 			/**
@@ -439,7 +652,10 @@
 			 *	@return		void
 			 */
 			settle : function( name ) {
-				if( Nino.admin.router.current().panel !== name )
+
+				const current = Nino.admin.router.current();
+
+				if( current.panel !== name || current.known === false )
 					Nino.admin.router.set( name, [] );
 			},
 
@@ -2664,6 +2880,10 @@
 			// rendered only the panels this account may use (see
 			// Admin::visiblePanels()).
 			//
+			// The title the page was loaded with, "Admin | <project>": what the title of the document
+			// follows the screen on show with (see retitle()). A page without a title has none to follow with
+			const baseTitle = typeof dc.title === 'string' && dc.title !== '' ? dc.title : null;
+
 			// panel name (matches the hash) -> [ nav link, pane ]
 			const panels = {};
 			dc.querySelectorAll('#admin-nav-wrap a[data-panel]').forEach( function( link ) {
@@ -2837,6 +3057,41 @@
 			}
 
 			/**
+			 *	The title of the document follows the screen: its name, the panel's name behind
+			 *	it where the screen is a tab, then the title the page was loaded with - "Slots -
+			 *	Images | Admin | Project". What a person sees in the tab of the browser and in
+			 *	its history says where they are
+			 *
+			 *	@param		{string}		panel					The panel on screen
+			 *	@param		{string}		[tab]					The tab of it that is open, left out for a pane with no tabs
+			 *
+			 *	@return		void
+			 */
+			function retitle( panel, tab ) {
+
+				if( baseTitle === null )
+					return;
+
+				const label = panels[panel][0].querySelector('.nino-admin-nav-label');
+				const names = [];
+
+				if( tab !== undefined && panels[panel][1] !== null ) {
+					const button = Array.from( panels[panel][1].querySelectorAll(':scope > .admin-panel-head > .admin-panel-tabs > button[data-tab]') ).find( function( btn ) { return btn.dataset.tab === tab } );
+
+					// The label is the first thing of the button: a count at it is a badge behind it, no part of the name
+					if( button !== undefined && button.firstChild !== null && tab !== panel )
+						names.push( String( button.firstChild.textContent ).trim() );
+				}
+
+				if( label !== null )
+					names.push( String( label.textContent ).trim() );
+
+				const name = names.filter( function( part ) { return part !== '' } ).join(' - ');
+
+				dc.title = name === '' ? baseTitle : name+ ' | '+ baseTitle;
+			}
+
+			/**
 			 *	What selectTab() does, without the history entry. A pane with tabs
 			 *	opens on `tab` where it has it, else on its first tab, the panel's own
 			 *	screen - that is what the address #<panel> asks for
@@ -2886,6 +3141,7 @@
 
 				if( tabPanes.length === 0 ) {
 					screen.name = panel;
+					retitle( panel );
 					show( panel );
 					Nino.admin.router.settle( panel );
 					return;
@@ -2906,6 +3162,7 @@
 				} );
 
 				screen.name = current;
+				retitle( panel, current );
 				show( current );
 				Nino.admin.router.settle( current );
 			}

@@ -15,7 +15,7 @@
  *													tree the panels offer (scopes()) and ticked off again in
  *													a list of their own, and a summary says in plain words
  *													what the role may do. Every view has its address:
- *													#roles, #roles/new and #roles/<id>. Manager-only, same
+ *													#users/roles, #users/roles/@new and #users/roles/<id>. Manager-only, same
  *													gate the backend enforces independently (see
  *													Roles/Roles.php beside it). A role that holds a
  *													permission the signed-in account does not is shown in
@@ -79,7 +79,7 @@
 				Nino.admin.roles._ready = true;
 
 				if( hash.panel === 'roles' && hash.parts.length > 0 ) {
-					if( hash.parts[0] === 'new' )
+					if( Nino.admin.router.isWord( hash.parts, 0, 'new' ) === true )
 						return Nino.admin.roles._openRole( null );
 					if( Nino.admin.roles._roles.some( function( r ) { return r.id === hash.parts[0] } ) === true )
 						return Nino.admin.roles._openRole( hash.parts[0] );
@@ -142,7 +142,7 @@
 
 			const open = dc.getElementById('roles-form').classList.contains('admin-hidden') === false;
 			const current = Nino.admin.roles._current;
-			const create = parts[0] === 'new';
+			const create = Nino.admin.router.isWord( parts, 0, 'new' ) === true;
 			const role = create === true || parts.length === 0 ? undefined : Nino.admin.roles._roles.find( function( r ) { return r.id === parts[0] } );
 
 			if( create === true ? ( open === true && current === null ) : ( role === undefined ? open === false : ( open === true && current !== null && current.id === role.id ) ) )
@@ -212,7 +212,7 @@
 		 *	@return		void
 		 */
 		_showForm : function( opened ) {
-			Nino.admin.router.set( 'roles', [ Nino.admin.roles._current === null ? 'new' : Nino.admin.roles._current.id ] );
+			Nino.admin.router.set( 'roles', [ Nino.admin.roles._current === null ? Nino.admin.router.word('new') : Nino.admin.roles._current.id ] );
 			Nino.adminUi.showLevel( 'roles-form', opened === true ? {} : { focus : false } );
 		},
 
@@ -268,7 +268,7 @@
 					};
 				} ), { label : Nino.content.getText('/_admin/nav/roles') } ) );
 
-			const add = Nino.adminUi.button( Nino.content.getText('/_admin/roles/label/new'), function() { Nino.admin.router.go( 'roles', [ 'new' ] ); Nino.admin.roles._opener = add; Nino.admin.roles._openRole( null, true ) } );
+			const add = Nino.adminUi.button( Nino.content.getText('/_admin/roles/label/new'), function() { Nino.admin.router.go( 'roles', [ Nino.admin.router.word('new') ] ); Nino.admin.roles._opener = add; Nino.admin.roles._openRole( null, true ) } );
 			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : add } ).el );
 		},
 

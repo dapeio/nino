@@ -1516,7 +1516,7 @@ $legalNotices = static fn( array $body ): array => array_values( array_filter( $
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
 $missingTypes = $legalNotices( $body );
 check( 'the module is active and its types are not there: the dashboard says so, once per type, with the file of the unit to copy back and a link to the type', count( array_filter( $missingTypes, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-nothing' ) ) === 2
-	&& $missingTypes[0]['values'][0] === 'legal' && str_ends_with( $missingTypes[0]['values'][1], 'install/elements/legal.php' ) && $missingTypes[0]['link'] === '#elements/legal' );
+	&& $missingTypes[0]['values'][0] === 'legal' && str_ends_with( $missingTypes[0]['values'][1], 'install/elements/legal.php' ) && $missingTypes[0]['link'] === '#elements/elements/legal' );
 
 $legalKeys = array_column( array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData ), static fn( array $notice ): bool => str_starts_with( $notice['text'], '/_admin/dashboard/notice/legal-' ) ), 'key' );
 check( 'a notice about the legal texts has a key of its own - its kind and a hash of what names it, and for the count of the rest the kind alone - so that two notices of a kind are two keys', count( $legalKeys ) >= 2 && count( array_unique( $legalKeys ) ) === count( $legalKeys )

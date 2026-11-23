@@ -29,7 +29,10 @@
 'use strict';
 
 const vm 		= require('vm');
-const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire, shellRouter } = require( './harness.js' );
+
+// What the panel writes into the address goes through the router's own codec: every state written, every link drawn, is read back
+const codec = shellRouter();
 
 // Every focus() the panel asks for, in order: a check counts them, which the
 // element's own focused flag cannot - and the one that has it now, which is what a page answers to activeElement
@@ -156,10 +159,10 @@ const Nino = {
 		workLocale : workLocale,
 		router : {
 			current : function() { return hash },
-			go : function( panel, parts ) { moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
-			set : function( panel, parts ) { written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+			go : function( panel, parts ) { codec.check( panel, parts ); moved.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
+			set : function( panel, parts ) { codec.check( panel, parts ); written.push( JSON.stringify( [ panel ].concat( parts ) ) ) },
 			leave : function( names, open, proceed, resync ) { leaves.push( { open : open, proceed : proceed, resync : resync } ) },
-			href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') },
+			href : function( name, parts ) { return codec.check( name, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
 		},
 		dirty : {
 			watchForm : function( name, getter, save ) { watched.push( { name : name, getter : getter, save : save } ) },
@@ -349,7 +352,7 @@ check( '...and a page nobody named in any language is called by its path', rowNa
 check( 'a row is a link that writes the address of its form, and opens the form through the router', rows().every( function( li ) {
 	const link = rowLink( li );
 	return link.tagName === 'A' && link.href === Nino.admin.router.href( 'routes', [ li.dataset.row ] );
-} ) && rows()[1].dataset.row === '/about' && rowLink( rows()[1] ).href === '#routes/%2Fabout' );
+} ) && rows()[1].dataset.row === '/about' && rowLink( rows()[1] ).href === '#routes/routes/%2Fabout' );
 
 const withOpen = openLink( '/about' );
 check( 'the link to the page is a real link in a tab of its own, under the project directory, named for a screen reader', withOpen !== null && withOpen.href === '/site/about' && withOpen.target === '_blank' && withOpen.rel === 'noopener'
@@ -392,7 +395,7 @@ check( 'Back shows the list, writes its address and puts the focus on the row th
 /*	A new route starts empty. The one thing it is given is the blank page when
 	the project has one - and nothing otherwise, so the person has to choose.	*/
 fire( newButton(), 'click' );
-check( 'a new route has an address of its own, #routes/@new', moved.at(-1) === '["routes","@new"]' && written.at(-1) === '["routes","@new"]' );
+check( 'a new route has an address of its own, #routes/@new', moved.at(-1) === '["routes",{"word":"@new"}]' && written.at(-1) === '["routes",{"word":"@new"}]' );
 check( '...no Element URI and no address filled in, one field for the address', fieldNamed('uri').value === '' && addressControls().length === 1 && addressControls()[0].value === '' );
 check( '...and starts on the blank page the project has, nothing else', fieldNamed('template').value === 'page-blank' );
 check( '...with a name and a title per language and no filler in them, and no Delete: there is nothing to delete', [ 'de_DE', 'en_US' ].every( function( locale ) {
@@ -847,11 +850,11 @@ check( 'feature routes have a title of their own, with the sentence that says wh
 const featureRows = rows().slice( 2 );
 check( 'they stand below the pages, a row each, named by what was written and by the path', rows().length === 4 && rowPath( featureRows[0] ) === '/blog/*' && rowName( featureRows[0] ) === 'Beitrag' && rowName( featureRows[1] ) === '/.newsletter' );
 check( '...without buttons and without a link out: none of them is the project\'s to move, and a placeholder is no page', featureRows.every( function( li ) { return findAll( li, function( el ) { return el.classList.contains('nino-admin-row-actions') } ).length === 0 } ) );
-check( '...a row opens the form at an address of its own: #routes/feature/<Element-URI>', rowLink( featureRows[1] ).href === '#routes/feature/%2Fnewsletter' );
+check( '...a row opens the form at an address of its own: #routes/routes/@feature/<Element-URI>', rowLink( featureRows[1] ).href === '#routes/routes/@feature/%2Fnewsletter' );
 
 fire( rowLink( featureRows[1] ), 'click' );
 check( 'a feature route opens a form of the path, which is read only, at its address', field('routes-form-runtime-path').value === '/.newsletter' && field('routes-form-runtime-path').readOnly === true
-	&& written.at(-1) === '["routes","feature","/newsletter"]' && fieldNamed('uri') === undefined && fieldNamed('template') === undefined );
+	&& written.at(-1) === '["routes",{"word":"@feature"},"/newsletter"]' && fieldNamed('uri') === undefined && fieldNamed('template') === undefined );
 check( '...with a name, a title and a description per language, the description of the language of the workbench', [ 'de_DE', 'en_US' ].every( function( locale ) { return rowControl( 'name', locale ) !== undefined && rowControl( 'title', locale ) !== undefined } ) && fieldNamed('description') !== undefined );
 check( '...and no navigations, no status code and no delete', navTicks().length === 0 && fieldNamed('statusCode') === undefined && deleteButton() === undefined );
 fire( theForm(), 'input', { target : rowControl( 'name', 'de_DE' ) } );
@@ -870,7 +873,7 @@ check( 'a complete form is sent as routes/savetexts for the Element-URI, and onl
 touched.length = 0; touchedUris.length = 0; toasts.length = 0;
 answer( 200, { runtime : featurePages.runtime } );
 check( 'the texts of a feature route are written like a page: the other panels are told, with the address the feature routes it at', touched.join() === 'routes' && touchedUris.join() === '/.newsletter' );
-check( '...a toast says so, and the person stays in the form, at its address', toasts.length === 1 && form.classList.contains('admin-hidden') === false && written.at(-1) === '["routes","feature","/newsletter"]' && status().textContent === '' );
+check( '...a toast says so, and the person stays in the form, at its address', toasts.length === 1 && form.classList.contains('admin-hidden') === false && written.at(-1) === '["routes",{"word":"@feature"},"/newsletter"]' && status().textContent === '' );
 
 // A page a feature routes by a pattern is no address a window can go to: saved, it is written and says no page
 fire( backLink(), 'click' );
@@ -917,16 +920,20 @@ function loadAt( parts, extra ) {
 	answer( 200, listing( [ '/', '/about', '/contact' ], Object.assign( { templates : [ 'page-about', 'page-blank', 'page-contact' ], defaultTemplate : 'page-blank',
 		runtime : [ { uri : '/newsletter', httpUri : '/.newsletter', httpUris : [ '/.newsletter' ], body : '', text : { de_DE : { name : 'Brief', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } } ] }, extra || {} ) ) );
 }
-loadAt( [ '@new' ] );
+loadAt( codec.parts( '@new' ) );
 check( 'a fresh load on #routes/@new opens the form of a new route', form.classList.contains('admin-hidden') === false && mount.classList.contains('admin-hidden') === true && fieldNamed('uri') !== undefined && fieldNamed('uri').value === '' && deleteButton() === undefined );
-check( '...without moving the focus the person did not put there', written.at(-1) === '["routes","@new"]' && inside( form, active ) === false );
+check( '...without moving the focus the person did not put there', written.at(-1) === '["routes",{"word":"@new"}]' && inside( form, active ) === false );
 loadAt( [ '/about' ] );
 check( 'a fresh load on the address of a route opens its form', fieldNamed('uri') !== undefined && fieldNamed('uri').value === '/about' && deleteButton() !== undefined );
-loadAt( [ 'feature', '/newsletter' ] );
+loadAt( codec.parts( '@feature', '/newsletter' ) );
 check( 'a fresh load on the address of a page a feature routes opens its form', field('routes-form-runtime-path') !== undefined && field('routes-form-runtime-path').value === '/.newsletter' );
+loadAt( codec.parts( { key : '@new' } ) );
+check( 'the key @new is no route and no form that makes one: the list', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true );
+loadAt( codec.parts( { key : '@feature' }, '/newsletter' ) );
+check( '...and the key @feature in front of a route is no page a feature routes', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true );
 loadAt( [ '/nothing-there' ] );
 check( 'an address that names no route is the list', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && written.at(-1) === '["routes"]' );
-loadAt( [ 'feature', '/about' ] );
+loadAt( codec.parts( '@feature', '/about' ) );
 check( '...and so does the address of a route as a page of a feature', mount.classList.contains('admin-hidden') === false );
 
 /*	A step through the browser's history changes the address and nothing else: the panel follows it, and asks about unsaved input first (the router's leave())	*/
@@ -1074,7 +1081,7 @@ fire( backLink(), 'click' );
 /*	A route whose Element URI is "new" (written by hand, no slash) keeps an address of its own: the one of a new route has an at sign,
 	which no Element URI has	*/
 loadAt( [ 'new' ], { pages : [ page( 'new' ), page( '/contact' ) ] } );
-check( 'a route called new has its own address and a fresh load on it opens that route, not the form of a new one', rowLink( rows()[0] ).href === '#routes/new' && fieldNamed('uri').value === 'new' && deleteButton() !== undefined );
+check( 'a route called new has its own address and a fresh load on it opens that route, not the form of a new one', rowLink( rows()[0] ).href === '#routes/routes/new' && fieldNamed('uri').value === 'new' && deleteButton() !== undefined );
 
 /*	An Element URI that is changed is the address of the form from then on, and the next save names the page by it	*/
 loadAt( [ '/contact' ] );
@@ -1109,5 +1116,8 @@ save();
 answer( 400, { error : 'unknown navigation', code : 'routes_unknown_nav', params : [ 'legal' ], field : 'navs' } );
 check( 'a refusal that names the navigations is said at the group of ticks, with the focus on its first tick, and no toast', findAll( form, function( el ) { return el.tagName === 'FIELDSET' && el.classList.contains('nino-admin-checklist-field') } )[0].attributes['aria-invalid'] === 'true'
 	&& active === navTicks()[0] && sentences().length === 1 && text('/_admin/error/routes_unknown_nav') !== '' );
+
+check( 'every address the panel wrote or drew - the list, a route, a new one, a page a feature routes - is read back by the router as the same screen and the same parts', codec.written.length > 6 && codec.mismatches.length === 0
+	&& codec.written.some( written => ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@feature' ) && written.parts.length === 2 ) && codec.written.some( written => written.parts[0] === '/about' ) );
 
 done();

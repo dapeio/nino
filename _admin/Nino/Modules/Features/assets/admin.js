@@ -8,7 +8,7 @@
  *													search over it, the columns name, category, version and
  *													state, and the small buttons of a row at its end. The
  *													count of a tab is the chip on its button. A feature
- *													has an address of its own, #features/<key>, behind its
+ *													has an address of its own, #features/features/<key>, behind its
  *													row: a view with the context bar and its way back, what
  *													it is and - for a feature without a panel of its own -
  *													its settings, and the bar of every form: Uninstall at the
@@ -166,6 +166,10 @@
 				Nino.admin.features._renderPanel();
 				Nino.admin.features._ready = true;
 
+				// The address a person typed that names no tab or feature is the list: it says so
+				if( first === true )
+					Nino.admin.features._address();
+
 				if( first === true )
 					Nino.admin.features._restored();
 
@@ -249,10 +253,11 @@
 		_named : function( parts ) {
 
 			const word = typeof parts[0] === 'string' ? parts[0] : '';
+			const said = Nino.admin.router.wordOf( parts, 0 );
 
-			// A tab is written with an @, which no key begins with: a feature may be called `active`
-			if( word.charAt( 0 ) === '@' && TABS.indexOf( word.slice( 1 ) ) !== -1 )
-				return { tab : word.slice( 1 ), key : '' };
+			// A tab is a word, @inactive: a feature may be called `active`, and its key is a key. A word that names no tab names nothing
+			if( said !== '' )
+				return { tab : TABS.indexOf( said.slice( 1 ) ) !== -1 ? said.slice( 1 ) : 'active', key : '' };
 
 			// A view keeps the tab it was opened from; one that is opened by its address has none, and is on its feature's own
 			if( word !== '' ) {
@@ -570,7 +575,7 @@
 		 *	@return		{Array}
 		 */
 		_tabAddress : function( tab ) {
-			return tab === 'active' ? [] : [ '@'+ tab ];
+			return tab === 'active' ? [] : [ Nino.admin.router.word( tab ) ];
 		},
 
 		/**
@@ -617,7 +622,7 @@
 				// A browser that keeps nothing for the page reloads all the same
 			}
 
-			wn.location.hash = '#'+ [ 'features' ].concat( options.parts || Nino.admin.features._tabParts() ).join('/');
+			wn.location.hash = Nino.admin.router.href( 'features', options.parts || Nino.admin.features._tabParts() );
 			wn.location.reload();
 		},
 
@@ -2513,7 +2518,7 @@
 			if( feature.active === true && feature.settings.length > 0 && feature.settingsTab ) {
 				const where = Nino.adminUi.hint( '' );
 				const link = dc.createElement('a');
-				link.href = '#'+ feature.settingsTab;
+				link.href = Nino.admin.router.href( feature.settingsTab, [] );
 				link.textContent = Nino.content.getText('/_admin/features/hint/settings-tab');
 				where.appendChild( link );
 				form.appendChild( where );

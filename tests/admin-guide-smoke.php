@@ -974,13 +974,13 @@ foreach( $elementsPanel as $script => $blocks ) {
 	if( preg_match( '/localeSelect\(|type\s*=\s*\'(?:radio|file)\'|nino-admin-field-radio|\b(?:wn|window)\.(?:alert|confirm|prompt)\(|[↑↓✕]/u', $source ) === 1 )
 		$ownKinds[] = $script;
 
-	if( str_contains( $source, 'router.set(' ) === false || str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false || str_contains( $source, "'@new'" ) === false )
+	if( str_contains( $source, 'router.set(' ) === false || str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false || str_contains( $source, "router.word('new')" ) === false )
 		$unaddressed[] = $script;
 }
 
 check( 'the Elements panel and the Element Types tab draw with the blocks the guide names for each task'. ( $unblocked === [] ? '' : ' - not '. implode( ', ', $unblocked ) ), $unblocked === [] );
 check( '...with no language switch of their own, no radios, no bare file input, no dialog of the browser and no character for an icon'. ( $ownKinds === [] ? '' : ' - '. implode( ', ', $ownKinds ) ), $ownKinds === [] );
-check( '...and every view has an address - the new one is @new, which no element or type can be called - that is written, linked to, moved by and asked before it is left'. ( $unaddressed === [] ? '' : ' - '. implode( ', ', $unaddressed ) ), $unaddressed === [] );
+check( '...and every view has an address - the new one is the word @new, which no element or type can be called - that is written, linked to, moved by and asked before it is left'. ( $unaddressed === [] ? '' : ' - '. implode( ', ', $unaddressed ) ), $unaddressed === [] );
 
 $elementsSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Elements/assets/admin.js' ) ) );
 

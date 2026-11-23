@@ -1747,11 +1747,11 @@ namespace Nino\Admin {
 				'head-bare'		=> '<div class="admin-panel-manualrow">[[manual]]</div>',
 				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist">[[content]]</div>',
 				'tab-button'	=> '<button type="button" role="tab" id="admin-tabbutton-[[uri]]" class="nino-admin-tab" data-tab="[[uri]]" aria-controls="admin-tab-[[uri]]" aria-selected="false">[[label]]</button>',
-				'tab-pane'		=> '<div id="admin-tab-[[uri]]" role="tabpanel" aria-labelledby="admin-tabbutton-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
+				'tab-pane'		=> '<div id="admin-tab-[[uri]]" role="tabpanel" aria-labelledby="admin-tabbutton-[[uri]]" data-tab="[[uri]]" data-address-tab="[[addressTab]]" hidden>[[content]]</div>',
 				// The same pane where there is no strip above it: one tab is no
 				// strip (see panesHtml()), so there is no tab to be the panel of
 				// and no button for aria-labelledby to point at
-				'tab-pane-lone'	=> '<div id="admin-tab-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
+				'tab-pane-lone'	=> '<div id="admin-tab-[[uri]]" data-tab="[[uri]]" data-address-tab="[[addressTab]]" hidden>[[content]]</div>',
 				// A panel without a template of its own renders mount points
 				// its script fills - see panes() in the panel contract
 				'mount'				=> '<div id="[[id]]"></div>',
@@ -1852,6 +1852,14 @@ namespace Nino\Admin {
 
 						$tab['parent'] = $entry['uri'];
 						$tab['door']	 = '';
+						$tab['addressTab'] = \Nino\AdminAddress::tab( $entry['uri'], $tab['uri'] );
+
+						// A name in an address names one screen of the panel: a tab
+						// whose name another screen of it has is refused, like a uri
+						if( $tab['addressTab'] === $entry['addressTab'] || in_array( $tab['addressTab'], array_column( $entry['tabs'], 'addressTab' ), true ) === true ) {
+							trigger_error( 'Panel '. $tabClass. ' as a tab of \''. $entry['uri']. '\' has the name \''. $tab['addressTab']. '\' in an address, which another screen of the panel has', E_USER_WARNING );
+							continue;
+						}
 
 						// A scope() holds only where the tab belongs to the area: the door
 						// of its panel and its own perm() lie in it. Anything else is a
@@ -1946,6 +1954,14 @@ namespace Nino\Admin {
 						break;
 					}
 
+					// The name the tab has in an address is one screen of the panel's only
+					$name = \Nino\AdminAddress::tab( $uri, $tabUri );
+
+					if( $name === $uri || in_array( $name, array_column( $panels[$uri]['tabs'], 'addressTab' ), true ) === true ) {
+						trigger_error( 'Settings tab of feature \''. $feature['key']. '\' has the name \''. $name. '\' in an address, which another screen of the panel has', E_USER_WARNING );
+						break;
+					}
+
 					$tab = [
 						'class'		=> \Nino\Modules\Features\Settings::class,
 						'uri'			=> $tabUri,
@@ -1968,6 +1984,7 @@ namespace Nino\Admin {
 						'tabs'		=> [],
 						'parent'	=> $uri,
 						'own'			=> true,
+						'addressTab'	=> $name,
 						'core'		=> $panel['core'],
 						'feature'	=> $feature['key'],
 					];
@@ -2219,6 +2236,10 @@ namespace Nino\Admin {
 				// visiblePanels() found the account lacks its permission but
 				// holds one of its tabs'
 				'own'			=> true,
+				// The name the screen has in an address (see address()): a
+				// panel's own screen is named like the panel, a tab's name is
+				// set by collect() from the panel it sits on
+				'addressTab'	=> $uri,
 			];
 		}
 
@@ -2454,8 +2475,8 @@ namespace Nino\Admin {
 
 					foreach( $tabs as $tab )
 						$content .= str_replace(
-							[ '[[uri]]', '[[content]]' ],
-							[ $tab['uri'], self::_paneContent( $tab ) ],
+							[ '[[uri]]', '[[addressTab]]', '[[content]]' ],
+							[ $tab['uri'], $tab['addressTab'], self::_paneContent( $tab ) ],
 							$paneHtml
 						);
 				}

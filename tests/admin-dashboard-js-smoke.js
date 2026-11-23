@@ -22,7 +22,10 @@
 'use strict';
 
 const vm 		= require('vm');
-const { check, done, fills, load, documentOf, findAll, element } = require( './harness.js' );
+const { check, done, fills, load, documentOf, findAll, element, shellRouter } = require( './harness.js' );
+
+// The links the panel draws are written by the router's own codec
+const codec = shellRouter();
 
 /** The text a notice shows: its own, and the label of its link */
 function notices() {
@@ -60,7 +63,7 @@ mount.appendChild( wrap );
 const requests = [];
 
 const Nino = {
-	admin : { router : { set : function() {} } },
+	admin : { router : codec.stub() },
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
 		requests.push( { action : data.action, callback : callback } );
@@ -107,9 +110,9 @@ check( '...and markup in it stays text', markup.textContent === '<img src=x oner
 
 const linked = Nino.adminUi.notice( 'Open the panel', { href : '#text', label : 'Open' } );
 check( 'a link to a panel of the workbench is an anchor with its label', links( linked ).length === 1 && links( linked )[0].href === '#text' && links( linked )[0].textContent === 'Open' );
-check( '...a hash with a path in it too', links( Nino.adminUi.notice( 'x', { href : '#elements/news', label : 'Open' } ) ).length === 1 );
+check( '...an address in it too: a tab, a word and a key', links( Nino.adminUi.notice( 'x', { href : '#elements/elements/news', label : 'Open' } ) ).length === 1 && links( Nino.adminUi.notice( 'x', { href : '#elements/types/@new', label : 'Open' } ) ).length === 1 && links( Nino.adminUi.notice( 'x', { href : '#text/keys/%2Fa%2Fb', label : 'Open' } ) ).length === 1 );
 
-[ 'javascript:alert(1)', 'https://example.org/', '//example.org/', '#', '#Text', '#a b', '', '#"onclick="x' ].forEach( function( href ) {
+[ 'javascript:alert(1)', 'https://example.org/', '//example.org/', '#', '#Text', '#a b', '', '#"onclick="x', '#elements//x', '#elements/%zz', '#elements/<x>', '#elements/@New' ].forEach( function( href ) {
 	check( 'no link for the target '+ JSON.stringify( href ), links( Nino.adminUi.notice( 'x', { href : href, label : 'Open' } ) ).length === 0 );
 } );
 check( '...nor for a link that is no object', links( Nino.adminUi.notice( 'x', null ) ).length === 0 && links( Nino.adminUi.notice( 'x', '#text' ) ).length === 0 );
@@ -143,12 +146,12 @@ check( 'a number is filled in as its text, a missing value leaves the blank, and
 // What the Legal module tells: the placeholder, the title of a section a person wrote, the language
 const unknownWords = text('/_admin/dashboard/notice/legal-unknown');
 show( { tiles : [], notices : [
-	{ text : '/_admin/dashboard/notice/legal-unknown', values : [ '#/project/company/contact/email#', 'Hosting <i>$&</i>', 'de_DE' ], link : '#elements/privacy/hosting' },
+	{ text : '/_admin/dashboard/notice/legal-unknown', values : [ '#/project/company/contact/email#', 'Hosting <i>$&</i>', 'de_DE' ], link : '#elements/elements/privacy/hosting' },
 	{ text : '/_admin/dashboard/notice/legal-more', values : [ '3' ], link : '' },
 ] } );
 check( 'a notice of the legal texts fills its three values in as text, whatever a section is called', unknownWords.split('%s').length === 4 && notices().length === 2
 	&& ownText( notices()[0] ).indexOf( unknownWords.split('%s')[0]+ '#/project/company/contact/email#' ) === 0 && ownText( notices()[0] ).indexOf( 'Hosting <i>$&</i>' ) !== -1 && ownText( notices()[0] ).indexOf( '(de_DE)' ) !== -1 );
-check( '...with a link into the section it is about', links( notices()[0] ).length === 1 && links( notices()[0] )[0].href === '#elements/privacy/hosting' );
+check( '...with a link into the section it is about', links( notices()[0] ).length === 1 && links( notices()[0] )[0].href === '#elements/elements/privacy/hosting' );
 check( '...and the line that counts the rest has no link and its number in it', links( notices()[1] ).length === 0 && ownText( notices()[1] ) === text('/_admin/dashboard/notice/legal-more').replace( '%s', '3' ) && text('/_admin/dashboard/notice/legal-more').indexOf( '%s' ) !== -1 );
 
 show( { tiles : [ { panel : 'users', value : '3', label : 'Users' } ] } );
@@ -179,6 +182,8 @@ check( '"Show all" is a link to the Log with the class of a link-button - the ta
 check( '...and stands after the list it belongs to', activity.parentNode.children[activity.parentNode.children.indexOf( activity ) + 1] === all );
 
 pinHeadAreas();
+
+check( 'every address the panel drew - a tile, a type, the log - is written by the router and read back by it as the same screen', codec.written.length > 2 && codec.mismatches.length === 0 );
 
 done();
 

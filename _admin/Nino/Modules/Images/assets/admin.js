@@ -10,7 +10,7 @@
  *													same convention as Text's key categories) into a list of
  *													categories -> all slots of that category shown at once,
  *													each category with an address of its own
- *													(#images/<category>). Slots can't be added/removed here,
+ *													(#images/images/<category>). Slots can't be added/removed here,
  *													only the file each currently points to changes - or goes
  *													away: Remove takes the image out of a slot after a
  *													question and leaves the slot.
@@ -172,31 +172,15 @@
 		},
 
 		/**
-		 *	The group a hash names, or null: its parts are the group's segments,
-		 *	the way the Text panel writes a row (#images/template/page-home), and
-		 *	the group as one part (#images/template%2Fpage-home, an address
-		 *	written before) reads the same
+		 *	The group a hash names, or null: the group is the one part,
+		 *	whatever it holds ('template/page-home')
 		 *
 		 *	@param		{Array}		parts					The hash behind the panel's name
 		 *
 		 *	@return		{string|null}
 		 */
 		_groupOf : function( parts ) {
-
-			const group = parts.join('/');
-
-			return parts.length > 0 && Nino.admin.images._groups[group] !== undefined ? group : null;
-		},
-
-		/**
-		 *	The parts of the address that name a group: its segments
-		 *
-		 *	@param		{string}	group
-		 *
-		 *	@return		{Array<string>}
-		 */
-		_groupParts : function( group ) {
-			return String( group ).split('/');
+			return parts.length === 1 && Nino.admin.images._groups[parts[0]] !== undefined ? parts[0] : null;
 		},
 
 		/**
@@ -268,7 +252,7 @@
 		 *	@return		void
 		 */
 		_showForm : function( opened ) {
-			Nino.admin.router.set( 'images', Nino.admin.images._groupParts( Nino.admin.images._currentGroup ) );
+			Nino.admin.router.set( 'images', [ Nino.admin.images._currentGroup ] );
 			Nino.adminUi.showLevel( 'images-form', opened === true ? {} : { focus : false } );
 		},
 
@@ -322,7 +306,7 @@
 			wrap.innerHTML = '';
 
 			if( Object.keys( Nino.admin.images._groups ).length === 0 ) {
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/slots/empty/images'), Nino.adminUi.button( Nino.content.getText('/_admin/nav/slots'), function() { wn.location.hash = '#slots' } ) ) );
+				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/slots/empty/images'), Nino.adminUi.button( Nino.content.getText('/_admin/nav/slots'), function() { wn.location.hash = Nino.admin.router.href( 'slots', [] ) } ) ) );
 				return;
 			}
 
@@ -334,7 +318,7 @@
 					key			: group,
 					title		: Nino.admin.images._groupLabel( group ),
 					detail	: Nino.adminUi.format( Nino.content.getText('/_admin/images/label/count'), slots.length )+ ' · '+ slots.map( function( slot ) { return slot.label } ).join(', '),
-					href		: Nino.admin.router.href( 'images', Nino.admin.images._groupParts( group ) ),
+					href		: Nino.admin.router.href( 'images', [ group ] ),
 					onOpen	: function() { Nino.admin.images._openGroup( group, true ) },
 				};
 			} ), { label : Nino.content.getText('/_admin/nav/images') } ) );
@@ -356,7 +340,7 @@
 			const open = function() {
 				Nino.admin.images._currentGroup = group;
 				Nino.admin.images._renderGroupForm();
-				Nino.admin.router.go( 'images', Nino.admin.images._groupParts( group ) );
+				Nino.admin.router.go( 'images', [ group ] );
 				Nino.admin.images._showForm( opened === true );
 			};
 

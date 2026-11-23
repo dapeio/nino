@@ -1713,6 +1713,8 @@ check( 'a tab joins the feature\'s panel: the Features permission, the system gr
 	&& $tab['perm'] === '/_admin/features/manage' && $tab['group'] === 'system' && $tab['label'] === '/_admin/nav/features'
 	&& $tab['tab'] === '/_admin/features/tab/settings' && $tab['panes'] === [ 'feature-settings-sample' ] && $tab['parent'] === 'sample'
 	&& $tab['class'] === \Nino\Modules\Features\Settings::class && $tab['feature'] === 'sample' && $tab['assets'] === [] && $tab['template'] === '' && $tab['tabs'] === [] );
+check( 'the tab is the panel\'s \'settings\' in an address, whatever the panel is called: #sample/settings', $tab['addressTab'] === 'settings' && \Nino\AdminAddress::of( 'sample', [], 'sample-settings' ) === '#sample/settings'
+	&& str_contains( \Nino\Admin\Admin::panesHtml( $appData ), 'data-tab="sample-settings" data-address-tab="settings"' ) );
 check( 'it follows the panel\'s own screen, and carries the Features panel\'s words', array_keys( \Nino\Admin\Admin::panels( $appData )['sample']['tabs'] ) === [ 'sample-settings' ]
 	&& $tab['text'] === \Nino\Modules\Features\Admin::text() && \Nino\Modules\Features\Settings::actions() === [] );
 check( 'a feature without a panel gets no tab, and neither does the Features panel itself', ( static function() use ( $appData ): bool {

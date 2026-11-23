@@ -24,7 +24,7 @@
 'use strict';
 
 const vm 		= require('vm');
-const { check, done, source, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, source, fills, load, element, findAll, fire, shellRouter } = require( './harness.js' );
 
 // --- the words -------------------------------------------------------------
 
@@ -58,6 +58,8 @@ function everything() {
 	return [ list, form ].concat( findAll( list, function() { return true } ), findAll( form, function() { return true } ) );
 }
 
+// What the panel writes into the address goes through the router's own codec: every state it writes is read back
+const codec = shellRouter();
 const requests = [];
 const confirms = [];
 let confirmAnswer = true;
@@ -66,8 +68,7 @@ let address = { panel : 'users', parts : [] };
 
 const Nino = {
 	admin : {
-		router : { current : function() { return address }, go : function() {}, set : function() {}, leave : function() {},
-			href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') } },
+		router : codec.stub( { current : function() { return address } } ),
 	},
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
@@ -239,7 +240,7 @@ const backLinkOf = function() { return findAll( form, function( el ) { return el
 
 panel._showList();
 panel._renderList( panel._users );
-check( 'a row is a link with the address of the account it opens', linkOf('c@example.com').href === '#users/c%40example.com' && linkOf('me@example.com').href === '#users/me%40example.com' );
+check( 'a row is a link with the address of the account it opens', linkOf('c@example.com').href === '#users/users/c%40example.com' && linkOf('me@example.com').href === '#users/users/me%40example.com' );
 
 fire( linkOf('c@example.com'), 'click' );
 check( 'opening an account shows its form and moves the focus into it', form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && focusedNow() === backLinkOf() && backLinkOf() !== undefined );
@@ -474,10 +475,12 @@ pinUsersNameEdit();
 		answer( 200, { users : JSON.parse( JSON.stringify( USERS ) ), canManage : canManage, roles : ROLES } );
 	};
 
-	fresh( [ 'new' ], true );
+	fresh( codec.parts( '@new' ), true );
 	check( 'the address of the new-account form opens it on a fresh load, as a click on New does', byId('users-create-form') !== null && form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && panel._currentUser === null );
-	fresh( [ 'new' ], false );
+	fresh( codec.parts( '@new' ), false );
 	check( '...for an account that may create one; for another it is the list', form.classList.contains('admin-hidden') === true && list.classList.contains('admin-hidden') === false );
+	fresh( codec.parts( { key : '@new' } ), true );
+	check( 'the key @new is no account and no form that makes one: the list - the word is read as a word, the key as a key', form.classList.contains('admin-hidden') === true && list.classList.contains('admin-hidden') === false );
 	fresh( [ 'b@example.com' ], true );
 	check( 'the address of an account opens its form', panel._currentUser !== null && panel._currentUser.mail === 'b@example.com' && byId('users-edit-form') !== null );
 	address = { panel : 'users', parts : [] };
@@ -502,6 +505,9 @@ pinUsersNameEdit();
 
 	check( 'every word the scripts of the panel name is a fill in English and in German'+ ( lacking.length === 0 ? '' : ' - not '+ lacking.join(', ') ), keys.size > 80 && lacking.length === 0 );
 }
+
+check( 'every address the panel wrote or drew - the rows, the new account, an account - is read back by the router as the same screen and the same parts', codec.written.length > 3 && codec.mismatches.length === 0
+	&& codec.written.some( written => ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.every( written => written.parts[0] !== 'new' ) && codec.written.some( written => written.parts[0] === 'c@example.com' ) );
 
 done();
 

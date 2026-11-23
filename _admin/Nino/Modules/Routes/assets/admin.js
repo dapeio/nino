@@ -12,9 +12,9 @@
  *													URI split every entry carries.
  *
  *													Every view has an address: #routes is the list,
- *													#routes/new the form of a new route, #routes/<Element
- *													URI> a route and #routes/feature/<Element URI> a page a
- *													feature routes. A save leaves the person in the view it
+ *													#routes/routes/@new the form of a new route,
+ *													#routes/routes/<Element URI> a route and
+ *													#routes/routes/@feature/<Element URI> a page a feature routes. A save leaves the person in the view it
  *													was made in and says so as a toast; a new route gets its
  *													address when it is saved. The list is rows of the block
  *													(list()) whose up and down buttons reorder the persisted routes at once,
@@ -226,10 +226,10 @@
 		 */
 		_target : function( parts ) {
 
-			if( parts[0] === '@new' && parts.length === 1 )
+			if( Nino.admin.router.isWord( parts, 0, 'new' ) === true && parts.length === 1 )
 				return { kind : 'new', uri : '', entry : Nino.admin.routes._blank() };
 
-			if( parts[0] === 'feature' && parts.length === 2 ) {
+			if( Nino.admin.router.isWord( parts, 0, 'feature' ) === true && parts.length === 2 ) {
 				const runtime = Nino.admin.routes._runtime.find( function( page ) { return page.uri === parts[1] } );
 				return runtime === undefined ? null : { kind : 'feature', uri : runtime.uri, entry : runtime };
 			}
@@ -358,7 +358,7 @@
 			if( view === null )
 				return [];
 
-			return view.kind === 'new' ? [ '@new' ] : ( view.kind === 'feature' ? [ 'feature', view.uri ] : [ view.uri ] );
+			return view.kind === 'new' ? [ Nino.admin.router.word('new') ] : ( view.kind === 'feature' ? [ Nino.admin.router.word('feature'), view.uri ] : [ view.uri ] );
 		},
 
 		/**
@@ -406,7 +406,7 @@
 		 */
 		_row : function( entry, kind, actions ) {
 
-			const parts = kind === 'feature' ? [ 'feature', entry.uri ] : [ entry.uri ];
+			const parts = kind === 'feature' ? [ Nino.admin.router.word('feature'), entry.uri ] : [ entry.uri ];
 
 			return {
 				key			: ( kind === 'feature' ? 'feature:' : '' )+ entry.uri,
@@ -470,7 +470,7 @@
 			wrap.appendChild( msg );
 
 			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/routes/label/new'), function() {
-				Nino.admin.router.go( 'routes', [ '@new' ] );
+				Nino.admin.router.go( 'routes', [ Nino.admin.router.word('new') ] );
 				Nino.admin.routes._open( { kind : 'new', uri : '', entry : Nino.admin.routes._blank() }, true, addBtn );
 			} );
 			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : addBtn } ).el );

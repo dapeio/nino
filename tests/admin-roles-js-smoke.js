@@ -24,7 +24,7 @@
 'use strict';
 
 const vm 		= require('vm');
-const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire, shellRouter } = require( './harness.js' );
 
 // --- the words -------------------------------------------------------------
 
@@ -375,10 +375,11 @@ console.log('\nAdmin Roles - the drill-down');
 	form.classList.add('admin-hidden');
 	pane.appendChild( form );
 
+	// The panel writes through the router's own codec: every state it writes is read back
+	const codec = shellRouter();
 	const sent = [];
 	const shell = {
-		router : { current : function() { return { panel : 'roles', parts : [] } }, go : function() {}, set : function() {}, leave : function() {},
-			href : function( name, at ) { return '#'+ [ name ].concat( at || [] ).map( encodeURIComponent ).join('/') } },
+		router : codec.stub( { current : function() { return { panel : 'roles', parts : [] } } } ),
 	};
 	const page = { admin : shell, events : { bindCallback : function() {} }, http : { sendRequest : function( uri, method, callback, data ) { sent.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } ) } }, content : { getText : text } };
 	const box = {
@@ -420,7 +421,7 @@ console.log('\nAdmin Roles - the drill-down');
 	const byId = function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null };
 	const errorsOf = function() { return findAll( form, function( el ) { return hasClass( el, 'nino-admin-field-error' ) } ) };
 
-	check( 'a row is a link with the address of the role it opens', linkOf('editor').href === '#roles/editor' && linkOf('author').href === '#roles/author' );
+	check( 'a row is a link with the address of the role it opens', linkOf('editor').href === '#users/roles/editor' && linkOf('author').href === '#users/roles/author' );
 
 	fire( linkOf('editor'), 'click' );
 	check( 'opening a role shows its form and moves the focus into it', form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && backLinkOf() !== undefined && focusedNow() === backLinkOf() );
@@ -541,6 +542,30 @@ console.log('\nAdmin Roles - the drill-down');
 	drilled._showList();
 	fire( linkOf('editor'), 'click' );
 	check( '...and a role that may be changed keeps its form', byId('roles-form-name') !== null && byId('roles-form-name').readOnly !== true && findAll( form, function( el ) { return el.tagName === 'BUTTON' } ).length > 0 );
+	// A role whose id reads @new and one called new: the word @new is the form that makes a role, %40new the key of the one that is called that.
+	// What the panel writes is read back by the router, and the panel opens what the router read
+	drilled._roles.push( { id : '@new', label : 'At new', users : 0, perms : [], canChange : true }, { id : 'new', label : 'New', users : 0, perms : [], canChange : true } );
+	drilled._renderList();
+	drilled._showList();
+	const hashOf = id => linkOf( id ).href;
+	check( 'the row of the role @new is a link to %40new and the row of the role new a link to new: two roles, two addresses, and the form that makes one is a third', hashOf('@new') === '#users/roles/%40new' && hashOf('new') === '#users/roles/new' && codec.href( 'roles', [ codec.word('new') ] ) === '#users/roles/@new' );
+	const follow = hash => { drilled._showList(); const read = codec.read( hash ); drilled._follow( read.parts ); return read };
+	follow( hashOf('@new') );
+	check( '...%40new, read by the router, opens the role @new and no form that makes one', drilled._current !== null && drilled._current.id === '@new' );
+	follow( hashOf('new') );
+	check( '...new opens the role called new', drilled._current !== null && drilled._current.id === 'new' );
+	follow( '#users/roles/@new' );
+	check( '...@new, the word, opens the form that makes a role, and no role', drilled._current === null && form.classList.contains('admin-hidden') === false );
+	drilled._showList();
+	fire( linkOf('@new'), 'click' );
+	check( '...and a click on the row of the role @new writes the address that opens that role again: the panel is on the role, and what it wrote is the key', drilled._current !== null && drilled._current.id === '@new' && codec.written.at(-1).parts.length === 1 && typeof codec.written.at(-1).parts[0] === 'string' );
+	drilled._showList();
+	drilled._roles.splice( -2 );
+	drilled._renderList();
+	drilled._showList();
+
+	check( 'every address the panel wrote or drew - the rows, a new role, a role - is read back by the router as the same screen and the same parts', codec.written.length > 3 && codec.mismatches.length === 0
+		&& codec.written.some( written => written.screen === 'roles' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.screen === 'roles' && written.parts[0] === 'editor' ) );
 }
 
 check( 'the words of the refusals the server names by code are worded in English and in German', [ 'en_US', 'de_DE' ].every( function( locale ) {
