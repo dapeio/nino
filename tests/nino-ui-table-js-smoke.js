@@ -457,4 +457,32 @@ const menus = ( t ) => descendants( t.mount ).filter( el => classOf( el, 'nino-a
 check( 'a row with up to three actions has them as buttons and no menu', attempt( () => menus( rowsWith( 3 ) ).length === 0 && menus( rowsWith( 1 ) ).length === 0 ) === true );
 check( 'a row with more has the first two and a menu for the rest; actionsInline 2 puts the third in the menu', attempt( () => menus( rowsWith( 5 ) ).length === 1 && menus( rowsWith( 3, { actionsInline : 2 } ) ).length === 1 ) === true );
 
+
+// --- select.clearOnChange: the choice is of what is in view (what the directory sets) -------------------------------------------
+
+{
+	const scoped = draw( { select : { actions : [ { key : 'x', label : 'Do', run : function() {} } ], clearOnChange : true } } );
+	const query2 = searchOf( scoped );
+	press( rowBoxes( scoped )[0] );
+	query2.value = 'Row 1';
+	fire( query2, 'input' );
+	check( 'with clearOnChange a search gives the choice up - and the number said to a screen reader follows rows that go', scoped.handle.selected().length === 0 );
+	query2.value = '';
+	fire( query2, 'input' );
+	press( rowBoxes( scoped )[0] );
+	press( rowBoxes( scoped )[1] );
+	scoped.handle.setRows( twelve().filter( row => row.uri !== '/r2' ) );
+	check( '...and the live region says the true number after setRows()', scoped.handle.selected().join() === '/r1' && descendants( scoped.mount ).filter( el => el.getAttribute('aria-live') === 'polite' )[0].textContent.includes('1') );
+	press( rowBoxes( scoped )[0] );
+	scoped.handle.refilter();
+	check( 'refilter() gives the choice up as well', scoped.handle.selected().length === 0 );
+
+	const kept = draw();
+	press( rowBoxes( kept )[0] );
+	searchOf( kept ).value = 'Row 1';
+	fire( searchOf( kept ), 'input' );
+	kept.handle.refilter();
+	check( 'a table that does not say so keeps the choice through a search and a refilter, as it always has', kept.handle.selected().join() === '/r1' );
+}
+
 done();

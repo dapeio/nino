@@ -429,6 +429,48 @@
 			},
 
 			/**
+			 *	Say whose the entry of the history is that the browser is on - the screen of a panel that made it for a thing it opens (a record) -, so that the entry
+			 *	is known as that panel's after a reload, Back and Forward, which the browser keeps the state of the entry through. A panel that closes the thing asks
+			 *	marked(), and takes an entry that it made off the history by the history, and writes over one that it did not
+			 *
+			 *	@param		{string}	name					The screen of the panel
+			 *
+			 *	@return		void
+			 */
+			mark : function( name ) {
+
+				const index = Nino.admin.router._stateIndex();
+
+				if( index === null || typeof wn.history.replaceState !== 'function' )
+					return;
+
+				wn.history.replaceState( { nino : index, mark : String( name ) }, '' );
+			},
+
+			/**
+			 *	The mark of the entry the browser is on (see mark()), '' where it has none
+			 *
+			 *	@return		{string}
+			 */
+			marked : function() {
+
+				const state = wn.history.state;
+
+				return state !== null && typeof state === 'object' && typeof state.mark === 'string' ? state.mark : '';
+			},
+
+			/**
+			 *	The number of the entry of the history the browser is on, null before the shell has started. A panel that adds an entry for a
+			 *	thing it opens - a record - asks it before and after, to know whether the move was written as an entry (see go()) and, when it
+			 *	closes the thing, whether the entry is still the one it made, which Back takes it off by
+			 *
+			 *	@return		{number|null}
+			 */
+			position : function() {
+				return Nino.admin.router._index;
+			},
+
+			/**
 			 *	Write the address: a new entry or over the one the browser is on,
 			 *	either way numbered
 			 *
@@ -441,8 +483,10 @@
 
 				const router = Nino.admin.router;
 				const index = ( router._index ?? 0 ) + ( push === true ? 1 : 0 );
+				// A mark that a panel put on the entry (see mark()) is the entry's as long as it is the same entry: written over, it keeps it
+				const held = push !== true && wn.history.state !== null && typeof wn.history.state === 'object' && typeof wn.history.state.mark === 'string' ? { mark : wn.history.state.mark } : {};
 
-				wn.history[ push === true ? 'pushState' : 'replaceState' ]( { nino : index }, '', hash );
+				wn.history[ push === true ? 'pushState' : 'replaceState' ]( Object.assign( { nino : index }, held ), '', hash );
 
 				router._index = index;
 				router._settled = index;
@@ -1246,6 +1290,8 @@
 					title		: Nino.content.getText('/_admin/common/dirty/title'),
 					message	: Nino.content.getText('/_admin/common/confirm/unsaved'),
 					choices	: choices,
+					// Input in a record that stands open is asked about on top of it; over any other dialog everything is as it was without the record
+					nested	: Nino.adminUi._choiceStack.length === 1 && String( Nino.adminUi._choiceStack[0].className ).split(' ').indexOf('nino-admin-record') !== -1,
 					onChoose : function( value ) {
 
 						if( value === 'discard' ) {

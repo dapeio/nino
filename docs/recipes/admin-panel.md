@@ -1089,8 +1089,9 @@ at the right, never the full width, in one order in every dialog, the shell's ow
 questions among them: the other ways on, then Cancel, and at the far right the one that
 goes on (*Discard, Cancel, Save*; *Reload, Cancel, Overwrite*). The focus is never on the
 answer that destroys. Its size is a class, `.nino-admin-dialog--narrow` (a
-question, 26 rem), `--form` (40 rem) or `--wide` (60 rem), each read from a token
-(`--nino-admin-dialog-narrow`, `-form`, `-wide`); at 390 px it fills the width less
+question, 26 rem), `--form` (40 rem), `--wide` (60 rem) or `--large` (72 rem, 90 % of the height at the
+most: the dialog of a record, which fills the whole screen at 390 px), each read from a token
+(`--nino-admin-dialog-narrow`, `-form`, `-wide`, `-large`); at 390 px the others fill the width less
 1 rem a side. A panel builds no `<dialog>` of its own and names no dialog class. The
 focus opens on the first field, or on the answer that does no harm where the way on
 is dangerous, and goes back to what asked. Four builders sit on it, and none of them
@@ -1100,6 +1101,7 @@ owns a word.
 |---|---|
 | A question before an action | `confirm( level, { title, message, details, yes, no, nested, onChoose } )` - `nested : true` where it is asked of an open dialog: it stands on it, Esc closes it alone and the focus goes back into the dialog below |
 | Make or copy something from a name and at most four more fields (duplicate, save as) | `formDialog()` |
+| One entry of a directory with an address of its own, steps to the entries around it and a bar (a message to read, a thing to edit) | `record()` - see [the standard directory and the record](#the-standard-directory-and-the-record) |
 | Pick one from a list (a block, a source, a component) | `pickDialog()` |
 | The properties of one part of a work surface, which stays in view | `propertiesDialog()` |
 | Text to be read | `manualDialog( title, content, opener )` |
@@ -1779,6 +1781,10 @@ A column may also carry `absent(row)`: a row for which it answers true counts as
 The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.
 `tests/nino-ui-table-js-smoke.js` covers it.
+
+### The standard directory and the record
+
+`directory()` draws everything over and under the rows of a panel in one call - the category, the search, the selects that narrow, the table with its box to choose rows by, its cells (`cell : 'clamp'`, `'limit'`, `'thumb'`, `'locales'`, `'date'`, `'badge'`) and buttons, the paging (25 for a table of pictures, 50 for every other) - and hands the rows in their order to `record()`, which opens one entry in the large dialog: name and identifier, the steps through the rows the directory shows, the bar, the address `#panel/tab/<entry>` and the question about unsaved input. `readLine()`, `messageBox()` and `imageFrame()` are what a record that is read is drawn with, `counter` of `textField()` and `textareaField()` the "n / limit" of a field. The options, the rules for when a panel uses which and a recipe to copy - a script that runs as it stands, and the fills and the server side that go beside it, with the actions behind [the backend skeleton](#backend-skeleton) - are in [the workbench interface](../admin-ui.md#directory-and-record); `tests/nino-ui-directory-js-smoke.js` and `tests/nino-ui-record-js-smoke.js` pin the blocks, `tests/admin-submissions-js-smoke.js` is the first panel over them.
 
 ### Lists, filters and tabs
 

@@ -222,7 +222,7 @@ $exceptions = [
 	[ ':where(.nino-admin) .nino-admin-manual code', 'font-size', 'max( .92em, 12px )' ],												// code inside a text follows the text
 	[ ':where(.nino-admin) .nino-admin-richtext-content code', 'font-size', 'max( .92em, 12px )' ],
 	[ ':where(.nino-admin) .nino-admin-checkbox-fieldset', 'font-size', 'max( .9em, 12px )' ],
-	[ ':where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field-error', 'margin-left', 'calc(min(max(7rem, 28%), 11rem) + var(--nino-admin-space-5))' ],	// the label column of a dialog's form
+	[ ':where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field-error', 'margin-left', 'calc(min(max(7rem, 28%), 11rem) + var(--nino-admin-space-5))' ],	// the label column of a dialog's form
 	[ '.nino-admin-auth', 'margin', 'clamp(2rem, 9vh, 6rem) auto' ],																						// the top of the login card
 	[ '#admin-page-wrap #admin-localepicker, #form-login #admin-localepicker', 'padding', '.1rem 14px .1rem 0' ],	// the room of the chevron in the login's language select
 ];
@@ -511,7 +511,7 @@ $listed = [
 	'_nino/Nino/Modules/Navigation/assets/admin.js'	=> 'adminUi.list(',
 	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.table(',
 	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
-	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.filterBar(',
+	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Images/assets/slots.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Elements/assets/admin.js'	=> 'adminUi.table(',
@@ -838,8 +838,8 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 	&& preg_match( '/admin-translation|admin-step-number|nino-admin-card|<h2>/', $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ) ) === 0 );
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_nino/Nino/Modules/Form/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {
@@ -1142,6 +1142,75 @@ check( 'the head and the foot of a page are Kopfbereich, Fußbereich and Kopf-/F
 check( 'the categories header and footer of a block are the words of the workbench: Kopfbereich and Fußbereich in German, Header and Footer in English',
 	array_slice( \Nino\Blocks::CATEGORIES, -2 ) === [ 'header', 'footer' ]
 	&& [ $de['/_admin/common/word/header'] ?? '', $de['/_admin/common/word/footer'] ?? '', $en['/_admin/common/word/header'] ?? '', $en['/_admin/common/word/footer'] ?? '' ] === [ 'Kopfbereich', 'Fußbereich', 'Header', 'Footer' ] );
+
+// --- the directory and the record ----------------------------------------------------------------------
+
+/*	What the chapter "Directory and record" promises is what the blocks have: the five rules, every option it names, every kind of cell, the size of the large
+	dialog and the one word of the list that the bar of a record adds	*/
+$guide		= $read( 'docs/admin-ui.md' );
+$blocks		= $read( '_admin/assets/Nino.admin.js' );
+
+preg_match( '/^## Directory and record\n(.*?)^## Forms$/ms', $guide, $chapter );
+$chapterText = $chapter[1] ?? '';
+
+check( 'the guide has the chapter on the directory and the record, with the five rules, the two blocks and a recipe',
+	$chapterText !== '' && preg_match( '/^### The five rules$/m', $chapterText ) === 1 && preg_match( '/^### The directory$/m', $chapterText ) === 1 && preg_match( '/^### The record$/m', $chapterText ) === 1 && preg_match( '/^### Recipe: [^\n]+$/m', $chapterText ) === 1
+	&& preg_match_all( '/^[1-5]\. \*\*/m', (string) preg_replace( '/^### The directory.*$/ms', '', $chapterText ) ) === 5 );
+
+/*	The options a table of the chapter names in its first column, in code: each is read by the block as options.<name>	*/
+$named = static function( string $heading ) use ( $chapterText ): array {
+
+	preg_match( '/^### '. preg_quote( $heading, '/' ). '$(.*?)(?=^### |\z)/ms', $chapterText, $part );
+	$names = [];
+
+	preg_match_all( '/^\| (`[^|]+?`)(?: \|)/m', $part[1] ?? '', $cells );
+
+	foreach( $cells[1] as $cell ) {
+		preg_match_all( '/`([a-zA-Z]+)/', $cell, $in );
+		foreach( $in[1] as $name )
+			$names[$name] = true;
+	}
+
+	return array_keys( $names );
+};
+
+$directoryOptions = $named( 'The directory' );
+$recordOptions = $named( 'The record' );
+$unread = [];
+
+foreach( [ 'directory' => $directoryOptions, 'record' => $recordOptions ] as $block => $names )
+	foreach( $names as $name )
+		if( in_array( $name, [ 'Option', 'What' ], true ) === false && str_contains( $blocks, 'options.'. $name ) === false && str_contains( $blocks, '.'. $name. ' ' ) === false && str_contains( $blocks, 'options.category.'. $name ) === false && str_contains( $blocks, 'options.danger.'. $name ) === false && str_contains( $blocks, 'options.directory.'. $name ) === false )
+			$unread[] = $block. ' '. $name;
+
+check( 'every option the guide names for the directory and for the record is one that the block reads'. ( $unread === [] ? '' : ' - not '. implode( ', ', $unread ) ), count( $directoryOptions ) > 10 && count( $recordOptions ) > 10 && $unread === [] );
+
+preg_match( '/^### The directory$(.*?)^### The record$/ms', $chapterText, $directoryText );
+preg_match( '/_cell : function\( column, row \) \{(.*?)\n\t\t\},/s', $blocks, $cellBody );
+preg_match_all( '/`(clamp|limit|thumb|locales|date|badge|text)`/', $directoryText[1] ?? '', $kinds );
+preg_match_all( "/case '([a-z]+)'/", $cellBody[1] ?? '', $cases );
+
+check( 'every kind of cell the guide names is one the table draws, and the table draws no kind the guide does not name', array_unique( $kinds[1] ) !== [] && array_diff( array_unique( $kinds[1] ), $cases[1] ) === [] && array_diff( $cases[1], array_unique( $kinds[1] ) ) === [] );
+
+check( 'the guide says what the large dialog is - 72 rem - and the token and the rule of the stylesheet say the same',
+	str_contains( $guide, '`large` 72 rem' ) && preg_match( '/--nino-admin-dialog-large:\s*72rem;/', $style ) === 1 && preg_match( '/\.nino-admin-dialog--large\s*\{[^}]*var\(--nino-admin-dialog-large\)/', $style ) === 1 );
+
+// The page sizes themselves (25 for a table of pictures, 50 for every other) are held where they happen, by tests/nino-ui-directory-js-smoke.js; the guide says them once
+check( 'the guide says the page sizes of a table of pictures and of every other', str_contains( $guide, 'pages by 25, every other by 50' ) );
+
+check( 'under 40 rem only the search is in view, as the guide says: the button of the filters is shown by the stylesheet from that width down',
+	str_contains( $guide, 'Under 40 rem only the search is in view' ) && preg_match( '/@media \(max-width: 40rem\) \{\s*:where\(\.nino-admin\) \[data-collapsible="true"\] > \.nino-admin-filterbar-toggle \{\s*display: inline-flex;/', $style ) === 1 );
+
+check( 'the dialog of a record is the one dialog that has a cross: no panel script asks choiceDialog() for one, and the guide says so',
+	str_contains( $guide, 'the one dialog that has a cross' ) && array_filter( $scripts, static fn( string $script ): bool => preg_match( '/choiceDialog\(\s*\{[^}]*\bclose\s*:/s', $bare( $read( $script ) ) ) === 1 && $script !== '_admin/assets/Nino.admin.js' && str_contains( $script, '.cache/' ) === false ) === [] );
+
+check( 'the destructive action of the bar of a record stands at the left whether the bar has a state or not, and the cell that fills takes the room the others leave',
+	preg_match( '/\.nino-admin \.nino-admin-dialog \.nino-admin-record-bar > \.nino-admin-btn-danger\s*\{\s*margin-right: auto;/', $style ) === 1
+	&& preg_match( '/td\.nino-admin-table-cell-fill\s*\{[^}]*max-width: 0;/', $style ) === 1 );
+
+check( 'the word of the bar of a record that saves and goes on is in the list of words, in both languages',
+	str_contains( $guide, '| Keep and show the next entry of the rows | **Speichern und weiter** | Save and continue |' )
+	&& str_contains( $read( '_admin/text/de_DE.php' ), "'[[/_admin/common/label/save-next]]'	=> 'Speichern und weiter'" ) && str_contains( $read( '_admin/text/en_US.php' ), "'[[/_admin/common/label/save-next]]'	=> 'Save and continue'" ) );
 
 $none = [];
 ninoDone( $none );

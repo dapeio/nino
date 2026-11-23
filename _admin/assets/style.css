@@ -160,6 +160,7 @@
 	--nino-admin-dialog-narrow: 26rem;
 	--nino-admin-dialog-form: 40rem;
 	--nino-admin-dialog-wide: 60rem;
+	--nino-admin-dialog-large: 72rem;
 	--nino-admin-dialog-sheet: 28rem;
 	/* The side column of a split view: open it is as wide as a column of an outline, folded it is the strip of icons */
 	--nino-admin-aside-width: 16rem;
@@ -1198,18 +1199,18 @@ a {
 }
 
 @media (min-width: 40rem) {
-	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field {
 		display: grid;
 		grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
 		align-items: center;
 		gap: var(--nino-admin-space-5);
 	}
 
-	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field > span {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field > span {
 		margin: 0;
 	}
 
-	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field-error {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field-error {
 		margin-left: calc(min(max(7rem, 28%), 11rem) + var(--nino-admin-space-5));
 	}
 }
@@ -2445,14 +2446,14 @@ a {
 }
 
 @media (min-width: 40rem) {
-	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > fieldset.nino-admin-checklist-field {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > fieldset.nino-admin-checklist-field {
 		position: relative;
 		display: grid;
 		grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
 		gap: var(--nino-admin-space-5);
 	}
 
-	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > fieldset.nino-admin-checklist-field > legend {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > fieldset.nino-admin-checklist-field > legend {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -2461,7 +2462,7 @@ a {
 		padding-right: var(--nino-admin-space-5);
 	}
 
-	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide) .nino-admin-dialog-fields > .nino-admin-field > :is(.nino-admin-field-note, .nino-admin-field-error, .nino-admin-checklist, .nino-admin-localerows-list, .nino-admin-filefield-body, .nino-admin-datetime) {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field > :is(.nino-admin-field-note, .nino-admin-field-error, .nino-admin-checklist, .nino-admin-localerows-list, .nino-admin-filefield-body, .nino-admin-datetime) {
 		grid-column: 2;
 	}
 }
@@ -3340,6 +3341,16 @@ a {
 :where(.nino-admin) .nino-admin-table-sort:hover:not(:disabled) {
 	background: var(--editor-blue-soft);
 	color: var(--editor-text);
+}
+
+/* The head of a column that is not sorted - a picture, the states of the languages - is a word in the face of the heads that are buttons */
+:where(.nino-admin) .nino-admin-table thead th:not(:has(.nino-admin-table-sort)):not(.nino-admin-table-select):not(.nino-admin-table-actions) {
+	padding: var(--nino-admin-space-3) var(--nino-admin-space-5);
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-strong);
+	letter-spacing: .04em;
+	text-transform: uppercase;
 }
 
 /* The sort marker is generated, so no caller has to ship an arrow glyph */
@@ -5868,6 +5879,374 @@ a {
 		scroll-behavior: auto !important;
 		transition-duration: .01ms !important;
 		animation-duration: .01ms !important;
+	}
+}
+
+
+/* ------------------------------------------------------------ The record (Nino.adminUi.record()) */
+
+/* A dialog that is a view of its own: 72 rem wide, 90 % of the height at the most and rolling inside; on a phone the whole screen, its bar at the foot */
+:where(.nino-admin) .nino-admin-dialog--large {
+	width: min(var(--nino-admin-dialog-large), calc(100vw - 2rem));
+	max-height: 90vh;
+	max-height: 90dvh;
+}
+
+:where(.nino-admin) .nino-admin-dialog-head-end {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--nino-admin-space-5);
+}
+
+/* The identifier under the name of the entry: quiet, in the face of an identifier, wrapping where it is long */
+:where(.nino-admin) .nino-admin-dialog-subtitle {
+	margin: calc( var(--nino-admin-space-3) * -1 ) 0 0;
+	color: var(--editor-text-secondary);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-sm);
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-dialog-close,
+:where(.nino-admin) .nino-admin-record-step {
+	flex: none;
+}
+
+:where(.nino-admin) .nino-admin-directory,
+:where(.nino-admin) .nino-admin-directory-body {
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-record {
+	overscroll-behavior: contain;
+}
+
+:where(.nino-admin) .nino-admin-record-steps {
+	display: flex;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+}
+
+:where(.nino-admin) .nino-admin-record-count {
+	min-width: 3.5rem;
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-md);
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-record-content {
+	display: grid;
+	align-content: start;
+	gap: var(--nino-admin-space-5);
+}
+
+:where(.nino-admin) .nino-admin-record-body,
+:where(.nino-admin) .nino-admin-record-lines {
+	display: grid;
+	gap: var(--nino-admin-space-5);
+	margin: 0;
+}
+
+/* The bar of a record stands at the foot of its dialog, in the flow of it - not fixed to the screen as the bar of a view is */
+.nino-admin .nino-admin-dialog .nino-admin-record-bar {
+	position: static;
+	flex: none;
+	margin: 0 calc( var(--nino-admin-space-7) * -1 ) calc( var(--nino-admin-space-7) * -1 );
+	padding: var(--nino-admin-space-5) var(--nino-admin-space-7);
+	box-shadow: none;
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	flex-wrap: wrap;
+}
+
+/* A record has the destructive action at the left, whether it has a state beside it or not, and what can be done with the entry at the right. Not in :where(): the bar
+   gives every button of it `margin: 0` at the weight of .nino-admin .nino-admin-actionbar button, which the auto margin has to outweigh */
+.nino-admin .nino-admin-dialog .nino-admin-record-bar > .nino-admin-btn-danger {
+	margin-right: auto;
+}
+
+/* One thing read and not edited: the name at the left, the value at the right where there is room, over it where there is not */
+:where(.nino-admin) .nino-admin-readline {
+	display: grid;
+	gap: var(--nino-admin-space-1) var(--nino-admin-space-5);
+	min-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-readline-label {
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-md);
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+:where(.nino-admin) .nino-admin-readline-value {
+	min-width: 0;
+	font-size: var(--nino-admin-text-lg);
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-readline-value a {
+	color: var(--editor-blue);
+}
+
+:where(.nino-admin) .nino-admin-readline-value.is-mono {
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-md);
+}
+
+:where(.nino-admin) .nino-admin-readline-value.is-empty {
+	color: var(--editor-text-secondary);
+}
+
+@media (min-width: 40rem) {
+	:where(.nino-admin) .nino-admin-readline {
+		grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
+		align-items: baseline;
+	}
+
+	/* A message is read from its first line: its name stands at the top of the box */
+	:where(.nino-admin) .nino-admin-readline:has(.nino-admin-messagebox) {
+		align-items: start;
+	}
+}
+
+/* A long text a person wrote: its breaks kept, in a box that rolls where it is long */
+:where(.nino-admin) .nino-admin-messagebox {
+	max-height: 22rem;
+	padding: var(--nino-admin-space-5) var(--nino-admin-space-6);
+	overflow: auto;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--nino-admin-surface-muted);
+	font-size: var(--nino-admin-text-lg);
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+:where(.nino-admin) .nino-admin-messagebox:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+
+/* A picture shown large: whole, never cut, on a quiet surface */
+:where(.nino-admin) .nino-admin-imageframe {
+	display: grid;
+	gap: var(--nino-admin-space-3);
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-imageframe-frame {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 12rem;
+	overflow: hidden;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--nino-admin-surface-muted);
+}
+
+:where(.nino-admin) .nino-admin-imageframe-frame img {
+	display: block;
+	max-width: 100%;
+	max-height: 22rem;
+	object-fit: contain;
+}
+
+:where(.nino-admin) .nino-admin-imageframe-frame.is-none {
+	flex-direction: column;
+	gap: var(--nino-admin-space-3);
+	border-style: dashed;
+	color: var(--editor-text-secondary);
+}
+
+:where(.nino-admin) .nino-admin-imageframe-caption {
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-md);
+}
+
+/* The counter of a field with a limit: under the control, at the right; in a dialog's grid in the column of the control */
+:where(.nino-admin) .nino-admin-field > .nino-admin-char-counter {
+	display: block;
+	margin-top: var(--nino-admin-space-1);
+}
+
+@media (min-width: 40rem) {
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field > .nino-admin-char-counter {
+		grid-column: 2;
+		margin-top: calc( var(--nino-admin-space-3) * -1 );
+	}
+
+	/* A field of several lines is named at its top, not at the middle of its height */
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field:has(> textarea) {
+		align-items: start;
+	}
+
+	:where(.nino-admin) :is(.nino-admin-dialog--form, .nino-admin-dialog--wide, .nino-admin-dialog--large) .nino-admin-dialog-fields > .nino-admin-field:has(> textarea) > span:first-child {
+		padding-top: var(--nino-admin-space-3);
+	}
+}
+
+/* ------------------------------------------------------------ Cells of a directory (table( { columns : [ { cell } ] } )) */
+
+/* One line, cut by an ellipsis where it is too long: the whole text is its tooltip */
+:where(.nino-admin) .nino-admin-table-clamp {
+	display: block;
+	max-width: var(--nino-admin-clamp, min(32rem, 40vw));
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-table-limit {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--nino-admin-space-3);
+	font-variant-numeric: tabular-nums;
+}
+
+:where(.nino-admin) .nino-admin-table-limit[data-over="true"] {
+	color: var(--editor-red-ink);
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+/* The column that takes the room the others leave - the message of a row: its text ends in an ellipsis before the buttons of the row and never runs under them */
+:where(.nino-admin) .nino-admin-table td.nino-admin-table-cell-fill {
+	width: 100%;
+	min-width: 8rem;
+	max-width: 0;
+}
+
+:where(.nino-admin) .nino-admin-table td.nino-admin-table-cell-fill .nino-admin-table-clamp {
+	max-width: none;
+}
+
+/* A picture of one size: what it shows fills it, a thing with no picture has the sign of "none" on a dashed frame */
+:where(.nino-admin) .nino-admin-thumb {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 4.5rem;
+	height: 3rem;
+	overflow: hidden;
+	border: 1px solid var(--editor-separator);
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	vertical-align: middle;
+}
+
+:where(.nino-admin) .nino-admin-thumb img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+:where(.nino-admin) .nino-admin-thumb.is-none {
+	border-style: dashed;
+	color: var(--editor-text-secondary);
+}
+
+:where(.nino-admin) .nino-admin-table td.nino-admin-table-cell-thumb {
+	width: 1%;
+	padding-block: var(--nino-admin-space-3);
+}
+
+/* The state in each language: badges that wrap where there are many of them */
+:where(.nino-admin) .nino-admin-table td.nino-admin-table-cell-locales {
+	white-space: normal;
+}
+
+:where(.nino-admin) .nino-admin-localestates {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: var(--nino-admin-space-2);
+	max-width: 14rem;
+}
+
+/* The row that was changed is the one drawn anew: it shows for a moment */
+@media (prefers-reduced-motion: no-preference) {
+	:where(.nino-admin) .nino-admin-table tbody tr.is-fresh td {
+		animation: nino-admin-fresh 2.4s ease-out;
+	}
+
+	@keyframes nino-admin-fresh {
+		from {
+			background: var(--editor-blue-soft);
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:where(.nino-admin) .nino-admin-table tbody tr.is-fresh td:first-child {
+		box-shadow: inset 3px 0 0 var(--editor-blue);
+	}
+}
+
+:where(.nino-admin) .nino-admin-directory-notice:not(:empty) {
+	margin-bottom: var(--nino-admin-space-4);
+}
+
+:where(.nino-admin) .nino-admin-loading {
+	margin: 0;
+	color: var(--editor-text-secondary);
+}
+
+/* Narrow: only the search is in view, and the selects are behind the button that counts the ones that narrow the list */
+:where(.nino-admin) .nino-admin-filterbar-toggle {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-filterbar-count[hidden] {
+	display: none;
+}
+
+@media (max-width: 40rem) {
+	:where(.nino-admin) [data-collapsible="true"] > .nino-admin-filterbar-toggle {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		gap: var(--nino-admin-space-3);
+		order: 2;
+	}
+
+	:where(.nino-admin) [data-collapsible="true"] > :is(input, .nino-admin-table-search) {
+		flex: 1 1 8rem;
+		order: 1;
+	}
+
+	:where(.nino-admin) [data-collapsible="true"] > .nino-admin-filterbar-select {
+		flex: 1 1 100%;
+		order: 3;
+	}
+
+	:where(.nino-admin) [data-collapsible="true"][data-open="false"] > .nino-admin-filterbar-select {
+		display: none;
+	}
+
+	/* The record is the whole screen */
+	:where(.nino-admin) .nino-admin-dialog--large {
+		width: 100vw;
+		max-width: 100vw;
+		height: 100vh;
+		height: 100dvh;
+		max-height: 100vh;
+		max-height: 100dvh;
+		border: 0;
+		border-radius: 0;
+	}
+
+	:where(.nino-admin) .nino-admin-dialog--large > .nino-admin-dialog-body {
+		padding: var(--nino-admin-space-5);
+	}
+
+	.nino-admin .nino-admin-dialog .nino-admin-record-bar {
+		margin: 0 calc( var(--nino-admin-space-5) * -1 ) calc( var(--nino-admin-space-5) * -1 );
+		padding: var(--nino-admin-space-3) var(--nino-admin-space-5) max(var(--nino-admin-space-3), env(safe-area-inset-bottom));
 	}
 }
 

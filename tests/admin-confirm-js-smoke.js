@@ -333,6 +333,7 @@ console.log('Nino.adminUi.confirm');
 		'/_admin/features/confirm/reapply' : 'big',
 		'/_admin/navs/confirm/delete' : 'destructive',
 		'/_admin/submissions/confirm/delete' : 'destructive',
+		'/_admin/submissions/confirm/delete-many' : 'destructive',
 	};
 	const found = {};
 	let calls = 0;

@@ -27,6 +27,7 @@
  *									matches( el, selector )				Whether an element answers a selector
  *									documentOf( mount )					A document stand-in over one mount element
  *									shellRouter( structure )			The real router of the workbench shell over a page that has the panels and tabs of the structure, a history that is numbered
+ *									adminPage()						The building blocks and the real shell (router, registry of unsaved input) in one page of dialogs that open modally
  *									addressFixture()					The table both languages write addresses by: tests/fixtures/addresses.json
  *
  *	Usage: require it from tests/<name>-js-smoke.js and run that with node.
@@ -696,4 +697,116 @@ function shellRouter( structure ) {
 	return out;
 }
 
-module.exports = { markupWrites, check, done, source, fills, load, classList, element, findAll, fire, matches, documentOf, shellRouter, addressFixture };
+
+// --- the workbench page: the building blocks and the real shell over one document -------------
+
+/**
+ *	The workbench of a page, in one context: Nino.admin.js (the building blocks), script.js (the real router and the real registry of
+ *	unsaved input) and a document whose dialogs open modally and close the way a browser's do, over a location and a history that
+ *	number their entries as the shell's do. What a suite of the building blocks that write addresses and ask before input is lost
+ *	needs, so that it holds the blocks to the very router and registry the panels use. The words are the keys themselves
+ *
+ *	@param		{Object}		[structure]		panel => [ [ screen, tab ], ... ] as in shellRouter(); the fixture's where left out
+ *	@param		{Object}		[options]			{ screen } the screen on show
+ *
+ *	@return		{Object}									{ ui, admin, router, dirty, Nino, box, context, doc, page, body, dialogs, entries, went, hash(), back(), forward(), index(), hashchange(), runTimers(), show( screen ) }
+ */
+function adminPage( structure, options ) {
+
+	structure = structure ?? addressFixture().structure;
+	options = options ?? {};
+
+	const page = element('div');
+	const doc = documentOf( page );
+	const dialogs = [];
+	const ids = new Set( [ 'admin-page-wrap' ] );
+	const panes = Object.keys( structure ).map( function( panel ) {
+		ids.add( 'admin-content-'+ panel );
+		const tabs = structure[panel].map( function( tab ) { ids.add( 'admin-tab-'+ tab[0] ); return { dataset : { tab : tab[0], addressTab : tab[1] } } } );
+		return { dataset : { panel : panel }, querySelectorAll : function() { return tabs } };
+	} );
+
+	let on = options.screen ?? '';
+	const wrap = Object.assign( element('div'), { classList : { contains : function( name ) { return name === 'show-'+ on }, add : function() {}, remove : function() {}, toggle : function() {} } } );
+	wrap.id = 'admin-page-wrap';
+	page.appendChild( wrap );
+
+	const entries = [ '' ];
+	const states = [ null ];
+	let at = 0;
+	const went = [];
+
+	const box = {
+		console : console,
+		location : { hash : '' },
+		history : {
+			get state() { return states[at] },
+			pushState : function( state, title, url ) { entries.splice( at + 1 ); states.splice( at + 1 ); entries.push( url ); states.push( state ); at++; box.location.hash = url },
+			replaceState : function( state, title, url ) { if( url !== undefined ) { entries[at] = url; box.location.hash = url } states[at] = state },
+			go : function( delta ) { went.push( delta ) },
+		},
+		document : doc,
+		matchMedia : function() { return { matches : false } },
+		// A timer is kept and run by the suite that asks for it, never by the clock
+		timers : [],
+		setTimeout : function( fn ) { box.timers.push( fn ); return box.timers.length },
+		clearTimeout : function() {},
+		listeners : [],
+		addEventListener : function( name, fn ) { if( name === 'hashchange' ) box.listeners.push( fn ) },
+		removeEventListener : function( name, fn ) { const at = box.listeners.indexOf( fn ); if( at !== -1 ) box.listeners.splice( at, 1 ) },
+	};
+
+	box.window = box;
+
+	const baseGet = doc.getElementById;
+	doc.getElementById = function( id ) { return id === 'admin-page-wrap' ? wrap : ( ids.has( id ) ? {} : baseGet( id ) ) };
+	const baseAll = doc.querySelectorAll;
+	doc.querySelectorAll = function( selector ) { return selector === '#admin-content-wrap > [data-panel]' ? panes : baseAll( selector ) };
+	doc.body = element('body');
+	doc.documentElement = { lang : 'en' };
+	// The element that has the focus, as the page has it
+	Object.defineProperty( doc, 'activeElement', { get : function() { return inFocus }, configurable : true } );
+	doc.createElement = function( tag ) {
+		const created = element( tag );
+		if( tag === 'dialog' ) {
+			created.open = false;
+			created.showModal = function() { created.open = true; created.modal = true };
+			created.show = function() { created.open = true; created.modal = false };
+			created.close = function() { created.open = false; fire( created, 'close' ) };
+			dialogs.push( created );
+		}
+		return created;
+	};
+
+	const Nino = { events : { bindCallback : function() {} }, content : { getText : function( key ) { return key } } };
+
+	box.Nino = Nino;
+
+	const context = vm.createContext( box );
+
+	load( '_admin/assets/script.js', context );
+	load( '_admin/assets/Nino.admin.js', context );
+
+	// The browser's own move through the history: the address the entry holds, written as the browser does - and the number of the entry the shell reads back
+	const step = function( to ) {
+
+		at = to;
+		box.location.hash = entries[at];
+	};
+
+	return {
+		ui : Nino.adminUi, admin : Nino.admin, router : Nino.admin.router, dirty : Nino.admin.dirty, Nino : Nino, box : box, context : context, doc : doc, page : page, body : doc.body, dialogs : dialogs, entries : entries, went : went,
+		hash : function() { return box.location.hash },
+		show : function( screen ) { on = screen },
+		// Back and Forward: the entry the browser moves to is what the address says. The shell answers it with arrive() and its panels' showCurrent(); a suite calls those itself
+		back : function() { step( Math.max( 0, at - 1 ) ) },
+		forward : function() { step( Math.min( entries.length - 1, at + 1 ) ) },
+		index : function() { return at },
+		// The browser's event for an address that changed (typed, followed, Back, Forward): what listens to it hears it
+		// The timers that were set, run now - in the order they were set
+		runTimers : function() { const due = box.timers.splice( 0 ); due.forEach( function( fn ) { fn() } ) },
+		hashchange : function() { box.listeners.slice().forEach( function( fn ) { fn( { type : 'hashchange' } ) } ) },
+	};
+}
+
+module.exports = { markupWrites, check, done, source, fills, load, classList, element, findAll, fire, matches, documentOf, shellRouter, adminPage, addressFixture };

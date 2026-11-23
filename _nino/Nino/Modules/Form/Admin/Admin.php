@@ -53,7 +53,7 @@ namespace Nino\Modules\Form {
 		}
 
 		public static function assets(): array {
-			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ), \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ) ];
+			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
 		}
 
 		public static function text(): string {

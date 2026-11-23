@@ -517,6 +517,7 @@
 		 *	  - secondary   the side actions, a list of buttons, in the order they stand
 		 *	  - primary     the main button: ONE element, which gets the class of its kind; a second one (in secondary, in danger, or a
 		 *	                list) is a TypeError, and so is a bar without one
+		 *	  - main        false for the bar of a record that is only read, which may have no main button (primary is then left out); every other bar has one
 		 *	  - list        true for the bar of a list: it carries .nino-admin-list-actions, which the shell's mark leaves alone, and
 		 *	                is drawn as every bar of a list (listActions()) is
 		 *	  - id, className, text   the id and the extra class of the bar, and { changed, saved } to word the state differently
@@ -538,7 +539,10 @@
 			const word = function( key, fill ) { return text[key] ?? Nino.adminUi.text( fill ) };
 			const isPrimary = function( el ) { return isElement( el ) === true && el.classList.contains('nino-admin-btn-primary') };
 
-			if( isElement( options.primary ) === false )
+			// A record that is only read has what can be done with it at the right, and may have nothing: `main : false` says that the bar has no main button
+			const mainless = options.main === false && ( options.primary === undefined || options.primary === null );
+
+			if( isElement( options.primary ) === false && mainless === false )
 				throw new TypeError( 'Nino.adminUi.actionBar(): a bar has exactly one main button, given as primary' );
 
 			if( Array.isArray( secondary ) === false || secondary.every( isElement ) === false )
@@ -555,7 +559,7 @@
 
 			const stated = options.status !== undefined && options.status !== false && options.status !== null;
 			const el = Nino.adminUi.el( 'div', 'nino-admin-actionbar' + ( stated === true ? ' nino-admin-bar' : '' ) + ( options.list === true ? ' nino-admin-list-actions' : '' ) + ( options.className ? ' '+ options.className : '' ) );
-			const made = { el : el, secondary : secondary, primary : options.primary, danger : options.danger ?? null };
+			const made = { el : el, secondary : secondary, primary : mainless === true ? null : options.primary, danger : options.danger ?? null };
 
 			if( options.id )
 				el.id = options.id;
@@ -582,8 +586,10 @@
 
 			secondary.forEach( function( button ) { el.appendChild( button ) } );
 
-			made.primary.classList.add('nino-admin-btn-primary');
-			el.appendChild( made.primary );
+			if( mainless === false ) {
+				made.primary.classList.add('nino-admin-btn-primary');
+				el.appendChild( made.primary );
+			}
 
 			return made;
 		},
@@ -1233,10 +1239,12 @@
 		 *																			value the one that is chosen (the first by default), label its name for a screen reader (it has no other), left out, the bar has no select
 		 *																			search { value, label, placeholder, onInput( value ), id, className } - left out, the bar has no field; className replaces the
 		 *																			classes of the field
+		 *																			filters [ { value, options, label, onChange( value ), id } ] - further selects, after the search, in the order given, each named for a screen reader by its label
+		 *																			collapse { label } - under 40 rem only the search is in view and the selects are behind one button of that name, which counts the ones that narrow the list (a select that holds another value than its first option, "all"); left out, the selects stay in view
 		 *																			items an array of elements that stand after the field: chip()
 		 *																			className what the bar has besides its own class
 		 *
-		 *	@return		{Object}										{ el, input, select } - el <div class="nino-admin-filterbar" role="search">, input the search field or null, select the select or null
+		 *	@return		{Object}										{ el, input, select, selects, toggle } - el <div class="nino-admin-filterbar" role="search">, input the search field or null, select the one left of the search or null, selects every select in the order they stand, toggle the button of a collapsed bar or null
 		 */
 		filterBar : function( options ) {
 
@@ -1247,33 +1255,41 @@
 
 			let input = null;
 			let select = null;
+			const selects = [];
 
-			if( options.filter !== undefined && options.filter !== null ) {
-				const filter = options.filter;
+			// One select of the bar: the options of the caller, the value it holds, and the word it is named by
+			const choose = function( filter ) {
 
-				select = dc.createElement('select');
-				select.className = 'nino-admin-input nino-admin-filterbar-select';
-				select.setAttribute( 'aria-label', filter.label ?? '' );
+				const made = dc.createElement('select');
+				made.className = 'nino-admin-input nino-admin-filterbar-select';
+				made.setAttribute( 'aria-label', filter.label ?? '' );
 
 				if( filter.id )
-					select.id = filter.id;
+					made.id = filter.id;
 
 				( filter.options || [] ).forEach( function( option ) {
 
 					const item = dc.createElement('option');
 					item.value = String( option.value ?? '' );
 					item.textContent = String( option.label ?? option.value ?? '' );
-					select.appendChild( item );
+					made.appendChild( item );
 				} );
 
 				if( filter.value !== undefined && filter.value !== null )
-					select.value = String( filter.value );
+					made.value = String( filter.value );
 
-				select.addEventListener( 'change', function() {
+				made.addEventListener( 'change', function() {
 					if( typeof filter.onChange === 'function' )
-						filter.onChange( select.value );
+						filter.onChange( made.value );
 				} );
 
+				selects.push( { el : made, first : ( filter.options || [] ).length > 0 ? String( filter.options[0].value ?? '' ) : '' } );
+
+				return made;
+			};
+
+			if( options.filter !== undefined && options.filter !== null ) {
+				select = choose( options.filter );
 				bar.appendChild( select );
 			}
 
@@ -1299,9 +1315,56 @@
 				bar.appendChild( input );
 			}
 
+			// The selects that narrow what the search finds stand after it, in the order they are given
+			( Array.isArray( options.filters ) === true ? options.filters : [] ).forEach( function( filter ) {
+				bar.appendChild( choose( filter ) );
+			} );
+
+			let toggle = null;
+
+			/*	Where there is little room - a phone - only the search is in view, and the selects are behind one button that says how many of them
+				narrow the list. The button is drawn always and shown by the stylesheet from a width of 40 rem down; a select is active when it
+				holds another value than its first option, which is "all"	*/
+			if( typeof options.collapse === 'object' && options.collapse !== null && selects.length > 0 ) {
+
+				const count = Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-filterbar-count' );
+
+				toggle = Nino.adminUi.button( options.collapse.label ?? '', function() {
+
+					const open = bar.dataset.open !== 'true';
+
+					bar.dataset.open = open === true ? 'true' : 'false';
+					toggle.setAttribute( 'aria-expanded', open === true ? 'true' : 'false' );
+				}, { kind : 'secondary', className : 'nino-admin-filterbar-toggle' } );
+				toggle.setAttribute( 'aria-expanded', 'false' );
+				toggle.appendChild( count );
+				// Attributes and no classes: the table gives its toolbar classes of its own and keeps these
+				bar.dataset.collapsible = 'true';
+				bar.dataset.open = 'false';
+				bar.appendChild( toggle );
+
+				const recount = function() {
+
+					const active = selects.filter( function( one ) { return one.el.value !== one.first } ).length;
+
+					count.textContent = active === 0 ? '' : String( active );
+					count.hidden = active === 0;
+					toggle.dataset.active = String( active );
+
+					// A select that narrows is not to be left out of sight: the bar is open while one does
+					if( active > 0 && bar.dataset.open !== 'true' ) {
+						bar.dataset.open = 'true';
+						toggle.setAttribute( 'aria-expanded', 'true' );
+					}
+				};
+
+				selects.forEach( function( one ) { one.el.addEventListener( 'change', recount ) } );
+				recount();
+			}
+
 			( options.items || [] ).forEach( function( item ) { bar.appendChild( item ) } );
 
-			return { el : bar, input : input, select : select };
+			return { el : bar, input : input, select : select, selects : selects.map( function( one ) { return one.el } ), toggle : toggle };
 		},
 
 		/**
@@ -2047,8 +2110,11 @@
 		 *	@param		{string}		options.message				The question - what a browser without <dialog> is asked, with a `content`
 		 *	@param		{Element}		[options.content]			Drawn in place of the message
 		 *	@param		{Element}		[options.tools]				Drawn at the right of the title
+		 *	@param		{string}		[options.subtitle]		A quiet line under the title - the identifier of what the dialog is about; text, never markup
+		 *	@param		{string}		[options.close]				The name of a button with a cross at the very right of the head, which is the answer that Escape is: a dialog that is a view of its own - a record - closes by it and by Escape, and has no Cancel in its bar
+		 *	@param		{Element}		[options.bar]					The bar at the foot in place of the row of the answers (actionBar()): what a record has there - the destructive action at the left, the state, several buttons, the main one at the right. The `choices` are then not drawn, but still say what Escape answers
 		 *	@param		{string}		[options.className]		Added to the dialog's own class
-		 *	@param		{string}		[options.size]				'narrow' (a question, the default), 'form', 'wide' or 'sheet' - the class nino-admin-dialog--<size>; a sheet stands at the right over the whole height
+		 *	@param		{string}		[options.size]				'narrow' (a question, the default), 'form', 'wide', 'large' or 'sheet' - the class nino-admin-dialog--<size>; large is the dialog of a record - 72 rem wide, 90 % of the height at most, filling the screen on a phone -, a sheet stands at the right over the whole height
 		 *	@param		{string}		[options.note]				A second paragraph under the message
 		 *	@param		{Array}			[options.details]			What the question is about, as a list under the message: lines of text, and groups { title, lines } where the lines have a heading each (what a deletion takes and what it keeps). Drawn as <ul>, every line as text and never as markup; the caller has cut a long list short with a line of its own ("and 3 more")
 		 *	@param		{Element}		[options.opener]			What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari
@@ -2133,11 +2199,32 @@
 				title.textContent = options.title;
 				head.appendChild( title );
 
-				if( options.tools !== undefined && options.tools !== null )
+				const hasTools = options.tools !== undefined && options.tools !== null;
+				const hasClose = typeof options.close === 'string' && options.close !== '';
+
+				if( hasTools === true && hasClose === false )
 					head.appendChild( options.tools );
+				else if( hasClose === true ) {
+
+					const end = Nino.adminUi.el( 'div', 'nino-admin-dialog-head-end' );
+
+					if( hasTools === true )
+						end.appendChild( options.tools );
+
+					// The answer that Escape is: through the same way out, so that a guard is asked
+					end.appendChild( Nino.adminUi.iconButton( 'x', options.close, function() { handle.close( cancel.value, true ) }, { className : 'nino-admin-dialog-close' } ) );
+					head.appendChild( end );
+				}
 
 				body.appendChild( head );
 				dialog.setAttribute( 'aria-labelledby', 'nino-admin-choice-title'+ sfx );
+
+				if( typeof options.subtitle === 'string' ) {
+					const sub = Nino.adminUi.el( 'p', 'nino-admin-dialog-subtitle', options.subtitle );
+					sub.id = 'nino-admin-choice-subtitle'+ sfx;
+					body.appendChild( sub );
+					dialog.setAttribute( 'aria-describedby', sub.id );
+				}
 			}
 
 			const scroll = dc.createElement('div');
@@ -2177,19 +2264,23 @@
 
 			const buttons = {};
 
-			choices.forEach( function( choice ) {
+			const barred = options.bar !== undefined && options.bar !== null;
 
-				const btn = dc.createElement('button');
-				btn.type = 'button';
-				btn.className = 'nino-admin-btn-'+ ( choice.kind === 'primary' || choice.kind === 'danger' ? choice.kind : 'secondary' );
-				btn.textContent = choice.label;
-				btn.autofocus = options.focus === undefined && choice === initial;
-				btn.addEventListener( 'click', function() { handle.close( choice.value, true ) } );
-				buttons[choice.value] = btn;
-				actions.appendChild( btn );
-			} );
+			// A dialog with a bar of its own has no row of answers: its buttons are the caller's
+			if( barred === false )
+				choices.forEach( function( choice ) {
 
-			body.appendChild( actions );
+					const btn = dc.createElement('button');
+					btn.type = 'button';
+					btn.className = 'nino-admin-btn-'+ ( choice.kind === 'primary' || choice.kind === 'danger' ? choice.kind : 'secondary' );
+					btn.textContent = choice.label;
+					btn.autofocus = options.focus === undefined && choice === initial;
+					btn.addEventListener( 'click', function() { handle.close( choice.value, true ) } );
+					buttons[choice.value] = btn;
+					actions.appendChild( btn );
+				} );
+
+			body.appendChild( barred === true ? options.bar : actions );
 			dialog.appendChild( body );
 
 			// What the caller gets to open and close the dialog by
@@ -4621,7 +4712,8 @@
 		 *	every one: the asterisk behind its name, drawn aria-hidden, and
 		 *	aria-required on the control. Owns no strings, the asterisk apart
 		 *
-		 *	@param	{Object}	options		{ key, type, value, placeholder, label, help, hint, note, fills, required, maxLength, minLength, autocomplete, id, onInput, className }
+		 *	@param	{Object}	options		{ key, type, value, placeholder, label, help, hint, note, fills, required, maxLength, minLength, counter, autocomplete, id, onInput, className }
+		 *													- counter    true for "n / maxLength" at the right below the field, or the limit as a number
 		 *													- help       what the value does, behind the (?) at the name (hint is the same thing)
 		 *													- note       what has to stay in view under the input
 		 *													- fills      the textfills the field takes, see textareaField(); drawn only where the caller asks for it
@@ -4687,10 +4779,45 @@
 
 			field.appendChild( input );
 
+			Nino.adminUi._counter( field, input, options );
 			Nino.adminUi._tools( name, input, options, options.label ?? '' );
 			Nino.adminUi._note( field, options.note );
 
 			return field;
+		},
+
+		/**
+		 *	The counter of a field that has a limit: "235 / 8000" at the right below the control, as every block that counts draws it. It is what
+		 *	stays visible at the field (see the guide, "Help"): a number the person needs while typing, no help. The count is the number of
+		 *	characters of the value (code points), and the counter is marked (.is-limit) where the value has reached or passed the limit. Owns no strings
+		 *
+		 *	@param		{Element}		field					The label of the field
+		 *	@param		{Element}		control				Its input or textarea
+		 *	@param		{Object}		options				The options of the field: counter - true for the field's maxLength, or the limit as a number (a limit the control does not enforce)
+		 *
+		 *	@return		{Element|null}							The counter, null for a field that has none
+		 */
+		_counter : function( field, control, options ) {
+
+			const limit = typeof options.counter === 'number' ? options.counter : ( options.counter === true && typeof options.maxLength === 'number' ? options.maxLength : 0 );
+
+			if( limit < 1 )
+				return null;
+
+			const counter = Nino.adminUi.el( 'span', 'nino-admin-char-counter' );
+			const count = function() {
+
+				const used = Array.from( String( control.value ?? '' ) ).length;
+
+				counter.textContent = used+ ' / '+ limit;
+				counter.classList.toggle( 'is-limit', used >= limit );
+			};
+
+			control.addEventListener( 'input', count );
+			count();
+			field.appendChild( counter );
+
+			return counter;
 		},
 
 		/**
@@ -4701,7 +4828,8 @@
 		 *	where the caller says that the account may edit the field, never for a field that is locked. Owns no
 		 *	strings, the asterisk apart
 		 *
-		 *	@param	{Object}	options		{ key, value, rows, placeholder, label, help, hint, note, fills, required, maxLength, spellcheck, id, onInput, className }
+		 *	@param	{Object}	options		{ key, value, rows, placeholder, label, help, hint, note, fills, required, maxLength, counter, spellcheck, id, onInput, className }
+		 *													- counter    true for "n / maxLength" at the right below the field, or the limit as a number
 		 *													- help       what the value does, behind the (?) at the name (hint is the same thing)
 		 *													- note       what has to stay in view under the textarea
 		 *													- fills      { editable, title, items | load } - editable true where the account may edit the field, else no icon; items [ { name, notation, value } ], or load( done ) answering them to done( list ) - null where they could not be had; title the dialog's, "Textfills for <label>" by default
@@ -4760,6 +4888,7 @@
 
 			field.appendChild( area );
 
+			Nino.adminUi._counter( field, area, options );
 			Nino.adminUi._tools( name, area, options, options.label ?? '' );
 			Nino.adminUi._note( field, options.note );
 
@@ -6381,38 +6510,63 @@
 		 *																					width): options [ { value, label } ], value the one chosen, label its name for a screen reader, onChange told the value. The table
 		 *																					does NOT filter by it - the caller gets the value and loads or filters the rows, drawing the table anew or with setRows(). The same bar for a
 		 *																					list that is no table is filterBar( { filter, search } )
+		 *	@param		{Array}			[options.filters]			Further selects after the search, in the order given - the shape of `filter`; the table does not filter by them either (see rowFilter)
+		 *	@param		{Object}		[options.collapse]		{ label } - under 40 rem the selects (filter and filters) are behind one button of that name, with the number of the ones that narrow the list (see filterBar())
+		 *	@param		{Function}	[options.rowFilter]		rowFilter( row ) is false for a row that is not shown: what the selects of the caller decide, applied before the search; refilter() draws again
+		 *	@param		{Object}		[options.state]				{ sort : { key, dir }, page, pageSize } the table starts in, for a table that is drawn again (the search is `query`)
+		 *	@param		{Function}	[options.onState]			Called with state() when the sort, the page, the page size or the search changed
+		 *	@param		{string}		[options.labels.range]		The words of the range under the table, "%s-%s of %s": from, to, of how many
 		 *	@param		{Object}		[options.select]			{ actions, label, rowLabel } - the rows can be chosen. A first column of checkboxes, each named by
 		 *																					rowLabel( row ) (the text of the first column by default), and in the head one for the rows of the page
 		 *																					that is shown, with the three states none, some, all of them. With one chosen a bar over the table says how
 		 *																					many, how many of them are not on this page (by the search or the paging), offers "All N matches" where the
 		 *																					search matches more rows than the page shows, has the actions as buttons - actions : [ { key, label, icon,
 		 *																					danger, run( keys ) } ], run is handed the keys (the rowKey, as it is in the row) of ALL the chosen rows, in the
-		 *																					order of rows - and "Clear selection". A search, a sort and a page keep what is chosen; setRows() drops the keys
-		 *																					that are gone. Shift and a click chooses the range from the box touched last to this one, on the page that is
+		 *																					order of rows - and "Clear selection". A search, a sort and a page keep what is chosen; setRows() drops the keys that are gone.
+		 *																					With `clearOnChange : true` (what the directory sets) what is chosen is always of what is in view: a search and
+		 *																					a change of the rows that the caller's selects leave (refilter()) give it up, and the number said to a screen reader follows setRows() Shift and a click chooses the range from the box touched last to this one, on the page that is
 		 *																					shown (the box is remembered by its row, and forgotten by a search, a sort, a page and new rows). label names
 		 *																					the head's checkbox. Without select the table has none of it
 		 *
-		 *	@return		{Object}													{ setRows, destroy, selected(), clearSelection() } - selected() the keys of the chosen rows, in the order of rows
+		 *	A column that has no `render` may say what kind of cell it is - `cell` - and the table draws it, and reads the search from what it shows:
+		 *	  'clamp'    one line, cut by an ellipsis where it is too long, the whole text as its tooltip; column.max ("14rem") is the widest it gets, column.fill true takes the room that the other columns leave (the message of a row)
+		 *	  'text'     the value as text, as a column with no kind has it
+		 *	  'limit'    a number against a limit: "812 / 800", the number in the value of the row and the limit given by column.limit( row ); over it the cell is marked by a badge and the word column.over
+		 *	  'thumb'    a picture of one fixed size - the value is its address - and where there is none a quiet sign for "no picture"; the table then pages by 25
+		 *	  'locales'  the state of a value in each language: the value is a list { locale, label, name, ok } and each language is a badge "DE \u2713" / "DE \u2013" - the sign says it, not the colour alone; it wraps where there are many
+		 *	  'date'     the moment as the workbench writes it (dateText())
+		 *	  'badge'    the value is a word, or { text, state } with a state of the badge
+		 *	A cell of a number column and its head stand at the right (type integer or double); a column that cannot be sorted - no label, or sortable false, or a picture - has a head that is a word and no button
+		 *
+		 *	@return		{Object}													{ setRows, rows, refilter, state, reveal, focusRow, selected, clearSelection, destroy } - selected() the keys of the chosen rows, in the order of rows; rows() the rows the search and rowFilter
+		 *																					leave, in the order the sort gives them, all pages; state() { query, sort : { key, dir }, page, pageSize }; reveal( key ) shows the page the row is on; focusRow( key ) gives the row the focus
+		 *																					(on its page); setRows( rows, { keep : true } ) takes the rows without going back to page 1 and keeps the choice of the rows that are still there
 		 */
 		table : function( options ) {
 
 			const mount 		= options.mount;
 			const columns 	= options.columns || [];
 			const labels 		= options.labels || {};
-			const pageSizes = options.pageSizes || [ 50, 100, 150 ];
+			// A table of pictures is paged by 25: fifty of them are a long way down the page
+			const pictured	= columns.some( function( column ) { return column.cell === 'thumb' } );
+			const pageSizes = options.pageSizes || ( pictured === true ? [ 25, 50, 100 ] : [ 50, 100, 150 ] );
 			const rowKey 		= options.rowKey || 'uri';
+			const start 		= typeof options.state === 'object' && options.state !== null ? options.state : {};
 
 			let rows 			= options.rows || [];
-			let pageSize 	= options.pageSize || pageSizes[0];
-			let page 			= 1;
-			let sortKey 	= '';
-			let sortDir 	= 1;
+			let pageSize 	= pageSizes.indexOf( start.pageSize ) !== -1 ? start.pageSize : ( options.pageSize || pageSizes[0] );
+			let page 			= Number.isInteger( start.page ) === true && start.page > 0 ? start.page : 1;
+			let sortKey 	= typeof start.sort === 'object' && start.sort !== null && columns.some( function( column ) { return column.key === start.sort.key } ) === true ? start.sort.key : '';
+			let sortDir 	= typeof start.sort === 'object' && start.sort !== null && start.sort.dir < 0 ? -1 : 1;
 			let query 		= typeof options.query === 'string' ? options.query : '';
 
 			const model = Nino.adminUi.tableModel;
 
 			// The rows that can be chosen: the key (as a string) of each, and the key as it is in the row
 			const selecting = typeof options.select === 'object' && options.select !== null;
+			// What is chosen is what is in view: the choice is given up where the rows change - a search, the selects of the caller - so that an action never reaches a row that is
+			// hidden. Only where the caller says so (the directory does); a table that has always kept the choice through a search keeps it
+			const scoped = selecting === true && options.select.clearOnChange === true;
 			const chosen = new Map();
 			let matchedNow = [];
 			let pageNow = [];
@@ -6426,6 +6580,9 @@
 			let shownText = new Map();
 
 			const shown = function( row, column ) {
+
+				if( typeof column.render !== 'function' && typeof column.cell === 'string' && column.cell !== '' )
+					return Nino.adminUi._cell( column, row ).text;
 
 				if( typeof column.render !== 'function' )
 					return model.format( row[column.key], column.type );
@@ -6463,9 +6620,11 @@
 			// --- search -----------------------------------------------
 			// The toolbar is the filter bar of the design system: the select that picks a kind, where the caller has one (options.filter), and the search.
 			// The table filters by the search alone; what the select chooses is the caller's to apply, who is told
-			const filtered = typeof options.filter === 'object' && options.filter !== null;
+			const filtered = ( typeof options.filter === 'object' && options.filter !== null ) || Array.isArray( options.filters ) === true;
 			const made = Nino.adminUi.filterBar( {
-				filter : filtered === true ? options.filter : null,
+				filter : typeof options.filter === 'object' && options.filter !== null ? options.filter : null,
+				filters : options.filters,
+				collapse : options.collapse,
 				search : {
 					className : 'nino-admin-table-search',
 					// A placeholder is not a name: it disappears on the first keystroke
@@ -6478,9 +6637,16 @@
 					onInput : function( typed ) {
 						query = typed;
 						page = 1;
+						// A table that keeps what is in view as what is chosen (select.clearOnChange, which the directory sets): another set - a search - is another choice
+						if( scoped === true ) {
+							chosen.clear();
+							anchor = null;
+						}
+
 						draw();
 						if( typeof options.onQuery === 'function' )
 							options.onQuery( query );
+						told();
 					},
 				},
 			} );
@@ -6589,7 +6755,7 @@
 
 				// A sort button with no word on it is announced as nothing and
 				// offers an order nobody can name: a column without a label has none
-				if( column.sortable === undefined ? String( column.label ?? '' ) === '' : column.sortable !== true ) {
+				if( column.sortable === undefined ? ( String( column.label ?? '' ) === '' || column.cell === 'thumb' || column.cell === 'locales' ) : column.sortable !== true ) {
 					th.textContent = column.label ?? '';
 					headRow.appendChild( th );
 					return;
@@ -6604,6 +6770,7 @@
 					sortKey = column.key;
 					page = 1;
 					draw();
+					told();
 				} );
 
 				th.appendChild( btn );
@@ -6650,6 +6817,7 @@
 				pageSize = parseInt( sizeSelect.value, 10 ) || pageSizes[0];
 				page = 1;
 				draw();
+				told();
 			} );
 
 			/*	The two arrows are glyphs, and a glyph is not a name: a screen
@@ -6662,14 +6830,14 @@
 			prev.className = 'nino-admin-table-step';
 			prev.textContent = '\u2039';
 			prev.setAttribute( 'aria-label', prevLabel );
-			prev.addEventListener( 'click', function() { page--; draw() } );
+			prev.addEventListener( 'click', function() { page--; draw(); told() } );
 
 			const next = dc.createElement('button');
 			next.type = 'button';
 			next.className = 'nino-admin-table-step';
 			next.textContent = '\u203a';
 			next.setAttribute( 'aria-label', nextLabel );
-			next.addEventListener( 'click', function() { page++; draw() } );
+			next.addEventListener( 'click', function() { page++; draw(); told() } );
 
 			pager.appendChild( sizeSelect );
 			pager.appendChild( range );
@@ -6679,7 +6847,7 @@
 
 			function draw() {
 
-				const matched = model.filter( rows, columns, query, options.searchText, shown );
+				const matched = model.filter( typeof options.rowFilter === 'function' ? rows.filter( options.rowFilter ) : rows, columns, query, options.searchText, shown );
 				const sortColumn = columns.find( function( c ) { return c.key === sortKey } ) || {};
 				const sorted 	= model.sort( matched, sortKey, sortColumn.type, sortDir, sortColumn.absent );
 				const view 		= model.page( sorted, pageSize, page );
@@ -6786,6 +6954,19 @@
 							else
 								td.textContent = cell === undefined ? text : String( cell );
 						}
+						else if( typeof column.cell === 'string' && column.cell !== '' ) {
+							const made = Nino.adminUi._cell( column, row );
+
+							if( made.node !== null )
+								td.appendChild( made.node );
+							else
+								td.textContent = made.text;
+
+							td.classList.add( 'nino-admin-table-cell-'+ column.cell );
+
+							if( column.fill === true )
+								td.classList.add('nino-admin-table-cell-fill');
+						}
 						else
 							// textContent throughout: every value here is content
 							// someone typed, and some of it is deliberately html
@@ -6796,7 +6977,7 @@
 							td.classList.add('nino-admin-table-uri');
 						if( column.wrap === true )
 							td.classList.add('is-wrap');
-						if( text === '' )
+						if( text === '' && column.cell !== 'thumb' && column.cell !== 'locales' && column.cell !== 'limit' )
 							td.classList.add('is-empty');
 						tr.appendChild( td );
 					} );
@@ -6837,7 +7018,7 @@
 				// A range and a page count read the same in every language
 				range.textContent = view.total === 0
 					? '0'
-					: view.from+ '\u2013'+ view.to+ ' / '+ view.total;
+					: ( typeof labels.range === 'string' ? Nino.adminUi.format( labels.range, view.from, view.to, view.total ) : view.from+ '\u2013'+ view.to+ ' / '+ view.total );
 
 				prev.disabled = ( view.page <= 1 );
 				next.disabled = ( view.page >= view.pages );
@@ -6854,6 +7035,21 @@
 				pager.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 
 				syncSelection( false );
+			}
+
+			// The caller hears of a change of what a person chose to see: the order, the page, the size of a page, the search
+			function told() {
+				if( typeof options.onState === 'function' )
+					options.onState( state() );
+			}
+
+			function state() {
+				return { query : query, sort : { key : sortKey, dir : sortDir }, page : page, pageSize : pageSize };
+			}
+
+			// The row of a key, if it is among the rows the search and the selects leave
+			function at( key ) {
+				return matchedNow.findIndex( function( row ) { return keyOf( row ) !== null && String( keyOf( row ) ) === String( key ) } );
 			}
 
 			// What is chosen, in the order of the rows
@@ -6887,7 +7083,7 @@
 					tr.classList.toggle( 'is-selected', on );
 				} );
 
-				// What is chosen and cannot be seen on this page - by the search or by the page - is said with the number, so that an action never reaches more than is shown
+				// What is chosen and cannot be seen on this page - on another page of the same rows - is said with the number: the choice is always of the rows the search and the selects leave, so an action never reaches a row that is hidden
 				const text = Nino.adminUi.format( Nino.adminUi.text('/_admin/common/table/selected'), chosen.size );
 				const unseen = chosen.size - among;
 				const unseenText = unseen > 0 ? Nino.adminUi.format( Nino.adminUi.text('/_admin/common/table/unseen'), unseen ) : '';
@@ -6913,21 +7109,1280 @@
 			draw();
 
 			return {
-				setRows : function( next ) {
+				setRows : function( next, how ) {
 
 					rows = next || [];
 					shownText = new Map();
-					page = 1;
 
-					// A key that is not in the new rows is gone from the choice
+					if( typeof how !== 'object' || how === null || how.keep !== true )
+						page = 1;
+
+					// A key that is not in the new rows is gone from the choice - and the number a screen reader was told is no longer true
 					const present = new Set( rows.map( keyOf ).filter( function( key ) { return key !== null } ).map( String ) );
+					const held = chosen.size;
 					Array.from( chosen.keys() ).forEach( function( key ) { if( present.has( key ) === false ) chosen.delete( key ) } );
 
 					draw();
+
+					// What a screen reader was told is the number that is true: said again where rows that were chosen are gone
+					if( scoped === true && chosen.size !== held )
+						syncSelection( true );
 				},
 				destroy : function() { mount.innerHTML = ''; mount.classList.remove('nino-admin-table-wrap') },
 				selected : selected,
 				clearSelection : clearSelection,
+				state : state,
+				rows : function() { return matchedNow.slice() },
+				// The caller's selects changed what the rows are: the choice is of the set that was, and is given up
+				refilter : function() {
+					page = 1;
+
+					if( scoped === true ) {
+						chosen.clear();
+						anchor = null;
+					}
+
+					draw();
+					told();
+				},
+				reveal : function( key ) {
+
+					const place = at( key );
+
+					if( place === -1 )
+						return false;
+
+					const wanted = Math.floor( place / pageSize ) + 1;
+
+					if( wanted !== page ) {
+						page = wanted;
+						draw();
+						told();
+					}
+
+					return true;
+				},
+				focusRow : function( key ) {
+
+					const tr = Array.from( tbody.querySelectorAll('tr') ).find( function( one ) { return one.dataset.row === String( key ) } );
+
+					if( tr === undefined )
+						return false;
+
+					// A row that holds controls is no stop of the Tab key; it takes the focus all the same
+					if( tr.hasAttribute('tabindex') === false )
+						tr.tabIndex = -1;
+
+					tr.focus();
+
+					return true;
+				},
+			};
+		},
+
+		/**
+		 *	What a column of a table draws for a value of one of its kinds (see table(), `cell`): the node and the text the cell shows - the text is
+		 *	what the search reads and what the cell is when it has no node. Every value is set as text, never as markup
+		 *
+		 *	@param		{Object}		column
+		 *	@param		{Object}		row
+		 *
+		 *	@return		{Object}									{ node, text } - node null where the cell is plain text
+		 */
+		_cell : function( column, row ) {
+
+			const value = row[column.key];
+			const plain = Nino.adminUi.tableModel.format( value, column.type );
+
+			switch( column.cell ) {
+
+				case 'clamp': {
+					if( plain === '' )
+						return { node : null, text : '' };
+
+					const span = Nino.adminUi.el( 'span', 'nino-admin-table-clamp', plain );
+					span.title = plain;
+
+					// The width a column of a table may take of the page: the caller's, where the text of the column is long or short for its place
+					if( typeof column.max === 'string' && /^[0-9.]+(rem|%|vw)$/.test( column.max ) === true )
+						span.style.setProperty( '--nino-admin-clamp', column.max );
+
+					return { node : span, text : plain };
+				}
+
+				case 'limit': {
+					const used = Number( value );
+					const max = typeof column.limit === 'function' ? Number( column.limit( row ) ) : NaN;
+
+					if( value === null || value === undefined || value === '' || Number.isFinite( used ) === false )
+						return { node : null, text : '' };
+
+					const text = Number.isFinite( max ) === true ? used+ ' / '+ max : String( used );
+					const over = Number.isFinite( max ) === true && used > max;
+					const span = Nino.adminUi.el( 'span', 'nino-admin-table-limit', text );
+
+					if( over === true ) {
+						span.dataset.over = 'true';
+						// The state is a word and a mark, never the colour alone
+						span.appendChild( Nino.adminUi.el( 'span', 'nino-admin-badge', String( column.over ?? '' ) ) ).dataset.state = 'warn';
+					}
+
+					return { node : span, text : text };
+				}
+
+				case 'thumb': {
+					const frame = Nino.adminUi.el( 'span', 'nino-admin-thumb' );
+					const src = Nino.adminUi._imageSource( value );
+
+					if( src === '' ) {
+						frame.classList.add('is-none');
+						frame.appendChild( Nino.adminUi.icon('image') );
+					}
+					else {
+						const img = dc.createElement('img');
+						img.src = src;
+						// The name of the thing stands in the cell beside it: the picture is no second name
+						img.alt = '';
+						img.loading = 'lazy';
+						frame.appendChild( img );
+					}
+
+					return { node : frame, text : '' };
+				}
+
+				case 'locales': {
+					const list = Array.isArray( value ) === true ? value : [];
+					const words = typeof column.words === 'object' && column.words !== null ? column.words : {};
+					const holder = Nino.adminUi.el( 'span', 'nino-admin-localestates' );
+
+					list.forEach( function( entry ) {
+
+						const ok = entry.ok === true;
+						const badge = Nino.adminUi.el( 'span', 'nino-admin-badge', String( entry.label ?? entry.locale ?? '' )+ ' '+ ( ok === true ? '✓' : '–' ) );
+
+						badge.dataset.state = ok === true ? 'ok' : 'warn';
+						badge.title = String( entry.name ?? entry.label ?? '' )+ ( words.ok !== undefined ? ': '+ ( ok === true ? words.ok : ( words.missing ?? '' ) ) : '' );
+						holder.appendChild( badge );
+					} );
+
+					return { node : holder, text : list.map( function( entry ) { return String( entry.name ?? entry.label ?? '' )+ ' '+ ( entry.ok === true ? '✓' : '–' ) } ).join(' ') };
+				}
+
+				case 'text':
+					return { node : null, text : plain };
+
+				case 'date': {
+					const text = Nino.adminUi.dateText( String( value ?? '' ) ) || plain;
+
+					return { node : null, text : text };
+				}
+
+				case 'badge': {
+					const given = typeof value === 'object' && value !== null && Array.isArray( value ) === false ? value : { text : plain };
+					const text = String( given.text ?? '' );
+
+					if( text === '' )
+						return { node : null, text : '' };
+
+					const badge = Nino.adminUi.el( 'span', 'nino-admin-badge', text );
+
+					if( typeof given.state === 'string' )
+						badge.dataset.state = given.state;
+
+					return { node : badge, text : text };
+				}
+
+				default:
+					throw new TypeError( 'Nino.adminUi.table(): "'+ String( column.cell )+ '" is no kind of cell' );
+			}
+		},
+
+		/**
+		 *	An address a picture may be shown from: a path of the site, a relative one, http(s) or an image given as data. Anything else - a
+		 *	script address, another scheme - is no picture
+		 *
+		 *	@param		{*}				value
+		 *
+		 *	@return		{string}									The address, '' where it is none
+		 */
+		_imageSource : function( value ) {
+
+			const src = typeof value === 'string' ? value.trim() : '';
+
+			if( src === '' || /[\u0000-\u001f\u007f]/.test( src ) === true )
+				return '';
+
+			if( /^[a-z][a-z0-9+.-]*:/i.test( src ) === true )
+				return /^(https?:\/\/|data:image\/(png|jpe?g|gif|webp|avif);)/i.test( src ) === true ? src : '';
+
+			return src;
+		},
+
+		/**
+		 *	One thing read and not edited, as a line of a record: its name and its value. The value is text - a message, a name, an address - and
+		 *	is set as text; a `href` makes it a link only where it leads to mail, a phone, a page of the web or a page of the site. Owns no strings
+		 *
+		 *	@param		{Object}		options					{ label, value, href, mono, node }
+		 *																			value  the text (a line that is empty draws a quiet dash)
+		 *																			href   an address the value is a link to: mailto:, tel:, http(s):// or a path of the site; any other is left out
+		 *																			mono   the value in the face of an identifier
+		 *																			node   an element in place of the text
+		 *
+		 *	@return		{Element}									<div class="nino-admin-readline" role="group">
+		 */
+		readLine : function( options ) {
+
+			options = options || {};
+
+			const line = Nino.adminUi.el( 'div', 'nino-admin-readline' );
+			const name = Nino.adminUi.el( 'span', 'nino-admin-readline-label', String( options.label ?? '' ) );
+			const value = Nino.adminUi.el( 'div', 'nino-admin-readline-value' );
+			const text = String( options.value ?? '' );
+
+			serial++;
+			name.id = 'nino-admin-readline-'+ serial;
+			line.setAttribute( 'role', 'group' );
+			line.setAttribute( 'aria-labelledby', name.id );
+
+			if( isElement( options.node ) === true )
+				value.appendChild( options.node );
+			else if( typeof options.href === 'string' && /^(mailto:|tel:|https?:\/\/|\/(?!\/))/i.test( options.href.trim() ) === true && text !== '' ) {
+				const link = dc.createElement('a');
+
+				link.href = options.href.trim();
+				link.textContent = text;
+				value.appendChild( link );
+			}
+			else if( text !== '' )
+				value.textContent = text;
+			else {
+				value.classList.add('is-empty');
+				value.textContent = '–';
+			}
+
+			if( options.mono === true )
+				value.classList.add('is-mono');
+
+			line.appendChild( name );
+			line.appendChild( value );
+
+			return line;
+		},
+
+		/**
+		 *	A long text a person wrote, to be read as it was written: its line breaks kept, its words wrapped, in a box of its own that rolls where it
+		 *	is long. Set as text - what it spells as markup is shown as the letters it is. The box is a stop of the Tab key (what rolls must be
+		 *	reachable by the keyboard) and is named by `label`
+		 *
+		 *	@param		{string}		text
+		 *	@param		{Object}		[options]				{ label } - the name of the box for a screen reader
+		 *
+		 *	@return		{Element}									<div class="nino-admin-messagebox" role="region" tabindex="0">
+		 */
+		messageBox : function( text, options ) {
+
+			options = options || {};
+
+			const box = Nino.adminUi.el( 'div', 'nino-admin-messagebox', String( text ?? '' ) );
+
+			box.tabIndex = 0;
+
+			if( typeof options.label === 'string' && options.label !== '' ) {
+				box.setAttribute( 'role', 'region' );
+				box.setAttribute( 'aria-label', options.label );
+			}
+
+			return box;
+		},
+
+		/**
+		 *	A picture shown large, in a frame: the whole picture - never cut - on a quiet surface, no higher than the frame. Without a picture the
+		 *	frame stands for "none" with the sentence the caller gives. Owns no strings
+		 *
+		 *	@param		{Object}		options					{ src, alt, none, caption }
+		 *																			src      the address of the picture (see _imageSource())
+		 *																			alt      what a person who cannot see it is told
+		 *																			none     the sentence of an empty frame
+		 *																			caption  a quiet line under the frame - the file, its size
+		 *
+		 *	@return		{Element}									<figure class="nino-admin-imageframe">
+		 */
+		imageFrame : function( options ) {
+
+			options = options || {};
+
+			const figure = Nino.adminUi.el( 'figure', 'nino-admin-imageframe' );
+			const frame = Nino.adminUi.el( 'div', 'nino-admin-imageframe-frame' );
+			const src = Nino.adminUi._imageSource( options.src );
+
+			if( src === '' ) {
+				frame.classList.add('is-none');
+				frame.appendChild( Nino.adminUi.icon('image') );
+				frame.appendChild( Nino.adminUi.el( 'span', '', String( options.none ?? '' ) ) );
+			}
+			else {
+				const img = dc.createElement('img');
+
+				img.src = src;
+				img.alt = String( options.alt ?? '' );
+				frame.appendChild( img );
+			}
+
+			figure.appendChild( frame );
+
+			if( typeof options.caption === 'string' && options.caption !== '' )
+				figure.appendChild( Nino.adminUi.el( 'figcaption', 'nino-admin-imageframe-caption', options.caption ) );
+
+			return figure;
+		},
+
+		/**
+		 *	The standard directory of a panel: everything over and under the rows of the things it manages, drawn by one call, in one order - the
+		 *	choice of a category (where there are categories), the search, the selects that narrow (where there are), the table with its box for
+		 *	choosing rows, its cells and its buttons, and the choice of the page. It is table() with what a panel adds to it by hand otherwise: the
+		 *	selects are applied here and not by the caller, the choice of the person is kept and handed back, and the order the rows are shown in is
+		 *	asked for - which is what record() walks when it steps from one entry to the next.
+		 *
+		 *	Under 40 rem only the search is in view; category and filters are behind one button, "Filters", that counts the ones that narrow the
+		 *	list. A table of pictures pages by 25, every other by 50. The rows are the panel's, all of them, and are filtered and sorted here, in the
+		 *	browser - what a panel that must fetch its rows by the page (more than a few thousand) draws with is `load` of a later patch, not built
+		 *	for the panels that do not need it.
+		 *
+		 *	Owns no strings: every word is the caller's, `labels`, with the shared fills of the table (range, filters) where it gives none
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{Element}		options.mount				Taken over
+		 *	@param		{Array}			options.columns			As of table() - with `cell` for a kind of cell
+		 *	@param		{string}		options.rowKey			The property that is a row's identity (a string)
+		 *	@param		{Object}		options.labels			{ search, empty, noMatch, filter, range, prev, next, pageSize } - the words
+		 *	@param		{Object}		[options.category]	{ id, label, value, options : [ { value, label } ], match( row, value ) } - the first select, left of the search; its first option is "all"
+		 *	@param		{Array}			[options.filters]		[ { id, label, value, options, match( row, value ) } ] - the selects after the search, in the order given; the first option of each is "all"
+		 *	@param		{Object}		[options.state]			What the directory starts as, for one that is drawn again: { query, sort, page, pageSize, category, filters : { id : value } }
+		 *	@param		{Function}	[options.onState]		Called with state() when a person changed what they see
+		 *	@param		{Function}	[options.searchText]	See table()
+		 *	@param		{Function}	[options.actions]		See table(); the first is what a keyboard opens the row by
+		 *	@param		{number}		[options.actionsInline]	See table()
+		 *	@param		{Object}		[options.select]		See table()
+		 *	@param		{Function}	[options.onOpen]		onOpen( row ) - a click on the row, Enter or Space on it
+		 *
+		 *	@return		{Object}										{ el, setRows( rows, { keep } ), update( rows, key ), rows(), state(), reveal( key ), focusRow( key ), selected(), clearSelection(),
+		 *																			notice( text ), loading( text ), fail( status, response, fallbackKey ), destroy() }
+		 */
+		directory : function( options ) {
+
+			const labels = options.labels || {};
+			const start = typeof options.state === 'object' && options.state !== null ? options.state : {};
+			const filters = Array.isArray( options.filters ) === true ? options.filters : [];
+			const first = function( list ) { return Array.isArray( list ) === true && list.length > 0 ? String( list[0].value ?? '' ) : '' };
+
+			// What the selects hold: the person's choice, which outlives every drawing of the table
+			const choice = { category : '', filters : {} };
+
+			if( options.category !== undefined && options.category !== null )
+				choice.category = String( start.category ?? options.category.value ?? first( options.category.options ) );
+
+			filters.forEach( function( filter ) {
+				choice.filters[filter.id] = String( ( start.filters ?? {} )[filter.id] ?? filter.value ?? first( filter.options ) );
+			} );
+
+			const root = Nino.adminUi.el( 'div', 'nino-admin-directory' );
+			const slot = Nino.adminUi.el( 'div', 'nino-admin-directory-notice' );
+			const holder = Nino.adminUi.el( 'div', 'nino-admin-directory-body' );
+
+			root.appendChild( slot );
+			root.appendChild( holder );
+			options.mount.innerHTML = '';
+			options.mount.appendChild( root );
+
+			let table = null;
+			let rows = [];
+			let seen = start;
+
+			const state = function() {
+				return Object.assign( table === null ? { query : seen.query ?? '', sort : seen.sort, page : seen.page, pageSize : seen.pageSize } : table.state(), { category : choice.category, filters : Object.assign( {}, choice.filters ) } );
+			};
+
+			const report = function() {
+				if( typeof options.onState === 'function' )
+					options.onState( state() );
+			};
+
+			// The selects are the directory's: a row is shown where the category and each filter let it through
+			const shows = function( row ) {
+
+				if( options.category !== undefined && options.category !== null && typeof options.category.match === 'function' && options.category.match( row, choice.category ) !== true )
+					return false;
+
+				return filters.every( function( filter ) { return typeof filter.match !== 'function' || filter.match( row, choice.filters[filter.id] ) === true } );
+			};
+
+			const changed = function() {
+				table.refilter();
+			};
+
+			const build = function() {
+
+				holder.innerHTML = '';
+				holder.removeAttribute('aria-busy');
+
+				const made = {
+					mount : holder,
+					columns : options.columns,
+					rows : rows,
+					rowKey : options.rowKey,
+					labels : Object.assign( { range : Nino.adminUi.text('/_admin/common/table/range') }, labels ),
+					search : true,
+					searchText : options.searchText,
+					query : seen.query ?? '',
+					state : seen,
+					actions : options.actions,
+					actionsInline : options.actionsInline,
+					select : typeof options.select === 'object' && options.select !== null ? Object.assign( {}, options.select, { clearOnChange : true } ) : undefined,
+					onRowClick : typeof options.onOpen === 'function' ? options.onOpen : undefined,
+					rowFilter : shows,
+					onState : report,
+				};
+
+				if( options.category !== undefined && options.category !== null )
+					made.filter = { id : options.category.id, label : options.category.label, options : options.category.options, value : choice.category, onChange : function( value ) { choice.category = value; changed() } };
+
+				if( filters.length > 0 )
+					made.filters = filters.map( function( filter ) {
+						return { id : filter.id, label : filter.label, options : filter.options, value : choice.filters[filter.id], onChange : function( value ) { choice.filters[filter.id] = value; changed() } };
+					} );
+
+				if( ( options.category !== undefined && options.category !== null ) || filters.length > 0 )
+					made.collapse = { label : labels.filter ?? Nino.adminUi.text('/_admin/common/table/filters') };
+
+				table = Nino.adminUi.table( made );
+			};
+
+			return {
+				el : root,
+				setRows : function( next, how ) {
+
+					rows = Array.isArray( next ) === true ? next : [];
+
+					if( table === null )
+						build();
+					else
+						table.setRows( rows, how );
+				},
+				// A row that was changed: the rows are taken without going back to the first page, and the row is the one that is drawn anew - it carries the class that makes it show
+				update : function( next, key ) {
+
+					rows = Array.isArray( next ) === true ? next : [];
+
+					if( table === null )
+						build();
+					else
+						table.setRows( rows, { keep : true } );
+
+					const tr = Array.from( holder.querySelectorAll('tr') ).find( function( one ) { return one.dataset.row === String( key ) } );
+
+					if( tr !== undefined )
+						tr.classList.add('is-fresh');
+				},
+				rows : function() { return table === null ? [] : table.rows() },
+				state : state,
+				reveal : function( key ) { return table === null ? false : table.reveal( key ) },
+				focusRow : function( key ) {
+
+					if( table === null )
+						return false;
+
+					// A row that is not on the page that is shown is brought there first
+					table.reveal( key );
+
+					return table.focusRow( key );
+				},
+				selected : function() { return table === null ? [] : table.selected() },
+				clearSelection : function() { if( table !== null ) table.clearSelection() },
+				// Where the focus goes when the row it was on is gone and no other is left: the search
+				focusSearch : function() {
+
+					const field = Array.from( holder.querySelectorAll('input') ).find( function( one ) { return one.type === 'search' } );
+
+					if( field === undefined )
+						return false;
+
+					field.focus();
+
+					return true;
+				},
+				// What needs a person's attention over the table - an entry that is not there - or nothing
+				notice : function( text ) {
+
+					slot.innerHTML = '';
+
+					if( typeof text === 'string' && text !== '' )
+						slot.appendChild( Nino.adminUi.notice( text ) );
+				},
+				loading : function( text ) {
+
+					seen = state();
+					table = null;
+					holder.innerHTML = '';
+					holder.setAttribute( 'aria-busy', 'true' );
+					holder.appendChild( Nino.adminUi.el( 'p', 'nino-admin-loading', String( text ?? '' ) ) );
+				},
+				fail : function( status, response, fallbackKey ) {
+
+					seen = state();
+					table = null;
+					holder.removeAttribute('aria-busy');
+					Nino.adminUi.showError( holder, status, response, fallbackKey );
+				},
+				destroy : function() {
+
+					table = null;
+					options.mount.innerHTML = '';
+				},
+			};
+		},
+
+		/**
+		 *	An entry of a directory, opened in a dialog of its own - the "record": large (72 rem, at most 90 % of the height, rolling inside; the whole
+		 *	screen on a phone), with the name of the entry and its identifier in the head, the step to the previous and the next entry with its place
+		 *	("3 of 24" - in the rows the directory shows now: its search, its selects and its sort, across the pages), and a cross that closes it;
+		 *	at the foot its bar, the destructive action at the left, the state, the further buttons and the one main button at the right. There is no
+		 *	Cancel: the cross and Escape close it, and a record that holds unsaved input asks first (Save, Discard, Cancel) - when it is closed, when
+		 *	the step is made and when the browser's Back or a typed address leaves it.
+		 *
+		 *	The address is `#panel/tab/<entry>`: a person's own move - a row opened - adds ONE entry of the browser's history, however many entries
+		 *	are stepped through after it (they replace the address), so that Back closes the record and nothing else. A record that was opened by an
+		 *	address (a reload, a link) has no entry of its own and is closed by writing the address of the directory over it. Only the entry is in the
+		 *	address: what the directory shows - search, selects, sort, page - stays where it is, because the directory is not drawn again while the
+		 *	record is open (the record stands over it), and an address that carries such a state would be one a person could not tell from another.
+		 *	An entry the panel does not know is told to the panel (`missing`), which says so over the directory; the address then is the directory's.
+		 *
+		 *	The panel calls follow( parts ) from its showCurrent() and after it has loaded its rows with the parts of the address
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{string}		options.screen			The panel's screen as the router knows it (its uri)
+		 *	@param		{string}		[options.dirty]			The name of the unsaved-input entry (the screen by default)
+		 *	@param		{Object}		options.directory		The directory the entries are in: rows(), reveal( key ), focusRow( key )
+		 *	@param		{Function}	options.keyOf				keyOf( row ) - the string that names the entry in the address
+		 *	@param		{Function}	[options.addressOf]	addressOf( row ) - what names the entry in the address, null for an entry that has no address of its own (an entry that cannot be named by one): it opens all the same and the address stays the directory's. keyOf( row ) by default
+		 *	@param		{Function}	options.find				find( key ) - the row of that key, whether the directory shows it or not, or null
+		 *	@param		{Function}	options.title				title( row ) - the name of the entry; text
+		 *	@param		{Function}	[options.subtitle]	subtitle( row ) - the identifier under it; text
+		 *	@param		{Function}	options.body				body( row, ctx ) - the content: an element, a form's fields or lines to read. ctx is { form, bar, row, key, status, go( delta ), close(), touch() } - touch() says that something was chosen that no field holds (a file) and is unsaved
+		 *	@param		{boolean}		[options.readOnly]	The entry is read and not edited: no state in the bar, and no Close in it either - the cross and Escape close - so the bar has the destructive action at the left and at the right what can be done with the entry
+		 *	@param		{Function}	[options.save]			save( row, ctx, done ) - done( ok, { row, error, conflict } ); the panel keeps its rows and draws the row anew (directory.update()) before it says ok. The entry was written
+		 *																			by another tab or person first: done( false, { conflict : true, error } ) asks the question of the guide on the record; ctx.overwrite is true for the save that answers Overwrite
+		 *	@param		{Function}	[options.reload]		reload( key, done ) - the panel reads the entry again and says done( row ), the row it holds now (null where it is gone), for the answer Reload of that question
+		 *	@param		{boolean}		[options.saveNext]	"Save and continue" beside Save: saves and goes on to the next entry
+		 *	@param		{Object}		[options.danger]		{ label, hidden( row ), run( row, opener, done ) } - the destructive action, at the left; hidden( row ) is true for an entry that has no button for it. run asks the question of its
+		 *																			level itself - the question of the level destructive, asked as nested, so that it stands on the record - and acts: done( true ) where it went (the panel has taken the
+		 *																			row out of its directory by then), done( false, { error } ) where it failed, done( null ) where the answer was no
+		 *	@param		{Array}			[options.actions]		[ { label, kind, run( row, ctx ), icon, hidden( row ) } ] - further buttons at the right of the bar; hidden( row ) true for an entry that the action does nothing for (no button without an effect). In a record that is only read the first with kind 'primary' is the main button
+		 *	@param		{Function}	options.missing			missing( key ) - the entry named by the address is not there
+		 *	@param		{Object}		options.labels			{ close, prev, next, position, save, saveNext, closeButton, deleted, saved } - the words; the shared fills where left out
+		 *
+		 *	@return		{Object}										{ open( key, { opener } ), follow(), close(), isOpen(), key(), refresh() } - follow() reads the address of the router itself: an address of this panel that names an entry opens
+		 *																			it, one that names none closes the record, one that is another panel's is not its to answer (it answers false), so that a panel cannot mistake it
+		 */
+		record : function( options ) {
+
+			const labels = options.labels || {};
+			const dirtyName = options.dirty ?? options.screen;
+			const word = function( key, fill ) { return labels[key] ?? Nino.adminUi.text( fill ) };
+			const readOnly = options.readOnly === true;
+
+			let current = null;       // { key, row }
+			let dialog = null;        // the handle of the dialog
+			let form = null;
+			let bar = null;
+			let title = null;
+			let subtitle = null;
+			let content = null;
+			let count = null;
+			let previous = null;
+			let next = null;
+			let removeButton = null;
+			let actions = [];         // [ { action, button } ] the further buttons of the bar
+			let busy = false;
+			let asking = false;       // the question about unsaved input is open for a move of the record's own
+			let refocus = null;       // the row that has the focus when the record is gone: the next one, after a deletion
+			let shown = null;         // what the body of the entry on screen was given
+			let touched = false;      // something was chosen that no field holds - a file - and is not saved
+			let allow = false;        // a way out the guard lets through
+			let silent = false;       // closed with no address to write: the address already says where it is
+			let expectBack = false;   // the cross has asked the history to step back: the hashchange that comes is the record's own
+			let onHash = null;        // the listener for an address that leads away
+
+			const router = function() {
+				return typeof shell().router === 'object' && shell().router !== null ? shell().router : null;
+			};
+
+			const registry = function() {
+				return typeof shell().dirty === 'object' && shell().dirty !== null ? shell().dirty : null;
+			};
+
+			const dirty = function() {
+				return registry() !== null && registry().isDirty( [ dirtyName ] ) === true;
+			};
+
+			// What is asked before input is lost: nothing where there is none. While the question of the record's own move is open, a Discard is
+			// the answer to that move and does not take the dialog away by itself (see the entry of the dirty registry below)
+			const ask = function( proceed, cancel ) {
+
+				if( dirty() === false )
+					return proceed();
+
+				asking = true;
+
+				registry().guard( [ dirtyName ], function( answered ) {
+					asking = false;
+					proceed( answered );
+				}, function() {
+					asking = false;
+
+					if( typeof cancel === 'function' )
+						cancel();
+				} );
+			};
+
+			const sequence = function() { return options.directory.rows() };
+
+			// The dialogs that stand on the record - a question about a deletion, about a conflict - are closed, the top one first, each as its own answer 'no'. Whether there were any
+			const closeAbove = function() {
+
+				const stack = Nino.adminUi._choiceStack;
+				const at = dialog === null ? -1 : stack.indexOf( dialog.el );
+
+				if( at === -1 )
+					return false;
+
+				const above = stack.slice( at + 1 );
+
+				above.reverse().forEach( function( layer ) { layer.close() } );
+
+				return above.length > 0;
+			};
+
+			const place = function() {
+
+				if( current === null )
+					return -1;
+
+				return sequence().findIndex( function( row ) { return options.keyOf( row ) === current.key } );
+			};
+
+			// What names an entry in the address, null for one that has no address - the entry is read all the same, and the address stays the directory's
+			const addressOf = function( row ) {
+				return typeof options.addressOf === 'function' ? options.addressOf( row ) : options.keyOf( row );
+			};
+
+			// The address of the record that is on screen, written over the one the browser is on
+			const address = function() {
+
+				if( router() === null )
+					return;
+
+				const named = current === null ? null : addressOf( current.row );
+
+				router().set( options.screen, named === null ? [] : [ named ] );
+			};
+
+			const refreshNav = function() {
+
+				const rows = sequence();
+				const at = place();
+
+				// An entry the directory does not show now - a search or a select hides it - is not in the order: there is no place to say and no step to make
+				count.textContent = at === -1 ? '' : Nino.adminUi.format( word( 'position', '/_admin/common/record/position' ), at + 1, rows.length );
+				previous.disabled = at <= 0;
+				next.disabled = at === -1 || at >= rows.length - 1;
+				previous.hidden = next.hidden = at === -1;
+			};
+
+			// A choice that is in no field - a file that was chosen for the entry - is unsaved input as well: the form says so
+			const touch = function() {
+
+				touched = true;
+
+				if( registry() !== null )
+					registry().refresh();
+			};
+
+			// What went wrong with an action, said where a person looks: in the line of the bar - a read record has none, and says it over its lines
+			const problem = function( text ) {
+
+				if( bar !== null && bar.line !== undefined ) {
+					bar.line.fail( text );
+					return;
+				}
+
+				const note = Nino.adminUi.notice( text );
+
+				note.setAttribute( 'role', 'alert' );
+				content.insertBefore( note, content.firstChild );
+			};
+
+			// What the form and the bar are given: one object for as long as an entry is shown, so that what the body keeps in it - a handle of a field - is what the save finds there
+			const context = function() {
+				return { form : form, bar : bar, row : current.row, key : current.key, status : bar === null ? null : bar.line, go : go, close : request, touch : touch };
+			};
+
+			const draw = function() {
+
+				const ctx = context();
+				const made = options.body( current.row, ctx );
+
+				shown = ctx;
+
+				content.innerHTML = '';
+
+				form = dc.createElement( readOnly === true ? 'div' : 'form' );
+				form.className = 'nino-admin-record-body';
+
+				if( readOnly === false ) {
+					form.noValidate = true;
+					form.addEventListener( 'submit', function( event ) {
+						event.preventDefault();
+						primarySave();
+					} );
+				}
+
+				form.appendChild( made );
+				content.appendChild( form );
+				ctx.form = form;
+				title.textContent = String( options.title( current.row ) );
+
+				if( subtitle !== null )
+					subtitle.textContent = typeof options.subtitle === 'function' ? String( options.subtitle( current.row ) ) : '';
+
+				// The page of the directory that holds the entry is the one behind the record
+				options.directory.reveal( current.key );
+				touched = false;
+				refreshNav();
+
+				// An entry that cannot be taken away - the panel says which - has no button for it, and a button that has no effect on an entry is not shown
+				if( removeButton !== null )
+					removeButton.hidden = typeof options.danger.hidden === 'function' && options.danger.hidden( current.row ) === true;
+
+				actions.forEach( function( one ) {
+					one.button.hidden = typeof one.action.hidden === 'function' && one.action.hidden( current.row ) === true;
+				} );
+
+				if( bar !== null && bar.paint !== undefined )
+					bar.paint( { dirty : false } );
+
+				if( registry() !== null )
+					registry().snapshot( dirtyName );
+			};
+
+			// What can take the focus in the content of the entry, in the order of the page
+			const stops = function() {
+				return content === null ? [] : Array.from( content.querySelectorAll('input, textarea, select, button, a, [tabindex]') ).filter( function( one ) { return one.type !== 'hidden' && one.disabled !== true && one.hidden !== true } );
+			};
+
+			// Show another entry in the dialog that is open: its fields, its head, its place. Where the focus stood in the content - a field, the box of a message - it
+			// stands at the same place in the next entry, where there is one; else at the head of the content
+			const show = function( key ) {
+
+				const row = options.find( key );
+
+				if( row === null )
+					return false;
+
+				const held = stops().indexOf( dc.activeElement );
+
+				current = { key : key, row : row };
+				draw();
+
+				if( held !== -1 ) {
+
+					const again = stops()[held];
+
+					( again ?? title ).focus();
+				}
+
+				return true;
+			};
+
+			function go( delta ) {
+
+				const rows = sequence();
+				const at = place();
+				const target = at === -1 ? undefined : rows[at + delta];
+
+				if( target === undefined || busy === true )
+					return;
+
+				ask( function() {
+					if( show( options.keyOf( target ) ) === true )
+						address();
+				} );
+			}
+
+			function primarySave( then, overwrite ) {
+
+				if( readOnly === true || typeof options.save !== 'function' || busy === true ) {
+
+					if( typeof then === 'function' )
+						then( false );
+
+					return;
+				}
+
+				busy = true;
+				bar.line.saving();
+
+				options.save( current.row, Object.assign( shown ?? context(), { row : current.row, overwrite : overwrite === true } ), function( ok, result ) {
+
+					busy = false;
+
+					// Another tab or another person wrote the entry first: the question of the guide, asked on the record - Overwrite saves again over what is there, Reload shows what is there
+					if( ok !== true && result !== undefined && result !== null && result.conflict === true ) {
+
+						bar.line.idle();
+						bar.paint( { dirty : true } );
+
+						Nino.adminUi.conflict( {
+							message : String( result.error ?? '' ),
+							nested : true,
+							opener : bar.primary,
+							onOverwrite : function() { primarySave( then, true ) },
+							onReload : function() {
+								options.reload( current.key, function( row ) {
+
+									if( row === null )
+										return;
+
+									current.row = row;
+									draw();
+								} );
+							},
+							onCancel : function() { if( typeof then === 'function' ) then( false ) },
+						} );
+
+						return;
+					}
+
+					if( ok !== true ) {
+						bar.line.fail( String( ( result ?? {} ).error ?? '' ) );
+						bar.paint( { dirty : true } );
+						// The first field that is wrong has the focus
+						const wrong = form === null ? null : form.querySelector('[aria-invalid="true"]');
+
+						if( wrong !== null )
+							wrong.focus();
+
+						if( typeof then === 'function' )
+							then( false );
+
+						return;
+					}
+
+					if( result !== undefined && result !== null && result.row !== undefined )
+						current.row = result.row;
+
+					title.textContent = String( options.title( current.row ) );
+
+					if( subtitle !== null && typeof options.subtitle === 'function' )
+						subtitle.textContent = String( options.subtitle( current.row ) );
+
+					touched = false;
+					bar.line.saved();
+					bar.paint( { dirty : false } );
+
+					if( registry() !== null )
+						registry().snapshot( dirtyName );
+
+					Nino.adminUi.say( word( 'saved', '/_admin/common/msg/saved' ) );
+					refreshNav();
+
+					if( typeof then === 'function' )
+						then( true );
+				} );
+			}
+
+			// The way out: the dialog is closed, and the address says the directory
+			function leave( how ) {
+
+				silent = how === 'silent';
+				allow = true;
+
+				if( dialog !== null )
+					dialog.close( 'close' );
+			}
+
+			function request() {
+				ask( function() { leave( 'own' ) } );
+			}
+
+			// The entry of the history that the browser is on is a record's of this panel: it is taken off the history by the history, and the step that comes of it is the record's own.
+			// Whether there was such an entry
+			const retreat = function() {
+
+				if( router() === null || router().marked() !== options.screen || typeof wn.history !== 'object' || typeof wn.history.go !== 'function' )
+					return false;
+
+				expectBack = true;
+
+				// A step that never comes must not keep the next address of the panel from being read
+				if( typeof wn.setTimeout === 'function' )
+					wn.setTimeout( function() { expectBack = false }, 1500 );
+
+				wn.history.go( -1 );
+
+				return true;
+			};
+
+			// Taking the dialog away: the focus goes to the row, the address to the directory
+			const done = function() {
+
+				const was = current;
+
+				if( onHash !== null && typeof wn.removeEventListener === 'function' )
+					wn.removeEventListener( 'hashchange', onHash );
+
+				onHash = null;
+				dialog = null;
+				form = null;
+				bar = null;
+				current = null;
+				allow = false;
+				busy = false;
+
+				if( silent === false && router() !== null ) {
+
+					// An entry that a record made in the history is marked as its own (it stays so through a reload, Back and Forward) and is taken back by the history, so that Back
+					// and the cross are the same move and no entry is left over; an address that was typed has no mark and is written over
+					if( retreat() === false )
+						router().set( options.screen, [] );
+				}
+
+				silent = false;
+
+				const target = refocus ?? ( was === null ? null : was.key );
+
+				refocus = null;
+
+				if( target !== null && options.directory.focusRow( target ) === false && typeof options.directory.focusSearch === 'function' )
+					options.directory.focusSearch();
+			};
+
+			const open = function( key, how ) {
+
+				how = how ?? {};
+
+				if( dialog !== null ) {
+
+					if( current !== null && current.key === key )
+						return true;
+
+					return show( key ) === true ? ( address(), true ) : false;
+				}
+
+				const row = options.find( key );
+
+				if( row === null ) {
+					options.missing( key );
+					return false;
+				}
+
+				current = { key : key, row : row };
+
+				const tools = Nino.adminUi.el( 'div', 'nino-admin-record-steps' );
+				previous = Nino.adminUi.iconButton( 'chevron-left', word( 'prev', '/_admin/common/record/prev' ), function() { go( -1 ) }, { className : 'nino-admin-record-step' } );
+				next = Nino.adminUi.iconButton( 'chevron-right', word( 'next', '/_admin/common/record/next' ), function() { go( 1 ) }, { className : 'nino-admin-record-step' } );
+				previous.setAttribute( 'aria-keyshortcuts', 'Alt+Shift+ArrowLeft' );
+				next.setAttribute( 'aria-keyshortcuts', 'Alt+Shift+ArrowRight' );
+				previous.title = word( 'prev', '/_admin/common/record/prev' )+ ' ('+ Nino.adminUi.text('/_admin/common/record/prev-key')+ ')';
+				next.title = word( 'next', '/_admin/common/record/next' )+ ' ('+ Nino.adminUi.text('/_admin/common/record/next-key')+ ')';
+				count = Nino.adminUi.el( 'span', 'nino-admin-record-count' );
+				count.setAttribute( 'aria-live', 'polite' );
+				tools.appendChild( previous );
+				tools.appendChild( count );
+				tools.appendChild( next );
+
+				content = Nino.adminUi.el( 'div', 'nino-admin-record-content' );
+
+				// The bar: the destructive action at the left, the state, the buttons, and the one main button at the right. A record is closed by its cross and by Escape: there is
+				// no Close and no Cancel in its bar. A record that is only read has at the right what can be done with it - the first action that says it is the main one -, or nothing
+				const secondary = [];
+				const acting = [];
+				let primary = null;
+
+				if( readOnly === false ) {
+
+					primary = Nino.adminUi.button( word( 'save', '/_admin/common/label/save' ), function() { primarySave() }, { kind : 'primary' } );
+
+					if( options.saveNext === true )
+						secondary.push( Nino.adminUi.button( word( 'saveNext', '/_admin/common/label/save-next' ), function() {
+							primarySave( function( ok ) { if( ok === true ) go( 1 ) } );
+						}, { kind : 'secondary' } ) );
+				}
+
+				( options.actions ?? [] ).forEach( function( action ) {
+
+					const button = Nino.adminUi.button( String( action.label ?? '' ), function() { action.run( current.row, context() ) }, { kind : action.kind ?? 'secondary', icon : action.icon } );
+
+					acting.push( { action : action, button : button } );
+
+					if( readOnly === true && primary === null && action.kind === 'primary' )
+						primary = button;
+					else
+						secondary.push( button );
+				} );
+
+				actions = acting;
+
+				if( typeof options.danger === 'object' && options.danger !== null )
+					removeButton = Nino.adminUi.button( String( options.danger.label ?? '' ), function() { remove() }, { kind : 'danger' } );
+				else
+					removeButton = null;
+
+				bar = Nino.adminUi.actionBar( { danger : removeButton ?? undefined, status : readOnly === true ? undefined : true, secondary : secondary, primary : primary ?? undefined, main : readOnly === true ? false : undefined, className : 'nino-admin-record-bar' } );
+
+				const keys = function( event ) {
+
+					if( event.altKey !== true || event.shiftKey !== true )
+						return;
+
+					if( event.key === 'ArrowLeft' || event.key === 'ArrowRight' ) {
+						event.preventDefault();
+						go( event.key === 'ArrowLeft' ? -1 : 1 );
+					}
+				};
+
+				const opened = Nino.adminUi.choiceDialog( {
+					title : String( options.title( row ) ),
+					subtitle : typeof options.subtitle === 'function' ? String( options.subtitle( row ) ) : undefined,
+					size : 'large',
+					className : 'nino-admin-record',
+					content : content,
+					tools : tools,
+					close : word( 'close', '/_admin/common/label/close' ),
+					bar : bar.el,
+					opener : how.opener,
+					choices : [ { value : 'close', label : word( 'close', '/_admin/common/label/close' ), kind : 'secondary' } ],
+					// Every way out - the cross, Escape - is asked here: a record with unsaved input is left only through its question
+					guard : function() {
+
+						if( allow === true )
+							return true;
+
+						request();
+
+						return false;
+					},
+					onOpen : function( handle ) {
+
+						dialog = handle;
+						handle.el.addEventListener( 'keydown', keys );
+						title = handle.el.querySelector('.nino-admin-dialog-title');
+						subtitle = handle.el.querySelector('.nino-admin-dialog-subtitle');
+						title.tabIndex = -1;
+
+						// An address that leads away - another panel, typed, a link, Back or Forward - takes the record with it. Where unsaved input is asked about the shell asks, and a Discard
+						// takes the record away (see the entry of the registry below); where there is none it is closed here. It stands over no other panel
+						onHash = function() {
+
+							if( dialog === null || router() === null || router().current().panel === options.screen || dirty() === true )
+								return;
+
+							// What stands on the record goes first, then the record
+							closeAbove();
+							leave( 'silent' );
+						};
+
+						if( typeof wn.addEventListener === 'function' )
+							wn.addEventListener( 'hashchange', onHash );
+
+						draw();
+
+						// The first field has the focus - a record that is only read, its name
+						const field = readOnly === true ? undefined : Array.from( form.querySelectorAll('input, textarea, select') ).find( function( one ) { return one.type !== 'hidden' && one.type !== 'file' && one.disabled !== true } );
+
+						( field ?? title ).focus();
+					},
+					onChoose : function() { done() },
+				} );
+
+				if( opened === false ) {
+					current = null;
+					return false;
+				}
+
+				return true;
+			};
+
+			function remove() {
+
+				if( current === null || busy === true || typeof options.danger !== 'object' )
+					return;
+
+				const rows = sequence();
+				const at = place();
+				const around = at === -1 ? undefined : ( rows[at + 1] ?? rows[at - 1] );
+				const row = current.row;
+
+				busy = true;
+
+				options.danger.run( row, removeButton, function( went, result ) {
+
+					busy = false;
+
+					if( went === null )
+						return;
+
+					if( went !== true ) {
+						problem( String( ( result ?? {} ).error ?? '' ) );
+						return;
+					}
+
+					Nino.adminUi.say( word( 'deleted', '/_admin/common/msg/deleted' ) );
+
+					// The focus goes to the row that took its place, once the dialog is gone
+					refocus = around === undefined ? null : options.keyOf( around );
+					leave( 'own' );
+				} );
+			}
+
+			// What a step through the history made of the address: the record it names is shown, or the one that is open is closed
+			const follow = function() {
+
+				const here = router();
+				const resync = function() { address() };
+
+				if( here === null )
+					return false;
+
+				// The record reads the address itself: what it says of this panel, or - where the screen is another one - nothing. It is not the record's to answer then: the panel on screen is
+				// another one, a record that stands open over it is closed by the listener of the address, and a question about unsaved input was asked by the shell once, not a second time here
+				const at = here.current();
+				const parts = at.panel === options.screen ? at.parts : null;
+				const named = Array.isArray( parts ) === true && parts.length === 1 ? String( parts[0] ) : null;
+
+				if( parts === null )
+					return false;
+
+				// The hashchange that the cross itself asked the history for: the record is closed already
+				if( expectBack === true && named === null ) {
+					expectBack = false;
+					return true;
+				}
+
+				// A question that stands on the record - the deletion, the conflict - is the top layer: Back closes that first, the record stays, and the step through the history is taken back
+				if( dialog !== null && closeAbove() === true ) {
+					here.refuse();
+					resync();
+
+					return true;
+				}
+
+				if( named === null ) {
+
+					if( dialog === null )
+						return false;
+
+					here.leave( [ dirtyName ], true, function() { leave( 'silent' ) }, resync );
+
+					return true;
+				}
+
+				if( current !== null && current.key === named )
+					return false;
+
+				// An entry that has no address of its own is not one an address can name
+				const found = options.find( named );
+
+				if( found === null || addressOf( found ) === null ) {
+
+					if( dialog !== null )
+						leave( 'silent' );
+
+					options.missing( named );
+
+					// The entry of the history that named the entry that is gone - Forward after it was taken away - is a record's and is taken off the history, as the cross takes it:
+					// written over it would stand as a second entry of the directory in a row, and Back would do nothing. An address that was typed is written over
+					if( retreat() === false )
+						here.set( options.screen, [] );
+
+					return true;
+				}
+
+				here.leave( [ dirtyName ], dialog !== null, function() {
+
+					if( dialog === null )
+						open( named, {} );
+					else
+						show( named );
+				}, resync );
+
+				return true;
+			};
+
+			// A person's own move: the entry is opened and the address is a new entry of the history - marked as the record's own, so that a reload, Back and Forward
+			// find it as it was and the cross takes it back. An entry that has no address leaves the address of the directory where it is
+			const openByPerson = function( key, how ) {
+
+				const here = router();
+				const row = options.find( key );
+
+				expectBack = false;
+
+				if( here !== null && dialog === null && row !== null && addressOf( row ) !== null ) {
+
+					const before = here.position();
+
+					here.go( options.screen, [ addressOf( row ) ] );
+
+					if( here.position() !== before )
+						here.mark( options.screen );
+				}
+
+				if( open( key, how ) === false )
+					return false;
+
+				address();
+
+				return true;
+			};
+
+			// Unsaved input in the open record: the shell asks before it goes, and a Discard takes the dialog away - the screen has changed under it
+			if( registry() !== null && typeof registry().watchForm === 'function' ) {
+
+				registry().watchForm( dirtyName, function() { return dialog === null ? null : form }, function( finished ) {
+					primarySave( function( ok ) {
+
+						finished( ok );
+
+						// The shell asked for the save because the panel is being left: what was saved goes with it
+						if( ok === true && asking === false && dialog !== null && router() !== null && router().current().panel !== options.screen )
+							leave( 'silent' );
+					} );
+				}, function() { return bar === null ? null : bar.el } );
+
+				const entry = registry()._entries[dirtyName];
+				const discard = entry.discard;
+				const changed = entry.isDirty;
+
+				entry.isDirty = function() { return ( touched === true && dialog !== null ) || changed() };
+
+				entry.discard = function() {
+
+					touched = false;
+					discard();
+
+					// A Discard of the shell's own question - the browser's Back, a typed address - leaves the record; a close of its own does that by itself
+					if( dialog !== null && allow === false && asking === false )
+						leave( 'silent' );
+				};
+			}
+
+			return {
+				open : openByPerson,
+				follow : follow,
+				close : request,
+				isOpen : function() { return dialog !== null },
+				key : function() { return current === null ? null : current.key },
+				refresh : function() { if( current !== null ) refreshNav() },
 			};
 		},
 
@@ -8888,6 +10343,7 @@
 		 *														- onReload    called when Reload is pressed: the caller drops its work and loads what the server holds
 		 *														- onCancel    called when nothing is done: Cancel or Escape
 		 *														- opener      what gets the focus back, see choiceDialog()
+		 *														- nested      the question is asked of an open dialog - a record - and stands on it
 		 *														- text        { title, overwrite, reload, reloadMessage, cancel } - reloadMessage is the sentence under the message that says what Reload drops
 		 *
 		 *	@return		{boolean}										false when a question is already open and this one was not asked
@@ -8906,6 +10362,7 @@
 				message	: options.message,
 				note		: word( 'reloadMessage', '/_admin/common/conflict/reload-message' ),
 				opener	: options.opener,
+				nested	: options.nested === true,
 				escape	: 'cancel',
 				choices	: [
 					{ value : 'reload', label : word( 'reload', '/_admin/common/conflict/reload' ), kind : 'secondary' },

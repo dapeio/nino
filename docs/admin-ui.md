@@ -72,6 +72,7 @@ The address of a view is the part after the `#`, and it is written in ONE form f
 - **A tab is named by its uri without the name of the panel in front of it:** `types` of `elements` is `#elements/types`, `builder-frames` of `builder` is `#builder/frames`, the settings of a feature's panel `<panel>-settings` is `#<panel>/settings`. The server renders the name with the pane (`data-address-tab`, `Panels::panesHtml()`), the router reads it from there. The tab itself is still called by its uri everywhere in a panel's script: `Nino.admin.router.href( 'types', [ Nino.admin.router.word( 'new' ) ] )` is `#elements/types/@new`. A tab whose name another screen of its panel has is refused when the registry is built, with a warning.
 - **A part is a word or a key, and the segment says which.** A *word* is a thing the workbench says - `@new`, `@scan`, `@rename`, `@inactive`, `@feature` - written with an at sign and a lowercase word, as it is. A *key* is the name of a thing from the data - a type, an element, an account, a route, a slot, a text key, or an element that is called `@new` - and is always ONE segment, whatever it holds: percent-encoded, a slash in it is `%2F` (`#text/text/template%2Fpage-home`), a space `%20`, an umlaut its bytes, every at sign `%40` (an account is `ada%40example.com`, the element `@new` is `%40new`). So a role, a menu or an element may be called `new` or `@new`: `new` is its key, `%40new` the key `@new`, and `@new` the form that makes one. The router tells them apart where it reads, at the segment as it is written, before it is decoded. A panel never splits a key at its slashes and never joins the segments of one.
 - **Nothing writes an address by hand but `Nino.admin.router`.** A panel asks it: `href( screen, parts )` for the link of a row (a real `a`), `go()` for a move the person made, `set()` to keep the address true to what is on screen, `current()` for `{ panel, parts, known }` - the screen the address names, its parts, and `known`, false where the address names a tab the panel has not (the panel's start is shown and the address is written over) and true everywhere else - also where a broken part ended the parts, since what stood before it was read. A string in `parts` is a key; a word is made with `router.word( 'new' )`, and read with `router.isWord( parts, at, 'new' )` - never by comparing a part with `'@new'`, which a key can be. What the server writes - a notice, the `next` of an application, a link in a text - is written by `\Nino\AdminAddress::of( $panel, $parts, $tab )`, with `AdminAddress::word()` for a word, which writes the same.
+- **A record is a part.** The entry that is open in the dialog of a [record](#the-record) is the one part of the address of its screen - `#images/images/page%2Fhome%2Fhero`, `#submissions/submissions/<id>` -, and nothing else of the directory is: its search, selects, sort and page are held by the screen as long as the panel is, and are not in the address. A person's own move to an entry adds one entry to the history, stepping to the next writes over it.
 - **An address in any other form is no address, and nothing reads it.** The panel's start is shown, never an error and never an empty screen: an unknown panel opens the first panel of the rail, an unknown tab the panel as it starts, a part a panel does not know (a thing that is gone, a word it has not) its list - and the address is written over by the one the screen has. A part that is no part - an empty segment, a control character, a stray `%` - ends the parts there: what stands before it is read, the part and what follows are dropped, the panel and its tab stay. An address of more than 4096 characters is none.
 - **What the person does is the same everywhere.** Reloading shows the state of the address. Back and Forward walk the states of the workbench without loading the page: a person's own move - the rail, a tab, a row opened, a back link - adds an entry; keeping the address true to the screen replaces one. A move that leaves a form with unsaved input asks first, as its back link does (Save, Discard, Cancel), and on Cancel the address stays where the screen is. The title of the document follows the screen, and the focus goes where [Keyboard and focus](#keyboard-and-focus) says.
 
@@ -79,7 +80,7 @@ The address of a view is the part after the `#`, and it is written in ONE form f
 
 | Task | The one way | Block |
 |---|---|---|
-| The directory of a panel - the things it manages, as soon as a row shows more than a name and one detail or has actions of its own (pages, elements, redirects, fonts) | A **table** in `.nino-admin-table-scroll`: a search field over the full width above it that searches in the browser ("Search <things>"), sortable columns, small buttons at the right of each row (open, duplicate, delete in red), page size and paging below, "New <thing>" at the bottom right of the bar. The whole set is loaded and filtered in the browser. | `Nino.adminUi.table()` |
+| The directory of a panel - the things it manages, as soon as a row shows more than a name and one detail or has actions of its own (pages, elements, redirects, fonts) | A **table** in `.nino-admin-table-scroll`: a search field over the full width above it that searches in the browser ("Search <things>"), sortable columns, small buttons at the right of each row (open, duplicate, delete in red), page size and paging below, "New <thing>" at the bottom right of the bar. The whole set is loaded and filtered in the browser. Every panel draws it as the [standard directory](#directory-and-record) - the category, the search, the filters, the table with the box to choose rows by and the paging, in one call - and opens what is a form in the dialog of a record. | `Nino.adminUi.directory()`, `Nino.adminUi.table()` |
 | Groups and short directories that are only opened (text groups, image groups, navigations, roles) | A **list**: a row of 53 px (the dense row of 46 px where it has no second line), the name in the strong weight, a quiet second line, a badge after the name, at the right at most three small actions and a "›" where the row opens. The whole row is the target, a real `a` (with an address) or `button`. A group has a title over its list. No chain of brackets in the first line: "Logo (/logo, 500x100, no image)" becomes a name and a second line. | `Nino.adminUi.list( rows, options )` |
 | Column heads of a table | Words, never the help text of the field; the column of the actions has no head. | `table()` |
 | Entries whose look is the content (a theme, a block) | **Cards** with a preview picture, all of the same height; a head line (name and badges) without a wrap - the name has half of the line at least, the badges give way first -, no description where the picture shows it, at most three small buttons with short words in ONE line at the bottom that share the width of the card. Cards are used for nothing else. | `cards( items )`, `scaleFrame()` for the picture |
@@ -95,6 +96,215 @@ The address of a view is the part after the `#`, and it is written in ONE form f
 | Parts of a view | The second level of tabs, under the head whose own tabs are the first: a tablist with the arrow keys that wraps into a second row at 390 px and never scrolls sideways. | `tabs( items )` |
 | A list that failed to load | The error stands in place of the list. | `showError()` |
 | Order | Where the order of a list changes without a form (routes), it is saved at once and said as a toast; in a form it belongs to the draft. | - |
+
+## Directory and record
+
+A panel that manages things shows them in a **directory** and opens one of them in a **record**. Both are blocks of the kernel; a panel draws neither by hand, whether it is the kernel's, the catalogue's or a project's.
+
+### The five rules
+
+1. **The directory of a panel is a table** - the category to narrow to (where there are categories), the search, the selects that narrow (where there are), the table with the box to choose rows by, its cells and its buttons, and the paging - as soon as an entry shows more than a name and one detail. It shows the state of an entry that one would otherwise see only after opening it (empty, missing, too long, inactive). Where the panel is a list of groups that are only opened, it stays a [list](#lists-and-tables).
+2. **An entry that is a form is opened in the record**: the large dialog, the name of the entry as its title, the fields of the guide, the bar at its foot (delete at the left, Save at the right, "Save and continue" where there is a row), the step to the previous and the next entry in its head.
+3. **An entry that is a structure** - a tree, a list with rows of its own, an editor that fills the area, a draft with a preview - **stays a view of its own** over the whole area, with its way back and its bar ([Anatomy](#anatomy-of-a-view)).
+4. **A record has an address**, `#panel/tab/<entry>` ([Addresses](#addresses)): a reload opens the directory with the record; Back closes it. Unsaved input is asked about before it is lost.
+5. **After the record is closed the directory is as it was** - search, selects, sort, page, the rows that were chosen, the place it was scrolled to -, the row that was changed is drawn anew, and the focus is on it.
+
+### The directory
+
+`Nino.adminUi.directory( options )` draws everything in one order, whatever order the options are given in: **category, search, filters**, then the table and its paging. Under 40 rem only the search is in view; the category and the filters stand behind one button, "Filters", that counts the ones that narrow the list (a select that does not hold its first option, "all"); a select that narrows keeps the bar open. The directory owns no word: `labels` says them, and the shared fills (the range "1-25 of 60", the name of the button) are the defaults.
+
+| Option | What it is |
+|---|---|
+| `mount`, `columns`, `rowKey`, `labels` | As of `table()`; `labels : { search, empty, noMatch, filter, range }` |
+| `category` | `{ id, label, value, options, match( row, value ) }` - the first select, left of the search; its first option is "all". Left out where there are no categories - never a select with one option |
+| `filters` | `[ { id, label, value, options, match( row, value ) } ]` - the selects after the search, in the order given; the first option of each is "all" |
+| `select` | `{ label, rowLabel( row ), actions : [ { key, label, danger, run( keys ) } ] }` - the box in front of every row, the box of the head for the rows of the page, the bar over the table with the actions for what is chosen (what takes away in red). Left out, no box |
+| `actions( row )` | The small buttons at the end of a row: at most three in view, the first is what the keyboard opens the row by, the one that takes away is last |
+| `onOpen( row )` | A click, Enter or Space on the row. The row is the target; where it holds buttons it is no stop of the Tab key, and its first button is |
+| `state`, `onState( state )` | What the person chose (`{ query, sort, page, pageSize, category, filters }`), told with every choice and taken back by a directory that is drawn again |
+| `searchText( row )` | More text of a row that the search reads beside the cells - a key, the label a value was collected under |
+
+The cells of a column are text unless the column says what it is (`cell`): `clamp` one line cut by an ellipsis with its text as tooltip (`max`: how wide it may get), `limit` a number against a limit - "812 / 800", over it marked by a badge with the word `over` -, `thumb` a picture of one size with the sign of "none" where there is none, `locales` the state of a value in each language as one badge each - "DE ✓", "EN –": a sign and not the colour says it, and it wraps where there are many -, `date` the moment as the workbench writes it, `badge` a word with a state, `text` the value as text, as a column with no kind has it; a kind that is none is an error of the caller. `fill` on a `clamp` column makes it take the room the other columns leave, so that its text ends in an ellipsis before the buttons of the row. A number column and its head stand at the right; a head of a column that cannot be sorted - a picture, the states of the languages, no label - is a word and no button. **A table that shows pictures pages by 25, every other by 50**; the range says "n-m of N".
+
+**What is chosen is what is in view.** In the directory the box of the head chooses the rows of the page that is shown; the choice stays while the rows are paged - it is of the same rows - and is given up when the rows change: a category, a filter or a search. A bulk action therefore never reaches an entry that is hidden, and its question says how many it takes. A row that is deleted or no longer there leaves the choice, and what is said to a screen reader follows. The rule is the directory's (`table( { select : { clearOnChange : true } } )`, which `directory()` sets): a panel that still draws `table()` keeps the choice through a search, as it always has - an export that is put together over several searches stays - and a panel that moves to the directory gets the rule with it.
+
+What the handle gives: `setRows( rows, { keep } )` the rows (all of them: the directory filters, sorts and pages in the browser; a panel whose rows would be many thousands reads them by the page - a `load` of a later patch, not built where nothing needs it), `update( rows, key )` the rows where the directory stands, the row of the key drawn anew and marked fresh, `rows()` the rows that are shown now - the search and the selects applied, the sort, **all pages** - which is the order a record walks, `state()`, `reveal( key )` brings the page of a row to the screen, `focusRow( key )` the focus to a row, `selected()`, `clearSelection()`, `notice( text )` one notice over the table (an entry that is not there), `loading( text )` the sentence "<Things> are loading ..." in place of the table, `fail( status, response, fallbackKey )` a load that failed in place of it.
+
+### The record
+
+`Nino.adminUi.record( options )` opens one entry of a directory in the large dialog: up to 72 rem wide, at most 90 % of the height, its content rolling inside; on a phone the whole screen, its bar at the foot. In its head stand the **name** of the entry, under it the **identifier** (`subtitle`), the **step** to the previous and the next entry with its place - "3 of 24", in the rows the directory shows now, by its search, its selects and its sort, **across its pages** - and the **cross** that closes it. **There is no Cancel in its bar**: the cross and Esc close the record (the one dialog that has a cross, because it is a view of its own). Alt+Shift+Left and Alt+Shift+Right are the steps. An entry that the directory hides - by a select, say - opens all the same and has no place and no steps.
+
+| Option | What it is |
+|---|---|
+| `screen`, `dirty`, `directory` | The router's name of the panel's screen, the name of its entry of unsaved input (the screen by default), the directory the entries are in |
+| `keyOf( row )`, `find( key )` | The string that names an entry in the address - one part, whatever it holds - and the row of a key, whether the directory shows it or not (`null` where it is none) |
+| `title( row )`, `subtitle( row )`, `body( row, ctx )` | The name, the identifier, and the content: the fields of a form, or lines to read - `readLine()`, `messageBox()`, `imageFrame()`. All of it is set as text |
+| `readOnly` | The entry is read and not edited: no state in the bar and **no Close** - the cross and Esc close the record, whatever it is. The bar has the destructive action at the left and at the right what can be done with the entry (its first action of kind `primary` is the main button), or nothing |
+| `save( row, ctx, done )`, `saveNext`, `reload( key, done )` | The save - `done( true, { row } )` after the panel has drawn the row anew with `directory.update()`, `done( false, { error } )` where it failed, `done( false, { conflict : true, error } )` where another wrote first: the question of the guide stands on the record, and `ctx.overwrite` is true for the save that answers Overwrite. `saveNext` adds "Save and continue" |
+| `danger : { label, hidden( row ), run( row, opener, done ) }` | The destructive action at the left of the bar. `run` asks the question of its level itself - `confirm( 'destructive', { ..., nested : true } )` - and acts; `done( true )` where it went, `done( false, { error } )` where it failed, `done( null )` where the answer was no |
+| `actions`, `addressOf( row )` | Further buttons `[ { label, kind, run( row, ctx ), hidden( row ) } ]` - `hidden( row )` is true for an entry that the action does nothing for: **a button with no effect is not drawn**. `addressOf( row )` is what names the entry in the address, `null` for an entry that cannot be named by one: it opens all the same, the address stays the directory's and no entry is added to the history |
+| `actions` | Further buttons between the destructive one and the main one - `[ { label, run( row, ctx ) } ]` |
+| `missing( key )` | The address names an entry that is not there: the panel says so over the directory, the address is the directory's |
+
+**The address and the history.** What a person opens adds one entry to the history of the browser, however far they step through the entries after it - stepping writes over the address - and the cross takes that one entry off the history again (`history.go( -1 )`), so Back and the cross are the same move. The entry is marked as the record's own (`router.mark()`), and the mark stays through a reload, Back and Forward, so that the cross takes it off the history every time and no two entries of the directory stand in a row; a record that an address opened by typing or a link has no mark: closing writes the address of the directory over it. The step back that the cross asks of the history is answered by the record - the directory is not read again and not drawn again, and the row has the focus. The panel calls `record.follow()` from its `showCurrent()` and once its rows have come in; the record reads the address itself - one of this panel's names an entry or none, another panel's is not the record's to answer - so that a panel has nothing to tell it apart by. **A record stands over no other panel**: where the address leads away - typed, a link, Back, Forward - it closes (a record that holds unsaved input is asked about, once, by the shell). **Back closes the top layer first**: while a question stands on the record (the deletion, a conflict) Back closes that question, the record stays and the step through the history is taken back - there is never a question without its record. An entry that is taken away and is named by the address again (Forward) is "not found", and the entry of the history loses its mark. Only the entry is in the address: what the directory shows (search, selects, sort, page) stays where it is, because the record stands over a directory that is not drawn again, and an address that carried it would be one a person cannot tell from another.
+
+**Unsaved input** is asked about - Save, Discard, Cancel - when the record is closed, when it is stepped, on Back and on an address that is typed; Cancel keeps the record, with what was typed and with the address it had (the step through the history is taken back); the question stands on the record. **The focus** opens in the first field - in the name of an entry that is only read - and goes back to its row when the record is closed; after a deletion it goes to the next row, else the previous, else the search. A step by the keyboard (Alt+Shift+Left and Right, named in the tooltip of the buttons) keeps the focus at the same place of the next entry - the same field - where there is one, else at its head.
+
+### Recipe: a panel with a directory and a record
+
+A panel "Things": its rows come from the server (`things/list`), they are drawn by the directory, an entry opens in the record (`#things/things/<key>`), is saved, taken away and stepped through. The block runs as it stands in a page of the workbench whose pane has a mount `things-list` and whose server answers `things/list`, `things/save` and `things/delete` - `tests/nino-ui-recipe-js-smoke.js` extracts this very block from this file and runs it as a panel.
+
+```js
+( function() {
+
+	// The words of a panel are fills of the workbench's own text system, in both languages; the blocks own none
+	const t = function( word ) { return Nino.content.getText( '/_admin/things/label/'+ word ) };
+	const call = function( action, payload, done ) { Nino.adminUi.api.call( 'things/'+ action, payload, done ) };
+	const fail = function( status, response ) { return Nino.adminUi.api.errorText( status, response, '/_admin/things/error/failed' ) };
+
+	let rows = [];
+	let directory = null;
+	let record = null;
+
+	// The content of the record: the fields of a form (a thing that is only read is drawn with readLine(), messageBox() and imageFrame()). The record keeps
+	// what the body puts in ctx for the save
+	const body = function( row, ctx ) {
+
+		const fields = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+		fields.appendChild( Nino.adminUi.textField( { label : t('name'), value : row.name, maxLength : 80, counter : true, required : true } ) );
+
+		return fields;
+	};
+
+	// The save: send the form, then bring the row and the directory to what is saved, and say so
+	const save = function( row, ctx, done ) {
+
+		const name = ctx.form.querySelector('input').value;
+
+		call( 'save', { key : row.key, name : name }, function( status, response ) {
+
+			if( status !== 200 )
+				return done( false, { error : fail( status, response ) } );
+
+			const saved = Object.assign( {}, row, { name : name } );
+
+			rows = rows.map( function( one ) { return one.key === row.key ? saved : one } );
+			directory.update( rows, row.key );
+			done( true, { row : saved } );
+		} );
+	};
+
+	// What takes an entry away asks the question of its level - on the record that is open: nested - and acts. By the time it says done( true ) the row is out of the rows and the directory
+	const remove = function( row, opener, done ) {
+
+		Nino.adminUi.confirm( 'destructive', {
+			title : t('remove'),
+			message : Nino.adminUi.format( t('remove-text'), row.name ),
+			yes : t('remove'),
+			no : Nino.adminUi.text('/_admin/common/label/cancel'),
+			nested : true,
+			opener : opener,
+			onChoose : function( ok ) {
+
+				if( ok === false )
+					return done( null );
+
+				call( 'delete', { key : row.key }, function( status, response ) {
+
+					if( status !== 200 )
+						return done( false, { error : fail( status, response ) } );
+
+					rows = rows.filter( function( one ) { return one !== row } );
+					directory.setRows( rows, { keep : true } );
+					done( true );
+				} );
+			},
+		} );
+	};
+
+	// The directory and the record over it, drawn once there are rows
+	const draw = function( mount ) {
+
+		directory = Nino.adminUi.directory( {
+			mount : mount,
+			rowKey : 'key',
+			columns : [ { key : 'name', label : t('name'), type : 'string', cell : 'clamp', fill : true }, { key : 'size', label : t('size'), type : 'integer' } ],
+			labels : { search : t('search'), empty : t('empty'), noMatch : t('nomatch') },
+			actions : function( row ) { return [ Nino.adminUi.iconButton( 'pencil', t('edit'), function( event ) { record.open( row.key, { opener : event.currentTarget } ) }, { small : true } ) ] },
+			onOpen : function( row ) { record.open( row.key, {} ) },
+		} );
+
+		record = Nino.adminUi.record( {
+			screen : 'things',
+			directory : directory,
+			keyOf : function( row ) { return row.key },
+			find : function( key ) { return rows.find( function( row ) { return row.key === key } ) ?? null },
+			title : function( row ) { return row.name },
+			subtitle : function( row ) { return row.key },
+			saveNext : true,
+			body : body,
+			save : save,
+			danger : { label : t('remove'), run : remove },
+			missing : function() { directory.notice( t('missing') ) },
+		} );
+	};
+
+	// The rows come from the server, all of them: the directory filters, sorts and pages in the browser. Once they are in, an address that names an entry opens it
+	const load = function() {
+
+		const mount = document.getElementById('things-list');
+
+		call( 'list', {}, function( status, response ) {
+
+			if( status !== 200 )
+				return directory === null ? Nino.adminUi.showError( mount, status, response, '/_admin/things/error/failed' ) : directory.fail( status, response, '/_admin/things/error/failed' );
+
+			rows = response.rows;
+
+			if( directory === null )
+				draw( mount );
+
+			directory.setRows( rows, { keep : true } );
+			record.follow();
+		} );
+	};
+
+	// The shell shows the panel - first, on entering it again, and on every step of the history that it answers. The record reads the address itself and follows one of this
+	// panel's; it has nothing to say to another, and the rows are read again only where it had nothing to say
+	Nino.admin.things = {
+		showCurrent : function() {
+
+			if( directory === null )
+				return load();
+
+			if( record.follow() === false && record.isOpen() === false )
+				load();
+		},
+	};
+
+} )();
+```
+
+### What stands beside the script
+
+The block above is the script of the panel. The rest is the panel of any panel ([the panel recipe](recipes/admin-panel.md#backend-skeleton) has all of it); for this one:
+
+- **The words** are fills of the panel's text folder, `text()` of its class, one file for each language (`text/de_DE.php`, `text/en_US.php`) - without them the buttons have no name and the recipe stops at the first one with an error:
+
+```php
+return [
+	'[[/_admin/things/label/name]]'      => 'Name',     '[[/_admin/things/label/size]]'   => 'Size',
+	'[[/_admin/things/label/search]]'    => 'Search things', '[[/_admin/things/label/empty]]' => 'No things yet.', '[[/_admin/things/label/nomatch]]' => 'No thing found.',
+	'[[/_admin/things/label/edit]]'      => 'Edit thing',    '[[/_admin/things/label/remove]]' => 'Delete thing',
+	'[[/_admin/things/label/remove-text]]' => 'Delete the thing "%s"?', '[[/_admin/things/label/missing]]' => 'This thing does not exist (any more).',
+	'[[/_admin/things/error/failed]]'    => 'The request failed.',
+];
+```
+
+- **The server side** is the class `Admin` of the panel: `actions()` answers `things/list`, `things/save` and `things/delete`, `perm()` the right, `panes()` a pane with the mount `things-list`, `assets()` the script and `text()` the folder. **Every action starts with `guardPerm()`** - the right and the token are checked there, for each call: a deletion of several entries is that many calls of `things/delete`. The list answers `\Nino\Http::ok( $request, [ 'rows' => [ ... ] ] )` with all the rows, each with the `key` that names it in the address; `save` and `delete` answer `ok` or `fail( $request, 400|404, ... )`, whose sentence the panel says.
+
+What the block does not do is what the blocks do: it writes no address, asks no question about unsaved input, steps no entry and sets no focus. **The `screen` is the uri of the panel's own screen** as the router knows it (`things` for a panel without tabs, the uri of the tab - `things-list` - otherwise): with any other name the record writes no address. Where the focus goes is the record's: to the row when it is closed, to the next row when the entry was taken away, to the search when none is left; the directory is not drawn again for that, so the rows are not read again either - the step back through the history that the cross asks for is answered by the record and reads nothing.
 
 ## Forms
 
@@ -173,6 +383,7 @@ Nino.adminUi.say( t('/_admin/common/msg/saved') );
 | One tile chosen in each of several groups, then taken over (the header and the footer of a page, a look for the day and one for the night) | `tileChoice( { label, help, note, groups : [ { key, label, help, note, value, items : [ { value, label, hint, image, draw } ] } ], draw, onChange } )` - a field of the dialog (`type : 'tiles'` in `formDialog()`, the value an object group => value), the content of `choiceDialog()` (`el`) or free on a page; see below |
 | The properties of ONE part of a work surface (a component, a logo, the menu of a frame) while the surface stays in view | `propertiesDialog()`: the title is the kind and name of the part, inside an `accordion()` with one section open (the content); the values go into the draft and the preview at once, the sheet has only "Close" - saving is done with the bar of the surface |
 | Text to read (a manual, the available textfills, markup to look at) | `manualDialog()` |
+| One entry of a directory that is a form - the fields of a thing, a message to read - with an address of its own, steps to the entries around it and a bar | `record()`, the large dialog, see [Directory and record](#directory-and-record) |
 | Everything else - every form of a record of its own with more than four fields, everything with an address of its own | a view of its own, no dialog |
 | A section that opens inside a form | only `accordion()`; never a "Delete" or "Duplicate" form inside a form |
 
@@ -184,8 +395,8 @@ Nino.adminUi.say( t('/_admin/common/msg/saved') );
 - **Buttons:** one row at the right. In every dialog the order is: further answers, Cancel, and the main answer at the far right. The answer that goes on is worded like the title ("Delete element"), never "Yes" or "OK". Exactly one button is `primary` or `danger`.
 - **Danger:** `danger` and the focus never on the destroying button: it opens on Cancel. Otherwise the focus opens on the first field or the first button.
 - **Keyboard:** a modal dialog keeps the Tab key in itself: the rest of the page is inert while it is open, Tab at the last control goes to the first and Shift+Tab at the first to the last.
-- **Closing:** Esc is the answer that does nothing. No "x", no closing by a click beside the dialog. The focus returns to what opened it.
-- **Sizes:** `narrow` 26 rem (a question), `form` 40 rem, `wide` 60 rem, `sheet` 28 rem at the right over the whole height. Title and answers stand, the content scrolls; at 390 px the dialog fills the width. The sheet of `propertiesDialog()` is not modal from 38 rem: no backdrop, the surface moves in and stays in use.
+- **Closing:** Esc is the answer that does nothing. No "x", no closing by a click beside the dialog. The focus returns to what opened it. The one exception is the dialog of a [record](#the-record), which is a view of its own: it closes by the cross in its head and by Esc, and has no Cancel in its bar.
+- **Sizes:** `narrow` 26 rem (a question), `form` 40 rem, `wide` 60 rem, `large` 72 rem (a record; the whole screen on a phone), `sheet` 28 rem at the right over the whole height. Title and answers stand, the content scrolls; at 390 px the dialog fills the width. The sheet of `propertiesDialog()` is not modal from 38 rem: no backdrop, the surface moves in and stays in use.
 - **Checking in a dialog** is the checking of a form (`fieldError()`); the dialog stays open until the server has said yes.
 
 **When a question is asked** (`level`; the shell's policy: development asks only `destructive`, production asks everything):
@@ -273,6 +484,7 @@ One word per thing. The fills are in `/_admin/common/label/*`; a panel takes the
 | Put a row into a draft | **<Ding> hinzufügen** | Add <thing> | New |
 | Put a block at a place (page editor) | **<Ding> einfügen** | Insert <thing> | Add |
 | Keep | **Speichern** | Save | Apply, OK, Done |
+| Keep and show the next entry of the rows | **Speichern und weiter** | Save and continue | Next, Save and next |
 | Bring what is saved to the website | **Auf Website anwenden** | Apply to website | Activate, Publish |
 | A copy | **Duplizieren** | Duplicate | Copy (that is the clipboard) |
 | Leave a dialog, do nothing | **Abbrechen** | Cancel | Close, No |
@@ -316,7 +528,7 @@ The workbench is fully usable on a phone, with one exception: a **work surface**
 - After a change of view the focus is on its heading (`tabindex="-1"`, without a visible ring for the mouse); after a dialog on what opened it; after the deletion of a row on the next one, else the previous, else the empty state; after a refused save on the first wrong field.
 - A composed block has one tab stop and the arrow keys (`steps()`, `tree()`, `accordion()`, tabs). The buttons that only show under the pointer show with the focus as well: on the row that has the stop while the focus is in the tree, so Tab goes to its buttons from any row.
 - Enter in a one-line field is the main button of the form or dialog. Esc closes dialogs and nothing else.
-- Shortcuts: Ctrl/Cmd+S saves (the shell). Further shortcuts are assigned by the shell alone.
+- Shortcuts: Ctrl/Cmd+S saves (the shell). Alt+Shift+Left and Alt+Shift+Right step through the entries of a record. Further shortcuts are assigned by the shell alone.
 - Changes of state are announced: the line of the bar is `role="status"`, an error is `role="alert"`, loading is `aria-busy`.
 
 ## Tokens
@@ -376,7 +588,7 @@ For every review of a view. A line marked **[T]** can be held as a structural te
 - [ ] At most one bar; exactly one main button, at the far right; "Delete <thing>" at the left. [T]
 
 **Lists**
-- [ ] A list, table or cards from the block; the row opens; actions small, the dangerous one last.
+- [ ] A list, table or cards from the block; the row opens; actions small, the dangerous one last. The directory of a panel is `directory()`; what is a form opens in `record()`, with an address. [T]
 - [ ] The empty state as a box; a load error in place of the list. [T]
 
 **Forms**

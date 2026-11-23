@@ -89,6 +89,15 @@ return [
 	'[[/_admin/common/table/selected]]'	=> '%n gewählt',
 	'[[/_admin/common/table/clear]]'	=> 'Auswahl aufheben',
 	'[[/_admin/common/table/more]]'	=> 'Weitere Aktionen',
+	'[[/_admin/common/table/range]]'	=> '%s–%s von %s',
+	'[[/_admin/common/table/filters]]'	=> 'Filter',
+	'[[/_admin/common/record/position]]'	=> '%s von %s',
+	'[[/_admin/common/record/prev]]'	=> 'Vorheriger Eintrag',
+	'[[/_admin/common/record/next]]'	=> 'Nächster Eintrag',
+	'[[/_admin/common/record/prev-key]]'	=> 'Alt+Umschalt+Pfeil links',
+	'[[/_admin/common/record/next-key]]'	=> 'Alt+Umschalt+Pfeil rechts',
+	'[[/_admin/common/record/missing]]'	=> 'Diesen Eintrag gibt es nicht (mehr).',
+	'[[/_admin/common/label/save-next]]'	=> 'Speichern und weiter',
 	// Die Wörter der Bausteine, die selbst welche zeichnen: Umschalter und
 	// Neuladen der geteilten Ansicht, Fehler und Urteil des Farbfelds, die
 	// Vorgabe der Stufenwahl (siehe Nino.adminUi.split(), color(), steps() und tree())

@@ -88,6 +88,15 @@ return [
 	'[[/_admin/common/table/selected]]'	=> '%n selected',
 	'[[/_admin/common/table/clear]]'	=> 'Clear selection',
 	'[[/_admin/common/table/more]]'	=> 'More actions',
+	'[[/_admin/common/table/range]]'	=> '%s–%s of %s',
+	'[[/_admin/common/table/filters]]'	=> 'Filters',
+	'[[/_admin/common/record/position]]'	=> '%s of %s',
+	'[[/_admin/common/record/prev]]'	=> 'Previous entry',
+	'[[/_admin/common/record/next]]'	=> 'Next entry',
+	'[[/_admin/common/record/prev-key]]'	=> 'Alt+Shift+Left',
+	'[[/_admin/common/record/next-key]]'	=> 'Alt+Shift+Right',
+	'[[/_admin/common/record/missing]]'	=> 'This entry does not exist (any more).',
+	'[[/_admin/common/label/save-next]]'	=> 'Save and continue',
 	// The words of the building blocks that draw their own: the split view's switch
 	// and reload button, the colour field's error and verdict, the strip's default
 	// (see Nino.adminUi.split(), color(), steps() and tree())
