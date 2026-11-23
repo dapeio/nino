@@ -699,6 +699,8 @@ A name is a slug of at most 40 characters - lower case letters, digits and hyphe
 | `class` | Whether the value is written as a class. `true` for a choice and a bool, `false` for the others, and only those two may say `true`. A `false` value is the token `[[attribute]]` of the template instead |
 | `label`, `hint`, `input` | For a tool: text or a locale map, and how it draws the attribute - a choice `select`, `segment` or `icons` (for an alignment), a bool `switch` or `checkbox` |
 
+**The name `format` is the text format.** An attribute named `format` is not a free name: on a component whose `source` is a text, it is the attribute that says for each call which format the text may hold - the drawing reads it in place of the `format` of the schema - and it must be a `choice` whose options are listed and are among `plain`, `inline`, `lines` and `blocks`, with the `format` of the schema as its default where the schema names one. An attribute of that name that is anything else - a `string` or an `int`, a choice with other options or options that are a method, or on a component whose source is no text - is refused by `validate()` with the reason, and the component is not registered; it is neither overwritten nor read as something else. A component that wants a format of its own - how a number or a date is written - takes another name, as `as` is the name of the attribute for a formatter of `\Nino\Format`.
+
 How a call's value becomes what the renderer is handed - always a string:
 
 - **choice**: the value if it is among the options, else the default. As a class where `class` is true and the value is not the default and not empty: `callout--tone-warn`. The options of a class are words (lower case letters, digits and hyphens) or empty.

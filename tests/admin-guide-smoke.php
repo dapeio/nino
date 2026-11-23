@@ -1061,6 +1061,7 @@ $drawn = array_map( static fn( string $line ): string => trim( explode( ' :', tr
 $recipe = $read( 'docs/recipes/admin-panel.md' );
 $unlisted = array_values( array_filter( $drawn, static fn( string $name ): bool => $name === '' || str_contains( $recipe, '`'. $name. '`' ) === false ) );
 
+check( 'the icons a component may name are the table of the script, name for name', $drawn !== [] && array_diff( $drawn, \Nino\Components::ICONS ) === [] && array_diff( \Nino\Components::ICONS, $drawn ) === [] );
 check( 'every icon of the table of the script is listed in the panel recipe'. ( $unlisted === [] ? '' : ' - '. implode( ', ', $unlisted ) ), count( $drawn ) > 60 && $unlisted === [] );
 
 $rule = static function( string $selector ) use ( $style ): string {

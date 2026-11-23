@@ -238,6 +238,11 @@ What the register does for the renderer, and what it leaves to it:
   says what a tool shows for a variant (a text or a locale => text map), a
   callback's answer may carry the same, and `\Nino\Components::variants( $appData,
   $name )` answers `[ 'standard' => ..., 'variants' => word => label or null ]`.
+- An attribute named `format` is the text format of the call, not a free name: on a component whose source is a
+  text it is a `choice` among `plain`, `inline`, `lines` and `blocks`, and the drawing reads it in place of the
+  `format` of the schema. Anything else under that name - another type, other options, or a component whose
+  source is no text - is refused with the reason and the component is not registered. A component that
+  formats a number or a date names its attribute otherwise (`as` is the name for a formatter).
 - A `ground` is the one attribute the kernel names itself: a choice among `none`,
   `base`, `alt`, `tint`, `primary` and `dark`, written as `<name>--ground-<word>`,
   which `Nino.css` answers for every component alike.

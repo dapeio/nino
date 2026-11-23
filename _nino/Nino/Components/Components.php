@@ -248,18 +248,17 @@ namespace Nino {
 
 		// The icons a component may name: the table of Nino.adminUi.icon() in _admin/assets/Nino.admin.js, name for name
 		public const array ICONS = [
-			'align-center', 'align-center-horizontal', 'align-center-vertical', 'align-end-horizontal',
-			'align-end-vertical', 'align-horizontal-space-between', 'align-justify', 'align-left', 'align-right',
-			'align-start-horizontal', 'align-start-vertical', 'arrow-down', 'arrow-left', 'arrow-left-right',
-			'arrow-right', 'arrow-up', 'brackets', 'check', 'chevron-down', 'chevron-left', 'chevron-right',
-			'chevron-up', 'chevrons-left', 'chevrons-right', 'circle-help', 'clock', 'code', 'columns-3', 'contact',
-			'cookie', 'copy', 'database', 'ellipsis', 'external-link', 'eye', 'eye-off', 'gauge', 'hand', 'heading',
-			'image', 'images', 'list', 'lock', 'mail', 'menu', 'monitor', 'mouse-pointer-click', 'move-horizontal',
-			'newspaper', 'panel-bottom', 'panel-top', 'panels-top-left', 'pencil', 'play', 'plus',
-			'rectangle-horizontal', 'redo-2', 'refresh-cw', 'repeat', 'rows-2', 'search', 'settings-2', 'share-2',
-			'sliders-horizontal', 'smartphone', 'square', 'square-split-horizontal', 'stretch-horizontal',
-			'stretch-vertical', 'sun-moon', 'table', 'tablet', 'text', 'text-cursor-input', 'timer', 'trash-2',
-			'triangle-alert', 'undo-2', 'x',
+			'align-center', 'align-center-horizontal', 'align-center-vertical', 'align-end-horizontal', 'align-end-vertical',
+			'align-horizontal-space-between', 'align-justify', 'align-left', 'align-right', 'align-start-horizontal',
+			'align-start-vertical', 'arrow-down', 'arrow-left', 'arrow-left-right', 'arrow-right', 'arrow-up', 'brackets',
+			'calendar', 'calendar-plus', 'check', 'chevron-down', 'chevron-left', 'chevron-right', 'chevron-up',
+			'chevrons-left', 'chevrons-right', 'circle-help', 'clock', 'code', 'columns-3', 'contact', 'cookie', 'copy',
+			'database', 'ellipsis', 'external-link', 'eye', 'eye-off', 'gauge', 'hand', 'heading', 'image', 'images', 'list',
+			'lock', 'mail', 'menu', 'monitor', 'mouse-pointer-click', 'move-horizontal', 'newspaper', 'panel-bottom',
+			'panel-top', 'panels-top-left', 'pencil', 'play', 'plus', 'rectangle-horizontal', 'redo-2', 'refresh-cw',
+			'repeat', 'rows-2', 'rss', 'search', 'settings-2', 'share-2', 'sliders-horizontal', 'smartphone', 'square',
+			'square-split-horizontal', 'stretch-horizontal', 'stretch-vertical', 'sun-moon', 'table', 'tablet', 'text',
+			'text-cursor-input', 'timer', 'trash-2', 'triangle-alert', 'undo-2', 'x',
 		];
 
 		// The longest label of a variant, in bytes: of the text, or of each text of a locale map
