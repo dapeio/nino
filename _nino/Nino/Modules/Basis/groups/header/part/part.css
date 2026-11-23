@@ -21,13 +21,13 @@
 .header-wrap--sticky { position: sticky; top: 0; z-index: 100; }
 /*	The preview of the workbench marks the page it shows (Nino.adminUi.previewFrame()): a header that stays would take the room of the page that is being worked on, so there it scrolls away with the page	*/
 [data-nino-preview="loose"] .header-wrap--sticky { position: static; }
-/*	An open menu that is folded - always, under 768 px, or with no ::details-content - is an overlay over the whole window: the header is fixed to it, the page is not pushed, and a taller list scrolls in it	*/
+/*	An open menu that is folded - always, under 768 px, or with no ::details-content - is an overlay over the whole window: the header is fixed to it, the page is not pushed, and a taller list scrolls in it. A menu of another component says it is one with data-header-menu	*/
 .header-wrap:has( .header-nav--collapse-always .header-nav-details[open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; justify-content: start; }
 @media (max-width: 767.98px) {
-	.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; justify-content: start; }
+	.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open], [data-header-menu][open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; justify-content: start; }
 }
 @supports not selector( ::details-content ) {
-	.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; justify-content: start; }
+	.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open], [data-header-menu][open] ) { position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; justify-content: start; }
 }
 .header-wrap-inner {
 	display: flex; flex-wrap: wrap; align-items: center; gap: var(--header-nav-gap);

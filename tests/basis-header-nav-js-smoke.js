@@ -65,8 +65,11 @@ function styleOf( held ) {
 
 /**
  *	A header with its menu: header.header-wrap > div > nav > details > summary and a list of links
+ *
+ *	@param		{boolean}	overlay			What the stylesheet makes of the header
+ *	@param		{string}	[kind]			'basis' the menu of the header; 'marked' the menu of another component, whose details says data-header-menu; 'unmarked' one that does not say it
  */
-function header( overlay ) {
+function header( overlay, kind ) {
 
 	const wrap = element( 'header' );
 	const inner = element( 'div' );
@@ -79,7 +82,12 @@ function header( overlay ) {
 	wrap.overlay = overlay;
 	// Drawn, as a browser says it: not in a node that is hidden or has no box
 	wrap.checkVisibility = function() { for( let node = wrap; node !== null; node = node.parentNode ) if( node.hidden === true ) return false; return true };
-	details.className = 'header-nav-details';
+	details.className = kind === undefined || kind === 'basis' ? 'header-nav-details' : 'menu-details';
+	nav.className = kind === undefined || kind === 'basis' ? 'header-nav' : 'menu';
+
+	if( kind === 'marked' )
+		details.setAttribute( 'data-header-menu', '' );
+
 	Object.defineProperty( details, 'open', {
 		get : function() { return details.hasAttribute( 'open' ) },
 		set : function( value ) { value === true ? details.setAttribute( 'open', '' ) : details.removeAttribute( 'open' ) },
@@ -118,11 +126,11 @@ function header( overlay ) {
 /**
  *	A page: body > [ aside, div#app > [ nav-of-the-site, main > article, header ], footer ], the script loaded over it
  *
- *	@param		{Object}	[options]		{ headers } how many headers, { width } window and root widths
+ *	@param		{Object}	[options]		{ headers } how many headers, { kind } the menu they have (see header()), { width } window and root widths
  */
 function page( options ) {
 
-	options = Object.assign( { headers : 1, innerWidth : 1000, clientWidth : 985, open : false }, options || {} );
+	options = Object.assign( { headers : 1, innerWidth : 1000, clientWidth : 985, open : false, kind : 'basis' }, options || {} );
 
 	const body = element( 'body' );
 	const app = element( 'div' );
@@ -140,7 +148,7 @@ function page( options ) {
 	main.appendChild( element( 'article' ) );
 
 	for( let i = 0; i < options.headers; i++ ) {
-		headers.push( header( true ) );
+		headers.push( header( true, options.kind ) );
 		app.appendChild( headers[i].wrap );
 	}
 
@@ -461,8 +469,8 @@ q = page();
 h = q.headers[0];
 check( 'nothing is watched while nothing is held', q.watching().length === 0 );
 q.turn( h, true );
-check( 'while the page is held the document is watched: the tree, and the attributes class, open, hidden, inert and style', q.watching().length === 1 && q.watching()[0].options.subtree === true && q.watching()[0].options.childList === true
-	&& q.watching()[0].options.attributes === true && [ 'class', 'open', 'hidden', 'inert', 'style' ].every( function( name ) { return q.watching()[0].options.attributeFilter.indexOf( name ) !== -1 } ) );
+check( 'while the page is held the document is watched: the tree, and the attributes class, open, hidden, inert, style and data-header-menu', q.watching().length === 1 && q.watching()[0].options.subtree === true && q.watching()[0].options.childList === true
+	&& q.watching()[0].options.attributes === true && [ 'class', 'open', 'hidden', 'inert', 'style', 'data-header-menu' ].every( function( name ) { return q.watching()[0].options.attributeFilter.indexOf( name ) !== -1 } ) );
 q.turn( h, false );
 check( '...and no longer once it is let go', q.watching().length === 0 );
 
@@ -851,5 +859,95 @@ q.turn( { details : element( 'details' ) }, true );
 q.resize();
 q.key( 'Escape' );
 check( 'a page with no header at all: no error from any event', q.errors.length === 0 );
+
+// --- the menu of another component -----------------------------------------------------------------------------------
+// A component of a feature draws a menu of its own in the header - nav.menu > details.menu-details - and says that it is one of those the header folds with
+// data-header-menu at its details: what the stylesheet makes of it is seen in a browser, here the script does with it what it does with the menu of Basis
+
+q = page( { kind : 'marked' } );
+h = q.headers[0];
+q.press( h );
+q.turn( h, true );
+check( 'the details of another component that says data-header-menu is held as the menu of Basis is: what stands beside the header is inert and the root does not scroll', names( q.inert() ) === 'aside nav main footer'
+	&& q.root.style.getPropertyValue( 'overflow' ) === 'hidden' && q.root.style.getPropertyValue( 'scrollbar-gutter' ) === 'stable' && q.errors.length === 0 );
+h.links['/other'].focus();
+event = q.key( 'Escape' );
+check( '...and Escape closes it and gives its button the focus, as it does there', h.details.open === false && h.summary.focused === true && event.defaultPrevented === true && q.inert().length === 0 && q.styled() === false );
+check( '...an Escape that another script has taken before (a panel of the menu that was closed with it) leaves it open: the key is the first one\'s', ( () => {
+	q.turn( h, true );
+	const taken = q.send( 'document', 'keydown', { key : 'Escape', defaultPrevented : true, target : q.body } );
+	return taken.defaultPrevented === true && h.details.open === true && q.inert().length > 0;
+} )() );
+
+q = page( { kind : 'marked' } );
+h = q.headers[0];
+q.window.scrollY = 600;
+q.press( h );
+q.window.scrollY = 523;
+q.turn( h, true );
+q.turn( h, false );
+check( 'the press on its button is remembered for the place of the page, which is given back when it is closed (the header leaves the flow of a page that is scrolled to its end)', q.scrolls.length === 1 && q.scrolls[0].top === 600 );
+
+q = page( { kind : 'marked' } );
+h = q.headers[0];
+q.turn( h, true );
+q.click( h.links['#about'] );
+check( 'a link to a place on the same page closes it and lets the page go', h.details.open === false && q.inert().length === 0 && q.styled() === false );
+
+q = page( { kind : 'marked' } );
+h = q.headers[0];
+h.wrap.overlay = false;
+q.turn( h, true );
+event = q.key( 'Escape' );
+check( 'where the stylesheet does not make it an overlay (a wide screen) nothing is held and Escape is not taken', q.inert().length === 0 && q.styled() === false && event.defaultPrevented === false && h.details.open === true );
+
+q = page( { kind : 'unmarked' } );
+h = q.headers[0];
+q.press( h );
+q.turn( h, true );
+event = q.key( 'Escape' );
+check( 'SAFETY: a menu in a nav of the header that does not say data-header-menu is none of the script\'s: nothing is held, Escape is not taken, the place of the page is not remembered', q.inert().length === 0 && q.styled() === false && event.defaultPrevented === false && h.details.open === true && q.scrolls.length === 0 );
+
+q = page( { kind : 'basis' } );
+h = q.headers[0];
+const faq = element( 'details' );
+faq.className = 'faq';
+faq.setAttribute( 'open', '' );
+faq.appendChild( element( 'summary' ) );
+faq.appendChild( element( 'p' ) );
+h.wrap.appendChild( faq );
+q.send( 'document', 'toggle', { target : faq } );
+event = q.key( 'Escape' );
+check( 'SAFETY: a details in the header that is no menu - a question and its answer in the actions of the header - is not held, and the Escape is not taken', q.inert().length === 0 && q.styled() === false && event.defaultPrevented === false && faq.hasAttribute( 'open' ) === true );
+
+q = page( { kind : 'marked', headers : 2 } );
+q.headers[1].details.removeAttribute( 'data-header-menu' );
+q.headers[1].details.className = 'header-nav-details';
+q.turn( q.headers[0], true );
+q.turn( q.headers[1], true );
+check( 'the menu of Basis and one of another component in one page are held one at a time, the last open one', q.inert().indexOf( q.headers[1].wrap ) === -1 && q.inert().indexOf( q.headers[0].wrap ) !== -1 );
+q.key( 'Escape' );
+q.key( 'Escape' );
+check( '...and Escape closes them in turn: nothing is left', q.headers[0].details.open === false && q.headers[1].details.open === false && q.inert().length === 0 && q.styled() === false );
+
+q = page( { kind : 'marked' } );
+h = q.headers[0];
+q.turn( h, true );
+h.details.removeAttribute( 'data-header-menu' );
+h.wrap.overlay = false;
+q.changed();
+check( 'the mark taken from the details of a menu that is held - the stylesheet makes no overlay of it any more - lets the page go at once, with nobody pressing anything', q.inert().length === 0 && q.styled() === false && h.details.open === true );
+
+q = page( { kind : 'marked' } );
+h = q.headers[0];
+const strayMarked = element( 'details' );
+strayMarked.className = 'menu-details';
+strayMarked.setAttribute( 'data-header-menu', '' );
+strayMarked.setAttribute( 'open', '' );
+strayMarked.appendChild( element( 'summary' ) );
+q.main.appendChild( strayMarked );
+q.turn( { details : strayMarked }, true );
+q.key( 'Escape' );
+check( 'a menu of another component that stands in no header is no overlay and breaks nothing', q.errors.length === 0 && q.inert().length === 0 && strayMarked.hasAttribute( 'open' ) === true );
 
 done();

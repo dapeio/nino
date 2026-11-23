@@ -447,6 +447,7 @@ function element( tag ) {
 					return true;
 			return false;
 		},
+		matches : function( selector ) { return matches( el, selector ) },
 		closest : function( selector ) {
 			for( let node = el; node !== null; node = node.parentNode )
 				if( matches( node, selector ) )

@@ -2,7 +2,8 @@
  *	Nino - Basis
  *	header-nav.js		While the open menu of the header is an overlay (by the stylesheet: the header is fixed over
  *									the window, drawn, with its button): Escape closes it, the page behind is inert and does not
- *									scroll, a link to a place on the page closes it. Without the script the menu is the stylesheet's.
+ *									scroll, a link to a place on the page closes it. The menu of another component is one too when its details says
+ *									data-header-menu. Without the script the menu is the stylesheet's.
  *
  *	@package						Dape/Nino
  *	@author							David Perchermeier <mail@dape.io>
@@ -33,7 +34,7 @@
 		let found = null;
 
 		if( !root.hasAttribute( 'data-nino-preview' ) )
-			document.querySelectorAll( '.header-nav-details[open]' ).forEach( menu => {
+			document.querySelectorAll( '.header-nav-details[open], [data-header-menu][open]' ).forEach( menu => {
 
 				const wrap = menu.closest( '.header-wrap' );
 				const button = menu.querySelector( 'summary' );
@@ -91,7 +92,7 @@
 			}
 
 			root.style.setProperty( 'overflow', 'hidden' );
-			watcher.observe( document, { subtree : true, childList : true, attributes : true, attributeFilter : [ 'class', 'open', 'hidden', 'inert', 'style' ] } );
+			watcher.observe( document, { subtree : true, childList : true, attributes : true, attributeFilter : [ 'class', 'open', 'hidden', 'inert', 'style', 'data-header-menu' ] } );
 		}
 
 		if( !menu )
@@ -137,7 +138,7 @@
 			const button = event.target.closest( 'summary' );
 			const link = event.target.closest( 'a[href]' );
 
-			if( !held && button && button.parentNode.classList.contains( 'header-nav-details' ) )
+			if( !held && button && button.parentNode.matches( '.header-nav-details, [data-header-menu]' ) )
 				at = window.scrollY;
 
 			const menu = !link || event.defaultPrevented || event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || ( link.target !== '' && link.target !== '_self' ) ? null : overlay();

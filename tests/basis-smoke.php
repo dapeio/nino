@@ -1145,7 +1145,7 @@ if( str_contains( basisBody( $partRules['section'], '.section-wrap-image ~ .sect
 // the header that folds its menu lays it over the whole window when it is open - fixed, with every edge at 0, scrolling in itself, the page behind not scrolling with it - and never pushes the page down: in the three places that
 // say "folded" (always, under 768 px, no ::details-content), the entries large by the tokens of the page, the line of the header with the button staying in the line
 $overlay = static fn( string $body ): bool => str_contains( $body, 'position: fixed;' ) === true && str_contains( $body, 'inset: 0;' ) === true && str_contains( $body, 'overflow-y: auto;' ) === true && str_contains( $body, 'overscroll-behavior: contain;' ) === true && str_contains( $body, 'position: static' ) === false && str_contains( $body, 'position: sticky' ) === false;
-$anyOpen = '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )';
+$anyOpen = '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open], [data-header-menu][open] )';
 if( $overlay( basisBody( $partRules['header'], '.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] )' ) ) === false
 	|| $overlay( basisBody( $partRules['header'], $anyOpen, '@media (max-width: 767.98px)' ) ) === false || $overlay( basisBody( $partRules['header'], $anyOpen, '@supports not ( selector( ::details-content ) )' ) ) === false && $overlay( basisBody( $partRules['header'], $anyOpen, '@supports not selector( ::details-content )' ) ) === false
 	|| str_contains( $partRules['header'] ? json_encode( $partRules['header'] ) : '', 'header-wrap--sticky:has(' ) === true
@@ -1153,6 +1153,14 @@ if( $overlay( basisBody( $partRules['header'], '.header-wrap:has( .header-nav--c
 	|| str_contains( basisBody( $partRules['header'], '.header-nav-details', '@supports selector( ::details-content )' ), 'display: contents;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav-details::details-content', '@supports selector( ::details-content )' ), 'flex: 1 0 100%;' ) === false
 	|| str_contains( basisBody( $partRules['header'], '.header-nav-toggle' ), 'margin-inline-start: auto;' ) === false || str_contains( basisBody( $partRules['header'], '.header-nav a' ), 'overflow-wrap: anywhere;' ) === false )
 	$bad[] = 'the menu does not keep its button in the line or its open list is no overlay over the window, or it pushes the page';
+
+// ...and so is the open menu of another component that says it is one - data-header-menu at its details, whatever its classes are -, in the two places that say "folded" that do not
+// depend on the menu of Basis (under 768 px, no ::details-content); the mark stands in these two rules and nowhere else, since the rule for "always" is the menu of Basis's own
+$marked = '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open], [data-header-menu][open] )';
+if( $overlay( basisBody( $partRules['header'], $marked, '@media (max-width: 767.98px)' ) ) === false || $overlay( basisBody( $partRules['header'], $marked, '@supports not selector( ::details-content )' ) ) === false
+	|| str_contains( basisBody( $partRules['header'], '.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] )' ), 'position: fixed;' ) === false
+	|| substr_count( (string) json_encode( $partRules['header'] ), 'data-header-menu' ) !== 2 )
+	$bad[] = 'the open menu of another component that says data-header-menu is not an overlay under 768 px or where ::details-content is not known, or the mark stands in more or in fewer places than these two';
 
 if( basisBody( $partRules['section'], '.section-wrap:has( > .section-wrap-image )', '@supports not ( color: light-dark( #000, #fff ) )' ) === '' )
 	$bad[] = 'a section with a picture has no colours of its own where light-dark() is not known';
@@ -1388,7 +1396,7 @@ if( $says( 'header', $columnOf. ' > .header-nav-list', 'position' ) !== 'absolut
 if( $says( 'header', $columnOf. '::details-content', 'display', '@supports selector( ::details-content )' ) !== 'contents' )
 	$wrapBad[] = 'the box of the open list of a menu in a column takes room of its own in the column';
 
-foreach( [ [ '.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] )', '' ], [ '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )', '@media (max-width: 767.98px)' ], [ '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open] )', '@supports not selector( ::details-content )' ] ] as [ $overlayOf, $overlayAt ] )
+foreach( [ [ '.header-wrap:has( .header-nav--collapse-always .header-nav-details[open] )', '' ], [ '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open], [data-header-menu][open] )', '@media (max-width: 767.98px)' ], [ '.header-wrap:has( .header-nav:not( .header-nav--collapse-never ) .header-nav-details[open], [data-header-menu][open] )', '@supports not selector( ::details-content )' ] ] as [ $overlayOf, $overlayAt ] )
 	if( $says( 'header', $overlayOf, 'justify-content', $overlayAt ) !== 'start' || $says( 'header', $overlayOf, 'position', $overlayAt ) !== 'fixed' )
 		$wrapBad[] = 'the header that is open does not keep its line at the top where it has a height ('. ( $overlayAt === '' ? 'always' : $overlayAt ). ')';
 
