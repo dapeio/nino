@@ -39,6 +39,10 @@ namespace Nino {
 	 *																	register: offer() and check() name it with CODE_HTML and leave the decision to the caller
 	 *											'logo'			true: the component draws the logo of the project and its source is an image: the root of a block that is a
 	 *																	header or a footer may name the logo of the project as its first word
+	 *											'menu'			the component draws a menu of the site, which a tool that asks where a page is linked from reads: [ 'attribute' => the
+	 *																	name of an attribute - a choice or a string, whose default is a menu - that names the menu of a call, and the default
+	 *																	is the menu where the call names none ] or [ 'name' => the menu it draws whatever the call says ]. A menu is a key
+	 *																	of the menus of the project, a lower case word that may hold hyphens and underscores; menus() answers what a source draws
 	 *											'source'		text, image, link or none (the default): what its first word is
 	 *											'format'		for a text: plain (the default), inline, lines or blocks; an attribute named
 	 *																	format - a choice among them - says it for each call
@@ -181,7 +185,7 @@ namespace Nino {
 		public const array SIDES = [ 'page', 'header', 'footer' ];
 
 		// The keys of a schema and of an attribute, which is all validate() accepts
-		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'deep', 'block', 'markup', 'logo', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
+		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'deep', 'block', 'markup', 'logo', 'menu', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input', 'labels' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
@@ -193,6 +197,9 @@ namespace Nino {
 		private const string KNOB = '/^([a-z][a-z0-9]*(?:-[a-z0-9]+)*)\.([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/D';
 		private const string STEP = '/^[A-Za-z0-9 .,%()+*\/#-]{1,120}$/D';
 		private const string FIELD = '/^[A-Za-z][A-Za-z0-9_-]*$/D';
+
+		// A menu of the project, as the Navigation panel names one
+		private const string MENU = '/^[a-z][a-z0-9_-]*$/D';
 
 		// What a reference to a text is written as: one word, with no bracket, no space and no control character in it
 		private const string SHAPE = '/^[^\s\[\]\x00-\x1F\x7F]+$/D';
@@ -527,7 +534,7 @@ namespace Nino {
 		 *	- at most TEMPLATE_LENGTH bytes, no null byte, utf-8, not empty
 		 *	- read with no note: every call closed, no stray end, nothing deeper than the parser reads, nothing it gives up on
 		 *	- no [[: a textfill is a text of the project, and so is what a fixed text would fill in
-		 *	- every call is of a component named in $names - those of its own feature and of the feature that comes with the kernel
+		 *	- every call is of a component named in $names - those of its own feature and of the features it is built on: the ones it requires, and those they require
 		 *	- no source that names something of the project: a call has none, but a picture that is one of
 		 *	  \Nino\Images::PLACEHOLDERS or the type of elements that is one of \Nino\Elements::PLACEHOLDERS - and no value of
 		 *	  an attribute that begins like a reference (~, / or .), which a text, a link or a picture would read as one, unless it
@@ -585,7 +592,7 @@ namespace Nino {
 					continue;
 
 				if( in_array( $node['n'], $names, true ) === false )
-					return 'calls "'. self::_shown( $node['n'] ). '", which is no component of its feature or of basis';
+					return 'calls "'. self::_shown( $node['n'] ). '", which is no component of its feature or of a feature it requires';
 
 				$loop = isset( \Nino\Elements::PLACEHOLDERS[$node['s']] ) === true;
 				$inside = $loop === true ? $node['s'] : $type;
@@ -1787,6 +1794,16 @@ namespace Nino {
 				$clean['attributes'][$attribute] = $result;
 			}
 
+			if( array_key_exists( 'menu', $schema ) === true ) {
+
+				$menu = self::_menu( $what, $schema['menu'], $clean['attributes'] );
+
+				if( is_string( $menu ) === true )
+					return $menu;
+
+				$clean['menu'] = $menu;
+			}
+
 			// An attribute named format says for each call what the text may hold: a choice among the formats of a text, whose default
 			// is the format of the schema where it names one
 			if( isset( $clean['attributes']['format'] ) === true ) {
@@ -1818,6 +1835,103 @@ namespace Nino {
 			$clean['template'] = $template[0];
 
 			return $clean;
+		}
+
+		/**
+		 *	What the 'menu' of a schema says: the attribute that names the menu of a call, or the menu the component draws
+		 *
+		 *	@param		string		$what					Whose schema, for the sentence
+		 *	@param		mixed			$declared			What the schema says
+		 *	@param		array			$attributes		The clean attributes of the schema
+		 *
+		 *	@return 	array|string							[ 'attribute' => name ] or [ 'name' => menu ], or what is wrong
+		 */
+		private static function _menu( string $what, mixed $declared, array $attributes ): array|string {
+
+			$form = is_array( $declared ) === true && count( $declared ) === 1 ? array_key_first( $declared ) : null;
+
+			if( in_array( $form, [ 'attribute', 'name' ], true ) === false )
+				return $what. ': "menu" is [ \'attribute\' => the attribute that names the menu ] or [ \'name\' => the menu the component draws ]';
+
+			$value = $declared[$form];
+
+			if( $form === 'name' ) {
+
+				if( is_string( $value ) === false || preg_match( self::MENU, $value ) !== 1 )
+					return $what. ': "menu" => "name" is a menu of the project: lower case letters, digits, hyphens and underscores, beginning with a letter';
+
+				return [ 'name' => $value ];
+			}
+
+			if( is_string( $value ) === false || isset( $attributes[$value] ) === false )
+				return $what. ': "menu" => "attribute" names an attribute of the component';
+
+			$attribute = $attributes[$value];
+
+			if( in_array( $attribute['type'], [ 'choice', 'string' ], true ) === false )
+				return $what. ': "menu" => "attribute": "'. $value. '" is a choice or a string - a menu is named by a word';
+
+			if( is_string( $attribute['default'] ?? null ) === false || preg_match( self::MENU, $attribute['default'] ) !== 1 )
+				return $what. ': "menu" => "attribute": the default of "'. $value. '" is the menu of a call that names none, a menu of the project';
+
+			return [ 'attribute' => $value ];
+		}
+
+		/**
+		 *	The menus the calls of a source draw, for a tool that asks where a page of the site is linked from: of each call of a registered
+		 *	component whose schema says 'menu', in the order they stand - the menu it names, or the default of the attribute that names it
+		 *	where the call names none, or the menu the schema says. Nothing is drawn or looked up: the source as it is written, the tree
+		 *	of it read once and not kept. A call of a name nobody registered draws no menu, and a value that is no menu - a fill, a
+		 *	reference, a word the project has no menu of - names none; whether the project has the menu is the caller's to look at
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				html+
+		 *
+		 *	@return 	array										The menus, each once
+		 */
+		public static function menus( array &$appData, string $source ): array {
+
+			$found = [];
+
+			self::_menus( (array) ( $appData[self::REGISTRY] ?? [] ), \Nino\Html::tree( $appData, $source, false ), 0, $found );
+
+			return array_values( array_unique( $found ) );
+		}
+
+		/**
+		 *	The menus of the nodes of one level, and below
+		 *
+		 *	@param		array			$registry			The clean schemas
+		 *	@param		array			$nodes
+		 *	@param		int				$depth
+		 *	@param		array			&$found				(reference)
+		 *
+		 *	@return 	void
+		 */
+		private static function _menus( array $registry, array $nodes, int $depth, array &$found ): void {
+
+			if( $depth > Markup::MAX_DEPTH )
+				return;
+
+			foreach( $nodes as $node ) {
+
+				if( is_array( $node ) === false || is_string( $node['n'] ?? null ) === false )
+					continue;
+
+				$menu = $registry[$node['n']]['menu'] ?? null;
+
+				if( is_array( $menu ) === true ) {
+
+					$named = isset( $menu['attribute'] ) === true ? ( is_array( $node['a'] ?? null ) === true ? ( $node['a'][$menu['attribute']] ?? null ) : null ) : $menu['name'];
+					$named = $named === null || $named === '' ? ( $registry[$node['n']]['attributes'][$menu['attribute'] ?? '']['default'] ?? null ) : $named;
+
+					if( is_string( $named ) === true && preg_match( self::MENU, $named ) === 1 )
+						$found[] = $named;
+				}
+
+				if( is_array( $node['c'] ?? null ) === true )
+					self::_menus( $registry, $node['c'], $depth + 1, $found );
+			}
 		}
 
 		/**

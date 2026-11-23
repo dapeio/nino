@@ -1008,6 +1008,9 @@
 			if( feature.requires.length > 0 )
 				notes.push( { text : Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) ), bad : false } );
 
+			if( feature.circle === true )
+				notes.push( { text : Nino.content.getText('/_admin/features/label/circle'), bad : false } );
+
 			if( feature.shipped === true )
 				notes.push( { text : Nino.content.getText('/_admin/features/label/shipped'), bad : false } );
 

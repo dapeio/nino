@@ -7,4 +7,5 @@ return [
 	'icon'       => 'text',
 	'in'         => [ 'footer-wrap' ],
 	'once'       => true,
+	'menu'       => [ 'name' => 'legal' ],
 ];

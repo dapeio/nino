@@ -54,7 +54,7 @@ Lege `features/Meetups/install/templates/page-meetups.tpl` an:
 
 - Die erste Zeile gibt der Vorlage ihren Namen in der Workbench.
 - `html-header` und `html-footer` sind die Rahmen jeder Seite des Projekts.
-- `[section-wrap]`, `[section-row]`, `[section-col]`, `[section-title]` und `[text]` sind Komponenten des Features **Basis**: ein Abschnitt, eine Zeile, eine Spalte, eine Überschrift und ein Text. Basis kommt mit Nino, und der Einrichtungsassistent schaltet es ein ([The Look](../setup.md#the-look)). Ist es aus, sind das Namen, die niemand anmeldet: Sie zeichnen nichts.
+- `[section-wrap]`, `[section-row]`, `[section-col]`, `[section-title]` und `[text]` sind Komponenten des Features **Basis**: ein Abschnitt, eine Zeile, eine Spalte, eine Überschrift und ein Text. Basis kommt mit Nino und ist aus, bis es jemand im Panel Features einschaltet - der Einrichtungsassistent schreibt eine schlichte HTML-Seite und schaltet kein Feature ein ([The Look](../setup.md#the-look)). Ist es aus, sind das Namen, die niemand anmeldet: Sie zeichnen nichts.
 - Die Worte stehen nicht in der Vorlage. `~title` ist ein Verweis auf einen Textschlüssel: Nino bildet ihn aus dem Namen der Vorlage, der `id` des Abschnitts und dem Namen, hier `/template/page-meetups/intro/title`. Der nächste Schritt legt die Worte an.
 
 ### 3. Die Worte

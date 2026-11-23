@@ -33,12 +33,12 @@ namespace Nino {
 	 *										}, {
 	 *											"kind": "theme", "key": "craft", "version": "1.1.0", "name": ..., "description": ...,
 	 *											"requires": { "nino": "^2.0", "features": [ "themes" ], "fonts": [ "lora" ] },
-	 *											"parts": { "section": { "feature": "basis", "contract": "^2.0" } }, "blocks": [ "hero-soft" ],
+	 *											"parts": { "cards": { "feature": "cards", "contract": "^2.0" } }, "blocks": [ "hero-soft" ],
 	 *											"preview": { "url": "https://.../craft.webp", "sha256": "...", "size": 41230 },
 	 *											"archive": "...", "sha256": "...", "size": 48211, "released": "..."
 	 *										}, {
 	 *											"kind": "blocks", "key": "gastro", "version": "1.0.0", "name": ..., "description": ...,
-	 *											"requires": { "nino": "^2.0", "features": [ "basis", "cards" ] },
+	 *											"requires": { "nino": "^2.0", "features": [ "cards", "forms" ] },
 	 *											"blocks": [ { "key": "menu", "category": "offer" } ], "preview": { ... }, "archive": "...", ...
 	 *										} ] }
 	 *

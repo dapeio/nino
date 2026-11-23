@@ -35,6 +35,7 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installed as %s',
 	'[[/_admin/features/label/requires]]'			=> 'Requires: %s',
+	'[[/_admin/features/label/circle]]'		=> 'It and the features it requires require each other; each of them can be switched off all the same.',
 	'[[/_admin/features/label/shipped]]'		=> 'Comes with Nino',
 	'[[/_admin/features/label/component-refused]]'	=> 'Not registered: %s',
 	'[[/_admin/features/label/rejected]]'		=> 'Not loaded: its manifest was refused',

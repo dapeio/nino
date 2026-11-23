@@ -1142,10 +1142,10 @@ namespace Nino\Modules {
 
 		/**
 		 *	The menus a template of the project outputs: every key a [navigation nav="..."] names and the menu
-		 *	of the menu components of Basis - [header-nav] (main) and [footer-nav] (footer), by their attribute menu or
-		 *	by the menu they take where it names none - and [footer-legal], which draws the menu legal, where they are
-		 *	registered, anywhere below /templates. One that a template builds from a fill is not seen, and a template nobody includes is counted -
-		 *	a hint, no guarantee
+		 *	of each call of a component that says in its schema that it draws one ('menu', see \Nino\Components::menus()) - the
+		 *	menu a call names by the attribute the schema says, the one it takes where it names none, or the one the schema says
+		 *	of a component that draws one menu - where it is registered, anywhere below /templates. One that a template builds from a
+		 *	fill is not seen, and a template nobody includes is counted - a hint, no guarantee
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1166,17 +1166,25 @@ namespace Nino\Modules {
 
 				$source = (string) file_get_contents( $file->getPathname() );
 
-				if( preg_match_all( '/\[navigation\b[^\]]*\bnav="([^"\[]+)"/', $source, $found ) > 0 )
-					$navs = array_merge( $navs, $found[1] );
+				// The calls are read as the page reads them, from the tree: one written with \[ is text, for the shortcode and the components alike
+				$stack = \Nino\Html::tree( $appData, $source, false );
 
-				// Only what is registered draws a menu: where the feature that brings these components is off, a call of one draws nothing
-				if( preg_match_all( '/\[(header|footer)-nav\b([^\]]*)\]/', $source, $found, PREG_SET_ORDER ) > 0 )
-					foreach( $found as $call )
-						if( isset( $appData[\Nino\Components::REGISTRY][$call[1]. '-nav'] ) === true )
-							$navs[] = preg_match( '/\bmenu="([^"\[]+)"/', $call[2], $named ) === 1 ? $named[1] : ( $call[1] === 'header' ? 'main' : 'footer' );
+				while( $stack !== [] ) {
 
-				if( isset( $appData[\Nino\Components::REGISTRY]['footer-legal'] ) === true && preg_match( '/\[footer-legal[\s\]]/', $source ) === 1 )
-					$navs[] = 'legal';
+					$node = array_shift( $stack );
+
+					if( is_array( $node ) === false )
+						continue;
+
+					if( ( $node['n'] ?? null ) === 'navigation' && is_string( $node['a']['nav'] ?? null ) === true && $node['a']['nav'] !== '' && str_contains( $node['a']['nav'], '[' ) === false )
+						$navs[] = $node['a']['nav'];
+
+					if( is_array( $node['c'] ?? null ) === true )
+						array_push( $stack, ...$node['c'] );
+				}
+
+				// Only what is registered draws a menu: where the feature that brings a component is off, a call of it draws nothing
+				$navs = array_merge( $navs, \Nino\Components::menus( $appData, $source ) );
 			}
 
 			return array_values( array_unique( $navs ) );

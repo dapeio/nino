@@ -261,7 +261,10 @@ What the register does for the renderer, and what it leaves to it:
   footer may read the texts of the project. `'markup' => true` says that the content of a container is the markup of the page
   itself: `offer()` and `check()` name its call with `\Nino\Components::CODE_HTML` and leave to the caller whether the account may
   write it. `'logo' => true`, for a component whose `source` is `image`, says that it draws the logo of the project, so that a header or a footer block may
-  name the logo of the site as the first word of its call. A root is neither `markup` nor `through`.
+  name the logo of the site as the first word of its call. A root is neither `markup` nor `through`. `'menu'` says that the
+  component draws a menu of the site, so that the legal check counts a call of it as an output of that menu: `[ 'attribute' => 'menu' ]`
+  names the attribute - a `choice` or a `string`, whose default is the menu where a call names none - that gives the menu of a call,
+  `[ 'name' => 'legal' ]` the one menu a component draws whatever its call says; `\Nino\Components::menus()` reads it.
 - A group and a component name belong to **one feature**. What a second feature
   claims is refused, with a sentence that names both, and that feature goes on
   without it.

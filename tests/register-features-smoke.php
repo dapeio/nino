@@ -1666,7 +1666,7 @@ $fifth = registerBoot( $project );
 $said = ninoWarnings();
 check( 'a demo that is refused is said once in a request, with the group and the reason - and the group and its components are registered all the same, with no file of the cache written for it',
 	count( $said ) === 1 && str_contains( $said[0], 'demo.tpl' ) === true && str_contains( $said[0], 'calls "nobody"' ) === true && \Nino\Components::groups( $fifth )['show']['demo'] === '' && array_keys( \Nino\Components::components( $fifth ) ) === [ 'show-box', 'show-line', 'show-pic' ] );
-check( '...and the Features panel is told the same sentence', in_array( 'feature "show", group "show": its demo.tpl calls "nobody", which is no component of its feature or of basis', \Nino\Features::componentProblems( $fifth, 'show' ), true ) === true );
+check( '...and the Features panel is told the same sentence', in_array( 'feature "show", group "show": its demo.tpl calls "nobody", which is no component of its feature or of a feature it requires', \Nino\Features::componentProblems( $fifth, 'show' ), true ) === true );
 registerRemove( $show );
 
 // What demoProblem() asks, by itself

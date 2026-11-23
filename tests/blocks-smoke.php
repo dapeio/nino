@@ -679,9 +679,9 @@ blocksRequest( $appData );
 $all = \Nino\Blocks::all( $appData );
 $rejected = \Nino\Blocks::rejected( $appData );
 ninoWarnings();
-check( 'the order of the roots is the project, the features by key, the hook: a block of the project is not put out by a feature that comes later, one of a feature is put out by one of an earlier key, and what is put out says by whom',
-	array_column( \Nino\Blocks::roots( $appData ), 'origin' ) === [ 'project', 'aaa', 'kit', 'zzz', 'theme-probe', 'label-bad', 'label-less' ] && $all['hero']['origin'] === 'aaa' && $all['pricing']['origin'] === 'project'
-	&& str_contains( (string) ( $rejected['kit/hero'] ?? '' ), '"aaa"' ) && str_contains( (string) ( $rejected['zzz/pricing'] ?? '' ), '"project"' ) );
+check( 'the order of the roots is the project, the features by key, the hook: a block of the project is not put out by a feature that comes later, one of a feature is put out by one of a feature that stands earlier in the modules - not by one of an earlier key - and what is put out says by whom',
+	array_column( \Nino\Blocks::roots( $appData ), 'origin' ) === [ 'project', 'aaa', 'kit', 'zzz', 'theme-probe', 'label-bad', 'label-less' ] && $all['hero']['origin'] === 'kit' && $all['pricing']['origin'] === 'project'
+	&& str_contains( (string) ( $rejected['aaa/hero'] ?? '' ), '"kit"' ) && str_contains( (string) ( $rejected['zzz/pricing'] ?? '' ), '"project"' ) );
 
 // A component that a feature which is off brings: the block is listed and needs that feature
 $needs = blocksParts();

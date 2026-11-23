@@ -35,6 +35,7 @@ return [
 	'[[/_admin/features/label/version]]'			=> 'Version %s',
 	'[[/_admin/features/label/installed]]'		=> 'installiert als %s',
 	'[[/_admin/features/label/requires]]'			=> 'Benötigt: %s',
+	'[[/_admin/features/label/circle]]'		=> 'Es und die Features, die es verlangt, verlangen einander; jedes lässt sich trotzdem ausschalten.',
 	'[[/_admin/features/label/shipped]]'		=> 'Gehört zu Nino',
 	'[[/_admin/features/label/component-refused]]'	=> 'Nicht angemeldet: %s',
 	'[[/_admin/features/label/rejected]]'		=> 'Nicht geladen: das Manifest wurde abgelehnt',

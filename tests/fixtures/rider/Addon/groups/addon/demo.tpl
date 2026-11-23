@@ -1,0 +1,8 @@
+[band-wrap]
+	[band-row]
+		[band-col]
+			[band-title text="A title"]
+			[addon-note text="A note below it"]
+		[/band-col]
+	[/band-row]
+[/band-wrap]

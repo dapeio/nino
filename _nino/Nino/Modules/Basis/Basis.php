@@ -31,7 +31,8 @@ namespace Nino\Modules {
 	 *										the call said arrives escaped by the register. Nothing here reads a value again.
 	 *
 	 *										Menus, the legal pages and the languages stay modules of the kernel (Navigation,
-	 *										Legal, Localepicker): this class asks them for data and draws it. A picture is
+	 *										Legal, Localepicker): this class asks them for data and draws it, and where one is
+	 *										not there the menu or the list is not drawn - a menu with no entry is none. A picture is
 	 *										\Nino\Images::picture().
 	 *
 	 *	@package					Dape/Nino
@@ -122,16 +123,30 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	A word of the feature for what a menu is called: the text <the words of the feature>navigation/<word>, in the language of the
+		 *	page. The words of a feature are /module/<name>/ where the kernel delivers it and /feature/<key>/ where it stands
+		 *	below features/ (\Nino\Features::textRoot()), so that the same file is read in both places
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$word					primary, menu or footer
+		 *
+		 *	@return 	string										Written for html
+		 */
+		private static function _word( array &$appData, string $word ): string {
+			return self::_text( (string) ( \Nino\Html::resolveTextfill( $appData, \Nino\Features::textRoot( $appData, 'basis' ). 'navigation/'. $word ) ?? '' ) );
+		}
+
+		/**
 		 *	The name of a navigation: the one the call gives it, else the word of the feature for it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					What the renderer was handed
-		 *	@param		string		$word					primary or footer: the part of /module/basis/navigation/
+		 *	@param		string		$word					primary or footer: the part of navigation/ in the words of the feature
 		 *
 		 *	@return 	string										Written for html
 		 */
 		private static function _name( array &$appData, array $args, string $word ): string {
-			return $args['label'] !== '' ? $args['label'] : self::_text( (string) ( \Nino\Html::resolveTextfill( $appData, '/module/basis/navigation/'. $word ) ?? '' ) );
+			return $args['label'] !== '' ? $args['label'] : self::_word( $appData, $word );
 		}
 
 		/**
@@ -157,6 +172,9 @@ namespace Nino\Modules {
 		 *	@return 	string										'' where the menu has no entry
 		 */
 		private static function _entries( array &$appData, string $menu ): string {
+
+			if( class_exists( Navigation::class ) === false )
+				return '';
 
 			$html = '';
 
@@ -238,7 +256,7 @@ namespace Nino\Modules {
 			if( $entries === '' )
 				return '';
 
-			return \Nino\Components::fill( $appData, 'header-nav', $args, $content, [ '[[entries]]' => $entries, '[[open]]' => $args['collapse'] === 'never' ? self::$html['open'] : '', '[[name]]' => self::_name( $appData, $args, 'primary' ) ] );
+			return \Nino\Components::fill( $appData, 'header-nav', $args, $content, [ '[[entries]]' => $entries, '[[open]]' => $args['collapse'] === 'never' ? self::$html['open'] : '', '[[name]]' => self::_name( $appData, $args, 'primary' ), '[[toggle]]' => self::_word( $appData, 'menu' ) ] );
 		}
 
 		/**
@@ -295,7 +313,7 @@ namespace Nino\Modules {
 
 			$legal = self::_entries( $appData, 'legal' );
 			$languages = '';
-			$entries = Localepicker::entries( $appData );
+			$entries = class_exists( Localepicker::class ) === true ? Localepicker::entries( $appData ) : [];
 
 			if( count( $entries ) > 1 )
 				foreach( $entries as $entry )

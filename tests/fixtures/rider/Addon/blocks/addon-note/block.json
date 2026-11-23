@@ -1,0 +1,12 @@
+{
+	"name": {
+		"de_DE": "Titel mit Anmerkung",
+		"en_US": "Title with a note"
+	},
+	"description": {
+		"de_DE": "Ein Titel und darunter eine Anmerkung.",
+		"en_US": "A title and a note below it."
+	},
+	"category": "content",
+	"rank": 90
+}

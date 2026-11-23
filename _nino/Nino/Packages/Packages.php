@@ -99,7 +99,7 @@ namespace Nino {
 			'identity'				=> '"key" is "%s" and the package is installed as "%s"',
 			'part-claims'			=> '"%s" is a component of the project: a part of a group the project does not have names components of its own',
 			'part-key'				=> '"%s" is no key of a part - there are %s',
-			'part-contract'		=> '"contract" names the feature and the versions of it the part is for, as basis@^1.0',
+			'part-contract'		=> '"contract" names the feature and the versions of it the part is for, as cards@^1.0',
 			'page-contract'		=> 'the contract of the page is kernel@<constraint>',
 			'page-css'				=> 'the page has no stylesheet: its part is part.json alone',
 			'page-keys'				=> 'the part of the page has a contract, knobs and values',

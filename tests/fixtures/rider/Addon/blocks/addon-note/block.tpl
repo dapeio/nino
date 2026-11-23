@@ -1,0 +1,8 @@
+[band-wrap id="note"]
+	[band-row]
+		[band-col]
+			[band-title ~title tag="h2"]
+			[addon-note ~note]
+		[/band-col]
+	[/band-row]
+[/band-wrap]

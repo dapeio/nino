@@ -1828,6 +1828,8 @@ namespace Nino\Modules\Features {
 				// Delivered with the kernel: switched on and off like the others, with no directory to remove and no update from the catalogue
 				'shipped'			=> $feature['shipped'],
 				'requires'		=> $feature['requires'],
+				// Its requirements lead back to it: a hint of its own, no problem - it can be switched off and removed all the same
+				'circle'			=> \Nino\Features::inCircle( $appData, $feature['key'] ),
 				'problems'		=> $feature['problems'],
 				// Why a component or a group of a feature that is on is not registered - nothing that keeps it from running, so no problem of the ones above
 				'components'	=> \Nino\Features::componentProblems( $appData, $feature['key'] ),

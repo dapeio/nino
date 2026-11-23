@@ -62,7 +62,7 @@ namespace Nino {
 
 		// The demo of a group: a template of the feature, drawn as a piece of a page where the knobs of the group are shown. The
 		// longest one is as long as the template of a component (\Nino\Components::demoProblem() asks for it); the six that
-		// basis brings are 1 KB to 3 KB
+		// the feature of the kernel brings are 1 KB to 3 KB
 		private const string DEMO = 'demo.tpl';
 
 		// What a settings schema may declare a value to be - each one is a
@@ -313,6 +313,65 @@ namespace Nino {
 			$active = array_map( static fn( mixed $class ): string => '\\'. ltrim( (string) $class, '\\' ), (array) ( $appData['/nino/modules'] ?? [] ) );
 
 			return array_filter( self::rejected( $appData ), static fn( string $directory ): bool => in_array( '\\Nino\\Modules\\'. $directory, $active, true ) === true && self::moduleOwner( $directory ) === null, ARRAY_FILTER_USE_KEY );
+		}
+
+		/**
+		 *	The root of the words of a feature, with the slash at its end: /feature/<key>/ for a feature that stands below features/ and
+		 *	/module/<directory in lower case>/ for one the kernel delivers (the key grammar of AGENTS.md: a catalogue feature has its words
+		 *	in /feature/ and a module of the kernel in /module/). What a feature reads of its own words - and what another feature
+		 *	reads of the words of the one it requires - is written <root>navigation/primary, so that the file is the same where the
+		 *	kernel delivers the feature and where it stands in the catalogue. The 'shipped' of it goes with the rest
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The key of a feature; what has the form of none gets a root under which nothing lies
+		 *
+		 *	@return 	string
+		 */
+		public static function textRoot( array &$appData, string $key ): string {
+
+			// What is no key of a feature has a root under which nothing lies: a key begins with a letter
+			if( preg_match( self::KEY_PATTERN, $key ) !== 1 )
+				return '/feature/-/';
+
+			// The features that are on are the walk of the boot, already made; one that is off is looked for in the list of all
+			$feature = null;
+
+			foreach( self::_listed( $appData ) as $manifest )
+				if( $manifest['key'] === $key )
+					$feature = $manifest;
+
+			$feature ??= self::get( $appData, $key );
+
+			return $feature !== null && $feature['shipped'] === true ? '/module/'. strtolower( basename( $feature['dir'] ) ). '/' : '/feature/'. $key. '/';
+		}
+
+		/**
+		 *	Whether the requirements of a feature lead back to it - it requires a feature that requires it, at any distance. Nothing is
+		 *	wrong with that and nothing is locked by it (see deactivate()); the Features panel says it of every feature in the circle
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *
+		 *	@return 	bool
+		 */
+		public static function inCircle( array &$appData, string $key ): bool {
+
+			$all = self::all( $appData );
+			$seen = [];
+			$queue = $all[$key]['requires'] ?? [];
+
+			for( $at = 0; $at < count( $queue ); $at++ ) {
+
+				if( $queue[$at] === $key )
+					return true;
+
+				if( isset( $seen[$queue[$at]] ) === false && isset( $all[$queue[$at]] ) === true ) {
+					$seen[$queue[$at]] = true;
+					array_push( $queue, ...$all[$queue[$at]]['requires'] );
+				}
+			}
+
+			return false;
 		}
 
 		/**
@@ -657,19 +716,24 @@ namespace Nino {
 		 */
 		public static function registerComponents( array &$appData ): void {
 
-			// The features the kernel delivers first, then the others in the order of the modules: who has a name or a group
-			// does not depend on the order a project switched them on in
-			$manifests = array_merge(
-				array_filter( self::_listed( $appData ), static fn( array $manifest ): bool => $manifest['shipped'] === true ),
-				array_filter( self::_listed( $appData ), static fn( array $manifest ): bool => $manifest['shipped'] === false )
-			);
+			// Read in the order of ordered(); what a name or a group belongs to is decided by winner(), once every feature has said what it
+			// brings, and does not depend on the order they are read in
+			$listed = self::_listed( $appData );
+			$byKey = [];
 
-			foreach( $manifests as $manifest ) {
+			foreach( $listed as $manifest )
+				$byKey[$manifest['key']] = $manifest;
+
+			$reads = [];
+			$claims = [ 'names' => [], 'groups' => [] ];
+
+			foreach( self::ordered( $listed ) as $manifest ) {
 
 				if( is_dir( $manifest['dir']. '/'. self::COMPONENTS ) === false )
 					continue;
 
-				$read = self::_register( $appData, $manifest );
+				$builtOn = self::_builtOn( $manifest, $byKey );
+				$read = self::_register( $appData, $manifest, $builtOn );
 
 				foreach( $read['rejected'] as $name => $why )
 					self::_said( $appData, $manifest['key']. '/'. $name, 'Features::registerComponents(): '. $why. ' - not registered' );
@@ -683,8 +747,356 @@ namespace Nino {
 					unset( $read['components'][$name] );
 				}
 
-				\Nino\Components::restore( $appData, $manifest['key'], $read, $renderers );
+				$reads[] = [ $manifest, $builtOn, $read, $renderers ];
+
+				foreach( array_keys( $read['groups'] ) as $group )
+					$claims['groups'][(string) $group][$manifest['key']] = true;
 			}
+
+			// The groups have their owners first: a component in a group its feature brings and does not get is not registered (\Nino\Components::restore()), so it claims no
+			// name either - a feature that loses a group takes nobody's component with it
+			foreach( $claims['groups'] as $group => $claimants )
+				$appData[\Nino\Components::OWNERS]['groups'][$group] = self::winner( $appData, array_keys( $claimants ) );
+
+			foreach( $reads as [ $manifest, , $read ] )
+				foreach( $read['components'] as $name => $clean ) {
+
+					$group = (string) ( $clean['group'] ?? '' );
+
+					if( isset( $read['groups'][$group] ) === true && ( $appData[\Nino\Components::OWNERS]['groups'][$group] ?? $manifest['key'] ) !== $manifest['key'] )
+						continue;
+
+					$claims['names'][(string) $name][$manifest['key']] = true;
+				}
+
+			foreach( $claims['names'] as $name => $claimants )
+				$appData[\Nino\Components::OWNERS]['names'][$name] = self::winner( $appData, array_keys( $claimants ) );
+
+			foreach( $reads as [ $manifest, $builtOn, $read, $renderers ] ) {
+
+				\Nino\Components::restore( $appData, $manifest['key'], $read, $renderers );
+
+				// The demos are held to what is registered for the feature, once the names have their owners
+				foreach( $read['groups'] as $group => $declared ) {
+
+					if( $declared['demo'] === '' || ( $appData[\Nino\Components::GROUPS][$group]['feature'] ?? '' ) !== $manifest['key'] )
+						continue;
+
+					$foreign = self::_demoForeign( $appData, $manifest['key'], array_map( 'strval', array_keys( $read['components'] ) ), $declared['demo'], array_keys( $builtOn ), $byKey );
+
+					if( $foreign === null )
+						continue;
+
+					$appData[\Nino\Components::GROUPS][$group]['demo'] = '';
+					self::_said( $appData, $manifest['key']. '/demo '. $group, 'Features::registerComponents(): feature "'. $manifest['key']. '", group "'. self::_shown( (string) $group ). '": its '. self::DEMO. ' calls "'. self::_shown( $foreign ). '", which is no component of its feature or of a feature it requires - not registered' );
+				}
+			}
+		}
+
+		/**
+		 *	Which of the features that are on has a name - of a component, of a group, of a block - that several of them bring: one rule for
+		 *	all of them. A feature that requires another of them (at any distance, and is not required by it in turn) gives way to it: who is
+		 *	required goes before who requires. Of the rest the
+		 *	one that stands first in '/nino/modules' has it, which also decides two that require each other. The order the features are
+		 *	read in (ordered()) decides nothing, and a requirement the claimants do not have between them - a feature that comes to require a third -
+		 *	moves nothing. A feature the kernel delivers has its name before all: this line goes with 'shipped'
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$keys					The keys of the features that bring the name
+		 *
+		 *	@return 	string|null								The key that has it, null for none
+		 */
+		public static function winner( array &$appData, array $keys ): ?string {
+
+			$keys = array_values( array_unique( $keys ) );
+
+			if( $keys === [] )
+				return null;
+
+			$modules = (array) ( $appData['/nino/modules'] ?? [] );
+
+			if( ( $appData['./nino/features/winner']['modules'] ?? null ) !== $modules ) {
+
+				$listed = self::_listed( $appData );
+				$position = [];
+				$requires = [];
+				$delivered = [];
+
+				foreach( $listed as $at => $manifest ) {
+
+					$position[$manifest['key']] ??= $at;
+					$delivered[$manifest['key']] = $manifest['shipped'] === true;
+					$requires[$manifest['key']] = $manifest['requires'];
+				}
+
+				$closure = [];
+
+				foreach( $requires as $key => $direct ) {
+
+					$found = [];
+
+					for( $queue = $direct, $at = 0; $at < count( $queue ); $at++ )
+						if( isset( $found[$queue[$at]] ) === false && isset( $requires[$queue[$at]] ) === true ) {
+							$found[$queue[$at]] = true;
+							array_push( $queue, ...$requires[$queue[$at]] );
+						}
+
+					$closure[$key] = $found;
+				}
+
+				$appData['./nino/features/winner'] = [ 'modules' => $modules, 'position' => $position, 'closure' => $closure, 'delivered' => $delivered ];
+			}
+
+			$state = $appData['./nino/features/winner'];
+			$first = static fn( string $a, string $b ): int => ( $state['position'][$a] ?? PHP_INT_MAX ) <=> ( $state['position'][$b] ?? PHP_INT_MAX );
+			usort( $keys, $first );
+
+			foreach( $keys as $key )
+				if( ( $state['delivered'][$key] ?? false ) === true )
+					return $key;
+
+			foreach( $keys as $key ) {
+
+				$gives = false;
+
+				foreach( $keys as $other )
+					if( $other !== $key && isset( $state['closure'][$key][$other] ) === true && isset( $state['closure'][$other][$key] ) === false )
+						$gives = true;
+
+				if( $gives === false )
+					return $key;
+			}
+
+			return $keys[0];
+		}
+
+		/**
+		 *	Features in the order they are read in: the order they come in, except that a feature waits behind every feature it requires, and
+		 *	so behind those they require. What waits stands where the last of what it waits for has stood, and no feature stands further
+		 *	forward than it did: a requirement is never drawn in front of a feature that was before it, whoever requires it - the first
+		 *	of the features that are ready is the next. A requirement that is not among the manifests - it is off or not there - is
+		 *	waited for by none; of a circle of requirements the first of its members that comes is put out, so that nobody waits for itself;
+		 *	two manifests of one key both stand in the list. The order is the list's own and independent of the file system: the readers that
+		 *	stand on it - the register of the components with its groups and the standard parts that follow it, and the places blocks
+		 *	are read from - hand it the list in the order they have always had
+		 *
+		 *	A feature the kernel delivers is waited for by every feature that is not (the same line as in _deliveredNames(): it goes with
+		 *	'shipped', and the order is the one the requirements say)
+		 *
+		 *	@param		array 		$manifests		Features, as manifest() answers them, in the order to keep
+		 *
+		 *	@return 	array										The same features in the order they are read in, with the keys they had
+		 */
+		public static function ordered( array $manifests ): array {
+
+			$left = [];
+			$delivered = 0;
+
+			foreach( $manifests as $manifest ) {
+
+				$left[$manifest['key']] = ( $left[$manifest['key']] ?? 0 ) + 1;
+				$delivered += $manifest['shipped'] === true ? 1 : 0;
+			}
+
+			$left['#'] = $delivered;
+			$unmet = [];
+			$waiting = [];
+
+			foreach( $manifests as $index => $manifest ) {
+
+				$unmet[$index] = 0;
+				$waits = array_diff( array_unique( $manifest['requires'] ), [ $manifest['key'] ] );
+
+				if( $manifest['shipped'] === false )
+					$waits[] = '#';
+
+				foreach( $waits as $wait )
+					if( ( $left[$wait] ?? 0 ) > 0 ) {
+						$unmet[$index]++;
+						$waiting[$wait][] = $index;
+					}
+			}
+
+			$ordered = [];
+			$pending = array_keys( $manifests );
+
+			while( $pending !== [] ) {
+
+				// The first that waits for nothing; where all of them wait, a circle: the first of them
+				$next = 0;
+
+				foreach( $pending as $at => $index )
+					if( $unmet[$index] <= 0 ) {
+						$next = $at;
+						break;
+					}
+
+				$index = $pending[$next];
+				array_splice( $pending, $next, 1 );
+				$ordered[$index] = $manifests[$index];
+
+				foreach( array_merge( [ $manifests[$index]['key'] ], $manifests[$index]['shipped'] === true ? [ '#' ] : [] ) as $done )
+					if( --$left[$done] === 0 )
+						foreach( $waiting[$done] ?? [] as $waits )
+							$unmet[$waits]--;
+			}
+
+			return $ordered;
+		}
+
+		/**
+		 *	The features a feature is built on, as the rule of a demo and the order read them: those its manifest requires that
+		 *	are on and, through them, those that they require - never the feature itself, whatever a circle of requirements
+		 *	says. A requirement that is off or is not there is none: what is not on has no components to call, and activate()
+		 *	puts a requirement on before the feature that requires it
+		 *
+		 *	@param		array 		$manifest			The feature
+		 *	@param		array 		$listed				The features that are on, by key
+		 *
+		 *	@return 	array										key => manifest
+		 */
+		private static function _builtOn( array $manifest, array $listed ): array {
+
+			$found = [];
+			$queue = $manifest['requires'];
+
+			for( $at = 0; $at < count( $queue ); $at++ ) {
+
+				$key = $queue[$at];
+
+				if( $key === $manifest['key'] || isset( $found[$key] ) === true || isset( $listed[$key] ) === false )
+					continue;
+
+				$found[$key] = $listed[$key];
+				array_push( $queue, ...$listed[$key]['requires'] );
+			}
+
+			return $found;
+		}
+
+		/**
+		 *	The names of the components that the folders of some features hold: what a demo of a feature built on them may call
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$builtOn			Features, as _builtOn() answers
+		 *
+		 *	@return 	array										Names
+		 */
+		private static function _namesOf( array &$appData, array $builtOn ): array {
+
+			$names = [];
+
+			foreach( $builtOn as $manifest )
+				$names = array_merge( $names, self::_componentNames( $appData, $manifest['dir'] ) );
+
+			return array_values( array_unique( $names ) );
+		}
+
+		/**
+		 *	The names of the folders of the components/ of a feature's directory that name a component - the name of a folder is
+		 *	the name of the component - so that the demo of another feature is checked against names and not against the register,
+		 *	which the cache of a feature is made without. The kind of a name that is not the feature's own, container or leaf,
+		 *	is the parser's to find, from the ends the demo has. Read once for a request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$dir					The directory of a feature
+		 *
+		 *	@return 	array										The names, sorted
+		 */
+		private static function _componentNames( array &$appData, string $dir ): array {
+
+			return $appData['./nino/features/names'][$dir] ??= self::componentNames( $dir );
+		}
+
+		/**
+		 *	The names of the components a feature's directory holds, as readComponents() takes them for the demos of a feature built on it
+		 *	(its third argument): the folders of components/ whose name is that of a component
+		 *
+		 *	@param		string		$dir					The directory of a feature
+		 *
+		 *	@return 	array										The names, sorted
+		 */
+		public static function componentNames( string $dir ): array {
+
+			$names = [];
+			$path = rtrim( $dir, '/' ). '/'. self::COMPONENTS;
+
+			foreach( @scandir( $path ) ?: [] as $entry )
+				if( $entry[0] !== '.' && preg_match( \Nino\Components::NAME, $entry ) === 1 && is_dir( $path. '/'. $entry ) === true )
+					$names[] = $entry;
+
+			sort( $names );
+
+			return $names;
+		}
+
+		/**
+		 *	The first call of a demo of a component that does not belong to what the demo may call: a component belongs to the feature that
+		 *	has it registered, so that the name of a folder of another feature, a component of its own that was left out, a component of
+		 *	a twin of its own key and the name of a component that a feature it does not stand on owns are all foreign. It may call what is
+		 *	registered for the feature itself, for a feature it is built on and for a feature the kernel delivers - and, while the kernel
+		 *	delivers one, the name of a component of it that nobody has registered, since a feature that is off draws nothing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature the demo is of
+		 *	@param		array 		$own					The names of the components its folders bring that are registered for it
+		 *	@param		string		$demo					The text of the demo
+		 *	@param		array 		$builtOn			The keys of the features it is built on
+		 *	@param		array 		$byKey				The features that are on, by key
+		 *
+		 *	@return 	string|null								The name of the call, null where there is none
+		 */
+		private static function _demoForeign( array &$appData, string $key, array $own, string $demo, array $builtOn, array $byKey ): ?string {
+
+			$notes = [];
+			$stack = \Nino\Markup::parse( $demo, \Nino\Components::containers( $appData ), $notes );
+			$delivered = array_keys( array_filter( $byKey, static fn( array $other ): bool => $other['shipped'] === true ) );
+
+			while( $stack !== [] ) {
+
+				$node = array_shift( $stack );
+
+				if( is_array( $node ) === false || is_string( $node['n'] ?? null ) === false )
+					continue;
+
+				$owner = $appData[\Nino\Components::OWNERS]['names'][$node['n']] ?? null;
+				$allowed = $owner === null ? in_array( $node['n'], self::_deliveredNames(), true ) : ( $owner === $key ? in_array( $node['n'], $own, true ) : in_array( $owner, array_merge( $builtOn, $delivered ), true ) );
+
+				if( $allowed === false )
+					return $node['n'];
+
+				if( is_array( $node['c'] ?? null ) === true )
+					array_push( $stack, ...$node['c'] );
+			}
+
+			return null;
+		}
+
+		/**
+		 *	What the Features panel says of the demos of a feature that call what they may not (see _demoForeign())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			The feature
+		 *	@param		array 		$read					As readComponents() answers it
+		 *	@param		array 		$own					The names of its components that are registered for it
+		 *	@param		array 		$builtOn			The keys of the features it is built on
+		 *	@param		array 		$byKey				The features that are on, by key
+		 *
+		 *	@return 	array										Sentences
+		 */
+		private static function _demosForeign( array &$appData, array $manifest, array $read, array $own, array $builtOn, array $byKey ): array {
+
+			$said = [];
+
+			foreach( $read['groups'] as $group => $declared ) {
+
+				$foreign = $declared['demo'] === '' ? null : self::_demoForeign( $appData, $manifest['key'], $own, $declared['demo'], $builtOn, $byKey );
+
+				if( $foreign !== null )
+					$said[] = 'feature "'. $manifest['key']. '", group "'. self::_shown( (string) $group ). '": its '. self::DEMO. ' calls "'. self::_shown( $foreign ). '", which is no component of its feature or of a feature it requires';
+			}
+
+			return $said;
 		}
 
 		/**
@@ -718,24 +1130,33 @@ namespace Nino {
 		/**
 		 *	The schemas of the components of a feature for one request: from its file in the cache of the register
 		 *	where that is the file's stamp - the kernel it was written for and the size and the time of every file
-		 *	of components/ and groups/ - or read, and kept where all of it is accepted
+		 *	of components/ and groups/, and the components of the features it is built on - or read, and kept where all of it is accepted
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$manifest			The feature
+		 *	@param		array 		$builtOn			The features it is built on, as _builtOn() answers
 		 *
 		 *	@return 	array										See readComponents(); 'rejected' is [] for what comes from the cache, and the folder itself unreadable is every component refused
 		 */
-		private static function _register( array &$appData, array $manifest ): array {
+		private static function _register( array &$appData, array $manifest, array $builtOn ): array {
 
 			$on = ( $appData[\Nino\Html::TREES_SWITCH] ?? true ) !== false;
 			$kept = self::REGISTER. '/'. $manifest['key']. '.php';
 			$stamp = self::_stamp( $manifest['dir'] );
+
+			// The demos were read against the components of the features it is built on: those are part of what the file was written for
+			$names = [];
+
+			foreach( $builtOn as $key => $other )
+				$names[] = $key. ':'. implode( ',', self::_componentNames( $appData, $other['dir'] ) );
+
+			$stamp['built on'] = implode( ';', $names );
 			$stored = $on === true ? self::_stored( $appData, $kept ) : null;
 
 			if( $stored !== null && $stored['kernel'] === \Nino\VERSION && $stored['stamp'] === $stamp )
 				return [ 'components' => $stored['components'], 'groups' => $stored['groups'], 'rejected' => [] ];
 
-			$read = self::readComponents( $manifest['dir'], $manifest['key'] );
+			$read = self::readComponents( $manifest['dir'], $manifest['key'], self::_namesOf( $appData, $builtOn ) );
 
 			if( is_string( $read ) === true )
 				return [ 'components' => [], 'groups' => [], 'rejected' => [ '' => $read ] ];
@@ -866,15 +1287,18 @@ namespace Nino {
 		 *	refused, since what is read into the schemas and the style bundle of the site is not what the folder holds.
 		 *	A standard part that breaks the rule of mixing (\Nino\Components::partProblems()) is refused alone: the group
 		 *	and its components are the feature's, and the part is not put into the style bundle. So is a demo.tpl that is
-		 *	no piece of html+ made of components with texts of its own (\Nino\Components::demoProblem()): the group has no demo
+		 *	no piece of html+ made of components with texts of its own (\Nino\Components::demoProblem()): the group has no demo.
+		 *	A demo calls the components of its own feature and of the features it is built on - the ones its manifest requires, and those
+		 *	they require - which the caller names; the components of a feature the kernel delivers are called by every demo
 		 *
 		 *	@param		string		$dir					The directory of the feature
 		 *	@param		string		$key					Its key, as the manifest says it
+		 *	@param		array			$builtOn			The names of the components of the features it is built on, which a demo may call as well; [] where there are none
 		 *
 		 *	@return 	array|string							[ 'components' => name => clean schema, 'groups' => group => [ 'label', 'knobs', 'part', 'demo' ],
 		 *																	'rejected' => name, 'group <name>', 'part <name>' or 'demo <name>' => why ], or why the folders cannot be read at all
 		 */
-		public static function readComponents( string $dir, string $key ): array|string {
+		public static function readComponents( string $dir, string $key, array $builtOn = [] ): array|string {
 
 			$dir = rtrim( $dir, '/' );
 			$base = realpath( $dir );
@@ -1046,7 +1470,7 @@ namespace Nino {
 						foreach( $components as $name => $clean )
 							$containers[$name] = isset( $clean['offers'] );
 
-						$problem = \Nino\Components::demoProblem( $text, array_unique( array_merge( array_keys( $components ), self::_basisNames() ) ), $containers );
+						$problem = \Nino\Components::demoProblem( $text, array_unique( array_merge( array_keys( $components ), $builtOn, self::_deliveredNames() ) ), $containers );
 						$source = $problem === null ? $text : '';
 					}
 
@@ -1061,21 +1485,28 @@ namespace Nino {
 		}
 
 		/**
-		 *	The names of the components of the feature that comes with the kernel (Basis), which the demo of any group may call: the
-		 *	folders of its components/ - the name of a folder is the name of the component - so that a demo of another feature is
-		 *	checked against names and not against the register, which the cache of a feature is made without. The kind of a
-		 *	name that is not the feature's own - container or leaf - is the parser's to find, from the ends the demo has
+		 *	The names of the components of the features the kernel delivers, which the demo of any group may call whether they are on or
+		 *	not: a feature that is delivered counts as required by every feature that is not (see ordered(), which says the same), so that
+		 *	the catalogue, whose features do not name it in 'requires', is read as it always was. This line and the one in ordered() go
+		 *	together with 'shipped'
 		 *
 		 *	@return 	array										The names
 		 */
-		private static function _basisNames(): array {
+		private static function _deliveredNames(): array {
 
 			$names = [];
-			$path = self::_shipped(). '/Basis/'. self::COMPONENTS;
 
-			foreach( @scandir( $path ) ?: [] as $entry )
-				if( $entry[0] !== '.' && preg_match( \Nino\Components::NAME, $entry ) === 1 && is_dir( $path. '/'. $entry ) === true )
-					$names[] = $entry;
+			foreach( @scandir( self::_shipped() ) ?: [] as $module ) {
+
+				if( $module[0] === '.' || is_file( self::_shipped(). '/'. $module. '/'. self::MANIFEST ) === false )
+					continue;
+
+				$path = self::_shipped(). '/'. $module. '/'. self::COMPONENTS;
+
+				foreach( @scandir( $path ) ?: [] as $entry )
+					if( $entry[0] !== '.' && preg_match( \Nino\Components::NAME, $entry ) === 1 && is_dir( $path. '/'. $entry ) === true )
+						$names[] = $entry;
+			}
 
 			return $names;
 		}
@@ -1165,7 +1596,13 @@ namespace Nino {
 			if( is_dir( $feature['dir']. '/'. self::COMPONENTS ) === false )
 				return $unread;
 
-			$read = self::readComponents( $feature['dir'], $key );
+			$byKey = [];
+
+			foreach( self::_listed( $appData ) as $listed )
+				$byKey[$listed['key']] = $listed;
+
+			$builtOn = self::_builtOn( $feature, $byKey );
+			$read = self::readComponents( $feature['dir'], $key, self::_namesOf( $appData, $builtOn ) );
 
 			if( is_string( $read ) === true )
 				return array_merge( $unread, [ $read ] );
@@ -1173,7 +1610,12 @@ namespace Nino {
 			$refused = [];
 			self::_renderers( $feature, $read['components'], $refused );
 
-			$problems = array_merge( $unread, array_values( $read['rejected'] ), array_values( $refused ) );
+			$problems = array_merge( $unread, array_values( $read['rejected'] ), array_values( $refused ), self::_demosForeign( $appData, $feature, $read, array_map( 'strval', array_diff( array_keys( $read['components'] ), array_keys( $refused ) ) ), array_keys( $builtOn ), $byKey ) );
+
+			// A block of its own that another place has, by the rule of winner(): the reason says whose the key is
+			foreach( \Nino\Blocks::rejected( $appData ) as $where => $why )
+				if( str_starts_with( $where, $key. '/' ) === true && str_contains( $why, 'the key is the one of the block of' ) === true )
+					$problems[] = 'block "'. self::_shown( substr( $where, strlen( $key ) + 1 ) ). '": '. $why;
 
 			foreach( array_keys( $read['groups'] ) as $group )
 				if( ( $appData[\Nino\Components::OWNERS]['groups'][$group] ?? $key ) !== $key )
@@ -1947,8 +2389,11 @@ namespace Nino {
 			if( $feature === null )
 				return 'unknown feature "'. $key. '"';
 
+			// A feature that this one requires is no reason to keep it: two features that require each other can be switched off one after the other
+			$below = self::_builtOn( $feature, self::all( $appData ) );
+
 			foreach( self::all( $appData ) as $other )
-				if( $other['active'] === true && in_array( $key, $other['requires'], true ) === true )
+				if( $other['active'] === true && in_array( $key, $other['requires'], true ) === true && isset( $below[$other['key']] ) === false )
 					return 'feature "'. $key. '" is required by "'. $other['key']. '"';
 
 			if( $feature['active'] === false )
