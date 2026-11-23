@@ -135,6 +135,9 @@ console.log('Submissions panel');
 	check( 'the message of a row is the long text, one line, cut by an ellipsis, whole in its tooltip',
 		byClass( w.rows()[1], 'nino-admin-table-clamp' ).pop().title === 'Hello there\nsecond line' );
 
+	check( 'under 40 rem a row is a card: the sender is its name, the moment, the form and the message stand under it, the address is left to the record',
+		first.children.filter( el => el.dataset.card !== undefined ).map( el => el.dataset.card ).join() === 'line,line,primary,omit,line' );
+
 	// --- the form is the category, the search is the rest ------------------------
 
 	check( 'the form is a select left of the search, named for a screen reader, with the entry that turns it off first',

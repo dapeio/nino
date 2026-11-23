@@ -51,7 +51,7 @@ console.log('The directory and the record carry a panel of images\n');
 	const bar = byClass( p.mount, 'nino-admin-table-toolbar' )[0];
 
 	check( 'the page draws 60 slots, 25 to the page because a column of pictures stands in the table', p.drawn.rows.length === 60 && p.drawn.directory.rows().length === 60 && p.rowEls().length === 25 );
-	check( 'the toolbar is the category, the search, the two filters and - for a narrow screen - the button of the filters', bar.children.map( el => el.tagName ).join() === 'SELECT,INPUT,SELECT,SELECT,BUTTON' && bar.dataset.collapsible === 'true' );
+	check( 'the toolbar is the category, the search, the two filters and - for a narrow screen - the button of the filters', bar.children.map( el => el.tagName ).join() === 'SELECT,INPUT,SELECT,SELECT,SELECT,BUTTON' && bar.dataset.collapsible === 'true' );
 	check( 'the heads of the pictures and of the states of the languages are words, the others buttons',
 		findAll( p.mount, el => el.tagName === 'TH' && el.dataset.key !== undefined ).map( th => th.dataset.key+ ':'+ tag( th, 'button' ).length ).join() === 'picture:0,name:1,groupName:1,size:1,usedText:1,states:0' );
 
@@ -68,7 +68,7 @@ console.log('The directory and the record carry a panel of images\n');
 	check( 'the category narrows the 60 to the slots of one group', p.drawn.directory.rows().length > 0 && p.drawn.directory.rows().every( row => row.group === 'home' ) );
 	selects[2].value = 'missing';
 	fire( selects[2], 'change' );
-	check( '...and the filter of the alt texts to those that miss one in a language', p.drawn.directory.rows().every( row => row.states.some( s => s.ok === false ) ) && bar.children[4].dataset.active === '2' );
+	check( '...and the filter of the alt texts to those that miss one in a language', p.drawn.directory.rows().every( row => row.states.some( s => s.ok === false ) ) && bar.children[5].dataset.active === '2' );
 	selects[0].value = '';
 	selects[2].value = '';
 	fire( selects[0], 'change' );

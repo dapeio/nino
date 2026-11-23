@@ -1201,6 +1201,22 @@ check( 'the guide says the page sizes of a table of pictures and of every other'
 check( 'under 40 rem only the search is in view, as the guide says: the button of the filters is shown by the stylesheet from that width down',
 	str_contains( $guide, 'Under 40 rem only the search is in view' ) && preg_match( '/@media \(max-width: 40rem\) \{\s*:where\(\.nino-admin\) \[data-collapsible="true"\] > \.nino-admin-filterbar-toggle \{\s*display: inline-flex;/', $style ) === 1 );
 
+// The rows as cards (the card is the stylesheet's, the marks on the cells are the script's and are held by tests/nino-ui-directory-js-smoke.js): under 40 rem the table of a directory is a stack of grids with no head, and the select of the sort is shown
+check( 'under 40 rem the rows of a directory are cards, as the guide says: the stylesheet makes a grid of each row, drops the head and shows the select of the sort - from that width down and not above',
+	str_contains( $guide, '**every row is a card**' ) && str_contains( $guide, '`narrow : \'second\'`' ) && str_contains( $guide, '`primary : true`' )
+	&& preg_match( '/@media \(max-width: 40rem\) \{\s*:where\(\.nino-admin\) \.nino-admin-table-scroll--cards \{\s*overflow: visible;/', $style ) === 1
+	&& preg_match( '/\.nino-admin-table--cards tbody tr \{\s*display: grid;/', $style ) === 1
+	&& preg_match( '/\.nino-admin-table--cards thead th:not\(\.nino-admin-table-select\) \{\s*display: none;/', $style ) === 1
+	&& preg_match( '/\[data-collapsible="true"\]\[data-open="true"\] > \.nino-admin-table-sortby \{\s*display: block;/', $style ) === 1
+	&& preg_match( '/\.nino-admin-table-sortby \{\s*display: none;/', $style ) === 1 );
+
+check( 'under 40 rem the cell of the buttons of a table that is no card sticks to the edge only where it has room, as the guide says: the stylesheet lets it roll when the script marks the frame',
+	str_contains( $guide, 'only while the first column still has its room beside it' ) && preg_match( '/\.nino-admin-table-scroll\.is-roll \.nino-admin-table :is\(th, td\)\.nino-admin-table-actions \{\s*position: static;/', $style ) === 1 );
+
+check( 'a link button in a line of text or a cell is text at the start that breaks its lines and is no wider than its room, and the first column of a table keeps a width under 40 rem that shows a name: a token that the stylesheet declares and reads',
+	preg_match( '/\.nino-admin-linkbutton \{[^}]*max-width: 100%;\s*text-align: start;\s*white-space: normal;/', $style ) === 1 && preg_match( '/\.nino-admin-table td \.nino-admin-linkbutton \{\s*[^}]*max-width: 28rem;/', $style ) === 1
+	&& preg_match( '/--nino-admin-table-name-min:\s*9rem;/', $style ) === 1 && preg_match( '/@media \(max-width: 40rem\) \{\s*:where\(\.nino-admin\) \.nino-admin-table:not\(\.nino-admin-table--cards\) tr > :is\(th, td\):first-child[^{]*\{\s*min-width: var\(--nino-admin-table-name-min\);/', $style ) === 1 );
+
 check( 'the dialog of a record is the one dialog that has a cross: no panel script asks choiceDialog() for one, and the guide says so',
 	str_contains( $guide, 'the one dialog that has a cross' ) && array_filter( $scripts, static fn( string $script ): bool => preg_match( '/choiceDialog\(\s*\{[^}]*\bclose\s*:/s', $bare( $read( $script ) ) ) === 1 && $script !== '_admin/assets/Nino.admin.js' && str_contains( $script, '.cache/' ) === false ) === [] );
 

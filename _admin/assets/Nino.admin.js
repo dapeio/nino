@@ -1239,7 +1239,8 @@
 		 *																			value the one that is chosen (the first by default), label its name for a screen reader (it has no other), left out, the bar has no select
 		 *																			search { value, label, placeholder, onInput( value ), id, className } - left out, the bar has no field; className replaces the
 		 *																			classes of the field
-		 *																			filters [ { value, options, label, onChange( value ), id } ] - further selects, after the search, in the order given, each named for a screen reader by its label
+		 *																			filters [ { value, options, label, onChange( value ), id, className, quiet } ] - further selects, after the search, in the order given, each named for a screen reader by its label;
+		 *																			`className` is added to the select's own, `quiet` true for a select that does not narrow the list (an order): the button does not count it and it does not hold the bar open
 		 *																			collapse { label } - under 40 rem only the search is in view and the selects are behind one button of that name, which counts the ones that narrow the list (a select that holds another value than its first option, "all"); left out, the selects stay in view
 		 *																			items an array of elements that stand after the field: chip()
 		 *																			className what the bar has besides its own class
@@ -1261,7 +1262,7 @@
 			const choose = function( filter ) {
 
 				const made = dc.createElement('select');
-				made.className = 'nino-admin-input nino-admin-filterbar-select';
+				made.className = 'nino-admin-input nino-admin-filterbar-select'+ ( filter.className ? ' '+ filter.className : '' );
 				made.setAttribute( 'aria-label', filter.label ?? '' );
 
 				if( filter.id )
@@ -1283,7 +1284,7 @@
 						filter.onChange( made.value );
 				} );
 
-				selects.push( { el : made, first : ( filter.options || [] ).length > 0 ? String( filter.options[0].value ?? '' ) : '' } );
+				selects.push( { el : made, first : ( filter.options || [] ).length > 0 ? String( filter.options[0].value ?? '' ) : '', quiet : filter.quiet === true } );
 
 				return made;
 			};
@@ -1345,7 +1346,7 @@
 
 				const recount = function() {
 
-					const active = selects.filter( function( one ) { return one.el.value !== one.first } ).length;
+					const active = selects.filter( function( one ) { return one.quiet === false && one.el.value !== one.first } ).length;
 
 					count.textContent = active === 0 ? '' : String( active );
 					count.hidden = active === 0;
@@ -1358,7 +1359,7 @@
 					}
 				};
 
-				selects.forEach( function( one ) { one.el.addEventListener( 'change', recount ) } );
+				selects.forEach( function( one ) { if( one.quiet === false ) one.el.addEventListener( 'change', recount ) } );
 				recount();
 			}
 
@@ -6528,6 +6529,17 @@
 		 *																					shown (the box is remembered by its row, and forgotten by a search, a sort, a page and new rows). label names
 		 *																					the head's checkbox. Without select the table has none of it
 		 *
+		 *	@param		{boolean}		[options.cards]				True for a table that is a stack of cards under 40 rem (the directory sets it): the cells are drawn as always and the stylesheet
+		 *																					makes each row a card - see the column options `primary` and `narrow` below. A card has no head: the table adds a select "Sort by"
+		 *																					(the sortable columns, ascending and descending) behind the button of the filters, and the box of the head stands in a strip over the cards.
+		 *																					The table keeps its roles (table, row, cell) as attributes, so that a screen reader hears it as one in whatever the stylesheet makes of it
+		 *
+		 *	A column of a table with `cards` says what it is in the card (the table is drawn the same at every width - only the stylesheet makes cards of it):
+		 *	  primary : true      the name of the card: at its top, strong, it breaks its lines instead of being cut. The first column that is no picture and no group of badges if none says so
+		 *	  narrow  : false     the column is not in the card (what stays in the record, or is said by another column)
+		 *	  narrow  : 'second'  the column stands under the name as the second line, without its label
+		 *	  (none)              "Label: value" in the order of the columns; a cell of a picture (`thumb`) stands left of the name, the badges of `locales` in one row
+		 *
 		 *	A column that has no `render` may say what kind of cell it is - `cell` - and the table draws it, and reads the search from what it shows:
 		 *	  'clamp'    one line, cut by an ellipsis where it is too long, the whole text as its tooltip; column.max ("14rem") is the widest it gets, column.fill true takes the room that the other columns leave (the message of a row)
 		 *	  'text'     the value as text, as a column with no kind has it
@@ -6614,6 +6626,32 @@
 			const nextLabel	= labels.next 		?? ( Nino.content.getText('/_admin/common/label/nextpage') || 'Next page' );
 			const sizeLabel	= labels.pageSize	?? ( Nino.content.getText('/_admin/common/label/perpage') || 'Rows per page' );
 
+			// A column is sorted by its head where it has a word and is no picture and no states of languages: the head and the select of a card are one rule
+			const sortable = function( column ) {
+				return column.sortable === undefined ? ( String( column.label ?? '' ) !== '' && column.cell !== 'thumb' && column.cell !== 'locales' ) : column.sortable === true;
+			};
+
+			// What each column is in a card (see `cards`): one name, one picture, the lines under the name, and what is left out. A column is read once, here
+			const cards = options.cards === true;
+			const cardOf = columns.map( function( column ) {
+				if( column.narrow === false )
+					return 'omit';
+				return column.cell === 'thumb' ? 'thumb' : ( column.narrow === 'second' ? 'second' : 'line' );
+			} );
+
+			if( cards === true ) {
+
+				const named = columns.findIndex( function( column, at ) { return column.primary === true && cardOf[at] !== 'omit' } );
+				const first = named !== -1 ? named : columns.findIndex( function( column, at ) { return cardOf[at] === 'line' && column.cell !== 'locales' } );
+
+				if( first !== -1 )
+					cardOf[first] = 'primary';
+
+				const picture = cardOf.indexOf('thumb');
+
+				cardOf.forEach( function( kind, at ) { if( kind === 'thumb' && at !== picture ) cardOf[at] = 'line' } );
+			}
+
 			mount.innerHTML = '';
 			mount.classList.add('nino-admin-table-wrap');
 
@@ -6621,10 +6659,48 @@
 			// The toolbar is the filter bar of the design system: the select that picks a kind, where the caller has one (options.filter), and the search.
 			// The table filters by the search alone; what the select chooses is the caller's to apply, who is told
 			const filtered = ( typeof options.filter === 'object' && options.filter !== null ) || Array.isArray( options.filters ) === true;
+
+			/*	A card has no head to sort by: the sort is a select, "Sort by", the last of the selects behind the button of the filters, drawn on every width
+				and shown by the stylesheet under 40 rem. It does not narrow the list, so the button does not count it (`quiet`). One option for the order the
+				rows come in, then every column that is sorted by its head, ascending and descending	*/
+			const sortWords = {
+				by : labels.sortBy ?? Nino.adminUi.text('/_admin/common/table/sort-by'),
+				none : labels.sortNone ?? Nino.adminUi.text('/_admin/common/table/sort-default'),
+				up : labels.sortUp ?? Nino.adminUi.text('/_admin/common/table/sort-up'),
+				down : labels.sortDown ?? Nino.adminUi.text('/_admin/common/table/sort-down'),
+			};
+			const sortOptions = [ { value : '', label : sortWords.none } ];
+
+			if( cards === true )
+				columns.filter( sortable ).forEach( function( column ) {
+					sortOptions.push( { value : column.key+ ':up', label : Nino.adminUi.format( sortWords.up, column.label ) }, { value : column.key+ ':down', label : Nino.adminUi.format( sortWords.down, column.label ) } );
+				} );
+
+			const sorting = sortOptions.length > 1;
+			const sortValue = function() { return sortKey === '' ? '' : sortKey+ ( sortDir < 0 ? ':down' : ':up' ) };
+			let sortSelect = null;
+
 			const made = Nino.adminUi.filterBar( {
 				filter : typeof options.filter === 'object' && options.filter !== null ? options.filter : null,
-				filters : options.filters,
-				collapse : options.collapse,
+				filters : ( Array.isArray( options.filters ) === true ? options.filters : [] ).concat( sorting === true ? [ {
+					id : 'nino-admin-table-sort-'+ ( ++serial ),
+					label : sortWords.by,
+					options : sortOptions,
+					value : sortValue(),
+					className : 'nino-admin-table-sortby',
+					quiet : true,
+					onChange : function( value ) {
+
+						const at = value.lastIndexOf(':');
+
+						sortKey = at === -1 ? '' : value.slice( 0, at );
+						sortDir = value.slice( at + 1 ) === 'down' ? -1 : 1;
+						page = 1;
+						draw();
+						told();
+					},
+				} ] : [] ),
+				collapse : options.collapse ?? ( sorting === true ? { label : labels.filter ?? Nino.adminUi.text('/_admin/common/table/filters') } : undefined ),
 				search : {
 					className : 'nino-admin-table-search',
 					// A placeholder is not a name: it disappears on the first keystroke
@@ -6652,7 +6728,10 @@
 			} );
 			const toolbar = made.el;
 			// The toolbar is the bar's content - the select and the search - under the table's own classes: it is not a second filter bar of the page
-			toolbar.className = 'nino-admin-table-toolbar'+ ( options.search === true ? ' nino-admin-table-toolbar--wide' : '' )+ ( filtered === true ? ' nino-admin-table-toolbar--filtered' : '' );
+			toolbar.className = 'nino-admin-table-toolbar'+ ( options.search === true ? ' nino-admin-table-toolbar--wide' : '' )+ ( filtered === true || sorting === true ? ' nino-admin-table-toolbar--filtered' : '' );
+
+			if( sorting === true )
+				sortSelect = made.selects[made.selects.length - 1];
 			mount.appendChild( toolbar );
 
 			// --- the bar of the chosen rows ---------------------------------
@@ -6708,6 +6787,17 @@
 			const thead = dc.createElement('thead');
 			const headRow = dc.createElement('tr');
 
+			/*	A table that is cards under 40 rem is drawn once, for every width, and keeps what it is as roles: a browser that no longer takes a
+				<table> for one once the stylesheet has changed its display - Safari with VoiceOver - still tells a screen reader a table, its rows
+				and their cells, so that each entry is read as one: the name, "label: value" for every line, then the buttons	*/
+			if( cards === true ) {
+				scroller.classList.add('nino-admin-table-scroll--cards');
+				table.classList.add('nino-admin-table--cards');
+				table.setAttribute( 'role', 'table' );
+				thead.setAttribute( 'role', 'rowgroup' );
+				headRow.setAttribute( 'role', 'row' );
+			}
+
 			// A box of the chosen rows, 24 px to press: the label is the target, the input is drawn in it
 			const checkbox = function( name ) {
 
@@ -6731,6 +6821,13 @@
 
 				th.className = 'nino-admin-table-select';
 				headCheck = all.input;
+
+				// Over the cards the box of the head stands in a strip of its own, with its words: the label is the box's name in the table, and the words beside it in a card
+				if( cards === true ) {
+					all.box.appendChild( Nino.adminUi.el( 'span', 'nino-admin-table-selecttext', options.select.label ?? Nino.adminUi.text('/_admin/common/table/select-page') ) );
+					th.setAttribute( 'role', 'columnheader' );
+				}
+
 				// The box of the head is for the rows of the page that is shown: what a person sees is what is chosen. The rows of the other pages are chosen
 				// by the offer in the bar, which says how many they are
 				headCheck.addEventListener( 'click', function() {
@@ -6750,12 +6847,14 @@
 
 				const th = dc.createElement('th');
 				th.dataset.key = column.key;
+				if( cards === true )
+					th.setAttribute( 'role', 'columnheader' );
 				if( column.type === 'integer' || column.type === 'double' )
 					th.classList.add('nino-admin-table-num');
 
 				// A sort button with no word on it is announced as nothing and
 				// offers an order nobody can name: a column without a label has none
-				if( column.sortable === undefined ? ( String( column.label ?? '' ) === '' || column.cell === 'thumb' || column.cell === 'locales' ) : column.sortable !== true ) {
+				if( sortable( column ) === false ) {
 					th.textContent = column.label ?? '';
 					headRow.appendChild( th );
 					return;
@@ -6782,6 +6881,8 @@
 			if( typeof options.actions === 'function' || typeof options.onRowClick === 'function' ) {
 				const th = dc.createElement('th');
 				th.className = 'nino-admin-table-actions';
+				if( cards === true )
+					th.setAttribute( 'role', 'columnheader' );
 				headRow.appendChild( th );
 			}
 
@@ -6789,6 +6890,8 @@
 			table.appendChild( thead );
 
 			const tbody = dc.createElement('tbody');
+			if( cards === true )
+				tbody.setAttribute( 'role', 'rowgroup' );
 			table.appendChild( tbody );
 			scroller.appendChild( table );
 			mount.appendChild( scroller );
@@ -6879,10 +6982,16 @@
 					th.setAttribute( 'aria-sort', sorted === false ? 'none' : ( sortDir < 0 ? 'descending' : 'ascending' ) );
 				} );
 
+				// The select of a card says the order the table has, whoever set it - the head, the select, the state it was drawn with
+				if( sortSelect !== null )
+					sortSelect.value = sortValue();
+
 				tbody.innerHTML = '';
 				view.rows.forEach( function( row ) {
 
 					const tr = dc.createElement('tr');
+					if( cards === true )
+						tr.setAttribute( 'role', 'row' );
 					if( row[rowKey] !== undefined && row[rowKey] !== null )
 						tr.dataset.row = String( row[rowKey] );
 					if( typeof options.onRowClick === 'function' ) {
@@ -6905,6 +7014,8 @@
 						const key = keyOf( row );
 
 						td.className = 'nino-admin-table-select';
+						if( cards === true )
+							td.setAttribute( 'role', 'cell' );
 
 						if( key !== null ) {
 
@@ -6940,10 +7051,19 @@
 						tr.appendChild( td );
 					}
 
-					columns.forEach( function( column ) {
+					columns.forEach( function( column, at ) {
 
 						const td = dc.createElement('td');
 						const text = model.format( row[column.key], column.type );
+
+						// What the cell is in a card, and the word it is read under: the stylesheet draws the label before the value of a line
+						if( cards === true ) {
+							td.setAttribute( 'role', 'cell' );
+							td.dataset.card = cardOf[at];
+
+							if( cardOf[at] === 'line' && String( column.label ?? '' ) !== '' )
+								td.dataset.label = String( column.label );
+						}
 
 						if( typeof column.render === 'function' ) {
 							const cell = column.render( row[column.key], row );
@@ -6993,10 +7113,20 @@
 						if( typeof options.onRowClick === 'function' ) {
 							const chev = Nino.adminUi.el( 'span', 'nino-admin-row-chev', '\u203a' );
 							chev.setAttribute( 'aria-hidden', 'true' );
-							td.appendChild( chev );
+
+							// In a card the sign stands at the end of the name, where the card is read from, and not at the foot beside the buttons
+							const name = cards === true ? tr.querySelector('[data-card="primary"]') : null;
+
+							( name !== null ? name : td ).appendChild( chev );
 						}
 
-						tr.appendChild( td );
+						// In a card the cell is for the buttons alone: a row that only opens has none
+						if( cards === true && typeof options.actions === 'function' ) {
+							td.setAttribute( 'role', 'cell' );
+							tr.appendChild( td );
+						}
+						else if( cards !== true )
+							tr.appendChild( td );
 					}
 
 					// Its own stop of the Tab key only where nothing inside it is one: a
@@ -7035,6 +7165,28 @@
 				pager.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 
 				syncSelection( false );
+				fit();
+			}
+
+			/*	Under 40 rem the cell of a row's buttons sticks to the right edge of the frame only while the columns before it still have their room beside it:
+				the box of the rows and the first column of the content, at the width they have. Where they have not - a text button "Edit" and "Delete" is 186 px
+				of a frame of 353 - it would lie over what the person came for, so the cell rolls with the rest (`is-roll`, the stylesheet does the rest). Measured
+				where the page has a layout; a table that is not shown has none and keeps what it had. A card never sticks	*/
+			function fit() {
+
+				if( cards === true || typeof scroller.clientWidth !== 'number' || scroller.clientWidth === 0 )
+					return;
+
+				const head = Array.from( headRow.children );
+				const last = head.findIndex( function( th ) { return th.classList.contains('nino-admin-table-actions') } );
+
+				if( last === -1 )
+					return;
+
+				const firstContent = head.findIndex( function( th ) { return th.classList.contains('nino-admin-table-select') === false && th.classList.contains('nino-admin-table-actions') === false } );
+				const before = head.slice( 0, firstContent === -1 ? 0 : firstContent + 1 ).reduce( function( sum, th ) { return sum + th.offsetWidth }, 0 );
+
+				scroller.classList.toggle( 'is-roll', scroller.clientWidth - head[last].offsetWidth < before );
 			}
 
 			// The caller hears of a change of what a person chose to see: the order, the page, the size of a page, the search
@@ -7108,6 +7260,14 @@
 
 			draw();
 
+			// A frame that changes its width - the phone turned, the window drawn smaller - is measured again
+			let watch = null;
+
+			if( cards !== true && typeof ResizeObserver === 'function' ) {
+				watch = new ResizeObserver( fit );
+				watch.observe( scroller );
+			}
+
 			return {
 				setRows : function( next, how ) {
 
@@ -7128,7 +7288,14 @@
 					if( scoped === true && chosen.size !== held )
 						syncSelection( true );
 				},
-				destroy : function() { mount.innerHTML = ''; mount.classList.remove('nino-admin-table-wrap') },
+				destroy : function() {
+
+					if( watch !== null )
+						watch.disconnect();
+
+					mount.innerHTML = '';
+					mount.classList.remove('nino-admin-table-wrap');
+				},
 				selected : selected,
 				clearSelection : clearSelection,
 				state : state,
@@ -7444,7 +7611,11 @@
 		 *	asked for - which is what record() walks when it steps from one entry to the next.
 		 *
 		 *	Under 40 rem only the search is in view; category and filters are behind one button, "Filters", that counts the ones that narrow the
-		 *	list. A table of pictures pages by 25, every other by 50. The rows are the panel's, all of them, and are filtered and sorted here, in the
+		 *	list, and so is the select "Sort by" - a card has no head to sort by. There every row is a card, drawn from the same columns: the column
+		 *	that is the name (`primary`, the first that is no picture and no group of badges where none says so) at its top, a picture left of it,
+		 *	the other columns as "label: value" in the order of the columns - `narrow : false` leaves one out, `narrow : 'second'` puts one under
+		 *	the name as a line without its label -, the buttons of the row in a line at the foot; the box of a row stays on the card and the whole
+		 *	card opens the row. A table of pictures pages by 25, every other by 50. The rows are the panel's, all of them, and are filtered and sorted here, in the
 		 *	browser - what a panel that must fetch its rows by the page (more than a few thousand) draws with is `load` of a later patch, not built
 		 *	for the panels that do not need it.
 		 *
@@ -7452,9 +7623,9 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{Element}		options.mount				Taken over
-		 *	@param		{Array}			options.columns			As of table() - with `cell` for a kind of cell
+		 *	@param		{Array}			options.columns			As of table() - with `cell` for a kind of cell, and `primary` and `narrow` for what a column is in a card
 		 *	@param		{string}		options.rowKey			The property that is a row's identity (a string)
-		 *	@param		{Object}		options.labels			{ search, empty, noMatch, filter, range, prev, next, pageSize } - the words
+		 *	@param		{Object}		options.labels			{ search, empty, noMatch, filter, range, prev, next, pageSize, sortBy, sortNone, sortUp, sortDown } - the words; the last four are the select of a card, "%s" in the two of the direction is the name of the column
 		 *	@param		{Object}		[options.category]	{ id, label, value, options : [ { value, label } ], match( row, value ) } - the first select, left of the search; its first option is "all"
 		 *	@param		{Array}			[options.filters]		[ { id, label, value, options, match( row, value ) } ] - the selects after the search, in the order given; the first option of each is "all"
 		 *	@param		{Object}		[options.state]			What the directory starts as, for one that is drawn again: { query, sort, page, pageSize, category, filters : { id : value } }
@@ -7532,6 +7703,7 @@
 					rowKey : options.rowKey,
 					labels : Object.assign( { range : Nino.adminUi.text('/_admin/common/table/range') }, labels ),
 					search : true,
+					cards : true,
 					searchText : options.searchText,
 					query : seen.query ?? '',
 					state : seen,

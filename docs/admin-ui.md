@@ -80,7 +80,7 @@ The address of a view is the part after the `#`, and it is written in ONE form f
 
 | Task | The one way | Block |
 |---|---|---|
-| The directory of a panel - the things it manages, as soon as a row shows more than a name and one detail or has actions of its own (pages, elements, redirects, fonts) | A **table** in `.nino-admin-table-scroll`: a search field over the full width above it that searches in the browser ("Search <things>"), sortable columns, small buttons at the right of each row (open, duplicate, delete in red), page size and paging below, "New <thing>" at the bottom right of the bar. The whole set is loaded and filtered in the browser. Every panel draws it as the [standard directory](#directory-and-record) - the category, the search, the filters, the table with the box to choose rows by and the paging, in one call - and opens what is a form in the dialog of a record. | `Nino.adminUi.directory()`, `Nino.adminUi.table()` |
+| The directory of a panel - the things it manages, as soon as a row shows more than a name and one detail or has actions of its own (pages, elements, redirects, fonts) | A **table** in `.nino-admin-table-scroll`: a search field over the full width above it that searches in the browser ("Search <things>"), sortable columns, small buttons at the right of each row (open, duplicate, delete in red), page size and paging below, "New <thing>" at the bottom right of the bar. The whole set is loaded and filtered in the browser. Every panel draws it as the [standard directory](#directory-and-record) - the category, the search, the filters, the table with the box to choose rows by and the paging, in one call - and opens what is a form in the dialog of a record. Under 40 rem its rows are [cards](#the-rows-as-cards-under-40-rem). | `Nino.adminUi.directory()`, `Nino.adminUi.table()` |
 | Groups and short directories that are only opened (text groups, image groups, navigations, roles) | A **list**: a row of 53 px (the dense row of 46 px where it has no second line), the name in the strong weight, a quiet second line, a badge after the name, at the right at most three small actions and a "›" where the row opens. The whole row is the target, a real `a` (with an address) or `button`. A group has a title over its list. No chain of brackets in the first line: "Logo (/logo, 500x100, no image)" becomes a name and a second line. | `Nino.adminUi.list( rows, options )` |
 | Column heads of a table | Words, never the help text of the field; the column of the actions has no head. | `table()` |
 | Entries whose look is the content (a theme, a block) | **Cards** with a preview picture, all of the same height; a head line (name and badges) without a wrap - the name has half of the line at least, the badges give way first -, no description where the picture shows it, at most three small buttons with short words in ONE line at the bottom that share the width of the card. Cards are used for nothing else. | `cards( items )`, `scaleFrame()` for the picture |
@@ -115,7 +115,7 @@ A panel that manages things shows them in a **directory** and opens one of them 
 
 | Option | What it is |
 |---|---|
-| `mount`, `columns`, `rowKey`, `labels` | As of `table()`; `labels : { search, empty, noMatch, filter, range }` |
+| `mount`, `columns`, `rowKey`, `labels` | As of `table()`; `labels : { search, empty, noMatch, filter, range }`. A column says what it is in a card with `primary` and `narrow` ([cards](#the-rows-as-cards-under-40-rem)); the four words of the select of the sort in a card are `labels : { sortBy, sortNone, sortUp, sortDown }`, with the shared fills as defaults |
 | `category` | `{ id, label, value, options, match( row, value ) }` - the first select, left of the search; its first option is "all". Left out where there are no categories - never a select with one option |
 | `filters` | `[ { id, label, value, options, match( row, value ) } ]` - the selects after the search, in the order given; the first option of each is "all" |
 | `select` | `{ label, rowLabel( row ), actions : [ { key, label, danger, run( keys ) } ] }` - the box in front of every row, the box of the head for the rows of the page, the bar over the table with the actions for what is chosen (what takes away in red). Left out, no box |
@@ -125,6 +125,27 @@ A panel that manages things shows them in a **directory** and opens one of them 
 | `searchText( row )` | More text of a row that the search reads beside the cells - a key, the label a value was collected under |
 
 The cells of a column are text unless the column says what it is (`cell`): `clamp` one line cut by an ellipsis with its text as tooltip (`max`: how wide it may get), `limit` a number against a limit - "812 / 800", over it marked by a badge with the word `over` -, `thumb` a picture of one size with the sign of "none" where there is none, `locales` the state of a value in each language as one badge each - "DE ✓", "EN –": a sign and not the colour says it, and it wraps where there are many -, `date` the moment as the workbench writes it, `badge` a word with a state, `text` the value as text, as a column with no kind has it; a kind that is none is an error of the caller. `fill` on a `clamp` column makes it take the room the other columns leave, so that its text ends in an ellipsis before the buttons of the row. A number column and its head stand at the right; a head of a column that cannot be sorted - a picture, the states of the languages, no label - is a word and no button. **A table that shows pictures pages by 25, every other by 50**; the range says "n-m of N".
+
+### The rows as cards under 40 rem
+
+Under 40 rem the directory draws no table with columns: **every row is a card**, drawn by the same call from the same `columns` - there is no second list of columns, no second markup and no panel code for it. A table of the kernel that is not a directory is not changed by this ([see below](#narrow-widths)).
+
+A card, from the top: the box of the row (where the directory has `select`) at the left, a **picture** (a column with `cell : 'thumb'`) next to it, and the **name** - strong, at the top, breaking its lines and never cut - with the sign "›" at its end; under the name the other columns, one line each, as **"label: value"** in the order of the columns (the label is the head of the column, quiet; a long text of a `clamp` column ends in an ellipsis after two lines, the badges of `locales` stand in one row and wrap only where they must); and at its foot, over a hairline, the **buttons of the row** as one line at the right - the same buttons as in the table, each named by its `aria-label` and its tooltip, icon buttons 28 px with 8 px between them, the one that takes away last. A line whose value is empty is not drawn. The whole card opens the row, as the whole row does; a press on one of its buttons or on its box is theirs.
+
+| Column option | What it is in a card |
+|---|---|
+| `primary : true` | The name of the card. Where no column says so, the first column that is no picture and no group of badges (`thumb`, `locales`) |
+| `narrow : false` | The column is not in the card: what is said by the name, or stays in the record |
+| `narrow : 'second'` | The column is the second line under the name, quiet and without its label |
+| *(none)* | "Label: value" in the order of the columns. A column with no label is a line without one |
+
+Choose the name by what a person calls the entry (the sender, the file, the page), not by the first column of the table - a date is rarely the name -, and leave out what the card repeats or what only the record is for (an address that stands in the record, a size). A card with more than five lines is a record: say `narrow : false` for what does not help to find the entry.
+
+**There is no head to sort by**: the select **"Sort by"** stands behind the button "Filters" with the category and the filters - the order the rows come in, then every sortable column ascending and descending (`labels.sortBy` and so on say the words). It is **not a filter**: the button does not count it, and it does not hold the bar open. A sort that was chosen by a head on a wide screen is what the select says, and the other way round; the state `sort` is the same. The strip over the cards holds the box of the head, with its words ("Select the rows of this page"). The bar of the chosen rows, the paging, the empty, the loading and the failed state are those of the table.
+
+**What a screen reader hears.** A card is still a row of a table: the table is drawn once for every width, and it carries its roles (`table`, `rowgroup`, `row`, `cell`, `columnheader`) as attributes, so that a browser that no longer takes a `<table>` for one once the stylesheet has set its `display` to something else - Safari with VoiceOver does not - still announces a table with its rows, and each entry is read as one row: the box (named by the row), the name, then every line as "label: value" (the label is generated text of the line, in the order of the lines), then the buttons by their names. A list of `li` would have meant a second markup for the same rows and a redraw when the width changes; the table keeps one DOM, one set of keys and one focus for both. A line that the card leaves out (`narrow : false`) or that is empty is not in the tree either, so what is heard is what is seen.
+
+The keyboard is the table's: the row is a stop of the Tab key where it holds no control, else its first button is the stop and Enter on the row opens it; the focus ring is drawn inside the card; the record and its steps are the same, and the focus goes back to the card when the record is closed.
 
 **What is chosen is what is in view.** In the directory the box of the head chooses the rows of the page that is shown; the choice stays while the rows are paged - it is of the same rows - and is given up when the rows change: a category, a filter or a search. A bulk action therefore never reaches an entry that is hidden, and its question says how many it takes. A row that is deleted or no longer there leaves the choice, and what is said to a screen reader follows. The rule is the directory's (`table( { select : { clearOnChange : true } } )`, which `directory()` sets): a panel that still draws `table()` keeps the choice through a search, as it always has - an export that is put together over several searches stays - and a panel that moves to the directory gets the rule with it.
 
@@ -229,7 +250,8 @@ A panel "Things": its rows come from the server (`things/list`), they are drawn 
 		directory = Nino.adminUi.directory( {
 			mount : mount,
 			rowKey : 'key',
-			columns : [ { key : 'name', label : t('name'), type : 'string', cell : 'clamp', fill : true }, { key : 'size', label : t('size'), type : 'integer' } ],
+			// Under 40 rem a row is a card: `primary` is its name; a column that says `narrow : false` is left out of it
+			columns : [ { key : 'name', label : t('name'), type : 'string', cell : 'clamp', fill : true, primary : true }, { key : 'size', label : t('size'), type : 'integer' } ],
 			labels : { search : t('search'), empty : t('empty'), noMatch : t('nomatch') },
 			actions : function( row ) { return [ Nino.adminUi.iconButton( 'pencil', t('edit'), function( event ) { record.open( row.key, { opener : event.currentTarget } ) }, { small : true } ) ] },
 			onOpen : function( row ) { record.open( row.key, {} ) },
@@ -514,7 +536,8 @@ The setup wizard and the recovery page are bilingual: German is the default, Eng
 
 The workbench is fully usable on a phone, with one exception: a **work surface** (a page editor, a theme editor) only has to work there - every action is reachable, nothing runs over the edge, targets are at least 24 px - and is not arranged for it. It is built and checked for a desktop and a tablet.
 
-- The page never scrolls sideways. What is wider (a table, code) scrolls in a frame of its own.
+- The page never scrolls sideways. What is wider (a table, code) scrolls in a frame of its own. **The rows of a directory are cards** under 40 rem and do not scroll at all ([cards](#the-rows-as-cards-under-40-rem)).
+- A table that is no directory keeps its columns and scrolls in its frame; the column of its buttons sticks to the right edge of the frame only while the first column still has its room beside it (the box of the rows and that column, at the width they have) - where it has not, the column rolls with the rest, so that it never lies over what a person came to read.
 - Tabs wrap into a second row; nothing disappears behind the edge without a visible sign. The "?" stays in the row of the title.
 - Labels stand above the fields (a narrow column); fields take the full width. The (?) icon stays at the name of the field.
 - The bar stays at the bottom: the line above, the badge at the left and the buttons at the right below it; buttons become small (30 px), the words stay. No bar has more than four buttons.

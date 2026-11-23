@@ -152,6 +152,8 @@
 	--nino-admin-control-small: 30px;
 	--nino-admin-control-icon: 28px;
 	--nino-admin-control-icon-small: 24px;
+	/* The first column of the content of a table keeps this width under 40 rem, whatever the buttons of the rows and the other columns take: about fourteen characters */
+	--nino-admin-table-name-min: 9rem;
 	--nino-admin-row-compact: 34px;
 	--nino-admin-tree-indent: 1.4rem;
 	--nino-admin-tree-guide: 14px;
@@ -452,6 +454,16 @@ a {
 	font-size: inherit;
 	font-weight: inherit;
 	box-shadow: none;
+	/* In a line of text and in a cell of a table it is text: at the start, breaking its lines, never wider than its room */
+	max-width: 100%;
+	text-align: start;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-table td .nino-admin-linkbutton {
+	/* A cell does not give the width a percentage needs: a long name breaks at this width and does not widen the table */
+	max-width: 28rem;
 }
 
 :where(.nino-admin) .nino-admin-linkbutton:hover:not(:disabled) {
@@ -6184,6 +6196,279 @@ a {
 @media (prefers-reduced-motion: reduce) {
 	:where(.nino-admin) .nino-admin-table tbody tr.is-fresh td:first-child {
 		box-shadow: inset 3px 0 0 var(--editor-blue);
+	}
+}
+
+/* ------------------------------------------------------------ Cards: the rows of a directory under 40 rem (table( { cards } ))
+   The table is drawn once, for every width, and its cells carry what they are (`data-card`: primary, thumb, second, line, omit; `data-label`: the word
+   of a line). Under 40 rem the rows stand as cards, one under another: the name at the top - strong, its lines broken and not cut -, a picture at its left,
+   the other columns as "label: value", the buttons in a line at the foot, the box of the row at the left of the name. The head is gone, and so is the
+   scrolling of the frame: the select "Sort by" behind the button of the filters has the sort, and the box of the head stands in a strip over the cards.
+   A row that is cut loose from a table keeps its roles (the table gives them), so that a screen reader still hears a table, its rows and their cells */
+
+/* Wide: the words that only a card shows, and the select that only a card has, are not there */
+:where(.nino-admin) .nino-admin-table-selecttext,
+:where(.nino-admin) .nino-admin-table-sortby {
+	display: none;
+}
+
+@media (max-width: 40rem) {
+	:where(.nino-admin) .nino-admin-table-scroll--cards {
+		overflow: visible;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
+	}
+
+	:where(.nino-admin) [data-collapsible="true"][data-open="true"] > .nino-admin-table-sortby {
+		display: block;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards,
+	:where(.nino-admin) .nino-admin-table--cards :is(thead, tbody) {
+		display: block;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards tbody {
+		display: grid;
+		gap: var(--nino-admin-space-4);
+	}
+
+	/* The head: no word of a column, no button to sort by - only the box that chooses the rows of the page, with its words */
+	:where(.nino-admin) .nino-admin-table--cards thead tr {
+		display: none;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards thead tr:has( th.nino-admin-table-select ) {
+		display: block;
+		margin-bottom: var(--nino-admin-space-4);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards thead th:not(.nino-admin-table-select) {
+		display: none;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards thead th.nino-admin-table-select {
+		position: static;
+		display: block;
+		width: auto;
+		padding: 0;
+		border: 0;
+		background: transparent;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards thead .nino-admin-table-selectcell {
+		display: inline-flex;
+		justify-content: flex-start;
+		gap: var(--nino-admin-space-4);
+		width: auto;
+		min-height: var(--nino-admin-control-icon);
+		padding-inline: var(--nino-admin-space-5);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards thead .nino-admin-table-selecttext {
+		display: inline;
+		color: var(--editor-text-secondary);
+		font-size: var(--nino-admin-text-sm);
+		font-weight: var(--nino-admin-weight-normal);
+	}
+
+	/* A card: a grid of the box, the picture and the name; the lines under them; the buttons at the foot */
+	:where(.nino-admin) .nino-admin-table--cards tbody tr {
+		display: grid;
+		grid-template-columns: auto auto minmax(0, 1fr);
+		align-items: start;
+		padding: var(--nino-admin-space-5);
+		border: 1px solid var(--editor-border);
+		border-radius: var(--editor-radius);
+		background: var(--editor-bg-grouped);
+		box-shadow: var(--editor-shadow-sm);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards tbody tr.is-selected {
+		border-color: var(--editor-blue);
+		background: var(--editor-blue-soft);
+	}
+
+	/* A card is the one thing that is tinted, not its cells: the tints of the table lie on the cells */
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards tbody tr td,
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards tbody tr:is(.is-selected, :hover, :focus-visible) td.nino-admin-table-actions,
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards tbody tr.is-selected td {
+		position: static;
+		width: auto;
+		min-width: 0;
+		max-width: none;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		box-shadow: none;
+		overflow: visible;
+		overflow-wrap: anywhere;
+		text-align: left;
+		text-overflow: clip;
+		white-space: normal;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td.nino-admin-table-select {
+		grid-column: 1;
+		grid-row: 1;
+		margin: 0 var(--nino-admin-space-4) 0 0;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards .nino-admin-table-selectcell {
+		width: var(--nino-admin-control-icon);
+		height: var(--nino-admin-control-icon);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td[data-card="thumb"] {
+		grid-column: 2;
+		grid-row: 1 / span 2;
+		margin-right: var(--nino-admin-space-5);
+	}
+
+	/* The name: strong, at the top, over the whole of what is left of the line, with the sign that the card opens at its end */
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards td[data-card="primary"] {
+		display: flex;
+		grid-column: 3;
+		grid-row: 1;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: var(--nino-admin-space-4);
+		min-height: var(--nino-admin-control-icon);
+		color: var(--editor-text);
+		font-family: inherit;
+		font-size: var(--nino-admin-text-md);
+		font-weight: var(--nino-admin-weight-strong);
+		line-height: 1.35;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td[data-card="primary"] > .nino-admin-row-chev {
+		margin: 0;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td[data-card="primary"] .nino-admin-table-clamp {
+		max-width: none;
+		overflow: visible;
+		white-space: normal;
+	}
+
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards td[data-card="second"] {
+		grid-column: 3;
+		grid-row: 2;
+		color: var(--editor-text-secondary);
+	}
+
+	/* The lines under: the word of the column, quiet, before its value; a line with nothing in it is not drawn */
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards td[data-card="line"] {
+		display: flex;
+		grid-column: 2 / -1;
+		align-items: baseline;
+		gap: var(--nino-admin-space-2);
+		margin-top: var(--nino-admin-space-1);
+		line-height: 1.35;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td[data-card="line"][data-label]::before {
+		flex: none;
+		content: attr(data-label) ":";
+		color: var(--editor-text-secondary);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td:is([data-card="line"], [data-card="second"]).is-empty,
+	:where(.nino-admin) .nino-admin-table--cards td[data-card="omit"] {
+		display: none;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td[data-card="line"] > :not(.nino-admin-table-clamp) {
+		min-width: 0;
+	}
+
+	/* A long text is cut after two lines, not one */
+	:where(.nino-admin) .nino-admin-table--cards td:not([data-card="primary"]) .nino-admin-table-clamp {
+		display: -webkit-box;
+		flex: 1 1 0;
+		min-width: 0;
+		max-width: none;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards .nino-admin-localestates {
+		max-width: none;
+	}
+
+	/* A badge is as wide as its words and no wider than the card: it breaks its lines where it must */
+	:where(.nino-admin) .nino-admin-table--cards td .nino-admin-badge {
+		max-width: 100%;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	/* The buttons: one line at the foot, at the right, over a hairline; the dangerous one is the last as everywhere */
+	:where(.nino-admin) .nino-admin-table.nino-admin-table--cards td.nino-admin-table-actions {
+		display: flex;
+		grid-column: 1 / -1;
+		justify-content: flex-end;
+		margin-top: var(--nino-admin-space-3);
+		padding-top: var(--nino-admin-space-3);
+		border-top: 1px solid var(--editor-separator);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td.nino-admin-table-actions:not( :has( button ) ) {
+		display: none;
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td.nino-admin-table-actions .nino-admin-row-actions {
+		flex-wrap: wrap;
+		gap: var(--nino-admin-space-3);
+	}
+
+	:where(.nino-admin) .nino-admin-table--cards td.nino-admin-table-actions .nino-admin-btn-icon--small {
+		width: var(--nino-admin-control-icon);
+		min-width: var(--nino-admin-control-icon);
+		height: var(--nino-admin-control-icon);
+		min-height: var(--nino-admin-control-icon);
+	}
+
+	/* The card that was changed shows for a moment, as a whole */
+	@media (prefers-reduced-motion: no-preference) {
+		:where(.nino-admin) .nino-admin-table--cards tbody tr.is-fresh td {
+			animation: none;
+		}
+
+		:where(.nino-admin) .nino-admin-table--cards tbody tr.is-fresh {
+			animation: nino-admin-fresh 2.4s ease-out;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:where(.nino-admin) .nino-admin-table--cards tbody tr.is-fresh td:first-child {
+			box-shadow: none;
+		}
+
+		:where(.nino-admin) .nino-admin-table--cards tbody tr.is-fresh {
+			box-shadow: inset 3px 0 0 var(--editor-blue);
+		}
+	}
+}
+
+/* A table that is no card: under 40 rem its first column of content keeps a width that shows a name (a wrapping cell would give it one letter) */
+@media (max-width: 40rem) {
+	:where(.nino-admin) .nino-admin-table:not(.nino-admin-table--cards) tr > :is(th, td):first-child:not(.nino-admin-table-select, .nino-admin-table-actions),
+	:where(.nino-admin) .nino-admin-table:not(.nino-admin-table--cards) tr > .nino-admin-table-select + :is(th, td) {
+		min-width: var(--nino-admin-table-name-min);
+	}
+}
+
+/* A table that is no card: under 40 rem the cell of the buttons sticks to the right edge only while the columns before it have their room (see table(): fit()); otherwise it rolls with them */
+@media (max-width: 40rem) {
+	:where(.nino-admin) .nino-admin-table-scroll.is-roll .nino-admin-table :is(th, td).nino-admin-table-actions {
+		position: static;
+		box-shadow: none;
 	}
 }
 

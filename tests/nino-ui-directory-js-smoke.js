@@ -30,7 +30,7 @@ const hasClass = ( el, name ) => String( el.className ).split(/\s+/).indexOf( na
 const tag = ( root, name ) => findAll( root, el => el.tagName === name.toUpperCase() );
 const byClass = ( root, name ) => findAll( root, el => hasClass( el, name ) );
 
-function world() {
+function world( extra ) {
 
 	const page = element('div');
 	const doc = documentOf( page );
@@ -41,6 +41,7 @@ function world() {
 
 	const sandbox = { console : console, document : doc, Nino : Nino };
 
+	Object.assign( sandbox, extra ?? {} );
 	sandbox.window = { Nino : Nino, matchMedia : function() { return { matches : false } } };
 	load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
@@ -333,8 +334,8 @@ function directoryOver( extra ) {
 	const bar = byClass( mount, 'nino-admin-table-toolbar' )[0];
 	const selects = tag( bar, 'select' );
 
-	check( 'the directory draws in one order: the category, the search, the filters - and, on a narrow screen, the button of the filters',
-		bar.children.map( el => el.tagName+ ( el.id !== '' ? '#'+ el.id : '' ) ).join() === 'SELECT#cat,INPUT,SELECT#state,SELECT#pic,BUTTON' && bar.dataset.collapsible === 'true' );
+	check( 'the directory draws in one order: the category, the search, the filters, the select of the sort of a card - and, on a narrow screen, the button of the filters',
+		bar.children.map( el => el.tagName+ ( el.id !== '' && el.id.indexOf('nino-admin-table-sort-') !== 0 ? '#'+ el.id : '' ) ).join() === 'SELECT#cat,INPUT,SELECT#state,SELECT#pic,SELECT,BUTTON' && bar.dataset.collapsible === 'true' );
 	check( 'the table has the box to choose rows by, in the head and in every row, and the paging of 25 for a table with pictures',
 		byClass( mount, 'nino-admin-table-select' ).length > 20 && ( () => { const d = directoryOver( { columns : COLUMNS.slice( 0, 4 ) } ); return shown( d.mount ).length === 25 } )() );
 
@@ -359,7 +360,7 @@ function directoryOver( extra ) {
 
 	const again = directoryOver( { state : directory.state() } );
 	check( 'a directory drawn again with that state shows the same rows, with the selects, the search and the button as they were',
-		again.directory.rows().length === 1 && tag( byClass( again.mount, 'nino-admin-table-toolbar' )[0], 'select' ).map( el => el.value ).join('|') === 'b|off|' && tag( byClass( again.mount, 'nino-admin-table-toolbar' )[0], 'input' )[0].value === 'item 12'
+		again.directory.rows().length === 1 && tag( byClass( again.mount, 'nino-admin-table-toolbar' )[0], 'select' ).map( el => el.value ).join('|') === 'b|off||' && tag( byClass( again.mount, 'nino-admin-table-toolbar' )[0], 'input' )[0].value === 'item 12'
 		&& byClass( again.mount, 'nino-admin-table-toolbar' )[0].dataset.open === 'true' );
 }
 
@@ -422,9 +423,172 @@ function directoryOver( extra ) {
 	const directory = w.ui.directory( { mount : mount, columns : [ { key : 'name', label : 'Name' } ], rowKey : 'key', labels : { search : 'Search', empty : 'none', noMatch : 'no' } } );
 	directory.setRows( ROWS.slice( 0, 3 ) );
 	const bar = byClass( mount, 'nino-admin-table-toolbar' )[0];
-	check( 'a directory with no category and no filter draws the search alone, and no button for selects it has not', bar.children.length === 1 && bar.children[0].tagName === 'INPUT' && bar.dataset.collapsible === undefined );
+	check( 'a directory with no category and no filter draws the search, and the select of the sort of a card behind the button - and nothing else', bar.children.map( el => el.tagName ).join() === 'INPUT,SELECT,BUTTON' && byClass( bar, 'nino-admin-table-sortby' ).length === 1 );
+	const unsorted = w.ui.directory( { mount : element('div'), columns : [ { key : 'name', label : 'Name', sortable : false } ], rowKey : 'key', labels : { search : 'Search' } } );
+	unsorted.setRows( ROWS.slice( 0, 3 ) );
+	check( '...a directory none of whose columns is sorted has the search alone, and no button for selects it has not', ( () => { const only = byClass( unsorted.el, 'nino-admin-table-toolbar' )[0]; return only.children.length === 1 && only.children[0].tagName === 'INPUT' && only.dataset.collapsible === undefined } )() );
 	directory.setRows( [] );
 	check( 'a directory with no rows says that there are none, in the sentence of the caller', byClass( mount, 'nino-admin-empty' )[0].textContent === 'none' );
+}
+
+
+
+// --- the cards: the rows of a directory under 40 rem, from the same columns -------------------------
+
+const CARD_COLUMNS = [
+	{ key : 'thumb', label : 'Preview', cell : 'thumb' },
+	{ key : 'when', label : 'Date', cell : 'date', type : 'date' },
+	{ key : 'name', label : 'Name', type : 'string', primary : true },
+	{ key : 'alts', label : 'Alt text', cell : 'locales' },
+	{ key : 'text', label : 'Text', cell : 'clamp', narrow : 'second' },
+	{ key : 'size', label : 'Size', type : 'integer', narrow : false },
+	{ key : 'state', label : '', type : 'string' },
+];
+
+function cardsOver( extra ) {
+
+	const w = world();
+	const mount = element('div');
+	const opened = [];
+	const options = Object.assign( {
+		mount : mount, columns : CARD_COLUMNS, rowKey : 'key',
+		labels : { search : 'Search', empty : 'None yet.', noMatch : 'No match.', sortBy : 'Sort by', sortNone : 'As listed', sortUp : '%s, up', sortDown : '%s, down' },
+		select : { label : 'Choose the rows of the page', actions : [ { key : 'x', label : 'Do', run : () => {} } ] },
+		actions : row => [ w.ui.iconButton( 'eye', 'Open '+ row.key, () => {}, { small : true } ), w.ui.iconButton( 'trash-2', 'Delete '+ row.key, () => {}, { small : true, danger : true } ) ],
+		onOpen : row => opened.push( row.key ),
+	}, extra ?? {} );
+	const directory = w.ui.directory( options );
+
+	directory.setRows( ROWS );
+
+	return { w, mount, directory, opened };
+}
+
+{
+	const { mount, directory, opened } = cardsOver();
+	const tr = findAll( mount, el => el.tagName === 'TR' && el.dataset.row === 'r01' )[0];
+	const kinds = tr.children.filter( el => el.dataset.card !== undefined ).map( el => el.dataset.card );
+
+	check( 'a row is drawn once, from the columns, and each cell says what it is in a card: the picture, the name the column names, the second line, the lines, and what is left out',
+		kinds.join() === 'thumb,line,primary,line,second,omit,line' );
+	check( '...a line says the word of its column; the name, the second line and a column with no word say none',
+		tr.children.filter( el => el.dataset.card !== undefined ).map( el => el.dataset.label ?? '' ).join() === ',Date,,Alt text,,,' );
+
+	const first = cardsOver( { columns : CARD_COLUMNS.map( c => Object.assign( {}, c, { primary : undefined } ) ) } );
+	const plain = findAll( first.mount, el => el.tagName === 'TR' && el.dataset.row === 'r01' )[0];
+	check( '...where no column says it is the name, the first that is no picture and no group of badges is', plain.children.filter( el => el.dataset.card === 'primary' ).length === 1 && plain.children.find( el => el.dataset.card === 'primary' ).textContent.indexOf('2026') !== -1 );
+
+	check( 'the table keeps its roles - table, row, cell - as attributes, so that a screen reader that no longer takes the table for one still hears each entry as a row of cells',
+		tag( mount, 'table' )[0].attributes.role === 'table' && tr.attributes.role === 'row' && tr.children.every( el => el.attributes.role === 'cell' ) && tag( mount, 'tbody' )[0].attributes.role === 'rowgroup' );
+
+	const name = tr.children.find( el => el.dataset.card === 'primary' );
+	const foot = tr.children.find( el => hasClass( el, 'nino-admin-table-actions' ) );
+	check( 'the sign that the card opens ends the name, and the cell of the buttons holds the buttons alone, each with its name',
+		byClass( name, 'nino-admin-row-chev' ).length === 1 && byClass( foot, 'nino-admin-row-chev' ).length === 0 && tag( foot, 'button' ).map( b => b.attributes['aria-label'] ).join() === 'Open r01,Delete r01' );
+
+	fire( tr, 'click' );
+	fire( tag( foot, 'button' )[0], 'click', { target : tag( foot, 'button' )[0] } );
+	check( 'the whole card opens the row, and a press on one of its buttons is the button\'s and nothing else', opened.join() === 'r01' );
+
+	const box = byClass( tr, 'nino-admin-table-check' )[0];
+	box.checked = true;
+	fire( box, 'click', { shiftKey : false } );
+	check( 'the box that chooses the row stays on the card, and the bar over the cards says how many are chosen, as over the table',
+		directory.selected().join() === 'r01' && byClass( mount, 'nino-admin-table-selection' ).length === 1 && hasClass( byClass( mount, 'nino-admin-table-selection' )[0], 'nino-admin-hidden' ) === false );
+	check( '...and the box of the head has its words beside it, for the strip over the cards: a label that is the target as well',
+		byClass( tag( mount, 'thead' )[0], 'nino-admin-table-selecttext' )[0].textContent === 'Choose the rows of the page' && byClass( tag( mount, 'thead' )[0], 'nino-admin-table-selectcell' )[0].children.some( el => hasClass( el, 'nino-admin-table-selecttext' ) ) );
+}
+
+{
+	const { mount, directory } = cardsOver();
+	const bar = byClass( mount, 'nino-admin-table-toolbar' )[0];
+	const sortby = byClass( bar, 'nino-admin-table-sortby' )[0];
+
+	check( 'a card has no head to sort by: the select "Sort by" has the order of the list and every column that is sorted by its head, up and down - and no picture, no states of languages, no column with no word',
+		sortby.attributes['aria-label'] === 'Sort by' && sortby.children.map( o => o.value ).join() === ',when:up,when:down,name:up,name:down,text:up,text:down,size:up,size:down'
+		&& sortby.children[0].textContent === 'As listed' && sortby.children[1].textContent === 'Date, up' && sortby.children[4].textContent === 'Name, down' );
+
+	sortby.value = 'size:down';
+	fire( sortby, 'change' );
+	check( 'a choice of the select orders the rows as the head would, and is told as what the person chose', directory.rows()[0].key === 'r60' && directory.state().sort.key === 'size' && directory.state().sort.dir === -1 );
+
+	fire( sorter( mount, 'name' ).children[0], 'click' );
+	check( '...and a sort by a head - a wide screen - is what the select says, whoever set it', sortby.value === 'name:up' );
+
+	sortby.value = '';
+	fire( sortby, 'change' );
+	check( '...the first option is the order the rows come in', directory.state().sort.key === '' && directory.rows()[0].key === 'r01' );
+	check( 'the select does not narrow the list: the button of the filters does not count it and the bar is not held open by it',
+		bar.dataset.collapsible === 'true' && ( () => { sortby.value = 'size:up'; fire( sortby, 'change' ); return byClass( bar, 'nino-admin-filterbar-toggle' )[0].dataset.active === '0' && bar.dataset.open === 'false' } )() );
+
+	const again = cardsOver( { state : directory.state() } );
+	check( '...and a directory drawn again with its state shows the order in the select - which is no filter: no count on the button, the bar closed', byClass( again.mount, 'nino-admin-table-sortby' )[0].value === 'size:up'
+		&& byClass( again.mount, 'nino-admin-filterbar-toggle' )[0].dataset.active === '0' && byClass( again.mount, 'nino-admin-table-toolbar' )[0].dataset.open === 'false' );
+}
+
+{
+	// The states are the table's: nothing yet, nothing found, loading, a failed load
+	const { mount, directory } = cardsOver();
+	directory.setRows( [] );
+	check( 'cards with no rows say that there are none, in the sentence of the caller, and draw no card', byClass( mount, 'nino-admin-empty' )[0].textContent === 'None yet.' && hasClass( byClass( mount, 'nino-admin-table-scroll' )[0], 'nino-admin-hidden' ) );
+	directory.setRows( ROWS );
+	const search = findAll( mount, el => el.tagName === 'INPUT' && el.type === 'search' )[0];
+	search.value = 'no such row';
+	fire( search, 'input' );
+	check( '...and a search that finds none says so, and the cards are gone with the rows', byClass( mount, 'nino-admin-empty' )[0].textContent === 'No match.' && shown( mount ).length === 0 );
+	directory.loading( 'Loading ...' );
+	check( '...loading is a sentence in place of the cards', byClass( mount, 'nino-admin-loading' )[0].textContent === 'Loading ...' && tag( mount, 'table' ).length === 0 );
+}
+
+{
+	// A table that is no card is as it was drawn: no cards, no roles, no select of the sort
+	const w = world();
+	const mount = element('div');
+	w.ui.table( { mount : mount, columns : COLUMNS, rows : ROWS, rowKey : 'key', labels : { search : 'Search' }, actions : row => [ w.ui.button( 'Edit', () => {}, { small : true } ) ], onRowClick : () => {} } );
+	check( 'a table that is not asked for cards has none of it: no role of its own, no mark on its cells, no select to sort by, no class of cards',
+		tag( mount, 'table' )[0].attributes.role === undefined && findAll( mount, el => el.dataset !== undefined && el.dataset.card !== undefined ).length === 0 && byClass( mount, 'nino-admin-table-sortby' ).length === 0
+		&& byClass( mount, 'nino-admin-table--cards' ).length === 0 && byClass( mount, 'nino-admin-table-scroll--cards' ).length === 0 );
+	const row = findAll( mount, el => el.tagName === 'TR' && el.dataset.row === 'r01' )[0];
+	check( '...and the sign that its row opens stands in the cell of the buttons, as it did', byClass( row.children[row.children.length - 1], 'nino-admin-row-chev' ).length === 1 );
+}
+
+{
+	// Under 40 rem the cell of the buttons of a table sticks to the right edge only while the columns before it keep their room
+	const watchers = [];
+	const w = world( { ResizeObserver : class { constructor( fn ) { this.fn = fn; this.gone = false; watchers.push( this ) } observe( el ) { this.seen = el } disconnect() { this.gone = true } } } );
+	const mount = element('div');
+	const t = w.ui.table( { mount : mount, columns : [ { key : 'name', label : 'Name' }, { key : 'size', label : 'Size', type : 'integer' } ], rows : ROWS.slice( 0, 3 ), rowKey : 'key', labels : {}, actions : () => [] } );
+	const frame = byClass( mount, 'nino-admin-table-scroll' )[0];
+	const heads = tag( mount, 'thead' )[0].children[0].children;
+	const measure = ( width, name, actions ) => { frame.clientWidth = width; heads[0].offsetWidth = name; heads[2].offsetWidth = actions };
+
+	measure( 353, 180, 186 );
+	watchers[0].fn();
+	check( 'where the first column and the buttons do not both fit in the frame the cell of the buttons rolls with the rest - 180 px and 186 px in 353 px', hasClass( frame, 'is-roll' ) === true );
+	measure( 353, 148, 123 );
+	watchers[0].fn();
+	check( '...where they do it sticks - 148 px and 123 px in 353 px - and a frame that was drawn wider is measured again', hasClass( frame, 'is-roll' ) === false );
+	measure( 0, 180, 186 );
+	watchers[0].fn();
+	check( '...a table that is not shown has no layout and keeps what it had', hasClass( frame, 'is-roll' ) === false );
+	check( '...the frame is the one that is watched', watchers[0].seen === frame );
+	// The box of the rows stands before the first column: it is part of what must have its room beside the buttons
+	const boxMount = element('div');
+	w.ui.table( { mount : boxMount, columns : [ { key : 'name', label : 'Name' } ], rows : ROWS.slice( 0, 3 ), rowKey : 'key', labels : {}, actions : () => [], select : { actions : [] } } );
+	const boxFrame = byClass( boxMount, 'nino-admin-table-scroll' )[0];
+	const boxHeads = tag( boxMount, 'thead' )[0].children[0].children;
+	boxFrame.clientWidth = 300; boxHeads[0].offsetWidth = 33; boxHeads[1].offsetWidth = 148; boxHeads[2].offsetWidth = 123;
+	watchers[1].fn();
+	check( '...the box of the rows counts with the first column: 33 + 148 px beside 123 px do not fit in 300 px', hasClass( boxFrame, 'is-roll' ) === true );
+	t.destroy();
+	check( '...and a table that is taken away stops watching its frame', watchers[0].gone === true );
+
+	const card = cardsOver();
+	const cardFrame = byClass( card.mount, 'nino-admin-table-scroll' )[0];
+	cardFrame.clientWidth = 353;
+	tag( card.mount, 'thead' )[0].children[0].children.forEach( th => { th.offsetWidth = 200 } );
+	card.directory.setRows( ROWS );
+	check( 'a card never sticks, whatever its widths: where a table of the same widths would roll, the frame of the cards is not marked', hasClass( cardFrame, 'is-roll' ) === false );
 }
 
 

@@ -257,8 +257,9 @@
 				columns.push( { key : 'form', label : word('/_admin/submissions/label/form'), type : 'string' } );
 
 			columns.push(
-				{ key : 'sender', label : word('/_admin/submissions/col/sender'), type : 'string', cell : 'clamp', max : '12rem' },
-				{ key : 'mail', label : word('/_admin/submissions/col/mail'), type : 'string', cell : 'clamp', max : '13rem' },
+				// On a phone a row is a card: the sender is its name, the address is in the record
+				{ key : 'sender', label : word('/_admin/submissions/col/sender'), type : 'string', cell : 'clamp', max : '12rem', primary : true },
+				{ key : 'mail', label : word('/_admin/submissions/col/mail'), type : 'string', cell : 'clamp', max : '13rem', narrow : false },
 				{ key : 'message', label : word('/_admin/submissions/col/message'), type : 'string', cell : 'clamp', fill : true }
 			);
 
