@@ -7,7 +7,7 @@
 		"de_DE": "Eine Spalte mit Kurztext, eine mit dem Menü, darunter Rechtliches und Sprachen.",
 		"en_US": "A column with a short text, one with the menu, and legal links and languages below."
 	},
-	"category": "frame",
+	"category": "footer",
 	"rank": 20,
 	"images": {}
 }

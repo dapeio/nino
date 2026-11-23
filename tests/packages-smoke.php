@@ -567,7 +567,7 @@ check( 'place() puts the file with the others and a theme that has it is install
 \Nino\Filesystem::removeDir( ninoSandboxDir( $placeApp ) );
 
 // A frame may read the texts of the project, a block of the pages may not: the package follows the rule of \Nino\Blocks by itself, as a theme or as a package of blocks
-$frameJson = json_encode( [ 'name' => [ 'de_DE' => 'Fuss', 'en_US' => 'Foot' ], 'description' => [ 'de_DE' => 'Ein Fuss', 'en_US' => 'A foot' ], 'category' => 'frame', 'rank' => 20, 'images' => (object) [] ] );
+$frameJson = json_encode( [ 'name' => [ 'de_DE' => 'Fuss', 'en_US' => 'Foot' ], 'description' => [ 'de_DE' => 'Ein Fuss', 'en_US' => 'A foot' ], 'category' => 'footer', 'rank' => 20, 'images' => (object) [] ] );
 $frameFiles = static fn( string $tpl, string $json ): array => [ 'block.json' => $json, 'block.tpl' => $tpl, 'text/de_DE.json' => '{}', 'text/en_US.json' => '{}' ];
 $footerTpl = "[footer-wrap id=\"footer\"]\n\t[footer-col size=\"100\"]\n\t\t[footer-logo /logo]\n\t\t[text /project/company/general/description format=\"inline\"]\n\t[/footer-col]\n[/footer-wrap]";
 $withFrame = array_merge( $good, [ 'blocks/footer/block.json' => $frameJson, 'blocks/footer/block.tpl' => $footerTpl, 'blocks/footer/text/de_DE.json' => '{}', 'blocks/footer/text/en_US.json' => '{}' ] );
@@ -576,6 +576,14 @@ check( 'a theme with a frame that reads a text of the project and the logo is ta
 	\Nino\Packages::check( $app, 'theme', $withFrame ) === null && ( \Nino\Packages::check( $app, 'theme', $inPage )['code'] ?? '' ) === 'block' && ( \Nino\Packages::check( $app, 'theme', $inPage )['path'] ?? '' ) === 'blocks/footer'
 	&& \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( $footerTpl, $frameJson ), $webp ) ) === null
 	&& ( \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( "[section-wrap id=\"footer\"][section-row][section-col][text /project/company/general/description][/section-col][/section-row][/section-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp ) )['code'] ?? '' ) === 'block' );
+
+// The feature Basis is off: a package of blocks whose block has a section as its root needs it and is no refusal
+$basisOff = ninoSandbox( 'packages-basis-off' );
+$basisOff['./nino/filesystem/path'] = dirname( __DIR__ );
+$GLOBALS['packagesSandboxes'][] = ninoSandboxDir( $basisOff );
+$sectionPack = packagesPack( 'probe-pack', $frameFiles( "[section-wrap id=\"footer\"][section-row][section-col][/section-col][/section-row][/section-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp );
+check( 'a package of blocks with a block of a section is taken where the feature of the section is off, as it is where it is on',
+	\Nino\Blocks::wraps( $basisOff ) === [] && \Nino\Packages::check( $basisOff, 'blocks', $sectionPack ) === null && \Nino\Packages::check( $app, 'blocks', $sectionPack ) === null );
 
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'pack.json' => json_encode( [ 'key' => 'probe-pack', 'version' => '1.0.0', 'name' => '<script>x</script>', 'description' => 'Probe' ] ) ] ) );
 check( 'the name of a package of blocks is text as well: a tag in it is refused, and the good name of the same package is none', $problem !== null && $problem['code'] === 'file-markup' && $problem['path'] === 'pack.json' && \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $block, $webp ) ) === null );

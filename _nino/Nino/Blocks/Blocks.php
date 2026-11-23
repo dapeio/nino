@@ -15,7 +15,7 @@ namespace Nino {
 	 *	or the footer of every page. A block is data and has no code: a folder blocks/<key>/ with
 	 *
 	 *		block.json			name and description in every language, the category, the rank, the picture slots, optionally the variants
-	 *		block.tpl				one call - a section-wrap, a header-wrap or a footer-wrap - with an id, made of components
+	 *		block.tpl				one call - of a component whose schema says it is the root of a block - with an id, made of components
 	 *		text/<locale>.json	the words of the sources the template reads with ~name, one file for each language
 	 *		images/<name>.<ext>	optional: the picture of a slot of block.json, svg, webp, png or jpg, at most one for a slot
 	 *
@@ -37,7 +37,7 @@ namespace Nino {
 	 *	- block.json and the texts are json of a depth and a length that are limited, keys that are words, the same keys in every language,
 	 *	  and no control character, no < and no [[ in any text
 	 *	- the template is at most MAX_TEMPLATE bytes of utf-8, is read by \Nino\Markup with no note and written back byte for byte, and is one call
-	 *	  of a root (ROOTS) that has an id; it has no [[ - a block reads no key of the project - and \Nino\Components::check() finds nothing
+	 *	  of a root (wraps()) that has an id; it has no [[ - a block reads no key of the project - and \Nino\Components::check() finds nothing
 	 *	  against it but a variant that the active mixture of the components does not have, which the block names and the tool tells
 	 *	  of: no name nobody registered - but a name that a feature which is off brings (components/<name>/) makes the block one that needs that
 	 *	  feature: it is listed with the keys in 'missing', and get() gives nothing of it to draw or put in -, no call that has no schema, no [html], no html that is no component, nothing at a place that is not
@@ -46,7 +46,7 @@ namespace Nino {
 	 *	  the root free and gives the ones inside the same new beginning, and the words of a call that has an id are the keys below it
 	 *	- a source is ~name, a picture of \Nino\Images::PLACEHOLDERS or the type of elements of \Nino\Elements::PLACEHOLDERS - below which
 	 *	  .field is a field of its model - and nothing else: no key of the project, no slot, no file; a value of an attribute that begins like
-	 *	  a source is the same. A FRAME, a block whose root is a header-wrap or a footer-wrap, may read more, and in the first word of a call
+	 *	  a source is the same. A FRAME, a block whose root is of the side header or footer of a page (the 'block' of its schema), may read more, and in the first word of a call
 	 *	  alone: a text key of the text store - the form a person gives a key (\Nino\Text::isGrammarKey(), at most FRAME_KEY_LENGTH bytes), under
 	 *	  one of the four roots /template/, /project/, /feature/ and /module/ (FRAME_TEXT_ALLOWED, with FRAME_TEXT_EXCEPT for what the owner takes out
 	 *	  again) - and, of a logo, the picture /logo or /logo/dark. A textfill is not where a secret is kept, and whoever puts a block on a site is
@@ -57,7 +57,7 @@ namespace Nino {
 	 *	  of the kernel, and each slot is read. A slot may have a picture of its own, images/<slot>.svg|webp|png|jpg: at most MAX_PICTURE
 	 *	  bytes, MAX_SIDE pixels on a side, of the type its ending says (\Nino\Images::size()), a svg that \Nino\Images::cleanSvg() takes -
 	 *	  and no other file in images/
-	 *	- the category says what the root is: 'frame' for a header-wrap and a footer-wrap, one of the others for a section-wrap
+	 *	- the category says what the root is: 'header' for a root of the side header, 'footer' for one of the side footer, one of the others for a root of the page
 	 *	- a variant is a name, a label in every language and a set: place => attribute => value, where a place is 'root' (the root of the template) or
 	 *	  the indices from the root down, the blanks counted ('1.1.1', the position \Nino\Markup gives a node and the Builder writes), and the
 	 *	  attribute is one of the schema of the component that stands there that is a look - a choice or a switch the register writes as a class of the
@@ -87,13 +87,9 @@ namespace Nino {
 		public const string CACHE = '/data/cache/blocks.php';
 		public const string OWN = '/blocks';
 
-		// The root of the template of a block: pages are a flat run of the first, the frames are the other two
-		public const array ROOTS = [ 'section-wrap', 'header-wrap', 'footer-wrap' ];
-
-		// What a block is filed under, in the order a tool lists them; 'frame' is what a header and a footer are
-		// The roots of a frame, which may read the texts of the project and the logo (see _frameReads())
-		private const array FRAME_ROOTS = [ 'header-wrap', 'footer-wrap' ];
-		private const array FRAME_LOGOS = [ 'header-logo', 'footer-logo' ];
+		// The sides of a page whose blocks are a frame, which may read the texts of the project and the logo (see _frameReads()): a block is of the side of its root,
+		// and the root says it in its schema (wraps())
+		private const array FRAMES = [ 'header', 'footer' ];
 		private const array FRAME_PICTURES = [ '/logo', '/logo/dark' ];
 		private const int FRAME_KEY_LENGTH = 200;
 
@@ -105,7 +101,8 @@ namespace Nino {
 		private const array FRAME_TEXT_ALLOWED = [ '/template/', '/project/', '/feature/', '/module/' ];
 		private const array FRAME_TEXT_EXCEPT = [];
 
-		public const array CATEGORIES = [ 'intro', 'content', 'trust', 'offer', 'action', 'contact', 'frame' ];
+		// What a block is filed under, in the order a tool lists them; a block of a header or a footer is filed under the side of its root, any other under one of the first six
+		public const array CATEGORIES = [ 'intro', 'content', 'trust', 'offer', 'action', 'contact', 'header', 'footer' ];
 
 		// The language a block always has, since it is the one a site that has no text of its own for a language takes
 		public const string FALLBACK = 'en_US';
@@ -165,7 +162,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	array										key => [ 'key', 'origin' => the key of the feature, 'project' or what the hook said, 'label' => what a person reads for the origin (text or locale => text map), 'name' and 'description' =>
-		 *																	locale => text, 'category', 'rank', 'wrap' => the root, 'locales', 'features' => the keys of
+		 *																	locale => text, 'category', 'rank', 'wrap' => the root, 'side' => the side of a page its schema says the root is of - page, header or footer; for a root of a feature that is off, the one the category says, which the feature confirms once it is on -, 'locales', 'features' => the keys of
 		 *																	the features whose components it calls - worked out from the register -, 'variants' => component => the
 		 *																	variants it names, 'images' => name => [ 'placeholder', 'width', 'height', 'label' => locale => text ], 'pictures' => slot =>
 		 *																	'images/<slot>.<ext>', the file below the folder of the block, for each slot that has a picture of its own,
@@ -184,16 +181,16 @@ namespace Nino {
 
 		/**
 		 *	What a block reads of the project: the keys of the texts and the logo it names, as a person who puts it in may look at them first. A frame names
-		 *	its sources in the first word of its calls (see _frameReads()); a block of the pages names none, and its answer is always empty. A source that is a
+		 *	its sources in the first word of its calls (see _frameReads()); a block of the page names none, and its answer is always empty. A source that is a
 		 *	slot of the block (~name), a placeholder of the kernel and a field of a loop are the block's own and are not listed
 		 *
-		 *	@param		array 		$block				A block as get() answers it, with 'wrap' and 'tree'
+		 *	@param		array 		$block				A block as get() answers it, with 'side' and 'tree'
 		 *
 		 *	@return 	array											The keys, each once, sorted: [ '/logo', '/project/company/general/description' ]
 		 */
 		public static function reads( array $block ): array {
 
-			if( in_array( $block['wrap'] ?? '', self::FRAME_ROOTS, true ) === false || is_array( $block['tree'] ?? null ) === false )
+			if( in_array( $block['side'] ?? '', self::FRAMES, true ) === false || is_array( $block['tree'] ?? null ) === false )
 				return [];
 
 			$keys = [];
@@ -466,6 +463,25 @@ namespace Nino {
 		}
 
 		/**
+		 *	The components a block may have as its root: those whose schema says 'block' (see \Nino\Components), each with the side of a page it says, so that
+		 *	a feature that is on brings its roots and the kernel names none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										name => page, header or footer, in the order the components were registered
+		 */
+		public static function wraps( array &$appData ): array {
+
+			$wraps = [];
+
+			foreach( (array) ( $appData[\Nino\Components::REGISTRY] ?? [] ) as $name => $schema )
+				if( is_string( $schema['block'] ?? null ) === true )
+					$wraps[(string) $name] = $schema['block'];
+
+			return $wraps;
+		}
+
+		/**
 		 *	Whether the parts of a block are one: the files of its folder as read() reads them, or what a tool made - which is how a tool checks
 		 *	what it is about to write, with the same rules the files are read by
 		 *
@@ -540,13 +556,14 @@ namespace Nino {
 			if( is_string( $own ) === true )
 				return $own;
 
-			$found = self::_template( $appData, (string) ( $parts['tpl'] ?? '' ) );
+			$found = self::_template( $appData, (string) ( $parts['tpl'] ?? '' ), $block['category'] );
 
 			if( is_string( $found ) === true )
 				return $found;
 
-			if( ( $found['wrap'] === 'section-wrap' ) === ( $block['category'] === 'frame' ) )
-				return 'the category "'. $block['category']. '" is not one for a '. $found['wrap']. ': a frame is a header-wrap or a footer-wrap, the rest are section-wraps';
+			// header and footer are categories and sides alike; every other category is a block of the page
+			if( ( in_array( $block['category'], self::FRAMES, true ) === true ? $block['category'] : 'page' ) !== $found['side'] )
+				return 'the category "'. $block['category']. '" is not one for a block whose root is of the side '. $found['side']. ': the blocks of a header are filed under "header", those of a footer under "footer" and those of the page under one of the others';
 
 			$defaults = self::_places( $appData, $found, $block['alternatives'] );
 
@@ -607,6 +624,7 @@ namespace Nino {
 				'category'		=> $block['category'],
 				'rank'				=> $block['rank'],
 				'wrap'				=> $found['wrap'],
+				'side'				=> $found['side'],
 				'locales'			=> $locales,
 				'features'		=> $features,
 				'missing'			=> $found['missing'],
@@ -653,7 +671,7 @@ namespace Nino {
 			$on = ( $appData[\Nino\Html::TREES_SWITCH] ?? true ) !== false;
 			$stored = $on === true ? self::_stored( $appData ) : null;
 
-			if( $stored !== null && $stored['kernel'] === \Nino\VERSION && $stored['version'] === $version && $stored['stamp'] === $stamp )
+			if( $stored !== null && $stored['kernel'] === \Nino\VERSION && $stored['rules'] === self::_rules() && $stored['version'] === $version && $stored['stamp'] === $stamp )
 				return $appData[self::STATE] = [ 'version' => $version, 'blocks' => $stored['blocks'], 'rejected' => $stored['rejected'] ];
 
 			$blocks = [];
@@ -685,11 +703,22 @@ namespace Nino {
 			if( $on === true ) {
 
 				// Written atomically and without a lock, as the register of a feature is: two requests that write it write the same blocks
-				\Nino\Filesystem::putFileContent( $appData, self::CACHE, [ 'kernel' => \Nino\VERSION, 'version' => $version, 'stamp' => $stamp, 'blocks' => $blocks, 'rejected' => $rejected ], true );
+				\Nino\Filesystem::putFileContent( $appData, self::CACHE, [ 'kernel' => \Nino\VERSION, 'rules' => self::_rules(), 'version' => $version, 'stamp' => $stamp, 'blocks' => $blocks, 'rejected' => $rejected ], true );
 				unset( $appData['./nino/filesystem/cache'][self::CACHE] );
 			}
 
 			return $appData[self::STATE] = [ 'version' => $version, 'blocks' => $blocks, 'rejected' => $rejected ];
+		}
+
+		/**
+		 *	What the rules of a block are, as far as they are not in a file or in the register: the categories and the sides whose blocks read the texts of the project.
+		 *	What is kept is only the answer of the rules it was read by
+		 *
+		 *	@return 	string
+		 */
+		private static function _rules(): string {
+
+			return sha1( serialize( [ self::CATEGORIES, self::FRAMES ] ) );
 		}
 
 		/**
@@ -1054,8 +1083,8 @@ namespace Nino {
 				ob_end_clean();
 			}
 
-			if( is_array( $value ) === false || array_keys( $value ) !== [ 'kernel', 'version', 'stamp', 'blocks', 'rejected' ]
-				|| is_string( $value['kernel'] ) === false || is_string( $value['version'] ) === false || is_array( $value['stamp'] ) === false
+			if( is_array( $value ) === false || array_keys( $value ) !== [ 'kernel', 'rules', 'version', 'stamp', 'blocks', 'rejected' ]
+				|| is_string( $value['kernel'] ) === false || is_string( $value['rules'] ) === false || is_string( $value['version'] ) === false || is_array( $value['stamp'] ) === false
 				|| is_array( $value['blocks'] ) === false || is_array( $value['rejected'] ) === false )
 				return null;
 
@@ -1323,10 +1352,11 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source
+		 *	@param		string		$category			The category of the block: the side of a root that a feature which is off brings is the one it says
 		 *
-		 *	@return 	array|string							[ 'wrap' => the root, 'id' => its id, 'calls' => name => true, 'variants' => name => words, 'slots' => the slots get() lists, 'tree' => the nodes ], or what is wrong
+		 *	@return 	array|string							[ 'wrap' => the root, 'side' => the side of a page the schema of the root says - the one the category says for a root a feature that is off brings, until it is on -, 'id' => its id, 'calls' => name => true, 'variants' => name => words, 'slots' => the slots get() lists, 'tree' => the nodes ], or what is wrong
 		 */
-		private static function _template( array &$appData, string $source ): array|string {
+		private static function _template( array &$appData, string $source, string $category ): array|string {
 
 			if( $source === '' || trim( $source ) === '' )
 				return 'block.tpl is empty';
@@ -1364,8 +1394,17 @@ namespace Nino {
 				else if( trim( (string) ( $node['t'] ?? 'x' ) ) !== '' )
 					return 'block.tpl has something beside its root that is no blank text';
 
-			if( $root === null || in_array( $root['n'], self::ROOTS, true ) === false )
-				return 'the root of block.tpl is one of '. implode( ', ', self::ROOTS );
+			$wraps = self::wraps( $appData );
+			$absent = self::_absent( $appData );
+
+			// The root a feature that is off brings is a block that needs that feature, as any other component of it is: its side is not known before the feature is on,
+			// and what the block may read is what its category says, the same limits as for a root that is known. The block is checked again, against the real side, once the feature is on
+			if( $root !== null && isset( $wraps[$root['n']] ) === true )
+				$side = $wraps[$root['n']];
+			else if( $root !== null && isset( $absent[$root['n']] ) === true )
+				$side = in_array( $category, self::FRAMES, true ) === true ? $category : 'page';
+			else
+				return 'the root of block.tpl is one of the components that are the root of a block: '. ( $wraps === [] ? 'there is none' : implode( ', ', array_keys( $wraps ) ) );
 
 			$id = $root['a']['id'] ?? null;
 
@@ -1373,7 +1412,6 @@ namespace Nino {
 				return 'the root has an id of at most '. self::ID_LENGTH. ' lower case letters, digits and hyphens';
 
 			// A name nobody registered that a feature that is off brings is a block that needs that feature; any other finding is a fault
-			$absent = self::_absent( $appData );
 			$missing = [];
 
 			foreach( \Nino\Components::check( $appData, $nodes ) as $position => $findings )
@@ -1392,8 +1430,8 @@ namespace Nino {
 			$registry = \Nino\Components::components( $appData );
 			$calls = [];
 			$variants = [];
-			// A frame - a header-wrap or a footer-wrap, which is what the category 'frame' says of a root - may read the texts of the project and the logo
-			$problem = self::_calls( $registry, $nodes, $id, true, null, $calls, $variants, in_array( $root['n'], self::FRAME_ROOTS, true ) );
+			// A frame - a block whose root is of the side header or footer - may read the texts of the project and the logo
+			$problem = self::_calls( $registry, $nodes, $id, true, null, $calls, $variants, in_array( $side, self::FRAMES, true ) );
 
 			if( $problem !== null )
 				return 'block.tpl: '. $problem;
@@ -1428,7 +1466,7 @@ namespace Nino {
 
 			ksort( $missing );
 
-			return [ 'wrap' => $root['n'], 'id' => $id, 'calls' => $calls, 'missing' => array_keys( $missing ), 'variants' => $variants, 'slots' => array_values( $slots ), 'tree' => $nodes ];
+			return [ 'wrap' => $root['n'], 'side' => $side, 'id' => $id, 'calls' => $calls, 'missing' => array_keys( $missing ), 'variants' => $variants, 'slots' => array_values( $slots ), 'tree' => $nodes ];
 		}
 
 		/**
@@ -1441,7 +1479,7 @@ namespace Nino {
 		 *	@param		string|null	$type					The type of elements of the loop the nodes stand in, null outside of one
 		 *	@param		array			&$calls				(reference) name => true
 		 *	@param		array			&$variants		(reference) name => [ the words of its variants but regular ]
-		 *	@param		bool			$frame				The root is a header-wrap or a footer-wrap: the first word of a call may be a text key of the project, and of a logo its picture - see _frameReads()
+		 *	@param		bool			$frame				The root is of the side header or footer: the first word of a call may be a text key of the project, and of a logo its picture - see _frameReads()
 		 *
 		 *	@return 	string|null								What is wrong, null where nothing is
 		 */
@@ -1488,7 +1526,7 @@ namespace Nino {
 				$inside = $loop === true ? $node['s'] : $type;
 				$source = is_string( $node['s'] ?? null ) === true ? $node['s'] : '';
 
-				if( $source !== '' && $loop === false && self::_reads( $source, true, $type ) === false && ( $frame === false || self::_frameReads( $source, (string) ( $schema['source'] ?? 'none' ), $name ) === false ) )
+				if( $source !== '' && $loop === false && self::_reads( $source, true, $type ) === false && ( $frame === false || self::_frameReads( $source, (string) ( $schema['source'] ?? 'none' ), ( $schema['logo'] ?? false ) === true ) === false ) )
 					return 'a source of "'. self::_shown( $name ). '" - '. self::_shown( $source ). ' - is neither ~name, a placeholder of the kernel nor a field of a placeholder type of elements';
 
 				foreach( (array) ( $node['a'] ?? [] ) as $attribute => $value )
@@ -1786,20 +1824,20 @@ namespace Nino {
 		 *	- the form a person gives a key (\Nino\Text::isGrammarKey(): a namespace and three words, so no
 		 *	segment of dots, no bracket, no control character, no backslash, nothing of /nino, /_nino or /_admin) of at most FRAME_KEY_LENGTH bytes, under a prefix
 		 *	of FRAME_TEXT_ALLOWED and under none of FRAME_TEXT_EXCEPT - and of a call
-		 *	of a logo (FRAME_LOGOS) whose first word is a picture, the logo of the site and its dark one. Only the FORM is looked at: a key that is not there is a text that is not
+		 *	of a component that draws the logo (its schema says 'logo') whose first word is a picture, the logo of the site and its dark one. Only the FORM is looked at: a key that is not there is a text that is not
 		 *	there, drawn as the page draws it, since a package comes from another site. Neither is a source of elements, a loop or a key of the
 		 *	configuration, the accounts or the session
 		 *
 		 *	@param		string		$written
 		 *	@param		string		$kind					What the first word of the component is: text, image, link or none
-	 *	@param		string		$component		The name of the component: only a logo reads the picture of the site
+		 *	@param		bool			$logo					The schema of the component says 'logo': only a logo reads the picture of the site
 		 *
 		 *	@return 	bool
 		 */
-		private static function _frameReads( string $written, string $kind, string $component ): bool {
+		private static function _frameReads( string $written, string $kind, bool $logo ): bool {
 
 			if( $kind === 'image' )
-				return in_array( $component, self::FRAME_LOGOS, true ) === true && in_array( $written, self::FRAME_PICTURES, true );
+				return $logo === true && in_array( $written, self::FRAME_PICTURES, true );
 
 			return $kind === 'text' && strlen( $written ) <= self::FRAME_KEY_LENGTH && \Nino\Text::isGrammarKey( $written ) && self::_frameKey( $written );
 		}

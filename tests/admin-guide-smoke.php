@@ -1145,5 +1145,10 @@ foreach( $shown['en'] as $where => $text )
 check( 'the head and the foot of a page are Kopfbereich, Fußbereich and Kopf-/Fußbereich in German - never Rahmen, Header or Footer - and Header, Footer and Header/footer in English, never a frame, in the workbench and in the Basis components, groups, blocks and description'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ),
 	$wrong === [] && str_contains( $shown['de']['basis menu footer'], 'Fußbereich' ) === true && str_contains( (string) file_get_contents( $basis. 'feature.php' ), 'Haupt, Menü, Fußbereich' ) === true && $de['/_admin/common/word/frame'] === 'Kopf-/Fußbereich' && $en['/_admin/common/word/frame'] === 'Header/footer' && $de['/_admin/common/word/border'] === 'Rahmenlinie' );
 
+// The categories of a block that are a side of a page, the last two the kernel lists, are worded as the head and the foot are everywhere else
+check( 'the categories header and footer of a block are the words of the workbench: Kopfbereich and Fußbereich in German, Header and Footer in English',
+	array_slice( \Nino\Blocks::CATEGORIES, -2 ) === [ 'header', 'footer' ]
+	&& [ $de['/_admin/common/word/header'] ?? '', $de['/_admin/common/word/footer'] ?? '', $en['/_admin/common/word/header'] ?? '', $en['/_admin/common/word/footer'] ?? '' ] === [ 'Kopfbereich', 'Fußbereich', 'Header', 'Footer' ] );
+
 $none = [];
 ninoDone( $none );

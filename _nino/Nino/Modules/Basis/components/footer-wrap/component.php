@@ -8,6 +8,7 @@ return [
 	'in'         => [ 'page' ],
 	'offers'     => [],
 	'deep'       => [ 'footer' ],
+	'block'      => 'footer',
 	'attributes' => [
 		'id' => [ 'type' => 'id', 'default' => '', 'label' => 'Id' ],
 		'ground' => [ 'type' => 'choice', 'options' => [ 'base', 'alt', 'tint', 'primary', 'dark' ], 'labels' => [ 'base' => [ 'de_DE' => 'Standard', 'en_US' => 'Default' ], 'alt' => [ 'de_DE' => 'Abgesetzt', 'en_US' => 'Offset' ], 'tint' => [ 'de_DE' => 'Getönt', 'en_US' => 'Tinted' ], 'primary' => [ 'de_DE' => 'Markenfarbe', 'en_US' => 'Brand color' ], 'dark' => [ 'de_DE' => 'Dunkel', 'en_US' => 'Dark' ] ], 'default' => 'alt', 'label' => [ 'de_DE' => 'Grund', 'en_US' => 'Ground' ] ],

@@ -33,6 +33,12 @@ namespace Nino {
 	 *																	(a column of a row, a card in it: the place header of a header-wrap), except below a container
 	 *																	of the flow that names it in its own 'in' - a part of its own, which keeps what it offers - and
 	 *																	in that part's own flow. allowed() without a path does not know them, offer() and check() do
+	 *											'block'			a container that stands in the page only: it is the root of a block, of the side of a page the word says,
+	 *																	one of SIDES - page, header or footer. \Nino\Blocks reads the roots from here
+	 *											'markup'		true: a container whose content is the markup of the page itself, no components. Who may write it is no rule of the
+	 *																	register: offer() and check() name it with CODE_HTML and leave the decision to the caller
+	 *											'logo'			true: the component draws the logo of the project and its source is an image: the root of a block that is a
+	 *																	header or a footer may name the logo of the project as its first word
 	 *											'source'		text, image, link or none (the default): what its first word is
 	 *											'format'		for a text: plain (the default), inline, lines or blocks; an attribute named
 	 *																	format - a choice among them - says it for each call
@@ -126,7 +132,7 @@ namespace Nino {
 		public const int LEVELS = 6;
 
 		// What offer() says of a component that may not stand at a place, and what check() calls the same thing where it finds it
-		// written. HTML is offer()'s alone: the register has no word on who may write html, it says that the name is that one
+		// written. HTML is the answer for a component whose schema says 'markup': the register has no word on who may write the markup of a page, it says that the component is one
 		public const string CODE_ONCE = 'once';
 		public const string CODE_DEPTH = 'depth';
 		public const string CODE_SELF = 'self';
@@ -171,8 +177,11 @@ namespace Nino {
 		// (the fixed text is read from 'text' by a component whose source is a text)
 		public const array RESERVED = [ 'value', 'source', 'content', 'class', 'text', 'variant', 'lang' ];
 
+		// The sides of a page a root of a block may be of: the page itself, its header, its footer
+		public const array SIDES = [ 'page', 'header', 'footer' ];
+
 		// The keys of a schema and of an attribute, which is all validate() accepts
-		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'deep', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
+		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'through', 'deep', 'block', 'markup', 'logo', 'source', 'format', 'children', 'attributes', 'variants', 'labels', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input', 'labels' ];
 
 		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
@@ -1645,6 +1654,32 @@ namespace Nino {
 				$clean['deep'] = $places;
 			}
 
+			if( array_key_exists( 'block', $schema ) === true ) {
+
+				if( is_string( $schema['block'] ) === false || in_array( $schema['block'], self::SIDES, true ) === false )
+					return $what. ': "block" is one of '. implode( ', ', self::SIDES ). ': the side of a page a block with this root belongs to';
+
+				if( isset( $clean['offers'] ) === false || in_array( 'page', $clean['in'], true ) === false )
+					return $what. ': "block" is for a container that stands in the page: it needs "offers" and "in" naming page';
+
+				$clean['block'] = $schema['block'];
+			}
+
+			foreach( [ 'markup', 'logo' ] as $flag ) {
+
+				if( isset( $schema[$flag] ) === true && is_bool( $schema[$flag] ) === false )
+					return $what. ': "'. $flag. '" must be true or false';
+
+				if( ( $schema[$flag] ?? false ) === true )
+					$clean[$flag] = true;
+			}
+
+			if( isset( $clean['markup'] ) === true && isset( $clean['offers'] ) === false )
+				return $what. ': "markup" is for a container: it needs "offers"';
+
+			if( isset( $clean['block'] ) === true && ( isset( $clean['markup'] ) === true || isset( $clean['through'] ) === true ) )
+				return $what. ': "block" is for a root that draws an element of its own and holds components: it is neither "markup" nor "through"';
+
 			if( isset( $schema['children'] ) === true ) {
 
 				if( $schema['children'] !== 'nodes' )
@@ -1659,6 +1694,9 @@ namespace Nino {
 				return $what. ': "source" must be one of '. implode( ', ', self::SOURCES );
 
 			$clean['source'] = $source;
+
+			if( isset( $clean['logo'] ) === true && $source !== 'image' )
+				return $what. ': "logo" is for a component whose source is an image';
 
 			if( isset( $schema['format'] ) === true ) {
 
@@ -1877,8 +1915,8 @@ namespace Nino {
 		 *	  does one that is 'through'
 		 *	- CODE_ONCE: its schema says 'once' and the container holds one already
 		 *	- CODE_DEPTH: it would be a level beyond LEVELS, counted from the first name of the path; a 'through' container is none
-		 *	- CODE_HTML: it is the component html and nothing else is against it. Who may write html is no rule of the register:
-		 *	  a caller that may takes it for true
+		 *	- CODE_HTML: its schema says 'markup' - its content is the markup of the page itself - and nothing else is against it. Who may write
+		 *	  markup is no rule of the register: a caller that may takes it for true
 		 *
 		 *	The path is where the container stands - the names of the components from the page to it, [] for the page - and the
 		 *	siblings are what it holds, the nodes \Nino\Markup::parse() answers. A container that is 'through' stands where the
@@ -1905,7 +1943,7 @@ namespace Nino {
 			$answer = [];
 
 			foreach( self::_letIn( $appData, $registry, $path ) as $name )
-				$answer[$name] = self::_blocked( $registry, $path, $name, $taken[$name] ?? 0 ) ?? ( $name === 'html' ? self::CODE_HTML : true );
+				$answer[$name] = self::_blocked( $registry, $path, $name, $taken[$name] ?? 0 ) ?? ( ( $registry[$name]['markup'] ?? false ) === true ? self::CODE_HTML : true );
 
 			return $answer;
 		}
@@ -1924,9 +1962,9 @@ namespace Nino {
 		 *	- CODE_PLACE (F7) a component at a place that offers none for it, and the rules of offer(): CODE_ONCE (K4, for the
 		 *	  second and each after), CODE_SELF, CODE_DEPTH (K5; said once, at the first, what is below it is looked at all the same); the detail is the name
 		 *	- CODE_DUPLICATE an id of an attribute of the type id that stands twice in the tree, for the second and each after
-		 *	- CODE_FREE a text between calls that holds a <, which is html that is no component. What stands in a call of html
-		 *	  is its content, and no finding
-		 *	- CODE_HTML the call of html itself: whether that is wrong is for the caller, who knows what the account may write
+		 *	- CODE_FREE a text between calls that holds a <, which is html that is no component. What stands in a call of a component whose schema
+		 *	  says 'markup' is its content, and no finding
+		 *	- CODE_HTML the call of a component whose schema says 'markup': whether that is wrong is for the caller, who knows what the account may write
 		 *
 		 *	Nothing is drawn or written. A tree with nothing against it is []. What it does not look at: the sources of the calls, textfills
 		 *	in values and between calls, the length and the control characters of a value, where a link goes, the ids of what a call with no
@@ -1981,7 +2019,7 @@ namespace Nino {
 
 				if( isset( $node['n'] ) === false ) {
 
-					if( is_string( $node['t'] ?? null ) === true && str_contains( $node['t'], '<' ) === true && ( $path[count( $path ) - 1] ?? '' ) !== 'html' )
+					if( is_string( $node['t'] ?? null ) === true && str_contains( $node['t'], '<' ) === true && ( $run['registry'][$path[count( $path ) - 1] ?? '']['markup'] ?? false ) !== true )
 						$found[$where][] = [ 'code' => self::CODE_FREE, 'detail' => '' ];
 
 					continue;
@@ -2012,7 +2050,7 @@ namespace Nino {
 				if( $blocked !== null )
 					$found[$where][] = [ 'code' => $blocked, 'detail' => $name ];
 
-				if( $name === 'html' )
+				if( ( $schema['markup'] ?? false ) === true )
 					$found[$where][] = [ 'code' => self::CODE_HTML, 'detail' => $name ];
 
 				foreach( self::_said( $appData, $run, $name, $schema, $node ) as $finding )

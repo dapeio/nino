@@ -7,4 +7,5 @@ return [
 	'icon'       => 'code',
 	'in'         => [ 'page', 'flow' ],
 	'offers'     => [],
+	'markup'     => true,
 ];

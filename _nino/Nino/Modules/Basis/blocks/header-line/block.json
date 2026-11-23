@@ -7,7 +7,7 @@
 		"de_DE": "Logo, Menü und ein Button in einer Zeile, oben festgehalten.",
 		"en_US": "Logo, menu and a button in one line, kept at the top."
 	},
-	"category": "frame",
+	"category": "header",
 	"rank": 10,
 	"images": {}
 }

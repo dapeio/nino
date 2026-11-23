@@ -8,6 +8,7 @@ return [
 	'in'         => [ 'page' ],
 	'offers'     => [],
 	'deep'       => [ 'header' ],
+	'block'      => 'header',
 	'attributes' => [
 		'id' => [ 'type' => 'id', 'default' => '', 'label' => 'Id' ],
 		'sticky' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'de_DE' => 'Bleibt oben stehen', 'en_US' => 'Stays at the top' ] ],

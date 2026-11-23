@@ -254,6 +254,14 @@ What the register does for the renderer, and what it leaves to it:
   the schema's, an attribute without a default, a `choice` whose default is no
   option, a `group` that is missing or has no `groups/<group>/group.php`, a
   template that names a file.
+- Three keys say what a component is to the kernel, which names no component of its own. `'block' => 'page'`, `'header'` or
+  `'footer'` makes a container that stands in the page - it needs `offers` and an `in` that names `page` - the root of a block,
+  of that side of a page: `\Nino\Blocks::wraps()` lists the roots, a block of such a root is read, checked and drawn like one of
+  the feature Basis, its category has to be the side (`header`, `footer`, any other for the page) and a block of a header or a
+  footer may read the texts of the project. `'markup' => true` says that the content of a container is the markup of the page
+  itself: `offer()` and `check()` name its call with `\Nino\Components::CODE_HTML` and leave to the caller whether the account may
+  write it. `'logo' => true`, for a component whose `source` is `image`, says that it draws the logo of the project, so that a header or a footer block may
+  name the logo of the site as the first word of its call. A root is neither `markup` nor `through`.
 - A group and a component name belong to **one feature**. What a second feature
   claims is refused, with a sentence that names both, and that feature goes on
   without it.

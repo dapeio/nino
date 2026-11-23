@@ -30,6 +30,7 @@ foreach( [ 'Aaa' => 'aaa', 'Zzz' => 'zzz', 'Gone' => 'gone' ] as $directory => $
 }
 
 mkdir( NINO_FEATURES_DIR. '/Gone/components/gone-card', 0755, true );
+mkdir( NINO_FEATURES_DIR. '/Gone/components/gone-head', 0755, true );
 
 register_shutdown_function( static function(): void {
 	\Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
@@ -141,7 +142,7 @@ $wanted = [ 'hero-full', 'hero-centered', 'page-header', 'split-image-text', 'te
 check( 'the eight blocks of basis are listed, all of basis and made of its components, and nothing is refused or said', array_keys( $all ) === array_values( array_filter( $wanted, static fn( string $key ): bool => isset( $all[$key] ) ) )
 	&& count( $all ) === 8 && array_unique( array_column( $all, 'origin' ) ) === [ 'basis' ] && array_unique( array_merge( ...array_column( $all, 'features' ) ) ) === [ 'basis' ]
 	&& \Nino\Blocks::rejected( $appData ) === [] && ninoWarnings() === [] );
-check( 'they are listed by category and rank, the frames last, each with its words in both languages', array_column( $all, 'category' ) === [ 'intro', 'intro', 'intro', 'content', 'content', 'content', 'frame', 'frame' ]
+check( 'they are listed by category and rank, the header and the footer last, each with its words in both languages', array_column( $all, 'category' ) === [ 'intro', 'intro', 'intro', 'content', 'content', 'content', 'header', 'footer' ]
 	&& array_unique( array_map( static fn( array $block ): string => implode( ',', array_keys( $block['name'] ) ), $all ) ) === [ 'hero-full' => 'de_DE,en_US' ] );
 check( 'a variant the block names is told, with the component that has it', $all['three-columns']['variants'] === [ 'section-col' => [ 'card' ] ] && $all['hero-full']['variants'] === [] );
 
@@ -310,7 +311,8 @@ $faults = [
 	'a slot of a placeholder that is not the kernel\'s'															=> $json( static function( array $meta ): array { $meta['images']['background']['placeholder'] = '/logo'; return $meta; } ),
 	'a name of a slot that jumps out of its folder'																	=> $json( static function( array $meta ): array { $meta['images']['../x'] = $meta['images']['background']; return $meta; } ),
 	'a category that is none'																												=> $json( static fn( array $meta ): array => [ 'category' => 'misc' ] + $meta ),
-	'a frame category for a section'																								=> $json( static fn( array $meta ): array => [ 'category' => 'frame' ] + $meta ),
+	'the category of a header for a section'																				=> $json( static fn( array $meta ): array => [ 'category' => 'header' ] + $meta ),
+	'the category of a footer for a section'																				=> $json( static fn( array $meta ): array => [ 'category' => 'footer' ] + $meta ),
 	'a key of block.json that is none'																							=> $json( static fn( array $meta ): array => $meta + [ 'script' => 'x' ] ),
 	'a name in one language only'																										=> $json( static function( array $meta ): array { unset( $meta['name']['en_US'] ); return $meta; } ),
 ];
@@ -720,6 +722,35 @@ check( 'a file that changed is read again, and a folder that is clean now is a b
 \Nino\Html::dropTrees( $appData );
 check( 'the file goes with the trees of the templates, and is made again by the next read', is_file( $file ) === false && ( blocksRequest( $appData ) ?? true ) === true && count( \Nino\Blocks::all( $appData ) ) > 0 && is_file( $file ) === true );
 
+// A file kept before the rules of the categories changed - it has no mark of the rules, or the mark of other ones; no entry says its side and its category is none today - is not what the next request lists
+$stale = [];
+
+foreach( [ 'a file of the form without a mark of the rules' => null, 'a file with the mark of other rules' => 'other' ] as $label => $mark ) {
+
+	$kept = (array) include $file;
+
+	if( $mark === null )
+		unset( $kept['rules'] );
+	else
+		$kept['rules'] = sha1( $mark );
+
+	foreach( $kept['blocks'] as $key => $block ) {
+
+		unset( $kept['blocks'][$key]['side'] );
+		$kept['blocks'][$key]['category'] = 'misc';
+	}
+
+	\Nino\Filesystem::putFileContent( $appData, \Nino\Blocks::CACHE, $kept, true );
+	unset( $appData['./nino/filesystem/cache'][\Nino\Blocks::CACHE] );
+	blocksRequest( $appData );
+	$fresh = \Nino\Blocks::all( $appData );
+
+	if( $fresh === [] || array_diff( array_column( $fresh, 'category' ), \Nino\Blocks::CATEGORIES ) !== [] || count( array_filter( array_column( $fresh, 'side' ) ) ) !== count( $fresh ) )
+		$stale[] = $label;
+}
+
+check( 'a file kept by other rules of the blocks is read again, whether it has no mark of them or the mark of other ones: every block listed has a category of today and a side'. ( $stale === [] ? '' : ' - kept: '. implode( ', ', $stale ) ), $stale === [] );
+
 unlink( $file );
 $appData['/nino/markup/cache'] = false;
 blocksRequest( $appData );
@@ -735,7 +766,7 @@ foreach( [ $own. '/linked-folder', $own. '/linked-file/block.tpl', ninoSandboxDi
 echo "\nF. A frame may read the texts of the project and the logo, and nothing else of the project\n";
 
 $frameSite = blocksSite();
-$frame = static function( string $tpl, string $category = 'frame' ): array {
+$frame = static function( string $tpl, string $category = 'footer' ): array {
 
 	$words = static fn( string $de, string $en ): array => [ 'de_DE' => $de, 'en_US' => $en ];
 
@@ -748,11 +779,11 @@ $frame = static function( string $tpl, string $category = 'frame' ): array {
 $footer = static fn( string $inside ): string => "[footer-wrap id=\"footer\"]\n\t[footer-col size=\"100\"]\n\t\t". $inside. "\n\t[/footer-col]\n[/footer-wrap]";
 $good = \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( "[footer-logo /logo]\n\t\t[text /project/company/general/description format=\"inline\" size=\"s\"]" ) ) );
 
-check( 'a footer that reads the logo of the site and a text of the project is a block: the standard footer of a site can be one', is_array( $good ) === true && $good['wrap'] === 'footer-wrap' && $good['category'] === 'frame' );
+check( 'a footer that reads the logo of the site and a text of the project is a block: the standard footer of a site can be one', is_array( $good ) === true && $good['wrap'] === 'footer-wrap' && $good['side'] === 'footer' && $good['category'] === 'footer' );
 check( '...it carries the KEY and never the text; the sources it reads are no slot of the block, nor a text of it, so no file of it - the template, the texts, an export - holds what the site says',
 	is_array( $good ) === true && str_contains( $good['source'], '/project/company/general/description' ) === true && $good['slots'] === [] && $good['texts'] === [ 'de_DE' => [], 'en_US' => [] ] );
 
-$header = \Nino\Blocks::validate( $frameSite, 'header', $frame( "[header-wrap id=\"header\"]\n\t[header-logo]\n\t[header-actions]\n\t\t[button /project/company/general/name href=\"page:/contact\"]\n\t[/header-actions]\n[/header-wrap]" ) );
+$header = \Nino\Blocks::validate( $frameSite, 'header', $frame( "[header-wrap id=\"header\"]\n\t[header-logo]\n\t[header-actions]\n\t\t[button /project/company/general/name href=\"page:/contact\"]\n\t[/header-actions]\n[/header-wrap]", 'header' ) );
 check( 'a header may do it as well, in any call whose first word is a text', is_array( $header ) === true );
 
 // Every key of the text store is read, whatever root it is under: the owner answers for what a frame shows
@@ -775,7 +806,7 @@ $appData['/nino/html/navs'] = [ 'main', 'footer' ];
 \Nino\Features::registerComponents( $appData );
 $words = [ 'de_DE' => 'x', 'en_US' => 'x' ];
 $parts = [
-	'json' => json_encode( [ 'name' => $words, 'description' => $words, 'category' => 'frame', 'rank' => 5, 'images' => (object) [] ] ),
+	'json' => json_encode( [ 'name' => $words, 'description' => $words, 'category' => 'footer', 'rank' => 5, 'images' => (object) [] ] ),
 	'tpl' => '[footer-wrap id="footer"][footer-col size="100"][text @KEY@][/footer-col][/footer-wrap]',
 	'texts' => [ 'de_DE' => '{}', 'en_US' => '{}' ],
 ];
@@ -847,10 +878,11 @@ check( 'what a frame may read is the first word of a call and no more: no other 
 
 $page = static fn( string $inside, string $category = 'content' ): array => $frame( "[section-wrap id=\"probe\"]\n\t[section-row]\n\t\t[section-col]\n\t\t\t". $inside. "\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]", $category );
 check( 'a block of the pages reads none of it: a text of the project and the logo are as refused as they were, whatever its category says',
-	array_filter( [ $page( '[text /project/company/general/description]' ), $page( '[text /project/company/general/description]', 'frame' ), $page( '[image /logo]' ) ], static fn( array $parts ): bool => is_array( \Nino\Blocks::validate( $frameSite, 'probe', $parts ) ) === true ) === []
+	array_filter( [ $page( '[text /project/company/general/description]' ), $page( '[text /project/company/general/description]', 'header' ), $page( '[text /project/company/general/description]', 'footer' ), $page( '[image /logo]' ) ], static fn( array $parts ): bool => is_array( \Nino\Blocks::validate( $frameSite, 'probe', $parts ) ) === true ) === []
 	&& is_array( \Nino\Blocks::validate( $frameSite, 'probe', array_merge( $page( '[text ~title]' ), [ 'texts' => [ 'de_DE' => '{"title":"x"}', 'en_US' => '{"title":"x"}' ] ] ) ) ) === true );
-check( 'a footer-wrap whose category is not frame is no block, nor is a section-wrap whose category is frame, with a text of the project or without', is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), 'content' ) ) ) === true
-	&& is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), 'intro' ) ) ) === true && is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), 'misc' ) ) ) === true );
+check( 'the category of a block is the side of its root: a footer in any other category, a header in the footer category and a footer in the header category are no block, nor is a block of the page in the category of a header or a footer',
+	array_filter( [ 'content', 'intro', 'misc', 'header' ], static fn( string $category ): bool => is_string( \Nino\Blocks::validate( $frameSite, 'footer', $frame( $footer( '[text /project/company/general/description]' ), $category ) ) ) === false ) === []
+	&& is_string( \Nino\Blocks::validate( $frameSite, 'header', $frame( "[header-wrap id=\"header\"][/header-wrap]", 'footer' ) ) ) === true && is_array( \Nino\Blocks::validate( $frameSite, 'header', $frame( "[header-wrap id=\"header\"][/header-wrap]", 'header' ) ) ) === true );
 
 // Drawn: what a page draws for the call, with the same care, and for a key that is not there as a page does - without a word in the log
 \Nino\Html::addFills( $frameSite, [ '/project/company/general/description' => 'Acme <b>Ltd</b> <script>alert(1)</script>' ], '*' );
@@ -868,8 +900,124 @@ check( 'where the site has no such text - a package of another site - the frame 
 // What a frame reads, for a tool to show before the block is put in: the keys of its texts and the logo, each once; a block of the pages reads none
 check( 'reads() lists the keys a frame names - texts and logo, sorted, each once - and nothing of the block\'s own slots, and is empty for a block of the pages',
 	is_array( $good ) === true && \Nino\Blocks::reads( $good + [ 'tree' => \Nino\Markup::parse( $good['source'], \Nino\Components::containers( $frameSite ) ) ] ) === [ '/logo', '/project/company/general/description' ]
-	&& \Nino\Blocks::reads( [ 'wrap' => 'footer-wrap', 'tree' => \Nino\Markup::parse( $footer( '[text /project/a/b/c][text /module/x/y/z][text /project/a/b/c][text ~title][text /nino/placeholder/landscape]' ), \Nino\Components::containers( $frameSite ) ) ] ) === [ '/module/x/y/z', '/project/a/b/c' ]
-	&& \Nino\Blocks::reads( [ 'wrap' => 'section-wrap', 'tree' => \Nino\Markup::parse( '[section-wrap id="x"][text /project/a/b/c][/section-wrap]', \Nino\Components::containers( $frameSite ) ) ] ) === [] && \Nino\Blocks::reads( [] ) === [] );
+	&& \Nino\Blocks::reads( [ 'side' => 'footer', 'tree' => \Nino\Markup::parse( $footer( '[text /project/a/b/c][text /module/x/y/z][text /project/a/b/c][text ~title][text /nino/placeholder/landscape]' ), \Nino\Components::containers( $frameSite ) ) ] ) === [ '/module/x/y/z', '/project/a/b/c' ]
+	&& \Nino\Blocks::reads( [ 'side' => 'page', 'tree' => \Nino\Markup::parse( '[section-wrap id="x"][text /project/a/b/c][/section-wrap]', \Nino\Components::containers( $frameSite ) ) ] ) === [] && \Nino\Blocks::reads( [] ) === [] );
+
+// --- G. the roots of a block are in the schema ------------------------------------------------------------
+
+echo "\nG. A component says it is the root of a block, and of which side of a page\n";
+
+// Three roots of a feature's own, one for each side, and two components that take a picture as their first word: one draws a logo, one does not
+$rootSite = blocksSite();
+$bare = ninoSandbox( 'blocks-bare' );
+
+foreach( [ 'probe-top' => 'page', 'probe-head' => 'header', 'probe-foot' => 'footer' ] as $name => $side )
+	\Nino\Components::addComponent( $rootSite, $name, [ 'label' => $name, 'in' => [ 'page' ], 'offers' => [ 'flow' ], 'block' => $side, 'attributes' => [ 'id' => [ 'type' => 'id', 'default' => '' ] ], 'template' => '<div[[id]] class="[[class]]">[[content]]</div>' ] );
+
+\Nino\Components::addComponent( $rootSite, 'probe-mark', [ 'label' => 'Mark', 'in' => [ 'flow' ], 'source' => 'image', 'logo' => true, 'template' => '<i class="[[class]]">[[value]]</i>' ] );
+\Nino\Components::addComponent( $rootSite, 'probe-pic', [ 'label' => 'Pic', 'in' => [ 'flow' ], 'source' => 'image', 'template' => '<i class="[[class]]">[[value]]</i>' ] );
+
+$wraps = \Nino\Blocks::wraps( $rootSite );
+ksort( $wraps );
+check( 'the roots of a block are what the schemas of the register say: the three of the kernel\'s feature and the three of the test, each with its side, and a project that registered none has none',
+	$wraps === [ 'footer-wrap' => 'footer', 'header-wrap' => 'header', 'probe-foot' => 'footer', 'probe-head' => 'header', 'probe-top' => 'page', 'section-wrap' => 'page' ] && \Nino\Blocks::wraps( $bare ) === [] );
+
+$rootParts = static fn( string $root, string $category, string $inside = '' ): array => $frame( '['. $root. ' id="x"]'. $inside. '[/'. $root. ']', $category );
+$sides = [ 'probe-top' => 'page', 'probe-head' => 'header', 'probe-foot' => 'footer' ];
+$taken = [];
+
+foreach( $sides as $root => $side )
+	foreach( [ 'content', 'intro', 'header', 'footer' ] as $category )
+		if( is_array( \Nino\Blocks::validate( $rootSite, 'probe', $rootParts( $root, $category ) ) ) !== ( $side === 'page' ? in_array( $category, [ 'content', 'intro' ], true ) : $category === $side ) )
+			$taken[] = $root. ' as '. $category;
+
+check( 'a block of a root that is not one of the kernel\'s is a block, and its category is the side of its root in both directions: header for a header, footer for a footer, one of the others for the page, and nothing else'
+	. ( $taken === [] ? '' : ' - against: '. implode( ', ', $taken ) ), $taken === [] );
+check( 'a component that is no root of a block is no root, whatever its name, and a name nobody brings is none either',
+	is_string( \Nino\Blocks::validate( $rootSite, 'probe', $rootParts( 'probe-mark', 'content' ) ) ) === true && is_string( \Nino\Blocks::validate( $rootSite, 'probe', $rootParts( 'nobody-wrap', 'content' ) ) ) === true );
+
+// The root a feature that is off brings: the block needs the feature, as it does for any component of it, and is no refusal
+$bare['./nino/filesystem/path'] = $root;
+$basisOff = \Nino\Blocks::validate( $bare, 'probe', $rootParts( 'section-wrap', 'content' ) );
+check( 'with the feature Basis off the block of a section is a block that needs it: listed with missing, the side its category says, and nothing of it to draw',
+	is_array( $basisOff ) === true && $basisOff['missing'] === [ 'basis' ] && $basisOff['side'] === 'page' );
+blocksWrite( ninoSandboxDir( $bare ). '/private/blocks', 'probe-block', $rootParts( 'section-wrap', 'content' ) );
+blocksRequest( $bare );
+\Nino\Blocks::forget( $bare );
+check( '...and it is read from a folder, listed with missing, refused by nothing, and get() has no tree and no source to draw', ( \Nino\Blocks::all( $bare )['probe-block']['missing'] ?? [] ) === [ 'basis' ] && \Nino\Blocks::rejected( $bare ) === []
+	&& isset( \Nino\Blocks::get( $bare, 'probe-block' )['tree'] ) === false && isset( \Nino\Blocks::get( $bare, 'probe-block' )['source'] ) === false );
+
+// A root of a feature that is off - Gone brings gone-head - has the side the category says, and the limits of that side: what a frame reads, and no more
+$offSite = blocksSite();
+$goneParts = static fn( string $category, string $inside ): array => $frame( '[gone-head id="x"]'. $inside. '[/gone-head]', $category );
+$goneHeader = \Nino\Blocks::validate( $offSite, 'probe', $goneParts( 'header', '[text /project/company/general/description]' ) );
+$notGone = [];
+
+foreach( [ 'a text of the project in a block of the page' => $goneParts( 'content', '[text /project/company/general/description]' ), 'a key of the configuration in a header' => $goneParts( 'header', '[text /nino/config/mail/password]' ),
+	'a text as a picture in a header' => $goneParts( 'header', '[image /project/company/general/description]' ), 'the logo for a component that is no logo' => $goneParts( 'header', '[image /logo]' ) ] as $label => $parts )
+	if( is_array( \Nino\Blocks::validate( $offSite, 'probe', $parts ) ) === true )
+		$notGone[] = $label;
+
+check( 'a header block of a root that a feature which is off brings reads what a frame reads - a text of the project - and nothing more: not in the category of the page, not a key of the configuration, not a picture it is not'
+	. ( $notGone === [] ? '' : ' - taken: '. implode( ', ', $notGone ) ), is_array( $goneHeader ) === true && $goneHeader['missing'] === [ 'gone' ] && $goneHeader['side'] === 'header' && $notGone === [] );
+
+// The feature is on, and the root says it is of the page: the block that was a header is no block
+\Nino\Components::addComponent( $offSite, 'gone-head', [ 'label' => 'Gone', 'in' => [ 'page' ], 'offers' => [ 'flow' ], 'block' => 'page', 'attributes' => [ 'id' => [ 'type' => 'id', 'default' => '' ] ], 'template' => '<div[[id]]>[[content]]</div>' ] );
+check( 'once the feature is on the real side counts: the block of the category header whose root is of the page is refused, and the one of the category content is a block',
+	is_string( \Nino\Blocks::validate( $offSite, 'probe', $goneParts( 'header', '' ) ) ) === true && is_array( \Nino\Blocks::validate( $offSite, 'probe', $goneParts( 'content', '' ) ) ) === true );
+
+// What a frame reads is the right of the root's side: the root of a header and of a footer of a feature of the test have it, the root of the page of the same feature has not
+$reading = '[text /project/company/general/description][probe-mark /logo]';
+$answers = [];
+
+foreach( $sides as $root => $side )
+	$answers[$root] = is_array( \Nino\Blocks::validate( $rootSite, 'probe', $rootParts( $root, $side === 'page' ? 'content' : $side, $reading ) ) );
+
+check( 'the right to read a text of the project and the logo is the right of a root that says header or footer: it holds for the header root and the footer root of another feature, and not for its root of the page',
+	$answers === [ 'probe-top' => false, 'probe-head' => true, 'probe-foot' => true ] );
+
+$notRead = [];
+
+foreach( [
+	'a text in the page root'		=> [ 'probe-top', 'content', '[text /project/company/general/description]' ],
+	'the logo in the page root'	=> [ 'probe-top', 'content', '[probe-mark /logo]' ],
+	'a picture in a header'			=> [ 'probe-head', 'header', '[probe-pic /logo]' ],
+	'another picture'						=> [ 'probe-head', 'header', '[probe-mark /logo/other]' ],
+	'the logo as a text'				=> [ 'probe-foot', 'footer', '[text /logo]' ],
+	'a configuration key'				=> [ 'probe-foot', 'footer', '[text /nino/config/mail/password]' ],
+] as $label => [ $root, $category, $inside ] )
+	if( is_array( \Nino\Blocks::validate( $rootSite, 'probe', $rootParts( $root, $category, $inside ) ) ) === true )
+		$notRead[] = $label;
+
+check( 'what a root of another feature may read is what the ones of the kernel\'s may: only the logo of a component that says it draws one, only the form of a key, and nothing at all for a root of the page'
+	. ( $notRead === [] ? '' : ' - taken: '. implode( ', ', $notRead ) ), $notRead === [] );
+
+// Read from a folder, listed with its side, told what it reads, and drawn
+$own = ninoSandboxDir( $rootSite ). '/private/blocks';
+
+foreach( $sides as $root => $side )
+	blocksWrite( $own, $root. '-block', $rootParts( $root, $side === 'page' ? 'content' : $side, $side === 'page' ? '' : $reading ) );
+
+blocksRequest( $rootSite );
+\Nino\Blocks::forget( $rootSite );
+ninoWarnings();
+
+$listed = \Nino\Blocks::all( $rootSite );
+$whole = static fn( string $key ): array => (array) \Nino\Blocks::get( $rootSite, $key );
+check( 'the blocks of the three roots are read from a folder: each is listed with its root, its side and its category, none is refused, and nothing is said',
+	array_map( static fn( string $key ): array => [ $listed[$key]['wrap'] ?? '', $listed[$key]['side'] ?? '', $listed[$key]['category'] ?? '' ], array_map( static fn( string $root ): string => $root. '-block', array_keys( $sides ) ) )
+		=== [ [ 'probe-top', 'page', 'content' ], [ 'probe-head', 'header', 'header' ], [ 'probe-foot', 'footer', 'footer' ] ] && \Nino\Blocks::rejected( $rootSite ) === [] && ninoWarnings() === [] );
+check( 'reads() answers the keys of a block by the side of its root: the header and the footer of the other feature name the text and the logo, its page root nothing',
+	array_map( static fn( string $key ): array => \Nino\Blocks::reads( $whole( $key ) ), [ 'probe-top-block', 'probe-head-block', 'probe-foot-block' ] )
+		=== [ [], [ '/logo', '/project/company/general/description' ], [ '/logo', '/project/company/general/description' ] ] );
+
+\Nino\Html::addFills( $rootSite, [ '/project/company/general/description' => 'Acme' ], '*' );
+check( 'a block of such a root is drawn by its own component, with the text of the site in it', str_starts_with( basisLessDraw( $rootSite, $whole( 'probe-head-block' )['source'] ), '<div id="x" class="probe-head">' ) === true
+	&& str_contains( basisLessDraw( $rootSite, $whole( 'probe-foot-block' )['source'] ), 'Acme' ) === true );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $rootSite ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $bare ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $offSite ) );
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $frameSite ) );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $absent ) );

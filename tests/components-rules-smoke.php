@@ -179,6 +179,48 @@ check( 'deep: a schema names it for a container, as a list of places that is not
 	&& array_filter( [ $schemaOf( [ 'deep' => 'place' ] ), $schemaOf( [ 'deep' => [] ] ), $schemaOf( [ 'deep' => [ 'Place' ] ] ), $schemaOf( [ 'deep' => [ 'a', 'a' ] ] ), $schemaOf( [ 'deep' => [ 1 ] ] ), \Nino\Components::validate( 'deep-probe', [ 'label' => 'x', 'deep' => [ 'place' ] ] ) ], 'is_string' ) !== []
 	&& count( array_filter( [ $schemaOf( [ 'deep' => 'place' ] ), $schemaOf( [ 'deep' => [] ] ), $schemaOf( [ 'deep' => [ 'Place' ] ] ), $schemaOf( [ 'deep' => [ 'a', 'a' ] ] ), $schemaOf( [ 'deep' => [ 1 ] ] ), \Nino\Components::validate( 'deep-probe', [ 'label' => 'x', 'deep' => [ 'place' ] ] ), $schemaOf( [ 'deep' => null ] ), $schemaOf( [ 'deep' => [ 'page' ] ] ), $schemaOf( [ 'deep' => [ 'ok', 'flow' ] ] ) ], 'is_string' ) ) === 9 );
 
+
+// block: the root of a block, of the side of a page the word says, for a container that stands in the page; and the two flags, markup and logo
+$rootOf = static fn( array $more ): array|string => \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'in' => [ 'page' ], 'offers' => [] ] + $more );
+$sidesTaken = [];
+$sidesRefused = [];
+
+foreach( \Nino\Components::SIDES as $side ) {
+
+	$answer = $rootOf( [ 'block' => $side ] );
+
+	if( is_array( $answer ) === false || $answer['block'] !== $side || \Nino\Components::validate( 'block-probe', $answer ) !== $answer )
+		$sidesTaken[] = $side;
+}
+
+foreach( [ 'a word that is no side' => $rootOf( [ 'block' => 'sidebar' ] ), 'a list' => $rootOf( [ 'block' => [ 'page' ] ] ), 'true' => $rootOf( [ 'block' => true ] ), 'null' => $rootOf( [ 'block' => null ] ), 'an empty word' => $rootOf( [ 'block' => '' ] ),
+	'a leaf' => \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'in' => [ 'page' ], 'block' => 'header' ] ), 'a container of the flow only' => \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'in' => [ 'flow' ], 'offers' => [], 'block' => 'footer' ] ),
+	'a container nowhere' => \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'offers' => [], 'block' => 'page' ] ) ] as $label => $answer )
+	if( is_string( $answer ) === false )
+		$sidesRefused[] = $label;
+
+check( 'block: a container that stands in the page names the side of its block, page, header or footer, and the clean schema keeps it; a word that is none, a value that is no word, and a component that is no container or does not stand in the page are refused'
+	. ( $sidesTaken === [] && $sidesRefused === [] ? '' : ' - '. implode( ', ', array_merge( $sidesTaken, $sidesRefused ) ) ), $sidesTaken === [] && $sidesRefused === [] && \Nino\Components::SIDES === [ 'page', 'header', 'footer' ] && array_key_exists( 'block', (array) $rootOf( [] ) ) === false );
+check( 'markup and logo: true is kept, false is none, anything else is refused, and markup is for a container',
+	( $rootOf( [ 'markup' => true ] )['markup'] ?? false ) === true && array_key_exists( 'markup', (array) $rootOf( [ 'markup' => false ] ) ) === false && is_string( $rootOf( [ 'markup' => 'yes' ] ) ) === true
+	&& is_string( \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'markup' => true ] ) ) === true && is_string( $rootOf( [ 'logo' => 1 ] ) ) === true
+	&& ( \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'source' => 'image', 'logo' => true ] )['logo'] ?? false ) === true && array_key_exists( 'logo', (array) $rootOf( [ 'logo' => false ] ) ) === false );
+check( 'a pair that means nothing is refused: a root that is markup, a root that is through, and a logo whose source is no image',
+	is_string( $rootOf( [ 'block' => 'page', 'markup' => true ] ) ) === true && is_string( $rootOf( [ 'block' => 'page', 'through' => true, 'children' => 'nodes' ] ) ) === true
+	&& is_string( \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'logo' => true ] ) ) === true && is_string( \Nino\Components::validate( 'block-probe', [ 'label' => 'x', 'source' => 'text', 'logo' => true ] ) ) === true
+	&& is_array( $rootOf( [ 'block' => 'header', 'logo' => false ] ) ) === true );
+
+// The component whose content is the markup of the page is the one whose schema says so, whatever it is called
+$markup = rulesSite( false );
+\Nino\Components::addComponent( $markup, 'rule-raw', [ 'label' => 'Raw', 'in' => [ 'page', 'flow' ], 'offers' => [], 'markup' => true, 'template' => '<div>[[content]]</div>' ] );
+\Nino\Components::addComponent( $markup, 'html', [ 'label' => 'Not markup', 'in' => [ 'page', 'flow' ], 'offers' => [], 'template' => '<div>[[content]]</div>' ] );
+$raw = \Nino\Components::offer( $markup, [], [] );
+check( 'a component of another name that says markup is offered with the reason html, and the component called html that does not say it is offered as any other',
+	$raw['rule-raw'] === \Nino\Components::CODE_HTML && $raw['html'] === true && $raw['section-wrap'] === true );
+check( 'check() names the call of the component that says markup, keeps what it holds free of a finding, and finds html between the calls anywhere else - the name html alone is nothing',
+	rulesCodes( $markup, '<p>[rule-raw]<b>x</b>[/rule-raw]' ) === [ '0' => [ 'free' ], '1' => [ 'html' ] ] && rulesCodes( $markup, '[html]<b>x</b>[/html]' ) === [ '0.0' => [ 'free' ] ]
+	&& rulesCodes( $markup, '[rule-raw]<b>x</b>[/rule-raw]' ) === [ '0' => [ 'html' ] ] );
+
 $notes = [];
 $once = \Nino\Components::offer( $appData, [ 'header-wrap' ], \Nino\Markup::parse( '[header-logo][header-nav /]', \Nino\Components::containers( $appData ), $notes ) );
 check( 'a component that is once in a container is offered no more where one stands, and the others still are', $once['header-logo'] === 'once' && $once['header-nav'] === 'once' && $once['header-actions'] === true );
