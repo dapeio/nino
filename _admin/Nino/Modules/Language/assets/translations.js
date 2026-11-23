@@ -171,7 +171,7 @@
 					if( chosen === null )
 						return;
 					chosen.text().then( function( value ) {
-						json.control.value = value;
+						json.fieldControl.value = value;
 						Nino.adminUi.clearFieldErrors( importSet );
 						if( typeof Nino.admin.dirty === 'object' )
 							Nino.admin.dirty.refresh();
@@ -211,7 +211,7 @@
 
 			const fields = Nino.admin.translations._fields;
 
-			return fields !== null && fields.json.control.value.trim() !== '';
+			return fields !== null && fields.json.fieldControl.value.trim() !== '';
 		},
 
 		/**
@@ -242,19 +242,19 @@
 
 			let translation;
 
-			if( fields.json.control.value.trim() === '' ) {
-				Nino.adminUi.fieldError( fields.json, fields.json.control, 'translations-json-error', Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), Nino.content.getText('/_admin/translations/label/paste') ) );
+			if( fields.json.fieldControl.value.trim() === '' ) {
+				Nino.adminUi.fieldError( fields.json, fields.json.fieldControl, 'translations-json-error', Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), Nino.content.getText('/_admin/translations/label/paste') ) );
 				panel._line.fail( Nino.content.getText('/_admin/translations/error/fields') );
-				fields.json.control.focus();
+				fields.json.fieldControl.focus();
 				return report( false );
 			}
 
 			try {
-				translation = panel._parseJson( fields.json.control.value );
+				translation = panel._parseJson( fields.json.fieldControl.value );
 			} catch( error ) {
-				Nino.adminUi.fieldError( fields.json, fields.json.control, 'translations-json-error', Nino.adminUi.format( Nino.content.getText('/_admin/translations/error/json'), error.message ) );
+				Nino.adminUi.fieldError( fields.json, fields.json.fieldControl, 'translations-json-error', Nino.adminUi.format( Nino.content.getText('/_admin/translations/error/json'), error.message ) );
 				panel._line.fail( Nino.content.getText('/_admin/translations/error/fields') );
-				fields.json.control.focus();
+				fields.json.fieldControl.focus();
 				return report( false );
 			}
 
@@ -289,7 +289,7 @@
 
 					// The document is in: the field holds nothing that is not sent
 					panel._line.idle();
-					fields.json.control.value = '';
+					fields.json.fieldControl.value = '';
 					fields.file.clear( false );
 
 					if( typeof Nino.admin.dirty === 'object' )
@@ -351,7 +351,7 @@
 			if( fields === null )
 				return;
 
-			fields.json.control.value = '';
+			fields.json.fieldControl.value = '';
 			fields.file.clear( false );
 			Nino.adminUi.clearFieldErrors( fields.form );
 			Nino.admin.translations._line.idle();

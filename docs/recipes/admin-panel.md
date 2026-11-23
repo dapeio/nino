@@ -929,8 +929,8 @@ the content language where it is not the native one. Their docblocks in
 Beside `textField()`, `selectField()`, `switchField()`, `numberField()` and `textareaField()` the form blocks have six
 more, each with the help behind the (?) and the note under the control that every field has
 ([Help, notes and textfills at a field](#help-notes-and-textfills-at-a-field)), each with what is wrong said at the field
-(`fieldError()`). The ones that are one control answer the element - the label, with the control as its `.control` where it
-is no `input` - and the ones that are a group answer a handle, `{ el, value(), set(), error( text ), clear(), focus() }`,
+(`fieldError()`). The ones that are one control answer the element - the label, with the control as its `fieldControl` where it
+is no `input` (`control` is a label's own, built in and read only: no block writes to it or reads it) - and the ones that are a group answer a handle, `{ el, value(), set(), error( text ), clear(), focus() }`,
 which a form reads its value from.
 
 `Nino.adminUi.checkField( { key, label, checked, required, help, note, onChange } )` is one tick with its name, the label at

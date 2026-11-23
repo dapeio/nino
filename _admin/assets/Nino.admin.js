@@ -2765,8 +2765,8 @@
 					readers[field.key] = function() { return controls[field.key].value };
 				} else if( field.type === 'check' ) {
 					label = Nino.adminUi.checkField( Object.assign( shared, { checked : field.value === true, onChange : say } ) );
-					controls[field.key] = label.control;
-					readers[field.key] = function() { return label.control.checked === true };
+					controls[field.key] = label.fieldControl;
+					readers[field.key] = function() { return label.fieldControl.checked === true };
 				} else if( field.type === 'checklist' ) {
 					handles[field.key] = Nino.adminUi.checklist( Object.assign( shared, { options : field.options, value : field.value, onChange : say } ) );
 					label = handles[field.key].el;
@@ -2789,8 +2789,8 @@
 					readers[field.key] = function() { return handles[field.key].value() };
 				} else if( field.type === 'code' ) {
 					label = Nino.adminUi.codeField( Object.assign( shared, { value : field.value, placeholder : field.placeholder, rows : field.rows, maxLength : field.maxLength, onInput : say } ) );
-					controls[field.key] = label.control;
-					readers[field.key] = function() { return label.control.value };
+					controls[field.key] = label.fieldControl;
+					readers[field.key] = function() { return label.fieldControl.value };
 				} else if( field.type === 'datetime' ) {
 					handles[field.key] = Nino.adminUi.dateTime( Object.assign( shared, { value : field.value, min : field.min, max : field.max, zone : field.zone, onChange : say } ) );
 					label = handles[field.key].el;
@@ -4504,7 +4504,7 @@
 		 *	@param	{Object}	options		{ key, id, className, label, help, hint, note, options, value, onChange }
 		 *
 		 *	@return	{Element}						The label; its select carries data-key, and is
-		 *													reachable as the label's own .control - so a caller
+		 *													reachable with querySelector('select') - so a caller
 		 *													writing a value back into it needs no id of its own
 		 */
 		selectField : function( options ) {
@@ -4945,7 +4945,7 @@
 		 *														- onChange   called with true or false on every change
 		 *														- className  the label's class instead of nino-admin-field
 		 *
-		 *	@return		{Element}									The label; its input is the label's own .control
+		 *	@return		{Element}									The label; its input is the label's own `fieldControl` (a name no element has: the built-in `control` of a label is read only)
 		 */
 		checkField : function( options ) {
 
@@ -4985,7 +4985,7 @@
 			} );
 
 			field.appendChild( input );
-			field.control = input;
+			field.fieldControl = input;
 
 			Nino.adminUi._tools( name, input, options, options.label ?? '' );
 			Nino.adminUi._note( field, options.note );
@@ -5480,7 +5480,7 @@
 			area.setAttribute( 'autocomplete', 'off' );
 			area.setAttribute( 'autocapitalize', 'off' );
 			area.setAttribute( 'autocorrect', 'off' );
-			field.control = area;
+			field.fieldControl = area;
 
 			return field;
 		},

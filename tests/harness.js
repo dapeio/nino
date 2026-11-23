@@ -480,6 +480,36 @@ function element( tag ) {
 
 	el.classList = classList( el );
 
+	/*	The `control` of a label is built in and can only be read: the assignment is dropped without a word (an error in strict mode), whatever a block
+		meant by it. With a `for` it is the element of that id - and only when the label hangs somewhere, where a page can look for the id (a label
+		that is not in the page yet answers null); without one, the first element in it that can be labelled; and none, null	*/
+	if( el.tagName === 'LABEL' )
+		Object.defineProperty( el, 'control', {
+			enumerable : true,
+			configurable : true,
+			get : function() {
+
+				const labelable = function( node ) { return [ 'SELECT', 'TEXTAREA', 'BUTTON', 'METER', 'OUTPUT', 'PROGRESS' ].indexOf( node.tagName ) !== -1 || ( node.tagName === 'INPUT' && node.type !== 'hidden' ) };
+
+				if( 'for' in el.attributes ) {
+
+					if( el.parentNode === null )
+						return null;
+
+					let root = el;
+
+					while( root.parentNode !== null )
+						root = root.parentNode;
+
+					const found = findAll( root, function( node ) { return node.id === el.attributes['for'] } )[0];
+
+					return found !== undefined && labelable( found ) ? found : null;
+				}
+
+				return findAll( el, function( node ) { return node !== el && labelable( node ) } )[0] ?? null;
+			},
+		} );
+
 	// A control's value is always a string in a browser, whatever was assigned;
 	// an option that was given none reads its text, and a select reads its
 	// selected option's - the first one that can be chosen when none is

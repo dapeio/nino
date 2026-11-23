@@ -290,9 +290,9 @@
 				Nino.adminUi.clearFieldErrors( form );
 
 				// The one thing left to say: it is asked for at the tick, and the focus goes there
-				if( ack.control.checked !== true ) {
-					Nino.adminUi.fieldError( ack, ack.control, 'finish-key-error', t('/_admin/install/finish/key-ack-error') );
-					ack.control.focus();
+				if( ack.fieldControl.checked !== true ) {
+					Nino.adminUi.fieldError( ack, ack.fieldControl, 'finish-key-error', t('/_admin/install/finish/key-ack-error') );
+					ack.fieldControl.focus();
 					return;
 				}
 

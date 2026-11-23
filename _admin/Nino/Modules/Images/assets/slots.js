@@ -880,7 +880,7 @@
 					field : fieldset, uriField : uriField, labelField : labelField, widthField : widthField, heightField : heightField,
 					uriInput : uriField.querySelector('input'), labelInput : labelField.querySelector('input'),
 					widthInput : widthField.querySelector('input'), heightInput : heightField.querySelector('input'),
-					ignoreCheck : ignore.control, index : index,
+					ignoreCheck : ignore.fieldControl, index : index,
 				};
 
 				[ row.widthInput, row.heightInput ].forEach( function( input ) { input.min = '1'; input.step = '1' } );

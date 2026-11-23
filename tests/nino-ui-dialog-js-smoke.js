@@ -242,6 +242,68 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 }
 
 
+// --- formDialog(): a tick and a field of code read their control whatever the field says about itself ------------------
+// The control of a label is built in and read only, and where the field has a help it is the element of the `for` - which is null until the label hangs in the page
+
+{
+	// The way on: the button of the primary kind - a field with a help has a button of its own in the dialog, so the row is not counted by place
+	const main = dialog => buttons( dialog ).filter( b => b.className === 'nino-admin-btn-primary' )[0];
+	const variants = [
+		[ 'a tick', {} ], [ 'a tick with a help', { help : 'Help' } ], [ 'a tick with a note', { note : 'Note' } ],
+		[ 'a required tick', { required : true } ], [ 'a required tick with a help', { help : 'Help', required : true } ],
+	];
+
+	variants.forEach( function( variant ) {
+		const w = world();
+		const sent = [];
+		let opened = true;
+
+		try {
+			w.ui.formDialog( { title : 'Field', fields : [ Object.assign( { key : 'on', type : 'check', label : 'On', value : variant[1].required === true }, variant[1] ) ], submit : 'Save', cancel : 'Cancel', onSubmit : values => sent.push( values ) } );
+		}
+		catch( error ) {
+			opened = false;
+		}
+
+		const dialog = w.dialogs[0];
+
+		check( variant[0]+ ' in a form dialog opens, and what a person ticks is what is sent', opened === true && ( () => {
+			const box = tag( dialog, 'input' ).filter( input => input.type === 'checkbox' )[0];
+			// A tick that is required must be ticked to be sent: it starts off and is ticked, the others start on and are cleared
+			box.checked = variant[1].required !== true ? false : true;
+			fire( main( dialog ), 'click' );
+			return box !== undefined && sent.length === 1 && sent[0].on === box.checked;
+		} )() );
+	} );
+
+	const w = world();
+	const sent = [];
+	let opened = true;
+
+	try {
+		w.ui.formDialog( { title : 'Field', fields : [ { key : 'json', type : 'code', label : 'Json', help : 'Help', value : '{ }' } ], submit : 'Save', cancel : 'Cancel', onSubmit : values => sent.push( values ) } );
+	}
+	catch( error ) {
+		opened = false;
+	}
+
+	check( 'a field of code with a help in a form dialog opens, and what is typed is what is sent', opened === true && ( () => {
+		tag( w.dialogs[0], 'textarea' )[0].value = '{ "a" : 1 }';
+		fire( main( w.dialogs[0] ), 'click' );
+		return sent.length === 1 && sent[0].json === '{ "a" : 1 }';
+	} )() );
+
+	// The stand-in is as the browser is: the control of a label cannot be written, and is null for a `for` that no page holds
+	const label = element('label');
+	const input = element('input');
+	label.appendChild( input );
+	label.setAttribute( 'for', 'x' );
+	input.id = 'x';
+	check( 'a label of the stand-in has the control of a browser: read only, null while it hangs nowhere, the element of its `for` once it hangs somewhere',
+		label.control === null && ( () => { try { label.control = input } catch( error ) {} return label.control === null } )() && ( () => { const page = element('div'); page.appendChild( label ); return label.control === input } )() );
+}
+
+
 // --- formDialog(): what was typed is not thrown away silently ---------------
 
 {

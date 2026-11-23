@@ -54,7 +54,7 @@ console.log( 'Nino.adminUi.checkField, checklist, localeRows, fileField, codeFie
 {
 	const told = [];
 	const field = ui.checkField( { key : 'agree', label : 'I agree', checked : false, required : true, help : 'Why it is asked.', note : 'Kept in view.', onChange : value => told.push( value ) } );
-	const box = field.control;
+	const box = field.fieldControl;
 
 	check( 'a tick is a label with its name first and the box in it, as every field: the label stands at the field', field.tagName === 'LABEL' && classes( field ).includes('nino-admin-field') && box.type === 'checkbox' && field.children.includes( box ) && field.children[0].tagName === 'SPAN' );
 	check( '...a required one has its star and aria-required, and its help is behind a (?) that is a button', box.getAttribute('aria-required') === 'true' && named( field, 'SPAN' ).some( el => classes( el ).includes('nino-admin-required') ) && findAll( field, el => classes( el ).includes('nino-admin-help-button') ).length === 1 );
@@ -159,7 +159,7 @@ console.log( 'Nino.adminUi.checkField, checklist, localeRows, fileField, codeFie
 
 {
 	const field = ui.codeField( { key : 'css', label : 'CSS', value : 'a {}', fills : { editable : true, items : [] } } );
-	const area = field.control;
+	const area = field.fieldControl;
 
 	check( 'a field of code is a textarea in the face of code that checks no spelling, completes nothing and does not wrap', area.tagName === 'TEXTAREA' && classes( area ).includes('nino-admin-code') && area.spellcheck === false && area.getAttribute('wrap') === 'off' && area.getAttribute('autocapitalize') === 'off' && area.getAttribute('autocomplete') === 'off' );
 	check( '...the Tab key is the browser\'s: the field listens to no key and takes none', Object.keys( area.listeners ).every( name => name !== 'keydown' && name !== 'keypress' && name !== 'keyup' ) );
