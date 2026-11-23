@@ -710,7 +710,8 @@ namespace Nino\Install {
 		 *	that order, when the project does not have the menu yet. Where it
 		 *	has, the menu is the editors' and a second run leaves it alone.
 		 *	\Nino\Features::activate() does not read
-		 *	'navs': a feature brings no menu. See _applyNavs().
+		 *	'navs': a feature brings no menu of its own; the pages it offers to a menu the project has are
+		 *	its 'menus' (see \Nino\Features::unitMenus()). See _applyNavs().
 		 *
 		 *	The name of each language the project has is written here too, in the
 		 *	language's own tongue: [[/_nino/locale/<code>/name]] in text/global.php,

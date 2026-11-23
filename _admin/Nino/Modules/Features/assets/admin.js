@@ -2221,7 +2221,7 @@
 				// The panel a feature brings only appears - or goes - once the
 				// shell is built again, on the level it was pressed on
 				Nino.admin.features._reload(
-					( what === 'update' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/updated'), feature.name ) : Nino.admin.features._activatedText( feature.name, response.switchedOn || [], feature.key ) )+ Nino.admin.features._skippedText( response.skipped ),
+					( what === 'update' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/updated'), feature.name ) : Nino.admin.features._activatedText( feature.name, response.switchedOn || [], feature.key ) )+ Nino.admin.features._skippedText( response.skipped )+ Nino.admin.features._menusText( response ),
 					{ focus : what === 'activate' ? Nino.admin.features._nextToActivate( feature.key ) : '', parts : inView === true ? [ feature.key ] : undefined }
 				);
 			} );
@@ -2308,7 +2308,7 @@
 
 				const said = ( required.length === 0
 					? Nino.content.getText('/_admin/features/msg/'+ word )
-					: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/'+ word+ '-with'), required.join( ', ' ) ) )+ Nino.admin.features._skippedText( response.skipped );
+					: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/'+ word+ '-with'), required.join( ', ' ) ) )+ Nino.admin.features._skippedText( response.skipped )+ Nino.admin.features._menusText( response );
 
 				/*	Said as a toast rather than written onto the row it was pressed
 					on, because that row is gone by the time anybody could read it: an
@@ -2710,6 +2710,29 @@
 			return Array.isArray( skipped ) === false ? '' : skipped.map( function( entry ) {
 				return ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/unit-skipped'), entry.name );
 			} ).join('');
+		},
+
+		/**
+		 *	What an activation, an installation or an update says besides what it did, where the unit of a feature put a page into a menu of the project - the page and the
+		 *	menu by their names - or was not allowed to because the account may not change menus: one sentence each, after a blank
+		 *
+		 *	@param		{Object}	response		As the panel answered it: 'menus' and 'menusUnnamed' [ { key, name, page, menu } ] and 'menusRefused' [ { key, name } ]
+		 *
+		 *	@return		{string}
+		 */
+		_menusText : function( response ) {
+
+			const added = Array.isArray( response.menus ) === true ? response.menus : [];
+			const unnamed = Array.isArray( response.menusUnnamed ) === true ? response.menusUnnamed : [];
+			const refused = Array.isArray( response.menusRefused ) === true ? response.menusRefused : [];
+
+			return added.map( function( entry ) {
+				return ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/menu-added'), entry.page, entry.menu );
+			} ).concat( unnamed.map( function( entry ) {
+				return ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/menu-unnamed'), entry.page, entry.menu );
+			} ), refused.map( function( entry ) {
+				return ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/menu-refused'), entry.name );
+			} ) ).join('');
 		},
 
 		/**

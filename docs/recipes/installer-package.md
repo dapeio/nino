@@ -106,6 +106,7 @@ Supported unit keys in the current installer:
 | `elementTypes` | Unit-root files copied into project `elements/` |
 | `elements` | Elements added to element types, add-only: `type uri => file below the unit`, e.g. `'privacy' => 'elements/privacy.php'` - see below |
 | `navs` | Menus the wizard creates when the project does not have them: `nav key => [ Element-URI, ... ]`, e.g. `'legal' => [ '/legal/imprint', '/legal/privacy' ]` - see below |
+| `menus` | A feature's unit only: pages the feature routes at run time, offered to menus the project has, once, at the first application of the unit - `menu key => [ Element-URI, ... ]`, e.g. `'main' => [ '/blog' ]` - see below |
 | `blacklist` | Text keys merged into `text/blacklist.php` |
 | `whenNoPages` | `true`: a feature's unit is applied as a whole where the project has no page yet, and not at all where it has one - see [the install unit](../features.md#the-install-unit) |
 | `config` | Top-level defaults written only when absent - a key `\Nino\AppData::DEFAULTS` sets is never absent, so a unit does not restate a framework default |
@@ -218,8 +219,8 @@ value that does not fit the model is left out and logged. See
 'navs' => [ 'legal' => [ '/legal/imprint', '/legal/privacy' ] ],
 ```
 
-Only the wizard's apply step reads it - a feature's activation does not, since a
-feature brings no menu. A key the project
+Only the wizard's apply step reads it - a feature's activation does not: `navs`
+makes a menu the project does not have, and a feature brings none. A key the project
 does not have under `/nino/html/navs` is added to it, and the Element-URIs
 become its members, priority 1, 2, ... in that order, under
 `/nino/html/navroutes`. The entries are Element-URIs - the `uri` of a
@@ -227,6 +228,16 @@ route - not route keys: a page with one route per language is one entry. A
 menu the project has is left as the editors made it, and a key that is no
 usable slug or an entry that does not start with `/` is skipped with a
 warning. Base frames show such a menu with `[navigation nav="legal"]`.
+
+`menus` is the other way round, and a feature's unit alone says it: it makes no menu and
+puts pages into menus the project already has. `'menus' => [ 'main' => [ '/blog' ] ]`
+puts the page of the Element-URI `/blog` - a page the feature routes at run time, in its
+`init()`, so that no route in `config.php` can carry a `navs` - at the end of the main menu,
+under `/nino/html/navroutes`, once: at the first application of the unit, never at a
+re-activation, **Apply content again** or an update, and never for a page that is a stored route of the project. A page that the unit puts into `config.php` with
+its `routes` says its menu on the route (`'navs' => [ 'main' => 5 ]`). The rules - the place, the menu that is
+not there, what removing the feature takes away, the record, the right to change menus - are in
+[the install unit](../features.md#the-install-unit).
 
 ## Text fragments
 

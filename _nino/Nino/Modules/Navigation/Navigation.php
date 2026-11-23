@@ -361,6 +361,257 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	Put pages at the end of menus the project has - the place that writes
+		 *	'/nino/html/navroutes' for a caller that is no panel (a feature's install
+		 *	unit says 'menus', see \Nino\Features::activate()), with take() and restore(), which
+		 *	take the same memberships out and put them back
+		 *
+		 *	A page is a member by its Element-URI, as above. It is put into a menu that is in
+		 *	'/nino/html/navs' - the key's default, 'main' and 'footer', where config.php holds
+		 *	none - and nothing is made for a menu that is not there: the Navigation module
+		 *	has to be on, and the menu has to be the project's. A page that is a member of
+		 *	the menu already, by a route's own 'navs' or by a membership of its own, is left
+		 *	where it stands. A page that is the 'uri' of a route config.php stores is the
+		 *	project's: it is not put anywhere and is told in $refused. A page that is added gets the place
+		 *	after the last one the menu holds - the greatest priority any stored route or any membership gives it,
+		 *	plus 1, the pages in the order they are named - so that it never stands in front of what
+		 *	the editors put there; where that place would be no whole number any more the page is not put
+		 *	and is told in $refused. Nothing is changed but '/nino/html/navroutes'
+		 *
+		 *	@param		array 		$content			The content of config.php, as it stands under the lock
+		 *	@param		array 		$menus				Menu key => [ Element-URI, ... ], checked by the caller
+		 *	@param		array 		&$added				(reference) Menu key => [ Element-URI, ... ]: the memberships this call added
+		 *	@param		int 			&$present			(reference) How many of the pages were members of their menu already
+		 *	@param		array 		&$refused			(reference) The Element-URIs that were not put: a route of the project's, or no place to put them
+		 *
+		 *	@return 	array											$content, with the memberships added
+		 */
+		public static function append( array $content, array $menus, array &$added, int &$present, array &$refused = [] ): array {
+
+			$added		= [];
+			$present	= 0;
+			$refused	= [];
+
+			if( self::on( $content ) === false )
+				return $content;
+
+			$registry		= array_map( 'strval', (array) ( $content['/nino/html/navs'] ?? \Nino\AppData::DEFAULTS['/nino/html/navs'] ) );
+			$routes			= is_array( $content['/nino/http/routes'] ?? null ) === true ? $content['/nino/http/routes'] : [];
+			$navroutes	= is_array( $content['/nino/html/navroutes'] ?? null ) === true ? $content['/nino/html/navroutes'] : [];
+
+			foreach( $menus as $nav => $uris ) {
+
+				if( in_array( (string) $nav, $registry, true ) === false )
+					continue;
+
+				$last = self::_last( $routes, $navroutes, (string) $nav );
+
+				foreach( $uris as $uri ) {
+
+					if( self::_stored( $routes, $uri ) === true ) {
+						$refused[] = $uri;
+						continue;
+					}
+
+					if( self::_member( $routes, $navroutes, $uri, (string) $nav ) === true ) {
+						$present++;
+						continue;
+					}
+
+					if( $last >= PHP_INT_MAX ) {
+						$refused[] = $uri;
+						continue;
+					}
+
+					if( is_array( $navroutes[$uri] ?? [] ) === false )
+						$navroutes[$uri] = [];
+
+					$navroutes[$uri][$nav]	= ++$last;
+					$added[$nav][]					= $uri;
+				}
+			}
+
+			if( $added !== [] )
+				$content['/nino/html/navroutes'] = $navroutes;
+
+			return $content;
+		}
+
+		/**
+		 *	Take the memberships of pages out of '/nino/html/navroutes', from every menu they stand in - whatever the menu is called now - and hand them
+		 *	back as they stood, menu key => priority, by Element-URI: what a feature that is switched off parks (see restore()), and what a feature
+		 *	that is removed leaves nothing of. A page that is the 'uri' of a route config.php stores is the project's and is left. The key is
+		 *	absent rather than empty when nothing is left in it, as the Navigations panel writes it
+		 *
+		 *	@param		array 		$content			The content of config.php, as it stands under the lock
+		 *	@param		array 		$uris					Element-URIs
+		 *	@param		array 		&$parked			(reference) Element-URI => [ menu key => priority ] of what stood
+		 *
+		 *	@return 	array											$content, without them
+		 */
+		public static function take( array $content, array $uris, array &$parked ): array {
+
+			$parked		= [];
+			$routes		= is_array( $content['/nino/http/routes'] ?? null ) === true ? $content['/nino/http/routes'] : [];
+			$navroutes	= is_array( $content['/nino/html/navroutes'] ?? null ) === true ? $content['/nino/html/navroutes'] : [];
+
+			foreach( $uris as $uri ) {
+
+				if( is_string( $uri ) === false || isset( $navroutes[$uri] ) === false || self::_stored( $routes, $uri ) === true )
+					continue;
+
+				foreach( is_array( $navroutes[$uri] ) === true ? $navroutes[$uri] : [] as $nav => $prio )
+					if( is_int( $prio ) === true )
+						$parked[$uri][(string) $nav] = $prio;
+
+				unset( $navroutes[$uri] );
+			}
+
+			if( $navroutes === [] )
+				unset( $content['/nino/html/navroutes'] );
+			else
+				$content['/nino/html/navroutes'] = $navroutes;
+
+			return $content;
+		}
+
+		/**
+		 *	Put what take() parked back: into the menus that are still there under the key they had, at the place they had where nothing holds it, else at
+		 *	the end; what cannot be put back - the menu is gone or has another key, the Navigation module is off, the page is a route of the project's now,
+		 *	a membership stands there already - is left out without a word
+		 *
+		 *	@param		array 		$content			The content of config.php, as it stands under the lock
+		 *	@param		array 		$parked				Element-URI => [ menu key => priority ]
+		 *	@param		int 			&$restored		(reference) How many memberships were put back
+		 *
+		 *	@return 	array											$content, with the memberships back
+		 */
+		public static function restore( array $content, array $parked, int &$restored ): array {
+
+			$restored = 0;
+
+			if( self::on( $content ) === false )
+				return $content;
+
+			$registry		= array_map( 'strval', (array) ( $content['/nino/html/navs'] ?? \Nino\AppData::DEFAULTS['/nino/html/navs'] ) );
+			$routes			= is_array( $content['/nino/http/routes'] ?? null ) === true ? $content['/nino/http/routes'] : [];
+			$navroutes	= is_array( $content['/nino/html/navroutes'] ?? null ) === true ? $content['/nino/html/navroutes'] : [];
+
+			foreach( $parked as $uri => $places ) {
+
+				if( is_string( $uri ) === false || is_array( $places ) === false || self::_stored( $routes, $uri ) === true )
+					continue;
+
+				foreach( $places as $nav => $prio ) {
+
+					$nav = (string) $nav;
+
+					if( is_int( $prio ) === false || in_array( $nav, $registry, true ) === false || self::_member( $routes, $navroutes, $uri, $nav ) === true )
+						continue;
+
+					$last = self::_last( $routes, $navroutes, $nav );
+
+					// Its own place where no route and no membership of the menu has it
+					$held = false;
+					foreach( $routes as $route )
+						if( is_array( $route ) === true && is_numeric( $route['navs'][$nav] ?? null ) === true && (int) $route['navs'][$nav] === $prio )
+							$held = true;
+					foreach( $navroutes as $memberships )
+						if( is_array( $memberships ) === true && ( $memberships[$nav] ?? null ) === $prio )
+							$held = true;
+
+					if( $held === true && $last >= PHP_INT_MAX )
+						continue;
+
+					if( is_array( $navroutes[$uri] ?? [] ) === false )
+						$navroutes[$uri] = [];
+
+					$navroutes[$uri][$nav] = $held === true ? $last + 1 : $prio;
+					$restored++;
+				}
+			}
+
+			if( $restored > 0 )
+				$content['/nino/html/navroutes'] = $navroutes;
+
+			return $content;
+		}
+
+		/**
+		 *	Whether the Navigation module is on in config.php
+		 *
+		 *	@param		array 		$content			The content of config.php
+		 *
+		 *	@return 	bool
+		 */
+		public static function on( array $content ): bool {
+			return in_array( '\\Nino\\Modules\\Navigation', array_map( static fn( mixed $class ): string => '\\'. ltrim( (string) $class, '\\' ), (array) ( $content['/nino/modules'] ?? [] ) ), true );
+		}
+
+		/**
+		 *	Whether a page is the 'uri' of a route config.php stores - one of the project's pages, taken out of a menu or not
+		 *
+		 *	@param		array 		$routes				The stored routes
+		 *	@param		string		$uri
+		 *
+		 *	@return 	bool
+		 */
+		private static function _stored( array $routes, string $uri ): bool {
+
+			foreach( $routes as $route )
+				if( is_array( $route ) === true && ( $route['uri'] ?? null ) === $uri )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	Whether a page is a member of a menu: by a membership of its own, or by a stored route with its Element-URI that has the menu in its 'navs'
+		 *
+		 *	@param		array 		$routes				The stored routes
+		 *	@param		array 		$navroutes		The memberships
+		 *	@param		string		$uri
+		 *	@param		string		$nav
+		 *
+		 *	@return 	bool
+		 */
+		private static function _member( array $routes, array $navroutes, string $uri, string $nav ): bool {
+
+			if( is_array( $navroutes[$uri] ?? null ) === true && is_int( $navroutes[$uri][$nav] ?? null ) === true )
+				return true;
+
+			foreach( $routes as $route )
+				if( is_array( $route ) === true && ( $route['uri'] ?? null ) === $uri && isset( $route['navs'][$nav] ) === true )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	The greatest place any stored route or any membership holds in a menu, 0 for none
+		 *
+		 *	@param		array 		$routes				The stored routes
+		 *	@param		array 		$navroutes		The memberships
+		 *	@param		string		$nav
+		 *
+		 *	@return 	int
+		 */
+		private static function _last( array $routes, array $navroutes, string $nav ): int {
+
+			$last = 0;
+
+			foreach( $routes as $route )
+				if( is_array( $route ) === true && is_array( $route['navs'] ?? null ) === true && is_numeric( $route['navs'][$nav] ?? null ) === true )
+					$last = max( $last, (int) $route['navs'][$nav] );
+
+			foreach( $navroutes as $memberships )
+				if( is_array( $memberships ) === true && is_int( $memberships[$nav] ?? null ) === true )
+					$last = max( $last, $memberships[$nav] );
+
+			return $last;
+		}
+
+		/**
 		 *	The priority a page holds in one navigation as a runtime-only
 		 *	membership, from '/nino/html/navroutes' - null when there is none,
 		 *	when the value is not a whole number, or for a route on a

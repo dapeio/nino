@@ -1677,7 +1677,8 @@ $siteStage = \Nino\Filesystem::path( $site, '/data/.packages' );
 $packages = $siteDir. '/private/packages';
 
 $block = blockFiles( $svg, $png );
-$looks100 = tarGz( featureFiles( 'Looks', 'looks', '1.0.0' ) );
+// The unit of Looks offers a page to the main menu: what a theme that asks for it is told when the account may not change menus
+$looks100 = tarGz( featureFiles( 'Looks', 'looks', '1.0.0', [ 'install/manifest.php' => '<?php return [ \'menus\' => [ \'main\' => [ \'/looks\' ] ] ];' ] ) );
 $remote['https://catalogue.test/features/looks-1.0.0.tar.gz'] = $looks100;
 $looksEntry = entry( 'looks', '1.0.0', $looks100 );
 
@@ -2000,6 +2001,7 @@ check( 'a key that is none, and a package the catalogue has no picture of, are a
 
 $requests = [];
 [ $status, $body ] = callFeatures( $site3, 'apiPackageInstall', [ 'kind' => 'theme', 'key' => 'craft-probe', 'version' => '1.0.0' ] );
+check( 'the feature that a theme asks for offers a page to a menu, the account may not change menus, and the answer says so, with the name of the feature', ( $body['menusRefused'] ?? [] ) === [ [ 'key' => 'looks', 'name' => 'Looks' ] ] && isset( $body['menus'] ) === false );
 check( 'a theme is installed with the feature it asks for, which is switched on: the answer says what was placed, in order, and what is on now', $status === 200
 	&& array_column( $body['placed'], 'key' ) === [ 'looks', 'craft-probe' ] && array_column( $body['switchedOn'], 'key' ) === [ 'looks' ] && ( $body['package']['state'] ?? '' ) === 'current' && ( $body['package']['local'] ?? '' ) === '1.0.0'
 	&& is_file( $site3Packages. '/themes/craft-probe/theme.json' ) === true && \Nino\Features::get( $site3, 'looks' )['active'] === true && stagingClean( $site3Stage ) === true );

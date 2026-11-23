@@ -634,7 +634,7 @@ template and icon are the [panel recipe](recipes/admin-panel.md).
 [Library Format](setup.md#library-format) the files). An activation reads `routes`,
 `templates`, `files`, `elementTypes`, `elements`, `blacklist` and `config` from it,
 and `text/global.php` and `text/<locale>.php` for every available locale; `key`,
-`imageSlots` and `whenNoPages` besides; `label`, `moduleClass`, `requiresModules`, `preset` and
+`imageSlots`, `whenNoPages` and `menus` besides; `label`, `moduleClass`, `requiresModules`, `preset` and
 `navs` are the wizard's alone. The unit of `Hello`, `features/Hello/install/manifest.php`, copies
 the template of the page `/hello` and adds a section of the privacy policy:
 
@@ -702,6 +702,47 @@ and `llms.txt` are none, and neither is a route that answers with an error statu
 unit's own routes do not count against it. A project without a page gets the unit as any other, and the setup wizard, which applies
 a unit with overwrite, ignores the key. The report of the application (see `\Nino\Features::applyUnit()`) says it with `'skipped' => 'pages'`
 and every count 0, and the panel says it after **Apply content again**, after an activation, after an installation and after an update, and the log of the actions holds it: "The project has pages already; <feature> placed nothing."
+
+**A page in a menu.** A feature that routes a page at run time - in its `init()`, the list of the posts at `/blog` - has no route in
+`config.php` to carry a menu, and says in its unit which menu of the project the page belongs in: `'menus' => [ 'main' => [ '/blog' ] ]`, a menu
+key and the Element-URIs of its pages, the `uri` of the route the page has. Three ways put a page into a menu, and a unit takes the one that fits the page:
+
+| The page is | Where the menu is said |
+| --- | --- |
+| a route the unit puts into `config.php` with its `routes` | on the route, `'navs' => [ 'main' => 5 ]`, as the pages of the start of a site do |
+| a page a feature routes at run time | `menus` of the unit, as here |
+| a menu the project does not have, to be made | `navs` of the unit, which only the setup wizard reads (and it makes the menu) |
+
+*When.* The first time the unit is applied - the first activation or installation, in the wizard's step of an application too - each page is
+put at the end of its menu, as a membership under its Element-URI in `/nino/html/navroutes`: the place after the greatest one a route or a
+membership holds in that menu. It is offered **once**: a switch off and on, **Apply content again** and an update offer nothing, and neither does
+any later activation. *Where.* Only where the project has that menu - a menu is never made, a project without the Navigation module has none - and
+the page is not in it already. A page that is the Element-URI of a route `config.php` stores - the start page, a page of the project, one the project
+took out of the menu - is the project's and is left out with a warning, as are the pages beyond the eighth of a unit (eight at most, all
+menus together), and a page whose place would be no whole number. A menu key has to be a slug and a page a string that starts with a single `/` and has
+no control character; what is not is left out with a warning. A page that the unit names and nothing names in the texts, `/_nino/webpage<uri>/name`, is put and
+said in a warning: a menu draws a page by that text and skips one that has none, so the unit brings it in `install/text/`. *Who.* A signed-in account
+that may switch the feature on and may not change menus (`/_admin/navs/manage`) offers none; the answer, the toast and the log say that the page is in
+no menu and that it is entered in the Navigations panel, and that is the end of it: the offer was made, and nothing puts the page into a menu later. The setup wizard's
+account is signed in and holds the right, so a wizard puts its pages in. The features that come on because the one asked for requires them are told the same way.
+
+*Off and removed.* What leaves the menus and what comes back follows the pages the unit **names** under `menus` - not whether the kernel put them there. A feature that is
+switched off has no route, and the kernel takes the memberships of those pages out of `navroutes` - out of every menu they stand in, whatever the menu is called by now,
+and whoever put them there, the kernel or the editors by hand, on a site that had the feature before this key existed too - and parks them in the record of the feature under
+`/nino/features`, `'menus' => [ 'offered' => [ '/blog' ], 'parked' => [ '/blog' => [ 'main' => 3 ] ] ]`, in the same write of `config.php` that takes the class out of the list
+(`deactivateRefused()` does the same, reading the key of the feature from its refused `feature.php` where it can). So no membership of a page that nothing routes is left for the
+Navigations panel to drop or for a page of the project under the same address to inherit; the address answers 404 and the panel lists nothing. Switched on again, they are put back:
+into the menus that exist under the same key, at the old place where it is free, else at the end; what cannot be put back is left out. With the Navigation module off nothing can be put back and
+it stays parked until the module is on and the feature is activated once more. A menu made anew under the old key while the feature was off is a menu that has that key: the page goes into it.
+A page the project took out of the menu before is not there to park and does not come back. A feature that is removed takes the memberships of its pages, present and parked, away;
+nothing is left in `config.php`, the address is free for a page of the project, and the feature put in again is a first time. A page another feature that is on names too, and a page that
+is the Element-URI of a route `config.php` stores, are not parked or taken. While the feature is on, its run-time route covers a page of the project under the same address: the menu
+draws the feature's page there, and the project's own page is back when the feature is off. All of it is written by `\Nino\Modules\Navigation` (`append()`, `take()`, `restore()`), which
+is where a Navigation that becomes a feature of its own keeps it. The report of the application says
+`'menus' => [ 'added' => 1, 'present' => 0, 'in' => ..., 'denied' => false, 'refused' => [] ]`, and the panel says after an activation, an installation and an update which page is
+in which menu - a page that has no name yet is said apart, as waiting for its name - and the log of the actions holds it. The kernel asks a feature no question about its routes at the time it is
+switched on - a module registers them in `init()` for each request, with callbacks that add up if it is called twice - so what a unit may offer is kept to what is no page of the project. A feature
+is written as in [Developing a feature](#developing-a-feature) and the catalogue's "Write a feature".
 
 A feature that processes personal data brings its own section of the privacy policy
 with the `elements` key, a map of an element type's uri to a file of the unit. The

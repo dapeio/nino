@@ -750,6 +750,26 @@ check( '...and the log of the house has the path, once', count( $warnings ) === 
 check( '...what could be removed of the directory is gone and the directory is what stays', is_dir( NINO_FEATURES_DIR. '/Alpha/sub' ) === false );
 \Nino\Filesystem::removeDir( $sandbox );
 
+// A page in a menu, through an install from the catalogue: the answer of the install says which page is in which menu, or that the account may not change menus
+$makeFeature( 'menued', [ 'install/manifest.php' => '<?php return [ \'menus\' => [ \'main\' => [ \'/menued\' ] ] ];', 'install/text/global.php' => '<?php return [ \'[[/_nino/webpage/menued/name]]\' => \'Menued\' ];' ] );
+
+foreach( [ 'with the right' => [ [ '/_admin/features/manage', '/_admin/navs/manage' ], true ], 'without it' => [ [ '/_admin/features/manage' ], false ] ] as $what => [ $perms, $may ] ) {
+
+	$reset();
+	$app = $project( 'change-menus', $perms );
+	\Nino\Filesystem::mutate( $app, '/config.php', static function( array $content ): array {
+		$content['/nino/modules'] = [ '\\Nino\\Modules\\Navigation' ];
+		return $content;
+	} );
+	$publish( $app );
+	[ $status, $body ] = $call( $app, 'apiInstall', [ 'key' => 'menued', 'version' => '1.0.0' ] );
+
+	check( 'an install from the catalogue '. $what. ' to change menus: the answer says '. ( $may === true ? 'which page is in which menu' : 'that the page is in none' ),
+		$status === 200 && ( $may === true ? ( $body['menus'] ?? [] ) === [ [ 'key' => 'menued', 'name' => 'Menued', 'page' => 'Menued', 'menu' => 'main' ] ] && isset( $body['menusRefused'] ) === false
+			: ( $body['menusRefused'] ?? [] ) === [ [ 'key' => 'menued', 'name' => 'Menued' ] ] && isset( $body['menus'] ) === false )
+		&& ( \Nino\Filesystem::getFileContent( $app, '/config.php', [] )['/nino/html/navroutes']['/menued']['main'] ?? null ) === ( $may === true ? 1 : null ) );
+}
+
 // The sentences exist in both languages of the workbench
 $missing = [];
 foreach( [ 'en_US', 'de_DE' ] as $locale )

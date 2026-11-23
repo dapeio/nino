@@ -45,6 +45,9 @@ namespace Nino {
 		// Where a feature's state lives in config.php: key => { version, settings }
 		public const string STATE_KEY = '/nino/features';
 
+		// How many pages a unit may offer to menus, all menus together
+		public const int MENUS_MAX = 8;
+
 		// The manifest beside a feature's class file
 		public const string MANIFEST = 'feature.php';
 
@@ -1953,10 +1956,7 @@ namespace Nino {
 					return null;
 				}
 
-				$state[$key] = [
-					'version'		=> $state[$key]['version'] ?? $feature['installed'],
-					'settings'	=> $result['values'],
-				];
+				$state[$key] = self::_recorded( is_array( $state[$key] ?? null ) ? $state[$key] : [], $state[$key]['version'] ?? $feature['installed'], $result['values'] );
 				$content[ self::STATE_KEY ] = $state;
 
 				return $content;
@@ -2089,10 +2089,14 @@ namespace Nino {
 		 *	gets to migrate its own data before the new version is recorded.
 		 *	Made under the lock of the features (see lock()).
 		 *
+		 *	The unit's 'menus' - pages the feature offers to a menu of the project - are
+		 *	offered once, at the first application of the unit, see unitMenus() and
+		 *	the record of a feature below.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *	@param		array 		$chain				Keys already being activated, against a requirement cycle
-		 *	@param		array|null	&$report		(reference) What the unit of this feature added and what the project had already, see applyUnit(); the requirements' units are not in it
+		 *	@param		array|null	&$report		(reference) What the unit of this feature added and what the project had already, see applyUnit(), and under 'menus' what it offered to the menus of the project: { added, present, in: menu => [ Element-URI ], denied }; the requirements' units are not in it
 		 *	@param		bool			$reapply			The unit is applied once more to a feature that is on (the panel's Apply content): the elements of a type the project has are left alone, see applyUnit()
 		 *
 		 *	@return 	true|string							True, or why not - BUSY while another change of the features holds the lock
@@ -2136,6 +2140,8 @@ namespace Nino {
 				return true;
 			$chain[] = $key;
 
+			$fromRequired = [];
+
 			foreach( $feature['requires'] as $required ) {
 
 				/*	A requirement that is already on, at the version its own
@@ -2157,9 +2163,17 @@ namespace Nino {
 				if( $have !== null && $have['active'] === true && $have['problems'] === [] && $have['installed'] === $have['version'] )
 					continue;
 
-				$result = self::activate( $appData, $required, $chain );
+				$below = null;
+				$result = self::activate( $appData, $required, $chain, $below );
 				if( $result !== true )
 					return 'required feature "'. $required. '": '. $result;
+
+				// What a requirement offered the menus is told with this feature's report, so that the answer, the sentence and the log of the panel have it
+				if( is_array( $below['menus'] ?? null ) === true )
+					$fromRequired[$required] = $below['menus'];
+
+				foreach( (array) ( $below['required'] ?? [] ) as $deeper => $deeperMenus )
+					$fromRequired[$deeper] = $deeperMenus;
 			}
 
 			/*	Replaced in this request while its class was already loaded -
@@ -2191,6 +2205,17 @@ namespace Nino {
 				if( $applied !== true )
 					return 'feature "'. $key. '" could not be activated: '. $applied;
 			}
+
+			// What the unit offers to the menus of the project - decided below, against the file, and only at the first application of the unit: a unit that was left out has nothing to offer
+			$menus = [];
+			if( $reapply === false && ( $report['skipped'] ?? '' ) === '' && is_dir( $feature['dir']. '/install' ) === true )
+				$menus = self::unitMenus( self::readUnitManifest( $feature['dir']. '/install' ) ?? [], $key );
+
+			$mayOffer = $menus !== [] && self::_mayOfferMenus( $appData );
+			$offered = null;
+
+			if( $fromRequired !== [] )
+				$report['required'] = $fromRequired;
 
 			$class 			= $feature['module'];
 
@@ -2233,7 +2258,7 @@ namespace Nino {
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
 				\Nino\Runtime::fail( 'Features::activate(): could not lock config.php for writing.' );
 
-			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $class, $key, $version, $added, $config ): array {
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $class, $key, $version, $added, $config, $menus, $mayOffer, &$offered ): array {
 
 				// Whether the class is in the file, not whether this request
 				// thought the feature was on: the two can differ, and what an
@@ -2243,11 +2268,11 @@ namespace Nino {
 					$modules[] = $class;
 				$content['/nino/modules'] = array_values( array_unique( $modules ) );
 
-				$state = is_array( $content[ self::STATE_KEY ] ?? null ) ? $content[ self::STATE_KEY ] : [];
-				$state[$key] = [
-					'version'		=> $version,
-					'settings'	=> is_array( $state[$key]['settings'] ?? null ) ? $state[$key]['settings'] : [],
-				];
+				$state	= is_array( $content[ self::STATE_KEY ] ?? null ) ? $content[ self::STATE_KEY ] : [];
+				$before	= is_array( $state[$key] ?? null ) ? $state[$key] : [];
+
+				$state[$key] = self::_recorded( $before, $version, is_array( $before['settings'] ?? null ) ? $before['settings'] : [] );
+
 				$content[ self::STATE_KEY ] = $state;
 
 				if( $added !== [] ) {
@@ -2259,6 +2284,44 @@ namespace Nino {
 							$stored[$routeKey] = $route;
 
 					$content['/nino/http/routes'] = $stored;
+				}
+
+				/*	The unit's menus are offered once, at the first application of the unit: a feature whose record has no version yet, or whose record was
+					given back by remove() (its 'menus' is null). What was offered is kept - the pages that were put, which deactivate() takes out of the menus
+					and parks here and remove() takes away - and so is the fact itself, an empty list too: a menu the project makes later, or a page it took
+					out, is the project's. An account without the right to change menus offers nothing, and that is the end of it: the record says it was
+					done, and no later activation, update or script puts the page into a menu that has been kept since. Decided here, from the file under the lock,
+					and after the unit's own routes are in it - they hold places in the menu too - and written with the version. A feature that was switched off
+					and is on again has its parked memberships put back	*/
+				$offered = $menus === [] ? null : [ 'added' => 0, 'present' => 0, 'in' => [], 'denied' => false, 'refused' => [] ];
+				$kept = $content[ self::STATE_KEY ][$key]['menus'] ?? null;
+
+				if( $menus !== [] && ( is_string( $before['version'] ?? null ) === false || ( array_key_exists( 'menus', $before ) === true && $before['menus'] === null ) ) ) {
+
+					$content[ self::STATE_KEY ][$key]['menus'] = [ 'offered' => [], 'parked' => [] ];
+
+					if( $mayOffer === false )
+						$offered['denied'] = true;
+					else {
+						$in = [];
+						$present = 0;
+						$refused = [];
+
+						if( class_exists( '\\Nino\\Modules\\Navigation' ) === true )
+							$content = \Nino\Modules\Navigation::append( $content, $menus, $in, $present, $refused );
+
+						$offered = [ 'added' => array_sum( array_map( 'count', $in ) ), 'present' => $present, 'in' => $in, 'denied' => false, 'refused' => $refused ];
+						$content[ self::STATE_KEY ][$key]['menus']['offered'] = $in === [] ? [] : array_values( array_unique( array_merge( ...array_values( $in ) ) ) );
+					}
+				}
+				elseif( is_array( $kept ) === true && is_array( $kept['parked'] ?? null ) === true && $kept['parked'] !== [] ) {
+
+					// With the Navigation module off nothing can be put back, and what is parked stays parked until it is on
+					if( class_exists( '\\Nino\\Modules\\Navigation' ) === true && \Nino\Modules\Navigation::on( $content ) === true ) {
+						$restored = 0;
+						$content = \Nino\Modules\Navigation::restore( $content, $kept['parked'], $restored );
+						$content[ self::STATE_KEY ][$key]['menus']['parked'] = [];
+					}
 				}
 
 				// The unit's own defaults, still only where the file has nothing:
@@ -2280,12 +2343,28 @@ namespace Nino {
 			if( $written === false )
 				\Nino\Runtime::fail( 'Features::activate(): failed to write config.php.' );
 
+			if( $offered !== null ) {
+
+				$report['menus'] = $offered;
+
+				// A page the menu cannot draw: it names no page, so a menu skips it
+				foreach( $offered['in'] as $uris )
+					foreach( $uris as $uri )
+						if( \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $uri. '/name' ) === '' )
+							trigger_error( 'Feature "'. $key. '" put "'. $uri. '" into a menu and has no name for it: a menu draws a page by the text /_nino/webpage'. $uri. '/name', E_USER_WARNING );
+
+				foreach( $offered['refused'] as $uri )
+					trigger_error( 'Feature "'. $key. '" offered "'. $uri. '" to a menu and it was left out: it is a page of the project, or has no place in the menu', E_USER_WARNING );
+			}
+
 			// What was written, read back into this request: the file is the
 			// decision now, not the copy this request booted with
 			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 			$persisted = is_array( $persisted ) ? $persisted : [];
 			$appData['/nino/modules'] = array_values( (array) ( $persisted['/nino/modules'] ?? [] ) );
 			$appData[ self::STATE_KEY ] = is_array( $persisted[ self::STATE_KEY ] ?? null ) ? $persisted[ self::STATE_KEY ] : [];
+
+			self::_syncMenus( $appData, $persisted );
 
 			if( $blacklist !== [] )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( mixed $list ) use ( $blacklist ): array {
@@ -2350,7 +2429,8 @@ namespace Nino {
 
 			$class = $feature['module'];
 
-			$unlisted = self::_unlist( $appData, $class );
+			// Its pages leave the menus in the same write that takes the class out of the list: what the unit names, wherever the project has put it
+			$unlisted = self::_unlist( $appData, $class, $key, self::_menuUris( $appData, $key, $feature['dir'] ) );
 
 			if( $unlisted !== true )
 				return $unlisted;
@@ -2358,6 +2438,66 @@ namespace Nino {
 			unset( $appData['./nino/features/all'] );
 
 			return true;
+		}
+
+		/**
+		 *	The pages whose memberships a feature that is switched off parks, and one that is removed takes away: the Element-URIs its unit names under 'menus' - whether the
+		 *	kernel offered them or the project put them into a menu by hand, and whether the record of the feature is from before the key or not - and the ones the
+		 *	record says it put. Not the ones another feature that is on names too: that page is theirs as well and stays where it is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature
+		 *	@param		string		$dir					Its directory, '' where it cannot be read
+		 *
+		 *	@return 	array										Element-URIs
+		 */
+		private static function _menuUris( array &$appData, string $key, string $dir ): array {
+
+			$named = static function( string $dir, string $name ): array {
+
+				$menus = is_dir( $dir. '/install' ) === true ? self::unitMenus( self::readUnitManifest( $dir. '/install' ) ?? [], $name, true ) : [];
+
+				return $menus === [] ? [] : array_merge( ...array_values( $menus ) );
+			};
+
+			$kept = $appData[ self::STATE_KEY ][$key]['menus'] ?? null;
+			$uris = array_merge( $dir === '' ? [] : $named( $dir, $key ), is_array( $kept ) === true ? (array) ( $kept['offered'] ?? [] ) : [] );
+
+			foreach( self::all( $appData ) as $other ) {
+
+				if( $other['key'] === $key || $other['active'] === false )
+					continue;
+
+				$theirs = $named( $other['dir'], $other['key'] );
+				$record = $appData[ self::STATE_KEY ][ $other['key'] ]['menus'] ?? null;
+
+				if( is_array( $record ) === true )
+					$theirs = array_merge( $theirs, (array) ( $record['offered'] ?? [] ) );
+
+				$uris = array_diff( $uris, $theirs );
+			}
+
+			return array_values( array_unique( array_filter( $uris, 'is_string' ) ) );
+		}
+
+		/**
+		 *	The request goes on with what config.php holds of the features' records and of the memberships of the menus
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		mixed 		$persisted		The content of config.php
+		 *
+		 *	@return 	void
+		 */
+		private static function _syncMenus( array &$appData, mixed $persisted ): void {
+
+			$persisted = is_array( $persisted ) === true ? $persisted : [];
+
+			$appData[ self::STATE_KEY ] = is_array( $persisted[ self::STATE_KEY ] ?? null ) === true ? $persisted[ self::STATE_KEY ] : [];
+
+			if( is_array( $persisted['/nino/html/navroutes'] ?? null ) === true )
+				$appData['/nino/html/navroutes'] = $persisted['/nino/html/navroutes'];
+			else
+				unset( $appData['/nino/html/navroutes'] );
 		}
 
 		/**
@@ -2372,9 +2512,9 @@ namespace Nino {
 		 *
 		 *	@return 	true|string							True, or why not
 		 */
-		private static function _unlist( array &$appData, string $class ): true|string {
+		private static function _unlist( array &$appData, string $class, string $key = '', array $uris = [] ): true|string {
 
-			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content, array &$appData ) use ( $class ): array {
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content, array &$appData ) use ( $class, $key, $uris ): array {
 
 				$list = is_array( $content['/nino/modules'] ?? null ) === true ? $content['/nino/modules'] : (array) ( $appData['/nino/modules'] ?? [] );
 
@@ -2383,6 +2523,17 @@ namespace Nino {
 					static fn( mixed $listed ): bool => '\\'. ltrim( (string) $listed, '\\' ) !== $class
 				) );
 
+				// The pages the feature put into menus leave them in the same write, and are parked in its record - where it has one to keep them in
+				if( $uris !== [] && is_array( $content[ self::STATE_KEY ][$key] ?? null ) === true && class_exists( '\\Nino\\Modules\\Navigation' ) === true ) {
+
+					$kept = $content[ self::STATE_KEY ][$key]['menus'] ?? null;
+					$parked = [];
+					$content = \Nino\Modules\Navigation::take( $content, $uris, $parked );
+
+					if( $parked !== [] || is_array( $kept ) === true )
+						$content[ self::STATE_KEY ][$key]['menus'] = [ 'offered' => is_array( $kept ) === true ? (array) ( $kept['offered'] ?? [] ) : [], 'parked' => $parked + ( is_array( $kept ) === true ? (array) ( $kept['parked'] ?? [] ) : [] ) ];
+				}
+
 				return $content;
 			} );
 
@@ -2390,6 +2541,8 @@ namespace Nino {
 				trigger_error( 'Features: failed to write config.php.', E_USER_WARNING );
 				return 'could not write config.php';
 			}
+
+			self::_syncMenus( $appData, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) );
 
 			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 			$appData['/nino/modules'] = array_values( (array) ( is_array( $persisted ) === true ? ( $persisted['/nino/modules'] ?? [] ) : [] ) );
@@ -2422,7 +2575,19 @@ namespace Nino {
 				if( isset( self::rejectedActive( $appData )[$directory] ) === false )
 					return 'unknown directory "'. $directory. '"';
 
-				$unlisted = self::_unlist( $appData, '\\Nino\\Modules\\'. $directory );
+				// The key of a refused manifest is read from the file where it can be, so that the pages of the feature leave the menus as they do for a manifest that is not refused
+				$dir = self::dir(). '/'. $directory;
+				$key = '';
+
+				try {
+					$raw = is_file( $dir. '/'. self::MANIFEST ) === true ? include $dir. '/'. self::MANIFEST : null;
+					$key = is_array( $raw ) === true && is_string( $raw['key'] ?? null ) === true ? $raw['key'] : '';
+				}
+				catch( \Throwable ) {
+					$key = '';
+				}
+
+				$unlisted = self::_unlist( $appData, '\\Nino\\Modules\\'. $directory, $key, $key === '' ? [] : self::_menuUris( $appData, $key, $dir ) );
 
 				if( $unlisted !== true )
 					return $unlisted;
@@ -2503,6 +2668,9 @@ namespace Nino {
 
 			self::invalidateOpcache( $dir );
 
+			// Read before the directory is gone: the pages the unit names, whose memberships go with it
+			$uris = self::_menuUris( $appData, $key, $dir );
+
 			// A feature reached through a symlink - a checkout linked into
 			// features/ during development, or a deployment that assembles the
 			// directory out of links - goes by dropping the link, never by
@@ -2517,6 +2685,53 @@ namespace Nino {
 			}
 
 			unset( $appData['./nino/features/all'] );
+
+			return self::_takeMenus( $appData, $key, $uris );
+		}
+
+		/**
+		 *	What remove() gives back of the menus a feature's unit offered: its pages - the ones it put, which are in the record, those parked in it and the memberships
+		 *	that are still there - go from '/nino/html/navroutes' by \Nino\Modules\Navigation::take(), from every menu they stand in, and the record of the feature is given
+		 *	back, its 'menus' null, so that the feature put in again offers them once more. The record and the memberships are written together. Nothing
+		 *	is written for a feature that offered nothing and whose unit names no menu
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature
+		 *	@param		array 		$uris					The pages the unit names, see _menuUris()
+		 *
+		 *	@return 	true|string
+		 */
+		private static function _takeMenus( array &$appData, string $key, array $uris ): true|string {
+
+			$record = $appData[ self::STATE_KEY ][$key] ?? null;
+
+			if( is_array( $record ) === false || ( array_key_exists( 'menus', $record ) === false && $uris === [] ) )
+				return true;
+
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $key, $uris ): array {
+
+				if( is_array( $content[ self::STATE_KEY ][$key] ?? null ) === false )
+					return $content;
+
+				$kept = $content[ self::STATE_KEY ][$key]['menus'] ?? null;
+				$all = array_merge( $uris, is_array( $kept ) === true ? array_keys( (array) ( $kept['parked'] ?? [] ) ) : [] );
+
+				if( $all !== [] && class_exists( '\\Nino\\Modules\\Navigation' ) === true ) {
+					$taken = [];
+					$content = \Nino\Modules\Navigation::take( $content, $all, $taken );
+				}
+
+				$content[ self::STATE_KEY ][$key]['menus'] = null;
+
+				return $content;
+			} );
+
+			if( $written === false ) {
+				trigger_error( 'Features: failed to write config.php.', E_USER_WARNING );
+				return 'could not write config.php';
+			}
+
+			self::_syncMenus( $appData, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) );
 
 			return true;
 		}
@@ -2760,6 +2975,114 @@ namespace Nino {
 			$report['texts'] = [ 'added' => $texts, 'present' => $present ];
 
 			return true;
+		}
+
+		/**
+		 *	The pages a unit offers to the menus of the project, 'menus' in its manifest: menu key => [ Element-URI, ... ], e.g. [ 'main' => [ '/blog' ] ].
+		 *	It is the way for a page a feature's code routes at run time - registered in init(), with no route in config.php, such as the list
+		 *	of Posts - to stand in a menu the project has; a page that the unit's own routes put in config.php says its menu on the route, 'navs',
+		 *	like the pages of the start of a site. Not 'navs' of the unit, which is the wizard's and makes a menu: this makes none.
+		 *
+		 *	A feature's first activation puts each page at the end of its menu, where the project has that menu and the page is not in it (see
+		 *	activate() and \Nino\Modules\Navigation::append()); the record of the feature keeps that it did, so that a page the project takes
+		 *	out of the menu stays out, and remove() takes the memberships it added away again. A menu key has to be a slug the Navigations panel
+		 *	takes, a page has to be an Element-URI - a string that starts with a single '/', without a control character; whatever is not, is left out with a
+		 *	warning, and a menu without a usable page is none
+		 *
+		 *	@param		array 		$manifest			The unit's manifest, see readUnitManifest()
+		 *	@param		string		$key					The feature, for the warnings
+		 *
+		 *	@return 	array											Menu key => [ Element-URI, ... ], [] where the unit names none
+		 */
+		public static function unitMenus( array $manifest, string $key, bool $quiet = false ): array {
+
+			if( array_key_exists( 'menus', $manifest ) === false )
+				return [];
+
+			if( is_array( $manifest['menus'] ) === false ) {
+
+				if( $quiet === false )
+					trigger_error( 'Feature "'. $key. '" says menus and it is no list of menus', E_USER_WARNING );
+
+				return [];
+			}
+
+			$menus = [];
+			$count = 0;
+
+			foreach( $manifest['menus'] as $nav => $uris ) {
+
+				if( is_string( $nav ) === false || preg_match( '/^[a-z][a-z0-9_-]*$/', $nav ) !== 1 || is_array( $uris ) === false ) {
+					if( $quiet === false )
+						trigger_error( 'Feature "'. $key. '" offers a menu that is no usable key: "'. ( is_string( $nav ) === true ? $nav : '' ). '"', E_USER_WARNING );
+
+					continue;
+				}
+
+				foreach( $uris as $uri ) {
+
+					if( is_string( $uri ) === false || preg_match( '#^/(?!/)[^\x00-\x1f\x7f]{0,198}$#D', $uri ) !== 1 ) {
+						if( $quiet === false )
+							trigger_error( 'Feature "'. $key. '" puts something that is no Element-URI into its menu "'. $nav. '"', E_USER_WARNING );
+
+						continue;
+					}
+
+					if( in_array( $uri, $menus[$nav] ?? [], true ) === true )
+						continue;
+
+					if( $count >= self::MENUS_MAX ) {
+
+						if( $quiet === false )
+							trigger_error( 'Feature "'. $key. '" offers more than '. self::MENUS_MAX. ' pages to menus: "'. $uri. '" is left out', E_USER_WARNING );
+
+						continue;
+					}
+
+					$menus[$nav][] = $uri;
+					$count++;
+				}
+			}
+
+			return $menus;
+		}
+
+		/**
+		 *	The record the kernel keeps of a feature in '/nino/features': its version and its settings, and 'menus' where it has it - what the
+		 *	unit added to the menus (menu key => [ Element-URI ]), or null for a feature whose next application offers them again. Every writer of
+		 *	the record goes through here, so that none of them drops what another keeps
+		 *
+		 *	@param		array 		$before				The record as it stands
+		 *	@param		mixed 		$version			The version to record
+		 *	@param		array 		$settings			The settings to record
+		 *
+		 *	@return 	array
+		 */
+		private static function _recorded( array $before, mixed $version, array $settings ): array {
+
+			$record = [ 'version' => $version, 'settings' => $settings ];
+
+			if( array_key_exists( 'menus', $before ) === true )
+				$record['menus'] = $before['menus'];
+
+			return $record;
+		}
+
+		/**
+		 *	Whether the account that switches a feature on may change a menu: one that is signed in needs the permission of the Navigations panel - a feature's
+		 *	activation is the Features panel's, a developer's, and a role may hold the one without the other. Where nobody is signed in, the setup
+		 *	wizard and a script, the project is its own
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		private static function _mayOfferMenus( array &$appData ): bool {
+
+			if( \Nino\Auth::getCurrentUser( $appData ) === false || class_exists( '\\Nino\\Modules\\Navigation\\Admin' ) === false )
+				return true;
+
+			return \Nino\Auth::checkPermission( $appData, \Nino\Modules\Navigation\Admin::MANAGE_PERM ) === true;
 		}
 
 		/**

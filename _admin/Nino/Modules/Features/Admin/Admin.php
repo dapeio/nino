@@ -766,7 +766,7 @@ namespace Nino\Modules\Features {
 				// placed and is switched on all the same
 				'switchedOn'	=> $isNew === true ? self::_switchedOn( $appData, $wasOn, $key ) : [],
 				'skipped'		=> $isNew === true ? self::_skipped( $appData, $key, $report ) : [],
-			] );
+			] + ( $isNew === true ? self::_menusAnswer( self::_menus( $appData, $key, $report ) ) : [] ) );
 		}
 
 		/**
@@ -927,6 +927,7 @@ namespace Nino\Modules\Features {
 			}
 
 			$skipped = [];
+			$menus = [ 'added' => [], 'refused' => [], 'unnamed' => [] ];
 
 			foreach( (array) ( $appData['./nino/catalogue/placed'] ?? [] ) as $placed ) {
 
@@ -936,6 +937,8 @@ namespace Nino\Modules\Features {
 				$unitReport = [];
 				$activated = \Nino\Features::activate( $appData, $placed['key'], [], $unitReport );
 				$skipped = array_merge( $skipped, self::_skipped( $appData, $placed['key'], $unitReport ) );
+				$offered = self::_menus( $appData, $placed['key'], $unitReport );
+				$menus = [ 'added' => array_merge( $menus['added'], $offered['added'] ), 'refused' => array_merge( $menus['refused'], $offered['refused'] ), 'unnamed' => array_merge( $menus['unnamed'], $offered['unnamed'] ) ];
 
 				if( $activated !== true ) {
 
@@ -955,7 +958,7 @@ namespace Nino\Modules\Features {
 				'placed'		=> array_values( (array) ( $appData['./nino/catalogue/placed'] ?? [] ) ),
 				'switchedOn'	=> self::_switchedOn( $appData, $wasOn, $key ),
 				'skipped'		=> $skipped,
-			] );
+			] + self::_menusAnswer( $menus ) );
 		}
 
 		/**
@@ -1398,7 +1401,7 @@ namespace Nino\Modules\Features {
 			// An update is activating again, and can switch on a requirement the
 			// new version added - so this is not empty only for a first Activate
 			self::_answer( $appData, $request, $key, $on === true
-				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ), 'skipped' => self::_skipped( $appData, $key, $report ) ]
+				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ), 'skipped' => self::_skipped( $appData, $key, $report ) ] + self::_menusAnswer( self::_menus( $appData, $key, $report ) )
 				: [ 'found' => $names === [] ? [] : self::_occurrences( $appData, $names ), 'privacy' => self::_privacy( $appData, $key ) ] );
 		}
 
@@ -1480,6 +1483,72 @@ namespace Nino\Modules\Features {
 				\Nino\Admin\Admin::record( $appData, $actor['mail'], 'The unit of feature "'. $key. '" was left out: the project has pages' );
 
 			return [ [ 'key' => $key, 'name' => \Nino\Features::localized( \Nino\Features::get( $appData, $key )['name'] ?? $key, \Nino\Admin\Admin::sessionLocale( $appData ) ) ] ];
+		}
+
+		/**
+		 *	The pages the unit of a feature put into a menu of the project ('menus', see \Nino\Features::unitMenus()): said in the answer, so that the panel names
+		 *	the page and the menu, and held in the log of the actions. A feature whose first application could not offer them, because the account may not change
+		 *	menus (the permission of the Navigations panel), is in 'refused': nothing was put anywhere, and nothing will be put later - the page is entered in the Navigations panel
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature
+		 *	@param		array|null	$report				The report of the application of the unit
+		 *
+		 *	@return 	array										{ added: [ { key, name, page, menu } ], unnamed: [ the same, for a page that has no name: it is entered, and the menu draws it once it has one ], refused: [ { key, name } ] } - both empty where the unit offered nothing; the features that were switched on with this one are in it
+		 */
+		private static function _menus( array &$appData, string $key, ?array $report ): array {
+
+			$answer = [ 'added' => [], 'refused' => [], 'unnamed' => [] ];
+
+			// The feature and the ones it switched on with it, which its report carries
+			foreach( array_merge( is_array( $report['menus'] ?? null ) === true ? [ $key => $report['menus'] ] : [], (array) ( $report['required'] ?? [] ) ) as $featureKey => $menus ) {
+
+				if( is_array( $menus ) === false )
+					continue;
+
+				$featureKey	= (string) $featureKey;
+				$locale			= \Nino\Admin\Admin::sessionLocale( $appData );
+				$name 			= \Nino\Features::localized( \Nino\Features::get( $appData, $featureKey )['name'] ?? $featureKey, $locale );
+				$actor 			= \Nino\Auth::getCurrentUser( $appData );
+
+				if( ( $menus['denied'] ?? false ) === true ) {
+
+					if( $actor !== false )
+						\Nino\Admin\Admin::record( $appData, $actor['mail'], 'The unit of feature "'. $featureKey. '" offered pages to menus and was not allowed to: the account may not change menus' );
+
+					$answer['refused'][] = [ 'key' => $featureKey, 'name' => $name ];
+					continue;
+				}
+
+				$names = is_array( $appData['/nino/html/navnames'] ?? null ) === true ? $appData['/nino/html/navnames'] : [];
+
+				foreach( (array) ( $menus['in'] ?? [] ) as $nav => $uris )
+					foreach( (array) $uris as $uri ) {
+
+						$page = html_entity_decode( \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $uri. '/name' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+						$menu = is_string( $names[$nav] ?? null ) === true && $names[$nav] !== '' ? $names[$nav] : (string) $nav;
+
+						if( $actor !== false )
+							\Nino\Admin\Admin::record( $appData, $actor['mail'], 'The unit of feature "'. $featureKey. '" put "'. $uri. '" into the menu "'. $nav. '"' );
+
+						// Only a page that has a name is one the menu draws; one that has none is entered, and the sentence says it is waiting for its name
+						$answer[ $page !== '' ? 'added' : 'unnamed' ][] = [ 'key' => $featureKey, 'name' => $name, 'page' => $page !== '' ? $page : $uri, 'menu' => $menu ];
+					}
+			}
+
+			return $answer;
+		}
+
+		/**
+		 *	The two fields of an answer that say what the units put into menus: 'menus' and 'menusRefused', and neither where there is nothing to say
+		 *
+		 *	@param		array 		$menus				See _menus()
+		 *
+		 *	@return 	array
+		 */
+		private static function _menusAnswer( array $menus ): array {
+
+			return ( $menus['added'] === [] ? [] : [ 'menus' => $menus['added'] ] ) + ( $menus['refused'] === [] ? [] : [ 'menusRefused' => $menus['refused'] ] ) + ( $menus['unnamed'] === [] ? [] : [ 'menusUnnamed' => $menus['unnamed'] ] );
 		}
 
 		/**

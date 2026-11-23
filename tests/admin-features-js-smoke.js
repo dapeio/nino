@@ -610,6 +610,16 @@ check( 'an activation or an update that left the unit out says so after its own 
 	kept[kept.length - 1].text === text('/_admin/features/msg/updated').replace( '%s', 'Plain' ) + ' ' + text('/_admin/features/msg/unit-skipped').replace( '%s', 'Plain' )
 	&& panel._skippedText( [] ) === '' && panel._skippedText( undefined ) === '' );
 
+// ...and where the unit put a page into a menu of the project, the sentence names the page and the menu; where the account may not change menus, it says that
+panel._renderPanel();
+fire( byTag( row( mount, 'plain' ), 'button' )[0], 'click' );
+answer( 200, { switchedOn : [], menus : [ { key : 'plain', name : 'Plain', page : 'Blog', menu : 'Hauptmenü' } ] } );
+check( 'an activation that put a page into a menu says which page and which menu after its own sentence',
+	kept[kept.length - 1].text === text('/_admin/features/msg/updated').replace( '%s', 'Plain' ) + ' ' + text('/_admin/features/msg/menu-added').replace( '%s', 'Blog' ).replace( '%s', 'Hauptmenü' )
+	&& panel._menusText( {} ) === '' && panel._menusText( { menus : [], menusRefused : [] } ) === ''
+	&& panel._menusText( { menusRefused : [ { key : 'plain', name : 'Plain' } ] } ) === ' ' + text('/_admin/features/msg/menu-refused').replace( '%s', 'Plain' ) );
+check( 'a page that is entered and has no name is said apart: it waits for its name', panel._menusText( { menusUnnamed : [ { key : 'plain', name : 'Plain', page : '/blog', menu : 'main' } ] } ) === ' ' + text('/_admin/features/msg/menu-unnamed').replace( '%s', '/blog' ).replace( '%s', 'main' ) );
+
 // Uninstall: destructive, says what goes and what stays, then the list is read again and the row after it takes the focus
 toInactive();
 asked.length = 0;
