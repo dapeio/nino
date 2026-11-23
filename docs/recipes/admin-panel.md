@@ -1099,7 +1099,7 @@ owns a word.
 
 | What | Builder |
 |---|---|
-| A question before an action | `confirm( level, { title, message, details, yes, no, nested, onChoose } )` - `nested : true` where it is asked of an open dialog: it stands on it, Esc closes it alone and the focus goes back into the dialog below |
+| A question before an action | `confirm( level, { title, message, details, yes, no, nested, opener, onChoose, onClose } )` - `nested : true` where it is asked of an open dialog: it stands on it, Esc closes it alone and the focus goes back into the dialog below |
 | Make or copy something from a name and at most four more fields (duplicate, save as) | `formDialog()` |
 | One entry of a directory with an address of its own, steps to the entries around it and a bar (a message to read, a thing to edit) | `record()` - see [the standard directory and the record](#the-standard-directory-and-the-record) |
 | Pick one from a list (a block, a source, a component) | `pickDialog()` |
@@ -1120,8 +1120,10 @@ default is `false`: a question is closed by an answer. `formDialog()` and `confi
 never closed by a press beside it.
 
 `formDialog( { title, fields, submit, cancel, message, size, onSubmit, onCancel,
-opener } )` draws `fields` - `[ { key, label, type, value, required, maxLength,
-validate } ]`, `type : 'select'` with `options : [ { value, label } ]`, the types of
+onClose, opener } )` draws `fields` - `[ { key, label, type, value, required, maxLength,
+min, max, step, unit, validate } ]`, `type : 'select'` with `options : [ { value, label } ]`
+(required: an empty value is wrong), `type : 'number'` with `step`, `min`, `max` and a `unit`
+([a number](#a-number-and-a-select-that-must-be-chosen)), the types of
 [the fields of a form](#the-fields-of-a-form-ticks-languages-files-code-and-moments), any other `type`
 that of an `<input>` - or a `body` element of your own. A required field that is empty
 and a `validate( value )` that answers a sentence are said at the field with
@@ -1148,7 +1150,7 @@ Nino.adminUi.formDialog( {
 } );
 ```
 
-`pickDialog( { title, items, search, searchFrom, empty, cancel, size, onChoose, onRow, onCancel, opener } )`
+`pickDialog( { title, items, search, searchFrom, empty, cancel, size, onChoose, onRow, onCancel, onClose, opener } )`
 draws `items` - `[ { value, label, description, code, group, image } ]`, `code` a notation in the face of code
 before the line - as rows; with a `group` (a text) the items of one group stand under a heading, in the order the groups first appear (`role="group"`, named by the heading, and a search
 hides a group that has nothing left); with an `image` (an address) on any item every item is a tile in a grid - a picture of a fixed shape over the name, `alt=""`, loaded lazily,
@@ -1181,6 +1183,63 @@ Nino.adminUi.propertiesDialog( {
 	sections : [ { key : 'content', label : Nino.content.getText('/_admin/catalog/label/content'), fields : [ { key : 'text', label : Nino.content.getText('/_admin/catalog/label/text'), value : draft.text } ] } ],
 } );
 ```
+
+### Where the focus goes back, and what is told after
+
+Every dialog block - `choiceDialog()`, `confirm()`, `formDialog()`, `pickDialog()`, `conflict()`, `propertiesDialog()`,
+`manualDialog()` and `record.open( key, { opener } )` - takes an `opener`: what gets the focus when the dialog closes, where it
+is not what had it when it opened (a button that was clicked has the focus in Chromium and Firefox, not in Safari). It is
+
+- an element, or anything that has a `focus()` - it is called as it is -, or
+- a function that answers one of them and is called when the dialog closes, not when it opens: for a control that is made
+  anew while the dialog is open, the row of a list that a save draws again.
+
+```js
+Nino.adminUi.formDialog( {
+	title : t('rename-title'), fields : fields, submit : t('rename-title'), cancel : t('cancel'),
+	opener : function() { return list.querySelector( '[data-key="'+ key+ '"] button' ) },   // the row as it is when the dialog closes
+	onSubmit : function( values, ctl ) { save( values, function() { draw(); ctl.close() } ) },
+	onClose : function( how ) { if( how === 'submit' ) announce( key ) },                  // after the focus is back
+} );
+```
+
+What is not in the page when the dialog closes gets no focus, since a browser would drop it on the page: it goes to the name
+of the panel the dialog was opened in (`.admin-panel-title`, as after any change of view). `onClose( value )` - `choiceDialog()`, `confirm()`, `formDialog()`, `pickDialog()` and `conflict()` take it - is called once
+the dialog is gone and the focus is back, after `onChoose` (a form's `onCancel`), on every way out and once: an answer, Esc,
+the cross. `value` is the answer - `submit` or `cancel` for a form
+(Esc and the cross are Cancel), `pick` or `cancel` for a list, `reload`, `cancel` or `overwrite` for a conflict, `true` or
+`false` for `confirm()` (which also calls it, with `true`, where the policy of the shell asks nothing). The question of a
+form that was changed is no way out of the form: `onClose` is called when the form closes. `propertiesDialog()` has its own
+`onClose()`, which is told nothing; a record sends the focus to its row itself and has no `onClose`.
+
+**One dialog after another, and over a record.** `formDialog()` takes `nested : true` as `confirm()` does: it opens over a dialog
+that is open - a `record()`, another form - stands on it, and Escape closes it alone with the focus back in the dialog below; the
+call answers `false` where a dialog is open and `nested` was not said, else a handle `{ el, close() }`, and `close()` closes the
+form as Cancel without the question about what was typed. A dialog is closed when `ctl.close()`, `close()` or an answer says so,
+not when the browser reports it a moment later: a dialog that the next line - or the `onClose` of the one that closed - asks
+for is opened, and the focus goes back to the opener of each in turn.
+
+**Actions of a record and of a directory.** `record( { actions } )` calls `run( row, ctx )` with the button as `ctx.opener`, and
+`directory( { select : { actions } } )` calls `run( keys, opener )` with the button of the bar: pass it on to what the action
+opens - `confirm( ..., { nested : true, opener : ctx.opener } )` - and the focus is on the button when that closes. After a save
+the title, the identifier and the buttons that fit the entry (`hidden( row )` of the actions and of `danger`) are drawn from
+the row the save answered. The buttons of a row of a table are the panel's own and get their own `event.currentTarget`.
+
+### A number and a select that must be chosen
+
+`numberField( { key, label, value, min, max, step, unit, required, help, note } )` is a number input in bounds. `step` is
+1, a whole number, unless it is given: 0.1, 0.5, `'any'`. `unit` is a word of the workbench, `/_admin/common/unit/<unit>`,
+written in brackets behind the label - seconds, minutes, hours, days, weeks, months, items, uris, per-hour, percent,
+characters and mm, in both languages; any other word is the caller's to write into the label. A browser in German takes
+`12,5` and puts `12.5` into the value of the input (a browser in another language drops the comma: the value is `125`);
+`Nino.adminUi.numberOf( input.value )` is the number, 12.5, for `12.5` and for a text typed with the comma, and null for an
+empty field and for anything that is no number - the caller says whether that is nothing typed or wrong. A `formDialog()`
+field of `type : 'number'` takes `step`, `min`, `max` and `unit` the same way and gives its value as the input does, a
+string; read it with `numberOf()`.
+
+`selectField( { ..., required : true } )` has the star and `aria-required` of every required field. It has no state of
+"nothing chosen" of its own: give it an empty first option and an empty `value`, and a `formDialog()` says "<Name> is
+missing." at the field, as it does for a text, when it is sent with that option.
 
 ## What one panel tells another
 
@@ -1784,7 +1843,7 @@ formatting as plain functions — extend and test there, not in the renderer.
 
 ### The standard directory and the record
 
-`directory()` draws everything over and under the rows of a panel in one call - the category, the search, the selects that narrow, the table with its box to choose rows by, its cells (`cell : 'clamp'`, `'limit'`, `'thumb'`, `'locales'`, `'date'`, `'badge'`) and buttons, the paging (25 for a table of pictures, 50 for every other); under 40 rem each row is a card drawn from the same columns - `primary : true` names the column that is the name of the card, `narrow : false` leaves one out, `narrow : 'second'` makes it the line under the name, and the select "Sort by" takes the place of the heads - and hands the rows in their order to `record()`, which opens one entry in the large dialog: name and identifier, the steps through the rows the directory shows, the bar, the address `#panel/tab/<entry>` and the question about unsaved input. `readLine()`, `messageBox()` and `imageFrame()` are what a record that is read is drawn with, `counter` of `textField()` and `textareaField()` the "n / limit" of a field. The options, the rules for when a panel uses which and a recipe to copy - a script that runs as it stands, and the fills and the server side that go beside it, with the actions behind [the backend skeleton](#backend-skeleton) - are in [the workbench interface](../admin-ui.md#directory-and-record); `tests/nino-ui-directory-js-smoke.js` and `tests/nino-ui-record-js-smoke.js` pin the blocks, `tests/admin-submissions-js-smoke.js` is the first panel over them.
+`directory()` takes the rows it starts with as `rows` (a `setRows( rows )` straight after the call); `rows : []` is a directory with nothing in it, and a call without `rows` says "Loading ..." (`labels.loading`) until `setRows()` or `fail()` - give no `rows` where they are read from the server, and `rows : []` only where there are none. `directory()` draws everything over and under the rows of a panel in one call - the category, the search, the selects that narrow, the table with its box to choose rows by, its cells (`cell : 'clamp'`, `'limit'`, `'thumb'`, `'locales'`, `'date'`, `'badge'`) and buttons, the paging (25 for a table of pictures, 50 for every other); under 40 rem each row is a card drawn from the same columns - `primary : true` names the column that is the name of the card, `narrow : false` leaves one out, `narrow : 'second'` makes it the line under the name, and the select "Sort by" takes the place of the heads - and hands the rows in their order to `record()`, which opens one entry in the large dialog: name and identifier, the steps through the rows the directory shows, the bar, the address `#panel/tab/<entry>` and the question about unsaved input. `readLine()`, `messageBox()` and `imageFrame()` are what a record that is read is drawn with, `counter` of `textField()` and `textareaField()` the "n / limit" of a field. The options, the rules for when a panel uses which and a recipe to copy - a script that runs as it stands, and the fills and the server side that go beside it, with the actions behind [the backend skeleton](#backend-skeleton) - are in [the workbench interface](../admin-ui.md#directory-and-record); `tests/nino-ui-directory-js-smoke.js` and `tests/nino-ui-record-js-smoke.js` pin the blocks, `tests/admin-submissions-js-smoke.js` is the first panel over them.
 
 ### Lists, filters and tabs
 

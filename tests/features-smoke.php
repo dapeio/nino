@@ -378,7 +378,7 @@ foreach( [ 'en_US', 'de_DE' ] as $unitLanguage ) {
 
 	$unitFills = (array) require __DIR__. '/../_admin/text/'. $unitLanguage. '.php';
 
-	check( 'the workbench has a word in '. $unitLanguage. ' for each unit a manifest may name', array_filter( [ 'seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'items', 'uris', 'per-hour', 'percent', 'characters' ],
+	check( 'the workbench has a word in '. $unitLanguage. ' for each unit a manifest may name', array_filter( [ 'seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'items', 'uris', 'per-hour', 'percent', 'characters', 'mm' ],
 		static fn( string $unit ): bool => is_string( $unitFills[ '[[/_admin/common/unit/'. $unit. ']]'] ?? null ) === false || $unitFills[ '[[/_admin/common/unit/'. $unit. ']]'] === '' ) === [] );
 }
 

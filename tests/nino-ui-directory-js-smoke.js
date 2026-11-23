@@ -643,4 +643,27 @@ function cardsOver( extra ) {
 	check( 'none of them wrote markup', markupWrites.length === before );
 }
 
+// --- the rows it starts with: none given is loading, an empty list is empty -------------------------
+
+{
+	const w = world();
+	const make = extra => { const mount = element('div'); const handle = w.ui.directory( Object.assign( { mount : mount, columns : [ { key : 'name', label : 'Name' } ], rowKey : 'key', labels : { search : 'Search', empty : 'None yet.', noMatch : 'no', loading : 'Items load ...' } }, extra ) ); return { mount, handle } };
+	const body = mount => byClass( mount, 'nino-admin-directory-body' )[0];
+
+	const none = make( {} );
+	check( 'a directory given no rows says that it is loading - the sentence of the caller - and is busy, with no table and no "empty"', byClass( none.mount, 'nino-admin-loading' )[0].textContent === 'Items load ...' && body( none.mount ).attributes['aria-busy'] === 'true' && tag( none.mount, 'table' ).length === 0 && byClass( none.mount, 'nino-admin-empty' ).length === 0 );
+	none.handle.setRows( ROWS.slice( 0, 3 ) );
+	check( '...and setRows() replaces it with the rows, which are no longer busy', shown( none.mount ).length === 3 && byClass( none.mount, 'nino-admin-loading' ).length === 0 && body( none.mount ).attributes['aria-busy'] === undefined );
+
+	const empty = make( { rows : [] } );
+	check( 'rows : [] is a directory with nothing in it: the sentence for that, not loading', byClass( empty.mount, 'nino-admin-empty' )[0].textContent === 'None yet.' && byClass( empty.mount, 'nino-admin-loading' ).length === 0 && body( empty.mount ).attributes['aria-busy'] === undefined );
+
+	const some = make( { rows : ROWS.slice( 0, 5 ) } );
+	check( 'rows given with the call are drawn as a setRows() straight after it would draw them', shown( some.mount ).length === 5 && some.handle.rows().length === 5 );
+
+	const words = make( { labels : { search : 'Search' } } );
+	check( '...and a loading without a word of the caller says the one of the workbench', byClass( words.mount, 'nino-admin-loading' )[0].textContent === '/_admin/common/table/loading' );
+}
+
+
 done();

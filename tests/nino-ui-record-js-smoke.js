@@ -19,7 +19,10 @@
  *															and that Cancel and Discard answer; save, save and
  *															continue, a refused save, a conflict; the deletion and the
  *															focus after it; the focus on opening and on closing; that
- *															what an entry holds is never set as markup.
+ *															what an entry holds is never set as markup; that the buttons follow the entry after a
+ *															save, that an action gets its button as
+ *															opener, and that a form opens over a record and one after
+ *															the other.
  *
  *	Usage: node tests/nino-ui-record-js-smoke.js
  */
@@ -761,5 +764,91 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 	w.h.box.location.hash = '#submissions/submissions/r05';
 	check( 'an address that names an entry is read as one, also while a step back is awaited', w.record.follow() === true && w.dialog() !== null && titleOf( w.dialog() ) === 'Item 5' );
 }
+
+// --- the buttons follow the entry after a save, and an action gives its button back to a dialog it opens ------------------
+
+{
+	// "off" in the name takes the actions away: Reply and Delete are for an entry that is on
+	const on = row => row.name.indexOf('off') === -1;
+	const asked = [];
+	const s = setup( true, {
+		danger : { label : 'Delete', hidden : row => on( row ) === false, run : () => {} },
+		actions : [ { label : 'Reply', hidden : row => on( row ) === false, run : ( row, ctx ) => { asked.push( ctx.opener ); } } ],
+	} );
+
+	s.record.open( 'r03', {} );
+	const d = s.dialog();
+	const shown = () => [ 'Delete', 'Reply' ].filter( text => buttonOf( d, text ).hidden !== true ).join();
+
+	check( 'an entry that is on has the buttons for it', shown() === 'Delete,Reply' );
+
+	// The focus is on a button that the saved entry has no use for
+	typeInto( d, 'Item 3 off' );
+	buttonOf( d, 'Reply' ).focus();
+	fire( buttonOf( d, 'Save' ), 'click' );
+	check( 'after a save the buttons are asked of the entry as the save answered it: Delete and Reply are gone', shown() === '' && titleOf( d ) === 'Item 3 off' );
+	check( '...and the focus of the button that went goes to the main button of the bar', buttonOf( d, 'Save' ).focused === true );
+
+	typeInto( d, 'Item 3' );
+	fire( buttonOf( d, 'Save' ), 'click' );
+	check( '...and a save of an entry that is on again shows them', shown() === 'Delete,Reply' && titleOf( d ) === 'Item 3' );
+
+	// The button of an action is its opener
+	const reply = buttonOf( d, 'Reply' );
+	fire( reply, 'click' );
+	check( 'an action gets its own button as ctx.opener', asked.length === 1 && asked[0] === reply );
+
+	s.h.ui.confirm( 'big', { title : 'Reply', message : 'Send?', yes : 'Send', no : 'Cancel', nested : true, opener : asked[0], onChoose : () => {} } );
+	escape( s.dialog() );
+	check( '...and a question it asks on the record gives the focus back to that button, the record stays open', s.dialog() === d && reply.focused === true );
+}
+
+{
+	// A form over the record, and one after the other: the focus goes back to the place it came from
+	const s = setup( true );
+	s.record.open( 'r03', {} );
+	const d = s.dialog();
+	const field = tag( d, 'input' )[0];
+	const save = buttonOf( d, 'Save' );
+	const form = ( opener, extra ) => s.h.ui.formDialog( Object.assign( { title : 'Note', fields : [ { key : 'n', label : 'Note', value : 'x' } ], submit : 'Add', cancel : 'Cancel', nested : true, opener : opener, onSubmit : ( values, ctl ) => ctl.close() }, extra ) );
+	const sendIt = dialog => fire( tag( dialog, 'button' ).filter( b => b.textContent === 'Add' )[0], 'click' );
+
+	field.focus();
+	check( 'a form opens over a record', form( field ) !== false && s.h.dialogs.filter( x => x.open === true ).length === 2 );
+	sendIt( s.dialog() );
+	check( '...and when it is sent the record is still open, and the focus is back in its field', s.dialog() === d && field.focused === true );
+
+	save.focus();
+	const log = [];
+	form( save, { onClose : v => { log.push( v ); form( field, { onClose : w => log.push( 'second:'+ w ) } ) } } );
+	sendIt( s.dialog() );
+	check( 'a form asked for in the onClose of another is opened over the record', log.join() === 'submit' && s.dialog() !== d && s.h.dialogs.filter( x => x.open === true ).length === 2 );
+	escape( s.dialog() );
+	check( '...and when that one is closed the focus is back in the field it was asked for with', s.dialog() === d && field.focused === true && log.join() === 'submit,second:cancel' );
+}
+
+
+// --- the state badge of the bar: nothing until something is typed, "Saved" only after a save ------------------------------
+
+{
+	const s = setup( true );
+	s.record.open( 'r03', {} );
+	const d = s.dialog();
+	const badge = () => byClass( d, 'nino-admin-actionbar-state' )[0];
+
+	check( 'an entry that was just opened says nothing of its state: no "Saved" for what was not saved', badge().hidden === true && badge().textContent === '' );
+
+	typeInto( d, 'Item 3 edited' );
+	s.h.dirty.refresh();
+	check( '...the first input says it is changed', badge().hidden === false && badge().dataset.state === 'warn' );
+
+	fire( buttonOf( d, 'Save' ), 'click' );
+	check( '...and only a save that went well says it is saved', badge().hidden === false && badge().dataset.state === 'ok' );
+
+	fire( buttonOf( d, 'Next' ), 'click' );
+	check( '...a step to the next entry is neutral again', badge().hidden === true && badge().textContent === '' );
+
+}
+
 
 done();

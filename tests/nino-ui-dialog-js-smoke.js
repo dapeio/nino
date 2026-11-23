@@ -20,7 +20,13 @@
  *															of the family (a tick, a list of ticks, the languages, a
  *															file, code, a moment), that a question lists what it is
  *															about as text, and that a modal dialog keeps the Tab key
- *															and makes the rest of the page inert.
+ *															and makes the rest of the page inert; that an opener
+ *															is an element, anything with a focus() or a function
+ *															answered when the dialog closes, and that what is no
+ *															longer in the page gives the focus to the name of the
+ *															panel; that onClose is called once on every way out
+ *															with the answer; that a required select is checked in
+ *															a form and a number field takes step, limits and unit.
  *
  *	Usage: node tests/nino-ui-dialog-js-smoke.js
  */
@@ -47,6 +53,7 @@ function world( shell, options ) {
 	options = options || {};
 
 	const dialogs = [];
+	const pending = [];
 	const page = element('div');
 	const Nino = {
 		events : { bindCallback : function() {} },
@@ -67,7 +74,16 @@ function world( shell, options ) {
 				created.show = function() { created.open = true; created.modal = false };
 			}
 			created.contains = function( node ) { return node !== null && ( node === created || findAll( created, el => el === node ).length > 0 ) };
-			created.close = function() { created.open = false; fire( created, 'close' ) };
+			// A browser says that a dialog was closed a moment after close(), as a task of its own: with deferClose the event waits for flush()
+			created.close = function() {
+				if( created.open === false )
+					return;
+				created.open = false;
+				if( options.deferClose === true )
+					pending.push( created );
+				else
+					fire( created, 'close' );
+			};
 			dialogs.push( created );
 		}
 		return created;
@@ -81,7 +97,7 @@ function world( shell, options ) {
 	sandbox.window = { Nino : Nino, matchMedia : function() { return { matches : options.wide === true } }, confirm : options.confirm ?? function() { throw new Error('a dialog of the design system is not the browser\'s confirm') } };
 	load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
-	return { ui : Nino.adminUi, dialogs : dialogs, doc : doc, keys : keys, body : doc.body, sandbox : sandbox };
+	return { ui : Nino.adminUi, dialogs : dialogs, doc : doc, keys : keys, body : doc.body, sandbox : sandbox, flush : function() { pending.splice( 0 ).forEach( dialog => fire( dialog, 'close' ) ) } };
 }
 
 const buttons = dialog => findAll( dialog, el => el.tagName === 'BUTTON' );
@@ -921,6 +937,327 @@ console.log('Nino.adminUi dialogs - confirm, formDialog, pickDialog, propertiesD
 
 	dialog.close();
 	check( 'the page is given back when the dialog closes', behind.inert === false );
+}
+
+
+// --- opener: an element, anything with a focus(), or a function that answers one ----
+
+{
+	const choices = [ { value : 'cancel', label : 'Cancel', kind : 'secondary' }, { value : 'ok', label : 'Ok', kind : 'primary' } ];
+	const open = ( w, opener, extra ) => {
+		w.ui.choiceDialog( Object.assign( { message : 'x', opener : opener, choices : choices, onChoose : function() {} }, extra ) );
+		return last( w );
+	};
+	// A panel: its name, and the controls in it
+	const panel = ( w ) => {
+		const pane = element('div');
+		pane.setAttribute( 'data-panel', 'things' );
+		const title = element('h2');
+		title.className = 'admin-panel-title';
+		pane.appendChild( title );
+		w.body.appendChild( pane );
+		return { pane : pane, title : title };
+	};
+
+	{
+		const w = world();
+		const button = element('button');
+		open( w, button ).close();
+		check( 'an opener that is an element gets the focus when the dialog closes', button.focused === true );
+	}
+
+	{
+		const w = world();
+		const log = [];
+		open( w, { focus : function() { log.push('focus') } } ).close();
+		check( '...so does anything that has a focus(): it is called as it is', log.join() === 'focus' );
+	}
+
+	{
+		const w = world();
+		let calls = 0;
+		let later = null;
+		const dialog = open( w, function() { calls++; return later } );
+		const before = calls;
+		later = element('button');
+		dialog.close();
+		check( '...a function is not called while the dialog is open but when it closes, and the element it answers then gets the focus', before === 0 && calls === 1 && later.focused === true );
+	}
+
+	{
+		const w = world();
+		const { pane, title } = panel( w );
+		const button = element('button');
+		pane.appendChild( button );
+		w.doc.activeElement = button;
+		const dialog = open( w, button );
+		button.remove();
+		dialog.close();
+		check( 'an opener that is no longer in the page takes no focus: it goes to the name of the panel the dialog was opened in', button.focused === false && title.focused === true && title.attributes.tabindex === '-1' );
+	}
+
+	{
+		const w = world();
+		const { pane, title } = panel( w );
+		const button = element('button');
+		pane.appendChild( button );
+		w.doc.activeElement = button;
+		const gone = element('button');
+		pane.appendChild( gone );
+		gone.remove();
+		open( w, function() { return gone } ).close();
+		check( '...also one that a function answers', gone.focused === false && title.focused === true );
+	}
+
+	{
+		const w = world();
+		const { pane, title } = panel( w );
+		const button = element('button');
+		pane.appendChild( button );
+		w.doc.activeElement = button;
+		open( w, function() { return null } ).close();
+		check( '...and a function that answers nothing', title.focused === true );
+	}
+
+	{
+		const w = world();
+		const stray = element('button');
+		w.body.appendChild( stray );
+		w.doc.activeElement = stray;
+		stray.remove();
+		check( '...where there is no panel either nothing is focused and nothing is thrown', thrown( () => open( w, stray ).close() ) === null && stray.focused === false );
+	}
+
+	{
+		// The use it is for: the list is drawn again before the dialog closes, and the row that did not exist when it opened gets the focus
+		const w = world();
+		const list = element('ul');
+		w.body.appendChild( list );
+		let row = element('button');
+		list.appendChild( row );
+		const old = row;
+		let ctl = null;
+
+		w.ui.formDialog( { title : 'Rename', fields : [ { key : 'name', label : 'Name', value : 'a' } ], submit : 'Save', cancel : 'Cancel', opener : () => row, onSubmit : ( values, control ) => { ctl = control } } );
+		const dialog = last( w );
+		fire( buttons( dialog ).filter( b => b.className === 'nino-admin-btn-primary' )[0], 'click' );
+		old.remove();
+		row = element('button');
+		list.appendChild( row );
+		ctl.close();
+		check( 'formDialog() takes the same: the row that was drawn while the dialog was open has the focus', dialog.open === false && row.focused === true && old.focused === false );
+	}
+}
+
+
+// --- onClose: every way out, after the focus is back ----------------------------------
+
+{
+	const choices = [ { value : 'cancel', label : 'Cancel', kind : 'secondary' }, { value : 'ok', label : 'Ok', kind : 'primary' } ];
+
+	// choiceDialog(): an answer, Escape, the cross - and the order: the answer, the focus, then the hook
+	{
+		const w = world();
+		const opener = element('button');
+		const log = [];
+		const open = ( extra ) => {
+			w.ui.choiceDialog( Object.assign( { title : 'T', message : 'x', opener : opener, choices : choices, close : 'Close', onChoose : v => log.push( 'choose:'+ v ), onClose : v => log.push( 'close:'+ v+ ':'+ opener.focused ) }, extra ) );
+			return last( w );
+		};
+
+		let dialog = open();
+		fire( buttons( dialog ).filter( b => b.textContent === 'Ok' )[0], 'click' );
+		escape( open() );
+		fire( buttons( open() ).filter( b => b.className.indexOf('nino-admin-dialog-close') !== -1 )[0], 'click' );
+		check( 'onClose is called once on every way out - an answer, Escape, the cross - with the answer, after onChoose and with the focus back', log.join() === 'choose:ok,close:ok:true,choose:cancel,close:cancel:true,choose:cancel,close:cancel:true' );
+
+		log.length = 0;
+		dialog = open( { guard : () => false } );
+		escape( dialog );
+		check( '...not while a guard keeps the dialog open', log.length === 0 && dialog.open === true );
+	}
+
+	// formDialog(): send, Cancel, Escape; the question of a changed form is not a way out of the form
+	{
+		const w = world();
+		const log = [];
+		const open = ( value ) => {
+			w.ui.formDialog( { title : 'Make', fields : [ { key : 'name', label : 'Name', value : value } ], submit : 'Make', cancel : 'Cancel', onSubmit : ( values, ctl ) => ctl.close(), onCancel : () => log.push('cancel-cb'), onClose : v => log.push( 'close:'+ v ) } );
+			return last( w );
+		};
+		const row = dialog => buttons( dialog ).filter( b => b.className.indexOf('nino-admin-btn-') === 0 );
+
+		let dialog = open( 'a' );
+		fire( row( dialog )[1], 'click' );
+		check( 'formDialog() says submit when it was sent', log.join() === 'close:submit' );
+
+		log.length = 0;
+		dialog = open( 'a' );
+		fire( row( dialog )[0], 'click' );
+		escape( open( 'a' ) );
+		check( '...and cancel for Cancel and for Escape, after onCancel', log.join() === 'cancel-cb,close:cancel,cancel-cb,close:cancel' );
+
+		log.length = 0;
+		dialog = open( 'a' );
+		const field = tag( dialog, 'input' )[0];
+		field.value = 'b';
+		fire( field, 'input' );
+		fire( row( dialog )[0], 'click' );
+		const question = last( w );
+		check( '...the question about what was typed is not a way out of the form: nothing is said while it stands', question !== dialog && log.length === 0 && dialog.open === true );
+		fire( buttons( question ).filter( b => b.className === 'nino-admin-btn-secondary' )[0], 'click' );
+		check( '...nor is the answer that keeps the form', log.length === 0 && dialog.open === true );
+		fire( row( dialog )[0], 'click' );
+		fire( buttons( last( w ) ).filter( b => b.className === 'nino-admin-btn-danger' )[0], 'click' );
+		check( '...the answer that throws it away closes the form, which says cancel once', dialog.open === false && log.join() === 'cancel-cb,close:cancel' );
+	}
+
+	// confirm(): true or false, and also where the policy asks nothing; pickDialog(): pick or cancel; conflict(): its three answers
+	{
+		const w = world();
+		const log = [];
+		const sure = ( extra ) => w.ui.confirm( 'destructive', Object.assign( asked( { onChoose : v => log.push( 'choose:'+ v ), onClose : v => log.push( 'close:'+ v ) } ), extra ) );
+
+		sure();
+		fire( buttons( last( w ) ).filter( b => b.className === 'nino-admin-btn-danger' )[0], 'click' );
+		sure();
+		escape( last( w ) );
+		check( 'confirm() says true for the answer that goes on and false for the other', log.join() === 'choose:true,close:true,choose:false,close:false' );
+
+		const quiet = world( { mode : { policy : () => ( { ask : false, note : '' } ) } } );
+		const said = [];
+		quiet.ui.confirm( 'routine', asked( { onClose : v => said.push( v ) } ) );
+		check( '...and true where the policy asks nothing, with no dialog', said.join() === 'true' && quiet.dialogs.length === 0 );
+
+		const old = world( undefined, { noDialog : true, confirm : () => false } );
+		const told = [];
+		old.ui.confirm( 'destructive', asked( { onClose : v => told.push( v ) } ) );
+		check( '...and where the browser has no <dialog> and asks itself', told.join() === 'false' );
+
+		const picks = [];
+		const pick = ( extra ) => w.ui.pickDialog( Object.assign( { title : 'Pick', items : [ { value : 'v', label : 'Item' } ], cancel : 'Cancel', onChoose : () => {}, onClose : v => picks.push( v ) }, extra ) );
+		pick();
+		fire( buttons( last( w ) ).filter( b => b.className === 'nino-admin-pick-item' )[0], 'click' );
+		pick();
+		escape( last( w ) );
+		check( 'pickDialog() says pick for a pick and cancel for the rest', picks.join() === 'pick,cancel' );
+
+		const answers = [];
+		const conflict = () => w.ui.conflict( { message : 'x', onClose : v => answers.push( v ) } );
+		[ 0, 1, 2 ].forEach( at => { conflict(); fire( buttons( last( w ) )[at], 'click' ) } );
+		check( 'conflict() says reload, cancel or overwrite', answers.join() === 'reload,cancel,overwrite' );
+	}
+}
+
+
+// --- a select that is required in a form dialog ----------------------------------------
+
+{
+	const w = world();
+	const sent = [];
+	w.ui.formDialog( { title : 'Make', fields : [ { key : 'kind', label : 'Kind', type : 'select', required : true, options : [ { value : '', label : '' }, { value : 'a', label : 'A' } ], value : '' } ], submit : 'Make', cancel : 'Cancel', onSubmit : values => sent.push( values ) } );
+
+	const dialog = last( w );
+	const select = tag( dialog, 'select' )[0];
+	const send = () => fire( buttons( dialog ).filter( b => b.className === 'nino-admin-btn-primary' )[0], 'click' );
+	const errors = () => tag( dialog, 'p' ).filter( p => p.className === 'nino-admin-field-error' );
+
+	check( 'a required select of a form dialog has the star and aria-required of the other fields', select.attributes['aria-required'] === 'true' && tag( dialog, 'span' ).filter( span => span.className === 'nino-admin-required' ).length === 1 );
+
+	send();
+	check( '...one that is empty is not sent: the dialog stays, the select is marked and says why at its field, and has the focus', sent.length === 0 && dialog.open === true && select.attributes['aria-invalid'] === 'true' && errors().length === 1 && select.attributes['aria-describedby'] === errors()[0].id && select.focused === true );
+
+	select.value = 'a';
+	fire( select, 'change' );
+	send();
+	check( '...one that was chosen is sent, and the sentence is gone', sent.length === 1 && sent[0].kind === 'a' && errors().length === 0 );
+}
+
+
+// --- a number in a form dialog: the step, the limits and the unit reach the input ---------
+
+{
+	const w = world();
+	const sent = [];
+	w.ui.formDialog( { title : 'Size', fields : [
+		{ key : 'depth', label : 'Depth', type : 'number', unit : 'mm', step : 0.5, min : 0, max : 20, value : '2.5', required : true },
+		{ key : 'rank', label : 'Rank', type : 'number', value : '3' },
+	], submit : 'Save', cancel : 'Cancel', onSubmit : values => sent.push( values ) } );
+
+	const dialog = last( w );
+	const [ depth, rank ] = tag( dialog, 'input' );
+	const deep = el => el.textContent+ el.children.map( deep ).join('');
+	const names = tag( dialog, 'span' ).map( deep );
+
+	check( 'a number field passes its step and limits to the input, and names its unit behind the label', depth.type === 'number' && depth.step === '0.5' && depth.min === '0' && depth.max === '20' && names.some( name => name.indexOf( 'Depth (/_admin/common/unit/mm)' ) === 0 ) );
+	check( '...one without them has none of the three on its input, as before', rank.type === 'number' && !rank.step && !rank.min && !rank.max && names.indexOf('Rank') !== -1 );
+
+	depth.value = '12.5';
+	fire( depth, 'input' );
+	fire( buttons( dialog ).filter( b => b.className === 'nino-admin-btn-primary' )[0], 'click' );
+	check( '...and its value is what the input says, a string with a dot, which numberOf() reads', sent.length === 1 && sent[0].depth === '12.5' && sent[0].rank === '3' && w.ui.numberOf( sent[0].depth ) === 12.5 );
+}
+
+
+// --- formDialog(): over another dialog, a handle, and one dialog after another ----------------
+
+{
+	const form = ( w, extra ) => w.ui.formDialog( Object.assign( { title : 'Make', fields : [ { key : 'name', label : 'Name', value : 'a' } ], submit : 'Make', cancel : 'Cancel', onSubmit : ( values, ctl ) => ctl.close() }, extra ) );
+	const main = dialog => buttons( dialog ).filter( b => b.className === 'nino-admin-btn-primary' )[0];
+
+	{
+		const w = world();
+		const below = form( w );
+		check( 'a form is not opened over a dialog that is open, and says so by false', below !== false && form( w ) === false && w.dialogs.length === 1 );
+
+		const log = [];
+		const field = tag( last( w ), 'input' )[0];
+		field.focus();
+		w.doc.activeElement = field;
+		const above = form( w, { nested : true, onClose : v => log.push( v ) } );
+		check( '...with nested it is: it stands on the one below, which stays open', above !== false && w.dialogs.length === 2 && w.dialogs[0].open === true && w.dialogs[1].open === true );
+
+		const input = tag( w.dialogs[1], 'input' )[0];
+		input.value = 'changed';
+		fire( input, 'input' );
+		above.close();
+		check( '...its handle closes it as Cancel without the question about what was typed, and says so once; the one below is open', w.dialogs[1].open === false && w.dialogs.length === 2 && log.join() === 'cancel' && w.dialogs[0].open === true && field.focused === true );
+		check( '...the handle has the dialog', above.el === w.dialogs[1] );
+	}
+
+	{
+		// A dialog is closed, and the next is asked for in the next line - the browser has not said "closed" yet
+		const w = world( undefined, { deferClose : true } );
+		const first = element('button');
+		const second = element('button');
+		const log = [];
+
+		form( w, { opener : first, onClose : v => log.push( '1:'+ v+ ':'+ first.focused ) } );
+		const one = last( w );
+		fire( main( one ), 'click' );
+		const next = form( w, { opener : second, onClose : v => log.push( '2:'+ v+ ':'+ second.focused ) } );
+
+		check( 'ctl.close() and a form asked for in the next line: it is opened, and the focus went back to the opener of the first', next !== false && w.dialogs.length === 2 && one.open === false && last( w ).open === true && log.join() === '1:submit:true' );
+
+		w.flush();
+		check( '...the browser\'s own "closed" does nothing more, and the second dialog is open', log.join() === '1:submit:true' && last( w ).open === true && w.dialogs[0].parentNode === null );
+
+		fire( main( last( w ) ), 'click' );
+		w.flush();
+		check( '...and the second one gives the focus to its own opener', last( w ).open === false && second.focused === true && log.join() === '1:submit:true,2:submit:true' );
+	}
+
+	{
+		// The documented way: the next dialog is asked for in onClose
+		const w = world( undefined, { deferClose : true } );
+		const first = element('button');
+		const second = element('button');
+		let next = null;
+
+		form( w, { opener : first, onClose : () => { next = form( w, { opener : second } ) } } );
+		fire( main( last( w ) ), 'click' );
+		check( 'a form asked for in the onClose of the one before is opened', next !== null && next !== false && last( w ).open === true && w.dialogs.length === 2 );
+	}
 }
 
 

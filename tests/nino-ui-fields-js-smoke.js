@@ -2,8 +2,8 @@
  *	Nino										A compact filesystembased php framework
  *	nino-ui-fields-js-smoke.js	DOM-light checks for the fields of the second part of
  *															the workbench's form blocks: Nino.adminUi.checkField(),
- *															checklist(), localeRows(), fileField(), codeField() and
- *															dateTime().
+ *															checklist(), localeRows(), fileField(), codeField(),
+ *															dateTime(), selectField() and numberField().
  *
  *															Pinned: that each is the element of the guide - a label
  *															at the field, a group that is named, a button of the
@@ -15,7 +15,10 @@
  *															file that is too large or of another type is not taken,
  *															that a field of code leaves the Tab key to the browser,
  *															and that a language that is the working one is the first
- *															row.
+ *															row; that selectField() and numberField() mark a
+ *															required field as the others do, that numberField()
+ *															takes a step, limits and a unit, and what numberOf()
+ *															makes of a value with a dot or a comma.
  *
  *	Usage: node tests/nino-ui-fields-js-smoke.js
  */
@@ -193,6 +196,78 @@ console.log( 'Nino.adminUi.checkField, checklist, localeRows, fileField, codeFie
 	check( 'a day the calendar does not have is no value, nor is a time of day it does not have', field.value() === '' && ui._moment( '2026-02-28T24:00' ) === null && ui._moment( '2026-02-28 07:05' ).time === '07:05' && ui._moment( 'tomorrow' ) === null );
 	field.error( 'Start is not valid.' );
 	check( 'what is wrong is said at the field', errorsIn( field.el ).length === 1 && field.date.getAttribute('aria-invalid') === 'true' );
+}
+
+// --- selectField: required ---------------------------------------------------------
+
+{
+	const deep = el => el.textContent+ el.children.map( deep ).join('');
+	const options = [ { value : '', label : '' }, { value : 'a', label : 'A' } ];
+	const plain = ui.selectField( { key : 'kind', label : 'Kind', options : options, value : '' } );
+	const field = ui.selectField( { key : 'kind', label : 'Kind', options : options, value : '', required : true, help : 'Which.' } );
+	const select = field.querySelector('select');
+
+	check( 'a required select has the star behind its name, which a screen reader does not hear, and aria-required on the control', named( field, 'SPAN' ).filter( el => classes( el ).includes('nino-admin-required') && el.getAttribute('aria-hidden') === 'true' && el.textContent === '*' ).length === 1 && select.getAttribute('aria-required') === 'true' && select.required === true );
+	check( '...its help stands behind the (?) as before, and the star is in the name that the (?) is named by', findAll( field, el => classes( el ).includes('nino-admin-help-button') ).length === 1 && deep( field.children[0] ).indexOf('Kind*') === 0 );
+	check( 'a select that is not required has neither', named( plain, 'SPAN' ).filter( el => classes( el ).includes('nino-admin-required') ).length === 0 && plain.querySelector('select').getAttribute('aria-required') === null && !plain.querySelector('select').required );
+}
+
+// --- numberField: step, limits, unit, required -----------------------------------------
+
+{
+	const deep = el => el.textContent+ el.children.map( deep ).join('');
+	const input = field => field.querySelector('input');
+	const plain = ui.numberField( { key : 'n', label : 'Count', value : 3, min : 1, max : 9 } );
+
+	check( 'a number field steps by 1 unless it is told another step, and takes the limits it is given', input( plain ).step === '1' && input( plain ).min === 1 && input( plain ).max === 9 );
+	check( '...a step of a tenth or a half, or any, is written on the input as it is given', [ [ 0.1, '0.1' ], [ 0.5, '0.5' ], [ '0.25', '0.25' ], [ 'any', 'any' ] ].every( ( [ given, written ] ) => input( ui.numberField( { key : 'n', label : 'x', value : 1, step : given } ) ).step === written ) );
+	check( '...without required it has no star and no aria-required', named( plain, 'SPAN' ).filter( el => classes( el ).includes('nino-admin-required') ).length === 0 && input( plain ).getAttribute('aria-required') === null );
+
+	const depth = ui.numberField( { key : 'depth', label : 'Depth', unit : 'mm', value : 2.5, step : 0.5, required : true, help : 'How deep.' } );
+	check( 'a unit is a word of the workbench, written in brackets behind the label: mm among them, in both languages', deep( depth.children[0] ).indexOf( 'Depth ('+ text['/_admin/common/unit/mm']+ ')' ) === 0 && text['/_admin/common/unit/mm'] === 'mm' && fills( '_admin/text/de_DE.php' )['/_admin/common/unit/mm'] === 'mm' );
+	check( '...a required number has the star behind the name and aria-required on the input, and the name of its help is the words alone', named( depth, 'SPAN' ).filter( el => classes( el ).includes('nino-admin-required') ).length === 1 && input( depth ).getAttribute('aria-required') === 'true' && input( depth ).required === true && findAll( depth, el => classes( el ).includes('nino-admin-help-button') ).length === 1 );
+}
+
+// --- numberOf: what a number input says, as the number ------------------------------------
+
+{
+	// What a browser in German gives for "12,5" is "12.5" in the value of its input (measured in the browser run of the patch); a text typed with the comma is read the same
+	check( 'a value with a dot, or with a comma, is the number', ui.numberOf('12.5') === 12.5 && ui.numberOf('12,5') === 12.5 && ui.numberOf('-0,5') === -0.5 && ui.numberOf(3) === 3 && ui.numberOf('7') === 7 );
+	check( '...an empty field and anything that is no number is null, which is for the caller to say is nothing typed or wrong', [ '', '  ', null, undefined, 'abc', '1,2,3', '1.234,5', '12,5 mm', '1e3' ].every( value => ui.numberOf( value ) === null ) );
+}
+
+// --- the note of a field is read with it -----------------------------------------------------
+
+{
+	const base = { key : 'k', label : 'L', note : 'Stays in view.' };
+	const made = {
+		text : () => { const el = ui.textField( base ); return [ el, el.querySelector('input') ] },
+		textarea : () => { const el = ui.textareaField( base ); return [ el, el.querySelector('textarea') ] },
+		select : () => { const el = ui.selectField( Object.assign( { options : [], value : '' }, base ) ); return [ el, el.querySelector('select') ] },
+		number : () => { const el = ui.numberField( Object.assign( { value : 1 }, base ) ); return [ el, el.querySelector('input') ] },
+		tick : () => { const el = ui.checkField( base ); return [ el, el.fieldControl ] },
+		switcher : () => { const el = ui.switchField( Object.assign( { checked : false }, base ) ); return [ el, el.querySelector('input') ] },
+		code : () => { const el = ui.codeField( base ); return [ el, el.fieldControl ] },
+		list : () => { const h = ui.checklist( Object.assign( { options : [ { value : 'a', label : 'A' } ], value : [] }, base ) ); return [ h.el, h.el ] },
+		file : () => { const h = ui.fileField( base ); return [ h.el, findAll( h.el, el => el.getAttribute('role') === 'group' )[0] ] },
+		moment : () => { const h = ui.dateTime( base ); return [ h.el, findAll( h.el, el => el.getAttribute('role') === 'group' )[0] ] },
+		languages : () => { const h = ui.localeRows( Object.assign( { locales : [ 'de_DE' ] }, base ) ); return [ h.el, findAll( h.el, el => el.getAttribute('role') === 'group' )[0] ] },
+	};
+	const described = ( root, control ) => String( control.getAttribute('aria-describedby') ?? '' ).split(/\s+/).map( id => findAll( root, el => el.id === id )[0] ).filter( Boolean );
+
+	Object.keys( made ).forEach( function( name ) {
+		const [ root, control ] = made[name]();
+		const note = findAll( root, el => classes( el ).includes('nino-admin-field-note') || ( el.tagName === 'SMALL' && el.textContent === 'Stays in view.' ) )[0];
+		check( 'the note of a '+ name+ ' is what its control - or its group - is described by', note !== undefined && described( root, control ).includes( note ) );
+	} );
+
+	// Together with the help, and an error does not take it away
+	const field = ui.checkField( { key : 'k', label : 'L', note : 'Stays in view.', help : 'Why.' } );
+	element('div').appendChild( field );
+	ui.fieldError( field, field.fieldControl, 'e1', 'Wrong.' );
+	const tokens = String( field.fieldControl.getAttribute('aria-describedby') ).split(/\s+/);
+	check( '...after the sentence of the help, both still there while an error is said, with the error first', tokens.length === 3 && tokens[0] === 'e1' && tokens.slice( 1 ).every( id => findAll( field, el => el.id === id ).length === 1 ) );
+	check( 'a field without a note is described by nothing it has not', ui.textField( { key : 'k', label : 'L' } ).querySelector('input').getAttribute('aria-describedby') === null );
 }
 
 done();

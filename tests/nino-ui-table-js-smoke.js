@@ -353,12 +353,13 @@ const twelve = () => Array.from( { length : 12 }, ( _, at ) => ( { uri : '/r'+ (
 const draw = ( extra ) => {
 	const mount = element('div');
 	const ran = [];
+	ran.openers = [];
 	const handle = ctx.Nino.adminUi.table( Object.assign( {
 		mount : mount,
 		columns : [ { key : 'name', label : 'Name', type : 'string' }, { key : 'uri', label : 'Uri', type : 'string' } ],
 		rows : twelve(),
 		labels : { search : 'Search', empty : '', noMatch : '' },
-		select : { actions : [ { key : 'drop', label : 'Drop', danger : true, run : keys => ran.push( keys ) }, { key : 'keep', label : 'Keep', run : keys => ran.push( keys ) } ] },
+		select : { actions : [ { key : 'drop', label : 'Drop', danger : true, run : ( keys, opener ) => { ran.push( keys ); ran.openers.push( opener ) } }, { key : 'keep', label : 'Keep', run : ( keys, opener ) => { ran.push( keys ); ran.openers.push( opener ) } } ] },
 	}, extra || {} ) );
 	return { mount : mount, ran : ran, handle : handle };
 };
@@ -402,6 +403,7 @@ check( 'rows that are drawn anew drop the keys that are gone and keep the others
 const buttonsOf = ( t ) => descendants( barOf( t ) ).filter( el => el.tagName === 'BUTTON' );
 fire( buttonsOf( choice )[1], 'click' );
 check( 'an action of the bar is handed the keys of the chosen rows, in the order of the rows; the one that takes something away is a danger button', choice.ran.length === 1 && choice.ran[0].join() === '/r1,/r11' && classOf( buttonsOf( choice )[0], 'nino-admin-btn-danger' ) === true );
+check( '...and the button it was pressed with, which a dialog it opens gives the focus back to', choice.ran.openers.length === 1 && choice.ran.openers[0] === buttonsOf( choice )[1] );
 
 fire( buttonsOf( choice )[buttonsOf( choice ).length - 1], 'click' );
 check( 'Clear selection takes every choice away and hides the bar', choice.handle.selected().length === 0 && classOf( barOf( choice ), 'nino-admin-hidden' ) === true );

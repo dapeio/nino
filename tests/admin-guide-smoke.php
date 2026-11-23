@@ -419,6 +419,13 @@ check( 'a link of the Dashboard is a target of 24 px at least: the token it read
 	&& preg_match( '/#admin-dashboard-elements a \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1
 	&& preg_match( '/\.admin-dashboard-more \{[^}]*min-height: var\(--nino-admin-control-icon-small\)/', $dashboard ) === 1 );
 
+// The box of a tick may stay small, its target is the label or the cell around it: 24 px at least by the token - the cell of a row and of the head of a directory, the tick of a field
+// and of a record, and the row of a list of ticks (the control height)
+check( 'the target of a tick is 24 px at least: the cell around the box of a row and of the head is the token of the small control in both directions, a row of a list of ticks has the height of a control, which is not less',
+	preg_match( '/\.nino-admin-table-selectcell \{[^}]*width: '. $token. ';[^}]*height: '. $token. ';/', $style ) === 1
+	&& preg_match( '/\.nino-admin-checklist label \{[^}]*min-height: var\(--nino-admin-control-height\)/', $style ) === 1
+	&& preg_match( '/^(\d+)px$/', $light['--nino-admin-control-height'] ?? '', $control ) === 1 && (int) $control[1] >= 24 && (int) ( $smallest !== '' ? substr( $smallest, 0, -2 ) : 0 ) >= 24 );
+
 // --- a save that went well is said by the toast and the badge, in no line --------------------------------------
 
 $spoken = [];

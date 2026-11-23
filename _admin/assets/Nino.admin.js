@@ -1980,7 +1980,7 @@
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.title			What the dialog is: "Textfills for Text"
 		 *	@param		{Array}			options.fills			[ { name, notation, value } ] - the notation as the field reads it (the key in brackets or between hashes), the value in the working language
-		 *	@param		{Element}		[options.opener]	See choiceDialog()
+		 *	@param		{Element|Object|Function}	[options.opener]	See choiceDialog()
 		 *
 		 *	@return		{boolean}										false when a dialog is already open
 		 */
@@ -2121,7 +2121,7 @@
 		 *	@param		{string}		[options.size]				'narrow' (a question, the default), 'form', 'wide', 'large' or 'sheet' - the class nino-admin-dialog--<size>; large is the dialog of a record - 72 rem wide, 90 % of the height at most, filling the screen on a phone -, a sheet stands at the right over the whole height
 		 *	@param		{string}		[options.note]				A second paragraph under the message
 		 *	@param		{Array}			[options.details]			What the question is about, as a list under the message: lines of text, and groups { title, lines } where the lines have a heading each (what a deletion takes and what it keeps). Drawn as <ul>, every line as text and never as markup; the caller has cut a long list short with a line of its own ("and 3 more")
-		 *	@param		{Element}		[options.opener]			What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari
+		 *	@param		{Element|Object|Function}	[options.opener]	What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari. An element, or anything that has a focus() - it is called as it is -, or a function that answers one of them and is called when the dialog closes, for a control that is drawn anew while the dialog is open (the row of a list). What is not in the page then gets no focus: it goes to the name of the panel the dialog was opened in
 		 *	@param		{Element}		[options.focus]				What gets the focus when the dialog opens
 		 *	@param		{boolean}		[options.nested]			The dialog asks something of an open dialog and stands on it
 		 *	@param		{string}		[options.escape]			The value of the choice that Escape is, where it is not the first 'secondary' one
@@ -2133,6 +2133,7 @@
 		 *	@param		{Function}	[options.guard]				guard( value, handle ) - false keeps the dialog open
 		 *	@param		{Function}	[options.onOpen]			onOpen( handle ) once the dialog is open
 		 *	@param		{Function}	options.onChoose			Called once with the chosen value
+		 *	@param		{Function}	[options.onClose]			onClose( value ) once the dialog is gone and the focus is back, after onChoose, on every way out - an answer, Escape, the cross - and where the browser has no <dialog>: value is the answer, which Escape and the cross give as the cancel answer
 		 *
 		 *	@return		{boolean}										false when a question is already open
 		 */
@@ -2155,12 +2156,22 @@
 
 				if( options.refuseWithoutDialog === true ) {
 					options.onChoose( cancel.value );
+
+					if( typeof options.onClose === 'function' )
+						options.onClose( cancel.value );
+
 					return true;
 				}
 
 				const yes = choices.find( function( choice ) { return choice.kind === 'primary' } ) ?? choices.find( function( choice ) { return choice.kind === 'danger' } ) ?? cancel;
 				const listed = Nino.adminUi._detailLines( options.details );
-				options.onChoose( wn.confirm( options.message+ ( hasNote === true ? '\n\n'+ options.note : '' )+ ( listed.length > 0 ? '\n\n'+ listed.join('\n') : '' ) ) === true ? yes.value : cancel.value );
+				const answer = wn.confirm( options.message+ ( hasNote === true ? '\n\n'+ options.note : '' )+ ( listed.length > 0 ? '\n\n'+ listed.join('\n') : '' ) ) === true ? yes.value : cancel.value;
+
+				options.onChoose( answer );
+
+				if( typeof options.onClose === 'function' )
+					options.onClose( answer );
+
 				return true;
 			}
 
@@ -2173,6 +2184,10 @@
 			}
 
 			const opener = options.opener ?? dc.activeElement;
+
+			// Where the focus goes if what was to get it is gone: the name of the panel this was opened in
+			const origin = ( isElement( opener ) === true ? opener : dc.activeElement ) ?? null;
+			const pane = origin !== null && typeof origin.closest === 'function' ? origin.closest('[data-panel]') : null;
 			const hasContent = options.content !== undefined && options.content !== null;
 			let chosen = null;
 
@@ -2300,6 +2315,10 @@
 
 					chosen = choice;
 					dialog.close();
+
+					// A browser says that a dialog was closed a moment after close(): what the closing does is done here, so that a dialog that is
+					// asked for at once - in the caller's next line or in onClose - is not refused for the one that is closing
+					finish();
 				},
 			};
 
@@ -2352,7 +2371,14 @@
 			if( modeless === true )
 				dc.addEventListener( 'keydown', onKey );
 
-			dialog.addEventListener( 'close', function() {
+			let finished = false;
+
+			const finish = function() {
+
+				if( finished === true )
+					return;
+
+				finished = true;
 				dialog.remove();
 
 				if( modeless === true ) {
@@ -2367,10 +2393,17 @@
 					release();
 				}
 
-				if( opener !== null && typeof opener.focus === 'function' )
-					opener.focus();
-				options.onChoose( ( chosen ?? cancel ).value );
-			} );
+				Nino.adminUi._focusBack( opener, pane );
+
+				const answer = ( chosen ?? cancel ).value;
+
+				options.onChoose( answer );
+
+				if( typeof options.onClose === 'function' )
+					options.onClose( answer );
+			};
+
+			dialog.addEventListener( 'close', finish );
 
 			if( options.focus !== undefined && options.focus !== null )
 				options.focus.autofocus = true;
@@ -2400,6 +2433,37 @@
 				options.onOpen( handle );
 
 			return true;
+		},
+
+		/**
+		 *	The focus goes back when a dialog closes: to the opener - an element, anything with a focus(), or a function that answers
+		 *	one of them now, so that a control drawn anew while the dialog was open is the one that gets it. An element that is no
+		 *	longer in the page takes no focus (a browser would drop it on the page); the name of the panel the dialog was opened in
+		 *	does, as after any change of view
+		 *
+		 *	@param		{Element|Object|Function|null}	opener
+		 *	@param		{Element|null}									pane			The panel the dialog was opened in
+		 *
+		 *	@return		{Element|Object|null}														What took the focus
+		 */
+		_focusBack : function( opener, pane ) {
+
+			const back = typeof opener === 'function' ? opener() : opener;
+
+			if( back !== null && back !== undefined && typeof back.focus === 'function' && back.isConnected !== false ) {
+				back.focus();
+				return back;
+			}
+
+			const title = pane !== null && pane.isConnected !== false ? pane.querySelector('.admin-panel-title') : null;
+
+			if( title === null )
+				return null;
+
+			title.setAttribute( 'tabindex', '-1' );
+			title.focus();
+
+			return title;
 		},
 
 		/**
@@ -2617,9 +2681,10 @@
 		 *	@param		{string}		[options.typed]					The word to type before the answer that goes on is open
 		 *	@param		{string}		[options.typedLabel]		What the field says, with %s for the word; /_admin/common/confirm/typed by default
 		 *	@param		{boolean}		[options.visitors]			false where the action does not touch what visitors see (an account, a role): the policy's note that visitors see the change at once is left out
-		 *	@param		{Element}		[options.opener]				See choiceDialog()
+		 *	@param		{Element|Object|Function}	[options.opener]	See choiceDialog()
 		 *	@param		{boolean}		[options.nested]				The question is asked of an open dialog - a form that asks before it throws something away - and stands on it: the focus goes back into the dialog below when it closes, and Escape closes this one alone. See choiceDialog()
 		 *	@param		{Function}	options.onChoose				Called once with true or false, and with `typed` the word that was typed as the second argument - not at all when false is returned
+		 *	@param		{Function}	[options.onClose]				onClose( answered ) once the dialog is gone and the focus is back, true or false as onChoose has it; also where the policy asks nothing and the answer is true. See choiceDialog()
 		 *
 		 *	@return		{boolean}												false when another question is already open and this one was not asked, which is the same click arriving twice
 		 */
@@ -2634,6 +2699,10 @@
 
 			if( policy.ask === false && typed === null ) {
 				options.onChoose( true );
+
+				if( typeof options.onClose === 'function' )
+					options.onClose( true );
+
 				return true;
 			}
 
@@ -2714,6 +2783,7 @@
 					} );
 				},
 				onChoose	: function( value ) { options.onChoose( value === 'yes', field === null ? undefined : field.value.trim() ) },
+				onClose		: typeof options.onClose === 'function' ? function( value ) { options.onClose( value === 'yes' ) } : undefined,
 			} );
 		},
 
@@ -2726,8 +2796,8 @@
 		 *	of the control where the dialog is wide enough and above it where it
 		 *	is not (style.css decides). Owns no strings
 		 *
-		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, placeholder, required, maxLength, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view; placeholder is an example of what is typed ("#ffffff") in a field that takes text - it is never the name of the field.
-		 *																	type 'select' takes options [ { value, label } ]; 'check' a tick (value true or false); 'checklist' ticks (options [ { value, label } ], value the list of the ticked); 'tiles' one tile chosen in each of several groups (groups as tileChoice() takes them, value an object group => value); 'locales' a row for each language (locales, values a map, multiline); 'file' (accept, maxBytes); 'code' (rows); 'datetime' (min, max, zone, value an ISO string);
+		 *	@param		{Array}			fields					[ { key, label, help, note, type, value, placeholder, required, maxLength, min, max, step, unit, autocomplete, options, validate } ] - help stands behind the (?) at the name, note stays in view; placeholder is an example of what is typed ("#ffffff") in a field that takes text - it is never the name of the field.
+		 *																	type 'select' takes options [ { value, label } ] and is wrong when it is required and its value is empty; type 'number' takes min, max, step (1 by default) and unit - a word of /_admin/common/unit/ - and gives its value as the input does, a string with a dot (numberOf() reads it); 'check' a tick (value true or false); 'checklist' ticks (options [ { value, label } ], value the list of the ticked); 'tiles' one tile chosen in each of several groups (groups as tileChoice() takes them, value an object group => value); 'locales' a row for each language (locales, values a map, multiline); 'file' (accept, maxBytes); 'code' (rows); 'datetime' (min, max, zone, value an ISO string);
 		 *																	any other type is the type of an <input>. validate( value ) answers the sentence that is wrong with it, or ''; a required field is wrong when it is empty - a tick not ticked, a list with none, a language with no text, no file
 		 *	@param		{Function}	[onInput]				onInput( key, value ) on every change of a field
 		 *
@@ -2763,7 +2833,7 @@
 				let label;
 
 				if( field.type === 'select' ) {
-					label = Nino.adminUi.selectField( { key : field.key, label : field.label, help : field.help, note : field.note, options : field.options, value : field.value ?? '', onChange : say } );
+					label = Nino.adminUi.selectField( { key : field.key, label : field.label, help : field.help, note : field.note, required : field.required, options : field.options, value : field.value ?? '', onChange : say } );
 					controls[field.key] = label.querySelector('select');
 					readers[field.key] = function() { return controls[field.key].value };
 				} else if( field.type === 'check' ) {
@@ -2802,7 +2872,7 @@
 				} else {
 					label = Nino.adminUi.textField( {
 						key				: field.key,
-						label			: field.label,
+						label			: field.unit === undefined || field.unit === null || field.unit === '' ? field.label : field.label+ ' ('+ Nino.adminUi.text( '/_admin/common/unit/'+ field.unit )+ ')',
 						help			: field.help,
 						note			: field.note,
 						type			: field.type,
@@ -2810,6 +2880,9 @@
 						placeholder	: field.placeholder,
 						required	: field.required,
 						maxLength	: field.maxLength,
+						min				: field.min,
+						max				: field.max,
+						step			: field.step,
 						autocomplete : field.autocomplete ?? 'off',
 						onInput		: say,
 					} );
@@ -2882,11 +2955,13 @@
 		 *	@param		{string}		options.cancel				The label of the answer that does not
 		 *	@param		{string}		[options.size]				'form' (the default), 'narrow' or 'wide'
 		 *	@param		{Object}		[options.text]				{ missing, discardTitle, discardMessage } - /_admin/common/error/missing (with %s for the field's label), /_admin/common/dialog/discard-title, /_admin/common/dialog/discard-message by default
-		 *	@param		{Element}		[options.opener]			See choiceDialog()
+		 *	@param		{Element|Object|Function}	[options.opener]	See choiceDialog()
 		 *	@param		{Function}	options.onSubmit			onSubmit( values, ctl ) with ctl { close(), fail( key, text ), idle() }: close() closes the dialog, fail() says a sentence at a field (key null: at the foot of the form) and lets the form be sent again, idle() only the latter
+		 *	@param		{boolean}		[options.nested]			The form is opened over a dialog that is open - a record, another form - and stands on it; Escape closes it alone and the focus goes back into the dialog below. See choiceDialog()
 		 *	@param		{Function}	[options.onCancel]		Called when the dialog closed without a send
+		 *	@param		{Function}	[options.onClose]			onClose( value ) once the dialog is gone and the focus is back: 'submit' after a send, 'cancel' after Cancel, Escape and the cross. See choiceDialog()
 		 *
-		 *	@return		{boolean}										false when a dialog is already open
+		 *	@return		{Object|boolean}						false when a dialog is already open; else a handle { el, close() } - close() closes the form as Cancel does, without the question about what was typed. A dialog that is asked for in the next line after ctl.close(), or after close(), is opened: the closing is done when they are called
 		 */
 		formDialog : function( options ) {
 
@@ -3003,12 +3078,15 @@
 
 			const first = made.controls[ fields.length > 0 ? fields[0].key : '' ] ?? form.querySelector('input, select, textarea');
 
-			return Nino.adminUi.choiceDialog( {
+			let held = null;
+
+			const opened = Nino.adminUi.choiceDialog( {
 				title			: options.title,
 				message		: options.title,
 				content		: form,
 				size			: options.size ?? 'form',
 				opener		: options.opener,
+				nested		: options.nested === true,
 				focus			: first ?? undefined,
 				choices		: [
 					{ value : 'cancel', label : options.cancel, kind : 'secondary' },
@@ -3047,6 +3125,7 @@
 					return false;
 				},
 				onOpen		: function( handle ) {
+					held = handle;
 					form.addEventListener( 'submit', function( event ) {
 						event.preventDefault();
 						handle.close( 'submit', true );
@@ -3062,7 +3141,13 @@
 					if( value !== 'submit' && typeof options.onCancel === 'function' )
 						options.onCancel();
 				},
+				onClose		: options.onClose,
 			} );
+
+			if( opened === false || held === null )
+				return false;
+
+			return { el : held.el, close : function() { busy = false; held.close( 'cancel' ) } };
 		},
 
 		// From how many items pickDialog() offers a search: fewer are found by looking
@@ -3093,9 +3178,10 @@
 		 *	@param		{string}		[options.empty]				What a search that finds nothing says
 		 *	@param		{string}		options.cancel				The label of Cancel
 		 *	@param		{string}		[options.size]				'wide' (the default), 'form' or 'narrow'
-		 *	@param		{Element}		[options.opener]			See choiceDialog()
+		 *	@param		{Element|Object|Function}	[options.opener]	See choiceDialog()
 		 *	@param		{Function}	options.onChoose			Called once with the value of the picked item
 		 *	@param		{Function}	[options.onCancel]		Called when nothing was picked
+		 *	@param		{Function}	[options.onClose]			onClose( value ) once the dialog is gone and the focus is back: 'pick' after a pick, 'cancel' otherwise. See choiceDialog()
 		 *
 		 *	@return		{boolean}										false when a dialog is already open
 		 */
@@ -3304,6 +3390,7 @@
 					else if( typeof options.onCancel === 'function' )
 						options.onCancel();
 				},
+				onClose		: options.onClose,
 			} );
 		},
 
@@ -3359,7 +3446,7 @@
 					Nino.adminUi.sectionHelp( title, root, options.help );
 			}
 
-			Nino.adminUi._note( root, options.note );
+			Nino.adminUi._note( root, options.note, root );
 
 			const list = Nino.adminUi.el( 'div', 'nino-admin-pick-list nino-admin-pick-list--tiles' );
 			root.appendChild( list );
@@ -3585,7 +3672,7 @@
 		 *	@param		{string}		options.close					The label of the one answer
 		 *	@param		{Function}	[options.onChange]		onChange( key, value, section ) for every change of a field of a section
 		 *	@param		{Function}	[options.onClose]			Called when the sheet closed
-		 *	@param		{Element}		[options.opener]			See choiceDialog()
+		 *	@param		{Element|Object|Function}	[options.opener]	See choiceDialog()
 		 *
 		 *	@return		{Object|boolean}						{ close(), set( key, value, [section] ) } - set() puts a value into the fields of the sheet without calling onChange; false when a dialog is already open
 		 */
@@ -4504,7 +4591,11 @@
 		 *	behind the (?) at its name - see fieldHelp(). What has to stay in view
 		 *	is its note, a quiet line under the select.
 		 *
-		 *	@param	{Object}	options		{ key, id, className, label, help, hint, note, options, value, onChange }
+		 *	A required select is marked the way textField() marks its input: the asterisk behind the name, drawn aria-hidden, and
+		 *	aria-required on the control. A select that is required is wrong when its value is empty - formDialog() says so at the
+		 *	field when it is sent; a caller of its own checks it
+		 *
+		 *	@param	{Object}	options		{ key, id, className, label, help, hint, note, required, options, value, onChange }
 		 *
 		 *	@return	{Element}						The label; its select carries data-key, and is
 		 *													reachable with querySelector('select') - so a caller
@@ -4518,11 +4609,19 @@
 			const name = dc.createElement('span');
 			name.textContent = options.label || options.key;
 
+			if( options.required === true )
+				Nino.adminUi._star( name );
+
 			field.appendChild( name );
 
 			const select = dc.createElement('select');
 			select.className = 'nino-admin-input';
 			select.setAttribute( 'data-key', options.key );
+
+			if( options.required === true ) {
+				select.required = true;
+				select.setAttribute( 'aria-required', 'true' );
+			}
 
 			if( options.id )
 				select.id = options.id;
@@ -4544,9 +4643,28 @@
 			field.appendChild( select );
 
 			Nino.adminUi._tools( name, select, options, options.label || options.key );
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, select );
 
 			return field;
+		},
+
+		/**
+		 *	The asterisk of a required field, behind the words of its name: drawn, and hidden from a screen reader, which hears
+		 *	aria-required of the control
+		 *
+		 *	@param		{Element}		name				The element that holds the words of the name
+		 *
+		 *	@return		{Element}									The asterisk
+		 */
+		_star : function( name ) {
+
+			const star = dc.createElement('span');
+			star.className = 'nino-admin-required';
+			star.setAttribute( 'aria-hidden', 'true' );
+			star.textContent = '*';
+			name.appendChild( star );
+
+			return star;
 		},
 
 		/**
@@ -4555,10 +4673,11 @@
 		 *
 		 *	@param		{Element}				field
 		 *	@param		{string|undefined}	note
+		 *	@param		{Element}				[control]		The control - or the group - the note is about: it is described by the note (aria-describedby), after the help and what an error says, so that a screen reader hears it with the field
 		 *
 		 *	@return		{Element|null}
 		 */
-		_note : function( field, note ) {
+		_note : function( field, note, control ) {
 
 			if( typeof note !== 'string' || note === '' )
 				return null;
@@ -4567,6 +4686,11 @@
 			line.className = 'nino-admin-hint nino-admin-field-note';
 			line.textContent = note;
 			field.appendChild( line );
+
+			if( control !== undefined && control !== null ) {
+				line.id = 'nino-admin-note-'+ ( ++serial );
+				control.setAttribute( 'aria-describedby', String( control.getAttribute('aria-describedby') ?? '' ).split(/\s+/).filter( function( token ) { return token !== '' } ).concat( line.id ).join(' ') );
+			}
 
 			return line;
 		},
@@ -4611,6 +4735,8 @@
 			if( options.note ) {
 				const note = dc.createElement('small');
 				note.textContent = options.note;
+				note.id = 'nino-admin-note-'+ ( ++serial );
+				input.setAttribute( 'aria-describedby', note.id );
 				copy.appendChild( note );
 			}
 			label.appendChild( copy );
@@ -4629,18 +4755,25 @@
 		},
 
 		/**
-		 *	A whole number in bounds, as a number input the browser limits the
+		 *	A number in bounds, as a number input the browser limits the
 		 *	same way the backend rejects - so an out-of-range value is caught
 		 *	before the request, and still caught by the backend if it is not.
+		 *	The step is 1, a whole number, unless the caller gives another (0.1,
+		 *	0.5, 'any'); the input reads what a person types the way the browser's
+		 *	language writes a number (12,5 in German) and says it with a dot in its
+		 *	value - numberOf() reads that into the number.
 		 *	Owns no strings, same rule as switchField(): the label, the hint
-		 *	and the unit come from the caller. A duration in seconds is
+		 *	and the unit come from the caller. The unit is a word of
+		 *	/_admin/common/unit/<unit> (seconds, minutes, hours, days, weeks, months,
+		 *	items, uris, per-hour, percent, characters, mm), written in brackets behind
+		 *	the label; a unit the workbench has no word for is written as it stands. A duration in seconds is
 		 *	unreadable as a number - 3600 says nothing, "1 h" does - so a
 		 *	field whose unit is seconds gets a reading aid, recomputed on
 		 *	input so the two never disagree. The Config panel, the Users
 		 *	panel's login-protection tab and a feature's settings in the
 		 *	Features panel render their numbers with it.
 		 *
-		 *	@param	{Object}	options		{ key, value, min, max, unit, label, help, hint, note } - help (hint is the same) stands behind the (?) at the name, note stays in view under the input
+		 *	@param	{Object}	options		{ key, value, min, max, step, unit, required, label, help, hint, note } - help (hint is the same) stands behind the (?) at the name, note stays in view under the input; step 1 by default; required puts the asterisk and aria-required, as textField() does
 		 *
 		 *	@return	{Element}						The label; its input carries data-key
 		 */
@@ -4655,20 +4788,32 @@
 			name.textContent = options.unit
 				? Nino.adminUi.text( options.label )+ ' ('+ Nino.adminUi.text( '/_admin/common/unit/'+ options.unit )+ ')'
 				: Nino.adminUi.text( options.label );
+
+			const words = name.textContent;
+
+			if( options.required === true )
+				Nino.adminUi._star( name );
+
 			label.appendChild( name );
 
 			const input = dc.createElement('input');
 			input.type = 'number';
-			input.step = '1';
+			input.step = options.step === undefined || options.step === null ? '1' : String( options.step );
 			input.value = options.value;
+
+			if( options.required === true ) {
+				input.required = true;
+				input.setAttribute( 'aria-required', 'true' );
+			}
+
 			if( options.key )
 				input.dataset.key = options.key;
 			if( options.min !== undefined ) input.min = options.min;
 			if( options.max !== undefined ) input.max = options.max;
 			label.appendChild( input );
 
-			Nino.adminUi._tools( name, input, { help : options.help !== undefined || options.hint !== undefined ? Nino.adminUi.text( options.help ?? options.hint ) : undefined }, name.textContent );
-			Nino.adminUi._note( label, options.note === undefined ? undefined : Nino.adminUi.text( options.note ) );
+			Nino.adminUi._tools( name, input, { help : options.help !== undefined || options.hint !== undefined ? Nino.adminUi.text( options.help ?? options.hint ) : undefined }, words );
+			Nino.adminUi._note( label, options.note === undefined ? undefined : Nino.adminUi.text( options.note ), input );
 
 			if( options.unit === 'seconds' ) {
 				const human = dc.createElement('small');
@@ -4709,6 +4854,27 @@
 		},
 
 		/**
+		 *	What a number input says, read as the number: "12.5" - what the input of a browser in German gives for a 12,5 that was
+		 *	typed - and "12,5" for a text that was typed with the comma are 12.5, an empty field and anything that is no number
+		 *	(a second separator, letters, a thousands mark) are null. The caller decides what null is - nothing typed, or wrong
+		 *
+		 *	@param		{string|number|null|undefined}	value
+		 *
+		 *	@return		{number|null}
+		 */
+		numberOf : function( value ) {
+
+			const text = String( value ?? '' ).trim();
+
+			if( /^[+-]?(\d+([.,]\d*)?|[.,]\d+)$/.test( text ) === false )
+				return null;
+
+			const number = Number( text.replace( ',', '.' ) );
+
+			return Number.isFinite( number ) === true ? number : null;
+		},
+
+		/**
 		 *	One line of text as a labelled input, beside selectField(),
 		 *	switchField() and numberField() and by the select's rule: the words
 		 *	are used as they are, so a caller that has a fill key runs it through
@@ -4716,12 +4882,13 @@
 		 *	every one: the asterisk behind its name, drawn aria-hidden, and
 		 *	aria-required on the control. Owns no strings, the asterisk apart
 		 *
-		 *	@param	{Object}	options		{ key, type, value, placeholder, label, help, hint, note, fills, required, maxLength, minLength, counter, autocomplete, id, onInput, className }
+		 *	@param	{Object}	options		{ key, type, value, placeholder, label, help, hint, note, fills, required, maxLength, minLength, min, max, step, counter, autocomplete, id, onInput, className }
 		 *													- counter    true for "n / maxLength" at the right below the field, or the limit as a number
 		 *													- help       what the value does, behind the (?) at the name (hint is the same thing)
 		 *													- note       what has to stay in view under the input
 		 *													- fills      the textfills the field takes, see textareaField(); drawn only where the caller asks for it
 		 *													- type       the input's type, text by default
+		 *													- min, max, step   the limits and the step of a number, date or time input, written on the input where they are given
 		 *													- key        written onto the input as data-key
 		 *													- onInput    called with the input's value on every input
 		 *													- className  the label's class instead of nino-admin-field
@@ -4765,6 +4932,11 @@
 			if( typeof options.minLength === 'number' )
 				input.minLength = options.minLength;
 
+			[ 'min', 'max', 'step' ].forEach( function( attribute ) {
+				if( options[attribute] !== undefined && options[attribute] !== null )
+					input[attribute] = String( options[attribute] );
+			} );
+
 			if( options.autocomplete )
 				input.autocomplete = options.autocomplete;
 
@@ -4785,7 +4957,7 @@
 
 			Nino.adminUi._counter( field, input, options );
 			Nino.adminUi._tools( name, input, options, options.label ?? '' );
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, input );
 
 			return field;
 		},
@@ -4894,7 +5066,7 @@
 
 			Nino.adminUi._counter( field, area, options );
 			Nino.adminUi._tools( name, area, options, options.label ?? '' );
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, area );
 
 			return field;
 		},
@@ -4991,7 +5163,7 @@
 			field.fieldControl = input;
 
 			Nino.adminUi._tools( name, input, options, options.label ?? '' );
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, input );
 
 			return field;
 		},
@@ -5068,7 +5240,7 @@
 			} );
 
 			set.appendChild( list );
-			Nino.adminUi._note( set, options.note );
+			Nino.adminUi._note( set, options.note, set );
 
 			const handle = {
 				el : set,
@@ -5184,7 +5356,7 @@
 			} );
 
 			field.appendChild( list );
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, list );
 
 			const handle = {
 				el : field,
@@ -5307,7 +5479,7 @@
 			body.appendChild( size );
 			body.appendChild( remove );
 			field.appendChild( body );
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, body );
 
 			let file = null;
 
@@ -5559,9 +5731,9 @@
 			field.appendChild( body );
 
 			if( typeof options.zone === 'string' && options.zone !== '' )
-				Nino.adminUi._note( field, Nino.adminUi.format( Nino.adminUi.text('/_admin/common/label/timezone'), options.zone ) );
+				Nino.adminUi._note( field, Nino.adminUi.format( Nino.adminUi.text('/_admin/common/label/timezone'), options.zone ), body );
 
-			Nino.adminUi._note( field, options.note );
+			Nino.adminUi._note( field, options.note, body );
 
 			const handle = {
 				el : field,
@@ -6525,8 +6697,8 @@
 		 *																					that is shown, with the three states none, some, all of them. With one chosen a bar over the table says how
 		 *																					many, how many of them are not on this page (by the search or the paging), offers "All N matches" where the
 		 *																					search matches more rows than the page shows, has the actions as buttons - actions : [ { key, label, icon,
-		 *																					danger, run( keys ) } ], run is handed the keys (the rowKey, as it is in the row) of ALL the chosen rows, in the
-		 *																					order of rows - and "Clear selection". A search, a sort and a page keep what is chosen; setRows() drops the keys that are gone.
+		 *																					danger, run( keys, opener ) } ], run is handed the keys (the rowKey, as it is in the row) of ALL the chosen rows, in the
+		 *																					order of rows, and its button as opener, which a dialog it opens gives the focus back to (see choiceDialog()) - and "Clear selection". A search, a sort and a page keep what is chosen; setRows() drops the keys that are gone.
 		 *																					With `clearOnChange : true` (what the directory sets) what is chosen is always of what is in view: a search and
 		 *																					a change of the rows that the caller's selects leave (refilter()) give it up, and the number said to a screen reader follows setRows() Shift and a click chooses the range from the box touched last to this one, on the page that is
 		 *																					shown (the box is remembered by its row, and forgotten by a search, a sort, a page and new rows). label names
@@ -6755,10 +6927,12 @@
 
 				( Array.isArray( options.select.actions ) === true ? options.select.actions : [] ).forEach( function( action ) {
 
-					bar.appendChild( Nino.adminUi.button( String( action.label ?? '' ), function() {
+					const button = Nino.adminUi.button( String( action.label ?? '' ), function() {
 						if( typeof action.run === 'function' )
-							action.run( selected() );
-					}, { kind : action.danger === true ? 'danger' : 'secondary', small : true, icon : action.icon } ) );
+							action.run( selected(), button );
+					}, { kind : action.danger === true ? 'danger' : 'secondary', small : true, icon : action.icon } );
+
+					bar.appendChild( button );
 				} );
 
 				// The rows of the other pages, offered with their number - never chosen without it being said
@@ -7626,9 +7800,10 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{Element}		options.mount				Taken over
+		 *	@param		{Array}			[options.rows]			The rows it starts with, as setRows() takes them: `rows : []` is a directory with nothing in it and says "empty"; without the option it says that it is loading (labels.loading) until setRows() or fail() is called
 		 *	@param		{Array}			options.columns			As of table() - with `cell` for a kind of cell, and `primary` and `narrow` for what a column is in a card
 		 *	@param		{string}		options.rowKey			The property that is a row's identity (a string)
-		 *	@param		{Object}		options.labels			{ search, empty, noMatch, filter, range, prev, next, pageSize, sortBy, sortNone, sortUp, sortDown } - the words; the last four are the select of a card, "%s" in the two of the direction is the name of the column
+		 *	@param		{Object}		options.labels			{ search, empty, noMatch, filter, loading, range, prev, next, pageSize, sortBy, sortNone, sortUp, sortDown } - the words; the last four are the select of a card, "%s" in the two of the direction is the name of the column
 		 *	@param		{Object}		[options.category]	{ id, label, value, options : [ { value, label } ], match( row, value ) } - the first select, left of the search; its first option is "all"
 		 *	@param		{Array}			[options.filters]		[ { id, label, value, options, match( row, value ) } ] - the selects after the search, in the order given; the first option of each is "all"
 		 *	@param		{Object}		[options.state]			What the directory starts as, for one that is drawn again: { query, sort, page, pageSize, category, filters : { id : value } }
@@ -7732,7 +7907,7 @@
 				table = Nino.adminUi.table( made );
 			};
 
-			return {
+			const handle = {
 				el : root,
 				setRows : function( next, how ) {
 
@@ -7814,6 +7989,15 @@
 					options.mount.innerHTML = '';
 				},
 			};
+
+			// The rows it starts with are a setRows() straight after the call - an empty list is a directory with nothing in it -; without them the
+			// directory says that it is loading, until setRows() or fail() comes
+			if( Array.isArray( options.rows ) === true )
+				handle.setRows( options.rows );
+			else
+				handle.loading( labels.loading ?? Nino.adminUi.text('/_admin/common/table/loading') );
+
+			return handle;
 		},
 
 		/**
@@ -7842,7 +8026,7 @@
 		 *	@param		{Function}	options.find				find( key ) - the row of that key, whether the directory shows it or not, or null
 		 *	@param		{Function}	options.title				title( row ) - the name of the entry; text
 		 *	@param		{Function}	[options.subtitle]	subtitle( row ) - the identifier under it; text
-		 *	@param		{Function}	options.body				body( row, ctx ) - the content: an element, a form's fields or lines to read. ctx is { form, bar, row, key, status, go( delta ), close(), touch() } - touch() says that something was chosen that no field holds (a file) and is unsaved
+		 *	@param		{Function}	options.body				body( row, ctx ) - the content: an element, a form's fields or lines to read. ctx is { form, bar, row, key, status, go( delta ), close(), touch() } - after a save the buttons that fit the entry - hidden( row ) of the actions and of danger - are asked of the row the save answered, and a button that has the focus and goes away gives it to the main button. touch() says that something was chosen that no field holds (a file) and is unsaved
 		 *	@param		{boolean}		[options.readOnly]	The entry is read and not edited: no state in the bar, and no Close in it either - the cross and Escape close - so the bar has the destructive action at the left and at the right what can be done with the entry
 		 *	@param		{Function}	[options.save]			save( row, ctx, done ) - done( ok, { row, error, conflict } ); the panel keeps its rows and draws the row anew (directory.update()) before it says ok. The entry was written
 		 *																			by another tab or person first: done( false, { conflict : true, error } ) asks the question of the guide on the record; ctx.overwrite is true for the save that answers Overwrite
@@ -7851,7 +8035,7 @@
 		 *	@param		{Object}		[options.danger]		{ label, hidden( row ), run( row, opener, done ) } - the destructive action, at the left; hidden( row ) is true for an entry that has no button for it. run asks the question of its
 		 *																			level itself - the question of the level destructive, asked as nested, so that it stands on the record - and acts: done( true ) where it went (the panel has taken the
 		 *																			row out of its directory by then), done( false, { error } ) where it failed, done( null ) where the answer was no
-		 *	@param		{Array}			[options.actions]		[ { label, kind, run( row, ctx ), icon, hidden( row ) } ] - further buttons at the right of the bar; hidden( row ) true for an entry that the action does nothing for (no button without an effect). In a record that is only read the first with kind 'primary' is the main button
+		 *	@param		{Array}			[options.actions]		[ { label, kind, run( row, ctx ), icon, hidden( row ) } ] - run gets the button as ctx.opener, which a dialog it opens gives the focus back to (see choiceDialog()); further buttons at the right of the bar; hidden( row ) true for an entry that the action does nothing for (no button without an effect). In a record that is only read the first with kind 'primary' is the main button
 		 *	@param		{Function}	options.missing			missing( key ) - the entry named by the address is not there
 		 *	@param		{Object}		options.labels			{ close, prev, next, position, save, saveNext, closeButton, deleted, saved } - the words; the shared fills where left out
 		 *
@@ -8001,6 +8185,38 @@
 				return { form : form, bar : bar, row : current.row, key : current.key, status : bar === null ? null : bar.line, go : go, close : request, touch : touch };
 			};
 
+			// The buttons of the bar that the entry has no use for are not shown: asked of the entry that is shown. A button that has the focus and goes away gives
+			// the focus to the main button of the bar, a record that is only read to its name
+			const paintActions = function() {
+
+				const held = dc.activeElement ?? null;
+
+				if( removeButton !== null )
+					removeButton.hidden = typeof options.danger.hidden === 'function' && options.danger.hidden( current.row ) === true;
+
+				actions.forEach( function( one ) {
+					one.button.hidden = typeof one.action.hidden === 'function' && one.action.hidden( current.row ) === true;
+				} );
+
+				if( held !== null && held.hidden === true && bar !== null && bar.el.contains( held ) === true )
+					( bar.primary !== undefined && bar.primary.hidden !== true ? bar.primary : title ).focus();
+			};
+
+			// The entry as it is now - what a save got back from the server: its name, its place and the buttons that fit it are drawn from it
+			const adopt = function( row ) {
+
+				if( current === null || row === undefined || row === null )
+					return;
+
+				current.row = row;
+				title.textContent = String( options.title( current.row ) );
+
+				if( subtitle !== null && typeof options.subtitle === 'function' )
+					subtitle.textContent = String( options.subtitle( current.row ) );
+
+				paintActions();
+			};
+
 			const draw = function() {
 
 				const ctx = context();
@@ -8035,15 +8251,11 @@
 				refreshNav();
 
 				// An entry that cannot be taken away - the panel says which - has no button for it, and a button that has no effect on an entry is not shown
-				if( removeButton !== null )
-					removeButton.hidden = typeof options.danger.hidden === 'function' && options.danger.hidden( current.row ) === true;
+				paintActions();
 
-				actions.forEach( function( one ) {
-					one.button.hidden = typeof one.action.hidden === 'function' && one.action.hidden( current.row ) === true;
-				} );
-
+				// An entry that was just drawn has not been saved by anyone: the badge says nothing until something is typed
 				if( bar !== null && bar.paint !== undefined )
-					bar.paint( { dirty : false } );
+					bar.paint( { dirty : false, fresh : true } );
 
 				if( registry() !== null )
 					registry().snapshot( dirtyName );
@@ -8155,14 +8367,10 @@
 					if( result !== undefined && result !== null && result.row !== undefined )
 						current.row = result.row;
 
-					title.textContent = String( options.title( current.row ) );
-
-					if( subtitle !== null && typeof options.subtitle === 'function' )
-						subtitle.textContent = String( options.subtitle( current.row ) );
-
+					adopt( current.row );
 					touched = false;
 					bar.line.saved();
-					bar.paint( { dirty : false } );
+					bar.paint( { dirty : false, fresh : false } );
 
 					if( registry() !== null )
 						registry().snapshot( dirtyName );
@@ -8295,7 +8503,7 @@
 
 				( options.actions ?? [] ).forEach( function( action ) {
 
-					const button = Nino.adminUi.button( String( action.label ?? '' ), function() { action.run( current.row, context() ) }, { kind : action.kind ?? 'secondary', icon : action.icon } );
+					const button = Nino.adminUi.button( String( action.label ?? '' ), function() { action.run( current.row, Object.assign( context(), { opener : button } ) ) }, { kind : action.kind ?? 'secondary', icon : action.icon } );
 
 					acting.push( { action : action, button : button } );
 
@@ -10517,6 +10725,7 @@
 		 *														- onOverwrite called to write over what is there; the caller sends the save again with the state the refusal was about
 		 *														- onReload    called when Reload is pressed: the caller drops its work and loads what the server holds
 		 *														- onCancel    called when nothing is done: Cancel or Escape
+		 *																- onClose     onClose( value ) once the dialog is gone and the focus is back: 'overwrite', 'reload' or 'cancel'
 		 *														- opener      what gets the focus back, see choiceDialog()
 		 *														- nested      the question is asked of an open dialog - a record - and stands on it
 		 *														- text        { title, overwrite, reload, reloadMessage, cancel } - reloadMessage is the sentence under the message that says what Reload drops
@@ -10553,6 +10762,7 @@
 
 					call( value === 'reload' ? 'onReload' : 'onCancel' );
 				},
+				onClose : options.onClose,
 			} );
 		},
 

@@ -785,7 +785,7 @@ manifest declares each by name (`/^[a-z][a-zA-Z0-9]*$/`) with a schema:
 | `type` | all | one of `\Nino\Features::SETTING_TYPES`: `bool`, `int`, `string`, `text`, `email`, `url`, `select`, `secret`, `lines` |
 | `label`, `hint`, `required` | all | a string or a `locale => string` map (the label is the name where left out); `true` refuses an empty value |
 | `default` | all but `secret` | has to pass its own schema; without one the type's zero value answers (`false`, `min` or `0`, `[]`, `''`) |
-| `min`, `max`, `unit` | `int` | ints, `min` not above `max`; the word the number is counted in, written in brackets behind the label: `seconds`, `minutes`, `hours`, `days`, `weeks`, `months`, `items`, `uris`, `per-hour`, `percent` and `characters` have a word in both languages (`[[/_admin/common/unit/<unit>]]`), any other is written as it stands |
+| `min`, `max`, `unit` | `int` | ints, `min` not above `max`; the word the number is counted in, written in brackets behind the label: `seconds`, `minutes`, `hours`, `days`, `weeks`, `months`, `items`, `uris`, `per-hour`, `percent`, `characters` and `mm` have a word in both languages (`[[/_admin/common/unit/<unit>]]`), any other is written as it stands |
 | `maxlength`, `pattern` | `string`, `text`, `secret`, `email`, `url` | `maxlength` 1 to 1000 (`text`: 10000), the ceiling where left out; `pattern`, for `string` only, a valid regular expression |
 | `options` | `select` | a non-empty map `value => label` |
 
