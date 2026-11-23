@@ -1,0 +1,9 @@
+/*	lever - the standard part of the test feature	*/
+:root {
+	--lever-space: var(--page-space-2);
+	--lever-radius: var(--page-radius);
+	--lever-size: var(--page-text-2);
+}
+.lever { display: inline-flex; padding: var(--lever-space); border-radius: var(--lever-radius); font-size: var(--lever-size); }
+.lever--tone-quiet { opacity: .8; }
+.lever-group { display: flex; gap: var(--page-space-2); }

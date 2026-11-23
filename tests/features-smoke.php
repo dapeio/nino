@@ -59,9 +59,14 @@ $warnings = ninoWarnings();
 
 check( 'dir() is the constant', \Nino\Features::dir() === __DIR__. '/fixtures/features' );
 check( 'a virtual /features path resolves there too, so a feature can name its own files', \Nino\Filesystem::path( $appData, '/features/Sample/feature.php' ) === __DIR__. '/fixtures/features/Sample/feature.php' );
-check( 'every readable manifest is listed, sorted by key - the ones below features/ and the one the kernel delivers (a module of the kernel with a feature.php)',
+// The features the kernel delivers: the modules of it that have a feature.php, whichever they are - what the kernel is delivered with is not this suite's to name
+$delivered = array_map( static fn( string $manifest ): string => (string) ( include $manifest )['key'], glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*/feature.php' ) ?: [] );
+$listed = array_merge( $delivered, [ 'boxy', 'helper', 'old', 'sample' ] );
+sort( $delivered );
+sort( $listed );
+check( 'every readable manifest is listed, sorted by key - the ones below features/ and the ones the kernel delivers (a module of the kernel with a feature.php)',
 	array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === false ) ) === [ 'boxy', 'helper', 'old', 'sample' ]
-	&& array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === [ 'basis' ] && array_keys( $all ) === [ 'basis', 'boxy', 'helper', 'old', 'sample' ] );
+	&& array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === $delivered && array_keys( $all ) === $listed );
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
@@ -1618,8 +1623,10 @@ foreach( $panelActions as $method => $data )
 // and would come last if the panel still answered in key order
 check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by the localized name', $status === 200 && $body['dir'] === '/tests/fixtures/features'
 	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
-	&& array_keys( $body ) === [ 'dir', 'rejected', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'basis', 'sample', 'boxy', 'helper', 'old' ]
-	&& array_column( $body['features'], 'name' ) === [ 'Basis-Komponenten', 'Beispiel-Feature', 'Boxy', 'Helper', 'Old' ] );
+	&& array_keys( $body ) === [ 'dir', 'rejected', 'catalogueUrl', 'writable', 'catalogue', 'features' ]
+	&& array_column( array_filter( $body['features'], static fn( array $feature ): bool => $feature['shipped'] === false ), 'key' ) === [ 'sample', 'boxy', 'helper', 'old' ]
+	&& array_column( array_filter( $body['features'], static fn( array $feature ): bool => $feature['shipped'] === false ), 'name' ) === [ 'Beispiel-Feature', 'Boxy', 'Helper', 'Old' ]
+	&& array_column( $body['features'], 'name' ) === ( static function() use ( $body ): array { $names = array_column( $body['features'], 'name' ); sort( $names, SORT_STRING ); return $names; } )() );
 check( 'apiList lists the directory whose manifest was refused, with the reason, apart from the features', $body['rejected'] === [ [ 'dir' => 'Broken', 'reason' => '"version" must be major.minor.patch', 'active' => false ], [ 'dir' => 'Elements', 'reason' => $rejected['Elements'], 'active' => false ], [ 'dir' => 'Twin', 'reason' => 'claims the key "sample" that the directory Sample already holds', 'active' => false ] ]
 	&& in_array( 'broken', array_column( $body['features'], 'key' ), true ) === false );
 // A feature that is switched on and whose manifest is refused is the one that runs unfinished: the answer says so
@@ -1672,7 +1679,7 @@ $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'shipped', 'requires', 'problems', 'components', 'calledIn', 'unit', 'data', 'settings', 'settingsTab' ] );
 $units = array_column( $body['features'], 'unit', 'key' );
 ksort( $units );
-check( 'every entry says whether the feature brings an install unit - the three that have a directory of it do, the others do not', $units === [ 'basis' => true, 'boxy' => false, 'helper' => true, 'old' => false, 'sample' => true ] );
+check( 'every entry says whether the feature brings an install unit - the two below features/ that have a directory of it do, the others do not', array_diff_key( $units, array_flip( $delivered ) ) === [ 'boxy' => false, 'helper' => true, 'old' => false, 'sample' => true ] && array_keys( $units ) === $listed );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so

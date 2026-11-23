@@ -1,0 +1,7 @@
+/*	pic - the standard part of the test feature	*/
+:root {
+	--pic-radius: var(--page-radius);
+	--pic-height: var(--page-space-6);
+}
+.pic img { border-radius: var(--pic-radius); max-width: 100%; }
+.pic--height-1 img { height: var(--pic-height); }

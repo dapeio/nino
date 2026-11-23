@@ -1,0 +1,12 @@
+/*	band - the standard part of the test feature	*/
+:root {
+	--band-wrap-space: var(--page-space-5);
+	--band-row-gap: var(--page-space-3);
+	--band-col-pad: var(--page-space-3);
+	--band-col-radius: var(--page-radius);
+	--band-title-space: var(--page-space-2);
+}
+.band-wrap { padding: var(--band-wrap-space) 0; }
+.band-row { display: flex; flex-wrap: wrap; gap: var(--band-row-gap); }
+.band-col--variant-card { padding: var(--band-col-pad); border-radius: var(--band-col-radius); }
+.band-title { margin-bottom: var(--band-title-space); }

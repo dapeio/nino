@@ -1085,10 +1085,10 @@ $found = [
 	'an escape in a class'	=> [ '.\73 ection { x: y; }', 'uses an escape (a backslash), which a part has no use for' ],
 	'an escape behind an own class'	=> [ '.probe-box\2e section { x: y; }', 'uses an escape (a backslash), which a part has no use for' ],
 	'a quote that is escaped in a string, round a class of another'	=> [ '.probe-box::after { content: "\""; } .section { color: red; } .probe-box::before { content: "\""; }', 'meets the class .section, which is no class of its own components' ],
-	'a token in capital letters'	=> [ '.probe-box { color: VAR(--section-x); }', 'reads --section-x, which is no token of the brand, of the page or of its own components' ],
+	'a token in capital letters'	=> [ '.probe-box { color: VAR(--band-x); }', 'reads --band-x, which is no token of the brand, of the page or of its own components' ],
 	'a token spelt with an escape'	=> [ '.probe-box { color: var(--\73 ection-x); }', 'uses an escape (a backslash), which a part has no use for' ],
-	'a token a string says is set'	=> [ '.probe-box { content: "--section-x:"; color: var(--section-x); }', 'reads --section-x, which is no token of the brand, of the page or of its own components' ],
-	'a token of another component that the part sets'	=> [ ':root { --section-gap: 0; }', 'sets --section-gap, which is no token of its own components' ],
+	'a token a string says is set'	=> [ '.probe-box { content: "--band-x:"; color: var(--band-x); }', 'reads --band-x, which is no token of the brand, of the page or of its own components' ],
+	'a token of another component that the part sets'	=> [ ':root { --band-gap: 0; }', 'sets --band-gap, which is no token of its own components' ],
 	'a token of the brand that the part sets'	=> [ ':root { --probe-box-a: 1px; --brand-text: red; }', 'sets --brand-text, which is no token of its own components' ],
 	'a custom property of nobody\'s that the part sets'	=> [ '.probe-box { --n: 1px; }', 'sets --n, which is no token of its own components' ],
 	'url() in capital letters'	=> [ '.probe-box { background: URL(x.png); }', 'uses url()' ],
@@ -1140,10 +1140,16 @@ $shipped = registerProject( 'register-shipped', [] );
 $shipped['./nino/filesystem/path'] = $registerKernel;
 $all = \Nino\Features::all( $shipped );
 
+// What the copy of the kernel is delivered with: the modules of it that have a feature.php - the twin of the fixture, and any feature the kernel itself delivers
+$delivered = array_map( static fn( string $manifest ): string => (string) ( include $manifest )['key'], glob( $registerKernel. '/_nino/Nino/Modules/*/feature.php' ) ?: [] );
+$listed = array_merge( $delivered, [ 'probe' ] );
+sort( $delivered );
+sort( $listed );
+
 check( 'a module of the kernel with a feature.php is a feature: it is listed beside the ones below features/, with shipped true - and the others with shipped false',
 	isset( $all['parcel'] ) === true && $all['parcel']['shipped'] === true && $all['parcel']['dir'] === $registerKernel. '/_nino/Nino/Modules/Parcel' && $all['parcel']['module'] === '\\Nino\\Modules\\Parcel'
-	&& $all['probe']['shipped'] === false && array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === [ 'basis', 'parcel' ] && $all['parcel']['active'] === false );
-check( '...with the kernel\'s modules that have no manifest not among them, in the order of the keys: the feature the kernel really delivers, and the one this suite puts there', array_keys( $all ) === [ 'basis', 'parcel', 'probe' ] );
+	&& $all['probe']['shipped'] === false && array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === $delivered && in_array( 'parcel', $delivered, true ) === true && $all['parcel']['active'] === false );
+check( '...with the kernel\'s modules that have no manifest not among them, in the order of the keys: the features the kernel really delivers, and the one this suite puts there', array_keys( $all ) === $listed );
 
 $taken = registerFeature( 'Parcel', [ 'key' => 'parceltwin' ] );
 $mine = registerFeature( 'Mine', [ 'key' => 'parcel' ] );
@@ -1499,24 +1505,24 @@ check( 'registering them from the cache includes not one of the twenty component
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $timed ) );
 // An attribute selector on class is allowed where it only narrows an element the part owns, and nowhere else
-$narrowing = [ 'section-wrap', 'section-col', 'section-row' ];
+$narrowing = [ 'band-wrap', 'band-col', 'band-row' ];
 $allowed = [
-	'.section-col:where( [class*="--ground-"] ) { color: red; }',
-	'.section-col:where( [class*="--ground-"], [class*="--pad-"], .section-col--variant-card ) { color: red; }',
-	'.section-col[class*="--ground-"] { color: red; }',
-	'.section-wrap:where( [class*="--height-"] ) > .section-row { color: red; }',
-	'.section-col:not( [class*="--ground-"] ) { color: red; }',
+	'.band-col:where( [class*="--ground-"] ) { color: red; }',
+	'.band-col:where( [class*="--ground-"], [class*="--pad-"], .band-col--variant-card ) { color: red; }',
+	'.band-col[class*="--ground-"] { color: red; }',
+	'.band-wrap:where( [class*="--height-"] ) > .band-row { color: red; }',
+	'.band-col:not( [class*="--ground-"] ) { color: red; }',
 ];
 $denied = [
 	'[class*="section"] { color: red; }',
-	'.section-col [class*="x"] { color: red; }',
-	'.section-col > [class~="section"] { color: red; }',
-	'.section-col:where( .section-row [class*="x"] ) { color: red; }',
-	'.section-col:has( > [class*="x"] ) { color: red; }',
-	'.section-col:has( [class*="x"] ) { color: red; }',
-	'.section-col:where( [class*="--ground-"] ) [class*="text"] { color: red; }',
+	'.band-col [class*="x"] { color: red; }',
+	'.band-col > [class~="section"] { color: red; }',
+	'.band-col:where( .band-row [class*="x"] ) { color: red; }',
+	'.band-col:has( > [class*="x"] ) { color: red; }',
+	'.band-col:has( [class*="x"] ) { color: red; }',
+	'.band-col:where( [class*="--ground-"] ) [class*="text"] { color: red; }',
 	'div:where( [class*="x"] ) { color: red; }',
-	':where( .section-col ) [class*="x"] { color: red; }',
+	':where( .band-col ) [class*="x"] { color: red; }',
 ];
 check( 'an attribute selector on class that narrows an element of the part - beside its class, or in :where(), :is() or :not() on it - keeps the rule of mixing',
 	array_filter( $allowed, static fn( string $css ): bool => \Nino\Components::partProblems( $css, $narrowing ) !== [] ) === [] );
@@ -1553,13 +1559,18 @@ ninoWarnings();
 $show = registerFeature( 'Show' );
 registerComponent( $show, 'show-box', registerSchema( [ 'group' => 'show', 'label' => 'Box', 'in' => [ 'page' ], 'offers' => [], 'template' => '<div class="[[class]]">[[content]]</div>' ] ) );
 registerComponent( $show, 'show-line', registerSchema( [ 'group' => 'show', 'label' => 'Line', 'in' => [ 'show-box' ], 'source' => 'text', 'template' => '<p class="[[class]]">[[value]]</p>' ] ) );
+registerComponent( $show, 'show-pic', registerSchema( [ 'group' => 'show', 'label' => 'Picture', 'in' => [ 'show-box' ], 'source' => 'image', 'template' => '<figure class="[[class]]">[[value]]</figure>', 'attributes' => [
+	'decorative'	=> [ 'type' => 'bool', 'default' => false, 'class' => false, 'label' => 'Decorative' ],
+	'light'				=> [ 'type' => 'image', 'default' => '', 'label' => 'Light' ],
+	'href'				=> [ 'type' => 'link', 'default' => '', 'label' => 'Link' ],
+] ] ) );
 registerGroup( $show, 'show', [ 'label' => 'Show' ] );
-$demo = '[show-box]'. "\n\t". '[show-line text="Hello"]'. "\n\t". '[section-title text="A title" href="#"]'. "\n\t". '[image /nino/placeholder/mark decorative]'. "\n". '[/show-box]'. "\n";
+$demo = '[show-box]'. "\n\t". '[show-line text="Hello"]'. "\n\t". '[show-line text="A title"]'. "\n\t". '[show-pic /nino/placeholder/mark decorative href="#"]'. "\n". '[/show-box]'. "\n";
 file_put_contents( $show. '/groups/show/demo.tpl', $demo );
 $result = $read( $show, 'show' );
 check( 'a demo.tpl of a group is read with the folders: its text is the demo of the group, and nothing is refused', is_array( $result ) === true && $result['rejected'] === [] && $result['groups']['show']['demo'] === $demo
 	&& array_keys( $result['groups']['show'] ) === [ 'label', 'knobs', 'part', 'demo' ] && $result['groups']['show']['part'] === false );
-check( '...it may call the components of its feature and those of basis, and a picture of the kernel', array_keys( $result['components'] ) === [ 'show-box', 'show-line' ] );
+check( '...it may call the components of its feature, and a picture of the kernel', array_keys( $result['components'] ) === [ 'show-box', 'show-line', 'show-pic' ] );
 
 registerFeature( 'None' );
 registerComponent( NINO_FEATURES_DIR. '/None', 'none-box', registerSchema( [ 'group' => 'none', 'in' => [ 'page' ] ] ) );
@@ -1576,10 +1587,10 @@ $refused = [
 	'a source that is a key of the project'				=> [ '[show-box][show-line /project/company/general/name][/show-box]', 'a source' ],
 	'a source that is a text of the template'			=> [ '[show-box][show-line ~title][/show-box]', 'a source' ],
 	'a source that is a field'									=> [ '[show-box][show-line .title][/show-box]', 'a source' ],
-	'a picture that is a slot of the project'		=> [ '[show-box][image /logo decorative][/show-box]', 'a source' ],
-	'a picture that is none of the kernel\'s'		=> [ '[show-box][image /nino/placeholder/other decorative][/show-box]', 'a source' ],
-	'a picture of an attribute that is a slot'	=> [ '[show-box][header-logo light="/logo"][/show-box]', 'begins like a reference' ],
-	'an address of the project'								=> [ '[show-box][button text="x" href="/contact"][/show-box]', 'begins like a reference' ],
+	'a picture that is a slot of the project'		=> [ '[show-box][show-pic /logo decorative][/show-box]', 'a source' ],
+	'a picture that is none of the kernel\'s'		=> [ '[show-box][show-pic /nino/placeholder/other decorative][/show-box]', 'a source' ],
+	'a picture of an attribute that is a slot'	=> [ '[show-box][show-pic /nino/placeholder/mark light="/logo"][/show-box]', 'begins like a reference' ],
+	'an address of the project'								=> [ '[show-box][show-pic /nino/placeholder/mark href="/contact"][/show-box]', 'begins like a reference' ],
 	'a call that is not closed'								=> [ '[show-box][show-line text="x"]', 'unclosed of "show-box"' ],
 	'an end that is none'											=> [ '[show-box][/show-box][/show-box]', 'stray-end' ],
 	'a document of more levels than are read'	=> [ str_repeat( '[show-box]', 17 ). str_repeat( '[/show-box]', 17 ), 'depth' ],
@@ -1597,10 +1608,10 @@ foreach( $refused as $what => [ $text, $says ] ) {
 	$result = $read( $show, 'show' );
 
 	if( is_array( $result ) === false || array_keys( $result['rejected'] ) !== [ 'demo show' ] || str_contains( $result['rejected']['demo show'], $says ) === false || $result['groups']['show']['demo'] !== ''
-		|| array_keys( $result['components'] ) !== [ 'show-box', 'show-line' ] || $result['groups']['show']['label'] !== 'Show' )
+		|| array_keys( $result['components'] ) !== [ 'show-box', 'show-line', 'show-pic' ] || $result['groups']['show']['label'] !== 'Show' )
 		$wrong[] = $what. ' - '. ( is_array( $result ) === true ? json_encode( $result['rejected'] ) : $result );
 }
-check( 'a demo that calls what its feature and basis do not have, reads or fills in what is the project\'s, is not read as html+ without a note, holds a null byte or is too long is refused with a sentence and no demo: the group, its knobs and its components stay ('. count( $refused ). ' cases)'
+check( 'a demo that calls what its feature does not have, reads or fills in what is the project\'s, is not read as html+ without a note, holds a null byte or is too long is refused with a sentence and no demo: the group, its knobs and its components stay ('. count( $refused ). ' cases)'
 	. ( $wrong === [] ? '' : ' - '. implode( '; ', array_slice( $wrong, 0, 3 ) ) ), $wrong === [] );
 
 $result = $read( $show, 'show' );
@@ -1654,7 +1665,7 @@ file_put_contents( $show. '/groups/show/demo.tpl', '[nobody]' );
 $fifth = registerBoot( $project );
 $said = ninoWarnings();
 check( 'a demo that is refused is said once in a request, with the group and the reason - and the group and its components are registered all the same, with no file of the cache written for it',
-	count( $said ) === 1 && str_contains( $said[0], 'demo.tpl' ) === true && str_contains( $said[0], 'calls "nobody"' ) === true && \Nino\Components::groups( $fifth )['show']['demo'] === '' && array_keys( \Nino\Components::components( $fifth ) ) === [ 'show-box', 'show-line' ] );
+	count( $said ) === 1 && str_contains( $said[0], 'demo.tpl' ) === true && str_contains( $said[0], 'calls "nobody"' ) === true && \Nino\Components::groups( $fifth )['show']['demo'] === '' && array_keys( \Nino\Components::components( $fifth ) ) === [ 'show-box', 'show-line', 'show-pic' ] );
 check( '...and the Features panel is told the same sentence', in_array( 'feature "show", group "show": its demo.tpl calls "nobody", which is no component of its feature or of basis', \Nino\Features::componentProblems( $fifth, 'show' ), true ) === true );
 registerRemove( $show );
 

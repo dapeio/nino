@@ -1,0 +1,7 @@
+/*	foot - the standard part of the test feature	*/
+:root {
+	--foot-wrap-space: var(--page-space-4);
+	--foot-col-gap: var(--page-space-4);
+}
+.foot-wrap { padding: var(--foot-wrap-space) 0; }
+.foot-col { display: flex; flex-direction: column; gap: var(--foot-col-gap); }

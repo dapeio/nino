@@ -1,0 +1,10 @@
+/*	crown - the standard part of the test feature	*/
+:root {
+	--crown-wrap-space: var(--page-space-2);
+	--crown-logo-height: 2.25rem;
+	--crown-nav-gap: var(--page-space-4);
+}
+.crown-wrap { padding: var(--crown-wrap-space) 0; }
+.crown-wrap--sticky { position: sticky; top: 0; }
+.crown-logo img { height: var(--crown-logo-height); }
+.crown-nav-list { display: flex; gap: var(--crown-nav-gap); }

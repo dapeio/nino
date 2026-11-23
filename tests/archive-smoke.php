@@ -15,6 +15,9 @@ declare(strict_types=1);
  *	Usage: php tests/archive-smoke.php
  */
 
+// The one feature of the run is the test feature of the kernel: a package of blocks is made of the components of a feature that is on
+define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/kit' );
+
 require __DIR__. '/harness.php';
 
 /**
@@ -369,7 +372,7 @@ check( 'the stream is the one the best level makes of the tar, and a path of 109
 // A package the writer made is one the kernel takes: a package of blocks with a slot for a svg and one for a webp, its preview, its texts and its licence; and a theme
 $app = ninoSandbox( 'archive' );
 $app['./nino/filesystem/path'] = dirname( __DIR__ );
-$app['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+$app['/nino/modules'] = [ '\\Nino\\Modules\\Kit' ];
 $app['/nino/html/navs'] = [ 'main', 'footer' ];
 \Nino\Features::registerComponents( $app );
 
@@ -382,7 +385,7 @@ $words = static fn( string $de, string $en ): array => [ 'de_DE' => $de, 'en_US'
 $slot = static fn( string $label ): array => [ 'placeholder' => '/nino/placeholder/landscape', 'width' => 800, 'height' => 600, 'label' => $words( $label, $label ) ];
 $block = [
 	'block.json'				=> json_encode( [ 'name' => $words( 'Probe', 'Probe' ), 'description' => $words( 'Eine Probe', 'A probe' ), 'category' => 'content', 'rank' => 5, 'images' => [ 'background' => $slot( 'Hintergrund' ), '1-photo' => $slot( 'Foto' ) ] ] ),
-	'block.tpl'					=> "[section-wrap id=\"probe\" image=\"~background\"]\n\t[section-row]\n\t\t[section-col id=\"probe-1\"]\n\t\t\t[section-title ~title]\n\t\t\t[image ~photo alt=\"\"]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]",
+	'block.tpl'					=> "[band-wrap id=\"probe\" image=\"~background\"]\n\t[band-row]\n\t\t[band-col id=\"probe-1\"]\n\t\t\t[band-title ~title]\n\t\t\t[pic ~photo alt=\"\"]\n\t\t[/band-col]\n\t[/band-row]\n[/band-wrap]",
 	'text/de_DE.json'		=> json_encode( [ '1-title' => 'Titel' ] ),
 	'text/en_US.json'		=> json_encode( [ '1-title' => 'Title' ] ),
 	'images/background.svg'	=> $svg,
@@ -393,8 +396,8 @@ $theme = [
 	'theme.json'							=> json_encode( [ 'key' => 'craft-probe', 'version' => '1.0.0', 'name' => $words( 'Craft', 'Craft' ), 'description' => $words( 'Weich', 'Soft' ), 'brand' => [] ] ),
 	'parts/page/part.json'		=> json_encode( [ 'contract' => 'kernel@^2.0', 'knobs' => [ 'radius' => [ 'label' => $words( 'Rundung', 'Radius' ), 'ladder' => [
 		[ '--page-radius' => '.375rem' ], [ '--page-radius' => '.625rem' ], [ '--page-radius' => '1rem' ], [ '--page-radius' => '1.5rem' ], [ '--page-radius' => '2rem' ] ] ] ] ] ),
-	'parts/button/part.json'	=> json_encode( [ 'contract' => 'basis@^1.0', 'ladders' => [ 'button.radius' => [ 'var(--page-radius)', 'calc( var(--page-radius) * 1.5 )', '999px', '999px', '999px' ] ] ] ),
-	'parts/button/part.css'		=> "/*	buttons - a soft shadow	*/\n.button:not( .button--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
+	'parts/lever/part.json'	=> json_encode( [ 'contract' => 'kit@^1.0', 'ladders' => [ 'lever.radius' => [ 'var(--page-radius)', 'calc( var(--page-radius) * 1.5 )', '999px', '999px', '999px' ] ] ] ),
+	'parts/lever/part.css'		=> "/*	levers - a soft shadow	*/\n.lever:not( .lever--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
 	'preview.webp'						=> $webp,
 	'LICENSE.txt'							=> "Probe licence\n",
 	'README.md'								=> "# Craft\n",

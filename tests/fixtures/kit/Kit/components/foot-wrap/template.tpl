@@ -1,0 +1,1 @@
+<footer[[id]] class="[[class]]">[[picture]]<div class="foot-wrap-inner">[[content]]</div>[[content:band-row]]</footer>

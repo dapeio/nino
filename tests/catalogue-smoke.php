@@ -470,14 +470,14 @@ check( 'an entry that is no object, or has no kind, is left out with that, and t
 
 // A theme and a package of blocks: what they carry, and what is left out
 $theme = packageEntry( 'theme', 'craft', '1.1.0', 'bytes', [ 'blocks' => [ 'hero-soft' ], 'requires' => [ 'nino' => '^2.0', 'features' => [ 'themes' ], 'fonts' => [ 'lora', 'lora' ] ],
-	'parts' => [ 'page' => [ 'contract' => 'kernel@^2.0' ], 'section' => [ 'feature' => 'basis', 'contract' => '^2.0' ] ] ] );
-$pack = packageEntry( 'blocks', 'gastro', '1.0.0', 'bytes', [ 'requires' => [ 'features' => [ 'basis', 'cards' ] ] ] );
+	'parts' => [ 'page' => [ 'contract' => 'kernel@^2.0' ], 'band' => [ 'feature' => 'kit', 'contract' => '^2.0' ] ] ] );
+$pack = packageEntry( 'blocks', 'gastro', '1.0.0', 'bytes', [ 'requires' => [ 'features' => [ 'kit', 'cards' ] ] ] );
 $parsed = \Nino\Catalogue::parse( document( [ $theme, $pack ] ) );
 check( 'a theme is read with its parts, blocks, fonts, features and picture, and a package of blocks with its blocks and category', is_array( $parsed ) && $parsed['unreadable'] === [] && count( $parsed['packages'] ) === 2
 	&& $parsed['packages'][0]['kind'] === 'theme' && $parsed['packages'][0]['fonts'] === [ 'lora' ] && $parsed['packages'][0]['requires'] === [ 'themes' ]
-	&& $parsed['packages'][0]['parts'] === [ 'page' => [ 'feature' => '', 'contract' => 'kernel@^2.0' ], 'section' => [ 'feature' => 'basis', 'contract' => '^2.0' ] ]
+	&& $parsed['packages'][0]['parts'] === [ 'page' => [ 'feature' => '', 'contract' => 'kernel@^2.0' ], 'band' => [ 'feature' => 'kit', 'contract' => '^2.0' ] ]
 	&& $parsed['packages'][0]['blocks'] === [ [ 'key' => 'hero-soft', 'category' => '' ] ] && $parsed['packages'][0]['preview']['size'] === strlen( 'RIFF'. pack( 'V', 12 ). 'WEBPVP8 ' )
-	&& $parsed['packages'][1]['kind'] === 'blocks' && $parsed['packages'][1]['blocks'] === [ [ 'key' => 'one', 'category' => 'offer' ] ] && $parsed['packages'][1]['requires'] === [ 'basis', 'cards' ]
+	&& $parsed['packages'][1]['kind'] === 'blocks' && $parsed['packages'][1]['blocks'] === [ [ 'key' => 'one', 'category' => 'offer' ] ] && $parsed['packages'][1]['requires'] === [ 'kit', 'cards' ]
 	&& isset( $parsed['packages'][1]['fonts'] ) === false && isset( $parsed['packages'][1]['parts'] ) === false );
 
 $wrongPackages = [
@@ -489,7 +489,7 @@ $wrongPackages = [
 	'a key of more than 40 characters'							=> [ $theme, [ 'key' => str_repeat( 'a', 41 ) ] ],
 	'a font that is no slug'												=> [ $theme, [ 'requires' => [ 'fonts' => [ 'Lora' ] ] ] ],
 	'a group that is no slug'												=> [ $theme, [ 'parts' => [ 'Section' => [ 'contract' => '^2.0' ] ] ] ],
-	'a part without a contract'											=> [ $theme, [ 'parts' => [ 'section' => [ 'feature' => 'basis' ] ] ] ],
+	'a part without a contract'											=> [ $theme, [ 'parts' => [ 'band' => [ 'feature' => 'kit' ] ] ] ],
 	'parts that are a list'													=> [ $theme, [ 'parts' => [ [ 'contract' => '^2.0' ] ] ] ],
 	'a block that is no slug'												=> [ $theme, [ 'blocks' => [ 'Hero' ] ] ],
 	'a block twice'																	=> [ $theme, [ 'blocks' => [ 'hero', 'hero' ] ] ],
@@ -1533,13 +1533,31 @@ $png = (string) base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA
 $svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#f00"/></svg>';
 
 /**
- *	A project with basis on, as \Nino\init() registers it, its own to put packages in
+ *	A folder with everything below it, copied
+ */
+function packageCopy( string $from, string $to ): void {
+
+	mkdir( $to, 0755, true );
+
+	foreach( array_diff( (array) scandir( $from ), [ '.', '..' ] ) as $entry )
+		if( is_dir( $from. '/'. $entry ) === true )
+			packageCopy( $from. '/'. $entry, $to. '/'. $entry );
+		else
+			copy( $from. '/'. $entry, $to. '/'. $entry );
+}
+
+/**
+ *	A project with the test feature of the kernel on, as \Nino\init() registers it, its own to put packages in
  */
 function packageSite( string $name ): array {
 
+	// The feature is a directory below features/, as a project has one: the copy of the one of the fixtures
+	if( is_dir( NINO_FEATURES_DIR. '/Kit' ) === false )
+		packageCopy( __DIR__. '/fixtures/kit/Kit', NINO_FEATURES_DIR. '/Kit' );
+
 	$app = ninoSandbox( $name );
 	$app['./nino/filesystem/path'] = dirname( __DIR__ );
-	$app['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+	$app['/nino/modules'] = [ '\\Nino\\Modules\\Kit' ];
 	$app['/nino/html/navs'] = [ 'main', 'footer' ];
 
 	\Nino\Features::registerComponents( $app );
@@ -1561,7 +1579,7 @@ function blockFiles( string $svg, string $png ): array {
 	return [
 		'block.json'				=> json_encode( [ 'name' => $words( 'Probe', 'Probe' ), 'description' => $words( 'Eine Probe', 'A probe' ), 'category' => 'content', 'rank' => 5,
 			'images' => [ 'background' => $slot( 'Hintergrund' ), '1-photo' => $slot( 'Foto' ) ] ] ),
-		'block.tpl'					=> "[section-wrap id=\"probe\" image=\"~background\"]\n\t[section-row]\n\t\t[section-col id=\"probe-1\"]\n\t\t\t[section-title ~title]\n\t\t\t[image ~photo alt=\"\"]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]\n",
+		'block.tpl'					=> "[band-wrap id=\"probe\" image=\"~background\"]\n\t[band-row]\n\t\t[band-col id=\"probe-1\"]\n\t\t\t[band-title ~title]\n\t\t\t[pic ~photo alt=\"\"]\n\t\t[/band-col]\n\t[/band-row]\n[/band-wrap]\n",
 		'text/de_DE.json'		=> json_encode( [ '1-title' => 'Titel' ] ),
 		'text/en_US.json'		=> json_encode( [ '1-title' => 'Title' ] ),
 		'images/background.svg'	=> $svg,
@@ -1579,8 +1597,8 @@ function themeFiles( string $key, string $version, array $block, string $preview
 		'theme.json'							=> json_encode( [ 'key' => $key, 'version' => $version, 'name' => $words( 'Craft', 'Craft' ), 'description' => $words( 'Weich', 'Soft' ), 'brand' => [] ] ),
 		'parts/page/part.json'		=> json_encode( [ 'contract' => 'kernel@^2.0', 'knobs' => [ 'radius' => [ 'label' => $words( 'Rundung', 'Radius' ), 'ladder' => [
 			[ '--page-radius' => '.375rem' ], [ '--page-radius' => '.625rem' ], [ '--page-radius' => '1rem' ], [ '--page-radius' => '1.5rem' ], [ '--page-radius' => '2rem' ] ] ] ] ] ),
-		'parts/button/part.json'	=> json_encode( [ 'contract' => 'basis@^1.0' ] ),
-		'parts/button/part.css'		=> "/*	buttons - a soft shadow	*/\n.button:not( .button--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
+		'parts/lever/part.json'	=> json_encode( [ 'contract' => 'kit@^1.0' ] ),
+		'parts/lever/part.css'		=> "/*	levers - a soft shadow	*/\n.lever:not( .lever--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
 		'preview.webp'						=> $preview,
 		'LICENSE.txt'							=> "Probe licence\n",
 	];
@@ -1761,13 +1779,13 @@ $tryTheme = static function( array $change, string $kind = 'theme', string $key 
 
 $cases = [
 	'a php file'											=> [ [ 'evil.php' => '<?php echo 1;' ], 'evil.php: the file is no file of a theme' ],
-	'a php file below a part'					=> [ [ 'parts/button/x.php' => '<?php' ], 'parts/button/x.php: the file is no file of a theme' ],
+	'a php file below a part'					=> [ [ 'parts/lever/x.php' => '<?php' ], 'parts/lever/x.php: the file is no file of a theme' ],
 	'an .htaccess'										=> [ [ '.htaccess' => 'Options +ExecCGI' ], 'the archive is refused: '. \Nino\Catalogue::ARCHIVE_WHY[ \Nino\Archive::PATH ] ],
-	'an @import'											=> [ [ 'parts/button/part.css' => "@import 'x.css';\n.button { color: red; }" ], 'parts/button/part.css: ' ],
-	'a token of another group, read'	=> [ [ 'parts/button/part.css' => '.button { color: var(--header-wrap-ink); }' ], 'parts/button/part.css: ' ],
-	'a token of another group, set'		=> [ [ 'parts/button/part.css' => ':root { --page-size: 1px; }' ], 'parts/button/part.css: ' ],
-	'a url()'													=> [ [ 'parts/button/part.css' => '.button { background: url(x.png); }' ], 'parts/button/part.css: ' ],
-	'a script of a block'							=> [ [ 'blocks/probe/block.tpl' => '[html]<script>alert(1)</script>[/html]' ], 'blocks/probe: ' ],
+	'an @import'											=> [ [ 'parts/lever/part.css' => "@import 'x.css';\n.lever { color: red; }" ], 'parts/lever/part.css: ' ],
+	'a token of another group, read'	=> [ [ 'parts/lever/part.css' => '.lever { color: var(--crown-wrap-ink); }' ], 'parts/lever/part.css: ' ],
+	'a token of another group, set'		=> [ [ 'parts/lever/part.css' => ':root { --page-size: 1px; }' ], 'parts/lever/part.css: ' ],
+	'a url()'													=> [ [ 'parts/lever/part.css' => '.lever { background: url(x.png); }' ], 'parts/lever/part.css: ' ],
+	'a script of a block'							=> [ [ 'blocks/probe/block.tpl' => '[raw]<script>alert(1)</script>[/raw]' ], 'blocks/probe: ' ],
 	'a picture that is no webp'				=> [ [ 'preview.webp' => 'this is no picture' ], 'preview.webp: ' ],
 ];
 $problems = [];

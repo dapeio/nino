@@ -1,0 +1,7 @@
+[band-wrap]
+	[band-row]
+		[band-col]
+			[pic /nino/placeholder/landscape decorative]
+		[/band-col]
+	[/band-row]
+[/band-wrap]

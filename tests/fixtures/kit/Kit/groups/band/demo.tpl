@@ -1,0 +1,8 @@
+[band-wrap ground="alt"]
+	[band-row]
+		[band-col variant="card"]
+			[band-title tag="h2" text="A title"]
+			[band-subtitle text="A subtitle"]
+		[/band-col]
+	[/band-row]
+[/band-wrap]

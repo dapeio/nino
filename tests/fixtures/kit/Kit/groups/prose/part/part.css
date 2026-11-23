@@ -1,0 +1,7 @@
+/*	prose - the standard part of the test feature	*/
+:root {
+	--prose-size: var(--page-text-2);
+	--prose-gap: var(--page-space-2);
+}
+.prose { font-size: var(--prose-size); }
+.prose p + p { margin-top: var(--prose-gap); }

@@ -1,0 +1,7 @@
+[band-wrap]
+	[band-row]
+		[band-col]
+			[prose text="A text of two lines." format="inline"]
+		[/band-col]
+	[/band-row]
+[/band-wrap]

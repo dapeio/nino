@@ -624,6 +624,9 @@ function legalProject( string $name ): array {
 			return $texts;
 		}, [] );
 
+	// The footer of the site outputs the menu that has the legal pages, as a template of a project may - with the shortcode of the kernel's own module
+	\Nino\Filesystem::putFileContent( $appData, '/templates/frame-footer.tpl', '<footer>[navigation nav="legal" id="legal__nav"][/navigation]</footer>' );
+
 	\Nino\Html::init( $appData );
 	\Nino\Features::registerComponents( $appData );
 	\Nino\Modules\Legal::init( $appData );
@@ -724,21 +727,6 @@ $navFindings = array_values( array_filter( \Nino\Modules\Legal::check( $clean ),
 check( 'nav: a page in no menu of the website, with the languages', count( $navFindings ) === 2 && $navFindings[0]['values'] === [ 'Impressum', 'de_DE, en_US' ] && $navFindings[1]['values'] === [ 'Datenschutz', 'de_DE, en_US' ] && $navFindings[0]['link'] === '#navs' );
 \Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '<footer>[navigation nav="legal" id="legal__nav"][/navigation]</footer>' );
 check( '...and no finding once a template outputs the menu that has them', \Nino\Modules\Legal::check( $clean ) === [] );
-// ...and the menu components of Basis are outputs of a menu: [footer-nav] and [header-nav] of the menu they name or, where they name none, of the one they take, and [footer-legal] of the menu legal
-\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-col][footer-nav][/footer-col][/footer-wrap]' );
-check( 'nav: [footer-nav] with no menu named outputs the menu footer, which has not the pages', count( array_filter( \Nino\Modules\Legal::check( $clean ), static fn( array $finding ): bool => $finding['kind'] === 'nav' ) ) === 2 );
-\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-col][footer-nav menu="legal"][/footer-col][/footer-wrap]' );
-check( '...[footer-nav menu="legal"] outputs the menu that has them', \Nino\Modules\Legal::check( $clean ) === [] );
-\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-legal][/footer-wrap]' );
-check( '...and so does [footer-legal], which draws the legal pages itself', \Nino\Modules\Legal::check( $clean ) === [] );
-\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '' );
-\Nino\Filesystem::putFileContent( $clean, '/templates/frame-header.tpl', '[header-wrap][header-nav menu="legal"][/header-wrap]' );
-check( '...and [header-nav menu="legal"] in the header outputs the menu as well', \Nino\Modules\Legal::check( $clean ) === [] );
-// ...but only where they are registered: with Basis off a call of them draws nothing and no menu is output
-\Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '[footer-wrap][footer-legal][footer-nav menu="legal"][/footer-wrap]' );
-$noBasis = $clean;
-unset( $noBasis[\Nino\Components::REGISTRY] );
-check( '...but one for each page when Basis is off: its components draw no menu', $kindsOf( \Nino\Modules\Legal::check( $noBasis ) ) === [ 'nav', 'nav' ] && \Nino\Modules\Legal::check( $clean ) === [] );
 \Nino\Filesystem::putFileContent( $clean, '/templates/frame-header.tpl', '' );
 \Nino\Filesystem::putFileContent( $clean, '/templates/frame-footer.tpl', '<footer>[navigation nav="legal" id="legal__nav"][/navigation]</footer>' );
 $noNavigation = $clean;

@@ -1,0 +1,1 @@
+<figure class="[[class]]">[[open]][[picture]][[close]][[figcaption]]</figure>

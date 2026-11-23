@@ -1,0 +1,1 @@
+<a class="[[class]]" href="[[href]]">[[pictures]]<span class="crown-logo-name">[[/project/company/general/name]]</span></a>

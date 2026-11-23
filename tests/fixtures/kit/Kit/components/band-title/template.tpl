@@ -1,0 +1,1 @@
+<[[tag]] class="[[class]]"[[lang]]>[[open]][[value]][[close]]</[[tag]]>

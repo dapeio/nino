@@ -1,0 +1,1 @@
+<[[tag]] class="[[class]]"[[link]][[lang]]>[[value]]</[[tag]]>

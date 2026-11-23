@@ -15,6 +15,9 @@ declare(strict_types=1);
  *	Usage: php tests/packages-smoke.php
  */
 
+// The one feature of the run is the test feature of the kernel: the components a block of a package is made of
+define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/kit' );
+
 require __DIR__. '/harness.php';
 
 $ignored = ninoWarnings();
@@ -25,7 +28,7 @@ $png = (string) base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA
 $svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><!-- the original --><rect id="a" width="10" height="10" fill="#f00"/></svg>';
 
 /**
- *	A project with basis on, as \Nino\init() registers it
+ *	A project with the test feature of the kernel on, as \Nino\init() registers it
  *
  *	@return 	array										$appData
  */
@@ -34,7 +37,7 @@ function packagesSite(): array {
 	$appData = ninoSandbox( 'packages' );
 	$GLOBALS['packagesSandboxes'][] = ninoSandboxDir( $appData );
 	$appData['./nino/filesystem/path'] = dirname( __DIR__ );
-	$appData['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+	$appData['/nino/modules'] = [ '\\Nino\\Modules\\Kit' ];
 	$appData['/nino/html/navs'] = [ 'main', 'footer' ];
 
 	\Nino\Features::registerComponents( $appData );
@@ -61,7 +64,7 @@ function packagesBlock( string $svg, string $png ): array {
 	return [
 		'block.json'				=> json_encode( [ 'name' => $words( 'Probe', 'Probe' ), 'description' => $words( 'Eine Probe', 'A probe' ), 'category' => 'content', 'rank' => 5,
 			'images' => [ 'background' => $slot( 'Hintergrund' ), '1-photo' => $slot( 'Foto' ) ] ] ),
-		'block.tpl'					=> "[section-wrap id=\"probe\" image=\"~background\"]\n\t[section-row]\n\t\t[section-col id=\"probe-1\"]\n\t\t\t[section-title ~title]\n\t\t\t[image ~photo alt=\"\"]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]",
+		'block.tpl'					=> "[band-wrap id=\"probe\" image=\"~background\"]\n\t[band-row]\n\t\t[band-col id=\"probe-1\"]\n\t\t\t[band-title ~title]\n\t\t\t[pic ~photo alt=\"\"]\n\t\t[/band-col]\n\t[/band-row]\n[/band-wrap]",
 		'text/de_DE.json'		=> json_encode( [ '1-title' => 'Titel' ] ),
 		'text/en_US.json'		=> json_encode( [ '1-title' => 'Title' ] ),
 		'images/background.svg'	=> $svg,
@@ -70,7 +73,7 @@ function packagesBlock( string $svg, string $png ): array {
 }
 
 /**
- *	A theme that has nothing against it: the page, a button, a header with a variant and a block
+ *	A theme that has nothing against it: the page, a lever, a crown with a variant and a block
  *
  *	@param		string		$version
  *	@param		array			$block				The files of its block
@@ -86,10 +89,10 @@ function packagesTheme( string $version, array $block, string $preview ): array 
 		'theme.json'								=> json_encode( [ 'key' => 'craft-probe', 'version' => $version, 'name' => $words( 'Craft', 'Craft' ), 'description' => $words( 'Weich', 'Soft' ), 'brand' => [] ] ),
 		'parts/page/part.json'			=> json_encode( [ 'contract' => 'kernel@^2.0', 'knobs' => [ 'radius' => [ 'label' => $words( 'Rundung', 'Radius' ), 'ladder' => [
 			[ '--page-radius' => '.375rem' ], [ '--page-radius' => '.625rem' ], [ '--page-radius' => '1rem' ], [ '--page-radius' => '1.5rem' ], [ '--page-radius' => '2rem' ] ] ] ] ] ),
-		'parts/button/part.json'		=> json_encode( [ 'contract' => 'basis@^1.0', 'ladders' => [ 'button.radius' => $ladder ] ] ),
-		'parts/button/part.css'			=> "/*	buttons - a soft shadow	*/\n.button:not( .button--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
-		'parts/header/part.json'		=> json_encode( [ 'contract' => 'basis@^1.0', 'variants' => [ 'header-wrap' => [ 'stacked' => $words( 'Gestapelt', 'Stacked' ) ] ], 'standard' => [ 'header-wrap' => 'stacked' ] ] ),
-		'parts/header/part.css'			=> "@media (min-width: 768px) {\n\t.header-wrap--variant-stacked .header-wrap-inner { flex-direction: column; }\n}\n",
+		'parts/lever/part.json'		=> json_encode( [ 'contract' => 'kit@^1.0', 'ladders' => [ 'lever.radius' => $ladder ] ] ),
+		'parts/lever/part.css'			=> "/*	levers - a soft shadow	*/\n.lever:not( .lever--tone-quiet ) { box-shadow: 0 2px 6px rgb( 0 0 0 / .15 ); }\n",
+		'parts/crown/part.json'		=> json_encode( [ 'contract' => 'kit@^1.0', 'variants' => [ 'crown-wrap' => [ 'stacked' => $words( 'Gestapelt', 'Stacked' ) ] ], 'standard' => [ 'crown-wrap' => 'stacked' ] ] ),
+		'parts/crown/part.css'			=> "@media (min-width: 768px) {\n\t.crown-wrap--variant-stacked .crown-wrap-inner { flex-direction: column; }\n}\n",
 		'preview.webp'							=> $preview,
 		'LICENSE.txt'								=> "Probe licence\n",
 		'README.md'									=> "# Craft\n",
@@ -154,7 +157,7 @@ $block = packagesBlock( $svg, $png );
 $theme = packagesTheme( '1.0.0', $block, $webp );
 $pack = packagesPack( 'probe-pack', $block, $webp );
 
-check( 'a theme of the parts of the page, a button and a header with a block of two pictures passes', \Nino\Packages::check( $app, 'theme', $theme ) === null );
+check( 'a theme of the parts of the page, a lever and a crown with a block of two pictures passes', \Nino\Packages::check( $app, 'theme', $theme ) === null );
 check( 'a package of blocks with the block passes', \Nino\Packages::check( $app, 'blocks', $pack ) === null );
 
 $placed = \Nino\Packages::place( $app, 'theme', 'craft-probe', $theme );
@@ -175,7 +178,7 @@ check( 'the block of the package is among the blocks with the key of the package
 	&& $all['probe']['pictures'] === [ '1-photo' => 'images/1-photo.png', 'background' => 'images/background.svg' ] );
 
 $origins = array_column( \Nino\Blocks::roots( $app ), 'origin' );
-check( 'the roots are Basis, the project, the packages, the other features - in that order', array_slice( $origins, 0, 3 ) === [ 'basis', 'project', 'pack:probe-pack' ] );
+check( 'the roots are the project, the packages, the features - in that order', array_slice( $origins, 0, 3 ) === [ 'project', 'pack:probe-pack', 'kit' ] );
 
 echo "\nPackages - what is refused, with the path, and nothing of it on the disk\n";
 
@@ -188,24 +191,24 @@ $good = packagesTheme( '1.0.0', $block, $webp );
 // A fault in an otherwise good theme: what it is changed to, and the code and the path that say it
 $faults = [
 	'a php file'												=> [ [ 'evil.php' => '<?php echo 1;' ], 'not-allowed', 'evil.php' ],
-	'a php file below a part'						=> [ [ 'parts/button/x.php' => '<?php' ], 'not-allowed', 'parts/button/x.php' ],
-	'an @import'												=> [ [ 'parts/button/part.css' => "@import 'x.css';\n.button { color: red; }" ], 'css', 'parts/button/part.css' ],
-	'a token of another group, read'		=> [ [ 'parts/button/part.css' => '.button { color: var(--header-wrap-ink); }' ], 'css', 'parts/button/part.css' ],
-	'a token of another group, set'			=> [ [ 'parts/button/part.css' => ':root { --page-size: 1px; }' ], 'css', 'parts/button/part.css' ],
-	'a class of another component'			=> [ [ 'parts/button/part.css' => '.header-wrap { color: red; }' ], 'css', 'parts/button/part.css' ],
-	'a url()'														=> [ [ 'parts/button/part.css' => '.button { background: url(x.png); }' ], 'css', 'parts/button/part.css' ],
-	'an !important'											=> [ [ 'parts/button/part.css' => '.button { color: red !important; }' ], 'css', 'parts/button/part.css' ],
+	'a php file below a part'						=> [ [ 'parts/lever/x.php' => '<?php' ], 'not-allowed', 'parts/lever/x.php' ],
+	'an @import'												=> [ [ 'parts/lever/part.css' => "@import 'x.css';\n.lever { color: red; }" ], 'css', 'parts/lever/part.css' ],
+	'a token of another group, read'		=> [ [ 'parts/lever/part.css' => '.lever { color: var(--crown-wrap-ink); }' ], 'css', 'parts/lever/part.css' ],
+	'a token of another group, set'			=> [ [ 'parts/lever/part.css' => ':root { --page-size: 1px; }' ], 'css', 'parts/lever/part.css' ],
+	'a class of another component'			=> [ [ 'parts/lever/part.css' => '.crown-wrap { color: red; }' ], 'css', 'parts/lever/part.css' ],
+	'a url()'														=> [ [ 'parts/lever/part.css' => '.lever { background: url(x.png); }' ], 'css', 'parts/lever/part.css' ],
+	'an !important'											=> [ [ 'parts/lever/part.css' => '.lever { color: red !important; }' ], 'css', 'parts/lever/part.css' ],
 	'an .htaccess'											=> [ [ '.htaccess' => 'Options +ExecCGI' ], 'not-allowed', '.htaccess' ],
-	'a script'													=> [ [ 'parts/button/part.js' => 'alert(1)' ], 'not-allowed', 'parts/button/part.js' ],
+	'a script'													=> [ [ 'parts/lever/part.js' => 'alert(1)' ], 'not-allowed', 'parts/lever/part.js' ],
 	'a hidden file'											=> [ [ 'blocks/probe/.secret' => 'x' ], 'not-allowed', 'blocks/probe/.secret' ],
-	'a file below a part that is no part file'	=> [ [ 'parts/button/part.json.bak' => '{}' ], 'not-allowed', 'parts/button/part.json.bak' ],
+	'a file below a part that is no part file'	=> [ [ 'parts/lever/part.json.bak' => '{}' ], 'not-allowed', 'parts/lever/part.json.bak' ],
 	'a path that climbs'								=> [ [ 'parts/../x.json' => '{}' ], 'path', 'parts/../x.json' ],
 	'a second spelling of a name'				=> [ [ 'readme.md' => 'x' ], 'twice', 'readme.md' ],
-	'a part.json that is too deep'			=> [ [ 'parts/button/part.json' => str_repeat( '{"a":', 9 ). '1'. str_repeat( '}', 9 ) ], 'json', 'parts/button/part.json' ],
-	'a part.json that is too large'			=> [ [ 'parts/button/part.json' => json_encode( [ 'contract' => 'basis@^1.0', 'x' => str_repeat( 'x', \Nino\Packages::MAX_JSON ) ] ) ], 'long', 'parts/button/part.json' ],
+	'a part.json that is too deep'			=> [ [ 'parts/lever/part.json' => str_repeat( '{"a":', 9 ). '1'. str_repeat( '}', 9 ) ], 'json', 'parts/lever/part.json' ],
+	'a part.json that is too large'			=> [ [ 'parts/lever/part.json' => json_encode( [ 'contract' => 'kit@^1.0', 'x' => str_repeat( 'x', \Nino\Packages::MAX_JSON ) ] ) ], 'long', 'parts/lever/part.json' ],
 	'a null byte in a text'							=> [ [ 'README.md' => "x\0y" ], 'text', 'README.md' ],
-	'a block with [html]'								=> [ [ 'blocks/probe/block.tpl' => "[section-wrap id=\"probe\" image=\"~background\"]\n\t[html]<b>x</b>[/html]\n[/section-wrap]" ], 'block', 'blocks/probe' ],
-	'a block with a source that is not its own'	=> [ [ 'blocks/probe/block.tpl' => "[section-wrap id=\"probe\" image=\"~background\"]\n\t[section-title /project/company/name]\n\t[image ~photo alt=\"\"]\n[/section-wrap]" ], 'block', 'blocks/probe' ],
+	'a block with [raw]'								=> [ [ 'blocks/probe/block.tpl' => "[band-wrap id=\"probe\" image=\"~background\"]\n\t[raw]<b>x</b>[/raw]\n[/band-wrap]" ], 'block', 'blocks/probe' ],
+	'a block with a source that is not its own'	=> [ [ 'blocks/probe/block.tpl' => "[band-wrap id=\"probe\" image=\"~background\"]\n\t[band-title /project/company/name]\n\t[pic ~photo alt=\"\"]\n[/band-wrap]" ], 'block', 'blocks/probe' ],
 	'a svg that is only a script, with no shape'	=> [ [ 'blocks/probe/images/background.svg' => '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' ], 'block', 'blocks/probe' ],
 	'a svg with a document type'				=> [ [ 'blocks/probe/images/background.svg' => '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY a "b">]><svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>' ], 'block', 'blocks/probe' ],
 	'a picture that is not what its ending says'	=> [ [ 'blocks/probe/images/1-photo.png' => $webp ], 'block', 'blocks/probe' ],
@@ -223,46 +226,46 @@ foreach( $faults as $label => [ $change, $code, $path ] ) {
 	check( 'a theme with '. $label. ' is refused as a whole, by '. $code. ' and with the path '. $path, $problem !== null && $problem['code'] === $code && $problem['path'] === $path );
 }
 
-$problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'probe/block.tpl' => '[html]x[/html]' ] ) );
+$problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'probe/block.tpl' => '[raw]x[/raw]' ] ) );
 check( 'a package of blocks with a block that is no block is refused with the folder of the block', $problem !== null && $problem['code'] === 'block' && $problem['path'] === 'probe' );
 
 // The steps a part says its knobs are delivered at, and the free css of a theme
 $withButton = static function( mixed $values ) use ( $good ): array {
 
-	$json = json_decode( $good['parts/button/part.json'], true );
+	$json = json_decode( $good['parts/lever/part.json'], true );
 	$json['values'] = $values;
 
-	return [ 'parts/button/part.json' => json_encode( $json ) ] + $good;
+	return [ 'parts/lever/part.json' => json_encode( $json ) ] + $good;
 };
 $page = json_decode( $good['parts/page/part.json'], true );
 $withPage = static fn( mixed $values ): array => [ 'parts/page/part.json' => json_encode( $page + [ 'values' => $values ] ) ] + $good;
 
 check( 'a theme without values and without theme.css is as good as it was, and a part may say the steps its knobs are delivered at: a knob of the group, a knob the part brings itself, a knob of the page, -2 to 2 and 0',
-	\Nino\Packages::check( $app, 'theme', $good ) === null && \Nino\Packages::check( $app, 'theme', $withButton( [ 'button.radius' => 1, 'button.space' => -2, 'button.size' => 0, 'button.radius' => 2 ] ) ) === null
+	\Nino\Packages::check( $app, 'theme', $good ) === null && \Nino\Packages::check( $app, 'theme', $withButton( [ 'lever.radius' => 1, 'lever.space' => -2, 'lever.size' => 0, 'lever.radius' => 2 ] ) ) === null
 	&& \Nino\Packages::check( $app, 'theme', $withPage( [ 'radius' => -1 ] ) ) === null && \Nino\Packages::check( $app, 'theme', $withButton( [] ) ) === null && \Nino\Packages::check( $app, 'theme', $withPage( (object) [] ) ) === null );
 
 $badValues = [];
 
 foreach( [
-	'a knob the part has not'					=> [ 'button.nope' => 1 ],
-	'a knob of another group'					=> [ 'header-wrap.space' => 1 ],
-	'a step above the ladder'					=> [ 'button.radius' => 3 ],
-	'a step below the ladder'					=> [ 'button.radius' => -3 ],
-	'a step that is a string'					=> [ 'button.radius' => '1' ],
-	'a step that is a fraction'				=> [ 'button.radius' => 1.5 ],
-	'a step that is a list'						=> [ 'button.radius' => [ 1 ] ],
-	'a step that is nested'						=> [ 'button.radius' => [ 'a' => [ 'b' => 1 ] ] ],
-	'a step that is null'							=> [ 'button.radius' => null ],
-	'a step that is true'							=> [ 'button.radius' => true ],
-	'a name with a semicolon'					=> [ 'button.radius; color: red' => 1 ],
-	'a name that climbs'							=> [ '../button.radius' => 1 ],
-	'a name with a control character'	=> [ "button.radius\n" => 1 ],
+	'a knob the part has not'					=> [ 'lever.nope' => 1 ],
+	'a knob of another group'					=> [ 'crown-wrap.space' => 1 ],
+	'a step above the ladder'					=> [ 'lever.radius' => 3 ],
+	'a step below the ladder'					=> [ 'lever.radius' => -3 ],
+	'a step that is a string'					=> [ 'lever.radius' => '1' ],
+	'a step that is a fraction'				=> [ 'lever.radius' => 1.5 ],
+	'a step that is a list'						=> [ 'lever.radius' => [ 1 ] ],
+	'a step that is nested'						=> [ 'lever.radius' => [ 'a' => [ 'b' => 1 ] ] ],
+	'a step that is null'							=> [ 'lever.radius' => null ],
+	'a step that is true'							=> [ 'lever.radius' => true ],
+	'a name with a semicolon'					=> [ 'lever.radius; color: red' => 1 ],
+	'a name that climbs'							=> [ '../lever.radius' => 1 ],
+	'a name with a control character'	=> [ "lever.radius\n" => 1 ],
 	'a name of digits'								=> [ '5' => 1 ],
 	'a list in place of a map'				=> [ 1, 2 ],
 	'a number'												=> 3,
-	'a string'												=> 'button.radius',
+	'a string'												=> 'lever.radius',
 	'null'														=> null,
-	'a thousand entries'							=> array_combine( array_map( static fn( int $at ): string => 'button.k'. $at, range( 1, 1000 ) ), array_fill( 0, 1000, 1 ) ),
+	'a thousand entries'							=> array_combine( array_map( static fn( int $at ): string => 'lever.k'. $at, range( 1, 1000 ) ), array_fill( 0, 1000, 1 ) ),
 ] as $label => $values )
 	if( ( \Nino\Packages::check( $app, 'theme', $withButton( $values ) )['code'] ?? '' ) !== 'part-values' )
 		$badValues[] = $label;
@@ -274,39 +277,39 @@ check( '...a group the project does not have is held to the knobs its part bring
 	\Nino\Packages::check( $app, 'theme', [ 'parts/strange/part.json' => json_encode( [ 'contract' => 'strange@^1.0', 'knobs' => [ 'strange.x-glow' => [ 'label' => 'Glow', 'ladder' => [ '0', '1', '2', '3', '4' ] ] ], 'values' => [ 'strange.x-glow' => 1 ] ] ) ] + $good ) === null );
 
 $css = static fn( string $text ): array => [ 'theme.css' => $text ] + $good;
-$fine = ":root { --button-radius: 2px; }\n/* a comment may say url( and @import and !important */\n.button { border-radius: var(--button-radius); }\n.header-wrap--sticky .header-logo { opacity: .9; }\n@media (min-width: 768px) { .button--size-l { padding: 1rem; } }\n";
+$fine = ":root { --lever-radius: 2px; }\n/* a comment may say url( and @import and !important */\n.lever { border-radius: var(--lever-radius); }\n.crown-wrap--sticky .crown-logo { opacity: .9; }\n@media (min-width: 768px) { .lever--size-l { padding: 1rem; } }\n";
 
 check( 'a theme with a theme.css that keeps the rule of a part over the classes of every component is taken', \Nino\Packages::check( $app, 'theme', $css( $fine ) ) === null && \Nino\Packages::check( $app, 'theme', $css( '' ) ) === null );
 
 $badCss = [];
 
 foreach( [
-	'url()'														=> ".button { background: url(x.png); }",
-	'an @import'											=> "@import 'x.css';\n.button { color: red; }",
-	'an !important'										=> ".button { color: red !important; }",
-	'expression()'										=> ".button { width: expression(alert(1)); }",
-	'the end of a style element'			=> ".button { content: 'x'; }\n</style><script>alert(1)</script>",
-	'the end of a style element in a comment'	=> "/* </style> */\n.button { color: red; }",
-	'the end of a style element in a string'	=> ".button::after { content: '</style>'; }",
-	'the beginning of a comment of markup'	=> "<!-- .button { color: red; }",
+	'url()'														=> ".lever { background: url(x.png); }",
+	'an @import'											=> "@import 'x.css';\n.lever { color: red; }",
+	'an !important'										=> ".lever { color: red !important; }",
+	'expression()'										=> ".lever { width: expression(alert(1)); }",
+	'the end of a style element'			=> ".lever { content: 'x'; }\n</style><script>alert(1)</script>",
+	'the end of a style element in a comment'	=> "/* </style> */\n.lever { color: red; }",
+	'the end of a style element in a string'	=> ".lever::after { content: '</style>'; }",
+	'the beginning of a comment of markup'	=> "<!-- .lever { color: red; }",
 	'an element selector'							=> "body { margin: 0; }",
 	'a link selector'									=> "a { color: red; }",
 	'the universal selector'					=> "* { box-sizing: border-box; }",
 	'an id'														=> "#page { color: red; }",
-	'an id with a class of a component'	=> ".button#page { color: red; }",
+	'an id with a class of a component'	=> ".lever#page { color: red; }",
 	'an attribute selector on the page'	=> "[data-x] { color: red; }",
-	'the classes of the page by an attribute'	=> "[class*=\"button\"] { color: red; }",
+	'the classes of the page by an attribute'	=> "[class*=\"lever\"] { color: red; }",
 	'@font-face'											=> "@font-face { font-family: X; src: local(Arial); }",
 	'@namespace'											=> "@namespace svg url(http://x);",
-	'@layer'													=> "@layer base { .button { color: red; } }",
-	'an escape that hides url('				=> ".button { background: \\75 rl(x.png); }",
+	'@layer'													=> "@layer base { .lever { color: red; } }",
+	'an escape that hides url('				=> ".lever { background: \\75 rl(x.png); }",
 	'an escape in a selector'					=> ".bu\\74 ton { color: red; }",
 	'a token that is none of a component\'s'	=> ":root { --page-size: 1px; }",
 	'a token of the brand set'				=> ":root { --brand-color-1: red; }",
-	'a comment that is not closed'		=> ".button { color: red; } /* x",
-	'braces that do not balance'			=> ".button { color: red;",
-	'behavior'												=> ".button { behavior: url(x.htc); }",
-	'-moz-binding'										=> ".button { -moz-binding: x; }",
+	'a comment that is not closed'		=> ".lever { color: red; } /* x",
+	'braces that do not balance'			=> ".lever { color: red;",
+	'behavior'												=> ".lever { behavior: url(x.htc); }",
+	'-moz-binding'										=> ".lever { -moz-binding: x; }",
 	'a way out of the rule by @media'	=> "@media print { body { margin: 0; } }",
 ] as $label => $text )
 	if( ( \Nino\Packages::check( $app, 'theme', $css( $text ) )['code'] ?? '' ) !== 'theme-css' )
@@ -317,7 +320,7 @@ check( 'a theme.css that loads, imports, forces, runs, ends the style element it
 
 // Whether a theme.css is valid does not depend on the site: a class is held to its form, and not to the components the site has on
 $withGallery = $app;
-$withGallery[\Nino\Components::REGISTRY]['gallery-grid'] = $app[\Nino\Components::REGISTRY]['button'];
+$withGallery[\Nino\Components::REGISTRY]['gallery-grid'] = $app[\Nino\Components::REGISTRY]['lever'];
 $gallery = ".gallery-grid { gap: 0; }\n.gallery-grid--cols-3 .gallery-item:hover { --gallery-gap: 1rem; opacity: var(--brand-color-1, 1); }\n.no-feature-has-this_class-2 { color: red; }";
 
 check( 'the register of this site has no gallery and the one of the other has: the same theme.css is as good in both, and a class that no component has here is no cause to refuse it',
@@ -333,34 +336,34 @@ foreach( [
 	'a function nested five deep'				=> '.a:is(.b:is(.c:is(.d:is(.e:is(.f))))) { gap: 0; }',
 	'a class that starts with a digit'		=> '.3-up { gap: 0; }',
 	'a class that starts with a hyphen'	=> '.-up { gap: 0; }',
-	'an element with a class'						=> 'a.button { gap: 0; }',
-	'an element behind a class'					=> '.button a { gap: 0; }',
-	'an id behind a class'							=> '.button #x { gap: 0; }',
-	'an attribute selector behind a class'	=> '.button[disabled] { gap: 0; }',
-	'an attribute selector of the class'	=> '.button:where([class*="--x"]) { gap: 0; }',
-	'the universal selector behind a class'	=> '.section-wrap * { display: none; }',
-	'the universal selector behind ~'		=> '.section-wrap ~ * { display: none; }',
-	'the universal selector behind +'		=> '.header-wrap + * { display: none; }',
-	'the universal selector behind >'		=> '.header-wrap > * { display: none; }',
-	'an element as the last part'				=> '.section-wrap ~ div { display: none; }',
-	'an element as the last part behind +'	=> '.section-wrap .text + a { display: none; }',
-	'an element in the middle'					=> '.section-wrap div .text { display: none; }',
-	'the universal selector in a nesting'	=> '.section-wrap { & ~ * { display: none; } }',
-	'an element in a nesting'						=> '.section-wrap { & + div { display: none; } }',
-	'an element in a nesting without &'	=> '.section-wrap { > a { display: none; } }',
+	'an element with a class'						=> 'a.lever { gap: 0; }',
+	'an element behind a class'					=> '.lever a { gap: 0; }',
+	'an id behind a class'							=> '.lever #x { gap: 0; }',
+	'an attribute selector behind a class'	=> '.lever[disabled] { gap: 0; }',
+	'an attribute selector of the class'	=> '.lever:where([class*="--x"]) { gap: 0; }',
+	'the universal selector behind a class'	=> '.band-wrap * { display: none; }',
+	'the universal selector behind ~'		=> '.band-wrap ~ * { display: none; }',
+	'the universal selector behind +'		=> '.crown-wrap + * { display: none; }',
+	'the universal selector behind >'		=> '.crown-wrap > * { display: none; }',
+	'an element as the last part'				=> '.band-wrap ~ div { display: none; }',
+	'an element as the last part behind +'	=> '.band-wrap .text + a { display: none; }',
+	'an element in the middle'					=> '.band-wrap div .text { display: none; }',
+	'the universal selector in a nesting'	=> '.band-wrap { & ~ * { display: none; } }',
+	'an element in a nesting'						=> '.band-wrap { & + div { display: none; } }',
+	'an element in a nesting without &'	=> '.band-wrap { > a { display: none; } }',
 	'an element two levels down'				=> '.a { .b { & ~ p { color: red; } } }',
-	'a part with only & at the top of the sheet'	=> '& .button { color: red; }',
-	':root with a descendant'						=> ':root .button { color: red; }',
+	'a part with only & at the top of the sheet'	=> '& .lever { color: red; }',
+	':root with a descendant'						=> ':root .lever { color: red; }',
 	'only a pseudo class'								=> ':hover { color: red; }',
 	'only a pseudo element'							=> '::before { content: ""; }',
-	'a part that is only :first-child'	=> '.button > :first-child { color: red; }',
-	'a class that is only in :not()'		=> ':not(.button) { color: red; }',
+	'a part that is only :first-child'	=> '.lever > :first-child { color: red; }',
+	'a class that is only in :not()'		=> ':not(.lever) { color: red; }',
 	'a class that is only in :is()'			=> ':is(.a, .b) { color: red; }',
 	'body in :is()'											=> '.a:is(.b, body) { color: red; }',
-	'* in :where()'											=> ':where(*) .button { color: red; }',
-	'body in :not()'										=> '.button:not(body) { color: red; }',
-	'body in :has()'										=> '.button:has(body) { color: red; }',
-	'a combinator and * in :has()'			=> '.button:has(> *) { color: red; }',
+	'* in :where()'											=> ':where(*) .lever { color: red; }',
+	'body in :not()'										=> '.lever:not(body) { color: red; }',
+	'body in :has()'										=> '.lever:has(body) { color: red; }',
+	'a combinator and * in :has()'			=> '.lever:has(> *) { color: red; }',
 	'* behind ~ in :not()'							=> '.a:not(.b ~ *) { color: red; }',
 	'* in :is() in :not()'							=> '.a:not(:is(.b, *)) { color: red; }',
 	'an element in :nth-child( of )'		=> '.a:nth-child(2n+1 of div) { color: red; }',
@@ -388,7 +391,7 @@ foreach( [
 	'no blank around the combinators'		=> '.a>.b+.c~.d { color: red; }',
 	'pseudo classes and elements'				=> '.a:hover:not(.b):focus-visible::after, .a::before { color: red; }',
 	'a list'														=> '.a, .b ~ .c { color: red; }',
-	'a modifier'												=> '.section-col--bleed.section-col--link { color: red; }',
+	'a modifier'												=> '.band-col--bleed.band-col--link { color: red; }',
 	':is() and :where() of classes'			=> '.a:is(.b, .c) .d:where(.e ~ .f) { color: red; }',
 	':has() with a combinator in front'	=> '.a:has(> .b, + .c) { color: red; }',
 	':not() with a combination'					=> '.a:not(.b .c) { color: red; }',
@@ -550,16 +553,16 @@ check( 'a part.css refuses @property, image(), element() and cross-fade() as it 
 	&& \Nino\Components::partProblems( '.probe-x :is(th, td) > :first-child { color: red; } .probe:not(:last-child)::after { content: ""; }', [ 'probe' ] ) === [] );
 
 $long = \Nino\Packages::check( $app, 'theme', $css( str_repeat( ' ', \Nino\Packages::MAX_CSS + 1 ) ) );
-$problem = \Nino\Packages::check( $app, 'theme', $css( ".button { color: red; }\n.button { color: red; }\n</style>" ) );
+$problem = \Nino\Packages::check( $app, 'theme', $css( ".lever { color: red; }\n.lever { color: red; }\n</style>" ) );
 check( 'a theme.css above the limit of a part.css is too long, and what is wrong in one is said with the line it stands on',
 	( $long['code'] ?? '' ) === 'long' && ( $long['path'] ?? '' ) === 'theme.css' && ( $problem['path'] ?? '' ) === 'theme.css' && str_contains( implode( ' ', $problem['params'] ?? [] ), 'line 3' ) === true && str_contains( \Nino\Packages::why( $problem ), 'theme.css' ) === true );
 check( 'a theme.css may be as long as a part.css: 40 KB of rules are taken - the limit of a json is not its limit - and a rule found wrong below a comment of several lines says its line',
-	\Nino\Packages::check( $app, 'theme', $css( str_repeat( ".button { color: red; }\n", 1600 ) ) ) === null
-	&& str_contains( implode( ' ', \Nino\Packages::check( $app, 'theme', $css( "/* one\ntwo\nthree */\n.button { color: red; }\n@font-face { font-family: X; }" ) )['params'] ?? [] ), 'line 5' ) === true );
+	\Nino\Packages::check( $app, 'theme', $css( str_repeat( ".lever { color: red; }\n", 1600 ) ) ) === null
+	&& str_contains( implode( ' ', \Nino\Packages::check( $app, 'theme', $css( "/* one\ntwo\nthree */\n.lever { color: red; }\n@font-face { font-family: X; }" ) )['params'] ?? [] ), 'line 5' ) === true );
 check( 'a text that is not utf-8 or holds a null byte is no theme.css', ( \Nino\Packages::check( $app, 'theme', $css( "a\0b" ) )['code'] ?? '' ) === 'text' && ( \Nino\Packages::check( $app, 'theme', $css( "\xff\xfe" ) )['code'] ?? '' ) === 'text' );
 check( 'theme.css is a file of a theme and of nothing else: a package of blocks has none, and a theme has the one at its root and none in a folder',
 	( \Nino\Packages::check( $app, 'blocks', [ 'theme.css' => $fine ] + packagesPack( 'probe-pack', $block, $webp ) )['code'] ?? '' ) === 'not-allowed'
-	&& ( \Nino\Packages::check( $app, 'theme', [ 'parts/button/theme.css' => $fine ] + $good )['code'] ?? '' ) === 'not-allowed' && ( \Nino\Packages::check( $app, 'theme', [ 'blocks/probe/theme.css' => $fine ] + $good )['code'] ?? '' ) === 'not-allowed'
+	&& ( \Nino\Packages::check( $app, 'theme', [ 'parts/lever/theme.css' => $fine ] + $good )['code'] ?? '' ) === 'not-allowed' && ( \Nino\Packages::check( $app, 'theme', [ 'blocks/probe/theme.css' => $fine ] + $good )['code'] ?? '' ) === 'not-allowed'
 	&& ( \Nino\Packages::check( $app, 'theme', [ 'Theme.css' => $fine ] + $good )['code'] ?? '' ) !== null );
 $placeApp = packagesSite();
 $placed = \Nino\Packages::place( $placeApp, 'theme', 'craft-probe', $css( $fine ) );
@@ -569,21 +572,21 @@ check( 'place() puts the file with the others and a theme that has it is install
 // A frame may read the texts of the project, a block of the pages may not: the package follows the rule of \Nino\Blocks by itself, as a theme or as a package of blocks
 $frameJson = json_encode( [ 'name' => [ 'de_DE' => 'Fuss', 'en_US' => 'Foot' ], 'description' => [ 'de_DE' => 'Ein Fuss', 'en_US' => 'A foot' ], 'category' => 'footer', 'rank' => 20, 'images' => (object) [] ] );
 $frameFiles = static fn( string $tpl, string $json ): array => [ 'block.json' => $json, 'block.tpl' => $tpl, 'text/de_DE.json' => '{}', 'text/en_US.json' => '{}' ];
-$footerTpl = "[footer-wrap id=\"footer\"]\n\t[footer-col size=\"100\"]\n\t\t[footer-logo /logo]\n\t\t[text /project/company/general/description format=\"inline\"]\n\t[/footer-col]\n[/footer-wrap]";
+$footerTpl = "[foot-wrap id=\"footer\"]\n\t[foot-col size=\"100\"]\n\t\t[foot-logo /logo]\n\t\t[prose /project/company/general/description format=\"inline\"]\n\t[/foot-col]\n[/foot-wrap]";
 $withFrame = array_merge( $good, [ 'blocks/footer/block.json' => $frameJson, 'blocks/footer/block.tpl' => $footerTpl, 'blocks/footer/text/de_DE.json' => '{}', 'blocks/footer/text/en_US.json' => '{}' ] );
-$inPage = array_merge( $good, [ 'blocks/footer/block.json' => json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ), 'blocks/footer/block.tpl' => "[section-wrap id=\"footer\"]\n\t[section-row]\n\t\t[section-col]\n\t\t\t[text /project/company/general/description]\n\t\t[/section-col]\n\t[/section-row]\n[/section-wrap]", 'blocks/footer/text/de_DE.json' => '{}', 'blocks/footer/text/en_US.json' => '{}' ] );
+$inPage = array_merge( $good, [ 'blocks/footer/block.json' => json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ), 'blocks/footer/block.tpl' => "[band-wrap id=\"footer\"]\n\t[band-row]\n\t\t[band-col]\n\t\t\t[prose /project/company/general/description]\n\t\t[/band-col]\n\t[/band-row]\n[/band-wrap]", 'blocks/footer/text/de_DE.json' => '{}', 'blocks/footer/text/en_US.json' => '{}' ] );
 check( 'a theme with a frame that reads a text of the project and the logo is taken, the same source in a block of the pages is refused with the folder of the block, and so is it in a package of blocks',
 	\Nino\Packages::check( $app, 'theme', $withFrame ) === null && ( \Nino\Packages::check( $app, 'theme', $inPage )['code'] ?? '' ) === 'block' && ( \Nino\Packages::check( $app, 'theme', $inPage )['path'] ?? '' ) === 'blocks/footer'
 	&& \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( $footerTpl, $frameJson ), $webp ) ) === null
-	&& ( \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( "[section-wrap id=\"footer\"][section-row][section-col][text /project/company/general/description][/section-col][/section-row][/section-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp ) )['code'] ?? '' ) === 'block' );
+	&& ( \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $frameFiles( "[band-wrap id=\"footer\"][band-row][band-col][prose /project/company/general/description][/band-col][/band-row][/band-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp ) )['code'] ?? '' ) === 'block' );
 
-// The feature Basis is off: a package of blocks whose block has a section as its root needs it and is no refusal
-$basisOff = ninoSandbox( 'packages-basis-off' );
-$basisOff['./nino/filesystem/path'] = dirname( __DIR__ );
-$GLOBALS['packagesSandboxes'][] = ninoSandboxDir( $basisOff );
-$sectionPack = packagesPack( 'probe-pack', $frameFiles( "[section-wrap id=\"footer\"][section-row][section-col][/section-col][/section-row][/section-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp );
-check( 'a package of blocks with a block of a section is taken where the feature of the section is off, as it is where it is on',
-	\Nino\Blocks::wraps( $basisOff ) === [] && \Nino\Packages::check( $basisOff, 'blocks', $sectionPack ) === null && \Nino\Packages::check( $app, 'blocks', $sectionPack ) === null );
+// The feature of the test is off: a package of blocks whose block has a band as its root needs it and is no refusal
+$kitOff = ninoSandbox( 'packages-kit-off' );
+$kitOff['./nino/filesystem/path'] = dirname( __DIR__ );
+$GLOBALS['packagesSandboxes'][] = ninoSandboxDir( $kitOff );
+$bandPack = packagesPack( 'probe-pack', $frameFiles( "[band-wrap id=\"footer\"][band-row][band-col][/band-col][/band-row][/band-wrap]", json_encode( [ 'category' => 'content' ] + json_decode( $frameJson, true ) ) ), $webp );
+check( 'a package of blocks with a block of a band is taken where the feature of the band is off, as it is where it is on',
+	\Nino\Blocks::wraps( $kitOff ) === [] && \Nino\Packages::check( $kitOff, 'blocks', $bandPack ) === null && \Nino\Packages::check( $app, 'blocks', $bandPack ) === null );
 
 $problem = \Nino\Packages::check( $app, 'blocks', array_merge( packagesPack( 'probe-pack', $block, $webp ), [ 'pack.json' => json_encode( [ 'key' => 'probe-pack', 'version' => '1.0.0', 'name' => '<script>x</script>', 'description' => 'Probe' ] ) ] ) );
 check( 'the name of a package of blocks is text as well: a tag in it is refused, and the good name of the same package is none', $problem !== null && $problem['code'] === 'file-markup' && $problem['path'] === 'pack.json' && \Nino\Packages::check( $app, 'blocks', packagesPack( 'probe-pack', $block, $webp ) ) === null );
@@ -719,11 +722,11 @@ check( 'a package of blocks put in place is among the blocks in the same request
 \Nino\Packages::place( $app, 'blocks', 'probe-pack', packagesPack( 'probe-pack', $block, $webp ) );
 
 $other = packagesSite();
-\Nino\Packages::place( $other, 'blocks', 'basis', packagesPack( 'basis', $block, $webp ) );
+\Nino\Packages::place( $other, 'blocks', 'kit', packagesPack( 'kit', $block, $webp ) );
 $ignored = ninoWarnings();
 $origins = array_column( \Nino\Blocks::roots( $other ), 'origin' );
-check( 'a package named like a feature has an origin of its own and takes nothing from the feature', in_array( 'pack:basis', $origins, true ) === true && array_count_values( $origins )['basis'] === 1 && isset( \Nino\Blocks::all( $other )['hero-full'] ) === true && \Nino\Blocks::all( $other )['hero-full']['origin'] === 'basis' );
-check( 'the files that stand beside the blocks of a package are no blocks', array_filter( array_keys( \Nino\Blocks::rejected( $other ) ), static fn( string $where ): bool => str_starts_with( $where, 'pack:basis/' ) ) === [] );
+check( 'a package named like a feature has an origin of its own and takes nothing from the feature', in_array( 'pack:kit', $origins, true ) === true && array_count_values( $origins )['kit'] === 1 && isset( \Nino\Blocks::all( $other )['hero'] ) === true && \Nino\Blocks::all( $other )['hero']['origin'] === 'kit' );
+check( 'the files that stand beside the blocks of a package are no blocks', array_filter( array_keys( \Nino\Blocks::rejected( $other ) ), static fn( string $where ): bool => str_starts_with( $where, 'pack:kit/' ) ) === [] );
 
 // A link in the place of a package is neither followed nor replaced; removing drops the link and leaves what it points at
 mkdir( $private. '/elsewhere' );
@@ -782,12 +785,12 @@ $answer = \Nino\Packages::place( $app, 'theme', 'later', [ 'theme.json' => json_
 check( '...and a closure that finds nothing wrong lets it through', $answer === true && is_file( $private. '/packages/themes/later/theme.json' ) === true );
 
 // A part of a group the project does not have says which components are its own: not one that the register holds, of whichever group
-$held = \Nino\Components::groups( $app )['header']['components'][0] ?? 'header-wrap';
+$held = \Nino\Components::groups( $app )['crown']['components'][0] ?? 'crown-wrap';
 $borrow = static fn( string $name ): array => [ 'parts/cards/part.json' => json_encode( [ 'contract' => 'cards@^1.0', 'variants' => [ $name => [ 'soft' => 'Soft' ] ] ] ),
 	'parts/cards/part.css' => '.'. $name. ' { color: var(--'. $name. '-ink); }' ] + packagesTheme( '1.0.0', $block, $webp );
 $ignored = ninoWarnings();
 $answer = \Nino\Packages::check( $app, 'theme', $borrow( $held ) );
-check( 'a part of a group the project has not, that names a component of the header as its own, is refused with the name', $answer !== null && $answer['code'] === 'part-claims' && $answer['path'] === 'parts/cards/part.json' && $answer['params'] === [ $held ] );
+check( 'a part of a group the project has not, that names a component of the crown as its own, is refused with the name', $answer !== null && $answer['code'] === 'part-claims' && $answer['path'] === 'parts/cards/part.json' && $answer['params'] === [ $held ] );
 check( '...and one that names a component that nobody has is not', \Nino\Packages::check( $app, 'theme', $borrow( 'card-soft' ) ) === null );
 
 foreach( $GLOBALS['packagesSandboxes'] as $sandbox )

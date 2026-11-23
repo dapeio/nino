@@ -1,0 +1,5 @@
+[foot-wrap]
+	[foot-col size="50"]
+		[foot-nav menu="footer"]
+	[/foot-col]
+[/foot-wrap]

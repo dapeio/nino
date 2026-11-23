@@ -1,0 +1,8 @@
+[crown-wrap]
+	[band-row]
+		[band-col]
+			[crown-logo]
+			[crown-nav menu="main"]
+		[/band-col]
+	[/band-row]
+[/crown-wrap]
