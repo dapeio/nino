@@ -83,7 +83,7 @@ For operation:
 - use `/_admin` exclusively via HTTPS;
 - create editor accounts with the **Editor** role and add a role only for a concrete need;
 - keep the number of developer accounts small;
-- sign out via **Logout** after work;
+- sign out via **Logout** after work: it is a POST to `/.nino/auth/logout` that signs out only after the token of the session has been checked, so a form on another site cannot end the session of an account that has `/_admin` open, and a GET signs nobody out; a page that is older than the last sign-in asks the workbench for the current token once and sends the request again, as every other request of the workbench does;
 - additionally protect the path via web server, VPN or IP allowances if the hosting allows it.
 
 If the accounts themselves are what is broken – the last developer password forgotten, a bad restore – the [recovery page](#recovery) is the way back in.

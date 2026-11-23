@@ -3197,7 +3197,12 @@
 			// The logout request goes out first and the page leaves in its answer,
 			// so the browser's own question would come after the session is gone
 			el.userLogout.addEventListener( 'click', function() {
-				Nino.admin.dirty.guard( null, function() { Nino.auth.logout( '[[/nino/dir]]/_admin' ) }, undefined, true );
+				// A page older than the last sign-in holds a token the logout is refused for: it asks for the current one once, as every other request of the workbench does
+				Nino.admin.dirty.guard( null, function() {
+					Nino.auth.logout( '[[/nino/dir]]/_admin', function( done ) {
+						Nino.adminUi.api.renew( function( info ) { done( info !== null && info.user !== '' ) } );
+					} );
+				}, undefined, true );
 			} );
 			// The link is a real one (href="#<panel>"): a click that asks the
 			// browser for something else - a new tab, a new window, a download -

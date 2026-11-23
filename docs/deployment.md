@@ -19,7 +19,7 @@ For small projects, there are two sensible approaches:
 
 In both cases the setup wizard converts a fresh checkout into a valid project state once ([Quick Start](../README.md#quick-start)); it is not an update tool for running projects. If you transfer an already configured project, the generated project directories must be fully included in the deployment.
 
-**Security:** If the setup is done on the target system, `/_admin` must be protected by a front-end access control, internal network, or a not yet public environment until the wizard is completed - it has no access protection of its own until then.
+**Security:** If the setup is done on the target system, `/_admin` must be protected by a front-end access control, internal network, or a not yet public environment until the wizard is completed - it has no access protection of its own until its first account exists, and asks for the session of that account from then on ([Setup Wizard](setup.md#who-may-do-what-before-and-after-the-first-account)).
 
 ## Webroot and Routing
 

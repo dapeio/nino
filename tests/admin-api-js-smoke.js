@@ -228,6 +228,24 @@ T.sent[n - 1].callback( answer( 401, { error : 'not logged in', code : 'session'
 T.sent[n].callback( answer( 500, null ) );
 check( 'when the check itself fails the request gets the answer it already had', failed.length === 1 && failed[0][0] === 401 && failed[0][1].code === 'session' && api.waiting() === false );
 
+// --- renew: the token the session holds, for a caller that sends one request of its own
+
+const renewed = [];
+const renewBefore = T.sent.length;
+T.csrfInputs.forEach( input => { input.value = 'old' } );
+api.renew( function( info ) { renewed.push( info ) } );
+check( 'renew asks whose session this is with GET ?session=1 on the endpoint of the workbench, and waits for the answer', T.sent.length === renewBefore + 1 && T.sent[renewBefore].method === 'GET' && T.sent[renewBefore].uri === '/sub/_admin/?session=1' && renewed.length === 0 );
+T.sent[renewBefore].callback( answer( 200, { user : 'someone@else.example', csrf : 'held-now' } ) );
+check( '...puts the token into every csrf field of the page whoever is signed in - the caller has no form to keep for an account - and hands the answer on', T.csrfInputs.every( input => input.value === 'held-now' ) && renewed.length === 1 && renewed[0].user === 'someone@else.example' && renewed[0].csrf === 'held-now' );
+api.renew( function( info ) { renewed.push( info ) } );
+T.sent[T.sent.length - 1].callback( answer( 200, { user : '', csrf : 'anonymous-3' } ) );
+check( '...a session that is gone has a token too, which is the one to sign in with', renewed[1].user === '' && T.csrfInputs.every( input => input.value === 'anonymous-3' ) );
+api.renew( function( info ) { renewed.push( info ) } );
+T.sent[T.sent.length - 1].callback( answer( 500, null ) );
+api.renew( function( info ) { renewed.push( info ) } );
+T.sent[T.sent.length - 1].callback( answer( 200, { user : 5 } ) );
+check( '...an answer that is none - a failure, a body without the two values - is null, and no field is touched', renewed[2] === null && renewed[3] === null && T.csrfInputs.every( input => input.value === 'anonymous-3' ) );
+
 // --- offline is not a server error
 
 const offline = [];

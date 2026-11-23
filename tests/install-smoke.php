@@ -24,6 +24,30 @@ require __DIR__. '/../_admin/install/Install.php';
 
 register_shutdown_function( static fn() => \Nino\Filesystem::removeDir( NINO_FEATURES_DIR ) );
 
+// Another process of the same project, for the pin that needs requests that arrive together: php install-smoke.php first-account <sandbox> <mail>.
+// It waits for the file <sandbox>/go, then makes the first account as the wizard's step does and says what it was answered
+if( ( $argv[1] ?? '' ) === 'first-account' ) {
+
+	$child = [ './nino/uid' => $argv[2] ];
+	\Nino\AppData::prepare( $child );
+	$child['./nino/filesystem/path']				= $argv[2];
+	$child['./nino/filesystem/configpath']	= $argv[2]. '/private';
+	$child['./nino/filesystem/contentpath']	= $argv[2]. '/private';
+	$child['./nino/filesystem/publicpath']	= $argv[2]. '/public';
+	$child['./nino/locales/current']				= 'de_DE';
+	$child['/nino/locales/native']					= 'de_DE';
+	$child['/nino/dir']											= '';
+	$child['/nino/auth/roles']							= \Nino\AppData::stored( $child, '/nino/auth/roles', [] );
+	$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+
+	while( is_file( $argv[2]. '/go' ) === false )
+		usleep( 200 );
+
+	[ $status, $answer ] = ninoCall( $child, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => $argv[3], 'pw' => 'a long enough password' ] );
+	echo json_encode( [ $status, $answer['code'] ?? '', \Nino\Auth::getCurrentUser( $child )['mail'] ?? '' ] );
+	exit( 0 );
+}
+
 $appData = ninoSandbox( 'install' );
 $sandbox = ninoSandboxDir( $appData );
 
@@ -877,7 +901,10 @@ foreach( [ 'apiSave', 'apiDelete', 'apiMove' ] as $action ) {
 check( 'every route write decides and writes under one lock'. ( $unlocked === [] ? '' : ' - unlocked: '. implode( ', ', $unlocked ) ), $unlocked === [] );
 
 \Nino\Auth::logoutUser( $appData );
+// The accounts as this request booted them are what the merge of the write knows: the one the section made is part of them for the deletion to count, and gone from them after it
+$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
 \Nino\Auth::deleteUser( $appData, 'dev@example.com' );
+$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
 
 // One step earlier, re-applying with nothing posted still leaves navigation,
 // the locale picker and the contact form active - there is no "opening
@@ -1017,10 +1044,20 @@ check( '...and hands the page the csrf token the sign-in rotated to', ( $body['c
 check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
 
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password' ] );
-check( 'creating the same address again replaces it rather than failing', $status === 200 );
-check( 'the replaced account uses the new password', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' ) !== false );
+// From the first account on this step changes the own account of the session: with the current password, and never another account
+\Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password', 'currentPassword' => 'a-long-enough-password' ] );
+check( 'the account of the session is changed by this step, with its current password: 200', $status === 200 && array_keys( $appData['/nino/auth/user'] ) === [ 'disabled@example.com', 'changeme@domain.com', 'admin@example.com' ] );
+check( 'the changed account uses the new password, and the session that changed it is still signed in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
 \Nino\Auth::logoutUser( $appData );
+check( '...and it can sign in with it', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' ) !== false );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'not the password' ] );
+check( 'a wrong current password is refused 401 with a code of its own and changes nothing', $status === 401 && ( $body['code'] ?? '' ) === 'install_wrong_password' && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'changeme@domain.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'a-different-password' ] );
+check( 'the address of another account is refused 400 with a code of its own: this step never replaces an account that is not the session\'s', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail_in_use' && count( $appData['/nino/auth/user'] ) === 3 );
+\Nino\Auth::logoutUser( $appData );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'a-different-password' ] );
+check( 'without a session it changes nothing at all: 401', $status === 401 && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
 
 /*	The rule the form names up front is the rule the server enforces. The
 	number is the one the wizard's page states, read from the page as the
@@ -1060,8 +1097,13 @@ check( 'one minimum password length, Recovery::MIN_PW_LENGTH, declared once and 
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
 check( 'a password one character below the rule the form shows is refused by the server', $status === 400 );
 
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', $minPw ) ] );
+\Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => str_repeat( 'x', $minPw ), 'currentPassword' => 'a-different-password' ] );
 check( '...and one of exactly that length is accepted', $status === 200 );
+ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password', 'currentPassword' => str_repeat( 'x', $minPw ) ] );
+// A second account is made by hand, as a project that is edited in config.php has it, for the end of the wizard below to see two of them
+\Nino\Auth::insertUser( $appData, 'boundary@example.com', str_repeat( 'x', $minPw ), [ '/*' ] );
+\Nino\Auth::loginUser( $appData, 'boundary@example.com', str_repeat( 'x', $minPw ) );
 
 /*	The refusals of the wizard are codes, which the page words in the language it speaks: a code is one of a fixed few and carries nothing of what was
 	typed - not an address, not a markup, not a length of a password - and the sentence of the server beside it is the English of a log, never what the page shows	*/
@@ -1769,8 +1811,8 @@ check( '...and its copy under .auth is that key behind the exit stub, written be
 check( '...the answer is not to be kept by a cache', ( $completed['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'private, no-store' );
 check( '...and no other key of config.php holds it: it is under /nino/backup/key alone', substr_count( (string) file_get_contents( $sandbox. '/private/config.php' ), (string) $shown ) === 1 );
 
-/*	Two accounts were created above (admin@ and boundary@), and the last
-	apiCreate() left boundary@ signed in. Which of the two stays signed in
+/*	Two accounts were made above (admin@ and boundary@), and boundary@ is the
+	one signed in. Which of the two stays signed in
 	is the login page's decision, not the wizard's: the session is ended
 	and the wizard is told so	*/
 check( 'with several accounts the wizard answers login: false', array_diff_key( $body, [ 'recoveryKey' => 1 ] ) === [ 'login' => false, 'targets' => [] ] );
@@ -2297,6 +2339,275 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 }
 
 
+// --- The session of the wizard ----------------------------------------------
+
+echo "Install::authorize - the wizard asks for the session of the first account\n";
+
+/*	Real requests, as far as a suite can send them: each one goes through Http::request() and Http::response() with the callbacks a request has
+	(the csrf guard, Auth, the wizard's own), $_POST filled as a browser fills it, and the session of the client that sends it - a client is
+	nothing but the session it holds, so "no cookie", "somebody else's cookie" and "the account's cookie" are three clients. The answer is the
+	status and the body the response ends with	*/
+$wsClients = [];
+$wsMail = 'owner@example.com';
+$wsPassword = 'a long enough password';
+$wsAsk = static function( array &$app, string $who, string $action, array $data = [], string $token = 'own' ) use ( &$wsClients ): array {
+	return wizardAsk( $app, $wsClients, $who, $action, $data, $token );
+};
+$wsActions = [
+	'checks/run' => [], 'setup/library' => [], 'setup/apply' => [ 'locales' => [ 'de_DE' ], 'modules' => [] ], 'personalinfos/list' => [], 'personalinfos/savebatch' => [ 'items' => [] ],
+	'accounts/list' => [], 'accounts/create' => [ 'mail' => 'owner@example.com', 'pw' => 'a long enough password', 'currentPassword' => 'a long enough password' ],
+	'applications/list' => [], 'applications/plan' => [ 'applications' => [ 'site' ] ], 'applications/apply' => [ 'applications' => [ 'site' ], 'feature' => 'alpha' ],
+	'finish/complete' => [ 'password' => 'a stranger password', 'applications' => [] ],
+];
+$wsReflection = new \ReflectionClass( \Nino\Install\Install::class );
+$wsActionList = [];
+foreach( $wsReflection->getReflectionConstant( 'MODULES' )->getValue() as $wsModule )
+	$wsActionList += $wsModule::actions();
+check( 'the requests below name every action the wizard has, and no other', array_keys( $wsActionList ) === array_keys( $wsActions ) );
+
+// --- before the first account: open, as it always was
+
+$appReset();
+$wsProject = $appProject( 'install-session', false );
+$wsStatuses = [];
+foreach( [ 'checks/run', 'setup/library', 'personalinfos/list', 'accounts/list', 'applications/list', 'applications/plan', 'finish/complete' ] as $wsAction ) {
+	wizardVisit( $wsProject, $wsClients, 'stranger' );
+	$wsStatuses[$wsAction] = $wsAsk( $wsProject, 'stranger', $wsAction, $wsActions[$wsAction] )[0];
+}
+check( 'before an account exists a visitor with the page\'s token is let through every action that reads or only asks for an account: the first four answer, the three that need an account say so with 409',
+	$wsStatuses === [ 'checks/run' => 200, 'setup/library' => 200, 'personalinfos/list' => 200, 'accounts/list' => 200, 'applications/list' => 409, 'applications/plan' => 409, 'finish/complete' => 409 ] );
+check( '...without the token of the page nothing is let through, the account step included: 403 with the code of the token, so that the page asks for the one of its session',
+	array_values( array_unique( array_map( static fn( string $wsAction ): string => $wsAsk( $wsProject, 'stranger', $wsAction, $wsActions[$wsAction], 'none' )[0]. ' '. json_encode( $wsAsk( $wsProject, 'stranger', $wsAction, $wsActions[$wsAction], 'none' )[1] ), array_keys( $wsActions ) ) ) ) === [ '403 '. json_encode( [ 'error' => 'the session token is no longer valid - reload the page', 'code' => 'csrf' ] ) ] );
+
+$wsBeforeAccount = wizardSession( $wsProject, $wsClients, 'stranger' );
+check( '...and the page whose token is refused there asks the same question of the session and is answered as it is later: nobody, and the token of the session to send the request again with', $wsBeforeAccount['user'] === '' && strlen( (string) ( $wsBeforeAccount['csrf'] ?? '' ) ) === 64 );
+
+// --- the first account: made by whoever asks, and the maker is signed in
+
+wizardVisit( $wsProject, $wsClients, 'maker' );
+[ $wsStatus, $wsBody ] = $wsAsk( $wsProject, 'maker', 'accounts/create', [ 'mail' => $wsMail, 'pw' => $wsPassword ] );
+check( 'the first account is made by the visitor that asks, which is the one thing a project without an account lets a stranger do', $wsStatus === 200 && $wsBody['users'] === [ $wsMail ] );
+$wsSession = wizardSession( $wsProject, $wsClients, 'maker' );
+check( '...the sign-in is made with it: the session of that visitor is the account\'s, and the token the answer names is the one the session holds from then on', $wsSession['user'] === $wsMail && $wsSession['csrf'] === $wsBody['csrf'] );
+
+// --- from the first account on: every action of every step wants the session
+
+$wsFingerprint = static function( array &$app ): string {
+	$config = \Nino\Filesystem::getFileContent( $app, '/config.php', [] );
+	return json_encode( [ array_keys( $app['/nino/auth/user'] ?? [] ), array_map( static fn( array $user ): string => $user['pw'], $app['/nino/auth/user'] ?? [] ), $config['/nino/modules'] ?? null, $config['/nino/locales/available'] ?? null,
+		$config['/nino/install/completed'] ?? null, glob( \Nino\Features::dir(). '/*' ), is_file( \Nino\Admin\Recovery::path( $app ) ) ] );
+};
+$wsBefore = $wsFingerprint( $wsProject );
+$wsAnswers = [ 'nobody' => [], 'visitor' => [], 'tokenless' => [], 'account' => [] ];
+foreach( $wsActions as $wsAction => $wsData ) {
+	$wsAnswers['nobody'][$wsAction]		= $wsAsk( $wsProject, 'nobody', $wsAction, $wsData, 'none' );
+	wizardVisit( $wsProject, $wsClients, 'visitor' );
+	$wsAnswers['visitor'][$wsAction]	= $wsAsk( $wsProject, 'visitor', $wsAction, $wsData );
+	$wsAnswers['tokenless'][$wsAction]	= $wsAsk( $wsProject, 'maker', $wsAction, $wsData, 'none' );
+}
+$wsCodes = static fn( array $answers ): array => array_values( array_unique( array_map( static fn( array $answer ): string => $answer[0]. ' '. ( $answer[1]['code'] ?? '' ), $answers ) ) );
+check( 'without a cookie and without a token every action is refused for the token, 403 \'csrf\'', $wsCodes( $wsAnswers['nobody'] ) === [ '403 csrf' ] );
+check( 'a visitor that has the page and its token, and no session, is refused every action with 401 \'session\' - the answer of the workbench, which tells the page to ask for the account', $wsCodes( $wsAnswers['visitor'] ) === [ '401 session' ] );
+check( '...the account\'s own cookie without the token is refused like a visit without a token: 403 \'csrf\'', $wsCodes( $wsAnswers['tokenless'] ) === [ '403 csrf' ] );
+check( '...and nothing was done by any of them: the accounts and their password hashes, the modules and languages of the project, the end of the wizard, the features and the recovery password are as they were', $wsFingerprint( $wsProject ) === $wsBefore );
+check( '...an answer says nothing about the project: the same words and no more for every action, the 401 and the 403 of the token alone',
+	array_values( array_unique( array_map( static fn( array $answer ): string => json_encode( $answer[1] ), array_merge( array_values( $wsAnswers['visitor'] ), array_values( $wsAnswers['nobody'] ) ) ) ) ) === [ json_encode( [ 'error' => 'not logged in', 'code' => 'session' ] ), json_encode( [ 'error' => 'the session token is no longer valid - reload the page', 'code' => 'csrf' ] ) ] );
+
+// The account made once more, with the password changed, by a visitor that has no session: the account is the first one's still
+$wsAsk( $wsProject, 'visitor', 'accounts/create', [ 'mail' => $wsMail, 'pw' => 'a password the stranger chose' ] );
+check( 'making the address of the account again, with another password, is refused to a visitor: the account is the one it was and still opens with its password', array_keys( $wsProject['/nino/auth/user'] ) === [ $wsMail ] && password_verify( $wsPassword, $wsProject['/nino/auth/user'][$wsMail]['pw'] ) === true );
+
+wizardVisit( $wsProject, $wsClients, 'visitor' );
+$wsVisitor = wizardSession( $wsProject, $wsClients, 'visitor' );
+$wsPage = wizardPage( $wsProject, $wsClients, 'visitor' );
+check( 'the question a page asks that has lost its session - whose is it, and which token - is answered to a visitor with nobody and a token, and to the account with its mail: nothing else, and not to be kept',
+	$wsVisitor['user'] === '' && is_string( $wsVisitor['csrf'] ) === true && strlen( $wsVisitor['csrf'] ) === 64 && array_keys( $wsVisitor ) === [ 'user', 'csrf', 'header' ] && $wsSession['user'] === $wsMail
+	&& $wsVisitor['header'] === 'no-store' && $wsSession['header'] === 'no-store' );
+check( 'the page itself is the same for everybody, whether an account exists or not: it holds no fact of the project (every step asks for its own through the api)', wizardPage( $wsProject, $wsClients, 'maker' ) === $wsPage && wizardPage( $wsProject, $wsClients, 'nobody' ) === $wsPage && $wsPage['status'] === 200 );
+
+// The account itself: every action goes through to the step
+$wsReached = [];
+foreach( $wsActions as $wsAction => $wsData )
+	$wsReached[$wsAction] = $wsAsk( $wsProject, 'maker', $wsAction, $wsAction === 'finish/complete' ? [ 'password' => 'short' ] : $wsData, (string) ( wizardSession( $wsProject, $wsClients, 'maker' )['csrf'] ?? '' ) )[0];
+check( 'the account with the token is let through to the action of every step - what is answered is the step\'s own, 200 or its own refusal (the password of the end of the wizard is too short, the catalogue is not asked for here)',
+	array_filter( $wsReached, static fn( int $status ): bool => in_array( $status, [ 401, 403 ], true ) === true ) === [] && $wsReached['checks/run'] === 200 && $wsReached['accounts/list'] === 200 && $wsReached['finish/complete'] === 400 );
+
+// --- the right of the account: the wizard is the work of the developer as a whole
+
+check( 'what the wizard asks of an account is what the role it gives the first account holds: everything where that role is the Developer the Setup step wrote',
+	\Nino\Install\Accounts::rootPerms( $wsProject ) === [ '/*' ] && $wsProject['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
+
+\Nino\Auth::insertUser( $wsProject, 'nothing@example.com', $wsPassword, [] );
+\Nino\Auth::insertUser( $wsProject, 'features@example.com', $wsPassword, [ \Nino\Modules\Features\Admin::MANAGE_PERM ] );
+\Nino\Auth::insertUser( $wsProject, 'users@example.com', $wsPassword, [ \Nino\Modules\Users\Admin::MANAGE_PERM ], 'editor' );
+\Nino\Auth::insertUser( $wsProject, 'language@example.com', $wsPassword, [ \Nino\Modules\Language\Admin::MANAGE_PERM ] );
+$wsPartialBefore = $wsFingerprint( $wsProject );
+$wsRights = [];
+foreach( [ 'nothing@example.com', 'features@example.com', 'users@example.com', 'language@example.com' ] as $wsWho ) {
+	wizardVisit( $wsProject, $wsClients, $wsWho );
+	wizardLogin( $wsProject, $wsClients, $wsWho, $wsWho, $wsPassword );
+	foreach( $wsActions as $wsAction => $wsData ) {
+		$wsData = $wsAction === 'accounts/create' ? [ 'mail' => $wsMail, 'pw' => 'the password of a partial account', 'currentPassword' => $wsPassword ] : $wsData;
+		$wsRights[$wsWho][$wsAction] = ( $wsAns = $wsAsk( $wsProject, $wsWho, $wsAction, $wsData, (string) ( wizardSession( $wsProject, $wsClients, $wsWho )['csrf'] ?? '' ) ) )[0]. ' '. ( $wsAns[1]['code'] ?? '' );
+	}
+}
+check( 'an account whose rights are narrower than the Developer\'s is refused every action of every step with 403 and the code of the wizard - the reading ones too: none holds nothing, one the right of a panel, one only the right of the Users panel, one only that of Language',
+	array_map( static fn( array $answers ): array => array_values( array_unique( $answers ) ), $wsRights ) === array_fill_keys( [ 'nothing@example.com', 'features@example.com', 'users@example.com', 'language@example.com' ], [ '403 install_not_allowed' ] ) );
+check( '...and nothing was written by any of them: the account of the developer with its password, the modules and languages, the end of the wizard, the features and the recovery password are as they were - the account step did not take over the account of the Developer for the one that may manage users, and the step that writes roles, routes and modules was not run for the one that may change the language',
+	$wsFingerprint( $wsProject ) === $wsPartialBefore && password_verify( $wsPassword, $wsProject['/nino/auth/user'][$wsMail]['pw'] ) === true );
+
+// A session that ended on the server (the sessions of the account were all ended), the cookie still there: the same answer as no session
+\Nino\Auth::logoutAllSessions( $wsProject, wizardSession( $wsProject, $wsClients, 'maker' )['user'] );
+$wsEnded = $wsAsk( $wsProject, 'maker', 'checks/run' );
+check( 'a session that was ended on the server, with the cookie and its token still in the browser, is refused as no session is: 401 \'session\'', $wsEnded[0] === 401 && ( $wsEnded[1]['code'] ?? '' ) === 'session' );
+
+// The way back: the sign-in of the account, with the token of the page, and the same request again - with the token of the new session, which the sign-in rotated
+$wsLogin = wizardLogin( $wsProject, $wsClients, 'maker', $wsMail, $wsPassword );
+$wsStale = $wsAsk( $wsProject, 'maker', 'checks/run', [], 'stale' );
+$wsAgain = $wsAsk( $wsProject, 'maker', 'checks/run', [], (string) ( wizardSession( $wsProject, $wsClients, 'maker' )['csrf'] ?? '' ) );
+check( 'the sign-in of the account brings the session back: it is answered 200, the token of the page from before it is refused 403 \'csrf\' - the page asks for the new one and sends the request again - and the request goes through with it',
+	$wsLogin === 200 && $wsStale[0] === 403 && ( $wsStale[1]['code'] ?? '' ) === 'csrf' && $wsAgain[0] === 200 );
+$wsWrong = wizardLogin( $wsProject, $wsClients, 'visitor', $wsMail, 'not the password' );
+check( 'a sign-in with another password is refused 401 and gives no session', $wsWrong === 401 && wizardSession( $wsProject, $wsClients, 'visitor' )['user'] === '' );
+
+// --- the account step signs the account in whether or not the address has been guessing at the sign-in
+
+$appReset();
+$wsCooling = $appProject( 'install-session-cooling', false );
+$wsTries = new \ReflectionClass( \Nino\Auth::class );
+\Nino\Filesystem::putFileContent( $wsCooling, $wsTries->getReflectionConstant( 'TRIES_PATH' )->getValue(), [ $wsTries->getReflectionConstant( 'IP_KEY_PREFIX' )->getValue(). \Nino\Http::clientBucket( '127.0.0.1' ) => 0 - ( time() + 600 ) ] );
+wizardVisit( $wsCooling, $wsClients, 'cooling' );
+$wsAsk( $wsCooling, 'cooling', 'accounts/create', [ 'mail' => $wsMail, 'pw' => $wsPassword ] );
+wizardVisit( $wsCooling, $wsClients, 'later' );
+check( 'with the ip of the visitor cooling down from earlier guesses at a password, the account is made and its maker is signed in all the same - the sign-in of the account step asks for no password - while a sign-in by password is refused',
+	wizardSession( $wsCooling, $wsClients, 'cooling' )['user'] === $wsMail && wizardLogin( $wsCooling, $wsClients, 'later', $wsMail, $wsPassword ) === 401 );
+
+// --- the first account is made by one request: of those that come together one wins
+
+$appReset();
+$wsRace = $appProject( 'install-session-race', false );
+$wsRaceDir = ninoSandboxDir( $wsRace );
+$wsRacers = [];
+foreach( range( 1, 6 ) as $wsNumber ) {
+	$wsRacers[$wsNumber] = proc_open( [ PHP_BINARY, __FILE__, 'first-account', $wsRaceDir, 'racer'. $wsNumber. '@example.com' ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $wsRacePipes[$wsNumber] );
+}
+file_put_contents( $wsRaceDir. '/go', '1' );
+$wsRaceAnswers = [];
+foreach( $wsRacers as $wsNumber => $wsProcess ) {
+	$wsRaceAnswers[$wsNumber] = json_decode( (string) stream_get_contents( $wsRacePipes[$wsNumber][1] ), true );
+	stream_get_contents( $wsRacePipes[$wsNumber][2] );
+	proc_close( $wsProcess );
+}
+$wsRaceStored = \Nino\AppData::stored( $wsRace, '/nino/auth/user', [] );
+$wsWon = array_values( array_filter( $wsRaceAnswers, static fn( mixed $answer ): bool => is_array( $answer ) === true && $answer[0] === 200 ) );
+check( 'six requests that make the first account together - separate processes at the same project, started together - are answered one 200 and five 401 \'session\': one account is made and one request signed in, the five others are told there is one and have no session',
+	count( $wsWon ) === 1 && count( $wsRaceAnswers ) === 6 && count( array_filter( $wsRaceAnswers, static fn( mixed $answer ): bool => is_array( $answer ) === true && $answer[0] === 401 && $answer[1] === 'session' && $answer[2] === '' ) ) === 5
+	&& $wsWon[0][2] !== '' && array_keys( $wsRaceStored ) === [ $wsWon[0][2] ] );
+
+// The same with an entry that cannot sign in at the address of every racer - a disabled or passwordless one the account replaces. The
+// removal of that entry is a write of its own, which lets the lock of the file go; the account is made under the lock all the same
+$appReset();
+$wsStale = $appProject( 'install-session-race-stale', false );
+$wsStaleDir = ninoSandboxDir( $wsStale );
+foreach( range( 1, 6 ) as $wsNumber ) {
+	\Nino\Auth::insertUser( $wsStale, 'racer'. $wsNumber. '@example.com', $wsPassword );
+	$wsStale['/nino/auth/user'][ 'racer'. $wsNumber. '@example.com' ]['pw'] = '';
+}
+\Nino\AppData::writeContentData( $wsStale, [ '/nino/auth/user' ] );
+$wsStaleWon = [];
+foreach( range( 1, 4 ) as $wsRound ) {
+
+	$wsRacers = $wsRacePipes = [];
+	foreach( range( 1, 6 ) as $wsNumber )
+		$wsRacers[$wsNumber] = proc_open( [ PHP_BINARY, __FILE__, 'first-account', $wsStaleDir, 'racer'. $wsNumber. '@example.com' ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $wsRacePipes[$wsNumber] );
+	file_put_contents( $wsStaleDir. '/go', '1' );
+	$wsStaleAnswers = [];
+	foreach( $wsRacers as $wsNumber => $wsProcess ) {
+		$wsStaleAnswers[$wsNumber] = json_decode( (string) stream_get_contents( $wsRacePipes[$wsNumber][1] ), true );
+		stream_get_contents( $wsRacePipes[$wsNumber][2] );
+		proc_close( $wsProcess );
+	}
+	$wsStaleStored = (array) \Nino\AppData::stored( $wsStale, '/nino/auth/user', [] );
+	$wsStaleWon[] = [
+		count( array_filter( $wsStaleAnswers, static fn( mixed $answer ): bool => is_array( $answer ) === true && $answer[0] === 200 && $answer[2] !== '' ) ),
+		count( array_filter( $wsStaleStored, static fn( mixed $user ): bool => is_array( $user ) === true && ( $user['pw'] ?? '' ) !== '' ) ),
+	];
+
+	// The next round starts from the entries that cannot sign in once more
+	unlink( $wsStaleDir. '/go' );
+	foreach( array_keys( $wsStaleStored ) as $wsRacer )
+		$wsStaleStored[$wsRacer]['pw'] = '';
+	$wsStale['/nino/auth/user'] = $wsStaleStored;
+	\Nino\AppData::writeContentData( $wsStale, [ '/nino/auth/user' ] );
+}
+check( 'six requests that each replace an entry that cannot sign in, started together, in four rounds: every round makes one account that can sign in and signs one request in', $wsStaleWon === array_fill( 0, 4, [ 1, 1 ] ) );
+
+// --- the wizard asks for everything, whatever the role of the developer holds in the file
+
+$appReset();
+$wsNarrow = $appProject( 'install-session-narrow', false );
+$wsNarrow['/nino/auth/roles']['developer']['perms'] = [ \Nino\Modules\Features\Admin::MANAGE_PERM ];
+\Nino\AppData::writeContentData( $wsNarrow, [ '/nino/auth/roles' ] );
+wizardVisit( $wsNarrow, $wsClients, 'first' );
+$wsAsk( $wsNarrow, 'first', 'accounts/create', [ 'mail' => $wsMail, 'pw' => $wsPassword ] );
+\Nino\Auth::insertUser( $wsNarrow, 'second@example.com', $wsPassword, [], 'developer' );
+wizardVisit( $wsNarrow, $wsClients, 'second' );
+wizardLogin( $wsNarrow, $wsClients, 'second', 'second@example.com', $wsPassword );
+$wsNarrowFirst = $wsAsk( $wsNarrow, 'first', 'checks/run' );
+$wsNarrowSecond = $wsAsk( $wsNarrow, 'second', 'checks/run', [], (string) ( wizardSession( $wsNarrow, $wsClients, 'second' )['csrf'] ?? '' ) );
+check( 'where the role of the developer was narrowed in the file, the wizard still asks for everything: the first account holds everything of its own and goes on, an account that holds only that role is refused 403',
+	\Nino\Install\Accounts::rootPerms( $wsNarrow ) === [ '/*' ] && ( $wsNarrow['/nino/auth/user'][$wsMail]['perms'] ?? [] ) === [ '/*' ]
+	&& $wsNarrowFirst[0] === 200 && $wsNarrowSecond[0] === 403 && ( $wsNarrowSecond[1]['code'] ?? '' ) === 'install_not_allowed' );
+
+// --- after the first account this step changes the own account of the session, and makes no other
+
+$appReset();
+$wsOwn = $appProject( 'install-session-own', false );
+wizardVisit( $wsOwn, $wsClients, 'owner' );
+$wsAsk( $wsOwn, 'owner', 'accounts/create', [ 'mail' => $wsMail, 'pw' => $wsPassword ], 'own' );
+$wsMoved = $wsAsk( $wsOwn, 'owner', 'accounts/create', [ 'mail' => 'moved@example.com', 'pw' => 'the new password of it', 'currentPassword' => $wsPassword ] );
+check( 'the step answered with another address and the password of the account of the session renames that account and changes its password - it makes no second account - and the session stays the one it is, as that account',
+	$wsMoved[0] === 200 && array_keys( $wsOwn['/nino/auth/user'] ) === [ 'moved@example.com' ] && $wsMoved[1]['users'] === [ 'moved@example.com' ] && $wsMoved[1]['user'] === 'moved@example.com'
+	&& wizardSession( $wsOwn, $wsClients, 'owner' )['user'] === 'moved@example.com' && password_verify( 'the new password of it', $wsOwn['/nino/auth/user']['moved@example.com']['pw'] ) === true );
+check( '...and the address of the account the session holds is in the page it draws, for the page to know whose it is - and in nobody else\'s', wizardAccountOfPage( $wsOwn, $wsClients, 'owner' ) === 'moved@example.com' && wizardAccountOfPage( $wsOwn, $wsClients, 'passer-by' ) === '' );
+$appReset();
+
+// --- the whole wizard, with real requests: without an application, and with one
+
+foreach( [ 'without an application' => [], 'with an application of the catalogue' => [ 'site' ] ] as $wsHow => $wsKeys ) {
+
+	$appReset();
+	$wsFlow = $appProject( 'install-session-flow', false );
+	$wsFlowCall = static function( string $action, array $data = [] ) use ( &$wsFlow, &$wsClients ): array {
+		wizardVisit( $wsFlow, $wsClients, 'person' );
+		return wizardAsk( $wsFlow, $wsClients, 'person', $action, $data );
+	};
+
+	$wsSteps = [];
+	foreach( [
+		[ 'checks/run', [] ], [ 'setup/library', [] ], [ 'setup/apply', [ 'locales' => [ 'de_DE' ], 'modules' => [] ] ], [ 'personalinfos/list', [] ], [ 'personalinfos/savebatch', [ 'items' => [] ] ],
+		[ 'accounts/list', [] ], [ 'accounts/create', [ 'mail' => $wsMail, 'pw' => $wsPassword ] ], [ 'accounts/list', [] ], [ 'applications/list', [] ],
+	] as [ $wsAction, $wsData ] )
+		$wsSteps[] = $wsFlowCall( $wsAction, $wsData )[0];
+
+	if( $wsKeys !== [] ) {
+		[ , $wsPlan ] = $wsFlowCall( 'applications/plan', [ 'applications' => $wsKeys ] );
+		foreach( $wsPlan['features'] ?? [] as $wsFeature )
+			$wsSteps[] = $wsFlowCall( 'applications/apply', [ 'applications' => $wsKeys, 'feature' => $wsFeature['key'] ] )[0];
+	}
+
+	// The browser's second tab: the page asks the same again with the session it has, and a reload is the first step again
+	$wsSteps[] = $wsFlowCall( 'checks/run' )[0];
+	[ $wsFinish, $wsEnd ] = $wsFlowCall( 'finish/complete', [ 'password' => 'a brand new dev password', 'applications' => $wsKeys ] );
+	check( 'the wizard runs through from the first step to its end '. $wsHow. ' - the environment, the language, the details, the account (the first, with its sign-in), the application, the end - and every request is answered by its step',
+		array_values( array_unique( $wsSteps ) ) === [ 200 ] && $wsFinish === 200 && ( $wsEnd['login'] ?? null ) === true && \Nino\Admin\Admin::isInstalled( $wsFlow ) === true );
+	check( '...and when it is over every action is refused 423, for the account\'s session as for anybody: the lock of the end of the wizard is the one the session of an account does not open',
+		array_values( array_unique( array_map( static fn( string $wsAction ): int => $wsFlowCall( $wsAction )[0], array_keys( $wsActions ) ) ) ) === [ 423 ] );
+}
+$appReset();
+echo "\n";
+
+
 // --- Cleanup ---------------------------------------------------------------
 
 ninoDone( $appData );
@@ -2379,4 +2690,162 @@ echo json_encode( $out );' );
 		( array_count_values( $out['absent']['runtime'] ?? [] )[$css] ?? 0 ) === 1 && ( $out['absent']['times'] ?? null ) === 1 );
 	check( 'where config.php holds a list already, the setup leaves it as it is, with nothing of the feature in it',
 		( $out['held']['status'] ?? null ) === 200 && ( $out['held']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/style.css', '/assets/own.css' ] );
+}
+
+
+/**
+ *	One request of the setup wizard - a POST to /_admin with an action - as the server hands it over to the client that sends it:
+ *	the session of the client is the session of the request (a client is nothing but its session; one that has none is a browser
+ *	without a cookie), the callbacks are those a request has - the csrf guard, Auth, the wizard's own - and the answer is what
+ *	Http::response() ends with
+ *
+ *	@param		array 		&$app					(reference) The project
+ *	@param		array 		&$clients			(reference) The sessions of the clients, by name
+ *	@param		string		$who					The client
+ *	@param		string		$action
+ *	@param		array 		$data					Becomes the 'data' field, json encoded
+ *	@param		string		$token				'own' for the token of the session of the client, 'none' for no token, 'stale' for the one a page that was drawn before the last sign-in holds, or the token itself
+ *
+ *	@return 	array										[ statusCode, body ]
+ */
+function wizardAsk( array &$app, array &$clients, string $who, string $action, array $data = [], string $token = 'own' ): array {
+
+	$uid		= $app['./nino/uid'];
+	$own		= $clients[$who]['./nino/csrf/token'] ?? '';
+	$given	= match( $token ) { 'own' => $own, 'none' => '', 'stale' => bin2hex( random_bytes( 32 ) ), default => $token };
+
+	$_SESSION	= [ $uid => $clients[$who] ?? [] ];
+	$_POST		= [ 'action' => $action, 'data' => json_encode( $data ) ] + ( $given === '' ? [] : [ '_csrf' => $given ] );
+	wizardBoot( $app );
+
+	$request = [ 'REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/_admin', 'REMOTE_ADDR' => '127.0.0.1' ];
+	\Nino\Http::request( $app, $request );
+	\Nino\Http::response( $app, $request );
+
+	$clients[$who] = $_SESSION[$uid] ?? [];
+	$_POST = [];
+
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null ];
+}
+
+/**
+ *	What a request has before it is answered: the callbacks of the csrf guard, of Auth - which reads the session of the request, so
+ *	that the account is the one of the session or nobody - and of the wizard, the routes of the wizard and the sign-in
+ *
+ *	@param		array 		&$app					(reference) The project
+ *
+ *	@return 	void
+ */
+function wizardBoot( array &$app ): void {
+
+	unset( $app['./nino/callbacks'], $app['./nino/auth/current'] );
+	\Nino\Csrf::init( $app );
+	\Nino\Auth::init( $app );
+	\Nino\Install\Install::init( $app );
+}
+
+/**
+ *	The page of the wizard drawn for a client - a GET of /_admin, which hands the client a session and its token the way the [csrf]
+ *	of the page does - and, with ?session, the answer a page that outlived its session asks first
+ *
+ *	@param		array 		&$app					(reference) The project
+ *	@param		array 		&$clients			(reference) The sessions of the clients, by name
+ *	@param		string		$who					The client
+ *	@param		bool			$session			Whether to ask the question of the session instead of the page
+ *
+ *	@return 	array										[ status, body, header (Cache-Control) ] as keys
+ */
+function wizardPage( array &$app, array &$clients, string $who, bool $session = false ): array {
+
+	$uid = $app['./nino/uid'];
+	$_SESSION = [ $uid => $clients[$who] ?? [] ];
+	$_GET = $session === true ? [ 'session' => '1' ] : [];
+	wizardBoot( $app );
+
+	$request = [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/_admin'. ( $session === true ? '?session=1' : '' ), 'REMOTE_ADDR' => '127.0.0.1' ];
+	\Nino\Http::request( $app, $request );
+	\Nino\Http::response( $app, $request );
+
+	// A visitor's page carries the token of its session: asking for it makes the session, as [csrf] does when the page is drawn
+	if( $session === false && $who !== 'nobody' )
+		\Nino\Csrf::getToken( $app );
+
+	$clients[$who] = $who === 'nobody' ? [] : ( $_SESSION[$uid] ?? [] );
+	$_GET = [];
+
+	return [ 'status' => $request['/nino/http/response']['statusCode'], 'body' => $request['/nino/http/response']['body'] ?? null, 'header' => $request['/nino/http/response']['header']['Cache-Control'] ?? '' ];
+}
+
+/**
+ *	A client that has opened the page: it holds a session with a token, which its requests carry
+ *
+ *	@param		array 		&$app					(reference) The project
+ *	@param		array 		&$clients			(reference) The sessions of the clients, by name
+ *	@param		string		$who					The client
+ *
+ *	@return 	void
+ */
+function wizardVisit( array &$app, array &$clients, string $who ): void {
+	wizardPage( $app, $clients, $who );
+}
+
+/**
+ *	The answer to the question of the page that lost its session: who is signed in for this client, and the token of its session
+ *
+ *	@param		array 		&$app					(reference) The project
+ *	@param		array 		&$clients			(reference) The sessions of the clients, by name
+ *	@param		string		$who					The client
+ *
+ *	@return 	array										{ user, csrf } and the Cache-Control of the answer as 'header'
+ */
+function wizardSession( array &$app, array &$clients, string $who ): array {
+
+	$answer = wizardPage( $app, $clients, $who, true );
+
+	return ( is_array( $answer['body'] ) === true ? $answer['body'] : [] ) + [ 'header' => $answer['header'] ];
+}
+
+/**
+ *	The sign-in of an account from the page of the wizard: POST /.nino/auth/login with the credentials in the header of basic
+ *	authentication, as Nino.js sends them, and the token of the session of the client
+ *
+ *	@param		array 		&$app					(reference) The project
+ *	@param		array 		&$clients			(reference) The sessions of the clients, by name
+ *	@param		string		$who					The client
+ *	@param		string		$mail
+ *	@param		string		$password
+ *
+ *	@return 	int											The status of the answer
+ */
+function wizardLogin( array &$app, array &$clients, string $who, string $mail, string $password ): int {
+
+	$uid = $app['./nino/uid'];
+	$_SESSION = [ $uid => $clients[$who] ?? [] ];
+	$_POST = [ '_csrf' => $_SESSION[$uid]['./nino/csrf/token'] ?? '' ];
+	wizardBoot( $app );
+
+	$request = [ 'REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/.nino/auth/login', 'REMOTE_ADDR' => '127.0.0.1', 'HTTP_AUTHORIZATION' => 'Basic '. base64_encode( $mail. ':'. $password ) ];
+	\Nino\Http::request( $app, $request );
+	\Nino\Http::response( $app, $request );
+
+	$clients[$who] = $_SESSION[$uid] ?? [];
+	$_POST = [];
+
+	return $request['/nino/http/response']['statusCode'];
+}
+
+/**
+ *	The account the page of the wizard carries for the client that draws it: the fill the template writes into the root of the page
+ *
+ *	@param		array 		&$app					(reference) The project
+ *	@param		array 		&$clients			(reference) The sessions of the clients, by name
+ *	@param		string		$who					The client
+ *
+ *	@return 	string
+ */
+function wizardAccountOfPage( array &$app, array &$clients, string $who ): string {
+
+	wizardPage( $app, $clients, $who );
+
+	return (string) ( \Nino\Html::getFills( $app )['[[/_admin/install/account]]'] ?? '' );
 }

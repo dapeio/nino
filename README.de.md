@@ -114,7 +114,7 @@ php -S 127.0.0.1:8000 router.php
 
 Öffne anschließend <http://127.0.0.1:8000/_admin>. `router.php` ist das Routing des eingebauten PHP-Servers und nur für die lokale Arbeit; ein Webserver braucht die Konfiguration aus dem [Deployment](docs/deployment.md#webroot-and-routing) (englisch).
 
-Ein frischer Checkout ist noch kein Projekt. Der Einrichtungsassistent, den `/_admin` zeigt, bis er abgeschlossen ist, legt `private/` und `public/` mit allem Inhalt an. Er hat keinen eigenen Zugriffsschutz, und noch existiert kein Konto; führe ihn deshalb lokal oder in einer anderen geschützten Umgebung aus. Solange er nicht abgeschlossen ist, kannst Du zu einem früheren Schritt zurückkehren und ihn erneut anwenden. Die sechs Schritte, jeder mit seiner Referenz im Handbuch [Setup Wizard](docs/setup.md) (englisch):
+Ein frischer Checkout ist noch kein Projekt. Der Einrichtungsassistent, den `/_admin` zeigt, bis er abgeschlossen ist, legt `private/` und `public/` mit allem Inhalt an. Er hat keinen eigenen Zugriffsschutz, bis sein erstes Konto existiert - danach verlangt jeder Schritt die Sitzung dieses Kontos; führe ihn deshalb lokal oder in einer anderen geschützten Umgebung aus und lege das Konto sofort an. Solange er nicht abgeschlossen ist, kannst Du zu einem früheren Schritt zurückkehren und ihn erneut anwenden. Die sechs Schritte, jeder mit seiner Referenz im Handbuch [Setup Wizard](docs/setup.md) (englisch):
 
 | Schritt | Entscheidung |
 |---|---|

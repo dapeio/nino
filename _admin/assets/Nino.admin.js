@@ -10816,6 +10816,31 @@
 			},
 
 			/**
+			 *	Ask the workbench whose session this is and take the token it holds into the csrf fields of the page, whoever
+			 *	is signed in: for a caller that sends one request on its own (the logout, the setup wizard) and has no form
+			 *	to keep for an account, which is what _check() decides for the requests that wait
+			 *
+			 *	@param		{Function}	callback			Called with ( info ): { user, csrf }, null where the server gave none
+			 *
+			 *	@return		void
+			 */
+			renew : function( callback ) {
+
+				Nino.http.sendRequest( Nino.adminUi.api._uri()+ '?session=1', 'GET', function( xhr ) {
+
+					const info = xhr.status === 200 && xhr.responseJSON !== null && typeof xhr.responseJSON === 'object' ? xhr.responseJSON : null;
+
+					if( info === null || typeof info.user !== 'string' || typeof info.csrf !== 'string' ) {
+						callback( null );
+						return;
+					}
+
+					dc.querySelectorAll('input[name="_csrf"]').forEach( function( input ) { input.value = info.csrf } );
+					callback( info );
+				} );
+			},
+
+			/**
 			 *	Let the waiting requests go without a session: each one gets the
 			 *	answer it already had, and one that only waited is sent as it
 			 *	is. The panels hear of the failure and take their forms back

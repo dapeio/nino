@@ -281,7 +281,7 @@ foreach( [ '/private/templates', '/public/images', '/private/text', '/private/as
 $wizardApp['/nino/dir'] = '';
 $wizardApp[ \Nino\Install\Applications::KEY_OVERRIDE ] = $publicKey;
 $wizardApp['./nino/fetch/stub'] = $app['./nino/fetch/stub'];
-\Nino\Auth::insertUser( $wizardApp, 'owner@example.com', 'a long enough password', [ '/*' ] );
+ninoUser( $wizardApp, 'owner@example.com', [ '/*' ], 'a long enough password' );
 $wizardHolder = $elsewhere( $wizardApp );
 \Nino\Features::lock( $wizardHolder );
 [ $status, $body ] = array_slice( ninoCall( $wizardApp, [ \Nino\Install\Install::class, 'handlePost' ], [ 'applications' => [ 'solo' ], 'feature' => 'alpha' ], 'applications/apply' ), 0, 2 );

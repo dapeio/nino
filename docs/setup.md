@@ -18,7 +18,22 @@ Until its last step has been completed, `/_admin` answers with the wizard instea
 
 The wizard is not an update tool for a running project. After successful completion, it locks itself out for good and `_admin/install/` can be removed from production delivery.
 
-**Security:** Until completion, the wizard has no access protection at all. Perform the setup locally or in another protected environment, not on an openly accessible domain.
+**Security:** The wizard is open until its first account exists, and asks for that account's session from then on. Until the account is made, whoever reaches the address can use every step - including the one that makes the first account, and whoever makes it is signed in as it - so perform the setup locally or in another protected environment, not on an openly accessible domain, and make the account at once. See [Who may do what](#who-may-do-what-before-and-after-the-first-account).
+
+## Who May Do What, Before and After the First Account
+
+| | Before an account that can sign in exists | From the first account on |
+|---|---|---|
+| The page of the wizard | the same for everybody, but for the address of the account of the session that draws it (the page's own to know) | the same |
+| Environment, language, details (read and write) | open to a visitor with the token of the page | the session of an account whose rights are not narrower than the Developer's, and the token of that session |
+| Applications and the end of the wizard | refused with 409: an account comes first | the same session; 401 for a visitor |
+| The account step | makes the first account and signs its maker in | changes the own account of the session: its address and its password |
+
+From the first account on the wizard is the work of the developer as a whole. Every action of every step - the reading ones too - asks for a session that holds everything (`/*`, `Accounts::rootPerms()`) - what the first account holds through the Developer role or, where the project stores a narrower role under that name, of its own - and for the token of that session. An account with fewer rights - the Editor role, an account that may only manage users or change the language - is refused with 403 (`install_not_allowed`) at every action; the wizard writes roles, routes, modules and accounts, which no right of one panel stands for. More accounts and accounts with fewer rights are made in the Users panel after the setup.
+
+Without a session the answer is the workbench's: 401 with the code `session`, or 403 with the code `csrf` for a token that is not the one of the session. Before the first account the actions that need an account answer 409 (`install_no_account`) and after it 401: the wizard tells whether an account exists, as the login page of a fresh installation does, and no more than that. The page does what the workbench does: it asks which session this is and what its token is (`GET /_admin/?session=1`, which answers the account's mail and the token, nothing else), and where nobody is signed in it asks for the account in a dialog and sends the request again, so the step that was on goes on. That is what happens after the cookie is gone or the sign-in has run out; a reload keeps the cookie and needs nothing. A request that was refused is never sent again as another account: where a second tab of the browser signed in as another one, the page is loaded anew.
+
+The first account is made under a lock of `config.php`: whether an account exists is asked again from the file once the lock is held, so that of requests that arrive together one makes the account and is signed in, and the others are told there is one (401) and get no session. The step signs its account in without asking for the password it has just set, so that an address that is cooling down from earlier attempts cannot leave the account made and its maker outside. Once it exists, a visitor can neither add an account nor replace one.
 
 ## Navigation and Saving
 
@@ -135,7 +150,7 @@ The links to the site's profiles elsewhere - Instagram, YouTube and the like - a
 
 ## 4. Accounts
 
-This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. **Create account** makes one and leaves the form ready for a second, then continue; what is typed into the form when **Next** is pressed is created first, as Enter in a field does. Editor accounts with fewer rights are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.
+This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. **Create account** makes it; what is typed into the form when **Next** is pressed is made first, as Enter in a field does. From then on the same form changes the own account of the session - its address and its password, with the current password asked, as the Users panel asks it for the own account - and makes no other. More accounts, Editor accounts with fewer rights among them, are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.
 
 Provide:
 
@@ -144,7 +159,9 @@ Provide:
 
 Both can be changed later under **Users**. The accounts live in `config.php` under `/nino/auth/user`.
 
-Each account is signed in to your browser as you create it. Whether that sign-in outlives the wizard is decided by the last step: with exactly one account, finishing opens the workbench as that account; with several, finishing ends the session and `/_admin` asks which one you are.
+The account is signed in to your browser as it is made. Whether that sign-in outlives the wizard is decided by the last step: with exactly one account, finishing opens the workbench as that account; with several (an account added by hand to `config.php`), finishing ends the session and `/_admin` asks which one you are.
+
+Once the first account exists, this step is asked for a session like every other (see [Who may do what](#who-may-do-what-before-and-after-the-first-account)): a visitor cannot add an account or replace the password of the one there is, and the session itself changes only its own account - an address that belongs to another account is refused.
 
 ## 5. Application
 

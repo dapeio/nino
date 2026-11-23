@@ -15,7 +15,7 @@
 		<!-- Every sentence of this page is a key of the table in install/assets/text.js (data-text, data-label, data-title) or is
 		     drawn by the scripts of the steps from the same table, in German or in English: the project the wizard makes has no
 		     text fills yet -->
-		<div id="install-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-checks" data-dir="[[/nino/dir]]" data-min-password="[[/_admin/install/min-password]]">
+		<div id="install-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail show-checks" data-dir="[[/nino/dir]]" data-min-password="[[/_admin/install/min-password]]" data-account="[[/_admin/install/account]]">
 			<aside id="install-shell-rail" class="nino-admin-rail" data-label="/_admin/install/rail/label">
 				<div id="install-bar-wrap" class="nino-admin-rail-head">
 					<div id="install-bar-title">
@@ -120,6 +120,7 @@
 		<script src="[[/nino/dir]]/_admin/assets/pagetext.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/text.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/script.js"></script>
+		<script src="[[/nino/dir]]/_admin/install/assets/session.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/checks.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/setup.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/personalinfos.js"></script>

@@ -87,7 +87,14 @@ namespace Nino\Install {
 		 *	Fill the GET /_admin response: the wizard while the project has
 		 *	never finished the setup, else a locked-out notice -
 		 *	Admin::isInstalled() answers that from '/nino/install/completed'
-		 *	and the stored recovery secret
+		 *	and the stored recovery secret.
+		 *
+		 *	The page itself is the same for everybody: it holds no fact of the
+		 *	project, every step asks for its own through the api, and the api
+		 *	asks for a session once an account exists (see authorize()). The
+		 *	one question the page asks before that is the workbench's own, "?session":
+		 *	whose session this is and the token it holds - what a page that outlived its
+		 *	session needs to sign in again and go on (see Nino.install.apiCall())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -98,8 +105,26 @@ namespace Nino\Install {
 
 			if( \Nino\Admin\Admin::isInstalled( $appData ) === false ) {
 
-				// The length a password must have, for the forms that name it: the page has no text file to ask
-				\Nino\Html::addFills( $appData, [ '[[/_admin/install/min-password]]' => (string) \Nino\Admin\Recovery::MIN_PW_LENGTH ], '*' );
+				// Nothing but the mail of the account that asks and a token that is no secret from the session it belongs to
+				if( isset( $_GET['session'] ) === true ) {
+
+					$user = \Nino\Auth::getCurrentUser( $appData );
+
+					\Nino\Http::ok( $request, [
+						'user'	=> $user === false ? '' : (string) ( $user['mail'] ?? '' ),
+						'csrf'	=> \Nino\Csrf::getToken( $appData ),
+					] );
+					return;
+				}
+
+				// The length a password must have, for the forms that name it: the page has no text file to ask. And the account of the
+				// session that asks, which is its own to know: a page that finds its session changed by another tab sees that it is not
+				// the one it was drawn for, as the workbench's does (see Nino.install.session)
+				$user = \Nino\Auth::getCurrentUser( $appData );
+				\Nino\Html::addFills( $appData, [
+					'[[/_admin/install/min-password]]'	=> (string) \Nino\Admin\Recovery::MIN_PW_LENGTH,
+					'[[/_admin/install/account]]'				=> $user === false ? '' : str_replace( '[', '&#91;', htmlspecialchars( (string) ( $user['mail'] ?? '' ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
+				], '*' );
 				return;
 			}
 
@@ -110,9 +135,10 @@ namespace Nino\Install {
 		 *	Fill the POST /_admin response. Every wizard api request goes
 		 *	through this single route, dispatched by $_POST['action'] - same
 		 *	shape as Admin::handlePost(), except there is no
-		 *	separate login step: the "already installed" gate below is the
-		 *	only auth the wizard has, or needs - once it trips there is no
-		 *	action left that should still run.
+		 *	separate login step of its own: the account step signs the account in
+		 *	as it makes it, and from then on every action asks for that session
+		 *	(see authorize()). The "already installed" gate below comes first -
+		 *	once it trips there is no action left that should still run.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -141,14 +167,56 @@ namespace Nino\Install {
 			// call_user_func() can't pass $appData/$request by reference, so dispatch via a
 			// dynamic static call instead - same pattern as Callbacks::doCallbacks()
 			[ $class, $method ] = $actions[$action];
+
+			if( self::authorize( $appData, $request ) === false )
+				return;
+
 			$class::{$method}( $appData, $request );
+		}
+
+		/**
+		 *	The one thing the wizard asks of a request that the page of the workbench asks as well: who it is. Until the first
+		 *	account exists nobody can be anybody, so the wizard is open - the account step is how the project gets its
+		 *	first one; what a stranger can do before that is listed in docs/setup.md. From the moment an account that can
+		 *	sign in exists, the wizard is the work of the developer as a whole: every action of every step, reading ones
+		 *	included, needs the session of an account whose rights are not narrower than those of the role the wizard gives
+		 *	the first account (Developer, which holds everything), and the token of that session, which the csrf guard asks
+		 *	before any action runs. The wizard writes roles, routes, modules and accounts, and a right of one panel is no
+		 *	measure of that. Without a session the answer is the workbench's own: 401 with the code 'session', which the page
+		 *	takes for the sign-in to ask for; an account with fewer rights is told 403. Nothing here says more than the
+		 *	login page of a fresh installation does: that a session is wanted
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	bool										If the request may proceed
+		 */
+		public static function authorize( array &$appData, array &$request ): bool {
+
+			if( \Nino\Install\Accounts::usableUsers( $appData ) === [] )
+				return true;
+
+			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
+				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+				return false;
+			}
+
+			foreach( \Nino\Install\Accounts::rootPerms( $appData ) as $perm )
+				if( \Nino\Auth::checkPermission( $appData, $perm ) === false ) {
+					\Nino\Http::fail( $request, 403, 'not allowed', 'install_not_allowed' );
+					return false;
+				}
+
+			return true;
 		}
 
 		/**
 		 *	Require the project to be one that has never finished the wizard -
 		 *	Admin::isInstalled() again, the same gate handleGet() reads -
 		 *	shared by every module action, checked once per request rather
-		 *	than per action
+		 *	than per action. A request an earlier callback refused stays
+		 *	refused; one the csrf guard refused is answered as the workbench
+		 *	answers it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -157,8 +225,14 @@ namespace Nino\Install {
 		 */
 		public static function guard( array &$appData, array &$request ): bool {
 
-			if( $request['/nino/http/response']['statusCode'] !== 200 )
+			// Refused by the csrf guard: said as the workbench says it, so that the page asks for the token of its session and sends the request again
+			if( $request['/nino/http/response']['statusCode'] !== 200 ) {
+
+				if( \Nino\Csrf::blocked( $request ) === true )
+					\Nino\Admin\Admin::failBlocked( $request );
+
 				return false;
+			}
 
 			if( \Nino\Admin\Admin::isInstalled( $appData ) === true ) {
 				\Nino\Http::fail( $request, 423, 'already installed', 'install_installed' );
@@ -174,7 +248,7 @@ namespace Nino\Install {
 		 *	is what this was, and it missed the guard Admin::postData() got
 		 *	when 'data[]=x' (an array where a string belongs) turned out to be
 		 *	a TypeError: a 500 that the wizard, which has no authentication
-		 *	until it finishes, answered to anyone
+		 *	until its first account exists, answered to anyone
 		 *
 		 *	@return 	array
 		 */
@@ -1198,16 +1272,30 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Create (or replace) the root account: the Developer role the Setup
-		 *	step wrote, or - should that step not have run - full access of
-		 *	its own. Can be called more than once in the same wizard run to
-		 *	set up several accounts - see docs/setup.md.
+		 *	The rights an account needs to work in the wizard once an account exists: everything. That is what the first account
+		 *	holds - through the Developer role the Setup step wrote, or of its own - and it is asked for as it is, not read from
+		 *	the role as the project stores it: a role that was narrowed or emptied in config.php must not open the wizard to an
+		 *	account that holds less
 		 *
-		 *	The account is signed in to this browser's session as it is
-		 *	created - the one moment its password is in hand. Whether that
-		 *	session is kept is decided when the wizard finishes: only the
-		 *	one account of a one-account setup walks into the workbench
-		 *	(see Finish::apiComplete())
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array		Permission strings
+		 */
+		public static function rootPerms( array &$appData ): array {
+			return [ '/*' ];
+		}
+
+		/**
+		 *	Make the first account, or change the own account of the session. The first account is the Developer role the Setup
+		 *	step wrote, or - should that step not have run - full access of its own, and it is signed in to this browser's
+		 *	session as it is made - the one moment its password is in hand. Whether that session is kept is decided when the
+		 *	wizard finishes (see Finish::apiComplete()).
+		 *
+		 *	Where an account that can sign in exists this changes the account of the session, its address and its password,
+		 *	by the rules of the workbench for the own account - the current password is asked, and an address that is another
+		 *	account's is refused. It never replaces an account that is not the session's and never makes another: more
+		 *	accounts are made in the Users panel. That is what keeps the first one the only one a stranger could
+		 *	have made, and the first one is made under a lock, so that of requests that arrive together one wins
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1230,25 +1318,128 @@ namespace Nino\Install {
 				return;
 			}
 
-			// Re-running this for the same address (eg. fixing a typo'd
-			// password) has to replace, not fail on "account already exists" -
-			// insertUser() alone won't, so any existing entry at this address
-			// is dropped first
-			if( isset( $appData['/nino/auth/user'][$mail] ) === true )
-				\Nino\Auth::deleteUser( $appData, $mail );
+			if( self::usableUsers( $appData ) === [] ) {
+				self::_first( $appData, $request, $mail, $pw );
+				return;
+			}
 
-			$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
-			\Nino\Auth::insertUser( $appData, $mail, $pw, $role === '' ? [ '/*' ] : [], $role );
+			self::_own( $appData, $request, $mail, $pw, \Nino\Admin\Admin::postString( $data, 'currentPassword' ) );
+		}
 
-			// A refusal here (an ip bucket still cooling down from before the
-			// wizard) costs nothing but the sign-in: the account is created
-			// either way, and the login page takes it after the wizard
-			\Nino\Auth::loginUser( $appData, $mail, $pw );
+		/**
+		 *	The first account, under the lock of config.php: that no account that can sign in exists is asked again once the lock is
+		 *	held, from the file - what another request wrote while this one waited is there - so that of requests that come
+		 *	together one makes the account and is signed in, and the others are told there is one (401 'session') and get no session
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$mail
+		 *	@param		string		$pw
+		 *
+		 *	@return 	void
+		 */
+		private static function _first( array &$appData, array &$request, string $mail, string $pw ): void {
+
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+				\Nino\Runtime::fail( 'Accounts::apiCreate(): could not lock config.php for the first account.' );
+
+			try {
+
+				$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
+				$stored = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
+				$appData['/nino/auth/user'] = is_array( $stored ) === true ? $stored : [];
+				$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
+
+				if( self::usableUsers( $appData ) !== [] ) {
+					\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+					return;
+				}
+
+				// An entry at this address that cannot sign in (disabled, no password) is the one the account replaces. Its
+				// removal is a write of its own, and a write lets the lock of the file go when it is done (see
+				// \Nino\Filesystem::mutate()): the lock is taken once more and the question asked once more, from the file,
+				// so that the account is made under the lock here as well
+				if( isset( $appData['/nino/auth/user'][$mail] ) === true ) {
+
+					\Nino\Auth::deleteUser( $appData, $mail );
+
+					if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+						\Nino\Runtime::fail( 'Accounts::apiCreate(): could not lock config.php for the first account.' );
+
+					$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
+					$stored = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
+					$appData['/nino/auth/user'] = is_array( $stored ) === true ? $stored : [];
+					$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
+
+					if( self::usableUsers( $appData ) !== [] ) {
+						\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+						return;
+					}
+				}
+
+				// The Developer role where it holds everything; where the project has none, or one that was narrowed, the account
+				// holds everything itself - the wizard asks for nothing less (see rootPerms())
+				$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
+				$full = $role !== '' && \Nino\Auth::holds( array_values( array_filter( (array) ( $appData['/nino/auth/roles']['developer']['perms'] ?? [] ), 'is_string' ) ), '/*' ) === true;
+				\Nino\Auth::insertUser( $appData, $mail, $pw, $full === true ? [] : [ '/*' ], $role );
+			}
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
+
+			// The account is signed in as it is made - the person who typed its password is at the keyboard, and every action of
+			// the steps after this one asks for the session. The password was not asked here: it was set a line above, so a
+			// sign-in by password has nothing to find out, and an ip bucket cooling down from earlier attempts would
+			// leave the account made and its maker outside
+			\Nino\Auth::resumeUser( $appData, $mail );
 
 			// The sign-in rotated the session's csrf token, and the wizard page
 			// still carries the one it was rendered with - every request after
 			// this one would be refused with it. The page is told the new one
-			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ), 'csrf' => \Nino\Csrf::getToken( $appData ) ] );
+			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ), 'csrf' => \Nino\Csrf::getToken( $appData ), 'user' => $mail ] );
+		}
+
+		/**
+		 *	The own account of the session, its address and its password - by the rules of the Users panel for an account that changes
+		 *	itself: the current password is confirmed (a wrong one counts against the account, as there), and an address that is
+		 *	another account's is refused. The session stays the one it is: the sessions of the account that were opened with the old
+		 *	password end, this one does not
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$mail					The address the account is to have
+		 *	@param		string		$pw						The password it is to have
+		 *	@param		string		$currentPw		The password it has
+		 *
+		 *	@return 	void
+		 */
+		private static function _own( array &$appData, array &$request, string $mail, string $pw, string $currentPw ): void {
+
+			$current = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $current === false ) {
+				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+				return;
+			}
+
+			$own = (string) $current['mail'];
+
+			if( $mail !== $own && \Nino\Auth::getUser( $appData, $mail ) !== false ) {
+				\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
+				return;
+			}
+
+			if( \Nino\Auth::confirmPassword( $appData, $own, $currentPw ) === false ) {
+				\Nino\Http::fail( $request, 401, 'wrong current password', 'install_wrong_password' );
+				return;
+			}
+
+			if( \Nino\Auth::updateUser( $appData, $own, $mail, $pw ) === false ) {
+				\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ), 'csrf' => \Nino\Csrf::getToken( $appData ), 'user' => $mail ] );
 		}
 	}
 
@@ -1261,7 +1452,9 @@ namespace Nino\Install {
 	 *												application" is the default and leaves the project as the
 	 *												steps before it made it.
 	 *
-	 *												The wizard has no login until it ends, so this step trusts
+	 *												The wizard has no login until its first account exists, and
+	 *												asks for that account's session from then on - this step needs
+	 *												an account, so it always does - yet it trusts
 	 *												nothing a request names. It reads the one catalogue the
 	 *												kernel ships the address and the key of (Catalogue::DEFAULT_URL,
 	 *												Catalogue::PUBLIC_KEY) - and none at all where config.php
@@ -1270,7 +1463,8 @@ namespace Nino\Install {
 	 *												archive hold, and takes from a request nothing but the keys of
 	 *												applications of that index and of a feature one of them lists.
 	 *												It needs an account first: an index is fetched and a package
-	 *												unpacked only once somebody has proved to be able to log in.
+	 *												unpacked only once somebody is signed in with the right to
+	 *												switch features on (see Install::authorize()).
 	 *
 	 *												What decides how an application is set up - the order of the
 	 *												features, what loading needs, when a feature is on and the one

@@ -317,18 +317,40 @@
 		},
 
 		/**
-		 *	Call an install/* wizard action
+		 *	Call an install/* wizard action. An answer that says the session is gone - from the first account on every action
+		 *	is the session's (see session.js) - is not handed to the caller: the page asks for the token and, where nobody is
+		 *	signed in, for the account, and sends the request again - three times at most for one request: a session that is
+		 *	still gone after that is the answer
 		 *
 		 *	@param		{string}		action				Action name (eg. "checks/run")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{number}		[round]				How often the request was sent before: 0 for the first
 		 *
 		 *	@return		void
 		 */
-		apiCall : function( action, payload, callback ) {
+		apiCall : function( action, payload, callback, round ) {
+
+			const sent = typeof round === 'number' ? round : 0;
+			const session = Nino.install.session;
 
 			Nino.http.sendRequest( Nino.dir+ '/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
+
+				if( session === undefined || sent >= 3 || session.lost( xhr.status, xhr.responseJSON ) === false ) {
+					callback( xhr.status, xhr.responseJSON );
+					return;
+				}
+
+				// A token that is not the session's may be mended by the one the server holds; a session that is not there wants the account
+				session.resume( xhr.status === 401, function( resumed ) {
+
+					if( resumed === false ) {
+						callback( xhr.status, xhr.responseJSON );
+						return;
+					}
+
+					Nino.install.apiCall( action, payload, callback, sent + 1 );
+				} );
 			}, { action : action, data : JSON.stringify( payload ) } );
 		},
 

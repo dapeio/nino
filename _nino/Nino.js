@@ -119,18 +119,42 @@
 			},
 
 			/**
-			 *	Log out the current user and redirect
+			 *	Log out the current user and redirect. The server signs out only a request that carries the token of
+			 *	the session (a 403 otherwise), and the token of a page that is older than a sign-in is not: a caller that
+			 *	can ask for the current one passes `renew`, which is called once after a 403 and sends the request again
+			 *	where it says it has put the token into the page. The page leaves in any answer
 			 *
 			 *	@param		{string}		redirect			Uri to redirect to afterwards
+			 *	@param		{Function}	[renew]				renew( done ) puts the session's current token into the page and calls done( true ), or done( false ) where there is none to send again with
 			 *
 			 *	@return		void
 			 */
-			logout : function( redirect ) {
-				Nino.http.sendRequest(
-					Nino.dir+ '/.nino/auth/logout',
-					'POST',
-					function(){ window.location.replace( redirect ) }
-				);
+			logout : function( redirect, renew ) {
+
+				const leave = function() { window.location.replace( redirect ) };
+
+				const send = function( again ) {
+					Nino.http.sendRequest(
+						Nino.dir+ '/.nino/auth/logout',
+						'POST',
+						function( xhr ) {
+
+							if( xhr.status === 403 && again === true && typeof renew === 'function' ) {
+								renew( function( renewed ) {
+									if( renewed === true )
+										send( false );
+									else
+										leave();
+								} );
+								return;
+							}
+
+							leave();
+						}
+					);
+				};
+
+				send( true );
 			},
 
 		},

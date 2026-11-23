@@ -25,7 +25,7 @@
 		// The accounts the server named last, which a change of the language draws again
 		_users : null,
 
-		// The parts of the form that are on the page: { form, mail, pw, pw2 } - the labels of the fields
+		// The parts of the form that are on the page: { form, legend, button, mail, pw, pw2, current } - the labels of the fields
 		_ui : null,
 
 		showCurrent : function() {
@@ -71,14 +71,20 @@
 			const pw = Nino.adminUi.textField( { key : 'accounts-pw', id : 'accounts-add-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw'), help : t( '/_admin/install/accounts/pw-help', Nino.install.minPassword() ) } );
 			const pw2 = Nino.adminUi.textField( { key : 'accounts-pw2', id : 'accounts-add-pw2', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw2') } );
 
+			// Asked only where an account exists, and then of the account of the session: it is what changing one's own account asks for
+			const current = Nino.adminUi.textField( { key : 'accounts-current', id : 'accounts-add-current', type : 'password', autocomplete : 'current-password', required : true, label : t('/_admin/install/accounts/current') } );
+			Nino.install.accounts._show( current, false );
+
 			grid.appendChild( mail );
+			grid.appendChild( current );
 			grid.appendChild( pw );
 			grid.appendChild( pw2 );
 			card.appendChild( grid );
 
 			// The step's own action, repeatable: the account is made and the form is ready for the next. Enter in a field does the same
 			const actions = Nino.adminUi.el( 'div', 'nino-admin-actions nino-admin-actions--end' );
-			actions.appendChild( Nino.adminUi.button( t('/_admin/install/accounts/create'), function() { self._create( function() {} ) }, { kind : 'secondary', id : 'accounts-add-submit' } ) );
+			const button = Nino.adminUi.button( t('/_admin/install/accounts/create'), function() { self._create( function() {} ) }, { kind : 'secondary', id : 'accounts-add-submit' } );
+			actions.appendChild( button );
 			card.appendChild( actions );
 
 			form.appendChild( card );
@@ -93,7 +99,7 @@
 			wrap.appendChild( list );
 			wrap.appendChild( form );
 
-			self._ui = { form : form, mail : mail, pw : pw, pw2 : pw2 };
+			self._ui = { form : form, legend : legend, button : button, mail : mail, pw : pw, pw2 : pw2, current : current };
 
 			if( self._users !== null )
 				self._render( self._users );
@@ -139,7 +145,20 @@
 
 			const ui = Nino.install.accounts._ui;
 
-			return ui !== null && [ ui.mail, ui.pw, ui.pw2 ].some( function( field ) { return field.querySelector('input').value !== '' } );
+			return ui !== null && [ ui.mail, ui.pw, ui.pw2, ui.current ].some( function( field ) { return field.querySelector('input').value !== '' } );
+		},
+
+		/**
+		 *	Show a field of the form or take it away: the attribute and the display both, since the block of a field sets its own display and a hidden attribute alone does not hide it
+		 *
+		 *	@param		{Element}		field
+		 *	@param		{boolean}		shown
+		 *
+		 *	@return		void
+		 */
+		_show : function( field, shown ) {
+			field.hidden = shown === false;
+			field.style.display = shown === true ? '' : 'none';
 		},
 
 		_refreshList : function() {
@@ -168,6 +187,14 @@
 			Nino.install.accounts._users = users;
 			wrap.innerHTML = '';
 
+			// From the first account on the form changes the account of the session (the wizard makes no other): it is said, and the current password is asked
+			const ui = Nino.install.accounts._ui;
+			if( ui !== null ) {
+				ui.legend.firstChild.textContent = t( users.length > 0 ? '/_admin/install/accounts/title-own' : '/_admin/install/accounts/title' );
+				ui.button.textContent = t( users.length > 0 ? '/_admin/install/accounts/change' : '/_admin/install/accounts/create' );
+				Nino.install.accounts._show( ui.current, users.length > 0 );
+			}
+
 			if( users.length === 0 ) {
 				wrap.appendChild( Nino.adminUi.emptyState( t('/_admin/install/accounts/none') ) );
 				return;
@@ -192,6 +219,7 @@
 			const mail = ui.mail.querySelector('input');
 			const pw = ui.pw.querySelector('input');
 			const pw2 = ui.pw2.querySelector('input');
+			const current = ui.current.querySelector('input');
 			const missing = function( key ) { return Nino.adminUi.format( t('/_admin/common/error/missing'), t( key ) ) };
 
 			Nino.adminUi.clearFieldErrors( ui.form );
@@ -202,6 +230,7 @@
 				[ mail.value.trim() === '' ? missing('/_admin/install/accounts/mail') : '', ui.mail, mail ],
 				[ pw.value === '' ? missing('/_admin/install/accounts/pw') : ( pw.value.length < min ? t( '/_admin/install/error/password-short', min ) : '' ), ui.pw, pw ],
 				[ pw2.value !== pw.value ? t('/_admin/install/error/mismatch') : ( pw2.value === '' ? missing('/_admin/install/accounts/pw2') : '' ), ui.pw2, pw2 ],
+				[ ui.current.hidden === false && current.value === '' ? missing('/_admin/install/accounts/current') : '', ui.current, current ],
 			].filter( function( problem ) { return problem[0] !== '' } );
 
 			if( problems.length > 0 ) {
@@ -214,11 +243,11 @@
 
 			Nino.install.say( t('/_admin/install/accounts/creating') );
 
-			Nino.install.apiCall( 'accounts/create', { mail : mail.value, pw : pw.value }, function( status, response ) {
+			Nino.install.apiCall( 'accounts/create', { mail : mail.value, pw : pw.value, currentPassword : current.value }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 
 					const code = response !== null && typeof response === 'object' && typeof response.code === 'string' ? response.code : '';
-					const field = code === 'install_mail' ? [ ui.mail, mail ] : ( code === 'install_password_short' ? [ ui.pw, pw ] : null );
+					const field = code === 'install_mail' || code === 'install_mail_in_use' ? [ ui.mail, mail ] : ( code === 'install_password_short' ? [ ui.pw, pw ] : ( code === 'install_wrong_password' ? [ ui.current, current ] : null ) );
 
 					// A refusal about a value is said at the field of it, and the line says that something is to be fixed; any other is said in the line, as the server's code is worded
 					const sentence = field !== null ? t('/_admin/install/error/fields') : Nino.install.failure( status, response );
@@ -242,9 +271,13 @@
 
 				Nino.install.say('');
 				Nino.adminUi.say( t('/_admin/install/accounts/created-msg') );
+				if( Nino.install.session !== undefined && typeof response.user === 'string' )
+					Nino.install.session.remember( response.user );
+
 				mail.value = '';
 				pw.value = '';
 				pw2.value = '';
+				current.value = '';
 				mail.focus();
 				Nino.install.accounts._render( response.users );
 				done( true );

@@ -912,6 +912,75 @@ authResumeChecks( $appData );
 
 echo "\n";
 
+// --- POST /.nino/auth/logout ---------------------------------------------
+
+echo "POST /.nino/auth/logout - signed out after the token is checked, and by nothing else\n";
+
+/*	Real requests, as far as a suite sends them: each goes through Http::request() and Http::response() with the callbacks a request has (the
+	csrf guard and Auth), the session of the browser that sends it in $_SESSION and the token where a browser puts it. What the request left
+	of the session is read back by a request of its own: who is signed in is what the session says to the next one	*/
+$outApp = ninoSandbox( 'auth-logout' );
+$outMail = 'signedin@example.com';
+\Nino\Auth::insertUser( $outApp, $outMail, 'correct horse battery staple' );
+
+$outSession = static function( array &$app ): array {
+	$_SESSION = [ $app['./nino/uid'] => [] ];
+	\Nino\Auth::loginUser( $app, 'signedin@example.com', 'correct horse battery staple' );
+	return $_SESSION[ $app['./nino/uid'] ];
+};
+$outWho = static function( array &$app, array $session ): string {
+	$_SESSION = [ $app['./nino/uid'] => $session ];
+	unset( $app['./nino/auth/current'], $app['./nino/callbacks'] );
+	\Nino\Auth::init( $app );
+	return \Nino\Auth::getCurrentUser( $app )['mail'] ?? '';
+};
+$outAsk = static function( array &$app, array &$session, string $method, string $token, string $as = 'field' ) use ( $outWho ): int {
+	$_SESSION = [ $app['./nino/uid'] => $session ];
+	$_POST = $as === 'field' && $token !== '' ? [ '_csrf' => $token ] : [];
+	unset( $app['./nino/auth/current'], $app['./nino/callbacks'] );
+	\Nino\Csrf::init( $app );
+	\Nino\Auth::init( $app );
+	$request = [ 'REQUEST_METHOD' => $method, 'REQUEST_URI' => '/.nino/auth/logout', 'REMOTE_ADDR' => '127.0.0.1' ] + ( $as === 'header' ? [ 'HTTP_X_CSRF_TOKEN' => $token ] : [] );
+	\Nino\Http::request( $app, $request );
+	\Nino\Http::response( $app, $request );
+	$session = $_SESSION[ $app['./nino/uid'] ] ?? [];
+	$_POST = [];
+	return $request['/nino/http/response']['statusCode'];
+};
+
+$outBrowser = $outSession( $outApp );
+$outToken = $outBrowser['./nino/csrf/token'];
+check( 'the account is signed in before the requests below', $outWho( $outApp, $outBrowser ) === $outMail );
+
+$outAnswers = [
+	'no token'													=> $outAsk( $outApp, $outBrowser, 'POST', '' ),
+	'a wrong token in the field'				=> $outAsk( $outApp, $outBrowser, 'POST', bin2hex( random_bytes( 32 ) ) ),
+	'a wrong token in the header'				=> $outAsk( $outApp, $outBrowser, 'POST', bin2hex( random_bytes( 32 ) ), 'header' ),
+	'the token of a session that is gone'	=> $outAsk( $outApp, $outBrowser, 'POST', hash( 'sha256', 'a session of another time' ) ),
+];
+check( 'a POST without the token of the session is refused 403, whatever is sent in its place: no token, a wrong one in the field or in the header, the token of another session', array_values( array_unique( $outAnswers ) ) === [ 403 ] );
+check( '...and it signs nobody out: the account is signed in after every one of them - the sign-out is done after the token is checked, not before, so that a form of another site cannot end the session of the person who has /_admin open',
+	$outWho( $outApp, $outBrowser ) === $outMail && ( \Nino\Auth::getUser( $outApp, $outMail )['sessions'] ?? [] ) !== [] );
+
+$outGet = $outAsk( $outApp, $outBrowser, 'GET', $outToken );
+check( 'a GET signs nobody out, with the token or without it: there is no such address', $outGet === 404 && $outAsk( $outApp, $outBrowser, 'GET', '' ) === 404 && $outWho( $outApp, $outBrowser ) === $outMail );
+
+$outBrowser['./nino/csrf/token'] = $outToken;
+$outHeader = $outAsk( $outApp, $outBrowser, 'POST', $outToken, 'header' );
+check( 'a POST with the token of the session - in the field of the page, where Nino.js puts it, or in the header - signs out: 200 and nobody is signed in after it', $outHeader === 200 && $outWho( $outApp, $outBrowser ) === '' );
+
+$outBrowser = $outSession( $outApp );
+$outStale = $outBrowser['./nino/csrf/token'];
+$outBrowser['./nino/csrf/token'] = bin2hex( random_bytes( 32 ) );
+check( 'a page older than the last sign-in holds a token that is not the session\'s: its sign-out is refused 403 with the account still signed in - which is why the page asks for the token again (see Nino.auth.logout()) - and the token of the session signs out',
+	$outAsk( $outApp, $outBrowser, 'POST', $outStale ) === 403 && $outWho( $outApp, $outBrowser ) === $outMail && $outAsk( $outApp, $outBrowser, 'POST', $outBrowser['./nino/csrf/token'] ) === 200 && $outWho( $outApp, $outBrowser ) === '' );
+
+\Nino\Auth::deleteUser( $outApp, $outMail );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $outApp ) );
+$_SESSION = [];
+
+echo "\n";
+
 // --- Cleanup ------------------------------------------------------------
 
 foreach( $GLOBALS['decoySites'] ?? [] as $decoyDir )

@@ -114,7 +114,7 @@ php -S 127.0.0.1:8000 router.php
 
 Then open <http://127.0.0.1:8000/_admin>. `router.php` is the routing of PHP's built-in server and for local work only; a web server needs the configuration in [Deployment](docs/deployment.md#webroot-and-routing).
 
-A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows until it is done, creates `private/` and `public/` with everything in them. It has no access protection of its own and no account exists yet, so run it locally or in another protected environment. As long as it is not completed, you can return to an earlier step and apply it again. The six steps, each with its reference in the [Setup Wizard](docs/setup.md) manual:
+A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows until it is done, creates `private/` and `public/` with everything in them. It has no access protection of its own until its first account exists - from then on every step asks for the session of that account - so run it locally or in another protected environment and make the account at once. As long as it is not completed, you can return to an earlier step and apply it again. The six steps, each with its reference in the [Setup Wizard](docs/setup.md) manual:
 
 | Step | Decision |
 |---|---|

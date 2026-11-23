@@ -1899,7 +1899,8 @@ dirtyState.ok = true;
 // ---- the shell's own exits. The logout button belongs to the last shell that wired it
 // (the one with the session dialog above), the language picker to this one
 const logoutAsked = [];
-withDialog.Nino.auth = { logout : function( to ) { dirtyLog.push( 'logout '+ to ) } };
+const logoutRenews = [];
+withDialog.Nino.auth = { logout : function( to, renew ) { dirtyLog.push( 'logout '+ to ); logoutRenews.push( renew ) } };
 withDialog.Nino.adminUi.choiceDialog = function( options ) { logoutAsked.push( options ); return true };
 const logoutDirty = withDialog.Nino.admin.dirty;
 logoutDirty.register( 'probe', { isDirty : function() { return true }, save : function( done ) { done( true ) }, discard : function() {} } );
@@ -1913,6 +1914,21 @@ fire( sessionLogout, 'click' );
 logoutAsked[1].onChoose('discard');
 check( '...an answer lets it go', dirtyLog.join() === 'logout [[/nino/dir]]/_admin' && logoutDirty._leaving === true );
 logoutDirty._entries.probe.isDirty = function() { return false };
+
+// The token of a page that is older than the last sign-in is not the session's, and the sign-out is refused for it: the shell hands the logout the way
+// to ask for the current one - the question every other request of the workbench asks (Nino.adminUi.api.renew()) - and the answer says whether there is a session to sign out of
+const renewAsked = [];
+let renewAnswer = null;
+withDialog.Nino.adminUi.api = { renew : function( callback ) { renewAsked.push( 'renew' ); callback( renewAnswer ) } };
+const renewedSession = [], renewedGone = [], renewedNone = [];
+renewAnswer = { user : 'me@example.com', csrf : 't' };
+logoutRenews[0]( function( again ) { renewedSession.push( again ) } );
+renewAnswer = { user : '', csrf : 't' };
+logoutRenews[0]( function( again ) { renewedGone.push( again ) } );
+renewAnswer = null;
+logoutRenews[0]( function( again ) { renewedNone.push( again ) } );
+check( 'the logout is given the way to renew the token of the page: the request is sent again where a session answers for it, and not where nobody is signed in any more or the question got no answer',
+	typeof logoutRenews[0] === 'function' && renewAsked.length === 3 && renewedSession.join() === 'true' && renewedGone.join() === 'false' && renewedNone.join() === 'false' );
 
 shell.Nino.content = { getText : function( key ) { return key } };
 const shellAsked = [];

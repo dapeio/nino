@@ -255,6 +255,39 @@ check( 'a login with null loads the page again where it stands', loginAnswered( 
 const refused = loginAnswered( null, 401 );
 check( '...and a refused one goes nowhere, whichever it was told, and says so to its caller', refused.navigations.length === 0 && refused.failed === 401 && loginAnswered( '/sub/_admin', 401 ).navigations.length === 0 );
 
+// --- the sign-out and the token --------------------------------------------------
+//
+// The server signs out a request that carries the token of the session and answers 403 to any other. A page that is older than the last
+// sign-in holds a token that is not the session's, and a sign-out that is refused and followed by a page that leaves all the same leaves the
+// account signed in. A caller that can ask for the current token says so (renew): it is asked once, after a 403, and the request goes out once
+// more with what it put into the page. The page leaves in every answer
+
+function logoutAnswered( statuses, renew ) {
+	sent.length = 0;
+	navigations.length = 0;
+	const asked = [];
+	subBox.Nino.auth.logout( '/sub', renew === null ? undefined : function( done ) { asked.push( 'renew' ); renew( done ) } );
+	for( let at = 0; at < sent.length; at++ ) {
+		sent[at].served = statuses[at];
+		sent[at].responseText = '';
+		sent[at].onload( { type : 'load' } );
+	}
+	return { requests : sent.length, asked : asked.length, navigations : navigations.join() };
+}
+
+const signedOut = logoutAnswered( [ 200 ], () => {} );
+check( 'a sign-out that is answered leaves for the uri, and asks for no token: one request', signedOut.requests === 1 && signedOut.asked === 0 && signedOut.navigations === 'replace /sub' );
+const refusedOnce = logoutAnswered( [ 403 ], null );
+check( '...one that is refused for the token by a caller that cannot renew it leaves all the same, with the one request it had', refusedOnce.requests === 1 && refusedOnce.navigations === 'replace /sub' );
+const renewedOnce = logoutAnswered( [ 403, 200 ], done => done( true ) );
+check( '...and one that is refused where the caller can renew the token asks for it once and goes out once more, then leaves', renewedOnce.requests === 2 && renewedOnce.asked === 1 && renewedOnce.navigations === 'replace /sub' );
+const nothingToSend = logoutAnswered( [ 403, 200 ], done => done( false ) );
+check( '...a caller that has no token to send - the session is gone already - sends nothing again and leaves', nothingToSend.requests === 1 && nothingToSend.asked === 1 && nothingToSend.navigations === 'replace /sub' );
+const refusedTwice = logoutAnswered( [ 403, 403, 403 ], done => done( true ) );
+check( '...a token that is refused again is not asked for again: two requests, one renewal, and the page leaves', refusedTwice.requests === 2 && refusedTwice.asked === 1 && refusedTwice.navigations === 'replace /sub' );
+const failedOther = logoutAnswered( [ 500 ], done => done( true ) );
+check( '...an answer that is no refusal of the token is not mended: no renewal, one request, the page leaves', failedOther.requests === 1 && failedOther.asked === 0 && failedOther.navigations === 'replace /sub' );
+
 // Nino.js leaves its ready callback behind, one millisecond out, and that one
 // reaches for an Event this context has not got: the suite ends here
 done();

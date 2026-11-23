@@ -479,7 +479,7 @@ $wizard['/nino/catalogue/url']	= $other;
 $wizard['/nino/catalogue/key']	= $publicKey;
 $wizard[ \Nino\Install\Applications::KEY_OVERRIDE ] = $publicKey;
 $wizard['./nino/fetch/stub']		= $project2['./nino/fetch/stub'];
-\Nino\Auth::insertUser( $wizard, 'owner@example.com', 'a long enough password', [ '/*' ] );
+ninoUser( $wizard, 'owner@example.com', [ '/*' ], 'a long enough password' );
 [ $status, $body ] = ninoCall( $wizard, [ \Nino\Install\Install::class, 'handlePost' ], [], 'applications/list' );
 check( 'the wizard, for the same project, offers none of them: it reads the official catalogue and nothing a project names', $status === 200 && $body['reason'] === 'install_not_official' && $body['applications'] === [] );
 [ $status ] = ninoCall( $wizard, [ \Nino\Install\Install::class, 'handlePost' ], [ 'applications' => [ 'site' ], 'feature' => 'beta' ], 'applications/apply' );
@@ -600,7 +600,7 @@ foreach( [ '/private/templates', '/public/images', '/private/text', '/private/as
 $wizardApp['/nino/dir'] = '';
 $wizardApp[ \Nino\Install\Applications::KEY_OVERRIDE ] = $publicKey;
 $wizardApp['./nino/fetch/stub'] = $panelApp['./nino/fetch/stub'];
-\Nino\Auth::insertUser( $wizardApp, 'owner@example.com', 'a long enough password', [ '/*' ] );
+ninoUser( $wizardApp, 'owner@example.com', [ '/*' ], 'a long enough password' );
 $answers = [];
 foreach( [ 'alpha', 'gamma' ] as $feature )
 	$answers[] = ninoCall( $wizardApp, [ \Nino\Install\Install::class, 'handlePost' ], [ 'applications' => [ 'blog' ], 'feature' => $feature ], 'applications/apply' );

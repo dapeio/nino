@@ -63,15 +63,18 @@ const de = text._tables.de;
 
 // What the step posts, and what it answers
 let calls = [];
-let answer = { status : 200, response : { users : [ 'admin@example.com' ] } };
+let answer = { status : 200, response : { users : [ 'admin@example.com' ], user : 'admin@example.com' } };
 Nino.install.apiCall = function( action, payload, callback ) {
 	calls.push( { action : action, payload : payload } );
 	callback( answer.status, answer.response );
 };
 
+const remembered = [];
+Nino.install.session = { remember : mail => remembered.push( mail ) };
 const byId = id => findAll( root, el => el.id === id )[0];
 const errors = () => findAll( content, el => el.className === 'nino-admin-field-error' ).map( el => el.textContent );
-const typed = ( mail, pw, pw2 ) => {
+const typed = ( mail, pw, pw2, current = 'the-current-password' ) => {
+	byId('accounts-add-current').value = current;
 	byId('accounts-add-mail').value = mail;
 	byId('accounts-add-pw').value = pw;
 	byId('accounts-add-pw2').value = pw2;
@@ -94,9 +97,9 @@ check( '...and says so at the repeat, in the one wording of the workbench for wh
 check( '...the line of the bar says that there is something to fix, as an error, and it is no sentence of the server', said[said.length - 1][1] === true && said[said.length - 1][0] === en['/_admin/install/error/fields'] );
 check( '...and keeps what was typed, so the typo can be fixed', byId('accounts-add-pw').value === 'a-long-enough-password' && byId('accounts-add-mail').value === 'admin@example.com' );
 
-typed( '', '', '' );
+typed( '', '', '', '' );
 create();
-check( 'an empty form is said at every field that is empty, in the wording of the workbench, the first of them has the focus, and nothing is posted', calls.length === 0 && errors().length === 3 && byId('accounts-add-mail').focused === true
+check( 'an empty form is said at every field that is empty - four where an account exists, the current password is asked then - in the wording of the workbench, the first of them has the focus, and nothing is posted', calls.length === 0 && errors().length === 4 && byId('accounts-add-mail').focused === true
 	&& errors()[0] === en['/_admin/common/error/missing'].replace( '%s', en['/_admin/install/accounts/mail'] ) );
 
 typed( 'admin@example.com', 'short', 'short' );
@@ -106,8 +109,11 @@ check( 'a password that is shorter than the length the page states is said at it
 typed( 'admin@example.com', 'a-long-enough-password', 'a-long-enough-password' );
 create();
 check( 'a matching repeat makes exactly one accounts/create call', calls.length === 1 && calls[0].action === 'accounts/create' );
-check( '...whose payload is still just the mail and the password', JSON.stringify( calls[0].payload ) === JSON.stringify( { mail : 'admin@example.com', pw : 'a-long-enough-password' } ) );
+check( '...whose payload is the mail, the password and the current one, which the server asks of an account that changes', JSON.stringify( calls[0].payload ) === JSON.stringify( { mail : 'admin@example.com', pw : 'a-long-enough-password', currentPassword : 'the-current-password' } ) );
+check( '...where an account exists the form says it changes that account - its heading and its button - and asks for the current password, which is not asked before the first account',
+	byId('accounts-add-current').hidden === false && byId('accounts-add-submit').textContent === en['/_admin/install/accounts/change'] && findAll( content, el => el.tagName === 'LEGEND' )[0].firstChild.textContent === en['/_admin/install/accounts/title-own'] );
 check( '...and after the 200 all three fields are empty, the list shows the account and the form is ready for the next', byId('accounts-add-mail').value === '' && byId('accounts-add-pw').value === '' && byId('accounts-add-pw2').value === '' && byId('accounts-add-mail').focused === true && errors().length === 0 );
+check( '...and the account the server names is the account of the page from then on, which is what keeps a request that was refused from being sent as another one (see session.js)', remembered.join() === 'admin@example.com' );
 check( '...with the confirmation said as a toast', findAll( doc.body, el => el.textContent === en['/_admin/install/accounts/created-msg'] ).length >= 1 );
 
 answer = { status : 400, response : { error : 'invalid email address', code : 'install_mail' } };
@@ -179,7 +185,7 @@ text.set('en');
 // The language: the form is drawn again, and what was typed stays
 typed( 'typed@example.com', 'abc', '' );
 text.set('de');
-check( 'the other language draws the form again in that language, and what was typed stays', byId('accounts-add-submit').textContent === de['/_admin/install/accounts/create'] && byId('accounts-add-mail').value === 'typed@example.com' && byId('accounts-add-pw').value === 'abc' );
+check( 'the other language draws the form again in that language, and what was typed stays', byId('accounts-add-submit').textContent === de['/_admin/install/accounts/change'] && byId('accounts-add-mail').value === 'typed@example.com' && byId('accounts-add-pw').value === 'abc' );
 check( '...and the list of the accounts stays', findAll( content, el => el.dataset.row === 'admin@example.com' ).length === 1 );
 
 done();

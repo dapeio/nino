@@ -92,7 +92,7 @@ sandbox.window = {
 sandbox.localStorage = sandbox.window.localStorage;
 const context = vm.createContext( sandbox );
 
-[ '_admin/assets/Nino.admin.js', '_admin/assets/pagetext.js', '_admin/install/assets/text.js', '_admin/install/assets/script.js', '_admin/install/assets/checks.js', '_admin/install/assets/setup.js',
+[ '_admin/assets/Nino.admin.js', '_admin/assets/pagetext.js', '_admin/install/assets/text.js', '_admin/install/assets/script.js', '_admin/install/assets/session.js', '_admin/install/assets/checks.js', '_admin/install/assets/setup.js',
 	'_admin/install/assets/personalinfos.js', '_admin/install/assets/accounts.js', '_admin/install/assets/applications.js', '_admin/install/assets/finish.js' ].forEach( file => load( file, context ) );
 
 const install = Nino.install;
@@ -127,7 +127,7 @@ check( '...and the words of the rail number them in that order, in both language
 
 // A step is a nav span, a content pane, a script tag and a _commitStep branch. Removing one means removing all four
 check( 'every step the rail names has its content pane, and the pane its own heading to take the focus', stepKeys.every( key => template.includes( 'id="install-content-'+ key+ '"' ) && new RegExp( 'id="install-content-'+ key+ '">\\s*<h2 class="nino-admin-sr-only" data-text="/_admin/install/step/'+ key+ '"' ).test( template ) ) );
-check( '...the script tags of the template are the page\'s words, the shell and the steps\' modules, in the order their dependencies need', ( template.match( /(?:_admin\/assets|install\/assets)\/([A-Za-z.-]+)\.js"/g ) || [] ).map( src => src.replace( /^.*\/|\.js"$/g, '' ) ).join() === 'Nino.admin,pagetext,text,script,checks,setup,personalinfos,accounts,applications,finish' );
+check( '...the script tags of the template are the page\'s words, the shell and the steps\' modules, in the order their dependencies need', ( template.match( /(?:_admin\/assets|install\/assets)\/([A-Za-z.-]+)\.js"/g ) || [] ).map( src => src.replace( /^.*\/|\.js"$/g, '' ) ).join() === 'Nino.admin,pagetext,text,script,session,checks,setup,personalinfos,accounts,applications,finish' );
 
 /*	The rail is a progress display, and the progress was shown by the colour
 	of one of six words and nothing else - so an operator who cannot see that

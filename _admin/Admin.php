@@ -576,7 +576,7 @@ namespace Nino\Admin {
 			// and a page that outlived its session reads that as "not allowed"
 			if( $request['/nino/http/response']['statusCode'] !== 200 ) {
 				if( \Nino\Csrf::blocked( $request ) === true )
-					self::_failBlocked( $request );
+					self::failBlocked( $request );
 				return;
 			}
 
@@ -619,7 +619,8 @@ namespace Nino\Admin {
 		/**
 		 *	Answer a request the csrf guard refused: with a token that is no
 		 *	longer this session's (code 'csrf', the page then asks for the
-		 *	current one and sends the request again - see Nino.adminUi.api),
+		 *	current one and sends the request again - see Nino.adminUi.api, and
+		 *	Nino.install.apiCall() for the setup wizard, which is answered the same),
 		 *	or with a body that never arrived at all. php drops the whole
 		 *	body of a post above post_max_size, token included, so such a
 		 *	request is refused for a missing token while the cause is its
@@ -629,7 +630,7 @@ namespace Nino\Admin {
 		 *
 		 *	@return 	void
 		 */
-		private static function _failBlocked( array &$request ): void {
+		public static function failBlocked( array &$request ): void {
 
 			$length	= $request['/nino/http/request']['header']['Content-Length'] ?? '';
 			$post		= \Nino\Images::limits()['post'];
