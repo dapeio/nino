@@ -102,7 +102,7 @@ const byId = id => findAll( root, el => el.id === id )[0];
 // What the server answers, by action: enough for every step to draw itself
 answers = {
 	'checks/run' : [ 200, { php : { version : '8.4.0', required : '8.4.0', ok : true }, extensions : { dom : { ok : true, reason : 'English of the server' }, Phar : { ok : false, reason : 'English of the server' }, unknown : { ok : true, reason : 'x' } }, directories : { '.' : { exists : true, writable : true, ok : true }, public : { exists : false, writable : true, ok : true } } } ],
-	'setup/library' : [ 200, { locales : [ 'de_DE', 'en_US' ], activeLocales : [ 'en_US' ], nativeLocale : 'en_US', modules : { widget : { label : 'Widget', requiresModules : [ 'forms' ], active : false } } } ],
+	'setup/library' : [ 200, { locales : [ 'de_DE', 'en_US' ], activeLocales : [ 'en_US' ], nativeLocale : 'en_US', decided : false, modules : { widget : { label : 'Widget', requiresModules : [ 'forms' ], active : false } } } ],
 	'personalinfos/list' : [ 200, { locales : [ 'de_DE', 'en_US' ], entries : [
 		{ key : '/project/company/general/name', global : true, labels : { de : 'Unternehmen › Name', en : 'Company › Name' }, values : { '*' : 'Acme' } },
 		{ key : '/project/company/contact/country', global : false, labels : { de : 'Unternehmen › Land', en : 'Company › Country' }, values : { de_DE : 'Deutschland', en_US : 'Germany' } },
@@ -270,10 +270,17 @@ check( '...the state of each row is a badge with its word and a sign, and a refu
 
 text.set('de');
 install.showStep( 1, false );
-const localeBoxes = () => findAll( byId('setup-languages'), el => el.tagName === 'INPUT' && el.type === 'checkbox' );
-localeBoxes()[0].checked = true;
-const labelOf = box => findAll( box.parentNode, el => el.tagName === 'SPAN' ).map( el => el.textContent ).join('');
-check( 'a language is named as the workbench names one - "Deutsch", "English (US)" - in either language of the page', localeBoxes().map( labelOf ).join() === 'Deutsch,English (US)' );
+const localeSelect = () => findAll( byId('setup-languages'), el => el.tagName === 'SELECT' );
+const labelOf = option => option.textContent;
+check( 'the step asks for one language, as one select, and names the languages as the workbench names them - "Deutsch", "English (US)" - in either language of the page',
+	localeSelect().length === 1 && findAll( byId('setup-languages'), el => el.tagName === 'INPUT' && el.type === 'checkbox' ).length === 0 && findAll( localeSelect()[0], el => el.tagName === 'OPTION' ).map( labelOf ).join() === 'Deutsch,English (US)' );
+check( '...a project that has not answered starts on the language of the page: German in a page in German', localeSelect()[0].value === 'de_DE' );
+localeSelect()[0].value = 'en_US';
+answers['setup/apply'] = [ 200, {} ];
+requests.length = 0;
+install.setup.apply( function() {} );
+const applied = requests.filter( request => request.action === 'setup/apply' );
+check( '...and the step sends that one language - a list of one - and the same one as the native language', applied.length === 1 && JSON.stringify( applied[0].payload.locales ) === '["en_US"]' && applied[0].payload.native === 'en_US' );
 
 install.showStep( 3, false );
 byId('accounts-add-mail').value = 'typed@example.com';
@@ -281,8 +288,8 @@ install.showStep( 1, false );
 byId('install-page-wrap').classList.add('x');
 text.set('en');
 check( 'the other language draws every step that wrote words by hand again: the bar, the fields, the sections', byId('install-back').textContent === text._tables.en['/_admin/install/label/back'] && byId('install-next').textContent === text._tables.en['/_admin/install/label/next']
-	&& findAll( byId('setup-languages'), el => el.tagName === '#TEXT' ).some( node => node.textContent === text._tables.en['/_admin/install/setup/locales'] ) );
-check( '...what was ticked stays ticked, and what was typed stays typed', localeBoxes()[0].checked === true && byId('accounts-add-mail').value === 'typed@example.com' );
+	&& findAll( byId('setup-languages'), el => el.tagName === 'SPAN' ).some( node => node.textContent === text._tables.en['/_admin/install/setup/language'] ) );
+check( '...what was chosen stays chosen, and what was typed stays typed', localeSelect()[0].value === 'en_US' && byId('accounts-add-mail').value === 'typed@example.com' );
 check( '...the choice is kept for the next page, and the page says it in <html lang> and the title', stored['nino-admin-page-language'] === 'en' && doc.documentElement.lang === 'en' && doc.title === text._tables.en['/_admin/page/title'] );
 check( '...and the picker names the other one in its own language', byId('page-language').textContent === 'Deutsch' && byId('page-language').getAttribute('lang') === 'de' );
 

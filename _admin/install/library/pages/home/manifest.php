@@ -7,7 +7,7 @@
 	'preset' 		=> 1,
 	'label' 		=> 'Home',
 	'routes' 		=> [
-		'GET://' => [ 'uri' => '/home', 'body' => '[template /templates/page-home]', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
+		'GET://' => [ 'uri' => '/home', 'body' => '[template /templates/page-home]' ],
 	],
 	'templates' => [ 'page-home.tpl' ],
 	// What the starter pages start this page's name, title and description

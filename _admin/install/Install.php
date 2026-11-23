@@ -337,9 +337,10 @@ namespace Nino\Install {
 	 *												plus text/global.php and/or text/&lt;locale&gt;.php fragments
 	 *												merged into the real /text files - see docs/setup.md's
 	 *												Library format section. The site's look is not a choice
-	 *												here: the base unit switches on the feature Basis, which
-	 *												draws the starter pages, and a theme is what replaces its
-	 *												standard look later.
+	 *												here: the starter site is plain html with a stylesheet of
+	 *												its own (the base unit's assets/style.css, the project's
+	 *												layer, which a theme does not overrule - the project turns
+	 *												its look there).
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -348,8 +349,7 @@ namespace Nino\Install {
 	class Setup {
 
 		// The css bundle this step seeds, and what goes into it: style.css is the
-		// project's own, shipped empty. The look of the starter pages is the
-		// standard part of the feature Basis, which the base unit switches on
+		// project's own, the stylesheet of the starter site
 		private const string BUNDLE_KEY = '/.cache/style.css';
 		private const array BASE_STYLESHEETS = [ '/assets/style.css' ];
 
@@ -447,6 +447,7 @@ namespace Nino\Install {
 				'locales' 				=> self::_locales(),
 				'activeLocales' 	=> $appData['/nino/locales/available'] ?? [],
 				'nativeLocale' 		=> $appData['/nino/locales/native'] ?? null,
+				'decided' 				=> $decided,
 				'modules' 				=> $modules,
 			] );
 		}
@@ -736,9 +737,9 @@ namespace Nino\Install {
 			$appData['/nino/modules'] = array_values( array_unique( $moduleClasses ) );
 
 			/*	The css bundle of a fresh project, in the one order that makes it
-				work: the framework first, then the project's own - which ships
-				empty and is never touched again, so a rule put there overrules
-				the framework. The stylesheets of features and modules are not
+				work: the framework first, then the project's own - the stylesheet
+				of the starter site, which a project edits, so a rule put there
+				overrules the framework. The stylesheets of features and modules are not
 				listed here: \Nino\Html::addAsset() puts them in at every boot,
 				in front of the project's own.
 
@@ -835,7 +836,7 @@ namespace Nino\Install {
 					return array_values( array_unique( array_merge( $list, $blacklist ) ) );
 				} );
 
-			// The features the base unit names - Basis, which draws the starter pages - are switched on last: an activation reads
+			// The features the base unit names, none of the unit of the starter site, are switched on last: an activation reads
 			// the module list back from config.php, so the list this step wrote is what it adds to, and its words are written
 			// for the languages this step has just made the project's
 			foreach( (array) ( \Nino\Features::readUnitManifest( self::LIBRARY. '/base' )['features'] ?? [] ) as $feature ) {
@@ -1889,21 +1890,20 @@ namespace Nino\Install {
 			$imageSlots	= [];
 			$position		= 0;
 
+			// The header and the footer every page of the starter set draws: the unit of the frames, ahead of the pages. An application that
+			// provides the start page brings the frames it wants, or none - a page is drawn without them
+			if( $own === false ) {
+
+				$framed = self::_applyFiles( $appData, self::LIBRARY. '/frame', $locales, $blacklist, $imageSlots );
+				if( $framed !== true )
+					return 'the frames could not be applied: '. $framed;
+			}
+
 			foreach( self::_units( $own ) as $unitKey ) {
 
 				$applied = self::_applyPage( $appData, $unitKey, ++$position, $locales, $navKeys, $routes, $blacklist, $imageSlots );
 				if( $applied !== true )
 					return 'the page "/'. $unitKey. '" could not be applied: '. $applied;
-			}
-
-			// The 404 page links to the start page by name. Where the application brings the
-			// start page itself there is no page of the starter set to write that address, so it
-			// is the address of the site, left as it is where something wrote it already
-			if( $own === true ) {
-
-				if( \Nino\Features::mergeText( $appData, '/text/global.php', [ '[[/_nino/webpage/home/uri]]' => '/' ], false ) === false )
-					return 'could not write /text/global.php';
-				$blacklist[] = '/_nino/webpage/home/uri';
 			}
 
 			$appData['/nino/http/routes'] = $routes;
@@ -1971,6 +1971,67 @@ namespace Nino\Install {
 		}
 
 		/**
+		 *	The files and the words of one unit of the library, written the way the Setup step writes a unit: its templates (those of a language
+		 *	the project does not have left out), files, image slots, element types, blacklist keys and text fragments - global and per language.
+		 *	Routes and a page's own meta are the business of the caller
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$unitDir			The unit's directory
+		 *	@param		array 		$locales			The active locales
+		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys
+		 *	@param		array 		&$imageSlots	(reference) Collected image slots, the first unit to name a uri winning
+		 *
+		 *	@return 	true|string							true, or the first file that could not be copied or written
+		 */
+		private static function _applyFiles( array &$appData, string $unitDir, array $locales, array &$blacklist, array &$imageSlots ): true|string {
+
+			$manifest = \Nino\Features::readUnitManifest( $unitDir ) ?? [];
+
+			if( count( $manifest['templates'] ?? [] ) > 0 ) {
+				\Nino\Filesystem::forceDir( $appData, '/templates' );
+				foreach( $manifest['templates'] as $locale => $file ) {
+					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
+						continue;
+					if( \Nino\Features::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) ) === false )
+						return 'could not copy /templates/'. $file;
+				}
+			}
+
+			// A file or a whole directory, as the unit ships it - and one the
+			// manifest names but the unit does not carry is a failure
+			foreach( ( $manifest['files'] ?? [] ) as $file )
+				if( \Nino\Features::copyTree( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) ) === false )
+					return 'could not copy /'. $file;
+
+			// The image slots the unit's templates show, checked once the files are in place
+			$seeded = \Nino\Features::imageSlots( $appData, $manifest, $imageSlots );
+			if( $seeded !== true )
+				return $seeded;
+
+			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
+				\Nino\Filesystem::forceDir( $appData, '/elements' );
+				foreach( $manifest['elementTypes'] as $file )
+					if( \Nino\Features::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) ) === false )
+						return 'could not copy /elements/'. $file;
+			}
+
+			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
+				$blacklist[] = $key;
+
+			$globalFragment = $unitDir. '/text/global.php';
+			if( is_file( $globalFragment ) === true && \Nino\Features::mergeText( $appData, '/text/global.php', (array) include $globalFragment ) === false )
+				return 'could not write /text/global.php';
+
+			foreach( $locales as $locale ) {
+				$localeFragment = $unitDir. '/text/'. $locale. '.php';
+				if( is_file( $localeFragment ) === true && \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment ) === false )
+					return 'could not write /text/'. $locale. '.php';
+			}
+
+			return true;
+		}
+
+		/**
 		 *	Create one starter page: its route, the unit's files and text, and the
 		 *	page's own meta - the name, title and description of every active
 		 *	language, and its Http-URI as a fill a template can link to by name
@@ -2035,46 +2096,9 @@ namespace Nino\Install {
 				$routes[$routeKey] = $route;
 			}
 
-			if( count( $manifest['templates'] ?? [] ) > 0 ) {
-				\Nino\Filesystem::forceDir( $appData, '/templates' );
-				foreach( $manifest['templates'] as $locale => $file ) {
-					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
-						continue;
-					if( \Nino\Features::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ) ) === false )
-						return 'could not copy /templates/'. $file;
-				}
-			}
-
-			// A file or a whole directory, as the unit ships it - and one the
-			// manifest names but the unit does not carry is a failure
-			foreach( ( $manifest['files'] ?? [] ) as $file )
-				if( \Nino\Features::copyTree( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ) ) === false )
-					return 'could not copy /'. $file;
-
-			// The image slots the unit's templates show, checked once the files are in place
-			$seeded = \Nino\Features::imageSlots( $appData, $manifest, $imageSlots );
-			if( $seeded !== true )
-				return $seeded;
-
-			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
-				\Nino\Filesystem::forceDir( $appData, '/elements' );
-				foreach( $manifest['elementTypes'] as $file )
-					if( \Nino\Features::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ) ) === false )
-						return 'could not copy /elements/'. $file;
-			}
-
-			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
-				$blacklist[] = $key;
-
-			$globalFragment = $unitDir. '/text/global.php';
-			if( is_file( $globalFragment ) === true && \Nino\Features::mergeText( $appData, '/text/global.php', (array) include $globalFragment ) === false )
-				return 'could not write /text/global.php';
-
-			foreach( $locales as $locale ) {
-				$localeFragment = $unitDir. '/text/'. $locale. '.php';
-				if( is_file( $localeFragment ) === true && \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment ) === false )
-					return 'could not write /text/'. $locale. '.php';
-			}
+			$filed = self::_applyFiles( $appData, $unitDir, $locales, $blacklist, $imageSlots );
+			if( $filed !== true )
+				return $filed;
 
 			if( $route !== null ) {
 

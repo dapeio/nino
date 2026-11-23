@@ -27,7 +27,7 @@
 			<link rel="icon" type="image/png" sizes="32x32" href="/public/favicon/favicon-32x32.png?v=1767225600">
 			<link rel="icon" type="image/png" sizes="16x16" href="/public/favicon/favicon-16x16.png?v=1767225600">
 			<link rel="manifest" href="/public/favicon/site.webmanifest?v=1767225600">
-			<link rel="stylesheet" href="/public/.cache/style.css?v=81b516c26847" type="text/css" />
+			<link rel="stylesheet" href="/public/.cache/style.css?v=d9ddf0cc5ccb" type="text/css" />
 
 			<!-- Structured data (schema.org). Values go through ""
 			     rather than "[[...]]" inside the quotes: a textfill is
@@ -58,19 +58,21 @@
 
 		<a class="nino-sr-only" href="#nino-main">Zum Inhalt springen</a>
 
-		<header id="header" class="header-wrap header-wrap--sticky"><div class="header-wrap-inner">
-	
-</div><div class="section-row section-row--valign-center">
-		<div class="section-col section-col--size-auto">
-			<a class="header-logo" href="/"><span class="header-logo-name">Muster &amp; Söhne GmbH</span></a>
-		</div>
-		<div class="section-col section-col--size-fill section-col--align-end">
-			<nav class="header-nav" aria-label="Hauptnavigation"><details class="header-nav-details"><summary class="header-nav-toggle" aria-label="Menü"><span aria-hidden="true"></span></summary><ul class="header-nav-list"><li><a href="/">Startseite</a></li><li><a href="/contact">Kontakt</a></li><li><a href="/new-webpage" aria-current="page">Neue Webseite</a></li></ul></details></nav>
-		</div>
-		<div class="section-col section-col--size-auto section-col--hide-on section-col--m-hide-off">
-			<a class="button button--size-s" href="/contact">Jetzt kontaktieren</a>
-		</div>
-	</div></header>
+		<header class="site-header">
+	<div class="wrap">
+		<a href="/" class="brand" title="Startseite" aria-label="Muster &amp; Söhne GmbH"><span>Muster & Söhne GmbH</span></a>
+		<nav class="site-nav" aria-label="Hauptnavigation">
+			<details>
+				<summary><span class="nino-sr-only">Menü</span></summary>
+				<ul>
+					<li><a href="/">Startseite</a></li>
+					<li><a href="/contact">Kontakt</a></li>
+				</ul>
+			</details>
+		</nav>
+		<a href="/contact" class="button">Jetzt kontaktieren</a>
+	</div>
+</header>
 
   <main id="nino-main" tabindex="-1">
 
@@ -78,18 +80,29 @@
 
 		</main>
 
-		<footer id="footer" class="footer-wrap"><div class="footer-wrap-inner">
-	
-	
-</div><div class="section-row">
-		<div class="section-col section-col--m-size-50">
-			
-			<div class="text text--size-s">Kurze Beschreibung Deines Unternehmens.</div>
+		<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-cols">
+			<div>
+				<p><strong>Muster & Söhne GmbH</strong></p>
+				<p>Kurze Beschreibung Deines Unternehmens.</p>
+			</div>
+			<nav aria-label="Navigation im Fußbereich">
+				<ul>
+					<li><a href="/">Startseite</a></li>
+					<li><a href="/contact">Kontakt</a></li>
+				</ul>
+			</nav>
 		</div>
-		<div class="section-col section-col--m-size-50">
-			<nav class="footer-nav" aria-label="Navigation im Fußbereich"><ul><li><a href="/">Startseite</a></li><li><a href="/contact">Kontakt</a></li><li><a href="/new-webpage" aria-current="page">Neue Webseite</a></li></ul></nav>
+		<div class="legal">
+			<p>&copy; 2026 Muster & Söhne GmbH</p>
+			<ul>
+				<li><a href="/impressum">Impressum</a></li>
+				<li><a href="/datenschutz">Datenschutz</a></li>
+			</ul>
 		</div>
-	</div><div class="footer-legal"><p class="footer-legal-copyright">&copy; 2026 Muster &amp; Söhne GmbH</p><ul class="footer-legal-pages"><li><a href="/impressum">Impressum</a></li><li><a href="/datenschutz">Datenschutz</a></li></ul><ul class="footer-legal-locales"><li><a href="?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE" aria-current="true">Deutsch</a></li><li><a href="?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English (US)</a></li></ul></div></footer>
+	</div>
+</footer>
 
 
 		<script nonce="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">NinoJstext={"\/module\/form\/info\/required":"Bitte f\u00fclle alle Pflichtfelder aus.","\/module\/form\/info\/email":"Bitte gib eine g\u00fcltige E-Mail-Adresse ein.","\/module\/form\/info\/invalid":"Bitte pr\u00fcfe Deine Eingaben.","\/module\/form\/info\/error":"Deine Nachricht konnte nicht versendet werden. Bitte probiere es sp\u00e4ter noch einmal.","\/module\/form\/info\/success":"Vielen Dank \u2013 Deine Nachricht wurde versandt."};</script>

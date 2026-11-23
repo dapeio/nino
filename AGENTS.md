@@ -87,7 +87,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package, see the [installer package recipe](docs/recipes/installer-package.md) |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature manual](docs/features.md) |
 | Compose a page template out of sections, columns and components in the workbench | The Builder - the feature `features/Builder` of the catalogue, panel Builder in the Features group, not here |
-| Add a complete starting page to the installation library | Page library unit - the wizard creates the ones that claim a `preset` position as its starter pages, see the [setup manual](docs/setup.md#the-starter-pages) |
+| Add a complete starting page to the installation library | Page library unit - the wizard creates the ones that claim a `preset` position as its starter pages, with the frames of `_admin/install/library/frame/`; the starter site is plain html with the stylesheet of `library/base/assets/style.css` and no feature switched on, see the [setup manual](docs/setup.md#the-starter-pages) and [The Look](docs/setup.md#the-look) |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
 | Map a public HTTP URL to output | Route |
 | Store repeated structured content | Element type and Elements, see the [Element types recipe](docs/recipes/element-types.md) |

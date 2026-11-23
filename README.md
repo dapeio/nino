@@ -58,7 +58,7 @@ The workbench provides full access for development, diagnostics and corrections,
        width="49%">
 </a>
 
-Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through the languages (and the modules a project added itself, if any), switches on the feature Basis, which draws the starter pages, copies the frames and the required assets, records basic information, creates the first developer accounts, offers the applications of the official catalogue (sets of features with a place to continue in), creates the starter pages and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
+Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, asks for the language of the website (and for the modules a project added itself, if any), copies the stylesheet of the starter site and the required assets, records basic information, creates the first developer accounts, offers the applications of the official catalogue (sets of features with a place to continue in), creates the starter pages with their header and footer - plain html, drawn by the kernel alone - and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
 #### The Builder - a feature
 
@@ -125,7 +125,7 @@ A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows u
 | [5. Application](docs/setup.md#5-application) | Which applications of the official catalogue - sets of features with a place to continue in - are placed and switched on, if any? |
 | [6. Finish](docs/setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? The starter pages are created here. |
 
-The look is not among its questions: the base unit switches on the feature Basis and delivers the two frame templates written in its components ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.
+The look is not among its questions: the starter site is plain html with a stylesheet of its own, and no feature is switched on for it ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.
 
 Then check the result. `/` delivers the configured website and `/_admin` opens the workbench with every panel for the root account. Look at every language and route, the navigation and the forms, and save a text and an image as a test. Once the wizard is complete, remove `_admin/install/` from a production delivery; everything it copied stays where it wrote it. The order and the checks are in [Verify the Result and Remove the Wizard](docs/setup.md#verify-the-result-and-remove-the-wizard).
 

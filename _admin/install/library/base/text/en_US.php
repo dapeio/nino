@@ -4,7 +4,6 @@
 	'[[/project/company/contact/country]]' => 'Germany',
 	'[[/project/company/general/description]]' => 'A short description of your company.',
 
-	'[[/template/frame-header/header/button]]' => 'Contact us',
 	'[[/template/common/navigation/skip]]' => 'Skip to content',
 	'[[/template/common/label/phone]]' => 'Phone',
 	'[[/template/common/label/email]]' => 'Email',

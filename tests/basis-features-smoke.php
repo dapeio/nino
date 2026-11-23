@@ -42,4 +42,7 @@ check( 'apiList lists it by its name, as the panel reads the list: in the order 
 	&& array_column( $body['features'], 'key' ) === [ 'basis', 'sample', 'boxy', 'helper', 'old' ] && array_column( $body['features'], 'name' ) === [ 'Basis-Komponenten', 'Beispiel-Feature', 'Boxy', 'Helper', 'Old' ] );
 check( 'it says it is delivered with the kernel, and brings an install unit', $byKey['basis']['shipped'] === true && $byKey['basis']['unit'] === true );
 
+[ $removeStatus, $removeBody ] = ninoCall( $appData, [ \Nino\Modules\Features\Admin::class, 'apiRemove' ], [ 'key' => 'basis' ] );
+check( 'the panel refuses to remove it, off or on: it is a module of the kernel', $removeStatus === 400 && ( $removeBody['code'] ?? '' ) === 'features_remove_shipped' );
+
 ninoDone( $appData );

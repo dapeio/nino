@@ -1,0 +1,15 @@
+/**
+ *	style.css						This site's own stylesheet - the layer "project", the last
+ *												of the css bundle's four, so a rule here wins over the
+ *												tokens of Nino.css and the stylesheets of the features
+ *												alike, whatever the selector of the rule it overrules
+ *												says. The bundle wraps this file in its layer: write the
+ *												rules, not the layer.
+ *
+ *												It ships empty on purpose. The look of the starter pages
+ *												is the standard part of the feature Basis, which reads
+ *												the tokens --brand-... and --page-... that Nino.css
+ *												declares: turn them here, as in
+ *
+ *													:root { --brand-color-1: #0a7d5a; }
+ */

@@ -58,7 +58,7 @@ Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korre
        width="49%">
 </a>
 
-Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, führt durch die Sprachen (und die Module, die ein Projekt selbst hinzugefügt hat, falls es welche gibt), schaltet das Feature Basis ein, übernimmt die Rahmen und die benötigten Assets, erfasst Basisinformationen, erstellt die ersten Entwicklerkonten, bietet die Anwendungen des offiziellen Katalogs an (Verbünde von Features mit einem Einstieg), legt die Starter-Seiten an und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
+Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, fragt nach der Sprache der Website (und nach den Modulen, die ein Projekt selbst hinzugefügt hat, falls es welche gibt), übernimmt das Stylesheet der Starter-Site und die benötigten Assets, erfasst Basisinformationen, erstellt die ersten Entwicklerkonten, bietet die Anwendungen des offiziellen Katalogs an (Verbünde von Features mit einem Einstieg), legt die Starter-Seiten mit Kopf und Fuß an – reines HTML, vom Kernel allein gezeichnet – und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
 
 #### Der Builder – ein Feature
 
@@ -125,7 +125,7 @@ Ein frischer Checkout ist noch kein Projekt. Der Einrichtungsassistent, den `/_a
 | [5. Application](docs/setup.md#5-application) | Welche Anwendungen des offiziellen Katalogs – Verbünde von Features mit einem Einstieg – werden angelegt und eingeschaltet, falls überhaupt? |
 | [6. Finish](docs/setup.md#6-finish) | Welches Recovery-Passwort öffnet `/_admin/recovery.php`, wenn die Konten kaputt sind – und sperrt den Assistenten? Hier entstehen die Starter-Seiten. |
 
-Das Erscheinungsbild gehört nicht zu seinen Fragen: Die Base-Einheit schaltet das Feature Basis ein und liefert die beiden Rahmen-Templates, die in seinen Komponenten geschrieben sind ([The Look](docs/setup.md#the-look)). Redakteurskonten entstehen später im Panel Users der Workbench.
+Das Erscheinungsbild gehört nicht zu seinen Fragen: Die Starter-Site ist reines HTML mit einem eigenen Stylesheet, und kein Feature wird dafür eingeschaltet ([The Look](docs/setup.md#the-look)). Redakteurskonten entstehen später im Panel Users der Workbench.
 
 Prüfe danach das Ergebnis. `/` liefert die eingerichtete Webseite, und `/_admin` öffnet die Workbench mit jedem Panel für das Root-Konto. Sieh Dir jede Sprache und Route, die Navigation und die Formulare an und speichere zur Probe einen Text und ein Bild. Ist der Assistent abgeschlossen, entferne `_admin/install/` aus einer Produktivauslieferung; alles, was er kopiert hat, bleibt dort, wo er es geschrieben hat. Reihenfolge und Prüfungen stehen unter [Verify the Result and Remove the Wizard](docs/setup.md#verify-the-result-and-remove-the-wizard).
 

@@ -336,7 +336,7 @@ namespace Nino {
 			// without its slash, a name - and never the start page: the words stand without a link, and the log says so
 			$first = is_string( $args[0] ?? null ) === true ? $args[0] : '';
 			$written = $first !== '' && strpbrk( $first[0], '~./' ) !== false ? $first : null;
-			$target = $written === null ? ( isset( $args[0] ) === true ? null : [ '/', '' ] ) : self::_linkPath( $appData, $written );
+			$target = $written === null ? ( isset( $args[0] ) === true ? null : [ '/', '' ] ) : self::linkPath( $appData, $written );
 
 			if( $target === null ) {
 
@@ -391,7 +391,7 @@ namespace Nino {
 		 *
 		 *	@return 	array|null								[ the path as the routes write it, what follows it: '?query', '#anchor', both or '' ]; null for a target that is none
 		 */
-		private static function _linkPath( array &$appData, string $written ): ?array {
+		public static function linkPath( array &$appData, string $written ): ?array {
 
 			// The key of a text is its text; any other source is what it is written as. Both are read with their entities, as a stored text has them
 			$text = $written !== '' && $written[0] === '/' ? self::resolveTextfill( $appData, $written ) : null;

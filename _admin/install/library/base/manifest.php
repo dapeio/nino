@@ -16,22 +16,12 @@
 			'header' 	=> [ 'Content-Type' => 'text/plain; charset=utf-8' ],
 		],
 	],
-	/*	The features the wizard switches on with this unit: Basis comes with the kernel and draws the header, the footer and the
-		starter pages written in its components. Whoever switches it off again and deletes the pages has the blank Nino	*/
-	'features' => [ 'basis' ],
+	/*	The features the wizard switches on with this unit: none. The starter site is plain html, drawn by the kernel alone - the header and the footer
+		of the frame unit, the pages of library/pages, and this unit's style.css - and a feature is switched on in the Features panel or by an application	*/
+	'features' => [],
 	'templates' => [
 		'html-header.tpl',
 		'html-footer.tpl',
-		// The site's header and footer markup, written in the components of Basis.
-		// html-header.tpl and html-footer.tpl carry them as [[header]] and [[footer]], which
-		// the standard frame fills, or the one a page chose by [frame /templates/frame-header-<word>]
-		// (see \Nino\Modules\Template::doFrame())
-		// rather than carrying them inline, so a project can rewrite either file
-		// without touching the page frame around it - and a missing include
-		// resolves to an empty string, which is exactly the silent no-header a
-		// delivery must never ship
-		'frame-header.tpl',
-		'frame-footer.tpl',
 		'robots.tpl',
 		'sitemap-xml.tpl',
 		'llms-txt.tpl',
@@ -65,10 +55,10 @@
 	],
 	/*	The logo is two image slots, not files the base unit ships: /logo, the
 		picture for a light ground, and /logo/dark, the one for a dark ground.
-		The header and the footer show them with [header-logo] and
-		[footer-logo], the mails and the page head ask /logo alone with
+		The header of the starter site shows them where they are, and the company
+		name where neither is, the mails and the page head ask /logo alone with
 		[imagevalues /logo], and until somebody uploads one - Images, in the
-		workbench - they show nothing. The size is the ratio of a wordmark;
+		workbench - the header shows the name. The size is the ratio of a wordmark;
 		an upload is cut to it, so a project whose logo is shaped otherwise
 		changes it under Image Slots	*/
 	'imageSlots' => [

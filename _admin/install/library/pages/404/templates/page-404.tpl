@@ -1,12 +1,10 @@
 <!-- nino:template-name Page not found -->
 [template /templates/html-header]
-[section-wrap id="hero" ground="dark" height="60"]
-	[section-row width="narrow"]
-		[section-col align="center"]
-			[section-title ~title tag="h1" size="xl"]
-			[section-subtitle ~subtitle]
-			[button ~button href="/_nino/webpage/home/uri"]
-		[/section-col]
-	[/section-row]
-[/section-wrap]
+<section class="hero hero--center">
+	<div class="wrap">
+		<h1>[[/template/page-404/hero/title]]</h1>
+		<p class="lead">[[/template/page-404/hero/subtitle]]</p>
+		[link class="button"][[/template/page-404/hero/button]][/link]
+	</div>
+</section>
 [template /templates/html-footer]

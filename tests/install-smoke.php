@@ -180,6 +180,23 @@ check( 'reports the config\'s current native locale itself, for the Native Local
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [], 'modules' => [] ] );
 check( 'rejects a selection with no locale at all', $status === 400 );
 
+// The language is a name of a text file of the library, and only those: whatever else a request names is refused, and nothing is read or written for it
+$treeOf = static function( string $dir ): array {
+	$files = [];
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) ) as $file )
+		$files[substr( $file->getPathname(), strlen( $dir ) )] = $file->isFile() === true ? md5_file( $file->getPathname() ) : '';
+	ksort( $files );
+	return $files;
+};
+$beforeBad = $treeOf( $sandbox );
+$badLocales = [ 'fr_FR' => [ 'fr_FR' ], 'a path' => [ '../base/text/de_DE' ], 'a case' => [ 'DE_de' ], 'a climb' => [ 'de_DE/../x' ], 'a list in a list' => [ [ 1 ] ], 'a number' => [ 1 ], 'null' => [ null ] ];
+$badStatuses = [];
+foreach( $badLocales as $label => $list )
+	$badStatuses[$label] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => $list, 'native' => 'fr_FR', 'modules' => [] ] )[0];
+
+check( 'a language that is no text file of the library is refused with a 400 - another language, a path, another case, a climb, a number, a list, null - and nothing is written for any of them: the tree of the sandbox is the same',
+	array_unique( array_values( $badStatuses ) ) === [ 400 ] && count( $badStatuses ) === 7 && $beforeBad !== [] && $treeOf( $sandbox ) === $beforeBad );
+
 // A route _install itself never wrote - eg. added by hand later through
 // _admin - has to survive every apply() below untouched: apply() only ever
 // owns the route keys base/modules could produce. Written straight to
@@ -235,15 +252,15 @@ check( 'the Setup step seeds the css bundle with the project\'s own stylesheet b
 	'/_nino/Nino.css', '/assets/style.css',
 ] );
 check( '...and the file it names is really in the project, and no theme and no script of the kernel with it', is_file( $sandbox. '/private/assets/style.css' ) === true && is_file( $sandbox. '/private/assets/theme.css' ) === false
-	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true
+	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === false && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === false
 	&& ( $configAfterApply['/nino/html/assets']['/.cache/script.js'] ?? \Nino\AppData::DEFAULTS['/nino/html/assets']['/.cache/script.js'] ) === [ '/_nino/Nino.js' ] );
 // No face is delivered: the page is set in the fonts of the visitor's system
 check( '...and no font is delivered to the project', glob( $sandbox. '/public/fonts/*' ) === [] );
-// The wizard switches the feature Basis on, which draws the starter pages: it is in the module list and its words are in the project
-check( '...and the feature Basis is on: in the module list, in the record of the features, and its words are in the language of the project',
-	in_array( '\\Nino\\Modules\\Basis', $configAfterApply['/nino/modules'], true ) === true && isset( $configAfterApply['/nino/features']['basis'] ) === true
-	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/module/basis/navigation/primary]]'] ?? '' ) !== ''
-	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/module/basis/navigation/menu]]'] ?? '' ) !== '' );
+// The starter site is plain html: no feature is switched on by the wizard, Basis least of all - it is not in the module list, not in the record of
+// the features, and none of its words is in the project
+check( '...and no feature is on: Basis is not in the module list, not in the record of the features, and its words are not in the project',
+	in_array( '\\Nino\\Modules\\Basis', $configAfterApply['/nino/modules'], true ) === false && isset( $configAfterApply['/nino/features'] ) === false
+	&& array_filter( array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/module/basis/' ) === true ) === [] );
 // A script in the project's assets is only ever loaded through a bundle - one
 // that no bundle names is a file that looks like the site's own hook and runs
 // nowhere
@@ -325,8 +342,8 @@ check( '...before any template can create that directory unprotected', strpos( $
 
 check( 'copies base\'s html-header.tpl', \Nino\Filesystem::fileExists( $appData, '/templates/html-header.tpl' ) === true );
 check( 'copies "forms"\'s own mail-header/footer templates', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
-check( 'copies the frames of the base unit, written in the components of Basis, and no template of "navigation" and "localepicker", whose menus the header and the footer of Basis draw',
-	\Nino\Filesystem::fileExists( $appData, '/templates/frame-header.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/frame-footer.tpl' ) === true
+check( 'copies no frame - the header and the footer are written with the starter pages, by the last step - and no template of "navigation" and "localepicker", whose menus the header and the footer of Basis draw',
+	\Nino\Filesystem::fileExists( $appData, '/templates/frame-header.tpl' ) === false && \Nino\Filesystem::fileExists( $appData, '/templates/frame-footer.tpl' ) === false
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === false && \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-nav.tpl' ) === false
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-localepicker.tpl' ) === false );
 
@@ -379,7 +396,6 @@ check( '...each section with a title and a text, and the global bucket with its 
 	&& ( $privacyAfterApply['*']['hosting']['order'] ?? null ) === 200 );
 check( 'the menu legal is created with the two pages by Element-URI, in that order', ( $configAfterApply['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 1
 	&& ( $configAfterApply['/nino/html/navroutes']['/legal/privacy']['legal'] ?? null ) === 2 );
-check( '...and the footer of the base frames outputs it, with the component that draws the legal pages', str_contains( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-footer.tpl', '' ), '[footer-legal]' ) === true );
 check( 'the unit\'s words for the Elements panel are on the blacklist', in_array( '/_admin/elements/type/privacy/hint', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true
 	&& in_array( '/_admin/elements/field/legal/text', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
 
@@ -388,6 +404,7 @@ check( 'never writes a fragment for a locale that was not picked', \Nino\Filesys
 [ , $libraryAfterApplyBody ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
 
 check( 'apiLibrary now reports de_DE as the active locale', $libraryAfterApplyBody['activeLocales'] === [ 'de_DE' ] );
+check( '...with the native one, and that the project has answered the step - which the page reads to start a project that has not on the language of the page', $libraryAfterApplyBody['nativeLocale'] === 'de_DE' && $libraryAfterApplyBody['decided'] === true && is_bool( $libraryBody['decided'] ) );
 
 // A second run with a different locale selection replaces the first run's
 // locales, exactly as before - but nothing about the always-on three can be
@@ -468,7 +485,7 @@ check( 'a posted native locale outside the picked set is ignored, falling back t
 	what a permission or a full disk does, provoked without either. The
 	warning check is a guard - copyFile() is silenced already - kept so the
 	refusal stays the whole outcome	*/
-$blockedTemplate = $sandbox. '/private/templates/frame-header.tpl';
+$blockedTemplate = $sandbox. '/private/templates/html-header.tpl';
 unlink( $blockedTemplate );
 mkdir( $blockedTemplate, 0755, true );
 $configBeforeBlocked	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -478,7 +495,7 @@ $blockedWarnings = ninoWarnings();
 rmdir( $blockedTemplate );
 
 check( 'a unit file the step cannot copy is a 500 naming the file', $status === 500
-	&& str_contains( (string) ( $body['error'] ?? '' ), '/templates/frame-header.tpl' ) === true );
+	&& str_contains( (string) ( $body['error'] ?? '' ), '/templates/html-header.tpl' ) === true );
 check( '...nothing was written to config.php for that apply', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) === $configBeforeBlocked );
 check( '...and no engine warning was raised on the way', array_filter( $blockedWarnings, static fn( string $w ): bool => str_contains( $w, 'file_put_contents' ) ) === [] );
 
@@ -521,10 +538,12 @@ $documentHead = (string) file_get_contents( __DIR__. '/../_admin/install/library
 check( 'the first element of the body of a page is a skip link to the main part, which the page names by an id and can focus: tabindex="-1", a target and no stop of the Tab key',
 	preg_match( '/<body>\s*<a class="nino-sr-only" href="#nino-main">\[\[\/template\/common\/navigation\/skip\]\]<\/a>/', $documentHead ) === 1
 	&& substr_count( $documentHead, 'id="nino-main"' ) === 1 && preg_match( '/<main id="nino-main" tabindex="-1">/', $documentHead ) === 1 );
-check( '...and the frames of the base unit are written in the components of Basis alone: a header with its logo, its menu and its action, a footer with its columns and its legal line, and no class of Nino\'s own',
-	preg_match( '/^\[header-wrap\b.*\[section-row\b.*\[header-logo\].*\[header-nav menu="main"\].*\[button\b/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ) ) === 1
-	&& preg_match( '/^\[footer-wrap\b.*\[section-row\b.*\[section-col\b.*\[footer-nav menu="footer"\].*\[footer-legal\]/s', (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ) ) === 1
-	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' ). (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-footer.tpl' ), 'nino-' ) === false );
+$frameHeader = (string) file_get_contents( __DIR__. '/../_admin/install/library/frame/templates/frame-header.tpl' );
+$frameFooter = (string) file_get_contents( __DIR__. '/../_admin/install/library/frame/templates/frame-footer.tpl' );
+preg_match_all( '/(?<!\[)\[([a-z][a-z0-9-]*)\b/', $frameHeader. $frameFooter, $frameCalls );
+check( '...and the frames of the frame unit are plain html with the calls of the kernel alone - [link], [imagevalues] and its [else] - and no component: a header that is a <header> with its brand, a menu that is a <details> and its action, a footer that is a <footer> with its columns and its legal line, and no script',
+	array_diff( array_unique( $frameCalls[1] ), [ 'link', 'imagevalues', 'else' ] ) === [] && str_starts_with( $frameHeader, '<header class="site-header">' ) === true && str_starts_with( $frameFooter, '<footer class="site-footer">' ) === true
+	&& str_contains( $frameHeader, '<details>' ) === true && str_contains( $frameHeader. $frameFooter, '<script' ) === false && substr_count( $frameHeader. $frameFooter, '[link' ) === substr_count( $frameHeader. $frameFooter, '[/link]' ) );
 $contactPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/contact/templates/page-contact.tpl' );
 check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and a form without a script keeps the check of the browser, so the markup has no novalidate',
 	preg_match( '/<input type="text" id="contact-form-name"[^>]* autocomplete="name"/', $contactPage ) === 1 && preg_match( '/<input type="email" id="contact-form-email"[^>]* autocomplete="email"/', $contactPage ) === 1
@@ -609,6 +628,17 @@ check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getF
 rmdir( $seedFile );
 
 check( 'where nothing is in the way the call succeeds', \Nino\Install\StarterPages::apply( $appData ) === true );
+check( 'the starter pages bring the frames: the header and the footer, with the words of the header\'s button',
+	\Nino\Filesystem::fileExists( $appData, '/templates/frame-header.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/frame-footer.tpl' ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/template/frame-header/header/button]]'] ?? '' ) !== '' && ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/template/frame-header/header/button]]'] ?? '' ) !== '' );
+
+\Nino\Modules\Legal::init( $appData );
+$legalNav = static fn( array &$project ): array => array_values( array_filter( \Nino\Modules\Legal::check( $project ), static fn( array $finding ): bool => $finding['kind'] === 'nav' ) );
+check( 'the footer of the frames links the imprint and the privacy policy, and the legal check finds a way to each page in both languages: no finding on a fresh site', $legalNav( $appData ) === [] );
+$withoutLinks = $appData;
+\Nino\Filesystem::putFileContent( $withoutLinks, '/templates/frame-footer.tpl', '<footer></footer>' );
+check( '...and one for each page, with both languages, where the links are not in the footer', array_column( array_column( $legalNav( $withoutLinks ), 'values' ), 1 ) === [ 'de_DE, en_US', 'de_DE, en_US' ] );
+\Nino\Filesystem::putFileContent( $withoutLinks, '/templates/frame-footer.tpl', (string) file_get_contents( __DIR__. '/../_admin/install/library/frame/templates/frame-footer.tpl' ) );
 
 $configAfterStarter = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 $starterRoutes = $pageRoutes( $configAfterStarter );
@@ -616,8 +646,8 @@ $starterRoutes = $pageRoutes( $configAfterStarter );
 check( 'Start, Contact and 404 are routed at the address their unit suggests, in the order of their positions', array_keys( $starterRoutes ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
 check( '...each route\'s own "uri" is the Element-URI "/<folder>", not the address', array_column( $starterRoutes, 'uri' ) === [ '/home', '/contact', '/404' ] );
 check( '...the 404 carries its status code, the others none', ( $starterRoutes['GET://404']['statusCode'] ?? null ) === 404 && isset( $starterRoutes['GET://']['statusCode'] ) === false && isset( $starterRoutes['GET://contact']['statusCode'] ) === false );
-check( '...Start and Contact are in the menus their unit proposes at their own position in the list - main and footer, the legal menu is not one of them - and 404 in none',
-	( $starterRoutes['GET://']['navs'] ?? null ) === [ 'main' => 1, 'footer' => 1 ] && ( $starterRoutes['GET://contact']['navs'] ?? null ) === [ 'main' => 2, 'footer' => 2 ] && isset( $starterRoutes['GET://404']['navs'] ) === false );
+check( '...the starter pages are in no menu: their templates link the pages by hand, so no route carries a membership of a menu the site does not output (the menus of the Legal module are the module\'s own)',
+	array_filter( $starterRoutes, static fn( array $route ): bool => isset( $route['navs'] ) === true ) === [] && array_keys( $configAfterStarter['/nino/html/navroutes'] ?? [] ) === [ '/legal/imprint', '/legal/privacy' ] );
 check( 'a hand-written route outside the library survives', ( $configAfterStarter['/nino/http/routes']['GET://custom']['body'] ?? null ) === 'hand-written route' );
 check( 'the contact page\'s module is the one the wizard always applies', in_array( '\\Nino\\Modules\\Form', $configAfterStarter['/nino/modules'], true ) === true );
 
@@ -637,16 +667,16 @@ check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1
 check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/hero/background.' ) === true
 	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
 // The request as \Nino\init() boots it: the feature Basis the wizard switched on is in the list of the modules, and its components are read from its folders
+\Nino\Html::init( $appData );
 \Nino\Features::registerComponents( $appData );
 \Nino\Modules\Template::init( $appData );
 $homeHtml = \Nino\Html::renderHtml( $appData, '[template /templates/page-home]' );
-check( 'the home template renders the slot as the picture behind its hero: an <img> with its size and an empty alt inside the section, and no literal image path', preg_match( '#<section id="hero"[^>]*>.*?<img [^>]*src="[^"]*/images/template/page-home/hero/background\.svg"[^>]*width="1920" height="1080" alt=""#s', $homeHtml ) === 1
-	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[section-wrap' ) === false );
+check( 'the home template renders the slot as the picture behind its hero: an <img> with its size and an empty alt inside the section, and no literal image path', preg_match( '#<section class="hero hero--tall">\s*<img src="[^"]*/images/template/page-home/hero/background\.svg" width="1920" height="1080" alt=""#s', $homeHtml ) === 1
+	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[imagevalues' ) === false );
 
 // The logo, which is a slot too: nothing in the shipped frames, the navigation
 // or the mail names a logo file, and with no logo uploaded none of them
 // leaves a broken <img> or an empty meta tag behind
-\Nino\Html::init( $appData );
 $logoFrames = static function( array &$appData ): array {
 	return [
 		'header'	=> \Nino\Html::renderHtml( $appData, '[template /templates/frame-header]' ),
@@ -657,15 +687,20 @@ $logoFrames = static function( array &$appData ): array {
 $logoShipped = '';
 foreach( [ '/templates/frame-header.tpl', '/templates/frame-footer.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl' ] as $logoTemplate )
 	$logoShipped .= (string) \Nino\Filesystem::getFileContent( $appData, $logoTemplate, '' );
-check( 'no shipped template names a logo file: every one asks the logo slots - the header as [header-logo], which takes both, the page head and the mail as the light slot alone',
-	preg_match( '#images/logo#', $logoShipped ) === 0 && substr_count( $logoShipped, '[header-logo' ) === 1 && substr_count( $logoShipped, '[footer-logo /logo]' ) === 1 && substr_count( $logoShipped, '[imagevalues /logo' ) === 3
-	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '[imagevalues /logo]' ) === 1
-	&& str_contains( $logoShipped, '/logo/dark' ) === false );
+check( 'no shipped template names a logo file: every one asks the logo slots - the header for both and takes the name of the company where there is none, the page head and the mail the light slot alone',
+	preg_match( '#images/logo#', $logoShipped ) === 0 && substr_count( $logoShipped, '[header-logo' ) === 0 && substr_count( $logoShipped, '[footer-logo' ) === 0
+	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-header.tpl', '' ), '[imagevalues /logo]' ) === 1 && substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-header.tpl', '' ), '[imagevalues /logo/dark]' ) === 2
+	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/html-header.tpl', '' ), '[imagevalues /logo]' ) === 2 && substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '[imagevalues /logo]' ) === 1
+	&& str_contains( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/html-header.tpl', '' ). (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '/logo/dark' ) === false );
 
 \Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'www.example.com', '[[/project/company/general/name]]' => 'Acme' ], '*' );
 $noLogo = $logoFrames( $appData );
 check( 'without an uploaded logo the header has no <img> and the mail header no picture at all', str_contains( $noLogo['header'], '<img' ) === false && str_contains( $noLogo['header'], '[header-logo' ) === false
 	&& str_contains( $noLogo['mail'], '<img' ) === false && str_contains( $noLogo['mail'], '[image' ) === false );
+// "Logo, sonst Name": the brand of the header is a link to the start page, and what stands in it is the one picture, both, the dark one alone - or the name of the company
+$brand = static fn( string $header ): string => preg_match( '#<a href="/"[^>]*class="brand"[^>]*>(.*?)</a>#s', $header, $brandMatch ) === 1 ? $brandMatch[1] : "\0";
+check( '"Logo, sonst Name": with no picture the brand of the header is the name of the company, as text', strip_tags( $brand( $noLogo['header'] ) ) === 'Acme' );
+check( '...and the link is named by the company in every case, so that a picture alone has a name', preg_match( '#class="brand"[^>]* aria-label="Acme"#', $noLogo['header'] ) === 1 );
 check( '...and the page head has no og:image or twitter:image, not even an empty one', str_contains( $noLogo['meta'], 'og:image' ) === false && str_contains( $noLogo['meta'], 'twitter:image' ) === false && str_contains( $noLogo['meta'], '[image' ) === false );
 
 $appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
@@ -673,11 +708,13 @@ $withLogo = $logoFrames( $appData );
 $logoUrl = \Nino\Images::getUrl( $appData, 'logo.webp' );
 check( 'with a logo the header shows the one picture, with its size and an empty alt, and no picture for the dark ground',
 	preg_match( '#<img [^>]*src="'. preg_quote( $logoUrl, '#' ). '"[^>]*width="500" height="100" alt=""#', $withLogo['header'] ) === 1 && substr_count( $withLogo['header'], '<img' ) === 1 );
+check( '...with the light picture alone the brand is that picture and no name', substr_count( $brand( $withLogo['header'] ), '<img' ) === 1 && strip_tags( $brand( $withLogo['header'] ) ) === '' && str_contains( $brand( $withLogo['header'] ), 'class="brand-light"' ) === true );
 $appData['/nino/html/images']['/logo/dark']['filename'] = 'logo-dark.webp';
 $darkUrl = \Nino\Images::getUrl( $appData, 'logo-dark.webp' );
 $withBoth = $logoFrames( $appData );
 check( '...with the picture for a dark ground as well both are in the header, the light one first',
 	substr_count( $withBoth['header'], '<img' ) === 2 && strpos( $withBoth['header'], $logoUrl ) !== false && strpos( $withBoth['header'], $darkUrl ) > strpos( $withBoth['header'], $logoUrl ) );
+check( '...with both the brand is the two pictures, the light one first, and no name', substr_count( $brand( $withBoth['header'] ), '<img' ) === 2 && strip_tags( $brand( $withBoth['header'] ) ) === '' && strpos( $brand( $withBoth['header'] ), 'brand-light' ) < strpos( $brand( $withBoth['header'] ), 'brand-dark' ) );
 // A name with a quote or a bracket in it breaks nothing: the pictures are whole and no part of a call is left standing as text
 \Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => 'O\'Brien\'s "Studio" [Nord] GmbH' ], '*' );
 $oddName = $logoFrames( $appData );
@@ -689,10 +726,20 @@ check( '...the page head and the mail ask the light slot alone: the dark one is 
 	&& str_contains( $withBoth['mail'], '<img src="https://www.example.com'. $logoUrl. '" width="180" alt="Acme">' ) === true );
 $appData['/nino/html/images']['/logo']['filename'] = null;
 $onlyDark = $logoFrames( $appData );
+check( '...with the dark picture alone the brand is that picture and no name', substr_count( $brand( $onlyDark['header'] ), '<img' ) === 1 && str_contains( $brand( $onlyDark['header'] ), 'class="brand-dark"' ) === true && strip_tags( $brand( $onlyDark['header'] ) ) === '' );
 check( '...a project that uploaded the dark picture alone has it in the header, and the mail and the page head have none',
 	str_contains( $onlyDark['header'], $darkUrl ) === true && str_contains( $onlyDark['header'], $logoUrl ) === false && substr_count( $onlyDark['header'], '<img' ) === 1
 	&& str_contains( $onlyDark['mail'], '<img' ) === false && str_contains( $onlyDark['meta'], 'og:image' ) === false );
 $appData['/nino/html/images']['/logo/dark']['filename'] = null;
+$oddText = 'O\'Brien\'s "Studio" [Nord] & Co';
+\Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => $oddText ], '*' );
+$oddBrand = $logoFrames( $appData )['header'];
+\Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => 'Acme' ], '*' );
+$oddDom = new \DOMDocument();
+@$oddDom->loadHTML( '<?xml encoding="utf-8"?>'. $oddBrand );
+$oddLinks = ( new \DOMXPath( $oddDom ) )->query( '//a[@class="brand"]' );
+check( '...a name with a quote, a bracket and an ampersand in it is the text of the brand and the name of its link, whole: one link, its aria-label the name', $oddLinks->length === 1 && $oddLinks->item( 0 )->getAttribute( 'aria-label' ) === $oddText
+	&& $oddLinks->item( 0 )->textContent === $oddText );
 $appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
 check( '...og:image and twitter:image carry its absolute address', str_contains( $withLogo['meta'], '<meta property="og:image" content="https://www.example.com'. $logoUrl. '">' ) === true
 	&& str_contains( $withLogo['meta'], '<meta name="twitter:image" content="https://www.example.com'. $logoUrl. '">' ) === true );
@@ -700,7 +747,7 @@ check( '...and the mail an <img> with the absolute address and the company name 
 $appData['/nino/html/images']['/logo']['filename'] = null;
 
 // So the Image Slots tab's scan has nothing to propose for it: the copied template is no literal <img> of the images directory
-check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), 'image="~background"' ) === true
+check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[imagevalues /template/page-home/hero/background]' ) === true
 	&& preg_match( '#<img\b[^>]*src="[^"]*/images/#i', (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ) ) === 0 );
 // A fresh install is the thing the dashboard's "Missing image slots" tile counts: with the logo and the hero both slots, no template has an <img> of the images directory left
 check( 'on a fresh install the Missing image slots tile reads 0 - every picture of the starter site is a slot', \Nino\Modules\Images\Slots::missingCount( $appData ) === 0 );
@@ -1442,6 +1489,26 @@ check( '...answers where it leads to: nowhere in particular', array_diff_key( $b
 check( '...and the empty page, which the Routes panel starts a new route on, is in the project beside them', \Nino\Filesystem::fileExists( $plain, '/templates/page-blank.tpl' ) === true );
 check( '...and the project is done', \Nino\Admin\Admin::isInstalled( $plain ) === true );
 
+// Who wins where a frame is there already: at the end the wizard writes the frames of its library with the starter pages and replaces a header or a footer - and a word of the header's button -
+// that the project has (as the setup step did before it), and where an application provides the start page it writes none and what is there stays
+$appReset();
+$handFrames = $appProject( 'install-finish-handframes' );
+\Nino\Filesystem::putFileContent( $handFrames, '/templates/frame-header.tpl', '<header>by hand</header>' );
+\Nino\Features::mergeText( $handFrames, '/text/de_DE.php', [ '[[/template/frame-header/header/button]]' => 'by hand' ] );
+$appFinish( $handFrames );
+check( 'a header that is there when the wizard ends with the starter pages is replaced by the one of the library, and so is the word of its button',
+	(string) \Nino\Filesystem::getFileContent( $handFrames, '/templates/frame-header.tpl', '' ) === (string) file_get_contents( __DIR__. '/../_admin/install/library/frame/templates/frame-header.tpl' )
+	&& \Nino\Filesystem::getFileContent( $handFrames, '/text/de_DE.php', [] )['[[/template/frame-header/header/button]]'] === ( include __DIR__. '/../_admin/install/library/frame/text/de_DE.php' )['[[/template/frame-header/header/button]]'] );
+$appReset();
+$handOwn = $appProject( 'install-finish-handown' );
+$appApplyAll( $handOwn, [ 'card' ] );
+\Nino\Filesystem::putFileContent( $handOwn, '/templates/frame-header.tpl', '<header>of the application</header>' );
+\Nino\Features::mergeText( $handOwn, '/text/de_DE.php', [ '[[/template/frame-header/header/button]]' => 'of the application' ] );
+$appFinish( $handOwn, [ 'applications' => [ 'card' ] ] );
+check( '...and where an application provides the start page the header it has stays, with its words, and no footer comes',
+	(string) \Nino\Filesystem::getFileContent( $handOwn, '/templates/frame-header.tpl', '' ) === '<header>of the application</header>'
+	&& \Nino\Filesystem::getFileContent( $handOwn, '/text/de_DE.php', [] )['[[/template/frame-header/header/button]]'] === 'of the application' && \Nino\Filesystem::fileExists( $handOwn, '/templates/frame-footer.tpl' ) === false );
+
 // A key that cannot be made leaves the wizard open: nothing is shown that is not kept, and the project does not count as installed
 $appReset();
 $noKey = $appProject( 'install-finish-nokey' );
@@ -1469,6 +1536,9 @@ $withTwo = $appProject( 'install-finish-two' );
 $appApplyAll( $withTwo, [ 'site', 'shop' ] );
 [ , $body ] = $appFinish( $withTwo, [ 'applications' => [ 'shop', 'site' ] ] );
 check( 'with several, every entry point is named, in the order of the catalogue', array_column( $body['targets'], 'key' ) === [ 'site', 'shop' ] );
+check( '...and the application that says nothing of the start page (shop) leaves the starter pages and their frames to the wizard: Start, Contact and 404 and the header and the footer are all there',
+	$starterOf( $withTwo ) === [ 'GET://', 'GET://contact', 'GET://404' ] && \Nino\Filesystem::fileExists( $withTwo, '/templates/frame-header.tpl' ) === true && \Nino\Filesystem::fileExists( $withTwo, '/templates/frame-footer.tpl' ) === true );
+check( '...and so does the application that starts with the starter pages (site) alone', \Nino\Filesystem::fileExists( $withSite, '/templates/frame-header.tpl' ) === true );
 
 // An application that brings the start page itself
 $appReset();
@@ -1482,21 +1552,24 @@ check( 'an application that provides the start page leaves the starter pages out
 check( '...the page for an address that is not there is made all the same, with its status code and its words in both languages', ( $ownRoutes['GET://404']['statusCode'] ?? null ) === 404
 	&& isset( \Nino\Filesystem::getFileContent( $own, '/text/de_DE.php', [] )['[[/_nino/webpage/404/name]]'], \Nino\Filesystem::getFileContent( $own, '/text/en_US.php', [] )['[[/_nino/webpage/404/name]]'] ) );
 $ownTemplate = (string) \Nino\Filesystem::getFileContent( $own, '/templates/page-404.tpl', '' );
-$ownGlobal = \Nino\Filesystem::getFileContent( $own, '/text/global.php', [] );
-preg_match_all( '#href="(/_nino/webpage/[^"]+)"#', $ownTemplate, $ownLinks );
-check( '...and every address the 404 page links to by name is written, so that no link of it leads nowhere', $ownLinks[1] !== [] && array_filter( $ownLinks[1], static fn( string $link ): bool => ( $ownGlobal['[['. $link. ']]'] ?? '' ) === '' ) === []
-	&& in_array( '/_nino/webpage/home/uri', \Nino\Filesystem::getFileContent( $own, '/text/blacklist.php', [] ), true ) );
-// Drawn: where an application brings the start page there is no page /home, and a link by page:/home would be a span - the button of the 404 page links by the address the wizard wrote
+check( '...and the 404 page links to the start page with a link that names no address, which is the address of the site wherever the start page comes from, so that nothing is written for it and no link of it leads nowhere',
+	str_contains( $ownTemplate, '[link class="button"]' ) === true && str_contains( $ownTemplate, '/_nino/webpage/home' ) === false
+	&& isset( \Nino\Filesystem::getFileContent( $own, '/text/global.php', [] )['[[/_nino/webpage/home/uri]]'] ) === false );
+// Drawn: where an application brings the start page there is no page /home, and the button of the 404 page is a link to the start page all the same
 $own['/nino/modules'] = \Nino\Filesystem::getFileContent( $own, '/config.php', [] )['/nino/modules'];
 $own['/nino/dir'] = '';
 \Nino\Html::init( $own );
 \Nino\Features::registerComponents( $own );
 \Nino\Modules\Template::init( $own );
 $own404 = \Nino\Html::renderHtml( $own, '[template /templates/page-404]' );
-check( '...and its button is a link to the address of the site, drawn so, and no span',
-	preg_match( '#<a class="button" href="/">#', $own404 ) === 1 && str_contains( $own404, '<span class="button">' ) === false
-	&& str_contains( \Nino\Html::renderHtml( $own, '[button /template/page-404/hero/button href="page:/home"]' ), '<span' ) === true );
+check( '...and its button is a link to the address of the site, drawn so, and no span', preg_match( '#<a href="/"[^>]* class="button">#', $own404 ) === 1 && str_contains( $own404, '<span' ) === false );
 check( '...and the empty page is in the project, with no route of its own', \Nino\Filesystem::fileExists( $own, '/templates/page-blank.tpl' ) === true );
+ninoWarnings();
+$ownDrawn = \Nino\Html::renderHtml( $own, '[template /templates/page-404]' );
+check( '...and no frame is written, the header and the footer being the ones an application brings or none: the page is drawn all the same - the scaffold with nothing in the place of the header and of the footer - and the log has nothing to say',
+	\Nino\Filesystem::fileExists( $own, '/templates/frame-header.tpl' ) === false && \Nino\Filesystem::fileExists( $own, '/templates/frame-footer.tpl' ) === false
+	&& str_contains( $ownDrawn, '<!doctype html>' ) === true && str_contains( $ownDrawn, '<main id="nino-main"' ) === true && str_contains( $ownDrawn, '</main>' ) === true && str_contains( $ownDrawn, '</html>' ) === true
+	&& str_contains( $ownDrawn, '[[header]]' ) === false && str_contains( $ownDrawn, '[[footer]]' ) === false && ninoWarnings() === [] );
 check( '...and names its entry point', array_column( $body['targets'], 'next' ) === [ '/card' ] );
 
 // ...but only one that is really in: posting it is not enough
@@ -1868,39 +1941,48 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 
 check( 'every page unit ships the templates its own routes render'. ( $pageFailures === [] ? '' : ' - '. implode( ' | ', $pageFailures ) ), $pageFailures === [] );
 
-/*	The pages of the library are written in the components of Basis, so a fresh project edits them in that notation. A template has its name
-	line at byte zero, the head, the sections and the foot, every [section-wrap] has an id that is a slug no section before it has, and no page
-	draws a section, a column or a button by hand. By grammar and position: no page, section or key of the library is named here	*/
+/*	The pages of the library are html, so a fresh project edits them as html. A template has its name line at byte zero, the head, the body and
+	the foot, no call of a component, no script, no style and no handler written into an element, and no more than one h1; the ids of its sections
+	are slugs no section before it has. By grammar and position: no page, section or key of the library is named here	*/
 $shapeFailures	= [];
 $shapeTemplates	= 0;
 
 foreach( glob( $realRoot. '/_admin/install/library/pages/*/templates/*.tpl' ) ?: [] as $shapeFile ) {
 
 	$shapeSource = (string) file_get_contents( $shapeFile );
+	$shapeLabel	= substr( $shapeFile, strlen( $realRoot. '/_admin/install/library/pages/' ) );
 
-	if( str_contains( $shapeSource, '[section-wrap' ) === false )
+	// The blank page is a head and a foot and nothing between them
+	if( str_contains( $shapeSource, '<section' ) === false && str_contains( $shapeSource, '<article' ) === false )
 		continue;
 
 	$shapeTemplates++;
-	$shapeLabel	= substr( $shapeFile, strlen( $realRoot. '/_admin/install/library/pages/' ) );
 	$shapeIds	= [];
 
-	if( preg_match( '~\A<!-- nino:template-name [^\r\n<>]+ -->\n\[template /templates/html-header(?:-[a-z0-9]+)*\]\n\[section-wrap\b.*\n\[template /templates/html-footer(?:-[a-z0-9]+)*\]\n\z~s', $shapeSource ) !== 1 )
-		$shapeFailures[] = $shapeLabel. ': the name line, the head, the sections and the foot do not stand where they are read';
+	if( preg_match( '~\A<!-- nino:template-name [^\r\n<>]+ -->\n\[template /templates/html-header(?:-[a-z0-9]+)*\]\n.*\n\[template /templates/html-footer(?:-[a-z0-9]+)*\]\n\z~s', $shapeSource ) !== 1 )
+		$shapeFailures[] = $shapeLabel. ': the name line, the head, the body and the foot do not stand where they are read';
 
-	if( preg_match( '~<(?:section|header|footer)\b|class="[^"]*\bnino-(?!form)~', $shapeSource ) === 1 )
-		$shapeFailures[] = $shapeLabel. ': a section, a header or a footer drawn by hand, or a class of the old stylesheet';
+	preg_match_all( '~(?<!\[)\[([a-z][a-z0-9-]*)\b~', preg_replace( '~\[template /templates/html-(?:header|footer)\]~', '', $shapeSource ), $shapeCalls );
 
-	preg_match_all( '~\[section-wrap\b([^\]]*)\]~', $shapeSource, $shapeTags );
+	if( array_diff( array_unique( $shapeCalls[1] ), [ 'link', 'imagevalues', 'else', 'csrf' ] ) !== [] )
+		$shapeFailures[] = $shapeLabel. ': a call that is no call of the kernel ('. implode( ', ', array_diff( array_unique( $shapeCalls[1] ), [ 'link', 'imagevalues', 'else', 'csrf' ] ) ). ')';
 
-	foreach( $shapeTags[1] as $shapeTag )
-		if( preg_match( '~ id="([a-z0-9]+(?:-[a-z0-9]+)*)"~', $shapeTag, $shapeId ) !== 1 || isset( $shapeIds[$shapeId[1]] ) === true )
-			$shapeFailures[] = $shapeLabel. ': a section without an id that is a slug, or with one a section before it has ('. trim( $shapeTag ). ')';
+	if( preg_match( '~<script\b|<style\b|\sstyle=|\son[a-z]+=~i', $shapeSource ) === 1 )
+		$shapeFailures[] = $shapeLabel. ': a script, a style or a handler written into the page';
+
+	if( substr_count( $shapeSource, '<h1' ) !== 1 )
+		$shapeFailures[] = $shapeLabel. ': not exactly one h1';
+
+	preg_match_all( '~<section\b[^>]*\sid="([^"]+)"~', $shapeSource, $shapeSections );
+
+	foreach( $shapeSections[1] as $shapeId )
+		if( preg_match( '~^[a-z0-9]+(?:-[a-z0-9]+)*$~', $shapeId ) !== 1 || isset( $shapeIds[$shapeId] ) === true )
+			$shapeFailures[] = $shapeLabel. ': an id that is no slug, or one a section before it has ('. $shapeId. ')';
 		else
-			$shapeIds[$shapeId[1]] = true;
+			$shapeIds[$shapeId] = true;
 }
 
-check( 'the pages of the library are written in the components of Basis ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 3 );
+check( 'the pages of the library are html with the calls of the kernel alone ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 3 );
 
 // The three a starter site is normally built from have to be among them, or
 // the starter pages have nothing to create on a fresh install
@@ -1942,14 +2024,16 @@ check( 'the always-on module list carries no unit the wizard offers', array_inte
 	\Nino\AppData::DEFAULTS['/nino/modules']
 ) === [] );
 
-/*	The base unit delivers no look of its own: the look of the starter pages is the standard part of the feature Basis, and what the unit
-	copies is the project's own empty stylesheet, the frames and the favicons - no theme and no webfont	*/
+/*	The look of the starter site is the base unit's stylesheet, which the project owns from the first day on: what the unit copies is that
+	stylesheet, the favicons and the scaffold - no theme, no webfont - and the unit switches no feature on	*/
 $baseUnit 	= $realRoot. '/_admin/install/library/base';
 $baseFiles 	= (array) ( ( include $baseUnit. '/manifest.php' )['files'] ?? [] );
+$baseCss		= (string) file_get_contents( $baseUnit. '/assets/style.css' );
 
-check( 'the base unit ships the project\'s own stylesheet and copies the directory it is in, and no theme, no webfont and no directory of fonts', is_file( $baseUnit. '/assets/style.css' ) === true
-	&& in_array( 'assets', $baseFiles, true ) === true && is_file( $baseUnit. '/assets/theme.css' ) === false && is_dir( $baseUnit. '/fonts' ) === false && in_array( 'fonts', $baseFiles, true ) === false
-	&& ( ( include $baseUnit. '/manifest.php' )['features'] ?? null ) === [ 'basis' ] );
+check( 'the base unit ships the stylesheet of the starter site - it begins with the comment that says it is the site\'s own - and copies the directory it is in, and no theme, no webfont and no directory of fonts', is_file( $baseUnit. '/assets/style.css' ) === true
+	&& str_starts_with( $baseCss, '/*' ) === true && str_contains( substr( $baseCss, 0, strpos( $baseCss, '*/' ) ), 'This site\'s own stylesheet' ) === true
+	&& in_array( 'assets', $baseFiles, true ) === true && is_file( $baseUnit. '/assets/theme.css' ) === false && is_dir( $baseUnit. '/fonts' ) === false && in_array( 'fonts', $baseFiles, true ) === false );
+check( '...and switches no feature on: the starter site is plain html', ( ( include $baseUnit. '/manifest.php' )['features'] ?? null ) === [] );
 
 /*	And the mailbox every mail this framework sends is addressed from.
 	\Nino\Mail::_getSender() reads '[[/project/mail/address/owner]]' for the From header
@@ -2097,8 +2181,8 @@ foreach( [ '/private/templates', '/public/images', '/private/text', '/private/as
 ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
 check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
-// The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the standard parts of Basis,
-// the look of the form and the project's own stylesheet, in at most 60 KB, and the reset alone in at most 12 KB
+// The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the look of the form and the
+// stylesheet of the site, and no rule of a part of Basis - Basis is off
 $keysBuilt = $keysApp;
 $keysBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
 $keysBuilt['/nino/html/assets'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/html/assets'];
@@ -2110,24 +2194,25 @@ $keysBuilt['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/conf
 \Nino\Features::registerParts( $keysBuilt );
 \Nino\Modules\Assets::doShortcode( $keysBuilt, [ '/.cache/style.css' ] );
 $keysBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, '/.cache/style.css' ) );
-check( 'the style bundle of a fresh starter site is the reset, the standard parts of Basis, the look of the form and the project\'s own stylesheet, and it is at most 60 KB; Nino.css alone is at most 12 KB',
-	strlen( $keysBundle ) > 20000 && strlen( $keysBundle ) <= 60 * 1024 && str_contains( $keysBundle, '.header-wrap' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
+$basisCss = '';
+foreach( glob( dirname( __DIR__ ). '/_nino/Nino/Modules/Basis/groups/*/part/part.css' ) ?: [] as $partCss )
+	$basisCss .= (string) file_get_contents( $partCss );
+// The lines of the parts that are the parts' alone: a line the reset or the site's own stylesheet says as well is no mark of Basis
+$sharedCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' ). $baseCss;
+$basisRules = array_filter( array_map( 'trim', explode( "\n", $basisCss ) ), static fn( string $line ): bool => strlen( $line ) > 30 && preg_match( '/^[.a-z:][^{]*\{.*\}$/', $line ) === 1 && str_contains( $sharedCss, $line ) === false );
+check( 'the style bundle of a fresh starter site is the reset, the look of the form and the stylesheet of the site: it carries no line of a part of Basis ('. count( $basisRules ). ' lines looked for), and it is at most 22 KB (21422 bytes measured); Nino.css alone is at most 12 KB',
+	strlen( $keysBundle ) > 15000 && strlen( $keysBundle ) <= 22 * 1024 && str_contains( $keysBundle, '.site-header' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
+	&& count( $basisRules ) > 100 && array_filter( $basisRules, static fn( string $line ): bool => str_contains( $keysBundle, $line ) === true ) === []
 	&& filesize( dirname( __DIR__ ). '/_nino/Nino.css' ) <= 12 * 1024 );
-// The scans of the workbench read the words and the pictures of a page of Basis through the register: ~title under the id of its section is a key read, image="~background" a place of a picture
 $keysApp['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];
 \Nino\Features::registerComponents( $keysApp );
-// The Features panel of the workbench lists Basis as delivered with the kernel and as on, and it cannot be removed
+// The Features panel of the workbench lists Basis as delivered with the kernel and as off, and it cannot be removed
 ninoUser( $keysApp, 'dev@example.com' );
 [ $featuresStatus, $featuresBody ] = ninoCall( $keysApp, [ \Nino\Modules\Features\Admin::class, 'apiList' ] );
 $basisRow = array_values( array_filter( (array) ( $featuresBody['features'] ?? [] ), static fn( array $row ): bool => ( $row['key'] ?? '' ) === 'basis' ) )[0] ?? [];
 [ $removeStatus, $removeBody ] = ninoCall( $keysApp, [ \Nino\Modules\Features\Admin::class, 'apiRemove' ], [ 'key' => 'basis' ] );
-check( 'the Features panel lists Basis as delivered with the kernel and as on, and refuses to remove it', $featuresStatus === 200 && ( $basisRow['shipped'] ?? null ) === true && ( $basisRow['active'] ?? null ) === true
+check( 'the Features panel lists Basis as delivered with the kernel and as off, where a fresh starter site has it, and refuses to remove it', $featuresStatus === 200 && ( $basisRow['shipped'] ?? null ) === true && ( $basisRow['active'] ?? null ) === false
 	&& $removeStatus === 400 && ( $removeBody['code'] ?? '' ) === 'features_remove_shipped' );
-$keysRead = \Nino\Components::sources( $keysApp, (string) \Nino\Filesystem::getFileContent( $keysApp, '/templates/page-home.tpl', '' ), 'page-home' );
-$keysReadOf = static fn( string $kind ): array => array_column( array_filter( $keysRead, static fn( array $read ): bool => $read['kind'] === $kind ), 'source' );
-check( 'the scans read the home page through the register: its title and its text as the keys they are under the id of their section, and the picture behind the hero as a place of a picture',
-	array_diff( [ '/template/page-home/hero/title', '/template/page-home/hero/subtitle', '/template/page-home/start-1/text', '/template/page-home/start-3/title' ], $keysReadOf( 'text' ) ) === []
-	&& in_array( '/template/page-home/hero/background', $keysReadOf( 'image' ), true ) === true );
 $starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$keysApp ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
 	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $keysApp ) === 0 );

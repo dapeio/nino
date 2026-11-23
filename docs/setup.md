@@ -9,12 +9,12 @@ This manual explains the decisions and writing processes of the six steps of the
 Until its last step has been completed, `/_admin` answers with the wizard instead of the login. It lives in `_admin/install/` and is intended for one-time initial setup. It speaks German and English, German first: the choice stands at the top right, holds for every step and over a reload, and is kept in the browser alone (one entry of its storage, no cookie), so a project that is not yet there has nothing to ask for it. Every sentence is in one table with both languages (`install/assets/text.js`), and what the server refuses comes back as a code that table words in the language chosen. It:
 
 - checks PHP and write permissions;
-- sets languages and modules;
-- creates the project directories from its library, the site's look among them;
+- sets the language of the website and the modules;
+- creates the project directories from its library, the stylesheet of the site among them;
 - records central website information;
 - creates the first developer accounts of the workbench;
 - offers the applications of Nino's official catalogue and, when asked, places and switches on their features;
-- creates the starter pages and sets the recovery password.
+- creates the starter pages - with the header and the footer they are drawn with - and sets the recovery password.
 
 The wizard is not an update tool for a running project. After successful completion, it locks itself out for good and `_admin/install/` can be removed from production delivery.
 
@@ -28,10 +28,10 @@ Three different rules apply:
 
 | Data Type | Behavior When Reapplying |
 |---|---|
-| Languages and modules | the visible selection replaces the previously managed state by the assistant; a feature an application switched on stays on |
+| Language and modules | the visible selection replaces the previously managed state by the assistant; a feature an application switched on stays on |
 | Applications | the features of the applications picked are placed and switched on; what is on already is left as it is, and nothing is switched off by picking less |
 | Templates, texts, and element types | are supplemented or updated but not automatically deleted |
-| The two frame templates | files with the same name are overwritten |
+| The scaffold, the stylesheet of the site and the frame templates | files with the same name are overwritten |
 
 This distinction protects your own changes. Deselecting a module may remove its configuration; automatically deleting a template file that has been edited in the meantime would not be safe.
 
@@ -47,15 +47,17 @@ Project directories that do not yet exist are expected. The decisive factor is t
 
 Fix failed checks before continuing. Without sufficient write permissions, the assistant cannot reliably create either configuration or content.
 
-## 2. Languages
+## 2. Language
 
 The step is named for what it asks about, and it is what the wizard applies the base unit and the always-on units in - so it creates the project's foundation at the same time.
 
-**Available Locales** determines the available languages. **Native Locale** is the default language and must be part of this selection. Technically, it serves as a fallback as long as no language is yet determined for a visitor, and in terms of content, it forms the "mother tongue" of the website.
+It asks for **one language**, the language of the website, as one select of the languages the library has texts in (`Deutsch`, `English (US)`). That language is the only one of the project and its native one: technically the fallback as long as no language is yet determined for a visitor, and in terms of content the "mother tongue" of the website. A project that has not answered the step yet starts on the language of the page the wizard is read in, where the library has texts in it; one that has keeps its own. Under the select, the API takes what it always took - `locales`, a list, and `native`, which must be one of them -, so a script or a test can set up a project in several languages at once; the page sends a list of one.
 
-When reapplying, the visible language selection replaces the previous state. The default language is retained as long as it is still selected; otherwise, Nino uses the first selected language.
+When reapplying, the language that is selected replaces the previous state: the project has that one language and no other.
 
-The wizard offers two languages and names each one it installs in its own tongue (`Deutsch`, `English (US)`) for the language switch of the site. A third - or a second one the wizard did not list - is added later, in the workbench's **Language** panel: **Add language** creates its text file with every key of the native language, all empty, names the language the same way (`Français`; its code where Nino has no name for it, which the **Text** panel changes), and the language is **not** switched on yet. Translate it first, under **Text** - the select lists it marked as inactive - or hand a file over under **Language › Translations**, which exports the native texts as JSON for a translator and imports the translated document into a language that is ticked or not. Tick the language when it is ready. Until then, and for every text it still lacks afterwards, the site shows the text of the native language and says in which language it is (`lang`); the Dashboard counts what is still to translate in each language.
+The wizard names the language it installs in its own tongue (`Deutsch`, `English (US)`) for the language switch of the site. A second language - or a third, or one the wizard did not list - is added later, in the workbench's **Language** panel: **Add language** creates its text file with every key of the native language, all empty, names the language the same way (`Français`; its code where Nino has no name for it, which the **Text** panel changes), and the language is **not** switched on yet. Translate it first, under **Text** - the select lists it marked as inactive - or hand a file over under **Language › Translations**, which exports the native texts as JSON for a translator and imports the translated document into a language that is ticked or not. Tick the language when it is ready. Until then, and for every text it still lacks afterwards, the site shows the text of the native language and says in which language it is (`lang`); the Dashboard counts what is still to translate in each language.
+
+What stays to be done by hand on the html starter site when a second language is added there, because the starter pages are plain templates and the texts of a language are files: the texts of the starter pages and of the header and the footer - the `/template/page-...` and `/template/frame-...` keys, which the **Text** panel lists with the new language empty - are translated or imported there; the page names, titles and descriptions of Start, Contact and 404 (`/_nino/webpage/<page>/name`, `title`, `description`) are the ones of the **Routes** panel; the words the legal pages have in the library's own languages come with the language (see Legal), and the menu needs nothing, because it is a list of links in the header and the footer whose words are the page names. No page, route or template is written again.
 
 ### Modules
 
@@ -63,7 +65,7 @@ Navigation, language selection (the locale picker), the contact form and the leg
 
 The list that remains offers every *other* module that ships an installer unit: nothing, in a fresh checkout, plus any module a project has added below `app/`, and any unit in an `_admin/install/library/modules/` that a checkout adds for itself - the wizard scans that directory when it exists, and none is shipped. Features - the catalogue's Newsletter and Search, for instance - are not offered here either: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](_admin.md#features) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection - and finds it already present when that dependency happens to be one of the four always-on ones. A used page template can also pull in required modules; a contact page, for example, works because the contact form's own module is always there.
 
-The **legal texts** - the module `Legal`, see [Developer Manual](development.md#legal) - are the one always-on unit with content of its own: the imprint and the privacy policy as elements of the types `legal` and `privacy`, one element per section in German and English, two pages that show them, and a third navigation, `legal`, that the footer of the base frame outputs. Practically every website owes its visitors an imprint and a privacy policy, and a link to them that was forgotten is the dearer mistake; whoever does not need them hides sections under **Elements** or takes the module out of `/nino/modules`.
+The **legal texts** - the module `Legal`, see [Developer Manual](development.md#legal) - are the one always-on unit with content of its own: the imprint and the privacy policy as elements of the types `legal` and `privacy`, one element per section in German and English, two pages that show them, and a third navigation, `legal`, which a footer may output with `[navigation nav="legal"]` (the footer of the starter site links the two pages itself). Practically every website owes its visitors an imprint and a privacy policy, and a link to them that was forgotten is the dearer mistake; whoever does not need them hides sections under **Elements** or takes the module out of `/nino/modules`.
 
 **Important:** The imprint and privacy policy Nino ships are a starting point, not legal advice. They are not tailored to any particular website and have not been legally reviewed. The operator of a website is responsible for having them checked by a qualified person before publication and for adapting them: to what the website actually processes, to the operator's legal form, and to further mandatory details such as a commercial register entry, a VAT identification number or a person responsible for journalistic content. The project gives no warranty that the texts are correct, complete or up to date.
 
@@ -82,28 +84,33 @@ A file a unit cannot copy - a target that is not writable - ends the step with a
 
 ### The Look
 
-Not a choice, and not a step: the base unit delivers no look of its own, it switches on the feature **Basis**, whose components draw the starter pages with their standard look, and every project starts from that. Two files, copied like any other unit file:
+Not a choice, and not a step: the starter site is plain html with a stylesheet of its own, drawn by the kernel alone, and every project starts from that. No feature is switched on for it - Basis, the feature that comes with the kernel, stays off until a project switches it on in the **Features** panel or an application brings it. The base unit copies the stylesheet, the last step the two frames with the pages:
 
 | File | What it is |
 |---|---|
-| `templates/frame-header.tpl` | the site's header, written in the components of Basis (`[header-wrap]` with a `[section-row]` of columns: the logo, the menu and the button), put into the `[[header]]` of `html-header.tpl`, as the frame a page chose with `[frame /templates/frame-header-<word>]` or as the standard - see development.md, The frame of a page |
-| `templates/frame-footer.tpl` | the site's footer (`[footer-wrap]` with a row of two columns, and the legal line), included the same way |
+| `assets/style.css` (base unit) | the stylesheet of the site, about 6.7 KB: the header and its menu, the title area, the sections and the cards, the footer and the print view, written against the tokens of `Nino.css` and with classes of its own; it begins with the comment that says it is this site's own stylesheet |
+| `templates/frame-header.tpl` (frame unit, last step) | the site's header: a `<header>` with the brand, the menu and the contact button, put into the `[[header]]` of `html-header.tpl`, as the frame a page chose with `[frame /templates/frame-header-<word>]` or as the standard - see development.md, The frame of a page |
+| `templates/frame-footer.tpl` (frame unit, last step) | the site's footer: the name and description of the company, the menu again, the year and the links to the imprint and the privacy policy, included the same way |
 
-The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
+The frames are written with `[link]` and `[imagevalues]` of the kernel and nothing else (see [Shortcodes](development.md#shortcodes)). The menu is a list of links, fixed in the template: `[link]...[/link]` for the start page and `[link /_nino/webpage/contact/uri]...[/link]` for a page, the address being the text the page has in each language, and the page that is shown carries `aria-current="page"`. Under 768 px the list is a `<details>` with a button under the header, with no script; from there on it stands open in the line - in a browser that knows `::details-content`; one that does not keeps the button and the list under the header at every width, which works as well. The brand is a link to the start page that holds the light logo and the dark logo where there are any, the one there is where there is one, and the name of the company as text where there is none: `[imagevalues /logo]...[else]...[/imagevalues]`. The links to the imprint and the privacy policy are `[link /_nino/webpage/legal/imprint/uri]` and `/privacy/uri`, the addresses the Legal module registers for its pages in each language, so the legal check counts them as a way to the pages (see [Legal](development.md#legal)); a footer that outputs the menu `legal` or has the components of Basis' `footer-legal` does as well.
 
-The delivery has no logo of its own. It declares two **image slots** (500 × 100, the shape of a wordmark), `/logo`, the picture for a light ground, and `/logo/dark`, the picture for a dark ground, and the base unit declares them empty - `imageSlots`, see below. The header draws them with `[header-logo]`, which writes both and lets the style show the one that fits the colour scheme of the page - the dark one where the header is dark, the light one otherwise and on paper; the footer draws `/logo` with `[footer-logo /logo]`. The Open Graph and Twitter tags in `html-header.tpl` and the mail header of the Form module ask `/logo` alone with `[imagevalues /logo]`. Upload the logo under **Images** in the workbench; a project with one picture uploads `/logo` and leaves `/logo/dark` empty, and the header then shows that one on every ground. Until there is one, the header and the footer show no picture - the link of the logo in the header writes the name of the site instead, so that it has something to see and to focus - the mail header none, and the page head carries no `og:image` and no `twitter:image`, instead of a broken or an empty one. An upload is cut to the slot's shape, so a logo shaped otherwise needs the slot's size changed on the **Image Slots** tab first.
+The frames are the unit `_admin/install/library/frame/`, which the starter pages write ahead of the pages - only where the project has no page route and no application provides the start page. A site an application gives its own start page has no header and no footer until the application brings them; every page is drawn all the same, the scaffold with nothing in the places of the header and the footer.
+
+The page templates include the two frames through the scaffold rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing frame resolves to an empty string - and that is the way a site without them is meant to be drawn.
+
+The delivery has no logo of its own. It declares two **image slots** (500 × 100, the shape of a wordmark), `/logo`, the picture for a light ground, and `/logo/dark`, the picture for a dark ground, and the base unit declares them empty - `imageSlots`, see below. The header of the starter site draws them as above, and the style shows the one that fits the colour scheme of the page; the Open Graph and Twitter tags in `html-header.tpl` and the mail header of the Form module ask `/logo` alone with `[imagevalues /logo]`. Upload the logo under **Images** in the workbench; a project with one picture uploads `/logo` and leaves `/logo/dark` empty, and the header then shows that one on every ground. Until there is one, the header shows the name of the company, the mail header no picture, and the page head carries no `og:image` and no `twitter:image`, instead of a broken or an empty one. An upload is cut to the slot's shape, so a logo shaped otherwise needs the slot's size changed on the **Image Slots** tab first.
 
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
 ```
 _nino/Nino.css              the reset: the tokens --brand-... and --page-..., the elements at rest
-features and modules        the stylesheets they add, in the order they add them - the standard parts of Basis among them
-assets/style.css            the project's own, shipped empty
+features and modules        the stylesheets they add, in the order they add them - the standard parts of Basis among them, where it is on
+assets/style.css            the project's own: the stylesheet of the starter site
 ```
 
-Setup seeds `/nino/html/assets`' bundle with the project's entry if it is not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. The stylesheets of the features and modules are not in that list: they are put into the bundle at every boot, in front of the project's files (see [Assets](features.md#assets)). `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it, a feature's stylesheet and a theme included. A file of the project that a module adds later is listed behind `style.css`. A feature SHOULD NOT build on where its stylesheet stands in relation to the theme.
+Setup seeds `/nino/html/assets`' bundle with the project's entry if it is not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. The stylesheets of the features and modules are not in that list: they are put into the bundle at every boot, in front of the project's files (see [Assets](features.md#assets)). A fresh starter site's bundle is the reset, the look of the form and `assets/style.css`: 21.4 KB, where the bundle with the standard parts of Basis is 46.9 KB. `assets/style.css` is the project's from the first day on - the Setup step writes it with the base unit and a project edits it - so a rule put there overrules everything above it, a feature's stylesheet and a theme included. A file of the project that a module adds later is listed behind `style.css`. A feature SHOULD NOT build on where its stylesheet stands in relation to the theme.
 
-The wizard asks no question about the look. A project turns it afterwards: `assets/style.css`, in the layer `project`, sets the tokens of the brand and of the page that `Nino.css` declares (`:root { --brand-color-1: #0a7d5a; }`), and a design a project keeps in `assets/theme.css` - a file of its own, none is delivered - stands in the layer `nino.theme`, between the standard parts of the features and `style.css`. A rule of either overrules a rule of `Nino.css` or of a feature with no more than a plain selector ([Assets](features.md#assets)).
+The wizard asks no question about the look. A project turns it afterwards: `assets/style.css`, in the layer `project`, sets the tokens of the brand and of the page that `Nino.css` declares (`:root { --brand-color-1: #0a7d5a; }`) and holds the rules of the starter site - delete what the pages you keep do not use -, and a design a project keeps in `assets/theme.css` - a file of its own, none is delivered - stands in the layer `nino.theme`, between the standard parts of the features and `style.css`. A rule of either overrules a rule of `Nino.css` or of a feature with no more than a plain selector ([Assets](features.md#assets)). The classes of the site's templates (`site-header`, `hero`, `card` and the like) belong to the site: a library template uses a class of the kernel (`nino-*`) or one `style.css` defines.
 
 ## 3. Personal Information
 
@@ -119,7 +126,7 @@ Language-independent, in the order the form shows them:
 - `/project/website/general/author`
 - `/project/website/general/host`
 
-`/project/company/contact/country` and `/project/company/general/description` are stored per language, so step through every active language and save its values. A key a library fork adds under either of those prefixes is offered too, appended after these.
+`/project/company/contact/country` and `/project/company/general/description` are stored per language: the form shows them in the language of the website, under their own heading, and saves them for it. A key a library fork adds under either of those prefixes is offered too, appended after these.
 
 These textfills are used in templates, meta tags, and possibly in the footer or contact forms. `/project/website/general/url` is the site's address without the protocol - `www.example.com`, and `www.example.com/shop` for a site served from a directory, which the address has to carry -: the base unit's templates put it behind `https://` for the canonical link, the Open Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt`, and the Form module's mails name it, so set it before the site goes live. The technical ones the base unit blacklists - `/project/website/html/charset`, `/project/website/html/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
 
@@ -176,16 +183,16 @@ There is no step for pages: a project builds its structure in the workbench's **
 
 After the starter pages, the last step applies once more, add-only, the install units of the features of every applied application whose `start` is not `starter`: a route such a unit left out while `/` was reserved in an earlier round comes with it, what the project has stays, and the wizard never ends on a project without a route for `/`.
 
-Whatever the project has, the empty page template `templates/page-blank.tpl` is put in place - the template alone, no route, never over a file that is there: it is the one the Routes panel starts **New route** on. Where an applied application provides the start page itself, the 404 page is the one starter page that is made, and only where no route answers with the status 404 yet: no start page, no contact page, no menu entry. Its link to the start page is the fill `/_nino/webpage/home/uri`, which the starter page *Start* would write; here it is written as `/` (blacklisted like the others), unless something has written it.
+Whatever the project has, the empty page template `templates/page-blank.tpl` is put in place - the template alone, no route, never over a file that is there: it is the one the Routes panel starts **New route** on. Where an applied application provides the start page itself, the 404 page is the one starter page that is made, and only where no route answers with the status 404 yet: no start page, no contact page, no menu entry, and no header and footer. Its button to the start page is `[link class="button"]...[/link]`, the link that names no address, which is the address of the site wherever the start page comes from, so nothing is written for it.
 
-A starter page is created like the page unit of a module, with the unit's own suggestions: its route is keyed by the unit's suggested HTTP URI (`GET://` for `/`, `GET://404` for `/404`) and carries the Element URI `/<unit folder>` as its `uri`, the unit's `statusCode` and - where the Navigation module is on - the menus the unit's route proposes, with the page's position in the list as its priority. The unit's `suggest` entry gives the HTTP URI, the name, title and description in **every** active language, a string or one string per language each; they are no text keys - a `/_nino/webpage<uri>/*` key is the system's, written under the Element URI the page is mounted at, together with `uri` (the page's reachable path) once in `text/global.php`, blacklisted as a technical value. A language the unit has no wording for falls back to English. Templates, `elementTypes`, the unit's text and unit-relative `files` are copied the way a module's unit is; a file or a seed the unit names and does not carry fails the step by name, before a route is written, and the wizard stays open.
+The frames come first: the unit `_admin/install/library/frame/` - `frame-header.tpl`, `frame-footer.tpl` and the words of the header's button and of the menus' labels - is copied the way a module's unit is, before the pages, and only where the pages are made at all. A starter page is created like the page unit of a module, with the unit's own suggestions: its route is keyed by the unit's suggested HTTP URI (`GET://` for `/`, `GET://404` for `/404`) and carries the Element URI `/<unit folder>` as its `uri`, the unit's `statusCode` and - where the Navigation module is on - the menus the unit's route proposes, with the page's position in the list as its priority. The starter pages of the library propose none - their templates link the pages by hand, so a menu in the **Navigations** panel would change nothing on the site - and the menus `main` and `footer` stand empty where a template of the project outputs them with `[navigation nav="main"]`; the menu `legal` has the two pages of the Legal module, which the module's own unit asks for. The unit's `suggest` entry gives the HTTP URI, the name, title and description in **every** active language, a string or one string per language each; they are no text keys - a `/_nino/webpage<uri>/*` key is the system's, written under the Element URI the page is mounted at, together with `uri` (the page's reachable path) once in `text/global.php`, blacklisted as a technical value. A language the unit has no wording for falls back to English. Templates, `elementTypes`, the unit's text and unit-relative `files` are copied the way a module's unit is; a file or a seed the unit names and does not carry fails the step by name, before a route is written, and the wizard stays open.
 
 A unit that shows a picture declares it as an **image slot** with
 `imageSlots`, keyed by the slot uri - `'/template/page-home/hero/background'
 => [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
 Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
 'template/page-home/hero/background.svg' ]` - and its template shows it with
-`[image /template/page-home/hero/background alt=""]` instead of a literal
+`[imagevalues /template/page-home/hero/background]<img src="[[src]]" ...>[/imagevalues]` instead of a literal
 `<img>`. The starter site's home hero is seeded with a neutral placeholder
 drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
 replaces it and **Remove image** deletes it, and the library keeps the source.
@@ -211,7 +218,8 @@ Everything the wizard copies from is one-time installer source, in one of four s
 
 | Path | Purpose |
 |---|---|
-| `_admin/install/library/base/` | always-applied routes, templates, texts, and assets |
+| `_admin/install/library/base/` | always-applied routes, the scaffold templates, texts, the stylesheet of the site and the favicons |
+| `_admin/install/library/frame/` | the header and the footer of the starter site, written with the starter pages |
 | `_nino/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit, beside the class it activates - applied on every run for Nino's own (`ALWAYS_MODULES`), a choice for a project's |
 | `_admin/install/library/modules/<key>/` | a selectable unit without a runtime class of its own |
 | `_admin/install/library/pages/<key>/` | one concrete page; the units that claim a `'preset'` position are the starter pages |

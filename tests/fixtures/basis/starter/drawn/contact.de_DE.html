@@ -1,0 +1,135 @@
+<!-- nino:template-name Contact -->
+<!doctype html>
+<html lang="de">
+		<head>
+			<meta charset="UTF-8">
+
+			<title>Kontakt | Muster & Söhne GmbH</title>
+			<meta name="description" content="Nimm Kontakt auf - wir antworten in der Regel innerhalb eines Werktages.">
+			<meta name="author" content="N107">
+			<meta name="viewport" content="width=device-width, initial-scale=1">
+			<link rel="canonical" href="https://example.com/contact">
+
+			<!-- Open Graph / social sharing -->
+			<meta property="og:type" content="website">
+			<meta property="og:site_name" content="Muster & Söhne GmbH">
+			<meta property="og:title" content="Kontakt | Muster & Söhne GmbH">
+			<meta property="og:description" content="Nimm Kontakt auf - wir antworten in der Regel innerhalb eines Werktages.">
+			<meta property="og:url" content="https://example.com/contact">
+			<meta property="og:locale" content="de_DE">
+			
+			<meta name="twitter:card" content="summary_large_image">
+			<meta name="twitter:title" content="Kontakt | Muster & Söhne GmbH">
+			<meta name="twitter:description" content="Nimm Kontakt auf - wir antworten in der Regel innerhalb eines Werktages.">
+			
+
+			<link rel="icon" href="/public/favicon/favicon.ico?v=1767225600" sizes="any">
+			<link rel="apple-touch-icon" sizes="180x180" href="/public/favicon/apple-touch-icon.png?v=1767225600">
+			<link rel="icon" type="image/png" sizes="32x32" href="/public/favicon/favicon-32x32.png?v=1767225600">
+			<link rel="icon" type="image/png" sizes="16x16" href="/public/favicon/favicon-16x16.png?v=1767225600">
+			<link rel="manifest" href="/public/favicon/site.webmanifest?v=1767225600">
+			<link rel="stylesheet" href="/public/.cache/style.css?v=81b516c26847" type="text/css" />
+
+			<!-- Structured data (schema.org). Values go through ""
+			     rather than "[[...]]" inside the quotes: a textfill is
+			     inserted verbatim, and /project/company/contact/address is multi-line by
+			     design (a postal address, offered as a <textarea> in
+			     the setup wizard's own Personal Infos step), so a raw newline
+			     used to land inside a json string and this whole block failed
+			     to parse on every page. "" emits the complete string
+			     literal, quotes included - see Html::doJsonShortcode() -->
+			<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "LocalBusiness",
+				"name": "Muster \u0026 Söhne GmbH",
+				"description": "Kurze Beschreibung Deines Unternehmens.",
+				"url": "https://example.com",
+				"telephone": "+49 30 000000",
+				"email": "kontakt@example.com",
+				"address": {
+					"@type": "PostalAddress",
+					"streetAddress": "Musterstraße 1\n10115 Berlin",
+					"addressCountry": "Deutschland"
+				}
+			}
+			</script>
+		</head>
+		<body>
+
+		<a class="nino-sr-only" href="#nino-main">Zum Inhalt springen</a>
+
+		<header id="header" class="header-wrap header-wrap--sticky"><div class="header-wrap-inner">
+	
+</div><div class="section-row section-row--valign-center">
+		<div class="section-col section-col--size-auto">
+			<a class="header-logo" href="/"><span class="header-logo-name">Muster &amp; Söhne GmbH</span></a>
+		</div>
+		<div class="section-col section-col--size-fill section-col--align-end">
+			<nav class="header-nav" aria-label="Hauptnavigation"><details class="header-nav-details"><summary class="header-nav-toggle" aria-label="Menü"><span aria-hidden="true"></span></summary><ul class="header-nav-list"><li><a href="/">Startseite</a></li><li><a href="/contact" aria-current="page">Kontakt</a></li><li><a href="/new-webpage">Neue Webseite</a></li></ul></details></nav>
+		</div>
+		<div class="section-col section-col--size-auto section-col--hide-on section-col--m-hide-off">
+			<a class="button button--size-s" href="/contact">Jetzt kontaktieren</a>
+		</div>
+	</div></header>
+
+  <main id="nino-main" tabindex="-1">
+
+<section id="hero" class="section-wrap section-wrap--ground-dark section-wrap--height-60">
+	<div class="section-row">
+		<div class="section-col">
+			<h1 class="section-title section-title--size-xl">Kontaktiere uns</h1>
+			<p class="section-subtitle">Schreib uns hier eine Nachricht.</p>
+		</div>
+	</div>
+</section>
+<section id="details" class="section-wrap">
+	<div class="section-row section-row--gap-3">
+		<div class="section-col section-col--m-size-50">
+			<h2 class="section-title">Muster &amp; Söhne GmbH</h2>
+			<p class="section-subtitle">Kurze Beschreibung Deines Unternehmens.</p>
+			<div class="text">Musterstraße 1<br>10115 Berlin</div>
+			<div class="text">+49 30 000000</div>
+			<div class="button-group">
+				<a class="button button--tone-quiet" href="mailto:kontakt@example.com">kontakt@example.com</a>
+			</div>
+		</div>
+		<div class="section-col section-col--m-size-50">
+			<form class="nino-form" action="/.form" method="post">
+				<input type="hidden" name="_csrf" value="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc">
+				<label for="contact-form-name">Name *</label>
+				<input type="text" id="contact-form-name" name="name" autocomplete="name" required>
+				<label for="contact-form-email">E-Mail-Adresse *</label>
+				<input type="email" id="contact-form-email" name="email" autocomplete="email" required>
+				<label for="contact-form-message">Nachricht *</label>
+				<textarea id="contact-form-message" name="message" required></textarea>
+				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
+				<p class="nino-form-message" aria-live="polite"></p>
+				<p class="nino-form-note">* Pflichtfelder</p>
+				<button type="submit" class="nino-form-submit">Absenden</button>
+			</form>
+		</div>
+	</div>
+</section>
+
+		</main>
+
+		<footer id="footer" class="footer-wrap"><div class="footer-wrap-inner">
+	
+	
+</div><div class="section-row">
+		<div class="section-col section-col--m-size-50">
+			
+			<div class="text text--size-s">Kurze Beschreibung Deines Unternehmens.</div>
+		</div>
+		<div class="section-col section-col--m-size-50">
+			<nav class="footer-nav" aria-label="Navigation im Fußbereich"><ul><li><a href="/">Startseite</a></li><li><a href="/contact" aria-current="page">Kontakt</a></li><li><a href="/new-webpage">Neue Webseite</a></li></ul></nav>
+		</div>
+	</div><div class="footer-legal"><p class="footer-legal-copyright">&copy; 2026 Muster &amp; Söhne GmbH</p><ul class="footer-legal-pages"><li><a href="/impressum">Impressum</a></li><li><a href="/datenschutz">Datenschutz</a></li></ul><ul class="footer-legal-locales"><li><a href="?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE" aria-current="true">Deutsch</a></li><li><a href="?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English (US)</a></li></ul></div></footer>
+
+
+		<script nonce="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">NinoJstext={"\/module\/form\/info\/required":"Bitte f\u00fclle alle Pflichtfelder aus.","\/module\/form\/info\/email":"Bitte gib eine g\u00fcltige E-Mail-Adresse ein.","\/module\/form\/info\/invalid":"Bitte pr\u00fcfe Deine Eingaben.","\/module\/form\/info\/error":"Deine Nachricht konnte nicht versendet werden. Bitte probiere es sp\u00e4ter noch einmal.","\/module\/form\/info\/success":"Vielen Dank \u2013 Deine Nachricht wurde versandt."};</script>
+		<script src="/public/.cache/script.js?v=da39a3ee5e6b"></script>
+	</body>
+</html>
+

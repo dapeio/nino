@@ -733,6 +733,29 @@ $noNavigation = $clean;
 $noNavigation['/nino/modules'] = array_values( array_diff( $clean['/nino/modules'], [ '\\Nino\\Modules\\Navigation' ] ) );
 check( '...but one when the Navigation module is off: there is no menu', $kindsOf( \Nino\Modules\Legal::check( $noNavigation ) ) === [ 'nav', 'nav' ] );
 
+// Links: the starter site of the wizard links the two pages with [link] in its footer, which every page draws
+$linked = static function( string $footer, string $name = 'frame-footer' ) use ( $noNavigation ): array {
+	$project = $noNavigation;
+	\Nino\Filesystem::putFileContent( $project, '/templates/frame-footer.tpl', '' );
+	\Nino\Filesystem::putFileContent( $project, '/templates/'. $name. '.tpl', $footer );
+	return array_column( array_filter( \Nino\Modules\Legal::check( $project ), static fn( array $finding ): bool => $finding['kind'] === 'nav' ), 'values' );
+};
+\Nino\Filesystem::putFileContent( $noNavigation, '/templates/frame-footer.tpl', '' );
+check( 'nav: a [link] to each page by the key that holds its address stands in no menu and is a way to the page in every language - with the Navigation module off as well',
+	$linked( '<footer>[link /_nino/webpage/legal/imprint/uri]a[/link] [link /_nino/webpage/legal/privacy/uri class="x"]b[/link]</footer>' ) === [] );
+$addresses = [];
+foreach( [ 'de_DE', 'en_US' ] as $locale ) {
+	\Nino\Locales::useLocale( $noNavigation, $locale );
+	$addresses[$locale] = [ \Nino\Html::renderTextfill( $noNavigation, '/_nino/webpage/legal/imprint/uri' ), \Nino\Html::renderTextfill( $noNavigation, '/_nino/webpage/legal/privacy/uri' ) ];
+}
+\Nino\Locales::useLocale( $noNavigation, 'de_DE' );
+check( 'the address of each page is a text in each language, the key of which a template links to', $addresses === [ 'de_DE' => [ '/impressum', '/datenschutz' ], 'en_US' => [ '/imprint', '/privacy' ] ] );
+check( 'nav: a [link] by a path is a way in the language that path is of and in none other',
+	$linked( '<footer>[link /impressum]a[/link] [link /privacy]b[/link]</footer>' ) === [ [ 'Impressum', 'en_US' ], [ 'Datenschutz', 'de_DE' ] ] );
+check( 'nav: a link with a query is no way to the page, and neither is a link in a frame that a page may leave out',
+	$linked( '<footer>[link /_nino/webpage/legal/imprint/uri]a[/link]</footer>', 'frame-footer-landing' ) === [ [ 'Impressum', 'de_DE, en_US' ], [ 'Datenschutz', 'de_DE, en_US' ] ]
+	&& $linked( '<footer>[link /impressum?a=1]a[/link] [link /privacy#x]b[/link]</footer>' ) === [ [ 'Impressum', 'de_DE, en_US' ], [ 'Datenschutz', 'de_DE, en_US' ] ] );
+
 // Features: a section of one that is off, and one that is on with nothing to be seen
 $sampleKinds = static fn( array $project ): array => array_values( array_filter( \Nino\Modules\Legal::check( $project ), static fn( array $finding ): bool => $finding['kind'] === 'feature' || $finding['kind'] === 'undescribed' ) );
 ninoWarnings();

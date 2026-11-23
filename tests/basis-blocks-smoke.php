@@ -206,7 +206,7 @@ $frames = [];
 foreach( [ 'header-line' => 'header-wrap', 'footer-columns' => 'footer-wrap' ] as $frameKey => $frameWrap ) {
 
 	$frame = \Nino\Blocks::get( $appData, $frameKey );
-	$starter = (string) file_get_contents( $root. '/_admin/install/library/base/templates/frame-'. ( $frameWrap === 'header-wrap' ? 'header' : 'footer' ). '.tpl' );
+	$starter = (string) file_get_contents( $root. '/tests/fixtures/basis/starter/base/templates/frame-'. ( $frameWrap === 'header-wrap' ? 'header' : 'footer' ). '.tpl' );
 	$frames[$frameKey] = [ \Nino\Components::check( $appData, $frame['tree'] ), \Nino\Components::check( $appData, \Nino\Markup::parse( $starter, \Nino\Components::containers( $appData ) ) ),
 		str_contains( $frame['source'], '[section-row' ), str_contains( $starter, '[section-row' ) ];
 }

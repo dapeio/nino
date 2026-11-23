@@ -55,8 +55,12 @@ $starter['/nino/http/routes'] = [
 \Nino\Runtime::setSessionValue( $starter, './nino/csrf/token', str_repeat( 'c', 64 ) );
 \Nino\Filesystem::putFileContent( $starter, '/templates/x.tpl', 'TEMPLATE-X-RAN' );
 
-foreach( [ 'base/templates/frame-header', 'base/templates/frame-footer', 'base/templates/html-header', 'base/templates/html-footer', 'pages/home/templates/page-home', 'pages/contact/templates/page-contact', 'pages/404/templates/page-404' ] as $starterFile )
+// The scaffold is the kernel's, the frames and the pages are the starter site written in the components of Basis
+foreach( [ 'base/templates/html-header', 'base/templates/html-footer' ] as $starterFile )
 	copy( __DIR__. '/../_admin/install/library/'. $starterFile. '.tpl', $starterDir. '/private/templates/'. basename( $starterFile ). '.tpl' );
+
+foreach( [ 'base/templates/frame-header', 'base/templates/frame-footer', 'pages/home/templates/page-home', 'pages/contact/templates/page-contact', 'pages/404/templates/page-404' ] as $starterFile )
+	copy( __DIR__. '/../tests/fixtures/basis/starter/'. $starterFile. '.tpl', $starterDir. '/private/templates/'. basename( $starterFile ). '.tpl' );
 
 $starterPages = [ 'page-home' => 0, 'page-contact' => 1, 'page-404' => 0 ];
 

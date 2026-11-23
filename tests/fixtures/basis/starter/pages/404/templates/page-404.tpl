@@ -1,0 +1,12 @@
+<!-- nino:template-name Page not found -->
+[template /templates/html-header]
+[section-wrap id="hero" ground="dark" height="60"]
+	[section-row width="narrow"]
+		[section-col align="center"]
+			[section-title ~title tag="h1" size="xl"]
+			[section-subtitle ~subtitle]
+			[button ~button href="/_nino/webpage/home/uri"]
+		[/section-col]
+	[/section-row]
+[/section-wrap]
+[template /templates/html-footer]

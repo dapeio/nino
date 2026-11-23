@@ -287,8 +287,15 @@ namespace Nino\Modules {
 		public static function routes( array &$appData ): void {
 
 			foreach( self::PAGES as $page => $definition )
-				foreach( self::_plan( $appData, $page )['routes'] as $entry )
+				foreach( self::_plan( $appData, $page )['routes'] as $entry ) {
+
 					$appData['/nino/http/routes'][ $entry['key'] ] = $entry['route'];
+
+					// The address of the page in each language it serves, as a text a template links to by its key:
+					// [link /_nino/webpage/legal/imprint/uri]...[/link], as the starter pages' own addresses are
+					foreach( $entry['locales'] as $locale )
+						\Nino\Html::addFills( $appData, [ '/_nino/webpage'. $definition['uri']. '/uri' => substr( $entry['key'], strlen( 'GET:/' ) ) ], $locale );
+				}
 		}
 
 		/**
@@ -543,8 +550,9 @@ namespace Nino\Modules {
 		 *	  one from, or the derived one is taken
 		 *	- route-stored: a stored route that carries the Element-URI of one of
 		 *	  the pages
-		 *	- nav: a page that no menu a template of the project outputs has, in a
-		 *	  language, with the real menu code asked - or the Navigation module is off
+		 *	- nav: a page that no menu a template of the project outputs has, and no
+		 *	  [link] to it stands in the scaffold or a frame, in a language, with the
+		 *	  real menu code asked - or the Navigation module is off
 		 *	- feature: a section of a feature that is switched off, still to be seen
 		 *	- undescribed: a feature that is on and has no section to be seen
 		 *
@@ -1050,7 +1058,10 @@ namespace Nino\Modules {
 		/**
 		 *	The nav findings: for each page, the languages in which no menu a
 		 *	template of the project outputs has it - found by asking the menu
-		 *	itself, in each language, for its lines
+		 *	itself, in each language, for its lines - and no [link] to it stands in
+		 *	the scaffold or in a frame, which every page draws: the address of a
+		 *	link is read as the [link] reads it, so a key that holds the address
+		 *	in each language counts
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1063,6 +1074,7 @@ namespace Nino\Modules {
 			$native		= \Nino\Locales::getNativeLocale( $appData );
 			$active		= in_array( '\\Nino\\Modules\\Navigation', array_map( static fn( mixed $class ): string => '\\'. ltrim( (string) $class, '\\' ), (array) ( $appData['/nino/modules'] ?? [] ) ), true );
 			$navs			= $active === true ? self::_templateNavs( $appData ) : [];
+			$links		= self::_templateLinks( $appData );
 
 			foreach( self::PAGES as $page => $definition ) {
 
@@ -1075,6 +1087,14 @@ namespace Nino\Modules {
 					$routeKey	= \Nino\Http::findRouteUri( $appData, $definition['uri'], $locale );
 					$path			= $routeKey === null ? '' : substr( $routeKey, strlen( 'GET:/' ) );
 					$found		= false;
+
+					foreach( $links as $source ) {
+
+						$target = $path === '' ? null : \Nino\Html::linkPath( $appData, $source );
+
+						if( $target !== null && $target === [ $path, '' ] )
+							$found = true;
+					}
 
 					foreach( $active === true && $path !== '' ? $navs : [] as $nav )
 						foreach( \Nino\Modules\Navigation::routeLines( $appData, $nav ) as $line )
@@ -1093,6 +1113,31 @@ namespace Nino\Modules {
 			}
 
 			return $findings;
+		}
+
+		/**
+		 *	The sources of the [link] calls in the templates every page draws - the scaffold (html-header, html-footer) and the standard
+		 *	frames (frame-header, frame-footer): what is written after the call's name, a path or the key of a text that holds one. A
+		 *	link in a template that a page may leave out is no way to the page; one a template builds from a fill is not seen - a hint,
+		 *	no guarantee
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Sources, as written
+		 */
+		private static function _templateLinks( array &$appData ): array {
+
+			$sources = [];
+
+			foreach( [ 'html-header', 'html-footer', 'frame-header', 'frame-footer' ] as $name ) {
+
+				$path = \Nino\Filesystem::path( $appData, '/templates/'. $name. '.tpl' );
+
+				if( is_file( $path ) === true && preg_match_all( '/\[link[ \t\r\n]+(\/[^\s\]]+)/', (string) file_get_contents( $path ), $found ) > 0 )
+					$sources = array_merge( $sources, $found[1] );
+			}
+
+			return array_values( array_unique( $sources ) );
 		}
 
 		/**

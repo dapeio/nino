@@ -120,7 +120,7 @@ function keysOfFragment( string $file ): array {
 // --- the units -----------------------------------------------------------------
 
 $libraryDir = $root. '/_admin/install/library';
-$unitDirs = [ 'base' => $libraryDir. '/base' ];
+$unitDirs = [ 'base' => $libraryDir. '/base', 'frame' => $libraryDir. '/frame' ];
 
 foreach( scandir( $libraryDir. '/pages' ) ?: [] as $page )
 	if( $page !== '.' && $page !== '..' && is_dir( $libraryDir. '/pages/'. $page ) === true )
@@ -494,9 +494,10 @@ check( 'the template without a category delivers no key of a template: .uncatego
 check( 'the two pages of the Legal module read the details of their page and carry no key of their own', array_filter( $units['module:legal']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === []
 	&& array_values( $units['module:legal']['templates'] ) === [ 'page-legal-imprint.tpl', 'page-legal-privacy.tpl' ] && isset( $units['page:legal'] ) === false );
 
-// The frames carry the keys of their own category, delivered by the base unit that delivers the frames
-check( 'the frames are frame-header.tpl and frame-footer.tpl, and their words are delivered with them - the label of the header\'s button, which the header names by the id of its own section', in_array( 'frame-header.tpl', $units['base']['templates'], true ) === true && in_array( 'frame-footer.tpl', $units['base']['templates'], true ) === true
-	&& isset( $provided['base']['/template/frame-header/header/button'] ) === true );
+// The frames carry the keys of their own category, delivered by the unit of the frames, which the starter pages write
+check( 'the frames are frame-header.tpl and frame-footer.tpl, delivered by the unit of the frames and not by the base unit, and their words are delivered with them - the label of the header\'s button, which the header names by the id of its own section',
+	$units['frame']['templates'] === [ 'frame-header.tpl', 'frame-footer.tpl' ] && array_intersect( $units['base']['templates'], $units['frame']['templates'] ) === []
+	&& isset( $provided['frame']['/template/frame-header/header/button'] ) === true && isset( $provided['base']['/template/frame-header/header/button'] ) === false );
 echo "\n";
 
 

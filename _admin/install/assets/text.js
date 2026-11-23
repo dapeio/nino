@@ -33,7 +33,7 @@
 			'/_admin/install/label/next'				: 'Weiter',
 
 			'/_admin/install/step/checks'				: '1. Umgebung',
-			'/_admin/install/step/setup'				: '2. Sprachen',
+			'/_admin/install/step/setup'				: '2. Sprache',
 			'/_admin/install/step/personalinfos'	: '3. Angaben zum Projekt',
 			'/_admin/install/step/accounts'			: '4. Konten',
 			'/_admin/install/step/applications'	: '5. Anwendung',
@@ -41,7 +41,7 @@
 			'/_admin/install/step/saving'				: 'Wird gespeichert …',
 
 			'/_admin/install/lead/checks'				: 'Die PHP-Version, die Erweiterungen und die Rechte für Dateien und Ordner, die Nino zum Laufen braucht.',
-			'/_admin/install/lead/setup'				: 'Wähle die Sprachen der Website und ihre Hauptsprache. Das lässt sich jederzeit in _admin/ ändern.',
+			'/_admin/install/lead/setup'				: 'Wähle die Sprache der Website. Weitere Sprachen legst Du später in /_admin an.',
 			'/_admin/install/lead/personalinfos'	: 'Trage die Angaben zu Deiner Firma und Website ein: Kontakt, Autor, Hosting – die wenigen Textschlüssel, die es immer gibt. Alles andere bleibt, wie die Bibliothek es vorgibt, und lässt sich später im Bereich Texte ändern.',
 			'/_admin/install/lead/accounts'			: 'Lege das erste Konto an, mit dem Du Dich bei /_admin anmeldest. Weitere Konten legst Du gleich an oder später im Bereich Nutzer.',
 			'/_admin/install/lead/applications'	: 'Wähle die erste Aufgabe für Nino. Weitere Anwendungen kannst Du später hinzufügen.',
@@ -73,12 +73,10 @@
 			'/_admin/install/locale/de-de'			: 'Deutsch',
 			'/_admin/install/locale/en-us'			: 'English (US)',
 
-			'/_admin/install/setup/title-languages'	: 'Sprachen',
-			'/_admin/install/setup/help-languages'	: 'Die Sprachen, in denen die Website ihre Texte hat, und die Hauptsprache unter ihnen. Beides lässt sich später in /_admin ändern.',
-			'/_admin/install/setup/locales'			: 'Verfügbare Sprachen',
-			'/_admin/install/setup/locales-help'	: 'Die Bibliothek bringt Texte in diesen Sprachen mit. Wähle mindestens eine.',
-			'/_admin/install/setup/native'			: 'Hauptsprache',
-			'/_admin/install/setup/native-help'	: 'Die Sprache, in der /_admin die Inhalte zuerst zeigt. Es stehen die Sprachen zur Wahl, die Du oben angehakt hast.',
+			'/_admin/install/setup/title-languages'	: 'Sprache',
+			'/_admin/install/setup/help-languages'	: 'Die Sprache, in der die Startseite und ihre Texte geschrieben sind. Weitere Sprachen legst Du später im Bereich Sprache von /_admin an.',
+			'/_admin/install/setup/language'		: 'Sprache der Website',
+			'/_admin/install/setup/language-help'	: 'Die Bibliothek bringt Texte in diesen Sprachen mit.',
 			'/_admin/install/setup/title-modules'	: 'Module',
 			'/_admin/install/setup/help-modules'	: 'Module, die die Bibliothek oder das Projekt mitbringt und die sich schon hier einrichten lassen.',
 			'/_admin/install/setup/modules'			: 'Module',
@@ -88,9 +86,8 @@
 
 			'/_admin/install/personalinfos/title-global'	: 'Allgemein',
 			'/_admin/install/personalinfos/help-global'		: 'Angaben, die für alle Sprachen gelten.',
-			'/_admin/install/personalinfos/title-locale'	: 'Je Sprache',
-			'/_admin/install/personalinfos/help-locale'		: 'Angaben, die es in jeder Sprache einzeln gibt. Wechsle die Sprache, um sie auszufüllen; was Du eingetragen hast, bleibt dabei erhalten.',
-			'/_admin/install/personalinfos/language'			: 'Sprache',
+			'/_admin/install/personalinfos/title-locale'	: 'In der Sprache der Website',
+			'/_admin/install/personalinfos/help-locale'		: 'Angaben, die in der Sprache der Website stehen.',
 			'/_admin/install/personalinfos/loading'				: 'Die Angaben werden noch geladen.',
 			'/_admin/install/personalinfos/failed'				: '%s Angaben ließen sich nicht speichern.',
 
@@ -224,7 +221,7 @@
 			'/_admin/install/label/next'				: 'Next',
 
 			'/_admin/install/step/checks'				: '1. Environment',
-			'/_admin/install/step/setup'				: '2. Languages',
+			'/_admin/install/step/setup'				: '2. Language',
 			'/_admin/install/step/personalinfos'	: '3. Project details',
 			'/_admin/install/step/accounts'			: '4. Accounts',
 			'/_admin/install/step/applications'	: '5. Application',
@@ -232,7 +229,7 @@
 			'/_admin/install/step/saving'				: 'Saving …',
 
 			'/_admin/install/lead/checks'				: 'The PHP version, extensions and file and folder permissions Nino needs to run.',
-			'/_admin/install/lead/setup'				: 'Pick the available languages and Nino’s default language. You can change this at any time in _admin/.',
+			'/_admin/install/lead/setup'				: 'Pick the language of the website. You add more languages later in /_admin.',
 			'/_admin/install/lead/personalinfos'	: 'Fill in the details of your company and website: contact, author, hosting - the handful of keys that are always there. Everything else stays as the library has it, and can be changed later in the Text panel.',
 			'/_admin/install/lead/accounts'			: 'Create the first account, the one you sign in to /_admin with. Create more now, or later in the Users panel.',
 			'/_admin/install/lead/applications'	: 'Select the primary task for Nino. You can add further areas of application later.',
@@ -264,12 +261,10 @@
 			'/_admin/install/locale/de-de'			: 'Deutsch',
 			'/_admin/install/locale/en-us'			: 'English (US)',
 
-			'/_admin/install/setup/title-languages'	: 'Languages',
-			'/_admin/install/setup/help-languages'	: 'The languages the website has its texts in, and the default one among them. Both can be changed later in the workbench.',
-			'/_admin/install/setup/locales'			: 'Available languages',
-			'/_admin/install/setup/locales-help'	: 'The library brings texts in these languages. Pick at least one.',
-			'/_admin/install/setup/native'			: 'Default language',
-			'/_admin/install/setup/native-help'	: 'The language the workbench shows content in first. It offers the languages you ticked above.',
+			'/_admin/install/setup/title-languages'	: 'Language',
+			'/_admin/install/setup/help-languages'	: 'The language the start page and its texts are written in. You add more languages later in the Language panel of /_admin.',
+			'/_admin/install/setup/language'		: 'Language of the website',
+			'/_admin/install/setup/language-help'	: 'The library brings texts in these languages.',
 			'/_admin/install/setup/title-modules'	: 'Modules',
 			'/_admin/install/setup/help-modules'	: 'Modules that the library or the project brings and that can be set up here already.',
 			'/_admin/install/setup/modules'			: 'Modules',
@@ -279,9 +274,8 @@
 
 			'/_admin/install/personalinfos/title-global'	: 'General',
 			'/_admin/install/personalinfos/help-global'		: 'Details that hold for every language.',
-			'/_admin/install/personalinfos/title-locale'	: 'Per language',
-			'/_admin/install/personalinfos/help-locale'		: 'Details that exist once per language. Change the language to fill them in; what you typed is kept.',
-			'/_admin/install/personalinfos/language'			: 'Language',
+			'/_admin/install/personalinfos/title-locale'	: 'In the language of the website',
+			'/_admin/install/personalinfos/help-locale'		: 'Details that are written in the language of the website.',
 			'/_admin/install/personalinfos/loading'				: 'The details are still loading.',
 			'/_admin/install/personalinfos/failed'				: '%s details could not be saved.',
 

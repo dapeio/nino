@@ -1,7 +1,7 @@
 <?php return [
 	'label' 		=> 'Blank',
 	'routes' 		=> [
-		'GET://new-webpage' => [ 'uri' => '/blank', 'body' => '[template /templates/page-blank]', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
+		'GET://new-webpage' => [ 'uri' => '/blank', 'body' => '[template /templates/page-blank]' ],
 	],
 	'templates' => [ 'page-blank.tpl' ],
 	'suggest' => [

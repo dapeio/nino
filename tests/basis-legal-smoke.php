@@ -17,7 +17,7 @@ require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
 
 /**
- *	A project the wizard set up - with the starter frames, written in the components of Basis - and the texts of which are filled in
+ *	A project the wizard set up, with the feature Basis switched on as a project does in the Features panel, and the texts of which are filled in
  *
  *	@param		string		$name
  *
@@ -34,6 +34,7 @@ function basisLegalProject( string $name ): array {
 
 	\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ], '/nino/modules' => [], '/nino/html/assets' => [], '/nino/http/routes' => [] ] );
 	ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+	\Nino\Features::activate( $appData, 'basis' );
 	$_POST['data'] = json_encode( [] );
 	$appData['/nino/modules'] = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
 

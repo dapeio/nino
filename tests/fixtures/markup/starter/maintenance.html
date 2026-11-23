@@ -63,7 +63,7 @@
 			<link rel="icon" type="image/png" sizes="32x32" href="/public/favicon/favicon-32x32.png?v=1767225600">
 			<link rel="icon" type="image/png" sizes="16x16" href="/public/favicon/favicon-16x16.png?v=1767225600">
 			<link rel="manifest" href="/public/favicon/site.webmanifest?v=1767225600">
-			<link rel="stylesheet" href="/public/.cache/style.css?v=81b516c26847" type="text/css" />
+			<link rel="stylesheet" href="/public/.cache/style.css?v=d9ddf0cc5ccb" type="text/css" />
 
 			<!-- Structured data (schema.org). Values go through ""
 			     rather than "[[...]]" inside the quotes: a textfill is
@@ -94,68 +94,80 @@
 
 		<a class="nino-sr-only" href="#nino-main">Zum Inhalt springen</a>
 
-		<header id="header" class="header-wrap header-wrap--sticky"><div class="header-wrap-inner">
-	
-</div><div class="section-row section-row--valign-center">
-		<div class="section-col section-col--size-auto">
-			<a class="header-logo" href="/"><span class="header-logo-name">Muster &amp; Söhne GmbH</span></a>
-		</div>
-		<div class="section-col section-col--size-fill section-col--align-end">
-			<nav class="header-nav" aria-label="Hauptnavigation"><details class="header-nav-details"><summary class="header-nav-toggle" aria-label="Menü"><span aria-hidden="true"></span></summary><ul class="header-nav-list"><li><a href="/" aria-current="page">Startseite</a></li><li><a href="/contact">Kontakt</a></li><li><a href="/new-webpage">Neue Webseite</a></li></ul></details></nav>
-		</div>
-		<div class="section-col section-col--size-auto section-col--hide-on section-col--m-hide-off">
-			<a class="button button--size-s" href="/contact">Jetzt kontaktieren</a>
-		</div>
-	</div></header>
+		<header class="site-header">
+	<div class="wrap">
+		<a href="/" aria-current="page" class="brand" title="Startseite" aria-label="Muster &amp; Söhne GmbH"><span>Muster & Söhne GmbH</span></a>
+		<nav class="site-nav" aria-label="Hauptnavigation">
+			<details>
+				<summary><span class="nino-sr-only">Menü</span></summary>
+				<ul>
+					<li><a href="/" aria-current="page">Startseite</a></li>
+					<li><a href="/contact">Kontakt</a></li>
+				</ul>
+			</details>
+		</nav>
+		<a href="/contact" class="button">Jetzt kontaktieren</a>
+	</div>
+</header>
 
   <main id="nino-main" tabindex="-1">
 
-<section id="hero" class="section-wrap section-wrap--ground-dark section-wrap--dim section-wrap--height-80"><div class="section-wrap-image"><img class="section-wrap-picture" src="/public/images/template/page-home/hero/background.svg" width="1920" height="1080" alt="" decoding="async"></div>
-	<div class="section-row">
-		<div class="section-col">
-			<h1 class="section-title section-title--size-xl">Willkommen.</h1>
-			<p class="section-subtitle">Hier steht Dein erster Eindruck.</p>
-			<a class="button" href="/contact">Kontakt</a>
-		</div>
+<section class="hero hero--tall">
+	<img src="/public/images/template/page-home/hero/background.svg" width="1920" height="1080" alt="" decoding="async">
+	<div class="wrap">
+		<h1>Willkommen.</h1>
+		<p class="lead">Hier steht Dein erster Eindruck.</p>
+		<a href="/contact" class="button">Kontakt</a>
 	</div>
 </section>
-<section id="start" class="section-wrap section-wrap--ground-alt">
-	<div class="section-row section-row--width-narrow">
-		<div class="section-col section-col--align-center">
-			<h2 class="section-title">Was Du hier findest</h2>
-			<div class="text"><p>Drei Karten als Platzhalter. Ersetze sie durch das, was Deine Besucher zuerst wissen sollen.</p></div>
+<section class="section section--alt" id="start">
+	<div class="wrap">
+		<div class="intro">
+			<h2>Was Du hier findest</h2>
+			<p>Drei Karten als Platzhalter. Ersetze sie durch das, was Deine Besucher zuerst wissen sollen.</p>
 		</div>
-	</div>
-	<div class="section-row">
-		<div id="start-1" class="section-col section-col--m-size-33 section-col--variant-card">
-			<h3 class="section-title section-title--size-s">Erstens</h3>
-			<div class="text"><p>Ein kurzer Satz zu Deinem ersten Angebot.</p></div>
-		</div>
-		<div id="start-2" class="section-col section-col--m-size-33 section-col--variant-card">
-			<h3 class="section-title section-title--size-s">Zweitens</h3>
-			<div class="text"><p>Ein kurzer Satz zu Deinem zweiten Angebot.</p></div>
-		</div>
-		<div id="start-3" class="section-col section-col--m-size-33 section-col--link section-col--variant-card">
-			<h3 class="section-title section-title--size-s"><a href="/contact">Kontakt</a></h3>
-			<div class="text"><p>Diese Karte ist als Ganzes ein Link zur Kontaktseite.</p></div>
+		<div class="cards">
+			<article class="card" id="start-1">
+				<h3>Erstens</h3>
+				<p>Ein kurzer Satz zu Deinem ersten Angebot.</p>
+			</article>
+			<article class="card" id="start-2">
+				<h3>Zweitens</h3>
+				<p>Ein kurzer Satz zu Deinem zweiten Angebot.</p>
+			</article>
+			<article class="card" id="start-3">
+				<h3><a href="/contact">Kontakt</a></h3>
+				<p>Diese Karte ist als Ganzes ein Link zur Kontaktseite.</p>
+			</article>
 		</div>
 	</div>
 </section>
 
 		</main>
 
-		<footer id="footer" class="footer-wrap"><div class="footer-wrap-inner">
-	
-	
-</div><div class="section-row">
-		<div class="section-col section-col--m-size-50">
-			
-			<div class="text text--size-s">Kurze Beschreibung Deines Unternehmens.</div>
+		<footer class="site-footer">
+	<div class="wrap">
+		<div class="footer-cols">
+			<div>
+				<p><strong>Muster & Söhne GmbH</strong></p>
+				<p>Kurze Beschreibung Deines Unternehmens.</p>
+			</div>
+			<nav aria-label="Navigation im Fußbereich">
+				<ul>
+					<li><a href="/" aria-current="page">Startseite</a></li>
+					<li><a href="/contact">Kontakt</a></li>
+				</ul>
+			</nav>
 		</div>
-		<div class="section-col section-col--m-size-50">
-			<nav class="footer-nav" aria-label="Navigation im Fußbereich"><ul><li><a href="/" aria-current="page">Startseite</a></li><li><a href="/contact">Kontakt</a></li><li><a href="/new-webpage">Neue Webseite</a></li></ul></nav>
+		<div class="legal">
+			<p>&copy; 2026 Muster & Söhne GmbH</p>
+			<ul>
+				<li><a href="/impressum">Impressum</a></li>
+				<li><a href="/datenschutz">Datenschutz</a></li>
+			</ul>
 		</div>
-	</div><div class="footer-legal"><p class="footer-legal-copyright">&copy; 2026 Muster &amp; Söhne GmbH</p><ul class="footer-legal-pages"><li><a href="/impressum">Impressum</a></li><li><a href="/datenschutz">Datenschutz</a></li></ul><ul class="footer-legal-locales"><li><a href="?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE" aria-current="true">Deutsch</a></li><li><a href="?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English (US)</a></li></ul></div></footer>
+	</div>
+</footer>
 
 
 		<script nonce="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">NinoJstext={"\/module\/form\/info\/required":"Bitte f\u00fclle alle Pflichtfelder aus.","\/module\/form\/info\/email":"Bitte gib eine g\u00fcltige E-Mail-Adresse ein.","\/module\/form\/info\/invalid":"Bitte pr\u00fcfe Deine Eingaben.","\/module\/form\/info\/error":"Deine Nachricht konnte nicht versendet werden. Bitte probiere es sp\u00e4ter noch einmal.","\/module\/form\/info\/success":"Vielen Dank \u2013 Deine Nachricht wurde versandt."};</script>

@@ -54,11 +54,9 @@ const publicTemplates = filesBelow( LIBRARY ).concat( moduleUnitFiles ).filter( 
 		&& [ 'llms-txt.tpl', 'robots.tpl', 'sitemap-xml.tpl' ].includes( name ) === false;
 } ).sort();
 
-/* The page frames used to be their own library units, one directory per
- * variant; since 1.2 the base unit delivers the one pair every project gets,
- * as frame-header.tpl and frame-footer.tpl beside the stylesheet that styles
- * them. The audit follows them there. */
-const FRAMES = [ 'base/templates/frame-header.tpl', 'base/templates/frame-footer.tpl' ];
+/* The page frames are the unit of their own that the last step of the wizard writes with the starter pages: frame-header.tpl and frame-footer.tpl,
+ * which the stylesheet of the base unit styles. The audit follows them there. */
+const FRAMES = [ 'frame/templates/frame-header.tpl', 'frame/templates/frame-footer.tpl' ];
 
 check( 'the audit reaches every finished public template kind',
 	FRAMES.every( function( frame ) { return publicTemplates.some( function( file ) { return relative( file ).endsWith( frame ); } ); } )
@@ -73,6 +71,11 @@ const VOID_TAGS = new Set( [
 ] );
 const WIDTH_CLASS = /^nino-grid-(?:(?:s|m|l|xl)-)?(?:25|33|50|66|75|100)$/;
 const CLASS_NAME = /^nino-[a-z0-9]+(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?$/;
+
+/* The classes of the site belong to the site: a class of a library template that is no class of the kernel (nino-*) is defined in the stylesheet of the
+ * library, the base unit's assets/style.css. */
+const STYLESHEET = fs.readFileSync( path.join( LIBRARY, 'base/assets/style.css' ), 'utf8' );
+const siteClasses = new Set( Array.from( STYLESHEET.matchAll( /\.([A-Za-z_][\w-]*)/g ), function( match ) { return match[1]; } ) );
 
 function tokenize( source ) {
 	const tokens = [];
@@ -126,8 +129,10 @@ function inspect( file, source ) {
 			gridProblems.push( 'line '+ token.line+ ': direct row child without grid width' );
 
 		token.classes.forEach( function( name ) {
-			if( name.startsWith('nino-') === false )
-				classProblems.push( 'line '+ token.line+ ': '+ name+ ' is outside the public namespace' );
+			if( name.startsWith('nino-') === false ) {
+				if( siteClasses.has( name ) === false )
+					classProblems.push( 'line '+ token.line+ ': '+ name+ ' is neither a class of the kernel nor defined in the stylesheet of the library' );
+			}
 			else if( CLASS_NAME.test( name ) === false )
 				classProblems.push( 'line '+ token.line+ ': '+ name );
 			if( name.startsWith('nino-section--') && token.classes.includes('nino-section') === false )
@@ -175,7 +180,7 @@ inspect( 'base document', documentPair ).mismatches.forEach( function( issue ) {
 
 check( 'finished HTML fragments are balanced'+ ( structureProblems.length === 0 ? '' : ' - '+ structureProblems.join('; ') ), structureProblems.length === 0 );
 check( 'grid rows contain direct grid columns only'+ ( gridProblems.length === 0 ? '' : ' - '+ gridProblems.join('; ') ), gridProblems.length === 0 );
-check( 'public class names use the Nino vocabulary'+ ( classProblems.length === 0 ? '' : ' - '+ classProblems.join('; ') ), classProblems.length === 0 );
+check( 'every class of a library template is defined in the stylesheet of the library or belongs to the kernel (nino-*), and the classes of the kernel keep its vocabulary'+ ( classProblems.length === 0 ? '' : ' - '+ classProblems.join('; ') ), classProblems.length === 0 );
 
 const definitionFiles = filesBelow( path.join( ROOT, '_nino' ) )
 	.concat( filesBelow( LIBRARY ) )
@@ -202,12 +207,25 @@ publicTemplates.forEach( function( file ) {
 
 check( 'every public nino-* class has an owner'+ ( undefinedClasses.length === 0 ? '' : ' - '+ undefinedClasses.join(', ') ), undefinedClasses.length === 0 );
 
-/* The frames are written in the components of Basis alone, so no class of the old stylesheet and no markup of their own stands in them: the
- * header and the footer are drawn by the feature, and what the stylesheet knows of them is the standard part of its groups. */
+/* The frames are plain html: a header and a footer element of their own, with the calls of the kernel in them and no component. */
 const frameMarkup = FRAMES.map( function( frame ) { return fs.readFileSync( path.join( LIBRARY, frame ), 'utf8' ); } ).join('\n');
 
-check( 'the frames are calls of the components of Basis and no markup of their own', /^\[header-wrap\b/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[0] ), 'utf8' ) )
-	&& /^\[footer-wrap\b/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[1] ), 'utf8' ) ) && /<[a-z]/.test( frameMarkup ) === false );
+check( 'the frames are a header element and a footer element', /^<header class="site-header">/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[0] ), 'utf8' ) )
+	&& /^<footer class="site-footer">/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[1] ), 'utf8' ) ) && /<script\b/.test( frameMarkup ) === false );
+
+/* No template of the library calls a component of Basis: the starter site is drawn by the kernel alone, with Basis off. */
+const basisComponents = fs.readdirSync( path.join( ROOT, '_nino/Nino/Modules/Basis/components' ) );
+const basisCalls = [];
+
+filesBelow( LIBRARY ).filter( function( file ) { return file.endsWith('.tpl'); } ).forEach( function( file ) {
+	fs.readFileSync( file, 'utf8' ).replace( /(?<!\[)\[([a-z][a-z0-9-]*)\b/g, function( match, name ) {
+		if( basisComponents.includes( name ) === true )
+			basisCalls.push( relative( file )+ ': '+ name );
+		return match;
+	} );
+} );
+
+check( 'no template of the library calls a component of Basis ('+ basisComponents.length+ ' components looked for)'+ ( basisCalls.length === 0 ? '' : ' - '+ basisCalls.join(', ') ), basisCalls.length === 0 && basisComponents.length > 10 );
 
 const semanticProblems = [];
 publicTemplates.forEach( function( file ) {
@@ -244,8 +262,29 @@ publicTemplates.forEach( function( file ) {
 
 check( 'finished templates keep non-visual HTML semantics'+ ( semanticProblems.length === 0 ? '' : ' - '+ semanticProblems.join('; ') ), semanticProblems.length === 0 );
 
-/* The frames name nothing by a fill of their own: the menus of the header and of the footer are named by the words the feature Basis delivers when
- * it is switched on, so a frame that carries an aria-label with a fill reads a key nobody delivers. */
-check( 'the frames carry no aria-label of their own', /\baria-label=/.test( frameMarkup ) === false );
+/* The stylesheet of the site, by rule: a word longer than its box breaks where the box ends in the places a name of the company stands (titles, cards, the foot, the buttons of a page and the menu), so nothing
+ * scrolls sideways at 320 px; and the print view hides the menu and the buttons of the header and of the title area and keeps what the page says - the address of the e-mail on the contact page is a button. */
+const bare = STYLESHEET.replace( /\/\*[\s\S]*?\*\//g, '' );
+const breaking = ( bare.match( /([^{}]+)\{[^{}]*overflow-wrap:\s*anywhere[^{}]*\}/g ) || [] ).join(' ');
+const printBlock = ( bare.match( /@media print\s*\{([\s\S]*)\}\s*$/ ) || [ '', '' ] )[1];
+const hiddenInPrint = ( printBlock.match( /([^{}]+)\{[^{}]*display:\s*none[^{}]*\}/ ) || [ '', '' ] )[1].split(',').map( selector => selector.trim() );
+
+check( 'the stylesheet breaks a long word in titles, cards, the foot, the buttons and the menu',
+	[ 'h1', 'h2', 'h3', '.card', '.site-footer', '.button', '.site-nav a', '.brand' ].every( selector => breaking.split(/[,{}]/).map( part => part.trim() ).includes( selector ) ) );
+check( 'the print view hides the menu and the buttons of the header and of the title area, and no bare .button: the e-mail address of the contact page is one and is printed',
+	[ '.site-nav', '.site-header .button', '.hero .button' ].every( selector => hiddenInPrint.includes( selector ) ) && hiddenInPrint.includes('.button') === false );
+
+/* A brand with no picture and no name - the company has none yet - draws an empty link: it stays in the line, so that the menu keeps its place, and is taken out of the order of the
+ * focus, so that the key never stops on a link nobody sees. The start page is in the menu. */
+const emptyBrand = ( bare.match( /\.brand:has\(\s*>\s*span:empty\s*\)\s*\{([^{}]*)\}/ ) || [ '', '' ] )[1];
+check( 'a brand that has neither picture nor name is hidden with its place kept - visibility, not display - so that the focus does not stop on an empty link and the menu does not move',
+	/visibility:\s*hidden/.test( emptyBrand ) === true && /display:\s*none/.test( emptyBrand ) === false );
+
+/* The frames name their menus by words the frame unit delivers, in both languages: a label that is a fill of a template key reads a key somebody writes. */
+const frameWords = [ 'de_DE', 'en_US' ].map( function( locale ) { return fs.readFileSync( path.join( LIBRARY, 'frame/text/'+ locale+ '.php' ), 'utf8' ); } );
+const frameLabels = Array.from( frameMarkup.matchAll( /\baria-label="\[\[(\/template\/[^\]]+)\]\]"/g ), function( match ) { return match[1]; } );
+
+check( 'every label of the frames is a word the frame unit delivers in both languages', frameLabels.length === 2
+	&& frameLabels.every( function( key ) { return frameWords.every( function( words ) { return words.includes( "'[["+ key+ "]]'" ); } ); } ) );
 
 done();

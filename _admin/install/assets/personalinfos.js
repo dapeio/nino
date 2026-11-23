@@ -10,9 +10,9 @@
  *													_admin/install/Install.php's PersonalInfos class. Same shape as
  *													the Text panel's own assets/admin.js and its category
  *													form: every global key on top in one fieldset, every
- *													locale-scoped key below behind a language <select>,
- *													in-memory _localeValues preserving
- *													unsaved edits across a locale switch. Driven by the shared
+ *													locale-scoped key below it - in the one language of the
+ *													website, the first the project has: there is nothing to
+ *													page through. Driven by the shared
  *													Back/Next bar (script.js) rather than its own save button -
  *													save() is exposed for Next to call, not wired to a button
  *													here. The fields are the blocks of the workbench.
@@ -130,8 +130,8 @@
 
 		/**
 		 *	Snapshot the currently visible fields into _globalValues and
-		 *	_localeValues before switching locale, before saving or before they
-		 *	are drawn again in another language
+		 *	_localeValues before saving or before they are drawn again in another
+		 *	language of the page
 		 *
 		 *	@return		void
 		 */
@@ -165,7 +165,7 @@
 		},
 
 		/**
-		 *	Re-render the locale-scoped fields for the currently selected locale
+		 *	Re-render the locale-scoped fields for the language of the website
 		 *
 		 *	@return		void
 		 */
@@ -185,8 +185,8 @@
 
 		/**
 		 *	Render the whole form: every global key in one fieldset, every
-		 *	locale-scoped key below behind a language <select> - same shape as
-		 *	the Text panel's own _renderGroupForm() (its assets/admin.js)
+		 *	locale-scoped key below it - same shape as the Text panel's own
+		 *	_renderGroupForm() (its assets/admin.js)
 		 *
 		 *	@return		void
 		 */
@@ -231,26 +231,8 @@
 				localeWrap.appendChild( legend );
 				Nino.adminUi.sectionHelp( legend, localeWrap, t('/_admin/install/personalinfos/help-locale') );
 
-				const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
-
-				// The language the fields below are in: the names are the workbench's, the one chosen stays where the page is drawn again
-				const select = Nino.adminUi.selectField( {
-					key			: 'personalinfos-locale',
-					id			: 'personalinfos-locale-select',
-					label		: t('/_admin/install/personalinfos/language'),
-					options	: self._locales.map( function( locale ) { return { value : locale, label : Nino.install.localeName( locale, self._locales ) } } ),
-					value		: self._selectedLocale,
-					onChange: function( value ) {
-						self._storeVisibleLocaleFields();
-						self._selectedLocale = value;
-						self._renderLocaleFields();
-					},
-				} );
-				grid.appendChild( select );
-
 				const fieldsWrap = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
 				fieldsWrap.id = 'personalinfos-form-locale-fields';
-				localeWrap.appendChild( grid );
 				localeWrap.appendChild( fieldsWrap );
 
 				wrap.appendChild( localeWrap );
@@ -261,9 +243,8 @@
 
 		/**
 		 *	Build the complete batch payload: global fields once, and every
-		 *	locale-scoped field once per available locale. A locale already
-		 *	visited in the selector comes from _localeValues; an untouched one
-		 *	keeps the value apiList() originally returned.
+		 *	locale-scoped field once per available locale - the one the fields
+		 *	show from what stands in them, any other as apiList() gave it.
 		 *
 		 *	@return		{Array}									Items for personalinfos/savebatch
 		 */
@@ -290,8 +271,7 @@
 
 		/**
 		 *	Save every field on the page in one batch request (global fields
-		 *	plus all available locales, including languages edited before the
-		 *	currently visible one) - called by
+		 *	plus all available locales) - called by
 		 *	the shared Next button, not by a button of its own
 		 *
 		 *	@param		{Function}	callback			Called with ( success )

@@ -1,34 +1,33 @@
 <!-- nino:template-name Home -->
 [template /templates/html-header]
-[section-wrap id="hero" ground="dark" image="~background" dim height="80"]
-	[section-row]
-		[section-col]
-			[section-title ~title tag="h1" size="xl"]
-			[section-subtitle ~subtitle]
-			[button /_nino/webpage/contact/name href="page:/contact"]
-		[/section-col]
-	[/section-row]
-[/section-wrap]
-[section-wrap id="start" ground="alt"]
-	[section-row width="narrow"]
-		[section-col align="center"]
-			[section-title ~title]
-			[text ~text]
-		[/section-col]
-	[/section-row]
-	[section-row]
-		[section-col id="start-1" size="100 m:33" variant="card"]
-			[section-title ~title tag="h3" size="s"]
-			[text ~text]
-		[/section-col]
-		[section-col id="start-2" size="100 m:33" variant="card"]
-			[section-title ~title tag="h3" size="s"]
-			[text ~text]
-		[/section-col]
-		[section-col id="start-3" size="100 m:33" variant="card" link]
-			[section-title ~title tag="h3" size="s" href="page:/contact"]
-			[text ~text]
-		[/section-col]
-	[/section-row]
-[/section-wrap]
+<section class="hero hero--tall">
+	[imagevalues /template/page-home/hero/background]<img src="[[src]]" width="[[width]]" height="[[height]]" alt="" decoding="async">[/imagevalues]
+	<div class="wrap">
+		<h1>[[/template/page-home/hero/title]]</h1>
+		<p class="lead">[[/template/page-home/hero/subtitle]]</p>
+		[link /_nino/webpage/contact/uri class="button"][[/_nino/webpage/contact/name]][/link]
+	</div>
+</section>
+<section class="section section--alt" id="start">
+	<div class="wrap">
+		<div class="intro">
+			<h2>[[/template/page-home/start/title]]</h2>
+			<p>[[/template/page-home/start/text]]</p>
+		</div>
+		<div class="cards">
+			<article class="card" id="start-1">
+				<h3>[[/template/page-home/start-1/title]]</h3>
+				<p>[[/template/page-home/start-1/text]]</p>
+			</article>
+			<article class="card" id="start-2">
+				<h3>[[/template/page-home/start-2/title]]</h3>
+				<p>[[/template/page-home/start-2/text]]</p>
+			</article>
+			<article class="card" id="start-3">
+				<h3>[link /_nino/webpage/contact/uri][[/template/page-home/start-3/title]][/link]</h3>
+				<p>[[/template/page-home/start-3/text]]</p>
+			</article>
+		</div>
+	</div>
+</section>
 [template /templates/html-footer]

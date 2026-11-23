@@ -47,7 +47,7 @@ function rulesSite( bool $own ): array {
 	\Nino\Features::registerComponents( $appData );
 
 	// The calls of the templates that are no component: the names that the modules and the kernel register
-	foreach( [ 'template', 'frame', 'assets', 'jstext', 'legal', 'privacy', 'json', 'imagevalues', 'csrf' ] as $shortcode )
+	foreach( [ 'template', 'frame', 'assets', 'jstext', 'legal', 'privacy', 'json', 'imagevalues', 'link', 'csrf' ] as $shortcode )
 		\Nino\Html::addShortcode( $appData, $shortcode, static fn(): string => '', null );
 
 	if( $own === false )
@@ -157,6 +157,8 @@ check( 'a component that is once in a container is offered no more where one sta
 $files = array_merge(
 	glob( $root. '/_admin/install/library/*/templates/*.tpl' ) ?: [],
 	glob( $root. '/_admin/install/library/pages/*/templates/*.tpl' ) ?: [],
+	glob( $root. '/tests/fixtures/basis/starter/*/templates/*.tpl' ) ?: [],
+	glob( $root. '/tests/fixtures/basis/starter/pages/*/templates/*.tpl' ) ?: [],
 	glob( $root. '/_nino/Nino/Modules/Basis/groups/*/demo.tpl' ) ?: [],
 	glob( $root. '/_nino/Nino/Modules/Legal/install/templates/*.tpl' ) ?: [],
 	[ $root. '/tests/fixtures/basis/page.tpl' ]
@@ -177,5 +179,45 @@ foreach( $files as $file ) {
 ksort( $codes );
 echo '  '. count( $files ). ' files, findings: '. json_encode( $codes ). "\n";
 check( 'the templates and the demos that come with the kernel have nothing against them but free html, calls with no schema and the html component', count( $files ) >= 14 && array_diff( array_keys( $codes ), [ 'free', 'bare', 'html' ] ) === [] );
+
+// The starter site in the components of Basis, kept as fixtures (tests/fixtures/basis/starter): the scans of the workbench read the words and the pictures of its home page through the register
+$homeSource = (string) file_get_contents( $root. '/tests/fixtures/basis/starter/pages/home/templates/page-home.tpl' );
+$basisSite = rulesSite( false );
+$reads = \Nino\Components::sources( $basisSite, $homeSource, 'page-home' );
+$readsOf = static fn( string $kind ): array => array_column( array_filter( $reads, static fn( array $read ): bool => $read['kind'] === $kind ), 'source' );
+check( 'the scans read the home page of the starter fixtures through the register: its title and its text as the keys they are under the id of their section, and the picture behind the hero as a place of a picture',
+	array_diff( [ '/template/page-home/hero/title', '/template/page-home/hero/subtitle', '/template/page-home/start-1/text', '/template/page-home/start-3/title' ], $readsOf( 'text' ) ) === []
+	&& in_array( '/template/page-home/hero/background', $readsOf( 'image' ), true ) === true );
+
+// ...and its pages are written in the components of Basis: a name line, the head, sections with an id that is a slug no section before has, the foot, and no section, header or footer drawn by hand
+$shapeFailures = [];
+$shapeCount = 0;
+
+foreach( glob( $root. '/tests/fixtures/basis/starter/pages/*/templates/*.tpl' ) ?: [] as $shapeFile ) {
+
+	$shapeSource = (string) file_get_contents( $shapeFile );
+
+	if( str_contains( $shapeSource, '[section-wrap' ) === false )
+		continue;
+
+	$shapeCount++;
+	$shapeIds = [];
+
+	if( preg_match( '~\A<!-- nino:template-name [^\r\n<>]+ -->\n\[template /templates/html-header(?:-[a-z0-9]+)*\]\n\[section-wrap\b.*\n\[template /templates/html-footer(?:-[a-z0-9]+)*\]\n\z~s', $shapeSource ) !== 1 )
+		$shapeFailures[] = basename( $shapeFile ). ': the name line, the head, the sections and the foot do not stand where they are read';
+
+	if( preg_match( '~<(?:section|header|footer)\b|class="[^"]*\bnino-(?!form)~', $shapeSource ) === 1 )
+		$shapeFailures[] = basename( $shapeFile ). ': a section, a header or a footer drawn by hand, or a class of the old stylesheet';
+
+	preg_match_all( '~\[section-wrap\b([^\]]*)\]~', $shapeSource, $shapeTags );
+
+	foreach( $shapeTags[1] as $shapeTag )
+		if( preg_match( '~ id="([a-z0-9]+(?:-[a-z0-9]+)*)"~', $shapeTag, $shapeId ) !== 1 || isset( $shapeIds[$shapeId[1]] ) === true )
+			$shapeFailures[] = basename( $shapeFile ). ': a section without an id that is a slug, or with one a section before it has';
+		else
+			$shapeIds[$shapeId[1]] = true;
+}
+
+check( 'the pages of the starter fixtures are written in the components of Basis ('. $shapeCount. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeCount >= 3 );
 
 ninoDone( $appData );

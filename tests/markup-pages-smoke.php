@@ -167,10 +167,11 @@ function pagesSite( bool $tools ): string {
  *
  *	@param		string		$sandbox
  *	@param		string		$locale
+ *	@param		bool			$basis				Whether the feature Basis is on, as it is in a project that switched it on in the Features panel: the starter site is plain html and has none
  *
  *	@return 	array
  */
-function pagesBoot( string $sandbox, string $locale ): array {
+function pagesBoot( string $sandbox, string $locale, bool $basis = false ): array {
 
 	$_SESSION = [];
 
@@ -194,6 +195,9 @@ function pagesBoot( string $sandbox, string $locale ): array {
 	\Nino\Csrf::init( $appData );
 	\Nino\Html::init( $appData );
 	\Nino\Auth::init( $appData );
+
+	if( $basis === true )
+		$appData['/nino/modules'][] = '\\Nino\\Modules\\Basis';
 
 	\Nino\Features::registerAssets( $appData );
 	\Nino\Features::registerComponents( $appData );
@@ -270,7 +274,8 @@ function pagesVisit( string $sandbox, string $locale, string $uri ): array {
  */
 function pagesCases( string $sandbox, array $cases, string $locale = 'de_DE' ): string {
 
-	$appData = pagesBoot( $sandbox, $locale );
+	// The cases are about the machine - loops, includes, fills - and use the components of Basis as their material, so Basis is on
+	$appData = pagesBoot( $sandbox, $locale, true );
 	$out = '';
 
 	// A call that hands on what it was given as it is - a loop has escaped the values of its element - to read what a loop puts into the attributes of a call
@@ -554,6 +559,18 @@ foreach( [ '/', '/contact' ] as $uri ) {
 	$traced[$uri] = (string) ( $request['/nino/http/response']['body'] ?? '' );
 }
 
+// The start page of the starter site in the components of Basis, kept as a fixture: put in place of the page of the site, with Basis on, drawn with the trace
+// as a preview asks for it
+copy( __DIR__. '/fixtures/basis/starter/pages/home/templates/page-home.tpl', $site. '/private/templates/page-home.tpl' );
+$appData = pagesBoot( $site, 'de_DE', true );
+ninoUser( $appData, 'trace@example.com', [ '/_admin/builder/manage' ] );
+$token = \Nino\Preview::issue( $appData, 'builder', '/_admin/builder/manage', [] );
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/request', static function( array &$appData, array &$request ): void {
+	\Nino\Preview::held( $appData, $request, 'builder', '/_admin/builder/manage' ) !== null && \Nino\Preview::trace( $appData );
+} );
+$request = \Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/?nino-preview='. $token, 'REMOTE_ADDR' => '127.0.0.1', 'HTTP_HOST' => 'example.com', 'HTTPS' => 'on' ] );
+$tracedBasis = (string) ( $request['/nino/http/response']['body'] ?? '' );
+
 $ignored = ninoWarnings();
 \Nino\Filesystem::removeDir( $site );
 \Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
@@ -561,7 +578,8 @@ $ignored = ninoWarnings();
 $misplaced = 0;
 $invalid = 0;
 
-foreach( $traced as $body ) {
+// the pages of the html site carry no trace; the start page of the Basis fixtures carries it everywhere a component is drawn
+foreach( $traced + [ 'basis' => $tracedBasis ] as $body ) {
 
 	// The comments the templates carry of their own are text of the template, which names a textarea in one
 	$body = (string) preg_replace( '/<!--(?!\/?nino:).*?-->/s', '', $body );
@@ -572,10 +590,10 @@ foreach( $traced as $body ) {
 			$invalid += json_decode( $json, true ) === null ? 1 : 0;
 }
 
-check( 'the titles and the buttons of the start page, drawn by renderers, carry the mark of their source as the content of their element',
-	preg_match_all( '#<h[1-3] class="section-title[^>]*><!--nino:s [^>]*-->#', $traced['/'] ) >= 3 && preg_match_all( '#<(?:a|span) class="button[^>]*><!--nino:s [^>]*-->#', $traced['/'] ) >= 1 );
-check( 'the pages of a preview that asked for the trace carry it, and no comment stands in a script, a style, a title, a textarea or a tag, and the JSON-LD is JSON', $misplaced === 0 && $invalid === 0
-	&& substr_count( $traced['/'], '<!--nino:n' ) > 20 && substr_count( $traced['/'], 'application/ld+json' ) >= 1 );
+check( 'the titles and the buttons of the start page of the starter fixtures, drawn by the renderers of Basis, carry the mark of their source as the content of their element',
+	preg_match_all( '#<h[1-3] class="section-title[^>]*><!--nino:s [^>]*-->#', $tracedBasis ) >= 3 && preg_match_all( '#<(?:a|span) class="button[^>]*><!--nino:s [^>]*-->#', $tracedBasis ) >= 1 && substr_count( $tracedBasis, '<!--nino:n' ) > 20 );
+check( 'the pages of a preview that asked for the trace carry it where a component is drawn - the html starter site has none, and its pages hold no comment of the trace - and no comment stands in a script, a style, a title, a textarea or a tag, and the JSON-LD is JSON',
+	$misplaced === 0 && $invalid === 0 && substr_count( implode( '', $traced ), '<!--nino:n' ) === 0 && substr_count( $traced['/'], 'application/ld+json' ) >= 1 );
 
 check( 'the start page, the contact page and the imprint answer 200 and an address that is not there 404, in both languages',
 	array_column( $visits, 0 ) === [ 200, 200, 200, 404, 200, 200, 200, 200, 404, 200 ] );
@@ -606,8 +624,29 @@ foreach( $visits as $label => [ , $body ] ) {
 check( 'the start page and the contact page have one header, one footer and at least two sections, and every page has one h1',
 	$structure['de_DE /'][0] === 1 && $structure['de_DE /'][1] === 1 && $structure['de_DE /'][2] >= 2 && $structure['de_DE /contact'][0] === 1 && $structure['de_DE /contact'][1] === 1 && $structure['de_DE /contact'][2] >= 2
 	&& $structure['en_US /'][2] >= 2 && $structure['en_US /contact'][2] >= 2 && array_filter( $structure, static fn( array $counts ): bool => $counts[3] !== 1 && $counts[0] !== 0 ) === [] );
-check( '...the hero of the start page stands in the row of the page, in line with the header, and no link of a page is a telephone address the visitor\'s own spelling would break: no tel: link',
-	preg_match( '/<section id="hero"[^>]*>.*?<div class="section-row">/s', $visits['de_DE /'][1] ) === 1 && preg_match( '/href="tel:/', $visits['de_DE /contact'][1] . $visits['de_DE /'][1] ) !== 1 );
+check( '...the hero of the start page follows the header, in the main part, with its picture, its h1 and no link of a page is a telephone address the visitor\'s own spelling would break: no tel: link',
+	preg_match( '/<header class="site-header">.*?<\/header>\s*<main id="nino-main" tabindex="-1">\s*<section class="hero hero--tall">\s*<img [^>]*>\s*<div class="wrap">\s*<h1>/s', $visits['de_DE /'][1] ) === 1 && preg_match( '/href="tel:/', $visits['de_DE /contact'][1] . $visits['de_DE /'][1] ) !== 1 );
+// The fresh site, page by page: its language, its one main part, and the one entry of the menu that is the page shown - a link with the mark in the header and in the footer
+$menuMarks = [];
+$mains = [];
+$languages = [];
+
+foreach( $visits as $label => [ , $body ] ) {
+
+	preg_match( '#<nav class="site-nav".*?</nav>#s', $body, $headerNav );
+	preg_match( '#<footer class="site-footer">.*?<nav .*?</nav>#s', $body, $footerNav );
+	preg_match_all( '#<a href="([^"]*)" aria-current="page"#', ( $headerNav[0] ?? '' ). ( $footerNav[0] ?? '' ), $marked );
+	$menuMarks[$label] = $marked[1];
+	$mains[$label] = substr_count( $body, '<main' );
+	$languages[$label] = preg_match( '#<html lang="([a-z]+)">#', $body, $lang ) === 1 ? $lang[1] : '';
+}
+
+check( 'every page of the fresh site has one main part and says its language: de on the pages of the German visit, en on those of the English one', array_values( array_unique( $mains ) ) === [ 1 ]
+	&& array_values( array_unique( array_map( static fn( string $label ): string => $languages[$label], array_filter( array_keys( $visits ), static fn( string $label ): bool => str_starts_with( $label, 'de_DE' ) ) ) ) ) === [ 'de' ]
+	&& array_values( array_unique( array_map( static fn( string $label ): string => $languages[$label], array_filter( array_keys( $visits ), static fn( string $label ): bool => str_starts_with( $label, 'en_US' ) ) ) ) ) === [ 'en' ] );
+check( '...the menu marks the start page on the start page and the contact page on the contact page, in the header and in the footer, and no entry on the pages that are in no menu',
+	$menuMarks['de_DE /'] === [ '/', '/' ] && $menuMarks['de_DE /contact'] === [ '/contact', '/contact' ] && $menuMarks['en_US /contact'] === [ '/contact', '/contact' ]
+	&& $menuMarks['de_DE /impressum'] === [] && $menuMarks['de_DE /datenschutz'] === [] && $menuMarks['de_DE /gibt-es-nicht'] === [] && $menuMarks['en_US /not-there'] === [] );
 check( '...the imprint holds the sections of the imprint and the privacy policy those of the privacy policy, in both languages, under one h1 and h2s',
 	array_filter( [ 'de_DE /impressum' => 'legal', 'en_US /imprint' => 'legal', 'de_DE /datenschutz' => 'privacy', 'en_US /privacy' => 'privacy' ], static function( string $type, string $label ) use ( $visits ): bool {
 		$body = $visits[$label][1];

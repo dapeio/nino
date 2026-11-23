@@ -8,7 +8,7 @@
 	'label' 					=> 'Contact',
 	'requiresModules' => [ 'forms' ],
 	'routes' 					=> [
-		'GET://contact' => [ 'uri' => '/contact', 'body' => '[template /templates/page-contact]', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
+		'GET://contact' => [ 'uri' => '/contact', 'body' => '[template /templates/page-contact]' ],
 	],
 	'templates' 			=> [ 'page-contact.tpl' ],
 	'suggest' => [
