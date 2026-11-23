@@ -14,7 +14,7 @@ declare(strict_types=1);
  *																C. Markup::layout(): a new tree written as by hand, content that is inline left alone, and the
  *																	 round trip through write() and parse()
  *
- *																The components are those of tests/fixtures/kit/Kit; what the rules say of Basis is tests/basis-rules-smoke.php.
+ *																The components are those of tests/fixtures/kit/Kit; what the rules say of Basis is in the suites of the feature Basis in the catalogue.
  *
  *	Usage: php tests/components-rules-smoke.php
  */

@@ -510,4 +510,18 @@ check( 'the next backup that succeeds deletes what is over the limit of each kin
 $uploadLimit = ninoCall( $appData, $list )[1]['uploadLimit'] ?? null;
 check( 'the list says how large an upload can be: the limit of php, 0 where it names none', $uploadLimit === \Nino\Images::limits()['php'] );
 
+// A feature that is on and has no directory is another case: it has no manifest and owns nothing a run could name. The backup and the restore of the panel go through, and each says in a sentence that the feature is switched on and not installed
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Gone';
+unset( $appData['./nino/features/all'], $appData['./nino/features/missing'], $appData['./nino/features/rejected'] );
+ninoWarnings();
+[ $status ] = $put( $appData, $old. '.php', $archive );
+[ $nowStatus, $nowBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiNow' ] );
+check( 'while a feature is on and its directory is not there, Back up now goes through and the answer says it in one sentence', $status === 200 && $nowStatus === 200 && is_string( $nowBody['id'] ?? null ) === true
+	&& \Nino\Backup::featureRefusal( $appData ) === null && str_contains( (string) ( $nowBody['note'] ?? '' ), 'features/Gone' ) === true && str_contains( (string) $nowBody['note'], 'not installed' ) === true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $nowBody['id'] ] );
+check( '...and so does the restore, with the same sentence', $status === 200 && str_contains( (string) ( $body['note'] ?? '' ), 'features/Gone' ) === true );
+$appData['/nino/modules'] = $modulesBefore;
+unset( $appData['./nino/features/rejected'], $appData['./nino/features/all'], $appData['./nino/features/missing'] );
+@unlink( $dir. '/'. $old. '.php' );
+
 ninoDone( $appData );

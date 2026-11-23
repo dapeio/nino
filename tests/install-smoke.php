@@ -246,8 +246,7 @@ foreach( glob( \Nino\Install\Setup::units()['localepicker']. '/text/*.php' ) ?: 
 		if( str_contains( (string) $key, '/_nino/locale/' ) === true )
 			$pickerNameLines[] = basename( $file ). ' '. $key;
 check( '...since no unit delivers it: the text of the Localepicker unit has no name of a language in it, and reaches every project the languages it has or not', $pickerNameLines === [] );
-// The look is not a choice any more: the standard part of the feature Basis is the look, so this step seeds the
-// bundle with Nino.css and the project's own stylesheet, which stays empty and last
+// The look is not a choice any more: this step seeds the bundle with Nino.css and the project's own stylesheet, which stays empty and last
 check( 'the Setup step seeds the css bundle with the project\'s own stylesheet behind the one of the kernel', $configAfterApply['/nino/html/assets']['/.cache/style.css'] === [
 	'/_nino/Nino.css', '/assets/style.css',
 ] );
@@ -256,11 +255,11 @@ check( '...and the file it names is really in the project, and no theme and no s
 	&& ( $configAfterApply['/nino/html/assets']['/.cache/script.js'] ?? \Nino\AppData::DEFAULTS['/nino/html/assets']['/.cache/script.js'] ) === [ '/_nino/Nino.js' ] );
 // No face is delivered: the page is set in the fonts of the visitor's system
 check( '...and no font is delivered to the project', glob( $sandbox. '/public/fonts/*' ) === [] );
-// The starter site is plain html: no feature is switched on by the wizard, Basis least of all - it is not in the module list, not in the record of
-// the features, and none of its words is in the project
-check( '...and no feature is on: Basis is not in the module list, not in the record of the features, and its words are not in the project',
-	in_array( '\\Nino\\Modules\\Basis', $configAfterApply['/nino/modules'], true ) === false && isset( $configAfterApply['/nino/features'] ) === false
-	&& array_filter( array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/module/basis/' ) === true ) === [] );
+// The starter site is plain html: no feature is switched on by the wizard - the module list names modules of the kernel alone, the record of the
+// features is not there, and no word of a feature is in the project
+check( '...and no feature is on: the module list holds modules of the kernel only, there is no record of the features, and no word of a feature is in the project',
+	array_filter( $configAfterApply['/nino/modules'], static fn( string $class ): bool => \Nino\Features::moduleOwner( basename( str_replace( '\\', '/', $class ) ) ) === null ) === [] && isset( $configAfterApply['/nino/features'] ) === false
+	&& array_filter( array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/feature/' ) === true ) === [] );
 // A script in the project's assets is only ever loaded through a bundle - one
 // that no bundle names is a file that looks like the site's own hook and runs
 // nowhere
@@ -342,7 +341,7 @@ check( '...before any template can create that directory unprotected', strpos( $
 
 check( 'copies base\'s html-header.tpl', \Nino\Filesystem::fileExists( $appData, '/templates/html-header.tpl' ) === true );
 check( 'copies "forms"\'s own mail-header/footer templates', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
-check( 'copies no frame - the header and the footer are written with the starter pages, by the last step - and no template of "navigation" and "localepicker", whose menus the header and the footer of Basis draw',
+check( 'copies no frame - the header and the footer are written with the starter pages, by the last step - and no template of "navigation" and "localepicker", whose menus the header and the footer of a feature draw',
 	\Nino\Filesystem::fileExists( $appData, '/templates/frame-header.tpl' ) === false && \Nino\Filesystem::fileExists( $appData, '/templates/frame-footer.tpl' ) === false
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/html-header-nav.tpl' ) === false && \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-nav.tpl' ) === false
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-localepicker.tpl' ) === false );
@@ -666,7 +665,7 @@ check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1
 
 check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/hero/background.' ) === true
 	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
-// The request as \Nino\init() boots it: the feature Basis the wizard switched on is in the list of the modules, and its components are read from its folders
+// The request as \Nino\init() boots it
 \Nino\Html::init( $appData );
 \Nino\Features::registerComponents( $appData );
 \Nino\Modules\Template::init( $appData );
@@ -2182,7 +2181,7 @@ ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
 check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
 // The style bundle of a fresh starter site, built as a request builds it, with the files of the checkout where the site's root is: the reset, the look of the form and the
-// stylesheet of the site, and no rule of a part of Basis - Basis is off
+// stylesheet of the site, and no rule of the part of a feature - no feature is on, so no group is registered
 $keysBuilt = $keysApp;
 $keysBuilt['./nino/filesystem/path'] = dirname( __DIR__ );
 $keysBuilt['/nino/html/assets'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/html/assets'];
@@ -2194,25 +2193,25 @@ $keysBuilt['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/conf
 \Nino\Features::registerParts( $keysBuilt );
 \Nino\Modules\Assets::doShortcode( $keysBuilt, [ '/.cache/style.css' ] );
 $keysBundle = (string) @file_get_contents( \Nino\Filesystem::path( $keysBuilt, '/.cache/style.css' ) );
-$basisCss = '';
-foreach( glob( dirname( __DIR__ ). '/_nino/Nino/Modules/Basis/groups/*/part/part.css' ) ?: [] as $partCss )
-	$basisCss .= (string) file_get_contents( $partCss );
-// The lines of the parts that are the parts' alone: a line the reset or the site's own stylesheet says as well is no mark of Basis
+$partCss = '';
+foreach( glob( __DIR__. '/fixtures/kit/Kit/groups/*/part/part.css' ) ?: [] as $file )
+	$partCss .= (string) file_get_contents( $file );
+// The lines of the parts that are the parts' alone: a line the reset or the site's own stylesheet says as well is no mark of a feature
 $sharedCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' ). $baseCss;
-$basisRules = array_filter( array_map( 'trim', explode( "\n", $basisCss ) ), static fn( string $line ): bool => strlen( $line ) > 30 && preg_match( '/^[.a-z:][^{]*\{.*\}$/', $line ) === 1 && str_contains( $sharedCss, $line ) === false );
-check( 'the style bundle of a fresh starter site is the reset, the look of the form and the stylesheet of the site: it carries no line of a part of Basis ('. count( $basisRules ). ' lines looked for), and it is at most 22 KB (21422 bytes measured); Nino.css alone is at most 12 KB',
+$partRules = array_filter( array_map( 'trim', explode( "\n", $partCss ) ), static fn( string $line ): bool => strlen( $line ) > 30 && preg_match( '/^[.a-z:][^{]*\{.*\}$/', $line ) === 1 && str_contains( $sharedCss, $line ) === false );
+check( 'the style bundle of a fresh starter site is the reset, the look of the form and the stylesheet of the site: no group of a feature is registered, it carries no line of a part of one ('. count( $partRules ). ' lines of the parts of the test feature looked for), and it is at most 22 KB (21422 bytes measured); Nino.css alone is at most 12 KB',
 	strlen( $keysBundle ) > 15000 && strlen( $keysBundle ) <= 22 * 1024 && str_contains( $keysBundle, '.site-header' ) === true && str_contains( $keysBundle, '.nino-form' ) === true && str_contains( $keysBundle, '--brand-color-1' ) === true
-	&& count( $basisRules ) > 100 && array_filter( $basisRules, static fn( string $line ): bool => str_contains( $keysBundle, $line ) === true ) === []
+	&& \Nino\Components::groups( $keysBuilt ) === [] && count( $partRules ) > 10 && array_filter( $partRules, static fn( string $line ): bool => str_contains( $keysBundle, $line ) === true ) === []
 	&& filesize( dirname( __DIR__ ). '/_nino/Nino.css' ) <= 12 * 1024 );
 $keysApp['/nino/modules'] = \Nino\Filesystem::getFileContent( $keysApp, '/config.php', [] )['/nino/modules'];
 \Nino\Features::registerComponents( $keysApp );
-// The Features panel of the workbench lists Basis as delivered with the kernel and as off, and it cannot be removed
+// The Features panel of the workbench has no feature on a fresh starter site: a feature that stands in the features directory is listed and off
+\Nino\Filesystem::copyDir( __DIR__. '/fixtures/kit/Kit', NINO_FEATURES_DIR. '/Kit' );
+unset( $keysApp['./nino/features/all'] );
 ninoUser( $keysApp, 'dev@example.com' );
 [ $featuresStatus, $featuresBody ] = ninoCall( $keysApp, [ \Nino\Modules\Features\Admin::class, 'apiList' ] );
-$basisRow = array_values( array_filter( (array) ( $featuresBody['features'] ?? [] ), static fn( array $row ): bool => ( $row['key'] ?? '' ) === 'basis' ) )[0] ?? [];
-[ $removeStatus, $removeBody ] = ninoCall( $keysApp, [ \Nino\Modules\Features\Admin::class, 'apiRemove' ], [ 'key' => 'basis' ] );
-check( 'the Features panel lists Basis as delivered with the kernel and as off, where a fresh starter site has it, and refuses to remove it', $featuresStatus === 200 && ( $basisRow['shipped'] ?? null ) === true && ( $basisRow['active'] ?? null ) === false
-	&& $removeStatus === 400 && ( $removeBody['code'] ?? '' ) === 'features_remove_shipped' );
+check( 'the Features panel of a fresh starter site lists the feature of the features directory and has it off, and refuses nothing', $featuresStatus === 200
+	&& array_column( (array) ( $featuresBody['features'] ?? [] ), 'active', 'key' ) === [ 'kit' => false ] && ( $featuresBody['rejected'] ?? null ) === [] );
 $starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$keysApp ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
 	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $keysApp ) === 0 );

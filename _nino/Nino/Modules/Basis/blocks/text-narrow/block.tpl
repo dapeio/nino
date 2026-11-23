@@ -1,8 +1,0 @@
-[section-wrap id="text" ground="base"]
-	[section-row width="narrow"]
-		[section-col]
-			[section-title ~title]
-			[text ~text]
-		[/section-col]
-	[/section-row]
-[/section-wrap]

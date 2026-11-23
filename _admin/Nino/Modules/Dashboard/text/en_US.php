@@ -11,6 +11,7 @@ return [
 	'[[/_admin/dashboard/label/all]]'				=> 'Show all',
 	'[[/_admin/dashboard/empty/elements]]'	=> 'No element types yet.',
 	'[[/_admin/dashboard/empty/activity]]'	=> 'No entries yet.',
+	'[[/_admin/dashboard/notice/feature-missing]]'	=> '"%s" is switched on but not installed: the feature is in the catalogue. Install it there; while it is missing its components are not drawn.',
 	'[[/_admin/dashboard/notice/mail]]'	=> 'Mail delivery has been failing since %s (failed attempts: %s). Check mail() on the server, the Mailer settings or the recipient address.',
 	'[[/_admin/dashboard/notice/untranslated]]'	=> 'Texts not translated yet (%s) in %s.',
 	'[[/_admin/dashboard/notice/legal-unknown]]'	=> 'There is no value for the detail %s in the section “%s” (%s). Add it under Texts or take the detail out of the section.',

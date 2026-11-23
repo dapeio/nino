@@ -1011,9 +1011,6 @@
 			if( feature.circle === true )
 				notes.push( { text : Nino.content.getText('/_admin/features/label/circle'), bad : false } );
 
-			if( feature.shipped === true )
-				notes.push( { text : Nino.content.getText('/_admin/features/label/shipped'), bad : false } );
-
 			// What stands in the way of switching it on, one line each - the
 			// kernel's own words, which is where the check lives
 			feature.problems.forEach( function( problem ) { notes.push( { text : problem, bad : true } ) } );
@@ -1044,7 +1041,7 @@
 		 *	not loaded - or, for a feature that is switched on all the same, that it runs
 		 *	unfinished - and the reason as the kernel worded it - text, never markup
 		 *
-		 *	@param		{Object}	entry				An entry of 'rejected' in features/list
+		 *	@param		{Object}	entry				An entry of 'rejected' in features/list; one that is 'missing' has no directory at all and says to install the feature
 		 *
 		 *	@return		{Object}
 		 */
@@ -1056,10 +1053,12 @@
 				maturity	: '',
 				category	: '',
 				version		: '',
-				state			: Nino.admin.features._stateWord( 'refused' ),
+				state			: Nino.admin.features._stateWord( entry.missing === true ? 'offer' : 'refused' ),
 				stateKind	: 'refused',
 				description	: '',
-				notes			: [ { text : Nino.content.getText( entry.active === true ? '/_admin/features/label/rejected-active' : '/_admin/features/label/rejected' ), bad : true }, { text : entry.reason, bad : true } ],
+				notes			: entry.missing === true
+					? [ { text : Nino.adminUi.format( Nino.content.getText('/_admin/features/label/missing'), entry.dir ), bad : true } ]
+					: [ { text : Nino.content.getText( entry.active === true ? '/_admin/features/label/rejected-active' : '/_admin/features/label/rejected' ), bad : true }, { text : entry.reason, bad : true } ],
 				entry			: entry,
 			};
 		},
@@ -1449,8 +1448,7 @@
 
 		/**
 		 *	What a row offers, at its end and small: Activate and Uninstall on an inactive feature -
-		 *	Activate while nothing stands in the way, and Uninstall not for one that comes with Nino,
-		 *	the dangerous one last -, Update and Deactivate on an active one, Install or Update on an
+		 *	Activate while nothing stands in the way, the dangerous one last -, Update and Deactivate on an active one, Install or Update on an
 		 *	offer, the archive to unpack by hand where nothing can be written, Deactivate on a refused
 		 *	manifest that runs, and Set up on an application that is not set up, the way on to what it
 		 *	brought once it is
@@ -1480,9 +1478,7 @@
 				// /nino/modules, so its directory is not something to delete from
 				// under the autoloader. Switching it off first is one click and
 				// says what it is doing
-				// ...except for a feature that comes with Nino: it is a module of the kernel, there is no directory of the project's to delete
-				if( feature.shipped !== true )
-					make( Nino.content.getText('/_admin/features/label/remove'), function( button ) { Nino.admin.features._remove( feature, ctx, button, false ) }, 'danger' );
+				make( Nino.content.getText('/_admin/features/label/remove'), function( button ) { Nino.admin.features._remove( feature, ctx, button, false ) }, 'danger' );
 			}
 
 			if( row.feature !== undefined && row.feature.active === true ) {
@@ -1903,6 +1899,8 @@
 						Array.isArray( feature.data ) === true && feature.data.length > 0 ? Nino.content.getText('/_admin/features/confirm/kept-data') : '',
 						feature.unit === true ? Nino.content.getText('/_admin/features/confirm/kept-unit') : '',
 					].filter( function( line ) { return line !== '' } ) },
+					// The features that require it stay and cannot be switched on until it is back
+					...( Array.isArray( feature.dependents ) === true && feature.dependents.length > 0 ? [ { title : Nino.content.getText('/_admin/features/confirm/dependents'), lines : feature.dependents } ] : [] ),
 				],
 				yes				: Nino.content.getText('/_admin/features/confirm/remove-title'),
 				no				: Nino.content.getText('/_admin/common/label/cancel'),
@@ -2330,7 +2328,7 @@
 
 		/**
 		 *	One line of facts under the name of a feature: how far along it is, the category, the version
-		 *	and the one on disk where that differs, what it requires and that it comes with Nino
+		 *	and the one on disk where that differs, and what it requires
 		 *
 		 *	@param		{Object}	feature
 		 *
@@ -2343,7 +2341,6 @@
 				feature.category ? Nino.admin.features._categoryLabel( feature.category ) : '',
 				Nino.adminUi.format( Nino.content.getText('/_admin/features/label/version'), Nino.admin.features._versionText( feature.version, feature.installed, '' ) ),
 				feature.requires.length > 0 ? Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) ) : '',
-				feature.shipped === true ? Nino.content.getText('/_admin/features/label/shipped') : '',
 			].filter( Boolean ).join( ' · ' );
 		},
 
@@ -2598,8 +2595,7 @@
 
 			if( feature.active === false ) {
 
-				if( feature.shipped !== true )
-					danger = make( Nino.content.getText('/_admin/features/label/remove'), function( button ) { Nino.admin.features._remove( feature, ctx, button, true ) }, 'danger' );
+				danger = make( Nino.content.getText('/_admin/features/label/remove'), function( button ) { Nino.admin.features._remove( feature, ctx, button, true ) }, 'danger' );
 
 				// The one thing the view is for. Where something stands in the way - the notices above say what - it is held back
 				// for good, and so no action of the view lets it go

@@ -13,8 +13,8 @@ declare(strict_types=1);
  *													 order the standard parts of the groups go into the style bundle, and in the places blocks are read from
  *
  *											The features are the two test features of the kernel (tests/fixtures/kit/Kit and tests/fixtures/rider/Addon, which
- *											requires it) and small ones the run writes below its features directory. What the rules say of Basis, the feature
- *											the kernel delivers, is tests/basis-*-smoke.php.
+ *											requires it) and small ones the run writes below its features directory. The rules as they hold for Basis are tested in the suites
+ *											of the feature Basis in the catalogue.
  *
  *	Usage: php tests/requires-smoke.php
  */
@@ -233,7 +233,7 @@ check( 'the root of the words of a feature that stands below features/ is /featu
 
 echo "\nA feature stands after the features it requires\n";
 
-$entry = static fn( string $key, array $requires = [], bool $shipped = false ): array => [ 'key' => $key, 'requires' => $requires, 'shipped' => $shipped ];
+$entry = static fn( string $key, array $requires = [] ): array => [ 'key' => $key, 'requires' => $requires ];
 $list = [ $entry( 'a', [ 'c' ] ), $entry( 'b' ), $entry( 'c', [ 'd' ] ), $entry( 'd' ), $entry( 'e', [ 'zz' ] ) ];
 $keys = static fn( array $manifests ): array => array_values( array_map( static fn( array $manifest ): string => $manifest['key'], $manifests ) );
 
@@ -259,9 +259,6 @@ check( 'ordered(): the order of the files does not enter - the same features in 
 		}
 		return $keys( \Nino\Features::ordered( [ $list[3], $list[2], $list[0], $list[1] ] ) ) === [ 'd', 'c', 'a', 'b' ];
 	} )() );
-
-check( 'ordered(): a feature the kernel delivers is waited for by every feature that is not one itself, and by none of the delivered',
-	$keys( \Nino\Features::ordered( [ $entry( 'a' ), $entry( 'b', [], true ), $entry( 'c', [], true ), $entry( 'd' ) ] ) ) === [ 'b', 'c', 'a', 'd' ] );
 
 $addonFirst = reqBoot( [ 'addon', 'kit' ] );
 $problems = ninoWarnings();

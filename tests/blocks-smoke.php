@@ -11,7 +11,7 @@ declare(strict_types=1);
  *											D. what is kept: the cache of what was read, the log that says it once, a file that changed
  *											E. variants: block.json names them, the register holds their values, a tree is told its variant and is put into another
  *
- *											The blocks are those of tests/fixtures/kit/Kit; what is told of the eight of Basis is tests/basis-blocks-smoke.php.
+ *											The blocks are those of tests/fixtures/kit/Kit; what is told of the eight of Basis is in the suites of the feature Basis in the catalogue.
  *
  *	Usage: php tests/blocks-smoke.php
  */

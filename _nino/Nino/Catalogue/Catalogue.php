@@ -655,8 +655,6 @@ namespace Nino {
 		 *						in the catalogue in a version that fits)
 		 *	- 'local'	the version on disk, null when not there
 		 *	- 'active'	whether the local one is active (a feature; a theme and a package of blocks are never)
-		 *	- 'shipped'	whether the local one is delivered with the kernel: it is 'current' whatever
-		 *						the catalogue lists, and install() refuses it
 		 *	- 'needs'	what is not there that the package asks for, as a hint: 'features' (their keys: they are
 		 *						installed with it where the catalogue lists them) and 'fonts' (their slugs: a font is
 		 *						never installed with a package, and a package is installed without it)
@@ -702,7 +700,6 @@ namespace Nino {
 				$offer['fits']		= $best !== null;
 				$offer['local']		= $feature === true ? ( $installed[$key]['version'] ?? null ) : ( $packages[$key] ?? null );
 				$offer['active']	= $feature === true ? ( $installed[$key]['active'] ?? false ) : false;
-				$offer['shipped']	= $feature === true && ( $installed[$key]['shipped'] ?? false ) === true;
 
 				$needs = [ 'features' => [], 'fonts' => [] ];
 				$blocked = [];
@@ -723,14 +720,11 @@ namespace Nino {
 				$offer['needs']		= $needs;
 				$offer['blocked']	= $feature === true ? [] : $blocked;
 
-				// A feature that is delivered with the kernel is updated with it: the catalogue offers no version of it
-				$offer['state']		= $offer['shipped'] === true
-					? 'current'
-					: ( $best === null || $offer['blocked'] !== []
-						? 'incompatible'
-						: ( $offer['local'] === null
-							? 'available'
-							: ( version_compare( self::_comparable( $offer['version'] ), self::_comparable( $offer['local'] ) ) > 0 ? 'upgrade' : 'current' ) ) );
+				$offer['state']		= $best === null || $offer['blocked'] !== []
+					? 'incompatible'
+					: ( $offer['local'] === null
+						? 'available'
+						: ( version_compare( self::_comparable( $offer['version'] ), self::_comparable( $offer['local'] ) ) > 0 ? 'upgrade' : 'current' ) );
 
 				$offers[$key] = $offer;
 			}
@@ -1002,10 +996,6 @@ namespace Nino {
 		private static function _plan( array &$appData, array $catalogue, string $kind, string $key, string $version, array $chain ): array|string {
 
 			$feature = $kind === \Nino\Packages::FEATURE;
-
-			// A feature that is delivered with the kernel is updated with it, and nothing in the features directory takes its place
-			if( $feature === true && ( \Nino\Features::get( $appData, $key )['shipped'] ?? false ) === true )
-				return 'the feature "'. $key. '" is delivered with the kernel and is updated with it';
 
 			$noun = match( $kind ) {
 				\Nino\Packages::FEATURE	=> '',

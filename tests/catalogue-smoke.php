@@ -710,7 +710,7 @@ check( 'the highest version this kernel can run is offered, not the highest ther
 check( 'nothing on disk: available', $offers['helper']['state'] === 'available' && $offers['helper']['local'] === null && $offers['helper']['active'] === false && $offers['sample']['state'] === 'available' );
 check( 'a feature no version of which fits is incompatible, shown with its newest version and what it asks for', $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['fits'] === false && $offers['ancient']['nino'] === '^0.9'
 	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['php']['ext'] === [ 'no_such_extension' ] );
-check( 'the offer is the catalogue entry plus fits, local, active, shipped, needs, blocked and state', array_keys( $offers['helper'] ) === [ 'kind', 'key', 'name', 'description', 'version', 'nino', 'php', 'requires', 'archive', 'sha256', 'size', 'released', 'preview', 'category', 'maturity', 'directory', 'fits', 'local', 'active', 'shipped', 'needs', 'blocked', 'state' ] );
+check( 'the offer is the catalogue entry plus fits, local, active, needs, blocked and state', array_keys( $offers['helper'] ) === [ 'kind', 'key', 'name', 'description', 'version', 'nino', 'php', 'requires', 'archive', 'sha256', 'size', 'released', 'preview', 'category', 'maturity', 'directory', 'fits', 'local', 'active', 'needs', 'blocked', 'state' ] );
 
 /*	An application is offered whole or not at all: every one of its features has a
 	version this kernel can run (the rule of offers()), or it stays out	*/
@@ -1115,7 +1115,7 @@ $requests = [];
 	not there at all. Leaving it in the Inactive tab made one intention take
 	two presses.	*/
 check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required', 'switchedOn' ] && $body['pending'] === false && $body['activated'] === true && $body['required'] === []
-	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'shipped', 'requires', 'circle', 'problems', 'components', 'calledIn', 'unit', 'data', 'settings', 'settingsTab' ]
+	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'dependents', 'circle', 'problems', 'components', 'calledIn', 'unit', 'data', 'settings', 'settingsTab' ]
 	&& $body['switchedOn'] === [ [ 'key' => 'extra', 'name' => 'Extra' ] ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === true && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
 check( 'the directory is in place, the archive was fetched once, and the class is in the module list', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )

@@ -62,7 +62,7 @@ namespace Nino {
 
 		// The demo of a group: a template of the feature, drawn as a piece of a page where the knobs of the group are shown. The
 		// longest one is as long as the template of a component (\Nino\Components::demoProblem() asks for it); the six that
-		// the feature of the kernel brings are 1 KB to 3 KB
+		// the feature Basis of the catalogue brings are 1 KB to 3 KB
 		private const string DEMO = 'demo.tpl';
 
 		// What a settings schema may declare a value to be - each one is a
@@ -154,6 +154,9 @@ namespace Nino {
 		// first character
 		private const string ASSET_PATTERN = '/^[A-Za-z0-9_][A-Za-z0-9_.\/-]*\.(?:css|js)$/D';
 
+		// The counter of the warning for a feature that is switched on and not installed (/data/feature-notices.php)
+		private const string MISSING_COUNTER = 'feature-notices';
+
 		private const int MAX_STRING_LENGTH = 1000;
 		private const int MAX_TEXT_LENGTH = 10000;
 		private const int MAX_LINES = 200;
@@ -173,25 +176,10 @@ namespace Nino {
 		}
 
 		/**
-		 *	The directory of the modules of the kernel: a module of it that has a feature.php is a feature that
-		 *	is delivered with the kernel (see all())
-		 *
-		 *	@return 	string
-		 */
-		private static function _shipped(): string {
-
-			return dirname( __DIR__ ). '/Modules';
-		}
-
-		/**
 		 *	Every feature the directory holds, keyed by manifest key and sorted
 		 *	by it - its manifest plus what this installation knows about it:
 		 *
 		 *	- 'dir'				absolute directory
-		 *	- 'shipped'		whether it is delivered with the kernel: a module of the kernel with a
-		 *								feature.php, which is switched on and off like any other, has no
-		 *								directory to remove, and is updated with the kernel and not from the
-		 *								catalogue
 		 *	- 'module'		the class it brings, \Nino\Modules\<Directory>
 		 *	- 'active'		whether that class is listed in '/nino/modules'
 		 *	- 'installed'	the version activate() last recorded, null before the first
@@ -214,19 +202,16 @@ namespace Nino {
 			$features = [];
 			$rejected = [];
 
-			// The kernel's own come first: the key of a feature below features/ that one of them holds is refused
-			$directories = [];
+			$dir = self::dir();
 
-			foreach( [ self::_shipped() => true, self::dir() => false ] as $dir => $shipped )
-				foreach( is_dir( $dir ) === true ? ( scandir( $dir ) ?: [] ) : [] as $entry )
-					$directories[] = [ $dir. '/'. $entry, $entry, $shipped ];
+			foreach( is_dir( $dir ) === true ? ( scandir( $dir ) ?: [] ) : [] as $entry ) {
 
-			foreach( $directories as [ $path, $entry, $shipped ] ) {
+				$path = $dir. '/'. $entry;
 
 				if( $entry[0] === '.' || is_dir( $path ) === false || is_file( $path. '/'. self::MANIFEST ) === false )
 					continue;
 
-				$manifest = self::manifest( $path, $reason, $shipped );
+				$manifest = self::manifest( $path, $reason );
 				if( $manifest === null ) {
 					$rejected[$entry] = (string) $reason;
 					continue;
@@ -242,6 +227,23 @@ namespace Nino {
 			}
 
 			ksort( $features );
+
+			// A class of a feature listed in the modules whose directory is not there: switched on, and not installed - the project was set up when the kernel
+			// carried the feature, or a directory was taken away by hand. Nothing is loaded for it and nothing is overwritten; it is said once for the request,
+			// and the panel lists it with the other directories that are refused
+			$missing = [];
+
+			foreach( (array) ( $appData['/nino/modules'] ?? [] ) as $class )
+				if( preg_match( '/^\\\\?Nino\\\\Modules\\\\([A-Z][A-Za-z0-9]*)$/D', (string) $class, $match ) === 1 && isset( $rejected[ $match[1] ] ) === false && class_exists( '\\Nino\\Modules\\'. $match[1] ) === false ) {
+					$missing[] = $match[1];
+					$rejected[ $match[1] ] = 'there is no directory features/'. $match[1]. ': the feature is switched on and is not installed - install it from the catalogue';
+
+					// Every request meets it, so it is said once an hour, as the kernel says what a page calls that nobody registered (\Nino\Components, \Nino\Feature::count())
+					if( \Nino\Feature::count( $appData, self::MISSING_COUNTER, $match[1], 1, 3600 ) === true )
+						trigger_error( 'Feature '. $match[1]. ' is switched on but its directory '. $dir. '/'. $match[1]. ' is not there - nothing of it is loaded', E_USER_WARNING );
+				}
+
+			$appData['./nino/features/missing'] = $missing;
 
 			// Written the way config.php writes it, with the leading separator -
 			// a hand-edited list without one still names the same class
@@ -260,6 +262,22 @@ namespace Nino {
 			$appData['./nino/features/rejected'] = $rejected;
 
 			return $features;
+		}
+
+		/**
+		 *	The features that are switched on in '/nino/modules' and whose directory is not there, by directory name: a feature that the project
+		 *	had when the kernel delivered it, or one whose directory was removed by hand. They are in rejected() as well, with their reason, and
+		 *	a switch-off by deactivateRefused() takes them out of the list
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Directory names
+		 */
+		public static function missing( array &$appData ): array {
+
+			self::all( $appData );
+
+			return (array) ( $appData['./nino/features/missing'] ?? [] );
 		}
 
 		/**
@@ -289,9 +307,12 @@ namespace Nino {
 		 */
 		public static function moduleOwner( string $name ): ?string {
 
+			// In every spelling of the name: php does not tell \Nino\Modules\LEGAL from \Nino\Modules\Legal, so a folder that is spelt otherwise is the module's name as well,
+			// whether the file system of the server tells them apart or not
 			foreach( [ 'the kernel' => dirname( __DIR__, 2 ), 'the workbench' => dirname( __DIR__, 3 ). '/_admin' ] as $owner => $root )
-				if( is_dir( $root. '/Nino/Modules/'. $name ) === true )
-					return $owner;
+				foreach( @scandir( $root. '/Nino/Modules' ) ?: [] as $entry )
+					if( $entry[0] !== '.' && strcasecmp( $entry, $name ) === 0 && is_dir( $root. '/Nino/Modules/'. $entry ) === true )
+						return $owner;
 
 			return null;
 		}
@@ -316,11 +337,9 @@ namespace Nino {
 		}
 
 		/**
-		 *	The root of the words of a feature, with the slash at its end: /feature/<key>/ for a feature that stands below features/ and
-		 *	/module/<directory in lower case>/ for one the kernel delivers (the key grammar of AGENTS.md: a catalogue feature has its words
-		 *	in /feature/ and a module of the kernel in /module/). What a feature reads of its own words - and what another feature
-		 *	reads of the words of the one it requires - is written <root>navigation/primary, so that the file is the same where the
-		 *	kernel delivers the feature and where it stands in the catalogue. The 'shipped' of it goes with the rest
+		 *	The root of the words of a feature, with the slash at its end: /feature/<key>/ (the key grammar of AGENTS.md: a feature has its
+		 *	words in /feature/ and a module of the kernel in /module/). What a feature reads of its own words - and what another feature
+		 *	reads of the words of the one it requires - is written <root>navigation/primary, so that the root is asked and not spelt out
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					The key of a feature; what has the form of none gets a root under which nothing lies
@@ -330,19 +349,7 @@ namespace Nino {
 		public static function textRoot( array &$appData, string $key ): string {
 
 			// What is no key of a feature has a root under which nothing lies: a key begins with a letter
-			if( preg_match( self::KEY_PATTERN, $key ) !== 1 )
-				return '/feature/-/';
-
-			// The features that are on are the walk of the boot, already made; one that is off is looked for in the list of all
-			$feature = null;
-
-			foreach( self::_listed( $appData ) as $manifest )
-				if( $manifest['key'] === $key )
-					$feature = $manifest;
-
-			$feature ??= self::get( $appData, $key );
-
-			return $feature !== null && $feature['shipped'] === true ? '/module/'. strtolower( basename( $feature['dir'] ) ). '/' : '/feature/'. $key. '/';
+			return preg_match( self::KEY_PATTERN, $key ) !== 1 ? '/feature/-/' : '/feature/'. $key. '/';
 		}
 
 		/**
@@ -461,11 +468,10 @@ namespace Nino {
 		 *
 		 *	@param		string		$dir					The feature directory
 		 *	@param		string|null	&$reason			(reference) Why the manifest was refused, null when it was not
-		 *	@param		bool			$shipped			The directory is a module of the kernel that has a manifest: its name is a module's, as it is there
 		 *
-		 *	@return 	array|null							The manifest with every key present and normalized, plus 'dir', 'module' and 'shipped'
+		 *	@return 	array|null							The manifest with every key present and normalized, plus 'dir' and 'module'
 		 */
-		public static function manifest( string $dir, ?string &$reason = null, bool $shipped = false ): ?array {
+		public static function manifest( string $dir, ?string &$reason = null ): ?array {
 
 			$dir = rtrim( $dir, '/' );
 			$path = $dir. '/'. self::MANIFEST;
@@ -487,7 +493,7 @@ namespace Nino {
 			// panel is \Nino\Modules\<Name>\Admin), is the kernel's and never the feature's:
 			// a directory of that name in either root takes the name
 			$owner = self::moduleOwner( $name );
-			if( $owner !== null && $shipped === false )
+			if( $owner !== null )
 				return $fail( 'the directory name is taken: \\Nino\\Modules\\'. $name. ' is a module of '. $owner. ', which the autoloader serves before a feature\'s' );
 
 			if( is_file( $path ) === false )
@@ -645,7 +651,7 @@ namespace Nino {
 			// own, so a manifest can name no file of another feature, and a file
 			// is a style sheet or a script, never a '..' away from where it is
 			$assets = [];
-			$assetsDir = ( $shipped === true ? '/_nino/Nino/Modules/' : '/features/' ). $name. '/assets/';
+			$assetsDir = '/features/'. $name. '/assets/';
 			foreach( (array) ( $raw['assets'] ?? [] ) as $file ) {
 				if( is_string( $file ) === false || str_starts_with( $file, $assetsDir ) === false
 					|| preg_match( self::ASSET_PATTERN, substr( $file, strlen( $assetsDir ) ) ) !== 1 || str_contains( $file, '..' ) === true )
@@ -674,7 +680,6 @@ namespace Nino {
 			return [
 				'key'					=> $key,
 				'dir'					=> $dir,
-				'shipped'			=> $shipped,
 				'module'			=> $module,
 				'name'				=> $raw['name'],
 				'description'	=> $raw['description'] ?? '',
@@ -782,7 +787,7 @@ namespace Nino {
 					if( $declared['demo'] === '' || ( $appData[\Nino\Components::GROUPS][$group]['feature'] ?? '' ) !== $manifest['key'] )
 						continue;
 
-					$foreign = self::_demoForeign( $appData, $manifest['key'], array_map( 'strval', array_keys( $read['components'] ) ), $declared['demo'], array_keys( $builtOn ), $byKey );
+					$foreign = self::_demoForeign( $appData, $manifest['key'], array_map( 'strval', array_keys( $read['components'] ) ), $declared['demo'], array_keys( $builtOn ) );
 
 					if( $foreign === null )
 						continue;
@@ -799,7 +804,7 @@ namespace Nino {
 		 *	required goes before who requires. Of the rest the
 		 *	one that stands first in '/nino/modules' has it, which also decides two that require each other. The order the features are
 		 *	read in (ordered()) decides nothing, and a requirement the claimants do not have between them - a feature that comes to require a third -
-		 *	moves nothing. A feature the kernel delivers has its name before all: this line goes with 'shipped'
+		 *	moves nothing
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$keys					The keys of the features that bring the name
@@ -820,12 +825,10 @@ namespace Nino {
 				$listed = self::_listed( $appData );
 				$position = [];
 				$requires = [];
-				$delivered = [];
 
 				foreach( $listed as $at => $manifest ) {
 
 					$position[$manifest['key']] ??= $at;
-					$delivered[$manifest['key']] = $manifest['shipped'] === true;
 					$requires[$manifest['key']] = $manifest['requires'];
 				}
 
@@ -844,16 +847,12 @@ namespace Nino {
 					$closure[$key] = $found;
 				}
 
-				$appData['./nino/features/winner'] = [ 'modules' => $modules, 'position' => $position, 'closure' => $closure, 'delivered' => $delivered ];
+				$appData['./nino/features/winner'] = [ 'modules' => $modules, 'position' => $position, 'closure' => $closure ];
 			}
 
 			$state = $appData['./nino/features/winner'];
 			$first = static fn( string $a, string $b ): int => ( $state['position'][$a] ?? PHP_INT_MAX ) <=> ( $state['position'][$b] ?? PHP_INT_MAX );
 			usort( $keys, $first );
-
-			foreach( $keys as $key )
-				if( ( $state['delivered'][$key] ?? false ) === true )
-					return $key;
 
 			foreach( $keys as $key ) {
 
@@ -880,9 +879,6 @@ namespace Nino {
 		 *	stand on it - the register of the components with its groups and the standard parts that follow it, and the places blocks
 		 *	are read from - hand it the list in the order they have always had
 		 *
-		 *	A feature the kernel delivers is waited for by every feature that is not (the same line as in _deliveredNames(): it goes with
-		 *	'shipped', and the order is the one the requirements say)
-		 *
 		 *	@param		array 		$manifests		Features, as manifest() answers them, in the order to keep
 		 *
 		 *	@return 	array										The same features in the order they are read in, with the keys they had
@@ -890,15 +886,10 @@ namespace Nino {
 		public static function ordered( array $manifests ): array {
 
 			$left = [];
-			$delivered = 0;
 
-			foreach( $manifests as $manifest ) {
-
+			foreach( $manifests as $manifest )
 				$left[$manifest['key']] = ( $left[$manifest['key']] ?? 0 ) + 1;
-				$delivered += $manifest['shipped'] === true ? 1 : 0;
-			}
 
-			$left['#'] = $delivered;
 			$unmet = [];
 			$waiting = [];
 
@@ -906,9 +897,6 @@ namespace Nino {
 
 				$unmet[$index] = 0;
 				$waits = array_diff( array_unique( $manifest['requires'] ), [ $manifest['key'] ] );
-
-				if( $manifest['shipped'] === false )
-					$waits[] = '#';
 
 				foreach( $waits as $wait )
 					if( ( $left[$wait] ?? 0 ) > 0 ) {
@@ -935,10 +923,11 @@ namespace Nino {
 				array_splice( $pending, $next, 1 );
 				$ordered[$index] = $manifests[$index];
 
-				foreach( array_merge( [ $manifests[$index]['key'] ], $manifests[$index]['shipped'] === true ? [ '#' ] : [] ) as $done )
-					if( --$left[$done] === 0 )
-						foreach( $waiting[$done] ?? [] as $waits )
-							$unmet[$waits]--;
+				$done = $manifests[$index]['key'];
+
+				if( --$left[$done] === 0 )
+					foreach( $waiting[$done] ?? [] as $waits )
+						$unmet[$waits]--;
 			}
 
 			return $ordered;
@@ -1033,24 +1022,21 @@ namespace Nino {
 		/**
 		 *	The first call of a demo of a component that does not belong to what the demo may call: a component belongs to the feature that
 		 *	has it registered, so that the name of a folder of another feature, a component of its own that was left out, a component of
-		 *	a twin of its own key and the name of a component that a feature it does not stand on owns are all foreign. It may call what is
-		 *	registered for the feature itself, for a feature it is built on and for a feature the kernel delivers - and, while the kernel
-		 *	delivers one, the name of a component of it that nobody has registered, since a feature that is off draws nothing
+		 *	a twin of its own key, the name of a component that a feature it does not stand on owns and a name nobody has registered are all
+		 *	foreign. It may call what is registered for the feature itself and for a feature it is built on
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					The feature the demo is of
 		 *	@param		array 		$own					The names of the components its folders bring that are registered for it
 		 *	@param		string		$demo					The text of the demo
 		 *	@param		array 		$builtOn			The keys of the features it is built on
-		 *	@param		array 		$byKey				The features that are on, by key
 		 *
 		 *	@return 	string|null								The name of the call, null where there is none
 		 */
-		private static function _demoForeign( array &$appData, string $key, array $own, string $demo, array $builtOn, array $byKey ): ?string {
+		private static function _demoForeign( array &$appData, string $key, array $own, string $demo, array $builtOn ): ?string {
 
 			$notes = [];
 			$stack = \Nino\Markup::parse( $demo, \Nino\Components::containers( $appData ), $notes );
-			$delivered = array_keys( array_filter( $byKey, static fn( array $other ): bool => $other['shipped'] === true ) );
 
 			while( $stack !== [] ) {
 
@@ -1060,7 +1046,7 @@ namespace Nino {
 					continue;
 
 				$owner = $appData[\Nino\Components::OWNERS]['names'][$node['n']] ?? null;
-				$allowed = $owner === null ? in_array( $node['n'], self::_deliveredNames(), true ) : ( $owner === $key ? in_array( $node['n'], $own, true ) : in_array( $owner, array_merge( $builtOn, $delivered ), true ) );
+				$allowed = $owner !== null && ( $owner === $key ? in_array( $node['n'], $own, true ) : in_array( $owner, $builtOn, true ) );
 
 				if( $allowed === false )
 					return $node['n'];
@@ -1080,17 +1066,16 @@ namespace Nino {
 		 *	@param		array 		$read					As readComponents() answers it
 		 *	@param		array 		$own					The names of its components that are registered for it
 		 *	@param		array 		$builtOn			The keys of the features it is built on
-		 *	@param		array 		$byKey				The features that are on, by key
 		 *
 		 *	@return 	array										Sentences
 		 */
-		private static function _demosForeign( array &$appData, array $manifest, array $read, array $own, array $builtOn, array $byKey ): array {
+		private static function _demosForeign( array &$appData, array $manifest, array $read, array $own, array $builtOn ): array {
 
 			$said = [];
 
 			foreach( $read['groups'] as $group => $declared ) {
 
-				$foreign = $declared['demo'] === '' ? null : self::_demoForeign( $appData, $manifest['key'], $own, $declared['demo'], $builtOn, $byKey );
+				$foreign = $declared['demo'] === '' ? null : self::_demoForeign( $appData, $manifest['key'], $own, $declared['demo'], $builtOn );
 
 				if( $foreign !== null )
 					$said[] = 'feature "'. $manifest['key']. '", group "'. self::_shown( (string) $group ). '": its '. self::DEMO. ' calls "'. self::_shown( $foreign ). '", which is no component of its feature or of a feature it requires';
@@ -1289,7 +1274,7 @@ namespace Nino {
 		 *	and its components are the feature's, and the part is not put into the style bundle. So is a demo.tpl that is
 		 *	no piece of html+ made of components with texts of its own (\Nino\Components::demoProblem()): the group has no demo.
 		 *	A demo calls the components of its own feature and of the features it is built on - the ones its manifest requires, and those
-		 *	they require - which the caller names; the components of a feature the kernel delivers are called by every demo
+		 *	they require - which the caller names
 		 *
 		 *	@param		string		$dir					The directory of the feature
 		 *	@param		string		$key					Its key, as the manifest says it
@@ -1470,7 +1455,7 @@ namespace Nino {
 						foreach( $components as $name => $clean )
 							$containers[$name] = isset( $clean['offers'] );
 
-						$problem = \Nino\Components::demoProblem( $text, array_unique( array_merge( array_keys( $components ), $builtOn, self::_deliveredNames() ) ), $containers );
+						$problem = \Nino\Components::demoProblem( $text, array_unique( array_merge( array_keys( $components ), $builtOn ) ), $containers );
 						$source = $problem === null ? $text : '';
 					}
 
@@ -1482,33 +1467,6 @@ namespace Nino {
 			}
 
 			return [ 'components' => $components, 'groups' => $groups, 'rejected' => $rejected ];
-		}
-
-		/**
-		 *	The names of the components of the features the kernel delivers, which the demo of any group may call whether they are on or
-		 *	not: a feature that is delivered counts as required by every feature that is not (see ordered(), which says the same), so that
-		 *	the catalogue, whose features do not name it in 'requires', is read as it always was. This line and the one in ordered() go
-		 *	together with 'shipped'
-		 *
-		 *	@return 	array										The names
-		 */
-		private static function _deliveredNames(): array {
-
-			$names = [];
-
-			foreach( @scandir( self::_shipped() ) ?: [] as $module ) {
-
-				if( $module[0] === '.' || is_file( self::_shipped(). '/'. $module. '/'. self::MANIFEST ) === false )
-					continue;
-
-				$path = self::_shipped(). '/'. $module. '/'. self::COMPONENTS;
-
-				foreach( @scandir( $path ) ?: [] as $entry )
-					if( $entry[0] !== '.' && preg_match( \Nino\Components::NAME, $entry ) === 1 && is_dir( $path. '/'. $entry ) === true )
-						$names[] = $entry;
-			}
-
-			return $names;
 		}
 
 		/**
@@ -1610,7 +1568,7 @@ namespace Nino {
 			$refused = [];
 			self::_renderers( $feature, $read['components'], $refused );
 
-			$problems = array_merge( $unread, array_values( $read['rejected'] ), array_values( $refused ), self::_demosForeign( $appData, $feature, $read, array_map( 'strval', array_diff( array_keys( $read['components'] ), array_keys( $refused ) ) ), array_keys( $builtOn ), $byKey ) );
+			$problems = array_merge( $unread, array_values( $read['rejected'] ), array_values( $refused ), self::_demosForeign( $appData, $feature, $read, array_map( 'strval', array_diff( array_keys( $read['components'] ), array_keys( $refused ) ) ), array_keys( $builtOn ) ) );
 
 			// A block of its own that another place has, by the rule of winner(): the reason says whose the key is
 			foreach( \Nino\Blocks::rejected( $appData ) as $where => $why )
@@ -1658,13 +1616,13 @@ namespace Nino {
 				if( $declared['part'] !== true || $manifest === null )
 					continue;
 
-				$standard = ( $manifest['shipped'] === true ? '/_nino/Nino/Modules/' : '/features/' ). basename( $manifest['dir'] ). '/'. self::GROUPS. '/'. $group. '/part/part.css';
+				$standard = '/features/'. basename( $manifest['dir'] ). '/'. self::GROUPS. '/'. $group. '/part/part.css';
 				$asked = [ 'group' => (string) $group, 'feature' => $manifest['key'], 'css' => $standard ];
 				$answer = \Nino\Callbacks::doCallbacks( $appData, \Nino\Components::PARTS, $asked );
 
-				// A stylesheet that is there, below a feature - a folder of features/ or a module of the kernel - or nothing: the bundle is served
+				// A stylesheet that is there, below a feature - a folder of features/ - or nothing: the bundle is served
 				$named = is_array( $answer ) === true && is_string( $answer['css'] ?? null ) === true
-					&& ( $answer['css'] === '' || ( preg_match( '#^/(?:features|_nino/Nino/Modules)/[A-Z][A-Za-z0-9]*/[A-Za-z0-9_][A-Za-z0-9_./-]*\.css$#D', $answer['css'] ) === 1
+					&& ( $answer['css'] === '' || ( preg_match( '#^/features/[A-Z][A-Za-z0-9]*/[A-Za-z0-9_][A-Za-z0-9_./-]*\.css$#D', $answer['css'] ) === 1
 						&& str_contains( $answer['css'], '..' ) === false && is_file( \Nino\Filesystem::path( $appData, $answer['css'] ) ) === true ) );
 
 				if( $named === false ) {
@@ -1737,21 +1695,12 @@ namespace Nino {
 				if( preg_match( '/^\\\\?Nino\\\\Modules\\\\([A-Z][A-Za-z0-9]*)$/D', (string) $class, $match ) !== 1 )
 					continue;
 
-				// A module of the kernel with a manifest first, as all() and the autoloader have it: a directory below features/ that is
-				// named like one is refused there and is no feature of its own
-				$shipped = true;
-				$dir = self::_shipped(). '/'. $match[1];
+				$dir = self::dir(). '/'. $match[1];
 
-				if( is_file( $dir. '/'. self::MANIFEST ) === false ) {
+				if( is_file( $dir. '/'. self::MANIFEST ) === false )
+					continue;
 
-					$shipped = false;
-					$dir = self::dir(). '/'. $match[1];
-
-					if( is_file( $dir. '/'. self::MANIFEST ) === false )
-						continue;
-				}
-
-				$manifest = self::manifest( $dir, $reason, $shipped );
+				$manifest = self::manifest( $dir, $reason );
 
 				if( $manifest !== null )
 					$listed[] = $manifest;
@@ -2501,8 +2450,7 @@ namespace Nino {
 		 *	the project's now, and putting the same feature back finds its
 		 *	settings where it left them.
 		 *
-		 *	Refused for a feature that is delivered with the kernel (a module of it with a
-		 *	manifest, 'shipped'), and for an active feature. Its class is listed in
+		 *	Refused for an active feature. Its class is listed in
 		 *	'/nino/modules', so removing the directory would leave the
 		 *	autoloader looking for a class that is not there - switch it off
 		 *	first, which is one click and says what it is doing. Made under the
@@ -2542,9 +2490,6 @@ namespace Nino {
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
 				return 'unknown feature "'. $key. '"';
-
-			if( $feature['shipped'] === true )
-				return 'feature "'. $key. '" is delivered with the kernel and has no directory of its own to remove';
 
 			if( $feature['active'] === true )
 				return 'feature "'. $key. '" is active - switch it off before removing it';

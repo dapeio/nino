@@ -84,7 +84,7 @@ A file a unit cannot copy - a target that is not writable - ends the step with a
 
 ### The Look
 
-Not a choice, and not a step: the starter site is plain html with a stylesheet of its own, drawn by the kernel alone, and every project starts from that. No feature is switched on for it - Basis, the feature that comes with the kernel, stays off until a project switches it on in the **Features** panel or an application brings it. The base unit copies the stylesheet, the last step the two frames with the pages:
+Not a choice, and not a step: the starter site is plain html with a stylesheet of its own, drawn by the kernel alone, and every project starts from that. No feature is switched on for it - Basis, a feature of the catalogue, is not part of it: a project gets it in the **Features** panel or with an application. The base unit copies the stylesheet, the last step the two frames with the pages:
 
 | File | What it is |
 |---|---|
@@ -104,7 +104,7 @@ The order in the css bundle is the whole contract, and each layer owns one slot 
 
 ```
 _nino/Nino.css              the reset: the tokens --brand-... and --page-..., the elements at rest
-features and modules        the stylesheets they add, in the order they add them - the standard parts of Basis among them, where it is on
+features and modules        the stylesheets they add, in the order they add them - the standard parts of a feature among them, where it is on
 assets/style.css            the project's own: the stylesheet of the starter site
 ```
 

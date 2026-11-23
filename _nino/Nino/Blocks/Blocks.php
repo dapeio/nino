@@ -19,8 +19,7 @@ namespace Nino {
 	 *		text/<locale>.json	the words of the sources the template reads with ~name, one file for each language
 	 *		images/<name>.<ext>	optional: the picture of a slot of block.json, svg, webp, png or jpg, at most one for a slot
 	 *
-	 *	Blocks are read from four places: the folder blocks/ of every feature that is on (the ones that come with the kernel
-	 *	among them), the folder blocks/ of the project's private tree, the packages of blocks that are installed
+	 *	Blocks are read from four places: the folder blocks/ of every feature that is on, the folder blocks/ of the project's private tree, the packages of blocks that are installed
 	 *	(private/packages/blocks/<key>/<block>/, see \Nino\Packages; the origin is 'pack:' and the key of the package, the label the name in its
 	 *	pack.json), and the roots that a callback of the hook
 	 *	'/nino/blocks' adds - it is handed a list and answers it with [ 'dir' => the absolute path of a folder of blocks, 'origin'
@@ -404,9 +403,9 @@ namespace Nino {
 		}
 
 		/**
-		 *	The places blocks are read from, in the order the first block of a key wins: the features the kernel delivers, the
-		 *	project's own folder, the installed packages of blocks by their keys, the other features that are on by their keys - each
-		 *	after the features it requires (\Nino\Features::ordered()) - and what the hook adds. A package is a thing the project chose to install: it stands behind what the project wrote itself and before
+		 *	The places blocks are read from, in the order the first block of a key wins: the project's own folder, the installed packages
+		 *	of blocks by their keys, the features that are on by their keys - each after the features it requires
+		 *	(\Nino\Features::ordered()) - and what the hook adds. A package is a thing the project chose to install: it stands behind what the project wrote itself and before
 		 *	the features, so that no feature that is switched on later puts out a block of it. The origin of a package is 'pack:<key>', a name no feature, no
 		 *	project and no root of the hook can have, so that no origin is another's. An entry the hook adds that is no [ 'dir', 'origin' ] of the kind the root has
 		 *	is said once and left out
@@ -420,25 +419,20 @@ namespace Nino {
 
 			$roots = [];
 
-			// The features the kernel delivers first, then the project, then the other features by their keys, each after the features it requires: a block of
-			// the project is never put out of the list by a feature that is switched on later, and none of them puts out one of a feature the kernel delivers
+			// The project first, then the features by their keys, each after the features it requires: a block of
+			// the project is never put out of the list by a feature that is switched on later
 			$features = \Nino\Features::ordered( array_filter( \Nino\Features::all( $appData ), static fn( array $feature ): bool => $feature['active'] === true ) );
 			$content = (string) ( $appData['./nino/filesystem/contentpath'] ?? '' );
 
-			foreach( $features as $key => $feature )
-				if( $feature['shipped'] === true )
-					$roots[] = [ 'origin' => $key, 'label' => $feature['name'], 'dir' => $feature['dir']. '/blocks', 'own' => $feature['dir'], 'rank' => 0 ];
-
 			if( $content !== '' )
-				$roots[] = [ 'origin' => 'project', 'label' => self::PROJECT, 'dir' => $content. self::OWN, 'own' => $content, 'rank' => 1 ];
+				$roots[] = [ 'origin' => 'project', 'label' => self::PROJECT, 'dir' => $content. self::OWN, 'own' => $content, 'rank' => 0 ];
 
 			if( $content !== '' )
 				foreach( self::_packages( $content. self::PACKAGES ) as $package )
-					$roots[] = $package + [ 'rank' => 3 ];
+					$roots[] = $package + [ 'rank' => 2 ];
 
 			foreach( $features as $key => $feature )
-				if( $feature['shipped'] === false )
-					$roots[] = [ 'origin' => $key, 'label' => $feature['name'], 'dir' => $feature['dir']. '/blocks', 'own' => $feature['dir'], 'rank' => 2 ];
+				$roots[] = [ 'origin' => $key, 'label' => $feature['name'], 'dir' => $feature['dir']. '/blocks', 'own' => $feature['dir'], 'rank' => 1 ];
 
 			$given = [];
 			$given = \Nino\Callbacks::doCallbacks( $appData, self::HOOK, $given );
@@ -455,7 +449,7 @@ namespace Nino {
 						$label = $entry['origin'];
 					}
 
-					$roots[] = [ 'origin' => $entry['origin'], 'label' => $label, 'dir' => rtrim( $entry['dir'], '/' ), 'own' => '', 'rank' => 4 ];
+					$roots[] = [ 'origin' => $entry['origin'], 'label' => $label, 'dir' => rtrim( $entry['dir'], '/' ), 'own' => '', 'rank' => 3 ];
 				}
 				else
 					self::_said( $appData, 'hook '. md5( serialize( $entry ) ), 'Blocks: an entry of the hook "'. self::HOOK. '" is no array of an absolute "dir" and an "origin" of lower case letters, digits and hyphens - left out' );
@@ -689,8 +683,8 @@ namespace Nino {
 					$parts = self::_read( $root, $name );
 					$block = is_string( $parts ) === true ? $parts : self::validate( $appData, $name, $parts );
 
-					// One key, one block: the one of the place that stands first of the ranks - the features the kernel delivers, the project,
-					// the other features, the packages, the hook - and, at one rank, the first; of two features the one \Nino\Features::winner() names. The block of a
+					// One key, one block: the one of the place that stands first of the ranks - the project, the
+					// features, the packages, the hook - and, at one rank, the first; of two features the one \Nino\Features::winner() names. The block of a
 					// feature that is on is put out by no package, and by no feature that stands behind it
 					if( is_string( $block ) === false && isset( $blocks[$name] ) === true ) {
 
@@ -699,7 +693,7 @@ namespace Nino {
 						$mine = [ 'origin' => $root['origin'], 'label' => $root['label'] ] + $block;
 						$win = null;
 
-						if( $root['rank'] === 2 && $ranks[$name] === 2 ) {
+						if( $root['rank'] === 1 && $ranks[$name] === 1 ) {
 
 							$held[$name][$root['origin']] = $mine;
 							$win = \Nino\Features::winner( $appData, array_keys( $held[$name] ) );
@@ -736,7 +730,7 @@ namespace Nino {
 					$blocks[$name] = [ 'origin' => $root['origin'], 'label' => $root['label'] ] + $block;
 					$ranks[$name] = $root['rank'];
 
-					if( $root['rank'] === 2 )
+					if( $root['rank'] === 1 )
 						$held[$name][$root['origin']] = $blocks[$name];
 				}
 

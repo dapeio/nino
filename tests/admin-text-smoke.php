@@ -13,6 +13,9 @@ declare(strict_types=1);
  *	Usage: php tests/admin-text-smoke.php
  */
 
+// The one feature of the run is the test feature of the kernel, which the scans read the components of
+define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/kit' );
+
 require __DIR__. '/harness.php';
 
 /**
@@ -860,8 +863,8 @@ echo "\n";
 
 // Both scans and the lists of where a slot is used read what a template names as
 // the source of a component, which takes the components' registry: a project has
-// the register of the components of Basis, which the sandbox registers itself
-$appData['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
+// the register of the components of the test feature, which the sandbox registers itself
+$appData['/nino/modules'] = [ '\\Nino\\Modules\\Kit' ];
 \Nino\Features::registerComponents( $appData );
 
 echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
@@ -1032,34 +1035,34 @@ foreach( [ '/template/page-alpha/intro/title', '/template/common/form/submit' ] 
 
 // --- the texts a component names as its source -------------------------------
 //
-// A page of the components of Basis names its texts as the source of a component,
-// in no fill: [text /template/page-delta/cards/one-text], or by ~name, which the
+// A page of the components of the test feature names its texts as the source of a component,
+// in no fill: [prose /template/page-delta/cards/one-text], or by ~name, which the
 // template and the id of the section above the call make a key of. The scan reads
 // those calls too, as the rendering finds them - the ones inside a card or a loop
 // among them - and a source is a key where it begins with a slash or is ~name and
 // the component takes a text. A name of a field of the element, a fixed text="..."
 // and a loop's source have no key to look up
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-delta.tpl', implode( "\n", [
-	'[section-wrap id="intro"][section-row][section-col]',
-	'	[section-title ~title]',
-	'	[section-subtitle ~sub-title]',
-	'[/section-col][/section-row][/section-wrap]',
-	'[section-wrap][section-row]',
-	'[section-col variant="card"]',
-	'	[image /template/page-delta/cards/one-picture]',
-	'	[section-title /template/page-delta/cards/one-title]',
-	'	[text /template/page-omega/cards/one-text format="inline"]',
-	'	[button /template/common/button/more text="Fixed words" href="/more"]',
-	'[/section-col]',
+	'[band-wrap id="intro"][band-row][band-col]',
+	'	[band-title ~title]',
+	'	[band-subtitle ~sub-title]',
+	'[/band-col][/band-row][/band-wrap]',
+	'[band-wrap][band-row]',
+	'[band-col variant="card"]',
+	'	[pic /template/page-delta/cards/one-picture]',
+	'	[band-title /template/page-delta/cards/one-title]',
+	'	[prose /template/page-omega/cards/one-text format="inline"]',
+	'	[lever /template/common/button/more text="Fixed words" href="/more"]',
+	'[/band-col]',
 	'[elements /deltas sort="title"]',
-	'	[section-col variant="card"]',
-	'		[section-title .title]',
-	'		[text .summary]',
-	'		[text /template/page-delta/stack/one-text]',
-	'	[/section-col]',
+	'	[band-col variant="card"]',
+	'		[band-title .title]',
+	'		[prose .summary]',
+	'		[prose /template/page-delta/stack/one-text]',
+	'	[/band-col]',
 	'[/elements]',
-	'[text /template/[[/nino/http/response/locale]]/dynamic/text]',
-	'[/section-row][/section-wrap]',
+	'[prose /template/[[/nino/http/response/locale]]/dynamic/text]',
+	'[/band-row][/band-wrap]',
 ] ) );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
 $componentRows = array_column( $body['missing'], null, 'key' );
@@ -1090,11 +1093,11 @@ foreach( [ '/template/page-omega/cards/one-text', '/template/page-delta/intro/ti
 // A link a component names by ~name is a text key as well - its value is an address the text files hold - and the scan lists it; a picture's
 // slot is a place of the Images panel and none
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-link.tpl', implode( "\n", [
-	'[section-wrap id="intro"][section-row][section-col]',
-	'	[button ~knopf href="~ziel"]',
-	'	[section-title text="Fixed" href="~titel-ziel"]',
-	'	[image ~foto alt="~foto-alt"]',
-	'[/section-col][/section-row][/section-wrap]',
+	'[band-wrap id="intro"][band-row][band-col]',
+	'	[lever ~knopf href="~ziel"]',
+	'	[band-title text="Fixed" href="~titel-ziel"]',
+	'	[pic ~foto alt="~foto-alt"]',
+	'[/band-col][/band-row][/band-wrap]',
 ] ) );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
 check( 'a link that a component names by ~name is a row of the scan like its text, and a picture\'s slot is none', $status === 200
@@ -1243,14 +1246,14 @@ unlink( $sandbox. '/private/templates/scan-fixture-img.tpl' );
 // panel warns about: an image uploaded to a slot no page shows never appears
 
 $usageTemplates = [
-	'usage-page' 	=> '<section>[image /use/hero alt=""]</section>[template /templates/usage-part][section-wrap image="/use/viauri"][/section-wrap][section-wrap id="band" image="~photo"][/section-wrap]',
-	'usage-part' 	=> '<p>[image /use/inner alt="[[/use/alt]]"]</p>[template /templates/usage-deeper][section-wrap id="deep" image="~picture"][/section-wrap]',
-	'usage-deeper' => '[image /use/deep]',
-	'usage-orphan' => '[image /use/orphan]',
-	'usage-loop' 	=> '[image /use/loop][template /templates/usage-loop][template /templates/usage-loop2]',
+	'usage-page' 	=> '<section>[pic /use/hero alt=""]</section>[template /templates/usage-part][band-wrap image="/use/viauri"][/band-wrap][band-wrap id="band" image="~photo"][/band-wrap]',
+	'usage-part' 	=> '<p>[pic /use/inner alt="[[/use/alt]]"]</p>[template /templates/usage-deeper][band-wrap id="deep" image="~picture"][/band-wrap]',
+	'usage-deeper' => '[pic /use/deep]',
+	'usage-orphan' => '[pic /use/orphan]',
+	'usage-loop' 	=> '[pic /use/loop][template /templates/usage-loop][template /templates/usage-loop2]',
 	'usage-loop2' => '[template /templates/usage-loop]',
-	'usage-de_DE' => '[image /use/german]',
-	'usage-en_US' => '[image /use/english]',
+	'usage-de_DE' => '[pic /use/german]',
+	'usage-en_US' => '[pic /use/english]',
 ];
 foreach( $usageTemplates as $usageName => $usageSource )
 	file_put_contents( $sandbox. '/private/templates/'. $usageName. '.tpl', $usageSource );
@@ -1259,7 +1262,7 @@ $usageRoutesBefore = $appData['/nino/http/routes'] ?? [];
 $appData['/nino/http/routes']['GET://usage'] 	= [ 'uri' => '/usage-page', 'body' => '[template /templates/usage-page]' ];
 $appData['/nino/http/routes']['GET://looped'] = [ 'uri' => '/looped', 'body' => '[template /templates/usage-loop]' ];
 $appData['/nino/http/routes']['GET://lang'] 	= [ 'uri' => '/lang', 'body' => '[template /templates/usage-[[/nino/http/response/locale]]]' ];
-$appData['/nino/http/routes']['POST://usage'] = [ 'uri' => '/usage-post', 'body' => '[image /use/post]' ];
+$appData['/nino/http/routes']['POST://usage'] = [ 'uri' => '/usage-post', 'body' => '[pic /use/post]' ];
 
 $usageText = \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', [] );
 $usageText['[[/_nino/webpage/usage-page/name]]'] = 'Nutzung';
@@ -1302,24 +1305,24 @@ foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'engli
 
 // --- the slots a component names as its source ---------------------------------
 //
-// The other way a page asks for a picture, and the way a page of Basis is written:
-// [image /template/page-delta/cards/one-picture]. A slot that is named and
+// The other way a page asks for a picture, and the way a page of the components is written:
+// [pic /template/page-delta/cards/one-picture]. A slot that is named and
 // not defined is a row of the scan, like a picture hardcoded in the markup; one
 // that exists and is shown only so is used, for the list of where it is - and
 // not "included nowhere", which an image uploaded to it would then wrongly warn of
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-delta.tpl', implode( "\n", [
-	'[section-wrap id="hero" image="~background"][/section-wrap]',
-	'[section-wrap][section-row]',
-	'[section-col variant="card"]',
-	'	[image /template/page-delta/cards/one-picture]',
-	'[/section-col]',
-	'[section-wrap image="/template/page-delta/viauri/picture"][/section-wrap]',
+	'[band-wrap id="hero" image="~background"][/band-wrap]',
+	'[band-wrap][band-row]',
+	'[band-col variant="card"]',
+	'	[pic /template/page-delta/cards/one-picture]',
+	'[/band-col]',
+	'[band-wrap image="/template/page-delta/viauri/picture"][/band-wrap]',
 	'[elements /deltas]',
-	'	[image image focus="top"]',
-	'	[image /template/page-delta/stack/one-picture]',
+	'	[pic image focus="top"]',
+	'	[pic /template/page-delta/stack/one-picture]',
 	'[/elements]',
-	'[image /template/[[/nino/http/response/locale]]/dynamic/picture]',
-	'[/section-row][/section-wrap]',
+	'[pic /template/[[/nino/http/response/locale]]/dynamic/picture]',
+	'[/band-row][/band-wrap]',
 ] ) );
 $namedRoutesBefore = $appData['/nino/http/routes'] ?? [];
 $appData['/nino/http/routes']['GET://delta'] = [ 'uri' => '/delta', 'body' => '[template /templates/page-delta]' ];
@@ -1350,13 +1353,13 @@ $appData['/nino/http/routes'] = $namedRoutesBefore;
 // A slot an attribute names is as much a picture of the page: the picture behind a section. Not the image field of the
 // element in a loop, which is no slot
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-echo.tpl', implode( "\n", [
-	'[section-wrap image="/template/page-echo/cards/one-background" dim]',
-	'	[section-row][section-col][text /template/page-echo/cards/one-text][/section-col][/section-row]',
-	'[/section-wrap]',
+	'[band-wrap image="/template/page-echo/cards/one-background" dim]',
+	'	[band-row][band-col][prose /template/page-echo/cards/one-text][/band-col][/band-row]',
+	'[/band-wrap]',
 	'[elements /deltas]',
-	'	[section-col variant="card"]',
-	'		[image image]',
-	'	[/section-col]',
+	'	[band-col variant="card"]',
+	'		[pic image]',
+	'	[/band-col]',
 	'[/elements]',
 ] ) );
 $appData['/nino/http/routes']['GET://echo'] = [ 'uri' => '/echo', 'body' => '[template /templates/page-echo]' ];
@@ -1526,6 +1529,22 @@ check( 'notices() holds back the legal texts from an account that may not edit e
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
 check( '...and an account that may not edit elements is told nothing of it', $legalNotices( $body ) === [] );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// A feature that is switched on and not installed: one notice for it, the first of all, with the link to the Features panel, and before the notices of the legal texts that the missing feature causes
+$appData['/nino/modules'] = array_merge( $legalModulesBefore, [ '\\Nino\\Modules\\Legal', '\\Nino\\Modules\\Vanished' ] );
+unset( $appData['./nino/features/all'], $appData['./nino/features/missing'], $appData['./nino/features/rejected'] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$missingFirst = array_values( array_filter( $body['notices'] ?? [], static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/feature-missing' ) );
+check( 'a feature that is on and has no directory is the first notice of the dashboard, once, naming it and linking the Features panel - before every notice of the legal texts',
+	count( $missingFirst ) === 1 && ( $body['notices'][0]['text'] ?? '' ) === '/_admin/dashboard/notice/feature-missing' && $missingFirst[0]['values'] === [ 'Vanished' ] && $missingFirst[0]['link'] === '#features'
+	&& count( $legalNotices( $body ) ) > 0 && array_search( $missingFirst[0], $body['notices'], true ) < array_search( $legalNotices( $body )[0], $body['notices'], true ) );
+\Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( '...and an account that may not manage the features is not told of it',
+	array_filter( $body['notices'] ?? [], static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/feature-missing' ) === [] );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+unset( $appData['./nino/features/all'], $appData['./nino/features/missing'], $appData['./nino/features/rejected'] );
+ninoWarnings();
 
 $appData['/nino/modules'] = $legalModulesBefore;
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );

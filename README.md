@@ -35,7 +35,7 @@ Solid HTML, CSS, and JavaScript skills plus basic PHP knowledge are useful for i
 
 The frontend is built from simple HTML-based templates, textfills, shortcodes, and recurring elements. Nino does not impose a ready-made page structure: the visible result remains an individual project.
 
-The feature Basis that comes with Nino, with its base components, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
+The feature Basis from the catalogue, with its base components, provides a quick starting point for conventional websites. Multilingual content, responsive design, performance, and security remain part of the project.
 
 ### `/_admin` — the workbench
 
@@ -70,7 +70,7 @@ The Builder composes a page template out of sections, rows, columns and componen
 * a dedicated template system with shortcodes and a clear separation of HTML and PHP
 * one workbench for developers and editors, with roles, recovery and an optional Builder for `.tpl` files, a feature from the catalogue
 * a file-based content model for textfills and recurring elements
-* a reset, asset bundling, and the frontend base components of the feature Basis
+* a reset and asset bundling; the frontend base components are the feature Basis of the catalogue
 * forms, navigation, language selection, and image processing
 * an imprint and a privacy policy as editable starting content, one element per section, in German and English, with the details of the company put in by placeholders
 * installable features with a manifest, settings and versioned updates, switched on in the workbench - a newsletter and a search among those the [dapeio/nino-features](https://github.com/dapeio/nino-features) catalogue provides

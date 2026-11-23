@@ -1,1 +1,0 @@
-<nav class="[[class]]" aria-label="[[name]]"><details class="header-nav-details"[[open]]><summary class="header-nav-toggle" aria-label="[[toggle]]"><span aria-hidden="true"></span></summary><ul class="header-nav-list">[[entries]]</ul></details></nav>

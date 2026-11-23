@@ -863,11 +863,27 @@ namespace Nino {
 		 */
 		public static function featureRefusal( array &$appData ): ?string {
 
-			$refused = \Nino\Features::rejectedActive( $appData );
+			// A feature that is switched on and has no directory has no manifest to refuse and owns nothing a run could name: the project is backed up as it is
+			$refused = array_diff_key( \Nino\Features::rejectedActive( $appData ), array_flip( \Nino\Features::missing( $appData ) ) );
 
 			return $refused === [] ? null : 'backup refused: the feature in features/'. array_key_first( $refused ). ' is switched on and its manifest is refused ('. reset( $refused ). '), so its data cannot be named';
 		}
 
+
+		/**
+		 *	The one sentence a backup or a restore adds to its answer where a feature is switched on and its directory is not there
+		 *	(see \Nino\Features::missing()): what the archive holds of it is what the project has, and that is no folder
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|null							The sentence, null where every feature that is on is installed
+		 */
+		public static function missingNote( array &$appData ): ?string {
+
+			$missing = \Nino\Features::missing( $appData );
+
+			return $missing === [] ? null : 'the feature '. implode( ', ', array_map( static fn( string $name ): string => 'features/'. $name, $missing ) ). ' is switched on but not installed: its folder is not in the archive';
+		}
 
 		/**
 		 *	Pack the files of a manifest into a tar and compress it: one pass over

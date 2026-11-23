@@ -24,19 +24,15 @@ declare(strict_types=1);
  *											   path, a knob that is a way into the css; what is included
  *											   and when
  *											E. the rule of mixing for a standard part
- *											F. a feature the kernel delivers: a module of the kernel with a
- *											   feature.php - listed, switched on and off, not removed, not
- *											   updated from the catalogue
+ *											F. the Features panel and the catalogue for the feature that is on:
+ *											   what it lists, the templates that call the components, the
+ *											   removal, the offer of an update
  *											G. the boot, in a process of its own; the two ways a feature
  *											   brings components side by side; what it costs
  *
- *											The kernel that is delivered with a feature is made here:
- *											the suite copies _nino/ and _admin/ into a directory of its own,
- *											puts the feature of tests/fixtures/register/ into the copy as a
- *											module of the kernel - a second feature of the same files under
- *											another name - and runs against the copy. No file of the
- *											checkout is added for it, and what is run is the code of the
- *											checkout and the real path a module of the kernel is found by.
+ *											The kernel is copied here: the suite copies _nino/ and _admin/
+ *											into a directory of its own and runs against the copy. No file of
+ *											the checkout is added for it.
  *
  *	Usage: php tests/register-features-smoke.php
  */
@@ -95,10 +91,6 @@ registerCopy( $registerSource. '/_nino', $registerKernel. '/_nino' );
 registerCopy( $registerSource. '/_admin', $registerKernel. '/_admin' );
 mkdir( $registerKernel. '/tests', 0755, true );
 copy( $registerSource. '/tests/harness.php', $registerKernel. '/tests/harness.php' );
-
-// The feature of the fixture twice: as a feature below features/, and - Probe becomes Parcel, probe parcel - as a module of the kernel
-$registerTwin = [ 'Probe' => 'Parcel', 'probe' => 'parcel' ];
-registerCopy( __DIR__. '/fixtures/register/Probe', $registerKernel. '/_nino/Nino/Modules/Parcel', $registerTwin );
 
 define( 'NINO_FEATURES_DIR', $registerWork. '/features' );
 
@@ -1127,96 +1119,17 @@ check( 'a part that breaks all three kinds says each - and a part that cannot be
 echo "\n";
 
 
-// --- F. A feature the kernel delivers ------------------------------------------------------------
+// --- F. The panel and the catalogue --------------------------------------------------------------
 
-echo "A feature that is delivered with the kernel\n";
+echo "The Features panel and the catalogue\n";
 
 // Nothing below features/ but the feature of the fixture
 foreach( scandir( NINO_FEATURES_DIR ) ?: [] as $entry )
 	if( $entry !== '.' && $entry !== '..' && $entry !== 'Probe' )
 		registerRemove( NINO_FEATURES_DIR. '/'. $entry );
 
-$shipped = registerProject( 'register-shipped', [] );
-$shipped['./nino/filesystem/path'] = $registerKernel;
-$all = \Nino\Features::all( $shipped );
-
-// What the copy of the kernel is delivered with: the modules of it that have a feature.php - the twin of the fixture, and any feature the kernel itself delivers
-$delivered = array_map( static fn( string $manifest ): string => (string) ( include $manifest )['key'], glob( $registerKernel. '/_nino/Nino/Modules/*/feature.php' ) ?: [] );
-$listed = array_merge( $delivered, [ 'probe' ] );
-sort( $delivered );
-sort( $listed );
-
-check( 'a module of the kernel with a feature.php is a feature: it is listed beside the ones below features/, with shipped true - and the others with shipped false',
-	isset( $all['parcel'] ) === true && $all['parcel']['shipped'] === true && $all['parcel']['dir'] === $registerKernel. '/_nino/Nino/Modules/Parcel' && $all['parcel']['module'] === '\\Nino\\Modules\\Parcel'
-	&& $all['probe']['shipped'] === false && array_keys( array_filter( $all, static fn( array $feature ): bool => $feature['shipped'] === true ) ) === $delivered && in_array( 'parcel', $delivered, true ) === true && $all['parcel']['active'] === false );
-check( '...with the kernel\'s modules that have no manifest not among them, in the order of the keys: the features the kernel really delivers, and the one this suite puts there', array_keys( $all ) === $listed );
-
-$taken = registerFeature( 'Parcel', [ 'key' => 'parceltwin' ] );
-$mine = registerFeature( 'Mine', [ 'key' => 'parcel' ] );
-$shippedAgain = registerProject( 'register-shipped-two', [] );
-ninoWarnings();
-$allAgain = \Nino\Features::all( $shippedAgain );
-$rejected = \Nino\Features::rejected( $shippedAgain );
-check( 'a directory below features/ named like the module of the kernel is refused, as it is for a module of the kernel that is no feature, and one that claims the key of the delivered feature is refused, naming the directory that holds it',
-	isset( $rejected['Parcel'] ) === true && str_contains( $rejected['Parcel'], 'the directory name is taken' ) === true && isset( $rejected['Mine'] ) === true && str_contains( $rejected['Mine'], 'claims the key "parcel" that the directory Parcel already holds' ) === true
-	&& $allAgain['parcel']['shipped'] === true && isset( $allAgain['parceltwin'] ) === false );
-registerRemove( $taken );
-registerRemove( $mine );
-
-// Switched on and off
-$project = registerProject( 'register-shipped-on', [] );
-$project['./nino/filesystem/path'] = $registerKernel;
-$project['/nino/http/routes'] = [ 'GET://' => [ 'uri' => '/home', 'body' => 'x' ] ];
-\Nino\AppData::writeContentData( $project, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native', '/nino/http/routes' ] );
-check( 'a delivered feature is switched on like any other: its class is listed, it is active, and its components are registered by the next boot - the standard part in the bundle by its path in the kernel',
-	\Nino\Features::activate( $project, 'parcel' ) === true && \Nino\Features::get( $project, 'parcel' )['active'] === true && in_array( '\\Nino\\Modules\\Parcel', $project['/nino/modules'], true ) === true );
-$request = registerBoot( $project );
-$bundle = registerBundle( $request );
-check( '...and draws what the fixture draws of the same files, with the parts in the layer of the components',
-	array_keys( \Nino\Components::components( $request ) ) === [ 'parcel-box', 'parcel-card', 'parcel-line', 'parcel-note' ] && \Nino\Components::groups( $request )['parcel']['feature'] === 'parcel'
-	&& \Nino\Html::renderHtml( $request, strtr( REGISTER_PAGE, [ 'probe' => 'parcel' ] ) ) === strtr( '<section class="probe-box probe-box--size-l" data-mark="box"><p class="probe-line" data-mark="calm">Hi</p></section><i class="probe-note">note</i><article class="probe-card">card</article>', [ 'probe' => 'parcel' ] )
-	&& $request['/nino/html/assets']['/.cache/style.css'] === [ '/_nino/Nino/Modules/Parcel/groups/parcel/part/part.css', '/_nino/Nino/Modules/Parcel/groups/parcel-more/part/part.css' ] && registerLayerOf( $bundle, '.parcel-box { padding' ) === 'nino.components' );
-check( '...with its cache under its own key, and a second request that includes none of its files', is_file( registerCache( $request, 'parcel' ) ) === true && ( static function( array $project ): bool { registerReads(); registerBoot( $project ); return registerReads() === [ [], [] ]; } )( $project ) );
-
-// A directory below features/ named like the delivered feature does not take its place at the boot: it is refused, and the delivered one is registered
-file_put_contents( $registerWork. '/features/Parcel.tmp', '' );
-@unlink( $registerWork. '/features/Parcel.tmp' );
-mkdir( NINO_FEATURES_DIR. '/Parcel', 0755, true );
-file_put_contents( NINO_FEATURES_DIR. '/Parcel/feature.php', '<?php return [ \'key\' => \'parcel\', \'name\' => \'Parcel\', \'version\' => \'9.0.0\' ];' );
-$covered = registerProject( 'register-covered', [ '\\Nino\\Modules\\Parcel' ] );
-$covered['./nino/filesystem/path'] = $registerKernel;
-ninoWarnings();
-$coveredBooted = registerBoot( $covered );
-$said = ninoWarnings();
-check( 'a directory below features/ named like a delivered feature does not cover it at the boot: the delivered feature is registered, with its part in the bundle, and the directory is no feature',
-	array_keys( \Nino\Components::components( $coveredBooted ) ) === [ 'parcel-box', 'parcel-card', 'parcel-line', 'parcel-note' ] && ( $coveredBooted['/nino/html/assets']['/.cache/style.css'][0] ?? '' ) === '/_nino/Nino/Modules/Parcel/groups/parcel/part/part.css'
-	&& $said === [] && \Nino\Features::get( $coveredBooted, 'parcel' )['shipped'] === true && isset( \Nino\Features::rejected( $coveredBooted )['Parcel'] ) === true );
-ninoWarnings();
-registerRemove( NINO_FEATURES_DIR. '/Parcel' );
-
-// Who has a name and a group does not depend on the order the features were switched on in: the delivered feature has them
-$taker = registerFeature( 'Rival' );
-registerGroup( $taker, 'parcel', [ 'label' => 'Rival of parcel' ], '.rival-two { color: red; }' );
-registerComponent( $taker, 'parcel-box', registerSchema( [ 'group' => 'parcel', 'template' => '<r>box of the rival</r>' ] ) );
-registerComponent( $taker, 'rival-two', registerSchema( [ 'group' => 'parcel', 'template' => '<r>two</r>' ] ) );
-registerComponent( $taker, 'rival-one', registerSchema( [ 'group' => 'rival', 'template' => '<r>one</r>' ] ) );
-registerGroup( $taker, 'rival', [ 'label' => 'Rival' ] );
-
-foreach( [ 'the rival switched on first' => [ '\\Nino\\Modules\\Rival', '\\Nino\\Modules\\Parcel' ], 'the delivered feature switched on first' => [ '\\Nino\\Modules\\Parcel', '\\Nino\\Modules\\Rival' ] ] as $what => $modules ) {
-
-	$ordered = registerProject( 'register-order', $modules );
-	$ordered['./nino/filesystem/path'] = $registerKernel;
-	ninoWarnings();
-	$orderedBooted = registerBoot( $ordered );
-	check( 'with '. $what. ' the delivered feature has its group, its name and its part, and the rival has what is its own',
-		\Nino\Components::groups( $orderedBooted )['parcel']['feature'] === 'parcel' && \Nino\Components::groups( $orderedBooted )['parcel']['components'] === [ 'parcel-box', 'parcel-line', 'parcel-note' ]
-		&& \Nino\Html::renderHtml( $orderedBooted, '[parcel-box][/parcel-box][rival-one]' ) === '<section class="parcel-box" data-mark="box"></section><r>one</r>' && isset( \Nino\Components::components( $orderedBooted )['rival-two'] ) === false
-		&& in_array( '/_nino/Nino/Modules/Parcel/groups/parcel/part/part.css', $orderedBooted['/nino/html/assets']['/.cache/style.css'], true ) === true && count( ninoWarnings() ) >= 2 );
-}
-registerRemove( $taker );
-
 // The panel
-$panelApp = registerProject( 'register-shipped-panel', [] );
+$panelApp = registerProject( 'register-panel', [] );
 $panelApp['./nino/filesystem/path'] = $registerKernel;
 $panelApp['/nino/admin/backups'] = false;
 $panelApp['/nino/admin/logs'] = false;
@@ -1229,8 +1142,8 @@ $panelCall = static function( array &$app, string $method, array $data = [] ): a
 
 [ $status, $body ] = $panelCall( $panelApp, 'apiList' );
 $entries = array_column( $body['features'] ?? [], null, 'key' );
-check( 'the Features panel lists a delivered feature with shipped true, an installed one with shipped false', $status === 200 && ( $entries['parcel']['shipped'] ?? null ) === true && ( $entries['probe']['shipped'] ?? null ) === false && $entries['parcel']['active'] === false && $entries['probe']['active'] === true );
-check( '...and the reason a component of a feature that is on is not registered - none where all are', $entries['probe']['components'] === [] && $entries['parcel']['components'] === [] );
+check( 'the Features panel lists the feature that is on as active', $status === 200 && array_keys( $entries ) === [ 'probe' ] && $entries['probe']['active'] === true );
+check( '...and the reason a component of a feature that is on is not registered - none where all are', $entries['probe']['components'] === [] );
 
 // Switching a feature off is asked about with the templates that call its components: the list says them before the switch, the answer of the switch
 // names the components among the shortcodes that stay behind, and a template that calls none of them, a closing tag, a name that only starts like one
@@ -1243,7 +1156,7 @@ $calledApp = registerBoot( $panelApp );
 [ $status, $body ] = $panelCall( $calledApp, 'apiList' );
 $entries = array_column( $body['features'] ?? [], null, 'key' );
 check( 'the list says, for a feature that is on and has components, the templates that call them - by name, sorted, with their number - and an empty answer for the others',
-	$status === 200 && ( $entries['probe']['calledIn'] ?? null ) === [ 'total' => 2, 'templates' => [ 'page-one.tpl', 'page-two.tpl' ] ] && ( $entries['parcel']['calledIn'] ?? null ) === [ 'total' => 0, 'templates' => [] ] );
+	$status === 200 && ( $entries['probe']['calledIn'] ?? null ) === [ 'total' => 2, 'templates' => [ 'page-one.tpl', 'page-two.tpl' ] ] );
 for( $more = 1; $more <= 12; $more++ )
 	\Nino\Filesystem::putFileContent( $calledApp, '/templates/page-more-'. sprintf( '%02d', $more ). '.tpl', '[probe-line]' );
 [ , $body ] = $panelCall( $calledApp, 'apiList' );
@@ -1262,15 +1175,6 @@ $offApp['/nino/modules'] = [];
 $panelCall( $offApp, 'apiList' );
 check( 'the list of the Features panel includes no file of the folders of a feature that is off', registerReads() === [ [], [] ] );
 
-$removal = 'feature "parcel" is delivered with the kernel and has no directory of its own to remove';
-[ $status, $body ] = $panelCall( $panelApp, 'apiRemove', [ 'key' => 'parcel' ] );
-check( 'Remove is refused for a delivered feature, in the panel under a code of its own - 400 - and the directory of the kernel is where it was',
-	$status === 400 && ( $body['code'] ?? '' ) === 'features_remove_shipped' && is_file( $registerKernel. '/_nino/Nino/Modules/Parcel/feature.php' ) === true );
-check( 'the kernel refuses it as well', \Nino\Features::remove( $panelApp, 'parcel' ) === $removal && is_dir( $registerKernel. '/_nino/Nino/Modules/Parcel' ) === true );
-$wasOn = \Nino\Features::activate( $panelApp, 'parcel' );
-[ $status, $body ] = $panelCall( $panelApp, 'apiRemove', [ 'key' => 'parcel' ] );
-check( '...with the feature on, the reason is the one that holds when it is off: it is delivered', $wasOn === true && $status === 400 && ( $body['code'] ?? '' ) === 'features_remove_shipped' && \Nino\Features::remove( $panelApp, 'parcel' ) === $removal );
-check( 'a delivered feature is switched off like any other, and stays where it is', \Nino\Features::deactivate( $panelApp, 'parcel' ) === true && \Nino\Features::get( $panelApp, 'parcel' )['active'] === false && is_file( $registerKernel. '/_nino/Nino/Modules/Parcel/feature.php' ) === true );
 check( 'an ordinary feature is removed as it was', ( static function() use ( &$panelApp, $panelCall ): bool {
 
 	\Nino\Features::deactivate( $panelApp, 'probe' );
@@ -1302,7 +1206,7 @@ $entryOf = static fn( string $key, string $version, array $more = [] ): array =>
 	'key' => $key, 'name' => ucfirst( $key ), 'description' => [ 'en_US' => 'A '. $key, 'de_DE' => 'Ein '. $key ], 'version' => $version, 'nino' => '^2.0', 'php' => [ 'ext' => [] ], 'requires' => [],
 	'directory' => ucfirst( $key ), 'archive' => 'https://catalogue.test/features/'. $key. '-'. $version. '.tar.gz', 'sha256' => hash( 'sha256', $archive ), 'size' => strlen( $archive ), 'released' => '2026-11-13',
 ];
-$json = ninoCatalogue( [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'probe', '9.9.9' ), $entryOf( 'newcomer', '1.0.0' ) ] );
+$json = ninoCatalogue( [ $entryOf( 'probe', '9.9.9' ), $entryOf( 'newcomer', '1.0.0' ) ] );
 openssl_sign( $json, $signature, $privateKey, OPENSSL_ALGO_SHA256 );
 $remote = [ \Nino\Catalogue::DEFAULT_URL => $json, \Nino\Catalogue::DEFAULT_URL. '.sig' => base64_encode( $signature ) ];
 $requests = [];
@@ -1315,26 +1219,12 @@ $catalogueApp['./nino/fetch/stub'] = static function( string $url, array $option
 };
 $fetched = \Nino\Catalogue::fetch( $catalogueApp );
 $offers = \Nino\Catalogue::offers( $catalogueApp, is_array( $fetched ) === true ? $fetched : [ 'packages' => [] ], 'feature' );
-check( 'the catalogue offers no update of a delivered feature: whatever version it lists, the offer is current and says it is delivered - and an installed feature is offered the update as it was',
-	is_array( $fetched ) === true && $offers['parcel']['state'] === 'current' && $offers['parcel']['shipped'] === true && $offers['parcel']['local'] === '1.0.0' && $offers['probe']['state'] === 'upgrade' && $offers['probe']['shipped'] === false && $offers['newcomer']['state'] === 'available' );
+check( 'the catalogue offers the update of an installed feature, whatever else it lists, and the feature it does not have as available',
+	is_array( $fetched ) === true && $offers['probe']['state'] === 'upgrade' && $offers['probe']['local'] === '1.0.0' && $offers['newcomer']['state'] === 'available' );
 $requests = [];
-$installed = \Nino\Catalogue::install( $catalogueApp, 'feature', 'parcel', '9.9.9' );
-check( 'an install of a delivered feature is refused before a byte is downloaded, with the sentence for it - and the one of an installed feature goes on to the download',
-	$installed === 'the feature "parcel" is delivered with the kernel and is updated with it' && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, '.tar.gz' ) === true ) === []
-	&& str_contains( (string) \Nino\Catalogue::install( $catalogueApp, 'feature', 'probe', '9.9.9' ), 'archive' ) === true && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'probe-9.9.9.tar.gz' ) === true ) !== [] );
-check( '...nor does a feature that requires a delivered one place it: the requirement is there, and the feature itself goes to the download', ( static function() use ( $entryOf, &$remote, &$catalogueApp, &$requests, $privateKey ): bool {
-
-	$json = ninoCatalogue( [ $entryOf( 'parcel', '9.9.9' ), $entryOf( 'needy', '1.0.0', [ 'requires' => [ 'parcel' ] ] ) ] );
-	openssl_sign( $json, $signature, $privateKey, OPENSSL_ALGO_SHA256 );
-	$remote[\Nino\Catalogue::DEFAULT_URL] = $json;
-	$remote[\Nino\Catalogue::DEFAULT_URL. '.sig'] = base64_encode( $signature );
-	unset( $catalogueApp['./nino/catalogue'] );
-	$requests = [];
-	$plan = \Nino\Catalogue::install( $catalogueApp, 'feature', 'needy', '1.0.0' );
-
-	return is_string( $plan ) === true && str_contains( $plan, 'archive' ) === true && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'parcel-9.9.9' ) === true ) === []
-		&& array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'needy-1.0.0' ) === true ) !== [];
-} )() );
+$requests = [];
+check( 'an install of an installed feature goes on to the download',
+	str_contains( (string) \Nino\Catalogue::install( $catalogueApp, 'feature', 'probe', '9.9.9' ), 'archive' ) === true && array_filter( $requests, static fn( string $url ): bool => str_contains( $url, 'probe-9.9.9.tar.gz' ) === true ) !== [] );
 
 echo "\n";
 

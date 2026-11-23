@@ -351,7 +351,9 @@ namespace Nino\Modules\Backups {
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'id' => $result ] );
+			$note = \Nino\Backup::missingNote( $appData );
+
+			\Nino\Http::ok( $request, [ 'id' => $result ] + ( $note !== null ? [ 'note' => $note ] : [] ) );
 		}
 
 		/**
@@ -745,7 +747,9 @@ namespace Nino\Modules\Backups {
 			\Nino\Csrf::rotateToken( $appData );
 			unset( $appData['./nino/auth/current'] );
 
-			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) );
+			$note = \Nino\Backup::missingNote( $appData );
+
+			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) + ( $note !== null ? [ 'note' => $note ] : [] ) );
 		}
 
 		/**

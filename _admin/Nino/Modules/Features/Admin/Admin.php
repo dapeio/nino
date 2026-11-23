@@ -187,7 +187,8 @@ namespace Nino\Modules\Features {
 		 *	directory is writable, and the last cached catalogue, if there is
 		 *	one - so the Available tab fills without a request of its own,
 		 *	see \Nino\Catalogue::cached(), and the directories whose manifest
-		 *	was refused with the reason ('rejected', see \Nino\Features::rejected())
+		 *	was refused with the reason ('rejected', see \Nino\Features::rejected()) - and the features that are switched on and have no directory
+		 *	('missing' of an entry, see \Nino\Features::missing())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -213,8 +214,9 @@ namespace Nino\Modules\Features {
 			// runs unfinished, and the panel says so under Active
 			$rejected = [];
 			$running	= \Nino\Features::rejectedActive( $appData );
+			$missing	= \Nino\Features::missing( $appData );
 			foreach( \Nino\Features::rejected( $appData ) as $directory => $reason )
-				$rejected[] = [ 'dir' => (string) $directory, 'reason' => $reason, 'active' => isset( $running[$directory] ) ];
+				$rejected[] = [ 'dir' => (string) $directory, 'reason' => $reason, 'active' => isset( $running[$directory] ), 'missing' => in_array( (string) $directory, $missing, true ) ];
 
 			\Nino\Http::ok( $request, [
 				'dir'					=> self::_dir(),
@@ -427,12 +429,6 @@ namespace Nino\Modules\Features {
 
 			if( $feature === null ) {
 				self::_unknown( $request );
-				return;
-			}
-
-			// A feature that is delivered with the kernel is a module of it, and has no directory of its own
-			if( $feature['shipped'] === true ) {
-				\Nino\Http::fail( $request, 400, 'feature "'. $key. '" is delivered with the kernel and has no directory of its own to remove', 'features_remove_shipped' );
 				return;
 			}
 
@@ -1825,9 +1821,9 @@ namespace Nino\Modules\Features {
 				'installed'		=> $feature['installed'],
 				'active'			=> $feature['active'],
 				'update'			=> $feature['update'],
-				// Delivered with the kernel: switched on and off like the others, with no directory to remove and no update from the catalogue
-				'shipped'			=> $feature['shipped'],
 				'requires'		=> $feature['requires'],
+				// The features that require it, by their names: what cannot be switched on once it is removed - the question before a removal says them
+				'dependents'	=> array_values( array_map( static fn( array $other ): string => \Nino\Features::localized( $other['name'], $locale ), array_filter( \Nino\Features::all( $appData ), static fn( array $other ): bool => in_array( $feature['key'], $other['requires'], true ) === true && $other['key'] !== $feature['key'] ) ) ),
 				// Its requirements lead back to it: a hint of its own, no problem - it can be switched off and removed all the same
 				'circle'			=> \Nino\Features::inCircle( $appData, $feature['key'] ),
 				'problems'		=> $feature['problems'],

@@ -6,18 +6,15 @@ declare(strict_types=1);
  *	install-site-smoke.php	Test of the site the wizard writes: a fresh project set up in ONE language - German once, English once - through the
  *												steps (Setup::apiApply with a list of one language, StarterPages::apply) and then visited with real requests. The starter
  *												site is plain html, drawn by the kernel alone: every page answers 200 with one h1 and one main part in the language of the
- *												site, the menu marks the page that is shown, no template calls a component of Basis, Basis is off, the log has nothing to
+ *												site, the menu marks the page that is shown, no template calls anything but what the kernel registers, no feature is on, the log has nothing to
  *												say, the legal check finds nothing missing, and the style bundle is the reset, the form and the site's own stylesheet.
  *												A site that an application sets up with its own start page is drawn without header and footer, with nothing in the log.
  *
  *	Usage: php tests/install-site-smoke.php
  */
 
-define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-site-features-'. getmypid() );
-mkdir( NINO_FEATURES_DIR, 0755, true );
-register_shutdown_function( static function(): void {
-	@rmdir( NINO_FEATURES_DIR );
-} );
+// The one feature the run has is the test feature of the kernel, which the last project switches on
+define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/kit' );
 
 require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
@@ -116,8 +113,6 @@ function siteVisit( string $sandbox, string $uri ): array {
 	return [ (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ), (string) ( $request['/nino/http/response']['body'] ?? '' ) ];
 }
 
-$basisComponents = array_map( 'basename', glob( dirname( __DIR__ ). '/_nino/Nino/Modules/Basis/components/*', GLOB_ONLYDIR ) ?: [] );
-
 foreach( [ 'de_DE' => [ 'de', [ '/', '/contact', '/impressum', '/datenschutz' ], '/imprint' ], 'en_US' => [ 'en', [ '/', '/contact', '/imprint', '/privacy' ], '/impressum' ] ] as $locale => [ $tag, $uris, $otherLanguage ] ) {
 
 	echo $locale. ": a fresh project in one language\n";
@@ -172,13 +167,16 @@ foreach( [ 'de_DE' => [ 'de', [ '/', '/contact', '/impressum', '/datenschutz' ],
 	preg_match_all( '#<a href="([^"]*)"#', (string) ( preg_match( '#<footer class="site-footer">.*</footer>#s', $visits['/'][1], $footerHtml ) === 1 ? $footerHtml[0] : '' ), $footer );
 	check( 'the footer links the start page, the contact page, the imprint and the privacy policy by the addresses the project has them at', $footer[1] === [ '/', '/contact', $uris[2], $uris[3] ] );
 
-	$templates = [];
-	foreach( glob( $site. '/private/templates/*.tpl' ) ?: [] as $file )
-		if( preg_match_all( '/(?<!\[)\[([a-z][a-z0-9-]*)\b/', (string) file_get_contents( $file ), $calls ) > 0 && array_intersect( $calls[1], $basisComponents ) !== [] )
-			$templates[] = basename( $file );
-	check( 'no template of the project calls a component of Basis, and Basis is off: not in the module list, not in the record of the features, no word of it in the texts', $templates === []
-		&& in_array( '\\Nino\\Modules\\Basis', $config['/nino/modules'], true ) === false && isset( $config['/nino/features'] ) === false
-		&& array_filter( array_keys( include $site. '/private/text/'. $locale. '.php' ), static fn( string $key ): bool => str_starts_with( $key, '[[/module/basis/' ) === true ) === [] );
+	// No feature is on, so no component is registered: a template that called one would leave the call in the page as it is written, so that the pages say it
+	$booted = siteBoot( $site );
+	$left = [];
+	foreach( $visits + [ '404' => $missing ] as $label => [ , $body ] )
+		if( preg_match( '/(?<!\[)\[\/?[a-z][a-z0-9-]*[ \]]/', (string) preg_replace( '#<!--.*?-->|<script\b.*?</script>|<style\b.*?</style>#s', '', $body ) ) === 1 )
+			$left[] = $label;
+	check( 'no page of the project has a call left in it - the templates call no component, and no feature is on: not in the module list, not in the record of the features, no word of a feature in the texts', $left === []
+		&& \Nino\Components::components( $booted ) === []
+		&& array_filter( \Nino\Features::all( $booted ), static fn( array $feature ): bool => $feature['active'] === true ) === [] && isset( $config['/nino/features'] ) === false
+		&& array_filter( array_keys( include $site. '/private/text/'. $locale. '.php' ), static fn( string $key ): bool => str_starts_with( $key, '[[/feature/' ) === true ) === [] );
 
 	$appData = siteBoot( $site );
 	\Nino\Locales::useLocale( $appData, $locale );
@@ -196,19 +194,19 @@ foreach( [ 'de_DE' => [ 'de', [ '/', '/contact', '/impressum', '/datenschutz' ],
 	echo "\n";
 }
 
-echo "The same project with Basis switched on in the Features panel\n";
+echo "The same project with the test feature switched on in the Features panel\n";
 
-$withBasis = siteProject( 'de_DE', false );
-$switching = siteBoot( $withBasis );
-$switched = \Nino\Features::activate( $switching, 'basis' );
-$basisVisit = siteVisit( $withBasis, '/' );
-$built = siteBoot( $withBasis );
+$withKit = siteProject( 'de_DE', false );
+$switching = siteBoot( $withKit );
+$switched = \Nino\Features::activate( $switching, 'kit' );
+$kitVisit = siteVisit( $withKit, '/' );
+$built = siteBoot( $withKit );
 $built['./nino/filesystem/path'] = dirname( __DIR__ );
 \Nino\Modules\Assets::doShortcode( $built, [ '/.cache/style.css' ] );
-$basisBundle = (string) @file_get_contents( \Nino\Filesystem::path( $built, '/.cache/style.css' ) );
-check( 'with Basis switched on the pages of the html site are drawn as they were - one header, one footer, one h1 - and the bundle holds the standard parts of Basis as well: the site\'s own stylesheet is still in it, behind them',
-	$switched === true && $basisVisit[0] === 200 && substr_count( $basisVisit[1], '<header' ) === 1 && substr_count( $basisVisit[1], '<footer' ) === 1 && substr_count( $basisVisit[1], '<h1' ) === 1
-	&& str_contains( $basisBundle, '.header-wrap' ) === true && strlen( $basisBundle ) > 40000 && strpos( $basisBundle, '.header-wrap' ) < strpos( $basisBundle, '.site-header' ) );
+$kitBundle = (string) @file_get_contents( \Nino\Filesystem::path( $built, '/.cache/style.css' ) );
+check( 'with a feature switched on the pages of the html site are drawn as they were - one header, one footer, one h1 - and the bundle holds the standard parts of the feature as well: the site\'s own stylesheet is still in it, behind them',
+	$switched === true && $kitVisit[0] === 200 && substr_count( $kitVisit[1], '<header' ) === 1 && substr_count( $kitVisit[1], '<footer' ) === 1 && substr_count( $kitVisit[1], '<h1' ) === 1
+	&& str_contains( $kitBundle, '.band-wrap' ) === true && strpos( $kitBundle, '.band-wrap' ) < strpos( $kitBundle, '.site-header' ) );
 ninoWarnings();
 echo "\n";
 

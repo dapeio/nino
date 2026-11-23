@@ -35,7 +35,7 @@ Für die Umsetzung sind gute HTML/CSS/JavaScript-Kenntnisse und PHP-Grundkenntni
 
 Das Frontend entsteht aus einfachen HTML-basierten Templates, Textfills, Shortcodes und wiederkehrenden Elementen. Nino gibt keine fertige Seitenstruktur vor: Das sichtbare Ergebnis bleibt ein individuelles Projekt.
 
-Das mit Nino gelieferte Feature Basis mit seinen Basiskomponenten bietet einen schnellen Ausgangspunkt für klassische Webseiten. Mehrsprachige Inhalte, Responsive Design, Performance und Sicherheit bleiben dabei Teil des Projekts.
+Das Feature Basis aus dem Katalog bietet mit seinen Basiskomponenten einen schnellen Ausgangspunkt für klassische Webseiten. Mehrsprachige Inhalte, Responsive Design, Performance und Sicherheit bleiben dabei Teil des Projekts.
 
 ### `/_admin` – die Workbench
 
@@ -70,7 +70,7 @@ Der Builder setzt ein Seitentemplate aus Sections, Zeilen, Spalten und Komponent
 * eigenes Template-System mit Shortcodes und klarer Trennung von HTML und PHP
 * eine Workbench für Entwickler und Redakteure, mit Rollen, Recovery und einem optionalen Builder für `.tpl`-Dateien, einem Feature aus dem Katalog
 * dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
-* ein Reset, Asset-Bundling und die Frontend-Basiskomponenten des Features Basis
+* ein Reset und Asset-Bundling; die Frontend-Basiskomponenten sind das Feature Basis aus dem Katalog
 * Formulare, Navigation, Sprachauswahl und Bildverarbeitung
 * Impressum und Datenschutzerklärung als bearbeitbarer Startinhalt, ein Element je Abschnitt, auf Deutsch und Englisch, mit den Angaben der Firma als Platzhalter
 * installierbare Features mit Manifest, Einstellungen und versionierten Updates, eingeschaltet in der Workbench – Newsletter und Suche darunter, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features)

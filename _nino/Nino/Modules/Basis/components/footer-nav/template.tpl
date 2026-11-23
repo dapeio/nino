@@ -1,1 +1,0 @@
-<nav class="[[class]]" aria-label="[[name]]"><ul>[[entries]]</ul></nav>

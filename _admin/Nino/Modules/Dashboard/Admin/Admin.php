@@ -168,6 +168,12 @@ namespace Nino\Modules\Dashboard {
 			$notices	= [];
 			$failure	= \Nino\Mail::failure( $appData );
 
+			// A feature that is switched on and not installed - the project had it when the kernel delivered it - draws nothing and is said first,
+			// before the notices it causes (the pages of the legal texts that no menu draws): the Features panel has the same sentence
+			if( class_exists( '\\Nino\\Modules\\Features\\Admin' ) === true && ( $everyone === true || \Nino\Auth::checkPermission( $appData, \Nino\Modules\Features\Admin::MANAGE_PERM ) === true ) )
+				foreach( \Nino\Features::missing( $appData ) as $name )
+					$notices[] = [ 'key' => 'feature-missing:'. $name, 'text' => '/_admin/dashboard/notice/feature-missing', 'values' => [ $name ], 'link' => '#features' ];
+
 			if( $failure !== null )
 				$notices[] = [ 'key' => 'mail', 'text' => '/_admin/dashboard/notice/mail', 'values' => [ $failure['since'], (string) $failure['count'] ], 'link' => '' ];
 

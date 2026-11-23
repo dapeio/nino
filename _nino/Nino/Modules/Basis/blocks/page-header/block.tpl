@@ -1,8 +1,0 @@
-[section-wrap id="intro" ground="alt"]
-	[section-row width="narrow"]
-		[section-col]
-			[section-title ~title tag="h1" size="l"]
-			[section-subtitle ~subtitle]
-		[/section-col]
-	[/section-row]
-[/section-wrap]

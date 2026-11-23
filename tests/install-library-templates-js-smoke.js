@@ -213,19 +213,22 @@ const frameMarkup = FRAMES.map( function( frame ) { return fs.readFileSync( path
 check( 'the frames are a header element and a footer element', /^<header class="site-header">/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[0] ), 'utf8' ) )
 	&& /^<footer class="site-footer">/.test( fs.readFileSync( path.join( LIBRARY, FRAMES[1] ), 'utf8' ) ) && /<script\b/.test( frameMarkup ) === false );
 
-/* No template of the library calls a component of Basis: the starter site is drawn by the kernel alone, with Basis off. */
-const basisComponents = fs.readdirSync( path.join( ROOT, '_nino/Nino/Modules/Basis/components' ) );
-const basisCalls = [];
+/* The starter site is drawn by the kernel alone, with no feature on: every call in a template of the library is one the kernel registers - what a project with no feature has as
+   shortcodes - or the [else] of [imagevalues], and none is the call of a component, which a feature brings. */
+const KERNEL_CALLS = [ 'json', 'imagevalues', 'else', 'link', 'assets', 'element', 'elements', 'elementvalues', 'template', 'frame', 'jstext', 'csrf', 'navigation', 'localepicker', 'legal', 'privacy' ];
+const foreignCalls = [];
+let calls = 0;
 
 filesBelow( LIBRARY ).filter( function( file ) { return file.endsWith('.tpl'); } ).forEach( function( file ) {
 	fs.readFileSync( file, 'utf8' ).replace( /(?<!\[)\[([a-z][a-z0-9-]*)\b/g, function( match, name ) {
-		if( basisComponents.includes( name ) === true )
-			basisCalls.push( relative( file )+ ': '+ name );
+		calls++;
+		if( KERNEL_CALLS.includes( name ) === false )
+			foreignCalls.push( relative( file )+ ': '+ name );
 		return match;
 	} );
 } );
 
-check( 'no template of the library calls a component of Basis ('+ basisComponents.length+ ' components looked for)'+ ( basisCalls.length === 0 ? '' : ' - '+ basisCalls.join(', ') ), basisCalls.length === 0 && basisComponents.length > 10 );
+check( 'every call in a template of the library is a call of the kernel, and none the call of a component ('+ calls+ ' calls looked at)'+ ( foreignCalls.length === 0 ? '' : ' - '+ foreignCalls.join(', ') ), foreignCalls.length === 0 && calls > 20 );
 
 const semanticProblems = [];
 publicTemplates.forEach( function( file ) {

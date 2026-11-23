@@ -2,7 +2,7 @@
  *	Nino										A compact filesystembased php framework
  *	nino-ui-previewtools-js-smoke.js	DOM-light checks for Nino.adminUi.previewTools(), the tools of a preview - the page it
  *													shows, the width it is laid out at, Reload - and for the page in a frame being marked by
- *													previewFrame() so that the sticky header of Basis does not stay. Held by structure: what
+ *													previewFrame() so that a sticky header does not stay. Held by structure: what
  *													is named, what reports a change made by hand and what does not.
  *
  *	Usage: node tests/nino-ui-previewtools-js-smoke.js

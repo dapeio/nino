@@ -10,11 +10,11 @@ declare(strict_types=1);
  *																 draws, and refuses what is none of them; check() finds the call that names a menu there is none of
  *															B. \Nino\Components::menus() answers what the calls of a source draw - the menu a call names, the default where it names
  *																 none, the fixed one - for the registered components only
- *															C. \Nino\Modules\Legal::check() reads a menu component of any feature as it read the ones of Basis: a page of the legal texts
+ *															C. \Nino\Modules\Legal::check() reads a menu component of any feature: a page of the legal texts
  *																 that stands in no menu a template outputs is a finding, and the menu a component of the test features draws is an output
  *
  *														The components are those of tests/fixtures/kit/Kit (crown-nav and foot-nav, which name their menu by an attribute) and of
- *														tests/fixtures/rider/Addon (addon-legal, which draws the menu legal). What Legal reads of Basis is tests/basis-legal-smoke.php.
+ *														tests/fixtures/rider/Addon (addon-legal, which draws the menu legal). What Legal reads of Basis is in the suites of the feature Basis in the catalogue.
  *
  *	Usage: php tests/component-menus-smoke.php
  */

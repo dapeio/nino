@@ -1,1 +1,0 @@
-<footer[[id]] class="[[class]]">[[picture]]<div class="footer-wrap-inner">[[content]]</div>[[content:section-row]][[content:footer-legal]]</footer>

@@ -1,1 +1,0 @@
-<header[[id]] class="[[class]]">[[picture]]<div class="header-wrap-inner">[[content:header-logo]][[content:header-nav]][[content:header-actions]][[content]]</div>[[content:section-row]]</header>

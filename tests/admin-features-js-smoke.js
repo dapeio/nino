@@ -192,10 +192,10 @@ const panel 	= Nino.admin.features;
 // deliberately without: a project whose features predate the field is the state the panel has to read well too
 const FEATURES = [
 	{ key : 'old', name : 'Old', description : '', category : 'system', maturity : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
-		shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '', unit : false },
-	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], shipped : false, components : [],
+		components : [], calledIn : { total : 0, templates : [] }, problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '', unit : false },
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], components : [],
 		calledIn : { total : 3, templates : [ 'page-home', 'page-about' ] }, problems : [], settings : [], settingsTab : '', unit : false },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [], shipped : false, components : [ 'component "x" is refused' ], calledIn : { total : 0, templates : [] }, problems : [], unit : true, settings : [
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [], components : [ 'component "x" is refused' ], calledIn : { total : 0, templates : [] }, problems : [], unit : true, settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
 		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
@@ -205,8 +205,8 @@ const FEATURES = [
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
 	], settingsTab : '' },
-	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [ 'bundled' ], shipped : false, components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '', unit : false },
-	{ key : 'bundled', name : 'Bundled', description : '', category : 'system', maturity : '', version : '1.0.0', installed : '1.0.0', active : false, update : false, requires : [], shipped : true, components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '', unit : false },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [ 'bundled' ], components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '', unit : false },
+	{ key : 'bundled', name : 'Bundled', description : '', category : 'system', maturity : '', version : '1.0.0', installed : '1.0.0', active : false, update : false, requires : [], dependents : [ 'Fresh' ], components : [], calledIn : { total : 0, templates : [] }, problems : [], settings : [], settingsTab : '', unit : false },
 ];
 
 // A feature of its own panel: its settings are edited there, and this view says where
@@ -316,10 +316,10 @@ writes.length = 0;
 toInactive();
 check( 'a tab picked is the person\'s own move written into the address, and the list follows', writes[0] === 'go features/@inactive' );
 check( 'Inactive is the same table of the same four columns', rowKeys( mount ) === 'old,fresh,bundled' && byTag( tabContent(), 'th' ).length === 5 && tabContent().attributes['aria-labelledby'] === 'features-tabbutton-inactive' );
-check( 'an inactive row offers Activate, and Uninstall last and in red - not for a feature that comes with Nino, and no Activate where something stands in the way',
+check( 'an inactive row offers Activate, and Uninstall last and in red, and no Activate where something stands in the way',
 	words( row( mount, 'fresh' ) ) === text('/_admin/features/label/activate')+ '|'+ text('/_admin/features/label/remove')
 	&& hasClass( byTag( row( mount, 'fresh' ), 'button' )[1], 'nino-admin-btn-danger' ) && hasClass( byTag( row( mount, 'fresh' ), 'button' )[0], 'nino-admin-btn-danger' ) === false
-	&& words( row( mount, 'old' ) ) === text('/_admin/features/label/remove') && words( row( mount, 'bundled' ) ) === text('/_admin/features/label/activate') );
+	&& words( row( mount, 'old' ) ) === text('/_admin/features/label/remove') && words( row( mount, 'bundled' ) ) === text('/_admin/features/label/activate')+ '|'+ text('/_admin/features/label/remove') );
 check( 'the reasons an activation is refused, and what a feature requires, are read whole under its name', findAll( row( mount, 'old' ), function( el ) { return hasClass( el, 'admin-features-note' ) } ).map( textOf ).join('|')
 	=== text('/_admin/features/label/requires').replace( '%s', 'nowhere' )+ '|'+ FEATURES[0].problems.join('|') );
 
@@ -601,6 +601,16 @@ check( 'an update asks at level big and posts the one action an update is, sayin
 // Uninstall: destructive, says what goes and what stays, then the list is read again and the row after it takes the focus
 toInactive();
 asked.length = 0;
+{
+	// A feature that others require: the question names them, as the ones that cannot be switched on afterwards
+	const keepAnswer = answerWith;
+	answerWith = false;
+	fire( byTag( row( mount, 'bundled' ), 'button' )[1], 'click' );
+	check( 'Uninstall of a feature that other features require names them as a third group of the question, the ones that cannot be switched on afterwards - and one that nobody requires has two',
+		asked[0].options.details.length === 3 && asked[0].options.details[2].title === text('/_admin/features/confirm/dependents') && asked[0].options.details[2].lines.join('|') === 'Fresh' );
+	answerWith = keepAnswer;
+}
+asked.length = 0;
 const uninstall = byTag( row( mount, 'fresh' ), 'button' )[1];
 fire( uninstall, 'click' );
 check( 'Uninstall is the destructive question, titled like the act, with what is deleted and what is kept as the two groups of its details - the directory goes, the settings, the files and the copies of its unit stay',
@@ -644,6 +654,11 @@ check( '...and the focus goes to the row that took its place', rowKeys( mount ) 
 	answer( 200, {} );
 	check( 'it asks, posts the directory alone and says the directory is inactive after the reload', asked[0].level === 'big' && requests[requests.length - 1].action === 'features/deactivate-refused' && requests[requests.length - 1].payload.dir === 'broken'
 		&& kept[kept.length - 1].text === text('/_admin/features/msg/inactive').replace( '%s', 'broken' ) );
+	panel._rejected = [ { dir : 'Gone', reason : 'there is no directory features/Gone', active : true, missing : true } ];
+	panel._renderPanel();
+	check( 'a feature that is switched on and not installed is a row of its own kind: the state "not installed", the sentence that it is in the catalogue with its name in it - and not the reason of the kernel - and Deactivate as its one action',
+		cells( row( mount, 'Gone' ) )[3] === text('/_admin/features/state/offer') && findAll( row( mount, 'Gone' ), function( el ) { return hasClass( el, 'admin-features-note' ) } ).map( textOf ).join('|') === text('/_admin/features/label/missing').replace( '%s', 'Gone' )
+		&& words( row( mount, 'Gone' ) ) === text('/_admin/features/label/deactivate') );
 	panel._rejected = [];
 	panel._renderPanel();
 }

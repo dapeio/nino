@@ -1,1 +1,0 @@
-<div class="[[class]]"[[lang]]>[[value]]</div>

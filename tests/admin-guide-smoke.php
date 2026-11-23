@@ -1113,24 +1113,17 @@ check( 'the chapter has links within itself, and each lands on a heading'. ( $de
 check( 'the agent guide and the panel recipe link to the chapter', str_contains( $read( 'AGENTS.md' ), '(docs/admin-ui.md)' ) === true && str_contains( $read( 'docs/recipes/admin-panel.md' ), '(../admin-ui.md)' ) === true );
 
 // The words for the head and the foot of a page: "Kopfbereich", "Fußbereich" and, for both, "Kopf-/Fußbereich" in German; "Header", "Footer" and "Header/footer" in English. None of the
-// words the workbench and the Basis components show for them is "Rahmen" (but the line round a box, "Rahmenlinie", which is another thing), "Header" or "Footer" in German or "frame" in English
+// words the workbench shows for them is "Rahmen" (but the line round a box, "Rahmenlinie", which is another thing), "Header" or "Footer" in German or "frame" in English. The words of a
+// feature - its components, groups, blocks and texts - are held to the same in the catalogue, in tests/words-smoke.php
 $words = static function( string $locale ) use ( $read ): array {
 	preg_match_all( "/'\\[\\[(\\/_admin\\/common\\/word\\/[a-z-]+)\\]\\]'\\s*=>\\s*'((?:[^'\\\\]|\\\\.)*)'/", $read( '_admin/text/'. $locale. '.php' ), $found, PREG_SET_ORDER );
 	return array_column( $found, 2, 1 );
 };
 $de = $words( 'de_DE' );
 $en = $words( 'en_US' );
-$basis = $root. '/_nino/Nino/Modules/Basis/';
 $shown = [
-	'de' => [ 'workbench frame' => $de['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $de['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $de['/_admin/common/word/frame-footer'] ?? '', 'workbench header' => $de['/_admin/common/word/header'] ?? '', 'workbench footer' => $de['/_admin/common/word/footer'] ?? '',
-		'component header-wrap' => ( include $basis. 'components/header-wrap/component.php' )['label']['de_DE'], 'component footer-wrap' => ( include $basis. 'components/footer-wrap/component.php' )['label']['de_DE'],
-		'group header' => ( include $basis. 'groups/header/group.php' )['label']['de_DE'], 'group footer' => ( include $basis. 'groups/footer/group.php' )['label']['de_DE'],
-		'block header-line' => json_decode( $read( '_nino/Nino/Modules/Basis/blocks/header-line/block.json' ), true )['name']['de_DE'], 'block footer-columns' => json_decode( $read( '_nino/Nino/Modules/Basis/blocks/footer-columns/block.json' ), true )['name']['de_DE'],
-		'feature basis' => ( include $basis. 'feature.php' )['description']['de_DE'], 'basis menu footer' => ( include $basis. 'install/text/de_DE.php' )['[[/module/basis/navigation/footer]]'] ],
-	'en' => [ 'workbench header' => $en['/_admin/common/word/header'] ?? '', 'workbench footer' => $en['/_admin/common/word/footer'] ?? '', 'workbench frame' => $en['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $en['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $en['/_admin/common/word/frame-footer'] ?? '',
-		'component header-wrap' => ( include $basis. 'components/header-wrap/component.php' )['label']['en_US'], 'component footer-wrap' => ( include $basis. 'components/footer-wrap/component.php' )['label']['en_US'],
-		'group header' => ( include $basis. 'groups/header/group.php' )['label']['en_US'], 'group footer' => ( include $basis. 'groups/footer/group.php' )['label']['en_US'],
-		'feature basis' => ( include $basis. 'feature.php' )['description']['en_US'] ],
+	'de' => [ 'workbench frame' => $de['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $de['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $de['/_admin/common/word/frame-footer'] ?? '', 'workbench header' => $de['/_admin/common/word/header'] ?? '', 'workbench footer' => $de['/_admin/common/word/footer'] ?? '' ],
+	'en' => [ 'workbench header' => $en['/_admin/common/word/header'] ?? '', 'workbench footer' => $en['/_admin/common/word/footer'] ?? '', 'workbench frame' => $en['/_admin/common/word/frame'] ?? '', 'workbench frame-header' => $en['/_admin/common/word/frame-header'] ?? '', 'workbench frame-footer' => $en['/_admin/common/word/frame-footer'] ?? '' ],
 ];
 $wrong = [];
 
@@ -1142,8 +1135,8 @@ foreach( $shown['en'] as $where => $text )
 	if( $text === '' || preg_match( '/frame/i', $text ) === 1 )
 		$wrong[] = 'en '. $where. ': '. $text;
 
-check( 'the head and the foot of a page are Kopfbereich, Fußbereich and Kopf-/Fußbereich in German - never Rahmen, Header or Footer - and Header, Footer and Header/footer in English, never a frame, in the workbench and in the Basis components, groups, blocks and description'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ),
-	$wrong === [] && str_contains( $shown['de']['basis menu footer'], 'Fußbereich' ) === true && str_contains( (string) file_get_contents( $basis. 'feature.php' ), 'Haupt, Menü, Fußbereich' ) === true && $de['/_admin/common/word/frame'] === 'Kopf-/Fußbereich' && $en['/_admin/common/word/frame'] === 'Header/footer' && $de['/_admin/common/word/border'] === 'Rahmenlinie' );
+check( 'the head and the foot of a page are Kopfbereich, Fußbereich and Kopf-/Fußbereich in German - never Rahmen, Header or Footer - and Header, Footer and Header/footer in English, never a frame, in the workbench'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ),
+	$wrong === [] && $de['/_admin/common/word/frame'] === 'Kopf-/Fußbereich' && $en['/_admin/common/word/frame'] === 'Header/footer' && $de['/_admin/common/word/border'] === 'Rahmenlinie' );
 
 // The categories of a block that are a side of a page, the last two the kernel lists, are worded as the head and the foot are everywhere else
 check( 'the categories header and footer of a block are the words of the workbench: Kopfbereich and Fußbereich in German, Header and Footer in English',

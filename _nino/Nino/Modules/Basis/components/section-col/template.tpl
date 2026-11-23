@@ -1,1 +1,0 @@
-<div[[id]] class="[[class]]">[[content]]</div>

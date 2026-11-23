@@ -20,8 +20,8 @@ declare(strict_types=1);
  *				 php tests/markup-pages-smoke.php --record=DIR	writes the outputs as fixtures into DIR
  */
 
-defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-markup-pages-features-'. getmypid() );
-is_dir( NINO_FEATURES_DIR ) === true || mkdir( NINO_FEATURES_DIR, 0755, true );
+// The features directory stands in ONE place as well, as its path goes into the version of a bundle too
+defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-markup-pages-features' );
 
 // The site of the pages stands in ONE directory, because its path goes into the version of a bundle, and every run removes it and makes it again: a second run of this suite
 // at the same time - in another copy, or one a person starts - takes the site from under the first, and a page is drawn from files that are not its own. The runs take
@@ -35,6 +35,15 @@ if( $pagesLock === false || flock( $pagesLock, LOCK_EX ) === false ) {
 
 require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
+
+// The one feature of the run is the test feature of the kernel, in a features directory made again for the run: the cases use its components as their material
+\Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
+mkdir( NINO_FEATURES_DIR, 0755, true );
+\Nino\Filesystem::copyDir( __DIR__. '/fixtures/kit/Kit', NINO_FEATURES_DIR. '/Kit' );
+
+// One time for every file, as for the site: the version of a bundle is made of file times
+foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( NINO_FEATURES_DIR. '/Kit', \FilesystemIterator::SKIP_DOTS ) ) as $file )
+	touch( $file->getPathname(), 1767225600 );
 
 /**
  *	The directory the site of the pages is built in: the path goes into the version of a bundle, so it is one
@@ -137,10 +146,10 @@ function pagesSite( bool $tools ): string {
 	\Nino\Elements::insertElement( $appData, '/probe/drei', [ 'title' => 'Drei "quoted" & more', 'body' => '<p>Text drei</p>', 'category' => 'A', 'price' => 3.0 ], '*' );
 
 	foreach( [
-		'probe-empty'				=> '<p class="empty">[[/project/company/general/name]] has [text text="nothing"]</p>',
+		'probe-empty'				=> '<p class="empty">[[/project/company/general/name]] has [prose text="nothing"]</p>',
 		'probe-row'					=> '<li>[[/project/company/general/name]]</li>',
-		'page-x.de_DE'			=> '<main>[text text="Deutsch"]</main>',
-		'page-x.en_US'			=> '<main>[text text="English"]</main>',
+		'page-x.de_DE'			=> '<main>[prose text="Deutsch"]</main>',
+		'page-x.en_US'			=> '<main>[prose text="English"]</main>',
 	] as $name => $template )
 		\Nino\Filesystem::putFileContent( $appData, '/templates/'. $name. '.tpl', $template );
 
@@ -167,11 +176,11 @@ function pagesSite( bool $tools ): string {
  *
  *	@param		string		$sandbox
  *	@param		string		$locale
- *	@param		bool			$basis				Whether the feature Basis is on, as it is in a project that switched it on in the Features panel: the starter site is plain html and has none
+ *	@param		bool			$kit					Whether the test feature is on, as a feature is in a project that switched it on in the Features panel: the starter site is plain html and has none
  *
  *	@return 	array
  */
-function pagesBoot( string $sandbox, string $locale, bool $basis = false ): array {
+function pagesBoot( string $sandbox, string $locale, bool $kit = false ): array {
 
 	$_SESSION = [];
 
@@ -196,8 +205,8 @@ function pagesBoot( string $sandbox, string $locale, bool $basis = false ): arra
 	\Nino\Html::init( $appData );
 	\Nino\Auth::init( $appData );
 
-	if( $basis === true )
-		$appData['/nino/modules'][] = '\\Nino\\Modules\\Basis';
+	if( $kit === true )
+		$appData['/nino/modules'][] = '\\Nino\\Modules\\Kit';
 
 	\Nino\Features::registerAssets( $appData );
 	\Nino\Features::registerComponents( $appData );
@@ -274,7 +283,7 @@ function pagesVisit( string $sandbox, string $locale, string $uri ): array {
  */
 function pagesCases( string $sandbox, array $cases, string $locale = 'de_DE' ): string {
 
-	// The cases are about the machine - loops, includes, fills - and use the components of Basis as their material, so Basis is on
+	// The cases are about the machine - loops, includes, fills - and use the components of the test feature as their material, so it is on
 	$appData = pagesBoot( $sandbox, $locale, true );
 	$out = '';
 
@@ -303,26 +312,26 @@ function pagesCases( string $sandbox, array $cases, string $locale = 'de_DE' ): 
 function pagesLoopCases(): array {
 
 	return [
-		'elements, a call in the content'	=> '[elements /probe sort="title"]<h3>[[title]]</h3><span data-n="[[.id]]" data-s="[[.slug]]" data-u="[[.uri]]"[[.lang]]>[[price]]</span><i>[[note]]</i>[text .body][text .title tag="h4"][/elements]',
+		'elements, a call in the content'	=> '[elements /probe sort="title"]<h3>[[title]]</h3><span data-n="[[.id]]" data-s="[[.slug]]" data-u="[[.uri]]"[[.lang]]>[[price]]</span><i>[[note]]</i>[prose .body][prose .title tag="h4"][/elements]',
 		'elements, a field in an attribute'	=> '[elements /probe sort="title" limit="2"][pages-echo text="Read [[title]]" href="/blog/[[.slug]]"][/elements]',
 		'elements, empty with a template'		=> '[elements /probe query="category=Z" empty="probe-empty"]<b>[[title]]</b>[/elements]',
 		'elements, empty with no template'	=> '[elements /probe query="category=Z"]<b>[[title]]</b>[/elements]',
 		'elements, empty="" a path that is none'	=> '[elements /probe query="category=Z" empty="../x"]<b>[[title]]</b>[/elements]',
 		'elements, a loop in a loop'				=> '[elements /probe sort="title"]<h4>[[title]]</h4>[elements /probe query="category=[[category]]" sort="title"]<i>[[title]]</i>[/elements][/elements]',
 		'elements, a template in a loop'	=> '[elements /probe sort="title"][template /templates/probe-row][/elements]',
-		'element'													=> '[element /probe/eins]<b>[[title]]</b> [[.id]] [[.slug]] [[category]] [[note]][text .title][/element]',
+		'element'													=> '[element /probe/eins]<b>[[title]]</b> [[.id]] [[.slug]] [[category]] [[note]][prose .title][/element]',
 		'element, a name that is none'		=> '[element /probe/nobody]<b>[[title]]</b>[/element]',
-		'elementvalues'										=> '[elementvalues /probe key="category"]<b>[[.id]]:[[.value]]([[.count]])</b>[spacer size="1"][/elementvalues]',
+		'elementvalues'										=> '[elementvalues /probe key="category"]<b>[[.id]]:[[.value]]([[.count]])</b>[prose text="-"][/elementvalues]',
 		'elementvalues, a loop in a value'	=> '[elementvalues /probe key="category"]<h5>[[.value]]</h5>[elements /probe query="category=[[.value]]" sort="title"]<i>[[title]]</i>[/elements][/elementvalues]',
 		'template with a fill in the path'	=> '[template /templates/page-x.[[/nino/http/response/locale]]]',
 		'template, a name that is none'		=> '[template /templates/nobody]after',
-		'a fill in the text and in a call'	=> '<p>[[/project/company/general/name]]</p>[text text="[[/project/company/general/name]] / [[/_nino/webpage/contact/title]]"]',
+		'a fill in the text and in a call'	=> '<p>[[/project/company/general/name]]</p>[prose text="[[/project/company/general/name]] / [[/_nino/webpage/contact/title]]"]',
 		'a fill that is none stays'				=> '<p>[[/project/nobody/nothing/here]] [[loose]]</p>',
 		'a fill with a fill in its name'		=> '<p>[[/_nino/webpage[[/nino/http/response/uri]]/title]]</p>',
 		'csrf'														=> '<form>[csrf]</form>',
 		'json'														=> '<script>[json /project/company/contact/address] [json /project/company/general/name]</script>',
 		'navigation, lines of a menu'			=> '[navigation nav="main" id="m" class="c"][/navigation]',
-		'navigation, lines by hand'				=> '[navigation id="hand"]/about:About us:class="x"'. "\n". 'https://example.com:Elsewhere'. "\n  \n". '<span>[text text="A line"]</span>'. "\n". '[/navigation]',
+		'navigation, lines by hand'				=> '[navigation id="hand"]/about:About us:class="x"'. "\n". 'https://example.com:Elsewhere'. "\n  \n". '<span>[prose text="A line"]</span>'. "\n". '[/navigation]',
 		'navigation, a burger with a counter'	=> '[navigation nav="legal" burger][/navigation][navigation nav="footer" burger][/navigation]',
 		'localepicker'										=> '[localepicker]',
 		'legal'														=> '[legal]',
@@ -488,7 +497,6 @@ $GLOBALS['pagesCold'] = false;
 $keptWorkbench = pagesTrees( $site );
 $warm['workbench.html'] = pagesWorkbench( $site );
 \Nino\Filesystem::removeDir( $site );
-\Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
 
 if( is_string( $record ) === true ) {
 
@@ -533,7 +541,7 @@ foreach( $outputs as $name => $output )
 
 echo "The starter site as a visitor meets it - the structure of its pages\n";
 
-// With the tools next to the project, so that the standard parts of Basis are files of the site as they are of an installation
+// With the tools next to the project, so that the files of the kernel are files of the site as they are of an installation
 $site = pagesSite( true );
 $ignored = ninoWarnings();
 $visits = [];
@@ -559,9 +567,21 @@ foreach( [ '/', '/contact' ] as $uri ) {
 	$traced[$uri] = (string) ( $request['/nino/http/response']['body'] ?? '' );
 }
 
-// The start page of the starter site in the components of Basis, kept as a fixture: put in place of the page of the site, with Basis on, drawn with the trace
-// as a preview asks for it
-copy( __DIR__. '/fixtures/basis/starter/pages/home/templates/page-home.tpl', $site. '/private/templates/page-home.tpl' );
+// A page of the components of the test feature - a band with a title and a button, a band of three cards and one more - put in place of the page of the site, with the feature on,
+// drawn with the trace as a preview asks for it
+file_put_contents( $site. '/private/templates/page-home.tpl', implode( "\n", [
+	'[band-wrap id="hero"][band-row][band-col]',
+	'	[band-title tag="h1" text="One"]',
+	'	[band-subtitle text="Two"]',
+	'	[lever text="Three" href="/contact"]',
+	'[/band-col][/band-row][/band-wrap]',
+	'[band-wrap id="cards"][band-row]',
+	'	[band-col variant="card"][band-title text="Card one"][prose text="Text one"][/band-col]',
+	'	[band-col variant="card"][band-title text="Card two"][prose text="Text two"][/band-col]',
+	'	[band-col variant="card"][band-title text="Card three"][prose text="Text three"][/band-col]',
+	'[/band-row][/band-wrap]',
+	'[band-wrap id="more"][band-row][band-col][band-title text="Four"][prose text="Five"][lever text="Six" href="/"][/band-col][/band-row][/band-wrap]',
+] ) );
 $appData = pagesBoot( $site, 'de_DE', true );
 ninoUser( $appData, 'trace@example.com', [ '/_admin/builder/manage' ] );
 $token = \Nino\Preview::issue( $appData, 'builder', '/_admin/builder/manage', [] );
@@ -569,7 +589,7 @@ $token = \Nino\Preview::issue( $appData, 'builder', '/_admin/builder/manage', []
 	\Nino\Preview::held( $appData, $request, 'builder', '/_admin/builder/manage' ) !== null && \Nino\Preview::trace( $appData );
 } );
 $request = \Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/?nino-preview='. $token, 'REMOTE_ADDR' => '127.0.0.1', 'HTTP_HOST' => 'example.com', 'HTTPS' => 'on' ] );
-$tracedBasis = (string) ( $request['/nino/http/response']['body'] ?? '' );
+$tracedKit = (string) ( $request['/nino/http/response']['body'] ?? '' );
 
 $ignored = ninoWarnings();
 \Nino\Filesystem::removeDir( $site );
@@ -578,8 +598,8 @@ $ignored = ninoWarnings();
 $misplaced = 0;
 $invalid = 0;
 
-// the pages of the html site carry no trace; the start page of the Basis fixtures carries it everywhere a component is drawn
-foreach( $traced + [ 'basis' => $tracedBasis ] as $body ) {
+// the pages of the html site carry no trace; the page of the test feature carries it everywhere a component is drawn
+foreach( $traced + [ 'kit' => $tracedKit ] as $body ) {
 
 	// The comments the templates carry of their own are text of the template, which names a textarea in one
 	$body = (string) preg_replace( '/<!--(?!\/?nino:).*?-->/s', '', $body );
@@ -590,8 +610,8 @@ foreach( $traced + [ 'basis' => $tracedBasis ] as $body ) {
 			$invalid += json_decode( $json, true ) === null ? 1 : 0;
 }
 
-check( 'the titles and the buttons of the start page of the starter fixtures, drawn by the renderers of Basis, carry the mark of their source as the content of their element',
-	preg_match_all( '#<h[1-3] class="section-title[^>]*><!--nino:s [^>]*-->#', $tracedBasis ) >= 3 && preg_match_all( '#<(?:a|span) class="button[^>]*><!--nino:s [^>]*-->#', $tracedBasis ) >= 1 && substr_count( $tracedBasis, '<!--nino:n' ) > 20 );
+check( 'the titles and the buttons of a page of components, drawn by their renderers, carry the mark of their source as the content of their element',
+	preg_match_all( '#<h[1-3] class="band-title[^>]*><!--nino:s [^>]*-->#', $tracedKit ) >= 3 && preg_match_all( '#<a class="lever[^>]*><!--nino:s [^>]*-->#', $tracedKit ) >= 1 && substr_count( $tracedKit, '<!--nino:n' ) > 20 );
 check( 'the pages of a preview that asked for the trace carry it where a component is drawn - the html starter site has none, and its pages hold no comment of the trace - and no comment stands in a script, a style, a title, a textarea or a tag, and the JSON-LD is JSON',
 	$misplaced === 0 && $invalid === 0 && substr_count( implode( '', $traced ), '<!--nino:n' ) === 0 && substr_count( $traced['/'], 'application/ld+json' ) >= 1 );
 

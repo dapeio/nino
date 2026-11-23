@@ -111,7 +111,7 @@ replaces none of them (see [Updates and Rollback](docs/deployment.md#updates-and
 
 | Path | What it is |
 | --- | --- |
-| `_nino/` | The kernel: `Nino.php` (boot and autoloader), one class per file in `_nino/Nino/<Class>/`, the modules Nino ships in `_nino/Nino/Modules/<Name>/` - each with its own `Admin/`, `assets/`, `text/`, `templates/` and `install/`, and the feature Basis with its `components/` and `groups/` - and the public `Nino.css` and `Nino.js` |
+| `_nino/` | The kernel: `Nino.php` (boot and autoloader), one class per file in `_nino/Nino/<Class>/`, the modules Nino ships in `_nino/Nino/Modules/<Name>/` - each with its own `Admin/`, `assets/`, `text/`, `templates/` and `install/` - and the public `Nino.css` and `Nino.js` |
 | `_admin/` | The workbench: the shell (`Admin.php`, `recovery.php`, `assets/style.css`, `assets/Nino.admin.js`, which the workbench and the setup wizard load), its screens as modules in `_admin/Nino/Modules/<Name>/`, and the setup wizard with its library in `_admin/install/`, deletable after setup |
 | `app/` | The project's own PHP classes and runtime modules, under namespaces of their own |
 | `features/` | Installed features, one directory each with a `feature.php` manifest; the `nino` constraint it names is the kernel whose vocabulary the feature uses. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) |
@@ -284,7 +284,7 @@ The forms a template writes:
 
 - Absolute textfill: `[[/template/page-home/main-hero/title]]`
 - Reusable template: `[template /templates/html-header]`
-- Image slot: `[image /template/page-home/main-hero/image alt=""]` - the component `image` of the feature Basis
+- Image slot: `[image /template/page-home/main-hero/image alt=""]` - the component `image` of the feature Basis of the catalogue (the components in the examples of this guide are those of Basis, which is not part of the kernel)
 - Component: `[section-title /template/page-home/main-hero/title tag="h3"]` - a shortcode with a schema, its first argument the source of its value; `~title` is the key `/template/<template>/<id of the section>/title`
 - Loop: `[elements /services sort="title"]...[/elements]` - what stands between the tags is drawn once for each element, and a component in it reads a field of the element as its source, `[section-title .title]`
 - Element-local field: `[[title]]` only inside `[element]` or `[elements]`; `[[.id]]` is the number in the loop, `[[.uri]]` the element's uri `/<type>/<name>`, `[[.slug]]` the name alone - the last segment of the uri, what a link to a page of the element (`/blog/[[.slug]]`) needs; `[[.lang]]`, in `[elements]`, is the lang attribute of the language the text was taken from
@@ -348,9 +348,10 @@ components in folders - `components/<name>/component.php` with its `template.tpl
 `groups/<group>/group.php`, the standard part `groups/<group>/part/part.css` and, optional, a
 demo `groups/<group>/demo.tpl` - which the
 kernel reads and checks for a feature that is on
-([a feature's components](docs/development.md#a-features-components)); a module of the kernel
-with a `feature.php` is a feature that comes with the kernel, and the feature Basis is one:
-the components a page is written in.
+([a feature's components](docs/development.md#a-features-components)). The kernel registers no
+component of its own: the components a page is written in are the feature Basis of the
+catalogue, a feature like any other. There are modules of the kernel (no `feature.php`) and
+features below `features/`, nothing in between.
 A shortcode says whether it has an end - `Html::addShortcode( ..., $container )`: `true` a
 container, `false` a leaf, `null` a container exactly where its end stands in the
 document - and a document that writes both forms of a name writes the leaf `[name ... /]`.
@@ -446,7 +447,7 @@ or the recovery page.
   later layer overrules a rule in an earlier one whatever its specificity and
   wherever its file stands. `Nino.css` is the layer `nino.reset` and holds it
   itself (the tokens and the reset); the bundle puts the stylesheets
-  of features and modules - the standard parts of the feature Basis among them - in `nino.components`, the project's own `assets/theme.css`
+  of features and modules - the standard parts of a feature among them - in `nino.components`, the project's own `assets/theme.css`
   in `nino.theme` and its other files below `assets/` - `style.css` among them
   - in `project`. A file never writes a layer of the four, and a project never
   writes one at all: the bundle does, and it repairs a file whose braces do
@@ -456,7 +457,7 @@ or the recovery page.
   workbench's bundles are no part of this.
 - A design layer turns `_nino/Nino.css` through the custom properties its
   `:root` declares, and the comments there are the reference. A new default is
-  declared in `Nino.css`. The standard parts of the feature Basis read those
+  declared in `Nino.css`. The standard parts of a feature read those
   tokens and nothing else of the page.
 
 ### Templates

@@ -34,10 +34,6 @@ $appData 	= ninoSandbox( 'keys' );
 $appData['/nino/dir'] 	= '';
 $appData['/nino/public'] = '/public';
 
-// The components the starter pages are written in, so that a source of a call is read as the register reads it
-$appData['/nino/modules'] = [ '\\Nino\\Modules\\Basis' ];
-\Nino\Features::registerComponents( $appData );
-
 // Keys the system writes itself: a page's details after its Element-URI, and
 // a language's name after its code
 const KEYS_SYSTEM_WEBPAGE 	= '#^/_nino/webpage(/.+)/(name|title|description|uri)$#';

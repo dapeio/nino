@@ -541,7 +541,7 @@ $nodes = \Nino\Markup::parse( '[link /kontakt]x[/link]', \Nino\Components::conta
 $found = \Nino\Components::check( $site, $nodes );
 check( 'a tree of components with a [link] in it has a finding of the register - a call with no schema: a block that holds it is refused', ( $found['0'][0]['code'] ?? '' ) === \Nino\Components::CODE_BARE && ( $found['0'][0]['detail'] ?? '' ) === 'link' );
 
-// 4. Html that is cleaned - the field of a format with tags, a call of Basis that holds markup: what is left of an <a> is its address
+// 4. Html that is cleaned - the field of a format with tags, a call that holds markup: what is left of an <a> is its address
 $kept = \Nino\Html::sanitizeHtml( linkDraw( $site, '[link /kontakt class="b" target="_blank" aria-label="x" title="t"]x[/link][link //evil.example]y[/link]' ), 'blocks', true );
 check( 'where html is cleaned the anchor of a link is the anchor of any html: the address, and neither aria-current nor a class, a target, a title', $kept === '<p><a href="/kontakt">x</a>y</p>' );
 

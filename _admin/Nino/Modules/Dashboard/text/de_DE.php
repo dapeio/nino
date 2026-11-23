@@ -11,6 +11,7 @@ return [
 	'[[/_admin/dashboard/label/all]]'				=> 'Alle anzeigen',
 	'[[/_admin/dashboard/empty/elements]]'	=> 'Noch keine Element-Typen angelegt.',
 	'[[/_admin/dashboard/empty/activity]]'	=> 'Noch keine Einträge.',
+	'[[/_admin/dashboard/notice/feature-missing]]'	=> '„%s“ ist eingeschaltet, aber nicht installiert: Das Feature liegt im Katalog. Installiere es dort; solange es fehlt, werden seine Komponenten nicht gezeichnet.',
 	'[[/_admin/dashboard/notice/mail]]'	=> 'Der Mailversand scheitert seit %s (Fehlversuche: %s). Prüfe mail() auf dem Server, die Einstellungen des Mailers oder die Empfängeradresse.',
 	'[[/_admin/dashboard/notice/untranslated]]'	=> 'Noch nicht übersetzte Texte (%s) in %s.',
 	'[[/_admin/dashboard/notice/legal-unknown]]'	=> 'Für die Angabe %s im Abschnitt „%s“ (%s) gibt es keinen Wert. Lege ihn unter Texte an oder nimm die Angabe aus dem Abschnitt.',
