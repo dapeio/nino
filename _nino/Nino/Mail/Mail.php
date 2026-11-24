@@ -66,6 +66,15 @@ namespace Nino {
 		// The kind of a mail that queue() charges to the cap of the client who set it off, as send() does: one visitor's action
 		public const string CLIENT = 'client';
 
+		// The kind of a mail that goes to nobody, for queue() alone: it takes the whole way of a mail of the kind CLIENT - read, counted
+		// against the client's cap and the places of the visitors, written, noted, work asked for after the response, key remembered -
+		// and the deliverer lets it go without a transport. It is kept as a mail of the kind CLIENT whose address is a line of hyphens as
+		// long as the address that was given (see queue()), so that no stored kind of the outbox is new
+		public const string VOID = 'void';
+
+		// The address a mail to nobody is checked with when it is delivered: it has none, and the check of the rest is the one of a mail
+		private const string VOID_ADDRESS = 'void@example.invalid';
+
 		// Where the last failed call is kept - see failure()
 		private const string STATUS_PATH = '/data/mail-status.php';
 
@@ -219,6 +228,22 @@ namespace Nino {
 		 *	An address or a reply address with a control character in it, a reply address that is a list, and a text that is no
 		 *	utf-8 are no mail ('invalid'): send() strips what it cannot send, a mail that waits is refused at the call.
 		 *
+		 *	The kind VOID is a mail to nobody, for the feature whose answer must not tell whether there is a mail: a sign-in that is
+		 *	answered alike for an address with an account and one without calls queue() with CLIENT in the first case and VOID in the
+		 *	second, with the same mail, the same key and the same code round the call. A mail of the kind VOID is checked and cleaned as
+		 *	one of the kind CLIENT - its address too, which has to be one - and goes the way of one: it counts against the cap of the
+		 *	client and the places of the visitors, is written to the outbox, noted, asked for after the response, and has its key
+		 *	remembered once it is delivered. What queue() answers for it is what it answers for a mail of the kind CLIENT, the id or ''
+		 *	and the same reasons in queueRefused(). The deliverer takes it, lets it go without asking a transport, and it is no
+		 *	failure and no line of the log: queued() counts it as it counts a mail that was delivered, and deliverQueued() reports it as
+		 *	'void', not as 'delivered' (a mail that goes to nobody clears no failure of the dashboard). Of the address nothing is kept:
+		 *	it is stored as a line of hyphens as long as the address was, and the hash of the content holds it as an HMAC with the secret
+		 *	of the outbox (MailQueue::secret()), so that no file of the project holds the address or lets it be guessed, and a second
+		 *	call under the key with another address is a conflict, as it is for a mail. The write is as large as that of a mail of the
+		 *	kind CLIENT whose address, subject and body are as long - the caller passes the same template with placeholders of the same
+		 *	length in both cases, and a fresh code in each. VOID is no brake and no way round one: it takes the places and the cap of a visitor as a mail does, and a feature
+		 *	needs a brake of its own for each sender before it calls queue(), the same in both cases.
+		 *
 		 *	The caps of the hour hold as they do for send() and sendSystem(), at the place where the mail is not
 		 *	delivered without them: a mail of the kind CLIENT counts one try of the client's cap when it is queued, the
 		 *	only moment the client is known; a mail of the kind SYSTEM or TEST counts one unit of the site's cap of that
@@ -226,7 +251,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$mail					{ to, subject, body, replyTo }
-		 *	@param		string		$kind					CLIENT, SYSTEM or TEST
+		 *	@param		string		$kind					CLIENT, SYSTEM, TEST or VOID
 		 *	@param		string		$key					Names the mail, '<name of the feature>/<anything>' - the name is a slug and no other feature's: a second call with the key of a mail that waits and the same mail is that mail, and its id is answered, one with another mail is refused as 'conflict'; '' for none. A key is remembered for ten minutes after its mail went out, so that a request that comes twice is the mail that went out
 		 *
 		 *	@return 	string									The id of the mail, 16 hex digits; '' where it was refused
@@ -238,7 +263,7 @@ namespace Nino {
 
 			// A key is the caller's own: it starts with a name of the feature or the module that queues - 'invite/2026-0042' - so that
 			// another one cannot take the id of its mail
-			if( in_array( $kind, [ self::CLIENT, self::SYSTEM, self::TEST ], true ) === false || ( $key !== '' && preg_match( '~^[a-z][a-z0-9-]{1,62}/[\x21-\x7e]{1,128}$~D', $key ) !== 1 ) )
+			if( in_array( $kind, [ self::CLIENT, self::SYSTEM, self::TEST, self::VOID ], true ) === false || ( $key !== '' && preg_match( '~^[a-z][a-z0-9-]{1,62}/[\x21-\x7e]{1,128}$~D', $key ) !== 1 ) )
 				return self::_refused( $appData, 'invalid' );
 
 			$checked = self::_checked( $mail );
@@ -246,8 +271,21 @@ namespace Nino {
 			if( $checked['mail'] === null )
 				return self::_refused( $appData, $checked['refused'] );
 
+			// The secret of the outbox is asked for by both: the hash of the content of a mail to nobody is keyed with it, and a mail
+			// that asks the disk for it too does what a mail to nobody does
+			$secret		= \Nino\MailQueue::secret( $appData );
+
+			if( $secret === '' )
+				return self::_refused( $appData, 'unwritable' );
+
+			// A mail to nobody is a mail of the kind CLIENT to the outbox, whose address is no address: nothing of the one that was given is
+			// kept. The hash of its content, which a second call with the key compares, holds the address as a keyed hash (HMAC with the
+			// secret of the outbox), so that a second call with another address is a conflict, as it is for a mail, and the stored value
+			// tells no address to whoever has the file but not the secret
+			$void			= $kind === self::VOID;
+			$kind			= $void === true ? self::CLIENT : $kind;
 			$hash			= $key === '' ? '' : hash( 'sha256', $key );
-			$content	= hash( 'sha256', (string) json_encode( [ $kind, $checked['mail'] ] ) );
+			$content	= $void === true ? hash_hmac( 'sha256', (string) json_encode( [ self::VOID, $checked['mail'] ] ), $secret ) : hash( 'sha256', (string) json_encode( [ $kind, $checked['mail'] ] ) );
 			$known		= \Nino\MailQueue::peek( $appData, $kind, $hash );
 
 			if( $known['id'] !== '' )
@@ -261,6 +299,17 @@ namespace Nino {
 				$appData['./nino/mail/ratelimited'] = true;
 
 				return self::_refused( $appData, 'ratelimited' );
+			}
+
+			// The hyphens take as many bytes in the file as the address does there, where a quote or a backslash is written with an escape
+			// of its own: the file is as large as the mail's. A mail at the very limit of MAX_BYTES whose address is made of such characters
+			// is refused as 'size', which is the one place the two kinds differ in what they take
+			if( $void === true ) {
+
+				$checked['mail']['to'] = str_repeat( '-', strlen( \Nino\MailQueue::encode( [ 'to' => $checked['mail']['to'] ] ) ) - strlen( \Nino\MailQueue::encode( [ 'to' => '' ] ) ) );
+
+				if( strlen( $checked['mail']['to'] ) + strlen( $checked['mail']['subject'] ) + strlen( $checked['mail']['replyTo'] ) + strlen( $checked['mail']['body'] ) > \Nino\MailQueue::MAX_BYTES )
+					return self::_refused( $appData, 'size' );
 			}
 
 			$added = \Nino\MailQueue::add( $appData, $checked['mail'], $kind, $hash, $content );
@@ -305,11 +354,11 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		int|null	$limit				The most mails to deliver, MailQueue::BATCH for none
 		 *
-		 *	@return 	array										{ delivered, retry, held, failed, unwritable } - the mails delivered; the ones that wait for another attempt; the ones that wait for the cap of the hour; the ones given up on; whether the outbox could not be written
+		 *	@return 	array										{ delivered, void, retry, held, failed, unwritable } - the mails delivered; the mails to nobody (VOID) that were let go, which clear no failure; the ones that wait for another attempt; the ones that wait for the cap of the hour; the ones given up on; whether the outbox could not be written
 		 */
 		public static function deliverQueued( array &$appData, ?int $limit = null ): array {
 
-			$result = [ 'delivered' => 0, 'retry' => 0, 'held' => 0, 'failed' => 0, 'unwritable' => false ];
+			$result = [ 'delivered' => 0, 'void' => 0, 'retry' => 0, 'held' => 0, 'failed' => 0, 'unwritable' => false ];
 
 			// With no outbox there is no mail to look at, and what the outbox left - a notice, the keys, a temporary file - still goes when its time is over
 			if( is_file( \Nino\Filesystem::path( $appData, \Nino\MailQueue::WAITING ) ) === false ) {
@@ -351,7 +400,7 @@ namespace Nino {
 				if( $settled['gaveUp'] === true )
 					$result['failed']++;
 				else if( $outcome === 'sent' )
-					$result['delivered']++;
+					$result[ self::_isVoid( $entry ) === true ? 'void' : 'delivered' ]++;
 				else if( $outcome === 'held' )
 					$result['held']++;
 				else
@@ -373,7 +422,8 @@ namespace Nino {
 				trigger_error( 'Mail queue: '. $result['failed']. ' mail(s) could not be delivered and were given up on - see \\Nino\\Mail::queued().', E_USER_WARNING );
 				self::_recordOutcome( $appData, false );
 			}
-			else if( $result['delivered'] > 0 && \Nino\MailQueue::counts( $appData )['failed'] === 0 )
+			// The look at the record is made for a mail to nobody as for a mail, so that the outbox is read the same; only a mail that went out clears the failure
+			else if( $result['delivered'] + $result['void'] > 0 && \Nino\MailQueue::counts( $appData )['failed'] === 0 && $result['delivered'] > 0 )
 				self::_recordOutcome( $appData, true );
 
 			return $result;
@@ -389,11 +439,21 @@ namespace Nino {
 		 */
 		private static function _deliverQueued( array &$appData, array $entry ): array {
 
-			// The file is one a person can edit: what was queued is checked once more
-			$checked = self::_checked( $entry );
+			// The file is one a person can edit: what was queued is checked once more, a mail to nobody with an address that stands for none
+			$void			= self::_isVoid( $entry );
+			$checked	= self::_checked( $void === true ? [ 'to' => self::VOID_ADDRESS ] + $entry : $entry );
 
 			if( $checked['mail'] === null )
 				return [ 'invalid', \Nino\MailQueue::INVALID ];
+
+			// Past the checks and before the transport: the one place a mail to nobody differs from a mail, and it is the end of its way. The
+			// sender is asked as _deliver() asks it, so that the texts it reads, and the line a sender that is none says in the log, are the same
+			if( $void === true ) {
+
+				self::_getSender( $appData );
+
+				return [ 'sent', '' ];
+			}
 
 			if( $entry['kind'] !== self::CLIENT && \Nino\Feature::count( $appData, self::COUNTER_PREFIX. $entry['kind'], 'site', $entry['kind'] === self::SYSTEM ? self::SYSTEM_CAP : self::TEST_CAP, self::WINDOW ) === false )
 				return [ 'held', '' ];
@@ -410,6 +470,19 @@ namespace Nino {
 			}
 
 			return $delivered === true ? [ 'sent', '' ] : [ 'again', \Nino\MailQueue::REFUSED ];
+		}
+
+		/**
+		 *	Whether a mail of the outbox is a mail to nobody (VOID): one of the kind CLIENT whose address is hyphens and nothing else,
+		 *	which no address is
+		 *
+		 *	@param		array 		$entry				{ kind, to }
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isVoid( array $entry ): bool {
+
+			return $entry['kind'] === self::CLIENT && preg_match( '/^-+$/D', (string) $entry['to'] ) === 1;
 		}
 
 		/**

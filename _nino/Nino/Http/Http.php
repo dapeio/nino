@@ -338,6 +338,33 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether the server lets the client go before the work after the response begins: php-fpm and LiteSpeed end the connection
+		 *	themselves (fastcgi_finish_request(), litespeed_finish_request()), so a visitor sees nothing of the work - not the time it
+		 *	takes, not a header it needs. Where this is false the work may still run (see canAfterResponse(): the response goes out by
+		 *	its length), but the connection of the request stays open until the work is done, as it does under php -S and, by the code,
+		 *	under Apache with mod_php. A feature whose answer must not tell what its work after the response did - a mail to nobody,
+		 *	\Nino\Mail::VOID - holds its promise only where this is true
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function releasesResponse( array &$appData ): bool {
+
+			return self::_finishes();
+		}
+
+		/**
+		 *	Whether php has a function that lets the client go: the one place that names them
+		 *
+		 *	@return 	bool
+		 */
+		private static function _finishes(): bool {
+
+			return function_exists( 'fastcgi_finish_request' ) === true || function_exists( 'litespeed_finish_request' ) === true;
+		}
+
+		/**
 		 *	Whether the server and the output of php let the response go before the work is done, and why not: the one decision
 		 *	that canAfterResponse() answers and prepareAfter() acts on. Where there is no finish function the response goes out
 		 *	by the length the kernel tells, which holds only if php's own compression is off or can be turned off, and no output
@@ -350,7 +377,7 @@ namespace Nino {
 		private static function _letGo( bool $apply ): string {
 
 			// php-fpm and LiteSpeed let the client go themselves, whatever the response is
-			if( function_exists( 'fastcgi_finish_request' ) === true || function_exists( 'litespeed_finish_request' ) === true )
+			if( self::_finishes() === true )
 				return '';
 
 			// A page php compresses itself has no length that is the body's: for this response it is off, as for a stream, and
@@ -401,7 +428,7 @@ namespace Nino {
 				return [];
 
 			// php-fpm and LiteSpeed let the client go themselves, whatever the response is
-			if( function_exists( 'fastcgi_finish_request' ) === true || function_exists( 'litespeed_finish_request' ) === true )
+			if( self::_finishes() === true )
 				return $after;
 
 			$response = &$request['/nino/http/response'];

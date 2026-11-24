@@ -27,7 +27,9 @@ namespace Nino {
 	 *
 	 *	WAITING, '/data/mail-queue.php': { format, waiting: [ mail, ... ] }. A mail is { id, key, content, kind, to,
 	 *	subject, body, replyTo, queued, tries, next, error, claim, until }. The file is removed when the last mail leaves
-	 *	it, so that the check of every request - whether the file is there - is a question of one stat.
+	 *	it, so that the check of every request - whether the file is there - is a question of one stat. A mail to nobody
+	 *	(\Nino\Mail::VOID) is a mail of the kind CLIENT here, whose 'to' is hyphens alone as long as the address was: the
+	 *	outbox knows no kind of its own for it, and the deliverer lets it go without a transport (see \Nino\Mail::queue()).
 	 *
 	 *	DUE, '/data/mail-queue-due.txt': the second at which something is due, as the digits of a number, written after
 	 *	every write of WAITING, from what the file holds, under its lock. What every request asks before its response,
@@ -83,6 +85,9 @@ namespace Nino {
 
 		// Where the second of the next due mail is kept, see \Nino\Http::MAIL_QUEUE_DUE
 		public const string DUE = \Nino\Http::MAIL_QUEUE_DUE;
+
+		// Where the secret of the outbox is kept: the key of the hash a mail to nobody has of its content
+		public const string SECRET = '/data/mail-secret.php';
 
 		// Where the mails are that were given up on
 		public const string FAILED = '/data/mail-failed.php';
@@ -140,6 +145,45 @@ namespace Nino {
 		public const string FAILURE = 'exception';
 		public const string EXPIRED = 'expired';
 		public const string ABANDONED = 'abandoned';
+
+		/**
+		 *	The secret of the outbox: 32 random bytes as hex, made on the first call and kept in SECRET, which is no part of a backup. It
+		 *	is the key of the HMAC that stands for the address in the hash of the content of a mail to nobody (\Nino\Mail::VOID), so that
+		 *	nobody who reads the keys or the outbox can try an address against it. A file that is not what this class wrote is made anew:
+		 *	the secret serves comparisons of ten minutes, nothing is lost with it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string										64 hex digits, '' where it can be neither read nor written
+		 */
+		public static function secret( array &$appData ): string {
+
+			$valid = static fn( mixed $stored ): string => is_array( $stored ) === true && is_string( $stored['secret'] ?? null ) === true && preg_match( '/^[0-9a-f]{64}$/D', $stored['secret'] ) === 1 ? $stored['secret'] : '';
+			$known = self::_load( $appData, self::SECRET );
+
+			if( $known === false )
+				return '';
+
+			if( $valid( $known ) !== '' )
+				return $valid( $known );
+
+			if( \Nino\Filesystem::lockFile( $appData, self::SECRET ) === false )
+				return '';
+
+			// A second process may have made it between the look and the lock
+			$known = self::_load( $appData, self::SECRET );
+
+			if( $known !== false && $valid( $known ) !== '' ) {
+
+				\Nino\Filesystem::unlockFile( $appData, self::SECRET );
+
+				return $valid( $known );
+			}
+
+			$secret = bin2hex( random_bytes( 32 ) );
+
+			return \Nino\Filesystem::putFileContent( $appData, self::SECRET, (string) json_encode( [ 'format' => 1, 'secret' => $secret ] ), true, self::MODE ) === true ? $secret : '';
+		}
 
 		/**
 		 *	The clock: now, or what a test has set in './nino/mail/now' - a key of the request, which no request can send

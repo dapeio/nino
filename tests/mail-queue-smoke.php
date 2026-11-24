@@ -18,120 +18,7 @@ declare(strict_types=1);
 // sends one (sendmail_path cannot be set from a script - it is php.ini's - so mail() is never what stands between a test and a real mail). The processes
 // of the suite are started with `-d sendmail_path=/bin/false` as well, which does reach mail(), and register a transport of their own
 require __DIR__. '/harness.php';
-
-/**
- *	The file protocol of php for a moment, with a record of what is done and with the failures a test names: a read of a file that is
- *	there fails, a chmod, an unlink. Everything else is what php does itself
- */
-final class FaultFs {
-
-	public $context;
-
-	// What was done, in order: [ operation, path, detail ]
-	public static array $log = [];
-
-	// operation => function( string $path ): bool, true to fail it
-	public static array $fail = [];
-
-	private $handle = null;
-	private string $path = '';
-
-	public static function on( array $fail = [] ): void {
-		self::$log = [];
-		self::$fail = $fail;
-		stream_wrapper_unregister( 'file' );
-		stream_wrapper_register( 'file', self::class );
-	}
-
-	public static function off(): void {
-		stream_wrapper_restore( 'file' );
-	}
-
-	private static function real( callable $call ): mixed {
-		stream_wrapper_restore( 'file' );
-
-		try {
-			return $call();
-		}
-		finally {
-			stream_wrapper_unregister( 'file' );
-			stream_wrapper_register( 'file', self::class );
-		}
-	}
-
-	private static function fails( string $operation, string $path ): bool {
-		return isset( self::$fail[$operation] ) === true && ( self::$fail[$operation] )( $path ) === true;
-	}
-
-	public function stream_open( string $path, string $mode, int $options, ?string &$opened ): bool {
-		self::$log[] = [ 'open', $path, $mode, str_starts_with( $mode, 'x' ) === true ? self::real( static fn(): int => (int) ( @fileperms( dirname( $path ) ) & 0777 ) ) : -1 ];
-
-		if( str_starts_with( $mode, 'r' ) === true && self::fails( 'read', $path ) === true )
-			return false;
-
-		$this->path = $path;
-		$this->handle = self::real( static fn(): mixed => @fopen( $path, $mode ) );
-
-		return $this->handle !== false;
-	}
-
-	public function stream_read( int $count ): string|false { return fread( $this->handle, $count ); }
-	public function stream_write( string $data ): int { self::$log[] = [ 'write', $this->path, (string) strlen( $data ) ]; return (int) fwrite( $this->handle, $data ); }
-	public function stream_eof(): bool { return feof( $this->handle ); }
-	public function stream_tell(): int { return (int) ftell( $this->handle ); }
-	public function stream_seek( int $offset, int $whence ): bool { return fseek( $this->handle, $offset, $whence ) === 0; }
-	public function stream_flush(): bool { return fflush( $this->handle ); }
-	public function stream_close(): void { fclose( $this->handle ); }
-	public function stream_stat(): array|false { return fstat( $this->handle ); }
-	public function stream_lock( int $operation ): bool { return flock( $this->handle, $operation ); }
-	public function stream_truncate( int $size ): bool { return ftruncate( $this->handle, $size ); }
-	public function stream_set_option( int $option, int $arg1, ?int $arg2 ): bool { return false; }
-
-	public function url_stat( string $path, int $flags ): array|false {
-		$stat = self::real( static fn(): mixed => ( $flags & STREAM_URL_STAT_LINK ) !== 0 ? @lstat( $path ) : @stat( $path ) );
-
-		// 'uid': function( string $path ): ?int - the owner a path is said to have
-		if( is_array( $stat ) === true && isset( self::$fail['uid'] ) === true && ( $uid = ( self::$fail['uid'] )( $path ) ) !== null ) {
-			$stat['uid'] = $uid;
-			$stat[4] = $uid;
-		}
-
-		return $stat;
-	}
-
-	public function unlink( string $path ): bool {
-		self::$log[] = [ 'unlink', $path, '' ];
-
-		return self::fails( 'unlink', $path ) === true ? false : self::real( static fn(): mixed => @unlink( $path ) );
-	}
-
-	public function rename( string $from, string $to ): bool {
-		self::$log[] = [ 'rename', $from, $to ];
-
-		return self::real( static fn(): mixed => @rename( $from, $to ) );
-	}
-
-	public function mkdir( string $path, int $mode, int $options ): bool {
-		return self::real( static fn(): mixed => @mkdir( $path, $mode, ( $options & STREAM_MKDIR_RECURSIVE ) !== 0 ) );
-	}
-
-	public function rmdir( string $path, int $options ): bool {
-		return self::real( static fn(): mixed => @rmdir( $path ) );
-	}
-
-	public function stream_metadata( string $path, int $option, mixed $value ): bool {
-		if( $option === STREAM_META_ACCESS ) {
-			self::$log[] = [ 'chmod', $path, decoct( (int) $value ) ];
-
-			return self::fails( 'chmod', $path ) === true ? false : self::real( static fn(): mixed => @chmod( $path, (int) $value ) );
-		}
-
-		if( $option === STREAM_META_TOUCH )
-			return self::real( static fn(): mixed => @touch( $path, ...( is_array( $value ) === true ? $value : [] ) ) );
-
-		return false;
-	}
-}
+require __DIR__. '/fixtures/faultfs.php';
 
 $appData = ninoSandbox( 'mail-queue' );
 $sandbox = ninoSandboxDir( $appData );
@@ -1219,7 +1106,7 @@ $cli['/nino/mail/cap'] = 0;
 \Nino\Mail::queue( $cli, $mail( 11 ) );
 $out = (string) shell_exec( escapeshellarg( PHP_BINARY ). ' -d '. escapeshellarg( 'sendmail_path='. $sandbox. '/sendmail.sh' ). ' '. escapeshellarg( $project. '/_nino/Nino/MailQueue/deliver.php' ). ' 2>&1' );
 clearstatcache();
-check( 'the command boots the project and delivers what is due, with no visitor: it says what it did and the mail went to the transport of the server', str_starts_with( trim( $out ), 'delivered 1,' ) === true && str_contains( (string) @file_get_contents( $sandbox. '/sendmail.out' ), $address( 11 ) ) === true && is_file( $project. '/private/data/mail-queue.php' ) === false );
+check( 'the command boots the project and delivers what is due, with no visitor: it says what it did and the mail went to the transport of the server', str_starts_with( trim( $out ), 'delivered 1, void 0,' ) === true && str_contains( (string) @file_get_contents( $sandbox. '/sendmail.out' ), $address( 11 ) ) === true && is_file( $project. '/private/data/mail-queue.php' ) === false );
 
 $command = static function( array $env ) use ( $project, $sandbox ): array {
 	$process = proc_open( [ PHP_BINARY, '-d', 'sendmail_path='. $sandbox. '/sendmail.sh', $project. '/_nino/Nino/MailQueue/deliver.php' ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes, null, $env + [ 'PATH' => (string) getenv( 'PATH' ) ] );
@@ -1239,7 +1126,7 @@ $away['/nino/mail/cap'] = 0;
 $untouched = is_file( $sandbox. '/outside/data/mail-queue.php' ) === true && str_contains( (string) @file_get_contents( $sandbox. '/sendmail.out' ), $address( 13 ) ) === false;
 [ $out2, , $code2 ] = $command( [ 'NINO_PRIVATE_DIR' => $sandbox. '/outside' ] );
 clearstatcache();
-check( 'the command finds a project whose private half is moved elsewhere as index.php does, by NINO_PRIVATE_DIR from the environment and no change of a file of the kernel: it delivers there, and where it is not told it does not', $untouched === true && str_starts_with( $out, 'delivered 0,' ) === true && str_starts_with( $out2, 'delivered 1,' ) === true && str_contains( $out2, 'waiting 0' ) === true && $code === 0 && $code2 === 0
+check( 'the command finds a project whose private half is moved elsewhere as index.php does, by NINO_PRIVATE_DIR from the environment and no change of a file of the kernel: it delivers there, and where it is not told it does not', $untouched === true && str_starts_with( $out, 'delivered 0, void 0,' ) === true && str_starts_with( $out2, 'delivered 1, void 0,' ) === true && str_contains( $out2, 'waiting 0' ) === true && $code === 0 && $code2 === 0
 	&& is_file( $sandbox. '/outside/data/mail-queue.php' ) === false && str_contains( (string) @file_get_contents( $sandbox. '/sendmail.out' ), $address( 13 ) ) === true );
 [ $out3, $err3, $code3 ] = $command( [ 'NINO_PRIVATE_DIR' => $sandbox. '/nowhere' ] );
 check( 'a command that cannot boot the project says why in one sentence on the error stream and ends with a code that is not 0, and prints no address', $code3 !== 0 && $out3 === '' && str_starts_with( $err3, 'mail queue:' ) === true && str_contains( $err3, 'example.com' ) === false );
