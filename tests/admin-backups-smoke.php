@@ -273,9 +273,17 @@ $outboxFile = \Nino\Filesystem::path( $appData, '/data/mail-queue.php' );
 file_put_contents( $outboxFile, 'LIVE' );
 $foreign = ninoSandboxDir( $appData ). '/foreign-outbox.json';
 file_put_contents( $foreign, 'ARCHIVE' );
+// The texts of the mails of the owner: the project has one of its own, and the archive carries one with the same id and one more
+$bodiesDir = \Nino\Filesystem::path( $appData, \Nino\MailQueue::BODIES );
+@mkdir( $bodiesDir, 0755, true );
+$liveBody = $bodiesDir. '/aaaaaaaaaaaaaaaa.php';
+file_put_contents( $liveBody, 'LIVE' );
+$foreignBody = ninoSandboxDir( $appData ). '/foreign-body.json';
+file_put_contents( $foreignBody, 'ARCHIVE' );
+file_put_contents( $foreignBody. '2', 'ARCHIVE' );
 $foreignTar = ninoSandboxDir( $appData ). '/foreign.tar';
 \Nino\Filesystem::putFileContent( $appData, '/text/probe.php', [ 'a' => 'archived' ] );
-\Nino\Backup::pack( $appData, \Nino\Backup::manifest( $appData ) + [ $foreign => 'data/mail-queue.php' ], $foreignTar );
+\Nino\Backup::pack( $appData, \Nino\Backup::manifest( $appData ) + [ $foreign => 'data/mail-queue.php', $foreignBody => 'data/.mail-bodies/aaaaaaaaaaaaaaaa.php', $foreignBody. '2' => 'data/.mail-bodies/bbbbbbbbbbbbbbbb.php' ], $foreignTar );
 $forgedId = '2026-01-02-030405-manual';
 \Nino\Filesystem::putFileContent( $appData, '/text/probe.php', [ 'a' => 'live' ] );
 $_FILES = [];
@@ -284,7 +292,9 @@ $restored = $status === 200 ? ninoCall( $appData, [ \Nino\Modules\Backups\Admin:
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 unset( $appData['./nino/filesystem/cache'] );
 check( 'an archive that carries the outbox of the mail is restored without it: the rest comes back, the outbox of the project is as it was', $restored[0] === 200 && \Nino\Filesystem::getFileContent( $appData, '/text/probe.php', [] ) === [ 'a' => 'archived' ] && (string) file_get_contents( $outboxFile ) === 'LIVE' );
+check( '...and so does the folder of the texts of the mails of the owner, which a backup never carries and an archive that was put together may: the text of the project stays as it was and the ones of the archive are not brought in', (string) file_get_contents( $liveBody ) === 'LIVE' && is_file( $bodiesDir. '/bbbbbbbbbbbbbbbb.php' ) === false );
 unlink( $outboxFile );
+unlink( $liveBody );
 
 // Names
 $beforeIds = $ids();

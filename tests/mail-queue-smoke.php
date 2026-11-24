@@ -76,7 +76,7 @@ $holders = static function( string $needle ) use ( $sandbox ): array {
 };
 $clock = static function( int $seconds ) use ( &$appData ): void { $appData['./nino/mail/now'] = NOW + $seconds; };
 $reset = static function() use ( &$appData, &$taken, &$answer, &$throws, &$onSend, $path ): void {
-	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-unwritable.php', '/data/mail-queue-unreadable.php', '/data/mail-queue-keys.php', '/data/mail-queue-stuck.php', \Nino\MailQueue::DAMAGED_KEYS ] as $name ) {
+	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-unwritable.php', '/data/mail-queue-unreadable.php', '/data/mail-queue-keys.php', '/data/mail-queue-stuck.php', \Nino\MailQueue::DAMAGED_KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED_STATES, '/data/mail-queue-body.php', '/data/mail-queue-states.php' ] as $name ) {
 		is_dir( $path( $name ) ) === true ? @rmdir( $path( $name ) ) : @unlink( $path( $name ) );
 	}
 
@@ -693,7 +693,7 @@ check( 'the files that hold the mails are php files of one statement that return
 // What the limits are
 $constants = ( new \ReflectionClass( \Nino\MailQueue::class ) )->getConstants();
 check( 'the limits are the ones the manual names', [ $constants['MAX_WAITING'], $constants['MAX_CLIENT'], $constants['MAX_BYTES'], $constants['MAX_AGE'], $constants['KEEP_FAILED'], $constants['MAX_FAILED'], $constants['BACKOFF'], $constants['LEASE'], $constants['BATCH'], $constants['CAP_WAIT'], $constants['KEY_MEMORY'], $constants['MAX_KEYS'] ]
-	=== [ 100, 60, 65536, 172800, 1209600, 500, [ 60, 300, 1800, 7200, 43200 ], 300, 5, 300, 600, 200 ] );
+	=== [ 100, 60, 65536, 172800, 1209600, 500, [ 60, 300, 1800, 7200, 43200 ], 300, 5, 300, 600, 700 ] );
 check( 'the span the request of a site believes a note of the outbox over is the longest wait and a lease', \Nino\Http::MAIL_NOTE_SPAN === \Nino\MailQueue::SPAN && \Nino\MailQueue::SPAN === max( \Nino\MailQueue::BACKOFF ) + \Nino\MailQueue::LEASE );
 
 $reset();

@@ -17,8 +17,8 @@ namespace Nino {
 	 *	is due - a request of a site with an empty outbox, or with mails that wait for a time to come, never loads it
 	 *	(see \Nino\Http::prepareAfter()).
 	 *
-	 *	Four files below /data/, kept out of every backup and of every restore (see \Nino\Backup::OUTBOX). The three that
-	 *	hold mails or keys are php files that a webserver which serves them by mistake runs and gets nothing from - the one
+	 *	Five files below /data/ and a folder, kept out of every backup and of every restore (see \Nino\Backup::OUTBOX). The four that
+	 *	hold mails, keys or states are php files that a webserver which serves them by mistake runs and gets nothing from - the one
 	 *	statement of the file, `<?php return '...';`, returns the json it holds - and they are DATA, as every file of /data/
 	 *	is: read from the disk with file_get_contents() and decoded here (decode()), and never loaded with include. A
 	 *	second process - the cron command beside the webserver - writes them, and the compiled copy of a script that the
@@ -40,6 +40,17 @@ namespace Nino {
 	 *	KEYS, '/data/mail-keys.php': { format, keys: [ { key, id, content, at }, ... ] }. The keys of the mails that were
 	 *	delivered in the last KEY_MEMORY seconds, as hashes, so that a request that comes twice - a double click - is the
 	 *	mail that went out and not a second one. Nothing of the mail is in it.
+	 *
+	 *	STATES, '/data/mail-states.php': { format, states: [ [ id, state, at, content, owner ], ... ] }. What became of the mails that carry a key,
+	 *	for KEEP_STATES seconds and for the last MAX_STATES_OWNER of the owner and MAX_STATES of the others: 'sent' or 'failed', by an id that is a keyed hash of the hash of
+	 *	the key (the secret of the outbox is the key, so that nobody who reads the file can try a key against it), and the time. No
+	 *	address, no subject, no text: \Nino\Mail::state() reads it, with the outbox, which says 'waiting'.
+	 *
+	 *	BODIES, '/data/.mail-bodies/<id>.php': the text of a mail of the kind OWNER, one file for each mail, written once before the
+	 *	mail is in WAITING and removed with it. A wave of 500 mails of 20 KB would make WAITING 10 MB, which is written whole for every mail
+	 *	that is queued, taken and settled (measured, see docs/development.md, Mail); with the text aside the file holds the 500 mails as it
+	 *	holds 500 mails of no text. The mail in WAITING has the text '' and its id is the name of the file. A folder that starts with a
+	 *	dot is none of a backup, and the text of a mail that is not in WAITING any more is swept after TEMP_KEEP seconds.
 	 *
 	 *	FAILED, '/data/mail-failed.php': { format, failed: [ record, ... ] }. What a mail came to that was given up on -
 	 *	no address, no subject, no body, no key, only { id, kind, queued, failed, tries, error } - for KEEP_FAILED seconds.
@@ -75,9 +86,27 @@ namespace Nino {
 		// Where the keys of the mails that went out are kept for a while
 		public const string KEYS = '/data/mail-keys.php';
 
-		// How long the key of a delivered mail is remembered, in seconds - ten minutes - and how many keys at most
+		// How long the key of a delivered mail is remembered, in seconds - ten minutes - and how many keys at most: as many as the outbox
+		// has places, so that a wave of the owner that is queued twice, a double click, is the same wave from its first mail to its last,
+		// whichever of its mails went out in between
 		public const int KEY_MEMORY = 600;
-		public const int MAX_KEYS = 200;
+		public const int MAX_KEYS = self::MAX_WAITING + self::MAX_OWNER;
+
+		// Where what became of a mail is kept for a while, by its key: a hash and a word and a time, no address and no text
+		public const string STATES = '/data/mail-states.php';
+
+		// How long the state of a mail is kept, in seconds - fourteen days, as the record of the mails given up on - and how many
+		// states at most; the oldest go first. The states of the mails of the owner (OWNER) are a list of their own, so that the mails of
+		// the visitors and the mails to nobody - a sign-in leaves one for every try - cannot push the states of a wave out of the file, and a
+		// second click on it send it twice: five full waves in fourteen days
+		public const int KEEP_STATES = 1209600;
+		public const int MAX_STATES = 2000;
+		public const int MAX_STATES_OWNER = 5 * self::MAX_OWNER;
+
+		// Where the texts of the mails of the owner (OWNER) wait, one file for each mail, named by its id: the mails of a wave are
+		// 20 KB each, and the one file of the outbox is written whole for every mail that is queued, taken and settled. A folder
+		// that starts with a dot is none of a backup (see \Nino\Backup::_transient())
+		public const string BODIES = '/data/.mail-bodies';
 
 		// The longest the outbox waits from now to anything, in seconds: the longest wait of BACKOFF and a lease. A note that says more
 		// is none, see \Nino\Http::MAIL_NOTE_SPAN
@@ -96,6 +125,7 @@ namespace Nino {
 		public const string DAMAGED = '/data/mail-queue-damaged.php';
 		public const string DAMAGED_FAILED = '/data/mail-failed-damaged.php';
 		public const string DAMAGED_KEYS = '/data/mail-keys-damaged.php';
+		public const string DAMAGED_STATES = '/data/mail-states-damaged.php';
 
 		// How long a temporary file of a write that was cut off is left, in seconds: an hour
 		public const int TEMP_KEEP = 3600;
@@ -111,6 +141,16 @@ namespace Nino {
 
 		// How many of them mails of a visitor (CLIENT) may be: the rest of the places is the system's
 		public const int MAX_CLIENT = 60;
+
+		// How many mails of the owner (OWNER) may wait, whatever the others hold: a wave of 500 and a few more. Measured, the file of
+		// the outbox holds them as it holds 100 mails with no text
+		public const int MAX_OWNER = 600;
+
+		// What delivering the mails of the owner costs, in seconds of credit: a mail takes OWNER_GAP of them, the credit grows by one
+		// for each second and holds OWNER_BURST mails at most. A run delivers up to OWNER_BURST of them at once and then what the
+		// time since the last has made - 20 mails a minute on average - and no run of any request or command delivers more
+		public const int OWNER_GAP = 3;
+		public const int OWNER_BURST = 20;
 
 		// How large one mail may be: the bytes of its address, subject, reply address and body
 		public const int MAX_BYTES = 65536;
@@ -145,6 +185,7 @@ namespace Nino {
 		public const string FAILURE = 'exception';
 		public const string EXPIRED = 'expired';
 		public const string ABANDONED = 'abandoned';
+		public const string UNREADABLE = 'unreadable';
 
 		/**
 		 *	The secret of the outbox: 32 random bytes as hex, made on the first call and kept in SECRET, which is no part of a backup. It
@@ -231,7 +272,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$mail					{ to, subject, body, replyTo }, cleaned and checked
-		 *	@param		string		$kind					One of \Nino\Mail::CLIENT, SYSTEM, TEST
+		 *	@param		string		$kind					One of \Nino\Mail::CLIENT, SYSTEM, TEST, OWNER
 		 *	@param		string		$key					The hash of the key against a second queueing of the same mail, '' for none
 		 *	@param		string		$content			The hash of what the mail is, which a second mail with the same key has to equal
 		 *
@@ -263,10 +304,29 @@ namespace Nino {
 					return null;
 				}
 
+				// A wave takes longer than the keys are remembered: for the owner a mail that went out stays the same mail as long as its state is kept
+				if( $kind === \Nino\Mail::OWNER && $key !== '' ) {
+
+					$kept = self::_kept( $appData, $key, $content );
+
+					if( $kept === null )
+						return null;
+
+					if( $kept['id'] !== '' || $kept['refused'] !== '' ) {
+						$result = $kept;
+						return null;
+					}
+				}
+
 				if( self::_full( $state['waiting'], $kind ) === true ) {
 					$result = [ 'id' => '', 'refused' => 'full' ];
 					return null;
 				}
+
+				// The text of a mail of the owner waits in a file of its own, written before the mail is in the outbox: a mail that is
+				// there has its text, and a text without a mail is swept (see _sweepBodies())
+				if( $kind === \Nino\Mail::OWNER && self::_putBody( $appData, $id, (string) $mail['body'] ) === false )
+					return null;
 
 				$state['waiting'][$id] = [
 					'id'			=> $id,
@@ -275,7 +335,7 @@ namespace Nino {
 					'kind'		=> $kind,
 					'to'			=> (string) $mail['to'],
 					'subject'	=> (string) $mail['subject'],
-					'body'		=> (string) $mail['body'],
+					'body'		=> $kind === \Nino\Mail::OWNER ? '' : (string) $mail['body'],
 					'replyTo'	=> (string) $mail['replyTo'],
 					'queued'	=> $now,
 					'tries'		=> 0,
@@ -291,8 +351,13 @@ namespace Nino {
 			} );
 
 			// The id of a mail that is new is answered when it is on the disk: the callback has set it before the write
-			if( $written === false && $result['id'] === $id )
+			if( $written === false && $result['id'] === $id ) {
+
 				$result = [ 'id' => '', 'refused' => 'unwritable' ];
+
+				if( $kind === \Nino\Mail::OWNER )
+					self::_dropBody( $appData, $id );
+			}
 
 			return $result;
 		}
@@ -339,8 +404,9 @@ namespace Nino {
 
 			$taken	= null;
 			$given	= 0;
+			$dropped = [];
 
-			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $token, $now, &$taken, &$given ): ?array {
+			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $token, $now, &$taken, &$given, &$dropped ): ?array {
 
 				$state	= self::_state( $stored );
 				$mine		= null;
@@ -364,8 +430,11 @@ namespace Nino {
 					$pending[ $entry['id'] ] = true;
 				}
 
-				$due = array_filter( array_diff_key( $state['waiting'], $pending ), static fn( array $entry ): bool => $entry['next'] <= $now && $entry['tries'] < self::attempts() && self::_leased( $entry, $now ) === false );
-				uasort( $due, static fn( array $a, array $b ): int => [ $a['queued'], $a['id'] ] <=> [ $b['queued'], $b['id'] ] );
+				// The mails of the owner are taken after the mails of the others and while the credit of their pace lasts, so that a wave neither
+				// keeps a mail of a visitor waiting nor goes out in one run
+				$credit	= self::_credit( $state['pace'], $now );
+				$due		= array_filter( array_diff_key( $state['waiting'], $pending ), static fn( array $entry ): bool => $entry['next'] <= $now && $entry['tries'] < self::attempts() && self::_leased( $entry, $now ) === false && ( $entry['kind'] !== \Nino\Mail::OWNER || $credit >= self::OWNER_GAP ) );
+				uasort( $due, static fn( array $a, array $b ): int => [ $a['kind'] === \Nino\Mail::OWNER, $a['queued'], $a['id'] ] <=> [ $b['kind'] === \Nino\Mail::OWNER, $b['queued'], $b['id'] ] );
 
 				foreach( $due as $entry ) {
 
@@ -375,6 +444,9 @@ namespace Nino {
 					$state['waiting'][ $entry['id'] ]['claim']	= $token;
 					$state['waiting'][ $entry['id'] ]['until']	= $now + self::LEASE;
 					$mine = [ 'id' => $entry['id'], 'kind' => $entry['kind'], 'to' => $entry['to'], 'subject' => $entry['subject'], 'body' => $entry['body'], 'replyTo' => $entry['replyTo'] ];
+
+					if( $entry['kind'] === \Nino\Mail::OWNER )
+						$state['pace'] = [ 'at' => $now, 'credit' => $credit - self::OWNER_GAP ];
 
 					break;
 				}
@@ -395,6 +467,12 @@ namespace Nino {
 					$pending = [];
 				}
 
+				$gone = array_intersect_key( $state['waiting'], $pending );
+
+				// What became of them is kept by their keys, once the record of them is written
+				self::_note( $appData, array_map( static fn( array $entry ): array => [ $entry['key'], $entry['content'], $entry['kind'] === \Nino\Mail::OWNER ], $gone ), \Nino\Mail::STATE_FAILED, $now );
+
+				$dropped = array_column( array_filter( $gone, static fn( array $entry ): bool => $entry['kind'] === \Nino\Mail::OWNER ), 'id' );
 				$state['waiting'] = array_diff_key( $state['waiting'], $pending );
 				$taken	= $mine;
 				$given	= count( $records );
@@ -423,6 +501,19 @@ namespace Nino {
 				}
 			}
 
+			// The texts of the mails that are gone leave with them, now that the outbox says so: a text left behind by an end in between is swept
+			foreach( $dropped as $id )
+				self::_dropBody( $appData, $id );
+
+			// The text of a mail of the owner is read when the mail is handed out, from its file: 'aside' says why it is none
+			if( $taken !== null && $taken['kind'] === \Nino\Mail::OWNER ) {
+
+				$text = self::_body( $appData, $taken['id'] );
+
+				$taken['body']	= $text['text'];
+				$taken['aside']	= $text['failure'];
+			}
+
 			$gaveUp = $given;
 
 			return $taken;
@@ -446,11 +537,13 @@ namespace Nino {
 
 			$gaveUp	= false;
 			$left		= false;
+			$text		= false;
 
-			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $token, $id, $outcome, $error, $now, &$gaveUp, &$left ): ?array {
+			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $token, $id, $outcome, $error, $now, &$gaveUp, &$left, &$text ): ?array {
 
 				$gaveUp	= false;
 				$left		= false;
+				$text		= false;
 				$state	= self::_state( $stored );
 				$entry	= $state['waiting'][$id] ?? null;
 
@@ -468,7 +561,11 @@ namespace Nino {
 					if( $entry['key'] !== '' && self::_remember( $appData, $entry, $now ) === false )
 						self::_say( $appData, 'mail-queue-keys', 'Mail queue: the key of a mail that went out could not be kept, so a mail that is queued twice with the same key goes out twice - check private/data/mail-keys.php.' );
 
+					// ...and what became of it for as long as a feature may ask
+					self::_note( $appData, [ [ $entry['key'], $entry['content'], $entry['kind'] === \Nino\Mail::OWNER ] ], \Nino\Mail::STATE_SENT, $now );
+
 					unset( $state['waiting'][$id] );
+					$text = $entry['kind'] === \Nino\Mail::OWNER;
 				}
 				// Anything else is the business of the deliverer that took the mail last
 				else if( $entry['claim'] !== $token ) {
@@ -486,8 +583,11 @@ namespace Nino {
 					if( self::_fail( $appData, [ self::_record( $id, $entry['kind'], $entry['queued'], $now, $entry['tries'], $outcome === 'invalid' ? self::INVALID : $error ) ], $now ) === false )
 						return null;
 
+					self::_note( $appData, [ [ $entry['key'], $entry['content'], $entry['kind'] === \Nino\Mail::OWNER ] ], \Nino\Mail::STATE_FAILED, $now );
+
 					unset( $state['waiting'][$id] );
 					$gaveUp = true;
+					$text = $entry['kind'] === \Nino\Mail::OWNER;
 				}
 				else {
 					$state['waiting'][$id]['error']	= $error;
@@ -497,6 +597,10 @@ namespace Nino {
 
 				return self::_file( $state );
 			} );
+
+			// The text of a mail of the owner that has left goes with it, once the outbox says so
+			if( $written === true && $text === true )
+				self::_dropBody( $appData, $id );
 
 			return [ 'written' => $written === true || $left === true, 'gaveUp' => $gaveUp ];
 		}
@@ -570,9 +674,15 @@ namespace Nino {
 
 			$due = PHP_INT_MAX;
 
+			$wait = max( 0, self::OWNER_GAP - self::_credit( $state['pace'], $now ) );
+
 			foreach( $state['waiting'] as $entry ) {
 
 				$wake = max( $entry['next'], self::_holdEnd( $entry, $now ) );
+
+				// A mail of the owner waits for its pace, unless it is out of attempts, which the next run gives up on whatever the pace
+				if( $entry['kind'] === \Nino\Mail::OWNER && $entry['tries'] < self::attempts() )
+					$wake = max( $wake, $now + $wait );
 
 				$due = min( $due, $wake, $entry['queued'] + self::MAX_AGE );
 			}
@@ -644,8 +754,9 @@ namespace Nino {
 		}
 
 		/**
-		 *	Whether the outbox has no place for a mail of a kind: all of MAX_WAITING are taken, or - for a mail of a visitor - the
-		 *	MAX_CLIENT that a visitor may have
+		 *	Whether the outbox has no place for a mail of a kind: for a mail of the owner the MAX_OWNER places of its own are taken, which
+		 *	no other kind has a share in; for the others all of MAX_WAITING of the mails that are not the owner's are taken, or - for a
+		 *	mail of a visitor - the MAX_CLIENT that a visitor may have
 		 *
 		 *	@param		array 		$waiting
 		 *	@param		string		$kind
@@ -654,7 +765,12 @@ namespace Nino {
 		 */
 		private static function _full( array $waiting, string $kind ): bool {
 
-			if( count( $waiting ) >= self::MAX_WAITING )
+			$owner = count( array_filter( $waiting, static fn( array $entry ): bool => $entry['kind'] === \Nino\Mail::OWNER ) );
+
+			if( $kind === \Nino\Mail::OWNER )
+				return $owner >= self::MAX_OWNER;
+
+			if( count( $waiting ) - $owner >= self::MAX_WAITING )
 				return true;
 
 			return $kind === \Nino\Mail::CLIENT && count( array_filter( $waiting, static fn( array $entry ): bool => $entry['kind'] === \Nino\Mail::CLIENT ) ) >= self::MAX_CLIENT;
@@ -740,7 +856,7 @@ namespace Nino {
 		 */
 		private static function _kinds(): array {
 
-			return [ \Nino\Mail::CLIENT, \Nino\Mail::SYSTEM, \Nino\Mail::TEST ];
+			return [ \Nino\Mail::CLIENT, \Nino\Mail::SYSTEM, \Nino\Mail::TEST, \Nino\Mail::OWNER ];
 		}
 
 		/**
@@ -994,20 +1110,329 @@ namespace Nino {
 		}
 
 		/**
+		 *	The credit of the mails of the owner at a time, in seconds: what the last that was taken left, and one for each second since,
+		 *	not above OWNER_BURST mails' worth. A mail takes OWNER_GAP of it. No pace is a full credit, and so is one that lies further
+		 *	ahead than a credit can grow: a clock that was set back, or a file that somebody edited, holds nothing, and gives one burst of
+		 *	OWNER_BURST mails each time it is set back
+		 *
+		 *	@param		array|null	$pace					{ at, credit } as _state() answers it
+		 *	@param		int				$now
+		 *
+		 *	@return 	int
+		 */
+		private static function _credit( ?array $pace, int $now ): int {
+
+			$cap = self::OWNER_BURST * self::OWNER_GAP;
+
+			if( $pace === null || $pace['at'] > $now + $cap )
+				return $cap;
+
+			return min( $cap, $pace['credit'] + max( 0, $now - $pace['at'] ) );
+		}
+
+		/**
+		 *	The id under which the state of a mail is kept: a keyed hash of the hash of its key, with the secret of the outbox, so that
+		 *	nobody who reads the file can try a key against it, and half the length of a hash, which holds against a collision at the
+		 *	number of states the file keeps
+		 *
+		 *	@param		string		$secret				As secret() answers
+		 *	@param		string		$hash					The hash of the key
+		 *
+		 *	@return 	string										32 hex digits
+		 */
+		private static function _stateId( string $secret, string $hash ): string {
+
+			return substr( hash_hmac( 'sha256', $hash, $secret ), 0, 32 );
+		}
+
+		/**
+		 *	The states a file of them holds that are none too old and are what they should be
+		 *
+		 *	@param		mixed			$stored
+		 *	@param		int				$now
+		 *
+		 *	@return 	array											{ id: [ id, state, at, content, owner ] }, the newest first; owner is 1 for a mail of the owner
+		 */
+		private static function _stateRecords( mixed $stored, int $now ): array {
+
+			$records = [];
+
+			foreach( is_array( $stored ) === true && is_array( $stored['states'] ?? null ) === true ? $stored['states'] : [] as $record ) {
+
+				if( is_array( $record ) === false || count( $record ) !== 5 || is_string( $record[0] ?? null ) === false || preg_match( '/^[0-9a-f]{32}$/D', $record[0] ) !== 1
+					|| is_string( $record[3] ?? null ) === false || preg_match( '/^[0-9a-f]{16}$/D', $record[3] ) !== 1 || in_array( $record[4] ?? null, [ 0, 1 ], true ) === false
+					|| in_array( $record[1] ?? null, [ \Nino\Mail::STATE_SENT, \Nino\Mail::STATE_FAILED ], true ) === false
+					|| is_int( $record[2] ?? null ) === false || $record[2] < 0 || $now - $record[2] >= self::KEEP_STATES )
+					continue;
+
+				$records[ $record[0] ] = [ $record[0], $record[1], $record[2], $record[3], $record[4] ];
+			}
+
+			uasort( $records, static fn( array $a, array $b ): int => $b[2] <=> $a[2] );
+
+			return $records;
+		}
+
+		/**
+		 *	Keep what became of mails by their keys: sent or given up on. A key that cannot be kept costs a feature the answer to
+		 *	state() for that mail and nothing else, and is said in the log, as a key of the mails that went out is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$items				[ [ the hash of the key, the hash of the content, whether it is a mail of the owner ], ... ]; '' for the key of a mail with none
+		 *	@param		string		$state				\Nino\Mail::STATE_SENT or STATE_FAILED
+		 *	@param		int				$now
+		 *
+		 *	@return 	void
+		 */
+		private static function _note( array &$appData, array $items, string $state, int $now ): void {
+
+			$items = array_values( array_filter( $items, static fn( array $item ): bool => $item[0] !== '' ) );
+
+			if( $items === [] )
+				return;
+
+			$secret = self::secret( $appData );
+
+			$kept = $secret !== '' && self::_mutate( $appData, self::STATES, static function( array $stored ) use ( $items, $state, $now, $secret ): array {
+
+				$fresh = [];
+
+				foreach( $items as [ $hash, $content, $owner ] ) {
+
+					$id = self::_stateId( $secret, $hash );
+					$fresh[$id] = [ $id, $state, $now, substr( hash_hmac( 'sha256', $content, $secret ), 0, 16 ), $owner === true ? 1 : 0 ];
+				}
+
+				// The new ones stand before the old ones of the same second, which the cut keeps; each of the two lists is cut by itself
+				$records = $fresh + array_diff_key( self::_stateRecords( $stored, $now ), $fresh );
+				uasort( $records, static fn( array $a, array $b ): int => $b[2] <=> $a[2] );
+
+				$room = [ 0 => self::MAX_STATES, 1 => self::MAX_STATES_OWNER ];
+				$records = array_filter( $records, static function( array $record ) use ( &$room ): bool {
+
+					return $room[ $record[4] ]-- > 0;
+				} );
+
+				return [ 'format' => 1, 'states' => array_values( $records ) ];
+			} );
+
+			if( $kept === false )
+				self::_say( $appData, 'mail-queue-states', 'Mail queue: what became of a mail could not be kept, so \Nino\Mail::state() does not know it - check private/data/mail-states.php.' );
+		}
+
+		/**
+		 *	What became of the mails that carry keys, read from the outbox and from the states, each file once
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$hashes				The hashes of the keys, none of them ''
+		 *
+		 *	@return 	array											{ hash: state } - \Nino\Mail::STATE_WAITING where the mail waits, STATE_SENT or STATE_FAILED where it was kept, STATE_UNKNOWN where nothing is; STATE_UNREADABLE for each where a file is there and cannot be read: what a mail came to is not known then
+		 */
+		public static function states( array &$appData, array $hashes ): array {
+
+			$answer	= [];
+			$state	= self::_read( $appData );
+			$stored	= self::_load( $appData, self::STATES );
+			$secret	= self::_load( $appData, self::SECRET );
+
+			if( $state['unreadable'] === true || $stored === false || $secret === false ) {
+
+				foreach( $hashes as $hash )
+					$answer[$hash] = \Nino\Mail::STATE_UNREADABLE;
+
+				return $answer;
+			}
+
+			// Without the secret nothing was ever kept, or what was kept cannot be found: a file of the states that this secret did not write
+			// holds ids that no key has
+			$key		= is_string( $secret['secret'] ?? null ) === true && preg_match( '/^[0-9a-f]{64}$/D', $secret['secret'] ) === 1 ? $secret['secret'] : '';
+			$kept		= $key === '' ? [] : self::_stateRecords( $stored, self::now( $appData ) );
+			$waiting = array_flip( array_column( $state['waiting'], 'key' ) );
+
+			foreach( $hashes as $hash ) {
+
+				if( isset( $waiting[$hash] ) === true )
+					$answer[$hash] = \Nino\Mail::STATE_WAITING;
+				else
+					$answer[$hash] = $key !== '' ? ( $kept[ self::_stateId( $key, $hash ) ][1] ?? \Nino\Mail::STATE_UNKNOWN ) : \Nino\Mail::STATE_UNKNOWN;
+			}
+
+			return $answer;
+		}
+
+		/**
+		 *	What the states say of a mail of the owner that carries a key, when it is neither in the outbox nor in the keys of the last
+		 *	KEY_MEMORY seconds: a wave takes longer than the keys are remembered, and a second click that comes after the first mails
+		 *	have gone out must not send them again. A mail that was delivered is the same mail for as long as the state is kept (and a
+		 *	mail whose content is another is a conflict, as for a key that is remembered); a mail that was given up on is free to be
+		 *	queued again, which is a second try of its owner
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The hash of the key
+		 *	@param		string		$content			The hash of what the mail is
+		 *
+		 *	@return 	array|null								{ id, refused } for a mail that is known - its id, which is the same for every call, or 'conflict' - and { id: '', refused: '' } for one that is not; null where a file is there and cannot be read: nothing is known
+		 */
+		private static function _kept( array &$appData, string $key, string $content ): ?array {
+
+			$stored	= self::_load( $appData, self::STATES );
+			$secret	= self::_load( $appData, self::SECRET );
+
+			if( $stored === false || $secret === false )
+				return null;
+
+			$salt = is_string( $secret['secret'] ?? null ) === true && preg_match( '/^[0-9a-f]{64}$/D', $secret['secret'] ) === 1 ? $secret['secret'] : '';
+			$id		= $salt === '' ? '' : self::_stateId( $salt, $key );
+			$kept	= $salt === '' ? null : ( self::_stateRecords( $stored, self::now( $appData ) )[$id] ?? null );
+
+			if( $kept === null || $kept[1] !== \Nino\Mail::STATE_SENT )
+				return [ 'id' => '', 'refused' => '' ];
+
+			// The id of a mail that went out long ago is not kept: the answer is one that every call gets alike, and state() says what it is
+			return $kept[3] === substr( hash_hmac( 'sha256', $content, $salt ), 0, 16 ) ? [ 'id' => substr( $id, 0, 16 ), 'refused' => '' ] : [ 'id' => '', 'refused' => 'conflict' ];
+		}
+
+		/**
+		 *	The file of the text of a mail of the owner, by the id of the mail
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id						16 hex digits
+		 *
+		 *	@return 	string										The path, '' where the id is none
+		 */
+		private static function _bodyPath( array &$appData, string $id ): string {
+
+			return preg_match( '/^[0-9a-f]{16}$/D', $id ) === 1 ? \Nino\Filesystem::path( $appData, self::BODIES. '/'. $id. '.php' ) : '';
+		}
+
+		/**
+		 *	Write the text of a mail of the owner: in the form of the other files of the outbox, with the mode MODE, once and whole
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id
+		 *	@param		string		$body
+		 *
+		 *	@return 	bool											Whether it is written
+		 */
+		private static function _putBody( array &$appData, string $id, string $body ): bool {
+
+			$json = json_encode( [ 'format' => 1, 'body' => $body ], JSON_UNESCAPED_SLASHES );
+
+			if( $json === false || self::_bodyPath( $appData, $id ) === '' )
+				return false;
+
+			$name		= self::BODIES. '/'. $id. '.php';
+			$written = \Nino\Filesystem::putFileContent( $appData, $name, $json, true, self::MODE );
+
+			// What was written is on the disk and nowhere else: the cache of the request keeps no copy of the text of a wave
+			unset( $appData['./nino/filesystem/cache'][$name] );
+
+			return $written;
+		}
+
+		/**
+		 *	The text of a mail of the owner, from its file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id
+		 *
+		 *	@return 	array											{ text, failure } - the text and '', or '' and 'missing' (no file, or one that is not what this class wrote: the mail cannot be sent) or 'unreadable' (the file is there and cannot be read: the mail waits for its next attempt)
+		 */
+		private static function _body( array &$appData, string $id ): array {
+
+			$real = self::_bodyPath( $appData, $id );
+
+			if( $real === '' )
+				return [ 'text' => '', 'failure' => 'missing' ];
+
+			clearstatcache( true, $real );
+			$raw = is_file( $real ) === true ? @file_get_contents( $real ) : false;
+
+			if( $raw === false && is_file( $real ) === true ) {
+
+				self::_say( $appData, 'mail-queue-body', 'Mail queue: the text of a mail of the owner is there and cannot be read, so the mail waits for its next attempt - the files of the outbox are 0600 and belong to the user of the webserver (private/data/.mail-bodies).' );
+
+				return [ 'text' => '', 'failure' => 'unreadable' ];
+			}
+
+			$stored = $raw === false ? null : self::decode( $raw );
+
+			return is_array( $stored ) === true && is_string( $stored['body'] ?? null ) === true ? [ 'text' => $stored['body'], 'failure' => '' ] : [ 'text' => '', 'failure' => 'missing' ];
+		}
+
+		/**
+		 *	Remove the file of the text of a mail
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id
+		 *
+		 *	@return 	void
+		 */
+		private static function _dropBody( array &$appData, string $id ): void {
+
+			$real = self::_bodyPath( $appData, $id );
+
+			if( $real !== '' )
+				@unlink( $real );
+		}
+
+		/**
+		 *	Remove what is left of the texts of the mails of the owner: the file of a mail that is not in the outbox - an end between
+		 *	the write of the text and the write of the mail, or between the write of the outbox and the removal of the text - once it is
+		 *	older than TEMP_KEEP, which no mail that was just queued is, and the temporary files of a write that was cut off. The
+		 *	outbox is read for it only where such a file is, so that a run that finds none pays for the listing of the folder
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		private static function _sweepBodies( array &$appData ): void {
+
+			$folder = \Nino\Filesystem::path( $appData, self::BODIES );
+
+			if( $folder === '' || is_dir( $folder ) === false || is_link( $folder ) === true )
+				return;
+
+			$old = [];
+
+			foreach( glob( $folder. '/*.php' ) ?: [] as $file )
+				if( time() - (int) @filemtime( $file ) >= self::TEMP_KEEP )
+					$old[] = $file;
+
+			$state = $old === [] ? null : self::_read( $appData );
+
+			// An outbox that cannot be read says nothing about what waits in it: nothing is removed
+			if( $state !== null && $state['unreadable'] === false )
+				foreach( $old as $file )
+					if( isset( $state['waiting'][ basename( $file, '.php' ) ] ) === false )
+						@unlink( $file );
+
+			foreach( glob( $folder. '/'. \Nino\Filesystem::PRIVATE_TEMP. '/*.tmp' ) ?: [] as $file )
+				if( time() - (int) @filemtime( $file ) >= self::TEMP_KEEP )
+					@unlink( $file );
+		}
+
+		/**
 		 *	What a file of the outbox holds, made into what it should be: nothing that was read is trusted. A mail that is
 		 *	not one - no id, a kind that is none, a text that is no text, a size over the limit - is not in 'waiting' and
 		 *	is counted in 'bad', which the deliverer gives up on
 		 *
 		 *	@param		mixed			$stored
 		 *
-		 *	@return 	array										{ waiting: { id: mail }, bad: int, unreadable: bool } - a file that is there and could not be read (_load() answers false for it) is no empty file: nothing is taken from it and nothing is written over it
+		 *	@return 	array										{ waiting: { id: mail }, bad: int, unreadable: bool, pace: { at, credit }|null } - a file that is there and could not be read (_load() answers false for it) is no empty file: nothing is taken from it and nothing is written over it
 		 */
 		private static function _state( mixed $stored ): array {
 
-			$state = [ 'waiting' => [], 'bad' => 0, 'unreadable' => $stored === false ];
+			$state = [ 'waiting' => [], 'bad' => 0, 'unreadable' => $stored === false, 'pace' => null ];
 
 			if( is_array( $stored ) === false )
 				return $state;
+
+			// The credit of the mails of the owner, as the last that was taken left it: a number that is none says no pace, which is a full credit
+			$pace = is_array( $stored['pace'] ?? null ) === true ? $stored['pace'] : [];
+
+			if( is_int( $pace['at'] ?? null ) === true && is_int( $pace['credit'] ?? null ) === true && $pace['at'] >= 0 && $pace['credit'] >= 0 && $pace['credit'] <= self::OWNER_BURST * self::OWNER_GAP )
+				$state['pace'] = [ 'at' => $pace['at'], 'credit' => $pace['credit'] ];
 
 			foreach( is_array( $stored['waiting'] ?? null ) === true ? $stored['waiting'] : [] as $entry ) {
 
@@ -1046,6 +1471,7 @@ namespace Nino {
 				|| ( $entry['key'] !== '' && preg_match( '/^[0-9a-f]{64}$/', $entry['key'] ) !== 1 )
 				|| preg_match( '/^[0-9a-f]{64}$/', $entry['content'] ) !== 1
 				|| in_array( $entry['kind'], self::_kinds(), true ) === false
+				|| ( $entry['kind'] === \Nino\Mail::OWNER && $entry['body'] !== '' )
 				|| preg_match( '/^[a-z]{0,16}$/', $entry['error'] ) !== 1
 				|| strlen( $entry['to'] ) + strlen( $entry['subject'] ) + strlen( $entry['body'] ) + strlen( $entry['replyTo'] ) > self::MAX_BYTES )
 				return null;
@@ -1077,7 +1503,12 @@ namespace Nino {
 		 */
 		private static function _file( array $state ): array {
 
-			return [ 'format' => 1, 'waiting' => array_values( $state['waiting'] ) ];
+			$file = [ 'format' => 1, 'waiting' => array_values( $state['waiting'] ) ];
+
+			if( $state['pace'] !== null )
+				$file['pace'] = $state['pace'];
+
+			return $file;
 		}
 
 		/**
@@ -1176,7 +1607,7 @@ namespace Nino {
 		 */
 		private static function _replace( array &$appData, string $path, string $real, string $raw ): bool {
 
-			$names	= [ self::FAILED => [ self::DAMAGED_FAILED, 'the record of the mails given up on starts empty' ], self::KEYS => [ self::DAMAGED_KEYS, 'the keys of the mails that went out start empty' ] ];
+			$names	= [ self::FAILED => [ self::DAMAGED_FAILED, 'the record of the mails given up on starts empty' ], self::KEYS => [ self::DAMAGED_KEYS, 'the keys of the mails that went out start empty' ], self::STATES => [ self::DAMAGED_STATES, 'the states of the mails start empty' ] ];
 			[ $to, $what ] = $names[$path] ?? [ self::DAMAGED, 'the outbox starts empty' ];
 			$sha		= hash( 'sha256', $raw );
 			$notice	= \Nino\Filesystem::path( $appData, $to );
@@ -1289,7 +1720,7 @@ namespace Nino {
 		 */
 		private static function _sweepAside( array &$appData ): void {
 
-			foreach( [ self::DAMAGED, self::DAMAGED_FAILED, self::DAMAGED_KEYS ] as $path ) {
+			foreach( [ self::DAMAGED, self::DAMAGED_FAILED, self::DAMAGED_KEYS, self::DAMAGED_STATES ] as $path ) {
 
 				$real = \Nino\Filesystem::path( $appData, $path );
 
@@ -1313,6 +1744,8 @@ namespace Nino {
 			foreach( glob( $folder. '/*.tmp' ) ?: [] as $file )
 				if( time() - (int) @filemtime( $file ) >= self::TEMP_KEEP )
 					@unlink( $file );
+
+			self::_sweepBodies( $appData );
 
 			// The keys of the mails that went out are of no use after their time, and the file is removed when nothing was added to it since
 			$keys = \Nino\Filesystem::path( $appData, self::KEYS );

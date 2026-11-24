@@ -72,6 +72,24 @@ namespace Nino {
 		// long as the address that was given (see queue()), so that no stored kind of the outbox is new
 		public const string VOID = 'void';
 
+		// The kind of a mail that an account of the workshop sets off - a round mail to the people of a workshop - for queue() alone: it is
+		// taken only where the request carries the session of such an account (\Nino\Auth::getCurrentUser()), is charged to no cap of the
+		// hour and to no place of the visitors or of the system, has places of its own (MailQueue::MAX_OWNER) and is delivered at a pace
+		// of its own, after the mails of the others (see queue())
+		public const string OWNER = 'owner';
+
+		// What became of a mail by its key, see state(): it waits, it was delivered, it was given up on, the outbox knows no mail of
+		// this key - never queued, or forgotten after MailQueue::KEEP_STATES seconds and MailQueue::MAX_STATES mails - or a file of
+		// the outbox is there and cannot be read
+		public const string STATE_WAITING = 'waiting';
+		public const string STATE_SENT = 'sent';
+		public const string STATE_FAILED = 'failed';
+		public const string STATE_UNKNOWN = 'unknown';
+		public const string STATE_UNREADABLE = 'unreadable';
+
+		// The shape of the key of a mail, see queue(): the name of the feature, a slash, what it makes of it
+		private const string KEY_PATTERN = '~^[a-z][a-z0-9-]{1,62}/[\x21-\x7e]{1,128}$~D';
+
 		// The address a mail to nobody is checked with when it is delivered: it has none, and the check of the rest is the one of a mail
 		private const string VOID_ADDRESS = 'void@example.invalid';
 
@@ -244,6 +262,21 @@ namespace Nino {
 		 *	length in both cases, and a fresh code in each. VOID is no brake and no way round one: it takes the places and the cap of a visitor as a mail does, and a feature
 		 *	needs a brake of its own for each sender before it calls queue(), the same in both cases.
 		 *
+		 *	The kind OWNER is a round mail that an account of the workshop sets off, one mail to each of the people of a workshop. It is
+		 *	taken only where the request carries the session of an account (\Nino\Auth::getCurrentUser()): a visitor, a session that
+		 *	ended, a command with no session get '' and queueRefused() says 'session'; and only in a POST request ('method' for any
+		 *	other). Which account may send it, and to whom, and whether the request carries the token of the form (CSRF), the feature
+		 *	asks itself - the kernel keeps that nobody without a session can set the kind off with a link, and nothing more. A mail
+		 *	with a key that waits, or was delivered and is still known to state() (fourteen days), is the same mail whenever it is
+		 *	queued again - its owner's second click, in the middle of a wave or an hour after it, sends nothing twice - and a mail that
+		 *	was given up on is queued anew; a feature that wants the same text sent again on purpose gives it a new key. It counts against no cap of the hour and against no place of the visitors or of the system, and a full wave
+		 *	keeps neither of them out, as they do not keep it: it has MailQueue::MAX_OWNER places of its own. Its text waits in a file
+		 *	of its own for each mail, so that a wave of 500 mails of 20 KB is no larger to the outbox than 100 mails of a few lines (see
+		 *	MailQueue). It is delivered after the mails of the others, at a pace - MailQueue::OWNER_BURST mails at once, and then one for
+		 *	each MailQueue::OWNER_GAP seconds, which is 20 mails a minute for a cron job that runs every minute: 200 mails take ten
+		 *	minutes, 500 mails 25 - with the waits and the end of the other kinds as they are. What became of one mail of a wave is asked
+		 *	of state() by its key.
+		 *
 		 *	The caps of the hour hold as they do for send() and sendSystem(), at the place where the mail is not
 		 *	delivered without them: a mail of the kind CLIENT counts one try of the client's cap when it is queued, the
 		 *	only moment the client is known; a mail of the kind SYSTEM or TEST counts one unit of the site's cap of that
@@ -251,7 +284,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$mail					{ to, subject, body, replyTo }
-		 *	@param		string		$kind					CLIENT, SYSTEM, TEST or VOID
+		 *	@param		string		$kind					CLIENT, SYSTEM, TEST, VOID or OWNER
 		 *	@param		string		$key					Names the mail, '<name of the feature>/<anything>' - the name is a slug and no other feature's: a second call with the key of a mail that waits and the same mail is that mail, and its id is answered, one with another mail is refused as 'conflict'; '' for none. A key is remembered for ten minutes after its mail went out, so that a request that comes twice is the mail that went out
 		 *
 		 *	@return 	string									The id of the mail, 16 hex digits; '' where it was refused
@@ -263,8 +296,19 @@ namespace Nino {
 
 			// A key is the caller's own: it starts with a name of the feature or the module that queues - 'invite/2026-0042' - so that
 			// another one cannot take the id of its mail
-			if( in_array( $kind, [ self::CLIENT, self::SYSTEM, self::TEST, self::VOID ], true ) === false || ( $key !== '' && preg_match( '~^[a-z][a-z0-9-]{1,62}/[\x21-\x7e]{1,128}$~D', $key ) !== 1 ) )
+			if( in_array( $kind, [ self::CLIENT, self::SYSTEM, self::TEST, self::VOID, self::OWNER ], true ) === false || ( $key !== '' && preg_match( self::KEY_PATTERN, $key ) !== 1 ) )
 				return self::_refused( $appData, 'invalid' );
+
+			// A mail of the owner is taken from an account that is signed in, and from nobody else: not a visitor, not a request with a session that
+			// ended or was never opened, not a cron job. Whether this account may send it is the feature's to ask; the kernel keeps that no visitor can
+			if( $kind === self::OWNER && \Nino\Auth::getCurrentUser( $appData ) === false )
+				return self::_refused( $appData, 'session' );
+
+			// ...and from a request that changes something: a wave is set off by a POST, never by a link another page sends the browser of a signed-in
+			// account to. The right and the CSRF token of that POST are the feature's to check (Csrf::blocked() does for a route); the kernel holds the
+			// session and the method
+			if( $kind === self::OWNER && ( $_SERVER['REQUEST_METHOD'] ?? '' ) !== 'POST' )
+				return self::_refused( $appData, 'method' );
 
 			$checked = self::_checked( $mail );
 
@@ -322,11 +366,59 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	string									'' where it took the mail or none was queued; else 'invalid', 'size', 'full', 'conflict', 'ratelimited' or 'unwritable'
+		 *	@return 	string									'' where it took the mail or none was queued; else 'invalid', 'size', 'full', 'conflict', 'ratelimited', 'session', 'method' or 'unwritable'
 		 */
 		public static function queueRefused( array &$appData ): string {
 
 			return (string) ( $appData['./nino/mail/queue/refused'] ?? '' );
+		}
+
+		/**
+		 *	What became of the mail that was queued under a key: it waits, it was delivered, it was given up on. A feature that
+		 *	lists the people of a round mail reads it for the mark by each name - states() for all of them at once. What is kept is
+		 *	the key as a keyed hash, the word and the time: no address, no subject, no text. A mail that was delivered or given up on
+		 *	stays known for MailQueue::KEEP_STATES seconds (fourteen days), and for the last MailQueue::MAX_STATES mails that did; what is
+		 *	older or further back is unknown, as is a key nothing was queued under. A mail to nobody (VOID) is delivered when it was let go.
+		 *	The key is the one that was given to queue(), in its form - a name of the feature and a slash - and the form is all there is
+		 *	to it: a feature that asks for a key of another one gets the answer, as it gets the id of its mail from queue() (see the
+		 *	key there). There is no call back into the code of a feature when a mail is delivered or given up on: a hook in the middle of
+		 *	the delivery would be foreign code in the work of a request that nobody waits for - the feature asks
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key
+		 *
+		 *	@return 	string									STATE_WAITING, STATE_SENT, STATE_FAILED, STATE_UNKNOWN, or STATE_UNREADABLE where a file of the outbox is there and cannot be read (what a mail came to is not known then)
+		 */
+		public static function state( array &$appData, string $key ): string {
+
+			return self::states( $appData, [ $key ] )[$key] ?? self::STATE_UNKNOWN;
+		}
+
+		/**
+		 *	What became of the mails that were queued under keys, for many at once: the files are read once for all of them, where
+		 *	one call of state() for each of 200 people would read them 200 times
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$keys					[ key, ... ]; what is no key in form is unknown, and what is no string is left out
+		 *
+		 *	@return 	array										{ key: state } as state() answers one, for each key that is a string
+		 */
+		public static function states( array &$appData, array $keys ): array {
+
+			$hashes = [];
+
+			foreach( $keys as $key )
+				if( is_string( $key ) === true && preg_match( self::KEY_PATTERN, $key ) === 1 )
+					$hashes[$key] = hash( 'sha256', $key );
+
+			$known = $hashes === [] ? [] : \Nino\MailQueue::states( $appData, array_values( array_unique( $hashes ) ) );
+			$answer = [];
+
+			foreach( $keys as $key )
+				if( is_string( $key ) === true )
+					$answer[$key] = isset( $hashes[$key] ) === true ? $known[ $hashes[$key] ] : self::STATE_UNKNOWN;
+
+			return $answer;
 		}
 
 		/**
@@ -352,7 +444,7 @@ namespace Nino {
 		 *	queued(). Where the outbox cannot be written nothing is sent and the answer says so, 'unwritable'.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		int|null	$limit				The most mails to deliver, MailQueue::BATCH for none
+		 *	@param		int|null	$limit				The most mails to deliver, MailQueue::BATCH for none; the mails of the owner (OWNER) are delivered after the others, within the limit and at their pace - MailQueue::OWNER_BURST at once at most, then one for each MailQueue::OWNER_GAP seconds
 		 *
 		 *	@return 	array										{ delivered, void, retry, held, failed, unwritable } - the mails delivered; the mails to nobody (VOID) that were let go, which clear no failure; the ones that wait for another attempt; the ones that wait for the cap of the hour; the ones given up on; whether the outbox could not be written
 		 */
@@ -439,6 +531,11 @@ namespace Nino {
 		 */
 		private static function _deliverQueued( array &$appData, array $entry ): array {
 
+			// The text of a mail of the owner is in a file of its own, which was not there or could not be read: a mail that has no text cannot be
+			// sent, and a text that cannot be read now is tried again after the wait
+			if( ( $entry['aside'] ?? '' ) !== '' )
+				return $entry['aside'] === 'unreadable' ? [ 'again', \Nino\MailQueue::UNREADABLE ] : [ 'invalid', \Nino\MailQueue::INVALID ];
+
 			// The file is one a person can edit: what was queued is checked once more, a mail to nobody with an address that stands for none
 			$void			= self::_isVoid( $entry );
 			$checked	= self::_checked( $void === true ? [ 'to' => self::VOID_ADDRESS ] + $entry : $entry );
@@ -455,7 +552,7 @@ namespace Nino {
 				return [ 'sent', '' ];
 			}
 
-			if( $entry['kind'] !== self::CLIENT && \Nino\Feature::count( $appData, self::COUNTER_PREFIX. $entry['kind'], 'site', $entry['kind'] === self::SYSTEM ? self::SYSTEM_CAP : self::TEST_CAP, self::WINDOW ) === false )
+			if( in_array( $entry['kind'], [ self::SYSTEM, self::TEST ], true ) === true && \Nino\Feature::count( $appData, self::COUNTER_PREFIX. $entry['kind'], 'site', $entry['kind'] === self::SYSTEM ? self::SYSTEM_CAP : self::TEST_CAP, self::WINDOW ) === false )
 				return [ 'held', '' ];
 
 			try {

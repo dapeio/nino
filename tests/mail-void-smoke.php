@@ -59,7 +59,7 @@ $holders = static function( string $needle ) use ( $sandbox ): array {
 	return $found;
 };
 $reset = static function() use ( &$appData, &$taken, &$answer, $path ): void {
-	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::DAMAGED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php' ] as $name )
+	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php' ] as $name )
 		@unlink( $path( $name ) );
 
 	clearstatcache();

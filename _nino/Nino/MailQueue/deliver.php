@@ -8,7 +8,8 @@ declare(strict_types=1);
  *	Usage: php _nino/Nino/MailQueue/deliver.php
  *
 
- *	Delivers what is due in the outbox, up to LIMIT mails, and prints one line: the mails delivered, the mails to nobody
+ *	Delivers what is due in the outbox, up to LIMIT mails - the mails of the owner (\Nino\Mail::OWNER) at their pace, at most
+ *	\Nino\MailQueue::OWNER_BURST for a run that comes once a minute - and prints one line: the mails delivered, the mails to nobody
  *	(\Nino\Mail::VOID) that were let go - a count for the operator, which tells a visitor nothing - the ones that wait for
  *	another attempt, the ones that wait for the cap of the hour, the ones given up on and the ones that still wait - no address.
  *	It ends with 1 and a sentence on the error stream where the project cannot be booted, where it does not run as the owner of private/data (it

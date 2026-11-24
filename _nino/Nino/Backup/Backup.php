@@ -189,7 +189,7 @@ namespace Nino {
 		}
 
 		// The files of the outbox of \Nino\Mail: not in a backup, and not brought back by a restore of any archive
-		private const array OUTBOX = [ 'mail-queue.php', 'mail-queue-due.txt', 'mail-keys.php', 'mail-failed.php', 'mail-queue-damaged.php', 'mail-failed-damaged.php', 'mail-keys-damaged.php', 'mail-queue-unreadable.php', 'mail-queue-keys.php', 'mail-queue-stuck.php', 'mail-queue-record.php', 'mail-queue-unwritable.php', 'mail-secret.php' ];
+		private const array OUTBOX = [ 'mail-queue.php', 'mail-queue-due.txt', 'mail-keys.php', 'mail-failed.php', 'mail-queue-damaged.php', 'mail-failed-damaged.php', 'mail-keys-damaged.php', 'mail-queue-unreadable.php', 'mail-queue-keys.php', 'mail-queue-stuck.php', 'mail-queue-record.php', 'mail-queue-unwritable.php', 'mail-queue-body.php', 'mail-queue-states.php', 'mail-states.php', 'mail-states-damaged.php', 'mail-secret.php' ];
 
 		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'mail-status.php', 'catalogue.php', ...self::OUTBOX ];
 
@@ -843,6 +843,12 @@ namespace Nino {
 
 			if( is_dir( $folder ) === true && is_link( $folder ) === false )
 				\Nino\Filesystem::removeDir( $folder );
+
+			// ...and the folder of the texts of the mails of the owner, which a backup never carries and an archive somebody put together may
+			$bodies = rtrim( $staging, DIRECTORY_SEPARATOR ). '/data/'. basename( \Nino\MailQueue::BODIES );
+
+			if( is_dir( $bodies ) === true && is_link( $bodies ) === false )
+				\Nino\Filesystem::removeDir( $bodies );
 		}
 
 		/**
