@@ -222,7 +222,7 @@
 				],
 				labels : { search : word('/_admin/logs/label/search'), empty : word('/_admin/logs/empty'), noMatch : word('/_admin/logs/nomatch'), loading : word('/_admin/logs/loading') },
 				actions : function( row ) {
-					return [ Nino.adminUi.iconButton( 'eye', word('/_admin/logs/row/open'), function( event ) {
+					return [ Nino.adminUi.iconButton( 'eye', row.shown !== '' ? Nino.adminUi.format( word('/_admin/logs/row/open'), row.shown ) : word('/_admin/logs/row/open-plain'), function( event ) {
 						panel._record.open( row.key, { opener : event.currentTarget } );
 					}, { small : true } ) ];
 				},

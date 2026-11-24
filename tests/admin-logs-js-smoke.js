@@ -147,7 +147,10 @@ console.log('Log panel');
 
 	// Each row has ONE button, which opens it
 	const buttons = tag( w.rows()[1], 'button' );
-	check( 'a row has one small icon button, named "Show entry", and no other', buttons.length === 1 && buttons[0].attributes['aria-label'] === text('/_admin/logs/row/open') && text('/_admin/logs/row/open') !== '' );
+	const named = key => tag( w.rows().find( row => row.dataset.row === key ), 'button' ).map( button => button.attributes['aria-label'] ).join('|');
+	check( 'a row has one small icon button and no other, named by the time of its line - no two buttons of a page are called the same but those of one minute', buttons.length === 1
+		&& named('2026-11-24.4') === text('/_admin/logs/row/open').replace( '%s', when('2026-11-24 10:15') ) && text('/_admin/logs/row/open').indexOf('%s') !== -1 );
+	check( '...and a line that has no time by the plain words', named('2026-11-24.2') === text('/_admin/logs/row/open-plain') && text('/_admin/logs/row/open-plain') !== '' );
 
 	// The card: structure only - the entry is its name, the time the second line, the account a labelled line
 	check( 'under 40 rem a row is a card: the time is the second line, the account a line with its label, the entry the name', w.rows()[1].children.filter( el => el.dataset.card !== undefined ).map( el => el.dataset.card ).join() === 'second,line,primary'

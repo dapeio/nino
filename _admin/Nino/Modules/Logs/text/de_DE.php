@@ -12,7 +12,8 @@ return [
 	'[[/_admin/logs/label/text]]'		=> 'Eintrag',
 	'[[/_admin/logs/label/search]]'		=> 'Einträge suchen',
 	'[[/_admin/logs/loading]]'	=> 'Einträge werden geladen ...',
-	'[[/_admin/logs/row/open]]'	=> 'Eintrag anzeigen',
+	'[[/_admin/logs/row/open]]'	=> 'Eintrag vom %s anzeigen',
+	'[[/_admin/logs/row/open-plain]]'	=> 'Eintrag anzeigen',
 	'[[/_admin/logs/record/title-plain]]'	=> 'Eintrag',
 	'[[/_admin/logs/record/missing]]'	=> 'Diesen Eintrag gibt es nicht (mehr).',
 

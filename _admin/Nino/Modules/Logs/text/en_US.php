@@ -12,7 +12,8 @@ return [
 	'[[/_admin/logs/label/text]]'		=> 'Entry',
 	'[[/_admin/logs/label/search]]'		=> 'Search entries',
 	'[[/_admin/logs/loading]]'	=> 'Entries are loading ...',
-	'[[/_admin/logs/row/open]]'	=> 'Show entry',
+	'[[/_admin/logs/row/open]]'	=> 'Show the entry of %s',
+	'[[/_admin/logs/row/open-plain]]'	=> 'Show entry',
 	'[[/_admin/logs/record/title-plain]]'	=> 'Entry',
 	'[[/_admin/logs/record/missing]]'	=> 'This entry does not exist (any more).',
 
