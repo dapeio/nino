@@ -1756,7 +1756,8 @@
 			 *	  another in production
 			 *	- else its save(), and only while it holds unsaved input
 			 *
-			 *	Nothing is done while a Save is running or a question is open, so
+			 *	Nothing is done while a Save is running or a question is open - the
+			 *	record of an entry is no question, see below -, so
 			 *	that a second press is the same press arriving twice. The run is
 			 *	kept like a Save answered to a question (see guard()): every exit
 			 *	meanwhile finds the registry busy and is told to stay, and a
@@ -1781,9 +1782,17 @@
 				ev.preventDefault();
 
 				// A question stands over the page - the shell's, or a panel's own
-				// dialog - and what is behind it is not what Ctrl+S is for
-				if( typeof dc.querySelector === 'function' && dc.querySelector('dialog[open]') !== null )
-					return;
+				// dialog - and what is behind it is not what Ctrl+S is for. The one
+				// dialog that is a view of its own is the record of an entry
+				// (Nino.adminUi.record()): its form is what the entry of its screen
+				// saves, so Ctrl+S is for it - while nothing stands over the record
+				if( typeof dc.querySelectorAll === 'function' ) {
+
+					const open = Array.from( dc.querySelectorAll('dialog[open]') );
+
+					if( open.length > 1 || ( open.length === 1 && ( typeof open[0].matches !== 'function' || open[0].matches('.nino-admin-record') === false ) ) )
+						return;
+				}
 
 				const dirty = Nino.admin.dirty;
 				const entry = dirty._entries[Nino.admin.router.current().panel];

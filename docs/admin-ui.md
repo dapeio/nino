@@ -564,7 +564,7 @@ The workbench is fully usable on a phone, with one exception: a **work surface**
 - After a change of view the focus is on its heading (`tabindex="-1"`, without a visible ring for the mouse); after a dialog on what opened it; after the deletion of a row on the next one, else the previous, else the empty state; after a refused save on the first wrong field.
 - A composed block has one tab stop and the arrow keys (`steps()`, `tree()`, `accordion()`, tabs). The buttons that only show under the pointer show with the focus as well: on the row that has the stop while the focus is in the tree, so Tab goes to its buttons from any row.
 - Enter in a one-line field is the main button of the form or dialog. Esc closes dialogs and nothing else.
-- Shortcuts: Ctrl/Cmd+S saves (the shell). Alt+Shift+Left and Alt+Shift+Right step through the entries of a record. Further shortcuts are assigned by the shell alone.
+- Shortcuts: Ctrl/Cmd+S saves (the shell) - the view, and the record of an entry while it is the one dialog that is open. Alt+Shift+Left and Alt+Shift+Right step through the entries of a record. Further shortcuts are assigned by the shell alone.
 - Changes of state are announced: the line of the bar is `role="status"`, an error is `role="alert"`, loading is `aria-busy`.
 
 ## Tokens

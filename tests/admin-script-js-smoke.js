@@ -2151,9 +2151,15 @@ function manualWorld() {
 			documentElement : null, body : null,
 			getElementById : function( id ) { return modeNodes[id] ?? null },
 			// The dialog of a question, where one is open
-			querySelector : function( selector ) { return selector === 'dialog[open]' ? modeDialog.open : null },
-			// The one pane the page has: Users
-			querySelectorAll : function( selector ) { return selector === '#admin-content-wrap > [data-panel]' ? [ { dataset : { panel : 'users' }, querySelectorAll : function() { return [] } } ] : [] },
+			querySelector : function( selector ) { return selector !== 'dialog[open]' ? null : ( Array.isArray( modeDialog.all ) === true ? ( modeDialog.all[0] ?? null ) : modeDialog.open ) },
+			// The one pane the page has: Users - and every dialog that is open, the one that was opened last at the end: the one of `open`, or the ones a check names
+			querySelectorAll : function( selector ) {
+
+				if( selector === 'dialog[open]' )
+					return modeDialog.all ?? ( modeDialog.open === null ? [] : [ modeDialog.open ] );
+
+				return selector === '#admin-content-wrap > [data-panel]' ? [ { dataset : { panel : 'users' }, querySelectorAll : function() { return [] } } ] : [];
+			},
 			createElement : function() { return node( '', {} ) },
 			addEventListener : function( type, fn ) { ( modeListeners[type] = modeListeners[type] ?? [] ).push( fn ) },
 		},
@@ -2324,6 +2330,21 @@ function manualWorld() {
 	prevented = key( {} );
 	check( 'nothing is saved while a dialog is open, whoever asked it, and the browser still does not get the key', saves === 2 && prevented === 1 );
 	modeDialog.open = null;
+
+	// the record of an entry is the one dialog that is a view of its own: its form is what the entry of its screen saves
+	const recordDialog = { matches : function( selector ) { return selector === '.nino-admin-record' } };
+	const otherDialog = { matches : function() { return false } };
+	modeDialog.all = [ recordDialog ];
+	prevented = key( {} );
+	check( 'Ctrl+S saves the entry of the screen while the record of an entry is the one dialog that is open, and the browser does not get the key', saves === 3 && prevented === 1 );
+	finish( true );
+	modeDialog.all = [ recordDialog, otherDialog ];
+	key( {} );
+	check( '...and not while a question stands over the record', saves === 3 );
+	modeDialog.all = [ otherDialog ];
+	key( {} );
+	check( '...nor while the one dialog that is open is no record', saves === 3 );
+	modeDialog.all = null;
 
 	// a failure of a nested save leaves its mark until the run that saw it ends
 	dirty._entries.users.save = function( done ) { saves++; finish = done };

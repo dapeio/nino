@@ -1606,7 +1606,9 @@ leaves the model alone and its links are inert.
 **Ctrl+S**, or Cmd+S, saves what is on screen, and the shell does it through the
 registry: the entry of the panel or tab the address names - `Nino.admin.router.current().panel` -
 has its `save( done )` called where it holds unsaved input, and nothing happens where it
-does not, or where no entry is registered, a save is running or a question is open. A
+does not, or where no entry is registered, a save is running or a question is open - the
+record of an entry (`Nino.adminUi.record()`) is no question but a view of its own, so Ctrl+S
+saves it while nothing stands over it. A
 panel that saves something other than a form, or does one thing in development and
 another in production, gives its entry a `shortcut`, `{ development : fn( done ), production : fn( done ) }`:
 the function for the mode the project is in is called whether the entry is unsaved or not -
