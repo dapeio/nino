@@ -8028,7 +8028,7 @@
 		 *	@param		{Function}	options.title				title( row ) - the name of the entry; text
 		 *	@param		{Function}	[options.subtitle]	subtitle( row ) - the identifier under it; text
 		 *	@param		{Function}	options.body				body( row, ctx ) - the content: an element, a form's fields or lines to read. ctx is { form, bar, row, key, status, go( delta ), close(), touch() } - after a save the buttons that fit the entry - hidden( row ) of the actions and of danger - are asked of the row the save answered, and a button that has the focus and goes away gives it to the main button. touch() says that something was chosen that no field holds (a file) and is unsaved, touch( false ) that it was taken back
-		 *	@param		{boolean}		[options.readOnly]	The entry is read and not edited: no state in the bar, and no Close in it either - the cross and Escape close - so the bar has the destructive action at the left and at the right what can be done with the entry
+		 *	@param		{boolean}		[options.readOnly]	The entry is read and not edited: no state in the bar, and no Close in it either - the cross and Escape close - so the bar has the destructive action at the left and at the right what can be done with the entry, and is not shown where the entry has no button at all
 		 *	@param		{Function}	[options.save]			save( row, ctx, done ) - done( ok, { row, error, conflict } ); the panel keeps its rows and draws the row anew (directory.update()) before it says ok. A save that failed after it had written part of the entry says the row as it is then - done( false, { row, error } ) - and the record takes it (its name, its buttons) The entry was written
 		 *																			by another tab or person first: done( false, { conflict : true, error } ) asks the question of the guide on the record; ctx.overwrite is true for the save that answers Overwrite
 		 *	@param		{Function}	[options.reload]		reload( key, done ) - the panel reads the entry again and says done( row ), the row it holds now (null where it is gone), for the answer Reload of that question
@@ -8228,6 +8228,10 @@
 
 				if( held !== null && held.hidden === true && bar !== null && bar.el.contains( held ) === true )
 					( bar.primary !== undefined && bar.primary.hidden !== true ? bar.primary : title ).focus();
+
+				// A record that is only read has a bar for its buttons alone - no state, no line -, so one that shows no button has no bar: an empty strip at the foot says nothing
+				if( readOnly === true && bar !== null )
+					bar.el.hidden = removeButton === null || removeButton.hidden === true ? actions.every( function( one ) { return one.button.hidden === true } ) : false;
 			};
 
 			// The entry as it is now - what a save got back from the server: its name, its place and the buttons that fit it are drawn from it

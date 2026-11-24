@@ -518,6 +518,29 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 // --- Round 2: what the review found --------------------------------------------------------
 
 {
+	// A record that is only read and shows no button has no bar: an empty strip at its foot says nothing
+	const none = setup( false, { danger : undefined } );
+
+	none.record.open( 'r01', {} );
+	check( 'a record that is only read and has nothing to press shows no bar', byClass( none.dialog(), 'nino-admin-actionbar' )[0].hidden === true );
+
+	const some = setup( false, { danger : { label : 'Delete', hidden : row => row.key === 'r02', run : () => {} }, actions : [ { label : 'Reply', hidden : row => row.key !== 'r03', run : () => {} } ] } );
+
+	some.record.open( 'r01', {} );
+	const strip = byClass( some.dialog(), 'nino-admin-actionbar' )[0];
+	check( '...one with a button that is shown has its bar', strip.hidden === false && buttonOf( strip, 'Delete' ).hidden === false );
+	fire( buttonOf( some.dialog(), 'Next' ), 'click' );
+	check( '...the bar goes where the entry that is stepped to has no use for any of the buttons', strip.hidden === true );
+	fire( buttonOf( some.dialog(), 'Next' ), 'click' );
+	check( '...and is back with the entry that has: the bar follows the entry that is shown', strip.hidden === false && buttonOf( strip, 'Reply' ).hidden === false );
+
+	const edited = setup( true, { danger : undefined } );
+
+	edited.record.open( 'r01', {} );
+	check( 'a record that is edited always has its bar: Save stands in it', byClass( edited.dialog(), 'nino-admin-actionbar' )[0].hidden !== true );
+}
+
+{
 	// A record that is only read: what can be done with it at the right, nothing else; an action that does nothing for an entry has no button
 	const s = setup( false, { actions : [ { label : 'Reply', kind : 'primary', hidden : row => row.key === 'r02', run : () => {} } ] } );
 

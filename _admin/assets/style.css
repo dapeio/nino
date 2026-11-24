@@ -5974,6 +5974,11 @@ a {
 	flex-wrap: wrap;
 }
 
+/* A record that is only read and shows no button has no bar (see Nino.adminUi.record()): the bar is a flex box, which the attribute alone does not take away */
+.nino-admin .nino-admin-dialog .nino-admin-record-bar[hidden] {
+	display: none;
+}
+
 /* A record has the destructive action at the left, whether it has a state beside it or not, and what can be done with the entry at the right. Not in :where(): the bar
    gives every button of it `margin: 0` at the weight of .nino-admin .nino-admin-actionbar button, which the auto margin has to outweigh */
 .nino-admin .nino-admin-dialog .nino-admin-record-bar > .nino-admin-btn-danger {
