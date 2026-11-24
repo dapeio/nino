@@ -1037,4 +1037,588 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 }
 
 
+// --- an entry that is being made: `create` -------------------------------------------------------------------------------------------
+
+const MAKER_LABELS = { position : '%s of %s', close : 'Close', prev : 'Previous', next : 'Next', save : 'Save', saveNext : 'Save and continue', closeButton : 'Close', deleted : 'Deleted.', saved : 'Saved.', createTitle : 'New thing', createSave : 'Create thing', created : 'Created.' };
+
+/**
+ *	A record that can make an entry: its form has the key as a field of its own while it is made (the first), the blank row is asked each time, and a save that makes
+ *	puts the row in the directory before it says so. `made` logs what body() and save() were given
+ */
+function maker( extra, create ) {
+
+	const made = { blanks : 0, bodies : [], saves : [] };
+	const s = setup( true, Object.assign( {
+		create : Object.assign( { blank : () => { made.blanks++; return { key : '', name : '' } } }, create ?? {} ),
+		labels : MAKER_LABELS,
+		body : function( row, ctx ) {
+			made.bodies.push( { row : row, creating : ctx.creating, key : ctx.key } );
+			const wrap = element('div');
+			if( ctx.creating === true )
+				wrap.appendChild( s.h.ui.textField( { label : 'Key', value : row.key, key : 'key' } ) );
+			wrap.appendChild( s.h.ui.textField( { label : 'Name', value : row.name, key : 'name' } ) );
+			return wrap;
+		},
+	}, extra ?? {} ) );
+
+	s.made = made;
+	s.opener = element('button');
+	s.h.page.appendChild( s.opener );
+
+	// What a save of the form does: the panel puts the new row in its directory and says it
+	s.calls.answer = function( finished, row, ctx ) {
+
+		const inputs = tag( ctx.form, 'input' );
+
+		made.saves.push( { creating : ctx.creating, row : row, key : ctx.key, values : inputs.map( el => el.value ) } );
+
+		if( ctx.creating !== true ) {
+			const renamed = Object.assign( {}, row, { name : inputs[0].value } );
+			s.rows().splice( s.rows().indexOf( row ), 1, renamed );
+			s.directory.update( s.rows(), row.key );
+			finished( true, { row : renamed } );
+			return;
+		}
+
+		const row2 = { key : inputs[0].value, name : inputs[1].value, group : 'a', thumb : '/images/new.jpg' };
+
+		s.rows().push( row2 );
+		s.directory.setRows( s.rows() );
+		finished( true, { row : row2 } );
+	};
+
+	return s;
+}
+
+/** Type into the n-th field of the record that is open */
+function typeAt( dialog, at, value ) { const input = tag( dialog, 'input' )[at]; input.value = value; fire( input, 'input' ); fire( input, 'change' ) }
+
+const toastsOf = h => byClass( h.body, 'nino-admin-toast-text' ).map( el => el.textContent );
+
+{
+	// Without `create` nothing is different: the handle has no call to make an entry, and the address of the word is no entry
+	const s = setup( true );
+
+	check( 'a record that was not given create has no create() and no creating() - a call is a TypeError of the language', s.record.create === undefined && s.record.creating === undefined );
+	s.h.box.location.hash = '#submissions/submissions/@new';
+	check( '...the address of the word is read as it always was: an entry that is not there, told to the panel, the address the directory\'s', s.record.follow() === true && s.dialog() === null && s.calls.missing.join() === '@new' && s.h.hash() === '#submissions' );
+
+	// create without what a form needs is a mistake of the caller
+	const refused = [ { create : { blank : () => ( {} ) }, labels : { createSave : 'x' } }, { create : { blank : () => ( {} ) }, labels : { createTitle : 'x' } }, { create : {}, labels : MAKER_LABELS }, { create : { blank : () => ( {} ) }, labels : MAKER_LABELS, readOnly : true } ].map( extra => {
+		try { setup( true, extra ); return null } catch( error ) { return error }
+	} );
+	check( 'a record with create and no createTitle, no createSave, no blank() or no way to save is a mistake of the caller: a TypeError when it is made', refused.every( error => error !== null && error.name === 'TypeError' ) );
+}
+
+{
+	const entryBadge = ( () => { const e = maker( { prefix : [] } ); e.record.open( 'r03', {} ); return byClass( e.dialog(), 'nino-admin-actionbar-state' )[0] } )();
+	const s = maker( { prefix : [] } );
+	const before = s.h.entries.length;
+
+	check( 'a record with create has create() and creating(), and no form is open before', typeof s.record.create === 'function' && s.record.creating() === false && s.dialog() === null );
+	s.record.create( { opener : s.opener } );
+	const d = s.dialog();
+
+	check( 'create() opens one dialog, the large dialog of a record', d !== null && s.h.dialogs.filter( x => x.open ).length === 1 && hasClass( d, 'nino-admin-dialog--large' ) && hasClass( d, 'nino-admin-record' ) );
+	check( '...its title is the one of the caller and it has no identifier under it', titleOf( d ) === 'New thing' && byClass( d, 'nino-admin-dialog-subtitle' ).every( el => el.hidden === true && el.textContent === '' ) );
+	check( '...no steps and no place: the steps are not shown and the count says nothing', buttonOf( d, 'Previous' ).hidden === true && buttonOf( d, 'Next' ).hidden === true && countOf( d ) === '' );
+	const bar = byClass( d, 'nino-admin-actionbar' )[0];
+	const shown = bar.children.filter( el => el.tagName === 'BUTTON' && el.hidden !== true ).map( el => el.textContent );
+	check( '...no destructive action and no "Save and continue" in its bar: the one main button, in the words of the caller', shown.join() === 'Create thing' && hasClass( bar.children[bar.children.length - 1], 'nino-admin-btn-primary' ) );
+	check( '...the badge says what an entry that was just opened says', byClass( d, 'nino-admin-actionbar-state' )[0].dataset.state === entryBadge.dataset.state && byClass( d, 'nino-admin-actionbar-state' )[0].dataset.fresh === entryBadge.dataset.fresh && entryBadge.dataset.state !== undefined );
+	check( 'the blank row is asked for when the form opens, and body() is given it and says that an entry is being made', s.made.blanks === 1 && s.made.bodies.length === 1 && s.made.bodies[0].creating === true && s.made.bodies[0].key === null && s.made.bodies[0].row.name === '' );
+	check( '...the focus is in the first field', tag( d, 'input' )[0].focused === true && tag( d, 'input' ).length === 2 );
+	check( 'the record says it: creating() is true, isOpen() is true and there is no key', s.record.creating() === true && s.record.isOpen() === true && s.record.key() === null );
+	check( 'the address is the word, written by the router, and it is one entry more of the history, marked as the record\'s own', s.h.hash() === '#submissions/submissions/@new' && s.h.entries.length === before + 1 && s.h.router.marked() === 'submissions' && s.h.router.current().parts.words[0] === true );
+}
+
+{
+	const s = maker( { prefix : [ 'folder' ] } );
+
+	s.h.router.set( 'submissions', [ 'folder' ] );
+	s.record.create( { opener : s.opener } );
+	check( 'under a prefix the address is the prefix and then the word', s.h.hash() === '#submissions/submissions/folder/@new' );
+
+	const f = maker( { prefix : [ 'folder' ] } );
+	f.h.box.location.hash = '#submissions/submissions/folder/@new';
+	check( 'an address that names the word behind the prefix opens the form, and closing writes the prefix', f.record.follow() === true && f.record.creating() === true && ( fire( buttonOf( f.dialog(), 'Close' ), 'click' ), f.h.hash() === '#submissions/submissions/folder' ) );
+	f.h.box.location.hash = '#submissions/submissions/@new';
+	check( '...and one that does not begin with the prefix is not the form', f.record.follow() === false && f.dialog() === null );
+
+	const t = maker( { prefix : [] }, { word : 'draft' } );
+	t.record.create( { opener : t.opener } );
+	check( 'the word of the address is the caller\'s where it says one', t.h.hash() === '#submissions/submissions/@draft' );
+}
+
+{
+	// Closing with nothing typed
+	const s = maker( { prefix : [] } );
+
+	s.record.create( { opener : s.opener } );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( 'the cross with nothing typed closes the form and takes the one entry of the history it made back - by the history itself', s.dialog() === null && s.record.isOpen() === false && s.record.creating() === false && s.h.went.join() === '-1' );
+	check( '...the focus goes to the button that opened it', s.opener.focused === true );
+
+	s.h.back();
+	s.h.router.arrive();
+	check( '...and the address is the directory\'s', s.h.hash() === '#submissions' && s.record.follow() === true && s.dialog() === null );
+
+	const t = maker( { prefix : [] } );
+	t.record.create( { opener : t.opener } );
+	escape( t.dialog() );
+	check( 'Escape does the same', t.dialog() === null && t.h.went.join() === '-1' && t.opener.focused === true );
+
+	// Back
+	const u = maker( { prefix : [] } );
+	u.record.create( { opener : u.opener } );
+	u.h.back();
+	u.h.router.arrive();
+	const entries = u.h.entries.length;
+	check( 'Back closes the form that holds no input, and writes nothing', u.record.follow() === true && u.dialog() === null && u.h.went.length === 0 && u.h.entries.length === entries && u.h.hash() === '#submissions' );
+	u.h.forward();
+	u.h.router.arrive();
+	check( '...and Forward opens it again, as the address says', u.record.follow() === true && u.dialog() !== null && titleOf( u.dialog() ) === 'New thing' && u.record.creating() === true );
+}
+
+{
+	// An address opens the form: a reload, a typed address, a link
+	const s = maker( { prefix : [] } );
+
+	s.h.box.location.hash = '#submissions/submissions/@new';
+	const entries = s.h.entries.length;
+
+	check( 'an address that names the word opens the form, and adds no entry of the history', s.record.follow() === true && s.dialog() !== null && titleOf( s.dialog() ) === 'New thing' && s.record.creating() === true && s.h.entries.length === entries && s.h.router.marked() === '' );
+	check( '...it is open once: the address that still names it does nothing', ( s.record.follow(), s.h.dialogs.filter( x => x.open ).length === 1 ) && s.made.blanks === 1 );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( '...closed, it writes the directory\'s address over its own and takes no step through the history', s.dialog() === null && s.h.hash() === '#submissions' && s.h.went.length === 0 && s.h.entries.length === entries );
+	check( '...and the focus goes to the search, there being no button and no row', tag( s.mount, 'input' ).find( el => el.type === 'search' ).focused === true );
+
+	// A key that is written the same is an entry
+	const t = maker( { prefix : [] } );
+	t.rows().push( { key : '@new', name : 'At new', group : 'a', thumb : '' } );
+	t.directory.setRows( t.rows() );
+	t.h.box.location.hash = '#submissions/submissions/%40new';
+	check( 'an entry whose key is @new is the part %40new: it opens the entry, not the form', t.record.follow() === true && titleOf( t.dialog() ) === 'At new' && t.record.creating() === false && t.record.key() === '@new' );
+	t.record.close();
+	t.record.open( '@new', {} );
+	check( '...and is written as %40new', t.h.hash() === '#submissions/submissions/%40new' );
+}
+
+{
+	// Unsaved input
+	const s = maker( { prefix : [] } );
+
+	s.record.create( { opener : s.opener } );
+	check( 'a form that holds nothing typed is no unsaved input', s.h.dirty.isDirty( [ 'submissions' ] ) === false );
+	typeAt( s.dialog(), 0, 'k1' );
+	check( '...and one that was typed in is: the entry of the registry serves the form', s.h.dirty.isDirty( [ 'submissions' ] ) === true );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( 'the cross asks first: Discard, Cancel and Save', s.h.dialogs.filter( d => d.open ).length === 2 && tag( s.dialog(), 'button' ).map( b => b.textContent ).join() === '/_admin/common/label/discard,/_admin/common/label/cancel,/_admin/common/label/save' );
+	fire( tag( s.dialog(), 'button' )[1], 'click' );
+	check( 'Cancel keeps the form, what was typed and the address', s.first().open === true && tag( s.first(), 'input' )[0].value === 'k1' && s.h.hash() === '#submissions/submissions/@new' && s.h.went.length === 0 && s.record.creating() === true );
+
+	fire( buttonOf( s.first(), 'Close' ), 'click' );
+	fire( tag( s.dialog(), 'button' )[0], 'click' );
+	check( 'Discard closes the form, with the history entry taken back and the focus on the opener', s.dialog() === null && s.made.saves.length === 0 && s.h.went.join() === '-1' && s.opener.focused === true && s.rows().length === 60 );
+
+	// Save, as the answer
+	const t = maker( { prefix : [] } );
+	t.record.create( { opener : t.opener } );
+	typeAt( t.dialog(), 0, 'k2' );
+	typeAt( t.dialog(), 1, 'Made' );
+	fire( buttonOf( t.dialog(), 'Close' ), 'click' );
+	fire( tag( t.dialog(), 'button' )[2], 'click' );
+	check( 'Save of the question runs the save that makes, and then leaves as for an entry: the form is closed', t.made.saves.length === 1 && t.made.saves[0].creating === true && t.dialog() === null && t.rows().length === 61 );
+	check( '...and the focus is on the new row', rowEl( t, 'k2' ) !== undefined && rowEl( t, 'k2' ).focused === true && t.h.went.join() === '-1' );
+
+	// Back with input
+	const u = maker( { prefix : [] } );
+	u.record.create( { opener : u.opener } );
+	typeAt( u.dialog(), 0, 'x' );
+	u.h.back();
+	u.h.router.arrive();
+	check( 'Back asks when the form holds input', u.record.follow() === true && u.first().open === true && u.h.dialogs.filter( d => d.open ).length === 2 );
+	fire( tag( u.dialog(), 'button' )[1], 'click' );
+	check( '...Cancel keeps the form and takes the step through the history back', u.first().open === true && u.h.went.join() === '1' && tag( u.first(), 'input' )[0].value === 'x' );
+
+	// open() while it holds input
+	const v = maker( { prefix : [] } );
+	v.record.create( { opener : v.opener } );
+	typeAt( v.dialog(), 0, 'y' );
+	v.record.open( 'r03', {} );
+	check( 'open() of an entry while the form holds input asks first, and shows nothing yet', v.h.dialogs.filter( d => d.open ).length === 2 && v.record.creating() === true );
+	fire( tag( v.dialog(), 'button' )[1], 'click' );
+	check( '...Cancel leaves the form as it is', v.record.creating() === true && tag( v.first(), 'input' )[0].value === 'y' && v.h.hash() === '#submissions/submissions/@new' );
+	v.record.open( 'r03', {} );
+	fire( tag( v.dialog(), 'button' )[0], 'click' );
+	check( '...Discard shows the entry, with the title, the steps and the address of an entry, in the dialog that was open', titleOf( v.first() ) === 'Item 3' && v.record.creating() === false && v.record.key() === 'r03' && v.h.hash() === '#submissions/submissions/r03' && v.h.dialogs.filter( d => d.open ).length === 1 && countOf( v.first() ) === '3 of 60' );
+	check( '...with the buttons of an entry', buttonOf( v.first(), 'Delete' ).hidden !== true && buttonOf( v.first(), 'Save and continue' ).hidden !== true && buttonOf( v.first(), 'Save' ) !== undefined && buttonOf( v.first(), 'Create thing' ) === undefined );
+
+	// create() while an entry holds input
+	const w = maker( { prefix : [] } );
+	w.record.open( 'r03', {} );
+	typeAt( w.dialog(), 0, 'z' );
+	w.record.create( { opener : w.opener } );
+	check( 'create() while an entry holds input asks first', w.h.dialogs.filter( d => d.open ).length === 2 && w.record.key() === 'r03' && w.record.creating() === false );
+	fire( tag( w.dialog(), 'button' )[0], 'click' );
+	check( '...Discard shows the form: its title, its bar, the word', titleOf( w.first() ) === 'New thing' && w.record.creating() === true && w.h.hash() === '#submissions/submissions/@new' && buttonOf( w.first(), 'Create thing' ) !== undefined && buttonOf( w.first(), 'Delete' ).hidden === true && buttonOf( w.first(), 'Save and continue' ).hidden === true );
+	check( '...with no entry of the history added: the one of the entry stays', w.h.entries.length === 2 && countOf( w.first() ) === '' );
+
+	// An entry with nothing typed goes to the form without a question
+	const x = maker( { prefix : [] } );
+	x.record.open( 'r03', {} );
+	x.record.create( { opener : x.opener } );
+	check( 'create() while an entry holds nothing is no question', x.h.dialogs.filter( d => d.open ).length === 1 && x.record.creating() === true );
+}
+
+{
+	// A save that is refused
+	const s = maker( { prefix : [] } );
+
+	s.calls.answer = ( finished ) => finished( false, { error : 'The key is taken.' } );
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'dup' );
+	fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+	check( 'a save that makes and is refused stays: the line says why, the form is still the form of an entry that is being made', byClass( s.dialog(), 'nino-admin-status' )[0].textContent === 'The key is taken.' && s.record.creating() === true && titleOf( s.dialog() ) === 'New thing' && s.h.hash() === '#submissions/submissions/@new' && s.h.dirty.isDirty( [ 'submissions' ] ) === true );
+	check( '...and a row that the failed save said it wrote is no entry for the form', ( s.calls.answer = ( finished ) => finished( false, { error : 'Half.', row : { key : 'half', name : 'Half' } } ), fire( buttonOf( s.dialog(), 'Create thing' ), 'click' ), titleOf( s.dialog() ) === 'New thing' && s.record.creating() === true ) );
+}
+
+{
+	// A save that makes
+	const s = maker( { prefix : [], saveNext : true, danger : { label : 'Delete', hidden : row => row.key === 'hide', run : () => {} }, actions : [ { label : 'Reply', run : () => {}, hidden : row => row.key === 'hide' } ] } );
+
+	s.record.create( { opener : s.opener } );
+	const d = s.dialog();
+	const entries = s.h.entries.length;
+	const bodies = s.made.bodies.length;
+
+	typeAt( d, 0, 'k9' );
+	typeAt( d, 1, 'Nine' );
+	fire( buttonOf( d, 'Create thing' ), 'click' );
+
+	check( 'the save is given the form and says that an entry is being made', s.made.saves.length === 1 && s.made.saves[0].creating === true && s.made.saves[0].key === null && s.made.saves[0].row.name === '' && s.made.saves[0].values.join() === 'k9,Nine' );
+	check( 'the record is the record of the entry: its key, creating() false, the same dialog', s.record.key() === 'k9' && s.record.creating() === false && s.dialog() === d && s.record.isOpen() === true );
+	check( '...the address is the entry\'s, written over: no entry of the history is added', s.h.hash() === '#submissions/submissions/k9' && s.h.entries.length === entries && s.h.router.marked() === 'submissions' );
+	check( '...the title and the identifier are the entry\'s', titleOf( d ) === 'Nine' && byClass( d, 'nino-admin-dialog-subtitle' )[0].textContent === '/things/k9' && byClass( d, 'nino-admin-dialog-subtitle' )[0].hidden !== true );
+	check( '...the steps and the place are there', countOf( d ) === '61 of 61' && buttonOf( d, 'Previous' ).hidden === false && buttonOf( d, 'Previous' ).disabled === false );
+	check( '...the destructive action, the further action and "Save and continue" are there, and the main button is Save', buttonOf( d, 'Delete' ).hidden === false && buttonOf( d, 'Reply' ).hidden === false && buttonOf( d, 'Save and continue' ).hidden === false && buttonOf( d, 'Save' ) !== undefined && buttonOf( d, 'Create thing' ) === undefined );
+	check( '...the body is drawn anew for the entry: a form with the name only, creating false, and the key the entry\'s', s.made.bodies.length === bodies + 1 && s.made.bodies[bodies].creating === false && s.made.bodies[bodies].key === 'k9' && tag( d, 'input' ).length === 1 && tag( d, 'input' )[0].value === 'Nine' );
+	check( '...the badge says saved, the toast says that it was made, and nothing is unsaved', byClass( d, 'nino-admin-actionbar-state' )[0].dataset.state === 'ok' && toastsOf( s.h ).join() === 'Created.' && s.h.dirty.isDirty( [ 'submissions' ] ) === false );
+
+	fire( buttonOf( d, 'Close' ), 'click' );
+	check( 'the cross takes the one entry of the history back, and the focus is on the new row', s.dialog() === null && s.h.went.join() === '-1' && rowEl( s, 'k9' ).focused === true );
+
+	// An entry that is hidden by hidden( row ), and no created word
+	const t = maker( { prefix : [], labels : Object.assign( {}, MAKER_LABELS, { created : undefined } ), danger : { label : 'Delete', hidden : row => row.key === 'hide', run : () => {} }, actions : [ { label : 'Reply', run : () => {}, hidden : row => row.key === 'hide' } ] } );
+	t.record.create( { opener : t.opener } );
+	typeAt( t.dialog(), 0, 'hide' );
+	fire( buttonOf( t.dialog(), 'Create thing' ), 'click' );
+	check( 'the buttons are those that hidden( row ) says for the entry that was made', buttonOf( t.dialog(), 'Delete' ).hidden === true && buttonOf( t.dialog(), 'Reply' ).hidden === true );
+	check( '...and the toast is the saved word where created is left out', toastsOf( t.h ).join() === 'Saved.' );
+
+	// Stepping from the new entry, and back to a form
+	const u = maker( { prefix : [], saveNext : true } );
+	u.record.create( { opener : u.opener } );
+	typeAt( u.dialog(), 0, 'k8' );
+	fire( buttonOf( u.dialog(), 'Create thing' ), 'click' );
+	fire( buttonOf( u.dialog(), 'Previous' ), 'click' );
+	check( 'the entry that was made has its place: the step goes to the one before', titleOf( u.dialog() ) === 'Item 60' && u.h.hash() === '#submissions/submissions/r60' );
+	u.record.create( { opener : u.opener } );
+	check( '...and another form can be opened over it, with the blank row asked again', u.record.creating() === true && u.made.blanks === 2 && u.dialog() !== null );
+}
+
+{
+	// What a save of an entry that exists says is the saved word, also in a record that can make entries; the page of the directory is not asked for an entry that is not there
+	const s = maker( { prefix : [] } );
+	const revealed = [];
+	const reveal = s.directory.reveal;
+
+	s.directory.reveal = function( key ) { revealed.push( key ); return reveal( key ) };
+	s.record.create( { opener : s.opener } );
+	check( 'the page that holds the entry is asked for an entry only: a form that makes one is on none', revealed.length === 0 );
+	typeAt( s.dialog(), 0, 'k7' );
+	fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+	typeAt( s.dialog(), 0, 'Renamed' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	check( 'a save of the entry that was made is a save of an entry: the toast is the saved word, and the entry is the one that was made', toastsOf( s.h ).join() === 'Saved.' && s.made.saves[1].creating === false && s.made.saves[1].key === 'k7' && titleOf( s.dialog() ) === 'Renamed' && revealed.every( key => key === 'k7' ) );
+
+	// The step of the history that the cross asked for is on its way, and the address is the form's
+	const t = maker( { prefix : [] } );
+	t.record.create( { opener : t.opener } );
+	fire( buttonOf( t.dialog(), 'Close' ), 'click' );
+	t.h.box.location.hash = '#submissions/submissions/@new';
+	check( 'the word is read as the word while the step of the cross is still on its way: it opens the form', t.record.follow() === true && t.record.creating() === true );
+}
+
+{
+	// An entry without an address of its own stays at the directory's address
+	const s = maker( { prefix : [], addressOf : row => row.key === 'noaddr' ? null : row.key } );
+
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'noaddr' );
+	fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+	s.h.back();
+	s.h.router.arrive();
+	check( 'an entry that has no address of its own, once made, has the address of the directory', s.record.key() === 'noaddr' && s.h.hash() === '#submissions' && s.record.creating() === false );
+}
+
+{
+	// A save that makes and does not say what it made is a mistake of the caller: said, and the form is not left in half a state
+	[ [ 'no row', ( finished ) => finished( true ) ], [ 'a row that find() does not know', ( finished ) => finished( true, { row : { key : 'ghost', name : 'Ghost' } } ) ] ].forEach( ( [ what, answer ] ) => {
+
+		const s = maker( { prefix : [] } );
+		let thrown = null;
+
+		s.calls.answer = answer;
+		s.record.create( { opener : s.opener } );
+		typeAt( s.dialog(), 0, 'q' );
+
+		try { fire( buttonOf( s.dialog(), 'Create thing' ), 'click' ) } catch( error ) { thrown = error }
+
+		check( 'done( true ) with '+ what+ ' is a TypeError of the caller, and the form stays as it was: creating, its address, what was typed, still unsaved, no ghost entry',
+			thrown !== null && thrown.name === 'TypeError' && s.record.creating() === true && s.record.key() === null && s.h.hash() === '#submissions/submissions/@new' && tag( s.dialog(), 'input' )[0].value === 'q' && s.h.dirty.isDirty( [ 'submissions' ] ) === true && titleOf( s.dialog() ) === 'New thing' );
+
+		// ...and the form can be saved again when the panel is right
+		s.calls.answer = ( finished, row, ctx ) => { const made = { key : 'q', name : '', group : 'a', thumb : '' }; s.rows().push( made ); s.directory.setRows( s.rows() ); finished( true, { row : made } ) };
+		fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+		check( '...and a save that is right after it makes the entry', s.record.key() === 'q' && s.record.creating() === false );
+	} );
+}
+
+{
+	// Ctrl+S, the registry's save
+	const s = maker( { prefix : [] } );
+
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'kc' );
+	s.h.dirty.shortcut( { ctrlKey : true, key : 's', preventDefault : () => {} } );
+	check( 'Ctrl+S - the key the shell listens for - reaches the save that makes', s.made.saves.length === 1 && s.made.saves[0].creating === true && s.record.key() === 'kc' );
+}
+
+{
+	// A form that is open when the panel is left by another address
+	const s = maker( { prefix : [] } );
+
+	s.record.create( { opener : s.opener } );
+	s.h.box.location.hash = '#images';
+	s.h.hashchange();
+	check( 'an address of another panel takes the form away, as it takes an entry', s.dialog() === null && s.record.isOpen() === false );
+
+	const t = maker( { prefix : [] } );
+	t.record.create( { opener : t.opener } );
+	t.h.box.location.hash = '#submissions/submissions/r03';
+	t.h.router.arrive();
+	check( 'an address that names an entry shows the entry in the form\'s dialog', t.record.follow() === true && t.record.creating() === false && titleOf( t.dialog() ) === 'Item 3' && t.h.dialogs.filter( d => d.open ).length === 1 );
+}
+
+
+// --- an entry whose key changes with a save: `rekey` -----------------------------------------------------------------------------------
+
+function renamer( extra ) {
+
+	const s = setup( true, extra );
+
+	// The panel has replaced the row in its directory - another key - before it says so
+	s.calls.answer = function( finished, row, ctx ) {
+		const moved = Object.assign( {}, row, { key : 'n'+ row.key.slice( 1 ), name : tag( ctx.form, 'input' )[0].value } );
+		s.rows().splice( s.rows().indexOf( row ), 1, moved );
+		s.directory.setRows( s.rows() );
+		finished( true, { row : moved } );
+	};
+
+	return s;
+}
+
+{
+	const s = renamer( { rekey : true, prefix : [] } );
+
+	s.record.open( 'r03', {} );
+	const entries = s.h.entries.length;
+	typeInto( s.dialog(), 'Moved' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+
+	check( 'with rekey a save that says a row of another key makes the record the record of that key: key() says it', s.record.key() === 'n03' );
+	check( '...the address is written over by the new address, with no entry added and the record\'s own entry still marked', s.h.hash() === '#submissions/submissions/n03' && s.h.entries.length === entries && s.h.router.marked() === 'submissions' );
+	check( '...the title, the subtitle and the place follow the row', titleOf( s.dialog() ) === 'Moved' && byClass( s.dialog(), 'nino-admin-dialog-subtitle' )[0].textContent === '/things/n03' && countOf( s.dialog() ) === '3 of 60' );
+	fire( buttonOf( s.dialog(), 'Next' ), 'click' );
+	check( '...and the steps go from the new place', titleOf( s.dialog() ) === 'Item 4' && s.h.hash() === '#submissions/submissions/r04' );
+	fire( buttonOf( s.dialog(), 'Previous' ), 'click' );
+	check( '...back to the entry of the new key', titleOf( s.dialog() ) === 'Moved' && s.record.key() === 'n03' );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( 'the cross takes the one entry of the history back, and the focus is on the row of the new key', s.dialog() === null && s.h.went.join() === '-1' && rowEl( s, 'n03' ) !== undefined && rowEl( s, 'n03' ).focused === true );
+}
+
+{
+	// A key that stays the same is no move
+	const s = setup( true, { rekey : true, prefix : [] } );
+
+	s.record.open( 'r03', {} );
+	typeInto( s.dialog(), 'Same key' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	check( 'with rekey a save that keeps the key leaves everything as it is', s.record.key() === 'r03' && s.h.hash() === '#submissions/submissions/r03' && titleOf( s.dialog() ) === 'Same key' );
+}
+
+{
+	// Without rekey the record keeps the key it has: what the base does is what stays
+	const s = renamer( { prefix : [] } );
+
+	s.record.open( 'r03', {} );
+	const entries = s.h.entries.length;
+	typeInto( s.dialog(), 'Moved' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	check( 'without rekey a row of another key leaves key() and the address as they were', s.record.key() === 'r03' && s.h.hash() === '#submissions/submissions/r03' && s.h.entries.length === entries && titleOf( s.dialog() ) === 'Moved' );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( '...and closing gives the focus to the row of the key it held, which is gone: the search has it', s.dialog() === null && tag( s.mount, 'input' ).find( el => el.type === 'search' ).focused === true );
+}
+
+
+
+// --- fix round: what a save in flight, a key that moves and an entry without an address do -------------------------------------------------
+
+{
+	// B1: the ctx the next save is given follows a key that a save changed
+	const s = setup( true, { rekey : true, prefix : [] } );
+	const seen = [];
+
+	s.calls.answer = function( finished, row, ctx ) {
+		seen.push( { ctxKey : ctx.key, ctxRow : ctx.row.key, rowKey : row.key } );
+		const moved = Object.assign( {}, row, { key : row.key+ 'x', name : tag( ctx.form, 'input' )[0].value } );
+		s.rows().splice( s.rows().indexOf( row ), 1, moved );
+		s.directory.setRows( s.rows() );
+		finished( true, { row : moved } );
+	};
+	s.record.open( 'r03', {} );
+	typeInto( s.dialog(), 'A' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	typeInto( s.dialog(), 'B' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	check( 'with rekey the save that follows a change of the key is given the new key and the new row in its ctx', seen.length === 2 && seen[1].ctxKey === 'r03x' && seen[1].ctxRow === 'r03x' && seen[1].rowKey === 'r03x' && s.record.key() === 'r03xx' );
+}
+
+{
+	// N8d and the page: rekey under a prefix, and the directory is asked for the page of the new key
+	const s = renamer( { rekey : true, prefix : [ 'folder' ] } );
+	const revealed = [];
+	const reveal = s.directory.reveal;
+
+	s.directory.reveal = function( key ) { revealed.push( key ); return reveal( key ) };
+	s.h.router.set( 'submissions', [ 'folder' ] );
+	s.record.open( 'r03', {} );
+	const entries = s.h.entries.length;
+	revealed.length = 0;
+	typeInto( s.dialog(), 'Moved' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	check( 'with rekey under a prefix the address is the prefix and the new key, written over', s.h.hash() === '#submissions/submissions/folder/n03' && s.h.entries.length === entries && s.record.key() === 'n03' );
+	check( '...and the page of the directory that holds the new key is the one behind the record', revealed.indexOf( 'n03' ) !== -1 );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( '...closed, the address is the folder\'s', s.h.hash() === '#submissions/submissions/folder' || s.h.went.join() === '-1' );
+}
+
+{
+	// N2: rekey to a key that find() does not know
+	const s = setup( true, { rekey : true, prefix : [] } );
+	let thrown = null;
+
+	s.calls.answer = ( finished, row ) => finished( true, { row : Object.assign( {}, row, { key : 'ghost' } ) } );
+	s.record.open( 'r03', {} );
+	typeInto( s.dialog(), 'A' );
+
+	try { fire( buttonOf( s.dialog(), 'Save' ), 'click' ) } catch( error ) { thrown = error }
+
+	check( 'a rekey to a key that find() does not know is a TypeError of the caller: the key, the address, the title and the place stay', thrown !== null && thrown.name === 'TypeError' && s.record.key() === 'r03' && s.h.hash() === '#submissions/submissions/r03' && titleOf( s.dialog() ) === 'Item 3' && countOf( s.dialog() ) === '3 of 60' );
+	check( '...what was typed stays as unsaved input, the badge says changed, the line is quiet, and the entry can be saved when the panel is right', tag( s.dialog(), 'input' )[0].value === 'A' && s.h.dirty.isDirty( [ 'submissions' ] ) === true && byClass( s.dialog(), 'nino-admin-actionbar-state' )[0].dataset.state === 'warn' && byClass( s.dialog(), 'nino-admin-status' )[0].dataset.state !== 'saving' );
+}
+
+{
+	// N1: no input while a save that makes runs
+	const s = maker( { prefix : [] } );
+	let pending = null;
+
+	s.calls.answer = ( finished, row, ctx ) => { pending = finished };
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'k5' );
+	fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+	check( 'while the save of a form that makes an entry runs its fields take no input', pending !== null && tag( s.dialog(), 'input' ).every( input => input.disabled === true ) );
+	pending( false, { error : 'No.' } );
+	check( '...and take it again after a refused save, the focus back where it was', tag( s.dialog(), 'input' ).every( input => input.disabled !== true ) && byClass( s.dialog(), 'nino-admin-status' )[0].textContent === 'No.' );
+
+	// An entry that exists is as it was: its fields stay open while it is saved
+	const t = maker( { prefix : [] } );
+	let waiting = null;
+
+	t.calls.answer = ( finished ) => { waiting = finished };
+	t.record.open( 'r03', {} );
+	typeAt( t.dialog(), 0, 'x' );
+	fire( buttonOf( t.dialog(), 'Save' ), 'click' );
+	check( 'the fields of an entry that exists are not locked by its save', waiting !== null && tag( t.dialog(), 'input' ).every( input => input.disabled !== true ) );
+}
+
+{
+	// N3: a conflict answered to a save that makes is a refused save
+	const s = maker( { prefix : [], reload : ( key, finished ) => { s.reloaded = key; finished( null ) } } );
+
+	s.calls.answer = ( finished ) => finished( false, { conflict : true, error : 'Taken.' } );
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'c' );
+	fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+	check( 'a conflict answered to the save of a form that makes an entry offers no Reload and no Overwrite: the error is in the line and the form stays', s.h.dialogs.filter( d => d.open ).length === 1 && byClass( s.dialog(), 'nino-admin-status' )[0].textContent === 'Taken.' && s.record.creating() === true && tag( s.dialog(), 'input' )[0].value === 'c' && s.reloaded === undefined );
+}
+
+{
+	// N4: an entry that was made and has no address of its own
+	const s = maker( { prefix : [], addressOf : row => row.key === 'noaddr' ? null : row.key } );
+	const before = s.h.entries.length;
+
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'noaddr' );
+	fire( buttonOf( s.dialog(), 'Create thing' ), 'click' );
+	check( 'the entry of the history that the form added is taken off the history, as the cross takes it', s.h.went.join() === '-1' && s.record.key() === 'noaddr' && s.record.isOpen() === true );
+	s.h.back();
+	s.h.router.arrive();
+	check( '...and the record stays open over the directory\'s address, with no entry of its own and no mark, when the panel follows the address', s.record.follow() === true && s.record.isOpen() === true && s.h.hash() === '#submissions' && s.h.entries.length === before + 1 && s.h.router.marked() === '' && s.record.creating() === false );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( '...and closing writes nothing more to the history', s.dialog() === null && s.h.went.join() === '-1' && s.h.hash() === '#submissions' );
+}
+
+{
+	// N5: the button that asked for the form is the one the focus goes back to
+	const s = maker( { prefix : [] } );
+	const rowButton = element('button');
+
+	s.h.page.appendChild( rowButton );
+	s.record.open( 'r03', { opener : rowButton } );
+	s.record.create( { opener : s.opener } );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( 'create() over an entry: the cross gives the focus to the button that asked for the form, not to the one that opened the entry', s.opener.focused === true && rowButton.focused !== true );
+}
+
+{
+	// N6: a word that is none is refused when the record is made
+	const refused = [ 'New Thing', 'Neu', '', 'new thing' ].map( word => {
+		try { maker( {}, { word : word } ); return null } catch( error ) { return error }
+	} );
+	check( 'a create.word that is no word of an address is a TypeError of the caller when the record is made', refused.every( error => error !== null && error.name === 'TypeError' ) );
+	check( '...a word as the router says one is none', ( () => { try { maker( {}, { word : 'draft' } ); return true } catch( error ) { return false } } )() === true );
+}
+
+{
+	// N7 and the focus after a save that makes
+	const s = maker( { prefix : [] } );
+
+	s.calls.answer = ( finished ) => finished( true );
+	s.record.create( { opener : s.opener } );
+	typeAt( s.dialog(), 0, 'q' );
+	try { fire( buttonOf( s.dialog(), 'Create thing' ), 'click' ) } catch( error ) { /* said by the check below */ }
+	check( 'a save that makes and answers no row leaves the bar as a refused save does: the badge says changed', byClass( s.dialog(), 'nino-admin-actionbar-state' )[0].dataset.state === 'warn' );
+
+	const t = maker( { prefix : [] } );
+
+	t.record.create( { opener : t.opener } );
+	typeAt( t.dialog(), 0, 'f1' );
+	tag( t.dialog(), 'input' )[1].focus();
+	fire( buttonOf( t.dialog(), 'Create thing' ), 'click' );
+	check( 'the focus that was in the form goes to the first field of the entry that it became', tag( t.dialog(), 'input' )[0].focused === true );
+}
+
+
 done();

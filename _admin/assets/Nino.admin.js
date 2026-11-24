@@ -8015,6 +8015,17 @@
 		 *	record is open (the record stands over it), and an address that carries such a state would be one a person could not tell from another.
 		 *	An entry the panel does not know is told to the panel (`missing`), which says so over the directory; the address then is the directory's.
 		 *
+		 *	An entry that is being made: with `create` the record also opens the form of an entry that does not exist yet, `#panel/tab/<prefix...>/@new` (the word is written by
+		 *	router.word(), so that an entry whose key reads `@new` - written %40new - stays an entry). The form is the same dialog with the title `labels.createTitle`, no identifier,
+		 *	no steps and no place, none of the buttons of an entry (the destructive action, the further actions, "Save and continue") and the one main button `labels.createSave`; body( row, ctx )
+		 *	is given `create.blank()` and ctx.creating true. A person's own move (create()) adds one entry of the history, marked as the record's own as open() does, and what leaves the
+		 *	form - the cross, Escape, Back, an address - is asked about unsaved input and ends as for an entry. A save that says done( true, { row } ) makes the record the record of that
+		 *	entry: the panel has put the row in its directory by then, its key is keyOf( row ), the address is written over (no new entry of the history), and the title, the steps, the
+		 *	place and the buttons are the entry's, the body drawn anew with ctx.creating false. While the save of the form runs its fields take no input. A done( true ) without a row, or with one find() does not know, is a mistake of the
+		 *	caller: the form stays as it was, the save is answered as a failed one and a TypeError is thrown; so is a rekey to a key find() does not know. done( false, { conflict } ) of a form that
+		 *	makes an entry is a refused save - the error in the line, the form stays - for there is no entry to reload or to overwrite. An entry that is made and has no address of its own has the
+		 *	directory's, and the entry of the history that the form added is taken off it
+		 *
 		 *	The panel calls follow( parts ) from its showCurrent() and after it has loaded its rows with the parts of the address
 		 *
 		 *	@param		{Object}		options
@@ -8032,15 +8043,17 @@
 		 *	@param		{Function}	[options.save]			save( row, ctx, done ) - done( ok, { row, error, conflict } ); the panel keeps its rows and draws the row anew (directory.update()) before it says ok. A save that failed after it had written part of the entry says the row as it is then - done( false, { row, error } ) - and the record takes it (its name, its buttons) The entry was written
 		 *																			by another tab or person first: done( false, { conflict : true, error } ) asks the question of the guide on the record; ctx.overwrite is true for the save that answers Overwrite
 		 *	@param		{Function}	[options.reload]		reload( key, done ) - the panel reads the entry again and says done( row ), the row it holds now (null where it is gone), for the answer Reload of that question
+		 *	@param		{Object}		[options.create]		{ blank(), word } - the record can make an entry: blank() answers the row of the entry that is being made, asked each time the form opens; word is the word of the address, 'new' by default. Needs a record that is saved (not readOnly, with save) and labels.createTitle and labels.createSave, else a TypeError. Without it the handle has no create() and creating()
+		 *	@param		{boolean}		[options.rekey]			The key of an entry is what a person edits: where save() of an entry that exists says done( true, { row } ) with a row whose keyOf() is another, the record takes that key - key() says it, the address is written over by the entry's new address (no new entry of the history, the record's own one stays), and the focus goes to the row of the new key when it closes. The panel has put the row in its directory by then, find( newKey ) knows it. Without it the key and the address stay what they were
 		 *	@param		{boolean}		[options.saveNext]	"Save and continue" beside Save: saves and goes on to the next entry
 		 *	@param		{Object}		[options.danger]		{ label, hidden( row ), stay, run( row, opener, done ) } - `stay : true` for an action that takes away something of the entry and not the entry (the picture of a slot): the record is not closed after it but drawn again as the entry is then, find( key ) - the panel has put the changed row in its rows. The destructive action, at the left; hidden( row ) is true for an entry that has no button for it. run asks the question of its
 		 *																			level itself - the question of the level destructive, asked as nested, so that it stands on the record - and acts: done( true ) where it went (the panel has taken the
 		 *																			row out of its directory by then), done( false, { error } ) where it failed, done( null ) where the answer was no
 		 *	@param		{Array}			[options.actions]		[ { label, kind, run( row, ctx ), icon, hidden( row ) } ] - run gets the button as ctx.opener, which a dialog it opens gives the focus back to (see choiceDialog()); further buttons at the right of the bar - none of the kind danger: that is the one `danger` at the left, and a record refuses a second; hidden( row ) true for an entry that the action does nothing for (no button without an effect). In a record that is only read the first with kind 'primary' is the main button
 		 *	@param		{Function}	options.missing			missing( key ) - the entry named by the address is not there
-		 *	@param		{Object}		options.labels			{ close, prev, next, position, save, saveNext, closeButton, deleted, saved } - the words; the shared fills where left out
+		 *	@param		{Object}		options.labels			{ close, prev, next, position, save, saveNext, closeButton, deleted, saved, createTitle, createSave, created } - the words; the shared fills where left out. createTitle and createSave are required with `create`; created is the toast after an entry was made (saved where left out)
 		 *
-		 *	@return		{Object}										{ open( key, { opener } ), follow(), close(), isOpen(), key(), refresh() } - follow() reads the address of the router itself: an address of this panel that names an entry opens
+		 *	@return		{Object}										{ open( key, { opener } ), follow(), close(), isOpen(), key(), refresh(), create( { opener } ), creating() } - create() and creating() only with `create`: create() opens the form of an entry that is being made, creating() says whether it is the one that is open; key() answers null while an entry is being made. follow() reads the address of the router itself: an address of this panel that names an entry opens
 		 *																			it, one that names none closes the record, one that is another panel's is not its to answer (it answers false), so that a panel cannot mistake it
 		 */
 		record : function( options ) {
@@ -8049,8 +8062,13 @@
 			const dirtyName = options.dirty ?? options.screen;
 			const word = function( key, fill ) { return labels[key] ?? Nino.adminUi.text( fill ) };
 			const readOnly = options.readOnly === true;
+			const maker = typeof options.create === 'object' && options.create !== null;
 
-			let current = null;       // { key, row }
+			// A form that makes an entry is saved: a record that is only read, one that has no save, or one that has no words for the form is a mistake of the caller
+			if( maker === true && ( typeof options.create.blank !== 'function' || readOnly === true || typeof options.save !== 'function' || typeof labels.createTitle !== 'string' || labels.createTitle === '' || typeof labels.createSave !== 'string' || labels.createSave === '' ) )
+				throw new TypeError( 'Nino.adminUi.record(): create is { blank() } of a record that is saved, and has labels.createTitle and labels.createSave' );
+
+			let current = null;       // { key, row } - and making : true for the form of an entry that is being made, whose key is null and whose row is the blank one
 			let dialog = null;        // the handle of the dialog
 			let form = null;
 			let bar = null;
@@ -8071,10 +8089,24 @@
 			let silent = false;       // closed with no address to write: the address already says where it is
 			let expectBack = false;   // the cross has asked the history to step back: the hashchange that comes is the record's own
 			let onHash = null;        // the listener for an address that leads away
+			let mainButton = null;    // the main button of the bar, whose words are the entry's or the form's
+			let continueButton = null; // "Save and continue", which an entry that is being made has none of
+			let starter = null;       // what opened the record: the button of a person's own move, which the focus goes back to
 
 			const router = function() {
 				return typeof shell().router === 'object' && shell().router !== null ? shell().router : null;
 			};
+
+			// The word of the address is a word as the router says one - router.word() refuses a name that is none
+			if( maker === true && router() !== null ) {
+
+				try {
+					router().word( options.create.word ?? 'new' );
+				}
+				catch( error ) {
+					throw new TypeError( 'Nino.adminUi.record(): create.word is no word of an address: '+ String( options.create.word ) );
+				}
+			}
 
 			const registry = function() {
 				return typeof shell().dirty === 'object' && shell().dirty !== null ? shell().dirty : null;
@@ -8168,7 +8200,7 @@
 				if( router() === null )
 					return;
 
-				const named = current === null ? null : addressOf( current.row );
+				const named = current === null ? null : ( current.making === true ? router().word( options.create.word ?? 'new' ) : addressOf( current.row ) );
 
 				router().set( options.screen, prefixed().concat( named === null ? [] : [ named ] ) );
 			};
@@ -8210,7 +8242,12 @@
 
 			// What the form and the bar are given: one object for as long as an entry is shown, so that what the body keeps in it - a handle of a field - is what the save finds there
 			const context = function() {
-				return { form : form, bar : bar, row : current.row, key : current.key, status : bar === null ? null : bar.line, go : go, close : request, touch : touch };
+				const ctx = { form : form, bar : bar, row : current.row, key : current.key, status : bar === null ? null : bar.line, go : go, close : request, touch : touch };
+
+				if( maker === true )
+					ctx.creating = current.making === true;
+
+				return ctx;
 			};
 
 			// The buttons of the bar that the entry has no use for are not shown: asked of the entry that is shown. A button that has the focus and goes away gives
@@ -8219,12 +8256,18 @@
 
 				const held = dc.activeElement ?? null;
 
+				// An entry that is being made has none of them: they are for one that exists
+				const making = current.making === true;
+
 				if( removeButton !== null )
-					removeButton.hidden = typeof options.danger.hidden === 'function' && options.danger.hidden( current.row ) === true;
+					removeButton.hidden = making === true || ( typeof options.danger.hidden === 'function' && options.danger.hidden( current.row ) === true );
 
 				actions.forEach( function( one ) {
-					one.button.hidden = typeof one.action.hidden === 'function' && one.action.hidden( current.row ) === true;
+					one.button.hidden = making === true || ( typeof one.action.hidden === 'function' && one.action.hidden( current.row ) === true );
 				} );
+
+				if( continueButton !== null )
+					continueButton.hidden = making;
 
 				if( held !== null && held.hidden === true && bar !== null && bar.el.contains( held ) === true )
 					( bar.primary !== undefined && bar.primary.hidden !== true ? bar.primary : title ).focus();
@@ -8237,7 +8280,7 @@
 			// The entry as it is now - what a save got back from the server: its name, its place and the buttons that fit it are drawn from it
 			const adopt = function( row ) {
 
-				if( current === null || row === undefined || row === null )
+				if( current === null || current.making === true || row === undefined || row === null )
 					return;
 
 				current.row = row;
@@ -8253,6 +8296,7 @@
 
 				const ctx = context();
 				const made = options.body( current.row, ctx );
+				const making = current.making === true;
 
 				shown = ctx;
 
@@ -8272,13 +8316,24 @@
 				form.appendChild( made );
 				content.appendChild( form );
 				ctx.form = form;
-				title.textContent = String( options.title( current.row ) );
+				title.textContent = making === true ? labels.createTitle : String( options.title( current.row ) );
 
 				if( subtitle !== null )
-					subtitle.textContent = typeof options.subtitle === 'function' ? String( options.subtitle( current.row ) ) : '';
+					subtitle.textContent = making === true || typeof options.subtitle !== 'function' ? '' : String( options.subtitle( current.row ) );
 
-				// The page of the directory that holds the entry is the one behind the record
-				options.directory.reveal( current.key );
+				// A form that makes an entry has no identifier to say and the main button says what it makes
+				if( maker === true ) {
+
+					if( subtitle !== null )
+						subtitle.hidden = making;
+
+					if( mainButton !== null )
+						mainButton.textContent = making === true ? labels.createSave : word( 'save', '/_admin/common/label/save' );
+				}
+
+				// The page of the directory that holds the entry is the one behind the record: an entry that is being made is on none
+				if( making === false )
+					options.directory.reveal( current.key );
 				touched = false;
 				refreshNav();
 
@@ -8322,6 +8377,54 @@
 				return true;
 			};
 
+			// The first field of the form has the focus - a record that is only read, its name
+			const firstField = function() {
+				return readOnly === true || form === null ? undefined : Array.from( form.querySelectorAll('input, textarea, select') ).find( function( one ) { return one.type !== 'hidden' && one.type !== 'file' && one.disabled !== true } );
+			};
+
+			// While the save of a form that makes an entry runs, its fields take no input: what is typed then would be gone with the form that is drawn anew for the entry
+			let locked = [];
+
+			const lock = function( on ) {
+
+				if( on === true && form !== null )
+					locked = Array.from( form.querySelectorAll('input, textarea, select') ).filter( function( one ) { return one.disabled !== true } );
+
+				locked.forEach( function( one ) { one.disabled = on === true } );
+
+				if( on !== true )
+					locked = [];
+			};
+
+			// The form of an entry that is being made, in the dialog that is open
+			const showBlank = function() {
+
+				current = { key : null, row : options.create.blank(), making : true };
+				draw();
+				( firstField() ?? title ).focus();
+			};
+
+			// The record is the record of the entry that the row says, whose key is its own: an entry that has just been made, or one whose save changed what names it. The address is
+			// written over - the entry of the history that the person's move added stays the record's, so that the cross takes it back
+			// The ctx that stays - the one the next save is given - follows the entry. An entry that has no address of its own has the directory's, and no entry of the history: the one that
+			// the person's move added (the form's @new) is taken off the history, as the cross takes it, and the record stays open over the directory's address
+			const retake = function( row ) {
+
+				current = { key : options.keyOf( row ), row : row };
+
+				if( shown !== null ) {
+					shown.key = current.key;
+					shown.row = current.row;
+				}
+
+				options.directory.reveal( current.key );
+
+				if( router() !== null && addressOf( row ) === null && retreat() === true )
+					return;
+
+				address();
+			};
+
 			function go( delta ) {
 
 				const rows = sequence();
@@ -8350,12 +8453,23 @@
 				busy = true;
 				bar.line.saving();
 
+				const held = dc.activeElement ?? null;
+
 				options.save( current.row, Object.assign( shown ?? context(), { row : current.row, overwrite : overwrite === true } ), function( ok, result ) {
 
 					busy = false;
 
-					// Another tab or another person wrote the entry first: the question of the guide, asked on the record - Overwrite saves again over what is there, Reload shows what is there
-					if( ok !== true && result !== undefined && result !== null && result.conflict === true ) {
+					// The fields of a form that makes an entry are open again, with the focus where it was
+					if( locked.length > 0 ) {
+						lock( false );
+
+						if( ok !== true && held !== null && form !== null && form.contains( held ) === true )
+							held.focus();
+					}
+
+					// Another tab or another person wrote the entry first: the question of the guide, asked on the record - Overwrite saves again over what is there, Reload shows what is there.
+					// An entry that is being made has none to reload or overwrite: its save is a refused one
+					if( ok !== true && result !== undefined && result !== null && result.conflict === true && current.making !== true ) {
 
 						bar.line.idle();
 						bar.paint( { dirty : true } );
@@ -8401,8 +8515,57 @@
 						return;
 					}
 
-					if( result !== undefined && result !== null && result.row !== undefined )
-						current.row = result.row;
+					const creating = current.making === true;
+					const made = result === undefined || result === null ? undefined : result.row;
+
+					// An entry that was made is the record's entry from here: the panel has put its row in its directory and says it. A row that is not there is a mistake of the caller: the form stays as it
+					// was, with what was typed, and the save is answered as one that failed
+					if( creating === true ) {
+
+						if( made === undefined || made === null || options.find( options.keyOf( made ) ) === null ) {
+
+							bar.line.idle();
+							bar.paint( { dirty : true } );
+
+							if( typeof then === 'function' )
+								then( false );
+
+							throw new TypeError( 'Nino.adminUi.record(): a save that makes an entry says done( true, { row } ) with the row of the entry, which find() knows' );
+						}
+
+						const held = dc.activeElement ?? null;
+						const inside = held !== null && content.contains( held ) === true;
+
+						retake( made );
+						draw();
+
+						// What had the focus in the form is gone with it: the first field of the entry has it
+						if( inside === true )
+							( firstField() ?? title ).focus();
+					}
+					else {
+
+						const moved = options.rekey === true && made !== undefined && made !== null && options.keyOf( made ) !== current.key;
+
+						// A key that find() does not know is a mistake of the caller, as for an entry that is made: the record keeps the key and the address it has, and the save is answered as a failed one
+						if( moved === true && options.find( options.keyOf( made ) ) === null ) {
+
+							bar.line.idle();
+							bar.paint( { dirty : true } );
+
+							if( typeof then === 'function' )
+								then( false );
+
+							throw new TypeError( 'Nino.adminUi.record(): a save of an entry whose key changed says done( true, { row } ) with the row of the new key, which find() knows' );
+						}
+
+						if( made !== undefined )
+							current.row = made;
+
+						// A panel whose entries are named by what a person edits says so: the entry has the key its row has now
+						if( moved === true )
+							retake( made );
+					}
 
 					adopt( current.row );
 					touched = false;
@@ -8412,12 +8575,16 @@
 					if( registry() !== null )
 						registry().snapshot( dirtyName );
 
-					Nino.adminUi.say( word( 'saved', '/_admin/common/msg/saved' ) );
+					Nino.adminUi.say( creating === true ? ( labels.created ?? word( 'saved', '/_admin/common/msg/saved' ) ) : word( 'saved', '/_admin/common/msg/saved' ) );
 					refreshNav();
 
 					if( typeof then === 'function' )
 						then( true );
 				} );
+
+				// A save that has not answered yet, of a form that makes an entry
+				if( busy === true && current !== null && current.making === true )
+					lock( true );
 			}
 
 			// The way out: the dialog is closed, and the address says the directory
@@ -8484,9 +8651,13 @@
 
 				if( target !== null && options.directory.focusRow( target ) === false && typeof options.directory.focusSearch === 'function' )
 					options.directory.focusSearch();
+
+				// A form that was opened by an address has no button that opened it, and no row either: the search has the focus
+				else if( target === null && was !== null && was.making === true && starter === null && typeof options.directory.focusSearch === 'function' )
+					options.directory.focusSearch();
 			};
 
-			const open = function( key, how ) {
+			const open = function( key, how, creating ) {
 
 				how = how ?? {};
 
@@ -8498,14 +8669,18 @@
 					return show( key ) === true ? ( address(), true ) : false;
 				}
 
-				const row = options.find( key );
+				// The form of an entry that is being made has no entry to find
+				const row = creating === true ? options.create.blank() : options.find( key );
 
 				if( row === null ) {
 					options.missing( key );
 					return false;
 				}
 
-				current = { key : key, row : row };
+				current = creating === true ? { key : null, row : row, making : true } : { key : key, row : row };
+				starter = how.opener ?? null;
+
+				const fallback = dc.activeElement ?? undefined;
 
 				const tools = Nino.adminUi.el( 'div', 'nino-admin-record-steps' );
 				previous = Nino.adminUi.iconButton( 'chevron-left', word( 'prev', '/_admin/common/record/prev' ), function() { go( -1 ) }, { className : 'nino-admin-record-step' } );
@@ -8530,13 +8705,17 @@
 
 				if( readOnly === false ) {
 
-					primary = Nino.adminUi.button( word( 'save', '/_admin/common/label/save' ), function() { primarySave() }, { kind : 'primary' } );
+					primary = Nino.adminUi.button( creating === true ? labels.createSave : word( 'save', '/_admin/common/label/save' ), function() { primarySave() }, { kind : 'primary' } );
 
-					if( options.saveNext === true )
-						secondary.push( Nino.adminUi.button( word( 'saveNext', '/_admin/common/label/save-next' ), function() {
+					if( options.saveNext === true ) {
+						continueButton = Nino.adminUi.button( word( 'saveNext', '/_admin/common/label/save-next' ), function() {
 							primarySave( function( ok ) { if( ok === true ) go( 1 ) } );
-						}, { kind : 'secondary' } ) );
+						}, { kind : 'secondary' } );
+						secondary.push( continueButton );
+					}
 				}
+
+				mainButton = primary;
 
 				( options.actions ?? [] ).forEach( function( action ) {
 
@@ -8571,15 +8750,16 @@
 				};
 
 				const opened = Nino.adminUi.choiceDialog( {
-					title : String( options.title( row ) ),
-					subtitle : typeof options.subtitle === 'function' ? String( options.subtitle( row ) ) : undefined,
+					title : creating === true ? labels.createTitle : String( options.title( row ) ),
+					subtitle : typeof options.subtitle === 'function' ? ( creating === true ? '' : String( options.subtitle( row ) ) ) : undefined,
 					size : 'large',
 					className : 'nino-admin-record',
 					content : content,
 					tools : tools,
 					close : word( 'close', '/_admin/common/label/close' ),
 					bar : bar.el,
-					opener : how.opener,
+					// A form that is opened over an entry is closed to the button that asked for it: the dialog asks when it closes
+					opener : maker === true ? function() { return starter ?? fallback } : how.opener,
 					choices : [ { value : 'close', label : word( 'close', '/_admin/common/label/close' ), kind : 'secondary' } ],
 					// Every way out - the cross, Escape - is asked here: a record with unsaved input is left only through its question
 					guard : function() {
@@ -8623,9 +8803,7 @@
 						draw();
 
 						// The first field has the focus - a record that is only read, its name
-						const field = readOnly === true ? undefined : Array.from( form.querySelectorAll('input, textarea, select') ).find( function( one ) { return one.type !== 'hidden' && one.type !== 'file' && one.disabled !== true } );
-
-						( field ?? title ).focus();
+						( firstField() ?? title ).focus();
 					},
 					onChoose : function() { done() },
 				} );
@@ -8696,13 +8874,14 @@
 				// another one, a record that stands open over it is closed by the listener of the address, and a question about unsaved input was asked by the shell once, not a second time here
 				const at = here.current();
 				const parts = at.panel === options.screen ? behind( at ) : null;
-				const named = Array.isArray( parts ) === true && parts.length === 1 ? String( parts[0] ) : null;
+				const makes = maker === true && Array.isArray( parts ) === true && parts.length === 1 && here.isWord( at.parts, prefixed().length, options.create.word ?? 'new' ) === true;
+				const named = Array.isArray( parts ) === true && parts.length === 1 && makes === false ? String( parts[0] ) : null;
 
 				if( parts === null )
 					return false;
 
 				// The hashchange that the cross itself asked the history for: the record is closed already
-				if( expectBack === true && named === null ) {
+				if( expectBack === true && named === null && makes === false ) {
 					expectBack = false;
 					return true;
 				}
@@ -8711,6 +8890,27 @@
 				if( dialog !== null && closeAbove() === true ) {
 					here.refuse();
 					resync();
+
+					return true;
+				}
+
+				// The word of the address that makes an entry - never a key that is written the same - is the form of an entry that is being made
+				if( makes === true ) {
+
+					if( current !== null && current.making === true ) {
+						address();
+						return false;
+					}
+
+					here.leave( [ dirtyName ], dialog !== null, function() {
+
+						if( dialog === null )
+							open( null, {}, true );
+						else
+							showBlank();
+
+						address();
+					}, resync );
 
 					return true;
 				}
@@ -8778,6 +8978,17 @@
 
 				expectBack = false;
 
+				// The form of an entry that is being made holds input: the person is asked before it is given up for an entry
+				if( maker === true && dialog !== null && current !== null && current.making === true && row !== null ) {
+
+					ask( function() {
+						if( show( key ) === true )
+							address();
+					} );
+
+					return true;
+				}
+
 				if( here !== null && dialog === null && row !== null && addressOf( row ) !== null ) {
 
 					const before = here.position();
@@ -8789,6 +9000,49 @@
 				}
 
 				if( open( key, how ) === false )
+					return false;
+
+				address();
+
+				return true;
+			};
+
+			// A person's own move: the form of an entry that is being made is opened, with an entry of the history of its own as an entry has. One that is open already is left
+			// as it is; an entry that is open and holds input is asked about first
+			const createByPerson = function( how ) {
+
+				const here = router();
+
+				how = how ?? {};
+				expectBack = false;
+
+				if( dialog !== null ) {
+
+					if( current !== null && current.making === true )
+						return true;
+
+					ask( function() {
+
+						// The button that asked for the form is the one the focus goes back to
+						starter = how.opener ?? starter;
+						showBlank();
+						address();
+					} );
+
+					return true;
+				}
+
+				if( here !== null ) {
+
+					const before = here.position();
+
+					here.go( options.screen, prefixed().concat( [ here.word( options.create.word ?? 'new' ) ] ) );
+
+					if( here.position() !== before )
+						here.mark( options.screen );
+				}
+
+				if( open( null, how, true ) === false )
 					return false;
 
 				address();
@@ -8827,7 +9081,7 @@
 				};
 			}
 
-			return {
+			const handle = {
 				open : openByPerson,
 				follow : follow,
 				close : request,
@@ -8835,6 +9089,14 @@
 				key : function() { return current === null ? null : current.key },
 				refresh : function() { if( current !== null ) refreshNav() },
 			};
+
+			// Only a record that was given `create` can make an entry: for any other the handle has no such call
+			if( maker === true ) {
+				handle.create = createByPerson;
+				handle.creating = function() { return current !== null && current.making === true };
+			}
+
+			return handle;
 		},
 
 		/**
