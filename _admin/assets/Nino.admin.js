@@ -8019,7 +8019,7 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.screen			The panel's screen as the router knows it (its uri)
-		 *	@param		{Array|Function}	[options.prefix]	The parts of the address that stand before the entry, for a directory that does not start at the head of its screen but under a part of it - the files of a folder, `#files/files/<folder>/<entry>`: an array of keys and words, or a function that answers it (the folder changes while the panel is there). The record opens and writes `#panel/tab/<prefix...>/<entry>`, answers an address that names the prefix alone as its directory, and an address that does not begin with the prefix is not its own: it closes where it is open and the panel draws the other view
+		 *	@param		{Array|Function}	[options.prefix]	The parts of the address that stand before the entry, for a directory that does not start at the head of its screen but under a part of it - the files of a folder, `#files/files/<folder>/<entry>`: an array of keys and words, or a function that answers it (the folder changes while the panel is there). The record opens and writes `#panel/tab/<prefix...>/<entry>`, answers an address that names the prefix alone as its directory, and an address that does not begin with the prefix is not its own: it closes where it is open and the panel draws the other view. A panel that leads its own views in the tab gives `prefix` (`[]` for a directory at the head of its screen) or writes its addresses itself: only with `prefix` does the record write the directory's address over one it reads as the directory's
 		 *	@param		{string}		[options.dirty]			The name of the unsaved-input entry (the screen by default)
 		 *	@param		{Object}		options.directory		The directory the entries are in: rows(), reveal( key ), focusRow( key )
 		 *	@param		{Function}	options.keyOf				keyOf( row ) - the string that names the entry in the address
@@ -8714,9 +8714,13 @@
 				if( named === null ) {
 
 					// An address that names the directory - and any other that is read as it: a part that is no part ended the parts, one part too many - is written as the
-					// directory's own, so that what stands in the bar is what is on screen; where it says so already nothing is written
+					// directory's own, so that what stands in the bar is what is on screen; where it says so already nothing is written. Only a panel that says where its directory
+					// stands (options.prefix, [] for the head of the screen) has that address to write: without it the address may name a view that the panel draws itself
 					if( dialog === null ) {
-						here.set( options.screen, prefixed() );
+
+						if( Array.isArray( options.prefix ) === true || typeof options.prefix === 'function' )
+							here.set( options.screen, prefixed() );
+
 						return false;
 					}
 

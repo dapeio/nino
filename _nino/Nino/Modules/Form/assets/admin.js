@@ -426,6 +426,7 @@
 
 			return Nino.adminUi.record( {
 				screen : 'submissions',
+				prefix : [],
 				readOnly : true,
 				// The directory it opened from, whatever it is drawn as at the moment
 				directory : {

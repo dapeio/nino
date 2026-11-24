@@ -144,6 +144,10 @@ reload.box.location.hash = '#things/things/nothing';
 reload.admin.things.showCurrent();
 check( 'an address that names an entry that is not there leaves the directory with a notice and the address of the directory', reload.dialogs.filter( x => x.open ).length === 0 && findAll( mount2, el => hasClass( el, 'nino-admin-notice' ) ).length === 1 && reload.hash() === '#things' );
 
+reload.box.location.hash = '#things/things/thing-3/extra';
+reload.admin.things.showCurrent();
+check( 'an address with a part too many is the directory\'s: no record, and the bar says the address of the directory', reload.dialogs.filter( x => x.open ).length === 0 && reload.hash() === '#things' );
+
 // A panel of another address
 const foreign = adminPage( { things : [], logs : [] } );
 const mount3 = element('div');

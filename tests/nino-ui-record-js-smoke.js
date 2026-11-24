@@ -880,10 +880,15 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 	t.h.hashchange();
 	check( '...and an address of another folder is not its own: the record closes, and the panel draws that folder', t.dialog() === null && t.record.follow() === false );
 
-	// The parts that stand before the prefix are a panel's own words: a record that has none reads the address as it always did
+	// A panel that leads views of its own in the tab - a folder view, `@folder/<id>` - and gives no prefix: its address is not the record's to write over
 	const u = setup( true );
-	u.h.box.location.hash = '#submissions/submissions/folder%2Fone/r05';
-	check( 'a record without a prefix reads the address from the first part: two parts name no entry', u.record.follow() === false && u.dialog() === null && u.h.hash() === '#submissions' );
+	u.h.box.location.hash = '#submissions/submissions/@folder/room1';
+	check( 'a record without a prefix reads the address from the first part: two parts name no entry, and the address the panel leads is left as it is', u.record.follow() === false && u.dialog() === null && u.h.hash() === '#submissions/submissions/@folder/room1' );
+	u.h.box.location.hash = '#submissions/submissions/r03/extra';
+	check( '...a part too many as well', u.record.follow() === false && u.dialog() === null && u.h.hash() === '#submissions/submissions/r03/extra' );
+	u.h.box.location.hash = '#submissions/submissions/r99';
+	u.record.follow();
+	check( '...and an entry that is not there is told to the panel; the address is the directory\'s', u.calls.missing.join() === 'r99' && u.h.hash() === '#submissions' );
 }
 
 
@@ -958,7 +963,7 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 // --- an address that was typed with a part that is none is written over by the true one ---------------------------------
 
 {
-	const s = setup( true );
+	const s = setup( true, { prefix : [] } );
 
 	s.h.box.location.hash = '#submissions/submissions/ab%zz';
 	check( 'a part that cannot be decoded ends the parts: the address is the directory\'s, and the bar says so instead of what was typed', s.record.follow() === false && s.h.hash() === '#submissions' );

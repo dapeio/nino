@@ -280,6 +280,12 @@ console.log('Submissions panel');
 	check( 'an entry that is not there leaves the list, says so over it, and writes the address of the list', m.dialog() === null && m.ids() !== '' && byClass( m.mount, 'nino-admin-notice' ).length === 1 && byClass( m.mount, 'nino-admin-notice' )[0].textContent === text('/_admin/submissions/record/missing') && m.h.hash() === '#submissions' );
 	fire( m.rows()[0], 'click', { target : m.rows()[0] } );
 	check( '...and the sentence is gone when an entry is opened', byClass( m.mount, 'nino-admin-notice' ).length === 0 );
+
+	const x = world();
+	x.h.box.location.hash = '#submissions/submissions/aaaaaaaaaaaaaaaa/extra';
+	x.panel.showCurrent();
+	x.answer( 200, { entries : ENTRIES, forms : FORMS, capped : '' } );
+	check( 'an address with a part too many is the list\'s: no record, and the bar says the address of the list', x.dialog() === null && x.h.hash() === '#submissions' );
 }
 
 

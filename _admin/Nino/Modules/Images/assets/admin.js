@@ -594,6 +594,7 @@
 
 			return Nino.adminUi.record( {
 				screen : 'images',
+				prefix : [],
 				// The directory it opened from, whatever it is drawn as at the moment
 				directory : {
 					rows : function() { return panel._directory.rows() },
