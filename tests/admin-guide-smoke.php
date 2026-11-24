@@ -473,7 +473,6 @@ check( 'a dialog of a form takes each of them as a type of field, and a question
 	patch that brings another panel over adds its script here, and from then on the panel keeps to it	*/
 $converted = [
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
-	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/roles.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Elements/assets/admin.js',
@@ -510,7 +509,7 @@ $listed = [
 	'_admin/Nino/Modules/Text/assets/keys.js'			=> 'adminUi.list(',
 	'_admin/Nino/Modules/Text/assets/textkeys.js'	=> 'adminUi.filterBar(',
 	'_admin/Nino/Modules/Features/assets/admin.js'	=> 'adminUi.table(',
-	'_admin/Nino/Modules/Users/assets/admin.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Users/assets/admin.js'		=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Users/assets/roles.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Users/assets/lockout.js'	=> 'adminUi.list(',
 	'_admin/Nino/Modules/Routes/assets/admin.js'		=> 'adminUi.list(',
@@ -562,6 +561,7 @@ $schemaForms = [
 	'_admin/Nino/Modules/Features/assets/admin.js',
 	'_admin/Nino/Modules/Features/assets/settings.js',
 	'_admin/Nino/Modules/Routes/assets/admin.js',
+	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
@@ -592,7 +592,6 @@ check( 'no form drawn from a schema puts the sentence of a field, or the explana
 	label, a select, an input of their own is none), the bar is the block's with one main button, what is wrong is said under the
 	field, and what went well is a toast. The list grows: the patch that brings another form over adds its script here	*/
 $guideForms = [
-	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/roles.js',
 	'_admin/Nino/Modules/Users/assets/lockout.js',
 	'_admin/Nino/Modules/Users/assets/recoverypw.js',
@@ -758,6 +757,7 @@ $barred = [
 	'_admin/Nino/Modules/Language/assets/translations.js',
 	'_nino/Nino/Modules/Form/assets/admin.js',
 	'_admin/Nino/Modules/Routes/assets/admin.js',
+	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Images/assets/favicon.js',
@@ -844,7 +844,7 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
 $sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
-$sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css', '_admin/Nino/Modules/Routes/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css', '_admin/Nino/Modules/Routes/assets/admin.css', '_admin/Nino/Modules/Users/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {

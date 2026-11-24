@@ -340,4 +340,145 @@ check( 'a Developer deletes a Developer while another full access stays', $statu
 [ $status ] = $call( $users, 'apiSetRole', [ 'username' => 'man@example.com', 'role' => 'editor' ] );
 check( '...and gives a manager another role', $status === 200 && \Nino\Auth::getUser( $appData, 'man@example.com' )['role'] === 'editor' );
 
+echo "\n";
+echo "What the workbench's accounts panel relies on - through the dispatcher the browser reaches every action by\n";
+
+/*	What was pinned before: the rank matrix above drives the api methods of the panel directly, one account against the next, and admin-smoke.php and
+	admin-system-smoke.php hold what each method answers for a plain user, a manager and a developer. What no suite held is the entry the browser calls -
+	Admin::handlePost(), with a session or without one and a token or none - for each of the seven actions of the account list and its form, the last
+	account with full access losing its role through users/save (only through users/role), and the effect on the sessions of a password that is set	*/
+$post = static function( string $action, array $data = [] ) use ( &$appData ): array {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	return [ $status, $body ];
+};
+$store = static function() use ( &$appData ): string {
+	return json_encode( [ $appData['/nino/auth/user'] ?? null, $appData['/nino/auth/roles'] ?? null ] );
+};
+
+// The last account with full access cannot lose its role through the one save of the account's form either
+$signIn( 'man2@example.com' );
+$fullAccess = array_keys( array_filter( $appData['/nino/auth/user'], static fn( array $user ): bool => in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) ) );
+$before = $accountOf( 'dev@example.com' );
+[ $status, $body ] = $post( 'users/save', [ 'username' => 'dev@example.com', 'mail' => 'dev@example.com', 'role' => 'editor' ] );
+check( 'the fixture: one account holds full access, and a manager asks that its role is taken away through users/save', $fullAccess === [ 'dev@example.com' ] );
+check( 'the last account with full access cannot lose its role through users/save: 409, "users_last_admin_role", nothing written', $status === 409 && ( $body['code'] ?? '' ) === 'users_last_admin_role' && $accountOf( 'dev@example.com' ) === $before );
+check( '...the refusal names no field of the form: it is said in the line', array_key_exists( 'field', $body ?? [] ) === false );
+
+\Nino\Auth::insertUser( $appData, 'dev3@example.com', $password, [], 'developer' );
+$signIn( 'dev@example.com' );
+[ $status ] = $post( 'users/save', [ 'username' => 'dev3@example.com', 'mail' => 'dev3@example.com', 'role' => 'editor' ] );
+check( 'while another account holds full access the same save goes through - the bound is the last one', $status === 200 && \Nino\Auth::getUser( $appData, 'dev3@example.com' )['role'] === 'editor' );
+\Nino\Auth::deleteUser( $appData, 'dev3@example.com' );
+
+// A manager who sets another account's password ends every session of that account
+$signIn( 'man2@example.com' );
+$appData['/nino/auth/user']['ed2@example.com']['sessions'] = [ 'one' => [ 'time' => time() ], 'two' => [ 'time' => time() ] ];
+[ $status ] = $post( 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'pw' => 'a password of my choosing' ] );
+check( 'a manager who sets the password of another account ends that account\'s sessions', $status === 200 && ( $appData['/nino/auth/user']['ed2@example.com']['sessions'] ?? [ 'x' ] ) === []
+	&& password_verify( 'a password of my choosing', (string) $appData['/nino/auth/user']['ed2@example.com']['pw'] ) === true );
+check( '...and keeps its own session', \Nino\Auth::getCurrentUser( $appData ) !== false && \Nino\Auth::getCurrentUser( $appData )['mail'] === 'man2@example.com' );
+$appData['/nino/auth/user']['ed2@example.com']['sessions'] = [ 'one' => [ 'time' => time() ] ];
+[ $status ] = $post( 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2.renamed@example.com' ] );
+check( '...a change of the address that is no password ends none: the account is the same, and its sessions go with it', $status === 200 && isset( $appData['/nino/auth/user']['ed2@example.com'] ) === false && array_keys( $appData['/nino/auth/user']['ed2.renamed@example.com']['sessions'] ?? [] ) === [ 'one' ] );
+
+// Who may call each of the seven actions
+$actionsOf = [
+	'users/list'			=> static fn( string $mail ): array => [],
+	'users/create'		=> static fn( string $mail ): array => [ 'mail' => 'made@example.com', 'pw' => 'a long enough password', 'role' => 'editor', 'name' => '' ],
+	'users/save'			=> static fn( string $mail ): array => [ 'username' => $mail, 'mail' => $mail, 'name' => 'Set through the dispatcher' ],
+	'users/delete'		=> static fn( string $mail ): array => [ 'username' => $mail ],
+	'users/logoutall'	=> static fn( string $mail ): array => [ 'username' => $mail ],
+	'users/role'			=> static fn( string $mail ): array => [ 'username' => $mail, 'role' => '' ],
+	'users/status'		=> static fn( string $mail ): array => [ 'username' => $mail, 'active' => false ],
+];
+
+\Nino\Auth::insertUser( $appData, 'tmp@example.com', $password, [], 'editor' );
+
+// No session: 401, the code "session", nothing written
+$signedOut = $appData;
+unset( $signedOut['./nino/auth/current'] );
+$bad = [];
+foreach( $actionsOf as $action => $ask ) {
+	$was = json_encode( [ $signedOut['/nino/auth/user'], $signedOut['/nino/auth/roles'] ] );
+	[ $status, $body ] = ninoCall( $signedOut, [ \Nino\Admin\Admin::class, 'handlePost' ], $ask( 'tmp@example.com' ), $action );
+	if( $status !== 401 || ( $body['code'] ?? '' ) !== 'session' || json_encode( [ $signedOut['/nino/auth/user'], $signedOut['/nino/auth/roles'] ] ) !== $was )
+		$bad[] = $action. ': '. $status;
+}
+check( 'with no session every one of the seven actions is 401 with the code "session", and writes nothing'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+
+// A token the guard refused: 403, the code "csrf", the action is not called
+$signIn( 'man2@example.com' );
+$bad = [];
+foreach( $actionsOf as $action => $ask ) {
+	$was = $store();
+	$_POST['action'] = $action;
+	$_POST['data'] = json_encode( $ask( 'tmp@example.com' ) );
+	$refused = [ '/nino/http/response' => [ 'statusCode' => 403, 'body' => false ], './nino/csrf/blocked' => true ];
+	\Nino\Admin\Admin::handlePost( $appData, $refused );
+	if( $refused['/nino/http/response']['statusCode'] !== 403 || ( $refused['/nino/http/response']['body']['code'] ?? '' ) !== 'csrf' || $store() !== $was )
+		$bad[] = $action. ': '. $refused['/nino/http/response']['statusCode'];
+}
+check( 'the dispatcher respects a request the token guard refused (it arrives marked blocked): 403 with the code "csrf" for every one of the seven actions, even for a manager, and the action is not called'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+
+// An account without the permission to manage users: the list is its own row, the ones that manage are 403, the ones for an account are its own or 403
+$signIn( 'ed.renamed@example.com' );
+$bad = [];
+foreach( [ 'users/create', 'users/delete', 'users/role', 'users/status' ] as $action ) {
+	$was = $store();
+	[ $status, $body ] = $post( $action, $actionsOf[$action]( 'tmp@example.com' ) );
+	if( $status !== 403 || array_key_exists( 'code', $body ?? [] ) === true || $store() !== $was )
+		$bad[] = $action. ': '. $status;
+}
+check( 'without the permission to manage users users/create, users/delete, users/role and users/status are 403 - no code, nothing written'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+foreach( [ 'users/delete', 'users/role', 'users/status' ] as $action ) {
+	$was = $store();
+	[ $status ] = $post( $action, $actionsOf[$action]( 'ed.renamed@example.com' ) );
+	if( $status !== 403 || $store() !== $was )
+		$bad[] = $action. ' of the own account: '. $status;
+}
+check( '...nor of the account\'s own record: it neither deletes, nor changes the role of, nor deactivates itself through them', $bad === [] );
+[ $status, $body ] = $post( 'users/list' );
+check( 'users/list answers every account, and for one that does not manage users its own row only, with the flag that says it cannot manage', $status === 200 && count( $body['users'] ) === 1 && $body['users'][0]['mail'] === 'ed.renamed@example.com' && $body['canManage'] === false && $body['users'][0]['isSelf'] === true );
+$was = $store();
+[ $status ] = $post( 'users/save', $actionsOf['users/save']( 'tmp@example.com' ) );
+[ $statusOut ] = $post( 'users/logoutall', $actionsOf['users/logoutall']( 'tmp@example.com' ) );
+check( 'users/save and users/logoutall are the own account\'s or a manager\'s: for another account an editor is 403 and nothing is written', $status === 403 && $statusOut === 403 && $store() === $was );
+[ $status, $body ] = $post( 'users/save', [ 'username' => 'ed.renamed@example.com', 'mail' => 'ed.renamed@example.com', 'name' => 'Own name', 'currentPassword' => $password ] );
+check( '...the own account is let through, with its current password', $status === 200 && ( $body['name'] ?? '' ) === 'Own name' && ( $appData['/nino/auth/user']['ed.renamed@example.com']['name'] ?? '' ) === 'Own name' );
+$was = $store();
+[ $status, $body ] = $post( 'users/save', [ 'username' => 'ed.renamed@example.com', 'mail' => 'ed.renamed@example.com', 'name' => 'Another name', 'currentPassword' => 'not the password' ] );
+check( '...and refused with a wrong one: 401, "wrong_password" at the field currentPassword, nothing is written', $status === 401 && ( $body['code'] ?? '' ) === 'wrong_password' && ( $body['field'] ?? '' ) === 'currentPassword' && $store() === $was
+	&& ( $appData['/nino/auth/user']['ed.renamed@example.com']['name'] ?? '' ) === 'Own name' );
+
+// A manager
+$signIn( 'man2@example.com' );
+[ $status, $body ] = $post( 'users/list' );
+check( 'a manager is answered every account, and says that it may manage', $status === 200 && count( $body['users'] ) === count( $appData['/nino/auth/user'] ) && $body['canManage'] === true );
+[ $status ] = $post( 'users/save', $actionsOf['users/save']( 'tmp@example.com' ) );
+check( 'a manager saves the account of another that is below it', $status === 200 && ( $appData['/nino/auth/user']['tmp@example.com']['name'] ?? '' ) === 'Set through the dispatcher' );
+$appData['/nino/auth/user']['tmp@example.com']['sessions'] = [ 'one' => [ 'time' => time() ] ];
+[ $status, $body ] = $post( 'users/logoutall', $actionsOf['users/logoutall']( 'tmp@example.com' ) );
+check( '...and ends its sessions - the answer says that they are not its own', $status === 200 && ( $body['loggedOutSelf'] ?? null ) === false && ( $appData['/nino/auth/user']['tmp@example.com']['sessions'] ?? [ 'x' ] ) === [] );
+[ $status ] = $post( 'users/role', [ 'username' => 'tmp@example.com', 'role' => '' ] );
+check( '...takes its role away', $status === 200 && ( $appData['/nino/auth/user']['tmp@example.com']['role'] ?? 'x' ) === '' );
+[ $status ] = $post( 'users/status', $actionsOf['users/status']( 'tmp@example.com' ) );
+check( '...deactivates it', $status === 200 && ( $appData['/nino/auth/user']['tmp@example.com']['status'] ?? 1 ) === \Nino\Auth::STATUS_DISABLED );
+[ $status, $body ] = $post( 'users/create', $actionsOf['users/create']( '' ) );
+check( '...creates an account with a role it may hand out', $status === 200 && ( $body['mail'] ?? '' ) === 'made@example.com' && ( $appData['/nino/auth/user']['made@example.com']['role'] ?? '' ) === 'editor' );
+[ $status ] = $post( 'users/delete', [ 'username' => 'made@example.com' ] );
+check( '...and deletes one', $status === 200 && isset( $appData['/nino/auth/user']['made@example.com'] ) === false );
+[ $status ] = $post( 'users/delete', [ 'username' => 'man2@example.com' ] );
+check( '...but not its own account', $status === 400 && isset( $appData['/nino/auth/user']['man2@example.com'] ) === true );
+[ $status ] = $post( 'users/status', [ 'username' => 'man2@example.com', 'active' => false ] );
+check( '...nor deactivates it', $status === 400 && \Nino\Auth::getUser( $appData, 'man2@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
+\Nino\Auth::deleteUser( $appData, 'tmp@example.com' );
+
+// A change of the own password keeps the session it is made in, and ends every other
+$signIn( 'ed.renamed@example.com' );
+$current = \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+$appData['/nino/auth/user']['ed.renamed@example.com']['sessions']['another-browser'] = [ 'time' => time() ];
+[ $status ] = $post( 'users/save', [ 'username' => 'ed.renamed@example.com', 'mail' => 'ed.renamed@example.com', 'pw' => 'a new password of my own', 'currentPassword' => $password ] );
+check( 'a change of the own password ends the sessions of the account but the one it is made in', $status === 200 && is_string( $current ) === true && $current !== '' && array_keys( $appData['/nino/auth/user']['ed.renamed@example.com']['sessions'] ?? [] ) === [ $current ]
+	&& password_verify( 'a new password of my own', (string) $appData['/nino/auth/user']['ed.renamed@example.com']['pw'] ) === true && \Nino\Auth::getCurrentUser( $appData ) !== false );
+
 ninoDone( $appData );

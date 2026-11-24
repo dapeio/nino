@@ -87,10 +87,6 @@ namespace Nino\Modules\Users {
 			return [ Roles::class, Lockout::class, RecoveryPassword::class ];
 		}
 
-		public static function panes(): array {
-			return [ 'users-list', 'users-form' ];
-		}
-
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),

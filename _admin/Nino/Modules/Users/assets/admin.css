@@ -4,8 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Users			Accounts, roles and login protection
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the three lists that
- *													add a finer permission to a role and the summary of
+ *													system in _admin/assets/style.css: the account in the
+ *													table of the directory with its badges, the three lists
+ *													that add a finer permission to a role and the summary of
  *													what the role may do. Bundled while the module is there
  *													(see the panel's assets()), so the same layer rules
  *													apply - the shell's stylesheet fixes the layer order,
@@ -20,11 +21,39 @@
 
 @layer nino.tool {
 
+/* ------------------------------------------------- The accounts in the table ---- */
+
+/* The address of an account that is longer than its column ends in an ellipsis, whole in its tooltip, and "(you)" behind it is quiet */
+#users-list .users-account {
+	display: inline-block;
+	max-width: 18rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	vertical-align: bottom;
+	white-space: nowrap;
+}
+
+#users-list .users-you {
+	color: var(--editor-text-secondary);
+	font-weight: var(--nino-admin-weight-normal);
+}
+
+/* The badges of an account's state stand in a row and wrap where they must */
+#users-list .users-states {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: var(--nino-admin-space-2);
+	max-width: 100%;
+}
+
+/* A badge says its words in one line: the time of a lock is in its tooltip and in the record */
+#users-list .users-states > .nino-admin-badge {
+	white-space: nowrap;
+}
+
 /* ------------------------------------------------- A line that is shown ---- */
 
-/* The state of an account, its role, the accounts that hold a role: text in the place of a field, as high as the
-   field beside it would be and in the type of its text */
-#users-form .nino-admin-field > p,
+/* The accounts that hold a role: text in the place of a field, as high as the field beside it would be and in the type of its text */
 #roles-form .nino-admin-field > p {
 	margin: 0;
 	padding: var(--nino-admin-space-3) 0;

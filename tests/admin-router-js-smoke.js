@@ -3,7 +3,7 @@
  *	admin-router-js-smoke.js	DOM-free checks for the workbench's history: what
  *										the router writes into it (a person's own move adds
  *										an entry, a state sync replaces one), and how the
- *										drill-down panels - Text, Users, Roles; Images and
+ *										drill-down panels - Text, Roles; Users, Images and
  *										Elements have their own tests - follow the hash a
  *										step through it leaves behind.
  *
@@ -252,44 +252,6 @@ console.log( 'Text Keys' );
 	check( 'another panel\'s hash keeps the level in memory', calls.join() === 'showForm' && asked.length === 0 );
 }
 
-console.log( 'Users' );
-{
-	const nodes = { 'users-form' : { classList : classes( true ) }, 'users-list' : { classList : classes( false ) } };
-	const { module, calls, asked, at } = panel( '_admin/Nino/Modules/Users/assets/admin.js', nodes, 'users', [ '_showList', '_showForm', '_openUser', '_renderCreateForm' ] );
-	module._users = [ { mail : 'ada@example.com' }, { mail : 'bob@example.com' } ];
-	module._canManage = true;
-	const on = ( form, user ) => { nodes['users-form'].classList = classes( form === false ); nodes['users-list'].classList = classes( form === true ); module._currentUser = user === undefined ? null : module._users.find( u => u.mail === user ) };
-
-	on( false );
-	at( 'users', 'bob@example.com' );
-	check( 'a hash that names an account opens its form', calls.join() === 'openUser bob@example.com' && asked[0].leaving === false );
-	at( 'users', { key : '@new' } );
-	check( '...the key @new, which no account has, is no form for a new one', calls.join() !== 'renderCreateForm' && calls.join() !== 'openUser @new' );
-	at( 'users', '@new' );
-	check( '...\'@new\' the form for a new one, where the account may create', calls.join() === 'renderCreateForm' );
-	module._canManage = false;
-	at( 'users', '@new' );
-	check( '...and the list where it may not', calls.join() === 'showList' );
-	module._canManage = true;
-
-	on( true, 'ada@example.com' );
-	at( 'users' );
-	check( 'the bare panel is the list, asked first - a form is left', calls.join() === 'showList' && asked[0].leaving === true && JSON.stringify( asked[0].names ) === '["users"]' );
-	at( 'users', 'bob@example.com' );
-	check( 'another account replaces this one', calls.join() === 'openUser bob@example.com' && asked[0].leaving === true );
-	at( 'users', '@new' );
-	check( 'the new-account form replaces an account\'s', calls.join() === 'renderCreateForm' );
-	at( 'users', 'ada@example.com' );
-	check( 'the account on screen is only written back', calls.join() === 'showForm' && asked.length === 0 );
-	on( true );
-	at( 'users', '@new' );
-	check( 'so is the new-account form', calls.join() === 'showForm' );
-	at( 'users', 'nobody@example.com' );
-	check( 'an account the list does not hold is the list', calls.join() === 'showList' );
-	at( 'dashboard' );
-	check( 'another panel\'s hash keeps the level in memory', calls.join() === 'showForm' && asked.length === 0 );
-}
-
 console.log( 'Roles' );
 {
 	const nodes = { 'roles-form' : { classList : classes( true ) }, 'roles-list' : { classList : classes( false ) } };
@@ -338,7 +300,7 @@ console.log( 'Back links and rows' );
 	} );
 
 	// The panels whose way back is the context bar's: the click that leaves a form goes through the router as well
-	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Elements/assets/types.js', '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/slots.js', '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js' ].forEach( function( file ) {
+	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Elements/assets/types.js', '_admin/Nino/Modules/Users/assets/roles.js', '_admin/Nino/Modules/Images/assets/slots.js', '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js' ].forEach( function( file ) {
 
 		const script = source( file );
 		const links = script.split( /back\s*:\s*\{ to : [^\n]*onClick : function\(\) \{/ ).slice( 1 );
