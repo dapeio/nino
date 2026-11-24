@@ -27,6 +27,9 @@ namespace Nino {
 			auth-tries.php re-locks accounts somebody already waited out;
 			a restored mail-status.php (the record of the last failed mail,
 			\Nino\Mail::failure()) brings back a failure that was fixed long
+			ago; a restored mail-queue.php (the outbox of \Nino\Mail::queue())
+			sends mails again that were delivered since the archive was made, and
+			a restored mail-failed.php reports mails that were given up on long
 			ago; restored .locks plants lock files for requests that ended weeks ago.
 
 			So the promise is kept where it is made rather than by what the list
@@ -38,7 +41,10 @@ namespace Nino {
 		// cannot be written - which the panel words in the interface language
 		public const int WRITE_FAILED = 1;
 
-		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'mail-status.php', 'catalogue.php' ];
+		// The files of the outbox of \Nino\Mail: not in a backup, and not brought back by a restore of any archive
+		private const array OUTBOX = [ 'mail-queue.php', 'mail-queue-due.txt', 'mail-keys.php', 'mail-failed.php', 'mail-queue-damaged.php', 'mail-failed-damaged.php' ];
+
+		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'mail-status.php', 'catalogue.php', ...self::OUTBOX ];
 
 		/**
 		 *	Whether a path below /data/ is one a backup must not carry
@@ -78,7 +84,8 @@ namespace Nino {
 		// _admin/ itself, ...) - that's already versioned in git and would
 		// just bloat every backup. Also deliberately not
 		// auth-tries.php, ratelimit.php or mail-status.php - transient
-		// throttling counters and the last failed mail, not data a restore
+		// throttling counters and the last failed mail - nor the outbox of
+		// \Nino\Mail (mail-queue.php and mail-failed.php), not data a restore
 		// should bring back. The workbench's
 		// activity log is not in an archive either: it is written to
 		// private/.logs/<day>.php (see \Nino\Modules\Logs\Admin),
@@ -510,6 +517,21 @@ namespace Nino {
 			}
 
 			return null;
+		}
+
+		/**
+		 *	Take the files of the outbox of the mail out of the unpacked copy of an archive, whatever archive it is: one of an
+		 *	older Nino, one somebody put together, one that carries what the backup of this kernel would not (see NEVER) - a
+		 *	restore that brought the outbox back would send what went out long ago
+		 *
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *
+		 *	@return 	void
+		 */
+		public static function dropOutbox( string $staging ): void {
+
+			foreach( self::OUTBOX as $name )
+				@unlink( rtrim( $staging, DIRECTORY_SEPARATOR ). '/data/'. $name );
 		}
 
 		/**

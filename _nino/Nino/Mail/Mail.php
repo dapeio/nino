@@ -38,6 +38,16 @@ namespace Nino {
 	// callback under '/nino/mail/send' (see TRANSPORT) and gets every
 	// mail after the cap and the header cleaning, with everything it
 	// needs to send it itself
+	//
+	// send(), sendAll() and sendSystem() deliver in the request, and the
+	// answer is theirs. queue() is the other way: a mail a feature wants
+	// out whatever happens to the request - the visitor leaves, the server
+	// drops the work after the response, the transport does not answer - is
+	// kept in an outbox below /data/ (see \Nino\MailQueue) and delivered
+	// by the requests that follow, with a wait that grows between the
+	// attempts, until it is delivered or given up on and reported. The
+	// outbox is the class \Nino\MailQueue, which a request loads only where
+	// a mail is queued or waits
 	class Mail {
 
 		// How long a window of the cap lasts, in seconds - no key of its own
@@ -52,6 +62,9 @@ namespace Nino {
 		public const string TEST = 'test';
 		public const int TEST_CAP = 6;
 		private const string COUNTER_PREFIX = 'sysmail-';
+
+		// The kind of a mail that queue() charges to the cap of the client who set it off, as send() does: one visitor's action
+		public const string CLIENT = 'client';
 
 		// Where the last failed call is kept - see failure()
 		private const string STATUS_PATH = '/data/mail-status.php';
@@ -184,6 +197,268 @@ namespace Nino {
 			}
 
 			return self::_deliverAll( $appData, $mails, true );
+		}
+
+		/**
+		 *	Keep a mail in the outbox, to be delivered after the response of this request or of a later one - by every
+		 *	request of the site, by the command of the outbox for a cron job (see docs/development.md, Mail) - whatever
+		 *	becomes of this request. The promise is the id that is answered: a mail that has one is delivered, or - once
+		 *	it has had its attempts, MailQueue::attempts() of them, after waits of 1 min, 5 min, 30 min, 2 h and 12 h - is
+		 *	given up on, said in the log and in failure() with a count and a time and counted in queued(); and it
+		 *	is delivered at least once: a process that dies between the transport's answer and the removal from the outbox
+		 *	leaves a mail that is sent a second time, and so does a transport that takes longer than MailQueue::LEASE seconds,
+		 *	after which another deliverer may take the mail. A mail is handed to the transport only after the outbox has
+		 *	written, and read back, that it was taken: where the disk is full or the file cannot be written nothing is sent.
+		 *
+		 *	What the outbox does not take it refuses here, at the call, and says why in queueRefused(): a mail that is no
+		 *	mail ('invalid': an address that is none, a subject or a reply address that is too long, a key over 200 bytes,
+		 *	a kind that is none), one over MailQueue::MAX_BYTES ('size'), an outbox that holds MailQueue::MAX_WAITING mails
+		 *	already, or MailQueue::MAX_CLIENT of a visitor's ('full'), a key that belongs to another mail ('conflict'), a client over its cap ('ratelimited', and rateLimited() says so), a file that cannot be written
+		 *	('unwritable'). Nothing is queued and nothing is dropped silently. The mail is cleaned as send() cleans it - no
+		 *	line break, no nul byte in a subject - and checked again when it is delivered, since the file is one a person can edit.
+		 *	An address or a reply address with a control character in it, a reply address that is a list, and a text that is no
+		 *	utf-8 are no mail ('invalid'): send() strips what it cannot send, a mail that waits is refused at the call.
+		 *
+		 *	The caps of the hour hold as they do for send() and sendSystem(), at the place where the mail is not
+		 *	delivered without them: a mail of the kind CLIENT counts one try of the client's cap when it is queued, the
+		 *	only moment the client is known; a mail of the kind SYSTEM or TEST counts one unit of the site's cap of that
+		 *	kind when it is about to go out, and one that is over the cap waits for the next hour and is no failure.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$mail					{ to, subject, body, replyTo }
+		 *	@param		string		$kind					CLIENT, SYSTEM or TEST
+		 *	@param		string		$key					Names the mail, '<name of the feature>/<anything>' - the name is a slug and no other feature's: a second call with the key of a mail that waits and the same mail is that mail, and its id is answered, one with another mail is refused as 'conflict'; '' for none. A key is remembered for ten minutes after its mail went out, so that a request that comes twice is the mail that went out
+		 *
+		 *	@return 	string									The id of the mail, 16 hex digits; '' where it was refused
+		 */
+		public static function queue( array &$appData, array $mail, string $kind = self::CLIENT, string $key = '' ): string {
+
+			$appData['./nino/mail/ratelimited']			= false;
+			$appData['./nino/mail/queue/refused']		= '';
+
+			// A key is the caller's own: it starts with a name of the feature or the module that queues - 'invite/2026-0042' - so that
+			// another one cannot take the id of its mail
+			if( in_array( $kind, [ self::CLIENT, self::SYSTEM, self::TEST ], true ) === false || ( $key !== '' && preg_match( '~^[a-z][a-z0-9-]{1,62}/[\x21-\x7e]{1,128}$~D', $key ) !== 1 ) )
+				return self::_refused( $appData, 'invalid' );
+
+			$checked = self::_checked( $mail );
+
+			if( $checked['mail'] === null )
+				return self::_refused( $appData, $checked['refused'] );
+
+			$hash			= $key === '' ? '' : hash( 'sha256', $key );
+			$content	= hash( 'sha256', (string) json_encode( [ $kind, $checked['mail'] ] ) );
+			$known		= \Nino\MailQueue::peek( $appData, $kind, $hash );
+
+			if( $known['id'] !== '' )
+				return $known['content'] === $content ? $known['id'] : self::_refused( $appData, 'conflict' );
+
+			if( $known['full'] === true )
+				return self::_refused( $appData, 'full' );
+
+			if( $kind === self::CLIENT && \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::_cap( $appData ), self::WINDOW ) === false ) {
+
+				$appData['./nino/mail/ratelimited'] = true;
+
+				return self::_refused( $appData, 'ratelimited' );
+			}
+
+			$added = \Nino\MailQueue::add( $appData, $checked['mail'], $kind, $hash, $content );
+
+			return $added['id'] !== '' ? $added['id'] : self::_refused( $appData, $added['refused'] );
+		}
+
+		/**
+		 *	Why the last queue() took no mail
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									'' where it took the mail or none was queued; else 'invalid', 'size', 'full', 'conflict', 'ratelimited' or 'unwritable'
+		 */
+		public static function queueRefused( array &$appData ): string {
+
+			return (string) ( $appData['./nino/mail/queue/refused'] ?? '' );
+		}
+
+		/**
+		 *	What the outbox holds, for a screen that tells the operator - without a word of any mail
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										{ waiting, failed, last, oldest }: the mails that wait; the mails given up on within the last fourteen days; the minute ('Y-m-d H:i') of the last of them, null for none; the minute the oldest mail that waits was queued, null for none. An oldest that is hours old says that nothing delivers
+		 */
+		public static function queued( array &$appData ): array {
+
+			return \Nino\MailQueue::counts( $appData );
+		}
+
+		/**
+		 *	Deliver what is due in the outbox: up to $limit mails, one at a time, the oldest first, each taken by its own
+		 *	lease (see MailQueue::claim()) - two deliverers at once send different mails and never one twice. Every request
+		 *	that finds a mail due calls it after its response (see \Nino\Http::prepareAfter()), and so does the command of
+		 *	the outbox. A mail is delivered the way send() delivers one, past its caps, and a mail that is not delivered
+		 *	waits for its next attempt, or is given up on after the last one: one line in the log with the count - no
+		 *	address, no subject - and the record of failure(), which the dashboard shows. A delivery that follows without
+		 *	a mail given up on in it clears that record, as a call of send() does, unless mails given up on are still kept in
+		 *	queued(). Where the outbox cannot be written nothing is sent and the answer says so, 'unwritable'.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int|null	$limit				The most mails to deliver, MailQueue::BATCH for none
+		 *
+		 *	@return 	array										{ delivered, retry, held, failed, unwritable } - the mails delivered; the ones that wait for another attempt; the ones that wait for the cap of the hour; the ones given up on; whether the outbox could not be written
+		 */
+		public static function deliverQueued( array &$appData, ?int $limit = null ): array {
+
+			$result = [ 'delivered' => 0, 'retry' => 0, 'held' => 0, 'failed' => 0, 'unwritable' => false ];
+
+			if( is_file( \Nino\Filesystem::path( $appData, \Nino\MailQueue::WAITING ) ) === false )
+				return $result;
+
+			$token	= bin2hex( random_bytes( 8 ) );
+			$left		= max( 1, $limit ?? \Nino\MailQueue::BATCH );
+
+			while( $left > 0 ) {
+
+				$gaveUp			= 0;
+				$unwritable	= false;
+				$entry			= \Nino\MailQueue::claim( $appData, $token, \Nino\MailQueue::now( $appData ), $gaveUp, $unwritable );
+
+				$result['failed'] += $gaveUp;
+
+				if( $unwritable === true ) {
+					$result['unwritable'] = true;
+					break;
+				}
+
+				if( $entry === null )
+					break;
+
+				[ $outcome, $error ] = self::_deliverQueued( $appData, $entry );
+
+				$settled = \Nino\MailQueue::settle( $appData, $token, $entry['id'], $outcome, $error, \Nino\MailQueue::now( $appData ) );
+
+				// A mail that went out and is not written down as gone would go out again with the next call of this loop
+				if( $settled['written'] === false ) {
+					$result['unwritable'] = true;
+					break;
+				}
+
+				if( $settled['gaveUp'] === true )
+					$result['failed']++;
+				else if( $outcome === 'sent' )
+					$result['delivered']++;
+				else if( $outcome === 'held' )
+					$result['held']++;
+				else
+					$result['retry']++;
+
+				$left--;
+			}
+
+			\Nino\MailQueue::release( $appData );
+
+			if( $result['unwritable'] === true ) {
+
+				// Said once an hour: a disk that stays full would fill the log with it
+				if( \Nino\Feature::count( $appData, 'mail-queue-unwritable', 'site', 1, self::WINDOW ) === true )
+					trigger_error( 'Mail queue: the outbox cannot be written, so nothing is delivered from it - check the disk of private/data.', E_USER_WARNING );
+			}
+			else if( $result['failed'] > 0 ) {
+
+				trigger_error( 'Mail queue: '. $result['failed']. ' mail(s) could not be delivered and were given up on - see \\Nino\\Mail::queued().', E_USER_WARNING );
+				self::_recordOutcome( $appData, false );
+			}
+			else if( $result['delivered'] > 0 && \Nino\MailQueue::counts( $appData )['failed'] === 0 )
+				self::_recordOutcome( $appData, true );
+
+			return $result;
+		}
+
+		/**
+		 *	One mail of the outbox, past the checks: whether it went, and why not
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$entry				{ id, kind, to, subject, body, replyTo }
+		 *
+		 *	@return 	array										[ outcome, error ] - see MailQueue::settle()
+		 */
+		private static function _deliverQueued( array &$appData, array $entry ): array {
+
+			// The file is one a person can edit: what was queued is checked once more
+			$checked = self::_checked( $entry );
+
+			if( $checked['mail'] === null )
+				return [ 'invalid', \Nino\MailQueue::INVALID ];
+
+			if( $entry['kind'] !== self::CLIENT && \Nino\Feature::count( $appData, self::COUNTER_PREFIX. $entry['kind'], 'site', $entry['kind'] === self::SYSTEM ? self::SYSTEM_CAP : self::TEST_CAP, self::WINDOW ) === false )
+				return [ 'held', '' ];
+
+			try {
+				$delivered = self::_deliver( $appData, $checked['mail']['to'], $checked['mail']['subject'], $checked['mail']['body'], $checked['mail']['replyTo'] );
+			}
+			// A transport is the code of a feature, and what ends a request ends this one as well
+			catch( \Nino\Failure $failure ) {
+				throw $failure;
+			}
+			catch( \Throwable ) {
+				return [ 'again', \Nino\MailQueue::FAILURE ];
+			}
+
+			return $delivered === true ? [ 'sent', '' ] : [ 'again', \Nino\MailQueue::REFUSED ];
+		}
+
+		/**
+		 *	A mail as the outbox takes it: cleaned the way _deliver() cleans it, and checked
+		 *
+		 *	@param		array 		$mail					{ to, subject, body, replyTo }
+		 *
+		 *	@return 	array										{ mail, refused } - the mail as { to, subject, body, replyTo } with the address alone in 'to' and a reply address that is one or '', or null and 'invalid' or 'size'
+		 */
+		private static function _checked( array $mail ): array {
+
+			$to				= is_string( $mail['to'] ?? null ) === true ? $mail['to'] : '';
+			$subject	= is_string( $mail['subject'] ?? null ) === true ? $mail['subject'] : '';
+			$replyTo	= is_string( $mail['replyTo'] ?? null ) === true ? $mail['replyTo'] : '';
+			$body			= is_string( $mail['body'] ?? null ) === true ? $mail['body'] : '';
+
+			// What send() strips from an address - a line break, a nul byte - a mail that waits is refused for: it would be another
+			// address than the one that was given. A reply address is one, and no list. And the file is json, which holds utf-8
+			if( preg_match( '/[\x00-\x1f\x7f]/', $to. $replyTo ) === 1 || preg_match( '/[,;]/', $replyTo ) === 1
+				|| mb_check_encoding( $to. $subject. $replyTo. $body, 'UTF-8' ) === false )
+				return [ 'mail' => null, 'refused' => 'invalid' ];
+
+			$to				= self::_headerValue( $to );
+			$subject	= self::_headerValue( $subject );
+			$replyTo	= self::_headerValue( $replyTo );
+			$body			= str_replace( "\0", '', $body );
+
+			if( preg_match( '/<([^<>]+)>$/', $to, $addressMatch ) === 1 )
+				$to = trim( $addressMatch[1] );
+
+			if( strlen( $to ) > 254 || strlen( $subject ) > 998 || strlen( $replyTo ) > 320 || filter_var( $to, FILTER_VALIDATE_EMAIL ) === false )
+				return [ 'mail' => null, 'refused' => 'invalid' ];
+
+			$replyTo = self::_replyToValue( $replyTo, false );
+
+			if( strlen( $to ) + strlen( $subject ) + strlen( $replyTo ) + strlen( $body ) > \Nino\MailQueue::MAX_BYTES )
+				return [ 'mail' => null, 'refused' => 'size' ];
+
+			return [ 'mail' => [ 'to' => $to, 'subject' => $subject, 'body' => $body, 'replyTo' => $replyTo ], 'refused' => '' ];
+		}
+
+		/**
+		 *	queue() says no: the reason is kept for queueRefused()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$reason
+		 *
+		 *	@return 	string									''
+		 */
+		private static function _refused( array &$appData, string $reason ): string {
+
+			$appData['./nino/mail/queue/refused'] = $reason;
+
+			return '';
 		}
 
 		/**
@@ -475,11 +750,15 @@ namespace Nino {
 		 *	own $to, and it is a plausible thing for a site owner to have
 		 *	typed; only its address part has to hold up.
 		 *
+		 *	The outbox says it without the value (a mail that waits is personal data, and nothing of it is in a log):
+		 *	$quote false.
+		 *
 		 *	@param		string		$replyTo			Already through _headerValue()
+		 *	@param		bool			$quote				Whether the warning names the value
 		 *
 		 *	@return 	string
 		 */
-		private static function _replyToValue( string $replyTo ): string {
+		private static function _replyToValue( string $replyTo, bool $quote = true ): string {
 
 			if( $replyTo === '' )
 				return '';
@@ -489,7 +768,9 @@ namespace Nino {
 			if( filter_var( $address, FILTER_VALIDATE_EMAIL ) !== false )
 				return $replyTo;
 
-			trigger_error( 'Mail: \''. $replyTo. '\' is no reply address - the mail went out without a Reply-To header.', E_USER_WARNING );
+			trigger_error( $quote === true
+				? 'Mail: \''. $replyTo. '\' is no reply address - the mail went out without a Reply-To header.'
+				: 'Mail: a reply address is none - the mail goes out without a Reply-To header.', E_USER_WARNING );
 
 			return '';
 		}

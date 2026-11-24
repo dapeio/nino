@@ -271,6 +271,26 @@ $restored = $status === 200 ? ninoCall( $appData, [ \Nino\Modules\Backups\Admin:
 unset( $appData['./nino/filesystem/cache'] );
 check( 'an archive that was downloaded, deleted and uploaded restores the project as it was', $status === 200 && $restored[0] === 200 && \Nino\Filesystem::getFileContent( $appData, '/text/probe.php', [] ) === [ 'a' => 'before' ] && $appData['/nino/backup/key'] === $round );
 
+// The outbox of the mail is brought back from no archive: one that carries it - an older Nino's, one somebody put together - restores everything else
+// and leaves the outbox of the project as it is
+$outboxFile = \Nino\Filesystem::path( $appData, '/data/mail-queue.php' );
+@mkdir( dirname( $outboxFile ), 0755, true );
+file_put_contents( $outboxFile, 'LIVE' );
+$foreign = ninoSandboxDir( $appData ). '/foreign-outbox.json';
+file_put_contents( $foreign, 'ARCHIVE' );
+$foreignTar = ninoSandboxDir( $appData ). '/foreign.tar';
+\Nino\Filesystem::putFileContent( $appData, '/text/probe.php', [ 'a' => 'archived' ] );
+\Nino\Backup::pack( $appData, \Nino\Backup::manifest( $appData ) + [ $foreign => 'data/mail-queue.php' ], $foreignTar );
+$forgedId = '2026-01-02-030405-manual';
+\Nino\Filesystem::putFileContent( $appData, '/text/probe.php', [ 'a' => 'live' ] );
+$_FILES = [];
+[ $status ] = $put( $appData, 'backup-example.com-'. $forgedId. '.php', backupsStub( (string) file_get_contents( $foreignTar. '.gz' ), (string) base64_decode( (string) $appData['/nino/backup/key'], true ) ) );
+$restored = $status === 200 ? ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $forgedId ] ) : [ 0 ];
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+unset( $appData['./nino/filesystem/cache'] );
+check( 'an archive that carries the outbox of the mail is restored without it: the rest comes back, the outbox of the project is as it was', $restored[0] === 200 && \Nino\Filesystem::getFileContent( $appData, '/text/probe.php', [] ) === [ 'a' => 'archived' ] && (string) file_get_contents( $outboxFile ) === 'LIVE' );
+unlink( $outboxFile );
+
 // Names
 $beforeIds = $ids();
 foreach( [

@@ -93,6 +93,17 @@ namespace Nino {
 			'trusted-types'		=> [],
 		];
 
+		// The file of the outbox of \Nino\Mail, which every request asks for once - here and not in the class of the outbox,
+		// which only a request that has a mail to deliver loads (see \Nino\MailQueue::WAITING)
+		public const string MAIL_QUEUE = '/data/mail-queue.php';
+
+		// ...and the note beside it of the second at which something in it is due (see \Nino\MailQueue::DUE)
+		public const string MAIL_QUEUE_DUE = '/data/mail-queue-due.txt';
+
+		// How far from now a note of the outbox may say that something is due, in seconds: the longest wait of a mail and a lease
+		// (see \Nino\MailQueue::SPAN). A note that says more was not written by it
+		public const int MAIL_NOTE_SPAN = 43500;
+
 		/*	The addresses a page of the project cannot have: the paths router.php and
 			the .htaccess files never hand to a page (the private and the source
 			halves, the checkout's own tests, features, docs and history), and the
@@ -309,9 +320,64 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether work asked for with afterResponse() is likely to run in this request, as far as the server and the output
+		 *	of php say before the response is made: where php-fpm or LiteSpeed let the client go themselves it is, and where
+		 *	they do not it is as long as no output buffer has a handler of its own and php's compression, if it is on, can still
+		 *	be switched off. What the response itself is - a file, a stream, a status without a body, a length or an encoding
+		 *	somebody set - decides in output() and is not known here, so a true is no promise, and a false is: the work is
+		 *	dropped. A feature that must not depend on it - a mail that has to go out, whatever the answer time tells -
+		 *	keeps its work where it is certain, \Nino\Mail::queue()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function canAfterResponse( array &$appData ): bool {
+
+			return self::_letGo( false ) === '';
+		}
+
+		/**
+		 *	Whether the server and the output of php let the response go before the work is done, and why not: the one decision
+		 *	that canAfterResponse() answers and prepareAfter() acts on. Where there is no finish function the response goes out
+		 *	by the length the kernel tells, which holds only if php's own compression is off or can be turned off, and no output
+		 *	buffer has a handler of its own or holds bytes that would come before the body - the length would be short of them
+		 *
+		 *	@param		bool			$apply				Turn php's compression off, as prepareAfter() does; false only asks whether that can be done
+		 *
+		 *	@return 	string										'' where it is, else the reason
+		 */
+		private static function _letGo( bool $apply ): string {
+
+			// php-fpm and LiteSpeed let the client go themselves, whatever the response is
+			if( function_exists( 'fastcgi_finish_request' ) === true || function_exists( 'litespeed_finish_request' ) === true )
+				return '';
+
+			// A page php compresses itself has no length that is the body's: for this response it is off, as for a stream, and
+			// where that cannot be done - the output has begun - the work is dropped
+			if( self::_compressing() === true && @ini_set( 'zlib.output_compression', $apply === true ? '0' : (string) ini_get( 'zlib.output_compression' ) ) === false )
+				return 'php compresses the page itself';
+
+			// A buffer with a handler of its own - a callback, an output_handler of the ini - changes what goes out after the length is told
+			// (the handler of php's own compression stays in the list when it is turned off: it passes what it gets); and bytes that stand in
+			// a buffer go out before the body, which a length of the body alone does not count
+			foreach( ob_get_status( true ) as $buffer ) {
+
+				if( in_array( $buffer['name'] ?? '', [ 'default output handler', 'zlib output compression' ], true ) === false )
+					return 'an output buffer has a handler of its own';
+
+				if( (int) ( $buffer['buffer_used'] ?? 0 ) > 0 )
+					return 'output stands before the response';
+			}
+
+			return '';
+		}
+
+		/**
 		 *	The part of output() that decides whether the asked-for work (see afterResponse()) runs in this request,
 		 *	and what the response has to tell for it: the Content-Length of a body that goes out as it is, where no server
-		 *	ends the connection by itself. Split out, since output() itself exit()s
+		 *	ends the connection by itself, and where the mails of the outbox wait, the work that delivers them. Split out, since
+		 *	output() itself exit()s
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request, its response finished (see _finalizeResponse())
@@ -319,6 +385,14 @@ namespace Nino {
 		 *	@return 	array										The work to run after the response, [] for none
 		 */
 		public static function prepareAfter( array &$appData, array &$request ): array {
+
+			// The mails that wait in the outbox (see \Nino\Mail::queue()) are delivered after the response of a request that finds one due.
+			// A site whose outbox is empty pays for it with one stat, a site whose mails wait for a time to come with the read of a note
+			// of a few bytes, and the response of neither is any other for it: the work is not asked for
+			if( self::_mailDue( $appData ) === true )
+				$appData['./nino/http/after'][] = static function() use ( &$appData ): void {
+					\Nino\Mail::deliverQueued( $appData );
+				};
 
 			$after = array_values( (array) ( $appData['./nino/http/after'] ?? [] ) );
 			unset( $appData['./nino/http/after'] );
@@ -336,19 +410,10 @@ namespace Nino {
 				|| in_array( (int) ( $response['statusCode'] ?? 200 ), [ 204, 205, 304 ], true ) === true )
 				return [];
 
-			// A page php compresses itself has no length that is the body's: for this response it is off, as for a stream, and
-			// where that cannot be done - the output has begun - the work is dropped, and the log says so
-			if( self::_compressing() === true ) {
+			$why = self::_letGo( true );
 
-				if( @ini_set( 'zlib.output_compression', '0' ) === false )
-					return self::_dropped( $appData, 'php compresses the page itself' );
-			}
-
-			// A buffer with a handler of its own - a callback, an output_handler of the ini - changes what goes out after the length is told
-			// (the handler of php's own compression stays in the list when it is turned off: it passes what it gets)
-			foreach( ob_get_status( true ) as $buffer )
-				if( in_array( $buffer['name'] ?? '', [ 'default output handler', 'zlib output compression' ], true ) === false )
-					return self::_dropped( $appData, 'an output buffer has a handler of its own' );
+			if( $why !== '' )
+				return self::_dropped( $appData, $why );
 
 			foreach( array_keys( (array) ( $response['header'] ?? [] ) ) as $name )
 				if( in_array( strtolower( (string) $name ), [ 'content-length', 'content-encoding', 'transfer-encoding' ], true ) === true )
@@ -363,6 +428,37 @@ namespace Nino {
 				$response['header']['Connection'] = 'close';
 
 			return $after;
+		}
+
+		/**
+		 *	Whether the outbox of \Nino\Mail has a mail due now, as cheaply as it can be told: a file that is not there is no, and
+		 *	a file that is there says by a note beside it - a few bytes - when the first of its mails is due. A note that is
+		 *	missing, is no number, lies further away than any wait does (MAIL_NOTE_SPAN) or is older than the file - a write of the
+		 *	file that was not followed by one of the note, or a hand that changed one of them - is a yes: the outbox is asked, and it
+		 *	writes the note again
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		private static function _mailDue( array &$appData ): bool {
+
+			$queue = \Nino\Filesystem::path( $appData, self::MAIL_QUEUE );
+
+			if( is_file( $queue ) === false )
+				return false;
+
+			$file	= \Nino\Filesystem::path( $appData, self::MAIL_QUEUE_DUE );
+			$note	= trim( (string) @file_get_contents( $file ) );
+			$now	= is_int( $appData['./nino/mail/now'] ?? null ) === true ? $appData['./nino/mail/now'] : time();
+
+			if( $note === '' || ctype_digit( $note ) === false || (int) $note <= $now || (int) $note > $now + self::MAIL_NOTE_SPAN )
+				return true;
+
+			clearstatcache( true, $file );
+			clearstatcache( true, $queue );
+
+			return (int) @filemtime( $file ) < (int) @filemtime( $queue );
 		}
 
 		/**

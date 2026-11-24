@@ -1082,6 +1082,9 @@ namespace Nino\Modules\Backups {
 				unlink( $stagedConfig );
 			}
 
+			// The outbox of the mail is no part of any restore, whatever the archive carries
+			\Nino\Backup::dropOutbox( $staging );
+
 			// A module that keeps state a restore must not simply overwrite
 			// rewrites its staged files here, before the copy below - the
 			// Newsletter module merges its removal record this way (see its

@@ -1840,7 +1840,7 @@ register_shutdown_function( static function() use ( &$warnings, &$session, $resu
 	$session[2] = session_status();
 	file_put_contents( $result, json_encode( [ http_response_code(), $warnings, $session ] ) );
 } );
-$appData = [];
+$appData = [ "./nino/filesystem/path" => dirname( $sessions ) ];
 $request = [
 	"/nino/http/request"	=> [ "method" => $method === "HEAD" ? "GET" : $method, "rawMethod" => $method, "header" => $range === "" ? [] : [ "Range" => $range ] ],
 	"/nino/http/response"	=> [ "statusCode" => 200, "header" => [ "Content-Type" => "audio/mpeg" ], "body" => "a body that must not be sent", "file" => $file ],

@@ -33,6 +33,7 @@ if( $case === "session" ) { ini_set( "session.save_path", $sandbox ); session_st
 if( $case === "handler" ) ob_start( static fn( string $buffer ): string => $buffer );
 if( $case === "buffer" ) ob_start();
 if( $case === "late" ) echo " ";
+if( $case === "stray" ) { ob_start(); echo "abc"; }
 if( $case === "json" ) $response["body"] = [ "a" => "ü" ];
 if( $case === "head" ) $method = "HEAD";
 if( $case === "banner" ) \Nino\Callbacks::registerCallback( $appData, "/nino/http/output", static function( array &$appData, array &$request ): void { $request["/nino/http/response"]["body"] .= "<div class=banner>Wartung</div>"; } );
@@ -46,6 +47,7 @@ if( $case === "fail" )
 	\Nino\Http::afterResponse( $appData, static function(): void { \Nino\Runtime::fail( "first work" ); } );
 if( $ask )
 	\Nino\Http::afterResponse( $appData, static function() use ( $sandbox, &$request ): void { file_put_contents( $sandbox . "/work.txt", json_encode( [ "Content-Length: " . ( $request["/nino/http/response"]["header"]["Content-Length"] ?? "none" ), "session: " . session_status() ] ) ); } );
+file_put_contents( $sandbox . "/can.txt", \Nino\Http::canAfterResponse( $appData ) === true ? "1" : "0" );
 \Nino\Callbacks::doCallbacks( $appData, "/nino/http/output", $request );
 \Nino\Http::output( $appData, $request );
 ' );
@@ -58,6 +60,7 @@ if( $ask )
 $run = static function( string $case, bool $ask, array $ini = [], bool $keep = false ) use ( $child, $sandbox ): array {
 
 	@unlink( $sandbox. '/work.txt' );
+	@unlink( $sandbox. '/can.txt' );
 
 	// The warning of a dropped work is said once an hour: each request of the tests is the first, but where a test asks for the hour
 	if( $keep === false )
@@ -67,7 +70,7 @@ $run = static function( string $case, bool $ask, array $ini = [], bool $keep = f
 	$out = stream_get_contents( $pipes[1] ). stream_get_contents( $pipes[2] );
 	proc_close( $process );
 
-	return [ 'out' => $out, 'work' => is_file( $sandbox. '/work.txt' ) === true ? json_decode( (string) file_get_contents( $sandbox. '/work.txt' ), true ) : null ];
+	return [ 'can' => @file_get_contents( $sandbox. '/can.txt' ), 'out' => $out, 'work' => is_file( $sandbox. '/work.txt' ) === true ? json_decode( (string) file_get_contents( $sandbox. '/work.txt' ), true ) : null ];
 };
 
 $length = static fn( ?array $headers ): ?string => $headers === null ? null : ( array_values( array_filter( array_map( static fn( string $line ): ?string => stripos( $line, 'Content-Length: ' ) === 0 ? substr( $line, 16 ) : null, $headers ) ) )[0] ?? null );
@@ -102,6 +105,9 @@ $handler = $run( 'handler', true );
 check( 'an output buffer with a handler of its own gets no length and the work does not run: a handler may change what goes out', $handler['work'] === null && str_starts_with( $handler['out'], '<p>Grüße</p>' ) && substr_count( $handler['out'], 'Work after the response is dropped' ) === 1 );
 $again = $run( 'handler', true, [], true );
 check( '...and that is said once an hour: the next request that drops its work says nothing, and does not fill the log', $again['work'] === null && str_contains( $again['out'], 'Work after the response is dropped' ) === false );
+check( 'the question whether work can follow the response is answered as the decision is that follows it: yes where it runs - a plain response, php\'s compression that can be turned off - and no where it is dropped - a buffer with a handler, output that has begun with the compression on', $html['can'] === '1' && $compressed['can'] === '1' && $handler['can'] === '0' && $late['can'] === '0' );
+$stray = $run( 'stray', true );
+check( 'bytes that stand in a buffer before the response would come before the body: the length of the body alone would be short of them, so the work is dropped and the question says no - never a length that is not the bytes that go out', $stray['work'] === null && $stray['can'] === '0' && str_starts_with( $stray['out'], 'abc<p>' ) === true );
 $buffer = $run( 'buffer', true );
 check( '...a buffer without one is flushed, and the length is the body\'s', $length( $buffer['work'] ) === '14' && $buffer['out'] === '<p>Grüße</p>' );
 $throw = $run( 'throw', true );
@@ -188,6 +194,12 @@ check( 'a response that carries work says Connection: close, and the length', co
 $request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => 'x', 'header' => [ 'CONNECTION' => 'keep-alive' ] ] ];
 \Nino\Http::prepareAfter( $appData, $request );
 check( '...but what somebody else said about the connection, in any spelling of the name, is left as it is', $request['/nino/http/response']['header'] === [ 'CONNECTION' => 'keep-alive', 'Content-Length' => '1' ] );
+
+check( 'the question whether work can follow the response is yes where nothing stands in the way', \Nino\Http::canAfterResponse( $appData ) === true );
+ob_start( static fn( string $buffer ): string => $buffer );
+$withHandler = \Nino\Http::canAfterResponse( $appData );
+ob_end_clean();
+check( '...and no where an output buffer has a handler of its own, which is where the work is dropped', $withHandler === false );
 
 echo "\n";
 
