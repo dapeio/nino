@@ -10,7 +10,8 @@ declare(strict_types=1);
 
  *	Delivers what is due in the outbox, up to LIMIT mails, and prints one line: the mails delivered, the ones that wait for
  *	another attempt, the ones that wait for the cap of the hour, the ones given up on and the ones that still wait - no address.
- *	It ends with 1 and a sentence on the error stream where the project cannot be booted or the outbox cannot be written. It is the same call every request
+ *	It ends with 1 and a sentence on the error stream where the project cannot be booted, where it does not run as the owner of private/data (it
+ *	writes and sends nothing then), or where the outbox cannot be written. It is the same call every request
  *	makes after its response (see \Nino\Mail::deliverQueued()), and a run that meets another deliverer at work does nothing.
  *
  *	@package						Dape/Nino
@@ -45,6 +46,16 @@ require dirname( __DIR__, 2 ). '/Nino.php';
 
 try {
 	$appData	= \Nino\init();
+	$foreign	= \Nino\MailQueue::foreignOwner( $appData );
+
+	// The files of the outbox are written with a rename and are 0600: a run as another user than the owner of private/data would leave
+	// files that the webserver cannot read. It writes nothing and sends nothing
+	if( $foreign !== null ) {
+
+		fwrite( STDERR, 'mail queue: this command runs as user '. $foreign['user']. ' and private/data belongs to user '. $foreign['owner']. ' - nothing was delivered; run it as the user of the webserver'. "\n" );
+		exit( 1 );
+	}
+
 	$result		= \Nino\Mail::deliverQueued( $appData, LIMIT );
 	$counts		= \Nino\Mail::queued( $appData );
 }

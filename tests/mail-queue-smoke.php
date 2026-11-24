@@ -19,6 +19,120 @@ declare(strict_types=1);
 // of the suite are started with `-d sendmail_path=/bin/false` as well, which does reach mail(), and register a transport of their own
 require __DIR__. '/harness.php';
 
+/**
+ *	The file protocol of php for a moment, with a record of what is done and with the failures a test names: a read of a file that is
+ *	there fails, a chmod, an unlink. Everything else is what php does itself
+ */
+final class FaultFs {
+
+	public $context;
+
+	// What was done, in order: [ operation, path, detail ]
+	public static array $log = [];
+
+	// operation => function( string $path ): bool, true to fail it
+	public static array $fail = [];
+
+	private $handle = null;
+	private string $path = '';
+
+	public static function on( array $fail = [] ): void {
+		self::$log = [];
+		self::$fail = $fail;
+		stream_wrapper_unregister( 'file' );
+		stream_wrapper_register( 'file', self::class );
+	}
+
+	public static function off(): void {
+		stream_wrapper_restore( 'file' );
+	}
+
+	private static function real( callable $call ): mixed {
+		stream_wrapper_restore( 'file' );
+
+		try {
+			return $call();
+		}
+		finally {
+			stream_wrapper_unregister( 'file' );
+			stream_wrapper_register( 'file', self::class );
+		}
+	}
+
+	private static function fails( string $operation, string $path ): bool {
+		return isset( self::$fail[$operation] ) === true && ( self::$fail[$operation] )( $path ) === true;
+	}
+
+	public function stream_open( string $path, string $mode, int $options, ?string &$opened ): bool {
+		self::$log[] = [ 'open', $path, $mode, str_starts_with( $mode, 'x' ) === true ? self::real( static fn(): int => (int) ( @fileperms( dirname( $path ) ) & 0777 ) ) : -1 ];
+
+		if( str_starts_with( $mode, 'r' ) === true && self::fails( 'read', $path ) === true )
+			return false;
+
+		$this->path = $path;
+		$this->handle = self::real( static fn(): mixed => @fopen( $path, $mode ) );
+
+		return $this->handle !== false;
+	}
+
+	public function stream_read( int $count ): string|false { return fread( $this->handle, $count ); }
+	public function stream_write( string $data ): int { self::$log[] = [ 'write', $this->path, (string) strlen( $data ) ]; return (int) fwrite( $this->handle, $data ); }
+	public function stream_eof(): bool { return feof( $this->handle ); }
+	public function stream_tell(): int { return (int) ftell( $this->handle ); }
+	public function stream_seek( int $offset, int $whence ): bool { return fseek( $this->handle, $offset, $whence ) === 0; }
+	public function stream_flush(): bool { return fflush( $this->handle ); }
+	public function stream_close(): void { fclose( $this->handle ); }
+	public function stream_stat(): array|false { return fstat( $this->handle ); }
+	public function stream_lock( int $operation ): bool { return flock( $this->handle, $operation ); }
+	public function stream_truncate( int $size ): bool { return ftruncate( $this->handle, $size ); }
+	public function stream_set_option( int $option, int $arg1, ?int $arg2 ): bool { return false; }
+
+	public function url_stat( string $path, int $flags ): array|false {
+		$stat = self::real( static fn(): mixed => ( $flags & STREAM_URL_STAT_LINK ) !== 0 ? @lstat( $path ) : @stat( $path ) );
+
+		// 'uid': function( string $path ): ?int - the owner a path is said to have
+		if( is_array( $stat ) === true && isset( self::$fail['uid'] ) === true && ( $uid = ( self::$fail['uid'] )( $path ) ) !== null ) {
+			$stat['uid'] = $uid;
+			$stat[4] = $uid;
+		}
+
+		return $stat;
+	}
+
+	public function unlink( string $path ): bool {
+		self::$log[] = [ 'unlink', $path, '' ];
+
+		return self::fails( 'unlink', $path ) === true ? false : self::real( static fn(): mixed => @unlink( $path ) );
+	}
+
+	public function rename( string $from, string $to ): bool {
+		self::$log[] = [ 'rename', $from, $to ];
+
+		return self::real( static fn(): mixed => @rename( $from, $to ) );
+	}
+
+	public function mkdir( string $path, int $mode, int $options ): bool {
+		return self::real( static fn(): mixed => @mkdir( $path, $mode, ( $options & STREAM_MKDIR_RECURSIVE ) !== 0 ) );
+	}
+
+	public function rmdir( string $path, int $options ): bool {
+		return self::real( static fn(): mixed => @rmdir( $path ) );
+	}
+
+	public function stream_metadata( string $path, int $option, mixed $value ): bool {
+		if( $option === STREAM_META_ACCESS ) {
+			self::$log[] = [ 'chmod', $path, decoct( (int) $value ) ];
+
+			return self::fails( 'chmod', $path ) === true ? false : self::real( static fn(): mixed => @chmod( $path, (int) $value ) );
+		}
+
+		if( $option === STREAM_META_TOUCH )
+			return self::real( static fn(): mixed => @touch( $path, ...( is_array( $value ) === true ? $value : [] ) ) );
+
+		return false;
+	}
+}
+
 $appData = ninoSandbox( 'mail-queue' );
 $sandbox = ninoSandboxDir( $appData );
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
@@ -63,9 +177,19 @@ $waiting = static function() use ( $path ): array {
 	$state = \Nino\MailQueue::decode( (string) @file_get_contents( $path( \Nino\MailQueue::WAITING ) ) );
 	return is_array( $state ) === true ? array_column( (array) ( $state['waiting'] ?? [] ), null, 'id' ) : [];
 };
+// The files below the project that hold a text
+$holders = static function( string $needle ) use ( $sandbox ): array {
+	$found = [];
+
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $sandbox. '/private', \FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( $file->isFile() === true && str_contains( (string) file_get_contents( $file->getPathname() ), $needle ) === true )
+			$found[] = $file->getPathname();
+
+	return $found;
+};
 $clock = static function( int $seconds ) use ( &$appData ): void { $appData['./nino/mail/now'] = NOW + $seconds; };
 $reset = static function() use ( &$appData, &$taken, &$answer, &$throws, &$onSend, $path ): void {
-	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-unwritable.php' ] as $name ) {
+	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-unwritable.php', '/data/mail-queue-unreadable.php', '/data/mail-queue-keys.php', '/data/mail-queue-stuck.php', \Nino\MailQueue::DAMAGED_KEYS ] as $name ) {
 		is_dir( $path( $name ) ) === true ? @rmdir( $path( $name ) ) : @unlink( $path( $name ) );
 	}
 
@@ -397,8 +521,11 @@ $reset();
 @mkdir( dirname( $list ), 0755, true );
 file_put_contents( $list, '{"waiting": [ broken' );
 $id = \Nino\Mail::queue( $appData, $mail( 1 ) );
-check( 'a file that does not decode is put aside and the outbox starts over: the mail is queued, the damaged file is kept for a person to read, the log says so', $id !== '' && is_file( $path( \Nino\MailQueue::DAMAGED ) ) === true && count( $waiting() ) === 1
-	&& str_contains( (string) file_get_contents( $path( \Nino\MailQueue::DAMAGED ) ), 'broken' ) === true && count( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) ) === 1 );
+$notice = \Nino\MailQueue::decode( (string) @file_get_contents( $path( \Nino\MailQueue::DAMAGED ) ) );
+check( 'a file that does not decode is replaced by a notice and the outbox starts over: the mail is queued, the notice has the time, the size and the hash of what was there, the log says so', $id !== '' && count( $waiting() ) === 1
+	&& ( $notice['damaged']['size'] ?? 0 ) === strlen( '{"waiting": [ broken' ) && ( $notice['damaged']['sha256'] ?? '' ) === hash( 'sha256', '{"waiting": [ broken' ) && is_int( $notice['damaged']['at'] ?? null ) === true
+	&& count( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) ) === 1 );
+check( '...and nothing of what was in it is kept: no file of the project holds a word of it, the notice is no more than a few bytes', $holders( 'broken' ) === [] && filesize( $path( \Nino\MailQueue::DAMAGED ) ) < 512 );
 
 echo "\n";
 echo "A disk that is full, a lease, a clock\n";
@@ -426,6 +553,150 @@ $onSend = null;
 $again = \Nino\Mail::deliverQueued( $appData );
 check( 'a mail that went out and cannot be written down as gone ends the run, and the next run does not send it: nothing is sent where nothing can be written', $result['unwritable'] === true && $result['delivered'] === 0 && $again['delivered'] === 0 && count( $taken ) === 1 );
 rmdir( $lockOf() );
+
+// A mail the outbox did not write is no mail it answers with an id for. The four ways a write fails with nothing to blame but the disk: a directory stands
+// where the file belongs, the folder of the file cannot take it (its folder is a file - no mode, no user of the machine, makes that go away), the
+// write itself fails (the place it is made for is seeded in the cache of the filesystem, which a failed write drops again), the lock cannot be taken
+$seed = static function( string $name, string $real ) use ( &$appData ): void { $appData['./nino/filesystem/cache'][$name] = [ 'path' => $real, 'content' => '', 'fstat' => [] ]; };
+$notFolder = $path( '/data/not-a-folder' );
+$breaks = [
+	'a directory in the place of the file' => [ static function() use ( $path ): void { @unlink( $path( \Nino\MailQueue::WAITING ) ); mkdir( $path( \Nino\MailQueue::WAITING ) ); }, static function() use ( $path ): void { rmdir( $path( \Nino\MailQueue::WAITING ) ); } ],
+	'a folder that is a file' => [ static function() use ( $seed, $notFolder ): void { touch( $notFolder ); $seed( \Nino\MailQueue::WAITING, $notFolder. '/mail-queue.php' ); }, static function() use ( $notFolder ): void { unlink( $notFolder ); } ],
+	'a write that fails' => [ static function() use ( $seed, $path ): void { $seed( \Nino\MailQueue::WAITING, $path( '/data' ). '/no-such-folder/mail-queue.php' ); }, static function(): void {} ],
+	'a lock that cannot be taken' => [ static function() use ( $lockOf ): void { @unlink( $lockOf() ); mkdir( $lockOf() ); }, static function() use ( $lockOf ): void { rmdir( $lockOf() ); } ],
+];
+foreach( $breaks as $label => [ $break, $mend ] ) {
+
+	$reset();
+	$kept = \Nino\Mail::queue( $appData, $mail( 50 ) );
+	$before = $label === 'a directory in the place of the file' ? [] : $waiting();
+	$break();
+	$queued = \Nino\Mail::queue( $appData, $mail( 51 ) );
+	$refused = \Nino\Mail::queueRefused( $appData );
+	\Nino\Mail::deliverQueued( $appData );
+	$mend();
+	unset( $appData['./nino/filesystem/cache'][\Nino\MailQueue::WAITING] );
+	$after = $waiting();
+	check( 'queue() says unwritable, with no id, where the outbox cannot be written - '. $label. ': the mail is not in the file, nothing is sent, and the mails that wait are as they were', $kept !== '' && $queued === '' && $refused === 'unwritable' && in_array( $address( 51 ), array_column( $taken, 'to' ), true ) === false && in_array( $address( 51 ), array_column( $after, 'to' ), true ) === false && array_diff_key( $after, $before ) === [] );
+	check( '...and it is not a mail the outbox thinks it holds: once the disk is as it was, the same mail is queued as a new one, and goes out once', \Nino\Mail::queue( $appData, $mail( 51 ) ) !== '' && \Nino\Mail::queueRefused( $appData ) === '' && in_array( $address( 51 ), array_column( $waiting(), 'to' ), true ) === true && \Nino\Mail::deliverQueued( $appData, 10 )['unwritable'] === false && count( array_keys( array_column( $taken, 'to' ), $address( 51 ) ) ) === 1 && $waiting() === [] );
+}
+
+// A claim that cannot be written down sends nothing, where the lock is taken and the write is what fails
+$reset();
+\Nino\Mail::queue( $appData, $mail( 52 ) );
+$seed( \Nino\MailQueue::WAITING, $path( '/data' ). '/no-such-folder/mail-queue.php' );
+$result = \Nino\Mail::deliverQueued( $appData );
+check( 'a mail that cannot be written down as taken is not sent: the write that fails, not the lock, ends the run with no attempt counted', $result['unwritable'] === true && $result['delivered'] === 0 && $taken === [] && array_values( $waiting() )[0]['tries'] === 0 );
+unset( $appData['./nino/filesystem/cache'][\Nino\MailQueue::WAITING] );
+
+// The key of a mail is kept so that a double click is one mail, and where it cannot be kept the mail has still gone: a mail that stays is sent again
+$reset();
+@unlink( $path( \Nino\MailQueue::KEYS ) );
+mkdir( $path( \Nino\MailQueue::KEYS ) );
+\Nino\Mail::queue( $appData, $mail( 53 ), \Nino\Mail::CLIENT, 'order/53' );
+$first = \Nino\Mail::deliverQueued( $appData );
+$clock( \Nino\MailQueue::BACKOFF[0] );
+$second = \Nino\Mail::deliverQueued( $appData );
+rmdir( $path( \Nino\MailQueue::KEYS ) );
+check( 'a mail whose key cannot be kept is delivered and leaves the outbox: it is not sent a second time after its wait', $first['delivered'] === 1 && $first['unwritable'] === false && $second['delivered'] === 0 && count( $taken ) === 1 && $waiting() === [] );
+
+// The record of a mail given up on cannot be written: the mail stays, and is given up on with the next run - one record, not one for every run
+$reset();
+\Nino\Mail::queue( $appData, $mail( 54 ) );
+$answer = false;
+for( $i = 0; $i < \Nino\MailQueue::attempts() - 1; $i++ ) {
+	\Nino\Mail::deliverQueued( $appData );
+	$clock( array_sum( array_slice( \Nino\MailQueue::BACKOFF, 0, $i + 1 ) ) );
+}
+mkdir( $path( \Nino\MailQueue::FAILED ) );
+$last = \Nino\Mail::deliverQueued( $appData );
+$stayed = count( $waiting() );
+rmdir( $path( \Nino\MailQueue::FAILED ) );
+$clock( array_sum( \Nino\MailQueue::BACKOFF ) + \Nino\MailQueue::BACKOFF[4] + 1 );
+$next = \Nino\Mail::deliverQueued( $appData );
+check( 'a mail that is out of attempts is not lost where the record of it cannot be written: it stays, the run says unwritable, and the next run gives up on it once, with its record', $last['unwritable'] === true && $stayed === 1 && $next['unwritable'] === false && $next['failed'] === 1 && $waiting() === [] && \Nino\Mail::queued( $appData )['failed'] === 1 );
+$answer = true;
+$appData['./nino/mail/now'] = NOW;
+
+// The mode of the files
+$reset();
+@unlink( $path( \Nino\MailQueue::KEYS ) );
+@mkdir( dirname( $path( \Nino\MailQueue::WAITING ) ), 0755, true );
+file_put_contents( $path( \Nino\MailQueue::WAITING ), \Nino\MailQueue::encode( [ 'format' => 1, 'waiting' => [] ] ) );
+chmod( $path( \Nino\MailQueue::WAITING ), 0644 );
+$mode = static fn( string $name ): int => is_file( $path( $name ) ) === true ? (int) ( fileperms( $path( $name ) ) & 0777 ) : -1;
+\Nino\Mail::queue( $appData, $mail( 55 ), \Nino\Mail::CLIENT, 'order/55' );
+$modes = [ 'waiting' => $mode( \Nino\MailQueue::WAITING ), 'note' => $mode( \Nino\MailQueue::DUE ) ];
+\Nino\Mail::queue( $appData, $mail( 56 ) );
+$answer = false;
+for( $i = 0; $i < \Nino\MailQueue::attempts(); $i++ ) {
+	\Nino\Mail::deliverQueued( $appData );
+	$clock( array_sum( array_slice( \Nino\MailQueue::BACKOFF, 0, $i + 1 ) ) + 1 );
+}
+$answer = true;
+$modes['failed'] = $mode( \Nino\MailQueue::FAILED );
+$appData['./nino/mail/now'] = NOW;
+\Nino\Mail::queue( $appData, $mail( 57 ), \Nino\Mail::CLIENT, 'order/57' );
+\Nino\Mail::deliverQueued( $appData );
+$modes['keys'] = $mode( \Nino\MailQueue::KEYS );
+check( 'every file of the outbox has the mode 0600 - the mails that wait, the note of the time, the record of those given up on, the keys - and a file that was there with 0644 has it after its next write', PHP_OS_FAMILY === 'Windows' || ( $modes === [ 'waiting' => 0600, 'note' => 0600, 'failed' => 0600, 'keys' => 0600 ] && glob( dirname( $path( \Nino\MailQueue::WAITING ) ). '/*.tmp' ) === [] ) );
+
+$reset();
+@unlink( $path( \Nino\MailQueue::KEYS ) );
+foreach( [ \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED ] as $name ) {
+	file_put_contents( $path( $name ), 'old' );
+	chmod( $path( $name ), 0644 );
+}
+file_put_contents( $path( \Nino\MailQueue::WAITING ), 'bad leak@example.org' );
+$id = \Nino\Mail::queue( $appData, $mail( 58 ) );
+$gave = 0;
+$unwritable = false;
+$taking = \Nino\MailQueue::claim( $appData, 'aaaa', NOW, $gave, $unwritable );
+file_put_contents( $path( \Nino\MailQueue::FAILED ), 'bad leak@example.net' );
+\Nino\MailQueue::settle( $appData, 'aaaa', $id, 'invalid', '', NOW );
+$modes = [ $mode( \Nino\MailQueue::DAMAGED ), $mode( \Nino\MailQueue::DAMAGED_FAILED ), $mode( \Nino\MailQueue::FAILED ) ];
+check( 'the notice of a file that cannot be read has the mode 0600 as well, in the outbox and in the record of the mails given up on, and none of them holds an address', PHP_OS_FAMILY === 'Windows' || $modes === [ 0600, 0600, 0600 ] );
+check( '...the notice of each is that of the file that was there, and no file of the project holds a word of what was in them', ( \Nino\MailQueue::decode( (string) file_get_contents( $path( \Nino\MailQueue::DAMAGED_FAILED ) ) )['damaged']['sha256'] ?? '' ) === hash( 'sha256', 'bad leak@example.net' ) && $holders( 'leak@example' ) === [] );
+
+// A call that finds the damaged file and writes nothing leaves the outbox started over all the same: the file is gone, and the log says it once
+$reset();
+file_put_contents( $path( \Nino\MailQueue::WAITING ), '{ not json leak@example.org' );
+\Nino\MailQueue::settle( $appData, 'aaaa', '1234567890123456', 'sent', '', NOW );
+$said = count( ninoWarnings() );
+\Nino\MailQueue::settle( $appData, 'aaaa', '1234567890123456', 'sent', '', NOW );
+check( 'a damaged file that a call finds and does not rewrite is replaced by its notice all the same: it is gone, the log says it once', is_file( $path( \Nino\MailQueue::WAITING ) ) === false && $said === 1 && ninoWarnings() === [] && $holders( 'leak@example' ) === [] );
+
+// A file that a version kept of the damaged file - what people wrote in it - goes with the next delivery, whatever its age; a notice goes when it is fourteen days old
+$reset();
+file_put_contents( $path( \Nino\MailQueue::DAMAGED ), \Nino\MailQueue::encode( [ 'format' => 1, 'waiting' => [ [ 'to' => 'kept@example.org' ] ] ] ) );
+file_put_contents( $path( \Nino\MailQueue::DAMAGED_FAILED ), 'a file that was kept: kept@example.org' );
+\Nino\Mail::queue( $appData, $mail( 60 ) );
+\Nino\Mail::deliverQueued( $appData );
+check( 'a file kept of a damaged one by an earlier outbox is removed with the next delivery, however young: no address of it stays on the disk', is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false && is_file( $path( \Nino\MailQueue::DAMAGED_FAILED ) ) === false && $holders( 'kept@example' ) === [] );
+
+$reset();
+file_put_contents( $path( \Nino\MailQueue::WAITING ), 'broken' );
+\Nino\Mail::queue( $appData, $mail( 61 ) );
+\Nino\Mail::deliverQueued( $appData );
+$young = is_file( $path( \Nino\MailQueue::DAMAGED ) ) === true;
+touch( $path( \Nino\MailQueue::DAMAGED ), time() - \Nino\MailQueue::KEEP_FAILED + 100 );
+\Nino\Mail::queue( $appData, $mail( 62 ) );
+\Nino\Mail::deliverQueued( $appData );
+$nearly = is_file( $path( \Nino\MailQueue::DAMAGED ) ) === true;
+touch( $path( \Nino\MailQueue::DAMAGED ), time() - \Nino\MailQueue::KEEP_FAILED );
+\Nino\Mail::queue( $appData, $mail( 63 ) );
+\Nino\Mail::deliverQueued( $appData );
+check( 'the notice of a file that could not be read stays for fourteen days and not a second more', $young === true && $nearly === true && is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false );
+
+// The other files of the filesystem keep the mode they have: the mode of the outbox is the call's own
+\Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'a' );
+chmod( $path( '/data/mode-probe.php' ), 0640 );
+\Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'b' );
+$kept = (int) ( fileperms( $path( '/data/mode-probe.php' ) ) & 0777 );
+\Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'c', false, 0600 );
+$named = (int) ( fileperms( $path( '/data/mode-probe.php' ) ) & 0777 );
+unlink( $path( '/data/mode-probe.php' ) );
+check( 'a file written with no mode keeps the one it has, and one written with a mode has it whatever it had', PHP_OS_FAMILY === 'Windows' || ( $kept === 0640 && $named === 0600 ) );
 
 // The note beside the outbox is no reason to hold a mail back: where it cannot be written it is removed, which says 'look', and the mail goes out
 $reset();
@@ -569,14 +840,14 @@ $clock( 500 );
 $late = \Nino\Mail::deliverQueued( $appData );
 check( 'a mail whose last attempt was taken and not settled - the process died - is given up on when the wait of that attempt is over, and not before', $early['failed'] === 0 && $early['delivered'] === 1 && $late['failed'] === 1 && count( $taken ) === 1 );
 
-// The file that is put aside is not kept for ever, and not lost to a race
+// The notice of a file that could not be read is not kept for ever, and the file is not lost to a race
 $reset();
 @mkdir( dirname( $path( \Nino\MailQueue::WAITING ) ), 0755, true );
 file_put_contents( $path( \Nino\MailQueue::WAITING ), '{ not json' );
 \Nino\Mail::queue( $appData, $mail( 36 ) );
 touch( $path( \Nino\MailQueue::DAMAGED ), time() - \Nino\MailQueue::KEEP_FAILED - 10 );
 \Nino\Mail::deliverQueued( $appData );
-check( 'what was put aside is removed when it is fourteen days old', is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false );
+check( 'the notice of a damaged file is removed when it is fourteen days old', is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false );
 
 $reset();
 $resetLog();
@@ -588,7 +859,8 @@ foreach( $queuers as $tag => $process ) {
 	stream_get_contents( $pipes[$tag][1] );
 	proc_close( $process );
 }
-check( 'a file that cannot be read, found by several requests at once, is put aside once, under the lock: every mail they queued is in the new outbox', count( $waiting() ) === 18 && is_file( $path( \Nino\MailQueue::DAMAGED ) ) === true && str_contains( (string) file_get_contents( $path( \Nino\MailQueue::DAMAGED ) ), 'not json' ) === true );
+$notice = \Nino\MailQueue::decode( (string) @file_get_contents( $path( \Nino\MailQueue::DAMAGED ) ) );
+check( 'a file that cannot be read, found by several requests at once, is replaced once, under the lock: every mail they queued is in the new outbox, and the notice is that of the file that was damaged', count( $waiting() ) === 18 && ( $notice['damaged']['sha256'] ?? '' ) === hash( 'sha256', '{ not json' ) && $holders( 'not json' ) === [] );
 
 // The empty file is removed under the lock the writers take
 $reset();
@@ -605,6 +877,265 @@ proc_terminate( $holder, 9 );
 proc_close( $holder );
 \Nino\MailQueue::release( $appData );
 check( 'the file of an outbox with no mail is not removed while a writer holds its lock, and is removed when it does not', $keptWhileLocked === true && is_file( $path( \Nino\MailQueue::WAITING ) ) === false );
+
+echo "\n";
+echo "A file that is there and cannot be read\n";
+
+// The outbox is 0600, and a user that is not the one of the webserver - a cron job that runs as root, a command run by hand - reads none of it. What
+// cannot be read is not empty: nothing is taken from it, nothing is written over it, and the log says why. The failure is made by the file protocol of
+// the suite (FaultFs), which fails the read of the file by name and leaves the file as it is - no mode of the machine is touched
+$sha = static fn( string $name ): string => is_file( $path( $name ) ) === true ? hash_file( 'sha256', $path( $name ) ) : '';
+$blind = static function( string $file, callable $do ): mixed {
+	FaultFs::on( [ 'read' => static fn( string $name ): bool => basename( $name ) === $file ] );
+
+	try {
+		return $do();
+	}
+	finally {
+		FaultFs::off();
+	}
+};
+$said = static fn(): array => array_values( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) );
+
+$reset();
+$one = \Nino\Mail::queue( $appData, $mail( 70 ) );
+$before = $sha( \Nino\MailQueue::WAITING );
+$answers = $blind( 'mail-queue.php', static fn(): array => [ \Nino\Mail::queue( $appData, $mail( 71 ) ), \Nino\Mail::queueRefused( $appData ), \Nino\Mail::queue( $appData, $mail( 72 ) ), \Nino\Mail::queueRefused( $appData ) ] );
+$log = $said();
+check( 'queue() says unwritable, with no id, where the file of the outbox is there and cannot be read - it is no empty outbox: the mails that wait are still all in the file, byte for byte', $one !== '' && $answers === [ '', 'unwritable', '', 'unwritable' ] && $sha( \Nino\MailQueue::WAITING ) === $before && array_keys( $waiting() ) === [ $one ] );
+check( '...and the log says it once, not once for each request, with no address and nothing of a mail', count( $log ) === 1 && str_contains( $log[0], 'example.com' ) === false && str_contains( $log[0], 'Subject' ) === false );
+$counts = $blind( 'mail-queue.php', static fn(): array => \Nino\Mail::queued( $appData ) );
+check( '...queued() does not say there is nothing: it says the outbox cannot be read', $counts['unreadable'] === true && \Nino\Mail::queued( $appData )['unreadable'] === false && \Nino\Mail::queued( $appData )['waiting'] === 1 );
+
+$reset();
+\Nino\Mail::queue( $appData, $mail( 73 ) );
+$before = $sha( \Nino\MailQueue::WAITING );
+$result = $blind( 'mail-queue.php', static fn(): array => \Nino\Mail::deliverQueued( $appData ) );
+check( 'a delivery that finds the file there and cannot read it takes nothing and sends nothing: the run says unwritable, and the file is not written over', $result['unwritable'] === true && $result['delivered'] === 0 && $taken === [] && $sha( \Nino\MailQueue::WAITING ) === $before );
+
+$gave = 0;
+$unwritable = false;
+$mine = $blind( 'mail-queue.php', static function() use ( &$appData, &$gave, &$unwritable ): ?array { return \Nino\MailQueue::claim( $appData, 'aaaa', NOW, $gave, $unwritable ); } );
+check( '...claim() answers no mail and says it could not write, where the file cannot be read, and leaves the file as it is', $mine === null && $unwritable === true && $sha( \Nino\MailQueue::WAITING ) === $before );
+
+// A mail that went out, and the outbox cannot be read when it is settled: the answer is not 'delivered' - the mail is still in the file with its lease
+$reset();
+\Nino\Mail::queue( $appData, $mail( 74 ) );
+$onSend = static function() use ( &$onSend ): void { FaultFs::on( [ 'read' => static fn( string $name ): bool => basename( $name ) === 'mail-queue.php' ] ); };
+$result = \Nino\Mail::deliverQueued( $appData );
+FaultFs::off();
+$onSend = null;
+$left = array_values( $waiting() );
+check( 'a mail that went out whose settlement finds the file unreadable is not reported as delivered: the run ends unwritable, the mail is as the claim wrote it, and no second mail goes out in this run', $result['unwritable'] === true && $result['delivered'] === 0 && count( $taken ) === 1 && count( $left ) === 1 && $left[0]['tries'] === 1 && $left[0]['claim'] !== '' && \Nino\Mail::deliverQueued( $appData )['delivered'] === 0 && count( $taken ) === 1 );
+
+// The file with no mail in it is removed when the last mail has left; one that cannot be read is not known to be empty
+$reset();
+\Nino\Filesystem::putFileContent( $appData, \Nino\MailQueue::WAITING, [ 'format' => 1, 'waiting' => [] ] );
+$blind( 'mail-queue.php', static function() use ( &$appData ): void { \Nino\MailQueue::release( $appData ); } );
+$kept = is_file( $path( \Nino\MailQueue::WAITING ) ) === true;
+\Nino\MailQueue::release( $appData );
+check( 'the file of an outbox that cannot be read is not removed as an empty one', $kept === true && is_file( $path( \Nino\MailQueue::WAITING ) ) === false );
+
+// The key of a mail is asked of the file of the keys, and where that cannot be read it is not known whether the mail went out a moment ago
+$reset();
+@unlink( $path( \Nino\MailQueue::KEYS ) );
+\Nino\Mail::queue( $appData, $mail( 75 ), \Nino\Mail::CLIENT, 'order/75' );
+\Nino\Mail::deliverQueued( $appData );
+$keyed = $blind( 'mail-keys.php', static fn(): array => [ \Nino\Mail::queue( $appData, $mail( 75 ), \Nino\Mail::CLIENT, 'order/75' ), \Nino\Mail::queueRefused( $appData ), \Nino\Mail::queue( $appData, $mail( 76 ) ) ] );
+check( 'a mail with a key is not queued where the file of the keys cannot be read: the same request again - a double click - is not sent twice for it, and a mail with no key is not asked', $keyed[0] === '' && $keyed[1] === 'unwritable' && $keyed[2] !== '' && count( $taken ) === 1 );
+
+$reset();
+\Nino\Mail::queue( $appData, $mail( 77 ), \Nino\Mail::CLIENT, 'order/77' );
+\Nino\Mail::queue( $appData, $mail( 78 ), \Nino\Mail::CLIENT, 'order/78' );
+ninoWarnings();
+$result = $blind( 'mail-keys.php', static fn(): array => \Nino\Mail::deliverQueued( $appData ) );
+$log = $said();
+check( 'a key that cannot be kept - its file cannot be read - is said in the log once, whatever the number of mails: both went out, once, and neither stays', $result['delivered'] === 2 && count( $taken ) === 2 && $waiting() === [] && count( array_filter( $log, static fn( string $line ): bool => str_contains( $line, 'mail-keys.php' ) === true ) ) >= 1 && count( $log ) === 2 );
+
+// The record of the mails given up on cannot be read: the mail that is to be given up on stays, with no attempt counted, and the others are delivered
+$reset();
+\Nino\Filesystem::putFileContent( $appData, \Nino\MailQueue::FAILED, [ 'format' => 1, 'failed' => [] ] );
+$spent = [ 'id' => '5123456789abcdef', 'tries' => \Nino\MailQueue::attempts(), 'next' => NOW, 'error' => 'refused', 'queued' => NOW ] + $stale;
+$fresh = [ 'id' => '6123456789abcdef', 'to' => $address( 90 ), 'tries' => 0, 'next' => NOW, 'error' => '', 'queued' => NOW ] + $stale;
+file_put_contents( $path( \Nino\MailQueue::WAITING ), \Nino\MailQueue::encode( [ 'format' => 1, 'waiting' => [ $spent, $fresh ] ] ) );
+$recordBefore = $sha( \Nino\MailQueue::FAILED );
+$result = $blind( 'mail-failed.php', static fn(): array => \Nino\Mail::deliverQueued( $appData ) );
+$log = $said();
+check( 'a record of the mails given up on that cannot be read holds back the mail that was to be recorded - it stays, with its attempts as they were - and the other mails are delivered', $result['delivered'] === 1 && $result['failed'] === 0 && array_column( $taken, 'to' ) === [ $address( 90 ) ] && ( $waiting()['5123456789abcdef']['tries'] ?? -1 ) === \Nino\MailQueue::attempts() && $sha( \Nino\MailQueue::FAILED ) === $recordBefore && count( $log ) === 2 );
+$result = \Nino\Mail::deliverQueued( $appData );
+check( '...and once the record can be read it is given up on, once, with its record', $result['failed'] === 1 && $waiting() === [] && \Nino\Mail::queued( $appData )['failed'] === 1 );
+$unreadableRecord = $blind( 'mail-failed.php', static fn(): array => \Nino\Mail::queued( $appData ) );
+check( 'queued() says unreadable for a record that cannot be read, as it does for the outbox', $unreadableRecord['unreadable'] === true && \Nino\Mail::queued( $appData )['unreadable'] === false );
+
+// A file that does not decode and cannot be replaced: the notice is written once, the outbox says unwritable, and the mails of the file are not lost
+$reset();
+file_put_contents( $path( \Nino\MailQueue::WAITING ), 'broken leak@example.org' );
+$notice = $path( \Nino\MailQueue::DAMAGED );
+FaultFs::on( [ 'unlink' => static fn( string $name ): bool => basename( $name ) === 'mail-queue.php' ] );
+$answers = [ \Nino\Mail::queue( $appData, $mail( 79 ) ), \Nino\Mail::queue( $appData, $mail( 80 ) ) ];
+FaultFs::off();
+$written = count( array_filter( FaultFs::$log, static fn( array $entry ): bool => $entry[0] === 'rename' && $entry[2] === $notice ) );
+$log = $said();
+check( 'a damaged file that cannot be removed is a write that failed: queue() says unwritable, the file stays, and the notice is written once, not for every request', $answers === [ '', '' ] && \Nino\Mail::queueRefused( $appData ) === 'unwritable' && $written === 1 && is_file( $path( \Nino\MailQueue::WAITING ) ) === true && is_file( $notice ) === true && count( $log ) === 1 );
+$id = \Nino\Mail::queue( $appData, $mail( 81 ) );
+check( '...and once it can be removed the outbox starts over', $id !== '' && count( $waiting() ) === 1 );
+
+// A damaged file is not removed where its notice cannot be written
+$reset();
+file_put_contents( $path( \Nino\MailQueue::WAITING ), 'broken leak@example.org' );
+$before = $sha( \Nino\MailQueue::WAITING );
+$seed( \Nino\MailQueue::DAMAGED, $path( '/data' ). '/no-such-folder/mail-queue-damaged.php' );
+$id = \Nino\Mail::queue( $appData, $mail( 82 ) );
+unset( $appData['./nino/filesystem/cache'][\Nino\MailQueue::DAMAGED] );
+check( 'a damaged file stays where the notice of it cannot be written: nothing of it is lost for a notice that is not there', $id === '' && \Nino\Mail::queueRefused( $appData ) === 'unwritable' && $sha( \Nino\MailQueue::WAITING ) === $before && is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false );
+
+// The file of the keys that does not decode has a notice of its own, and a line of its own
+$reset();
+@unlink( $path( \Nino\MailQueue::KEYS ) );
+file_put_contents( $path( \Nino\MailQueue::WAITING ), 'broken queue' );
+\Nino\Mail::queue( $appData, $mail( 83 ) );
+$queueLine = $said();
+$queueNotice = $sha( \Nino\MailQueue::DAMAGED );
+file_put_contents( $path( \Nino\MailQueue::KEYS ), 'broken keys leak@example.org' );
+\Nino\Mail::queue( $appData, $mail( 84 ), \Nino\Mail::CLIENT, 'order/84' );
+\Nino\Mail::deliverQueued( $appData, 10 );
+$keysLine = $said();
+$keysNotice = \Nino\MailQueue::decode( (string) @file_get_contents( $path( \Nino\MailQueue::DAMAGED_KEYS ) ) );
+check( 'a file of the keys that does not decode is replaced by a notice of its own: the notice of the outbox is as it was, and the line in the log is not the line of the outbox', ( $keysNotice['damaged']['sha256'] ?? '' ) === hash( 'sha256', 'broken keys leak@example.org' ) && $sha( \Nino\MailQueue::DAMAGED ) === $queueNotice && count( $queueLine ) === 1 && count( $keysLine ) === 1 && $keysLine[0] !== $queueLine[0] && $holders( 'leak@example' ) === [] );
+touch( $path( \Nino\MailQueue::DAMAGED_KEYS ), time() - \Nino\MailQueue::KEEP_FAILED );
+\Nino\Mail::queue( $appData, $mail( 85 ) );
+\Nino\Mail::deliverQueued( $appData, 10 );
+check( '...and the sweep knows it: it goes when it is fourteen days old', is_file( $path( \Nino\MailQueue::DAMAGED_KEYS ) ) === false );
+
+// The sweep takes the lock of the file it removes: a writer that holds it is not overtaken
+$reset();
+file_put_contents( $path( \Nino\MailQueue::DAMAGED ), 'a file that was kept: kept@example.org' );
+$holder = $appData;
+unset( $holder['./nino/filesystem/locks'] );
+\Nino\Filesystem::lockFile( $holder, \Nino\MailQueue::DAMAGED );
+\Nino\Mail::queue( $appData, $mail( 86 ) );
+\Nino\Mail::deliverQueued( $appData );
+$heldBack = is_file( $path( \Nino\MailQueue::DAMAGED ) ) === true;
+\Nino\Filesystem::unlockFile( $holder, \Nino\MailQueue::DAMAGED );
+\Nino\Mail::queue( $appData, $mail( 87 ) );
+\Nino\Mail::deliverQueued( $appData );
+check( 'a file that is removed by the sweep is removed under its lock: while another holds it, it stays', $heldBack === true && is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false );
+
+// The temp file of a write with a mode has the mode before the first byte is in it, the umask of the process is not touched, and a mode that cannot be set is a failed write
+\Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'old' );
+umask( 0022 );
+$umask = umask();
+FaultFs::on();
+$ok = \Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'new', false, 0600 );
+FaultFs::off();
+$tempOf = array_values( array_filter( FaultFs::$log, static fn( array $entry ): bool => $entry[0] === 'open' && str_ends_with( $entry[1], '.tmp' ) ) )[0][1] ?? '';
+$order = array_column( array_filter( FaultFs::$log, static fn( array $entry ): bool => $entry[1] === $tempOf ), 0 );
+$opened = array_values( array_filter( FaultFs::$log, static fn( array $entry ): bool => $entry[0] === 'open' && $entry[1] === $tempOf ) )[0] ?? [];
+check( 'a file written with a mode gets it before the first byte: the temp file is made, its mode set, then written and renamed - in that order - and the umask of the process is the one it was', $ok === true && $tempOf !== '' && array_values( array_unique( $order ) ) === [ 'open', 'chmod', 'write', 'rename' ] && umask() === $umask );
+check( '...the temp file is made exclusively, in a folder of its own beside the file that has the mode 0700 when the file is made - nobody else can open it while it is written - and the file is where it was asked for', ( $opened[2] ?? '' ) === 'xb' && ( $opened[3] ?? -1 ) === 0700 && basename( dirname( $tempOf ) ) === \Nino\Filesystem::PRIVATE_TEMP && dirname( dirname( $tempOf ) ) === dirname( $path( '/data/mode-probe.php' ) ) && ( fileperms( dirname( $tempOf ) ) & 0777 ) === 0700 && glob( dirname( $tempOf ). '/*' ) === [] );
+$dir = $path( '/data' ). '/mode-dir-probe';
+mkdir( $dir );
+$dirMode = (int) ( fileperms( $dir ) & 0777 );
+rmdir( $dir );
+check( '...and what is made after it - a directory - has the mode the process gives it', $dirMode === ( 0777 & ~$umask ) );
+FaultFs::on( [ 'chmod' => static fn( string $name ): bool => str_ends_with( $name, '.tmp' ) ] );
+$failed = \Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'newer', false, 0600 );
+FaultFs::off();
+check( 'a mode that cannot be set is a write that failed: it answers false, the file is as it was, no temp file is left, and no byte was written to one', $failed === false && str_contains( (string) file_get_contents( $path( '/data/mode-probe.php' ) ), 'new' ) === true && str_contains( (string) file_get_contents( $path( '/data/mode-probe.php' ) ), 'newer' ) === false );
+check( '...and the bytes were never written: the log of the file protocol has no write to a temp file after the failed chmod', array_filter( FaultFs::$log, static fn( array $entry ): bool => $entry[0] === 'write' ) === [] && glob( $path( '/data' ). '/mode-probe.php.*.tmp' ) === [] && glob( $path( '/data' ). '/'. \Nino\Filesystem::PRIVATE_TEMP. '/*.tmp' ) === [] );
+unlink( $path( '/data/mode-probe.php' ) );
+
+echo "\n";
+echo "The folder of the temp files, who writes, what is left\n";
+
+// A folder that is there with another mode, or is a link, is no place for a file that nobody else may open: the write fails and nothing is written
+$data = $path( '/data' );
+$folder = $data. '/'. \Nino\Filesystem::PRIVATE_TEMP;
+$leftOver = glob( $folder. '/*' ) ?: [];
+foreach( $leftOver as $file )
+	unlink( $file );
+@rmdir( $folder );
+mkdir( $folder, 0755 );
+umask( 0022 );
+$wide = \Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'x', false, 0600 );
+rmdir( $folder );
+mkdir( $data. '/linked-folder' );
+symlink( $data. '/linked-folder', $folder );
+$linked = \Nino\Filesystem::putFileContent( $appData, '/data/mode-probe.php', 'x', false, 0600 );
+unlink( $folder );
+rmdir( $data. '/linked-folder' );
+check( 'a folder of the temp files that has a wider mode, or is a link, is a write that failed: the folder is not trusted, and no file is written', $wide === false && $linked === false && is_file( $path( '/data/mode-probe.php' ) ) === false );
+$plain = \Nino\Filesystem::putFileContent( $appData, '/data/mode-plain.php', 'x' );
+FaultFs::on();
+\Nino\Filesystem::putFileContent( $appData, '/data/mode-plain.php', 'y' );
+\Nino\Filesystem::putFileContent( $appData, '/data/mode-plain.php', 'z', false, 0644 );
+FaultFs::off();
+$temps = array_values( array_map( static fn( array $entry ): string => dirname( $entry[1] ), array_filter( FaultFs::$log, static fn( array $entry ): bool => $entry[0] === 'open' && str_ends_with( $entry[1], '.tmp' ) ) ) );
+unlink( $path( '/data/mode-plain.php' ) );
+check( 'a write with no mode, or with a mode the others may read, makes its temp file beside the file as it did: the folder is for the files that shut others out', $plain === true && $temps === [ $data, $data ] );
+
+// The command of a cron job that is not the owner of the folder: it asks before it writes
+$mine = posix_geteuid();
+FaultFs::on( [ 'uid' => static fn( string $name ): ?int => $name === $data ? $mine + 1 : null ] );
+$foreign = \Nino\MailQueue::foreignOwner( $appData );
+FaultFs::off();
+check( 'the command asks who owns private/data before it writes: where that is another user than the one it runs as it is told both, where it is the same it is told nothing', $foreign === [ 'owner' => $mine + 1, 'user' => $mine ] && \Nino\MailQueue::foreignOwner( $appData ) === null );
+
+// The file of the keys that cannot be read and is older than the keys are kept holds nothing: it is replaced, and mails with a key go
+$reset();
+\Nino\Filesystem::putFileContent( $appData, \Nino\MailQueue::KEYS, [ 'format' => 1, 'keys' => [] ] );
+$young = $blind( 'mail-keys.php', static fn(): string => \Nino\Mail::queue( $appData, $mail( 91 ), \Nino\Mail::CLIENT, 'order/91' ) );
+touch( $path( \Nino\MailQueue::KEYS ), time() - \Nino\MailQueue::KEY_MEMORY - 5 );
+$old = $blind( 'mail-keys.php', static fn(): string => \Nino\Mail::queue( $appData, $mail( 92 ), \Nino\Mail::CLIENT, 'order/92' ) );
+$result = $blind( 'mail-keys.php', static fn(): array => \Nino\Mail::deliverQueued( $appData ) );
+check( 'a file of keys that cannot be read and is younger than the keys are kept rejects a mail with a key; an older one is of no use, and the mail is queued', $young === '' && $old !== '' );
+$kept = \Nino\MailQueue::decode( (string) @file_get_contents( $path( \Nino\MailQueue::KEYS ) ) );
+$stillThere = count( $kept['keys'] ?? [] ) === 1 && ( $kept['keys'][0]['key'] ?? '' ) === hash( 'sha256', 'order/92' );
+check( '...and the delivery of it goes out once, and the file of keys is a file of this user again', $result['delivered'] === 1 && count( $taken ) === 1 && $stillThere === true && \Nino\Mail::queue( $appData, $mail( 92 ), \Nino\Mail::CLIENT, 'order/92' ) !== '' );
+
+// With no outbox there is still what it left: the sweep runs when there is no mail to look at
+$reset();
+@unlink( $path( \Nino\MailQueue::KEYS ) );
+$aged = $path( \Nino\MailQueue::DAMAGED_KEYS );
+file_put_contents( $aged, \Nino\MailQueue::encode( [ 'format' => 1, 'damaged' => [ 'at' => 1, 'size' => 1, 'sha256' => str_repeat( 'a', 64 ) ] ] ) );
+touch( $aged, time() - \Nino\MailQueue::KEEP_FAILED );
+\Nino\Filesystem::putFileContent( $appData, \Nino\MailQueue::KEYS, [ 'format' => 1, 'keys' => [] ] );
+touch( $path( \Nino\MailQueue::KEYS ), time() - \Nino\MailQueue::KEY_MEMORY - 5 );
+@mkdir( $folder, 0700 );
+file_put_contents( $folder. '/old.php.aaaaaaaaaaaa.tmp', 'x' );
+file_put_contents( $folder. '/new.php.bbbbbbbbbbbb.tmp', 'x' );
+touch( $folder. '/old.php.aaaaaaaaaaaa.tmp', time() - \Nino\MailQueue::TEMP_KEEP );
+check( 'a site that has no outbox is swept all the same, which is what the command of a cron job does: the notice that is old, the keys that are of no use and the temp file of a write that was cut off go, and what is young stays', is_file( $path( \Nino\MailQueue::WAITING ) ) === false && \Nino\Mail::deliverQueued( $appData )['delivered'] === 0 && is_file( $aged ) === false && is_file( $path( \Nino\MailQueue::KEYS ) ) === false && is_file( $folder. '/old.php.aaaaaaaaaaaa.tmp' ) === false && is_file( $folder. '/new.php.bbbbbbbbbbbb.tmp' ) === true );
+unlink( $folder. '/new.php.bbbbbbbbbbbb.tmp' );
+
+// A notice that cannot be read is not judged: it goes when it is old, not at once
+$reset();
+file_put_contents( $path( \Nino\MailQueue::WAITING ), 'broken' );
+\Nino\Mail::queue( $appData, $mail( 93 ) );
+\Nino\Mail::deliverQueued( $appData );
+$blind( 'mail-queue-damaged.php', static function() use ( &$appData ): void { \Nino\MailQueue::sweep( $appData ); } );
+$kept = is_file( $path( \Nino\MailQueue::DAMAGED ) ) === true;
+touch( $path( \Nino\MailQueue::DAMAGED ), time() - \Nino\MailQueue::KEEP_FAILED );
+$blind( 'mail-queue-damaged.php', static function() use ( &$appData ): void { \Nino\MailQueue::sweep( $appData ); } );
+check( 'a notice that cannot be read is kept until it is old, and then removed', $kept === true && is_file( $path( \Nino\MailQueue::DAMAGED ) ) === false );
+
+// The log names the file and not where it is, and the counters of the log are no part of a backup
+$reset();
+\Nino\Mail::queue( $appData, $mail( 94 ) );
+$blind( 'mail-queue.php', static fn(): string => \Nino\Mail::queue( $appData, $mail( 95 ) ) );
+$log = $said();
+check( 'the line in the log about a file that cannot be read has no path of the project in it', count( $log ) === 1 && str_contains( $log[0], $sandbox ) === false && str_contains( $log[0], 'mail-queue.php' ) === true );
+$never = ( new \ReflectionClass( \Nino\Backup::class ) )->getReflectionConstant( 'NEVER' )->getValue();
+check( 'the counters that keep the log from saying the same twice in an hour are no part of a backup, nor of a restore', array_diff( [ 'mail-queue-unreadable.php', 'mail-queue-keys.php', 'mail-queue-stuck.php', 'mail-queue-record.php', 'mail-queue-unwritable.php' ], $never ) === [] );
+$staging = $sandbox. '/staging';
+mkdir( $staging. '/data/'. \Nino\Filesystem::PRIVATE_TEMP, 0755, true );
+file_put_contents( $staging. '/data/'. \Nino\Filesystem::PRIVATE_TEMP. '/left.php.cccccccccccc.tmp', 'leak@example.org' );
+\Nino\Backup::dropOutbox( $staging );
+check( 'a restore brings back no temp file of the outbox: the folder of them is dropped with the files of the outbox from what an archive carries', is_dir( $staging. '/data/'. \Nino\Filesystem::PRIVATE_TEMP ) === false );
+@mkdir( $folder, 0700 );
+file_put_contents( $folder. '/left.php.dddddddddddd.tmp', 'x' );
+check( 'and a backup does not carry it', in_array( 'data/'. \Nino\Filesystem::PRIVATE_TEMP. '/left.php.dddddddddddd.tmp', array_map( static fn( string $name ): string => (string) preg_replace( '#/+#', '/', $name ), \Nino\Backup::manifest( $appData ) ), true ) === false );
+unlink( $folder. '/left.php.dddddddddddd.tmp' );
 
 echo "\n";
 echo "The backup, the outbox as a whole\n";
@@ -628,7 +1159,7 @@ check( 'a backup carries neither the mails that wait nor the record of those giv
 
 $reflection = new \ReflectionClass( \Nino\Backup::class );
 $never = $reflection->getReflectionConstant( 'NEVER' )->getValue();
-$files = [ basename( \Nino\MailQueue::WAITING ), basename( \Nino\MailQueue::FAILED ), basename( \Nino\MailQueue::DAMAGED ), basename( \Nino\MailQueue::DAMAGED_FAILED ), basename( \Nino\MailQueue::KEYS ), basename( \Nino\MailQueue::DUE ) ];
+$files = [ basename( \Nino\MailQueue::WAITING ), basename( \Nino\MailQueue::FAILED ), basename( \Nino\MailQueue::DAMAGED ), basename( \Nino\MailQueue::DAMAGED_FAILED ), basename( \Nino\MailQueue::DAMAGED_KEYS ), basename( \Nino\MailQueue::KEYS ), basename( \Nino\MailQueue::DUE ) ];
 check( 'the files the outbox writes are the ones the backup keeps out, and the file every request looks for is the file of the outbox', array_diff( $files, $never ) === [] && \Nino\Http::MAIL_QUEUE === \Nino\MailQueue::WAITING && \Nino\Http::MAIL_QUEUE === '/data/'. basename( \Nino\MailQueue::WAITING ) );
 
 echo "\n";
@@ -712,6 +1243,40 @@ check( 'the command finds a project whose private half is moved elsewhere as ind
 	&& is_file( $sandbox. '/outside/data/mail-queue.php' ) === false && str_contains( (string) @file_get_contents( $sandbox. '/sendmail.out' ), $address( 13 ) ) === true );
 [ $out3, $err3, $code3 ] = $command( [ 'NINO_PRIVATE_DIR' => $sandbox. '/nowhere' ] );
 check( 'a command that cannot boot the project says why in one sentence on the error stream and ends with a code that is not 0, and prints no address', $code3 !== 0 && $out3 === '' && str_starts_with( $err3, 'mail queue:' ) === true && str_contains( $err3, 'example.com' ) === false );
+
+// A command that does not run as the owner of private/data writes nothing and sends nothing: the files it wrote are 0600 and another user's, which the webserver could not read
+$nobody = function_exists( 'posix_getpwnam' ) === true ? posix_getpwnam( 'nobody' ) : false;
+
+if( function_exists( 'posix_geteuid' ) === true && posix_geteuid() === 0 && $nobody !== false ) {
+
+	$owned = $sandbox. '/owned';
+	\Nino\Filesystem::copyDir( $root. '/_nino', $owned. '/_nino' );
+	mkdir( $owned. '/private/data', 0755, true );
+	file_put_contents( $owned. '/private/config.php', '<?php return [];' );
+	$other = [ './nino/uid' => $owned ];
+	\Nino\AppData::prepare( $other );
+	foreach( [ 'path' => $owned, 'configpath' => $owned. '/private', 'contentpath' => $owned. '/private', 'publicpath' => $owned. '/public' ] as $name => $value )
+		$other['./nino/filesystem/'. $name] = $value;
+	$other['/nino/mail/cap'] = 0;
+	\Nino\Mail::queue( $other, $mail( 14 ) );
+
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $owned. '/private', \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST ) as $item )
+		chown( $item->getPathname(), $nobody['uid'] );
+
+	chown( $owned. '/private', $nobody['uid'] );
+	$listing = static fn(): array => array_map( static fn( string $file ): string => $file. ':'. filemtime( $file ), array_merge( glob( $owned. '/private/data/*' ) ?: [], glob( $owned. '/private/data/.[!.]*' ) ?: [] ) );
+	$before = [ $listing(), (string) @file_get_contents( $sandbox. '/sendmail.out' ), hash_file( 'sha256', $owned. '/private/data/mail-queue.php' ) ];
+	$process = proc_open( [ PHP_BINARY, '-d', 'sendmail_path='. $sandbox. '/sendmail.sh', $owned. '/_nino/Nino/MailQueue/deliver.php' ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes, null, [ 'PATH' => (string) getenv( 'PATH' ) ] );
+	$out = trim( (string) stream_get_contents( $pipes[1] ) );
+	$err = trim( (string) stream_get_contents( $pipes[2] ) );
+	$code = proc_close( $process );
+	clearstatcache();
+	check( 'a command that runs as another user than the owner of private/data writes nothing and sends nothing: it says in one sentence which two users, prints no address and ends with a code that is not 0', $code !== 0 && $out === '' && str_contains( $err, (string) $nobody['uid'] ) === true && str_contains( $err, '@' ) === false && substr_count( $err, "\n" ) === 0
+		&& $before === [ $listing(), (string) @file_get_contents( $sandbox. '/sendmail.out' ), hash_file( 'sha256', $owned. '/private/data/mail-queue.php' ) ] );
+}
+else
+	echo "  not run - this needs root and a user 'nobody': the command asks \\Nino\\MailQueue::foreignOwner(), which is pinned above\n";
+
 
 $socket = stream_socket_server( 'tcp://127.0.0.1:0' );
 $port = (int) substr( (string) stream_socket_get_name( $socket, false ), strrpos( (string) stream_socket_get_name( $socket, false ), ':' ) + 1 );

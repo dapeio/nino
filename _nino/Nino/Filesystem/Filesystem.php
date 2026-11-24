@@ -107,7 +107,9 @@ namespace Nino {
 		 *	(a temporary file next to it is renamed over it, so a reader never
 		 *	sees half of one). A .php file is written as <?php return ...; from
 		 *	the value, a .json file as json, any other as the string; the
-		 *	directory is made where it is missing, and the file keeps its mode.
+		 *	directory is made where it is missing, and the file keeps its mode - or
+		 *	has the one the caller names in $mode, which a file that is there with
+		 *	another mode gets with this write.
 		 *	The file is locked while it is written, unless the caller holds the
 		 *	lock already ($nolock - lockFile() and mutate() do), and the lock is
 		 *	released when this returns.
@@ -120,10 +122,11 @@ namespace Nino {
 		 *	@param		string		$filename			A virtual path, see getFileContent()
 		 *	@param		mixed		$content			The value to write
 		 *	@param		bool		$nolock				The caller holds the lock of this file already
+		 *	@param		int|null	$mode				The mode of the file, null to keep the one it has (a new file has the one the umask gives it); a system without modes takes it as no error
 		 *
 		 *	@return 	bool							Whether it was written; false for an unusable path, a lock that could not be taken, a value json cannot encode and a failed write - the file is then as it was
 		 */
-		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false ): bool {
+		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false, ?int $mode = null ): bool {
 
 			// See getFileContent() - same defense-in-depth rejection, on the
 			// write side, where a nul byte is the half that is not theoretical:
@@ -156,7 +159,7 @@ namespace Nino {
 			if( substr( $filename, -4 ) === '.php' )
 				$content = '<?php return '. var_export( $content, true ). ';';
 
-			$success = self::_writeFile( $path, (string) $content );
+			$success = self::_writeFile( $path, (string) $content, $mode );
 
 			/*	The compiled copy of a .php file goes while the lock is still held. A reader takes the lock, includes the
 				file and writes what it read back with its own change: released first, the lock let the next one in
@@ -216,9 +219,32 @@ namespace Nino {
 		// binding and every password hash gone. rename() within the same
 		// directory is atomic, so a concurrent reader sees either the whole
 		// old file or the whole new one, never a half-written one.
-		private static function _writeFile( string $path, string $content ): bool {
+		//
+		// $mode, where the caller names one, is the mode of the file whatever it had before. Where it
+		// shuts the group and the others out, the temp file is made in a folder of its own beside the
+		// file, PRIVATE_TEMP, which has the mode 0700 and the owner of this process: nobody else can
+		// open the file while it is made, and so none holds a handle to it when its mode is set - a
+		// file made with the mode of the umask is open to whoever opens it before the chmod() and
+		// reads what is written after it. The folder is made with mkdir(), which needs no umask; one
+		// that is there is checked - no link, a directory, the owner and the mode - and is a failed
+		// write where it is not what it should be. The temp file is made exclusively and gets the
+		// mode before the first byte is written to it. The umask of the process is not touched: it is
+		// the process's, and in a server that runs threads it is the threads' too
+		private static function _writeFile( string $path, string $content, ?int $mode = null ): bool {
 
-			$temp		= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+			$name		= basename( $path ). '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+			$temp		= dirname( $path ). '/'. $name;
+
+			if( $mode !== null && ( $mode & 0077 ) === 0 ) {
+
+				$folder = dirname( $path ). '/'. self::PRIVATE_TEMP;
+
+				if( self::_privateFolder( $folder ) === false )
+					return false;
+
+				$temp = $folder. '/'. $name;
+			}
+
 			// @ on every primary I/O call below, not just the cleanup ones -
 			// a disk-full/quota/permission failure here otherwise raises a
 			// plain E_WARNING, which Runtime::handleError() (deliberately)
@@ -226,10 +252,17 @@ namespace Nino {
 			// === false check three lines down - is what ends the request,
 			// and every caller's carefully worded "could not be written"/
 			// "could not be locked" message not currently reachable
-			$handle	= @fopen( $temp, 'wb' );
+			$handle	= @fopen( $temp, $mode === null ? 'wb' : 'xb' );
 
 			if( $handle === false )
 				return false;
+
+			// A system that has no modes answers true to a chmod() that did nothing; one that has them and refuses is a failed write
+			if( $mode !== null && @chmod( $temp, $mode & 0777 ) === false ) {
+				fclose( $handle );
+				@unlink( $temp );
+				return false;
+			}
 
 			$written = @fwrite( $handle, $content );
 
@@ -246,9 +279,9 @@ namespace Nino {
 			// Keep the existing file's mode - the temp file was created fresh
 			// under the current umask, so without this a rewrite could quietly
 			// widen (or narrow) permissions on eg. config.php
-			$mode = @fileperms( $path );
-			if( $mode !== false )
-				@chmod( $temp, $mode & 0777 );
+			$kept = $mode === null ? @fileperms( $path ) : false;
+			if( $kept !== false )
+				@chmod( $temp, $kept & 0777 );
 
 			if( @rename( $temp, $path ) === false ) {
 				@unlink( $temp );
@@ -256,6 +289,24 @@ namespace Nino {
 			}
 
 			return true;
+		}
+
+		// The folder of the temp files of the writes that shut others out: made with 0700, or one that is there and is a directory
+		// of this process's owner with the mode 0700 and no link. A system that has no owners or modes (no posix) is taken as it is
+		private static function _privateFolder( string $folder ): bool {
+
+			if( is_link( $folder ) === false && is_dir( $folder ) === false && @mkdir( $folder, 0700 ) === true && ( (int) @fileperms( $folder ) & 0777 ) !== 0700 )
+				@chmod( $folder, 0700 );
+
+			$stat = @lstat( $folder );
+
+			if( $stat === false || ( $stat['mode'] & 0170000 ) !== 0040000 )
+				return false;
+
+			if( function_exists( 'posix_geteuid' ) === true && $stat['uid'] !== posix_geteuid() )
+				return false;
+
+			return PHP_OS_FAMILY === 'Windows' || ( $stat['mode'] & 0777 ) === 0700;
 		}
 
 		// Lock a file for a read-modify-write sequence. The lock lives on a
@@ -447,6 +498,10 @@ namespace Nino {
 		// NINO_PRIVATE_DIR points at, so a moved private directory changes
 		// no call site - the same indirection '/config.php' already has
 		public const string CONTENT_DIR = '/private';
+
+		// The folder beside a file where the temporary file of a write is made when the mode of the file shuts others out (see
+		// putFileContent()): its own mode is 0700, so that nobody else can open the file while it is made. A leading dot keeps it out of a backup
+		public const string PRIVATE_TEMP = '.private-tmp';
 		// Everything a project keeps that a webserver must never serve: its
 		// configuration, the templates it renders, the text and elements it
 		// renders them from, the data its visitors produce, and the stylesheet

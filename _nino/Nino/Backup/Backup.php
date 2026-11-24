@@ -42,7 +42,7 @@ namespace Nino {
 		public const int WRITE_FAILED = 1;
 
 		// The files of the outbox of \Nino\Mail: not in a backup, and not brought back by a restore of any archive
-		private const array OUTBOX = [ 'mail-queue.php', 'mail-queue-due.txt', 'mail-keys.php', 'mail-failed.php', 'mail-queue-damaged.php', 'mail-failed-damaged.php' ];
+		private const array OUTBOX = [ 'mail-queue.php', 'mail-queue-due.txt', 'mail-keys.php', 'mail-failed.php', 'mail-queue-damaged.php', 'mail-failed-damaged.php', 'mail-keys-damaged.php', 'mail-queue-unreadable.php', 'mail-queue-keys.php', 'mail-queue-stuck.php', 'mail-queue-record.php', 'mail-queue-unwritable.php' ];
 
 		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'mail-status.php', 'catalogue.php', ...self::OUTBOX ];
 
@@ -532,6 +532,12 @@ namespace Nino {
 
 			foreach( self::OUTBOX as $name )
 				@unlink( rtrim( $staging, DIRECTORY_SEPARATOR ). '/data/'. $name );
+
+			// ...and the folder of the temporary files of its writes, which an archive that was made by hand may carry
+			$folder = rtrim( $staging, DIRECTORY_SEPARATOR ). '/data/'. \Nino\Filesystem::PRIVATE_TEMP;
+
+			if( is_dir( $folder ) === true && is_link( $folder ) === false )
+				\Nino\Filesystem::removeDir( $folder );
 		}
 
 		/**

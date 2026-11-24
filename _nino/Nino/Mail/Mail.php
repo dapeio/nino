@@ -285,7 +285,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										{ waiting, failed, last, oldest }: the mails that wait; the mails given up on within the last fourteen days; the minute ('Y-m-d H:i') of the last of them, null for none; the minute the oldest mail that waits was queued, null for none. An oldest that is hours old says that nothing delivers
+		 *	@return 	array										{ waiting, failed, last, oldest, unreadable }: the mails that wait; the mails given up on within the last fourteen days; the minute ('Y-m-d H:i') of the last of them, null for none; the minute the oldest mail that waits was queued, null for none. An oldest that is hours old says that nothing delivers; an unreadable that is true says that a file of the outbox is there and cannot be read (its owner is another user), and what is counted is what could be read
 		 */
 		public static function queued( array &$appData ): array {
 
@@ -311,8 +311,13 @@ namespace Nino {
 
 			$result = [ 'delivered' => 0, 'retry' => 0, 'held' => 0, 'failed' => 0, 'unwritable' => false ];
 
-			if( is_file( \Nino\Filesystem::path( $appData, \Nino\MailQueue::WAITING ) ) === false )
+			// With no outbox there is no mail to look at, and what the outbox left - a notice, the keys, a temporary file - still goes when its time is over
+			if( is_file( \Nino\Filesystem::path( $appData, \Nino\MailQueue::WAITING ) ) === false ) {
+
+				\Nino\MailQueue::sweep( $appData );
+
 				return $result;
+			}
 
 			$token	= bin2hex( random_bytes( 8 ) );
 			$left		= max( 1, $limit ?? \Nino\MailQueue::BATCH );
