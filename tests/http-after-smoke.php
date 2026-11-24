@@ -178,6 +178,17 @@ check( 'a response that streams a file is sent as it is and the work is dropped'
 $request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => 'x', 'header' => [] ] ];
 check( 'nothing asked for, nothing decided: the response is not touched', \Nino\Http::prepareAfter( $appData, $request ) === [] && $request['/nino/http/response']['header'] === [] );
 
+// Where the kernel tells the length and nothing ends the connection but the client, the connection is closed with the response, so that the next request
+// of the browser is not served on it behind the work
+\Nino\Http::afterResponse( $appData, static function(): void {} );
+$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => 'x', 'header' => [] ] ];
+$decided = \Nino\Http::prepareAfter( $appData, $request );
+check( 'a response that carries work says Connection: close, and the length', count( $decided ) === 1 && ( $request['/nino/http/response']['header']['Connection'] ?? '' ) === 'close' && ( $request['/nino/http/response']['header']['Content-Length'] ?? '' ) === '1' );
+\Nino\Http::afterResponse( $appData, static function(): void {} );
+$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => 'x', 'header' => [ 'CONNECTION' => 'keep-alive' ] ] ];
+\Nino\Http::prepareAfter( $appData, $request );
+check( '...but what somebody else said about the connection, in any spelling of the name, is left as it is', $request['/nino/http/response']['header'] === [ 'CONNECTION' => 'keep-alive', 'Content-Length' => '1' ] );
+
 echo "\n";
 
 ninoDone( $appData );

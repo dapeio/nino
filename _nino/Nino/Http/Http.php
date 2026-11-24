@@ -356,6 +356,12 @@ namespace Nino {
 
 			$response['header']['Content-Length'] = (string) strlen( $response['body'] );
 
+			// The client stops reading at the length, but a browser keeps the connection for its next request, and a server that
+			// answers on it one request at a time (php -S, a single worker) serves that request when the work is done. The
+			// connection is closed with this response, unless somebody else said what the connection does
+			if( in_array( 'connection', array_map( 'strtolower', array_map( 'strval', array_keys( (array) ( $response['header'] ?? [] ) ) ) ), true ) === false )
+				$response['header']['Connection'] = 'close';
+
 			return $after;
 		}
 

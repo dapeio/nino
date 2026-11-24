@@ -141,6 +141,7 @@ The runtime textfills are added in two passes, and the split matters. `/nino/dir
 - Non-string bodies are JSON-encoded and receive a suitable `Content-Type`.
 - Project and standard headers are merged.
 - Status code and headers are sent.
+- Where the response carries work asked for with `afterResponse()` and no server ends the connection by itself (no `fastcgi_finish_request()`, no LiteSpeed), the kernel tells the length of the body and says `Connection: close`, unless the response names a `Connection` of its own: the browser's next request then is not served on the connection that waits for the work.
 - A response that names a `file` has the file sent in place of its body, after the headers and in pieces: whole, or as the one byte range the request asked for. Every output buffer is ended first and PHP's own output compression is switched off for the request, so that the bytes leave as they are, and the visitor's session is closed, so that a long download does not keep their other requests waiting (see [Answering a File](#answering-a-file)).
 - For `HEAD`, the body is not output - and no byte of a file.
 - Then the script ends with `exit`.
