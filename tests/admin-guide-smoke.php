@@ -911,7 +911,7 @@ check( 'neither panel ships a stylesheet of its own: what they draw is the block
 	draws a part, and that no part is drawn by hand, asked with the browser's dialogs or styled with a number	*/
 $images = [
 	'_admin/Nino/Modules/Images/assets/admin.js'		=> [ 'adminUi.directory(', 'adminUi.record(', 'adminUi.imageFrame(', 'adminUi.readLine(', 'adminUi.localeRows(', 'adminUi.fileField(', 'adminUi.confirm(' ],
-	'_admin/Nino/Modules/Images/assets/slots.js'		=> [ 'adminUi.directory(', 'adminUi.record(', 'adminUi.formDialog(', 'adminUi.readLine(', 'adminUi.numberField(', 'adminUi.textField(', 'adminUi.checkField(', 'adminUi.confirm(', 'adminUi.say(' ],
+	'_admin/Nino/Modules/Images/assets/slots.js'		=> [ 'adminUi.directory(', 'adminUi.record(', 'adminUi.formDialog(', 'adminUi.numberField(', 'adminUi.textField(', 'adminUi.checkField(', 'adminUi.confirm(', 'adminUi.say(' ],
 	'_admin/Nino/Modules/Images/assets/favicon.js'	=> [ 'adminUi.color(', 'adminUi.fileField(', 'adminUi.confirm(', 'adminUi.dateText(', 'adminUi.sectionHelp(' ],
 ];
 

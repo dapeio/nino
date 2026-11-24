@@ -463,7 +463,7 @@
 		},
 
 		/**
-		 *	The content of the record: the uri to read - it is what the templates write and cannot be changed -, the label, the width and the height. What it keeps in ctx
+		 *	The content of the record: the label, the width and the height. The uri stands under the name in the head of the record - it is what the templates write and cannot be changed, so it is no field. What it keeps in ctx
 		 *	- the fields - is what the save finds there
 		 *
 		 *	@param		{Object}		row
@@ -474,8 +474,6 @@
 		_body : function( row, ctx ) {
 
 			const fields = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
-
-			fields.appendChild( Nino.adminUi.readLine( { label : word('/_admin/slots/label/uri'), value : row.uri, mono : true } ) );
 
 			const label = Nino.adminUi.textField( {
 				id : 'slots-form-label',
