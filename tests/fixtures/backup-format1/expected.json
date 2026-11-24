@@ -1,0 +1,14 @@
+{
+    "key": "nRJoL/kbo8MukgQt5CbOUL4xJNEuFH+U2VDQNjKF6SQ=",
+    "id": "2026-01-02-030405-manual",
+    "files": {
+        "private/assets/style.css": "d70e713083be86366d980a5b34e5fdfa1af38c65",
+        "private/config.php": "88d08eadb12991775de25e42c1de3392b0dd1823",
+        "private/data/forms.2026-01.php": "36782fff4a97672f511272b45b4050d9486b971a",
+        "private/data/forms.2026-02.php": "9ac56d65112377d191225e7bc6ffc93f27e1cb3d",
+        "private/elements/news.php": "4a8c134d77620a06dd8ff0fb36f6062b9fa342d8",
+        "private/templates/page-home.tpl": "ae21f0e5636128b37504607c4df3d50da48ab673",
+        "private/text/de_DE.php": "b8e7781c2a6484f73690e5fb765969453587ca96",
+        "public/images/elements/news/a.png": "bd77b71f19858b9ad5ff1f241ebd9925701a24b9"
+    }
+}

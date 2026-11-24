@@ -40,9 +40,11 @@ namespace Nino\Modules {
 	 *											- .php extension with a self-terminating stub - a direct
 	 *											  request hits exit() before the real (encrypted) data
 	 *											  ever gets output
-	 *											- AES-256-GCM encrypted payload (12-byte iv + 16-byte tag
-	 *											  + ciphertext), so raw filesystem access to the file
-	 *											  alone still isn't enough without the key
+	 *											- AES-256-GCM encrypted payload, in chunks of 256 KiB that
+	 *											  each carry their own tag (see \Nino\Backup\Seal), so
+	 *											  raw filesystem access to the file alone still isn't
+	 *											  enough without the key, and an archive of any size is
+	 *											  written and opened with the memory of a chunk
 	 *
 	 *											The encrypted payload is base64 and stays inside a
 	 *											single quoted string literal in the same PHP block as
@@ -93,11 +95,10 @@ namespace Nino\Modules {
 		public const string MANUAL_SUFFIX = '-manual';
 
 		// What a note, the archive key's copy and an archive begin and end with: the stub that ends a request for the
-		// file (\Nino\Admin\Recovery::STUB_PREFIX and STUB_SUFFIX, which a test holds equal). Here and not read from
-		// Recovery, a class that a request of the workbench has and a page request has not: missed() and stopped()
-		// are for a feature that reports from a page request too
-		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		public const string STUB_SUFFIX = "';\n";
+		// file, defined once by the kernel (\Nino\Backup\Seal), which a page request has as well as a request of the
+		// workbench: missed() and stopped() are for a feature that reports from a page request too
+		public const string STUB_PREFIX = \Nino\Backup\Seal::STUB_PREFIX;
+		public const string STUB_SUFFIX = \Nino\Backup\Seal::STUB_SUFFIX;
 
 		// The note of the day's one attempt (see maybeRun()), in the archive
 		// directory behind the same exit-stub as an archive. Its name is no
@@ -111,22 +112,11 @@ namespace Nino\Modules {
 		// is no date either
 		private const string RUN_FILE = 'run.php';
 
-		// What _create() holds at its peak is two copies of the compressed
-		// archive (it and its ciphertext, while it is encrypted, PEAK_FACTOR):
-		// the sources are packed in pieces and never in memory together, so what
-		// compresses costs nothing. Opening an archive (Admin::restore() and
-		// its snapshot) needs no more
-		private const int PEAK_FACTOR = 2;
-
-		// Formats that are compressed already: gzip takes the least of a file of
-		// these, never less than PICTURE_FLOOR of its size (jpeg gains under one
-		// percent, png and webp less), which makes the pictures a lower bound of the
-		// archive that is safe to refuse on before anything is packed
-		private const array PICTURE_FORMATS = [ 'jpg', 'jpeg', 'png', 'webp', 'avif', 'heic', 'heif' ];
-		private const float PICTURE_FLOOR = 0.9;
-
-		// Room for the code, the tar's own bookkeeping and the pieces the
-		// stub is written in
+		// What _create() holds at its peak is a few chunks of the archive (see \Nino\Backup\Seal::pieces()): the sources are packed
+		// and compressed in pieces, and the file is written in the chunks it is sealed in, so no size of the sources is a size of
+		// the memory. What does lie whole in memory is an archive of format 1, which is read and no longer written (openShort())
+		//
+		// Room for the code and the pieces an archive of format 1 is read in, on top of the archive itself
 		private const int PEAK_OVERHEAD = 16777216;
 
 		// Under the private directory, not in this tool's own folder: archives
@@ -258,13 +248,16 @@ namespace Nino\Modules {
 
 				$run = self::_begin( $dir, 'daily' );
 
+				$cause = null;
+
 				try {
 					self::_create( $appData, $dir, $path, $run );
 				} catch( \Throwable $e ) {
+					$cause = self::_cause( $e );
 					self::_noteAttempt( $dir, $today, self::_reason( $e ), self::_code( $e ) );
 					throw $e;
 				} finally {
-					self::_end( $run );
+					self::_end( $run, $cause );
 				}
 
 				@unlink( $dir. '/'. self::ATTEMPT_FILE );
@@ -295,13 +288,10 @@ namespace Nino\Modules {
 		 *	click at five in the afternoon must not replace it. Kept like the daily ones - the same
 		 *	way - and only the newest ones, as many as the project keeps.
 		 *
-		 *	Without the daily lock: the name is to the second, so two clicks in
-		 *	the same second make the same archive - the second write replaces
-		 *	the first, atomically, and both answer with that id. That lock is
-		 *	taken by every request of the workbench
-		 *	(see maybeRun()) - holding it for the seconds an archive takes
-		 *	would stop all of them. _bootstrap() serialises itself under
-		 *	config.php's lock. The activity log line is the panel's (see
+		 *	Under the lock of the daily run and of a restore (not waited for): two
+		 *	clicks at once make one archive and answer the other with a 409, and a
+		 *	restore is never in the middle of a backup. _bootstrap() serialises itself
+		 *	under config.php's lock. The activity log line is the panel's (see
 		 *	Admin::log()), not written here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -313,21 +303,32 @@ namespace Nino\Modules {
 			if( ( $appData['/nino/admin/backups'] ?? true ) === false )
 				return [ 409, 'backups are switched off' ];
 
+			// The lock of the daily run and of a restore, not waited for: a second "Back up now", a restore and a run of the day
+			// never go on at the same time, and the one that finds it taken is told so. The requests of the workbench that find it
+			// taken skip the daily run (see maybeRun()), which is what they do while a restore runs
+			if( \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH, false ) === false )
+				return [ 409, 'a backup or a restore is running', 'backups_busy' ];
+
+			$run = null;
+
 			try {
 
 				self::_bootstrap( $appData );
 
 				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
 
-				$dir 	= self::dir( $appData );
-				$id 	= date( 'Y-m-d-His' ). self::MANUAL_SUFFIX;
-
-				$run = self::_begin( $dir, 'manual' );
+				$dir 		= self::dir( $appData );
+				$id 		= date( 'Y-m-d-His' ). self::MANUAL_SUFFIX;
+				$run 		= self::_begin( $dir, 'manual' );
+				$cause 	= null;
 
 				try {
 					self::_create( $appData, $dir, $dir. '/'. $id. '.php', $run );
+				} catch( \Throwable $e ) {
+					$cause = self::_cause( $e );
+					throw $e;
 				} finally {
-					self::_end( $run );
+					self::_end( $run, $cause );
 				}
 
 				// An archive that was made is the way out of a day that went
@@ -338,7 +339,14 @@ namespace Nino\Modules {
 				return $id;
 
 			} catch( \RuntimeException | \PharException $e ) {
+
+				if( $e->getCode() === \Nino\Backup::DISK_SHORT && $run instanceof \stdClass )
+					return [ 507, $e->getMessage(), 'backups_disk', $run->short ];
+
 				return self::_code( $e ) === 'write' ? [ 500, $e->getMessage(), 'backups_write' ] : [ 500, $e->getMessage() ];
+			}
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, self::LOCK_PATH );
 			}
 		}
 
@@ -375,7 +383,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array|null							[ 'kind' => 'daily'|'manual', 'started' => unix time, 'files' => int, 'bytes' => int, 'cause' => 'time'|'memory'|'error'|'' (what ended it, '' where nothing says), 'limit' => seconds or bytes of that limit, 0 where there is none ], or null
+		 *	@return 	array|null							[ 'kind' => 'daily'|'manual', 'started' => unix time, 'files' => int, 'bytes' => int, 'cause' => 'time'|'memory'|'error'|'disk'|'' (what ended it, '' where nothing says), 'limit' => seconds or bytes of that limit, 0 where there is none ], or null
 		 */
 		public static function stopped( array &$appData ): ?array {
 
@@ -402,7 +410,7 @@ namespace Nino\Modules {
 				'started'	=> $note['started'],
 				'files' 	=> is_int( $note['files'] ?? null ) === true ? $note['files'] : 0,
 				'bytes' 	=> is_int( $note['bytes'] ?? null ) === true ? $note['bytes'] : 0,
-				'cause' 	=> in_array( $note['cause'] ?? null, [ 'time', 'memory', 'error' ], true ) === true ? $note['cause'] : '',
+				'cause' 	=> in_array( $note['cause'] ?? null, [ 'time', 'memory', 'error', 'disk' ], true ) === true ? $note['cause'] : '',
 				'limit' 	=> is_int( $note['limit'] ?? null ) === true ? $note['limit'] : 0,
 			];
 		}
@@ -487,7 +495,18 @@ namespace Nino\Modules {
 		 */
 		private static function _code( \Throwable $e ): string {
 
-			return get_class( $e ) === \RuntimeException::class && $e->getCode() === \Nino\Backup::WRITE_FAILED ? 'write' : '';
+			return get_class( $e ) === \RuntimeException::class && in_array( $e->getCode(), [ \Nino\Backup::WRITE_FAILED, \Nino\Backup::DISK_SHORT ], true ) === true ? 'write' : '';
+		}
+
+		/**
+		 *	What ended a run that failed on its own, as the record of it says: 'disk' where a write failed, nothing else
+		 *
+		 *	@param		\Throwable	$e
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _cause( \Throwable $e ): ?string {
+			return get_class( $e ) === \RuntimeException::class && $e->getCode() === \Nino\Backup::WRITE_FAILED ? 'disk' : null;
 		}
 
 		/**
@@ -507,7 +526,7 @@ namespace Nino\Modules {
 		/**
 		 *	The memory limit in bytes; 0 or less for none. php's own unless
 		 *	'./nino/backups/memory' names one as an int: the test of the check
-		 *	cannot lower the limit of the process that runs it
+		 *	cannot lower the limit of the process that runs it. Asked by openShort() alone
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -518,35 +537,6 @@ namespace Nino\Modules {
 			$injected = $appData['./nino/backups/memory'] ?? null;
 
 			return is_int( $injected ) === true ? $injected : ini_parse_quantity( (string) ini_get( 'memory_limit' ) );
-		}
-
-		/**
-		 *	Refuse a step the memory limit would not carry, with the sizes in
-		 *	the message: running out of it is a fatal error that no catch sees.
-		 *	Asked where the size is known - of the largest file before the
-		 *	archive is built, of the compressed archive before it is read - on
-		 *	top of what this request uses already.
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		int				$bytes				What the step holds at once
-		 *	@param		string		$of						What that is, for the message
-		 *
-		 *	@return 	void
-		 *
-		 *	@throws		\RuntimeException					If the step would not fit
-		 */
-		private static function _requireMemory( array &$appData, int $bytes, string $of ): void {
-
-			$limit = self::_limit( $appData );
-
-			if( $limit <= 0 )
-				return;
-
-			$used = memory_get_usage();
-			$need = $used + $bytes + self::PEAK_OVERHEAD;
-
-			if( $need > $limit )
-				throw new \RuntimeException( sprintf( 'the backup needs about %d MB of memory (%d MB for %s, %d MB in use) and the limit is %d MB', ceil( $need / 1048576 ), ceil( $bytes / 1048576 ), $of, ceil( $used / 1048576 ), floor( $limit / 1048576 ) ) );
 		}
 
 		/**
@@ -683,6 +673,8 @@ namespace Nino\Modules {
 			$run->note 	= [ 'kind' => $kind, 'started' => time() ];
 			$run->temp 	= '';
 			$run->lease = null;
+			$run->partial = '';
+			$run->short = [];
 			$run->handle = @fopen( $run->path, 'c+b' );
 
 			if( $run->handle !== false && flock( $run->handle, LOCK_EX | LOCK_NB ) === false ) {
@@ -710,6 +702,8 @@ namespace Nino\Modules {
 						$cause = [ 'cause' => 'time', 'limit' => (int) $match[1] ];
 					else if( preg_match( '/^Allowed memory size of (\d+) bytes exhausted/', $error['message'], $match ) === 1 )
 						$cause = [ 'cause' => 'memory', 'limit' => (int) $match[1] ];
+					else if( preg_match( '/could not be written|No space left on device|errno=28|Disk quota exceeded/i', $error['message'] ) === 1 )
+						$cause = [ 'cause' => 'disk' ];
 				}
 
 				self::_record( $run, $cause );
@@ -744,18 +738,26 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	End a run that ends by itself: its record goes, and its temporary files
+		 *	End a run that ends by itself: its record goes, and its temporary files. Where the run ended because a write failed - a disk
+		 *	that is full - the record stays and says so ('disk'), as it does for a run that php ended: the person who looks at the
+		 *	panel later is told what ended it, and the next run that succeeds takes the record away
 		 *
 		 *	@param		\stdClass	$run					See _begin()
+		 *	@param		string|null	$cause				'disk', or null for a run that ended by itself in order
 		 *
 		 *	@return 	void
 		 */
-		private static function _end( \stdClass $run ): void {
+		private static function _end( \stdClass $run, ?string $cause = null ): void {
 
 			$run->done = true;
 
 			if( is_resource( $run->handle ) === true ) {
-				@unlink( $run->path );
+
+				if( $cause !== null )
+					self::_record( $run, [ 'cause' => $cause ] );
+				else
+					@unlink( $run->path );
+
 				fclose( $run->handle );
 			}
 
@@ -763,7 +765,7 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Remove the temporary files of a run, and let go of the lock of the
+		 *	Remove the temporary files of a run - the file an archive is being written to among them - and let go of the lock of the
 		 *	first of them
 		 *
 		 *	@param		\stdClass	$run					See _begin()
@@ -771,6 +773,12 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		private static function _dropTemp( \stdClass $run ): void {
+
+			// The archive that was being written, which only a rename makes one
+			if( $run->partial !== '' ) {
+				@unlink( $run->partial );
+				$run->partial = '';
+			}
 
 			if( $run->temp === '' )
 				return;
@@ -788,14 +796,13 @@ namespace Nino\Modules {
 
 		/**
 		 *	What the run has to pack, read from the files before anything is
-		 *	made: the manifest, the number of files and of bytes, and of those
-		 *	the bytes that do not compress - the pictures, which a compressed
-		 *	archive holds as large as they are. A file the manifest names that
-		 *	cannot be read ends the run here
+		 *	made: the manifest - every file of the project the archive carries,
+		 *	the data a feature owns among them - the number of files and of
+		 *	bytes. A file the manifest names that cannot be read ends the run here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ 'manifest' => path -> name, 'files' => int, 'bytes' => int, 'pictures' => int ]
+		 *	@return 	array										[ 'manifest' => path -> name, 'files' => int, 'bytes' => int ]
 		 *
 		 *	@throws		\RuntimeException					If a file of the manifest cannot be read
 		 */
@@ -803,7 +810,6 @@ namespace Nino\Modules {
 
 			$manifest = \Nino\Backup::manifest( $appData );
 			$bytes 		= 0;
-			$pictures	= 0;
 
 			foreach( $manifest as $absolute => $archiveName ) {
 
@@ -813,32 +819,27 @@ namespace Nino\Modules {
 					throw new \RuntimeException( 'backup source could not be read: '. $archiveName );
 
 				$bytes += $size;
-
-				if( str_starts_with( $archiveName, 'images/' ) === true && in_array( strtolower( pathinfo( $archiveName, PATHINFO_EXTENSION ) ), self::PICTURE_FORMATS, true ) === true )
-					$pictures += $size;
-				else if( str_starts_with( $archiveName, 'fonts/' ) === true && in_array( strtolower( pathinfo( $archiveName, PATHINFO_EXTENSION ) ), [ 'woff', 'woff2' ], true ) === true )
-					$pictures += $size;
 			}
 
-			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes, 'pictures' => $pictures ];
+			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes ];
 		}
 
 		/**
 		 *	Tar+gzip every file the admin panel can write to at runtime and,
 		 *	after them, the note of the state they come from (see
-		 *	\Nino\Backup::stamp()), encrypt it, and write it out behind the .php
-		 *	exit-stub. Built via PharData rather than shelling out to
-		 *	`tar`/`gzip` - pure PHP, and unlike the executable Phar class,
-		 *	PharData isn't restricted by the phar.readonly ini setting many
-		 *	hosts enable by default.
+		 *	\Nino\Backup::stamp()), seal it in chunks (see \Nino\Backup\Seal),
+		 *	and write it out behind the .php exit-stub. Built via PharData rather
+		 *	than shelling out to `tar`/`gzip` - pure PHP, and unlike the
+		 *	executable Phar class, PharData isn't restricted by the phar.readonly
+		 *	ini setting many hosts enable by default.
 		 *
 		 *	The files are packed in one pass (see \Nino\Backup::pack()), which
-		 *	reads each in pieces. A project whose pictures could not be carried
-		 *	by the memory limit is refused before anything is packed: the
-		 *	pictures do not compress, so their size is the least the archive
-		 *	will have, and it is held twice while it is encrypted. What the
-		 *	size of the compressed archive tells beyond that is checked once
-		 *	it exists
+		 *	reads each in pieces - PharData copies a file of any size from stream
+		 *	to stream - and the compressed archive is read in chunks to be sealed,
+		 *	so what a run holds in memory does not grow with the sources. What it
+		 *	needs is room on the disk, about twice the bytes of the sources, so a
+		 *	disk with less free is refused before anything is packed, with the
+		 *	sizes in the message
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
@@ -862,11 +863,26 @@ namespace Nino\Modules {
 
 			// What an earlier run left that ended without a word
 			\Nino\Backup::sweepTemp( $appData );
+			self::_sweepPartial( $dir );
+
+			$key = base64_decode( (string) $appData['/nino/backup/key'], true );
+			if( is_string( $key ) === false || strlen( $key ) !== 32 )
+				throw new \RuntimeException( 'backup encryption key is invalid' );
 
 			$plan = self::_plan( $appData );
 
 			self::_record( $run, [ 'files' => $plan['files'], 'bytes' => $plan['bytes'] ] );
-			self::_requireMemory( $appData, (int) ( $plan['pictures'] * self::PICTURE_FLOOR ) * self::PEAK_FACTOR, 'the pictures' );
+
+			// What packing needs of the disk at the most (see \Nino\Backup::spaceNeed(), measured): twice the bytes of the files in the
+			// temporary directory, and where the archive is written to the same disk, more. A disk that has less is refused with the
+			// sizes before anything is made; a disk that fills up all the same - another request writes to it - ends the run with the
+			// notice of a write that failed, and the record of the run says 'disk'
+			$short = \Nino\Backup::spaceShort( $appData, $plan['bytes'], $plan['files'], $dir );
+
+			if( $short !== null ) {
+				$run->short = $short;
+				throw new \RuntimeException( sprintf( 'the backup needs about %d MB of free space for its temporary files and %d MB are free', $short[0], $short[1] ), \Nino\Backup::DISK_SHORT );
+			}
 
 			$temp = \Nino\Backup::tempFile( $appData, 'backup' );
 			if( $temp === false )
@@ -878,41 +894,36 @@ namespace Nino\Modules {
 
 			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar );
 
-			// What compresses costs nothing here; what does not is read, and
-			// encrypted next to its plain bytes
-			self::_requireMemory( $appData, (int) @filesize( $tmpTar. '.gz' ) * self::PEAK_FACTOR, 'the compressed archive' );
+			// Sealed chunk by chunk while it is written, to a file beside the archive that a rename makes one
+			self::_writeRawAtomic( $path, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ), $run );
 
-			$gz = @file_get_contents( $tmpTar. '.gz' );
-			if( $gz === false )
-				throw new \RuntimeException( 'compressed backup could not be read' );
-
-			// Held in memory from here on
 			@unlink( $tmpTar. '.gz' );
+		}
 
-			$key = base64_decode( (string) $appData['/nino/backup/key'], true );
-			if( is_string( $key ) === false || strlen( $key ) !== 32 )
-				throw new \RuntimeException( 'backup encryption key is invalid' );
+		/**
+		 *	Remove the files a run that was ended left in the archive directory while it wrote an archive (see _writeRawAtomic()): a
+		 *	temporary file that is a day old belongs to no run that goes on
+		 *
+		 *	@param		string		$dir					Absolute path to the backup directory
+		 *
+		 *	@return 	void
+		 */
+		private static function _sweepPartial( string $dir ): void {
 
-			$iv 		= random_bytes( 12 );
-			$tag 		= '';
-			$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
-
-			// The plain archive is not needed past this line: the ciphertext
-			// is written from where it is, in pieces
-			unset( $gz );
-
-			if( $cipher === false )
-				throw new \RuntimeException( 'backup encryption failed' );
-
-			self::_writeRawAtomic( $path, \Nino\Admin\Recovery::stubPieces( $iv, $tag, $cipher ) );
+			foreach( @scandir( $dir ) ?: [] as $name )
+				if( preg_match( '/^(?:.+\.php\.[0-9a-f]{12}|upload-[0-9a-f]{12})\.tmp$/D', $name ) === 1 && time() - (int) @filemtime( $dir. '/'. $name ) > 86400 )
+					@unlink( $dir. '/'. $name );
 		}
 
 		// Raw (non-serialized) counterpart to Filesystem's atomic writer. Backup
 		// blobs and the restore-key stub are valid PHP source strings already;
 		// passing either through putFileContent() would var_export them instead.
 		// The content is a string or the pieces of one, in order, so an archive
-		// need not exist as a single string next to its parts
-		private static function _writeRawAtomic( string $path, string|iterable $content ): void {
+		// need not exist as a single string next to its parts. The file is written
+		// under a name of its own and renamed: a run that ends in the middle of it
+		// leaves no archive, and the file it leaves is the one a run's shutdown
+		// removes ($run) or the next run of the day sweeps
+		private static function _writeRawAtomic( string $path, string|iterable $content, ?\stdClass $run = null ): void {
 
 			$temp = $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
 			$handle = @fopen( $temp, 'wb' );
@@ -920,38 +931,56 @@ namespace Nino\Modules {
 			if( $handle === false )
 				throw new \RuntimeException( 'temporary file could not be opened: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
 
-			$written	= 0;
-			$expected	= 0;
+			if( $run !== null )
+				$run->partial = $temp;
 
-			foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
-				$expected += strlen( $piece );
-				$put = @fwrite( $handle, $piece );
-				if( $put === false ) {
-					$written = false;
-					break;
+			try {
+
+				$written	= 0;
+				$expected	= 0;
+
+				foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
+					$expected += strlen( $piece );
+					$put = @fwrite( $handle, $piece );
+					if( $put === false ) {
+						$written = false;
+						break;
+					}
+					$written += $put;
 				}
-				$written += $put;
+
+				$flushed = @fflush( $handle );
+				$closed	 = @fclose( $handle );
+				$handle	 = null;
+
+				// What is on the disk must be what was written: a write that was cut short
+				// is not an archive, and nothing is renamed into its place
+				clearstatcache( true, $temp );
+
+				if( $written === false || $written !== $expected || $flushed === false || $closed === false || @filesize( $temp ) !== $expected )
+					throw new \RuntimeException( 'file could not be written: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
+
+				$mode = @fileperms( $path );
+				if( $mode !== false )
+					@chmod( $temp, $mode & 0777 );
+
+				if( @rename( $temp, $path ) === false )
+					throw new \RuntimeException( 'file could not be replaced: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
+
+				if( $run !== null )
+					$run->partial = '';
 			}
+			catch( \Throwable $e ) {
 
-			$flushed = @fflush( $handle );
-			$closed	 = @fclose( $handle );
+				if( is_resource( $handle ) === true )
+					fclose( $handle );
 
-			// What is on the disk must be what was written: a write that was cut short
-			// is not an archive, and nothing is renamed into its place
-			clearstatcache( true, $temp );
-
-			if( $written === false || $written !== $expected || $flushed === false || $closed === false || @filesize( $temp ) !== $expected ) {
 				@unlink( $temp );
-				throw new \RuntimeException( 'file could not be written: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
-			}
 
-			$mode = @fileperms( $path );
-			if( $mode !== false )
-				@chmod( $temp, $mode & 0777 );
+				if( $run !== null )
+					$run->partial = '';
 
-			if( @rename( $temp, $path ) === false ) {
-				@unlink( $temp );
-				throw new \RuntimeException( 'file could not be replaced: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
+				throw $e;
 			}
 		}
 
@@ -1072,11 +1101,10 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	What opening an archive of this size costs in memory beyond what is
-		 *	asked for already, and whether the limit carries it. An archive is read
-		 *	whole and decrypted whole (see Admin::_decrypt()): its ciphertext and
-		 *	its plain bytes are in memory together, about one and a half times the
-		 *	file, which is base64
+		 *	What opening an archive of format 1 of this size costs in memory beyond what is asked for already, and whether the
+		 *	limit carries it. Such an archive is read whole and decrypted whole (see \Nino\Backup\Seal::open()): its ciphertext
+		 *	and its plain bytes are in memory together, about one and a half times the file, which is base64. An archive of
+		 *	format 2 is opened chunk by chunk and costs no more than a chunk, so the callers ask for format 1 only
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		int				$bytes				Size of the archive file
@@ -1093,6 +1121,38 @@ namespace Nino\Modules {
 			$need = memory_get_usage() + (int) ( $bytes * 1.5 ) + self::PEAK_OVERHEAD;
 
 			return $need > $limit ? [ (int) ceil( $need / 1048576 ), (int) floor( $limit / 1048576 ) ] : null;
+		}
+
+		/**
+		 *	Whether the disk has the room a restore of this archive needs, before anything is opened: the plain archive and the files
+		 *	it is unpacked to lie in the temporary directory next to each other - at least twice the plain archive, which is three
+		 *	quarters of the file where it does not compress - and the safety snapshot of what the project holds needs what a backup
+		 *	needs (see \Nino\Backup::spaceNeed()) on top, since the two others are still there while it is made
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int				$bytes				Size of the archive file
+		 *
+		 *	@return 	array|null							null where it fits or the system does not say, else [ megabytes needed, megabytes free ]
+		 */
+		public static function restoreShort( array &$appData, int $bytes ): ?array {
+
+			$manifest = \Nino\Backup::manifest( $appData );
+			$have 		= 0;
+
+			foreach( array_keys( $manifest ) as $absolute )
+				$have += (int) @filesize( $absolute );
+
+			$temp 		= sys_get_temp_dir();
+			$dir 			= self::dir( $appData );
+			$together = ( $a = @stat( $temp ) ) !== false && ( $b = @stat( is_dir( $dir ) === true ? $dir : dirname( $dir ) ) ) !== false && $a['dev'] === $b['dev'];
+			$need 		= 2 * (int) ceil( $bytes * 3 / 4 ) + \Nino\Backup::spaceNeed( $have, count( $manifest ), $together );
+			$free 		= \Nino\Backup::freeSpace( $appData, $temp );
+
+			if( $free !== null && $free < $need )
+				return [ (int) ceil( $need / 1048576 ), (int) floor( max( 0, $free ) / 1048576 ) ];
+
+			// The snapshot is written to the directory of the archives, which is a disk of its own where it is not the temporary one
+			return $together === false ? \Nino\Backup::archiveShort( $appData, $have, $dir ) : null;
 		}
 	}
 }

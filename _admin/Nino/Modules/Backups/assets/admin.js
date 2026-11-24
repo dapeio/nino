@@ -144,7 +144,7 @@
 		 *	Say a run that ended without an end of its own: when it began, what
 		 *	ended it where the server said, and how much it had to pack
 		 *
-		 *	@param		{Object}		stopped				{ started: unix time, files, bytes, cause: 'time'|'memory'|'error'|'', limit: seconds or bytes }
+		 *	@param		{Object}		stopped				{ started: unix time, files, bytes, cause: 'time'|'memory'|'error'|'disk'|'', limit: seconds or bytes }
 		 *
 		 *	@return		{string}
 		 */
@@ -158,6 +158,9 @@
 
 			if( stopped.cause === 'memory' )
 				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-memory'), when, Nino.adminUi.megabytes( stopped.limit ), size, stopped.files );
+
+			if( stopped.cause === 'disk' )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-disk'), when, size, stopped.files );
 
 			return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-open'), when, size, stopped.files );
 		},
@@ -198,7 +201,7 @@
 						: ( detail !== '' ? detail+ ' '+ Nino.content.getText('/_admin/backups/msg/stopped-retry') : Nino.content.getText('/_admin/backups/msg/interrupted') ) ) );
 
 				// Said once: a missed backup that has no reason of its own is that run
-				if( detail !== '' && noReason === false )
+				if( detail !== '' && noReason === false && ( isMissed === true && missed.code === 'write' && stopped.cause === 'disk' ) === false )
 					wrap.appendChild( Nino.adminUi.notice( detail ) );
 			}
 

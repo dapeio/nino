@@ -1771,12 +1771,8 @@ $prefix = "<?php http_response_code(403); exit; return '";
 check( 'the backup file starts with the self-terminating stub, not raw bytes', str_starts_with( $raw, $prefix ) === true );
 
 $suffix 	= "';\n";
-$payload 	= base64_decode( substr( $raw, strlen( $prefix ), -strlen( $suffix ) ) );
 $key 			= base64_decode( $appData['/nino/backup/key'] );
-$iv 			= substr( $payload, 0, 12 );
-$tag 			= substr( $payload, 12, 16 );
-$cipher 	= substr( $payload, 28 );
-$gz 			= openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+$gz 			= ninoUnsealed( $raw, $key );
 
 check( 'the payload decrypts with the stored key', $gz !== false );
 

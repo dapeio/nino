@@ -15,7 +15,7 @@ declare(strict_types=1);
 
 require __DIR__. '/harness.php';
 
-$data = new ReflectionMethod( '\Nino\Backup', '_isData' );
+$stream = new ReflectionMethod( '\Nino\Backup', '_isData' );
 
 /** Whether the tokens of php's tokenizer are those of a data file, and nothing else */
 function lexerTokensAreData( string $source ): bool {
@@ -87,6 +87,76 @@ function lexerTokensAreData( string $source ): bool {
 	return $ended === true;
 }
 
+/**
+ *	The reader as it was before it read a file in pieces, which was given the whole of the text: the judge of the reader that reads
+ *	a window of it. Its three patterns are the constants of the class
+ */
+function lexerOracle( string $source ): bool {
+
+	$comment 	= '~\G(?://|#(?!\[))(?:(?!\?>)[^\r\n])*+|\G/\*(?:(?!\*/)[\s\S])*+\*/~';
+	$declare 	= ( new ReflectionClassConstant( '\Nino\Backup', 'DECLARE' ) )->getValue();
+	$token 		= ( new ReflectionClassConstant( '\Nino\Backup', 'DATA_TOKEN' ) )->getValue();
+
+	if( preg_match( '/^<\?php\s/', $source ) !== 1 )
+		return false;
+
+	$at 			= 5;
+	$length 	= strlen( $source );
+	$phase 		= 0;
+	$declared = false;
+
+	while( $at < $length ) {
+
+		if( preg_match( $comment, $source, $found, 0, $at ) === 1 ) {
+			$at += strlen( $found[0] );
+			continue;
+		}
+
+		if( $phase === 0 ) {
+
+			if( preg_match( '/\G\s++/', $source, $found, 0, $at ) === 1 )
+				$at += strlen( $found[0] );
+			else if( $declared === false && preg_match( $declare, $source, $found, 0, $at ) === 1 ) {
+				$declared = true;
+				$at += strlen( $found[0] );
+			}
+			else if( preg_match( '/\Greturn(?=\s)/', $source, $found, 0, $at ) === 1 ) {
+				$phase = 1;
+				$at += 6;
+			}
+			else
+				return false;
+
+			continue;
+		}
+
+		if( preg_match( $token, $source, $found, 0, $at ) !== 1 )
+			return false;
+
+		if( $phase === 2 && trim( $found[0] ) !== '' )
+			return false;
+
+		if( $found[0] === ';' )
+			$phase = 2;
+
+		$at += strlen( $found[0] );
+	}
+
+	return $phase === 2;
+}
+
+/** The verdict of the reader that reads a file in pieces of the size given, over the bytes of a string */
+function lexerWindowed( ReflectionMethod $stream, string $source, int $window ): bool {
+
+	$handle = fopen( 'php://memory', 'r+b' );
+	fwrite( $handle, $source );
+	rewind( $handle );
+	$verdict = $stream->invoke( null, $handle, $window );
+	fclose( $handle );
+
+	return $verdict;
+}
+
 mt_srand( 20261115 );
 
 $pick = static fn( array $of ): string => $of[mt_rand( 0, count( $of ) - 1 )];
@@ -123,6 +193,7 @@ $through = 0;
 $refused = 0;
 $wrong 	 = [];
 $kinds 	 = [];
+$sources = [];
 
 for( $variant = 0; $variant < 1200; $variant++ ) {
 
@@ -135,7 +206,9 @@ for( $variant = 0; $variant < 1200; $variant++ ) {
 
 	$source = $pick( $opens ). $pick( $comments ). $pick( $declares ). $pick( $spaces ). $pick( $comments ). $pick( $returns ). ( mt_rand( 0, 9 ) === 0 ? '' : ' ' ). $pick( $comments ). $body. $pick( $spaces ). $tail;
 
-	if( $data->invoke( null, $source ) === true ) {
+	$sources[] = $source;
+
+	if( lexerWindowed( $stream, $source, 65536 ) === true ) {
 		$through++;
 
 		if( lexerTokensAreData( $source ) === false )
@@ -147,6 +220,63 @@ for( $variant = 0; $variant < 1200; $variant++ ) {
 
 check( 'the variants are made from a fixed seed, and both sets are there: '. $through. ' let through and '. $refused. ' refused of 1200', $through >= 100 && $refused >= 100 && $through + $refused === 1200 );
 check( 'every variant the reader lets through is, for php\'s own tokenizer, nothing but the allowed tokens'. ( $wrong === [] ? '' : ' - first: '. json_encode( $wrong[0] ) ), $wrong === [] );
+
+// The reader that reads a window of the file says what the reader of the whole text says, whatever the size of the window - tokens, strings and comments that stand across the end of a window included
+$apart = [];
+foreach( $sources as $source ) {
+
+	$expected = lexerOracle( $source );
+
+	foreach( [ 1, 2, 3, 5, 8, 13, 40, 65536 ] as $window )
+		if( lexerWindowed( $stream, $source, $window ) !== $expected ) {
+			$apart[] = [ $window, $source ];
+			break;
+		}
+}
+check( 'the reader of a window and the reader of the whole text agree on every one of the '. count( $sources ). ' variants, at eight sizes of the window'. ( $apart === [] ? '' : ' - first: '. json_encode( $apart[0] ) ), $apart === [] );
+
+// What is long: a string, a comment and a run of blanks that are many windows
+$long = [
+	'a string of 300 KB'													=> "<?php return [ 'a' => '". str_repeat( 'x', 300000 ). "' ];",
+	'a string with escapes across the windows'		=> "<?php return [ '". str_repeat( "ab\\'cd\\\\ef", 3000 ). "' ];",
+	'a string that ends in a backslash and a quote' => "<?php return [ 'x\\' ];",
+	'a string with a backslash before a line break' => "<?php return [ 'x\\\ny' ];",
+	'a string after the semicolon'								=> "<?php return []; 'x'",
+	'a string that is not closed'									=> "<?php return [ 'x". str_repeat( 'y', 70000 ). "];",
+	'a block comment of 200 KB'										=> "<?php /* ". str_repeat( '*/ ', 1 ). str_repeat( 'c', 200000 ). " */ return [];",
+	'a block comment that is not closed'					=> "<?php return []; /* ". str_repeat( 'c', 100000 ),
+	'a line comment of 200 KB with the data behind it' => "<?php // ". str_repeat( 'c', 200000 ). "\nreturn [];",
+	'a line comment that a closing tag ends, far in' => "<?php return []; // ". str_repeat( 'c', 70000 ). "?> [];",
+	'a line comment to the end of the file'				=> "<?php return []; // ". str_repeat( 'c', 70000 ),
+	'a run of blanks of 200 KB in an array'				=> "<?php return array". str_repeat( ' ', 200000 ). "( 1 );",
+	'a run of blanks of 2 MB, which is refused'		=> "<?php return array". str_repeat( ' ', 2 * 1048576 ). "( 1 );",
+	'a number of 100000 digits'										=> "<?php return [ ". str_repeat( '7', 100000 ). " ];",
+	'a lot of small entries'											=> "<?php return [ ". str_repeat( "'k' => 1, ", 40000 ). "];",
+];
+$longWrong = [];
+foreach( $long as $what => $source ) {
+
+	$expected = $what === 'a run of blanks of 2 MB, which is refused' ? false : lexerOracle( $source );
+
+	foreach( [ 4096, 65536 ] as $window )
+		if( lexerWindowed( $stream, $source, $window ) !== $expected )
+			$longWrong[] = $what. ' at '. $window;
+}
+check( 'what is long is read to the end in windows, and says what the reader of the whole says: '. count( $long ). ' sources'. ( $longWrong === [] ? '' : ' - '. implode( ', ', $longWrong ) ), $longWrong === [] );
+
+// A file of 40 MB is read with the memory of a window
+$handle = fopen( 'php://temp/maxmemory:1048576', 'r+b' );
+fwrite( $handle, "<?php return [ 'a' => '" );
+for( $piece = 0; $piece < 40; $piece++ )
+	fwrite( $handle, str_repeat( 'x', 1048576 ) );
+fwrite( $handle, "' ];" );
+rewind( $handle );
+memory_reset_peak_usage();
+$base = memory_get_usage();
+$verdict = $stream->invoke( null, $handle );
+$peak = memory_get_peak_usage() - $base;
+fclose( $handle );
+check( 'a data file of 40 MB is read as data with a peak of a few windows', $verdict === true && $peak < 8 * 1048576 );
 
 // The checker itself: it finds what it is there to find
 $caught = [ "<?php return [ system('id') ];", "<?php return [ \$x ];", "<?php return \"a\";", "<?php return [];\n?>x", "<?php return [] ; echo 1;", "<?php #[A]\nreturn [];", "<?php return [ 'a' ]();" ];
@@ -170,7 +300,7 @@ $cases = [
 	'var_export writes => at the end of a line' 												=> [ "<?php return array (\n  'a' => \n  array (\n    'b' => \n    array (\n    ),\n  ),\n);", true ],
 ];
 foreach( $cases as $what => [ $source, $expected ] )
-	check( $what. ': '. ( $expected === true ? 'data' : 'refused' ), $data->invoke( null, $source ) === $expected && ( $expected === false || lexerTokensAreData( $source ) === true ) );
+	check( $what. ': '. ( $expected === true ? 'data' : 'refused' ), lexerWindowed( $stream, $source, 65536 ) === $expected && ( $expected === false || lexerTokensAreData( $source ) === true ) );
 
 $appData = [];
 ninoDone( $appData );

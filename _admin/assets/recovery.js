@@ -25,7 +25,7 @@
 
 	// The codes of a refusal that belong to a field: the key of an archive, the file of one
 	const KEY_CODES = [ 'backups_key', 'backups_key_wrong', 'backups_key_missing', 'backups_key_format', 'backups_key_tries', 'backups_upload_key', 'backups_upload_nokey' ];
-	const FILE_CODES = [ 'backups_too_large', 'backups_upload_name', 'backups_upload_exists', 'backups_upload_format', 'backups_upload_memory', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server' ];
+	const FILE_CODES = [ 'backups_too_large', 'backups_upload_name', 'backups_upload_exists', 'backups_upload_format', 'backups_upload_memory', 'backups_disk', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server' ];
 
 	Object.assign( wn.Nino.recovery, {
 

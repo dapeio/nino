@@ -57,12 +57,7 @@ function recoveryKeyFile( array &$appData, string $bytes ): void {
 
 /** The stub of an archive of the given key around the given plain bytes - what the project's own writer makes of them */
 function recoveryKeyStub( string $plain, string $rawKey ): string {
-
-	$iv 		= random_bytes( 12 );
-	$tag 		= '';
-	$cipher = openssl_encrypt( $plain, 'aes-256-gcm', $rawKey, OPENSSL_RAW_DATA, $iv, $tag );
-
-	return implode( '', iterator_to_array( \Nino\Admin\Recovery::stubPieces( $iv, $tag, (string) $cipher ), false ) );
+	return ninoSealed( $plain, $rawKey );
 }
 
 /** An archive of the key and the files given: [ name in the archive => bytes ], made the way a backup is - a tar, gzipped, encrypted, behind its stub */
@@ -85,13 +80,9 @@ function recoveryKeyArchive( array $files, string $rawKey ): string {
 	return recoveryKeyStub( $gz, $rawKey );
 }
 
-/** Whether a key opens the archive in a file: the stub read as base64 of iv, tag and ciphertext, and a gcm that accepts the tag */
+/** Whether a key opens the archive in a file: the stub read by the reader of the suite, and every tag of it accepted */
 function recoveryKeyOpens( string $file, string $rawKey ): bool {
-
-	$raw = (string) file_get_contents( $file );
-	$bin = (string) base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
-
-	return openssl_decrypt( substr( $bin, 28 ), 'aes-256-gcm', $rawKey, OPENSSL_RAW_DATA, substr( $bin, 0, 12 ), substr( $bin, 12, 16 ) ) !== false;
+	return ninoUnsealed( (string) file_get_contents( $file ), $rawKey ) !== false;
 }
 
 /** Every file below a directory that holds the text, as a list of paths */
@@ -458,6 +449,24 @@ file_put_contents( $staging. '/config.php', $data( str_repeat( 'x', 3000000 ) ) 
 check( '...a large file passes, and costs a pattern and not a list of tokens', \Nino\Backup::codeRefusal( $staging ) === null );
 file_put_contents( $staging. '/config.php', "<?php return [ 'a' => '". str_repeat( 'x', 3000000 ). "' ]; system('id');" );
 check( '...and code behind a large string is found', \Nino\Backup::codeRefusal( $staging ) !== null );
+$bigData = fopen( $staging. '/config.php', 'wb' );
+fwrite( $bigData, "<?php return [ 'a' => '" );
+for( $piece = 0; $piece < 48; $piece++ )
+	fwrite( $bigData, str_repeat( 'x', 1048576 ) );
+fwrite( $bigData, "' ];\n" );
+fclose( $bigData );
+memory_reset_peak_usage();
+$bigBase = memory_get_usage();
+$bigVerdict = \Nino\Backup::codeRefusal( $staging );
+$bigPeak = memory_get_peak_usage() - $bigBase;
+check( '...a data file of 48 MB passes with the memory of a window, not of the file', $bigVerdict === null && $bigPeak < 8 * 1048576 );
+file_put_contents( $staging. '/config.php', $data( [ 'a' => 1 ] ) );
+file_put_contents( $staging. '/images/elements/a/shapes.svg', '<svg xmlns="http://www.w3.org/2000/svg">'. str_repeat( '<path d="M0 0L1 1"/>', 20000 ). '</svg>' );
+check( '...a drawing that is a page of shapes passes', \Nino\Backup::codeRefusal( $staging ) === null );
+file_put_contents( $staging. '/images/elements/a/shapes.svg', '<svg xmlns="http://www.w3.org/2000/svg">'. str_repeat( '<path d="M0 0L1 1"/>', 60000 ). '</svg>' );
+$bigDrawing = \Nino\Backup::codeRefusal( $staging );
+check( '...and one of more than a megabyte is refused for its size - it cannot be judged within what a restore may take, and is no drawing that is more than shapes', $bigDrawing !== null && str_contains( $bigDrawing, 'more than shapes' ) === false );
+unlink( $staging. '/images/elements/a/shapes.svg' );
 file_put_contents( $staging. '/config.php', $data( [ 'a' => 1 ] ) );
 mkdir( $staging. '/themes/mine', 0755, true );
 file_put_contents( $staging. '/themes/mine/theme.json', '{}' );

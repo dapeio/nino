@@ -290,6 +290,123 @@ function ninoUser( array &$appData, string $mail, array $perms = [ '/*' ], strin
 }
 
 /**
+ *	A nonce of 12 bytes plus a number, as three words of 32 bits with the carry between them, wrapping at 96 bits
+ *
+ *	@param		string		$nonce
+ *	@param		int				$number
+ *
+ *	@return 	string
+ */
+function ninoNonce( string $nonce, int $number ): string {
+
+	$words 	= array_reverse( array_values( unpack( 'N3', $nonce ) ) );
+	$carry 	= $number;
+
+	foreach( $words as $index => $word ) {
+		$sum 							= $word + $carry;
+		$words[$index] 		= $sum & 0xFFFFFFFF;
+		$carry 						= $sum >> 32;
+	}
+
+	return pack( 'N3', ...array_reverse( $words ) );
+}
+
+/**
+ *	The file of a backup archive in format 2, made from the layout in the docblock of \Nino\Backup\Seal and by none of its code, so that
+ *	a test reads what the product wrote with another reader and hands the product what another writer made: the stub, the base64 of the
+ *	header (the magic "NinoBak" and the version, the size of a chunk, a nonce of 12 bytes) and the chunks, each its ciphertext and its
+ *	tag, the number of the chunk and a byte for the last one in what the tag covers besides the header
+ *
+ *	@param		string		$plain				The compressed archive
+ *	@param		string		$key					The 32 bytes of the key
+ *	@param		int				$chunk				How much of the archive a chunk holds
+ *	@param		string|null	$nonce			The 12 bytes of the header, random where none is given
+ *
+ *	@return 	string									The bytes of the file
+ */
+function ninoSealed( string $plain, string $key, int $chunk = 1048576, ?string $nonce = null ): string {
+
+	$nonce 		= $nonce ?? random_bytes( 12 );
+	$header 	= "NinoBak\x02". pack( 'N', $chunk ). $nonce;
+	$parts 		= $plain === '' ? [ '' ] : str_split( $plain, $chunk );
+	$body 		= $header;
+
+	foreach( $parts as $number => $part ) {
+
+		// The nonce of a chunk is the nonce of the header plus its number, as a number of 96 bits
+		$iv 		= ninoNonce( $nonce, $number );
+		$tag 		= '';
+		$cipher = openssl_encrypt( $part, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, $header. pack( 'N', $number ). ( $number === count( $parts ) - 1 ? "\x01" : "\x00" ), 16 );
+		$body 	.= $cipher. $tag;
+	}
+
+	return "<?php http_response_code(403); exit; return '". base64_encode( $body ). "';\n";
+}
+
+/**
+ *	The archive of a file of format 1 or 2 read back the way a person with the key would, by none of the code of the product
+ *
+ *	@param		string		$file					The bytes of the file
+ *	@param		string		$key					The 32 bytes of the key
+ *
+ *	@return 	string|false							The compressed archive, false where a tag does not hold or the file is none
+ */
+function ninoUnsealed( string $file, string $key ): string|false {
+
+	$prefix = "<?php http_response_code(403); exit; return '";
+	$suffix = "';\n";
+
+	if( str_starts_with( $file, $prefix ) === false || str_ends_with( $file, $suffix ) === false )
+		return false;
+
+	$bytes = base64_decode( substr( $file, strlen( $prefix ), -strlen( $suffix ) ), true );
+
+	if( $bytes === false )
+		return false;
+
+	if( str_starts_with( $bytes, "NinoBak\x02" ) === false )
+		return openssl_decrypt( substr( $bytes, 28 ), 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $bytes, 0, 12 ), substr( $bytes, 12, 16 ) );
+
+	$header = substr( $bytes, 0, 24 );
+	$chunk 	= (int) unpack( 'N', substr( $header, 8, 4 ) )[1];
+	$nonce 	= substr( $header, 12 );
+	$rest 	= substr( $bytes, 24 );
+	$count 	= max( 1, (int) ceil( strlen( $rest ) / ( $chunk + 16 ) ) );
+	$plain 	= '';
+
+	for( $number = 0; $number < $count; $number++ ) {
+
+		$piece 	= substr( $rest, $number * ( $chunk + 16 ), $chunk + 16 );
+		$iv 		= ninoNonce( $nonce, $number );
+		$part 	= openssl_decrypt( substr( $piece, 0, -16 ), 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, substr( $piece, -16 ), $header. pack( 'N', $number ). ( $number === $count - 1 ? "\x01" : "\x00" ) );
+
+		if( $part === false )
+			return false;
+
+		$plain .= $part;
+	}
+
+	return $plain;
+}
+
+/**
+ *	The file of an archive in format 1, which no code writes any more: iv, tag and the ciphertext of the whole archive in one stub
+ *
+ *	@param		string		$plain				The compressed archive
+ *	@param		string		$key					The 32 bytes of the key
+ *
+ *	@return 	string									The bytes of the file
+ */
+function ninoSealedOld( string $plain, string $key ): string {
+
+	$iv 		= random_bytes( 12 );
+	$tag 		= '';
+	$cipher = openssl_encrypt( $plain, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+
+	return "<?php http_response_code(403); exit; return '". base64_encode( $iv. $tag. (string) $cipher ). "';\n";
+}
+
+/**
  *	One request of the site, the way a web server hands it over, as far as
  *	its first stage: the server array run through Http::request(), which
  *	builds the request, seeds the response with the default headers and runs

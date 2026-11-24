@@ -41,6 +41,153 @@ namespace Nino {
 		// cannot be written - which the panel words in the interface language
 		public const int WRITE_FAILED = 1;
 
+		// The code of the RuntimeException that says the disk has less room than a run needs, before it began: the sizes are
+		// carried beside it by the run (see \Nino\Modules\Backups::now())
+		public const int DISK_SHORT = 2;
+
+		// What a run keeps free beyond what it counts: the tar's end, the stamp, the bookkeeping of the file system
+		private const int SPACE_RESERVE = 4194304;
+
+		/**
+		 *	The free bytes of the disk a path lies on: what the system says, or what './nino/backups/disk' names as an int (the
+		 *	test of the check cannot fill a disk)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$path					A directory
+		 *
+		 *	@return 	int|null								null where the system does not say
+		 */
+		public static function freeSpace( array &$appData, string $path ): ?int {
+
+			$injected = $appData['./nino/backups/disk'] ?? null;
+
+			if( is_int( $injected ) === true )
+				return $injected;
+
+			$free = @disk_free_space( $path );
+
+			return $free === false ? null : (int) $free;
+		}
+
+		/**
+		 *	What packing files of this size needs of the temporary directory at the most. Measured with a temporary directory of a
+		 *	tmpfs of a chosen size and files that do not compress: PharData holds the tar and what it is copying from, so the
+		 *	tar takes twice the bytes of the files while it is made (82 MB for 41 MB of files), and then tar and the compressed archive
+		 *	lie side by side, twice again. Where the archive is written to the same disk, the compressed archive (as large as the
+		 *	files, where they do not compress) and the sealed one (a third more) lie together once the tar is gone, which is more
+		 *	still: 7/3 of the bytes. A header of the tar takes 512 bytes for each file
+		 *
+		 *	@param		int				$bytes				The bytes of the files
+		 *	@param		int				$files				How many there are
+		 *	@param		bool			$together			Whether the archive is written to the disk of the temporary directory
+		 *
+		 *	@return 	int
+		 */
+		public static function spaceNeed( int $bytes, int $files, bool $together ): int {
+			return ( $together === true ? (int) ceil( $bytes * 7 / 3 ) : 2 * $bytes ) + 512 * $files + self::SPACE_RESERVE;
+		}
+
+		/**
+		 *	Whether the disk has the room that packing files of this size needs, before anything is packed
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int				$bytes				The bytes of the files
+		 *	@param		int				$files				How many there are
+		 *	@param		string|null	$archiveDir		The directory the archive is written to, where there is one
+		 *
+		 *	@return 	array|null							null where it fits or the system does not say, else [ megabytes needed, megabytes free ]
+		 */
+		public static function spaceShort( array &$appData, int $bytes, int $files, ?string $archiveDir ): ?array {
+
+			$temp 		= sys_get_temp_dir();
+			$together = $archiveDir !== null && ( $a = @stat( $temp ) ) !== false && ( $b = @stat( $archiveDir ) ) !== false && $a['dev'] === $b['dev'];
+			$need 		= self::spaceNeed( $bytes, $files, $together );
+			$free 		= self::freeSpace( $appData, $temp );
+
+			if( $free !== null && $free < $need )
+				return [ (int) ceil( $need / 1048576 ), (int) floor( max( 0, $free ) / 1048576 ) ];
+
+			// Archives that are kept on a disk of their own: the sealed archive, a third more than the compressed one, is written there
+			return $archiveDir !== null && $together === false ? self::archiveShort( $appData, $bytes, $archiveDir ) : null;
+		}
+
+		/**
+		 *	Whether the disk the archives are kept on has the room for one of files of this size: a third more than the bytes where they do not
+		 *	compress, and the reserve
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int				$bytes				The bytes of the files
+		 *	@param		string		$archiveDir		The directory the archive is written to
+		 *
+		 *	@return 	array|null							null where it fits or the system does not say, else [ megabytes needed, megabytes free ]
+		 */
+		public static function archiveShort( array &$appData, int $bytes, string $archiveDir ): ?array {
+
+			$need = (int) ceil( $bytes * 4 / 3 ) + self::SPACE_RESERVE;
+			$free = self::freeSpace( $appData, is_dir( $archiveDir ) === true ? $archiveDir : dirname( $archiveDir ) );
+
+			return $free !== null && $free < $need ? [ (int) ceil( $need / 1048576 ), (int) floor( max( 0, $free ) / 1048576 ) ] : null;
+		}
+
+		/**
+		 *	Whether the disks that the files of an unpacked archive are copied to have the room for them, before anything is copied: for each
+		 *	disk, what its files grow by - the size of the staged files less the size of those they replace - and the reserve. The staged tree
+		 *	is read, so the sizes are the sizes, not a guess
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *
+		 *	@return 	array|null							null where it fits or the system does not say, else [ megabytes needed, megabytes free ]
+		 */
+		public static function restoreRoom( array &$appData, string $staging ): ?array {
+
+			$growth = [];
+			$free 	= [];
+
+			foreach( glob( rtrim( $staging, DIRECTORY_SEPARATOR ). '/*' ) ?: [] as $entry ) {
+
+				$name 		= basename( $entry );
+
+				// The note of the state is read and taken out, no file of the project
+				if( $name === 'nino.php' )
+					continue;
+
+				$target 	= $name === 'config.php' ? \Nino\Filesystem::getConfigPath( $appData ). '/config.php' : self::target( $appData, $name );
+				$anchor 	= $target;
+
+				while( $anchor !== dirname( $anchor ) && file_exists( $anchor ) === false )
+					$anchor = dirname( $anchor );
+
+				$stat 		= @stat( $anchor );
+				$device 	= $stat === false ? $anchor : $stat['dev'];
+				$free[$device] = $anchor;
+				$grow 		= 0;
+
+				$walk = is_dir( $entry ) === true
+					? new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $entry, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY )
+					: new \ArrayIterator( [ new \SplFileInfo( $entry ) ] );
+
+				foreach( $walk as $file ) {
+
+					$relative = $file->getPathname() === $entry ? '' : substr( $file->getPathname(), strlen( $entry ) );
+					$grow 		+= (int) @filesize( $file->getPathname() ) - ( is_file( $target. $relative ) === true ? (int) @filesize( $target. $relative ) : 0 );
+				}
+
+				$growth[$device] = ( $growth[$device] ?? 0 ) + max( 0, $grow );
+			}
+
+			foreach( $growth as $device => $grow ) {
+
+				$room = self::freeSpace( $appData, $free[$device] );
+				$need = $grow + self::SPACE_RESERVE;
+
+				if( $room !== null && $room < $need )
+					return [ (int) ceil( $need / 1048576 ), (int) floor( max( 0, $room ) / 1048576 ) ];
+			}
+
+			return null;
+		}
+
 		// The files of the outbox of \Nino\Mail: not in a backup, and not brought back by a restore of any archive
 		private const array OUTBOX = [ 'mail-queue.php', 'mail-queue-due.txt', 'mail-keys.php', 'mail-failed.php', 'mail-queue-damaged.php', 'mail-failed-damaged.php', 'mail-keys-damaged.php', 'mail-queue-unreadable.php', 'mail-queue-keys.php', 'mail-queue-stuck.php', 'mail-queue-record.php', 'mail-queue-unwritable.php' ];
 
@@ -520,6 +667,164 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a file is one gzip stream and nothing else: the stream ends, and nothing follows its end - not a second member, which
+		 *	zlib's readers join to the first as if it were one, and not bytes. PharData took neither, and the unpacking of this class
+		 *	would take both, so a restore asks it first. Read in small pieces, so that the memory is that of one piece unpacked
+		 *
+		 *	@param		string		$gz						Absolute path of the .gz
+		 *
+		 *	@return 	bool
+		 */
+		public static function gzipOnly( string $gz ): bool {
+
+			$handle = @fopen( $gz, 'rb' );
+			$size 	= $handle === false ? 0 : (int) ( fstat( $handle )['size'] ?? 0 );
+			$state 	= $handle === false ? false : @inflate_init( ZLIB_ENCODING_GZIP );
+
+			if( $handle === false || $state === false ) {
+
+				if( $handle !== false )
+					fclose( $handle );
+
+				return false;
+			}
+
+			try {
+				while( feof( $handle ) === false ) {
+
+					$piece = fread( $handle, 8192 );
+
+					if( $piece === false || $piece === '' )
+						break;
+
+					if( @inflate_add( $state, $piece, ZLIB_NO_FLUSH ) === false )
+						return false;
+
+					if( inflate_get_status( $state ) === ZLIB_STREAM_END )
+						return inflate_get_read_len( $state ) === $size;
+				}
+			}
+			finally {
+				fclose( $handle );
+			}
+
+			// It did not end
+			return false;
+		}
+
+		/**
+		 *	Unpack a .tar.gz into a directory, entry by entry and each file in pieces: what a restore stages an archive with. PharData
+		 *	read the whole archive's index along and held about 4 % of the archive's size in memory for it - 19 MB for 500 MB of files - and
+		 *	this holds a piece. It is the second reader of the headers after refusal(), which has judged them already: what is
+		 *	still asked here is what writing needs - a file or a directory, a name of plain segments, a checksum that holds - and what
+		 *	was written is read again by staged() before anything of it is used
+		 *
+		 *	@param		string		$tarGz				Absolute path of the .tar.gz
+		 *	@param		string		$into					Absolute path of the directory the entries are made in, which exists
+		 *	@param		bool			&$unwritten		(reference) Set where what failed is a write, a disk that is full
+		 *
+		 *	@return 	string|null							Why the archive could not be unpacked, null where it was
+		 */
+		public static function unpack( string $tarGz, string $into, bool &$unwritten = false ): ?string {
+
+			$unwritten = false;
+
+			$handle = @gzopen( $tarGz, 'rb' );
+
+			if( $handle === false )
+				return 'the backup could not be read';
+
+			$root = rtrim( $into, DIRECTORY_SEPARATOR );
+
+			try {
+				while( ( $block = gzread( $handle, 512 ) ) !== false && $block !== '' ) {
+
+					if( strlen( $block ) !== 512 )
+						return 'the backup ends inside a header';
+
+					if( $block === str_repeat( "\0", 512 ) )
+						return null;
+
+					$sum = array_sum( array_map( 'ord', str_split( substr( $block, 0, 148 ). '        '. substr( $block, 156 ) ) ) );
+					if( preg_match( '/^[0-7]+$/', trim( substr( $block, 148, 8 ), "\0 " ) ) !== 1 || octdec( trim( substr( $block, 148, 8 ), "\0 " ) ) !== $sum )
+						return 'the backup is not a tar archive';
+
+					$size = trim( substr( $block, 124, 12 ), "\0 " );
+					if( preg_match( '/^[0-7]*$/', $size ) !== 1 )
+						return 'the backup is not a tar archive';
+
+					$size 	= (int) octdec( $size === '' ? '0' : $size );
+					$type 	= $block[156];
+					$name 	= self::_field( $block, 0, 100 );
+					$prefix = self::_field( $block, 345, 155 );
+
+					if( $name === null || $prefix === null )
+						return 'the backup holds a name with a NUL byte';
+
+					if( $type !== '0' && $type !== "\0" && $type !== '5' )
+						return 'the backup holds an entry that is no file and no directory';
+
+					$segments = explode( '/', rtrim( $prefix !== '' ? $prefix. '/'. $name : $name, '/' ) );
+
+					foreach( $segments as $segment )
+						if( $segment === '' || $segment === '.' || $segment === '..' )
+							return 'the backup holds a path that is none of plain segments';
+
+					$target = $root. '/'. implode( '/', $segments );
+
+					if( $type === '5' ) {
+
+						if( is_dir( $target ) === false && @mkdir( $target, 0777, true ) === false && is_dir( $target ) === false )
+							return 'a directory could not be made';
+
+						continue;
+					}
+
+					if( is_dir( dirname( $target ) ) === false && @mkdir( dirname( $target ), 0777, true ) === false && is_dir( dirname( $target ) ) === false )
+						return 'a directory could not be made';
+
+					$out = @fopen( $target, 'wb' );
+
+					if( $out === false )
+						return 'a file could not be made';
+
+					for( $left = $size; $left > 0; $left -= strlen( $piece ) ) {
+
+						$piece = gzread( $handle, min( 1048576, $left ) );
+
+						if( $piece === false || $piece === '' ) {
+							fclose( $out );
+							return 'the backup ends inside a file';
+						}
+
+						if( @fwrite( $out, $piece ) !== strlen( $piece ) ) {
+							fclose( $out );
+							$unwritten = true;
+							return 'a file could not be written';
+						}
+					}
+
+					if( @fclose( $out ) === false ) {
+						$unwritten = true;
+						return 'a file could not be written';
+					}
+
+					// The data comes in blocks of 512 bytes
+					$padding = ( 512 - $size % 512 ) % 512;
+
+					if( $padding > 0 && strlen( (string) gzread( $handle, $padding ) ) !== $padding )
+						return 'the backup ends inside a file';
+				}
+
+				// The end of a tar is two blocks of zeros: a stream that stops before them was cut
+				return 'the backup ends without its end';
+			}
+			finally {
+				gzclose( $handle );
+			}
+		}
+
+		/**
 		 *	Take the files of the outbox of the mail out of the unpacked copy of an archive, whatever archive it is: one of an
 		 *	older Nino, one somebody put together, one that carries what the backup of this kernel would not (see NEVER) - a
 		 *	restore that brought the outbox back would send what went out long ago
@@ -593,55 +898,217 @@ namespace Nino {
 		// '(' that does not belong to array(
 		private const string DATA_TOKEN = '/\G(?:\s++|array\s*+\(|[\[\]),;]|=>|\.(?!\.)|-?(?:\d++(?:\.\d++)?(?:[eE][+-]?\d++)?|INF)|NAN|(?i:true|false|null)(?![A-Za-z0-9_])|\'(?:[^\'\\\\]++|\\\\.)*+\'|"\\\\0")/';
 
-		// A comment, which the element type files of the install units and of the catalogue's features
-		// carry at their head and which a person writes between the lines of a file of their own. A line
-		// comment ends where php ends it: at any of the three line breaks (a lone carriage return is
-		// one) and at a closing tag, which is left standing for the pattern to refuse; '#[' is an
-		// attribute and no comment
-		private const string COMMENT = '~\G(?://|#(?!\[))(?:(?!\?>)[^\r\n])*+|\G/\*(?:(?!\*/)[\s\S])*+\*/~';
-
 		// The one statement ahead of the return that is data: the declaration the install units' files start with
 		private const string DECLARE = '/\Gdeclare\s*+\(\s*+strict_types\s*+=\s*+1\s*+\)\s*+;/';
+
+		// The largest drawing (svg) a restore of an archive that was opened with a typed key judges: the check is a set of patterns over
+		// one text, which cannot be run over a window of it without a drawing being cut where a script or a reference stands, so a drawing
+		// above it is refused for its size and for nothing else - a drawing of a page is far smaller
+		private const int SVG_MAX = 1048576;
+
+		// The most a token of a data file may take where it has no end of its own that is in sight: a run of blanks or of digits. A file
+		// with a longer one is no data file of Nino's, which writes none
+		private const int TOKEN_MAX = 1048576;
 
 		/**
 		 *	Whether the text of a php file is data and nothing else: <?php, comments and one
 		 *	declare(strict_types=1); where there are any, return, then what var_export() writes (see
 		 *	DATA_TOKEN) with comments between its tokens, then the semicolon and nothing but blanks and
-		 *	comments. It is read token by token with patterns of its own and not by the tokenizer, so that
-		 *	a file of any size costs the file and no token list; whatever they do not name - and a pattern
-		 *	that fails - is no data
+		 *	comments. It is read token by token with patterns of its own and not by the tokenizer, and
+		 *	in pieces: a window of the file is held, a token is read where it stands in it, and a string
+		 *	or a comment - which may be as long as the file - is walked over to its end without being
+		 *	kept. Of a token that reaches the end of the window the next piece is read before it is
+		 *	judged, so the answer is that of a reader of the whole text whatever the size of the window;
+		 *	but for a run of blanks or digits beyond TOKEN_MAX, which is refused. Whatever the patterns
+		 *	do not name - and a pattern that fails - is no data. A comment is what the element type files
+		 *	of the install units and of the catalogue's features carry at their head and a person writes
+		 *	between the lines of a file of their own: a line comment ends where php ends it, at any of the
+		 *	three line breaks (a lone carriage return is one) and at a closing tag, which is left standing
+		 *	to be refused; '#[' is an attribute and no comment
 		 *
-		 *	@param		string		$source				The file's bytes
+		 *	@param		resource	$handle				The file, at its start
+		 *	@param		int				$window				How much is read at a time, and how much a token is looked ahead
 		 *
 		 *	@return 	bool
 		 */
-		private static function _isData( string $source ): bool {
+		private static function _isData( $handle, int $window = 65536 ): bool {
 
-			if( preg_match( '/^<\?php\s/', $source ) !== 1 )
+			$buffer = '';
+			$at 		= 0;
+			$eof 		= false;
+
+			// At least $count bytes after $at, or what the file has left; what lies before $at goes
+			$ensure = static function( int $count ) use ( $handle, $window, &$buffer, &$at, &$eof ): void {
+
+				if( $eof === true || strlen( $buffer ) - $at >= $count )
+					return;
+
+				$buffer = (string) substr( $buffer, $at );
+				$at 		= 0;
+
+				while( $eof === false && strlen( $buffer ) < $count ) {
+
+					$piece = fread( $handle, $window );
+
+					if( $piece === false || $piece === '' )
+						$eof = true;
+					else
+						$buffer .= $piece;
+				}
+			};
+
+			// The token a pattern finds at $at, where it ends before the end of what is held or where there is no more of the file
+			$match = static function( string $pattern ) use ( $ensure, &$buffer, &$at, &$eof ): ?string {
+
+				while( true ) {
+
+					$found = preg_match( $pattern, $buffer, $token, 0, $at ) === 1;
+
+					if( $eof === true || ( $found === true && $at + strlen( $token[0] ) < strlen( $buffer ) ) )
+						return $found === true ? $token[0] : null;
+
+					if( strlen( $buffer ) - $at > self::TOKEN_MAX )
+						return null;
+
+					$ensure( strlen( $buffer ) - $at + 4096 );
+				}
+			};
+
+			// Past a string that begins at $at: its end, and nothing in it but what the pattern of a string takes
+			$string = static function() use ( $handle, $window, &$buffer, &$at, &$eof ): bool {
+
+				$from = $at + 1;
+
+				while( true ) {
+
+					$from += strcspn( $buffer, "'\\", $from );
+
+					if( $from >= strlen( $buffer ) || ( $buffer[$from] === '\\' && $from + 1 >= strlen( $buffer ) ) ) {
+
+						// What was read is plain; a backslash waits for the character it escapes
+						$buffer = $from < strlen( $buffer ) ? substr( $buffer, $from ) : '';
+						$from 	= 0;
+						$at 		= 0;
+						$piece 	= $eof === true ? false : fread( $handle, $window );
+
+						if( $piece === false || $piece === '' ) {
+							$eof = true;
+							return false;
+						}
+
+						$buffer .= $piece;
+						continue;
+					}
+
+					if( $buffer[$from] === "'" ) {
+						$at = $from + 1;
+						return true;
+					}
+
+					// A backslash takes the character after it, and that is none of the line breaks the pattern's dot does not take
+					if( $buffer[$from + 1] === "\n" )
+						return false;
+
+					$from += 2;
+				}
+			};
+
+			// Past a comment that begins at $at, a block ($block) or one that ends at a line break; false where it has no end, or where a closing tag of php ends it
+			$comment = static function( bool $block ) use ( $handle, $window, &$buffer, &$at, &$eof ): bool {
+
+				$from = $at + ( $block === true ? 2 : 1 );
+
+				if( $block === false && $buffer[$at] === '/' )
+					$from++;
+
+				while( true ) {
+
+					$found = $block === true ? strpos( $buffer, '*/', $from ) : false;
+
+					if( $block === false ) {
+
+						$from += strcspn( $buffer, "\r\n?", $from );
+
+						if( $from < strlen( $buffer ) && $buffer[$from] === '?' ) {
+
+							if( $from + 1 < strlen( $buffer ) ) {
+
+								if( $buffer[$from + 1] === '>' )
+									return false;
+
+								$from++;
+								continue;
+							}
+						}
+						else if( $from < strlen( $buffer ) ) {
+							$at = $from;
+							return true;
+						}
+					}
+					else if( $found !== false ) {
+						$at = $found + 2;
+						return true;
+					}
+
+					// Everything but the last character, which may be the first of the end, is read and gone
+					$keep 	= max( 0, strlen( $buffer ) - 1 );
+					$piece 	= $eof === true ? false : fread( $handle, $window );
+
+					if( $piece === false || $piece === '' ) {
+						$eof = true;
+
+						// A line comment that runs to the end of the file is closed by it
+						if( $block === false ) {
+							$buffer = '';
+							$at 		= 0;
+							return true;
+						}
+
+						return false;
+					}
+
+					$buffer = (string) substr( $buffer, $keep ). $piece;
+					$from 	= $from > $keep ? $from - $keep : 0;
+					$at 		= 0;
+				}
+			};
+
+			$ensure( 6 );
+
+			if( preg_match( '/^<\?php\s/', $buffer ) !== 1 )
 				return false;
 
 			$at 			= 5;
-			$length 	= strlen( $source );
 			$phase 		= 0;
 			$declared = false;
 
-			while( $at < $length ) {
+			while( true ) {
 
-				if( preg_match( self::COMMENT, $source, $token, 0, $at ) === 1 ) {
-					$at += strlen( $token[0] );
+				$ensure( $window );
+
+				if( $at >= strlen( $buffer ) )
+					break;
+
+				$next = $buffer[$at + 1] ?? '';
+
+				if( ( $buffer[$at] === '/' && $next === '*' ) || ( $buffer[$at] === '/' && $next === '/' ) || ( $buffer[$at] === '#' && $next !== '[' ) ) {
+
+					if( $comment( $next === '*' && $buffer[$at] === '/' ) === false )
+						return false;
+
 					continue;
 				}
 
 				// Ahead of the return: blanks, one declare, then the return itself
 				if( $phase === 0 ) {
 
-					if( preg_match( '/\G\s++/', $source, $token, 0, $at ) === 1 )
-						$at += strlen( $token[0] );
-					else if( $declared === false && preg_match( self::DECLARE, $source, $token, 0, $at ) === 1 ) {
+					if( ( $token = $match( '/\G\s++/' ) ) !== null )
+						$at += strlen( $token );
+					else if( $declared === false && ( $token = $match( self::DECLARE ) ) !== null ) {
 						$declared = true;
-						$at += strlen( $token[0] );
+						$at += strlen( $token );
 					}
-					else if( preg_match( '/\Greturn(?=\s)/', $source, $token, 0, $at ) === 1 ) {
+					else if( $match( '/\Greturn(?=\s)/' ) !== null ) {
 						$phase = 1;
 						$at += 6;
 					}
@@ -651,17 +1118,24 @@ namespace Nino {
 					continue;
 				}
 
-				if( preg_match( self::DATA_TOKEN, $source, $token, 0, $at ) !== 1 )
+				// A string of the data is walked over; after the one semicolon nothing is but blanks and comments
+				if( $buffer[$at] === "'" ) {
+
+					if( $phase === 2 || $string() === false )
+						return false;
+
+					continue;
+				}
+
+				$token = $match( self::DATA_TOKEN );
+
+				if( $token === null || ( $phase === 2 && trim( $token ) !== '' ) )
 					return false;
 
-				// After the one semicolon only blanks and comments may follow
-				if( $phase === 2 && trim( $token[0] ) !== '' )
-					return false;
-
-				if( $token[0] === ';' )
+				if( $token === ';' )
 					$phase = 2;
 
-				$at += strlen( $token[0] );
+				$at += strlen( $token );
 			}
 
 			return $phase === 2;
@@ -736,7 +1210,16 @@ namespace Nino {
 				// A svg of a block is read by the kernel as a drawing as well; what a restore puts there is held to the same rule
 				if( ( str_starts_with( $relative, 'images/' ) === true || str_starts_with( $relative, 'blocks/' ) === true || str_starts_with( $relative, 'themes/' ) === true ) && preg_match( '/\.svg$/', $name ) === 1 ) {
 
-					$drawing = @file_get_contents( $item->getPathname() );
+					// Judged as one text, so only a drawing of the size a picture of shapes has: the limit is what the check takes of memory (measured
+					// 14 MB for 1 MiB of the worst a drawing can hold), and a drawing of a page is far smaller
+					$handle 	= @fopen( $item->getPathname(), 'rb' );
+					$drawing 	= $handle === false ? false : stream_get_contents( $handle, self::SVG_MAX + 1 );
+
+					if( $handle !== false )
+						fclose( $handle );
+
+					if( $drawing !== false && strlen( $drawing ) > self::SVG_MAX )
+						return self::_refuse( $relative, 'a drawing of more than '. self::SVG_MAX. ' bytes, which is more than a restore judges' );
 
 					if( $drawing === false || self::_isPlainSvg( $drawing ) === false )
 						return self::_refuse( $relative, 'a drawing that is more than shapes' );
@@ -756,9 +1239,13 @@ namespace Nino {
 
 				// A php file by its name is data or it is refused; the extension is read as php reads it,
 				// whatever the case
-				$source = @file_get_contents( $item->getPathname() );
+				$handle = @fopen( $item->getPathname(), 'rb' );
+				$data 	= $handle !== false && self::_isData( $handle ) === true;
 
-				if( $source === false || self::_isData( $source ) === false )
+				if( $handle !== false )
+					fclose( $handle );
+
+				if( $data === false )
 					return self::_refuse( $relative, 'code' );
 			}
 
@@ -938,30 +1425,73 @@ namespace Nino {
 			foreach( $manifest as $absolute => $name )
 				$entries[$name] = $absolute;
 
-			$phar = new \PharData( $tar );
+			// The stamp is made before the step, which turns every notice into an exception: what it reads is no part of the writing
+			$stamp = self::stamp( $appData );
 
+			// Everything PharData says of a file that cannot be written - a disk that is full - is one sentence, and no path. It says it as a
+			// notice first, and the handler of the kernel ends the request at a notice: so the step runs with a handler of its own
+			// (see raising()), which makes it an exception that is caught here
 			try {
-				$phar->buildFromIterator( new \ArrayIterator( $entries ) );
+
+				self::raising( static function() use ( $tar, $entries, $stamp ): void {
+
+					$phar = new \PharData( $tar );
+
+					$phar->buildFromIterator( new \ArrayIterator( $entries ) );
+					$phar->addFromString( 'nino.php', $stamp );
+
+					// Written out to the tar before it is touched below, and before the handler of the step is gone
+					unset( $phar );
+				} );
 			}
-			catch( \UnexpectedValueException | \BadMethodCallException ) {
+			catch( \PharException | \UnexpectedValueException | \BadMethodCallException | \ErrorException ) {
 
 				// The one that could not be read, by its name in the archive
 				foreach( $entries as $name => $absolute )
 					if( @is_readable( $absolute ) === false )
 						throw new \RuntimeException( 'backup source could not be read: '. $name );
 
-				throw new \RuntimeException( 'backup source could not be read' );
+				// All of them can be read: what failed is the write
+				throw new \RuntimeException( 'the backup could not be written: there was no room left, or a file could not be written', self::WRITE_FAILED );
 			}
-
-			$phar->addFromString( 'nino.php', self::stamp( $appData ) );
-
-			// Written out to the tar before it is touched below
-			unset( $phar );
 
 			self::_modes( $tar );
 			self::_gzip( $tar, $tar. '.gz' );
 
 			@unlink( $tar );
+		}
+
+		/**
+		 *	Run a step in which every notice, warning and error that php raises is an \ErrorException, and the handler that was there is back
+		 *	when it ends, whichever way it ends. What php functions say of a write that failed they say as a notice or a warning, and the
+		 *	handler of the kernel ends the request at one: a step that wants to answer for it - a disk that is full - asks for the exception
+		 *
+		 *	@param		callable	$step					The work
+		 *
+		 *	@return 	mixed										What the step returns
+		 *
+		 *	@throws		\ErrorException						For what php raised in it
+		 *	@throws		\PharException						Where the step does what PharData does and it says so by an exception of its own
+		 *	@throws		\UnexpectedValueException
+		 *	@throws		\BadMethodCallException
+		 */
+		public static function raising( callable $step ): mixed {
+
+			set_error_handler( static function( int $level, string $message, string $file = '', int $line = 0 ): bool {
+
+				// What the code silenced with @ is no failure of the step
+				if( ( error_reporting() & $level ) === 0 )
+					return false;
+
+				throw new \ErrorException( $message, 0, $level, $file, $line );
+			} );
+
+			try {
+				return $step();
+			}
+			finally {
+				restore_error_handler();
+			}
 		}
 
 		/**

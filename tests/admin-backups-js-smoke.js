@@ -380,6 +380,19 @@ check( '...the memory limit is told in megabytes', said( noticeOf() ) && memoryT
 mount.innerHTML = '';
 requests.length = 0;
 panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : null, stopped : stopped( 'disk', 'manual' ) } );
+const diskText = noticeOf().length === 1 ? noticeOf()[0].textContent : '';
+check( '...a run that the disk ended says so, with the size and the number of files, in words of its own', said( noticeOf() ) && diskText !== '' && diskText !== manualTime && diskText.toLowerCase().includes( 'disk' ) );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : { reason : 'no room', code : 'write' }, stopped : stopped( 'disk', 'daily' ) } );
+check( 'a missed daily backup that a write failed and the run that the disk ended are one notice, not two', noticeOf().length === 1 );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
 answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : null, stopped : stopped( '', 'manual' ) } );
 const openText = memoryText();
 check( '...and a run that nothing says why it ended is told as one that did not end', said( noticeOf() ) && openText !== '' );

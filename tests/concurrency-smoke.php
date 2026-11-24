@@ -251,14 +251,9 @@ check( 'parallel first-use requests persist one backup directory/key pair', coun
 check( 'parallel first-use requests create exactly one usable daily backup', is_file( $today ) === true && count( glob( $backupDir. '/*.php' ) ?: [] ) === 1 );
 
 if( is_file( $today ) === true ) {
-	$prefix = "<?php http_response_code(403); exit; return '";
-	$suffix = "';\n";
 	$raw = file_get_contents( $today );
-	$payload = base64_decode( substr( $raw, strlen( $prefix ), -strlen( $suffix ) ), true );
 	$key = base64_decode( (string) ( $onDisk['/nino/backup/key'] ?? '' ), true );
-	$plain = ( is_string( $payload ) && is_string( $key ) )
-		? openssl_decrypt( substr( $payload, 28 ), 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $payload, 0, 12 ), substr( $payload, 12, 16 ) )
-		: false;
+	$plain = is_string( $key ) ? ninoUnsealed( $raw, $key ) : false;
 	check( 'the surviving config key decrypts the concurrently-created backup', is_string( $plain ) === true && str_starts_with( $plain, "\x1f\x8b" ) === true );
 } else {
 	check( 'the surviving config key decrypts the concurrently-created backup', false );

@@ -51,12 +51,7 @@ function backupsFile( array &$appData, string $name, string $bytes, int $error =
 
 /** The stub of an archive of the given key around the given plain bytes - what the project's own writer makes of them */
 function backupsStub( string $plain, string $rawKey ): string {
-
-	$iv 		= random_bytes( 12 );
-	$tag 		= '';
-	$cipher = openssl_encrypt( $plain, 'aes-256-gcm', $rawKey, OPENSSL_RAW_DATA, $iv, $tag );
-
-	return implode( '', iterator_to_array( \Nino\Admin\Recovery::stubPieces( $iv, $tag, (string) $cipher ), false ) );
+	return ninoSealed( $plain, $rawKey );
 }
 
 $upload		= [ \Nino\Modules\Backups\Admin::class, 'apiUpload' ];
@@ -392,11 +387,25 @@ check( 'a new project that was given the key of this one takes its archive, and 
 	&& ninoCall( $fresh, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $second ] )[0] === 200 );
 \Nino\Filesystem::removeDir( ninoSandboxDir( $fresh ) );
 
-// An archive that this server cannot open
+// An archive that this server cannot open: one of format 1, which is read whole. One in chunks is opened with the memory of a chunk, whatever the limit says
+$oldFormat = ninoSealedOld( (string) ninoUnsealed( $archive, $rawKey ), $rawKey );
 $appData['./nino/backups/memory'] = memory_get_usage() + 1048576;
-[ $status, $body ] = $put( $appData, $old. '.php', $archive );
+[ $status, $body ] = $put( $appData, $old. '.php', $oldFormat );
+$chunked = $put( $appData, $old. '.php', $archive );
 unset( $appData['./nino/backups/memory'] );
-check( 'an archive the memory limit does not carry opening is refused before it is opened: 413 with the sizes, nothing in the directory', $status === 413 && ( $body['code'] ?? '' ) === 'backups_upload_memory' && count( $body['params'] ?? [] ) === 2 && is_file( $dir. '/'. $old. '.php' ) === false && $tmpFiles() === [] );
+check( 'an archive of format 1 that the memory limit does not carry opening is refused before it is opened: 413 with the sizes, nothing in the directory', $status === 413 && ( $body['code'] ?? '' ) === 'backups_upload_memory' && count( $body['params'] ?? [] ) === 2 && $tmpFiles() === [] );
+check( '...and an archive in chunks is taken under the same limit', $chunked[0] === 200 && is_file( $dir. '/'. $old. '.php' ) === true );
+unlink( $dir. '/'. $old. '.php' );
+file_put_contents( $dir. '/'. $old. '.php', $oldFormat );
+$snapshotsBefore = glob( $dir. '/pre-restore-*' ) ?: [];
+$appData['./nino/backups/memory'] = memory_get_usage() + 1048576;
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $old ] );
+unset( $appData['./nino/backups/memory'] );
+check( 'the restore of an archive of format 1 from the list is refused the same way where the limit does not carry it, and nothing is restored or made', $status === 413 && ( $body['code'] ?? '' ) === 'backups_upload_memory' && ( glob( $dir. '/pre-restore-*' ) ?: [] ) === $snapshotsBefore );
+unlink( $dir. '/'. $old. '.php' );
+[ $status ] = $put( $appData, $old. '.php', $oldFormat );
+check( 'an archive of format 1 is taken where the limit carries it, and is listed like any other', $status === 200 && is_file( $dir. '/'. $old. '.php' ) === true );
+unlink( $dir. '/'. $old. '.php' );
 
 // A project that has no key: the workbench makes one with the first request, so the copy is gone only where backups are off
 $keyPath = $sandbox. '/private/.auth/backup-key.php';

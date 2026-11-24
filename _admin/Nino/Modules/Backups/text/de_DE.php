@@ -15,9 +15,12 @@ return [
 	'[[/_admin/backups/msg/interrupted]]'	=> 'Das automatische Backup von heute wurde nicht fertig: Die Anfrage, die es angelegt hat, wurde beendet, meist weil dem Server der Speicher oder die Zeit ausging. Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an.',
 	'[[/_admin/backups/msg/stopped-time]]'	=> 'Das Backup, das am %s begann, wurde vom Server beendet: Seine Zeitgrenze (%s s) war erreicht. Zu packen: %s MB, Dateien: %s.',
 	'[[/_admin/backups/msg/stopped-memory]]'	=> 'Das Backup, das am %s begann, wurde vom Server beendet: Seine Speichergrenze (%s MB) war erreicht. Zu packen: %s MB, Dateien: %s.',
+	'[[/_admin/backups/msg/stopped-disk]]'	=> 'Das Backup, das am %s begann, endete, weil die Platte voll war: Eine Datei ließ sich nicht schreiben. Zu packen: %s MB, Dateien: %s. Schaffe Platz auf dem Server, im temporären Ordner und dort, wo die Backups liegen.',
 	'[[/_admin/backups/msg/stopped-open]]'	=> 'Das Backup, das am %s begann, wurde nicht beendet, und der Server hat nicht gesagt, warum – wahrscheinlich war seine Zeit- oder Speichergrenze erreicht. Zu packen: %s MB, Dateien: %s.',
 	'[[/_admin/backups/msg/stopped-retry]]'	=> 'Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an, sobald die Ursache behoben ist.',
 	'[[/_admin/backups/msg/reason-write]]'	=> 'es war kein Platz mehr, im Temp-Ordner oder dort, wo die Backups liegen, oder eine Datei ließ sich nicht schreiben',
+	'[[/_admin/error/backups_disk]]'	=> 'Die Platte dieses Servers hat dafür zu wenig Platz: Etwa %s MB sind nötig, %s MB sind frei. Nichts wurde geändert.',
+	'[[/_admin/error/backups_restore_partial]]'	=> 'Die Wiederherstellung blieb auf halbem Weg stehen: Eine Datei ließ sich nicht schreiben, wahrscheinlich ist die Platte voll. Ein Teil des Projekts hat den Stand des Archivs, ein Teil den davor. Das Archiv %s in der Liste hält den Stand davor: Stelle es wieder her, um zurückzugehen, sobald auf der Platte Platz ist.',
 	'[[/_admin/error/backups_write]]'	=> 'Für das Backup war kein Platz mehr, im Temp-Ordner oder dort, wo die Backups liegen, oder eine Datei ließ sich nicht schreiben. Die vorhandenen Backups sind unberührt.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'Das Backup stammt aus Nino %s, hier läuft %s.',
 	'[[/_admin/error/backups_busy]]'	=> 'Ein Backup oder eine Wiederherstellung läuft gerade. Versuche es gleich noch einmal.',
@@ -45,7 +48,7 @@ return [
 	'[[/_admin/error/backups_key_missing]]'	=> 'Gib den Recovery-Key des Archivs ein.',
 	'[[/_admin/error/backups_key_format]]'	=> 'Das ist kein Recovery-Key: Er ist 44 Zeichen lang und endet auf =.',
 	'[[/_admin/error/backups_key_tries]]'	=> 'Zu viele Versuche mit einem Recovery-Key. Versuche es später noch einmal.',
-	'[[/_admin/error/backups_upload_memory]]'	=> 'Die Speichergrenze dieses Servers reicht nicht, um das Archiv zu öffnen (etwa %s MB nötig, Grenze %s MB). Eine Wiederherstellung braucht dasselbe: Erhöhe zuerst memory_limit.',
+	'[[/_admin/error/backups_upload_memory]]'	=> 'Dieses Archiv ist von der älteren Art, die ganz im Speicher geöffnet wird, und die Speichergrenze dieses Servers reicht dafür nicht (etwa %s MB nötig, Grenze %s MB). Eine Wiederherstellung braucht dasselbe: Erhöhe zuerst memory_limit. Ein Archiv, das diese Version anlegt, wird in Stücken geöffnet und braucht so viel nicht.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/backups/manual/intro]]'	=> 'Ein Backup ist eine Kopie der Inhalte Deiner Website, wie sie an einem Tag waren. Nino legt jeden Tag von selbst eines an und behält die neuesten; wie viele, stellst Du unter Konfiguration ein, dort lässt es sich auch abschalten.',

@@ -1549,7 +1549,7 @@ namespace Nino\Admin {
 		 *	hash, the activity log's day files
 		 *
 		 *	@param		string		$path
-		 *	@param		string|iterable	$content		The bytes, or the pieces of them in order (see Recovery::stubPieces())
+		 *	@param		string|iterable	$content		The bytes, or the pieces of them in order (see \Nino\Backup\Seal::pieces())
 		 *
 		 *	@return 	bool										False when the file could not be written
 		 */
@@ -1564,14 +1564,24 @@ namespace Nino\Admin {
 			$written	= 0;
 			$expected	= 0;
 
-			foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
-				$expected += strlen( $piece );
-				$put = fwrite( $handle, $piece );
-				if( $put === false ) {
-					$written = false;
-					break;
+			// Pieces that are made while they are written (an archive sealed in chunks) can fail in the middle: the file
+			// that was begun is not left behind
+			try {
+
+				foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
+					$expected += strlen( $piece );
+					$put = fwrite( $handle, $piece );
+					if( $put === false ) {
+						$written = false;
+						break;
+					}
+					$written += $put;
 				}
-				$written += $put;
+			}
+			catch( \Throwable $e ) {
+				fclose( $handle );
+				@unlink( $temp );
+				throw $e;
 			}
 
 			$flushed = fflush( $handle );
@@ -2595,43 +2605,12 @@ namespace Nino\Admin {
 
 		// The stub that file is wrapped in - a php file that 403s and exits
 		// before it ever returns the hash, so it stays useless even where a
-		// webserver happily serves it. The one definition: the backup
-		// archives and their key copy (\Nino\Modules\Backups and its panel)
-		// and the activity log (\Nino\Modules\Logs\Admin) are wrapped in it too
-		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		public const string STUB_SUFFIX = "';\n";
-
-		// How much of an archive's ciphertext is base64-encoded at a time (see
-		// stubPieces()): a multiple of three, so every piece but the last
-		// encodes to the same characters as it does inside the whole
-		private const int STUB_CHUNK = 786432;
-
-		/**
-		 *	An archive's stub as pieces, to be written one after the other: the
-		 *	prefix, the base64 of iv, tag and ciphertext, the suffix. The bytes
-		 *	are those of STUB_PREFIX. base64_encode( iv. tag. cipher ). STUB_SUFFIX,
-		 *	without a second and a third copy of the ciphertext in memory
-		 *
-		 *	@param		string		$iv						The 12 bytes of the initialisation vector
-		 *	@param		string		$tag					The 16 bytes of the authentication tag
-		 *	@param		string		$cipher				The ciphertext
-		 *
-		 *	@return 	\Generator<int, string>
-		 */
-		public static function stubPieces( string $iv, string $tag, string $cipher ): \Generator {
-
-			yield self::STUB_PREFIX;
-
-			// iv and tag are 28 bytes, one short of a multiple of three: the
-			// first two bytes of the ciphertext complete the first piece, and
-			// every one after it starts on a boundary of three
-			yield base64_encode( $iv. $tag. substr( $cipher, 0, 2 ) );
-
-			for( $offset = 2, $length = strlen( $cipher ); $offset < $length; $offset += self::STUB_CHUNK )
-				yield base64_encode( substr( $cipher, $offset, self::STUB_CHUNK ) );
-
-			yield self::STUB_SUFFIX;
-		}
+		// webserver happily serves it. The one definition is the kernel's
+		// (\Nino\Backup\Seal): the backup archives and their key copy
+		// (\Nino\Modules\Backups and its panel) and the activity log
+		// (\Nino\Modules\Logs\Admin) are wrapped in it too
+		public const string STUB_PREFIX = \Nino\Backup\Seal::STUB_PREFIX;
+		public const string STUB_SUFFIX = \Nino\Backup\Seal::STUB_SUFFIX;
 
 		private const int MAX_TRIES = 5;
 		private const int COOLDOWN = 3600;

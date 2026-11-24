@@ -144,54 +144,62 @@ namespace Nino\Modules\Backups {
 		}
 
 		/**
-		 *	Decrypt one backup/snapshot file's payload
+		 *	The files and directories a request makes for its work - the plain archive of a restore, the copy of an upload - and removes
+		 *	when it ends in order, which a finally does not for the end that php makes of a request at its time or memory limit: a function
+		 *	that php runs at that end removes what is still listed. What a step removes by itself it takes off the list
 		 *
-		 *	@param		string		$path					Absolute path to the .php file
-		 *	@param		string		$key					Raw (not base64) 32-byte AES key
-		 *
-		 *	@return 	string|false						Decrypted tar.gz bytes, or false if decryption failed
+		 *	@return 	array										[ the files still to be removed, the directories still to be removed ], each an \ArrayObject of paths
 		 */
-		private static function _decrypt( string $path, string $key ): string|false {
+		private static function _guard(): array {
 
-			// Read and decoded piece by piece: the file is the base64 of the
-			// payload, and as one string next to its decoding and its parts it
-			// took more memory to open an archive than it took to make it. A
-			// piece is a multiple of four characters, so it decodes on its own
-			$handle = @fopen( $path, 'rb' );
-			if( $handle === false )
-				return false;
+			$files 	= new \ArrayObject();
+			$dirs 	= new \ArrayObject();
 
-			$remaining 	= (int) @filesize( $path ) - strlen( \Nino\Admin\Recovery::STUB_PREFIX ) - strlen( \Nino\Admin\Recovery::STUB_SUFFIX );
-			$header 		= '';
-			$cipher 		= '';
+			register_shutdown_function( static function() use ( $files, $dirs ): void {
 
-			fseek( $handle, strlen( \Nino\Admin\Recovery::STUB_PREFIX ) );
+				foreach( $files as $file )
+					@unlink( (string) $file );
 
-			while( $remaining > 0 ) {
+				foreach( $dirs as $dir )
+					if( is_dir( (string) $dir ) === true )
+						\Nino\Filesystem::removeDir( (string) $dir );
+			} );
 
-				$piece = fread( $handle, min( 786432, $remaining ) );
-				if( $piece === false || $piece === '' )
-					break;
+			return [ $files, $dirs ];
+		}
 
-				$remaining -= strlen( $piece );
-				$bytes 			= (string) base64_decode( $piece );
+		/**
+		 *	Whether the disk where an uploaded file is kept for its check has the room for it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$dir					The archive directory
+		 *	@param		string		$uploaded			The uploaded file
+		 *
+		 *	@return 	array|null							null where it fits, else [ http status, message, code, params ]
+		 */
+		private static function _roomForUpload( array &$appData, string $dir, string $uploaded ): ?array {
 
-				// iv and tag come first, 28 bytes, and are not part of the ciphertext
-				if( strlen( $header ) < 28 ) {
-					$take 		= 28 - strlen( $header );
-					$header .= substr( $bytes, 0, $take );
-					$bytes 		= substr( $bytes, $take );
-				}
+			$need = (int) @filesize( $uploaded ) + 4194304;
+			$free = \Nino\Backup::freeSpace( $appData, $dir );
 
-				$cipher .= $bytes;
-			}
+			return $free !== null && $free < $need ? [ 507, 'the disk has no room for the archive', 'backups_disk', [ (int) ceil( $need / 1048576 ), (int) floor( max( 0, $free ) / 1048576 ) ] ] : null;
+		}
 
-			fclose( $handle );
+		/**
+		 *	What a restore answers where an archive could not be opened (see \Nino\Backup\Seal::open()): a tag that does not hold is
+		 *	the key or a file that was changed, which cannot be told apart, and anything else is a file that is none of ours
+		 *
+		 *	@param		string		$code					What open() answered
+		 *	@param		bool			$typed				Whether the key is one somebody typed at recovery.php
+		 *
+		 *	@return 	array										[ http status, message, code ]
+		 */
+		private static function _failure( string $code, bool $typed ): array {
 
-			if( strlen( $header ) !== 28 )
-				return false;
+			if( $code === \Nino\Backup\Seal::AUTH )
+				return $typed === true ? [ 422, 'the key does not open the archive', 'backups_key_wrong' ] : [ 422, 'the archive cannot be opened with this project\'s key', 'backups_key' ];
 
-			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $header, 0, 12 ), substr( $header, 12, 16 ) );
+			return [ 422, 'the file is no backup', 'backups_upload_format' ];
 		}
 
 		// What an archive's id may look like: a dated backup, one made on
@@ -344,10 +352,7 @@ namespace Nino\Modules\Backups {
 			$result = \Nino\Modules\Backups::now( $appData );
 
 			if( is_array( $result ) === true ) {
-				if( ( $result[2] ?? '' ) === 'backups_write' )
-					\Nino\Http::fail( $request, $result[0], $result[1], 'backups_write' );
-				else
-					\Nino\Http::fail( $request, $result[0], $result[1] );
+				\Nino\Http::fail( $request, $result[0], $result[1], (string) ( $result[2] ?? '' ), $result[3] ?? [] );
 				return;
 			}
 
@@ -512,7 +517,8 @@ namespace Nino\Modules\Backups {
 				return;
 			}
 
-			$temp = '';
+			$temp 	= '';
+			[ $guardFiles ] = self::_guard();
 
 			try {
 
@@ -530,7 +536,15 @@ namespace Nino\Modules\Backups {
 					return;
 				}
 
+				$short = self::_roomForUpload( $appData, $dir, $tmp );
+
+				if( $short !== null ) {
+					\Nino\Http::fail( $request, ...$short );
+					return;
+				}
+
 				$temp 		= $dir. '/upload-'. bin2hex( random_bytes( 6 ) ). '.tmp';
+				$guardFiles->append( $temp );
 				$staged 	= self::_stage( $tmp, $temp );
 
 				if( $staged !== true ) {
@@ -539,27 +553,33 @@ namespace Nino\Modules\Backups {
 				}
 
 				// Whether this project's key opens it is the one proof that it is one
-				// of its archives, and opening takes about what restoring it will: a
-				// server that cannot is told, before php runs out of memory in the
-				// middle of it
-				$short = \Nino\Modules\Backups::openShort( $appData, (int) @filesize( $temp ) );
+				// of its archives: every chunk of it is read and its tag checked, none of
+				// it kept. An archive of format 1 is read whole, and a server that cannot
+				// is told, before php runs out of memory in the middle of it
+				if( \Nino\Backup\Seal::format( $temp ) === 1 ) {
 
-				if( $short !== null ) {
-					\Nino\Http::fail( $request, 413, 'the memory limit does not carry opening the archive', 'backups_upload_memory', $short );
+					$short = \Nino\Modules\Backups::openShort( $appData, (int) @filesize( $temp ) );
+
+					if( $short !== null ) {
+						\Nino\Http::fail( $request, 413, 'the memory limit does not carry opening the archive', 'backups_upload_memory', $short );
+						return;
+					}
+				}
+
+				try {
+					$opened = \Nino\Backup\Seal::open( $temp, $key, null, $head );
+				}
+				catch( \RuntimeException ) {
+					\Nino\Http::fail( $request, 500, 'could not read upload', 'upload_server' );
 					return;
 				}
 
-				$gz = self::_decrypt( $temp, $key );
-
-				if( $gz === false ) {
-					\Nino\Http::fail( $request, 422, 'the archive cannot be opened with this project\'s key', 'backups_upload_key' );
+				if( $opened !== null ) {
+					\Nino\Http::fail( $request, 422, $opened === \Nino\Backup\Seal::AUTH ? 'the archive cannot be opened with this project\'s key' : 'the file is no backup', $opened === \Nino\Backup\Seal::AUTH ? 'backups_upload_key' : 'backups_upload_format' );
 					return;
 				}
 
-				$gzip = str_starts_with( $gz, "\x1f\x8b" );
-				unset( $gz );
-
-				if( $gzip === false ) {
+				if( $head !== "\x1f\x8b" ) {
 					\Nino\Http::fail( $request, 422, 'the archive holds no gzip', 'backups_upload_format' );
 					return;
 				}
@@ -732,7 +752,7 @@ namespace Nino\Modules\Backups {
 				self::recordRestore( $appData, $actor['mail'], $date, $result );
 
 			if( $result !== true ) {
-				\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '' );
+				\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '', $result[3] ?? [] );
 				return;
 			}
 
@@ -765,7 +785,7 @@ namespace Nino\Modules\Backups {
 		 *	@return 	void
 		 */
 		public static function recordRestore( array &$appData, string $actor, string $date, true|array $result ): void {
-			\Nino\Admin\Admin::record( $appData, $actor, 'Restore Backup '. $date. ( $result === true ? '' : ' failed ('. $result[0]. ')' ) );
+			\Nino\Admin\Admin::record( $appData, $actor, 'Restore Backup '. $date. ( $result === true ? '' : ' failed ('. $result[0]. ')'. ( ( $result[2] ?? '' ) === 'backups_restore_partial' ? ' in part, the state before is the archive '. (string) ( $result[3][0] ?? '' ) : '' ) ) );
 		}
 
 		/**
@@ -819,7 +839,8 @@ namespace Nino\Modules\Backups {
 			if( \Nino\Filesystem::lockFile( $appData, \Nino\Modules\Backups::LOCK_PATH, false ) === false )
 				return [ 409, 'a backup or a restore is running', 'backups_busy' ];
 
-			$temp = '';
+			$temp 	= '';
+			[ $guardFiles ] = self::_guard();
 
 			try {
 
@@ -828,16 +849,17 @@ namespace Nino\Modules\Backups {
 				if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false )
 					return [ 500, 'the backup directory could not be created', 'backups_write' ];
 
+				$short = self::_roomForUpload( $appData, $dir, $uploaded );
+
+				if( $short !== null )
+					return $short;
+
 				$temp 		= $dir. '/upload-'. bin2hex( random_bytes( 6 ) ). '.tmp';
+				$guardFiles->append( $temp );
 				$staged 	= self::_stage( $uploaded, $temp );
 
 				if( $staged !== true )
 					return $staged;
-
-				$short = \Nino\Modules\Backups::openShort( $appData, (int) @filesize( $temp ) );
-
-				if( $short !== null )
-					return [ 413, 'the memory limit does not carry opening the archive', 'backups_upload_memory', $short ];
 
 				return self::_restoreArchive( $appData, $dir, $temp, $notice, $key );
 			}
@@ -872,13 +894,13 @@ namespace Nino\Modules\Backups {
 				return [ 404, 'unknown backup date' ];
 			}
 
-			$gz = self::_decrypt( $path, $key );
+			// An archive of format 1 is read whole: a server that cannot carry it says so before php runs out of memory
+			if( \Nino\Backup\Seal::format( $path ) === 1 ) {
 
-			if( $gz === false ) {
-				// Not a server fault: the key does not open it. The sentence of the code says which key and what to do
-				return $entered === null
-					? [ 422, 'the archive cannot be opened with this project\'s key', 'backups_key' ]
-					: [ 422, 'the key does not open the archive', 'backups_key_wrong' ];
+				$short = \Nino\Modules\Backups::openShort( $appData, (int) @filesize( $path ) );
+
+				if( $short !== null )
+					return [ 413, 'the memory limit does not carry opening the archive', 'backups_upload_memory', $short ];
 			}
 
 			/*	tempnam() creates the file it names, and the archive was written
@@ -896,35 +918,57 @@ namespace Nino\Modules\Backups {
 				(see \Nino\Backup::sweepTemp())	*/
 			\Nino\Backup::sweepTemp( $appData );
 
+			// The plain archive, what it is unpacked to and the snapshot of the project need room next to each other: said before any of
+			// them is made, with the sizes
+			$short = \Nino\Modules\Backups::restoreShort( $appData, (int) @filesize( $path ) );
+
+			if( $short !== null )
+				return [ 507, 'the disk has no room for a restore of the archive', 'backups_disk', $short ];
+
 			$temp = \Nino\Backup::tempFile( $appData, 'restore' );
 			if( $temp === false )
-				return [ 500, 'the temporary restore file could not be created' ];
+				return [ 500, 'the temporary restore file could not be created', 'backups_write' ];
 
 			[ $tmpBase, $lease ] = $temp;
 
 			$tmpGz 		= $tmpBase. '.tar.gz';
 			$staging	= $tmpBase. '.staging';
 
+			// What a request that php ends takes with it: the plain archive, config.php among it, is no file to leave in the temporary directory
+			[ $guardFiles, $guardDirs ] = self::_guard();
+			$guardFiles->exchangeArray( [ $tmpGz, $tmpBase ] );
+			$guardDirs->exchangeArray( [ $staging ] );
+
 			try {
-				// Not held in memory across the snapshot: that one needs as much
-				// again while it is made, and the two together are more than
-				// either needs. It waits in the file PharData is to read, which
-				// only its owner may read: it is the plain archive, config.php
-				// among it. The archive itself is not decrypted again: a snapshot
-				// made in the second the archive was (a restore of a snapshot)
-				// replaces it
+				// The plain archive waits in the file PharData is to read, which only
+				// its owner may read: config.php is among it. It is written chunk by
+				// chunk as the archive is opened and used once every chunk of the file
+				// has held - a file that was cut, changed or put together from two
+				// ends in a tag that does not, and nothing of what was read is looked
+				// at then. Not held in memory across the snapshot, which needs as much
+				// again while it is made. The archive itself is not opened again: a
+				// snapshot made in the second the archive was (a restore of a
+				// snapshot) replaces it
 				$handle = @fopen( $tmpGz, 'xb' );
 				if( $handle === false )
-					return [ 500, 'the backup could not be written for unpacking' ];
+					return [ 500, 'the backup could not be written for unpacking', 'backups_write' ];
 
 				@chmod( $tmpGz, 0600 );
-				$put = @fwrite( $handle, $gz );
-				@fclose( $handle );
+				fclose( $handle );
 
-				if( $put !== strlen( $gz ) )
-					return [ 500, 'the backup could not be written for unpacking' ];
+				try {
+					$opened = \Nino\Backup\Seal::open( $path, $key, $tmpGz, $head );
+				}
+				catch( \RuntimeException ) {
+					return [ 500, 'the backup could not be written for unpacking', 'backups_write' ];
+				}
 
-				unset( $gz );
+				if( $opened !== null )
+					return self::_failure( $opened, $entered !== null );
+
+				// One gzip stream: a tar that is cut in two members, or bytes behind the end, are what PharData refused and no reader of ours may join
+				if( $head !== "\x1f\x8b" || \Nino\Backup::gzipOnly( $tmpGz ) === false )
+					return [ 422, 'the archive holds no gzip', 'backups_upload_format' ];
 
 				// Read before the snapshot and before anything is unpacked: the
 				// names of its entries as the tar holds them, which the
@@ -958,14 +1002,22 @@ namespace Nino\Modules\Backups {
 				// has now: after an archive of another project's key it is the one key that is not in
 				// the project any more, and the snapshot is then opened with it typed in at recovery.php
 				// (a project that has no key of its own makes it with the one that was typed)
+				// The disks the files are copied back to have the room for them: said with the numbers before anything is touched
+				$short = \Nino\Backup::restoreRoom( $appData, $staging );
+
+				if( $short !== null )
+					return [ 507, 'the disk of the project has no room for the files of the archive', 'backups_disk', $short ];
+
+				$snapshot = '';
+
 				try {
-					self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key );
+					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key );
 				}
 				catch( \RuntimeException $e ) {
-					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ];
+					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ] + ( $e->getCode() === \Nino\Backup::WRITE_FAILED ? [ 2 => 'backups_write' ] : [] );
 				}
 
-				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true );
+				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true, $snapshot );
 			}
 			finally {
 				@unlink( $tmpGz );
@@ -973,6 +1025,8 @@ namespace Nino\Modules\Backups {
 					\Nino\Filesystem::removeDir( $staging );
 				@unlink( $tmpBase );
 				fclose( $lease );
+				$guardFiles->exchangeArray( [] );
+				$guardDirs->exchangeArray( [] );
 			}
 		}
 
@@ -987,17 +1041,15 @@ namespace Nino\Modules\Backups {
 		private static function _unpack( string $tmpGz, string $staging ): true|array {
 
 			if( @mkdir( $staging, 0700, true ) === false )
-				return [ 500, 'the restore staging directory could not be created' ];
+				return [ 500, 'the restore staging directory could not be created', 'backups_write' ];
 
-			// PharData throws for an archive it cannot read - a file somebody
-			// truncated or replaced that still decrypts - and a throw here was
-			// a 500 the panel could not explain
-			try {
-				( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
-			}
-			catch( \Throwable $e ) {
-				return [ 500, 'the backup could not be unpacked: '. $e->getMessage() ];
-			}
+			// An archive that cannot be read - a file somebody truncated or replaced that still decrypts - is
+			// answered with what is wrong with it, and no path
+			$unwritten = false;
+			$failure 	 = \Nino\Backup::unpack( $tmpGz, $staging, $unwritten );
+
+			if( $failure !== null )
+				return [ 500, 'the backup could not be unpacked: '. $failure ] + ( $unwritten === true ? [ 2 => 'backups_write' ] : [] );
 
 			$refused = \Nino\Backup::staged( $staging );
 
@@ -1019,7 +1071,7 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
-		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false ): true|array {
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false, string $snapshot = '' ): true|array {
 
 			if( $written === false && @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
 				return [ 500, 'the backup could not be written for unpacking' ];
@@ -1067,7 +1119,7 @@ namespace Nino\Modules\Backups {
 			if( is_file( $stagedConfig ) === true ) {
 
 				if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
-					return [ 500, 'could not lock config.php for the restore' ];
+					return [ 500, 'could not lock config.php for the restore', 'backups_write' ];
 
 				$target	= $configPath. '/config.php';
 				$temp		= $target. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
@@ -1075,7 +1127,7 @@ namespace Nino\Modules\Backups {
 				if( @copy( $stagedConfig, $temp ) === false || @rename( $temp, $target ) === false ) {
 					@unlink( $temp );
 					\Nino\Filesystem::unlockFile( $appData, '/config.php' );
-					return [ 500, 'could not write config.php' ];
+					return [ 500, 'could not write config.php', 'backups_write' ];
 				}
 
 				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
@@ -1108,14 +1160,18 @@ namespace Nino\Modules\Backups {
 			// the elements; the folder is made where it is missing. An archive
 			// that has no blocks/, themes/ or fonts/ puts nothing there and takes
 			// nothing away: the blocks, the themes and the fonts on disk stay
+			//
+			// Every copy is asked how it went and every file is looked at after it: a disk that fills up leaves files that are cut off, and
+			// a restore that says it was done over such a site is the worst answer there is
+			$unfinished = false;
+
 			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
 
 				$target = \Nino\Backup::target( $appData, basename( $entry ) );
+				$copied = is_dir( $entry ) === true ? \Nino\Filesystem::copyDir( $entry, $target ) : @copy( $entry, $target );
 
-				if( is_dir( $entry ) === true )
-					\Nino\Filesystem::copyDir( $entry, $target );
-				else
-					@copy( $entry, $target );
+				if( $copied === false || self::_whole( $entry, $target ) === false )
+					$unfinished = true;
 			}
 
 			// extractTo()/copyDir() write straight to disk, bypassing Filesystem's own
@@ -1132,6 +1188,36 @@ namespace Nino\Modules\Backups {
 
 			if( function_exists( 'opcache_reset' ) === true )
 				opcache_reset();
+
+			// Partly done: the answer says so, and which archive of the list holds the state before - no path
+			if( $unfinished === true )
+				return [ 500, 'the restore is done in part: a file could not be written, the disk may be full', 'backups_restore_partial', [ $snapshot ] ];
+
+			return true;
+		}
+
+		/**
+		 *	Whether what was copied is what there was to copy: every file of the source is at the target with the size it has
+		 *
+		 *	@param		string		$source				A staged file or directory
+		 *	@param		string		$target				Where it was copied to
+		 *
+		 *	@return 	bool
+		 */
+		private static function _whole( string $source, string $target ): bool {
+
+			clearstatcache();
+
+			if( is_file( $source ) === true )
+				return is_file( $target ) === true && filesize( $target ) === filesize( $source );
+
+			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $file ) {
+
+				$there = $target. substr( $file->getPathname(), strlen( $source ) );
+
+				if( is_file( $there ) === false || filesize( $there ) !== $file->getSize() )
+					return false;
+			}
 
 			return true;
 		}
@@ -1151,9 +1237,9 @@ namespace Nino\Modules\Backups {
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$key					Raw (not base64) 32-byte AES key
 		 *
-		 *	@return 	void
+		 *	@return 	string									The id of the snapshot, as the list names it
 		 */
-		private static function _safetySnapshot( array &$appData, string $dir, string $key ): void {
+		private static function _safetySnapshot( array &$appData, string $dir, string $key ): string {
 
 			/*	The shape Backups::_create() has, which this had drifted from:
 				the file tempnam() makes was never removed - one per restore,
@@ -1171,28 +1257,19 @@ namespace Nino\Modules\Backups {
 
 			$tmpTar = $tmpBase. '.tar';
 
+			// What a request that php ends takes with it: the plain tar of the project is no file to leave in the temporary directory
+			[ $guardFiles ] = self::_guard();
+			$guardFiles->exchangeArray( [ $tmpTar, $tmpTar. '.gz', $tmpBase ] );
+
 			try {
 				// One pass over the files, as a backup is made (see \Nino\Backup::pack())
 				\Nino\Backup::pack( $appData, \Nino\Backup::manifest( $appData ), $tmpTar );
 
-				$gz = @file_get_contents( $tmpTar. '.gz' );
-				if( $gz === false )
-					throw new \RuntimeException( 'the compressed snapshot could not be read' );
-
-				@unlink( $tmpTar. '.gz' );
-
-				$iv 		= random_bytes( 12 );
-				$tag 		= '';
-				$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
-				unset( $gz );
-				if( $cipher === false )
-					throw new \RuntimeException( 'the snapshot could not be encrypted' );
-
 				$snapshot	= $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php';
 
-				// Renamed into place like a backup itself: a snapshot the list
-				// offers is a whole one or none
-				if( \Nino\Admin\Admin::writeFileAtomic( $snapshot, \Nino\Admin\Recovery::stubPieces( $iv, $tag, $cipher ) ) === false )
+				// Sealed in chunks as it is written, and renamed into place like a
+				// backup itself: a snapshot the list offers is a whole one or none
+				if( \Nino\Admin\Admin::writeFileAtomic( $snapshot, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ) ) === false )
 					throw new \RuntimeException( 'the snapshot could not be written' );
 			}
 			finally {
@@ -1200,9 +1277,12 @@ namespace Nino\Modules\Backups {
 				@unlink( $tmpTar. '.gz' );
 				@unlink( $tmpBase );
 				fclose( $lease );
+				$guardFiles->exchangeArray( [] );
 			}
 
 			self::_pruneSnapshots( $dir );
+
+			return basename( $snapshot, '.php' );
 		}
 
 		/**

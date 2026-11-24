@@ -15,9 +15,12 @@ return [
 	'[[/_admin/backups/msg/interrupted]]'	=> 'Today’s automatic backup did not finish: the request that was making it ended, most likely because the server ran out of memory or time. Nino does not try again by itself today; Back up now makes one.',
 	'[[/_admin/backups/msg/stopped-time]]'	=> 'The backup that began on %s was ended by the server: its time limit (%s s) ran out. To pack: %s MB, files: %s.',
 	'[[/_admin/backups/msg/stopped-memory]]'	=> 'The backup that began on %s was ended by the server: its memory limit (%s MB) ran out. To pack: %s MB, files: %s.',
+	'[[/_admin/backups/msg/stopped-disk]]'	=> 'The backup that began on %s ended because the disk was full: a file could not be written. To pack: %s MB, files: %s. Free room on the server, in the temporary directory and where the backups are kept.',
 	'[[/_admin/backups/msg/stopped-open]]'	=> 'The backup that began on %s did not end, and the server did not say why - most likely its time or memory limit ran out. To pack: %s MB, files: %s.',
 	'[[/_admin/backups/msg/stopped-retry]]'	=> 'Nino does not try again by itself today; Back up now makes one once the cause is out of the way.',
 	'[[/_admin/backups/msg/reason-write]]'	=> 'there was no room left, in the temporary directory or where the backups are kept, or a file could not be written',
+	'[[/_admin/error/backups_disk]]'	=> 'The disk of this server has too little room for this: about %s MB are needed, %s MB are free. Nothing was changed.',
+	'[[/_admin/error/backups_restore_partial]]'	=> 'The restore stopped halfway: a file could not be written, most likely because the disk is full. Part of the project is the archive’s state and part is the state before. The archive %s in the list holds the state before: restore it to go back, once there is room on the disk.',
 	'[[/_admin/error/backups_write]]'	=> 'There was no room left to write the backup, in the temporary directory or where the backups are kept, or a file could not be written. The backups that exist are untouched.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'The backup comes from Nino %s; this is %s.',
 	'[[/_admin/error/backups_busy]]'	=> 'A backup or a restore is running. Try again in a moment.',
@@ -45,7 +48,7 @@ return [
 	'[[/_admin/error/backups_key_missing]]'	=> 'Type the recovery key of the archive.',
 	'[[/_admin/error/backups_key_format]]'	=> 'That is no recovery key: it is 44 characters long and ends in =.',
 	'[[/_admin/error/backups_key_tries]]'	=> 'Too many attempts with a recovery key. Try again later.',
-	'[[/_admin/error/backups_upload_memory]]'	=> 'The memory limit of this server does not carry opening this archive (about %s MB needed, limit %s MB). A restore needs the same: raise memory_limit first.',
+	'[[/_admin/error/backups_upload_memory]]'	=> 'This archive is of the older kind, which is opened whole in memory, and the memory limit of this server does not carry it (about %s MB needed, limit %s MB). A restore needs the same: raise memory_limit first. An archive made by this version is opened in pieces and needs no such room.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/backups/manual/intro]]'	=> 'A backup is a copy of your website’s content as it was on one day. Nino takes one by itself every day and keeps the newest few; how many is set in Config, which also switches it off.',
