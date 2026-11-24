@@ -7804,7 +7804,7 @@
 		 *	@param		{Array}			options.columns			As of table() - with `cell` for a kind of cell, and `primary` and `narrow` for what a column is in a card
 		 *	@param		{string}		options.rowKey			The property that is a row's identity (a string)
 		 *	@param		{Object}		options.labels			{ search, empty, noMatch, filter, loading, range, prev, next, pageSize, sortBy, sortNone, sortUp, sortDown } - the words; the last four are the select of a card, "%s" in the two of the direction is the name of the column
-		 *	@param		{Object}		[options.category]	{ id, label, value, options : [ { value, label } ], match( row, value ) } - the first select, left of the search; its first option is "all"
+		 *	@param		{Object}		[options.category]	{ id, label, value, options : [ { value, label } ], match( row, value ) } - the first select, left of the search; its first option is "all" - and match() is asked with the value of that option too, which is '' unless the caller gives another: it answers true for it
 		 *	@param		{Array}			[options.filters]		[ { id, label, value, options, match( row, value ) } ] - the selects after the search, in the order given; the first option of each is "all"
 		 *	@param		{Object}		[options.state]			What the directory starts as, for one that is drawn again: { query, sort, page, pageSize, category, filters : { id : value } }
 		 *	@param		{Function}	[options.onState]		Called with state() when a person changed what they see
@@ -8019,6 +8019,7 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		options.screen			The panel's screen as the router knows it (its uri)
+		 *	@param		{Array|Function}	[options.prefix]	The parts of the address that stand before the entry, for a directory that does not start at the head of its screen but under a part of it - the files of a folder, `#files/files/<folder>/<entry>`: an array of keys and words, or a function that answers it (the folder changes while the panel is there). The record opens and writes `#panel/tab/<prefix...>/<entry>`, answers an address that names the prefix alone as its directory, and an address that does not begin with the prefix is not its own: it closes where it is open and the panel draws the other view
 		 *	@param		{string}		[options.dirty]			The name of the unsaved-input entry (the screen by default)
 		 *	@param		{Object}		options.directory		The directory the entries are in: rows(), reveal( key ), focusRow( key )
 		 *	@param		{Function}	options.keyOf				keyOf( row ) - the string that names the entry in the address
@@ -8026,16 +8027,16 @@
 		 *	@param		{Function}	options.find				find( key ) - the row of that key, whether the directory shows it or not, or null
 		 *	@param		{Function}	options.title				title( row ) - the name of the entry; text
 		 *	@param		{Function}	[options.subtitle]	subtitle( row ) - the identifier under it; text
-		 *	@param		{Function}	options.body				body( row, ctx ) - the content: an element, a form's fields or lines to read. ctx is { form, bar, row, key, status, go( delta ), close(), touch() } - after a save the buttons that fit the entry - hidden( row ) of the actions and of danger - are asked of the row the save answered, and a button that has the focus and goes away gives it to the main button. touch() says that something was chosen that no field holds (a file) and is unsaved
+		 *	@param		{Function}	options.body				body( row, ctx ) - the content: an element, a form's fields or lines to read. ctx is { form, bar, row, key, status, go( delta ), close(), touch() } - after a save the buttons that fit the entry - hidden( row ) of the actions and of danger - are asked of the row the save answered, and a button that has the focus and goes away gives it to the main button. touch() says that something was chosen that no field holds (a file) and is unsaved, touch( false ) that it was taken back
 		 *	@param		{boolean}		[options.readOnly]	The entry is read and not edited: no state in the bar, and no Close in it either - the cross and Escape close - so the bar has the destructive action at the left and at the right what can be done with the entry
-		 *	@param		{Function}	[options.save]			save( row, ctx, done ) - done( ok, { row, error, conflict } ); the panel keeps its rows and draws the row anew (directory.update()) before it says ok. The entry was written
+		 *	@param		{Function}	[options.save]			save( row, ctx, done ) - done( ok, { row, error, conflict } ); the panel keeps its rows and draws the row anew (directory.update()) before it says ok. A save that failed after it had written part of the entry says the row as it is then - done( false, { row, error } ) - and the record takes it (its name, its buttons) The entry was written
 		 *																			by another tab or person first: done( false, { conflict : true, error } ) asks the question of the guide on the record; ctx.overwrite is true for the save that answers Overwrite
 		 *	@param		{Function}	[options.reload]		reload( key, done ) - the panel reads the entry again and says done( row ), the row it holds now (null where it is gone), for the answer Reload of that question
 		 *	@param		{boolean}		[options.saveNext]	"Save and continue" beside Save: saves and goes on to the next entry
-		 *	@param		{Object}		[options.danger]		{ label, hidden( row ), run( row, opener, done ) } - the destructive action, at the left; hidden( row ) is true for an entry that has no button for it. run asks the question of its
+		 *	@param		{Object}		[options.danger]		{ label, hidden( row ), stay, run( row, opener, done ) } - `stay : true` for an action that takes away something of the entry and not the entry (the picture of a slot): the record is not closed after it but drawn again as the entry is then, find( key ) - the panel has put the changed row in its rows. The destructive action, at the left; hidden( row ) is true for an entry that has no button for it. run asks the question of its
 		 *																			level itself - the question of the level destructive, asked as nested, so that it stands on the record - and acts: done( true ) where it went (the panel has taken the
 		 *																			row out of its directory by then), done( false, { error } ) where it failed, done( null ) where the answer was no
-		 *	@param		{Array}			[options.actions]		[ { label, kind, run( row, ctx ), icon, hidden( row ) } ] - run gets the button as ctx.opener, which a dialog it opens gives the focus back to (see choiceDialog()); further buttons at the right of the bar; hidden( row ) true for an entry that the action does nothing for (no button without an effect). In a record that is only read the first with kind 'primary' is the main button
+		 *	@param		{Array}			[options.actions]		[ { label, kind, run( row, ctx ), icon, hidden( row ) } ] - run gets the button as ctx.opener, which a dialog it opens gives the focus back to (see choiceDialog()); further buttons at the right of the bar - none of the kind danger: that is the one `danger` at the left, and a record refuses a second; hidden( row ) true for an entry that the action does nothing for (no button without an effect). In a record that is only read the first with kind 'primary' is the main button
 		 *	@param		{Function}	options.missing			missing( key ) - the entry named by the address is not there
 		 *	@param		{Object}		options.labels			{ close, prev, next, position, save, saveNext, closeButton, deleted, saved } - the words; the shared fills where left out
 		 *
@@ -8129,6 +8130,33 @@
 				return sequence().findIndex( function( row ) { return options.keyOf( row ) === current.key } );
 			};
 
+			// The parts that stand before the entry in the address (options.prefix), as the panel gives them now
+			const prefixed = function() {
+
+				const given = typeof options.prefix === 'function' ? options.prefix() : options.prefix;
+
+				return Array.isArray( given ) === true ? given.slice() : [];
+			};
+
+			// What an address that names this screen says after the prefix: the parts behind it, or null where it does not begin with the prefix - a view of the panel that is not the directory this record belongs to
+			const behind = function( at ) {
+
+				const front = prefixed();
+
+				if( at.parts.length < front.length )
+					return null;
+
+				const same = front.every( function( part, index ) {
+
+					if( typeof part === 'object' && part !== null && typeof part.word === 'string' )
+						return router().wordOf( at.parts, index ) === part.word;
+
+					return router().wordOf( at.parts, index ) === '' && at.parts[index] === String( part );
+				} );
+
+				return same === true ? at.parts.slice( front.length ) : null;
+			};
+
 			// What names an entry in the address, null for one that has no address - the entry is read all the same, and the address stays the directory's
 			const addressOf = function( row ) {
 				return typeof options.addressOf === 'function' ? options.addressOf( row ) : options.keyOf( row );
@@ -8142,7 +8170,7 @@
 
 				const named = current === null ? null : addressOf( current.row );
 
-				router().set( options.screen, named === null ? [] : [ named ] );
+				router().set( options.screen, prefixed().concat( named === null ? [] : [ named ] ) );
 			};
 
 			const refreshNav = function() {
@@ -8158,9 +8186,9 @@
 			};
 
 			// A choice that is in no field - a file that was chosen for the entry - is unsaved input as well: the form says so
-			const touch = function() {
+			const touch = function( on ) {
 
-				touched = true;
+				touched = on !== false;
 
 				if( registry() !== null )
 					registry().refresh();
@@ -8350,6 +8378,11 @@
 					}
 
 					if( ok !== true ) {
+
+						// A save that failed after it had written part of the entry says the entry as it is now: its buttons, its name are the ones it has
+						if( result !== undefined && result !== null && result.row !== undefined && result.row !== null )
+							adopt( result.row );
+
 						bar.line.fail( String( ( result ?? {} ).error ?? '' ) );
 						bar.paint( { dirty : true } );
 						// The first field that is wrong has the focus
@@ -8436,7 +8469,7 @@
 					// An entry that a record made in the history is marked as its own (it stays so through a reload, Back and Forward) and is taken back by the history, so that Back
 					// and the cross are the same move and no entry is left over; an address that was typed has no mark and is written over
 					if( retreat() === false )
-						router().set( options.screen, [] );
+						router().set( options.screen, prefixed() );
 				}
 
 				silent = false;
@@ -8566,7 +8599,13 @@
 						// takes the record away (see the entry of the registry below); where there is none it is closed here. It stands over no other panel
 						onHash = function() {
 
-							if( dialog === null || router() === null || router().current().panel === options.screen || dirty() === true )
+							if( dialog === null || router() === null || dirty() === true )
+								return;
+
+							// The address of this panel that is still the directory of the record, or an entry of it, is the record's own; anything else leads away
+							const now = router().current();
+
+							if( now.panel === options.screen && behind( now ) !== null )
 								return;
 
 							// What stands on the record goes first, then the record
@@ -8621,6 +8660,19 @@
 
 					Nino.adminUi.say( word( 'deleted', '/_admin/common/msg/deleted' ) );
 
+					// What takes away something of the entry and leaves the entry - the picture of a slot - leaves the record open, drawn as the entry is now
+					if( options.danger.stay === true ) {
+
+						const kept = options.find( current.key );
+
+						if( kept !== null ) {
+							current.row = kept;
+							draw();
+						}
+
+						return;
+					}
+
 					// The focus goes to the row that took its place, once the dialog is gone
 					refocus = around === undefined ? null : options.keyOf( around );
 					leave( 'own' );
@@ -8639,7 +8691,7 @@
 				// The record reads the address itself: what it says of this panel, or - where the screen is another one - nothing. It is not the record's to answer then: the panel on screen is
 				// another one, a record that stands open over it is closed by the listener of the address, and a question about unsaved input was asked by the shell once, not a second time here
 				const at = here.current();
-				const parts = at.panel === options.screen ? at.parts : null;
+				const parts = at.panel === options.screen ? behind( at ) : null;
 				const named = Array.isArray( parts ) === true && parts.length === 1 ? String( parts[0] ) : null;
 
 				if( parts === null )
@@ -8661,16 +8713,22 @@
 
 				if( named === null ) {
 
-					if( dialog === null )
+					// An address that names the directory - and any other that is read as it: a part that is no part ended the parts, one part too many - is written as the
+					// directory's own, so that what stands in the bar is what is on screen; where it says so already nothing is written
+					if( dialog === null ) {
+						here.set( options.screen, prefixed() );
 						return false;
+					}
 
 					here.leave( [ dirtyName ], true, function() { leave( 'silent' ) }, resync );
 
 					return true;
 				}
 
-				if( current !== null && current.key === named )
+				if( current !== null && current.key === named ) {
+					address();
 					return false;
+				}
 
 				// An entry that has no address of its own is not one an address can name
 				const found = options.find( named );
@@ -8685,7 +8743,7 @@
 					// The entry of the history that named the entry that is gone - Forward after it was taken away - is a record's and is taken off the history, as the cross takes it:
 					// written over it would stand as a second entry of the directory in a row, and Back would do nothing. An address that was typed is written over
 					if( retreat() === false )
-						here.set( options.screen, [] );
+						here.set( options.screen, prefixed() );
 
 					return true;
 				}
@@ -8696,6 +8754,8 @@
 						open( named, {} );
 					else
 						show( named );
+
+					address();
 				}, resync );
 
 				return true;
@@ -8714,7 +8774,7 @@
 
 					const before = here.position();
 
-					here.go( options.screen, [ addressOf( row ) ] );
+					here.go( options.screen, prefixed().concat( [ addressOf( row ) ] ) );
 
 					if( here.position() !== before )
 						here.mark( options.screen );

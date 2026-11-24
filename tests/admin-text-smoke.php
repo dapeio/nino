@@ -1248,7 +1248,7 @@ unlink( $sandbox. '/private/templates/scan-fixture-img.tpl' );
 $usageTemplates = [
 	'usage-page' 	=> '<section>[pic /use/hero alt=""]</section>[template /templates/usage-part][band-wrap image="/use/viauri"][/band-wrap][band-wrap id="band" image="~photo"][/band-wrap]',
 	'usage-part' 	=> '<p>[pic /use/inner alt="[[/use/alt]]"]</p>[template /templates/usage-deeper][band-wrap id="deep" image="~picture"][/band-wrap]',
-	'usage-deeper' => '[pic /use/deep]',
+	'usage-deeper' => '[pic /use/deep][imagevalues /use/values]<img src="[[src]]">[else]none[/imagevalues]',
 	'usage-orphan' => '[pic /use/orphan]',
 	'usage-loop' 	=> '[pic /use/loop][template /templates/usage-loop][template /templates/usage-loop2]',
 	'usage-loop2' => '[template /templates/usage-loop]',
@@ -1268,7 +1268,7 @@ $usageText = \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Admin\A
 $usageText['[[/_nino/webpage/usage-page/name]]'] = 'Nutzung';
 \Nino\Filesystem::putFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', $usageText );
 
-foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
+foreach( [ 'hero', 'viauri', 'inner', 'deep', 'values', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
 	$appData['/nino/html/images']['/use/'. $usageSlot] = [ 'label' => 'Use '. $usageSlot, 'width' => 10, 'height' => 10, 'filename' => null ];
 
 $usage = \Nino\Modules\Images\Slots::usage( $appData );
@@ -1286,6 +1286,7 @@ $bandRow = array_column( $bandBody['slots'], null, 'uri' )['/template/usage-page
 check( '...and a slot that exists and is shown only by image="~name" under the id of a section is used - by the template and by the page - and is not the slot nothing shows',
 	( $bandRow['usage'] ?? null ) === [ 'templates' => [ 'usage-page' ], 'pages' => [ $usagePage ] ] && ( $bandRow['usage'] ?? null ) !== \Nino\Modules\Images\Slots::NO_USAGE );
 unset( $appData['/nino/html/images']['/template/usage-page/band/photo'] );
+check( 'a slot drawn by [imagevalues] - the shortcode of the kernel that logo and hero of the starter pages are - is used like one drawn by a component: by the template and by the page', ( $usage['/use/values'] ?? null ) === [ 'templates' => [ 'usage-deeper' ], 'pages' => [ $usagePage ] ] );
 check( 'a template no route renders is listed with its templates and no pages', ( $usage['/use/orphan'] ?? null ) === [ 'templates' => [ 'usage-orphan' ], 'pages' => [] ] );
 check( 'templates that include themselves, directly or through another, are read once and do not run away', ( $usage['/use/loop']['pages'] ?? null ) === [ [ 'httpUri' => '/looped', 'name' => '/looped' ] ] );
 check( 'a body that names its template by language is read for every available language, and a page without a name of its own is named by its http uri',
@@ -1299,8 +1300,142 @@ check( 'apiList carries usage on every slot: the used one with its page, the unu
 
 foreach( array_keys( $usageTemplates ) as $usageName )
 	unlink( $sandbox. '/private/templates/'. $usageName. '.tpl' );
+// What the kernel puts round a page - the frame of the head and of the foot, drawn in the scaffold - is on every page that has it, found by the same rules that draw the page
+$frameFiles = [
+	'html-header' 					=> '<head></head><body>[[header]]',
+	'html-footer' 					=> '[[footer]]</body>',
+	'frame-header' 					=> '<header>[imagevalues /use/frame]<img src="[[src]]">[/imagevalues]</header>',
+	'frame-header-landing' 	=> '<header>[imagevalues /use/landing]<img src="[[src]]">[/imagevalues]</header>',
+	'frame-footer' 					=> '<footer>[imagevalues /use/footer]<img src="[[src]]">[/imagevalues]</footer>',
+];
+$frameFilesBefore = [];
+foreach( $frameFiles as $frameName => $frameSource ) {
+	$frameFilesBefore[$frameName] = is_file( $sandbox. '/private/templates/'. $frameName. '.tpl' ) === true ? (string) file_get_contents( $sandbox. '/private/templates/'. $frameName. '.tpl' ) : null;
+	file_put_contents( $sandbox. '/private/templates/'. $frameName. '.tpl', $frameSource );
+}
+$frameRoutesBefore = $appData['/nino/http/routes'];
+$appData['/nino/http/routes'] = [
+	'GET://p1' => [ 'uri' => '/p1', 'body' => '[template /templates/html-header]<main></main>[template /templates/html-footer]' ],
+	'GET://p2' => [ 'uri' => '/p2', 'body' => '[frame /templates/frame-header-landing]<main></main>[frame /templates/frame-footer]' ],
+	'GET://p3' => [ 'uri' => '/p3', 'body' => '[frame /templates/frame-header-none]<main>no frame</main>' ],
+	'GET://p4' => [ 'uri' => '/p4', 'body' => '<main>a page with no frame at all</main>' ],
+];
+foreach( [ '/use/frame', '/use/landing', '/use/footer' ] as $frameSlot )
+	$appData['/nino/html/images'][$frameSlot] = [ 'label' => 'F '. $frameSlot, 'width' => 10, 'height' => 10, 'filename' => null ];
+$frameUsage = \Nino\Modules\Images\Slots::usage( $appData );
+$frameOf = static fn( string $slot ): array => array_column( $frameUsage[$slot]['pages'] ?? [], 'httpUri' );
+check( 'a picture of the standard frame of the head is on every page that calls the scaffold of the head - and on no page that has no frame', $frameOf( '/use/frame' ) === [ '/p1' ] );
+check( 'a page that chooses a frame has that frame: the file of its word, and the standard foot', $frameOf( '/use/landing' ) === [ '/p2' ] && $frameOf( '/use/footer' ) === [ '/p1', '/p2' ] );
+check( '...a page that chooses no frame at all (the word none) and a page that calls neither the scaffold nor a frame have none', in_array( '/p3', $frameOf( '/use/landing' ), true ) === false && in_array( '/p4', $frameOf( '/use/frame' ), true ) === false && in_array( '/p3', $frameOf( '/use/frame' ), true ) === false );
+// A draft of a preview takes the place of the file of the scaffold: one with no place for the frame
+$appData['./nino/template/swapped']['html-header'] = '<head></head><body>no place for the frame';
+$noPlace = \Nino\Modules\Images\Slots::usage( $appData );
+unset( $appData['./nino/template/swapped']['html-header'] );
+check( '...and a scaffold that has no place for the frame draws none, so the picture of the standard frame is on no page', ( $noPlace['/use/frame']['pages'] ?? [] ) === [] );
+$appData['/nino/http/routes'] = $frameRoutesBefore;
+foreach( $frameFilesBefore as $frameName => $frameBefore )
+	if( $frameBefore === null )
+		unlink( $sandbox. '/private/templates/'. $frameName. '.tpl' );
+	else
+		file_put_contents( $sandbox. '/private/templates/'. $frameName. '.tpl', $frameBefore );
+foreach( [ '/use/frame', '/use/landing', '/use/footer' ] as $frameSlot )
+	unset( $appData['/nino/html/images'][$frameSlot] );
+
+// The starter site's own head and foot: the logo and the dark logo are drawn by the frame, and every page that calls the scaffold has the frame
+$starterFiles = [ 'html-header' => '/_admin/install/library/base/templates/html-header.tpl', 'html-footer' => '/_admin/install/library/base/templates/html-footer.tpl', 'frame-header' => '/_admin/install/library/frame/templates/frame-header.tpl', 'frame-footer' => '/_admin/install/library/frame/templates/frame-footer.tpl' ];
+$starterBefore = [];
+foreach( $starterFiles as $starterName => $starterFile ) {
+	$starterBefore[$starterName] = is_file( $sandbox. '/private/templates/'. $starterName. '.tpl' ) === true ? (string) file_get_contents( $sandbox. '/private/templates/'. $starterName. '.tpl' ) : null;
+	copy( __DIR__. '/..'. $starterFile, $sandbox. '/private/templates/'. $starterName. '.tpl' );
+}
+$starterRoutesBefore = $appData['/nino/http/routes'];
+$appData['/nino/http/routes'] = [
+	'GET://' 				=> [ 'uri' => '/home', 'body' => '[template /templates/html-header]<main>home</main>[template /templates/html-footer]' ],
+	'GET://contact' => [ 'uri' => '/contact', 'body' => '[template /templates/html-header]<main>contact</main>[template /templates/html-footer]' ],
+];
+foreach( [ '/logo', '/logo/dark' ] as $starterSlot )
+	$appData['/nino/html/images'][$starterSlot] = [ 'label' => 'S '. $starterSlot, 'width' => 10, 'height' => 10, 'filename' => null ];
+$starterUsage = \Nino\Modules\Images\Slots::usage( $appData );
+check( 'the dark logo of the starter site is on every page: the frame of its head draws it, and every page that calls the scaffold of the head has that frame', array_column( $starterUsage['/logo/dark']['pages'] ?? [], 'httpUri' ) === [ '/', '/contact' ] );
+check( '...and the logo, which the scaffold itself reads for the address of its picture too, is on both pages once', array_column( $starterUsage['/logo']['pages'] ?? [], 'httpUri' ) === [ '/', '/contact' ] );
+$appData['/nino/http/routes'] = $starterRoutesBefore;
+foreach( [ '/logo', '/logo/dark' ] as $starterSlot )
+	unset( $appData['/nino/html/images'][$starterSlot] );
+foreach( $starterBefore as $starterName => $starterContent )
+	if( $starterContent === null )
+		unlink( $sandbox. '/private/templates/'. $starterName. '.tpl' );
+	else
+		file_put_contents( $sandbox. '/private/templates/'. $starterName. '.tpl', $starterContent );
+
+// The directory of the Images panel: the group each slot stands under, and whether every page shows it
+file_put_contents( $sandbox. '/private/templates/page-gruppe.tpl', '[pic /template/page-gruppe/hero/image]' );
+$groupText = \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', [] );
+$groupText['[[/_nino/webpage/gruppe/name]]'] = 'Die Gruppe';
+\Nino\Filesystem::putFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', $groupText );
+$groupRoutesBefore = $appData['/nino/http/routes'];
+$appData['/nino/http/routes'] = [
+	'GET://a' 					=> [ 'uri' => '/a', 'body' => '[pic /every/x][pic /some/y]' ],
+	'GET://gruppe'			=> [ 'uri' => '/gruppe', 'body' => '[template /templates/page-gruppe][pic /every/x]' ],
+	'GET://robots.txt'	=> [ 'uri' => '/robots.txt', 'body' => '[pic /every/x]' ],
+	'GET://b' 					=> [ 'uri' => '/b', 'body' => '[pic /every/x][pic /some/y]' ],
+	'GET://_admin'			=> [ 'uri' => '/_admin', 'body' => '[nothing]' ],
+];
+foreach( [ '/every/x', '/some/y', '/template/page-gruppe/hero/image', '/template/frame-header/logo/image', '/template/page-lose/hero/image', '/logo', '/odd/thing/image' ] as $groupSlot )
+	$appData['/nino/html/images'][$groupSlot] = [ 'label' => 'G '. $groupSlot, 'width' => 10, 'height' => 10, 'filename' => null ];
+
+[ , $groupBody ] = callDev( $appData, \Nino\Modules\Images\Admin::class, 'apiList' );
+$groupRows = array_column( $groupBody['slots'], null, 'uri' );
+check( 'a slot of the template of a page stands under the name of that page, in the language of the workbench', ( $groupRows['/template/page-gruppe/hero/image']['group'] ?? null ) === [ 'key' => 'page:page-gruppe', 'type' => 'page', 'name' => 'Die Gruppe', 'address' => '/gruppe' ] );
+check( '...the slots of the head, the foot and the other shared templates, and those with no place of their own, stand under the group that has no name of its own - the client says "General"',
+	( $groupRows['/template/frame-header/logo/image']['group'] ?? null ) === [ 'key' => 'general', 'type' => 'general', 'name' => '', 'address' => '' ] && ( $groupRows['/logo']['group'] ?? null ) === [ 'key' => 'general', 'type' => 'general', 'name' => '', 'address' => '' ] );
+check( '...a template no route renders is spelled out by its name, and a slot that is named after no place - however many words its uri has - is general, so that /logo and /logo/dark are not a group each', ( $groupRows['/template/page-lose/hero/image']['group'] ?? null ) === [ 'key' => 'other:page-lose', 'type' => 'other', 'name' => 'Lose', 'address' => '' ] && ( $groupRows['/odd/thing/image']['group'] ?? null ) === [ 'key' => 'general', 'type' => 'general', 'name' => '', 'address' => '' ] );
+check( 'a slot that every page shows is told so: the pages of the website are its routes for GET that are no file, and neither is robots.txt nor the address of the workbench', \Nino\Modules\Images\Admin::pageUris( $appData ) === [ '/a', '/gruppe', '/b' ]
+	&& ( $groupRows['/every/x']['everywhere'] ?? null ) === true && ( $groupRows['/some/y']['everywhere'] ?? null ) === false );
+// The mail templates are the site's and no page's; the first route that renders a template names its page; a feature that is off names nothing; the language is the one the names are shown in; one word under a feature's key is no slot of the feature
+file_put_contents( $sandbox. '/private/templates/page-viele.tpl', '[pic /template/page-viele/hero/image]' );
+$groupText = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$groupDe = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+foreach( [ 'eins' => 'First', 'zwei' => 'Second', 'viele' => 'Many' ] as $groupPage => $groupName ) {
+	$groupText['[[/_nino/webpage/'. $groupPage. '/name]]'] = $groupName;
+	$groupDe['[[/_nino/webpage/'. $groupPage. '/name]]'] = $groupName. ' de';
+}
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', $groupText );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', $groupDe );
+$appData['/nino/http/routes'] = [
+	'GET://eins' => [ 'uri' => '/eins', 'body' => '[template /templates/page-viele]' ],
+	'GET://zwei' => [ 'uri' => '/zwei', 'body' => '[template /templates/page-viele]' ],
+];
+$appData['./nino/features/all'] = [
+	'gallery' => [ 'key' => 'gallery', 'name' => [ 'en_US' => 'Gallery', 'de_DE' => 'Galerie' ], 'active' => true ],
+	'quiet' 	=> [ 'key' => 'quiet', 'name' => [ 'en_US' => 'Quiet', 'de_DE' => 'Leise' ], 'active' => false ],
+];
+$groupUris = [ '/template/mail-owner/logo/image', '/template/page-viele/hero/image', '/gallery/one', '/quiet/one', '/gallery' ];
+$sessionBefore = \Nino\Runtime::getSessionValue( $appData, './admin/locale', '' );
+\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'en_US' );
+$englishGroups = \Nino\Modules\Images\Admin::groups( $appData, $groupUris );
+\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'de_DE' );
+$germanGroups = \Nino\Modules\Images\Admin::groups( $appData, $groupUris );
+$sessionBefore === '' ? \Nino\Runtime::unsetSessionValue( $appData, './admin/locale' ) : \Nino\Runtime::setSessionValue( $appData, './admin/locale', $sessionBefore );
+check( 'the pictures of a mail template are general: the mail is the site\'s and no page\'s', $englishGroups['/template/mail-owner/logo/image']['key'] === 'general' );
+check( 'where two routes render one template the first names the page - and its address is the group\'s', $englishGroups['/template/page-viele/hero/image'] === [ 'key' => 'page:page-viele', 'type' => 'page', 'name' => 'First', 'address' => '/eins' ] );
+check( 'a slot under the key of a feature that is on is the feature\'s, named in the language of the workbench; one under a key of a feature that is off is general', $englishGroups['/gallery/one']['name'] === 'Gallery' && $germanGroups['/gallery/one']['name'] === 'Galerie' && $englishGroups['/quiet/one']['key'] === 'general' );
+check( '...and the names of the pages are those of that language too, not of the native one', $germanGroups['/template/page-viele/hero/image']['name'] === 'First de' && $englishGroups['/template/page-viele/hero/image']['name'] === 'First' );
+check( '...a slot of ONE word that is the key of a feature is no slot of the feature', $englishGroups['/gallery']['key'] === 'general' );
+unset( $appData['./nino/features/all'] );
+unlink( $sandbox. '/private/templates/page-viele.tpl' );
+
+// A website of ONE page has no "every page": the slot stands on that page and is said to by its name
+$appData['/nino/http/routes'] = [ 'GET://only' => [ 'uri' => '/only', 'body' => '[pic /every/x]' ] ];
+[ , $oneBody ] = callDev( $appData, \Nino\Modules\Images\Admin::class, 'apiList' );
+$oneRow = array_column( $oneBody['slots'], null, 'uri' )['/every/x'];
+check( 'on a website of one page the slot that stands on it is not "on every page": it names the page, which is what a person asks about', $oneRow['everywhere'] === false && array_column( $oneRow['usage']['pages'], 'httpUri' ) === [ '/only' ] );
+$appData['/nino/http/routes'] = $groupRoutesBefore;
+foreach( [ '/every/x', '/some/y', '/template/page-gruppe/hero/image', '/template/frame-header/logo/image', '/template/page-lose/hero/image', '/logo', '/odd/thing/image' ] as $groupSlot )
+	unset( $appData['/nino/html/images'][$groupSlot] );
+unlink( $sandbox. '/private/templates/page-gruppe.tpl' );
+
 $appData['/nino/http/routes'] = $usageRoutesBefore;
-foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
+foreach( [ 'hero', 'viauri', 'inner', 'deep', 'values', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
 	unset( $appData['/nino/html/images']['/use/'. $usageSlot] );
 
 // --- the slots a component names as its source ---------------------------------

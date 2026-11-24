@@ -49,6 +49,29 @@ function world( extra ) {
 }
 
 // The rows of the table that are drawn, by their key
+/**
+ *	Whether the rule of the stylesheet that makes what a cell holds a box of the line - so that the sign "›" that a row opens stands on the line of the name -
+ *	reaches a cell, asked of the selector the stylesheet has: td, the classes it is not, the sign among its children. Read from the stylesheet, applied to the
+ *	cell a table drew; a selector of another shape is no answer and fails the check
+ */
+function lineRule() {
+
+	const sheet = source('_admin/assets/style.css').replace( /\/\*[\s\S]*?\*\//g, '' );
+	const rule = /([^{}]*\.nino-admin-row-chev\) > :not\(\.nino-admin-row-chev\))\s*\{([^}]*)\}/.exec( sheet );
+
+	if( rule === null || /display:\s*inline-block/.test( rule[2] ) === false )
+		return null;
+
+	const parts = /^\s*:where\(\.nino-admin\) \.nino-admin-table td((?::not\(\.[\w-]+\))*):has\(> \.nino-admin-row-chev\) > :not\(\.nino-admin-row-chev\)\s*$/.exec( rule[1] );
+
+	if( parts === null )
+		return null;
+
+	const not = Array.from( parts[1].matchAll( /:not\(\.([\w-]+)\)/g ) ).map( m => m[1] );
+
+	return cell => cell.tagName === 'TD' && cell.children.some( c => hasClass( c, 'nino-admin-row-chev' ) ) && not.every( name => hasClass( cell, name ) === false );
+}
+
 const shown = mount => findAll( mount, el => el.tagName === 'TR' && el.dataset.row !== undefined ).map( el => el.dataset.row );
 const sorter = ( mount, key ) => findAll( mount, el => el.tagName === 'TH' && el.dataset.key === key )[0];
 
@@ -345,6 +368,12 @@ function directoryOver( extra ) {
 	check( 'a change of the category is told as one: the state that comes is the one with the category', states.length === toldBefore + 1 && states[states.length - 1].category === 'b' );
 	check( 'the category narrows the rows - by the directory, not by the caller', shown( mount ).length === 20 && directory.rows().every( row => row.group === 'b' ) );
 
+	// What match() is asked with: every value the select holds, the first option - "all" - included, so that the caller answers true for it
+	const asked = [];
+	directoryOver( { category : { id : 'cat2', label : 'Group', value : '', options : [ { value : '', label : 'All groups' }, { value : 'a', label : 'A' } ], match : ( row, value ) => { asked.push( value ); return value === '' || row.group === value } }, filters : [] } );
+	check( 'match() of the category is asked with the value of its first option - "all" - as well, which is the empty string', asked.length > 0 && asked.every( value => value === '' ) );
+
+
 	selects[1].value = 'off';
 	fire( selects[1], 'change' );
 	check( '...and a filter narrows what is left, the two together', directory.rows().every( row => row.group === 'b' && row.state === 'off' ) && directory.rows().length === 5 );
@@ -483,6 +512,8 @@ function cardsOver( extra ) {
 
 	const name = tr.children.find( el => el.dataset.card === 'primary' );
 	const foot = tr.children.find( el => hasClass( el, 'nino-admin-table-actions' ) );
+	const reaches = lineRule();
+	check( 'the rule that makes what a cell holds a box of the line, so that the sign stands on the line of the name, reaches the cell of the name - a name with a line under it among them - and not the cell of the buttons', reaches !== null && reaches( name ) === true && reaches( foot ) === false );
 	check( 'the sign that the card opens ends the name, and the cell of the buttons holds the buttons alone, each with its name',
 		byClass( name, 'nino-admin-row-chev' ).length === 1 && byClass( foot, 'nino-admin-row-chev' ).length === 0 && tag( foot, 'button' ).map( b => b.attributes['aria-label'] ).join() === 'Open r01,Delete r01' );
 
@@ -549,6 +580,7 @@ function cardsOver( extra ) {
 		tag( mount, 'table' )[0].attributes.role === undefined && findAll( mount, el => el.dataset !== undefined && el.dataset.card !== undefined ).length === 0 && byClass( mount, 'nino-admin-table-sortby' ).length === 0
 		&& byClass( mount, 'nino-admin-table--cards' ).length === 0 && byClass( mount, 'nino-admin-table-scroll--cards' ).length === 0 );
 	const row = findAll( mount, el => el.tagName === 'TR' && el.dataset.row === 'r01' )[0];
+	check( '...the rule of the line does not reach it: the sign in the cell of the buttons stays where it stood', lineRule() !== null && lineRule()( row.children[row.children.length - 1] ) === false );
 	check( '...and the sign that its row opens stands in the cell of the buttons, as it did', byClass( row.children[row.children.length - 1], 'nino-admin-row-chev' ).length === 1 );
 }
 

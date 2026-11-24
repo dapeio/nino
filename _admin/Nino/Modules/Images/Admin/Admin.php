@@ -14,10 +14,11 @@ namespace Nino\Modules\Images {
 	 *	Nino										A compact filesystembased php framework
 	 *	Modules						The workbench's own screens
 	 *	Images									Admin "Images" panel: the image slots of
-	 *													/nino/html/images in config.php - this screen replaces a
-	 *													slot's current image or takes it away; creating and
-	 *													removing slots is the Image Slots tab's job (see
-	 *													Slots/Slots.php)
+	 *													/nino/html/images in config.php - the directory of them
+	 *													with a record for each: this screen replaces a slot's
+	 *													current image, takes it away and writes its alt texts;
+	 *													creating and removing slots is the Image Slots tab's job
+	 *													(see Slots/Slots.php)
 	 *
 	 *	@package								Dape/Nino
 	 *	@author									David Perchermeier <mail@dape.io>
@@ -55,7 +56,7 @@ namespace Nino\Modules\Images {
 		}
 
 		public static function panes(): array {
-			return [ 'images-list', 'images-form' ];
+			return [ 'images-list' ];
 		}
 
 		public static function assets(): array {
@@ -88,9 +89,140 @@ namespace Nino\Modules\Images {
 		}
 
 		/**
+		 *	The size of a stored picture in bytes, 0 for a name that names none: a name that is empty, absolute, climbs out with '..' or holds
+		 *	a control character is one a hand wrote into config.php, and is no file below /images/ (see \Nino\Images::read())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/
+		 *
+		 *	@return 	int
+		 */
+		public static function bytes( array &$appData, string $filename ): int {
+
+			if( self::named( $filename ) === false )
+				return 0;
+
+			$size = @filesize( \Nino\Filesystem::path( $appData, '/images/'. $filename ) );
+
+			return $size === false ? 0 : $size;
+		}
+
+		/**
+		 *	Whether a stored name is one of a file below /images/: not empty, not absolute, no '..' and no control character. A name
+		 *	that is none was written into config.php by hand, and is no picture of the folder - the list shows it as no picture
+		 *
+		 *	@param		string		$filename
+		 *
+		 *	@return 	bool
+		 */
+		public static function named( string $filename ): bool {
+			return $filename !== '' && str_contains( $filename, '..' ) === false && str_starts_with( $filename, '/' ) === false && preg_match( '/[\x00-\x1F\x7F]/', $filename ) !== 1;
+		}
+
+		/**
+		 *	The group each slot stands under in the directory, by what a person calls the place it belongs to: the name of the page whose route
+		 *	renders the template a slot of a template is named after (/template/page-home/... - the first route that renders it names it, in the
+		 *	language the workbench shows the names of the pages in, as Slots::usage() does), 'general' for the slots of the head, the foot, the mail
+		 *	and the other templates that no page is, and for every slot that is named after no place (/logo, /logo/dark) - the mail templates are the
+		 *	site's and no page's, so their pictures are general -, the name of the feature for a slot with more than one word under the key of an
+		 *	ACTIVE feature (/gallery/...; /gallery alone is general), and the template's own name, spelled out, for a template that no route renders.
+		 *
+		 *	A group is led by its key, never by its name: two pages that are called the same are two groups, and a page called like the general group
+		 *	is not that group. The key is the template of a page, the key of a feature, or 'general'; where two groups would show the same name the
+		 *	client adds the address - 'address' is the http uri of the page, '' for a group that is no page
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$uris					The slots' uris
+		 *
+		 *	@return 	array										uri => [ 'key' => string, 'type' => 'page'|'feature'|'general'|'other', 'name' => string, 'address' => string ] - the name of a general one is the client's word
+		 */
+		public static function groups( array &$appData, array $uris ): array {
+
+			$locale = \Nino\Admin\Admin::sessionLocale( $appData );
+			$text		= \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+			$pages	= [];
+
+			foreach( ( $appData['/nino/http/routes'] ?? [] ) as $routeKey => $route ) {
+
+				if( str_starts_with( (string) $routeKey, 'GET://' ) === false || is_array( $route ) === false || preg_match( '#\[template /templates/([A-Za-z0-9._-]+)[\] ]#', (string) ( $route['body'] ?? '' ), $match ) !== 1 )
+					continue;
+
+				$httpUri = substr( (string) $routeKey, strlen( 'GET:/' ) );
+				$name		 = (string) ( $text['[[/_nino/webpage'. (string) ( $route['uri'] ?? $httpUri ). '/name]]'] ?? '' );
+
+				if( $name !== '' )
+					$pages[ $match[1] ] ??= [ $name, $httpUri ];
+			}
+
+			$features = [];
+
+			foreach( \Nino\Features::all( $appData ) as $key => $feature )
+				if( ( $feature['active'] ?? false ) === true )
+					$features[ (string) $key ] = \Nino\Features::localized( $feature['name'] ?? '', $locale ) ?: (string) $key;
+
+			$general = [ 'key' => 'general', 'type' => 'general', 'name' => '', 'address' => '' ];
+			$groups = [];
+
+			foreach( $uris as $uri ) {
+
+				$uri		= (string) $uri;
+				$words	= array_values( array_filter( explode( '/', $uri ), static fn( string $part ): bool => $part !== '' ) );
+				$first	= $words[0] ?? '';
+
+				if( $first === 'template' && isset( $words[1] ) === true ) {
+
+					$template = $words[1];
+
+					if( isset( $pages[$template] ) === true )
+						$groups[$uri] = [ 'key' => 'page:'. $template, 'type' => 'page', 'name' => $pages[$template][0], 'address' => $pages[$template][1] ];
+					else if( preg_match( '/^(?:frame|html|mail|common)(?:-|$)/', $template ) === 1 )
+						$groups[$uri] = $general;
+					else
+						$groups[$uri] = [ 'key' => 'other:'. $template, 'type' => 'other', 'name' => ucfirst( str_replace( '-', ' ', (string) preg_replace( '/^page-/', '', $template ) ) ), 'address' => '' ];
+				}
+				else if( count( $words ) > 1 && isset( $features[$first] ) === true )
+					$groups[$uri] = [ 'key' => 'feature:'. $first, 'type' => 'feature', 'name' => $features[$first], 'address' => '' ];
+				else
+					$groups[$uri] = $general;
+			}
+
+			return $groups;
+		}
+
+		/**
+		 *	The addresses of the pages of the website: its routes for GET that are no file (robots.txt, sitemap.xml) and no address of the
+		 *	workbench (/_admin)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ http uri, ... ]
+		 */
+		public static function pageUris( array &$appData ): array {
+
+			$uris = [];
+
+			foreach( ( $appData['/nino/http/routes'] ?? [] ) as $routeKey => $route ) {
+
+				if( str_starts_with( (string) $routeKey, 'GET://' ) === false || is_array( $route ) === false )
+					continue;
+
+				$httpUri = substr( (string) $routeKey, strlen( 'GET:/' ) );
+
+				// A file (robots.txt) and the workbench's own address (/_admin) are no page of the website
+				if( str_contains( basename( $httpUri ), '.' ) === false && str_starts_with( $httpUri, '/_' ) === false )
+					$uris[] = $httpUri;
+			}
+
+			return array_values( array_unique( $uris ) );
+		}
+
+		/**
 		 *	List every developer-fixed image slot - each with its alt texts per
-		 *	language and where it is used (see Slots::usage()) - and the
-		 *	languages an alt text can be written in
+		 *	language, where it is used (see Slots::usage()) - and whether that is
+		 *	every page - the group it stands under (see groups()) and, for a slot
+		 *	that has a picture, the file, its weight and the size it really has;
+		 *	a stored name that is no file below /images/ is no picture here -
+		 *	and the languages an alt text can be written in
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -102,32 +234,51 @@ namespace Nino\Modules\Images {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$usage = Slots::usage( $appData );
+			$usage	= Slots::usage( $appData );
+			$groups	= self::groups( $appData, array_map( 'strval', array_keys( \Nino\Images::getSlots( $appData ) ) ) );
+			$every	= self::pageUris( $appData );
 
 			$slots = [];
-			foreach( \Nino\Images::getSlots( $appData ) as $uri => $slot )
+			foreach( \Nino\Images::getSlots( $appData ) as $uri => $slot ) {
+
+				$filename = is_string( $slot['filename'] ?? null ) === true && self::named( $slot['filename'] ) === true ? $slot['filename'] : null;
+				$stored 	= $filename === null ? false : \Nino\Images::dimensions( $appData, $filename );
+				$where		= $usage[$uri] ?? Slots::NO_USAGE;
+
 				$slots[] = [
 					'uri' 			=> $uri,
 					'label' 		=> $slot['label'] ?? $uri,
 					'width' 		=> $slot['width'] ?? 0,
 					'height' 		=> $slot['height'] ?? 0,
-					'url' 			=> ( empty( $slot['filename'] ) === false ) ? \Nino\Images::getUrl( $appData, $slot['filename'] ) : null,
+					'url' 			=> $filename === null ? null : \Nino\Images::getUrl( $appData, $filename ),
+					'file' 			=> $filename,
+					'bytes' 		=> $filename === null ? 0 : self::bytes( $appData, $filename ),
+					'shown' 		=> $stored === false ? null : $stored,
 					'alt' 			=> $slot['alt'] ?? [],
-					'usage' 		=> $usage[$uri] ?? Slots::NO_USAGE,
+					'group' 		=> $groups[(string) $uri],
+					'usage' 		=> $where,
+					// A slot that every page shows - the logo of the head - is said so, and not as a list of all of them. A website of ONE page has no
+					// "every": the slot stands on that page, and is said to be on it by its name
+					'everywhere'=> count( $where['pages'] ) > 1 && array_diff( $every, array_column( $where['pages'], 'httpUri' ) ) === [],
 				];
+			}
 
 			\Nino\Http::ok( $request, [ 'slots' => $slots, 'locales' => \Nino\Locales::getAvailableLocales( $appData ) ] );
 		}
 
 		/**
-		 *	Upload, process and store a new image for one slot. Committed
-		 *	immediately, same as \Nino\Modules\Elements\Admin::apiUploadImage() - stored at a
+		 *	Upload, process and store a new image for one slot. The call commits,
+		 *	same as \Nino\Modules\Elements\Admin::apiUploadImage() - the record of
+		 *	the panel sends it from its Save, after the person chose a file and
+		 *	looked at it in the browser, so that a file nobody saved never
+		 *	arrives. Stored at a
 		 *	deterministic path ("images/<uri>"), so a replace overwrites in
 		 *	place; the previous file only needs deleting in the rare case the
 		 *	output format itself changed - and only once the slot's record is
 		 *	written. A config.php that cannot be written leaves the old file
 		 *	standing: put back as it was where the new one overwrote it, the
-		 *	new one removed where it has a name of its own. The answer says how large the picture is as it is shown
+		 *	new one removed where it has a name of its own. The answer carries the
+		 *	weight of the stored file, says how large the picture is as it is shown
 		 *	and whether that is smaller than the slot's target: crop mode
 		 *	scales such a picture up, which the person should hear about
 		 *
@@ -202,7 +353,7 @@ namespace Nino\Modules\Images {
 			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
 				\Nino\Images::deleteUnlessShared( $appData, $oldFilename );
 
-			$body = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ];
+			$body = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ), 'bytes' => self::bytes( $appData, $filename ) ];
 
 			// What the picture is shown at, not what it is stored at: a
 			// photograph a camera stored on its side is measured upright
@@ -218,8 +369,9 @@ namespace Nino\Modules\Images {
 		/**
 		 *	Save the alt texts of one slot - { uri, alt : { <locale> : text } }.
 		 *	Merged per posted language, an empty text removes that language's
-		 *	entry (see \Nino\Images::setSlotAlt()), so the panel posts the one
-		 *	language it saves, when its field is left. An alt text is one short line: more than 250
+		 *	entry (see \Nino\Images::setSlotAlt()), so the panel posts the
+		 *	languages that were changed, in one call, with its Save: all of them
+		 *	are written or none. An alt text is one short line: more than 250
 		 *	characters once it is cleaned, a language the site does not have,
 		 *	a value that is not a string and bytes that are not UTF-8 are all
 		 *	a 400 and change nothing. Answers the slot's stored map

@@ -487,7 +487,7 @@ namespace Nino\Modules\Images {
 
 		/**
 		 *	The slots a page shows: those of its own source and of every
-		 *	template it includes, however deep
+		 *	template it includes, however deep - and of the frame the kernel puts round it (see \Nino\Modules\Template::frameFiles())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source				A route body or a template
@@ -556,6 +556,10 @@ namespace Nino\Modules\Images {
 				if( preg_match_all( '#\[template /templates/([A-Za-z0-9._-]+)[\] ]#', $variant, $matches ) > 0 )
 					foreach( $matches[1] as $name )
 						$includes[$name] = true;
+
+				// What the kernel puts round a page - the frame of its head and of its foot, in the scaffold - is on every page that has it
+				foreach( \Nino\Modules\Template::frameFiles( $appData, $variant ) as $name )
+					$includes[$name] = true;
 			}
 
 			return [ 'images' => $images, 'includes' => $includes ];

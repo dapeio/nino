@@ -2557,7 +2557,9 @@ namespace Nino {
 		 *	it, read once and not kept - and nothing is drawn or looked up: a value is no call, and a value that
 		 *	holds one, or a fill, reads nothing
 		 *
-		 *	Of each call of a registered component it lists, in the order they stand, the first word where its
+		 *	Of each call of [imagevalues] - the shortcode of the kernel that draws the picture of a slot - the first word where it is
+		 *	a key, as an image; and
+		 *	of each call of a registered component it lists, in the order they stand, the first word where its
 		 *	source is a text, an image or a link, and each attribute of the type text, image or link - the
 		 *	default where the call says none - that names a key: ~name, which the template and the nearest id
 		 *	above the call - its own, where it has one - make a key of, and a key with a slash in front. A link
@@ -2606,6 +2608,16 @@ namespace Nino {
 
 				$inner = $scope;
 				$schema = $registry[$node['n']] ?? null;
+
+				// [imagevalues /slot] is a shortcode of the kernel and no component, and what it draws is a picture of a slot: its first word is read as the source of an image is
+				if( $schema === null && $node['n'] === 'imagevalues' ) {
+
+					$written = is_string( $node['s'] ?? null ) === true ? $node['s'] : '';
+					$key = self::_key( $written, 'image', $template, $inner );
+
+					if( $key !== null )
+						$found[] = [ 'name' => 'imagevalues', 'kind' => 'image', 'source' => $key, 'written' => $written ];
+				}
 
 				if( $schema !== null ) {
 

@@ -1079,6 +1079,25 @@ check( 'the slot uri\'s leading slash is stripped for the deterministic path', $
 
 $slotUploadPath = \Nino\Filesystem::path( $appData, '/images/'. $slotBody['filename'] );
 check( 'the processed file exists on disk', is_file( $slotUploadPath ) === true );
+check( 'the answer of an upload carries the weight of the stored file', ( $slotBody['bytes'] ?? null ) === filesize( $slotUploadPath ) );
+
+// The directory of the panel shows the file, its weight and the size it really has in the same answer as the slots: nothing is asked for one by one
+[ , $filedBody ] = ninoCall( $appData, [ \Nino\Modules\Images\Admin::class, 'apiList' ] );
+$filedRow = $filedBody['slots'][0];
+check( 'apiList names the file of a slot that has a picture, its weight and the size it is stored at', $filedRow['file'] === $slotBody['filename'] && $filedRow['bytes'] === filesize( $slotUploadPath ) && $filedRow['shown'] === [ 'width' => 60, 'height' => 40 ] );
+$appData['/nino/html/images']['/handwritten'] = [ 'label' => 'Hand written', 'width' => 60, 'height' => 40, 'filename' => '../hero.60x40.jpg' ];
+[ , $handBody ] = ninoCall( $appData, [ \Nino\Modules\Images\Admin::class, 'apiList' ] );
+$handRow = array_values( array_filter( $handBody['slots'], static fn( array $slot ): bool => $slot['uri'] === '/handwritten' ) )[0];
+check( 'a name that climbs out of the folder of the pictures is no picture here: no file, no address, no weight, no size - the answer names no file outside it', $handRow['file'] === null && $handRow['url'] === null && $handRow['bytes'] === 0 && $handRow['shown'] === null );
+$appData['/nino/html/images']['/handwritten']['filename'] = '/'. $slotBody['filename'];
+[ , $handBody ] = ninoCall( $appData, [ \Nino\Modules\Images\Admin::class, 'apiList' ] );
+$handRow = array_values( array_filter( $handBody['slots'], static fn( array $slot ): bool => $slot['uri'] === '/handwritten' ) )[0];
+check( '...as does an absolute one, though it would name the same file below the folder', $handRow['file'] === null && $handRow['url'] === null && $handRow['bytes'] === 0 && $handRow['shown'] === null );
+$appData['/nino/html/images']['/handwritten']['filename'] = "hero\x01.60x40.jpg";
+[ , $handBody ] = ninoCall( $appData, [ \Nino\Modules\Images\Admin::class, 'apiList' ] );
+$handRow = array_values( array_filter( $handBody['slots'], static fn( array $slot ): bool => $slot['uri'] === '/handwritten' ) )[0];
+check( '...and so does a name with a control character in it', $handRow['file'] === null && $handRow['url'] === null && \Nino\Modules\Images\Admin::named( "a\x7Fb" ) === false && \Nino\Modules\Images\Admin::named( 'a/b.webp' ) === true );
+unset( $appData['/nino/html/images']['/handwritten'] );
 check( 'the filename is committed to the slot immediately', ( \Nino\Images::getSlot( $appData, '/hero' )['filename'] ?? null ) === $slotBody['filename'] );
 
 [ $slotStatus2, $slotBody2 ] = callUploadSlotImage( $appData, '/hero' );
@@ -1283,6 +1302,14 @@ check( '251 characters are a 400, with the code and the limit that belongs in it
 [ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => str_repeat( 'ä', 250 ). "\n" ] ] );
 check( '...and 250 characters, the trailing line break cleaned away first, are not', $status === 200 );
 check( 'nothing of the refused calls was stored', array_keys( \Nino\Images::getSlot( $appData, '/small' )['alt'] ?? [] ) === [ 'de_DE' ] );
+
+// The record saves what it changed in ONE call: the languages are taken all or none, and what is the same as it was writes the same bytes
+$configBefore = (string) file_get_contents( \Nino\Filesystem::path( $appData, '/config.php' ) );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => 'Gut', 'en_US' => str_repeat( 'x', 251 ) ] ] );
+check( 'two languages in one call of which one is refused: the answer is 400 and the good one is not written either', $status === 400 && (string) file_get_contents( \Nino\Filesystem::path( $appData, '/config.php' ) ) === $configBefore );
+$storedAlt = \Nino\Images::getSlot( $appData, '/small' )['alt'];
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => $storedAlt ] );
+check( 'a call with the texts the slot has leaves config.php byte for byte as it was', $status === 200 && (string) file_get_contents( \Nino\Filesystem::path( $appData, '/config.php' ) ) === $configBefore );
 
 [ $status, $body ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => ' Ein Haus ', 'en_US' => 'A house' ] ] );
 $persistedAlt = ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['/small']['alt'] ?? null;

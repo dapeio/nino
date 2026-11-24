@@ -851,4 +851,162 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 }
 
 
+// --- a directory that lies under a part of its screen: the parts before the entry --------------------------------------
+
+{
+	const folder = { key : 'folder/one' };
+	const s = setup( true, { prefix : () => [ folder.key ] } );
+
+	s.h.router.set( 'submissions', [ folder.key ] );
+	s.record.open( 'r03', {} );
+	check( 'a record under a folder writes the folder as ONE part - whatever it holds - and the entry behind it', s.h.hash() === '#submissions/submissions/folder%2Fone/r03' );
+
+	fire( buttonOf( s.dialog(), 'Next' ), 'click' );
+	check( '...stepping writes over the entry and keeps the folder', s.h.hash() === '#submissions/submissions/folder%2Fone/r04' && s.h.router.current().parts.join('|') === 'folder/one|r04' );
+
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( '...closed, the address is the folder\'s and no more', s.dialog() === null && s.h.went.join() === '-1' );
+
+	const t = setup( true, { prefix : () => [ folder.key ] } );
+	t.h.box.location.hash = '#submissions/submissions/folder%2Fone/r05';
+	check( 'an address that names the entry behind the folder opens it', t.record.follow() === true && t.dialog() !== null && titleOf( t.dialog() ) === 'Item 5' );
+
+	t.h.box.location.hash = '#submissions/submissions/folder%2Fone';
+	check( '...one that names the folder alone is the directory: the record closes', t.record.follow() === true && t.dialog() === null );
+
+	t.h.box.location.hash = '#submissions/submissions/folder%2Fone/r06';
+	t.record.follow();
+	t.h.box.location.hash = '#submissions/submissions/other%20folder/r06';
+	t.h.hashchange();
+	check( '...and an address of another folder is not its own: the record closes, and the panel draws that folder', t.dialog() === null && t.record.follow() === false );
+
+	// The parts that stand before the prefix are a panel's own words: a record that has none reads the address as it always did
+	const u = setup( true );
+	u.h.box.location.hash = '#submissions/submissions/folder%2Fone/r05';
+	check( 'a record without a prefix reads the address from the first part: two parts name no entry', u.record.follow() === false && u.dialog() === null && u.h.hash() === '#submissions' );
+}
+
+
+// --- the prefix: a word and a key are not the same part, and a record opened by a typed address closes to the folder ------------------------
+
+{
+	const folder = 'folder/one';
+	const s = setup( true, { prefix : [ folder ] } );
+
+	s.h.box.location.hash = '#submissions/submissions/folder%2Fone/r04';
+	s.record.follow();
+	check( 'a record that an address opened under a folder has no entry of its own, and is closed by writing the address of that folder - not the address of the screen', s.dialog() !== null && s.h.router.marked() === '' );
+	fire( buttonOf( s.dialog(), 'Close' ), 'click' );
+	check( '...the address stays the folder\'s: the prefix is not lost by closing', s.h.hash() === '#submissions/submissions/folder%2Fone' && s.h.went.length === 0 );
+
+	// A prefix that is a key: written as the word it looks like is another address
+	const k = setup( true, { prefix : [ '@new' ] } );
+	k.h.box.location.hash = '#submissions/submissions/@new/r03';
+	check( 'a part of the prefix that is a key does not match the word that is written the same - the record is not opened by it', k.record.follow() === false && k.dialog() === null );
+	k.h.box.location.hash = '#submissions/submissions/%40new/r03';
+	check( '...and matches the key', k.record.follow() === true && k.dialog() !== null );
+
+	// A prefix that is a word does not match the key that is written the same
+	const m = setup( true, { prefix : [ { word : '@new' } ] } );
+	m.h.box.location.hash = '#submissions/submissions/%40new/r03';
+	check( 'a part of the prefix that is a word does not match the key that is written the same', m.record.follow() === false && m.dialog() === null );
+	m.h.box.location.hash = '#submissions/submissions/@new/r03';
+	check( '...and matches the word', m.record.follow() === true && m.dialog() !== null );
+}
+
+
+// --- an action that takes something of the entry away and not the entry: the record stays ----------------------------------------------
+
+{
+	let gone = false;
+	const s = setup( true, { danger : { label : 'Remove picture', stay : true, hidden : row => row.thumb === '', run : ( row, opener, finished ) => {
+		gone = true;
+		s.rows()[s.rows().indexOf( row )] = Object.assign( {}, row, { thumb : '', name : 'Item without picture' } );
+		s.directory.update( s.rows(), row.key );
+		finished( true );
+	} } } );
+
+	s.record.open( 'r03', {} );
+	const d = s.dialog();
+	fire( buttonOf( d, 'Remove picture' ), 'click' );
+	check( 'an action that says it stays leaves the record open after it went, drawn as the entry is now: its title is the new one, and the button of an entry that has nothing to take away is not shown',
+		gone === true && s.dialog() === d && titleOf( d ) === 'Item without picture' && buttonOf( d, 'Remove picture' ).hidden === true && s.record.isOpen() === true );
+	check( '...the address is the entry\'s still, the directory has the row, fresh, and nothing is asked about unsaved input', s.h.hash() === '#submissions/submissions/r03' && rowEl( s, 'r03' ).classList.contains('is-fresh') === true && s.h.dirty.isDirty( [ 'submissions' ] ) === false );
+}
+
+
+// --- a save that wrote part of the entry says the entry as it is --------------------------------------------------------------------------
+
+{
+	const s = setup( true, { danger : { label : 'Delete', hidden : row => row.name.indexOf('half') === -1, run : () => {} } } );
+
+	s.calls.answer = ( finished, row ) => {
+		const half = Object.assign( {}, row, { name : 'half written' } );
+		s.rows()[s.rows().indexOf( row )] = half;
+		finished( false, { error : 'The rest failed.', row : half } );
+	};
+	s.record.open( 'r03', {} );
+	check( 'before: the entry has no button to delete', buttonOf( s.dialog(), 'Delete' ).hidden === true );
+	typeInto( s.dialog(), 'typed' );
+	fire( buttonOf( s.dialog(), 'Save' ), 'click' );
+	check( 'a save that failed after it wrote part of the entry says it: the line of the bar says why, and the record takes the row the panel gave - its title, and the buttons that fit it',
+		byClass( s.dialog(), 'nino-admin-status' )[0].textContent === 'The rest failed.' && titleOf( s.dialog() ) === 'half written' && buttonOf( s.dialog(), 'Delete' ).hidden === false );
+	check( '...and what was typed stays, as unsaved input', tag( s.dialog(), 'input' )[0].value === 'typed' && s.h.dirty.isDirty( [ 'submissions' ] ) === true );
+}
+
+
+// --- an address that was typed with a part that is none is written over by the true one ---------------------------------
+
+{
+	const s = setup( true );
+
+	s.h.box.location.hash = '#submissions/submissions/ab%zz';
+	check( 'a part that cannot be decoded ends the parts: the address is the directory\'s, and the bar says so instead of what was typed', s.record.follow() === false && s.h.hash() === '#submissions' );
+
+	s.h.box.location.hash = '#submissions/submissions/r03/extra';
+	check( '...as is one part too many', s.record.follow() === false && s.h.hash() === '#submissions' );
+
+	s.h.box.location.hash = '#submissions/submissions/r03/%zz';
+	check( '...and the entry that stood before the part that is none is opened, under its own address', s.record.follow() === true && s.dialog() !== null && titleOf( s.dialog() ) === 'Item 3' && s.h.hash() === '#submissions/submissions/r03' );
+
+	const entries = s.h.entries.length;
+	s.record.follow();
+	check( 'an address that is true is written over by nothing', s.h.hash() === '#submissions/submissions/r03' && s.h.entries.length === entries );
+}
+
+
+// --- what takes away has one place --------------------------------------------------------------------------------------
+
+{
+	let refused = null;
+
+	try {
+		setup( true, { actions : [ { label : 'Archive', kind : 'danger', run : () => {} } ] } ).record.open( 'r01', {} );
+	}
+	catch( error ) {
+		refused = error;
+	}
+
+	check( 'a second action in the colour of danger is refused: what takes an entry away is `danger`, at the left', refused !== null && refused.name === 'TypeError' );
+
+	const ok = setup( true, { actions : [ { label : 'Archive', kind : 'secondary', run : () => {} } ] } );
+	ok.record.open( 'r01', {} );
+	check( '...and a normal action stands beside them', buttonOf( ok.dialog(), 'Archive' ) !== undefined && hasClass( buttonOf( ok.dialog(), 'Archive' ), 'nino-admin-btn-secondary' ) );
+}
+
+
+// --- a choice that is taken back is no unsaved input --------------------------------------------------------------------
+
+{
+	let ctx = null;
+	const s = setup( true, { body : function( row, c ) { ctx = c; return element('div') } } );
+
+	s.record.open( 'r03', {} );
+	ctx.touch();
+	check( 'something chosen that no field holds - a file - is unsaved input', s.h.dirty.isDirty( [ 'submissions' ] ) === true );
+	ctx.touch( false );
+	check( '...and is none again when it is taken back', s.h.dirty.isDirty( [ 'submissions' ] ) === false );
+}
+
+
 done();

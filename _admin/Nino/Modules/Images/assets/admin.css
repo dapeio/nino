@@ -4,9 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Images			The picture of every image slot
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the picture of a slot
- *													and the button that takes it away, one under the other, and
- *													the lines a slot shows and does not take. Bundled while the
+ *													system in _admin/assets/style.css: the name and the key of
+ *													a slot in the table of the directory, and the lines the
+ *													Image Slots tab shows and does not take. Bundled while the
  *													module is there (see the panel's assets()), so the same layer
  *													rules apply - the shell's stylesheet fixes the layer order,
  *													this one only ever adds to nino.tool, scoped to the panel's
@@ -19,21 +19,41 @@
 
 @layer nino.tool {
 
-/* The picture of a slot and Remove, one under the other at the left of their column */
-#images-form .images-slot-image {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: var(--nino-admin-space-3);
+/* The name of a slot in the table: the name strong, its key under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip */
+#images-list .images-name {
+	display: inline-grid;
+	gap: var(--nino-admin-space-1);
+	max-width: 16rem;
+	text-align: left;
 }
 
-/* A slot that has no picture has nothing to put here: neither a gap nor a row */
-#images-form .images-slot-image:not(:has(> :not([hidden]))) {
-	display: none;
+#images-list .images-name > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* What a slot shows and does not take - its size, the pages, the call - is a line at the height of the name beside it */
-#images-form .images-slot > .nino-admin-field > p,
+#images-list .images-name-label {
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+#images-list .images-name-key {
+	color: var(--editor-text-secondary);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
+}
+
+/* The pages that use a slot: one line, cut by an ellipsis where it is long - every page is in its tooltip */
+#images-list .images-used {
+	display: inline-block;
+	max-width: 10rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* What a finding of the scan shows and does not take - its size, the pages - is a line at the height of the name beside it */
 #slots-form .slots-scan-row > .nino-admin-field > p {
 	margin: 0;
 }

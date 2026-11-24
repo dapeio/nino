@@ -436,6 +436,54 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The templates a source draws that no [template] call of it names: what the kernel puts round a page. A page that calls the scaffold
+		 *	([template /templates/html-header]) has the standard frame in its [[header]] - the file frame-header - where the scaffold has a place for it,
+		 *	and one that calls [frame /templates/frame-header-<word>] has the scaffold and the frame of that word (the standard where the file is not
+		 *	there), and none for the word none - decided by the same rules that draw the page (see doFrame(), _wears(), _frame()), so that a tool that
+		 *	looks for what a page shows - the pictures of the head and the foot of every page - reads the same files. A source that calls neither
+		 *	has no frame
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				html+ of a page or of a template
+		 *
+		 *	@return 	array										[ template name without .tpl, ... ] - html-header, frame-header-landing -, each once
+		 */
+		public static function frameFiles( array &$appData, string $source ): array {
+
+			$names = [];
+
+			foreach( self::FRAME_SIDES as $side ) {
+
+				$wears = null;
+
+				// The scaffold called by name: the standard frame is in it
+				if( preg_match( '#\[template /templates/html-'. $side. '[\] ]#', $source ) === 1 ) {
+					$wears = self::_wears( $appData, $side );
+
+					if( $wears === true )
+						$names[] = 'frame-'. $side;
+				}
+
+				// A frame the page chooses: the scaffold with the file of the word, the standard where the word has none
+				if( preg_match_all( '#\[frame /templates/frame-'. $side. '(?:-([a-z0-9]+(?:-[a-z0-9]+)*))?[\] ]#', $source, $found ) > 0 ) {
+
+					$wears ??= self::_wears( $appData, $side );
+					$names[] = 'html-'. $side;
+
+					foreach( $found[1] as $word ) {
+
+						if( $wears === false || $word === 'none' || strlen( $word ) > self::FRAME_LENGTH )
+							continue;
+
+						$names[] = $word !== '' && $word !== 'default' && self::_exists( $appData, $side, $word ) === true ? 'frame-'. $side. '-'. $word : 'frame-'. $side;
+					}
+				}
+			}
+
+			return array_values( array_unique( $names ) );
+		}
+
+		/**
 		 *	The frames of the site: the standard of each side, where its template is there, and the named ones - the files frame-header-<word>.tpl
 		 *	and frame-footer-<word>.tpl of the templates, as the directory lists them: a name that has the form exactly (so a file whose name has
 		 *	a capital is none, on a file system that folds the case as on one that does not), a file and no link, a word that is none of the reserved

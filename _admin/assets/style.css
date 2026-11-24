@@ -6113,6 +6113,16 @@ a {
 	white-space: nowrap;
 }
 
+/* The cell of the name carries the sign that the row opens after its content: what the cell holds - a text, a name with a line under it - is a box of the line and not a block that pushes the sign under itself, and the sign stands on the line of the first line of it. Only the cell of the name: where the sign stands in the cell of the buttons of a table that is no directory, it stays as it was */
+:where(.nino-admin) .nino-admin-table td:not(.nino-admin-table-actions):has(> .nino-admin-row-chev) > :not(.nino-admin-row-chev) {
+	display: inline-block;
+	vertical-align: top;
+}
+
+:where(.nino-admin) .nino-admin-table td:not(.nino-admin-table-actions):has(> .nino-admin-row-chev) > .nino-admin-row-chev {
+	vertical-align: top;
+}
+
 :where(.nino-admin) .nino-admin-table-limit {
 	display: inline-flex;
 	align-items: center;

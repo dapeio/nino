@@ -519,7 +519,7 @@ $listed = [
 	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.table(',
 	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
 	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.directory(',
-	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Images/assets/slots.js'		=> 'adminUi.list(',
 	'_admin/Nino/Modules/Elements/assets/admin.js'	=> 'adminUi.table(',
 	'_admin/Nino/Modules/Elements/assets/types.js'	=> 'adminUi.list(',
@@ -905,11 +905,12 @@ $withStyle = array_values( array_filter( [ '_admin/Nino/Modules/Routes', '_nino/
 check( 'neither panel ships a stylesheet of its own: what they draw is the blocks\' and the design system\'s'. ( $withStyle === [] ? '' : ' - '. implode( ', ', $withStyle ) ), $withStyle === [] );
 // --- the Images panel and its two tabs are built of the blocks, and every action of them is said as the guide says it ---------------
 
-/*	The Images panel is the guide's third model - nothing is saved by a button, an upload and an alt text are said by a toast and what is
-	wrong at the field -, the Image Slots tab a list and a form, the Favicon tab a form with the colour block and the file block. Held by
-	structure: which block draws a part, and that no part is drawn by hand, asked with the browser's dialogs or styled with a number	*/
+/*	The Images panel is the standard directory of the slots with the record of one slot over it - everything in the record is saved with
+	its Save, what is wrong stands at the field -, the Image Slots tab a list and a form, the Favicon tab a form with the colour block and the
+	file block. Held by structure: which block draws a part, and that no part is drawn by hand, asked with the browser's dialogs or styled with
+	a number	*/
 $images = [
-	'_admin/Nino/Modules/Images/assets/admin.js'		=> [ 'adminUi.localeRows(', 'adminUi.fileField(', 'adminUi.contextBar(', 'adminUi.confirm(', 'adminUi.say(', 'adminUi.list(' ],
+	'_admin/Nino/Modules/Images/assets/admin.js'		=> [ 'adminUi.directory(', 'adminUi.record(', 'adminUi.imageFrame(', 'adminUi.readLine(', 'adminUi.localeRows(', 'adminUi.fileField(', 'adminUi.confirm(' ],
 	'_admin/Nino/Modules/Images/assets/slots.js'		=> [ 'adminUi.textField(', 'adminUi.checkField(', 'adminUi.confirm(', 'adminUi.say(' ],
 	'_admin/Nino/Modules/Images/assets/favicon.js'	=> [ 'adminUi.color(', 'adminUi.fileField(', 'adminUi.confirm(', 'adminUi.dateText(', 'adminUi.sectionHelp(' ],
 ];
@@ -940,8 +941,8 @@ check( '...and put the sentence of no field under it: the help is the option of 
 
 $imagesSource = $bare( $read( '_admin/Nino/Modules/Images/assets/admin.js' ) );
 
-check( 'the Images panel has no bar and no Save, since every action of it is immediate: no actionBar(), no submit, and no form', str_contains( $imagesSource, 'actionBar(' ) === false && str_contains( $imagesSource, "createElement('form')" ) === false && str_contains( $imagesSource, "'submit'" ) === false );
-check( '...an alt text is saved when its field is left: the script listens for the blur of the control of each language', preg_match( '/addEventListener\(\s*\'blur\'\s*,[^;]{0,80}_saveAlt\(/', $imagesSource ) === 1 );
+check( 'the Images panel draws no bar, no Save and no form of its own: the record has them', str_contains( $imagesSource, 'actionBar(' ) === false && str_contains( $imagesSource, "createElement('form')" ) === false && str_contains( $imagesSource, "'submit'" ) === false );
+check( '...and nothing is saved by leaving a field: an alt text and a file wait for the Save of the record, so the script listens for no blur and no change of a control to send a request', preg_match( '/addEventListener\(\s*\'(?:blur|input)\'/', $imagesSource ) === 0 );
 
 $faviconSource = $bare( $read( '_admin/Nino/Modules/Images/assets/favicon.js' ) );
 
@@ -1202,6 +1203,10 @@ check( 'every kind of cell the guide names is one the table draws, and the table
 
 check( 'the guide says what the large dialog is - 72 rem - and the token and the rule of the stylesheet say the same',
 	str_contains( $guide, '`large` 72 rem' ) && preg_match( '/--nino-admin-dialog-large:\s*72rem;/', $style ) === 1 && preg_match( '/\.nino-admin-dialog--large\s*\{[^}]*var\(--nino-admin-dialog-large\)/', $style ) === 1 );
+
+// The sign that a row opens stands on the line of the first line of the name: the guide says it, and which cells the stylesheet's rule reaches is held where a table is drawn, by tests/nino-ui-directory-js-smoke.js
+check( 'the guide says where the sign that a row opens stands: behind the name of the row on the line of its first line',
+	str_contains( $guide, 'stands behind the name of the row on the line of its first line' ) );
 
 // The page sizes themselves (25 for a table of pictures, 50 for every other) are held where they happen, by tests/nino-ui-directory-js-smoke.js; the guide says them once
 check( 'the guide says the page sizes of a table of pictures and of every other', str_contains( $guide, 'pages by 25, every other by 50' ) );
