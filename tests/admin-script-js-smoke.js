@@ -1513,6 +1513,7 @@ check( 'a guard with nothing unsaved goes straight on and asks nothing', proceed
 dirtyState.keys = true;
 check( 'an entry that says so is dirty, by name or for all', JSON.stringify( dirty.dirtyNames() ) === '["keys"]' && dirty.isDirty() === true && dirty.isDirty( [ 'keys' ] ) === true );
 check( '...and an entry outside the scope of a guard does not count', dirty.isDirty( [ 'text' ] ) === false && dirty.dirtyNames( [ 'text', 'nobody' ] ).length === 0 );
+check( 'the entry of a name is handed out as it was registered, and a name nobody registered has none', dirty.entry('keys').isDirty() === true && dirty.entry('text').isDirty() === false && dirty.entry('nobody') === null );
 
 let cancelled = 0;
 proceeded = 0;

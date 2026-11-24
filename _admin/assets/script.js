@@ -1192,6 +1192,20 @@
 			},
 
 			/**
+			 *	The entry registered under a name, as register() or watchForm() put
+			 *	it there: a tab that shows two views under its one name - a record
+			 *	and a form beside it - registers an entry that hands on to the entry
+			 *	of whichever of them is on screen
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		{Object|null}						null where nothing is registered under the name
+			 */
+			entry : function( name ) {
+				return Nino.admin.dirty._entries[name] ?? null;
+			},
+
+			/**
 			 *	The registered names in scope that hold unsaved input
 			 *
 			 *	@param		{Array|null}	[names]			null for every entry
