@@ -472,7 +472,6 @@ check( 'a dialog of a form takes each of them as a type of field, and a question
 /*	The panels that draw their bar and their way back with actionBar() and contextBar() and not by hand. The list grows: the
 	patch that brings another panel over adds its script here, and from then on the panel keeps to it	*/
 $converted = [
-	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/admin.js',
 	'_admin/Nino/Modules/Users/assets/roles.js',
@@ -597,7 +596,6 @@ $guideForms = [
 	'_admin/Nino/Modules/Users/assets/roles.js',
 	'_admin/Nino/Modules/Users/assets/lockout.js',
 	'_admin/Nino/Modules/Users/assets/recoverypw.js',
-	'_admin/Nino/Modules/Routes/assets/admin.js',
 	'_nino/Nino/Modules/Navigation/assets/admin.js',
 	'_admin/Nino/Modules/Images/assets/slots.js',
 	'_admin/Nino/Modules/Images/assets/favicon.js',
@@ -633,7 +631,7 @@ foreach( $guideForms as $script ) {
 		$unbarred[] = $script;
 }
 
-check( 'every form of the panels that follow the guide here (Users, Routes, Navigations) is novalidate and made of the blocks of the workbench'. ( $handmade === [] ? '' : ' - '. implode( ', ', $handmade ) ), $handmade === [] );
+check( 'every form of the panels that follow the guide here (Users, Navigations) is novalidate and made of the blocks of the workbench'. ( $handmade === [] ? '' : ' - '. implode( ', ', $handmade ) ), $handmade === [] );
 check( '...says what is wrong under the field and clears it again'. ( $unchecked === [] ? '' : ' - '. implode( ', ', $unchecked ) ), $unchecked === [] );
 check( '...and has the one bar of the blocks, with no class of a button or a bar written in the script'. ( $unbarred === [] ? '' : ' - '. implode( ', ', $unbarred ) ), $unbarred === [] );
 
@@ -846,7 +844,7 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
 $sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
-$sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css', '_admin/Nino/Modules/Routes/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {
@@ -882,7 +880,8 @@ foreach( $routing as $script ) {
 	if( str_contains( $source, 'adminUi.iconButton(' ) === false || preg_match( '/[↑↓×↗]/u', $source ) === 1 )
 		$iconless[] = $script;
 
-	if( str_contains( $source, 'router.set(' ) === false || str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false )
+	// The Routes panel moves by its records, which write the address of a person's own move (router.go()); the panel keeps it true and asks before it is left
+	if( str_contains( $source, 'router.set(' ) === false || str_contains( $source, 'router.href(' ) === false || ( str_contains( $source, 'router.go(' ) === false && str_contains( $script, '/Routes/' ) === false ) || str_contains( $source, 'router.leave(' ) === false )
 		$unaddressed[] = $script;
 
 	if( preg_match( '/\b(window|wn)\.(confirm|alert|prompt)\(|(?<![\w.])(alert|prompt|confirm)\(/', $source ) === 1 || str_contains( $source, 'adminUi.confirm(' ) === false )
@@ -899,10 +898,13 @@ $routesScript = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read
 check( 'the values of every language of a route - name, title and address - are rows of localeRows(), the description follows the working language and says so', substr_count( $routesScript, 'adminUi.localeRows(' ) >= 3
 	&& str_contains( $routesScript, 'adminUi.localeBadge(' ) === true && preg_match( '/workLocale\.follow\(\s*\'routes\'/', $routesScript ) === 1 && str_contains( $routesScript, 'adminUi.checklist(' ) === true && str_contains( $routesScript, 'adminUi.switchField(' ) === true );
 
-$withStyle = array_values( array_filter( [ '_admin/Nino/Modules/Routes', '_nino/Nino/Modules/Navigation' ], static fn( string $dir ): bool => is_file( $root. '/'. $dir. '/assets/admin.css' ) === true
+$withStyle = array_values( array_filter( [ '_nino/Nino/Modules/Navigation' ], static fn( string $dir ): bool => is_file( $root. '/'. $dir. '/assets/admin.css' ) === true
 	|| str_contains( $read( $dir. '/Admin/Admin.php' ), "'/assets/admin.css'" ) === true ) );
 
-check( 'neither panel ships a stylesheet of its own: what they draw is the blocks\' and the design system\'s'. ( $withStyle === [] ? '' : ' - '. implode( ', ', $withStyle ) ), $withStyle === [] );
+check( 'Navigations ships no stylesheet of its own: what it draws is the blocks\' and the design system\'s'. ( $withStyle === [] ? '' : ' - '. implode( ', ', $withStyle ) ), $withStyle === [] );
+check( 'Routes ships one - the name of a page and its addresses in the table - and the stylesheet is bundled by the assets() of the panel', is_file( $root. '/_admin/Nino/Modules/Routes/assets/admin.css' ) === true && str_contains( $read( '_admin/Nino/Modules/Routes/Admin/Admin.php' ), "'/assets/admin.css'" ) === true );
+check( 'the Routes panel is the standard directory of its pages with the record of a page over it, a second record for the pages of features and the list of those; it draws no form, no bar of its own and no back link', str_contains( $routesScript, 'adminUi.directory(' ) === true && substr_count( $routesScript, 'adminUi.record(' ) === 2
+	&& str_contains( $routesScript, 'adminUi.list(' ) === true && str_contains( $routesScript, "createElement('form')" ) === false && str_contains( $routesScript, 'adminUi.contextBar(' ) === false );
 // --- the Images panel and its two tabs are built of the blocks, and every action of them is said as the guide says it ---------------
 
 /*	The Images panel is the standard directory of the slots with the record of one slot over it - everything in the record is saved with

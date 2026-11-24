@@ -685,6 +685,83 @@ check( '...and so has the page of a save, a delete and a move: the Element-URI n
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/hello', 'text' => [] ] );
 check( '...and routes/savetexts needs the panel\'s session and permission like every action of it', $status === 401 );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+// --- Routes: who may call the five actions ----------------------------------------------------------------------------
+
+/*	The panel is the directory of the pages with a record over it, and it calls the five actions of \Nino\Modules\Routes\Admin and no other. What stands in
+	front of them is the dispatch of the workbench (a session, the token the csrf guard has checked) and guardPerm() (the right /_admin/routes/manage). Each
+	action is called through Admin::handlePost(), as the page calls it: with no session, with a token the csrf guard refused, with an account that has
+	another right, and with the right - which does what the action does	*/
+echo "\nRoutes - who may call the five actions\n";
+
+
+foreach( [ '/acc-a', '/acc-b' ] as $accUri )
+	callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '', 'uri' => $accUri, 'httpUris' => [ '' => $accUri ], 'template' => 'page-about', 'text' => $pageText( $accUri ) ] );
+
+$routeActions = [
+	'routes/list'				=> [],
+	'routes/save'				=> [ 'originalUri' => '/acc-a', 'uri' => '/acc-a', 'httpUris' => [ '' => '/acc-a' ], 'template' => 'page-about', 'text' => $pageText( 'acc-a changed' ) ],
+	'routes/move'				=> [ 'uri' => '/acc-b', 'direction' => 'up' ],
+	'routes/delete'			=> [ 'uri' => '/acc-b' ],
+	'routes/savetexts'	=> [ 'uri' => '/.newsletter', 'text' => $runtimeText( [ 'name' => 'Rechte', 'title' => 'Rechte' ], [ 'name' => 'Rights', 'title' => 'Rights' ] ) ],
+];
+// What the actions write: the routes of config.php and the texts of the first language
+$routesHeld = static fn(): string => serialize( [ \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? null, \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) ] );
+$routesAnswers = [ 'session' => [], 'token' => [], 'right' => [] ];
+$routesBefore = $routesHeld();
+
+\Nino\Auth::logoutUser( $appData );
+
+foreach( $routeActions as $routeAction => $routeData ) {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeData, $routeAction );
+	$routesAnswers['session'][$routeAction] = [ $status, $body['code'] ?? '', $routesHeld() === $routesBefore ];
+}
+
+ninoUser( $appData, 'otherright@example.com', [ '/_admin/images/manage' ] );
+
+foreach( $routeActions as $routeAction => $routeData ) {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeData, $routeAction );
+	$routesAnswers['right'][$routeAction] = [ $status, $body['error'] ?? '', $routesHeld() === $routesBefore ];
+}
+
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+foreach( $routeActions as $routeAction => $routeData ) {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeData, $routeAction, 403 );
+	$routesAnswers['token'][$routeAction] = [ $status, $body['code'] ?? '', $routesHeld() === $routesBefore ];
+}
+
+\Nino\Auth::deleteUser( $appData, 'otherright@example.com' );
+
+check( 'with no session every one of the five actions is a 401 with the code "session", and nothing is read or written', $routesAnswers['session'] === array_fill_keys( array_keys( $routeActions ), [ 401, 'session', true ] ) );
+check( '...with the right of another panel and not the right to manage the routes every one is a 403, "not allowed", and nothing is read or written', $routesAnswers['right'] === array_fill_keys( array_keys( $routeActions ), [ 403, 'not allowed', true ] ) );
+check( '...with a token the csrf guard refused every one is a 403 and is not looked at', $routesAnswers['token'] === array_fill_keys( array_keys( $routeActions ), [ 403, '', true ] ) );
+
+ninoUser( $appData, 'routesright@example.com', [ \Nino\Modules\Routes\Admin::MANAGE_PERM ] );
+
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'routes/list' );
+check( 'with the right the list answers the pages in the order they are stored in, with what the table shows and the record reads - and writes nothing', $status === 200 && $routesHeld() === $routesBefore && in_array( '/acc-a', array_column( $body['pages'], 'uri' ), true )
+	&& array_search( '/acc-a', array_column( $body['pages'], 'uri' ), true ) < array_search( '/acc-b', array_column( $body['pages'], 'uri' ), true )
+	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text' ] && isset( $body['runtime'], $body['templates'], $body['locales'], $body['localeNames'], $body['selectedLocale'], $body['navs'], $body['navNames'], $body['defaultTemplate'] ) );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeActions['routes/save'], 'routes/save' );
+check( '...a save writes the page: its texts', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/acc-a/name]]'] ?? '' ) === 'acc-a changed' );
+$accOrder = static fn(): array => array_column( ( ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'routes/list' )[1] )['pages'], 'uri' );
+$accBefore = $accOrder();
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeActions['routes/move'], 'routes/move' );
+$accAfter = $accOrder();
+check( '...a move swaps the page with its neighbour in the stored order', $status === 200 && array_search( '/acc-b', $accAfter, true ) === array_search( '/acc-b', $accBefore, true ) - 1 );
+// A page a feature routes is in no config.php, and a save of the routes reads them anew: it is there when its texts are written
+$appData['/nino/http/routes']['GET://.newsletter'] = [ 'uri' => '/.newsletter', 'body' => '[template /templates/page-newsletter]' ];
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeActions['routes/savetexts'], 'routes/savetexts' );
+check( '...savetexts writes the texts of a page a feature routes', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/.newsletter/name]]'] ?? '' ) === 'Rechte' );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeActions['routes/delete'], 'routes/delete' );
+check( '...and a delete takes the routes of the page away, and no other', $status === 200 && in_array( '/acc-b', $accOrder(), true ) === false && in_array( '/acc-a', $accOrder(), true ) === true );
+
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::deleteUser( $appData, 'routesright@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/acc-a' ] );
+
 foreach( [ 'name', 'title', 'description' ] as $runtimeField )
 	foreach( [ '/text/de_DE.php', '/text/en_US.php' ] as $runtimeFile )
 		\Nino\Filesystem::mutate( $appData, $runtimeFile, function( array $content ) use ( $runtimeField ): array {

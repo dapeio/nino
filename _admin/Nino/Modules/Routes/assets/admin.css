@@ -1,0 +1,59 @@
+@layer nino.system, nino.tool, nino.local;
+
+/**
+ *	Nino										A compact filesystembased php framework
+ *	Modules\Routes					The pages of the project's routes
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css: the name and the Element
+ *													URI of a page in the table of the directory, and its addresses
+ *													with the link that opens the page. Bundled while the module
+ *													is there (see the panel's assets()), so the same layer rules
+ *													apply - the shell's stylesheet fixes the layer order, this one
+ *													only ever adds to nino.tool, scoped to the panel's own id.
+ *
+ *	@package								Dape/Nino
+ *	@author									David Perchermeier <mail@dape.io>
+ *	@link										https://github.com/dapeio/nino
+ */
+
+@layer nino.tool {
+
+/* The name of a page in the table: the name strong, its Element URI under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip */
+#routes-list .routes-name {
+	display: inline-grid;
+	gap: var(--nino-admin-space-1);
+	min-width: 11rem;
+	max-width: 16rem;
+	text-align: left;
+}
+
+#routes-list .routes-name > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#routes-list .routes-name-label {
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+#routes-list .routes-name-key {
+	color: var(--editor-text-secondary);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
+}
+
+/* The addresses of a page in one line that an ellipsis ends, and the link that opens the page behind them, which the ellipsis never takes */
+#routes-list .routes-paths {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--nino-admin-space-2);
+	max-width: 100%;
+}
+
+#routes-list .routes-paths > .nino-admin-btn-icon {
+	flex: none;
+}
+
+}

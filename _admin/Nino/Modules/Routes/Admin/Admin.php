@@ -66,7 +66,7 @@ namespace Nino\Modules\Routes {
 	 *												per language is one entry, with its paths.
 	 *
 	 *												Saving a page keeps whatever its first route carries that
-	 *												this form does not edit - a 'maintenance' => false or a
+	 *												the record of a page does not edit - a 'maintenance' => false or a
 	 *												'header' somebody put into config.php by hand - on every
 	 *												route of the page, the 'locale' of each being the
 	 *												language it is the address of. The two Element-URIs of
@@ -136,13 +136,10 @@ namespace Nino\Modules\Routes {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-icon lucide-route"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>';
 		}
 
-		public static function panes(): array {
-			return [ 'routes-list', 'routes-form' ];
-		}
-
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
 			];
 		}
 
@@ -181,7 +178,7 @@ namespace Nino\Modules\Routes {
 		/**
 		 *	List the pages, every templates/page-*.tpl file available to
 		 *	pick from, the template a new route is proposed ('' when the project
-		 *	has no page-blank - then the form asks for a choice), the active
+		 *	has no page-blank - then the record of a new route asks for a choice), the active
 		 *	locales with what each is called and the one the workbench is on,
 		 *	and the navigations a page can be put into (empty while the
 		 *	Navigation module is inactive, which is what tells the frontend to

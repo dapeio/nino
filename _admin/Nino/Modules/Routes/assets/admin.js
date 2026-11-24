@@ -2,39 +2,47 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	admin.js								"Routes" panel: create/edit/delete the site's actual page
- *													routes without hand-editing /nino/http/routes as raw json
- *													(the Config panel no longer edits that key). The
- *													template select only ever offers a templates/page-*.tpl
- *													file that already exists on disk, and a new route starts
- *													with every field empty - see the panel's own
- *													Admin/Admin.php class docblock for the Element URI/Http
- *													URI split every entry carries.
+ *	admin.js								"Routes" panel: the pages of the site's project - create, edit, order
+ *													and delete the page routes without hand-editing /nino/http/routes
+ *													as raw json (the Config panel no longer edits that key). The
+ *													template select only ever offers a templates/page-*.tpl file that
+ *													already exists on disk, and a new route starts with every field
+ *													empty - see the panel's own Admin/Admin.php class docblock for the
+ *													Element URI/Http URI split every entry carries.
  *
- *													Every view has an address: #routes is the list,
- *													#routes/routes/@new the form of a new route,
- *													#routes/routes/<Element URI> a route and
- *													#routes/routes/@feature/<Element URI> a page a feature routes. A save leaves the person in the view it
- *													was made in and says so as a toast; a new route gets its
- *													address when it is saved. The list is rows of the block
- *													(list()) whose up and down buttons reorder the persisted routes at once,
- *													which is what orders every menu those pages appear in
- *													(see \Nino\Modules\Navigation), and say so as a toast.
+ *													The panel is the standard directory of the workbench
+ *													(Nino.adminUi.directory()) of the project's pages in the order
+ *													they are stored in, and the record of a page
+ *													(Nino.adminUi.record()) over it. The order is what orders every
+ *													menu those pages appear in (see \Nino\Modules\Navigation), and it
+ *													is saved at once: the arrows of a row move a page, and are locked
+ *													while a search shows only some of the rows. No column sorts: the
+ *													stored order is the one order of the list.
+ *
+ *													Every view has an address: #routes is the directory,
+ *													#routes/routes/<Element URI> the record of a page,
+ *													#routes/routes/@new the form of a new route and
+ *													#routes/routes/@feature/<Element URI> the record of a page a feature
+ *													routes. Two records stand over one screen, each answering only its
+ *													own addresses (see _follow()), and the shell asks about unsaved
+ *													input of either by the one name of the panel (see _share()).
  *
  *													A page has one Http URI for every language or one for each: a
- *													switch says which, and the form draws the one field or a row per
- *													language - the name, the title and the addresses are values
- *													of every language one under the other (localeRows()), the
- *													description is the one of the language the workbench edits
- *													content in (Nino.admin.workLocale) and the others keep theirs.
- *													Languages whose rows hold one address share it (see
- *													_addressMap()). The navigations a page stands in are the ticks
- *													of one list, each named by its name and, quietly, its key.
+ *													switch says which, and the record draws the one field or a row per
+ *													language - the name, the title and the addresses are values of
+ *													every language one under the other (localeRows()), the description
+ *													is the one of the language the workbench edits content in
+ *													(Nino.admin.workLocale) and the others keep theirs. Languages whose
+ *													rows hold one address share it (see _addressMap()). The
+ *													navigations a page stands in are the ticks of one list, each named
+ *													by its name and, quietly, its key. A save that changed nothing
+ *													sends nothing.
+ *
  *													The pages a feature or a module routes at runtime - which no
- *													config.php has - are listed below them, one row per
- *													Element-URI, without the buttons and without delete: their form
- *													is the paths, read-only, and the name, title and
- *													description, saved as routes/savetexts.
+ *													config.php has - are a list under the directory, one row per
+ *													Element-URI, without buttons and without delete: their record is
+ *													the paths, to read, and the name, title and description, saved as
+ *													routes/savetexts.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -45,8 +53,11 @@
 
 	wn.Nino.admin = wn.Nino.admin || {};
 
+	const word = function( key ) { return Nino.content.getText( key ) };
+
 	Nino.admin.routes = {
 
+		// What the last list answered: the pages in the order they are stored in, the pages of features, and what a record offers - the templates, the languages, the navigations
 		_pages 					: [],
 		_runtime 				: [],
 		_templates 			: [],
@@ -56,104 +67,212 @@
 		_localeNames 		: {},
 		_navs 					: [],
 		_navNames 			: {},
+		// ...and as rows: what the directory shows of a page, what the record reads
+		_rows 					: [],
+		_featureRows 		: [],
 		_ready 					: false,
 		_loading 				: false,
-		// The form that is open - { kind, uri, entry, work, fields... } - or null while the list is. kind is
-		// 'page' (a route of the project), 'new' (none yet) or 'feature' (a page a feature routes)
-		_view 					: null,
-		// The row or the button that opened the form that is open: Back returns
-		// the focus to it (see Nino.adminUi.backTo()) - a row is found again by its key, since the list is drawn again behind the form
-		_opener 				: null,
-		// The status line of the form that is open (see Nino.adminUi.status())
-		_line 					: null,
-		// The status line under the list, where a refused move reports
-		_listLine 			: null,
-		// What the address fields of the form that is open start from, and what
-		// they are given back from when the switch is turned: { one, shared,
-		// bound } (see _addressesOf()). Between two turns the fields on screen
-		// are the truth
-		_addresses 			: null,
-		// The stamp of the templates (see Nino.admin.touch()) the list was asked
-		// for: the form offers the templates the answer held, and one written
-		// since is not among them
+		_directory 			: null,
+		// The record of a page of the project, and the one of a page a feature routes
+		_record 				: null,
+		_featureRecord 	: null,
+		// The room the list of the pages of features is drawn in, and the button of the bar of the list
+		_features 			: null,
+		_add 						: null,
+		// The columns the directory was drawn with: with the navigations or without - a navigation that comes or goes is another table
+		_shape 					: '',
+		// What the person sees of the directory - the search, the page - kept while it is drawn again
+		_state 					: {},
+		// The up and down button of every row that is drawn, by Element URI: the lock follows what the person asks the table to show
+		_buttons 				: {},
+		// What the body of each record was given, for as long as it is on screen: the fields are kept in ctx.view
+		_ctx 						: null,
+		_featureCtx 		: null,
+		// The stamp of the templates (see Nino.admin.touch()) the list was asked for: the record offers the templates the answer held, and one written since is
+		// not among them
 		_stamp 					: 0,
-		// ...and the stamp of the navigations (the Navigations panel touches it): the ticks of the form are the ones the list held
+		// ...and the stamp of the navigations (the Navigations panel touches it): the ticks of the record are the ones the list held
 		_navStamp 			: 0,
 
 		/**
-		 *	Load the persisted page list and draw the level the address names
+		 *	Load the persisted page list and draw the directory; an address that names a record opens it once the rows are in
 		 *
 		 *	@return		void
 		 */
 		init : function() {
 
-			if( dc.getElementById('routes-list') === null || Nino.admin.routes._loading === true )
+			if( dc.getElementById('routes-list') === null )
 				return;
 
-			Nino.admin.routes._loading = true;
-
-			// A template written while the answer is on its way is not in it: the
-			// stamp is the one from before the request went out
-			const stamp = Nino.admin.stamp( 'templates' );
-			const navStamp = Nino.admin.stamp( 'navigations' );
-
-			Nino.admin.routes._load( function( status, response ) {
-
-				Nino.admin.routes._loading = false;
-
-				if( status !== 200 || response === null )
-					return Nino.admin.routes._showError( dc.getElementById('routes-list'), status, response );
-
-				Nino.admin.routes._ready = true;
-				Nino.admin.routes._stamp = stamp;
-				Nino.admin.routes._navStamp = navStamp;
-
-				// Taken before any level below writes its own address
-				const hash = Nino.admin.router.current();
-
-				Nino.admin.routes._renderList();
-
-				const target = hash.panel === 'routes' ? Nino.admin.routes._target( hash.parts ) : null;
-
-				if( target === null )
-					return Nino.admin.routes._showList();
-
-				Nino.admin.routes._open( target, false );
-			} );
+			Nino.admin.routes._load( false );
 		},
 
 		/**
-		 *	Ask for the list and take the answer in: the pages, the pages of features, the templates, the languages and the
-		 *	navigations. The caller draws
-		 *
-		 *	@param		{Function}	done					Called with ( status, response )
+		 *	The panel is shown. An address of this panel is followed - the record of a page opens, steps or closes, the form of a new route and the record of a page of
+		 *	a feature open and close -, and where none is open the list is read again if a template or a navigation was written since it was read: the record offers what
+		 *	the answer held. Not while a record is open
 		 *
 		 *	@return		void
 		 */
-		_load : function( done ) {
+		showCurrent : function() {
 
-			Nino.admin.routes._apiCall( 'list', {}, function( status, response ) {
+			const panel = Nino.admin.routes;
 
-				if( status === 200 && response !== null ) {
-					Nino.admin.routes._pages 						= response.pages;
-					Nino.admin.routes._runtime 					= response.runtime || [];
-					Nino.admin.routes._templates 				= response.templates;
-					Nino.admin.routes._defaultTemplate 	= response.defaultTemplate || '';
-					Nino.admin.routes._locales 					= response.locales;
-					Nino.admin.routes._selectedLocale 	= response.selectedLocale || '';
-					Nino.admin.routes._localeNames 			= response.localeNames || {};
-					Nino.admin.routes._navs 						= response.navs;
-					Nino.admin.routes._navNames 				= response.navNames || {};
+			if( panel._ready === false )
+				return panel.init();
+
+			if( panel._follow() === true )
+				return;
+
+			if( panel._record.isOpen() === true || panel._featureRecord.isOpen() === true )
+				return;
+
+			if( Nino.admin.stamp( 'templates' ) !== panel._stamp || Nino.admin.stamp( 'navigations' ) !== panel._navStamp )
+				panel._load( true );
+		},
+
+		/**
+		 *	Ask for the list and take the answer in: the pages, the pages of features, the templates, the languages and the navigations. Drawn the first time with the
+		 *	sentence that it is loading; read again, the directory takes the new rows where it stands - its search and its page are what a person chose
+		 *
+		 *	@param		{boolean}		quiet				A list that is drawn already is read again
+		 *	@param		{Function}	[then]			Called with true once the list is drawn, with false where it could not be read
+		 *
+		 *	@return		void
+		 */
+		_load : function( quiet, then ) {
+
+			const panel = Nino.admin.routes;
+			const told = function( ok ) { if( typeof then === 'function' ) then( ok ) };
+
+			if( panel._loading === true )
+				return told( false );
+
+			panel._loading = true;
+
+			// A template written while the answer is on its way is not in it: the stamp is the one from before the request went out
+			const stamp = Nino.admin.stamp( 'templates' );
+			const navStamp = Nino.admin.stamp( 'navigations' );
+
+			if( quiet === false || panel._directory === null ) {
+				panel._frame();
+				panel._directory.loading( word('/_admin/routes/loading') );
+			}
+
+			panel._apiCall( 'list', {}, function( status, response ) {
+
+				panel._loading = false;
+
+				if( status !== 200 || response === null ) {
+					panel._directory.fail( status, response, '/_admin/common/error/load' );
+					return told( false );
 				}
 
-				done( status, response );
+				panel._take( response );
+				panel._stamp = stamp;
+				panel._navStamp = navStamp;
+				panel._ready = true;
+				panel._draw();
+
+				// An address that names a page, the new one or a page of a feature is followed once the rows are in
+				panel._follow();
+				told( true );
 			} );
 		},
 
 		/**
-		 *	The language a page is named in on the list: the one the workbench edits
-		 *	content in (Nino.admin.workLocale) where the website serves it, else the one
-		 *	the server named when the list was read
+		 *	Take the answer of the list in
+		 *
+		 *	@param		{Object}		response
+		 *
+		 *	@return		void
+		 */
+		_take : function( response ) {
+
+			const panel = Nino.admin.routes;
+
+			panel._pages 						= response.pages;
+			panel._runtime 					= response.runtime || [];
+			panel._templates 				= response.templates;
+			panel._defaultTemplate 	= response.defaultTemplate || '';
+			panel._locales 					= response.locales;
+			panel._selectedLocale 	= response.selectedLocale || '';
+			panel._localeNames 			= response.localeNames || {};
+			panel._navs 						= response.navs;
+			panel._navNames 				= response.navNames || {};
+			panel._rowsOf();
+		},
+
+		/**
+		 *	The rows of the pages and of the pages of features, from what the panel holds: a name is the one of the language the workbench is on
+		 *
+		 *	@return		void
+		 */
+		_rowsOf : function() {
+
+			const panel = Nino.admin.routes;
+
+			panel._rows = panel._pages.map( panel._row );
+			panel._featureRows = panel._runtime.map( panel._featureRow );
+		},
+
+		/**
+		 *	The room the panel is drawn in: the directory, the list of the pages of features under it and, under both, the bar of the list - "New route" as the main
+		 *	button. The records stand over it
+		 *
+		 *	@return		void
+		 */
+		_frame : function() {
+
+			const panel = Nino.admin.routes;
+
+			if( panel._directory !== null )
+				return;
+
+			const wrap = dc.getElementById('routes-list');
+
+			wrap.innerHTML = '';
+
+			const mount = Nino.adminUi.el( 'div' );
+
+			mount.id = 'routes-directory';
+			wrap.appendChild( mount );
+
+			panel._features = Nino.adminUi.el( 'div' );
+			panel._features.id = 'routes-features';
+			wrap.appendChild( panel._features );
+
+			const add = Nino.adminUi.button( word('/_admin/routes/label/new'), function() { panel._record.create( { opener : add } ) } );
+
+			panel._add = add;
+			panel._directory = panel._build( mount, panel._state );
+			panel._record = panel._makeRecord();
+			panel._featureRecord = panel._makeFeatureRecord();
+			panel._share();
+
+			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : add } ).el );
+		},
+
+		/**
+		 *	Draw what the last answer holds: the rows of the directory - drawn anew, with the navigations as a column, where the Navigation module came or went - and the
+		 *	list of the pages of features
+		 *
+		 *	@return		void
+		 */
+		_draw : function() {
+
+			const panel = Nino.admin.routes;
+
+			if( panel._shape !== ( panel._navs.length > 0 ? 'navs' : '' ) )
+				panel._directory = panel._build( dc.getElementById('routes-directory'), panel._directory.state() );
+
+			panel._directory.setRows( panel._rows, { keep : true } );
+			panel._drawFeatures();
+		},
+
+		/**
+		 *	The language a page is named in: the one the workbench edits content in (Nino.admin.workLocale) where the website serves it, else the one the server named
+		 *	when the list was read
 		 *
 		 *	@return		{string}
 		 */
@@ -165,126 +284,63 @@
 		},
 
 		/**
-		 *	The workbench's content language moved: the list names its pages in it,
-		 *	and the form that is open is drawn again with the description of that
-		 *	language - the shell has asked about its unsaved input already, so what
-		 *	it holds now is what is saved
+		 *	The workbench's content language moved: the names of the directory and of the list are the ones of that language, and a record that is open is drawn again
+		 *	with the description of that language - the shell has asked about its unsaved input already, so what it holds now is what is saved
 		 *
 		 *	@return		void
 		 */
 		_followLocale : function() {
 
-			if( Nino.admin.routes._ready === false )
+			const panel = Nino.admin.routes;
+
+			if( panel._ready === false )
 				return;
 
-			Nino.admin.routes._renderList();
+			panel._rowsOf();
+			panel._directory.setRows( panel._rows, { keep : true } );
+			panel._drawFeatures();
 
-			const view = Nino.admin.routes._view;
+			[ [ panel._record, panel._ctx, 'routes' ], [ panel._featureRecord, panel._featureCtx, 'routes-feature' ] ].forEach( function( open ) {
 
-			if( view === null )
-				return;
+				if( open[0].isOpen() === false )
+					return;
 
-			Nino.admin.routes._draw( view.kind, view.entry );
-			Nino.admin.routes._snapshot();
+				// An entry that stands among the rows the record steps through is drawn again from its row: its name is in its head, and its description is the one of the
+				// language. The form of a new route, and an entry that a search hides, have no place to be stepped to: what they draw in the language - the badge, the
+				// description - is put right where it stands, and is what is saved
+				const among = open[0].creating !== undefined && open[0].creating() === true ? false : open[0].key() !== null && ( open[0] === panel._featureRecord ? true : panel._directory.rows().some( function( row ) { return row.key === open[0].key() } ) );
+
+				if( among === true )
+					return open[1].go( 0 );
+
+				panel._localize( open[1].view );
+				Nino.admin.dirty.snapshot( open[2] );
+			} );
 		},
 
 		/**
-		 *	Re-show whichever level (list or form) is on - and read the list again
-		 *	first where a page template was written since it was read (the Builder
-		 *	creates them), so that the form's select offers it. Not while a form
-		 *	is open: the list would be drawn over it. Where the address names
-		 *	another level - a step through the history - that one is shown
+		 *	The record's own part that follows the working language, put right in place: the badge that says it and the description
+		 *
+		 *	@param		{Object}		view					What the body of the record keeps
 		 *
 		 *	@return		void
 		 */
-		showCurrent : function() {
+		_localize : function( view ) {
 
-			if( Nino.admin.routes._ready === false )
-				return Nino.admin.routes.init();
+			const panel = Nino.admin.routes;
+			const work = panel._language();
 
-			const hash = Nino.admin.router.current();
+			view.work = work;
+			view.description.value = view.descriptions[work] ?? '';
 
-			if( hash.panel === 'routes' && Nino.admin.routes._follow( hash.parts ) === true )
-				return;
+			const badge = Nino.adminUi.localeBadge( work );
 
-			if( Nino.admin.routes._view !== null )
-				return Nino.admin.routes._showForm();
+			view.badge.innerHTML = '';
 
-			if( Nino.admin.stamp( 'templates' ) !== Nino.admin.routes._stamp || Nino.admin.stamp( 'navigations' ) !== Nino.admin.routes._navStamp )
-				return Nino.admin.routes.init();
+			if( badge !== null )
+				view.badge.appendChild( badge );
 
-			Nino.admin.routes._showList();
-		},
-
-		/**
-		 *	What the parts of an address name: '@new' - an at sign no Element URI has, so that a route called new keeps an address of its own -, a route of the project, a page a feature routes, or the list. A
-		 *	route or a page the list does not hold is the list
-		 *
-		 *	@param		{Array}		parts					The address behind the panel's name
-		 *
-		 *	@return		{Object|null}							{ kind, uri, entry }, null for the list
-		 */
-		_target : function( parts ) {
-
-			if( Nino.admin.router.isWord( parts, 0, 'new' ) === true && parts.length === 1 )
-				return { kind : 'new', uri : '', entry : Nino.admin.routes._blank() };
-
-			if( Nino.admin.router.isWord( parts, 0, 'feature' ) === true && parts.length === 2 ) {
-				const runtime = Nino.admin.routes._runtime.find( function( page ) { return page.uri === parts[1] } );
-				return runtime === undefined ? null : { kind : 'feature', uri : runtime.uri, entry : runtime };
-			}
-
-			const page = parts.length === 1 ? Nino.admin.routes._pages.find( function( entry ) { return entry.uri === parts[0] } ) : undefined;
-
-			return page === undefined ? null : { kind : 'page', uri : page.uri, entry : page };
-		},
-
-		/**
-		 *	The empty entry of a new route: nothing but the template the project proposes
-		 *
-		 *	@return		{Object}
-		 */
-		_blank : function() {
-			return { uri : '', httpUris : {}, template : Nino.admin.routes._defaultTemplate, text : {} };
-		},
-
-		/**
-		 *	Move to the level the address names, if it is not the one on screen. Leaving a form that holds unsaved
-		 *	input asks first (see Nino.admin.router.leave())
-		 *
-		 *	@param		{Array}		parts					The address behind the panel's name
-		 *
-		 *	@return		{boolean}									Whether a move was made or is being asked about
-		 */
-		_follow : function( parts ) {
-
-			const target = Nino.admin.routes._target( parts );
-			const view = Nino.admin.routes._view;
-
-			if( target === null ? view === null : ( view !== null && view.kind === target.kind && view.uri === target.uri ) )
-				return false;
-
-			Nino.admin.router.leave( [ 'routes' ], view !== null, function() {
-				if( target === null )
-					Nino.admin.routes._showList();
-				else
-					Nino.admin.routes._open( target, false );
-			}, Nino.admin.routes._showLevel );
-
-			return true;
-		},
-
-		/**
-		 *	Show the level that is on, and write it into the address
-		 *
-		 *	@return		void
-		 */
-		_showLevel : function() {
-
-			if( Nino.admin.routes._view !== null )
-				return Nino.admin.routes._showForm();
-
-			Nino.admin.routes._showList();
+			view.badge.hidden = badge === null;
 		},
 
 		/**
@@ -301,240 +357,951 @@
 		},
 
 		/**
-		 *	Show a failed request's status/error in a container
+		 *	The row of a page: what the table shows of it, and the page itself for the record to read
 		 *
-		 *	@param		{Element}		container
-		 *	@param		{number}		status
-		 *	@param		{*}					response
+		 *	@param		{Object}		entry					One entry of _pages
 		 *
-		 *	@return		void
+		 *	@return		{Object}
 		 */
-		_showError : function( container, status, response ) {
-			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
+		_row : function( entry ) {
+
+			const panel = Nino.admin.routes;
+			const code = Number( entry.statusCode ) || 200;
+
+			return {
+				key					: entry.uri,
+				uri					: entry.uri,
+				entry				: entry,
+				name				: panel._pageName( entry ),
+				paths				: panel._paths( entry ),
+				// The template, or the word for a body that picks it when the page is asked for
+				templateText : typeof entry.template === 'string' && entry.template !== '' ? entry.template : word('/_admin/routes/label/runtime'),
+				navText			: ( entry.navs || [] ).map( function( key ) { return panel._navNames[key] || key } ).join(', '),
+				statusText	: code === 200 ? '' : String( code ),
+				// The state a person would otherwise see only after opening the page: has it a description in each language
+				states			: panel._locales.map( function( locale ) {
+					return { locale : locale, label : panel._short( locale ), name : Nino.adminUi.localeName( locale, panel._locales ), ok : String( ( ( entry.text || {} )[locale] || {} ).description || '' ).trim() !== '' };
+				} ),
+			};
 		},
 
 		/**
-		 *	Show the list again as it stands: the focus stays where it is, unless it
-		 *	stood in the form that is hidden now (see Nino.adminUi.showLevel()). What
-		 *	a person opens goes through _open(), and Back through the back link
+		 *	The row of a page a feature routes: its name and its paths
 		 *
-		 *	@param		{Element|null}	[opener]	Back: the control that opened the form that is left
+		 *	@param		{Object}		entry					One entry of _runtime
 		 *
-		 *	@return		void
+		 *	@return		{Object}
 		 */
-		_showList : function( opener ) {
+		_featureRow : function( entry ) {
 
-			Nino.admin.routes._view = null;
-			Nino.admin.router.set( 'routes', [] );
+			const panel = Nino.admin.routes;
 
-			if( opener === undefined )
-				Nino.adminUi.showLevel( 'routes-list', { focus : false } );
-			else
-				Nino.adminUi.backTo( 'routes-list', opener );
+			return { key : entry.uri, uri : entry.uri, entry : entry, name : panel._pageName( entry ), paths : panel._paths( entry ) };
 		},
 
 		/**
-		 *	Show the form again as it stands, at the address it has
+		 *	The row of a page of the project that the panel holds, or null
 		 *
-		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *	@param		{string}		key
 		 *
-		 *	@return		void
+		 *	@return		{Object|null}
 		 */
-		_showForm : function( opened ) {
-
-			Nino.admin.router.set( 'routes', Nino.admin.routes._parts() );
-			Nino.adminUi.showLevel( 'routes-form', opened === true ? {} : { focus : false } );
+		_find : function( key ) {
+			return Nino.admin.routes._rows.find( function( row ) { return row.key === key } ) ?? null;
 		},
 
 		/**
-		 *	The address of the form that is open, behind the panel's name
+		 *	The row of a page of a feature that the panel holds, or null
+		 *
+		 *	@param		{string}		key
+		 *
+		 *	@return		{Object|null}
+		 */
+		_findFeature : function( key ) {
+			return Nino.admin.routes._featureRows.find( function( row ) { return row.key === key } ) ?? null;
+		},
+
+		/**
+		 *	The name of a language in a badge: its code's language, "DE" - and where two languages of the site share it, the whole code, "PT-BR"
+		 *
+		 *	@param		{string}		code
+		 *
+		 *	@return		{string}
+		 */
+		_short : function( code ) {
+
+			const language = String( code ).split('_')[0];
+			const shared = Nino.admin.routes._locales.filter( function( other ) { return String( other ).split('_')[0] === language } ).length > 1;
+
+			return ( shared === true ? String( code ).replace( '_', '-' ) : language ).toUpperCase();
+		},
+
+		/**
+		 *	The empty entry of a new route as a row: nothing but the template the project proposes
+		 *
+		 *	@return		{Object}
+		 */
+		_blank : function() {
+
+			const panel = Nino.admin.routes;
+
+			return panel._row( { uri : '', httpUri : '', httpUris : {}, template : panel._defaultTemplate, navs : [], statusCode : 200, text : {} } );
+		},
+
+		/**
+		 *	The directory: the search over the pages and the table, with the up and down arrows of a row for the order the pages are stored in. There is no category, no
+		 *	select that narrows and no box to choose rows by: nothing here is done to several pages at once. The rows are always in the order they are stored in: no column sorts
+		 *
+		 *	@param		{Element}		mount
+		 *	@param		{Object}		[state]				What the person saw before
+		 *
+		 *	@return		{Object}
+		 */
+		_build : function( mount, state ) {
+
+			const panel = Nino.admin.routes;
+			const navs = panel._navs.length > 0;
+
+			panel._shape = navs === true ? 'navs' : '';
+
+			const columns = [
+				{ key : 'name', label : word('/_admin/routes/label/name'), type : 'string', primary : true, sortable : false, render : panel._nameCell },
+				{ key : 'paths', label : word('/_admin/routes/label/httpuri'), type : 'string', sortable : false, render : panel._pathCell },
+				{ key : 'templateText', label : word('/_admin/routes/label/template'), type : 'string', sortable : false, narrow : false },
+			];
+
+			// Where the Navigation module is off no page stands in a menu: the column would say nothing
+			if( navs === true )
+				columns.push( { key : 'navText', label : word('/_admin/routes/col/navs'), type : 'string', sortable : false, narrow : false } );
+
+			columns.push(
+				{ key : 'statusText', label : word('/_admin/routes/col/status'), type : 'string', sortable : false, render : panel._statusCell },
+				{ key : 'states', label : word('/_admin/routes/col/description'), cell : 'locales', words : { ok : word('/_admin/routes/col/description-ok'), missing : word('/_admin/routes/col/description-missing') } }
+			);
+
+			return Nino.adminUi.directory( {
+				mount : mount,
+				rowKey : 'key',
+				state : state,
+				onState : function( now ) { panel._state = now; panel._lockAll() },
+				columns : columns,
+				labels : { search : word('/_admin/routes/label/search'), empty : word('/_admin/routes/empty'), noMatch : word('/_admin/routes/nomatch'), loading : word('/_admin/routes/loading') },
+				// What a person looks for, whatever the cells show of it: the name in every language, the Element URI, every address, the template
+				searchText : function( row ) {
+
+					const names = panel._locales.map( function( locale ) { return String( ( ( row.entry.text || {} )[locale] || {} ).name || '' ) } );
+
+					return names.concat( [ row.uri, row.paths, row.entry.template || '' ] ).join(' ');
+				},
+				actions : panel._actions,
+				// A row is opened by its first button as well: the row is not a stop of the Tab key where it holds buttons
+				onOpen : function( row ) { panel._record.open( row.key, {} ) },
+			} );
+		},
+
+		/**
+		 *	The name of a page in the table: the name strong, its Element URI under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip
+		 *
+		 *	@param		{string}		value
+		 *	@param		{Object}		row
+		 *
+		 *	@return		{Element}
+		 */
+		_nameCell : function( value, row ) {
+
+			const cell = Nino.adminUi.el( 'span', 'routes-name' );
+			const name = Nino.adminUi.el( 'strong', 'routes-name-label', row.name );
+			const key = Nino.adminUi.el( 'span', 'routes-name-key', row.uri );
+
+			name.title = row.name;
+			key.title = row.uri;
+			cell.appendChild( name );
+			cell.appendChild( key );
+
+			return cell;
+		},
+
+		/**
+		 *	The addresses of a page, in one line that an ellipsis ends, and behind them the link that opens the page itself in a tab of its own - a real link with a name, so
+		 *	that it is opened, copied and middle-clicked like one. Only for a path that is a path below this site: a '//host' would be read as another origin
+		 *
+		 *	@param		{string}		value
+		 *	@param		{Object}		row
+		 *
+		 *	@return		{Element}
+		 */
+		_pathCell : function( value, row ) {
+
+			const cell = Nino.adminUi.el( 'span', 'routes-paths' );
+			const paths = Nino.adminUi.el( 'span', 'nino-admin-table-clamp', row.paths );
+			const first = String( row.entry.httpUri || '' );
+
+			paths.title = row.paths;
+			// The address is the column that gives way: the name has the room it needs
+			paths.style.setProperty( '--nino-admin-clamp', '12rem' );
+			cell.appendChild( paths );
+
+			if( first.charAt(0) === '/' && first.charAt(1) !== '/' ) {
+
+				const name = Nino.adminUi.format( word('/_admin/routes/label/open'), row.name );
+				const link = Nino.adminUi.el( 'a', 'nino-admin-btn-icon nino-admin-btn-icon--small' );
+
+				link.href = Nino.admin.assetUrl( first );
+				link.target = '_blank';
+				link.rel = 'noopener';
+				link.title = name;
+				link.setAttribute( 'aria-label', name );
+				link.appendChild( Nino.adminUi.icon( 'external-link' ) );
+				cell.appendChild( link );
+			}
+
+			return cell;
+		},
+
+		/**
+		 *	The status of a page: a badge for a code that is not the 200 of a page, and nothing for one that is
+		 *
+		 *	@param		{string}		value
+		 *	@param		{Object}		row
+		 *
+		 *	@return		{Element|string}
+		 */
+		_statusCell : function( value, row ) {
+
+			if( row.statusText === '' )
+				return '';
+
+			const badge = Nino.adminUi.el( 'span', 'nino-admin-badge', row.statusText );
+
+			badge.dataset.state = 'warn';
+
+			return badge;
+		},
+
+		/**
+		 *	The buttons at the end of a row, in the order the keyboard and the eye take them: edit - the one that opens the row -, up and down. "Open the page" is a link
+		 *	in the address, since a row has room for three buttons and the menu behind "More actions" begins with the third (see table(), actionsInline)
+		 *
+		 *	@param		{Object}		row
 		 *
 		 *	@return		{Array}
 		 */
-		_parts : function() {
+		_actions : function( row ) {
 
-			const view = Nino.admin.routes._view;
+			const panel = Nino.admin.routes;
 
-			if( view === null )
-				return [];
+			const edit = Nino.adminUi.iconButton( 'pencil', Nino.adminUi.format( word('/_admin/routes/row/open'), row.name ), function( event ) {
+				panel._record.open( row.key, { opener : event.currentTarget } );
+			}, { small : true } );
+			const up = Nino.adminUi.iconButton( 'arrow-up', word('/_admin/routes/label/moveup'), function() { panel._move( row.uri, 'up' ) }, { small : true } );
+			const down = Nino.adminUi.iconButton( 'arrow-down', word('/_admin/routes/label/movedown'), function() { panel._move( row.uri, 'down' ) }, { small : true } );
 
-			return view.kind === 'new' ? [ Nino.admin.router.word('new') ] : ( view.kind === 'feature' ? [ Nino.admin.router.word('feature'), view.uri ] : [ view.uri ] );
+			panel._buttons[row.uri] = { up : up, down : down };
+			panel._lock( row.uri );
+
+			return [ edit, up, down ];
 		},
 
 		/**
-		 *	The link of a row of the list, as the list draws it now: the list is drawn
-		 *	again behind an open form after a save, and the row that was pressed is
-		 *	gone with the old drawing
+		 *	Why a page cannot be moved now: the arrows move a page among its neighbours in the order that is stored, and a search shows other rows. No column of the table
+		 *	sorts - the stored order is the one order of this list - so a search is the one thing that can hide a neighbour
 		 *
-		 *	@param		{string}	key
-		 *
-		 *	@return		{Element|null}
+		 *	@return		{string}									The reason, '' where every page is shown
 		 */
-		_rowOf : function( key ) {
+		_locked : function() {
 
-			const row = Array.from( dc.getElementById('routes-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === key } );
+			if( String( Nino.admin.routes._directory.state().query ?? '' ).trim() !== '' )
+				return word('/_admin/routes/lock/search');
 
-			return row === undefined ? null : row.querySelector('a');
+			return '';
 		},
 
 		/**
-		 *	The control Back returns the focus to from the form that is open: the row of
-		 *	the route, or the button that opened the form of a new one
+		 *	Lock or unlock the arrows of a row: locked while a search shows not every page, saying why, and at the edges of the order
 		 *
-		 *	@return		{Element|null}
+		 *	@param		{string}		uri
+		 *
+		 *	@return		void
 		 */
-		_backTarget : function() {
+		_lock : function( uri ) {
 
-			const view = Nino.admin.routes._view;
+			const panel = Nino.admin.routes;
+			const pair = panel._buttons[uri];
+			const at = panel._rows.findIndex( function( row ) { return row.uri === uri } );
+			const reason = panel._locked();
 
-			if( view === null || view.kind === 'new' )
-				return Nino.admin.routes._opener;
+			if( pair === undefined )
+				return;
 
-			return Nino.admin.routes._rowOf( ( view.kind === 'feature' ? 'feature:' : '' )+ view.uri );
+			pair.up.disabled = reason !== '' || at <= 0;
+			pair.down.disabled = reason !== '' || at === panel._rows.length - 1;
+			pair.up.title = reason === '' ? word('/_admin/routes/label/moveup') : reason;
+			pair.down.title = reason === '' ? word('/_admin/routes/label/movedown') : reason;
 		},
 
 		/**
-		 *	The row of a page in the list: its name over its addresses, a link that opens
-		 *	the form, and the buttons at the end. A page that is routed at runtime has
-		 *	none of the buttons - no menu order to change, nothing to delete
+		 *	The arrows of every row that is drawn, after the person changed the search
 		 *
-		 *	@param		{Object}		entry					One entry from _pages or _runtime
-		 *	@param		{string}		kind					'page' or 'feature'
-		 *	@param		{Array}			[actions]			Small buttons
-		 *
-		 *	@return		{Object}									A row for list()
+		 *	@return		void
 		 */
-		_row : function( entry, kind, actions ) {
+		_lockAll : function() {
 
-			const parts = kind === 'feature' ? [ Nino.admin.router.word('feature'), entry.uri ] : [ entry.uri ];
+			const panel = Nino.admin.routes;
+
+			Object.keys( panel._buttons ).forEach( panel._lock );
+		},
+
+		/**
+		 *	Swap one page with its neighbor - see Admin.php's apiMove(). The order is saved at once, which a toast says; the rows are the ones the server answers with, the
+		 *	row that moved is the one drawn anew, and the focus stays on the button that was pressed - on the other one where that is locked now, at the edge of the order.
+		 *	A move the server refuses leaves the order on screen a guess - a route somebody else deleted since, a config.php that could not be written -, so the list is read
+		 *	again and the reason is said over the table
+		 *
+		 *	@param		{string}	uri						The Element-URI of the page
+		 *	@param		{string}	direction			'up' | 'down'
+		 *
+		 *	@return		void
+		 */
+		_move : function( uri, direction ) {
+
+			const panel = Nino.admin.routes;
+
+			panel._apiCall( 'move', { uri : uri, direction : direction }, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+
+					panel._apiCall( 'list', {}, function( listStatus, listResponse ) {
+
+						if( listStatus === 200 && listResponse !== null ) {
+							panel._pages = listResponse.pages;
+							panel._rowsOf();
+							panel._directory.setRows( panel._rows, { keep : true } );
+						}
+
+						// After the rows, which draw the table anew
+						panel._directory.notice( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+					} );
+
+					return;
+				}
+
+				Nino.admin.touch( 'routes' );
+
+				panel._pages = response.pages;
+				panel._rowsOf();
+				panel._directory.notice('');
+				panel._directory.update( panel._rows, uri );
+				panel._directory.reveal( uri );
+
+				const pair = panel._buttons[uri];
+
+				if( pair !== undefined ) {
+					const own = pair[direction];
+
+					( own.disabled === true ? pair[direction === 'up' ? 'down' : 'up'] : own ).focus();
+				}
+
+				Nino.adminUi.say( word('/_admin/routes/msg/moved') );
+			} );
+		},
+
+		/**
+		 *	The list of the pages a feature or a module routes at runtime, under the directory: a row is a name over its paths and opens the record of its texts, nothing
+		 *	more - no menu order, no delete, because there is no route of the project's to move or remove. What these pages are is behind the (?) at the title of the group.
+		 *	Nothing is drawn when no feature routes a page
+		 *
+		 *	@return		void
+		 */
+		_drawFeatures : function() {
+
+			const panel = Nino.admin.routes;
+			const holder = panel._features;
+
+			holder.innerHTML = '';
+
+			if( panel._featureRows.length === 0 )
+				return;
+
+			const group = Nino.adminUi.list( panel._featureRows.map( function( row ) {
+				return {
+					key			: row.key,
+					title		: row.name,
+					detail	: row.paths,
+					href		: Nino.admin.router.href( 'routes', [ Nino.admin.router.word('feature'), row.uri ] ),
+					onOpen	: function( one, event ) { panel._featureRecord.open( row.key, { opener : event !== undefined && event !== null ? event.currentTarget : undefined } ) },
+				};
+			} ), { title : word('/_admin/routes/runtime/title') } );
+
+			Nino.adminUi.sectionHelp( group.querySelector('h2'), group, word('/_admin/routes/runtime/help') );
+			holder.appendChild( group );
+		},
+
+		/**
+		 *	The directory as the records see it: what is on screen now, whatever drew it last
+		 *
+		 *	@return		{Object}
+		 */
+		_pageDirectory : function() {
+
+			const panel = Nino.admin.routes;
 
 			return {
-				key			: ( kind === 'feature' ? 'feature:' : '' )+ entry.uri,
-				title		: Nino.admin.routes._pageName( entry ),
-				detail	: Nino.admin.routes._paths( entry ),
-				href		: Nino.admin.router.href( 'routes', parts ),
-				actions : actions,
-				onOpen	: function( row ) {
-					Nino.admin.router.go( 'routes', parts );
-					Nino.admin.routes._open( { kind : kind, uri : entry.uri, entry : entry }, true );
+				rows : function() { return panel._directory.rows() },
+				reveal : function( key ) { return panel._directory.reveal( key ) },
+				focusRow : function( key ) { return panel._directory.focusRow( key ) },
+				focusSearch : function() { return panel._directory.focusSearch() },
+			};
+		},
+
+		/**
+		 *	The list of the pages of features as the record of one sees it: the rows in the order they are shown, which are all of them - there is no page, no search
+		 *
+		 *	@return		{Object}
+		 */
+		_featureDirectory : function() {
+
+			const panel = Nino.admin.routes;
+
+			const link = function( key ) {
+
+				// The record of a page of a feature has written the address of its directory - the word alone - where it closed, which is the directory of the panel: the
+				// focus is given back right after that write
+				panel._plain();
+
+				const found = Array.from( panel._features.querySelectorAll('li') ).find( function( li ) { return li.dataset.row === key } );
+
+				return found === undefined ? null : found.querySelector('a');
+			};
+
+			return {
+				rows : function() { return panel._featureRows },
+				reveal : function() { return true },
+				focusRow : function( key ) {
+
+					const target = link( key );
+
+					if( target === null )
+						return false;
+
+					target.focus();
+
+					return true;
+				},
+				// The heading of the list, else its first row: where the focus goes when the page is gone
+				focusSearch : function() {
+
+					panel._plain();
+
+					const target = panel._features.querySelector('h2') ?? panel._features.querySelector('a');
+
+					if( target === null )
+						return false;
+
+					target.setAttribute( 'tabindex', '-1' );
+					target.focus();
+
+					return true;
 				},
 			};
 		},
 
 		/**
-		 *	Render the page list, plus the "New route" button in the bar below it. A
-		 *	row is the page's name over its addresses, a link that opens its form
-		 *	and, at the end, the link to the page itself and the buttons that
-		 *	reorder the persisted list - a page goes with all of its routes - which is
-		 *	what orders the menus (equal menu priorities follow route order, see
-		 *	Admin.php's apiMove())
+		 *	The record of a page of the project: a dialog over the directory with the name of the page in its head and its Element URI under it, the fields of the page,
+		 *	"Delete route" at the left of the bar and "Save", "Save and continue" at the right. The form of a new route is the same dialog (`create`), and a save that
+		 *	changes the Element URI gives the record the new one (`rekey`)
+		 *
+		 *	@return		{Object}
+		 */
+		_makeRecord : function() {
+
+			const panel = Nino.admin.routes;
+
+			return Nino.adminUi.record( {
+				screen : 'routes',
+				prefix : [],
+				directory : panel._pageDirectory(),
+				keyOf : function( row ) { return row.key },
+				find : panel._find,
+				title : function( row ) { return row.name },
+				subtitle : function( row ) { return row.uri },
+				saveNext : true,
+				rekey : true,
+				create : { blank : panel._blank },
+				labels : { prev : word('/_admin/routes/record/prev'), next : word('/_admin/routes/record/next'), createTitle : word('/_admin/routes/label/new'), createSave : word('/_admin/routes/label/create'), created : word('/_admin/routes/msg/created') },
+				body : panel._body,
+				save : panel._save,
+				danger : { label : word('/_admin/routes/label/delete'), run : panel._remove },
+				missing : function() { panel._directory.notice( word('/_admin/routes/record/missing') ) },
+			} );
+		},
+
+		/**
+		 *	The record of a page a feature routes: a second record of the same screen, at #routes/routes/@feature/<Element URI>, over the list of those pages. It has
+		 *	a name of its own for unsaved input, which the entry of the panel answers for (see _share()), no way to delete and no form of a new page
+		 *
+		 *	@return		{Object}
+		 */
+		_makeFeatureRecord : function() {
+
+			const panel = Nino.admin.routes;
+
+			return Nino.adminUi.record( {
+				screen : 'routes',
+				prefix : [ Nino.admin.router.word('feature') ],
+				dirty : 'routes-feature',
+				directory : panel._featureDirectory(),
+				keyOf : function( row ) { return row.key },
+				find : panel._findFeature,
+				title : function( row ) { return row.name },
+				subtitle : function( row ) { return row.paths },
+				saveNext : true,
+				labels : { prev : word('/_admin/routes/record/prev'), next : word('/_admin/routes/record/next') },
+				body : panel._featureBody,
+				save : panel._saveFeature,
+				missing : function() { panel._directory.notice( word('/_admin/routes/record/missing') ) },
+			} );
+		},
+
+		/**
+		 *	The two records are two views of one panel, and the shell knows a panel by one name of unsaved input: `routes`, the entry of the record of a page. The record of a
+		 *	page of a feature is a watched form of its own - `routes-feature` - and the entry of the panel answers for whichever of the two is open, so that the question
+		 *	before a way out of the panel and the save the shell runs reach the one that holds the input
 		 *
 		 *	@return		void
 		 */
-		_renderList : function( focus ) {
+		_share : function() {
 
-			const wrap = dc.getElementById('routes-list');
-			const moves = {};
-			wrap.innerHTML = '';
+			const dirty = Nino.admin.dirty;
 
-			const pages = Nino.admin.routes._pages;
+			if( typeof dirty !== 'object' || typeof dirty.entry !== 'function' )
+				return;
 
-			if( pages.length === 0 )
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/routes/empty') ) );
-			else
-				wrap.appendChild( Nino.adminUi.list( pages.map( function( entry, index ) {
+			const own = dirty.entry('routes');
+			const feature = dirty.entry('routes-feature');
 
-					const actions = [];
-					const open = Nino.admin.routes._openLink( entry );
+			if( own === null || feature === null )
+				return;
 
-					if( open !== null )
-						actions.push( open );
+			const on = function() { return Nino.admin.routes._featureRecord.isOpen() === true };
 
-					const up = Nino.adminUi.iconButton( 'arrow-up', Nino.content.getText('/_admin/routes/label/moveup'), function() { Nino.admin.routes._move( entry.uri, 'up' ) }, { small : true, disabled : index === 0 } );
-					const down = Nino.adminUi.iconButton( 'arrow-down', Nino.content.getText('/_admin/routes/label/movedown'), function() { Nino.admin.routes._move( entry.uri, 'down' ) }, { small : true, disabled : index === pages.length - 1 } );
-
-					moves[entry.uri] = { up : up, down : down };
-					actions.push( up, down );
-
-					return Nino.admin.routes._row( entry, 'page', actions );
-				} ), { label : Nino.content.getText('/_admin/nav/routes') } ) );
-
-			Nino.admin.routes._renderRuntimeList( wrap );
-
-			// The line a refused move reports into. Beside the list rather than
-			// in place of it: the rows are still every route there is, and they
-			// carry the buttons the next attempt is made with
-			const msg = dc.createElement('p');
-			msg.id = 'routes-list-msg';
-			Nino.admin.routes._listLine = Nino.adminUi.status( msg );
-			wrap.appendChild( msg );
-
-			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/routes/label/new'), function() {
-				Nino.admin.router.go( 'routes', [ Nino.admin.router.word('new') ] );
-				Nino.admin.routes._open( { kind : 'new', uri : '', entry : Nino.admin.routes._blank() }, true, addBtn );
+			dirty.register( 'routes', {
+				isDirty : function() { return on() === true ? feature.isDirty() : own.isDirty() },
+				save : function( done ) { return on() === true ? feature.save( done ) : own.save( done ) },
+				discard : function() { return on() === true ? feature.discard() : own.discard() },
+				bar : function() { return on() === true ? feature.bar() : own.bar() },
 			} );
-			wrap.appendChild( Nino.adminUi.actionBar( { list : true, primary : addBtn } ).el );
+		},
 
-			// After a move the focus stays on the button that was pressed, which stands in the row the page moved to; at the edge of the
-			// list that button is locked and the other one takes it
-			if( focus !== undefined && moves[focus.uri] !== undefined ) {
-				const own = moves[focus.uri][focus.direction];
-				const other = moves[focus.uri][focus.direction === 'up' ? 'down' : 'up'];
+		/**
+		 *	What the address names, and which of the two records answers it. A page of the project - one part, the word @new for the form of a new one - is the record of
+		 *	a page, a page of a feature - the word @feature and one part - the record of those. The record of a page reads two parts as one too many and writes the
+		 *	address of the directory over it, so it never sees an address of the other record; and the one that is open and is not the address's own is closed first,
+		 *	asking about its unsaved input: what is on screen is the screen, and where it cannot be taken away the address is written to what the screen shows
+		 *
+		 *	@return		{boolean}									Whether the address was answered
+		 */
+		_follow : function() {
 
-				( own.disabled === true ? other : own ).focus();
+			const panel = Nino.admin.routes;
+			const router = Nino.admin.router;
+			const at = router.current();
+
+			if( at.panel !== 'routes' )
+				return false;
+
+			const feature = at.parts.length > 0 && router.isWord( at.parts, 0, 'feature' ) === true;
+			const here = feature === true ? panel._featureRecord : panel._record;
+			const other = feature === true ? panel._record : panel._featureRecord;
+
+			// The address says what the screen has to be - written again where closing the other one wrote over it
+			const parts = at.parts.map( function( part, index ) { return at.parts.words[index] === true ? router.word( part.slice( 1 ) ) : part } );
+
+			const answer = function() {
+
+				const answered = here.follow();
+
+				panel._plain();
+
+				return answered;
+			};
+
+			if( other.isOpen() === false )
+				return answer();
+
+			router.leave( [ 'routes' ], true, function() {
+
+				if( other.isOpen() === true ) {
+
+					// The entry of the history the browser is on may be the other record's own, which its closing would take off the history by stepping back: it is closed as
+					// what it is not, and the address is the one that was asked for
+					const mark = router.marked();
+
+					if( mark !== '' )
+						router.mark('');
+
+					other.close();
+
+					router.set( 'routes', parts );
+
+					if( mark !== '' )
+						router.mark( mark );
+				}
+
+				answer();
+			}, panel._address );
+
+			return true;
+		},
+
+		/**
+		 *	The record of a page of a feature writes the address of its own directory, the word @feature alone, where it closes or where the page is not there. The
+		 *	directory of the panel is the list, and that is the address
+		 *
+		 *	@return		void
+		 */
+		_plain : function() {
+
+			const router = Nino.admin.router;
+			const at = router.current();
+
+			if( at.panel === 'routes' && at.parts.length === 1 && router.isWord( at.parts, 0, 'feature' ) === true )
+				router.set( 'routes', [] );
+		},
+
+		/**
+		 *	Write the address of what is on screen: the form of a new route, a page, a page of a feature or the directory
+		 *
+		 *	@return		void
+		 */
+		_address : function() {
+
+			const panel = Nino.admin.routes;
+			const router = Nino.admin.router;
+			let parts = [];
+
+			if( panel._record.isOpen() === true )
+				parts = panel._record.creating() === true ? [ router.word('new') ] : [ panel._record.key() ];
+			else if( panel._featureRecord.isOpen() === true )
+				parts = [ router.word('feature'), panel._featureRecord.key() ];
+
+			router.set( 'routes', parts );
+		},
+
+		/**
+		 *	The mark after the name of a field that cannot be left empty is the block's star; what a field says is
+		 *	its label. The control a block drew inside the label it returned
+		 *
+		 *	@param		{Element}		label					What textField(), selectField() and the like returned
+		 *	@param		{string}		field					The name the server marks the control by where it refuses it
+		 *
+		 *	@return		{Element}									The control
+		 */
+		_control : function( label, field ) {
+
+			const control = label.querySelector('input, select, textarea');
+			control.dataset.field = field;
+
+			return control;
+		},
+
+		/**
+		 *	A group of fields of a record: a fieldset with its legend
+		 *
+		 *	@param		{string}		title
+		 *
+		 *	@return		{Object}									{ set, legend }
+		 */
+		_section : function( title ) {
+
+			const set = dc.createElement('fieldset');
+			const legend = set.appendChild( Nino.adminUi.el( 'legend', '', title ) );
+
+			return { set : set, legend : legend };
+		},
+
+		/**
+		 *	What the body of a record keeps of its own, from the entry it draws: the language the description is of, and the description of each language - the one of the
+		 *	working language is what its field holds, the others stay as they were
+		 *
+		 *	@param		{Object}		entry
+		 *
+		 *	@return		{Object}
+		 */
+		_view : function( entry ) {
+
+			const panel = Nino.admin.routes;
+			const view = { entry : entry, work : panel._language(), descriptions : {} };
+
+			panel._locales.forEach( function( locale ) {
+				view.descriptions[locale] = String( ( ( entry.text || {} )[locale] || {} ).description || '' );
+			} );
+
+			// Where the language is not the native one the record says in which it writes: at the head of the body
+			view.badge = Nino.adminUi.el( 'p', 'routes-worklang' );
+
+			const badge = Nino.adminUi.localeBadge( view.work );
+
+			if( badge !== null )
+				view.badge.appendChild( badge );
+
+			view.badge.hidden = badge === null;
+
+			return view;
+		},
+
+		/**
+		 *	The section of the content of a page: the name and the title of every language, and the description of the language the workbench edits content in
+		 *
+		 *	@param		{Object}		view
+		 *	@param		{Object}		entry
+		 *
+		 *	@return		{Element}
+		 */
+		_content : function( view, entry ) {
+
+			const panel = Nino.admin.routes;
+			const section = panel._section( word('/_admin/routes/label/content') );
+
+			Nino.adminUi.sectionHelp( section.legend, section.set, word('/_admin/routes/help/content') );
+
+			view.name = Nino.adminUi.localeRows( { key : 'name', label : word('/_admin/routes/label/name'), required : true, locales : panel._locales,
+				values : panel._valuesOf( entry, 'name' ), placeholder : word('/_admin/routes/placeholder/name'), help : word('/_admin/routes/help/name') } );
+			view.title = Nino.adminUi.localeRows( { key : 'title', label : word('/_admin/routes/label/title'), required : true, locales : panel._locales,
+				values : panel._valuesOf( entry, 'title' ), placeholder : word('/_admin/routes/placeholder/title'), help : word('/_admin/routes/help/title') } );
+
+			[ view.name, view.title ].forEach( function( rows, at ) {
+				Object.keys( rows.controls ).forEach( function( locale ) { rows.controls[locale].dataset.field = at === 0 ? 'name' : 'title' } );
+				section.set.appendChild( rows.el );
+			} );
+
+			const description = Nino.adminUi.textareaField( { key : 'description', label : word('/_admin/routes/label/description'), rows : 3,
+				value : view.descriptions[view.work] ?? '', help : word('/_admin/routes/help/description') } );
+
+			view.description = panel._control( description, 'description' );
+			section.set.appendChild( description );
+
+			return section.set;
+		},
+
+		/**
+		 *	The content of the record of a page of the project: the section of the route - the Element URI, the switch for one Http URI for every language and the
+		 *	address, or the rows of the languages, the template, the status code and, while the Navigation module is active, the navigations - and the section of the
+		 *	content. The record checks its required fields itself (see _save()), so the browser's own bubble - in the browser's language, not the workbench's - never
+		 *	gets to speak. What the fields are is kept in ctx.view, which the save finds there
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *
+		 *	@return		{Element}
+		 */
+		_body : function( row, ctx ) {
+
+			const panel = Nino.admin.routes;
+			const view = panel._view( row.entry );
+			const body = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+			view.row = row;
+			view.creating = ctx.creating === true;
+			ctx.view = view;
+			panel._ctx = ctx;
+
+			body.appendChild( view.badge );
+
+			const section = panel._section( word('/_admin/routes/label/route') );
+
+			panel._drawRoute( section.set, view, row.entry );
+			body.appendChild( section.set );
+			body.appendChild( panel._content( view, row.entry ) );
+
+			return body;
+		},
+
+		/**
+		 *	The content of the record of a page a feature routes: its paths, to read, and the section of the content
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *
+		 *	@return		{Element}
+		 */
+		_featureBody : function( row, ctx ) {
+
+			const panel = Nino.admin.routes;
+			const view = panel._view( row.entry );
+			const body = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+			view.row = row;
+			ctx.view = view;
+			panel._featureCtx = ctx;
+
+			body.appendChild( view.badge );
+			body.appendChild( Nino.adminUi.readLine( { label : word('/_admin/routes/label/httpuri'), value : row.paths, mono : true } ) );
+			body.appendChild( panel._content( view, row.entry ) );
+
+			return body;
+		},
+
+		/**
+		 *	One value of every language, for localeRows()
+		 *
+		 *	@param		{Object}		entry
+		 *	@param		{string}		field					'name' or 'title'
+		 *
+		 *	@return		{Object}									Language => value
+		 */
+		_valuesOf : function( entry, field ) {
+
+			const values = {};
+
+			Nino.admin.routes._locales.forEach( function( locale ) {
+				values[locale] = String( ( ( entry.text || {} )[locale] || {} )[field] || '' );
+			} );
+
+			return values;
+		},
+
+		/**
+		 *	The fields of the section of the route of a page of the project: Element URI, the switch for one Http
+		 *	URI for every language and the address, template, status code and the navigations
+		 *
+		 *	@param		{Element}		fieldset
+		 *	@param		{Object}		view
+		 *	@param		{Object}		entry
+		 *
+		 *	@return		void
+		 */
+		_drawRoute : function( fieldset, view, entry ) {
+
+			const routes = Nino.admin.routes;
+
+			const uri = Nino.adminUi.textField( { label : word('/_admin/routes/label/uri'), id : 'routes-form-uri', value : entry.uri || '', required : true,
+				placeholder : word('/_admin/routes/placeholder/uri'), help : word('/_admin/routes/help/uri') } );
+			view.uriInput = routes._control( uri, 'uri' );
+			fieldset.appendChild( uri );
+
+			view.addresses = routes._addressesOf( entry );
+
+			const oneSwitch = Nino.adminUi.switchField( {
+				key 		: 'one-address',
+				checked : view.addresses.one,
+				label 	: word('/_admin/routes/label/one-address'),
+				help 		: word('/_admin/routes/hint/one-address'),
+			} );
+			oneSwitch.querySelector('input').addEventListener( 'change', function( ev ) { routes._switchAddresses( view, ev.target.checked ) } );
+			fieldset.appendChild( oneSwitch );
+
+			const addressWrap = dc.createElement('div');
+			addressWrap.id = 'routes-form-addresses';
+			addressWrap.className = 'nino-admin-fieldgrid';
+			view.addressWrap = addressWrap;
+			routes._renderAddresses( view );
+			fieldset.appendChild( addressWrap );
+
+			// A route with no template of its own to start on - a new one in a
+			// project without a blank page, or one whose file is gone - makes
+			// the person choose: the first file in the list is not a proposal,
+			// it is the one that happens to sort first. A body that names its
+			// template at runtime has its own option, and the select is locked
+			const fixedBody = entry.body !== undefined && entry.body !== '' && routes._templateFromBody( entry.body ) === null;
+			const options = routes._templates.map( function( name ) { return { value : name, label : name } } );
+			const asking = fixedBody === false && routes._templates.indexOf( entry.template ) === -1;
+
+			if( fixedBody === true )
+				options.unshift( { value : '', label : word('/_admin/routes/label/runtime') } );
+			else if( asking === true )
+				options.unshift( { value : '', label : word('/_admin/routes/label/choose') } );
+
+			const template = Nino.adminUi.selectField( { key : 'template', label : word('/_admin/routes/label/template'), id : 'routes-form-template', options : options,
+				value : fixedBody === true || asking === true ? '' : entry.template,
+				help : fixedBody === true ? Nino.adminUi.format( word('/_admin/routes/hint/runtime'), entry.body ) : word('/_admin/routes/help/template') } );
+
+			// The star is the field's, a placeholder is a choice to make and no choice, and the select that the route's body decides is locked
+			view.template = routes._control( template, 'template' );
+			view.template.setAttribute( 'aria-required', 'true' );
+			// The star stands after the words of the name, where the block puts it, and before the (?)
+			const templateName = template.querySelector('span');
+			( templateName.querySelector('.nino-admin-field-text') ?? templateName ).appendChild( routes._star() );
+
+			if( asking === true )
+				view.template.querySelector('option').disabled = true;
+
+			view.template.disabled = fixedBody === true;
+			fieldset.appendChild( template );
+
+			const status = Nino.adminUi.textField( { key : 'status', type : 'number', label : word('/_admin/routes/label/status'), id : 'routes-form-status',
+				value : String( entry.statusCode || 200 ), help : word('/_admin/routes/help/status') } );
+			view.status = routes._control( status, 'statusCode' );
+			view.status.min = '100';
+			view.status.max = '599';
+			fieldset.appendChild( status );
+
+			// One tick per navigation the project registered (/nino/html/navs), named by its name where it has one and
+			// by its key behind it, quietly - an empty list means the Navigation module is inactive and no menu field is
+			// offered at all. What a page is a member of lives on its route, which is what actually renders it (see
+			// \Nino\Modules\Navigation::routeLines())
+			view.navs = null;
+
+			if( routes._navs.length > 0 ) {
+
+				view.navs = Nino.adminUi.checklist( { key : 'navs', label : word('/_admin/routes/label/navs'), help : word('/_admin/routes/help/navs'),
+					value : entry.navs || [], options : routes._navs.map( function( key ) {
+						const name = routes._navNames[key] ?? '';
+						return name === '' ? { value : key, label : key } : { value : key, label : name, state : key };
+					} ) } );
+				fieldset.appendChild( view.navs.el );
 			}
 		},
 
 		/**
-		 *	The link that opens the page itself in a tab of its own, as a small icon: a real link with a name, so
-		 *	that it is opened, copied and middle-clicked like one. Only for a path that is a path below this site - a
-		 *	'//host' would be read as another origin
+		 *	The mark after the name of a field that cannot be left empty - drawn
+		 *	aria-hidden, the control says it with aria-required. selectField() has none of its own
 		 *
-		 *	@param		{Object}		entry					One entry from _pages
-		 *
-		 *	@return		{Element|null}
+		 *	@return		{Element}
 		 */
-		_openLink : function( entry ) {
-
-			if( entry.httpUri.charAt(0) !== '/' || entry.httpUri.charAt(1) === '/' )
-				return null;
-
-			const name = Nino.content.getText('/_admin/routes/label/open');
-			const link = Nino.adminUi.el( 'a', 'nino-admin-btn-icon nino-admin-btn-icon--small' );
-
-			link.href = Nino.admin.assetUrl( entry.httpUri );
-			link.target = '_blank';
-			link.rel = 'noopener';
-			link.title = name;
-			link.setAttribute( 'aria-label', name );
-			link.appendChild( Nino.adminUi.icon( 'external-link' ) );
-
-			return link;
+		_star : function() {
+			const star = dc.createElement('span');
+			star.className = 'nino-admin-required';
+			star.setAttribute( 'aria-hidden', 'true' );
+			star.textContent = '*';
+			return star;
 		},
 
 		/**
-		 *	The pages features route at runtime, under the persisted ones: a
-		 *	row is the page's name over its path and opens the form of its
-		 *	texts, nothing more - no menu order, no delete, because there is no
-		 *	route of the project's to move or remove. What these pages are is
-		 *	behind the (?) at the title of the group. Nothing is drawn when no
-		 *	feature routes a page
+		 *	The on-disk template a route body names, when it names exactly
+		 *	one - mirrors \Nino\Pages::templateOf(), which is what actually
+		 *	decides whether a save may rewrite the body
 		 *
-		 *	@param		{Element}		wrap					The list's container
+		 *	@param		{string}	body
 		 *
-		 *	@return		void
+		 *	@return		{string|null}		Null if body isn't a plain template reference
 		 */
-		_renderRuntimeList : function( wrap ) {
+		_templateFromBody : function( body ) {
+			const match = /^\[template \/templates\/([A-Za-z0-9._-]+)\]$/.exec( String( body ).trim() );
+			return match !== null ? match[1] : null;
+		},
 
-			if( Nino.admin.routes._runtime.length === 0 )
-				return;
+		/**
+		 *	What a page is called in the table: its name in the language the
+		 *	workbench is on, else in the first language that has one, else its
+		 *	path - a page with no name at all is still a row somebody can open
+		 *
+		 *	@param		{Object}	entry
+		 *
+		 *	@return		{string}
+		 */
+		_pageName : function( entry ) {
 
-			const group = Nino.adminUi.list( Nino.admin.routes._runtime.map( function( entry ) {
-				return Nino.admin.routes._row( entry, 'feature' );
-			} ), { title : Nino.content.getText('/_admin/routes/runtime/title') } );
+			const nameIn = function( locale ) {
+				return String( ( ( entry.text || {} )[locale] || {} ).name || '' ).trim();
+			};
 
-			Nino.adminUi.sectionHelp( group.querySelector('h2'), group, Nino.content.getText('/_admin/routes/runtime/help') );
-			wrap.appendChild( group );
+			const locales = [ Nino.admin.routes._language() ].concat( Nino.admin.routes._locales );
+
+			for( let i = 0; i < locales.length; i++ )
+				if( locales[i] !== '' && nameIn( locales[i] ) !== '' )
+					return nameIn( locales[i] );
+
+			return entry.httpUri;
 		},
 
 		/**
@@ -584,379 +1351,6 @@
 		},
 
 		/**
-		 *	What a page is called in the list: its name in the language the
-		 *	workbench is on, else in the first language that has one, else its
-		 *	path - a page with no name at all is still a row somebody can open
-		 *
-		 *	@param		{Object}	entry
-		 *
-		 *	@return		{string}
-		 */
-		_pageName : function( entry ) {
-
-			const nameIn = function( locale ) {
-				return String( ( ( entry.text || {} )[locale] || {} ).name || '' ).trim();
-			};
-
-			const locales = [ Nino.admin.routes._language() ].concat( Nino.admin.routes._locales );
-
-			for( let i = 0; i < locales.length; i++ )
-				if( locales[i] !== '' && nameIn( locales[i] ) !== '' )
-					return nameIn( locales[i] );
-
-			return entry.httpUri;
-		},
-
-		/**
-		 *	The on-disk template a route body names, when it names exactly
-		 *	one - mirrors Admin.php's _templateFromBody(), which is
-		 *	what actually decides whether a save may rewrite the body
-		 *
-		 *	@param		{string}	body
-		 *
-		 *	@return		{string|null}		Null if body isn't a plain template reference
-		 */
-		_templateFromBody : function( body ) {
-			const match = /^\[template \/templates\/([A-Za-z0-9._-]+)\]$/.exec( String( body ).trim() );
-			return match !== null ? match[1] : null;
-		},
-
-		/**
-		 *	Swap one page with its neighbor and re-render - see Admin.php's
-		 *	apiMove(). A move that is made says so as a toast: it is saved at once
-		 *
-		 *	@param		{string}	uri						The Element-URI of the page
-		 *	@param		{string}	direction			'up' | 'down'
-		 *
-		 *	@return		void
-		 */
-		_move : function( uri, direction ) {
-			Nino.admin.routes._apiCall( 'move', { uri : uri, direction : direction }, function( status, response ) {
-
-				/*	A move the server refused leaves the order on screen a guess:
-					whatever the reason - a route somebody else has deleted since
-					this list was drawn, a config.php that could not be written - it
-					is read back from the server and the reason is put under the
-					list, where the row's buttons are for the next attempt	*/
-				if( status !== 200 || response === null ) {
-
-					Nino.admin.routes._apiCall( 'list', {}, function( listStatus, listResponse ) {
-
-						if( listStatus === 200 && listResponse !== null ) {
-							Nino.admin.routes._pages = listResponse.pages;
-							Nino.admin.routes._renderList();
-						}
-
-						// After the re-render, because that builds the line anew
-						Nino.admin.routes._showMoveError( status, response );
-					} );
-					return;
-				}
-
-				Nino.admin.touch( 'routes' );
-
-				Nino.admin.routes._pages = response.pages;
-				Nino.admin.routes._renderList( { uri : uri, direction : direction } );
-				Nino.adminUi.say( Nino.content.getText('/_admin/routes/msg/moved') );
-			} );
-		},
-
-		/**
-		 *	Report a move the server refused, in the line below the list
-		 *
-		 *	@param		{number}		status
-		 *	@param		{*}					response
-		 *
-		 *	@return		void
-		 */
-		_showMoveError : function( status, response ) {
-
-			const line = Nino.admin.routes._listLine;
-
-			// No list rendered means no line under it, and then the error has to
-			// go somewhere rather than nowhere
-			if( line === null || dc.getElementById('routes-list-msg') === null )
-				return Nino.admin.routes._showError( dc.getElementById('routes-list'), status, response );
-
-			line.error( status, response, '/_admin/common/error/save' );
-		},
-
-		/**
-		 *	Open a form: the route of the project, a page a feature routes or the empty one of a new route
-		 *
-		 *	@param		{Object}				target		{ kind, uri, entry }
-		 *	@param		{boolean}				opened		The person opened it: the focus goes into the form
-		 *	@param		{Element}				[opener]	The button that was pressed, where it is no row
-		 *
-		 *	@return		void
-		 */
-		_open : function( target, opened, opener ) {
-
-			Nino.admin.routes._opener = opener ?? null;
-			Nino.admin.routes._draw( target.kind, target.entry );
-			Nino.admin.routes._showForm( opened );
-			Nino.admin.routes._snapshot();
-		},
-
-		/**
-		 *	What the form holds now is what is saved
-		 *
-		 *	@return		void
-		 */
-		_snapshot : function() {
-
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.snapshot( 'routes' );
-		},
-
-		/**
-		 *	The mark after the name of a field that cannot be left empty is the block's star; what a field says is
-		 *	its label. The control a block drew inside the label it returned
-		 *
-		 *	@param		{Element}		label					What textField(), selectField() and the like returned
-		 *	@param		{string}		field					The name the server marks the control by where it refuses it
-		 *
-		 *	@return		{Element}									The control
-		 */
-		_control : function( label, field ) {
-
-			const control = label.querySelector('input, select, textarea');
-			control.dataset.field = field;
-
-			return control;
-		},
-
-		/**
-		 *	Draw the form of a page: the way back, the section of the route with the Element URI, the switch for one
-		 *	Http URI for every language and the address - or the rows of the languages -, the template, the status
-		 *	code and, while the Navigation module is active, the navigations; the section of the content with the name
-		 *	and title of every language and the description of the language the workbench edits; and the bar with
-		 *	Delete at the left (where there is a page to delete) and Save at the right edge. A page a feature routes has
-		 *	the path, read-only, and the content. The form checks its required fields itself (see _save()), so the
-		 *	browser's own bubble - in the browser's language, not the workbench's - never gets to speak
-		 *
-		 *	@param		{string}		kind					'page', 'new' or 'feature'
-		 *	@param		{Object}		entry					The page the form is for, or the empty one of a new route
-		 *
-		 *	@return		void
-		 */
-		_draw : function( kind, entry ) {
-
-			const routes = Nino.admin.routes;
-			const wrap = dc.getElementById('routes-form');
-			const work = routes._language();
-			const view = { kind : kind, uri : kind === 'new' ? '' : entry.uri, entry : entry, work : work, descriptions : {} };
-
-			wrap.innerHTML = '';
-			routes._view = view;
-
-			routes._locales.forEach( function( locale ) {
-				view.descriptions[locale] = String( ( ( entry.text || {} )[locale] || {} ).description || '' );
-			} );
-
-			const back = Nino.adminUi.contextBar( { back : { to : wrap, onClick : function() {
-				Nino.admin.router.go( 'routes', [] );
-				Nino.admin.routes._showList( Nino.admin.routes._backTarget() );
-			} } } );
-			wrap.appendChild( back );
-			Nino.adminUi.localeBadge( work, back );
-
-			const form = dc.createElement('form');
-			form.noValidate = true;
-
-			// Both sections get their card look from the design system's `fieldset` rule
-			const pageFieldset = dc.createElement('fieldset');
-			pageFieldset.appendChild( Nino.adminUi.el( 'legend', '', Nino.content.getText('/_admin/routes/label/route') ) );
-
-			if( kind === 'feature' )
-				routes._drawPath( pageFieldset, entry );
-			else
-				routes._drawRoute( pageFieldset, view, entry );
-
-			form.appendChild( pageFieldset );
-
-			const contentFieldset = dc.createElement('fieldset');
-			const contentLegend = contentFieldset.appendChild( Nino.adminUi.el( 'legend', '', Nino.content.getText('/_admin/routes/label/content') ) );
-			Nino.adminUi.sectionHelp( contentLegend, contentFieldset, Nino.content.getText('/_admin/routes/help/content') );
-
-			view.name = Nino.adminUi.localeRows( { key : 'name', label : Nino.content.getText('/_admin/routes/label/name'), required : true, locales : routes._locales,
-				values : routes._valuesOf( entry, 'name' ), placeholder : Nino.content.getText('/_admin/routes/placeholder/name'), help : Nino.content.getText('/_admin/routes/help/name') } );
-			view.title = Nino.adminUi.localeRows( { key : 'title', label : Nino.content.getText('/_admin/routes/label/title'), required : true, locales : routes._locales,
-				values : routes._valuesOf( entry, 'title' ), placeholder : Nino.content.getText('/_admin/routes/placeholder/title'), help : Nino.content.getText('/_admin/routes/help/title') } );
-
-			[ view.name, view.title ].forEach( function( rows, at ) {
-				Object.keys( rows.controls ).forEach( function( locale ) { rows.controls[locale].dataset.field = at === 0 ? 'name' : 'title' } );
-				contentFieldset.appendChild( rows.el );
-			} );
-
-			const description = Nino.adminUi.textareaField( { key : 'description', label : Nino.content.getText('/_admin/routes/label/description'), rows : 3,
-				value : view.descriptions[work] ?? '', help : Nino.content.getText('/_admin/routes/help/description') } );
-			view.description = routes._control( description, 'description' );
-			contentFieldset.appendChild( description );
-
-			form.appendChild( contentFieldset );
-
-			// The bar is the one of every form (actionBar()): Delete at the left where there is a page to delete, Save at the right edge
-			const deleteBtn = kind === 'page' ? Nino.adminUi.button( Nino.content.getText('/_admin/routes/label/delete'), function() { Nino.admin.routes._delete() }, { kind : 'danger' } ) : null;
-			const msg = dc.createElement('p');
-			msg.id = 'routes-form-msg';
-
-			const bar = Nino.adminUi.actionBar( { danger : deleteBtn, status : { line : msg, fresh : kind === 'new' }, primary : Nino.adminUi.button( Nino.content.getText( kind === 'new' ? '/_admin/routes/label/create' : '/_admin/common/label/save' ), null, { type : 'submit' } ) } );
-			routes._line = bar.line;
-			view.bar = bar;
-			// A bar with a status line shows no other mark of unsaved input: the line follows the form
-			routes._line.bind( form );
-
-			form.appendChild( bar.el );
-
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.routes._save() } );
-
-			wrap.appendChild( form );
-		},
-
-		/**
-		 *	One value of every language, for localeRows()
-		 *
-		 *	@param		{Object}		entry
-		 *	@param		{string}		field					'name' or 'title'
-		 *
-		 *	@return		{Object}									Language => value
-		 */
-		_valuesOf : function( entry, field ) {
-
-			const values = {};
-
-			Nino.admin.routes._locales.forEach( function( locale ) {
-				values[locale] = String( ( ( entry.text || {} )[locale] || {} )[field] || '' );
-			} );
-
-			return values;
-		},
-
-		/**
-		 *	The path of a page a feature routes: shown, not changed - the feature decides it
-		 *
-		 *	@param		{Element}		fieldset
-		 *	@param		{Object}		entry
-		 *
-		 *	@return		void
-		 */
-		_drawPath : function( fieldset, entry ) {
-
-			const path = Nino.adminUi.textField( { label : Nino.content.getText('/_admin/routes/label/httpuri'), id : 'routes-form-runtime-path', value : Nino.admin.routes._paths( entry ),
-				help : Nino.content.getText('/_admin/routes/runtime/path') } );
-
-			path.querySelector('input').readOnly = true;
-			fieldset.appendChild( path );
-		},
-
-		/**
-		 *	The fields of the section of the route of a page of the project: Element URI, the switch for one Http
-		 *	URI for every language and the address, template, status code and the navigations
-		 *
-		 *	@param		{Element}		fieldset
-		 *	@param		{Object}		view
-		 *	@param		{Object}		entry
-		 *
-		 *	@return		void
-		 */
-		_drawRoute : function( fieldset, view, entry ) {
-
-			const routes = Nino.admin.routes;
-
-			const uri = Nino.adminUi.textField( { label : Nino.content.getText('/_admin/routes/label/uri'), id : 'routes-form-uri', value : entry.uri || '', required : true,
-				placeholder : Nino.content.getText('/_admin/routes/placeholder/uri'), help : Nino.content.getText('/_admin/routes/help/uri') } );
-			view.uriInput = routes._control( uri, 'uri' );
-			fieldset.appendChild( uri );
-
-			routes._addresses = routes._addressesOf( entry );
-
-			const oneSwitch = Nino.adminUi.switchField( {
-				key 		: 'one-address',
-				checked : routes._addresses.one,
-				label 	: Nino.content.getText('/_admin/routes/label/one-address'),
-				help 		: Nino.content.getText('/_admin/routes/hint/one-address'),
-			} );
-			oneSwitch.querySelector('input').addEventListener( 'change', function( ev ) { Nino.admin.routes._switchAddresses( ev.target.checked ) } );
-			fieldset.appendChild( oneSwitch );
-
-			const addressWrap = dc.createElement('div');
-			addressWrap.id = 'routes-form-addresses';
-			addressWrap.className = 'nino-admin-fieldgrid';
-			view.addressWrap = addressWrap;
-			routes._renderAddresses( addressWrap );
-			fieldset.appendChild( addressWrap );
-
-			// A route with no template of its own to start on - a new one in a
-			// project without a blank page, or one whose file is gone - makes
-			// the person choose: the first file in the list is not a proposal,
-			// it is the one that happens to sort first. A body that names its
-			// template at runtime has its own option, and the select is locked
-			const fixedBody = entry.body !== undefined && entry.body !== '' && routes._templateFromBody( entry.body ) === null;
-			const options = routes._templates.map( function( name ) { return { value : name, label : name } } );
-			const asking = fixedBody === false && routes._templates.indexOf( entry.template ) === -1;
-
-			if( fixedBody === true )
-				options.unshift( { value : '', label : Nino.content.getText('/_admin/routes/label/runtime') } );
-			else if( asking === true )
-				options.unshift( { value : '', label : Nino.content.getText('/_admin/routes/label/choose') } );
-
-			const template = Nino.adminUi.selectField( { key : 'template', label : Nino.content.getText('/_admin/routes/label/template'), id : 'routes-form-template', options : options,
-				value : fixedBody === true || asking === true ? '' : entry.template,
-				help : fixedBody === true ? Nino.adminUi.format( Nino.content.getText('/_admin/routes/hint/runtime'), entry.body ) : Nino.content.getText('/_admin/routes/help/template') } );
-
-			// The star is the field's, a placeholder is a choice to make and no choice, and the select that the route's body decides is locked
-			view.template = routes._control( template, 'template' );
-			view.template.setAttribute( 'aria-required', 'true' );
-			// The star stands after the words of the name, where the block puts it, and before the (?)
-			const templateName = template.querySelector('span');
-			( templateName.querySelector('.nino-admin-field-text') ?? templateName ).appendChild( routes._star() );
-
-			if( asking === true )
-				view.template.querySelector('option').disabled = true;
-
-			view.template.disabled = fixedBody === true;
-			fieldset.appendChild( template );
-
-			const status = Nino.adminUi.textField( { key : 'status', type : 'number', label : Nino.content.getText('/_admin/routes/label/status'), id : 'routes-form-status',
-				value : String( entry.statusCode || 200 ), help : Nino.content.getText('/_admin/routes/help/status') } );
-			view.status = routes._control( status, 'statusCode' );
-			view.status.min = '100';
-			view.status.max = '599';
-			fieldset.appendChild( status );
-
-			// One tick per navigation the project registered (/nino/html/navs), named by its name where it has one and
-			// by its key behind it, quietly - an empty list means the Navigation module is inactive and no menu field is
-			// offered at all. What a page is a member of lives on its route, which is what actually renders it (see
-			// \Nino\Modules\Navigation::routeLines())
-			view.navs = null;
-
-			if( routes._navs.length > 0 ) {
-
-				view.navs = Nino.adminUi.checklist( { key : 'navs', label : Nino.content.getText('/_admin/routes/label/navs'), help : Nino.content.getText('/_admin/routes/help/navs'),
-					value : entry.navs || [], options : routes._navs.map( function( key ) {
-						const name = routes._navNames[key] ?? '';
-						return name === '' ? { value : key, label : key } : { value : key, label : name, state : key };
-					} ) } );
-				fieldset.appendChild( view.navs.el );
-			}
-		},
-
-		/**
-		 *	The mark after the name of a field that cannot be left empty - drawn
-		 *	aria-hidden, the control says it with aria-required. selectField() has none of its own
-		 *
-		 *	@return		{Element}
-		 */
-		_star : function() {
-			const star = dc.createElement('span');
-			star.className = 'nino-admin-required';
-			star.setAttribute( 'aria-hidden', 'true' );
-			star.textContent = '*';
-			return star;
-		},
-
-		/**
 		 *	What the address fields of a page start from: the one field for
 		 *	every language where the page has one address for them all - a new
 		 *	page has none yet - and a row per language where it has one for
@@ -986,27 +1380,28 @@
 		 *	from the address of every language, which is what it is reached
 		 *	at until it is given one
 		 *
-		 *	@param		{Element}		wrap					The container of the fields
+		 *	@param		{Object}		view					What the body of the record keeps
 		 *
 		 *	@return		void
 		 */
-		_renderAddresses : function( wrap ) {
+		_renderAddresses : function( view ) {
 
 			const routes = Nino.admin.routes;
-			const addresses = routes._addresses;
-			const label = Nino.content.getText('/_admin/routes/label/httpuri');
-			const help = Nino.content.getText('/_admin/routes/help/httpuri');
-			const placeholder = Nino.content.getText('/_admin/routes/placeholder/httpuri');
+			const addresses = view.addresses;
+			const wrap = view.addressWrap;
+			const label = word('/_admin/routes/label/httpuri');
+			const help = word('/_admin/routes/help/httpuri');
+			const placeholder = word('/_admin/routes/placeholder/httpuri');
 
 			wrap.innerHTML = '';
-			routes._view.address = null;
-			routes._view.addressRows = null;
+			view.address = null;
+			view.addressRows = null;
 
 			if( addresses.one === true ) {
 				const field = Nino.adminUi.textField( { label : label, id : 'routes-form-http-uri', value : addresses.shared, required : true, placeholder : placeholder, help : help } );
 				const input = routes._control( field, 'httpUri' );
 				input.dataset.address = '';
-				routes._view.address = input;
+				view.address = input;
 				wrap.appendChild( field );
 				return;
 			}
@@ -1021,18 +1416,18 @@
 				rows.controls[locale].dataset.field = 'httpUri-'+ locale;
 			} );
 
-			routes._view.addressRows = rows;
+			view.addressRows = rows;
 			wrap.appendChild( rows.el );
 		},
 
 		/**
 		 *	The address controls on screen, in the order they stand in: [ { locale, value } ], locale '' for the one field
 		 *
+		 *	@param		{Object}		view
+		 *
 		 *	@return		{Array}
 		 */
-		_addressFields : function() {
-
-			const view = Nino.admin.routes._view;
+		_addressFields : function( view ) {
 
 			if( view.address !== null )
 				return [ { locale : '', value : view.address.value, control : view.address } ];
@@ -1048,16 +1443,17 @@
 		 *	every language, the field starts from the first address a language
 		 *	has where none was given for all of them
 		 *
+		 *	@param		{Object}		view
 		 *	@param		{boolean}		one						Whether the page has one address for every language now
 		 *
 		 *	@return		void
 		 */
-		_switchAddresses : function( one ) {
+		_switchAddresses : function( view, one ) {
 
 			const routes = Nino.admin.routes;
-			const addresses = routes._addresses;
+			const addresses = view.addresses;
 
-			routes._addressFields().forEach( function( field ) {
+			routes._addressFields( view ).forEach( function( field ) {
 				if( field.locale === '' )
 					addresses.shared = field.value;
 				else
@@ -1068,7 +1464,7 @@
 				addresses.shared = routes._locales.map( function( locale ) { return addresses.bound[locale] } ).find( function( value ) { return value !== '' } ) ?? '';
 
 			addresses.one = one;
-			routes._renderAddresses( routes._view.addressWrap );
+			routes._renderAddresses( view );
 		},
 
 		/**
@@ -1079,8 +1475,7 @@
 		 *	of its own. A page has one such address - a second pair of fields that
 		 *	hold one is sent as it stands, and the server refuses it. Two fields
 		 *	hold one address when it reads as one the way the server reads it: a
-		 *	slash in front, none behind, no blank around (see Admin.php's
-		 *	_normalizeUri())
+		 *	slash in front, none behind, no blank around (see \Nino\Pages::normalizeUri())
 		 *
 		 *	@param		{Array}			fields				[ { locale, value } ] in the order the fields stand in; locale is '' for the field of every language
 		 *
@@ -1132,40 +1527,33 @@
 		},
 
 		/**
-		 *	Say a refusal of the server where it belongs: in the line of the bar and, where it names a field of the
-		 *	form, under that field - a language's row for the name, the title and the addresses - with the focus
-		 *	there. A sentence that names a language by its code names it as the workbench does
+		 *	Say a refusal of the server where it belongs: under the field it names - a language's row for the name, the title and the addresses -, with the focus there.
+		 *	A sentence that names a language by its code names it as the workbench does
 		 *
+		 *	@param		{Object}		ctx
 		 *	@param		{number}		status
 		 *	@param		{*}					response			The answer of the server
 		 *	@param		{Array}			folded				The languages whose address fields were sent as one (see _addressMap())
 		 *
-		 *	@return		void
+		 *	@return		{string}									The sentence, which the line of the bar says as well
 		 */
-		_refused : function( status, response, folded ) {
+		_refused : function( ctx, status, response, folded ) {
 
 			const routes = Nino.admin.routes;
-			const view = routes._view;
-			const form = dc.getElementById('routes-form');
+			const view = ctx.view;
 			const named = routes._refusedField( response, folded );
 
-			Nino.adminUi.clearFieldErrors( form );
+			Nino.adminUi.clearFieldErrors( ctx.form );
 
-			if( named === null || typeof named !== 'object' ) {
-				routes._line.error( status, named, '/_admin/common/error/save' );
-				return;
-			}
+			if( named === null || typeof named !== 'object' )
+				return Nino.adminUi.api.errorText( status, named, '/_admin/common/error/save' );
 
-			// The field is marked below, where it is: the line only says the sentence
 			const worded = routes._worded( named );
-			const said = Object.assign( {}, worded );
-			delete said.field;
-			routes._line.error( status, said, '/_admin/common/error/save' );
-
-			if( view === null || typeof named.field !== 'string' )
-				return;
-
 			const sentence = Nino.adminUi.api.errorText( status, worded, '/_admin/common/error/save' );
+
+			if( typeof named.field !== 'string' )
+				return sentence;
+
 			const field = named.field;
 			const locale = Array.isArray( named.params ) === true && typeof named.params[0] === 'string' ? named.params[0] : '';
 			const own = { uri : view.uriInput, template : view.template, statusCode : view.status, httpUri : view.address };
@@ -1179,16 +1567,16 @@
 					rows.error( locale, sentence );
 					rows.focus( locale );
 				}
-				return;
+				return sentence;
 			}
 
-			if( field === 'navs' && view.navs !== null ) {
+			if( field === 'navs' && view.navs !== null && view.navs !== undefined ) {
 				view.navs.error( sentence );
 				view.navs.focus();
-				return;
+				return sentence;
 			}
 
-			if( field.indexOf('httpUri-') === 0 && view.addressRows !== null ) {
+			if( field.indexOf('httpUri-') === 0 && view.addressRows !== null && view.addressRows !== undefined ) {
 
 				const code = field.slice( 'httpUri-'.length );
 
@@ -1196,16 +1584,18 @@
 					view.addressRows.error( code, sentence );
 					view.addressRows.focus( code );
 				}
-				return;
+				return sentence;
 			}
 
 			control = Object.hasOwn( own, field ) === true ? own[field] : null;
 
 			if( control === undefined || control === null )
-				return;
+				return sentence;
 
 			Nino.adminUi.fieldError( control.closest('label'), control, 'routes-error-'+ ( control.id || field ), sentence );
 			control.focus();
+
+			return sentence;
 		},
 
 		/**
@@ -1228,11 +1618,12 @@
 		 *	The texts of every language as a save sends them: name, title and description - the description of the
 		 *	language the workbench edits is what the field holds, the others are what they were
 		 *
+		 *	@param		{Object}		view
+		 *
 		 *	@return		{Object}									Language => { name, title, description }
 		 */
-		_texts : function() {
+		_texts : function( view ) {
 
-			const view = Nino.admin.routes._view;
 			const text = {};
 
 			view.descriptions[view.work] = view.description.value;
@@ -1259,218 +1650,225 @@
 		},
 
 		/**
-		 *	Create or save the page currently open
+		 *	The required fields of the form, checked here before a request: the form is not validated by the browser (the record is novalidate), and a name or a title
+		 *	nobody wrote would render as the raw [[/_nino/webpage.../name]] on the page and in the menu. Every attempt starts without the marks of the one before; a field that
+		 *	fails says why where it stands, the first one takes the focus
 		 *
-		 *	Every way this ends reports to done( ok ), if there is one (see
-		 *	Nino.admin.dirty.guard())
+		 *	@param		{Object}		ctx
+		 *	@param		{boolean}		page					The record of a page of the project: the Element URI, the addresses and the template are required as well
 		 *
-		 *	@param		{Function}	[done]				Called once with true when the page was written, false otherwise
-		 *
-		 *	@return		void
+		 *	@return		{boolean}									Whether the fields are all there
 		 */
-		_save : function( done ) {
+		_complete : function( ctx, page ) {
 
 			const routes = Nino.admin.routes;
-			const view = routes._view;
+			const view = ctx.view;
+			const said = function( key ) { return Nino.adminUi.format( word('/_admin/common/error/missing'), key ) };
 
-			const report = function( ok ) {
-				if( typeof done === 'function' )
-					done( ok );
-			};
-
-			const line = routes._line;
-			const word = function( key ) { return Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), Nino.content.getText( key ) ) };
-
-			/*	The required fields are checked here, before a request: the
-				form is not validated by the browser (see _draw()), and
-				a name or a title nobody wrote would render as the raw
-				[[/_nino/webpage.../name]] on the page and in the menu. Every
-				attempt starts without the marks of the one before; a field
-				that fails says why where it stands, the first one takes the
-				focus, and the one summary is the status line's, in the
-				workbench's own words	*/
-			Nino.adminUi.clearFieldErrors( dc.getElementById('routes-form') );
+			Nino.adminUi.clearFieldErrors( ctx.form );
 
 			const missing = [];
 			const need = function( control, say ) {
 				if( String( control.value ).trim() === '' )
 					missing.push( { focus : function() { control.focus() }, say : say } );
 			};
-			const needRow = function( rows, locale, key ) {
-				need( rows.controls[locale], function() { rows.error( locale, word( key ) ) } );
+			const needRow = function( rows, locale, name ) {
+				need( rows.controls[locale], function() { rows.error( locale, said( name ) ) } );
 			};
-			const needField = function( field, key ) {
-				need( field, function() { Nino.adminUi.fieldError( field.closest('label'), field, 'routes-error-'+ field.id, word( key ) ) } );
+			const needField = function( field, name ) {
+				need( field, function() { Nino.adminUi.fieldError( field.closest('label'), field, 'routes-error-'+ field.id, said( name ) ) } );
 			};
 
-			// A page a feature routes has its texts and nothing else to fill in
-			if( view.kind !== 'feature' ) {
-				needField( view.uriInput, '/_admin/routes/label/uri' );
-				routes._addressFields().forEach( function( field ) {
+			if( page === true ) {
+				needField( view.uriInput, word('/_admin/routes/label/uri') );
+				routes._addressFields( view ).forEach( function( field ) {
 					if( field.locale === '' )
-						needField( field.control, '/_admin/routes/label/httpuri' );
+						needField( field.control, word('/_admin/routes/label/httpuri') );
 					else
-						needRow( view.addressRows, field.locale, '/_admin/routes/label/httpuri' );
+						needRow( view.addressRows, field.locale, word('/_admin/routes/label/httpuri') );
 				} );
 
 				if( view.template.disabled !== true )
-					needField( view.template, '/_admin/routes/label/template' );
+					needField( view.template, word('/_admin/routes/label/template') );
 			}
 
-			routes._locales.forEach( function( locale ) { needRow( view.name, locale, '/_admin/routes/label/name' ) } );
-			routes._locales.forEach( function( locale ) { needRow( view.title, locale, '/_admin/routes/label/title' ) } );
+			routes._locales.forEach( function( locale ) { needRow( view.name, locale, word('/_admin/routes/label/name') ) } );
+			routes._locales.forEach( function( locale ) { needRow( view.title, locale, word('/_admin/routes/label/title') ) } );
 
-			if( missing.length > 0 ) {
-				routes._missing( missing );
-				line.fail( Nino.content.getText('/_admin/routes/error/fields') );
-				report( false );
-				return;
-			}
+			if( missing.length === 0 )
+				return true;
 
-			line.saving();
+			routes._missing( missing );
 
-			const text = routes._texts();
+			return false;
+		},
 
-			if( view.kind === 'feature' )
-				return routes._saveRuntime( text, report );
+		/**
+		 *	Whether the texts of every language are what the entry has: a save of such a record writes nothing
+		 *
+		 *	@param		{Object}		text					Language => { name, title, description }, as _texts() made it
+		 *	@param		{Object}		entry
+		 *
+		 *	@return		{boolean}
+		 */
+		_sameTexts : function( text, entry ) {
 
-			// What is on screen: language => address, or '' for the one address of
-			// every language - which is also the address of the languages whose
-			// fields hold the same one
-			const addressed = routes._addressMap( routes._addressFields() );
-			const original = view.kind === 'new' ? '' : view.uri;
+			return Nino.admin.routes._locales.every( function( locale ) {
 
-			routes._apiCall( 'save', {
-				originalUri 		: original,
+				const stored = ( entry.text || {} )[locale] || {};
+
+				return [ 'name', 'title', 'description' ].every( function( field ) { return text[locale][field] === String( stored[field] || '' ) } );
+			} );
+		},
+
+		/**
+		 *	Whether a save would send what the page already is: the Element URI, the addresses, the template, the status code, the navigations and the texts as they were
+		 *	loaded. A page that nothing was changed in is not written again
+		 *
+		 *	@param		{Object}		payload				What a save sends
+		 *	@param		{Object}		entry					The page as it is loaded
+		 *
+		 *	@return		{boolean}
+		 */
+		_same : function( payload, entry ) {
+
+			const routes = Nino.admin.routes;
+			const sorted = function( map ) { return JSON.stringify( Object.keys( map ).sort().map( function( key ) { return [ key, map[key] ] } ) ) };
+			const held = ( entry.navs || [] ).slice().sort().join();
+
+			return payload.uri === entry.uri
+				&& sorted( payload.httpUris ) === sorted( entry.httpUris || {} )
+				&& payload.template === ( entry.template ?? '' )
+				&& String( payload.statusCode ).trim() === String( entry.statusCode || 200 )
+				&& payload.navs.slice().sort().join() === held
+				&& routes._sameTexts( payload.text, entry );
+		},
+
+		/**
+		 *	Create or save the page the record shows. What is wrong with a field is said at the field before anything is sent, and what the server refuses stands at the field it
+		 *	names. A page that nothing was changed in is not sent: it is saved as it is. The rows are the ones the server answers with, and the row of the page - the one the
+		 *	answer holds and the list did not, where it is new or its Element URI changed - is the one the record takes
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Function}	done					done( ok, { row, error } )
+		 *
+		 *	@return		void
+		 */
+		_save : function( row, ctx, done ) {
+
+			const routes = Nino.admin.routes;
+			const view = ctx.view;
+			const current = routes._find( row.key ) ?? row;
+			const creating = ctx.creating === true;
+
+			if( routes._complete( ctx, true ) === false )
+				return done( false, { error : word('/_admin/routes/error/fields') } );
+
+			const text = routes._texts( view );
+
+			// What is on screen: language => address, or '' for the one address of every language - which is also the address of the languages whose fields hold the
+			// same one
+			const addressed = routes._addressMap( routes._addressFields( view ) );
+			const payload = {
+				originalUri 		: creating === true ? '' : current.uri,
 				uri 						: view.uriInput.value,
 				httpUris 				: addressed.httpUris,
 				template 				: view.template.value,
 				statusCode 			: view.status.value,
 				navs						: view.navs === null ? [] : view.navs.value(),
 				text 						: text,
-			}, function( status, response ) {
+			};
 
-				if( status !== 200 || response === null ) {
-					routes._refused( status, response, addressed.folded );
-					report( false );
-					return;
-				}
+			// Nothing was changed: there is nothing to write, and what is stored stays as it is
+			if( creating === false && routes._same( payload, current.entry ) === true )
+				return done( true, { row : current } );
 
-				routes._saved( response, original, addressed, report );
+			routes._apiCall( 'save', payload, function( status, response ) {
+
+				if( status !== 200 || response === null )
+					return done( false, { error : routes._refused( ctx, status, response, addressed.folded ) } );
+
+				routes._saved( payload, addressed, response, done );
 			} );
 		},
 
 		/**
-		 *	A page was written: the list is what the server answered, the form stays - a new route gets its address and
-		 *	its Delete button, a route whose Element-URI changed the new one - and the window beside the workbench goes to
-		 *	the page that was saved. What the form holds now is what is saved
+		 *	A page was written: the rows are what the server answered, the row of the page is the one the answer holds and the list did not - a new page, or one whose
+		 *	Element URI changed -, the directory draws it anew, and the window beside the workbench goes to the page that was saved
 		 *
-		 *	@param		{Object}		response			{ pages }
-		 *	@param		{string}		original			The Element-URI the page had, '' for a new one
+		 *	@param		{Object}		payload				What was sent
 		 *	@param		{Object}		addressed			What _addressMap() made of the fields
-		 *	@param		{Function}	report				Called once with true
+		 *	@param		{Object}		response			{ pages }
+		 *	@param		{Function}	done
 		 *
 		 *	@return		void
 		 */
-		_saved : function( response, original, addressed, report ) {
+		_saved : function( payload, addressed, response, done ) {
 
 			const routes = Nino.admin.routes;
-			const view = routes._view;
 			const before = routes._pages.map( function( page ) { return page.uri } );
-			const kind = view.kind;
 
 			routes._pages = response.pages;
+			routes._rowsOf();
 
-			// A page that was created or whose Element-URI changed is the one the answer holds and the list did not
 			const fresh = response.pages.find( function( page ) { return before.indexOf( page.uri ) === -1 } );
-			const uri = fresh === undefined ? original : fresh.uri;
+			const uri = fresh === undefined ? payload.originalUri : fresh.uri;
+			const made = routes._find( uri );
 
 			// The page that was saved is the one a window beside this one goes to
 			Nino.admin.touch( 'routes', routes._publicPath( addressed.httpUris ) );
-			routes._renderList();
 
-			const entry = routes._pages.find( function( page ) { return page.uri === uri } );
-
-			if( kind === 'new' && entry !== undefined ) {
-
-				// The form of the page that now exists: with its address and its Delete button
-				routes._draw( 'page', entry );
-				routes._showForm();
-				routes._line.saved();
-				routes._snapshot();
-				routes._view.bar.primary.focus();
-				report( true );
-				return;
+			if( made === null ) {
+				routes._directory.setRows( routes._rows, { keep : true } );
+				return done( false, { error : Nino.adminUi.api.errorText( 200, null, '/_admin/common/error/save' ) } );
 			}
 
-			if( entry !== undefined ) {
-				view.uri = uri;
-				view.entry = entry;
-			}
-
-			view.kind = 'page';
-
-			if( entry !== undefined )
-				routes._showForm();
-
-			routes._line.saved();
-			routes._snapshot();
-			report( true );
+			routes._directory.update( routes._rows, uri );
+			done( true, { row : made } );
 		},
 
 		/**
-		 *	Save the texts of the feature page currently open - routes/savetexts
-		 *	writes the three /_nino/webpage keys per language and nothing else
+		 *	Save the texts of the page a feature routes the record shows - routes/savetexts writes the three /_nino/webpage keys per language and nothing else. A record
+		 *	nothing was changed in sends nothing
 		 *
-		 *	@param		{Object}		text					Locale => { name, title, description }
-		 *	@param		{Function}	report				Called once with true when the texts were written, false otherwise
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Function}	done					done( ok, { row, error } )
 		 *
 		 *	@return		void
 		 */
-		_saveRuntime : function( text, report ) {
+		_saveFeature : function( row, ctx, done ) {
 
 			const routes = Nino.admin.routes;
-			const line = routes._line;
-			const view = routes._view;
+			const current = routes._findFeature( row.key ) ?? row;
 
-			routes._apiCall( 'savetexts', { uri : view.uri, text : text }, function( status, response ) {
+			if( routes._complete( ctx, false ) === false )
+				return done( false, { error : word('/_admin/routes/error/fields') } );
 
-				if( status !== 200 || response === null ) {
-					routes._refused( status, response, [] );
-					report( false );
-					return;
-				}
+			const text = routes._texts( ctx.view );
+
+			if( routes._sameTexts( text, current.entry ) === true )
+				return done( true, { row : current } );
+
+			routes._apiCall( 'savetexts', { uri : current.uri, text : text }, function( status, response ) {
+
+				if( status !== 200 || response === null )
+					return done( false, { error : routes._refused( ctx, status, response, [] ) } );
 
 				routes._runtime = response.runtime || routes._runtime;
+				routes._rowsOf();
 
-				const entry = routes._runtime.find( function( page ) { return page.uri === view.uri } );
+				const made = routes._findFeature( current.key ) ?? current;
 
-				if( entry !== undefined )
-					view.entry = entry;
-
-				Nino.admin.touch( 'routes', routes._publicPath( { '' : view.entry.httpUri } ) );
-				routes._renderList();
-				line.saved();
-				routes._snapshot();
-				report( true );
+				Nino.admin.touch( 'routes', routes._publicPath( { '' : made.entry.httpUri } ) );
+				routes._drawFeatures();
+				done( true, { row : made } );
 			} );
 		},
 
 		/**
-		 *	The entry of the page that is open, from the list the panel holds
-		 *
-		 *	@return		{Object|undefined}
-		 */
-		_currentEntry : function() {
-
-			const view = Nino.admin.routes._view;
-
-			return view === null ? undefined : Nino.admin.routes._pages.find( function( page ) { return page.uri === view.uri } );
-		},
-
-		/**
-		 *	What a delete takes and what it leaves behind, as the two groups of the question: the addresses of the page,
-		 *	and - built from what the list already holds - the page's texts (the keys of the languages that hold
+		 *	What a delete takes and what it leaves behind, as the two groups of the question: the addresses of the page, and - built from what the list already holds - the page's texts (the keys of the languages that hold
 		 *	a value, and the path fill) and the template file, shared with how many other routes, or with none. A
 		 *	route that resolves its template at runtime names its body instead, there is no single file to name
 		 *
@@ -1506,24 +1904,24 @@
 				keys.push( base+ '/'+ fields.join('|')+ ' ('+ locales.join(', ')+ ')' );
 			keys.push( base+ '/uri' );
 
-			const stays = [ Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-texts'), keys.join(', ') ) ];
+			const stays = [ Nino.adminUi.format( word('/_admin/routes/confirm/stays-texts'), keys.join(', ') ) ];
 
 			if( entry.template === '' )
-				stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-body'), entry.body ) );
+				stays.push( Nino.adminUi.format( word('/_admin/routes/confirm/stays-body'), entry.body ) );
 			else {
 				const others = routes._pages.filter( function( page ) { return page.template === entry.template && page.uri !== entry.uri } ).length;
 
 				if( others === 0 )
-					stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template'), entry.template ) );
+					stays.push( Nino.adminUi.format( word('/_admin/routes/confirm/stays-template'), entry.template ) );
 				else if( others === 1 )
-					stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template-one'), entry.template ) );
+					stays.push( Nino.adminUi.format( word('/_admin/routes/confirm/stays-template-one'), entry.template ) );
 				else
-					stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template-shared'), entry.template, others ) );
+					stays.push( Nino.adminUi.format( word('/_admin/routes/confirm/stays-template-shared'), entry.template, others ) );
 			}
 
 			return [
-				{ title : Nino.content.getText('/_admin/routes/confirm/deleted'), lines : routes._addressLines( entry ) },
-				{ title : Nino.content.getText('/_admin/routes/confirm/kept'), lines : stays },
+				{ title : word('/_admin/routes/confirm/deleted'), lines : routes._addressLines( entry ) },
+				{ title : word('/_admin/routes/confirm/kept'), lines : stays },
 			];
 		},
 
@@ -1543,52 +1941,45 @@
 		},
 
 		/**
-		 *	Confirm, then delete the page currently open. Its routes are
-		 *	removed - every address it has, which the question names; any
-		 *	/_nino/webpage.../name,title,description,uri text meta is left in
-		 *	place, same additive-only rule the rest of Nino follows - and so
-		 *	is its template file, which is why the question says what stays
-		 *	(see _details()). The person goes back to the list, which the page
-		 *	has left
+		 *	Take the page away, after asking. Its routes are removed - every address it has, which the question names; any /_nino/webpage.../name,title,description,uri text meta
+		 *	is left in place, same additive-only rule the rest of Nino follows - and so is its template file, which is why the question says what stays (see _details()).
+		 *	The question stands on the record; the record is closed by it and the focus goes to the next row. A cancelled question sends nothing
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Element}		opener					The button that asked, which has the focus again when the question is closed
+		 *	@param		{Function}	done						done( true ) where it was deleted, done( null ) where the answer was no, done( false, { error } )
 		 *
 		 *	@return		void
 		 */
-		_delete : function() {
+		_remove : function( row, opener, done ) {
 
 			const routes = Nino.admin.routes;
-			const entry = routes._currentEntry();
-			const uri = routes._view.uri;
+			const current = routes._find( row.key ) ?? row;
 
 			Nino.adminUi.confirm( 'destructive', {
-				title			: Nino.content.getText('/_admin/routes/confirm/delete-title'),
-				message		: Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), entry === undefined ? uri : routes._paths( entry ) ),
-				details		: entry === undefined ? undefined : routes._details( entry ),
-				yes				: Nino.content.getText('/_admin/routes/confirm/delete-title'),
-				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				title			: word('/_admin/routes/confirm/delete-title'),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), current.paths ),
+				details		: routes._details( current.entry ),
+				yes				: word('/_admin/routes/confirm/delete-title'),
+				no				: word('/_admin/common/label/cancel'),
+				nested		: true,
+				opener		: opener,
 				onChoose	: function( ok ) {
 
 					if( ok === false )
-						return;
+						return done( null );
 
-					const line = routes._line;
-					line.idle( Nino.content.getText('/_admin/common/msg/deleting') );
+					routes._apiCall( 'delete', { uri : current.uri }, function( status, response ) {
 
-					// The focus goes to the row after the one that goes, else the one before it
-					const at = routes._pages.findIndex( function( page ) { return page.uri === uri } );
-					const next = routes._pages[at + 1] ?? routes._pages[at - 1];
+						if( status !== 200 || response === null )
+							return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) } );
 
-					routes._apiCall( 'delete', { uri : uri }, function( status, response ) {
-						if( status !== 200 || response === null ) {
-							line.error( status, response, '/_admin/common/error/delete' );
-							return;
-						}
 						Nino.admin.touch( 'routes' );
+
 						routes._pages = response.pages;
-						routes._renderList();
-						Nino.admin.router.go( 'routes', [] );
-						routes._showList( next === undefined ? null : routes._rowOf( next.uri ) );
-						Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/deleted') );
-						routes._snapshot();
+						routes._rowsOf();
+						routes._directory.setRows( routes._rows, { keep : true } );
+						done( true );
 					} );
 				},
 			} );
@@ -1597,12 +1988,7 @@
 
 	Nino.events.bindCallback( 'ready', Nino.admin.routes.init );
 
-	// The list names its pages, and the form describes its page, in the content language, whoever moved it (see Nino.admin.workLocale)
+	// The directory names its pages, and the record describes its page, in the content language, whoever moved it (see Nino.admin.workLocale)
 	Nino.admin.workLocale.follow( 'routes', Nino.admin.routes._followLocale );
-
-	// The shell asks before anything throws the open page's input away (see
-	// Nino.admin.dirty). A shell without the registry is simply not asking
-	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.watchForm( 'routes', function() { return dc.getElementById('routes-form') }, function( done ) { Nino.admin.routes._save( done ) } );
 
 })(window, document, document.documentElement, document.body);
