@@ -516,7 +516,7 @@ $listed = [
 	'_admin/Nino/Modules/Users/assets/lockout.js'	=> 'adminUi.list(',
 	'_admin/Nino/Modules/Routes/assets/admin.js'		=> 'adminUi.list(',
 	'_nino/Nino/Modules/Navigation/assets/admin.js'	=> 'adminUi.list(',
-	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.table(',
+	'_admin/Nino/Modules/Logs/assets/admin.js'			=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
 	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.directory(',
@@ -845,8 +845,8 @@ check( 'the Translations tab is built from the blocks of a form: the file, the c
 	&& preg_match( '/admin-translation|admin-step-number|nino-admin-card|<h2>/', $bare( $read( '_admin/Nino/Modules/Language/assets/translations.js' ) ) ) === 0 );
 check( 'the Dashboard has the head the shell draws for every list: its panel does not answer head() false', str_contains( $bare( $read( '_admin/Nino/Modules/Dashboard/Admin/Admin.php' ) ), 'function head()' ) === false );
 
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
-$sheeted = [ '_admin/Nino/Modules/Logs/assets/admin.css', '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Elements/assets/admin.css' ];
+$sheeted = [ '_admin/Nino/Modules/Dashboard/assets/admin.css', '_admin/Nino/Modules/Images/assets/admin.css', '_admin/Nino/Modules/Text/assets/admin.css', '_admin/Nino/Modules/Features/assets/admin.css' ];
 $untoken = [];
 
 foreach( $sheeted as $sheet ) {

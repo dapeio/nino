@@ -63,7 +63,6 @@ namespace Nino\Modules\Logs {
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
-				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
 			];
 		}
 
@@ -160,7 +159,12 @@ namespace Nino\Modules\Logs {
 
 		/**
 		 *	List every recorded line within the retention window, most
-		 *	recent first
+		 *	recent first, and beside it the key of each line (same length,
+		 *	same order): <Y-m-d>.<n> - the day of the file the line stands in
+		 *	and its 1-based position in that file as it is stored. A day's
+		 *	file only ever grows at its end (see record()), so a key names the
+		 *	same line for as long as the file lives, whatever is recorded
+		 *	after it; the workbench writes it into the address of the line
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -172,7 +176,16 @@ namespace Nino\Modules\Logs {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::VIEW_PERM ) === false )
 				return;
 
-			\Nino\Http::ok( $request, [ 'lines' => array_reverse( self::_allLines( $appData ) ) ] );
+			$lines = [];
+			$keys 	= [];
+
+			foreach( self::_allDays( $appData ) as $day => $dayLines )
+				foreach( $dayLines as $at => $line ) {
+					$lines[] = $line;
+					$keys[] 	= $day. '.'. ( $at + 1 );
+				}
+
+			\Nino\Http::ok( $request, [ 'lines' => array_reverse( $lines ), 'keys' => array_reverse( $keys ) ] );
 		}
 
 		/**
@@ -233,11 +246,24 @@ namespace Nino\Modules\Logs {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array
+		 *	@return		array
 		 */
 		private static function _allLines( array &$appData ): array {
+			return array_merge( [], ...array_values( self::_allDays( $appData ) ) );
+		}
 
-			$lines = [];
+		/**
+		 *	Read the lines of every day's file within the retention window,
+		 *	the oldest day first, each day's lines in the order they are
+		 *	stored
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return		array									'Y-m-d' => string[]
+		 */
+		private static function _allDays( array &$appData ): array {
+
+			$days = [];
 
 			$files = glob( self::_logDir( $appData ). '/*.php' ) ?: [];
 
@@ -245,9 +271,9 @@ namespace Nino\Modules\Logs {
 
 			foreach( $files as $file )
 				if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-					$lines = array_merge( $lines, self::_readLines( $file ) );
+					$days[ basename( $file, '.php' ) ] = self::_readLines( $file );
 
-			return $lines;
+			return $days;
 		}
 
 		/**

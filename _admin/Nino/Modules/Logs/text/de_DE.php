@@ -11,9 +11,13 @@ return [
 	'[[/_admin/logs/label/actor]]'		=> 'Konto',
 	'[[/_admin/logs/label/text]]'		=> 'Eintrag',
 	'[[/_admin/logs/label/search]]'		=> 'Einträge suchen',
+	'[[/_admin/logs/loading]]'	=> 'Einträge werden geladen ...',
+	'[[/_admin/logs/row/open]]'	=> 'Eintrag anzeigen',
+	'[[/_admin/logs/record/title-plain]]'	=> 'Eintrag',
+	'[[/_admin/logs/record/missing]]'	=> 'Diesen Eintrag gibt es nicht (mehr).',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/logs/manual/intro]]'	=> 'Wer wann was geändert hat: jede Anmeldung und jede Änderung in der Workbench, mit Zeit und Konto.',
-	'[[/_admin/logs/manual/list]]'	=> 'Die neueste Zeile steht oben. Hier wird nichts von Hand geschrieben und nichts verändert.',
+	'[[/_admin/logs/manual/list]]'	=> 'Die neueste Zeile steht oben. Die Tabelle lässt sich durchsuchen und nach Zeit, Konto oder Eintrag sortieren; eine Zeile öffnet sich und zeigt alles, was sie sagt. Hier wird nichts von Hand geschrieben und nichts verändert.',
 	'[[/_admin/logs/manual/day]]'	=> 'Die Zeilen werden vierzehn Tage aufgehoben. Ob sie überhaupt geschrieben werden, stellst Du unter Konfiguration ein.',
 ];

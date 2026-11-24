@@ -3431,6 +3431,117 @@ $appData['/nino/auth/user']['dev@example.com']['perms'] = [ '/*' ];
 echo "\n";
 
 
+// --- Log: the key of a line, and who may read the lines -----------------
+
+echo "Log - the key of a line is the day and its place in that day's file, and who may call logs/list\n";
+
+$appData['/nino/admin/logs'] = true;
+$logsDirKey	= (string) ( new ReflectionClassConstant( '\Nino\Modules\Logs\Admin', 'LOGS_DIR' ) )->getValue();
+$logsDir		= \Nino\Filesystem::path( $appData, $logsDirKey );
+
+// A directory of its own for these checks: the lines the sections before this one recorded are not the ones asked about
+\Nino\Filesystem::removeDir( $logsDir );
+mkdir( $logsDir, 0755, true );
+
+$logDay = static fn( int $ago ): string => date( 'Y-m-d', strtotime( '-'. $ago. ' days' ) );
+$logToday = date( 'Y-m-d' );
+$logDayA = $logDay( 3 );
+$logDayB = $logDay( 2 );
+
+// A day's file as record() leaves it: the stub, then the lines joined by a line break, in base64
+$writeDay = static function( string $day, array $lines ) use ( $logsDir ): void {
+	file_put_contents( $logsDir. '/'. $day. '.php', \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+};
+
+// What the files hold, read by hand: every line of every day's file, the oldest day first, and the key each one has
+$readDays = static function() use ( $logsDir ): array {
+	$files = glob( $logsDir. '/*.php' ) ?: [];
+	sort( $files );
+	$stored = [];
+	foreach( $files as $file )
+		if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 ) {
+			$raw = base64_decode( substr( (string) file_get_contents( $file ), strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
+			foreach( $raw === '' ? [] : explode( "\n", $raw ) as $at => $line )
+				$stored[] = [ basename( $file, '.php' ). '.'. ( $at + 1 ), $line ];
+		}
+	return $stored;
+};
+
+$logList = static function() use ( &$appData ): array {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'logs/list' );
+	return [ $status, is_array( $body ) === true ? $body : [] ];
+};
+
+$writeDay( $logDayA, [ $logDayA. ' 08:00  a@example.com  Login', $logDayA. ' 09:30  b@example.com  Save Text /one', $logDayA. ' 17:45  a@example.com  Save Text /two' ] );
+$writeDay( $logDayB, [ $logDayB. ' 07:15  b@example.com  Login', $logDayB. ' 07:20  b@example.com  Save Text /one' ] );
+// What is no day's file is not read: a file with another name
+file_put_contents( $logsDir. '/notes.php', \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( 'a line of a file that is no day' ). \Nino\Admin\Recovery::STUB_SUFFIX );
+
+\Nino\Modules\Logs\Admin::record( $appData, 'c@example.com', 'First of today' );
+\Nino\Modules\Logs\Admin::record( $appData, 'c@example.com', 'Second of today' );
+
+[ $status, $body ] = $logList();
+$stored = $readDays();
+
+check( 'logs/list answers 200 with the lines and, beside them, the keys', $status === 200 && is_array( $body['lines'] ?? null ) === true && is_array( $body['keys'] ?? null ) === true && array_keys( $body ) === [ 'lines', 'keys' ] );
+check( '...the keys have the length of the lines, and the key of a line is the day of its file and its place in that file, counted from 1: the most recent first, as the lines are',
+	count( $body['keys'] ) === count( $body['lines'] ) && count( $body['lines'] ) === 7
+	&& $body['keys'] === [ $logToday. '.2', $logToday. '.1', $logDayB. '.2', $logDayB. '.1', $logDayA. '.3', $logDayA. '.2', $logDayA. '.1' ]
+	&& $body['lines'][0] === date( 'Y-m-d H:i' ). '  c@example.com  Second of today' && $body['lines'][2] === $logDayB. ' 07:20  b@example.com  Save Text /one' && $body['lines'][6] === $logDayA. ' 08:00  a@example.com  Login' );
+check( '...a file that is no day\'s is not read: none of its lines and none of its keys are there', in_array( 'a line of a file that is no day', $body['lines'], true ) === false && count( array_filter( $body['keys'], static fn( string $key ): bool => str_starts_with( $key, 'notes' ) ) ) === 0 );
+check( '...every key has the form day.number, and no two lines have the same one', count( array_filter( $body['keys'], static fn( mixed $key ): bool => is_string( $key ) === true && preg_match( '/^\d{4}-\d{2}-\d{2}\.\d+$/', $key ) === 1 ) ) === 7 && count( array_unique( $body['keys'] ) ) === 7 );
+check( '...the numbering of every day starts at 1, whatever the days before it hold', in_array( $logDayA. '.1', $body['keys'], true ) === true && in_array( $logDayB. '.1', $body['keys'], true ) === true && in_array( $logToday. '.1', $body['keys'], true ) === true && in_array( $logDayB. '.3', $body['keys'], true ) === false );
+check( '...and the keys name the lines the files hold: the pairs are the ones read from the files by hand', array_map( null, array_reverse( array_column( $stored, 0 ) ), array_reverse( array_column( $stored, 1 ) ) ) === array_map( null, $body['keys'], $body['lines'] ) );
+check( 'the lines themselves are what the files hold, most recent first, byte for byte: keys are an addition', json_encode( $body['lines'] ) === json_encode( array_reverse( array_column( $stored, 1 ) ) )
+	&& $body['lines'] === \Nino\Modules\Logs\Admin::recentLines( $appData, 500 ) );
+
+// A line recorded afterwards changes no earlier key
+$before = array_combine( $body['keys'], $body['lines'] );
+\Nino\Modules\Logs\Admin::record( $appData, 'c@example.com', 'Third of today' );
+[ $status, $after ] = $logList();
+$afterPairs = array_combine( $after['keys'], $after['lines'] );
+check( 'a line recorded afterwards changes no earlier key: every key names the line of the text it named, and the new line has the next place of today', $status === 200 && count( $after['keys'] ) === 8
+	&& array_intersect_key( $afterPairs, $before ) === $before && $after['keys'][0] === $logToday. '.3' && str_ends_with( $after['lines'][0], '  c@example.com  Third of today' ) );
+
+// A day that expires takes its own keys with it and renumbers nothing else
+unlink( $logsDir. '/'. $logDayA. '.php' );
+[ , $expired ] = $logList();
+check( 'a day that is dropped takes its own keys with it, and no key of another day moves', array_combine( $expired['keys'], $expired['lines'] ) === array_diff_key( $afterPairs, array_flip( [ $logDayA. '.1', $logDayA. '.2', $logDayA. '.3' ] ) ) );
+
+// No line, no key; a file that holds none is no day
+$writeDay( $logDayA, [] );
+unlink( $logsDir. '/'. $logToday. '.php' );
+unlink( $logsDir. '/'. $logDayB. '.php' );
+[ $status, $empty ] = $logList();
+check( 'a log with no line answers lines and keys as two empty lists', $status === 200 && $empty === [ 'lines' => [], 'keys' => [] ] );
+
+// Who may call it: the same four questions as for the slots, with real requests through the dispatcher
+$writeDay( $logDayB, [ $logDayB. ' 07:15  b@example.com  Login' ] );
+ninoUser( $appData, 'logsright@example.com', [ \Nino\Modules\Logs\Admin::VIEW_PERM ] );
+\Nino\Auth::logoutUser( $appData );
+[ $sessionStatus, $sessionBody ] = $logList();
+ninoUser( $appData, 'logswrong@example.com', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
+[ $rightStatus, $rightBody ] = $logList();
+\Nino\Auth::loginUser( $appData, 'logsright@example.com', 'correct horse battery staple' );
+[ $tokenStatus, $tokenBody ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'logs/list', 403 );
+[ $viewStatus, $viewBody ] = $logList();
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $fullStatus, $fullBody ] = $logList();
+
+check( 'logs/list with no session is a 401 with the code "session", and answers no line and no key', $sessionStatus === 401 && ( $sessionBody['code'] ?? '' ) === 'session' && isset( $sessionBody['lines'] ) === false && isset( $sessionBody['keys'] ) === false );
+check( '...with an account that does not hold the right to read the log it is a 403, "not allowed", and answers no line and no key', $rightStatus === 403 && ( $rightBody['error'] ?? '' ) === 'not allowed' && isset( $rightBody['lines'] ) === false && isset( $rightBody['keys'] ) === false );
+check( '...with a token the csrf guard refused it is a 403 and is not looked at', $tokenStatus === 403 && isset( $tokenBody['lines'] ) === false && isset( $tokenBody['keys'] ) === false );
+// The sign-ins of the accounts made here are lines of today, before the one of the day written by hand
+$readable = static fn( array $answer ): bool => count( $answer['lines'] ) === count( $answer['keys'] ) && count( $answer['lines'] ) >= 1 && end( $answer['lines'] ) === $logDayB. ' 07:15  b@example.com  Login' && end( $answer['keys'] ) === $logDayB. '.1'
+	&& array_values( array_unique( array_map( static fn( string $key ): string => substr( $key, 0, 10 ), array_slice( $answer['keys'], 0, -1 ) ) ) ) === [ $logToday ];
+check( '...with the right to read the log it is a 200 with the lines and the keys, and so it is with full access', $viewStatus === 200 && $readable( $viewBody ) === true && $fullStatus === 200 && $readable( $fullBody ) === true && count( $fullBody['lines'] ) === count( $viewBody['lines'] ) + 1 );
+
+\Nino\Auth::deleteUser( $appData, 'logsright@example.com' );
+\Nino\Auth::deleteUser( $appData, 'logswrong@example.com' );
+
+echo "\n";
+
+
 // --- Final: unauthed guard sanity check across every module -------------
 
 echo "Every module rejects an unauthed request\n";
