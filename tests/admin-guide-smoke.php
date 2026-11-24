@@ -520,7 +520,7 @@ $listed = [
 	'_admin/Nino/Modules/Backups/assets/admin.js'		=> 'adminUi.list(',
 	'_nino/Nino/Modules/Form/assets/admin.js'				=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Images/assets/admin.js'		=> 'adminUi.directory(',
-	'_admin/Nino/Modules/Images/assets/slots.js'		=> 'adminUi.list(',
+	'_admin/Nino/Modules/Images/assets/slots.js'		=> 'adminUi.directory(',
 	'_admin/Nino/Modules/Elements/assets/admin.js'	=> 'adminUi.table(',
 	'_admin/Nino/Modules/Elements/assets/types.js'	=> 'adminUi.list(',
 ];
@@ -906,12 +906,12 @@ check( 'neither panel ships a stylesheet of its own: what they draw is the block
 // --- the Images panel and its two tabs are built of the blocks, and every action of them is said as the guide says it ---------------
 
 /*	The Images panel is the standard directory of the slots with the record of one slot over it - everything in the record is saved with
-	its Save, what is wrong stands at the field -, the Image Slots tab a list and a form, the Favicon tab a form with the colour block and the
-	file block. Held by structure: which block draws a part, and that no part is drawn by hand, asked with the browser's dialogs or styled with
-	a number	*/
+	its Save, what is wrong stands at the field -, the Image Slots tab a directory of its own with the
+	record of one slot, a dialog of a form for a new slot and the scan as a view of its own, the Favicon tab a form with the colour block and the file block. Held by structure: which block
+	draws a part, and that no part is drawn by hand, asked with the browser's dialogs or styled with a number	*/
 $images = [
 	'_admin/Nino/Modules/Images/assets/admin.js'		=> [ 'adminUi.directory(', 'adminUi.record(', 'adminUi.imageFrame(', 'adminUi.readLine(', 'adminUi.localeRows(', 'adminUi.fileField(', 'adminUi.confirm(' ],
-	'_admin/Nino/Modules/Images/assets/slots.js'		=> [ 'adminUi.textField(', 'adminUi.checkField(', 'adminUi.confirm(', 'adminUi.say(' ],
+	'_admin/Nino/Modules/Images/assets/slots.js'		=> [ 'adminUi.directory(', 'adminUi.record(', 'adminUi.formDialog(', 'adminUi.readLine(', 'adminUi.numberField(', 'adminUi.textField(', 'adminUi.checkField(', 'adminUi.confirm(', 'adminUi.say(' ],
 	'_admin/Nino/Modules/Images/assets/favicon.js'	=> [ 'adminUi.color(', 'adminUi.fileField(', 'adminUi.confirm(', 'adminUi.dateText(', 'adminUi.sectionHelp(' ],
 ];
 

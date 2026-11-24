@@ -5,7 +5,8 @@
  *	Modules\Images			The picture of every image slot
  *	admin.css								What the module's /_admin panel needs beyond the design
  *													system in _admin/assets/style.css: the name and the key of
- *													a slot in the table of the directory, and the lines the
+ *													a slot in the table of the directory - of the Images panel
+ *													and of the Image Slots tab - and the lines the scan of the
  *													Image Slots tab shows and does not take. Bundled while the
  *													module is there (see the panel's assets()), so the same layer
  *													rules apply - the shell's stylesheet fixes the layer order,
@@ -19,25 +20,29 @@
 
 @layer nino.tool {
 
-/* The name of a slot in the table: the name strong, its key under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip */
-#images-list .images-name {
+/* The name of a slot in the table - of the Images panel and of the Image Slots tab alike: the name strong, its key under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip */
+#images-list .images-name,
+#slots-list .images-name {
 	display: inline-grid;
 	gap: var(--nino-admin-space-1);
 	max-width: 16rem;
 	text-align: left;
 }
 
-#images-list .images-name > * {
+#images-list .images-name > *,
+#slots-list .images-name > * {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-#images-list .images-name-label {
+#images-list .images-name-label,
+#slots-list .images-name-label {
 	font-weight: var(--nino-admin-weight-strong);
 }
 
-#images-list .images-name-key {
+#images-list .images-name-key,
+#slots-list .images-name-key {
 	color: var(--editor-text-secondary);
 	font-family: var(--nino-admin-mono);
 	font-size: var(--nino-admin-text-xs);
@@ -48,6 +53,23 @@
 #images-list .images-used {
 	display: inline-block;
 	max-width: 10rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The state of a slot in the table: the badge, and under it the templates that name a slot no page includes - one line that an ellipsis ends, whole in its tooltip */
+#slots-list .slots-state {
+	display: inline-grid;
+	gap: var(--nino-admin-space-1);
+	justify-items: start;
+	max-width: 16rem;
+}
+
+#slots-list .slots-state-templates {
+	color: var(--editor-text-secondary);
+	font-size: var(--nino-admin-text-xs);
+	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

@@ -213,6 +213,77 @@ check( '...and now that the record is persisted, the file went with it', is_file
 
 echo "\n";
 
+// --- the Image Slots tab: who may call its five actions, and a save with nothing changed -----------------------------
+
+/*	The tab is the directory of the slots with the record of one slot over it: it calls the five actions of \Nino\Modules\Images\Slots and no other,
+	and what stands in front of them is the dispatch of the workbench (a session, the token the csrf guard has checked) and guardPerm() (the right
+	/_admin/slots/manage). Each action is called through Admin::handlePost(), as the page calls it: with no session, with a token the csrf guard
+	refused, with an account that holds the right of the Images panel and not this one, and with the right	*/
+echo "Image Slots - who may call the five actions, and a save with nothing changed\n";
+
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/keep', 'label' => 'Keep', 'width' => '100', 'height' => '50' ] );
+check( 'a slot to ask about is made', $status === 200 );
+
+$slotsFile = \Nino\Filesystem::path( $appData, '/config.php' );
+$slotsBytes = static fn(): string => (string) file_get_contents( $slotsFile );
+$kept = $slotsBytes();
+
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/keep', 'label' => 'Keep', 'width' => '100', 'height' => '50' ] );
+check( 'a slot saved with the values it has leaves config.php byte for byte as it was', $status === 200 && $slotsBytes() === $kept );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/keep', 'label' => '  Keep ', 'width' => 100, 'height' => ' 50' ] );
+check( '...whether the sizes are numbers or texts and the label has spaces around it: they are trimmed and read as numbers before they are stored', $status === 200 && $slotsBytes() === $kept );
+
+$slotActions = [
+	'slots/list'		=> [],
+	'slots/save'		=> [ 'uri' => '/home/keep', 'label' => 'Changed', 'width' => '101', 'height' => '51' ],
+	'slots/create'	=> [ 'uri' => '/home/made', 'label' => 'Made', 'width' => '10', 'height' => '10' ],
+	'slots/delete'	=> [ 'uri' => '/home/keep' ],
+	'slots/scan'		=> [],
+];
+// The slots as the file and the request hold them: the account that is made for the test is written to config.php as well, so the file is not compared whole here
+$slotsHeld = static fn(): array => [ serialize( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ), serialize( $appData['/nino/html/images'] ) ];
+$held = $slotsHeld();
+$answers = [ 'session' => [], 'token' => [], 'right' => [] ];
+
+\Nino\Auth::logoutUser( $appData );
+
+foreach( $slotActions as $action => $data ) {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	$answers['session'][$action] = [ $status, $body['code'] ?? '', $slotsHeld() === $held ];
+}
+
+ninoUser( $appData, 'slotsright@example.com', [ \Nino\Modules\Images\Admin::MANAGE_PERM ] );
+
+foreach( $slotActions as $action => $data ) {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	$answers['right'][$action] = [ $status, $body['error'] ?? '', $slotsHeld() === $held ];
+}
+
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+foreach( $slotActions as $action => $data ) {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action, 403 );
+	$answers['token'][$action] = [ $status, $body['code'] ?? '', $slotsHeld() === $held ];
+}
+
+\Nino\Auth::deleteUser( $appData, 'slotsright@example.com' );
+
+check( 'with no session every one of the five actions is a 401 with the code "session", and nothing is read or written', array_map( static fn( array $answer ): array => [ $answer[0], $answer[1], $answer[2] ], $answers['session'] ) === array_fill_keys( array_keys( $slotActions ), [ 401, 'session', true ] ) );
+check( '...with the right of the Images panel and not the right to manage the slots every one is a 403, "not allowed", and nothing is read or written', $answers['right'] === array_fill_keys( array_keys( $slotActions ), [ 403, 'not allowed', true ] ) );
+check( '...with a token the csrf guard refused every one is a 403 and is not looked at', $answers['token'] === array_fill_keys( array_keys( $slotActions ), [ 403, '', true ] ) );
+
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'slots/list' );
+check( 'with the right the list answers its slots, each with whether it has an image and where it is used - no more than the tab shows', $status === 200 && array_column( $body['slots'], 'uri' ) === array_keys( $appData['/nino/html/images'] ) && array_keys( $body['slots'][0] ) === [ 'uri', 'label', 'width', 'height', 'hasImage', 'usage' ] );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'slots/scan' );
+check( '...the scan its findings, and writes nothing', $status === 200 && isset( $body['missing'] ) === true && $slotsHeld() === $held );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $slotActions['slots/create'], 'slots/create' );
+check( '...a create makes the slot, a save changes it, a delete takes it away', $status === 200 && ( $appData['/nino/html/images']['/home/made']['label'] ?? '' ) === 'Made'
+	&& ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $slotActions['slots/save'], 'slots/save' )[0] === 200 && ( $appData['/nino/html/images']['/home/keep']['width'] ?? 0 ) === 101
+	&& ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $slotActions['slots/delete'], 'slots/delete' )[0] === 200 && isset( $appData['/nino/html/images']['/home/keep'] ) === false );
+callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/home/made' ] );
+
+echo "\n";
+
 
 // --- Dev\Text ---------------------------------------------------------------
 

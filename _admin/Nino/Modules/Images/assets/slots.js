@@ -8,14 +8,27 @@
  *													slot definitions (label/width/height) - the "set" half of
  *													what the Images panel edits ("values" half: which file
  *													currently fills a slot). Same split as types.js and the
- *													Elements panel. Never touches a slot's filename. A row
- *													also says when no page shows its slot. Every view has its
- *													address: #images/slots, #images/slots/@new,
- *													#images/slots/@scan and #images/slots/<the slot's uri,
- *													one part>. The form is the
- *													guide's first model - a bar with Delete at its left, the state
- *													and one main button - and stays after a save; what is wrong is
- *													said at the field, and what went well is a toast.
+ *													Elements panel. Never touches a slot's filename.
+ *
+ *													The tab is the standard directory of the workbench
+ *													(Nino.adminUi.directory(): the name of a slot with its uri
+ *													under it, the target size, and what one would otherwise see
+ *													only after opening it - no page includes the slot, with the
+ *													templates that name it, or it has no image -, the choice of
+ *													what to show and the search) with the record of one slot
+ *													over it (Nino.adminUi.record(), address #images/slots/<the
+ *													slot's uri, ONE part>: %2Flogo). The record holds the uri to
+ *													read, the label, the width and the height, is saved with
+ *													Save (a record that was not changed sends nothing) and takes
+ *													the slot away with "Delete image slot", after a question.
+ *													A new slot is made in a dialog of its own (formDialog(), the
+ *													address #images/slots/@new): there is no row to open for it.
+ *													The scan of the templates (#images/slots/@scan) stays a view
+ *													of its own in the level beside the directory, with its way
+ *													back, its form and its bar. The words @new and @scan are
+ *													answered here, before an address is handed to the record: a
+ *													record reads one part as the key of an entry. Everything the
+ *													server or a person wrote is shown as text.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -26,29 +39,35 @@
 
 	wn.Nino.admin = wn.Nino.admin || {};
 
+	const word = function( key ) { return Nino.content.getText( key ) };
+
 	Nino.admin.slots = {
 
-		_slots 		: [],
-		// The slot on the form, null while a new one is being made
-		_current	: null,
-		_isNew 		: false,
-		// The rows of the scan form while it is the one on screen, else null -
-		// what the shell's Save tells the two forms apart by
-		_scanRows : null,
+		// The rows of the last list: one for each slot - what the table shows of it and what the record reads
+		_rows					: [],
+		_directory		: null,
+		_record				: null,
+		// What the person sees of the directory - the search, the choice, the sort, the page - kept while the panel lives
+		_state				: {},
+		_ready				: false,
+		_loading			: false,
+		// What the templates and the slots were when the list was read (see Nino.admin.touch()): the usage of a slot and its picture are in the rows, and a
+		// template or a slot written since is not
+		_stamp				: '',
+		// The two buttons of the list's bar, which the views that they open give the focus back to
+		_buttons			: { add : null, scan : null },
+		// The dialog of a new slot is open - its handle
+		_adding				: false,
+		_dialog				: null,
+		// The rows of the scan form while it is the one on screen, else null - what the shell's Save tells the scan from the record by
+		_scanRows			: null,
 		// The scan is the view on screen, with its rows or still waiting for them
-		_scanning : false,
-		// The controls the form's save reads, as _renderForm() made them
-		_parts		: null,
-		// The status line of the form that is open - see Nino.adminUi.status()
-		_line			: null,
-		_loading	: false,
-		_ready 		: false,
-		// The row or the button that opened the form that is open: Back returns
-		// the focus to it (see Nino.adminUi.backTo())
-		_opener 	: null,
+		_scanning			: false,
+		// The status line of the scan form
+		_line					: null,
 
 		/**
-		 *	Load every image slot, render the list and open whatever the hash points at
+		 *	Load every image slot, draw the directory and open whatever the address points at
 		 *
 		 *	@return		void
 		 */
@@ -57,164 +76,68 @@
 			if( dc.getElementById('slots-list') === null || Nino.admin.slots._loading === true || Nino.admin.slots._ready === true )
 				return;
 
-			Nino.admin.slots._loading = true;
-
-			Nino.admin.slots._reload( function( ok ) {
-
-				Nino.admin.slots._loading = false;
-
-				if( ok === false )
-					return;
-
-				Nino.admin.slots._ready = true;
-
-				// Captured only now: the hash is the one the page was loaded with
-				const hash = Nino.admin.router.current();
-
-				if( hash.panel === 'slots' && hash.parts.length > 0 ) {
-
-					if( Nino.admin.router.isWord( hash.parts, 0, 'new' ) === true && hash.parts.length === 1 )
-						return Nino.admin.slots._openSlot( null );
-
-					if( Nino.admin.router.isWord( hash.parts, 0, 'scan' ) === true && hash.parts.length === 1 )
-						return Nino.admin.slots._openScan();
-
-					const slot = Nino.admin.slots._slotAt( hash.parts );
-
-					if( slot !== null )
-						return Nino.admin.slots._openSlot( slot.uri );
-				}
-
-				Nino.admin.slots._showList();
-			} );
+			Nino.admin.slots._load( false );
 		},
 
 		/**
-		 *	Ask for the slots and draw the list - behind the form that is open, which stays: the list under it is the one Back
-		 *	returns to. The Images panel of this same module lists the slots there are pictures for, and loads them once. The
-		 *	slots just changed - every create, save, delete and scan ends up here - so its copy is stale, and it says "no
-		 *	image slots yet" out loud when it has none: a stale copy would not be an empty screen but a wrong sentence. Marking
-		 *	it unloaded is enough, showCurrent() fetches again when the tab is next on
-		 *
-		 *	@param		{Function}	[then]		Called once with true when the list is drawn, false when it could not be had
-		 *
-		 *	@return		void
-		 */
-		_reload : function( then ) {
-
-			Nino.admin.slots._apiCall( 'list', {}, function( status, response ) {
-
-				if( status !== 200 || response === null ) {
-					Nino.admin.slots._showError( dc.getElementById('slots-list'), status, response );
-					if( typeof then === 'function' )
-						then( false );
-					return;
-				}
-
-				Nino.admin.slots._slots = response.slots;
-				Nino.admin.slots._renderList();
-
-				if( Nino.admin.images !== undefined )
-					Nino.admin.images._ready = false;
-
-				if( typeof then === 'function' )
-					then( true );
-			} );
-		},
-
-		/**
-		 *	Re-apply whatever drill-down level this tab is currently on -
-		 *	called when it is selected, so the hash gets synced to reality.
-		 *
-		 *	Where the hash names this tab, the hash wins: a step through the
-		 *	browser's history changes the address and nothing else, so the level
-		 *	it names is shown - and leaving a form that holds unsaved input asks
-		 *	first, as its back link does. A hash that names another panel (a
-		 *	click on the rail) leaves the level in memory as it is
+		 *	The tab is shown. An address of this tab is followed - the record opens, closes or steps, the dialog of a new slot and the scan open and close -, an address
+		 *	of another panel leaves what is on screen as it is and writes its own address. The slots are read again, without losing what was chosen, where a template or a
+		 *	slot was written since they were read (the Images panel writes the pictures)
 		 *
 		 *	@return		void
 		 */
 		showCurrent : function() {
 
-			if( Nino.admin.slots._ready === false )
+			const panel = Nino.admin.slots;
+
+			if( panel._ready === false )
+				return panel.init();
+
+			const here = Nino.admin.router.current().panel === 'slots';
+
+			// The record reads the address itself, and answers only one that is this tab's
+			if( here === true && panel._follow() === true )
 				return;
 
-			const hash = Nino.admin.router.current();
-			if( hash.panel === 'slots' && Nino.admin.slots._follow( hash.parts ) === true )
+			// An address of another panel leaves the tab as it is, and writes the address of what is on screen
+			if( here === false )
+				panel._address();
+
+			if( panel._record.isOpen() === true || panel._adding === true || panel._scanning === true )
 				return;
 
-			Nino.admin.slots._showLevel();
+			if( panel._stampNow() !== panel._stamp )
+				panel._load( true );
 		},
 
 		/**
-		 *	Show the level this tab is on, and write it into the address
+		 *	What the templates and the slots are: the two counters of the shell, as one value
+		 *
+		 *	@return		{string}
+		 */
+		_stampNow : function() {
+			return Nino.admin.stamp( 'templates' )+ ':'+ Nino.admin.stamp( 'slots' );
+		},
+
+		/**
+		 *	Tell the shell that a slot was written, and take it as read by this tab: what the tab wrote itself is on screen. The Images panel lists the slots there are
+		 *	pictures for and says "no image slots yet" out loud when it has none: its copy is stale after every write here, and marking it unloaded is enough - its
+		 *	showCurrent() reads again when it is next on
 		 *
 		 *	@return		void
 		 */
-		_showLevel : function() {
+		_wrote : function() {
 
-			if( dc.getElementById('slots-form').classList.contains('admin-hidden') === false )
-				return Nino.admin.slots._showForm();
+			const panel = Nino.admin.slots;
+			const same = panel._stampNow() === panel._stamp;
 
-			Nino.admin.slots._showList();
-		},
+			Nino.admin.touch( 'slots' );
 
-		/**
-		 *	Move to the level the hash names, if it is not the one on screen:
-		 *	the new-slot form, the scan, a slot's form or the list. A slot that does
-		 *	not exist is the list. Leaving a form with unsaved input asks first (see
-		 *	Nino.admin.router.leave())
-		 *
-		 *	@param		{Array}		parts					The hash behind the tab's name
-		 *
-		 *	@return		{boolean}									Whether a move was made or is being asked about
-		 */
-		_follow : function( parts ) {
+			if( same === true )
+				panel._stamp = panel._stampNow();
 
-			const slots = Nino.admin.slots;
-			const open = dc.getElementById('slots-form').classList.contains('admin-hidden') === false;
-			const scanning = slots._scanRows !== null || slots._scanning === true;
-			const create = parts.length === 1 && Nino.admin.router.isWord( parts, 0, 'new' ) === true;
-			const scan = parts.length === 1 && Nino.admin.router.isWord( parts, 0, 'scan' ) === true;
-			const slot = create === true || scan === true || parts.length === 0 ? null : slots._slotAt( parts );
-
-			let there;
-
-			if( create === true )
-				there = open === true && scanning === false && slots._isNew === true;
-			else if( scan === true )
-				there = open === true && scanning === true;
-			else if( slot === null )
-				there = open === false;
-			else
-				there = open === true && scanning === false && slots._isNew === false && slots._current !== null && slots._current.uri === slot.uri;
-
-			if( there === true )
-				return false;
-
-			Nino.admin.router.leave( [ 'slots' ], open, function() {
-				if( create === true )
-					slots._openSlot( null );
-				else if( scan === true )
-					slots._openScan();
-				else if( slot === null )
-					slots._showList();
-				else
-					slots._openSlot( slot.uri );
-			}, slots._showLevel );
-
-			return true;
-		},
-
-		/**
-		 *	The slot an address names, or null: its uri is the one part, whatever it holds
-		 *
-		 *	@param		{Array}		parts					The hash behind the tab's name
-		 *
-		 *	@return		{Object|null}
-		 */
-		_slotAt : function( parts ) {
-			return parts.length !== 1 ? null : Nino.admin.slots._slots.find( function( slot ) { return slot.uri === parts[0] } ) ?? null;
+			if( Nino.admin.images !== undefined )
+				Nino.admin.images._ready = false;
 		},
 
 		/**
@@ -231,285 +154,350 @@
 		},
 
 		/**
-		 *	Show a failed request's status/error in a container
+		 *	Read the list. Drawn the first time with the sentence that it is loading; read again without it, the directory takes the new rows where it stands - its
+		 *	search, its choice, its sort and its page are what a person chose
 		 *
-		 *	@param		{Element}		container
-		 *	@param		{number}		status
-		 *	@param		{*}					response
-		 *
-		 *	@return		void
-		 */
-		_showError : function( container, status, response ) {
-			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
-		},
-
-		/**
-		 *	Show the list again as it stands: the focus stays where it is, unless it
-		 *	stood in the level that is hidden now (see Nino.adminUi.showLevel()). Back
-		 *	goes to the row that opened the form, and what a person opens takes the
-		 *	focus in
-		 *
-		 *	@param		{Element|null}	[opener]	Back: the control that opened the form that is left
+		 *	@param		{boolean}		quiet				A list that is drawn already is read again
+		 *	@param		{Function}	[then]			Called with true once the list is drawn, with false where it could not be read
 		 *
 		 *	@return		void
 		 */
-		_showList : function( opener ) {
-			Nino.admin.router.set( 'slots', [] );
+		_load : function( quiet, then ) {
 
-			if( opener === undefined )
-				Nino.adminUi.showLevel( 'slots-list', { focus : false } );
-			else
-				Nino.adminUi.backTo( 'slots-list', opener );
-		},
+			const panel = Nino.admin.slots;
+			const told = function( ok ) { if( typeof then === 'function' ) then( ok ) };
 
-		/**
-		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
-		 *
-		 *	@return		void
-		 */
-		_showForm : function( opened ) {
+			if( panel._loading === true )
+				return told( false );
 
-			const slots = Nino.admin.slots;
-			let parts = [ Nino.admin.router.word('new') ];
+			panel._loading = true;
 
-			if( slots._scanRows !== null || slots._scanning === true )
-				parts = [ Nino.admin.router.word('scan') ];
-			else if( slots._isNew === false && slots._current !== null )
-				parts = [ slots._current.uri ];
+			// A template written while the answer is on its way is not in it: the stamp is the one from before the request went out
+			const stamp = panel._stampNow();
 
-			Nino.admin.router.set( 'slots', parts );
+			if( quiet === false || panel._directory === null ) {
+				panel._frame();
+				panel._directory.loading( word('/_admin/slots/loading') );
+			}
 
-			// A new slot is named first: the field is where the person starts, not the heading over the form
-			Nino.adminUi.showLevel( 'slots-form', opened !== true ? { focus : false } : ( slots._isNew === true && slots._parts !== null && slots._scanning === false ? { focus : slots._parts.uriInput } : {} ) );
-		},
+			panel._apiCall( 'list', {}, function( status, response ) {
 
-		/**
-		 *	The row of a slot as the list is drawn now: the list is drawn again behind
-		 *	an open form after a save, and the row that was pressed is gone with the
-		 *	old drawing
-		 *
-		 *	@param		{string}	uri
-		 *
-		 *	@return		{Element|null}
-		 */
-		_rowOf : function( uri ) {
+				panel._loading = false;
 
-			const row = Array.from( dc.getElementById('slots-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === uri } );
+				if( status !== 200 || response === null || Array.isArray( response.slots ) === false ) {
+					panel._directory.fail( status, response, '/_admin/common/error/load' );
+					return told( false );
+				}
 
-			return row === undefined ? null : row.querySelector('a');
-		},
+				panel._rows = response.slots.map( panel._row );
+				panel._stamp = stamp;
+				panel._directory.setRows( panel._rows, { keep : true } );
+				panel._ready = true;
 
-		/**
-		 *	The control Back returns the focus to from the form that is open: the row
-		 *	of the slot, or the button that opened the form
-		 *
-		 *	@return		{Element|null}
-		 */
-		_backTarget : function() {
-
-			const slots = Nino.admin.slots;
-
-			return slots._isNew === false && slots._current !== null && slots._scanRows === null && slots._scanning !== true ? slots._rowOf( slots._current.uri ) : slots._opener;
-		},
-
-		/**
-		 *	Draw the way back of a form: one link, "Back to <the tab>", which leaves the form for the list
-		 *
-		 *	@param		{string}		title			The name of the view
-		 *
-		 *	@return		{Element}									The bar
-		 */
-		_contextBar : function( title ) {
-			return Nino.adminUi.contextBar( {
-				back	: { to : Nino.content.getText('/_admin/nav/slots'), href : Nino.admin.router.href( 'slots', [] ), onClick : function() {
-					Nino.admin.router.go( 'slots', [] );
-					Nino.admin.slots._showList( Nino.admin.slots._backTarget() );
-				} },
-				title	: title,
+				// An address that names a slot, the new one or the scan is followed once the rows are in
+				panel._follow();
+				told( true );
 			} );
 		},
 
 		/**
-		 *	Render the slot list: a row for each slot - its label over its uri and size - and the list's own bar,
-		 *	"New image slot" as the main button and the scan beside it
+		 *	The room the list is drawn in: the directory, the record over it and, under the directory, the bar of the list - "New image slot" as the main button and the
+		 *	scan beside it
 		 *
 		 *	@return		void
 		 */
-		_renderList : function() {
+		_frame : function() {
+
+			const panel = Nino.admin.slots;
+
+			if( panel._directory !== null )
+				return;
 
 			const wrap = dc.getElementById('slots-list');
+
 			wrap.innerHTML = '';
 
-			if( Nino.admin.slots._slots.length === 0 )
-				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/slots/empty') ) );
-			else
-				// A row opens a slot and writes its address: a link, with that address
-				wrap.appendChild( Nino.adminUi.list( Nino.admin.slots._slots.map( function( slot ) {
+			const mount = Nino.adminUi.el( 'div' );
 
-					const unused = ( slot.usage || { pages : [] } ).pages.length === 0;
+			mount.id = 'slots-directory';
+			wrap.appendChild( mount );
 
-					return {
-						key			: slot.uri,
-						title		: slot.label,
-						detail	: slot.uri+ ' · '+ slot.width+ ' × '+ slot.height+ ' px'+ ( unused === true ? Nino.admin.slots._templatesLabel( slot ) : '' ),
-						badge		: unused === true ? { text : Nino.content.getText('/_admin/slots/label/unused'), state : 'warn' } : ( slot.hasImage ? undefined : { text : Nino.content.getText('/_admin/slots/label/noimage'), state : 'muted' } ),
-						href		: Nino.admin.router.href( 'slots', [ slot.uri ] ),
-						onOpen	: function() { Nino.admin.router.go( 'slots', [ slot.uri ] ); Nino.admin.slots._openSlot( slot.uri, true ) },
-					};
-				} ), { label : Nino.content.getText('/_admin/nav/slots') } ) );
+			const add = Nino.adminUi.button( word('/_admin/slots/label/new'), function() { panel._openNew( add, true ) } );
+			const scan = Nino.adminUi.button( word('/_admin/slots/label/scan'), function() { panel._openScan( true, true ) }, { kind : 'secondary' } );
 
-			const add = Nino.adminUi.button( Nino.content.getText('/_admin/slots/label/new'), function() {
-				Nino.admin.router.go( 'slots', [ Nino.admin.router.word('new') ] );
-				Nino.admin.slots._opener = add;
-				Nino.admin.slots._openSlot( null, true );
-			} );
-
-			const scan = Nino.adminUi.button( Nino.content.getText('/_admin/slots/label/scan'), function() {
-				Nino.admin.router.go( 'slots', [ Nino.admin.router.word('scan') ] );
-				Nino.admin.slots._opener = scan;
-				Nino.admin.slots._openScan( true );
-			}, { kind : 'secondary' } );
+			panel._buttons = { add : add, scan : scan };
+			panel._directory = panel._build( mount, panel._state );
+			panel._record = panel._makeRecord();
+			panel._share();
 
 			wrap.appendChild( Nino.adminUi.actionBar( { list : true, secondary : [ scan ], primary : add } ).el );
 		},
 
 		/**
-		 *	What the list row says about the pages that do not show a slot: the templates that name it, if any, since a slot
-		 *	used in a template no route renders is not the same thing as one no template mentions
+		 *	The row of a slot as the list answered it: what the table shows of it and what the record reads
 		 *
-		 *	@param		{Object}		slot					{ usage : { templates, pages } }
+		 *	@param		{Object}		slot					{ uri, label, width, height, hasImage, usage : { templates, pages } }
 		 *
-		 *	@return		{string}									'' or ' · Templates: a, b'
+		 *	@return		{Object}
 		 */
-		_templatesLabel : function( slot ) {
+		_row : function( slot ) {
 
-			const templates = ( slot.usage || { templates : [] } ).templates;
+			const usage = slot.usage !== null && typeof slot.usage === 'object' ? slot.usage : {};
 
-			return templates.length === 0 ? '' : ' · '+ Nino.adminUi.format( Nino.content.getText('/_admin/slots/label/templates'), templates.join(', ') );
+			return Nino.admin.slots._derive( {
+				key			: String( slot.uri ),
+				uri			: String( slot.uri ),
+				label		: String( slot.label ?? slot.uri ),
+				width		: Number( slot.width ) || 0,
+				height	: Number( slot.height ) || 0,
+				hasImage	: slot.hasImage === true,
+				templates	: ( Array.isArray( usage.templates ) === true ? usage.templates : [] ).map( String ),
+				pages		: Array.isArray( usage.pages ) === true ? usage.pages.length : 0,
+			} );
 		},
 
 		/**
-		 *	Open the form of one slot, or an empty one
+		 *	What a row says that follows from the rest of it: its size, and the state a person would otherwise see only after opening the slot - that no page
+		 *	includes it, or that it has no image
 		 *
-		 *	@param		{string|null}	uri
-		 *	@param		{boolean}			[opened]	The person opened it - a row, a button, or the slot that was just made: the focus goes into the form. Otherwise it is shown as it stands, by the address or after a step through the history
+		 *	@param		{Object}		row
 		 *
-		 *	@return		void
+		 *	@return		{Object}									The row, with the derived values set
 		 */
-		_openSlot : function( uri, opened ) {
+		_derive : function( row ) {
 
-			const slots = Nino.admin.slots;
+			row.size = row.width+ ' × '+ row.height+ ' px';
+			row.unused = row.pages === 0;
+			row.stateText = row.unused === true ? word('/_admin/slots/label/unused') : ( row.hasImage === true ? '' : word('/_admin/slots/label/noimage') );
 
-			slots._isNew = uri === null;
-			slots._current = uri === null ? null : ( slots._slots.find( function( slot ) { return slot.uri === uri } ) ?? null );
-			slots._scanning = false;
-			slots._renderForm();
-			slots._showForm( opened === true );
+			return row;
 		},
 
 		/**
-		 *	Render the form: the uri (a new slot's own; fixed once the slot exists - it is what the templates write), the
-		 *	label, the width and the height, and the bar
+		 *	The row of a key, or null
+		 *
+		 *	@param		{string}		key
+		 *
+		 *	@return		{Object|null}
+		 */
+		_find : function( key ) {
+			return Nino.admin.slots._rows.find( function( row ) { return row.key === key } ) ?? null;
+		},
+
+		/**
+		 *	Put a row in the place of the row of the same key, and have the directory draw it anew where it stands
+		 *
+		 *	@param		{Object}		next
 		 *
 		 *	@return		void
 		 */
-		_renderForm : function() {
+		_replace : function( next ) {
 
-			const slots = Nino.admin.slots;
-			const slot = slots._current;
-			const text = function( key ) { return Nino.content.getText( key ) };
+			const panel = Nino.admin.slots;
 
-			const wrap = dc.getElementById('slots-form');
-			wrap.innerHTML = '';
-			wrap.appendChild( slots._contextBar( slot === null ? text('/_admin/slots/label/new') : slot.label ) );
+			panel._rows = panel._rows.map( function( row ) { return row.key === next.key ? next : row } );
+			panel._directory.update( panel._rows, next.key );
+		},
 
-			const form = dc.createElement('form');
-			form.id = 'slots-edit-form';
-			form.noValidate = true;
+		/**
+		 *	The directory: the choice of what to show - the slots without an image, those no page includes -, the search and the table with its paging. There is no
+		 *	box to choose rows by: nothing here is done to several slots at once. The size is sorted as a string whose numbers are read as numbers (the width first,
+		 *	then the height), as it is in the table of the Images panel
+		 *
+		 *	@param		{Element}		mount
+		 *	@param		{Object}		[state]				What the person saw before
+		 *
+		 *	@return		{Object}
+		 */
+		_build : function( mount, state ) {
 
-			const fieldset = dc.createElement('fieldset');
-			const legend = dc.createElement('legend');
-			legend.textContent = slot === null ? text('/_admin/slots/label/new') : slot.label;
-			fieldset.appendChild( legend );
+			const panel = Nino.admin.slots;
 
-			const uriField = Nino.adminUi.textField( {
-				id					: 'slots-form-uri',
-				label				: text('/_admin/slots/label/uri'),
-				help				: text('/_admin/slots/hint/uri'),
-				placeholder	: '/template/page-home/hero/image',
-				value				: slot === null ? '' : slot.uri,
-				required		: true,
-				autocomplete: 'off',
+			return Nino.adminUi.directory( {
+				mount : mount,
+				rowKey : 'key',
+				state : state,
+				onState : function( now ) { panel._state = now },
+				columns : [
+					{ key : 'label', label : word('/_admin/images/col/name'), type : 'string', primary : true, render : panel._nameCell },
+					{ key : 'size', label : word('/_admin/images/label/target'), type : 'string' },
+					{ key : 'stateText', label : word('/_admin/slots/col/state'), type : 'string', render : panel._stateCell, absent : function( row ) { return row.stateText === '' } },
+				],
+				labels : { search : word('/_admin/slots/label/search'), empty : word('/_admin/slots/empty'), noMatch : word('/_admin/slots/nomatch'), loading : word('/_admin/slots/loading') },
+				filters : [ {
+					id : 'slots-show',
+					label : word('/_admin/slots/label/show'),
+					value : '',
+					options : [
+						{ value : '', label : word('/_admin/slots/label/show-all') },
+						{ value : 'none', label : word('/_admin/slots/label/show-none') },
+						{ value : 'unused', label : word('/_admin/slots/label/show-unused') },
+					],
+					match : function( row, value ) {
+						return value === '' || ( value === 'none' ? row.hasImage === false : row.unused === true );
+					},
+				} ],
+				// What a person looks for, whatever the cells show of it: the name, the uri and the templates that name the slot
+				searchText : function( row ) {
+					return [ row.label, row.uri ].concat( row.templates ).join(' ');
+				},
+				actions : function( row ) {
+					return [ Nino.adminUi.iconButton( 'pencil', Nino.adminUi.format( word('/_admin/slots/row/open'), row.label ), function( event ) {
+						panel._record.open( row.key, { opener : event.currentTarget } );
+					}, { small : true } ) ];
+				},
+				// A row is opened by its first button as well: the row is not a stop of the Tab key where it holds buttons
+				onOpen : function( row ) { panel._record.open( row.key, {} ) },
 			} );
-			const uriInput = uriField.querySelector('input');
-			uriInput.spellcheck = false;
-			uriInput.disabled = slot !== null;
-			fieldset.appendChild( uriField );
+		},
 
-			const labelField = Nino.adminUi.textField( {
-				id					: 'slots-form-label',
-				label				: text('/_admin/common/label/label'),
-				help				: text('/_admin/slots/hint/label'),
-				value				: slot === null ? '' : slot.label,
-				required		: true,
+		/**
+		 *	The cell of the name: the label of the slot, strong, and its uri under it
+		 *
+		 *	@param		{string}		value
+		 *	@param		{Object}		row
+		 *
+		 *	@return		{Element}
+		 */
+		_nameCell : function( value, row ) {
+
+			const cell = Nino.adminUi.el( 'span', 'images-name' );
+			const label = Nino.adminUi.el( 'strong', 'images-name-label', row.label );
+			const key = Nino.adminUi.el( 'span', 'images-name-key', row.uri );
+
+			// What an ellipsis cuts is whole in the tooltip
+			label.title = row.label;
+			key.title = row.uri;
+			cell.appendChild( label );
+			cell.appendChild( key );
+
+			return cell;
+		},
+
+		/**
+		 *	The cell of the state: a badge that warns where no page includes the slot, with the templates that name it where there are any - a slot used in a
+		 *	template that no route renders is not the same thing as one no template mentions -; else a quiet badge where the slot has no image; else nothing
+		 *
+		 *	@param		{string}		value
+		 *	@param		{Object}		row
+		 *
+		 *	@return		{Element|string}
+		 */
+		_stateCell : function( value, row ) {
+
+			if( row.stateText === '' )
+				return '';
+
+			const cell = Nino.adminUi.el( 'span', 'slots-state' );
+			const badge = Nino.adminUi.el( 'span', 'nino-admin-badge', row.stateText );
+
+			badge.dataset.state = row.unused === true ? 'warn' : 'muted';
+			cell.appendChild( badge );
+
+			if( row.unused === true && row.templates.length > 0 ) {
+				const names = Nino.adminUi.format( word('/_admin/slots/label/templates'), row.templates.join(', ') );
+				const line = Nino.adminUi.el( 'span', 'slots-state-templates', names );
+
+				line.title = names;
+				cell.appendChild( line );
+			}
+
+			return cell;
+		},
+
+		/**
+		 *	The record: a slot in a dialog of its own, with the step to the one before and the one after it in the rows the directory shows, "Save", "Save and continue"
+		 *	and "Delete image slot" at the left of its bar
+		 *
+		 *	@return		{Object}
+		 */
+		_makeRecord : function() {
+
+			const panel = Nino.admin.slots;
+
+			return Nino.adminUi.record( {
+				screen : 'slots',
+				prefix : [],
+				directory : panel._directory,
+				keyOf : function( row ) { return row.key },
+				find : panel._find,
+				title : function( row ) { return row.label },
+				subtitle : function( row ) { return row.uri },
+				saveNext : true,
+				labels : { prev : word('/_admin/slots/record/prev'), next : word('/_admin/slots/record/next') },
+				body : panel._body,
+				save : panel._save,
+				danger : { label : word('/_admin/slots/label/delete'), run : panel._remove },
+				missing : function() { panel._directory.notice( word('/_admin/slots/record/missing') ) },
 			} );
-			const labelInput = labelField.querySelector('input');
-			fieldset.appendChild( labelField );
+		},
 
-			const size = function( id, label, value ) {
-				const field = Nino.adminUi.textField( { id : id, label : label, help : text('/_admin/slots/hint/size'), value : value === undefined ? '' : String( value ), required : true, type : 'number' } );
-				const input = field.querySelector('input');
-				input.min = '1';
-				input.step = '1';
-				return field;
+		/**
+		 *	The record and the scan are two views of one tab, and the shell knows a tab by one name of unsaved input: the entry of the record, `slots`. The scan is a
+		 *	watched form of its own - `slots-scan` - and the entry of the tab answers for whichever of the two is on screen, so that the question before a way out of
+		 *	the panel, the back link of the scan and Ctrl+S reach the one that holds the input
+		 *
+		 *	@return		void
+		 */
+		_share : function() {
+
+			const dirty = Nino.admin.dirty;
+
+			if( typeof dirty !== 'object' || typeof dirty.entry !== 'function' )
+				return;
+
+			const own = dirty.entry('slots');
+			const scan = dirty.entry('slots-scan');
+
+			if( own === null || scan === null )
+				return;
+
+			const on = function() { return Nino.admin.slots._scanning === true };
+
+			dirty.register( 'slots', {
+				isDirty : function() { return on() === true ? scan.isDirty() : own.isDirty() },
+				save : function( done ) { return on() === true ? scan.save( done ) : own.save( done ) },
+				discard : function() { return on() === true ? scan.discard() : own.discard() },
+				bar : function() { return on() === true ? scan.bar() : own.bar() },
+			} );
+		},
+
+		/**
+		 *	The content of the record: the uri to read - it is what the templates write and cannot be changed -, the label, the width and the height. What it keeps in ctx
+		 *	- the fields - is what the save finds there
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *
+		 *	@return		{Element}
+		 */
+		_body : function( row, ctx ) {
+
+			const fields = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+			fields.appendChild( Nino.adminUi.readLine( { label : word('/_admin/slots/label/uri'), value : row.uri, mono : true } ) );
+
+			const label = Nino.adminUi.textField( {
+				id : 'slots-form-label',
+				label : word('/_admin/common/label/label'),
+				help : word('/_admin/slots/hint/label'),
+				value : row.label,
+				required : true,
+			} );
+
+			// The unit stands in the name of the field: a unit of the block would say it twice
+			const size = function( key, name, value ) {
+				return Nino.adminUi.numberField( { key : key, label : name, help : word('/_admin/slots/hint/size'), value : String( value ), min : '1', step : 1, required : true } );
 			};
 
-			const widthField = size( 'slots-form-width', text('/_admin/slots/label/width'), slot === null ? undefined : slot.width );
-			const heightField = size( 'slots-form-height', text('/_admin/slots/label/height'), slot === null ? undefined : slot.height );
-			fieldset.appendChild( widthField );
-			fieldset.appendChild( heightField );
+			const width = size( 'width', word('/_admin/slots/label/width'), row.width );
+			const height = size( 'height', word('/_admin/slots/label/height'), row.height );
 
-			form.appendChild( fieldset );
+			[ label, width, height ].forEach( function( field ) { fields.appendChild( field ) } );
 
-			const deleteBtn = slot === null ? null : Nino.adminUi.button( text('/_admin/slots/label/delete'), function() { slots._delete() }, { kind : 'danger' } );
+			ctx.parts = { label : label, width : width, height : height };
 
-			const msg = dc.createElement('p');
-			msg.id = 'slots-form-msg';
-			const bar = Nino.adminUi.actionBar( {
-				danger	: deleteBtn,
-				status	: { line : msg, fresh : slot === null },
-				primary	: Nino.adminUi.button( text( slot === null ? '/_admin/slots/label/create' : '/_admin/common/label/save' ), null, { type : 'submit' } ),
-			} );
-
-			slots._line = bar.line;
-			bar.line.bind( form );
-			form.appendChild( bar.el );
-
-			slots._parts = {
-				uriInput : uriInput, labelInput : labelInput,
-				widthInput : widthField.querySelector('input'), heightInput : heightField.querySelector('input'),
-			};
-			slots._scanRows = null;
-
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); slots._save() } );
-			wrap.appendChild( form );
-
-			if( slot === null )
-				uriInput.focus();
-
-			// What the form holds now is what is saved
-			slots._snapshot();
-		},
-
-		/**
-		 *	Have the shell take the form on screen - whichever it is - as the one
-		 *	that is stored (see Nino.admin.dirty)
-		 *
-		 *	@return		void
-		 */
-		_snapshot : function() {
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.snapshot( 'slots' );
+			return fields;
 		},
 
 		/**
@@ -526,10 +514,10 @@
 		_wrong : function( name, value, expect, valid ) {
 
 			if( value.trim() === '' )
-				return Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), name );
+				return Nino.adminUi.format( word('/_admin/common/error/missing'), name );
 
 			if( typeof valid === 'function' && valid( value.trim() ) === false )
-				return Nino.adminUi.format( Nino.content.getText('/_admin/slots/error/invalid'), name, Nino.content.getText( expect ) );
+				return Nino.adminUi.format( word('/_admin/slots/error/invalid'), name, Nino.content.getText( expect ) );
 
 			return '';
 		},
@@ -558,227 +546,426 @@
 		},
 
 		/**
-		 *	Say what is wrong at the fields of the form that is open - the sentence under each, the line of the bar for
-		 *	all of them - and take the focus to the first. A new slot's uri is also wrong where a slot holds it already
+		 *	The save of the record: what was changed and nothing else - a record with no change sends nothing and says that it is saved. What is wrong with a field is
+		 *	said at the field, before anything is sent, and what the server refuses stands at the field it names. The row is what was sent: the server answers nothing
+		 *	but ok, so the list is not read again
 		 *
-		 *	@param		{Object}		line					The status line of the form's bar
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Function}	done					done( ok, { row, error } )
 		 *
-		 *	@return		{boolean}									Whether every field is fine
+		 *	@return		void
 		 */
-		_check : function( line ) {
+		_save : function( row, ctx, done ) {
 
-			const slots = Nino.admin.slots;
-			const parts = slots._parts;
-			const text = function( key ) { return Nino.content.getText( key ) };
+			const panel = Nino.admin.slots;
+			const current = panel._find( row.key ) ?? row;
+			const parts = ctx.parts;
+			const input = function( key ) { return parts[key].querySelector('input') };
 
-			Nino.adminUi.clearFieldErrors( dc.getElementById('slots-edit-form') );
+			Nino.adminUi.clearFieldErrors( ctx.form );
 
 			let first = null;
 
 			[
-				[ parts.uriInput, '/_admin/slots/label/uri', '/_admin/slots/expect/uri', slots._isUri ],
-				[ parts.labelInput, '/_admin/common/label/label', '', undefined ],
-				[ parts.widthInput, '/_admin/slots/label/width', '/_admin/slots/expect/size', slots._isSize ],
-				[ parts.heightInput, '/_admin/slots/label/height', '/_admin/slots/expect/size', slots._isSize ],
+				[ 'label', '/_admin/common/label/label', '', undefined ],
+				[ 'width', '/_admin/slots/label/width', '/_admin/slots/expect/size', panel._isSize ],
+				[ 'height', '/_admin/slots/label/height', '/_admin/slots/expect/size', panel._isSize ],
 			].forEach( function( rule ) {
 
-				const input = rule[0];
-
-				// The uri of a slot that exists is no field to fill
-				if( input.disabled === true )
-					return;
-
-				const name = text( rule[1] );
-				let sentence = slots._wrong( name, input.value, rule[2], rule[3] );
-
-				if( sentence === '' && input === parts.uriInput && slots._slots.some( function( slot ) { return slot.uri === input.value.trim() } ) === true )
-					sentence = Nino.adminUi.format( text('/_admin/slots/error/taken'), name );
+				const sentence = panel._wrong( word( rule[1] ), input( rule[0] ).value, rule[2], rule[3] );
 
 				if( sentence === '' )
 					return;
 
-				Nino.adminUi.fieldError( input.closest('label'), input, 'slots-error-'+ input.id, sentence );
-
-				if( first === null )
-					first = input;
+				Nino.adminUi.fieldError( parts[rule[0]], input( rule[0] ), 'slots-error-'+ rule[0], sentence );
+				first = first ?? input( rule[0] );
 			} );
 
-			if( first === null )
-				return true;
-
-			line.fail( text('/_admin/slots/error/fields') );
-			first.focus();
-
-			return false;
-		},
-
-		/**
-		 *	Create or save the slot currently open
-		 *
-		 *	Every way this ends reports to done( ok ), if there is one (see
-		 *	Nino.admin.dirty.guard())
-		 *
-		 *	@param		{Function}	[done]				Called once with true when the slot was written, false otherwise
-		 *
-		 *	@return		void
-		 */
-		_save : function( done ) {
-
-			const slots = Nino.admin.slots;
-			const report = function( ok ) {
-				if( typeof done === 'function' )
-					done( ok );
-			};
-
-			if( slots._check( slots._line ) === false ) {
-				report( false );
-				return;
+			if( first !== null ) {
+				first.focus();
+				return done( false, { error : word('/_admin/slots/error/fields') } );
 			}
 
-			const parts = slots._parts;
-			const line = slots._line;
-			const creating = slots._isNew === true;
-			const uri = creating === true ? parts.uriInput.value.trim() : slots._current.uri;
+			const typed = { label : input('label').value.trim(), width : input('width').value.trim(), height : input('height').value.trim() };
 
-			line.saving();
+			// Nothing was changed: there is nothing to write, and what is stored stays as it is
+			if( typed.label === current.label && parseInt( typed.width, 10 ) === current.width && parseInt( typed.height, 10 ) === current.height )
+				return done( true, { row : current } );
 
-			slots._apiCall( creating === true ? 'create' : 'save', { uri : uri, label : parts.labelInput.value.trim(), width : parts.widthInput.value.trim(), height : parts.heightInput.value.trim() }, function( status, response ) {
+			panel._apiCall( 'save', { uri : current.uri, label : typed.label, width : typed.width, height : typed.height }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					slots._refused( line, status, response );
-					report( false );
-					return;
+
+					const field = response !== null && typeof response === 'object' && typeof response.field === 'string' ? response.field : '';
+					const sentence = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+
+					// A refusal that names a field of the record is said there, and the focus goes to it
+					if( parts[field] !== undefined ) {
+						Nino.adminUi.fieldError( parts[field], input( field ), 'slots-error-'+ field, sentence );
+						input( field ).focus();
+					}
+
+					return done( false, { error : sentence } );
 				}
 
-				Nino.admin.touch( 'slots' );
+				panel._wrote();
 
-				// The list under the form is drawn again; the form stays, and a slot that was just made is the one on it, with its address
-				slots._reload( function( ok ) {
+				const saved = panel._derive( Object.assign( {}, current, { label : typed.label, width : parseInt( typed.width, 10 ), height : parseInt( typed.height, 10 ) } ) );
 
-					// The slot is written: only the list failed, and a Save that is reported as failed would be tried again
-					if( ok === false ) {
-						slots._showList();
-						report( true );
-						return;
-					}
-
-					if( creating === true ) {
-						slots._openSlot( uri, true );
-						slots._line.saved();
-					}
-					else {
-						slots._current = slots._slots.find( function( slot ) { return slot.uri === uri } ) ?? slots._current;
-						slots._snapshot();
-						line.saved();
-					}
-
-					report( true );
-				} );
+				panel._replace( saved );
+				done( true, { row : saved } );
 			} );
 		},
 
 		/**
-		 *	Say what the server refused: in the line of the bar and, for the refusals that are about a field, under that
-		 *	field - the size it names, the uri that is taken
+		 *	Take the slot away, after asking - its uploaded file (if any) goes with it. The question stands on the record; the record is closed by it and the focus goes
+		 *	to the next row. A cancelled question sends nothing
 		 *
-		 *	@param		{Object}		line					The status line of the form's bar
-		 *	@param		{number}		status
-		 *	@param		{*}					response
-		 *
-		 *	@return		void
-		 */
-		_refused : function( line, status, response ) {
-
-			const slots = Nino.admin.slots;
-			const parts = slots._parts;
-			const field = response !== null && typeof response === 'object' && typeof response.field === 'string' ? response.field : '';
-			let input = null;
-
-			if( field === 'width' )
-				input = parts.widthInput;
-			else if( field === 'height' )
-				input = parts.heightInput;
-			else if( status === 409 )
-				input = parts.uriInput;
-
-			Nino.adminUi.clearFieldErrors( dc.getElementById('slots-edit-form') );
-			line.error( status, response, '/_admin/common/error/save' );
-
-			if( input === null )
-				return;
-
-			Nino.adminUi.fieldError( input.closest('label'), input, 'slots-error-'+ input.id, status === 409 ? Nino.adminUi.format( Nino.content.getText('/_admin/slots/error/taken'), Nino.content.getText('/_admin/slots/label/uri') ) : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
-			input.focus();
-		},
-
-		/**
-		 *	Delete the slot currently open, after confirmation - its
-		 *	uploaded file (if any) goes with it - and return to the list
+		 *	@param		{Object}		row
+		 *	@param		{Element}		opener					The button that asked, which has the focus again when the question is closed
+		 *	@param		{Function}	done						done( true ) where it was deleted, done( null ) where the answer was no, done( false, { error } )
 		 *
 		 *	@return		void
 		 */
-		_delete : function() {
+		_remove : function( row, opener, done ) {
 
-			const slots = Nino.admin.slots;
-			const slot = slots._current;
+			const panel = Nino.admin.slots;
+			const current = panel._find( row.key ) ?? row;
 
 			Nino.adminUi.confirm( 'destructive', {
-				title			: Nino.content.getText('/_admin/slots/confirm/delete-title'),
-				message		: Nino.adminUi.format( Nino.content.getText('/_admin/slots/confirm/delete'), slot.label ),
-				yes				: Nino.content.getText('/_admin/slots/confirm/delete-title'),
-				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				title			: word('/_admin/slots/confirm/delete-title'),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/slots/confirm/delete'), current.label ),
+				yes				: word('/_admin/slots/confirm/delete-title'),
+				no				: word('/_admin/common/label/cancel'),
+				nested		: true,
+				opener		: opener,
 				onChoose	: function( ok ) {
 
 					if( ok === false )
-						return;
+						return done( null );
 
-					slots._apiCall( 'delete', { uri : slot.uri }, function( status, response ) {
+					panel._apiCall( 'delete', { uri : current.uri }, function( status, response ) {
 
-						if( status !== 200 || response === null ) {
-							slots._line.error( status, response, '/_admin/common/error/delete' );
-							return;
-						}
+						if( status !== 200 || response === null )
+							return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) } );
 
-						Nino.admin.touch( 'slots' );
-
-						slots._reload( function() {
-							slots._current = null;
-							slots._showList();
-							Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/deleted') );
-						} );
+						panel._wrote();
+						panel._rows = panel._rows.filter( function( one ) { return one.key !== current.key } );
+						panel._directory.setRows( panel._rows, { keep : true } );
+						done( true );
 					} );
 				},
 			} );
 		},
 
 		/**
-		 *	Open the "hardcoded <img> tags found in templates, not backed by
-		 *	any slot - and slots a template names that nobody has made" scan
-		 *	results form - see Slots::apiScan()
+		 *	The dialog of a new slot: its uri, its label, its width and its height. It is no entry of the directory - there is no row to open - so it is a dialog of its
+		 *	own with the address #images/slots/@new. What is wrong is said at the field before anything is sent; what the server refuses - a uri that is taken, a size -
+		 *	is said at its field, and the dialog stays open until the server has said yes. Then the list is read again - the new row needs its usage - and the row is
+		 *	shown, fresh and with the focus
 		 *
-		 *	@param		{boolean}		[opened]	The person pressed the button: the focus goes into the view
+		 *	@param		{Element|null}	opener			The button that opened it
+		 *	@param		{boolean}				[person]		The person pressed the button: the address is a step of the history; otherwise it is written over the one that named it
 		 *
 		 *	@return		void
 		 */
-		_openScan : function( opened ) {
+		_openNew : function( opener, person ) {
+
+			const panel = Nino.admin.slots;
+			const router = Nino.admin.router;
+
+			if( panel._adding === true )
+				return;
+
+			const closed = function() {
+				panel._adding = false;
+				panel._dialog = null;
+			};
+
+			const uriName = word('/_admin/slots/label/uri');
+			const size = function( key, label ) {
+				return { key : key, label : label, help : word('/_admin/slots/hint/size'), type : 'number', min : 1, step : 1, required : true, validate : function( value ) { return panel._wrong( label, value, '/_admin/slots/expect/size', panel._isSize ) } };
+			};
+
+			if( person === true )
+				router.go( 'slots', [ router.word('new') ] );
+			else
+				router.set( 'slots', [ router.word('new') ] );
+
+			panel._adding = true;
+
+			const dialog = Nino.adminUi.formDialog( {
+				title		: word('/_admin/slots/label/create'),
+				fields	: [
+					{
+						key : 'uri', label : uriName, help : word('/_admin/slots/hint/uri'), placeholder : '/template/page-home/hero/image', required : true,
+						validate : function( value ) {
+
+							const sentence = panel._wrong( uriName, value, '/_admin/slots/expect/uri', panel._isUri );
+
+							return sentence === '' && panel._find( value.trim() ) !== null ? Nino.adminUi.format( word('/_admin/slots/error/taken'), uriName ) : sentence;
+						},
+					},
+					{ key : 'label', label : word('/_admin/common/label/label'), help : word('/_admin/slots/hint/label'), required : true },
+					size( 'width', word('/_admin/slots/label/width') ),
+					size( 'height', word('/_admin/slots/label/height') ),
+				],
+				submit	: word('/_admin/slots/label/create'),
+				cancel	: word('/_admin/common/label/cancel'),
+				opener	: opener ?? undefined,
+				onCancel : function() {
+					closed();
+					router.set( 'slots', [] );
+				},
+				onSubmit : function( values, ctl ) {
+
+					const uri = values.uri.trim();
+
+					panel._apiCall( 'create', { uri : uri, label : values.label.trim(), width : values.width.trim(), height : values.height.trim() }, function( status, response ) {
+
+						if( status !== 200 || response === null ) {
+
+							const field = response !== null && typeof response === 'object' && typeof response.field === 'string' ? response.field : '';
+							const key = [ 'uri', 'label', 'width', 'height' ].indexOf( field ) !== -1 ? field : ( status === 409 ? 'uri' : null );
+
+							return ctl.fail( key, status === 409 ? Nino.adminUi.format( word('/_admin/slots/error/taken'), uriName ) : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+						}
+
+						panel._wrote();
+						ctl.close();
+						closed();
+						router.set( 'slots', [] );
+
+						panel._load( true, function( read ) {
+
+							if( read === true ) {
+								panel._directory.update( panel._rows, uri );
+								panel._directory.focusRow( uri );
+							}
+
+							Nino.adminUi.say( word('/_admin/slots/msg/created') );
+						} );
+					} );
+				},
+			} );
+
+			if( dialog === false ) {
+				closed();
+				router.set( 'slots', [] );
+				return;
+			}
+
+			panel._dialog = dialog;
+		},
+
+		/**
+		 *	A step through the history that leaves the dialog of a new slot: the dialog is asked to close as Escape asks it - one with nothing typed in it closes, one
+		 *	with input asks what to do with it, which is the question of the workbench - and where it stays, the address is written to what the screen shows
+		 *
+		 *	@return		void
+		 */
+		_leaveAdding : function() {
+
+			const panel = Nino.admin.slots;
+			const router = Nino.admin.router;
+
+			if( panel._dialog !== null && typeof wn.KeyboardEvent === 'function' )
+				panel._dialog.el.dispatchEvent( new wn.KeyboardEvent( 'keydown', { key : 'Escape', bubbles : true, cancelable : true } ) );
+
+			if( panel._adding === false )
+				return;
+
+			if( router.refuse() === false )
+				router.set( 'slots', [ router.word('new') ] );
+		},
+
+		/**
+		 *	What the address names. The dialog of a new slot and the scan are the tab's own - #images/slots/@new, #images/slots/@scan -, the words are told from a slot
+		 *	that is called "@new" by the router (isWord()) and never answered by the record, which would read one part as the key of an entry. A slot is the record's: it
+		 *	reads the address itself. What is on screen is the screen: a step through the history that leaves it asks first where there is input, and where it
+		 *	cannot be taken, the address is written to what the screen shows
+		 *
+		 *	@return		{boolean}									Whether the address was answered
+		 */
+		_follow : function() {
+
+			const panel = Nino.admin.slots;
+			const router = Nino.admin.router;
+			const at = router.current();
+
+			if( at.panel !== 'slots' )
+				return false;
+
+			const one = at.parts.length === 1;
+			const create = one === true && router.isWord( at.parts, 0, 'new' ) === true;
+			const scan = one === true && router.isWord( at.parts, 0, 'scan' ) === true;
+
+			if( panel._adding === true ) {
+
+				if( create === false )
+					panel._leaveAdding();
+
+				return true;
+			}
+
+			if( panel._scanning === true ) {
+
+				if( scan === true )
+					return false;
+
+				router.leave( [ 'slots' ], true, function() {
+					panel._leaveScan( null );
+					panel._follow();
+				}, panel._address );
+
+				return true;
+			}
+
+			if( create === true || scan === true ) {
+
+				router.leave( [ 'slots' ], panel._record.isOpen(), function() {
+
+					// A record that holds input was asked about; one that does not is closed here
+					if( panel._record.isOpen() === true )
+						panel._record.close();
+
+					if( panel._record.isOpen() === true )
+						return panel._address();
+
+					if( create === true )
+						panel._openNew( null, false );
+					else
+						panel._openScan( false, false );
+				}, panel._address );
+
+				return true;
+			}
+
+			return panel._record.follow();
+		},
+
+		/**
+		 *	Write the address of what is on screen: the scan, the dialog of a new slot, the slot that is open or the directory
+		 *
+		 *	@return		void
+		 */
+		_address : function() {
+
+			const panel = Nino.admin.slots;
+			const router = Nino.admin.router;
+			let parts = [];
+
+			if( panel._scanning === true )
+				parts = [ router.word('scan') ];
+			else if( panel._adding === true )
+				parts = [ router.word('new') ];
+			else if( panel._record !== null && panel._record.isOpen() === true )
+				parts = [ panel._record.key() ];
+
+			router.set( 'slots', parts );
+		},
+
+		/**
+		 *	Leave the scan for the directory, as it stands: the focus goes back to the button that opened the scan where the person came back by the link, else it stays
+		 *
+		 *	@param		{boolean|null}	back				The person used the way back
+		 *
+		 *	@return		void
+		 */
+		_leaveScan : function( back ) {
+
+			const panel = Nino.admin.slots;
+
+			panel._scanning = false;
+			panel._scanRows = null;
+
+			if( back === true )
+				Nino.adminUi.backTo( 'slots-list', panel._buttons.scan );
+			else
+				Nino.adminUi.showLevel( 'slots-list', { focus : false } );
+		},
+
+		/**
+		 *	Show the directory and write its address
+		 *
+		 *	@return		void
+		 */
+		_showList : function() {
+			Nino.admin.slots._leaveScan( null );
+			Nino.admin.router.set( 'slots', [] );
+		},
+
+		/**
+		 *	Draw the way back of the scan: one link, "Back to <the tab>", which leaves the scan for the directory
+		 *
+		 *	@param		{string}		title			The name of the view
+		 *
+		 *	@return		{Element}									The bar
+		 */
+		_contextBar : function( title ) {
+			return Nino.adminUi.contextBar( {
+				back	: { to : word('/_admin/nav/slots'), href : Nino.admin.router.href( 'slots', [] ), onClick : function() {
+					Nino.admin.router.go( 'slots', [] );
+					Nino.admin.slots._leaveScan( true );
+				} },
+				title	: title,
+			} );
+		},
+
+		/**
+		 *	Have the shell take the scan form on screen as the one that is stored (see Nino.admin.dirty)
+		 *
+		 *	@return		void
+		 */
+		_snapshot : function() {
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'slots-scan' );
+		},
+
+		/**
+		 *	Show the scan in the level beside the directory and write its address
+		 *
+		 *	@param		{boolean}		[opened]	The person opened it: the focus goes into the view. Otherwise it is shown as it stands, by the address or after a step through the history
+		 *
+		 *	@return		void
+		 */
+		_showScan : function( opened ) {
+			Nino.admin.router.set( 'slots', [ Nino.admin.router.word('scan') ] );
+			Nino.adminUi.showLevel( 'slots-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	Open the "hardcoded <img> tags found in templates, not backed by
+		 *	any slot - and slots a template names that nobody has made" scan
+		 *	results form - see Slots::apiScan(). It is a view of its own, in the
+		 *	level beside the directory: its way back, its form and its bar
+		 *
+		 *	@param		{boolean}		[opened]	The person pressed the button: the focus goes into the view
+		 *	@param		{boolean}		[person]	...and the address is a step of the history; otherwise it is written over the one that named the scan
+		 *
+		 *	@return		void
+		 */
+		_openScan : function( opened, person ) {
 
 			const slots = Nino.admin.slots;
 
-			slots._isNew = false;
-			slots._current = null;
+			if( person === true )
+				Nino.admin.router.go( 'slots', [ Nino.admin.router.word('scan') ] );
+
 			slots._scanRows = null;
 			slots._scanning = true;
 
 			const wrap = dc.getElementById('slots-form');
 			wrap.innerHTML = '';
-			wrap.appendChild( slots._contextBar( Nino.content.getText('/_admin/slots/label/scan') ) );
+			wrap.appendChild( slots._contextBar( word('/_admin/slots/label/scan') ) );
 
-			const waiting = Nino.adminUi.el( 'p', '', Nino.content.getText('/_admin/common/msg/scanning') );
+			const waiting = Nino.adminUi.el( 'p', '', word('/_admin/common/msg/scanning') );
 			waiting.setAttribute( 'aria-busy', 'true' );
 			wrap.appendChild( waiting );
 
 			slots._snapshot();
-			slots._showForm( opened === true );
+			slots._showScan( opened === true );
 
 			slots._apiCall( 'scan', {}, function( status, response ) {
 
@@ -819,21 +1006,20 @@
 
 			const slots = Nino.admin.slots;
 			const wrap = dc.getElementById('slots-form');
-			const text = function( key ) { return Nino.content.getText( key ) };
 
 			// The view that stood while the scan ran may hold the focus, on its back link: the one that replaces it takes it over
 			const held = ( dc.activeElement ?? null ) !== null && dc.activeElement.closest('#slots-form') !== null;
 			wrap.innerHTML = '';
 			slots._scanning = true;
 
-			const back = slots._contextBar( text('/_admin/slots/label/scan') );
+			const back = slots._contextBar( word('/_admin/slots/label/scan') );
 			wrap.appendChild( back );
 
 			if( held === true )
 				back.querySelector('a').focus();
 
 			if( missing.length === 0 ) {
-				wrap.appendChild( Nino.adminUi.emptyState( text('/_admin/slots/scan/none') ) );
+				wrap.appendChild( Nino.adminUi.emptyState( word('/_admin/slots/scan/none') ) );
 				slots._scanRows = null;
 				slots._snapshot();
 				return;
@@ -857,7 +1043,7 @@
 
 				const where = Nino.adminUi.el( 'div', 'nino-admin-field' );
 				fieldset.appendChild( where );
-				where.appendChild( Nino.adminUi.el( 'span', '', text('/_admin/slots/label/files') ) );
+				where.appendChild( Nino.adminUi.el( 'span', '', word('/_admin/slots/label/files') ) );
 				where.appendChild( Nino.adminUi.el( 'p', '', item.files.join(', ') ) );
 
 				const field = function( id, label, value, type, required ) {
@@ -866,12 +1052,12 @@
 					return made;
 				};
 
-				const uriField = field( 'slots-scan-uri-'+ index, text('/_admin/slots/label/uri'), item.suggestedUri, 'text', true );
-				const labelField = field( 'slots-scan-label-'+ index, text('/_admin/common/label/label'), item.suggestedUri.replace(/^\//, '').replace(/-/g, ' '), 'text', true );
-				const widthField = field( 'slots-scan-width-'+ index, text('/_admin/slots/label/width'), item.width ? String( item.width ) : '', 'number', true );
-				const heightField = field( 'slots-scan-height-'+ index, text('/_admin/slots/label/height'), item.height ? String( item.height ) : '', 'number', true );
+				const uriField = field( 'slots-scan-uri-'+ index, word('/_admin/slots/label/uri'), item.suggestedUri, 'text', true );
+				const labelField = field( 'slots-scan-label-'+ index, word('/_admin/common/label/label'), item.suggestedUri.replace(/^\//, '').replace(/-/g, ' '), 'text', true );
+				const widthField = field( 'slots-scan-width-'+ index, word('/_admin/slots/label/width'), item.width ? String( item.width ) : '', 'number', true );
+				const heightField = field( 'slots-scan-height-'+ index, word('/_admin/slots/label/height'), item.height ? String( item.height ) : '', 'number', true );
 
-				const ignore = Nino.adminUi.checkField( { id : 'slots-scan-ignore-'+ index, label : text('/_admin/common/label/ignore') } );
+				const ignore = Nino.adminUi.checkField( { id : 'slots-scan-ignore-'+ index, label : word('/_admin/common/label/ignore') } );
 				fieldset.appendChild( ignore );
 
 				form.appendChild( fieldset );
@@ -892,7 +1078,7 @@
 			msg.id = 'slots-scan-msg';
 			const bar = Nino.adminUi.actionBar( {
 				status	: { line : msg, fresh : true },
-				primary	: Nino.adminUi.button( text('/_admin/slots/label/scan-create'), null, { type : 'submit' } ),
+				primary	: Nino.adminUi.button( word('/_admin/slots/label/scan-create'), null, { type : 'submit' } ),
 			} );
 
 			slots._line = bar.line;
@@ -994,7 +1180,6 @@
 		_checkRow : function( row, taken ) {
 
 			const slots = Nino.admin.slots;
-			const text = function( key ) { return Nino.content.getText( key ) };
 
 			Nino.adminUi.clearFieldErrors( row.field );
 
@@ -1007,11 +1192,11 @@
 				[ row.heightInput, row.heightField, '/_admin/slots/label/height', '/_admin/slots/expect/size', slots._isSize ],
 			].forEach( function( rule ) {
 
-				const name = text( rule[2] );
+				const name = word( rule[2] );
 				let sentence = slots._wrong( name, rule[0].value, rule[3], rule[4] );
 
 				if( sentence === '' && rule[0] === row.uriInput && taken.indexOf( rule[0].value.trim() ) !== -1 )
-					sentence = Nino.adminUi.format( text('/_admin/slots/error/taken'), name );
+					sentence = Nino.adminUi.format( word('/_admin/slots/error/taken'), name );
 
 				if( sentence === '' )
 					return;
@@ -1043,7 +1228,6 @@
 		_saveScanResults : function( rows, done ) {
 
 			const slots = Nino.admin.slots;
-			const text = function( key ) { return Nino.content.getText( key ) };
 			const report = function( ok ) {
 				if( typeof done === 'function' )
 					done( ok );
@@ -1058,7 +1242,7 @@
 				return;
 			}
 
-			const taken = slots._slots.map( function( slot ) { return slot.uri } );
+			const taken = slots._rows.map( function( row ) { return row.uri } );
 			const pending = [];
 			const refused = [];
 			let first = null;
@@ -1076,7 +1260,7 @@
 			} );
 
 			if( refused.length > 0 ) {
-				line.fail( text('/_admin/slots/error/fields') );
+				line.fail( word('/_admin/slots/error/fields') );
 				first.focus();
 			}
 
@@ -1101,18 +1285,18 @@
 
 					const left = refused.length + failed.length;
 
-					slots._reload( function() {
+					slots._load( true, function() {
 
 						slots._snapshot();
 
 						if( left === 0 ) {
 							slots._showList();
-							Nino.adminUi.say( Nino.adminUi.format( text('/_admin/slots/scan/created'), created ) );
+							Nino.adminUi.say( Nino.adminUi.format( word('/_admin/slots/scan/created'), created ) );
 						}
 						else {
-							line.fail( text('/_admin/slots/error/fields') );
+							line.fail( word('/_admin/slots/error/fields') );
 							if( created > 0 )
-								Nino.adminUi.say( Nino.adminUi.format( text('/_admin/slots/scan/created'), created ) );
+								Nino.adminUi.say( Nino.adminUi.format( word('/_admin/slots/scan/created'), created ) );
 						}
 
 						report( left === 0 );
@@ -1124,7 +1308,7 @@
 				const row = pending[i];
 
 				if( refused.length === 0 )
-					line.idle( Nino.adminUi.format( text('/_admin/common/msg/creating'), row.uriInput.value, i + 1, pending.length ) );
+					line.idle( Nino.adminUi.format( word('/_admin/common/msg/creating'), row.uriInput.value, i + 1, pending.length ) );
 
 				slots._apiCall( 'create', {
 					uri 		: row.uriInput.value.trim(),
@@ -1141,7 +1325,7 @@
 					else {
 						failed.push( row );
 						Nino.adminUi.fieldError( row.uriField, row.uriInput, 'slots-scan-error-'+ row.index+ '-'+ row.uriInput.id, status === 409
-							? Nino.adminUi.format( text('/_admin/slots/error/taken'), text('/_admin/slots/label/uri') )
+							? Nino.adminUi.format( word('/_admin/slots/error/taken'), word('/_admin/slots/label/uri') )
 							: Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
 					}
 
@@ -1155,14 +1339,17 @@
 
 	Nino.events.bindCallback( 'ready', Nino.admin.slots.init );
 
-	// The shell asks before anything throws the open slot's input away (see
-	// Nino.admin.dirty). A shell without the registry is simply not asking
+	// The shell asks before anything throws the input of the scan away (see Nino.admin.dirty). The record has its own entry, `slots`, which answers for the scan as
+	// well while the scan is on screen (see _share()). A shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.watchForm( 'slots', function() { return dc.getElementById('slots-form') }, function( done ) {
+		Nino.admin.dirty.watchForm( 'slots-scan', function() { return dc.getElementById('slots-form') }, function( done ) {
 			if( Nino.admin.slots._scanRows !== null )
 				Nino.admin.slots._saveScanResults( Nino.admin.slots._scanRows, done );
 			else
-				Nino.admin.slots._save( done );
+				done( true );
+		}, function() {
+			const form = dc.getElementById('slots-form');
+			return form === null ? null : form.querySelector('.nino-admin-actionbar');
 		} );
 
 })(window, document, document.documentElement, document.body);

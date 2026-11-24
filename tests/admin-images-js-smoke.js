@@ -19,21 +19,33 @@
  *													errors at the field they belong to, that a name of the browser
  *													is in no field of a request, that the preview is a data address
  *													and that everything a person or the server wrote is shown as
- *													text. The Image Slots tab is a list of rows with an address each
- *													and a form with its bar. Nothing here compares a sentence: the
- *													checks read the build - which block drew a part, where it
- *													stands, what was sent - and the keys the scripts ask for are
- *													real ones in both languages.
+ *													text.
+ *
+ *													The Image Slots tab is the standard directory of the slots
+ *													with the record of one slot over it (address
+ *													#images/slots/<the uri as ONE part>), a dialog of its own for
+ *													a new slot (#images/slots/@new) and the scan of the templates
+ *													as a view of its own (#images/slots/@scan). Pinned: the
+ *													columns, the state of a slot as the table says it, the choice
+ *													of what to show and the search over the label, the uri and
+ *													the templates, the record (a record that was not changed
+ *													sends no request, what is wrong is said at the field, what
+ *													the server refuses stands at the field it names, a deletion
+ *													asks first), the dialog of a new slot, the words @new and
+ *													@scan told from a key, the requests, the addresses and that
+ *													everything a person or the server wrote is shown as text.
+ *													Nothing here compares a sentence: the checks read the build -
+ *													which block drew a part, where it stands, what was sent - and
+ *													the keys the scripts ask for are real ones in both languages.
  *
  *	Usage: node tests/admin-images-js-smoke.js
  */
 
 'use strict';
 
-const vm = require('vm');
-const { check, done, source, fills, load, element, findAll, fire, documentOf, shellRouter, adminPage, markupWrites } = require( './harness.js' );
+const { check, done, source, fills, load, element, findAll, fire, shellRouter, adminPage, markupWrites } = require( './harness.js' );
 
-// What the Image Slots tab writes into the address goes through the router's own codec: every state written is read back
+// What the Image Slots tab writes into the address goes through the router's own codec as well: every state written is read back
 const codec = shellRouter();
 
 const moduleEn	= fills('_admin/Nino/Modules/Images/text/en_US.php');
@@ -42,127 +54,8 @@ const workbench	= fills('_admin/text/en_US.php');
 
 const text = function( key ) { return moduleEn[key] ?? workbench[key] ?? '' };
 
-/**
- *	One page of the workbench: the panes a panel script finds by id, the shell's router and registry of
- *	unsaved input as far as the scripts use them, a dialog that opens and closes as the browser's does,
- *	and the requests the script sends, kept. The scripts named are loaded into it
- *
- *	@param		{Array}		levels			The ids of the levels of the pane
- *	@param		{string}	panel				The pane's name
- *	@param		{Array}		scripts			The scripts of the module, from the checkout root
- *
- *	@return		{Object}
- */
-function page( levels, panel, scripts ) {
-
-	const pane = element('div');
-	pane.dataset.panel = panel;
-	const head = element('div');
-	head.className = 'admin-panel-head';
-	const title = element('h2');
-	title.className = 'admin-panel-title';
-	title.textContent = 'Images';
-	head.appendChild( title );
-	pane.appendChild( head );
-
-	const out = { pane : pane, title : title, requests : [], dialogs : [], routed : [], touched : [], saved : [], refreshed : 0, asked : [], hash : { panel : panel, parts : [] }, stamps : { templates : 0 }, levels : {} };
-
-	levels.forEach( function( id ) {
-		const level = element('div');
-		level.id = id;
-		pane.appendChild( level );
-		out.levels[id] = level;
-	} );
-
-	// The shell's registry of unsaved input: the entries a script registered, and the question before an exit where one is dirty
-	const registry = {
-		_entries : {},
-		register : function( name, entry ) { registry._entries[name] = entry },
-		watchForm : function( name, getter, save ) { registry._entries[name] = { form : getter, save : save, isDirty : function() { return false } } },
-		snapshot : function( name ) { out.saved.push( name ) },
-		refresh : function() { out.refreshed++ },
-		guard : function( names, proceed, onCancel ) {
-			if( names.some( function( name ) { return registry._entries[name] !== undefined && registry._entries[name].isDirty() === true } ) === false )
-				return proceed();
-			out.asked.push( { names : names, proceed : proceed, onCancel : onCancel } );
-		},
-	};
-
-	const router = {
-		set : function( name, parts ) { codec.check( name, parts ); out.routed.push( 'set '+ [ name ].concat( parts ).join('/') ) },
-		go : function( name, parts ) { codec.check( name, parts ); out.routed.push( 'go '+ [ name ].concat( parts ).join('/') ) },
-		href : function( name, parts ) { return codec.check( name, parts ) }, word : codec.word, wordOf : codec.wordOf, isWord : codec.isWord,
-		current : function() { return out.hash },
-		leave : function( names, leaving, proceed, resync ) { if( leaving === true ) return registry.guard( names, proceed, resync ); proceed() },
-	};
-
-	const Nino = {
-		admin : { dirty : registry, router : router, touch : function( topic ) { out.touched.push( topic ) }, stamp : function( topic ) { return out.stamps[topic] ?? 0 } },
-		events : { bindCallback : function() {} },
-		http : { sendRequest : function( uri, method, callback, data ) {
-			out.requests.push( { action : data.action, payload : JSON.parse( data.data ), file : data.file, callback : callback } );
-		} },
-		content : { getText : text },
-	};
-
-	const document = documentOf( pane );
-	const wrap = element('div');
-	wrap.dataset.uploadBytes = '2097152';
-	wrap.dataset.uploadPixels = '20000000';
-	const byId = document.getElementById;
-	document.getElementById = function( id ) { return id === 'admin-page-wrap' ? wrap : byId( id ) };
-	document.body = element('body');
-	document.documentElement = { lang : 'en' };
-	Object.defineProperty( document, 'activeElement', { get : function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null } } );
-
-	const created = document.createElement;
-	document.createElement = function( tag ) {
-		const el = created( tag );
-		if( tag === 'dialog' ) {
-			el.open = false;
-			el.showModal = function() { el.open = true };
-			el.close = function() { el.open = false; fire( el, 'close' ) };
-			out.dialogs.push( el );
-		}
-		return el;
-	};
-
-	out.bitmap = null;
-	const window = {
-		Nino : Nino,
-		location : { hash : '' },
-		setTimeout : function() { return 1 },
-		clearTimeout : function() {},
-		confirm : function() { throw new Error('a question is asked in a dialog of the design system, not with the browser\'s confirm') },
-		alert : function() { throw new Error('a sentence is said at the field, not with the browser\'s alert') },
-		createImageBitmap : function() { return out.bitmap === null ? Promise.reject( new Error('no') ) : Promise.resolve( out.bitmap ) },
-	};
-
-	const context = vm.createContext( { console : console, document : document, Nino : Nino, window : window } );
-	load( '_admin/assets/Nino.admin.js', context );
-	scripts.forEach( function( script ) { load( script, context ) } );
-	Nino.adminUi.locales.names = { de_DE : 'Deutsch', en_US : 'English (US)' };
-
-	out.Nino = Nino;
-	out.window = window;
-	out.registry = registry;
-	out.answer = function( status, body ) { out.requests[out.requests.length - 1].callback( { status : status, responseJSON : body } ) };
-	out.toasts = function() { return findAll( document.body, function( el ) { return el.classList.contains('nino-admin-toast-text') } ).map( function( el ) { return el.textContent } ) };
-	out.focused = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
-	out.all = function( root, predicate ) { return findAll( root, predicate ) };
-	out.ask = function( yes ) {
-		const dialog = out.dialogs.pop();
-		const buttons = findAll( dialog, function( el ) { return el.tagName === 'BUTTON' } );
-		fire( buttons[yes === true ? 1 : 0], 'click' );
-		return dialog;
-	};
-
-	return out;
-}
-
 const has = function( el, name ) { return el.classList.contains( name ) };
 const byClass = function( root, name ) { return findAll( root, function( el ) { return has( el, name ) } ) };
-const buttonsOf = function( root ) { return findAll( root, function( el ) { return el.tagName === 'BUTTON' } ) };
 const errorsOf = function( root ) { return byClass( root, 'nino-admin-field-error' ) };
 
 ( async function() {
@@ -1003,259 +896,726 @@ check( 'the scripts ask for '+ asked.size+ ' keys, and each has words in English
 
 console.log('\nAdmin Image Slots');
 
-const tab = page( [ 'slots-list', 'slots-form' ], 'slots', [ '_admin/Nino/Modules/Images/assets/slots.js' ] );
-const slots = tab.Nino.admin.slots;
-const catalogue = [
-	{ uri : '/logo', label : 'Logo', width : 500, height : 100, hasImage : true, usage : { templates : [], pages : [ { httpUri : '/', name : 'Home' } ] } },
-	{ uri : '/logo/dark', label : 'Logo dark', width : 500, height : 100, hasImage : false, usage : { templates : [ 'page-x' ], pages : [] } },
+// What the server answers for the slots: some with a picture, some without, some that no page includes - with and without the templates that name them -, and one whose
+// name, key and template are markup and quotes
+const HOSTILE = '<img src=x onerror=alert(1)> "quoted"';
+const ODD = '/odd/a%b@c';
+const LOGO = '/logo';
+const slotCatalogue = () => [
+	{ uri : LOGO, label : 'Logo', width : 500, height : 100, hasImage : true, usage : { templates : [], pages : [ { httpUri : '/', name : 'Home' } ] } },
+	{ uri : '/logo/dark', label : 'Logo dark', width : 500, height : 100, hasImage : false, usage : { templates : [ 'page-x', 'frame-header' ], pages : [] } },
 	{ uri : '/template/page-home/hero/background', label : 'Hero', width : 1920, height : 1080, hasImage : true, usage : { templates : [], pages : [ { httpUri : '/', name : 'Home' } ] } },
+	{ uri : '/template/page-about/team/photo', label : 'Team photo', width : 640, height : 480, hasImage : true, usage : { templates : [], pages : [] } },
+	{ uri : '/template/page-lose/hero/image', label : 'Lose', width : 640, height : 360, hasImage : false, usage : { templates : [], pages : [ { httpUri : '/lose', name : 'Lose' } ] } },
+	{ uri : ODD, label : HOSTILE, width : 10, height : 20, hasImage : false, usage : { templates : [ HOSTILE ], pages : [] } },
 ];
-const list = tab.levels['slots-list'];
-const form2 = tab.levels['slots-form'];
 
-slots.init();
-check( 'the tab asks the server for the slots when it is first shown', tab.requests.length === 1 && tab.requests[0].action === 'slots/list' );
-tab.answer( 200, { slots : catalogue } );
-check( '...and shows the list when no address names another view', slots._ready === true && list.classList.contains('admin-hidden') === false && tab.routed[tab.routed.length - 1] === 'set slots' );
+// The Image Slots tab over the real shell, as the Images panel is above: the router and the registry of unsaved input of the page, the levels of the pane, the
+// requests the tab sends, kept
+function slotsWorld( hash ) {
 
-const slotLinks = findAll( list, el => el.tagName === 'A' && has( el, 'nino-admin-row-open' ) );
-check( 'every slot is a row of the list block - a link with its address, its uri as one part - and no row is a button to nowhere', slotLinks.map( l => l.href ).join() === '#images/slots/%2Flogo,#images/slots/%2Flogo%2Fdark,#images/slots/%2Ftemplate%2Fpage-home%2Fhero%2Fbackground'
-	&& findAll( list, el => has( el, 'nino-admin-list-row' ) ).length === 3 && findAll( list, el => el.tagName === 'BUTTON' && has( el, 'nino-admin-row-open' ) ).length === 0 );
-check( '...two lines each: the label over the uri and the size', findAll( list, el => el.tagName === 'SMALL' ).map( s => s.textContent.indexOf( ' × ' ) !== -1 ).every( Boolean ) && findAll( list, el => el.tagName === 'SMALL' ).length === 3 );
-const pills = findAll( list, el => has( el, 'nino-admin-badge' ) );
-check( 'a slot that no page shows has a badge that warns, in words; one without a picture says it quietly', pills.length === 1 && pills[0].dataset.state === 'warn' );
-check( '...the templates that name it are on its second line', findAll( list, el => el.tagName === 'SMALL' )[1].textContent.indexOf('page-x') !== -1 );
-check( 'the list has its bar: the scan beside "New image slot", which is the one main button at the far right', byClass( list, 'nino-admin-actionbar' ).length === 1
-	&& buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] ).length === 2 && has( buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] )[1], 'nino-admin-btn-primary' ) && has( buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] )[0], 'nino-admin-btn-secondary' ) );
+	const h = adminPage();
+	const list = element('div');
+	const form = element('div');
+	const requests = [];
 
-tab.routed.length = 0;
-fire( slotLinks[0], 'click' );
-check( 'opening a slot is a step Back returns to: it writes its address, shows the form and moves the focus into it', tab.routed.join() === 'go slots//logo,set slots//logo' && form2.classList.contains('admin-hidden') === false
-	&& list.classList.contains('admin-hidden') === true && tab.focused() !== null );
+	list.id = 'slots-list';
+	form.id = 'slots-form';
+	form.classList.add('admin-hidden');
+	h.page.appendChild( list );
+	h.page.appendChild( form );
+	h.show('slots');
+	h.router.start();
+	h.router.set( 'slots', [] );
+	h.Nino.content.getText = text;
+	h.Nino.http = { sendRequest : function( uri, method, callback, data ) {
+		requests.push( { uri : uri, method : method, action : data.action, payload : JSON.parse( data.data ), csrf : data._csrf, callback : callback } );
+	} };
+	h.box.KeyboardEvent = function( type, init ) { Object.assign( this, { type : type }, init ) };
 
-const edit = findAll( form2, el => el.tagName === 'FORM' )[0];
-const inputs = function() { return Object.fromEntries( [ 'uri', 'label', 'width', 'height' ].map( name => [ name, findAll( form2, el => el.id === 'slots-form-'+ name )[0] ] ) ) };
-check( 'the form is novalidate: what is wrong is said by the panel, at the field', edit.noValidate === true );
-check( 'the fields are blocks - a label with a star and aria-required each, the help behind a (?) and no line of hint under them', findAll( edit, el => has( el, 'nino-admin-help-button' ) ).length === 4
-	&& findAll( edit, el => has( el, 'nino-admin-required' ) ).length === 4 && Object.values( inputs() ).every( input => input.getAttribute('aria-required') === 'true' ) && findAll( edit, el => el.tagName === 'SMALL' ).length === 0 );
-check( 'the uri of a slot that exists is fixed: it is what the templates write', inputs().uri.disabled === true && inputs().uri.value === '/logo' && inputs().width.value === '500' );
-const bar = byClass( form2, 'nino-admin-actionbar' )[0];
-check( 'one bar: "Delete" at its left, the state, and one main button - the submit - at the far right', bar.children[0].tagName === 'BUTTON' && has( bar.children[0], 'nino-admin-btn-danger' )
-	&& buttonsOf( bar ).filter( b => has( b, 'nino-admin-btn-primary' ) ).length === 1 && bar.children[bar.children.length - 1].type === 'submit' && byClass( bar, 'nino-admin-actionbar-state' ).length === 1 );
-check( 'one back link, in the context bar, with the name of the slot as its heading', byClass( form2, 'nino-admin-back-link' ).length === 1 && findAll( form2, el => el.tagName === 'H3' )[0].textContent === 'Logo' );
+	// Every address the tab writes or links to is read back by the router as the same screen and the same parts
+	[ 'set', 'go', 'href' ].forEach( name => {
+		const real = h.router[name];
+		h.router[name] = function( screen, parts ) { codec.check( screen, parts ); return real.call( this, screen, parts ) };
+	} );
 
-// Saving: refused at the fields first, nothing sent
-const submit = function() { fire( edit, 'submit' ) };
-const line = function() { return findAll( form2, el => el.id === 'slots-form-msg' )[0] };
-tab.requests.length = 0;
-inputs().label.value = '  ';
-inputs().width.value = '0';
-inputs().height.value = 'abc';
-submit();
-check( 'a form that is not right is refused at its fields: one sentence under each, the field invalid, nothing sent', tab.requests.length === 0 && errorsOf( form2 ).length === 3
-	&& [ 'label', 'width', 'height' ].every( name => inputs()[name].getAttribute('aria-invalid') === 'true' ) && inputs().uri.getAttribute('aria-invalid') === null );
-check( '...the line of the bar says it as an alert, and the focus is on the first field that is wrong', line().dataset.state === 'error' && line().attributes.role === 'alert' && tab.focused() === inputs().label );
+	if( hash !== undefined )
+		h.box.location.hash = hash;
 
-inputs().label.value = 'Logo';
-inputs().width.value = '640';
-inputs().height.value = '120';
-submit();
-check( 'a form that is right is sent for the slot - the values trimmed - and the sentences are gone', tab.requests.length === 1 && tab.requests[0].action === 'slots/save'
-	&& JSON.stringify( tab.requests[0].payload ) === JSON.stringify( { uri : '/logo', label : 'Logo', width : '640', height : '120' } ) && errorsOf( form2 ).length === 0 );
-tab.answer( 400, { error : 'a slot needs a width and a height', code : 'invalid_value', field : 'width' } );
-check( 'a refusal that names a field is said at that field, and in the line', errorsOf( form2 ).length === 1 && inputs().width.getAttribute('aria-invalid') === 'true' && line().dataset.state === 'error' );
+	load( '_admin/Nino/Modules/Images/assets/slots.js', h.context );
 
-submit();
-tab.answer( 200, {} );
-check( 'a save that went through reads the list again and tells the other panels', tab.requests[tab.requests.length - 1].action === 'slots/list' && tab.touched.join() === 'slots' );
-tab.answer( 200, { slots : catalogue.map( s => s.uri === '/logo' ? Object.assign( {}, s, { width : 640, height : 120 } ) : s ) } );
-check( '...and the form stays: no jump to the list, one toast that says it and an empty line', form2.classList.contains('admin-hidden') === false && tab.toasts().join() === text('/_admin/common/msg/saved') && line().textContent === '' );
-check( '...the list under it is drawn again, for Back', findAll( list, el => el.tagName === 'SMALL' )[0].textContent.indexOf('640 × 120') !== -1 );
+	const panel = h.admin.slots;
+	const answer = ( status, body ) => { const request = requests[requests.length - 1]; request.callback( { status : status, responseJSON : body } ); return request };
+	const open = slots => { panel.showCurrent(); answer( 200, { slots : slots ?? slotCatalogue() } ) };
+	const rows = () => findAll( list, el => el.tagName === 'TR' && el.dataset.row !== undefined );
+	const dialog = () => h.dialogs.filter( d => d.open ).pop() ?? null;
 
-// Delete
-tab.requests.length = 0;
-fire( bar.children[0], 'click' );
-check( 'Delete asks first - the dialog is the design system\'s, it opens on Cancel and names the slot - and a Cancel sends nothing', tab.dialogs.length === 1 && findAll( tab.dialogs[0], el => el.id === 'nino-admin-choice-text' )[0].textContent.indexOf('“Logo”') !== -1 );
-tab.ask( false );
-check( '...', tab.requests.length === 0 );
-fire( bar.children[0], 'click' );
-tab.ask( true );
-check( 'a confirmed one sends the delete for the slot', tab.requests.length === 1 && tab.requests[0].action === 'slots/delete' && tab.requests[0].payload.uri === '/logo' );
-tab.answer( 403, null );
-check( 'a refusal is said in the line of the bar and the form stays', line().dataset.state === 'error' && form2.classList.contains('admin-hidden') === false );
-fire( bar.children[0], 'click' );
-tab.ask( true );
-tab.touched.length = 0;
-tab.answer( 200, {} );
-tab.answer( 200, { slots : catalogue.slice( 1 ) } );
-check( 'a delete that went through shows the list again, tells the other panels and says it by a toast', list.classList.contains('admin-hidden') === false && form2.classList.contains('admin-hidden') === true && tab.touched.join() === 'slots'
-	&& tab.toasts().join() === text('/_admin/common/msg/deleted') && findAll( list, el => el.tagName === 'STRONG' ).length === 2 );
+	return { h, panel, list, form, requests, answer, open, rows, dialog,
+		ids : () => rows().map( el => el.dataset.row ),
+		search : () => tag( list, 'input' ).find( el => el.type === 'search' ),
+		show : () => tag( list, 'select' ).find( el => el.id === 'slots-show' ),
+		cells : id => rows().find( el => el.dataset.row === id ).children.filter( el => el.tagName === 'TD' ),
+		bar : () => byClass( list, 'nino-admin-actionbar' ).filter( el => hasClass( el, 'nino-admin-list-actions' ) )[0],
+		button : ( d, key ) => tag( d, 'button' ).find( b => b.textContent === text( key ) || b.attributes['aria-label'] === text( key ) ),
+		// The fields of the record: the label, the width and the height; of the dialog of a new slot, the uri as well
+		field : ( d, key ) => tag( d, 'input' ).find( el => el.dataset.key === key || ( key === 'label' && el.id === 'slots-form-label' ) ),
+		stateOf : d => byClass( d, 'nino-admin-actionbar-state' )[0],
+		ask : yes => { const d = dialog(); fire( tag( d, 'button' )[yes === true ? 1 : 0], 'click' ); return d },
+		tree : () => requests.map( r => r.action ).join(),
+		toasts : () => byClass( h.body, 'nino-admin-toast-text' ).map( el => el.textContent ),
+		focused : () => findAll( h.page, el => el.focused === true )[0] ?? null,
+		step : address => { h.box.location.hash = address; h.router.arrive(); panel.showCurrent() },
+	};
+}
 
-// A new slot
-slots._slots = catalogue;
-tab.routed.length = 0;
-const add = buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] ).find( b => has( b, 'nino-admin-btn-primary' ) );
-fire( add, 'click' );
-check( 'New image slot opens an empty form at the address #images/slots/@new', tab.routed.join() === 'go slots/@new,set slots/@new' && inputs().uri.disabled === false && inputs().uri.value === '' && tab.focused() === inputs().uri );
-const bar2 = byClass( form2, 'nino-admin-actionbar' )[0];
-check( '...with no Delete - the bar holds the state and the one main button, worded as a view that creates' , has( bar2.children[0], 'nino-admin-badge' ) === true && bar2.children[bar2.children.length - 1].textContent === text('/_admin/slots/label/create') );
+const SAVE_SLOT = '/_admin/common/label/save';
+const CREATE_SLOT = '/_admin/slots/label/create';
+const DELETE_SLOT = '/_admin/slots/label/delete';
+const NEW_SLOT = '/_admin/slots/label/new';
+const SCAN_SLOT = '/_admin/slots/label/scan';
 
-tab.requests.length = 0;
-const edit2 = findAll( form2, el => el.tagName === 'FORM' )[0];
-inputs().uri.value = 'logo';
-inputs().label.value = 'X';
-inputs().width.value = '10';
-inputs().height.value = '10';
-fire( edit2, 'submit' );
-check( 'a uri that is no uri is refused at the field before anything is sent', tab.requests.length === 0 && errorsOf( form2 ).length === 1 && tab.focused() === inputs().uri );
-inputs().uri.value = '/logo/dark';
-fire( edit2, 'submit' );
-check( 'a uri a slot holds already is refused at the field as taken', tab.requests.length === 0 && errorsOf( form2 ).length === 1 );
-inputs().uri.value = '/new-slot';
-fire( edit2, 'submit' );
-check( 'a good one goes to slots/create', tab.requests.length === 1 && tab.requests[0].action === 'slots/create' && tab.requests[0].payload.uri === '/new-slot' );
-tab.answer( 409, { error : 'slot already exists' } );
-check( 'a 409 is said at the uri', errorsOf( form2 ).length === 1 && inputs().uri.getAttribute('aria-invalid') === 'true' );
-fire( edit2, 'submit' );
-tab.answer( 200, {} );
-tab.routed.length = 0;
-tab.answer( 200, { slots : catalogue.concat( [ { uri : '/new-slot', label : 'X', width : 10, height : 10, hasImage : false, usage : { templates : [], pages : [] } } ] ) } );
-check( 'a slot that was made is the one on the form from then on: its uri fixed, Delete in the bar, its address written over the one of the new form', inputs().uri.disabled === true && inputs().uri.value === '/new-slot'
-	&& tab.routed.indexOf( 'set slots//new-slot' ) !== -1 && has( byClass( form2, 'nino-admin-actionbar' )[0].children[0], 'nino-admin-btn-danger' ) && slots._isNew === false );
+{
+	// --- the directory ----------------------------------------------------------------------------------
 
-// The address
-tab.hash = { panel : 'slots', parts : [] };
-slots.showCurrent();
-check( 'an address that names the list shows it', list.classList.contains('admin-hidden') === false && form2.classList.contains('admin-hidden') === true );
-tab.hash = { panel : 'slots', parts : [ '/logo/dark' ] };
-slots.showCurrent();
-check( 'an address of a uri as one part opens that slot', form2.classList.contains('admin-hidden') === false && slots._current.uri === '/logo/dark' );
-tab.hash = { panel : 'slots', parts : codec.parts( { key : '@new' } ) };
-slots.showCurrent();
-check( '...%40new is the key @new, which is no slot and no form that makes one: the list', slots._isNew === false && form2.classList.contains('admin-hidden') === true );
-tab.hash = { panel : 'slots', parts : codec.parts( { key : '@scan' } ) };
-slots.showCurrent();
-check( '...and %40scan is no scan', form2.classList.contains('admin-hidden') === true && slots._scanning !== true );
-tab.hash = { panel : 'slots', parts : codec.parts( '@new' ) };
-slots.showCurrent();
-check( '...@new the form of a new one', slots._isNew === true && form2.classList.contains('admin-hidden') === false );
-tab.hash = { panel : 'slots', parts : [ 'nope' ] };
-slots.showCurrent();
-check( '...and a slot there is none of is the list', form2.classList.contains('admin-hidden') === true );
-check( 'the slot a person types into a new form and leaves asks first, as every form does', ( function() {
-	tab.hash = { panel : 'slots', parts : codec.parts( '@new' ) };
-	slots.showCurrent();
-	tab.registry._entries.slots.isDirty = function() { return true };
-	tab.asked.length = 0;
-	tab.hash = { panel : 'slots', parts : [] };
-	slots.showCurrent();
-	const asked = tab.asked.length === 1 && form2.classList.contains('admin-hidden') === false;
-	tab.registry._entries.slots.isDirty = function() { return false };
-	return asked;
-} )() );
-check( 'a slot is named by its uri as one part: the segments of it name none, and a word with an at sign names no slot', slots._slotAt( [ '/logo/dark' ] ).uri === '/logo/dark'
-	&& slots._slotAt( [ 'logo', 'dark' ] ) === null && slots._slotAt( [ '@scan' ] ) === null && slots._slotAt( [ '@new' ] ) === null );
-tab.registry._entries.slots.isDirty = function() { return false };
+	const w = slotsWorld();
 
+	check( 'the tab attaches under its nav uri with init and showCurrent', typeof w.panel === 'object' && typeof w.panel.init === 'function' && typeof w.panel.showCurrent === 'function' );
+
+	w.panel.showCurrent();
+	check( 'showing it asks the server for the slots in one request, and for nothing else', w.requests.length === 1 && w.requests[0].action === 'slots/list' && JSON.stringify( w.requests[0].payload ) === '{}' );
+	check( 'while it loads the sentence stands in place of the table, and says it is busy', byClass( w.list, 'nino-admin-loading' )[0].textContent === text('/_admin/slots/loading') && byClass( w.list, 'nino-admin-directory-body' )[0].attributes['aria-busy'] === 'true' );
+
+	w.answer( 200, { slots : slotCatalogue() } );
+
+	check( 'every slot is a row of the standard directory, in the order the server gave', w.ids().join() === slotCatalogue().map( slot => slot.uri ).join() && byClass( w.list, 'nino-admin-directory' ).length === 1 );
+	check( 'the list is the one on show, the level of the scan is not', w.list.classList.contains('admin-hidden') === false && w.form.classList.contains('admin-hidden') === true );
+
+	const heads = findAll( w.list, el => el.tagName === 'TH' && el.dataset.key !== undefined ).map( el => el.dataset.key );
+	check( 'the columns are the name, the target size and the state - no picture, nothing else', heads.join() === 'label,size,stateText' );
+	check( 'there is no box to choose rows by: nothing is done to several slots at once', tag( w.list, 'input' ).filter( el => el.type === 'checkbox' ).length === 0 );
+	check( 'there is no category: the one select is the choice of what to show', tag( w.list, 'select' ).filter( el => hasClass( el, 'nino-admin-filterbar-select' ) && hasClass( el, 'nino-admin-table-sortby' ) === false ).length === 1 && w.show().id === 'slots-show' );
+
+	// The name: the label strong, its uri under it
+	const cells = w.cells( LOGO );
+	check( 'a row says the label of the slot strong, with its uri under it, as text', byClass( cells[0], 'images-name-label' )[0].tagName === 'STRONG' && byClass( cells[0], 'images-name-label' )[0].textContent === 'Logo' && byClass( cells[0], 'images-name-key' )[0].textContent === LOGO );
+	check( '...and the target size as width × height px', cells[1].textContent === '500 × 100 px' );
+
+	// The state is what one would otherwise see only after opening the slot
+	const dark = w.cells('/logo/dark')[2];
+	check( 'a slot that no page includes says so in a badge that warns, with the templates that name it under it', byClass( dark, 'nino-admin-badge' ).length === 1 && byClass( dark, 'nino-admin-badge' )[0].dataset.state === 'warn' && byClass( dark, 'nino-admin-badge' )[0].textContent === text('/_admin/slots/label/unused')
+		&& byClass( dark, 'slots-state-templates' )[0].textContent === text('/_admin/slots/label/templates').replace( '%s', 'page-x, frame-header' ) );
+	const team = w.cells('/template/page-about/team/photo')[2];
+	check( '...a slot that no page includes and no template names has the badge and no line of templates', byClass( team, 'nino-admin-badge' )[0].dataset.state === 'warn' && byClass( team, 'slots-state-templates' ).length === 0 );
+	const lose = w.cells('/template/page-lose/hero/image')[2];
+	check( 'a slot that a page includes and that has no image says so quietly, in a badge of the state muted', byClass( lose, 'nino-admin-badge' ).length === 1 && byClass( lose, 'nino-admin-badge' )[0].dataset.state === 'muted' && byClass( lose, 'nino-admin-badge' )[0].textContent === text('/_admin/slots/label/noimage') );
+	check( 'a slot that is included and has its image says nothing in the state', byClass( w.cells( LOGO )[2], 'nino-admin-badge' ).length === 0 && w.cells( LOGO )[2].textContent === '' );
+
+	// The choice of what to show: all, without an image, not included anywhere
+	check( 'the choice has the name "Show" and its first option is "all"', w.show().children.map( o => o.value ).join('|') === '|none|unused' && w.show().children[0].textContent === text('/_admin/slots/label/show-all') && w.show().children.map( o => o.textContent ).join('|') === [ 'show-all', 'show-none', 'show-unused' ].map( word => text('/_admin/slots/label/'+ word) ).join('|') );
+	const show = value => { w.show().value = value; fire( w.show(), 'change' ) };
+	show( 'none' );
+	check( 'without image shows the slots that have none', w.ids().join() === [ '/logo/dark', '/template/page-lose/hero/image', ODD ].join() );
+	show( 'unused' );
+	check( 'not included anywhere shows the slots that no page includes, whatever else they have', w.ids().join() === [ '/logo/dark', '/template/page-about/team/photo', ODD ].join() );
+	show( '' );
+	check( 'all shows every slot again', w.ids().length === 6 );
+
+	// The search reads the label, the uri and the templates
+	w.search().value = 'page-about';
+	fire( w.search(), 'input' );
+	check( 'the search finds a slot by its uri', w.ids().join() === '/template/page-about/team/photo' );
+	w.search().value = 'frame-header';
+	fire( w.search(), 'input' );
+	check( '...and by a template that names it, which no cell shows beyond the badge of the slot', w.ids().join() === '/logo/dark' );
+	w.search().value = 'team photo';
+	fire( w.search(), 'input' );
+	check( '...and by its label', w.ids().join() === '/template/page-about/team/photo' );
+	w.search().value = 'no such slot';
+	fire( w.search(), 'input' );
+	check( 'a search that finds nothing says so with its own sentence', w.ids().length === 0 && byClass( w.list, 'nino-admin-table-empty' ).concat( byClass( w.list, 'nino-admin-empty' ) ).some( el => el.textContent === text('/_admin/slots/nomatch') ) );
+	check( '...and the search is named for what it searches', w.search().attributes['aria-label'] === text('/_admin/slots/label/search') || w.search().placeholder === text('/_admin/slots/label/search') );
+	w.search().value = '';
+	fire( w.search(), 'input' );
+
+	// The size sorts as a string whose numbers are numbers: 10 before 500 before 640 before 1920
+	const sizeHead = findAll( w.list, el => el.tagName === 'TH' && el.dataset.key === 'size' )[0];
+	fire( tag( sizeHead, 'button' )[0], 'click' );
+	check( 'the target size sorts by its numbers: 10 before 500 before 640 before 1920', w.panel._directory.rows().map( row => row.width ).join() === '10,500,500,640,640,1920' );
+
+	// The list bar: the scan beside "New image slot", which is the one main button at the far right
+	const buttons = tag( w.bar(), 'button' );
+	check( 'the list has its bar: the scan beside "New image slot", which is the one main button at the far right', buttons.length === 2 && buttons[1].textContent === text( NEW_SLOT ) && hasClass( buttons[1], 'nino-admin-btn-primary' )
+		&& buttons[0].textContent === text( SCAN_SLOT ) && hasClass( buttons[0], 'nino-admin-btn-secondary' ) );
+
+	// Each row has ONE button: the pencil, named for the slot
+	const edit = tag( w.rows().find( el => el.dataset.row === LOGO ), 'button' );
+	check( 'a row has one small icon button, "Edit image slot <label>", and no other', edit.length === 1 && edit[0].attributes['aria-label'] === text('/_admin/slots/row/open').replace( '%s', 'Logo' ) );
+	check( 'a list that is empty has no table but the sentence of the empty state, and the bar is still there', ( () => {
+		const e = slotsWorld();
+		e.open( [] );
+		return byClass( e.list, 'nino-admin-table-empty' ).concat( byClass( e.list, 'nino-admin-empty' ) ).some( el => el.textContent === text('/_admin/slots/empty') ) && tag( e.bar(), 'button' ).length === 2;
+	} )() );
+
+	check( 'a list that cannot be read says so in place of the table', ( () => {
+		const e = slotsWorld();
+		e.panel.showCurrent();
+		e.answer( 500, { error : 'down' } );
+		return byClass( e.list, 'nino-admin-error' ).concat( byClass( e.list, 'nino-admin-notice' ) ).length > 0 && e.panel._ready === false;
+	} )() );
+}
+
+{
+	// --- text from the server or a person is text -------------------------------------------------------------------
+
+	const w = slotsWorld();
+	w.open();
+	const hostile = w.cells( ODD );
+
+	check( 'a label, a uri and a template that are markup and quotes are drawn as the letters they are: no element comes of them, in the table', byClass( hostile[0], 'images-name-label' )[0].textContent === HOSTILE && byClass( hostile[0], 'images-name-key' )[0].textContent === ODD
+		&& byClass( hostile[2], 'slots-state-templates' )[0].textContent.indexOf( HOSTILE ) !== -1 && tag( w.list, 'img' ).length === 0 && markupWrites.length === 0 );
+
+	fire( w.rows().find( el => el.dataset.row === ODD ), 'click', { target : w.rows().find( el => el.dataset.row === ODD ) } );
+	const d = w.dialog();
+	check( '...in the title and the subtitle of the record', byClass( d, 'nino-admin-dialog-title' )[0].textContent === HOSTILE && byClass( d, 'nino-admin-dialog-subtitle' )[0].textContent === ODD && tag( d, 'img' ).length === 0 );
+	check( '...and in the field of the label, as its value', w.field( d, 'label' ).value === HOSTILE );
+
+	fire( w.button( d, DELETE_SLOT ), 'click' );
+	const question = w.dialog();
+	check( '...and in the question that asks before the deletion, which names the slot', question !== d && tag( question, 'img' ).length === 0 && tag( question, 'p' ).some( p => p.textContent.indexOf( HOSTILE ) !== -1 ) && markupWrites.length === 0 );
+}
+
+{
+	// --- the record: one slot -----------------------------------------------------------------------------------------
+
+	const w = slotsWorld();
+	w.open();
+	const before = w.h.entries.length;
+	const row = w.rows().find( el => el.dataset.row === LOGO );
+
+	fire( row, 'click', { target : row } );
+	const d = w.dialog();
+
+	check( 'a click on a row opens its record, the large dialog, at the address #images/slots/<the uri as ONE part>, one entry more in the history', d !== null && hasClass( d, 'nino-admin-dialog--large' ) && w.h.hash() === '#images/slots/%2Flogo' && w.h.entries.length === before + 1 );
+	check( 'it is named by the label of the slot and says the uri under it, and has its place in the rows', byClass( d, 'nino-admin-dialog-title' )[0].textContent === 'Logo' && byClass( d, 'nino-admin-dialog-subtitle' )[0].textContent === LOGO && byClass( d, 'nino-admin-record-count' )[0].textContent.indexOf(' of 6') !== -1 );
+	check( 'the uri is a line to read - it is what the templates write - and no field', tag( d, 'input' ).every( input => input.value !== LOGO ) && byClass( d, 'nino-admin-readline' ).length === 1 && byClass( d, 'nino-admin-readline-value' )[0].textContent === LOGO );
+	check( 'the label, the width and the height are the fields of the record, with the values of the slot, each required with a star', tag( d, 'input' ).length === 3 && w.field( d, 'label' ).value === 'Logo' && w.field( d, 'width' ).value === '500' && w.field( d, 'height' ).value === '100'
+		&& byClass( d, 'nino-admin-required' ).length === 3 && tag( d, 'input' ).every( input => input.attributes['aria-required'] === 'true' ) );
+	check( '...the sizes are numbers of at least 1, in steps of 1, and each field has its help behind a (?) and no line under it', w.field( d, 'width' ).type === 'number' && w.field( d, 'width' ).min === '1' && w.field( d, 'width' ).step === '1' && w.field( d, 'height' ).type === 'number' && byClass( d, 'nino-admin-help-button' ).length === 3 && tag( d, 'small' ).length === 0 );
+	check( '...the form of the record is novalidate: what is wrong is said by the tab, at the field', findAll( d, el => el.tagName === 'FORM' )[0].noValidate === true );
+
+	const bar = byClass( d, 'nino-admin-actionbar' )[0];
+	check( 'the bar has "Delete image slot" first, then the state, "Save and continue", and the one main button "Save" last - no Cancel, no Close', bar.children[0].textContent === text( DELETE_SLOT ) && hasClass( bar.children[0], 'nino-admin-btn-danger' )
+		&& bar.children.filter( el => el.tagName === 'BUTTON' ).map( el => el.textContent ).join() === [ text( DELETE_SLOT ), text('/_admin/common/label/save-next'), text( SAVE_SLOT ) ].join() && hasClass( bar.children[bar.children.length - 1], 'nino-admin-btn-primary' ) );
+	check( 'a record that was just opened says nothing of its state, and the step to the next slot is named for the slot', w.stateOf( d ).hidden === true && w.button( d, '/_admin/slots/record/next' ) !== undefined && w.button( d, '/_admin/slots/record/prev' ) !== undefined );
+
+	// The row by its button, too
+	fire( tag( d, 'button' ).find( b => hasClass( b, 'nino-admin-dialog-close' ) ), 'click' );
+	check( 'the cross closes the record, and the focus is on the row', w.dialog() === null && w.rows().find( el => el.dataset.row === LOGO ).focused === true );
+}
+
+{
+	const w = slotsWorld();
+	w.open();
+	const pencil = tag( w.rows().find( el => el.dataset.row === '/logo/dark' ), 'button' )[0];
+
+	fire( pencil, 'click', { currentTarget : pencil } );
+	const d = w.dialog();
+	check( 'the pencil of a row opens the same record: its address is the uri as one part, with the slash written %2F', d !== null && w.h.hash() === '#images/slots/%2Flogo%2Fdark' && byClass( d, 'nino-admin-dialog-title' )[0].textContent === 'Logo dark' );
+
+	// Stepping goes along the rows the directory shows
+	fire( w.button( d, '/_admin/slots/record/next' ), 'click' );
+	check( 'stepping goes to the slot after in the rows the directory shows, and the address follows without a new entry', byClass( d, 'nino-admin-dialog-title' )[0].textContent === 'Hero' && w.h.hash() === '#images/slots/%2Ftemplate%2Fpage-home%2Fhero%2Fbackground' );
+}
+
+{
+	// A reload with an address that names a slot, and an address of a slot that is not there
+	const w = slotsWorld( '#images/slots/%2Fodd%2Fa%25b%40c' );
+
+	w.panel.showCurrent();
+	check( 'a reload with an address draws the directory first and opens the record the address names once the list has come', w.dialog() === null && w.requests.length === 1 );
+	w.answer( 200, { slots : slotCatalogue() } );
+	check( '...the record is the one the address names - a uri with a slash, a percent sign and an at sign is ONE part -, with no entry of its own in the history', w.dialog() !== null && byClass( w.dialog(), 'nino-admin-dialog-title' )[0].textContent === HOSTILE && w.ids().length === 6 );
+
+	// Back closes it, and the list is not read again for that
+	const asked = w.requests.length;
+	w.step('#images/slots');
+	check( 'the address of the directory closes the record, and the list is not read again for that', w.dialog() === null && w.requests.length === asked && w.h.hash() === '#images/slots' );
+
+	const m = slotsWorld( '#images/slots/%2Fnothing' );
+	m.panel.showCurrent();
+	m.answer( 200, { slots : slotCatalogue() } );
+	check( 'a slot that is not there is said over the directory, and the address is the directory\'s', m.dialog() === null && byClass( m.list, 'nino-admin-notice' ).length === 1 && byClass( m.list, 'nino-admin-notice' )[0].textContent === text('/_admin/slots/record/missing') && m.h.hash() === '#images/slots' );
+
+	const t = slotsWorld( '#images/slots/ab%zz' );
+	t.panel.showCurrent();
+	t.answer( 200, { slots : slotCatalogue() } );
+	check( 'a part that cannot be decoded is no slot: the directory shows, and the address is the directory\'s', t.dialog() === null && t.h.hash() === '#images/slots' && byClass( t.list, 'nino-admin-notice' ).length === 0 );
+
+	// %40new is the key @new - which no slot can be called - and not the word
+	const k = slotsWorld( '#images/slots/%40new' );
+	k.panel.showCurrent();
+	k.answer( 200, { slots : slotCatalogue() } );
+	check( 'the key @new (%40new) is no slot and no dialog of a new one: the word is told from the key by the router, and the directory says that there is no such slot', k.dialog() === null && k.panel._adding === false && byClass( k.list, 'nino-admin-notice' ).length === 1 );
+	const s = slotsWorld( '#images/slots/%40scan' );
+	s.panel.showCurrent();
+	s.answer( 200, { slots : slotCatalogue() } );
+	check( '...and %40scan is no scan', s.panel._scanning === false && s.form.classList.contains('admin-hidden') === true );
+}
+
+{
+	// --- Save: what was changed is sent, what was not is not -----------------------------------------------------------
+
+	const w = slotsWorld();
+	w.open();
+	const row = w.rows().find( el => el.dataset.row === LOGO );
+
+	fire( row, 'click', { target : row } );
+	const d = w.dialog();
+	const asked = w.requests.length;
+
+	fire( w.button( d, SAVE_SLOT ), 'click' );
+	check( 'a save with no change sends no request - what is stored stays as it is - and says that it is saved', w.requests.length === asked && w.stateOf( d ).dataset.state === 'ok' && w.toasts().join() === text('/_admin/common/msg/saved') );
+	check( '...and the other panels are not told of a write there was none of', w.h.admin.stamp('slots') === 0 );
+
+	// A value that says the same - the size with leading zeros, the label with spaces around it - is no change either
+	w.field( d, 'label' ).value = '  Logo ';
+	w.field( d, 'width' ).value = '0500';
+	fire( w.field( d, 'width' ), 'input' );
+	fire( w.button( d, SAVE_SLOT ), 'click' );
+	check( '...nor is one that says the same thing in other letters: spaces around the label, a size with zeros in front', w.requests.length === asked );
+
+	// Wrong values: refused at the fields, nothing sent
+	w.field( d, 'label' ).value = '  ';
+	w.field( d, 'width' ).value = '0';
+	w.field( d, 'height' ).value = 'abc';
+	fire( w.field( d, 'height' ), 'input' );
+	fire( w.button( d, SAVE_SLOT ), 'click' );
+	check( 'a record that is not right is refused at its fields: one sentence under each, the field invalid, nothing sent', w.requests.length === asked && errorsOf( d ).length === 3 && [ 'label', 'width', 'height' ].every( key => w.field( d, key ).attributes['aria-invalid'] === 'true' ) );
+	check( '...the sentences say what is wrong with the field, the line of the bar says that there are fields to check, and the focus is on the first that is wrong', errorsOf( d )[0].textContent === text('/_admin/common/error/missing').replace( '%s', text('/_admin/common/label/label') )
+		&& errorsOf( d )[1].textContent === text('/_admin/slots/error/invalid').replace( '%s', text('/_admin/slots/label/width') ).replace( '%s', text('/_admin/slots/expect/size') )
+		&& byClass( d, 'nino-admin-status' )[0].textContent === text('/_admin/slots/error/fields') && byClass( d, 'nino-admin-status' )[0].dataset.state === 'error' && w.focused() === w.field( d, 'label' ) );
+
+	// A change: ONE request with the trimmed values
+	w.field( d, 'label' ).value = '  Wordmark ';
+	w.field( d, 'width' ).value = '640';
+	w.field( d, 'height' ).value = '120';
+	fire( w.field( d, 'height' ), 'input' );
+	fire( w.button( d, SAVE_SLOT ), 'click' );
+	check( 'a record that is changed sends ONE slots/save for the slot with the values trimmed, and the sentences are gone', w.requests.length === asked + 1 && w.requests[asked].action === 'slots/save'
+		&& JSON.stringify( w.requests[asked].payload ) === JSON.stringify( { uri : LOGO, label : 'Wordmark', width : '640', height : '120' } ) && errorsOf( d ).length === 0 );
+
+	w.answer( 400, { error : 'a slot needs a width and a height of at least 1 pixel', code : 'invalid_value', field : 'width' } );
+	check( 'a refusal that names a field is said at that field - and in the bar - with the focus on it, and the record is still changed', errorsOf( d ).length === 1 && w.field( d, 'width' ).attributes['aria-invalid'] === 'true' && w.focused() === w.field( d, 'width' )
+		&& byClass( d, 'nino-admin-status' )[0].dataset.state === 'error' && w.h.dirty.isDirty( [ 'slots' ] ) === true && w.panel._find( LOGO ).label === 'Logo' );
+
+	w.answer( 400, { error : 'x', code : 'slots_label', field : 'label' } ) ;
+}
+
+{
+	const w = slotsWorld();
+	w.open();
+	fire( w.rows()[0], 'click', { target : w.rows()[0] } );
+	const d = w.dialog();
+	const asked = w.requests.length;
+
+	w.field( d, 'label' ).value = 'Wordmark';
+	w.field( d, 'width' ).value = '640';
+	w.field( d, 'height' ).value = '120';
+	fire( w.field( d, 'height' ), 'input' );
+	w.h.dirty.refresh();
+	check( 'a typed value makes the record changed, and nothing is sent by typing', w.stateOf( d ).dataset.state === 'warn' && w.h.dirty.isDirty( [ 'slots' ] ) === true && w.requests.length === asked );
+
+	fire( w.button( d, SAVE_SLOT ), 'click' );
+	check( 'the save is one request, and the one that is sent is for the slot with every value of the record: the label and both sizes', w.requests.length === asked + 1 && JSON.stringify( w.requests[asked].payload ) === JSON.stringify( { uri : LOGO, label : 'Wordmark', width : '640', height : '120' } ) );
+	check( '...and a second press while it is out sends nothing', ( fire( w.button( d, SAVE_SLOT ), 'click' ), w.requests.length === asked + 1 ) );
+
+	w.answer( 200, {} );
+	const saved = w.panel._find( LOGO );
+	check( 'once the server says so the row is what was sent - the label, the sizes as numbers - and the list is NOT read again', saved.label === 'Wordmark' && saved.width === 640 && saved.height === 120 && saved.size === '640 × 120 px' && w.tree() === 'slots/list,slots/save' );
+	check( '...the row of the directory is drawn anew and fresh, the title of the record is the new label, the badge says saved, and the other panels are told', w.rows()[0].classList.contains('is-fresh') === true && byClass( w.cells( LOGO )[0], 'images-name-label' )[0].textContent === 'Wordmark' && w.cells( LOGO )[1].textContent === '640 × 120 px'
+		&& byClass( d, 'nino-admin-dialog-title' )[0].textContent === 'Wordmark' && w.stateOf( d ).dataset.state === 'ok' && w.h.dirty.isDirty( [ 'slots' ] ) === false && w.h.admin.stamp('slots') === 1 );
+	check( '...a slot that was written is told to the Images panel as well: its copy is stale', ( () => {
+		const v = slotsWorld();
+		v.h.admin.images = { _ready : true };
+		v.open();
+		fire( v.rows()[0], 'click', { target : v.rows()[0] } );
+		v.field( v.dialog(), 'label' ).value = 'Other';
+		fire( v.field( v.dialog(), 'label' ), 'input' );
+		fire( v.button( v.dialog(), SAVE_SLOT ), 'click' );
+		v.answer( 200, {} );
+		return v.h.admin.images._ready === false && v.h.admin.stamp('slots') === 1;
+	} )() );
+
+	// A refusal of another kind is said in the bar alone
+	const v = slotsWorld();
+	v.open();
+	fire( v.rows()[0], 'click', { target : v.rows()[0] } );
+	v.field( v.dialog(), 'label' ).value = 'Other';
+	fire( v.field( v.dialog(), 'label' ), 'input' );
+	fire( v.button( v.dialog(), SAVE_SLOT ), 'click' );
+	v.answer( 403, { error : 'not allowed' } );
+	check( 'a refusal that names no field is said in the line of the bar alone, and the row stays as it was', errorsOf( v.dialog() ).length === 0 && byClass( v.dialog(), 'nino-admin-status' )[0].dataset.state === 'error' && v.panel._find( LOGO ).label === 'Logo' );
+
+	// A refusal that names the label stands at the label
+	const u = slotsWorld();
+	u.open();
+	fire( u.rows()[0], 'click', { target : u.rows()[0] } );
+	u.field( u.dialog(), 'label' ).value = 'Other';
+	fire( u.field( u.dialog(), 'label' ), 'input' );
+	fire( u.button( u.dialog(), SAVE_SLOT ), 'click' );
+	u.answer( 400, { error : 'label is required', code : 'slots_label', field : 'label' } );
+	check( 'a refusal that names the label is said at the label', errorsOf( u.dialog() ).length === 1 && u.field( u.dialog(), 'label' ).attributes['aria-invalid'] === 'true' );
+}
+
+{
+	// Save and continue goes on to the next slot of the rows the directory shows
+	const w = slotsWorld();
+	w.open();
+	w.show().value = 'unused';
+	fire( w.show(), 'change' );
+	check( 'the choice of what to show narrows the rows the record walks', w.ids().join() === [ '/logo/dark', '/template/page-about/team/photo', ODD ].join() );
+	fire( w.rows()[0], 'click', { target : w.rows()[0] } );
+	const d = w.dialog();
+
+	w.field( d, 'label' ).value = 'Dark logo';
+	fire( w.field( d, 'label' ), 'input' );
+	fire( w.button( d, '/_admin/common/label/save-next' ), 'click' );
+	w.answer( 200, {} );
+	check( 'Save and continue saves and goes on to the next slot of the rows that are shown - not of all slots -: the title and the address are the next one\'s', byClass( d, 'nino-admin-dialog-title' )[0].textContent === 'Team photo' && w.h.hash() === '#images/slots/%2Ftemplate%2Fpage-about%2Fteam%2Fphoto' );
+	check( '...and what the person chose in the directory is as it was when the record is closed', ( fire( tag( d, 'button' ).find( b => hasClass( b, 'nino-admin-dialog-close' ) ), 'click' ), w.show().value === 'unused' && w.ids().length === 3 ) );
+}
+
+{
+	// --- Delete: asked first, the record is closed, the focus goes to the next row ------------------------------------
+
+	const w = slotsWorld();
+	w.open();
+	fire( w.rows()[1], 'click', { target : w.rows()[1] } );
+	const d = w.dialog();
+	const asked = w.requests.length;
+
+	fire( w.button( d, DELETE_SLOT ), 'click' );
+	const question = w.dialog();
+	check( 'it asks first, on the record, with the question of the level destructive that names the slot - and sends nothing', question !== d && byClass( question, 'nino-admin-dialog-title' )[0].textContent === text('/_admin/slots/confirm/delete-title')
+		&& tag( question, 'p' ).some( p => p.textContent === text('/_admin/slots/confirm/delete').replace( '%s', 'Logo dark' ) ) && w.requests.length === asked );
+	w.ask( false );
+	check( 'declining sends nothing and leaves the record as it is', w.requests.length === asked && w.dialog() === d && w.panel._find('/logo/dark') !== null );
+
+	fire( w.button( d, DELETE_SLOT ), 'click' );
+	w.ask( true );
+	check( 'confirming sends slots/delete for the slot, and for nothing else', w.requests.length === asked + 1 && w.requests[asked].action === 'slots/delete' && JSON.stringify( w.requests[asked].payload ) === JSON.stringify( { uri : '/logo/dark' } ) );
+	w.answer( 403, { error : 'not allowed' } );
+	check( 'a refusal is said in the bar and the record stays, the row with it', w.dialog() === d && byClass( d, 'nino-admin-status' )[0].dataset.state === 'error' && w.panel._find('/logo/dark') !== null );
+
+	fire( w.button( d, DELETE_SLOT ), 'click' );
+	w.ask( true );
+	w.answer( 200, {} );
+	check( 'once the server says so the row is gone from the directory and the list is not read again for that', w.ids().indexOf('/logo/dark') === -1 && w.ids().length === 5 && w.tree() === 'slots/list,slots/delete,slots/delete' );
+	check( '...the record is closed, the other panels are told, and the focus is on the row that took its place', w.dialog() === null && w.h.admin.stamp('slots') >= 1 && w.rows()[1].dataset.row === '/template/page-home/hero/background' && w.rows()[1].focused === true );
+	check( '...the entry of the history the record made is taken off by the history, and the address is the directory\'s', w.h.went.slice( -1 )[0] === -1 && ( w.h.back(), w.h.router.arrive(), w.panel.showCurrent(), w.h.hash() === '#images/slots' && w.dialog() === null && w.ids().length === 5 ) );
+}
+
+{
+	// --- A new slot: no row to open, a dialog of its own ----------------------------------------------------------------
+
+	const w = slotsWorld();
+	w.open();
+	const add = tag( w.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-primary' ) );
+	const before = w.h.entries.length;
+
+	fire( add, 'click' );
+	const d = w.dialog();
+	check( 'New image slot opens the dialog of a new slot at the address #images/slots/@new, one entry more in the history - the dialog of a form, no record', d !== null && hasClass( d, 'nino-admin-dialog--form' ) && hasClass( d, 'nino-admin-record' ) === false
+		&& w.h.hash() === '#images/slots/@new' && w.h.entries.length === before + 1 );
+	check( 'it is titled and answered "Create image slot", with Cancel beside it', byClass( d, 'nino-admin-dialog-title' )[0].textContent === text( CREATE_SLOT ) && w.button( d, CREATE_SLOT ) !== undefined && w.button( d, '/_admin/common/label/cancel' ) !== undefined );
+	check( 'it has the four fields - the uri, the label, the width and the height - each required, each with its help, the uri with the example of what is typed', [ 'uri', 'label', 'width', 'height' ].every( key => w.field( d, key ) !== undefined && w.field( d, key ).attributes['aria-required'] === 'true' )
+		&& w.field( d, 'uri' ).placeholder === '/template/page-home/hero/image' && byClass( d, 'nino-admin-help-button' ).length === 4 && w.field( d, 'width' ).type === 'number' );
+	check( '...and the focus is on the uri', w.field( d, 'uri' ).focused === true );
+
+	const asked = w.requests.length;
+	const type = ( key, value ) => { w.field( d, key ).value = value; fire( w.field( d, key ), 'input' ) };
+
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	check( 'nothing typed is refused at every field - four sentences "is missing" - and nothing is sent', w.requests.length === asked && errorsOf( d ).length === 4 );
+
+	type( 'uri', 'logo' ); type( 'label', 'X' ); type( 'width', '10' ); type( 'height', '10' );
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	check( 'a uri that is no uri is refused at the field before anything is sent, with what the field takes', w.requests.length === asked && errorsOf( d ).length === 1 && errorsOf( d )[0].textContent === text('/_admin/slots/error/invalid').replace( '%s', text('/_admin/slots/label/uri') ).replace( '%s', text('/_admin/slots/expect/uri') ) && w.focused() === w.field( d, 'uri' ) );
+	type( 'uri', '/logo/dark' );
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	check( 'a uri a slot holds already is refused at the field as taken - nothing is sent', w.requests.length === asked && errorsOf( d ).length === 1 && errorsOf( d )[0].textContent === text('/_admin/slots/error/taken').replace( '%s', text('/_admin/slots/label/uri') ) );
+	type( 'width', '0' );
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	check( 'a size that is no whole number of at least 1 is refused at its field', w.requests.length === asked && errorsOf( d ).some( el => el.textContent.indexOf( text('/_admin/slots/expect/size') ) !== -1 ) );
+
+	type( 'uri', ' /new-slot ' ); type( 'label', ' Fresh ' ); type( 'width', '300' ); type( 'height', '200' );
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	check( 'a good one sends slots/create with the values trimmed, and the dialog does not close before the server has said yes', w.requests.length === asked + 1 && w.requests[asked].action === 'slots/create' && JSON.stringify( w.requests[asked].payload ) === JSON.stringify( { uri : '/new-slot', label : 'Fresh', width : '300', height : '200' } ) && w.dialog() === d );
+
+	w.answer( 409, { error : 'slot already exists', code : 'slots_exists', field : 'uri' } );
+	check( 'a 409 is said at the uri, the dialog stays open with what was typed, and the form can be sent again', w.dialog() === d && errorsOf( d ).length === 1 && w.field( d, 'uri' ).attributes['aria-invalid'] === 'true' && w.field( d, 'label' ).value === ' Fresh ' && w.panel._find('/new-slot') === null );
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	w.answer( 400, { error : 'a slot needs a width and a height of at least 1 pixel', code : 'invalid_value', field : 'height' } );
+	check( 'a refusal that names the height is said at the height', w.dialog() === d && errorsOf( d ).length === 1 && w.field( d, 'height' ).attributes['aria-invalid'] === 'true' );
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	w.answer( 500, { error : 'could not save the slot' } );
+	check( 'a refusal that names no field is said at the foot of the form', w.dialog() === d && errorsOf( d ).length === 1 && errorsOf( d )[0].textContent.indexOf('could not save the slot') !== -1 );
+
+	fire( w.button( d, CREATE_SLOT ), 'click' );
+	w.answer( 200, {} );
+	check( 'once the server says so the dialog closes, the address is the directory\'s, the other panels are told, and the list is read again - the new row needs its usage', w.dialog() === null && w.h.hash() === '#images/slots' && w.h.admin.stamp('slots') === 1 && w.requests[w.requests.length - 1].action === 'slots/list' );
+
+	const fresh = slotCatalogue().concat( [ { uri : '/new-slot', label : 'Fresh', width : 300, height : 200, hasImage : false, usage : { templates : [], pages : [] } } ] );
+	w.answer( 200, { slots : fresh } );
+	check( '...the row of the new slot is in the directory, fresh, has the focus, and a toast says that the slot was made', w.ids().indexOf('/new-slot') !== -1 && w.rows().find( el => el.dataset.row === '/new-slot' ).classList.contains('is-fresh') === true && w.rows().find( el => el.dataset.row === '/new-slot' ).focused === true
+		&& w.toasts().join() === text('/_admin/slots/msg/created') );
+}
+
+{
+	// The address opens the dialog, Esc and Cancel close it, Back too
+	const w = slotsWorld( '#images/slots/@new' );
+	w.panel.showCurrent();
+	w.answer( 200, { slots : slotCatalogue() } );
+	const d = w.dialog();
+	check( 'a reload at #images/slots/@new draws the directory and opens the dialog of a new slot over it', d !== null && hasClass( d, 'nino-admin-dialog--form' ) && w.ids().length === 6 && w.panel._adding === true && w.h.hash() === '#images/slots/@new' );
+
+	fire( d, 'keydown', { key : 'Escape' } );
+	check( 'Esc closes it - nothing was typed, so nothing is asked - and the address is the directory\'s', w.dialog() === null && w.panel._adding === false && w.h.hash() === '#images/slots' );
+
+	const v = slotsWorld();
+	v.open();
+	fire( tag( v.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-primary' ) ), 'click' );
+	fire( v.button( v.dialog(), '/_admin/common/label/cancel' ), 'click' );
+	check( 'Cancel closes it too, and the focus is on the button that opened it', v.dialog() === null && v.h.hash() === '#images/slots' && tag( v.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-primary' ) ).focused === true );
+
+	// Input that was typed is asked about
+	const u = slotsWorld();
+	u.open();
+	fire( tag( u.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-primary' ) ), 'click' );
+	u.field( u.dialog(), 'label' ).value = 'typed';
+	fire( u.field( u.dialog(), 'label' ), 'input' );
+	fire( u.dialog(), 'keydown', { key : 'Escape' } );
+	check( 'Esc with something typed asks first - the dialog stays, with the question on it - and the address stays', u.dialogs !== null && u.h.dialogs.filter( x => x.open ).length === 2 && u.panel._adding === true && u.h.hash() === '#images/slots/@new' );
+	u.ask( true );
+	check( '...Discard closes it, and the address is the directory\'s', u.dialog() === null && u.panel._adding === false && u.h.hash() === '#images/slots' );
+
+	// Back
+	const t = slotsWorld();
+	t.open();
+	fire( tag( t.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-primary' ) ), 'click' );
+	t.h.back();
+	t.h.router.arrive();
+	t.panel.showCurrent();
+	check( 'Back from the dialog closes it, as Esc does', t.dialog() === null && t.panel._adding === false && t.h.hash() === '#images/slots' );
+}
+
+{
+	// The address of a new slot, typed while a record is open: the record is closed, the dialog opens
+	const w = slotsWorld();
+	w.open();
+	fire( w.rows()[0], 'click', { target : w.rows()[0] } );
+	check( 'a record is open', w.dialog() !== null && w.panel._record.isOpen() === true );
+	w.step('#images/slots/@new');
+	check( 'the address of a new slot, typed while a record is open, closes the record and opens the dialog of a new slot', w.panel._record.isOpen() === false && w.panel._adding === true && w.dialog() !== null && hasClass( w.dialog(), 'nino-admin-dialog--form' ) && w.h.hash() === '#images/slots/@new' );
+}
+
+{
+	// The word is told from a key by the router
+	const w = slotsWorld();
+	w.open();
+	check( 'a slot is named by its uri as one part: the segments of it name none, a word names no slot, and the key @new is no word', w.panel._find('/logo/dark').uri === '/logo/dark' && w.panel._find('logo') === null && w.panel._find('@scan') === null && w.panel._find('@new') === null );
+}
 
 // --- the scan -------------------------------------------------------------------------------------
 
-slots._slots = catalogue;
-tab.requests.length = 0;
-tab.hash = { panel : 'slots', parts : [] };
-slots.showCurrent();
-const scanButton = buttonsOf( byClass( list, 'nino-admin-actionbar' )[0] ).find( b => has( b, 'nino-admin-btn-secondary' ) );
-tab.routed.length = 0;
-fire( scanButton, 'click' );
-check( 'the scan has an address of its own and opens in the form level, waiting for the server with the focus in the view', tab.routed.join() === 'go slots/@scan,set slots/@scan' && tab.requests[0].action === 'slots/scan' && form2.classList.contains('admin-hidden') === false
-	&& findAll( form2, el => el.attributes['aria-busy'] === 'true' ).length === 1 );
+{
+	const w = slotsWorld();
+	w.open();
+	const scanButton = tag( w.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-secondary' ) );
+	const before = w.h.entries.length;
 
-const found = [
-	{ filename : 'a.png', src : '/images/a.png', suggestedUri : '/a', width : 100, height : 50, files : [ 'page-a.tpl' ] },
-	{ filename : '', src : '/template/page-x/cards/one-background', suggestedUri : '/template/page-x/cards/one-background', width : 0, height : 0, files : [ 'page-x.tpl' ] },
-	{ filename : 'c.png', src : '/images/c.png', suggestedUri : '/c', width : 80, height : 0, files : [ 'page-c.tpl' ] },
-];
-tab.answer( 200, { missing : found } );
-const cards = findAll( form2, el => el.tagName === 'FIELDSET' );
-const sizeOf = function( card ) { return findAll( card, el => el.type === 'number' ) };
-check( 'every finding is a card with the fields of a slot, as blocks, in a form that is novalidate and has the one bar', cards.length === 3 && findAll( form2, el => el.tagName === 'FORM' )[0].noValidate === true
-	&& byClass( form2, 'nino-admin-actionbar' ).length === 1 && buttonsOf( byClass( form2, 'nino-admin-actionbar' )[0] ).filter( b => has( b, 'nino-admin-btn-primary' ) ).length === 1 );
-check( 'a finding that comes with a size asks for none; one without marks its width and its height as required', sizeOf( cards[0] ).every( i => i.required !== true ) && sizeOf( cards[1] ).length === 2 && sizeOf( cards[1] ).every( i => i.required === true && i.getAttribute('aria-required') === 'true' )
-	&& sizeOf( cards[2] ).every( i => i.required === true ) );
-const starsShown = function( card ) { return findAll( card, el => has( el, 'nino-admin-required' ) && el.hidden !== true ).length };
-check( 'a finding without a size has the star after the names of its width and its height, as it has after its uri and label; one with a size has two', starsShown( cards[1] ) === 4 && starsShown( cards[2] ) === 4 && starsShown( cards[0] ) === 2 );
-check( 'the scan opens as a view of nothing yet saved: its state badge is the one of a fresh thing', byClass( form2, 'nino-admin-actionbar-state' )[0].dataset.fresh === 'true' );
-const tick = function( card ) { return findAll( card, el => el.type === 'checkbox' )[0] };
-tick( cards[1] ).checked = true;
-fire( tick( cards[1] ), 'change' );
-check( 'a finding that is ignored asks for nothing: a slot nobody makes needs no size', sizeOf( cards[1] ).every( i => i.required !== true && i.getAttribute('aria-required') === null ) );
-tick( cards[1] ).checked = false;
-fire( tick( cards[1] ), 'change' );
-check( '...and the stars of its size come back with the need', starsShown( cards[1] ) === 4 );
-check( '...and asks again when it is not', sizeOf( cards[1] ).every( i => i.required === true ) );
+	fire( scanButton, 'click' );
+	check( 'the scan has an address of its own and opens in the level beside the directory, waiting for the server', w.h.hash() === '#images/slots/@scan' && w.h.entries.length === before + 1 && w.requests[w.requests.length - 1].action === 'slots/scan'
+		&& w.form.classList.contains('admin-hidden') === false && w.list.classList.contains('admin-hidden') === true && findAll( w.form, el => el.attributes['aria-busy'] === 'true' ).length === 1 );
+	check( '...with one back link, "Back to Image Slots", in its context bar', byClass( w.form, 'nino-admin-back-link' ).length === 1 );
 
-tab.requests.length = 0;
-let outcome = null;
-slots._saveScanResults( slots._scanRows, function( ok ) { outcome = ok } );
-check( 'a submit makes the finding that is right and sends none of those that are not', tab.requests.length === 1 && tab.requests[0].action === 'slots/create' && tab.requests[0].payload.uri === '/a' );
-check( 'each finding that is not right is refused at its fields: a sentence under each field, the field invalid, the focus on the first', errorsOf( cards[1] ).length === 2 && errorsOf( cards[2] ).length === 1 && errorsOf( cards[0] ).length === 0
-	&& tab.focused() === sizeOf( cards[1] )[0] );
-tab.answer( 200, {} );
-check( 'the slot made is told to the other panels and the list is read again', tab.touched.slice( -1 )[0] === 'slots' && tab.requests[tab.requests.length - 1].action === 'slots/list' );
-tab.answer( 200, { slots : catalogue } );
-check( '...the card of the slot that was made is gone, the others stay with their sentences, and the save reports false', outcome === false && findAll( form2, el => el.tagName === 'FIELDSET' ).length === 2 && slots._scanRows.length === 2 );
+	const found = [
+		{ filename : 'a.png', src : '/images/a.png', suggestedUri : '/a', width : 100, height : 50, files : [ 'page-a.tpl' ] },
+		{ filename : '', src : '/template/page-x/cards/one-background', suggestedUri : '/template/page-x/cards/one-background', width : 0, height : 0, files : [ 'page-x.tpl' ] },
+		{ filename : 'c.png', src : '/images/c.png', suggestedUri : '/c', width : 80, height : 0, files : [ 'page-c.tpl' ] },
+	];
+	w.answer( 200, { missing : found } );
+	const cards = findAll( w.form, el => el.tagName === 'FIELDSET' );
+	const sizeOf = card => findAll( card, el => el.type === 'number' );
+	check( 'every finding is a card with the fields of a slot, as blocks, in a form that is novalidate and has the one bar', cards.length === 3 && findAll( w.form, el => el.tagName === 'FORM' )[0].noValidate === true
+		&& byClass( w.form, 'nino-admin-actionbar' ).length === 1 && tag( byClass( w.form, 'nino-admin-actionbar' )[0], 'button' ).filter( b => hasClass( b, 'nino-admin-btn-primary' ) ).length === 1 );
+	check( 'a finding that comes with a size asks for none; one without marks its width and its height as required', sizeOf( cards[0] ).every( i => i.required !== true ) && sizeOf( cards[1] ).length === 2 && sizeOf( cards[1] ).every( i => i.required === true && i.getAttribute('aria-required') === 'true' ) && sizeOf( cards[2] ).every( i => i.required === true ) );
+	const starsShown = card => findAll( card, el => hasClass( el, 'nino-admin-required' ) && el.hidden !== true ).length;
+	check( 'a finding without a size has the star after the names of its width and its height, as it has after its uri and label; one with a size has two', starsShown( cards[1] ) === 4 && starsShown( cards[2] ) === 4 && starsShown( cards[0] ) === 2 );
+	check( 'the scan opens as a view of nothing yet saved: its state badge is the one of a fresh thing, and the shell has no input of it', byClass( w.form, 'nino-admin-actionbar-state' )[0].dataset.fresh === 'true' && w.h.dirty.isDirty( [ 'slots' ] ) === false );
+	const tick = card => findAll( card, el => el.type === 'checkbox' )[0];
+	tick( cards[1] ).checked = true;
+	fire( tick( cards[1] ), 'change' );
+	check( 'a finding that is ignored asks for nothing: a slot nobody makes needs no size', sizeOf( cards[1] ).every( i => i.required !== true && i.getAttribute('aria-required') === null ) );
+	tick( cards[1] ).checked = false;
+	fire( tick( cards[1] ), 'change' );
+	check( '...and the stars of its size come back with the need', starsShown( cards[1] ) === 4 && sizeOf( cards[1] ).every( i => i.required === true ) );
 
-const left = slots._scanRows.slice();
-sizeOf( left[0].field )[0].value = '10';
-fire( sizeOf( left[0].field )[0], 'input' );
-check( 'what is typed into a finding takes its sentences away', errorsOf( left[0].field ).length === 0 && errorsOf( left[1].field ).length === 1 );
-sizeOf( left[0].field )[1].value = '10';
-sizeOf( left[1].field )[0].value = '20';
-sizeOf( left[1].field )[1].value = '20';
-tab.requests.length = 0;
-outcome = null;
-slots._saveScanResults( slots._scanRows, function( ok ) { outcome = ok } );
-check( 'with every finding right they are made one request at a time, the next after the answer to the one before', tab.requests.length === 1 );
-tab.answer( 200, {} );
-check( '...', tab.requests.length === 2 && outcome === null );
-tab.answer( 409, { error : 'exists' } );
-check( 'a finding the server refuses stays in the form with its sentence at the uri; the one made leaves it', slots._scanRows.length === 1 && slots._scanRows[0] === left[1] && errorsOf( left[1].field ).length === 1 );
-tab.answer( 200, { slots : catalogue } );
-check( '...and the save reports false', outcome === false );
+	// Input in the scan is unsaved input of the tab: the shell asks before it is lost
+	const label = findAll( cards[0], el => el.type === 'text' )[1];
+	label.value = 'Changed in the scan';
+	fire( label, 'input' );
+	check( 'what is typed into a finding is unsaved input of the tab - the entry of the tab says so while the scan is on screen - and is no input of the record', w.h.dirty.isDirty( [ 'slots' ] ) === true && w.h.dirty.isDirty( [ 'slots-scan' ] ) === true );
+	label.value = 'a';
+	fire( label, 'input' );
+	check( '...and the entry of the tab is clean again once the input is the one that was drawn', w.h.dirty.isDirty( [ 'slots' ] ) === false );
 
-// What a template or a file is called is text: a name that is markup draws no element
-slots._renderScanForm( [ { filename : '', src : '<img src=x onerror=1>', suggestedUri : '/x', width : 1, height : 1, files : [ '<b>part</b>.tpl' ] } ] );
-check( 'the path of a finding and the files it was found in are drawn as text: a name that is markup makes no element', findAll( form2, el => el.tagName === 'IMG' || el.tagName === 'B' ).length === 0
-	&& findAll( form2, el => el.tagName === 'LEGEND' )[0].textContent === '<img src=x onerror=1>' && findAll( form2, el => el.tagName === 'P' ).some( p => p.textContent === '<b>part</b>.tpl' ) );
-slots._renderScanForm( [ { filename : 'd.png', src : '/images/d.png', suggestedUri : '/d', width : 1, height : 1, files : [ 'page-d.tpl', 'page-e.tpl' ] } ] );
-check( 'the files a finding was found in are said, each by its name, in the order the server named them, and nothing else stands in that place', findAll( form2, el => el.tagName === 'P' && el.textContent.indexOf( '.tpl' ) !== -1 ).map( p => p.textContent ).join('|') === 'page-d.tpl, page-e.tpl' );
+	w.requests.length = 0;
+	let outcome = null;
+	w.panel._saveScanResults( w.panel._scanRows, ok => { outcome = ok } );
+	check( 'a submit makes the finding that is right and sends none of those that are not', w.requests.length === 1 && w.requests[0].action === 'slots/create' && w.requests[0].payload.uri === '/a' );
+	check( 'each finding that is not right is refused at its fields: a sentence under each field, the field invalid, the focus on the first', errorsOf( cards[1] ).length === 2 && errorsOf( cards[2] ).length === 1 && errorsOf( cards[0] ).length === 0 && w.focused() === sizeOf( cards[1] )[0] );
+	w.answer( 200, {} );
+	check( 'the slot made is told to the other panels and the list is read again', w.h.admin.stamp('slots') === 1 && w.requests[w.requests.length - 1].action === 'slots/list' );
+	const withA = slotCatalogue().concat( [ { uri : '/a', label : 'a', width : 100, height : 50, hasImage : false, usage : { templates : [], pages : [] } } ] );
+	w.answer( 200, { slots : withA } );
+	check( '...the card of the slot that was made is gone, the others stay with their sentences, the save reports false - and the directory under the scan has the new slot', outcome === false && findAll( w.form, el => el.tagName === 'FIELDSET' ).length === 2 && w.panel._scanRows.length === 2 && w.panel._find('/a') !== null && w.rows().some( el => el.dataset.row === '/a' ) === true );
 
-// All ignored, and nothing found
-slots._renderScanForm( found.slice( 0, 1 ) );
-tick( findAll( form2, el => el.tagName === 'FIELDSET' )[0] ).checked = true;
-outcome = null;
-slots._saveScanResults( slots._scanRows, function( ok ) { outcome = ok } );
-check( 'findings that are all ignored make nothing: the list is shown and the save is done', outcome === true && list.classList.contains('admin-hidden') === false );
-slots._renderScanForm( [] );
-check( 'a scan that found nothing is an empty state, and has no form', byClass( form2, 'nino-admin-empty' ).length === 1 && findAll( form2, el => el.tagName === 'FORM' ).length === 0 && slots._scanRows === null );
+	const left = w.panel._scanRows.slice();
+	sizeOf( left[0].field )[0].value = '10';
+	fire( sizeOf( left[0].field )[0], 'input' );
+	check( 'what is typed into a finding takes its sentences away', errorsOf( left[0].field ).length === 0 && errorsOf( left[1].field ).length === 1 );
+	sizeOf( left[0].field )[1].value = '10';
+	sizeOf( left[1].field )[0].value = '20';
+	sizeOf( left[1].field )[1].value = '20';
+	w.requests.length = 0;
+	outcome = null;
+	w.panel._saveScanResults( w.panel._scanRows, ok => { outcome = ok } );
+	check( 'with every finding right they are made one request at a time, the next after the answer to the one before', w.requests.length === 1 );
+	w.answer( 200, {} );
+	check( '...', w.requests.length === 2 && outcome === null );
+	w.answer( 409, { error : 'exists' } );
+	check( 'a finding the server refuses stays in the form with its sentence at the uri; the one made leaves it', w.panel._scanRows.length === 1 && w.panel._scanRows[0] === left[1] && errorsOf( left[1].field ).length === 1 );
+	w.answer( 200, { slots : withA } );
+	check( '...and the save reports false', outcome === false );
 
-// The scan view left while it ran
-const wait = page( [ 'slots-list', 'slots-form' ], 'slots', [ '_admin/Nino/Modules/Images/assets/slots.js' ] );
-wait.Nino.admin.slots._slots = catalogue;
-wait.Nino.admin.slots._openScan();
-wait.levels['slots-form'].children.length = 0;
-wait.levels['slots-form'].appendChild( element('p') );
-wait.answer( 200, { missing : found } );
-check( 'an answer to a scan whose view was left has nowhere to go: nothing is drawn over what is on screen', findAll( wait.levels['slots-form'], el => el.tagName === 'FORM' ).length === 0 );
+	// Back returns to the directory with the focus on the button that opened the scan
+	const back = byClass( w.form, 'nino-admin-back-link' )[0];
+	fire( back, 'click' );
+	check( 'the way back leaves the scan for the directory, writes its address and gives the focus to the button that opened the scan', w.list.classList.contains('admin-hidden') === false && w.form.classList.contains('admin-hidden') === true && w.h.hash() === '#images/slots' && scanButton.focused === true && w.panel._scanning === false );
+}
 
-// Nothing the tab shows is a sentence of the browser's: its script says no alert and no confirm
+{
+	// After the scan made slots the directory shows them
+	const w = slotsWorld();
+	w.open();
+	fire( tag( w.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-secondary' ) ), 'click' );
+	w.answer( 200, { missing : [ { filename : 'a.png', src : '/images/a.png', suggestedUri : '/scanned', width : 100, height : 50, files : [ 'page-a.tpl' ] } ] } );
+	fire( findAll( w.form, el => el.tagName === 'FORM' )[0], 'submit' );
+	check( 'the scan creates the finding that is right for its uri, label and size', w.requests[w.requests.length - 1].action === 'slots/create' && JSON.stringify( w.requests[w.requests.length - 1].payload ) === JSON.stringify( { uri : '/scanned', label : 'scanned', width : '100', height : '50' } ) );
+	w.answer( 200, {} );
+	w.answer( 200, { slots : slotCatalogue().concat( [ { uri : '/scanned', label : 'scanned', width : 100, height : 50, hasImage : false, usage : { templates : [], pages : [] } } ] ) } );
+	check( 'the directory shows the slots the scan made, the directory is the level on screen again, its address is written, and the number of slots is told in a toast', w.ids().indexOf('/scanned') !== -1 && w.list.classList.contains('admin-hidden') === false && w.form.classList.contains('admin-hidden') === true && w.h.hash() === '#images/slots'
+		&& w.toasts().join() === text('/_admin/slots/scan/created').replace( '%s', '1' ) );
+}
+
+{
+	// A reload at the scan, Back, and a record while the scan has input
+	const w = slotsWorld( '#images/slots/@scan' );
+	w.panel.showCurrent();
+	w.answer( 200, { slots : slotCatalogue() } );
+	check( 'a reload at #images/slots/@scan opens the scan once the list is in, and asks the server for it', w.panel._scanning === true && w.form.classList.contains('admin-hidden') === false && w.requests[w.requests.length - 1].action === 'slots/scan' );
+	w.answer( 200, { missing : [ { filename : 'a.png', src : '/images/a.png', suggestedUri : '/a', width : 100, height : 50, files : [ 'page-a.tpl' ] } ] } );
+
+	const input = findAll( w.form, el => el.type === 'text' )[0];
+	input.value = '/typed';
+	fire( input, 'input' );
+	w.h.box.location.hash = '#images/slots';
+	w.h.router.arrive();
+	w.panel.showCurrent();
+	check( 'a step through the history that leaves the scan with input in it asks first - Save, Discard, Cancel - and the scan stays until it is answered', w.h.dialogs.filter( d => d.open ).length === 1 && w.panel._scanning === true );
+	const question = w.dialog();
+	fire( tag( question, 'button' ).find( b => b.textContent === text('/_admin/common/label/discard') ), 'click' );
+	check( '...Discard shows the directory', w.panel._scanning === false && w.list.classList.contains('admin-hidden') === false && w.form.classList.contains('admin-hidden') === true );
+}
+
+{
+	// The scan view left while it ran
+	const w = slotsWorld();
+	w.open();
+	fire( tag( w.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-secondary' ) ), 'click' );
+	w.form.children.length = 0;
+	w.form.appendChild( element('p') );
+	w.answer( 200, { missing : [ { filename : 'a.png', src : '/images/a.png', suggestedUri : '/a', width : 100, height : 50, files : [ 'page-a.tpl' ] } ] } );
+	check( 'an answer to a scan whose view was left has nowhere to go: nothing is drawn over what is on screen', findAll( w.form, el => el.tagName === 'FORM' ).length === 0 );
+
+	// What a template or a file is called is text: a name that is markup draws no element
+	w.panel._renderScanForm( [ { filename : '', src : '<img src=x onerror=1>', suggestedUri : '/x', width : 1, height : 1, files : [ '<b>part</b>.tpl' ] } ] );
+	check( 'the path of a finding and the files it was found in are drawn as text: a name that is markup makes no element', findAll( w.form, el => el.tagName === 'IMG' || el.tagName === 'B' ).length === 0
+		&& findAll( w.form, el => el.tagName === 'LEGEND' )[0].textContent === '<img src=x onerror=1>' && findAll( w.form, el => el.tagName === 'P' ).some( p => p.textContent === '<b>part</b>.tpl' ) );
+	w.panel._renderScanForm( [ { filename : 'd.png', src : '/images/d.png', suggestedUri : '/d', width : 1, height : 1, files : [ 'page-d.tpl', 'page-e.tpl' ] } ] );
+	check( 'the files a finding was found in are said, each by its name, in the order the server named them, and nothing else stands in that place', findAll( w.form, el => el.tagName === 'P' && el.textContent.indexOf( '.tpl' ) !== -1 ).map( p => p.textContent ).join('|') === 'page-d.tpl, page-e.tpl' );
+
+	// All ignored, and nothing found
+	w.panel._renderScanForm( [ { filename : 'a.png', src : '/images/a.png', suggestedUri : '/a', width : 100, height : 50, files : [ 'page-a.tpl' ] } ] );
+	findAll( w.form, el => el.type === 'checkbox' )[0].checked = true;
+	let outcome = null;
+	w.panel._saveScanResults( w.panel._scanRows, ok => { outcome = ok } );
+	check( 'findings that are all ignored make nothing: the list is shown and the save is done', outcome === true && w.list.classList.contains('admin-hidden') === false );
+	w.panel._renderScanForm( [] );
+	check( 'a scan that found nothing is an empty state, and has no form', byClass( w.form, 'nino-admin-empty' ).length === 1 && findAll( w.form, el => el.tagName === 'FORM' ).length === 0 && w.panel._scanRows === null );
+}
+
+{
+	// --- the tab shown again: what was written elsewhere --------------------------------------------------------------
+
+	const w = slotsWorld();
+	w.open();
+	w.show().value = 'none';
+	fire( w.show(), 'change' );
+	const asked = w.requests.length;
+
+	w.panel.showCurrent();
+	check( 'shown again with nothing written since, it reads nothing', w.requests.length === asked );
+	w.h.admin.touch( 'slots' );
+	w.panel.showCurrent();
+	check( 'shown again after a slot was written elsewhere - the Images panel puts a picture in one - it reads the list quietly, and what was chosen is still chosen', w.requests.length === asked + 1 && w.requests[asked].action === 'slots/list' && w.show().value === 'none' );
+	w.answer( 200, { slots : slotCatalogue().map( slot => Object.assign( slot, { hasImage : true } ) ) } );
+	check( '...and the rows are what the server holds now: with an image, no slot is shown for "without image"', w.ids().length === 0 );
+}
+
+{
+	// --- the rights and the token: the tab calls the five actions the server has, and no other -------------------------
+
+	const w = slotsWorld();
+	w.open();
+	fire( w.rows()[0], 'click', { target : w.rows()[0] } );
+	w.field( w.dialog(), 'label' ).value = 'Other';
+	fire( w.field( w.dialog(), 'label' ), 'input' );
+	fire( w.button( w.dialog(), SAVE_SLOT ), 'click' );
+	w.answer( 200, {} );
+	fire( w.button( w.dialog(), DELETE_SLOT ), 'click' );
+	w.ask( true );
+	w.answer( 200, {} );
+	fire( tag( w.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-primary' ) ), 'click' );
+	[ [ 'uri', '/made' ], [ 'label', 'Made' ], [ 'width', '5' ], [ 'height', '5' ] ].forEach( ( [ key, value ] ) => { w.field( w.dialog(), key ).value = value } );
+	fire( w.button( w.dialog(), CREATE_SLOT ), 'click' );
+	w.answer( 200, {} );
+	w.answer( 200, { slots : slotCatalogue() } );
+	fire( tag( w.bar(), 'button' ).find( b => hasClass( b, 'nino-admin-btn-secondary' ) ), 'click' );
+
+	check( 'the tab calls slots/list, slots/save, slots/delete, slots/create and slots/scan - the five actions the server has - and nothing else', Array.from( new Set( w.requests.map( r => r.action ) ) ).sort().join() === 'slots/create,slots/delete,slots/list,slots/save,slots/scan' );
+	check( 'every call goes to the one door of the workbench, as a POST', w.requests.every( r => r.method === 'POST' && r.uri.endsWith('/_admin/') ) );
+}
+
+// Nothing the tab shows is a sentence of the browser's, and nothing it is told is markup
 const slotsSource = source('_admin/Nino/Modules/Images/assets/slots.js');
 check( 'the tab asks nothing with the browser\'s own dialogs', /\b(alert|confirm|prompt)\s*\(/.test( slotsSource.replace( /\/\*[\s\S]*?\*\//g, '' ).replace( /Nino\.adminUi\.confirm\(/g, '' ) ) === false );
-check( 'nothing the tab is told is written as markup - innerHTML is only ever emptied', ( slotsSource.match( /innerHTML[^\n]*/g ) || [] ).every( function( use ) { return /^innerHTML = '';$/.test( use ) } ) );
+check( 'nothing the tab is told is written as markup - innerHTML is only ever emptied', ( slotsSource.match( /innerHTML[^\n]*/g ) || [] ).every( use => /^innerHTML = '';$/.test( use ) ) );
 
-check( 'every address the Image Slots tab wrote or drew - the slots, the new slot, the scan - is read back by the router as the same screen and the same parts', codec.written.length > 6 && codec.mismatches.length === 0
+check( 'every address the Image Slots tab wrote or drew - the slots, the new slot, the scan - is read back by the router as the same screen and the same parts', codec.written.length > 20 && codec.mismatches.length === 0
 	&& codec.written.some( written => written.screen === 'slots' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.screen === 'slots' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@scan' ) )
-	&& codec.written.every( written => written.screen === 'slots' && written.parts.length <= 1 ) );
+	&& codec.written.some( written => written.screen === 'slots' && written.parts[0] === LOGO ) && codec.written.every( written => written.screen === 'slots' && written.parts.length <= 1 ) );
 
 
 done();
