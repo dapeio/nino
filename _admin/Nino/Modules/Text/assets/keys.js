@@ -3,19 +3,25 @@
  *	keys.js									"Text" module: find a text key - by its key, the names it
  *													is read by or what it says, hidden ones included - or
  *													browse the rows the keys fall into (the same ones as the
- *													Text panel, with the same names, see textkeys.js) and edit
- *													every key of a row: its text in the language the
- *													workbench edits content in (Nino.admin.workLocale) - or
- *													the one text of a global key - and what its shape is,
- *													its format, its limit, whether it is global and whether
- *													it is hidden from the Text panel. All of it is saved
- *													with the one Save of the row. A key is renamed and
- *													deleted from its own row. Every view has its address:
- *													#text/keys, #text/keys/<row>, #text/keys/<row>/<key>,
- *													#text/keys/@new, #text/keys/@rename/<key> and
- *													#text/keys/@scan - the form that
- *													creates or renames a key, which asks for it segment by
- *													segment: /<namespace>/<category>/<part>/<name>.
+ *													Text panel, with the same names, see textkeys.js). A row
+ *													of the list says how many keys it holds and how many are
+ *													hidden; it opens as the standard directory of its keys
+ *													(Nino.adminUi.directory()): the name and the key, the
+ *													section, the text of the working language, the format, the
+ *													limit and the state - in the order the templates read
+ *													them, so nothing sorts. ONE key is edited in the record
+ *													over it (Nino.adminUi.record(), #text/keys/<row>/<key>):
+ *													its text in every language and its settings - format,
+ *													limit, one text for all languages, hidden from the Text
+ *													panel. A save writes what was changed and nothing else:
+ *													the shape of the key by keys/save, each language that was
+ *													changed by keys/savebatch. The record renames the key in a
+ *													small dialog over it (#text/keys/@rename/<key>), deletes
+ *													it, and makes a new one (#text/keys/@new) from the four
+ *													parts /<namespace>/<category>/<part>/<name>. The scan of
+ *													the templates for missing keys is a view of its own
+ *													(#text/keys/@scan). The language the texts are shown in is
+ *													the workbench's own (Nino.admin.workLocale).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -25,6 +31,8 @@
 ( function(wn,dc,dE,bd) {
 
 	wn.Nino.admin = wn.Nino.admin || {};
+
+	const word = function( key ) { return Nino.content.getText( key ) };
 
 	Nino.admin.keys = {
 
@@ -43,79 +51,131 @@
 		// are unlocked on purpose
 		NAMESPACES			: [ 'project', 'template', 'feature', 'module' ],
 
-		// The languages that have a text file, the first of which is the language of the tab where the workbench has none
+		// The languages that have a text file, the ones of them the website does not serve yet
 		_locales				: [],
+		_inactive				: [],
 		// What the server sent (see \Nino\Modules\Text\Keys::apiList()) and the
 		// rows textkeys.js made of it: _groups is row id -> its keys. _categories
-		// is what the key form offers to choose from
+		// is what the form of a key offers to choose from
 		_data						: null,
 		_model					: null,
 		_categories			: {},
 		_groups					: {},
-		// The row that is open - its id is the part of a key it stands for,
-		// eg. 'template/page-home' - and the key that was asked for, if one was
-		_currentGroup		: null,
-		_focusKey				: null,
+		// The row whose keys are on screen - its id is the part of a key it stands
+		// for, eg. 'template/page-home' - null where the list is; which level is
+		// on screen ('list', 'group') and the one of the scan
+		_group					: null,
+		_shown					: null,
 		// What the search box holds, whether it is cut down to the keys that are
 		// hidden from the Text panel, and how many hits are drawn
 		_search					: { query : '', hiddenOnly : false, shown : 0 },
-		// The text a key was read as, kept for each key a save was turned down for as changed: the keys are read again after every save, and the
-		// next save is held to the text this tab was shown, not to the one it was never shown. Given up by Overwrite and by Reload, which
-		// are the answers that say what is to be done with the text of the other tab
-		_stamps					: {},
-		// The language the row on screen was drawn in: what it shows and the only one it writes
-		_shownLocale		: null,
-		// What the row on screen knows of its fields (see Nino.admin.textKeys.session()), what it holds
-		// besides the text - key -> the controls of its shape and what they held when it was drawn - and
-		// the line of its bar
-		_session				: null,
-		_settings				: {},
-		_status					: null,
-		// Which form the pane shows - 'group', 'new' (which is also the form that
-		// renames) or 'scan' - and the rows of the scan form, for isDirty()
+		// The directory of the keys of the open row, what the person chose in it
+		// for each row (kept while the tab lives), and the record over it
+		_directory			: null,
+		_states					: {},
+		_record					: null,
+		// What the body of the record on screen was given - the fields of the languages, the controls of the shape - and the context of the record
 		_view						: null,
-		_scanRows				: [],
-		// The button that opened the form of a key's own or the scan: Back
-		// returns the focus to it (a row's own link is found again, see _backTarget())
-		_opener					: null,
-		// The key the form of 'new' renames, null while it creates one; whether
-		// the namespaces that normally belong to a template, a feature or a module
-		// are unlocked; what the form held when it was drawn, for isDirty()
-		_renameFrom			: null,
-		_unlocked				: false,
-		_formInitial		: '',
+		_ctx						: null,
 		_fieldSeq				: 0,
-		_saving					: false,
+		// The text a key was read as, kept for each language a save was turned down for as changed: the keys are read again after every save, and the next
+		// save is held to the text this tab was shown, not to the one it was never shown. Given up by Overwrite and by Reload
+		_stamps					: {},
+		// A save wrote and the keys could not be read again: the record says so and offers Reload
+		_stale					: false,
+		// The key whose rename dialog is open, the dialog, whether it was opened as an entry of the history of its own, and what is to be done once the history is
+		// back at the record of the key (the rename is done and the record follows the new key)
+		_renaming				: null,
+		_dialog					: null,
+		_renamePushed		: false,
+		_renameLeaving	: false,
+		_afterRename		: null,
+		// The address is read for the form of a new key (its parts do not stand under a row), or for a record the address says is not the form of a new key
+		_wantNew				: false,
+		_forced					: null,
+		// The row and the namespace the form of a new key starts from, where the button that opened it stood in a row
+		_seed						: null,
+		// The scan is the view on screen, with its rows or still waiting for them
+		_scanning				: false,
+		_scanRows				: null,
+		_line						: null,
+		// The scan button of the bar of the list, and the button that opened the scan - one of the two bars - which the way back of the scan gives the focus to
+		_buttons				: { scan : null, add : null },
+		_opener					: null,
+		// A move of the person's own: the level it leads to takes the focus
+		_moved					: false,
+		_loading				: false,
 		_ready					: false,
+		// What the templates and the texts were when the keys were read (see Nino.admin.touch())
+		_stamp					: '',
 
 		/**
-		 *	Load every known text key, sort them into rows and render the list -
-		 *	or, on the first load, open the view the hash names
+		 *	Load every known text key, sort them into rows and render the list - or,
+		 *	where the address names a row, a key or a view, open it
 		 *
 		 *	@return		void
 		 */
 		init : function() {
 
-			if( dc.getElementById('keys-list') === null )
+			const keys = Nino.admin.keys;
+
+			if( dc.getElementById('keys-list') === null || keys._loading === true || keys._ready === true )
 				return;
 
-			Nino.admin.keys._load( function( status, response ) {
+			keys._loading = true;
+
+			// A text or a template written while the answer is on its way is not in it: the stamp is the one from before the request went out
+			const stamp = keys._stampNow();
+
+			keys._load( function( status, response ) {
+
+				keys._loading = false;
 
 				if( status !== 200 || response === null )
-					return Nino.admin.keys._showError( dc.getElementById('keys-list'), status, response );
+					return keys._showError( dc.getElementById('keys-list'), status, response );
 
-				// Before the first _show*() below, which writes the address
-				const hash = Nino.admin.keys._ready === false ? Nino.admin.router.current() : { panel : '', parts : [] };
+				keys._stamp = stamp;
+				keys._ready = true;
+				keys._renderList();
 
-				Nino.admin.keys._renderCategoryList();
-				Nino.admin.keys._showList();
-				Nino.admin.keys._ready 	= true;
+				if( keys._record === null ) {
+					keys._record = keys._makeRecord();
+					keys._share();
+				}
 
-				const target = hash.panel === 'keys' && hash.parts.length > 0 ? Nino.admin.keys._target( hash.parts ) : null;
-
-				if( target !== null )
-					Nino.admin.keys._open( target, false );
+				// Drawn from what this answer holds, whatever stood there before
+				keys._group = null;
+				keys._directory = null;
+				keys._shown = null;
+				keys.showCurrent();
 			} );
+		},
+
+		/**
+		 *	What the templates and the texts are: two counters of the shell, as one value
+		 *
+		 *	@return		{string}
+		 */
+		_stampNow : function() {
+			return Nino.admin.stamp( 'templates' )+ ':'+ Nino.admin.stamp( 'texts' );
+		},
+
+		/**
+		 *	Tell the shell that something was written, and take it as read by this tab: what the tab wrote itself is on screen
+		 *
+		 *	@param		{Array<string>}		topics		'texts' and, for a key a template reads, 'templates'
+		 *
+		 *	@return		void
+		 */
+		_wrote : function( topics ) {
+
+			const keys = Nino.admin.keys;
+			const same = keys._stampNow() === keys._stamp;
+
+			topics.forEach( function( topic ) { Nino.admin.touch( topic ) } );
+
+			if( same === true )
+				keys._stamp = keys._stampNow();
 		},
 
 		/**
@@ -132,6 +192,7 @@
 
 				if( status === 200 && response !== null ) {
 					Nino.admin.keys._locales = response.locales.map( function( entry ) { return entry.locale } );
+					Nino.admin.keys._inactive = response.locales.filter( function( entry ) { return entry.active === false } ).map( function( entry ) { return entry.locale } );
 					Nino.admin.keys._categories = response.categories ?? {};
 					Nino.admin.keys._data = response;
 					Nino.admin.keys._buildModel();
@@ -159,154 +220,22 @@
 		 */
 		_buildModel : function() {
 
-			const data = Nino.admin.keys._data;
-
-			Nino.admin.keys._model = Nino.admin.textKeys.build( {
-				entries : data.keys, pages : data.pages, templates : data.templates, features : data.features, order : data.order, admin : true, locale : Nino.admin.keys._locale(),
-			} );
-			Nino.admin.keys._groups = Object.create( null );
-
-			Object.keys( Nino.admin.keys._model.rows ).forEach( function( id ) {
-				Nino.admin.keys._groups[id] = Nino.admin.keys._model.rows[id].entries;
-			} );
-		},
-
-		/**
-		 *	What the parts of an address name: '@new', '@scan' and '@rename' behind a key - an at sign no key has,
-		 *	so that a row called new keeps an address of its own -, a row, a key in a row, or the list. What
-		 *	is not there is the list
-		 *
-		 *	@param		{Array}		parts					The address behind the tab's name
-		 *
-		 *	@return		{Object|null}						{ view : 'new', key } for the form of a key (null for a new one), { view : 'scan' }, { view : 'group', row, key }, null for the list
-		 */
-		_target : function( parts ) {
-
 			const keys = Nino.admin.keys;
+			const data = keys._data;
 
-			if( Nino.admin.router.isWord( parts, 0, 'new' ) === true && parts.length === 1 )
-				return { view : 'new', key : null };
+			keys._model = Nino.admin.textKeys.build( {
+				entries : data.keys, pages : data.pages, templates : data.templates, features : data.features, order : data.order, admin : true, locale : keys._locale(),
+			} );
+			keys._groups = Object.create( null );
 
-			if( Nino.admin.router.isWord( parts, 0, 'scan' ) === true && parts.length === 1 )
-				return { view : 'scan' };
-
-			if( Nino.admin.router.isWord( parts, 0, 'rename' ) === true )
-				return parts.length === 2 && keys._renamable( parts[1] ) === true ? { view : 'new', key : parts[1] } : null;
-
-			const group = keys._model === null ? null : Nino.admin.textKeys.resolve( keys._model, parts );
-
-			return group === null ? null : { view : 'group', row : group.row, key : group.key };
+			Object.keys( keys._model.rows ).forEach( function( id ) {
+				keys._groups[id] = keys._model.rows[id].entries;
+			} );
 		},
 
 		/**
-		 *	Whether a key of the list may be renamed: the names of the system and of the workbench are what the code
-		 *	that reads them asks for, and only their value is edited
-		 *
-		 *	@param		{string}	key
-		 *
-		 *	@return		{boolean}
-		 */
-		_renamable : function( key ) {
-
-			const model = Nino.admin.keys._model;
-
-			return model !== null && model.rowOf[key] !== undefined && key.indexOf('/_nino/') !== 0 && key.indexOf('/_admin/') !== 0;
-		},
-
-		/**
-		 *	Show a view of the tab: the row, the form of a key or the scan
-		 *
-		 *	@param		{Object}		target				See _target()
-		 *	@param		{boolean}		opened				The person opened it: the focus goes into it
-		 *	@param		{Element}		[opener]			The control that opened it
-		 *
-		 *	@return		void
-		 */
-		_open : function( target, opened, opener ) {
-
-			if( target.view === 'group' )
-				Nino.admin.keys._openGroup( target.row, target.key, opened );
-			else if( target.view === 'scan' )
-				Nino.admin.keys._openScanForm( opener, opened );
-			else
-				Nino.admin.keys._openNewKeyForm( target.key, opener, opened );
-		},
-
-		/**
-		 *	Re-show whichever level (list or form) is currently on - or, where the
-		 *	hash names this tab, the level it names: a step through the browser's
-		 *	history changes the address and nothing else. Leaving a form that holds
-		 *	unsaved input asks first, as its back link does
-		 *
-		 *	@return		void
-		 */
-		showCurrent : function() {
-
-			if( Nino.admin.keys._ready === false )
-				return;
-
-			const hash = Nino.admin.router.current();
-			if( hash.panel === 'keys' && Nino.admin.keys._follow( hash.parts ) === true )
-				return;
-
-			Nino.admin.keys._showLevel();
-		},
-
-		_showLevel : function() {
-
-			if( dc.getElementById('keys-form').classList.contains('admin-hidden') === false )
-				return Nino.admin.keys._showForm();
-
-			Nino.admin.keys._showList();
-		},
-
-		/**
-		 *	Move to the level the hash names, if it is not the one on screen. A
-		 *	row, or a key - which is in one - opens it, and so does the form that
-		 *	creates, renames or scans; a hash that names nothing there is, is the
-		 *	list. Leaving a form with unsaved input asks first
-		 *
-		 *	@param		{Array}		parts					The hash behind the tab's name
-		 *
-		 *	@return		{boolean}									Whether a move was made or is being asked about
-		 */
-		_follow : function( parts ) {
-
-			const keys = Nino.admin.keys;
-			const open = dc.getElementById('keys-form').classList.contains('admin-hidden') === false;
-			const target = parts.length > 0 ? keys._target( parts ) : null;
-
-			const same = target === null ? open === false
-				: ( open === true && keys._view === target.view && ( target.view === 'scan' || ( target.view === 'new' ? keys._renameFrom === target.key : keys._currentGroup === target.row ) ) );
-
-			if( same === true ) {
-
-				// Another key of the row on screen is no move, but the field the
-				// address names is the one shown and the one it keeps
-				if( target !== null && target.view === 'group' && target.key !== keys._focusKey ) {
-					keys._focusKey = target.key;
-
-					if( target.key !== null )
-						keys._focusField( target.key );
-				}
-
-				return false;
-			}
-
-			Nino.admin.router.leave( [ 'keys' ], open, function() {
-				if( target === null ) {
-					keys._destroyHtmlEditors();
-					keys._showList();
-					return;
-				}
-				keys._open( target, false );
-			}, keys._showLevel );
-
-			return true;
-		},
-
-		/**
-		 *	Call a keys/* admin action
+		 *	Call a keys/* admin action - this tab's name for Nino.adminUi.api.call(),
+		 *	which owns where the request goes
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "keys/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
@@ -332,244 +261,310 @@
 		},
 
 		/**
-		 *	The list again as it stands: the focus stays where it is, unless it
-		 *	stood in the level that is hidden now (see Nino.adminUi.showLevel()).
-		 *	Back goes to the control that opened the form
+		 *	The row an address names: its first part, where that is a row and no word of the router. Nothing for the list
 		 *
-		 *	@param		{Element|null}	[opener]	Back: the control to give the focus to; null where there is none to name
+		 *	@param		{Object}	at						router.current()
 		 *
-		 *	@return		void
+		 *	@return		{string|null}
 		 */
-		_showList : function( opener ) {
-
-			Nino.admin.keys._view = null;
-			Nino.admin.router.set( 'keys', [] );
-
-			if( opener === undefined )
-				Nino.adminUi.showLevel( 'keys-list', { focus : false } );
-			else
-				Nino.adminUi.backTo( 'keys-list', opener );
-		},
-
-		/**
-		 *	The address of the form on screen: a row, or the form that creates, renames or scans
-		 *
-		 *	@return		{Array}
-		 */
-		_parts : function() {
+		_addressGroup : function( at ) {
 
 			const keys = Nino.admin.keys;
 
-			if( keys._view === 'scan' )
-				return [ Nino.admin.router.word('scan') ];
+			if( keys._model === null || at.parts.length === 0 || Nino.admin.router.wordOf( at.parts, 0 ) !== '' )
+				return null;
 
-			if( keys._view === 'new' )
-				return keys._renameFrom === null ? [ Nino.admin.router.word('new') ] : [ Nino.admin.router.word('rename'), keys._renameFrom ];
+			const id = String( at.parts[0] );
 
-			return Nino.admin.textKeys.hashParts( keys._currentGroup, keys._focusKey );
+			return keys._model.rows[id] === undefined ? null : id;
 		},
 
 		/**
-		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *	Whether a key of the list may be renamed: the names of the system and of the workbench are what the code
+		 *	that reads them asks for, and only their value is edited
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{boolean}
+		 */
+		_renamable : function( key ) {
+
+			const model = Nino.admin.keys._model;
+
+			return model !== null && model.rowOf[key] !== undefined && key.indexOf('/_nino/') !== 0 && key.indexOf('/_admin/') !== 0;
+		},
+
+		/**
+		 *	The tab is shown, or the address moved. The record reads the address itself; the words of the tab - @new, @scan, @rename and a key - are answered here
+		 *	first (see _follow()). Where a text or a template was written since the keys were read they are read again, not while something stands over the table
+		 *	that would be drawn under it. An address of another panel (a click on the rail) leaves the level in memory as it is, and writes its address
 		 *
 		 *	@return		void
 		 */
-		_showForm : function( opened ) {
-			Nino.admin.router.set( 'keys', Nino.admin.keys._parts() );
-			Nino.adminUi.showLevel( 'keys-form', opened === true ? {} : { focus : false } );
+		showCurrent : function() {
+
+			const keys = Nino.admin.keys;
+
+			if( keys._ready === false ) {
+				keys.init();
+				return;
+			}
+
+			const standing = keys._record.isOpen() === true || keys._scanning === true || keys._dialog !== null;
+
+			if( standing === false && keys._stampNow() !== keys._stamp ) {
+				keys._ready = false;
+				keys.init();
+				return;
+			}
+
+			const at = Nino.admin.router.current();
+
+			if( at.panel !== 'keys' ) {
+				keys._address();
+				return;
+			}
+
+			keys._follow( at );
 		},
 
 		/**
-		 *	The control Back returns the focus to from the form that is open: the
-		 *	row of the group as the list is drawn now, or the button that opened a
-		 *	form of a key's own or the scan
+		 *	What the address names, and who answers it. The words of the tab are the tab's own and are never read as a row or as the key of a record: @scan is the view
+		 *	of the scan, @rename and a key the rename dialog over the record of that key, @new the form of a new key in the record. Everything else is a row, a key in
+		 *	it - the record's - or the list. What is on screen is the screen: a step through the history that leaves a view asks first where there is input
+		 *
+		 *	@param		{Object}	at						router.current()
+		 *
+		 *	@return		void
+		 */
+		_follow : function( at ) {
+
+			const keys = Nino.admin.keys;
+			const router = Nino.admin.router;
+			const parts = at.parts;
+			const single = parts.length === 1;
+			const isNew = single === true && router.isWord( parts, 0, 'new' ) === true;
+			const isScan = single === true && router.isWord( parts, 0, 'scan' ) === true;
+			const isRename = parts.length === 2 && router.isWord( parts, 0, 'rename' ) === true && keys._renamable( parts[1] ) === true;
+
+			// The history is back at the record of the key that was renamed: the record follows the new key
+			if( keys._afterRename !== null ) {
+				keys._finishRename();
+				return;
+			}
+
+			if( keys._dialog !== null ) {
+
+				if( isRename === true && parts[1] === keys._renaming )
+					return;
+
+				keys._leaveRename();
+				return;
+			}
+
+			if( keys._scanning === true ) {
+
+				if( isScan === true )
+					return;
+
+				router.leave( [ 'keys' ], true, function() {
+					keys._leaveScan( null );
+					keys._follow( router.current() );
+				}, keys._address );
+
+				return;
+			}
+
+			if( isScan === true ) {
+
+				router.leave( [ 'keys' ], keys._record.isOpen(), function() {
+
+					// A record that holds input was asked about; one that does not is closed here
+					if( keys._record.isOpen() === true )
+						keys._record.close();
+
+					if( keys._record.isOpen() === true )
+						return keys._address();
+
+					keys._openScan( false, false );
+				}, keys._address );
+
+				return;
+			}
+
+			if( isRename === true ) {
+				keys._openRenameByAddress( parts[1] );
+				return;
+			}
+
+			if( isNew === true ) {
+
+				if( keys._shown === null )
+					keys._level( null );
+
+				if( keys._record.isOpen() === false )
+					keys._seed = null;
+
+				keys._wantNew = true;
+
+				try {
+					keys._record.follow();
+				}
+				finally {
+					keys._wantNew = false;
+				}
+
+				return;
+			}
+
+			const want = keys._addressGroup( at );
+
+			// A form of a new key that stands open reads the address as the key of a record: what the address says is the row, not that
+			if( keys._record.creating() === true )
+				keys._forced = { row : want };
+
+			if( want !== keys._group || ( want !== null && keys._directory === null ) || keys._shown === null )
+				keys._level( want );
+			else if( want === null )
+				Nino.adminUi.showLevel( 'keys-list', { focus : false } );
+
+			try {
+				keys._record.follow();
+			}
+			finally {
+				keys._forced = null;
+			}
+		},
+
+		/**
+		 *	Write the address of what is on screen and show its level: the scan, the form of a new key, a key of a row, the row, or the list
+		 *
+		 *	@return		void
+		 */
+		_address : function() {
+
+			const keys = Nino.admin.keys;
+			const router = Nino.admin.router;
+			let parts = [];
+
+			if( keys._scanning === true )
+				parts = [ router.word('scan') ];
+			else if( keys._dialog !== null && keys._renaming !== null )
+				parts = [ router.word('rename'), keys._renaming ];
+			else if( keys._record !== null && keys._record.creating() === true )
+				parts = [ router.word('new') ];
+			else if( keys._group !== null ) {
+				parts = [ keys._group ];
+
+				if( keys._record !== null && keys._record.isOpen() === true && keys._record.key() !== null )
+					parts.push( keys._record.key() );
+			}
+
+			router.set( 'keys', parts );
+			Nino.adminUi.showLevel( keys._scanning === true || keys._group !== null ? 'keys-form' : 'keys-list', { focus : false } );
+		},
+
+		/**
+		 *	Show the level the address names: the list - which is drawn again, for what was edited since it was shown has changed its counts, and the focus goes
+		 *	back to the row that was open where the person came back - or the keys of a row, drawn from the state the person left them in
+		 *
+		 *	@param		{string|null}	group
+		 *
+		 *	@return		void
+		 */
+		_level : function( group ) {
+
+			const keys = Nino.admin.keys;
+			const was = keys._group;
+			const moved = keys._moved;
+
+			keys._moved = false;
+
+			// A record that stands open keeps its fields until it is closed
+			if( keys._record.isOpen() === false )
+				keys._release();
+
+			keys._group = group;
+
+			if( group === null ) {
+
+				keys._directory = null;
+				keys._shown = 'list';
+				keys._renderBody();
+
+				if( moved === true && was !== null )
+					Nino.adminUi.backTo( 'keys-list', keys._rowOf( was ) );
+				else
+					Nino.adminUi.showLevel( 'keys-list', { focus : false } );
+
+				return;
+			}
+
+			keys._drawGroup( group );
+			keys._shown = 'group';
+			Nino.adminUi.showLevel( 'keys-form', moved === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	A move of the person's own inside the tab: the address is a new entry of the history, and the screen follows it
+		 *
+		 *	@param		{Array}		parts					The address behind the tab's name
+		 *
+		 *	@return		void
+		 */
+		_go : function( parts ) {
+			Nino.admin.keys._moved = true;
+			Nino.admin.router.go( 'keys', parts );
+			Nino.admin.keys.showCurrent();
+		},
+
+		/**
+		 *	The link of a row as the list is drawn now: the list is drawn again whenever it is shown, and the link that was pressed is gone with the old drawing
+		 *
+		 *	@param		{string}	group			The row's id
 		 *
 		 *	@return		{Element|null}
 		 */
-		_backTarget : function() {
+		_rowOf : function( group ) {
 
-			if( Nino.admin.keys._view !== 'group' )
-				return Nino.admin.keys._opener;
+			const row = Array.from( dc.getElementById('keys-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === group } );
 
-			const row = Array.from( dc.getElementById('keys-list').querySelectorAll('li') ).find( function( li ) { return li.dataset.row === Nino.admin.keys._currentGroup } );
 			return row === undefined ? null : row.querySelector('a');
 		},
 
-		/**
-		 *	The one way back of a form: "Back to <the panel>" in the context bar, which leaves the form for the list
-		 *	and puts the focus on what opened it. A form that holds unsaved input is asked about first by the shell
-		 *
-		 *	@param		{Element}		wrap					The level the bar stands in
-		 *	@param		{string}		title					The name of the view
-		 *
-		 *	@return		{Element}
-		 */
-		_contextBar : function( wrap, title ) {
-
-			const bar = Nino.adminUi.contextBar( {
-				back : { to : Nino.content.getText('/_admin/text/label/back-name'), href : Nino.admin.router.href( 'keys', [] ), onClick : function() {
-					Nino.admin.router.go( 'keys', [] );
-					Nino.admin.keys._destroyHtmlEditors();
-					Nino.admin.keys._showList( Nino.admin.keys._backTarget() );
-				} },
-				title : title,
-			} );
-
-			// What is shown and written in a language says which, where it is not the native one
-			Nino.adminUi.localeBadge( Nino.admin.keys._locale(), bar );
-
-			return bar;
-		},
-
+		// ------------------------------------------------------------------ The first level
 
 		/**
-		 *	The search of the list - a box and the filter for the keys hidden from
-		 *	the Text panel - and the line that says how many hits there are
+		 *	Draw the controls of the list - the search and the chip for the keys hidden from the Text panel - and the line that says how many hits there are, the place
+		 *	the rows or the hits go, and the bar of the list: the scan beside the main button that makes a new key. Then the rows
 		 *
-		 *	@return		{Element}
+		 *	@return		void
 		 */
-		_renderSearchBar : function() {
+		_renderList : function() {
+
+			const keys = Nino.admin.keys;
+			const wrap = dc.getElementById('keys-list');
+
+			wrap.innerHTML = '';
 
 			const search = Nino.admin.textKeys.searchBar( {
-				query : Nino.admin.keys._search.query,
+				query : keys._search.query,
 				onQuery : function( query ) {
-					Nino.admin.keys._search.query = query;
-					Nino.admin.keys._search.shown = 0;
-					Nino.admin.keys._renderBody();
+					keys._search.query = query;
+					keys._search.shown = 0;
+					keys._renderBody();
 				},
 				chips : [ { id : 'hidden', onToggle : function() {
-					Nino.admin.keys._search.hiddenOnly = Nino.admin.keys._search.hiddenOnly === false;
-					Nino.admin.keys._search.shown = 0;
-					Nino.admin.keys._renderBody();
+					keys._search.hiddenOnly = keys._search.hiddenOnly === false;
+					keys._search.shown = 0;
+					keys._renderBody();
 				} } ],
 			} );
 
 			search.input.id = 'keys-search';
 			search.chips.hidden.id = 'keys-list-hidden';
-			search.chips.hidden.textContent = Nino.content.getText('/_admin/keys/label/hidden-only');
-			search.chips.hidden.setAttribute( 'aria-pressed', Nino.admin.keys._search.hiddenOnly === true ? 'true' : 'false' );
-
-			return search.bar;
-		},
-
-		/**
-		 *	The workbench's content language moved (Nino.admin.workLocale), and the
-		 *	shell has asked about the unsaved input of this tab first: the row on
-		 *	screen is drawn again in the other language, the list names its rows in it.
-		 *	The other forms of the tab (a new key, the scan) have no translation to
-		 *	show and read the language when they are drawn
-		 *
-		 *	@param		{string}	locale
-		 *
-		 *	@return		void
-		 */
-		_followLocale : function( locale ) {
-
-			if( Nino.admin.keys._data === null )
-				return;
-
-			const form = dc.getElementById('keys-form');
-
-			if( form.classList.contains('admin-hidden') === false && Nino.admin.keys._view === 'group' && dc.getElementById('keys-edit-form') !== null ) {
-
-				if( locale === Nino.admin.keys._shownLocale )
-					return;
-
-				Nino.admin.keys._buildModel();
-				Nino.admin.keys._renderGroupForm( {}, {} );
-				return;
-			}
-
-			// The forms that make a key and scan write in the language, and say which
-			const bar = form.classList.contains('admin-hidden') === false ? form.querySelector('.nino-admin-contextbar') : null;
-
-			if( bar !== null )
-				Nino.adminUi.localeBadge( locale, bar );
-
-			Nino.admin.keys._search.shown = 0;
-			Nino.admin.keys._buildModel();
-			Nino.admin.keys._renderBody();
-		},
-
-		/**
-		 *	The hits of the search, 50 at a time: a row for each key (see
-		 *	Nino.admin.textKeys.hitList()). A hit opens the row at the key; only
-		 *	the code of a language switches the language, asked for as every change of it is
-		 *
-		 *	@param		{Element}	body
-		 *
-		 *	@return		void
-		 */
-		_renderHits : function( body ) {
-
-			const search 	= Nino.admin.keys._search;
-			const locale 	= Nino.admin.keys._locale();
-			const hits 		= Nino.admin.textKeys.search( Nino.admin.keys._model, { query : search.query, locale : locale, onlyHidden : search.hiddenOnly } );
-			const status 	= dc.getElementById('keys-list-status');
-			const step 		= Nino.adminUi.ELEMENTLIST_RESULTS;
-
-			if( search.shown === 0 )
-				search.shown = step;
-
-			status.textContent = Nino.adminUi.format( Nino.content.getText( hits.length === 1 ? '/_admin/text/msg/result' : '/_admin/text/msg/results' ), hits.length );
-
-			if( hits.length === 0 ) {
-				body.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/text/msg/nothing') ) );
-				return;
-			}
-
-			body.appendChild( Nino.admin.textKeys.hitList( hits.slice( 0, search.shown ), locale, {
-				href : function( hit ) { return Nino.admin.router.href( 'keys', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) ) },
-				onOpen : function( hit ) {
-					Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) );
-					Nino.admin.keys._openGroup( hit.item.row.id, hit.item.field.entry.key, true );
-				},
-				onLanguage : function( code ) { Nino.admin.workLocale.choose( code ) },
-			} ) );
-
-			if( hits.length > search.shown ) {
-				body.appendChild( Nino.adminUi.button( Nino.content.getText('/_admin/text/label/more'), function() {
-					search.shown += step;
-					Nino.admin.keys._renderBody();
-				}, { kind : 'secondary' } ) );
-			}
-		},
-
-		/**
-		 *	Draw what is below the search: the hits where something is searched
-		 *	for, the rows otherwise
-		 *
-		 *	@return		void
-		 */
-		_renderBody : function() {
-
-			const body = dc.getElementById('keys-list-body');
-
-			if( body === null )
-				return;
-
-			body.innerHTML = '';
-
-			if( Nino.admin.keys._search.query.trim() === '' && Nino.admin.keys._search.hiddenOnly === false ) {
-				dc.getElementById('keys-list-status').textContent = '';
-				Nino.admin.keys._fillBody( body );
-				return;
-			}
-
-			Nino.admin.keys._renderHits( body );
-		},
-
-		/**
-		 *	Render the search, the rows and the bar of the list: the scan beside the main button that makes a new key
-		 *
-		 *	@return		void
-		 */
-		_renderCategoryList : function() {
-
-			const wrap = dc.getElementById('keys-list');
-			wrap.innerHTML = '';
-
-			wrap.appendChild( Nino.admin.keys._renderSearchBar() );
+			search.chips.hidden.textContent = word('/_admin/keys/label/hidden-only');
+			wrap.appendChild( search.bar );
 
 			const status = dc.createElement('p');
 			status.id = 'keys-list-status';
@@ -577,28 +572,89 @@
 			status.setAttribute( 'aria-live', 'polite' );
 			wrap.appendChild( status );
 
-			const body = dc.createElement('section');
+			const body = dc.createElement('div');
 			body.id = 'keys-list-body';
 			wrap.appendChild( body );
 
-			Nino.admin.keys._renderBody();
+			const bar = keys._listBar( function() { return null } );
 
-			const scanBtn = Nino.adminUi.button( Nino.content.getText('/_admin/keys/label/scan'), function() {
-				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('scan') ] );
-				Nino.admin.keys._openScanForm( scanBtn, true );
-			}, { kind : 'secondary' } );
+			keys._buttons = { scan : bar.scan, add : bar.add };
+			wrap.appendChild( bar.el );
 
-			const addBtn = Nino.adminUi.button( Nino.content.getText('/_admin/keys/label/new'), function() {
-				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('new') ] );
-				Nino.admin.keys._openNewKeyForm( null, addBtn, true );
-			} );
-
-			wrap.appendChild( Nino.adminUi.actionBar( { list : true, secondary : [ scanBtn ], primary : addBtn } ).el );
+			keys._renderBody();
 		},
 
 		/**
-		 *	The rows, in the blocks and groups textkeys.js made of them: each a
-		 *	link that opens the row's form, and has its address
+		 *	The bar of the list - and of the table of a row, under it: the scan beside the main button that makes a new key
+		 *
+		 *	@param		{Function}	seed		seed() answers what the form of a new key starts from - { namespace, category } - or null
+		 *
+		 *	@return		{Object}									{ el, scan, add }
+		 */
+		_listBar : function( seed ) {
+
+			const keys = Nino.admin.keys;
+
+			const scan = Nino.adminUi.button( word('/_admin/keys/label/scan'), function() {
+				keys._opener = scan;
+				keys._openScan( true, true );
+			}, { kind : 'secondary' } );
+
+			const add = Nino.adminUi.button( word('/_admin/keys/label/new'), function() {
+				keys._newKey( add, seed() );
+			} );
+
+			return { el : Nino.adminUi.actionBar( { list : true, secondary : [ scan ], primary : add } ).el, scan : scan, add : add };
+		},
+
+		/**
+		 *	Draw what is below the search: the hits where something is searched for, the rows otherwise
+		 *
+		 *	@return		void
+		 */
+		_renderBody : function() {
+
+			const keys = Nino.admin.keys;
+			const body = dc.getElementById('keys-list-body');
+
+			if( body === null || keys._model === null )
+				return;
+
+			const chip = dc.getElementById('keys-list-hidden');
+
+			chip.setAttribute( 'aria-pressed', keys._search.hiddenOnly === true ? 'true' : 'false' );
+			body.innerHTML = '';
+
+			if( keys._search.query.trim() === '' && keys._search.hiddenOnly === false ) {
+				dc.getElementById('keys-list-status').textContent = '';
+				keys._fillBody( body );
+				return;
+			}
+
+			keys._renderHits( body );
+		},
+
+		/**
+		 *	What a row of the list says under its name: how many keys it holds and - where there are any - how many of them are hidden from the Text panel
+		 *
+		 *	@param		{Object}	row
+		 *
+		 *	@return		{string}
+		 */
+		_counts : function( row ) {
+
+			const total = row.entries.length;
+			const hidden = row.entries.filter( function( entry ) { return entry.blacklisted === true } ).length;
+			const words = [ Nino.adminUi.format( word( total === 1 ? '/_admin/keys/count/key' : '/_admin/keys/count/keys' ), total ) ];
+
+			if( hidden > 0 )
+				words.push( Nino.adminUi.format( word('/_admin/keys/count/hidden'), hidden ) );
+
+			return words.join(' · ');
+		},
+
+		/**
+		 *	The rows, in the blocks and groups textkeys.js made of them: each a link that opens the keys of the row, and has its address
 		 *
 		 *	@param		{Element}	body
 		 *
@@ -606,22 +662,22 @@
 		 */
 		_fillBody : function( body ) {
 
-			const model 	= Nino.admin.keys._model;
-			const locale 	= Nino.admin.keys._locale();
+			const keys = Nino.admin.keys;
+			const model = keys._model;
+			const locale = keys._locale();
 
 			if( Object.keys( model.rows ).length === 0 ) {
-				body.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/keys/empty') ) );
+				body.appendChild( Nino.adminUi.emptyState( word('/_admin/keys/empty') ) );
 				return;
 			}
 
 			model.blocks.forEach( function( block ) {
 
 				const part = dc.createElement('section');
-				part.appendChild( Nino.adminUi.sectionTitle( Nino.content.getText( '/_admin/text/group/'+ block.id ) ) );
+				part.appendChild( Nino.adminUi.sectionTitle( word( '/_admin/text/group/'+ block.id ) ) );
 
 				( block.rows !== undefined ? [ { id : block.id, rows : block.rows } ] : block.groups ).forEach( function( group ) {
 
-					// A row opens a form and writes its address: a link, with that address
 					part.appendChild( Nino.adminUi.list( group.rows.map( function( id ) {
 
 						const row = model.rows[id];
@@ -629,15 +685,12 @@
 						return {
 							key : id,
 							title : Nino.admin.textKeys.rowLabel( model, row, locale ),
-							detail : Nino.admin.textKeys.rowSummary( row, locale ),
+							detail : keys._counts( row ),
 							sub : Nino.admin.textKeys.rowDepth( row ) > 0,
 							href : Nino.admin.router.href( 'keys', Nino.admin.textKeys.hashParts( id ) ),
-							onOpen : function() {
-								Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( id ) );
-								Nino.admin.keys._openGroup( id, null, true );
-							},
+							onOpen : function() { keys._go( Nino.admin.textKeys.hashParts( id ) ) },
 						};
-					} ), { title : block.rows === undefined && group.id !== 'common' ? Nino.content.getText( '/_admin/text/group/'+ group.id ) : '', level : 3 } ) );
+					} ), { title : block.rows === undefined && group.id !== 'common' ? word( '/_admin/text/group/'+ group.id ) : '', level : 3 } ) );
 				} );
 
 				body.appendChild( part );
@@ -645,70 +698,511 @@
 		},
 
 		/**
-		 *	Open a row's form, at one of its keys where one was asked for: that
-		 *	field is scrolled to and marked
+		 *	The hits of the search, 50 at a time: a row for each key (see Nino.admin.textKeys.hitList()). A hit opens the record of its key; only the code of
+		 *	a language switches the language, asked for as every change of it is
 		 *
-		 *	@param		{string}		group					The row's id
-		 *	@param		{string|null}	[key]
-		 *	@param		{boolean}			[opened]			The person opened it - a row, or a hit: the focus goes into the form, to the field of the key where there is one. Otherwise it is shown as it stands, by the address
+		 *	@param		{Element}	body
 		 *
 		 *	@return		void
 		 */
-		_openGroup : function( group, key, opened ) {
+		_renderHits : function( body ) {
 
-			Nino.admin.keys._destroyHtmlEditors();
+			const keys = Nino.admin.keys;
+			const search = keys._search;
+			const locale = keys._locale();
+			const hits = Nino.admin.textKeys.search( keys._model, { query : search.query, locale : locale, onlyHidden : search.hiddenOnly } );
+			const status = dc.getElementById('keys-list-status');
+			const step = Nino.adminUi.ELEMENTLIST_RESULTS;
 
-			Nino.admin.keys._currentGroup = group;
-			Nino.admin.keys._focusKey 		= key ?? null;
-			Nino.admin.keys._view 				= 'group';
+			if( search.shown === 0 )
+				search.shown = step;
 
-			Nino.admin.keys._renderGroupForm( {}, {} );
-			Nino.admin.keys._showForm( opened === true );
+			status.textContent = Nino.adminUi.format( word( hits.length === 1 ? '/_admin/text/msg/result' : '/_admin/text/msg/results' ), hits.length );
 
-			if( Nino.admin.keys._focusKey !== null )
-				Nino.admin.keys._focusField( Nino.admin.keys._focusKey );
+			if( hits.length === 0 ) {
+				body.appendChild( Nino.adminUi.emptyState( word('/_admin/text/msg/nothing') ) );
+				return;
+			}
+
+			body.appendChild( Nino.admin.textKeys.hitList( hits.slice( 0, search.shown ), locale, {
+				href : function( hit ) { return Nino.admin.router.href( 'keys', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) ) },
+				onOpen : function( hit ) { keys._go( Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) ) },
+				onLanguage : function( code ) { Nino.admin.workLocale.choose( code ) },
+			} ) );
+
+			if( hits.length > search.shown ) {
+				body.appendChild( Nino.adminUi.button( word('/_admin/text/label/more'), function() {
+					search.shown += step;
+					keys._renderBody();
+				}, { kind : 'secondary' } ) );
+			}
 		},
 
 		/**
-		 *	Scroll to the field of a key, mark it and put the cursor in its text
+		 *	The workbench's content language moved (Nino.admin.workLocale), and the shell has asked about the unsaved input of this tab first: the rows are named in
+		 *	the other language, the table of the open row says its texts in it, and a record that is open is drawn again with that language first - what it held
+		 *	is saved or given up by now. The form of a new key says in which language its start value is written; the scan says it in its bar
+		 *
+		 *	@param		{string}	locale
+		 *
+		 *	@return		void
+		 */
+		_followLocale : function( locale ) {
+
+			const keys = Nino.admin.keys;
+
+			if( keys._data === null || keys._model === null )
+				return;
+
+			keys._buildModel();
+			keys._search.shown = 0;
+
+			if( dc.getElementById('keys-list-body') !== null )
+				keys._renderBody();
+
+			if( keys._scanning === true ) {
+
+				const bar = dc.getElementById('keys-form').querySelector('.nino-admin-contextbar');
+
+				if( bar !== null )
+					Nino.adminUi.localeBadge( locale, bar );
+
+				return;
+			}
+
+			if( keys._group !== null && keys._model.rows[keys._group] !== undefined )
+				keys._drawGroup( keys._group );
+
+			if( keys._record === null || keys._record.isOpen() === false || keys._view === null )
+				return;
+
+			if( keys._view.creating === true ) {
+				keys._view.mark();
+				return;
+			}
+
+			keys._redraw();
+		},
+
+		// ------------------------------------------------------------------ The keys of a row: the table
+
+		/**
+		 *	The rows of the directory of a row of the list: a key each, in the order of the sections and of the templates. What the table shows of a key, and the key
+		 *	itself for the record to read
+		 *
+		 *	@param		{string}	group					The row's id
+		 *
+		 *	@return		{Array}
+		 */
+		_rows : function( group ) {
+
+			const keys = Nino.admin.keys;
+			const T = Nino.admin.textKeys;
+			const locale = keys._locale();
+			const all = word('/_admin/text/label/all-languages');
+			const hidden = word('/_admin/keys/label/blacklist');
+			const rows = [];
+
+			T.sections( keys._model, keys._model.rows[group] ).forEach( function( section ) {
+
+				const place = section.route === '' ? section.label : section.label+ ' ('+ section.route+ ')';
+
+				section.fields.forEach( function( field ) {
+
+					const entry = field.entry;
+					const shown = T.plain( T.valueOf( entry, locale ) );
+					const formatWord = keys.FORMATS.indexOf( entry.format ) === -1 ? String( entry.format ) : word( '/_admin/keys/format/'+ entry.format );
+					const states = [];
+
+					if( entry.global === true )
+						states.push( { text : all } );
+
+					if( entry.blacklisted === true )
+						states.push( { text : hidden, state : 'warn' } );
+
+					rows.push( {
+						key : entry.key,
+						entry : entry,
+						name : field.label,
+						place : place,
+						sectionId : section.id,
+						title : [ place, field.label ].filter( function( part, at, parts ) { return at === 0 || part !== parts[at - 1] } ).join(' › '),
+						text : shown.length > 200 ? shown.slice( 0, 200 )+ '…' : shown,
+						format : entry.formatSet === true ? formatWord : Nino.adminUi.format( word('/_admin/keys/col/auto'), formatWord ),
+						limit : entry.maxlengthSet === true ? String( entry.maxlength ) : Nino.adminUi.format( word('/_admin/keys/col/auto'), entry.maxlength ),
+						hidden : entry.blacklisted === true,
+						states : states,
+						// What a person looks for: every language's text, whole
+						found : Object.keys( entry.values ).map( function( code ) { return T.plain( entry.values[code] ) } ).join(' '),
+					} );
+				} );
+			} );
+
+			return rows;
+		},
+
+		/**
+		 *	The row of one key, as the directory and the record have it: null for a key that is not in the open row
 		 *
 		 *	@param		{string}	key
 		 *
-		 *	@return		void
+		 *	@return		{Object|null}
 		 */
-		_focusField : function( key ) {
+		_find : function( key ) {
 
-			const field = Array.from( dc.getElementById('keys-form').querySelectorAll('[data-key]') ).find( function( el ) { return el.dataset.key === key } );
+			const keys = Nino.admin.keys;
 
-			if( field === undefined )
-				return;
+			if( keys._group === null || keys._model === null || keys._model.rows[keys._group] === undefined )
+				return null;
 
-			field.classList.add('is-found');
+			const row = keys._rows( keys._group ).find( function( one ) { return one.key === key } );
 
-			if( typeof field.scrollIntoView === 'function' )
-				field.scrollIntoView( { block : 'center' } );
-
-			const control = field.querySelector('textarea, input, [contenteditable="true"]');
-
-			if( control !== null && typeof control.focus === 'function' )
-				control.focus( { preventScroll : true } );
+			return row === undefined ? null : row;
 		},
 
 		/**
-		 *	The textfills a text may take, for the "[ ]" at the name of a field: asked for when the dialog opens,
-		 *	in the language on screen
+		 *	The key of the model, whatever row the table shows
 		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{Object|undefined}
+		 */
+		_entryOf : function( key ) {
+
+			const keys = Nino.admin.keys;
+
+			if( keys._model === null || keys._model.rowOf[key] === undefined )
+				return undefined;
+
+			return ( keys._groups[keys._model.rowOf[key]] ?? [] ).find( function( entry ) { return entry.key === key } );
+		},
+
+		/**
+		 *	The keys of a row: the way back and the name of the row in the context bar, and under it the directory - the section as its category, the search, the
+		 *	select "Show", and the table in the order the templates read the keys - with the bar of the list under it. What the person chose in it is kept for the
+		 *	row while the tab lives
+		 *
+		 *	@param		{string}	group					The row's id
+		 *
+		 *	@return		void
+		 */
+		_drawGroup : function( group ) {
+
+			const keys = Nino.admin.keys;
+			const T = Nino.admin.textKeys;
+			const model = keys._model;
+			const row = model.rows[group];
+			const locale = keys._locale();
+
+			const wrap = dc.getElementById('keys-form');
+			wrap.innerHTML = '';
+
+			const back = Nino.adminUi.contextBar( {
+				back : { to : word('/_admin/text/label/back-name'), href : Nino.admin.router.href( 'keys', [] ), onClick : function() { keys._moved = true; Nino.admin.router.go( 'keys', [] ); keys.showCurrent() } },
+				title : T.rowLabel( model, row, locale ),
+			} );
+			wrap.appendChild( back );
+			Nino.adminUi.localeBadge( locale, back );
+
+			const mount = Nino.adminUi.el( 'div' );
+			wrap.appendChild( mount );
+
+			const sections = T.sections( model, row );
+
+			keys._directory = Nino.adminUi.directory( {
+				mount : mount,
+				rowKey : 'key',
+				state : keys._states[group],
+				onState : function( now ) { keys._states[group] = now },
+				columns : [
+					{ key : 'name', label : word('/_admin/text/col/name'), type : 'string', primary : true, sortable : false, render : keys._nameCell },
+					{ key : 'place', label : word('/_admin/text/col/section'), type : 'string', sortable : false, narrow : false },
+					{ key : 'text', label : Nino.adminUi.format( word('/_admin/text/col/text'), Nino.adminUi.localeName( locale ) ), type : 'string', cell : 'clamp', fill : true, sortable : false },
+					{ key : 'format', label : word('/_admin/keys/label/format'), type : 'string', sortable : false, narrow : false },
+					{ key : 'limit', label : word('/_admin/keys/label/limit'), type : 'string', sortable : false, narrow : false },
+					{ key : 'states', label : word('/_admin/keys/col/state'), sortable : false, render : keys._stateCell },
+				],
+				labels : { search : word('/_admin/text/label/search'), empty : word('/_admin/keys/empty'), noMatch : word('/_admin/text/msg/nothing') },
+				// The sections of the row, in the order the templates read them; a row that has one section has nothing to narrow to
+				category : sections.length < 2 ? undefined : {
+					id : 'keys-section',
+					label : word('/_admin/text/col/section'),
+					value : '',
+					options : [ { value : '', label : word('/_admin/text/filter/sections') } ].concat( sections.map( function( section ) {
+						return { value : section.id, label : section.route === '' ? section.label : section.label+ ' ('+ section.route+ ')' };
+					} ) ),
+					match : function( one, value ) { return value === '' || one.sectionId === value },
+				},
+				filters : [ {
+					id : 'keys-show',
+					label : word('/_admin/text/filter/show'),
+					value : '',
+					options : [
+						{ value : '', label : word('/_admin/keys/filter/all') },
+						{ value : 'hidden', label : word('/_admin/keys/filter/hidden') },
+						{ value : 'global', label : word('/_admin/keys/filter/global') },
+					],
+					match : function( one, value ) {
+
+						if( value === 'hidden' )
+							return one.hidden === true;
+
+						return value !== 'global' || one.entry.global === true;
+					},
+				} ],
+				// What a person looks for: the name, the key, the section and the text in every language
+				searchText : function( one ) { return [ one.name, one.key, one.place, one.found ].join(' ') },
+				actions : keys._actions,
+				onOpen : function( one ) {
+					keys._directory.notice('');
+					keys._record.open( one.key, {} );
+				},
+				rows : keys._rows( group ),
+			} );
+
+			// The form of a new key starts in the namespace and the category of the row
+			wrap.appendChild( keys._listBar( function() { return keys._seedOf( group ) } ).el );
+		},
+
+		/**
+		 *	What the form of a new key starts from where its button stands in a row: the namespace and the category the row stands for, for a row that stands
+		 *	for one. Nothing for the others (the rows of the system, the pages without a template)
+		 *
+		 *	@param		{string}	group					The row's id
+		 *
+		 *	@return		{Object|null}
+		 */
+		_seedOf : function( group ) {
+
+			const keys = Nino.admin.keys;
+			const parts = String( group ).split('/');
+
+			if( parts.length !== 2 || keys.NAMESPACES.indexOf( parts[0] ) === -1 || keys.SEGMENT.test( parts[1] ) === false )
+				return null;
+
+			return { namespace : parts[0], category : parts[1] };
+		},
+
+		/**
+		 *	The name of a key in the table: its name strong, its key under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip
+		 *
+		 *	@param		{string}	value
+		 *	@param		{Object}	row
+		 *
+		 *	@return		{Element}
+		 */
+		_nameCell : function( value, row ) {
+
+			const cell = Nino.adminUi.el( 'span', 'admin-text-name' );
+			const name = Nino.adminUi.el( 'strong', 'admin-text-name-label', row.name );
+			const key = Nino.adminUi.el( 'span', 'admin-text-name-key', row.key );
+
+			name.title = row.name;
+			key.title = row.key;
+			cell.appendChild( name );
+			cell.appendChild( key );
+
+			return cell;
+		},
+
+		/**
+		 *	What a key is besides its text, as badges: a word each, and the colour is not the only thing that says it - one text for all languages, hidden from the Text panel
+		 *
+		 *	@param		{Array}		value
+		 *	@param		{Object}	row
+		 *
+		 *	@return		{Element|string}
+		 */
+		_stateCell : function( value, row ) {
+
+			if( row.states.length === 0 )
+				return '';
+
+			const cell = Nino.adminUi.el( 'span', 'admin-key-states' );
+
+			row.states.forEach( function( state ) {
+
+				const badge = Nino.adminUi.el( 'span', 'nino-admin-badge', state.text );
+
+				if( state.state !== undefined )
+					badge.dataset.state = state.state;
+
+				cell.appendChild( badge );
+			} );
+
+			return cell;
+		},
+
+		/**
+		 *	The button at the end of a row: edit, which opens the record of the key
+		 *
+		 *	@param		{Object}	row
+		 *
+		 *	@return		{Array}
+		 */
+		_actions : function( row ) {
+
+			return [ Nino.adminUi.iconButton( 'pencil', Nino.adminUi.format( word('/_admin/keys/row/open'), row.title ), function( event ) {
+				Nino.admin.keys._directory.notice('');
+				Nino.admin.keys._record.open( row.key, { opener : event.currentTarget } );
+			}, { small : true } ) ];
+		},
+
+		/**
+		 *	The directory as the record sees it: what is on screen now, whatever drew it last. Before a table is drawn - the form of a new key over the list - it
+		 *	holds no row
+		 *
+		 *	@return		{Object}
+		 */
+		_texts : function() {
+
+			const keys = Nino.admin.keys;
+
+			return {
+				rows : function() { return keys._directory === null ? [] : keys._directory.rows() },
+				reveal : function( key ) { return keys._directory === null ? false : keys._directory.reveal( key ) },
+				focusRow : function( key ) { return keys._directory === null ? false : keys._directory.focusRow( key ) },
+				focusSearch : function() { return keys._directory === null ? false : keys._directory.focusSearch() },
+			};
+		},
+
+		// ------------------------------------------------------------------ The record of a key
+
+		/**
+		 *	The parts of the address that stand before the entry of the record: the row - #text/keys/<row>/<key> -, nothing for the form of a new key (#text/keys/@new),
+		 *	and the word and the key of the rename dialog that stands over the record (#text/keys/@rename/<key>) - the address that is on screen is the one the
+		 *	record does not read as leading away
+		 *
+		 *	@return		{Array}
+		 */
+		_prefix : function() {
+
+			const keys = Nino.admin.keys;
+
+			if( keys._renaming !== null )
+				return [ Nino.admin.router.word('rename'), keys._renaming ];
+
+			if( keys._forced !== null )
+				return keys._forced.row === null ? [] : [ keys._forced.row ];
+
+			if( keys._wantNew === true || ( keys._record !== null && keys._record.creating() === true ) )
+				return [];
+
+			return keys._group === null ? [] : [ keys._group ];
+		},
+
+		/**
+		 *	The row of the form of a new key: nothing yet, and what the form starts from
+		 *
+		 *	@return		{Object}
+		 */
+		_blank : function() {
+			return { key : '', blank : true, entry : null, seed : Nino.admin.keys._seed ?? {} };
+		},
+
+		/**
+		 *	The record of a key: a dialog over the table with the place of the key in its head and its key under it, its text in every language and its settings,
+		 *	"Delete text key" at the left of the bar and "Rename", "Save and continue" and "Save" at the right. The form of a new key is the same dialog (`create`)
+		 *
+		 *	@return		{Object}
+		 */
+		_makeRecord : function() {
+
+			const keys = Nino.admin.keys;
+
+			return Nino.adminUi.record( {
+				screen : 'keys',
+				prefix : keys._prefix,
+				directory : keys._texts(),
+				keyOf : function( row ) { return row.key },
+				find : keys._find,
+				title : function( row ) { return row.title },
+				subtitle : function( row ) { return row.key },
+				saveNext : true,
+				create : { blank : keys._blank },
+				labels : {
+					prev : word('/_admin/keys/record/prev'), next : word('/_admin/keys/record/next'),
+					createTitle : word('/_admin/keys/label/new'), createSave : word('/_admin/keys/label/create'), created : word('/_admin/keys/msg/created'),
+				},
+				body : keys._body,
+				save : keys._save,
+				reload : keys._reload,
+				danger : { label : word('/_admin/keys/confirm/delete-title'), run : keys._remove },
+				actions : [
+					// A key of the system is what the code that reads it asks for: its value is edited, its name is not
+					{ label : word('/_admin/common/label/rename'), kind : 'secondary', hidden : function( row ) { return keys._renamable( row.key ) === false }, run : function( row, ctx ) { keys._rename( row.key, ctx.opener ) } },
+					// Where the keys could not be read again after a save, the record says so and offers to read them
+					{ label : word('/_admin/keys/label/reload'), kind : 'secondary', hidden : function() { return keys._stale === false }, run : function( row, ctx ) { keys._refetch( row.key, ctx.opener ) } },
+				],
+				// An address that names a key the row does not hold: said over the table
+				missing : function() {
+					if( keys._directory !== null )
+						keys._directory.notice( word('/_admin/keys/record/missing') );
+				},
+			} );
+		},
+
+		/**
+		 *	The record, the form of a new key and the scan are views of one tab, and the shell knows a tab by one name of unsaved input: the entry of the record, `keys`.
+		 *	The scan is a watched form of its own - `keys-scan` - and the entry of the tab answers for whichever of the two is on screen, so that the question before a way
+		 *	out of the tab, the back link of the scan and Ctrl+S reach the one that holds the input
+		 *
+		 *	@return		void
+		 */
+		_share : function() {
+
+			const dirty = Nino.admin.dirty;
+
+			if( typeof dirty !== 'object' || typeof dirty.entry !== 'function' )
+				return;
+
+			const own = dirty.entry('keys');
+			const scan = dirty.entry('keys-scan');
+
+			if( own === null || scan === null )
+				return;
+
+			const on = function() { return Nino.admin.keys._scanning === true };
+
+			dirty.register( 'keys', {
+				isDirty : function() { return on() === true ? scan.isDirty() : own.isDirty() },
+				save : function( done ) { return on() === true ? scan.save( done ) : own.save( done ) },
+				discard : function() { return on() === true ? scan.discard() : own.discard() },
+				bar : function() { return on() === true ? scan.bar() : own.bar() },
+			} );
+		},
+
+		/**
+		 *	Take the editors of the record that was on screen down, and the fields with them
+		 *
+		 *	@return		void
+		 */
+		_release : function() {
+
+			const keys = Nino.admin.keys;
+
+			if( keys._view !== null )
+				keys._view.fields.forEach( function( field ) { field.handle.destroy() } );
+
+			keys._view = null;
+			keys._ctx = null;
+		},
+
+		/**
+		 *	The textfills a text may take, for the "[ ]" at the name of a field: asked for when the dialog opens, in the language of THAT field
+		 *
+		 *	@param		{string}		locale
 		 *	@param		{Function}	done					Called with the list the server sent, with null where it could not be had
 		 *
 		 *	@return		void
 		 */
-		_loadFills : function( done ) {
-			Nino.admin.textKeys.fills( function( callback ) { Nino.admin.keys._apiCall( 'fills', { locale : Nino.admin.keys._view === 'group' ? Nino.admin.keys._shownLocale : Nino.admin.keys._locale() }, callback ) }, done );
+		_loadFills : function( locale, done ) {
+			Nino.admin.textKeys.fills( function( callback ) { Nino.admin.keys._apiCall( 'fills', { locale : locale }, callback ) }, done );
 		},
 
 		/**
-		 *	What a key's shape was when the form was drawn, as the controls hold it: the format ('auto' where none
-		 *	was chosen), the limit as typed ('' for automatic), whether it is global and whether it is hidden
+		 *	What a key's shape was when it was drawn, as the controls hold it: the format ('auto' where none was chosen), the limit as typed ('' for automatic),
+		 *	whether it is global and whether it is hidden
 		 *
 		 *	@param		{Object}	entry					Key entry
 		 *
@@ -719,459 +1213,270 @@
 		},
 
 		/**
-		 *	The rows of one key in the form: its text, and under it what its shape is - the format, the limit, whether
-		 *	it is global, whether it is hidden from the Text panel - with Rename and Delete at the end of that row. The
-		 *	shape is saved with the text, by the one Save of the row
+		 *	What the controls of the shape hold now
 		 *
-		 *	@param		{Object}		field					{ entry, label }, see Nino.admin.textKeys.sections()
-		 *	@param		{Object}		carried				key -> { value, shape }: what was typed into a key that a save did not take, drawn again as it was typed
+		 *	@param		{Object}	view
 		 *
-		 *	@return		{Array}										The elements of the grid
+		 *	@return		{Object}									{ format, limit, global, hidden }
 		 */
-		_keyRows : function( field, carried ) {
+		_shapeNow : function( view ) {
 
-			const keys 		= Nino.admin.keys;
-			const entry 	= field.entry;
-			const seq 		= ++keys._fieldSeq;
-			const typed 	= carried[entry.key] ?? {};
-			const text 		= function( key ) { return Nino.content.getText( key ) };
-			const base 		= keys._shapeOf( entry );
-			const shape 	= Object.assign( {}, base, typed.shape ?? {} );
+			const set = view.set;
 
-			const value = Nino.admin.textKeys.valueField( {
-				entry : entry,
-				value : Nino.admin.textKeys.valueOf( entry, keys._shownLocale ),
-				label : field.label,
-				id : 'keys-field-'+ seq,
-				writable : true,
-				fills : keys._loadFills,
-			} );
+			return { format : set.format.value, limit : set.limit.value.trim(), global : set.global.checked, hidden : set.hidden.checked };
+		},
 
-			// What was drawn is what is stored; what was typed is a change of it
-			keys._session.add( value );
+		/**
+		 *	Whether the controls of the shape hold otherwise than they were drawn
+		 *
+		 *	@param		{Object}	view
+		 *
+		 *	@return		{boolean}
+		 */
+		_shapeChanged : function( view ) {
 
-			if( typed.value !== undefined )
-				value.write( typed.value );
+			const base = view.set.base;
+			const now = Nino.admin.keys._shapeNow( view );
 
-			const row = Nino.adminUi.el( 'div', 'nino-admin-field admin-key-settings' );
-			const name = Nino.adminUi.el( 'span', '', text('/_admin/keys/label/settings') );
-			const controls = Nino.adminUi.el( 'div', 'admin-key-controls' );
+			return now.format !== base.format || now.limit !== base.limit || now.global !== base.global || now.hidden !== base.hidden;
+		},
 
-			name.id = 'keys-settings-'+ seq;
-			controls.setAttribute( 'role', 'group' );
-			controls.setAttribute( 'aria-labelledby', name.id );
-			row.dataset.settings = entry.key;
-			name.appendChild( Nino.adminUi.fieldHelp( text('/_admin/keys/help/settings'), { name : text('/_admin/keys/label/settings') } ) );
-			row.appendChild( name );
+		/**
+		 *	A group of fields of the record: a fieldset with its legend
+		 *
+		 *	@param		{string}		title
+		 *
+		 *	@return		{Element}
+		 */
+		_section : function( title ) {
 
-			// The format the value is kept in and the limit its counter counts to. A format that holds less than the
-			// one before converts what is stored when it is saved (see _save())
+			const set = dc.createElement('fieldset');
+
+			set.appendChild( Nino.adminUi.el( 'legend', '', title ) );
+
+			return set;
+		},
+
+		/**
+		 *	The content of the record. A key that exists: the text in every language - the working language first and marked, then the others in their order, a language
+		 *	the website does not serve yet marked as the select of the working language marks it - or the one field of a key that is the same in every language,
+		 *	each drawn by the rule of the key (a line, several lines, the rich-text editor) with its counter, and under it the settings: the format, the limit, whether it
+		 *	is one text for all languages and whether it is hidden from the Text panel. What the fields and the controls are is kept in ctx.view, which the save finds
+		 *	there. The form of a new key: see _newBody()
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *
+		 *	@return		{Element}
+		 */
+		_body : function( row, ctx ) {
+
+			const keys = Nino.admin.keys;
+
+			// The fields of the entry that was on screen go with it
+			keys._release();
+
+			if( ctx.creating === true )
+				return keys._newBody( row, ctx );
+
+			const wrap = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+			// The root of what the tab's stylesheet arranges in the record: the dialog stands outside the pane of the tab
+			wrap.id = 'keys-record';
+
+			const view = { key : row.key, creating : false, fields : [], set : null, wrap : wrap, conflict : [], locale : keys._locale(), draw : null, lock : null };
+
+			/**
+			 *	Draw the fields and the controls from what the keys hold now. What a save did not take is drawn as it was typed - carry.texts the text of a language,
+			 *	carry.shape the controls of the shape - and says why at its field - carry.say
+			 */
+			view.draw = function( carry ) {
+
+				carry = carry ?? {};
+
+				view.fields.forEach( function( field ) { field.handle.destroy() } );
+				view.fields = [];
+				wrap.innerHTML = '';
+
+				const entry = keys._entryOf( view.key ) ?? row.entry;
+				const locale = keys._locale();
+				const codes = entry.global === true ? [ '*' ] : [ locale ].concat( keys._locales.filter( function( code ) { return code !== locale } ) );
+
+				view.locale = locale;
+
+				const texts = keys._section( word('/_admin/keys/label/text') );
+
+				codes.forEach( function( code ) {
+
+					const marks = [];
+
+					if( entry.global === false && code === locale )
+						marks.push( word('/_admin/text/label/working') );
+
+					if( entry.global === false && keys._inactive.indexOf( code ) !== -1 )
+						marks.push( word('/_admin/common/word/inactive') );
+
+					const name = entry.global === true ? word('/_admin/text/label/all-languages') : Nino.adminUi.localeName( code, keys._locales );
+					const handle = Nino.admin.textKeys.valueField( {
+						entry : entry,
+						value : Nino.admin.textKeys.valueOf( entry, code === '*' ? locale : code ),
+						label : marks.length === 0 ? name : name+ ' ('+ marks.join(', ')+ ')',
+						id : 'keys-field-'+ ( ++keys._fieldSeq ),
+						writable : true,
+						fills : function( done ) { keys._loadFills( code === '*' ? locale : code, done ) },
+						keyLine : false,
+						badge : false,
+						locale : code,
+					} );
+
+					// What the field read back after it was drawn: a rich text reads back as the markup the editor built, not always the string that is stored
+					const kept = { code : code, handle : handle, base : handle.read() };
+
+					view.fields.push( kept );
+
+					if( carry.texts !== undefined && carry.texts[code] !== undefined )
+						handle.write( carry.texts[code] );
+
+					texts.appendChild( handle.el );
+				} );
+
+				wrap.appendChild( texts );
+
+				const settings = keys._settings( view, entry, carry );
+
+				wrap.appendChild( settings );
+
+				if( carry.say !== undefined )
+					keys._say( view, carry.say );
+			};
+
+			view.lock = function( on ) {
+
+				view.fields.forEach( function( field ) {
+
+					if( field.handle.readonly === true )
+						return;
+
+					const box = field.handle.control.querySelector !== undefined ? field.handle.control.querySelector('[contenteditable]') : null;
+
+					if( box !== null && box !== undefined )
+						box.setAttribute( 'contenteditable', on === true ? 'false' : 'true' );
+					else
+						field.handle.control.disabled = on === true;
+				} );
+
+				[ view.set.format, view.set.limit, view.set.global, view.set.hidden ].forEach( function( control ) { control.disabled = on === true } );
+			};
+
+			view.draw();
+			ctx.view = view;
+			keys._view = view;
+			keys._ctx = ctx;
+
+			// The record puts the focus in the first line or box of the form; the editor of a rich text is neither, so it is given the focus once the record is drawn
+			if( view.fields.length > 0 && view.fields[0].handle.readonly !== true && /^(INPUT|TEXTAREA)$/.test( view.fields[0].handle.control.tagName ) === false )
+				wn.setTimeout( function() {
+					if( keys._view === view && view.fields.length > 0 && wrap.contains( dc.activeElement ) === false )
+						view.fields[0].handle.focus();
+				}, 0 );
+
+			return wrap;
+		},
+
+		/**
+		 *	The settings of a key: the format the text is kept in, the limit its counter counts to, one text for all languages and whether the key is hidden from the
+		 *	Text panel - fields of the workbench, each with its own help. A format that holds less than the one before converts what is stored when it is saved
+		 *	(see _save()); the controls and what they held when they were drawn are kept in view.set
+		 *
+		 *	@param		{Object}	view
+		 *	@param		{Object}	entry
+		 *	@param		{Object}	carry					What was typed into controls that a save did not take
+		 *
+		 *	@return		{Element}									The fieldset
+		 */
+		_settings : function( view, entry, carry ) {
+
+			const keys = Nino.admin.keys;
+			const seq = ++keys._fieldSeq;
+			const base = keys._shapeOf( entry );
+			const shape = Object.assign( {}, base, carry.shape ?? {} );
+			const section = keys._section( word('/_admin/keys/label/settings') );
+
+			// The format the value is kept in, and the limit its counter counts to
 			const formatField = Nino.adminUi.selectField( {
 				id : 'keys-format-'+ seq,
-				label : text('/_admin/keys/label/format'),
-				options : [ 'auto' ].concat( keys.FORMATS ).map( function( format ) { return { value : format, label : text('/_admin/keys/format/'+ format) } } ),
+				label : word('/_admin/keys/label/format'),
+				help : word('/_admin/keys/help/format'),
+				options : [ 'auto' ].concat( keys.FORMATS ).map( function( format ) { return { value : format, label : word( '/_admin/keys/format/'+ format ) } } ),
 				value : shape.format,
 			} );
 			const limitField = Nino.adminUi.textField( {
 				id : 'keys-limit-'+ seq,
-				label : text('/_admin/keys/label/limit'),
+				label : word('/_admin/keys/label/limit')+ ' ('+ word('/_admin/common/unit/characters')+ ')',
+				help : word('/_admin/keys/help/limit'),
 				type : 'number',
 				value : shape.limit,
-				placeholder : text('/_admin/keys/placeholder/limit'),
+				placeholder : word('/_admin/keys/placeholder/limit'),
 			} );
-			const globalField = Nino.adminUi.switchField( { checked : shape.global, label : text('/_admin/common/label/global'), on : text('/_admin/common/label/on'), off : text('/_admin/common/label/off') } );
-			const hiddenField = Nino.adminUi.switchField( { checked : shape.hidden, label : text('/_admin/keys/label/blacklist'), on : text('/_admin/common/label/on'), off : text('/_admin/common/label/off') } );
+			const globalField = Nino.adminUi.switchField( { checked : shape.global, label : word('/_admin/keys/label/global'), help : word('/_admin/keys/help/global'), on : word('/_admin/common/label/on'), off : word('/_admin/common/label/off') } );
+			const hiddenField = Nino.adminUi.switchField( { checked : shape.hidden, label : word('/_admin/keys/label/hide'), help : word('/_admin/keys/help/hidden'), on : word('/_admin/common/label/on'), off : word('/_admin/common/label/off') } );
 
 			limitField.querySelector('input').min = '1';
 			limitField.querySelector('input').step = '1';
 
 			// The field counts to the limit that is typed, and takes as much: a text may be made longer in the save that raises it
 			limitField.querySelector('input').addEventListener( 'input', function( ev ) {
-				const typedLimit = ev.target.value.trim();
-				value.setLimit( /^\d+$/.test( typedLimit ) === true && Number( typedLimit ) >= 1 ? Number( typedLimit ) : entry.maxlength );
+
+				const typed = ev.target.value.trim();
+				const limit = /^\d+$/.test( typed ) === true && Number( typed ) >= 1 ? Number( typed ) : entry.maxlength;
+
+				view.fields.forEach( function( field ) { field.handle.setLimit( limit ) } );
 			} );
 
-			[ formatField, limitField, globalField, hiddenField ].forEach( function( control ) { controls.appendChild( control ) } );
+			[ formatField, limitField, globalField, hiddenField ].forEach( function( control ) { section.appendChild( control ) } );
 
-			// Rename and Delete are small buttons at the end of the row, the one that takes something away last
-			const actions = [];
-
-			if( keys._renamable( entry.key ) === true )
-				actions.push( Nino.adminUi.button( text('/_admin/common/label/rename'), function( ev ) { keys._rename( entry.key, ev.currentTarget ) }, { kind : 'secondary', small : true, name : Nino.adminUi.format( text('/_admin/keys/label/rename-key'), entry.key ) } ) );
-
-			actions.push( Nino.adminUi.button( text('/_admin/common/label/delete'), function() { keys._delete( entry.key ) }, { kind : 'danger', small : true, name : Nino.adminUi.format( text('/_admin/keys/label/delete-key'), entry.key ) } ) );
-
-			controls.appendChild( Nino.adminUi.rowActions( actions ) );
-			row.appendChild( controls );
-
-			keys._settings[entry.key] = {
+			view.set = {
 				base : base,
 				format : formatField.querySelector('select'), formatField : formatField,
 				limit : limitField.querySelector('input'), limitField : limitField,
-				global : globalField.querySelector('input'), hidden : hiddenField.querySelector('input'),
-				row : row,
+				global : globalField.querySelector('input'), globalField : globalField,
+				hidden : hiddenField.querySelector('input'), hiddenField : hiddenField,
 			};
 
-			return [ value.el, row ];
+			// The limit of a key that was typed and not saved is the limit its fields count to
+			if( shape.limit !== base.limit && /^\d+$/.test( shape.limit ) === true && Number( shape.limit ) >= 1 )
+				view.fields.forEach( function( field ) { field.handle.setLimit( Number( shape.limit ) ) } );
+
+			return section;
 		},
 
 		/**
-		 *	What the controls of a key's shape hold now
+		 *	Say at its field what a save did not take: the sentence under the text of a language, the format, the limit, or the controls of the shape
 		 *
-		 *	@param		{string}	key
-		 *
-		 *	@return		{Object}									{ format, limit, global, hidden }
-		 */
-		_shapeNow : function( key ) {
-
-			const set = Nino.admin.keys._settings[key];
-
-			return { format : set.format.value, limit : set.limit.value.trim(), global : set.global.checked, hidden : set.hidden.checked };
-		},
-
-		/**
-		 *	The keys whose shape the controls hold otherwise than it was drawn
-		 *
-		 *	@return		{Array<string>}
-		 */
-		_shapeChanged : function() {
-
-			const keys = Nino.admin.keys;
-
-			return Object.keys( keys._settings ).filter( function( key ) {
-				const base = keys._settings[key].base;
-				const now = keys._shapeNow( key );
-				return now.format !== base.format || now.limit !== base.limit || now.global !== base.global || now.hidden !== base.hidden;
-			} );
-		},
-
-		/**
-		 *	Take every rich-text editor of the form on screen down, and the fields with it
+		 *	@param		{Object}	view
+		 *	@param		{Object}	say						{ texts : { code : sentence }, format, limit, shape }
 		 *
 		 *	@return		void
 		 */
-		_destroyHtmlEditors : function() {
+		_say : function( view, say ) {
 
-			if( Nino.admin.keys._session !== null )
-				Nino.admin.keys._session.destroy();
+			const set = view.set;
 
-			Nino.admin.keys._session = null;
-		},
+			Object.keys( say.texts ?? {} ).forEach( function( code ) {
 
-		/**
-		 *	Run proceed() - after the shell has asked about unsaved input in this
-		 *	tab, where the shell has the registry. A shell without it (an older
-		 *	one, a test) goes straight on
-		 *
-		 *	@param		{Function}	proceed
-		 *	@param		{Function}	[onCancel]
-		 *
-		 *	@return		void
-		 */
-		_guard : function( proceed, onCancel ) {
+				const field = view.fields.find( function( one ) { return one.code === code } );
 
-			if( typeof Nino.admin.dirty !== 'object' ) {
-				proceed();
-				return;
-			}
-
-			Nino.admin.dirty.guard( [ 'keys' ], proceed, onCancel );
-		},
-
-		/**
-		 *	Open the form of a key's rename: the same form as the one that creates, filled in with the key. Leaving the
-		 *	row that held the key asks about unsaved input first
-		 *
-		 *	@param		{string}		key
-		 *	@param		{Element}		[opener]			The button that was pressed: Back returns the focus to it
-		 *
-		 *	@return		void
-		 */
-		_rename : function( key, opener ) {
-
-			Nino.admin.keys._guard( function() {
-				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('rename'), key ] );
-				Nino.admin.keys._openNewKeyForm( key, opener, true );
-			} );
-		},
-
-		/**
-		 *	Delete a key entirely, after confirmation, and draw the row again without it - or show the list, where it
-		 *	was the last. A refusal stands in the line of the bar
-		 *
-		 *	@param		{string}	key
-		 *
-		 *	@return		void
-		 */
-		_delete : function( key ) {
-
-			const keys = Nino.admin.keys;
-
-			Nino.adminUi.confirm( 'destructive', {
-				title			: Nino.content.getText('/_admin/keys/confirm/delete-title'),
-				message		: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/delete'), key ),
-				yes				: Nino.content.getText('/_admin/keys/confirm/delete-title'),
-				no				: Nino.content.getText('/_admin/common/label/cancel'),
-				onChoose	: function( ok ) {
-
-					if( ok === false )
-						return;
-
-					// Drawing the row again drops what is typed into it
-					keys._guard( function() {
-
-						const line = keys._status;
-
-						keys._apiCall( 'delete', { key : key }, function( status, response ) {
-
-							if( status !== 200 || response === null ) {
-								if( line !== null )
-									line.error( status, response, '/_admin/common/error/delete' );
-								return;
-							}
-
-							Nino.admin.touch( 'texts' );
-
-							// The focus goes to the key that stands where the deleted one did: the next, else the one before
-							const order = keys._session === null ? [] : keys._session.keys();
-							const at = order.indexOf( key );
-
-							keys._reload( true, 'delete', order[at + 1] ?? order[at - 1] ?? null );
-						} );
-					} );
-				},
-			} );
-		},
-
-		/**
-		 *	Read the keys again after something was written and draw what is on screen from them: the row that is
-		 *	open, or the list where the row has no key any more. What is said as a toast is the caller's
-		 *
-		 *	@param		{boolean}	saved					Whether to say "Saved." or "Deleted." as a toast
-		 *	@param		{string}	[what]				'delete' for "Deleted."
-		 *	@param		{string|null}	[focusKey]	The key whose field takes the focus
-		 *
-		 *	@return		void
-		 */
-		_reload : function( saved, what, focusKey ) {
-
-			const keys = Nino.admin.keys;
-
-			keys._load( function( status, response ) {
-
-				if( status !== 200 || response === null ) {
-					keys._stay( status, response, {}, {}, {} );
-					return;
-				}
-
-				keys._renderCategoryList();
-
-				if( keys._groups[keys._currentGroup] === undefined ) {
-					keys._view = null;
-					keys._destroyHtmlEditors();
-					keys._showList( null );
-				}
-				else {
-					keys._renderGroupForm( {}, {} );
-					keys._showForm( false );
-
-					if( focusKey !== undefined && focusKey !== null && keys._session.get( focusKey ) !== undefined )
-						keys._session.get( focusKey ).focus();
-				}
-
-				if( saved === true )
-					Nino.adminUi.say( Nino.content.getText( what === 'delete' ? '/_admin/common/msg/deleted' : '/_admin/common/msg/saved' ) );
-			} );
-		},
-
-		/**
-		 *	Whether the tab holds input nobody has saved - what the shell asks
-		 *	before it lets anything throw that away (see Nino.admin.dirty). For
-		 *	a row: a text or a shape that differs from what it held when it was
-		 *	drawn or last saved, which includes one whose save was refused. For
-		 *	the new-key form and the scan form: anything typed or ticked
-		 *
-		 *	@return		{boolean}
-		 */
-		isDirty : function() {
-
-			const form = dc.getElementById('keys-form');
-
-			if( form === null || form.classList.contains('admin-hidden') === true )
-				return false;
-
-			// The form that creates or renames: dirty once a segment is not what it was
-			// drawn with - /project and nothing, or the key's own - or anything is typed
-			// into the starting value or ticked
-			if( Nino.admin.keys._view === 'new' ) {
-				const value = function( id ) { const el = dc.getElementById( id ); return el === null ? '' : el.value };
-				const isGlobal = dc.getElementById('keys-form-new-global');
-				return JSON.stringify( Nino.admin.keys._readSegments() ) !== Nino.admin.keys._formInitial || value('keys-form-new-value') !== '' || ( isGlobal !== null && isGlobal.checked === true );
-			}
-
-			if( Nino.admin.keys._view === 'scan' )
-				return Nino.admin.keys._scanRows.some( function( row ) { return ( row.valueInput !== null && row.valueInput.value !== '' ) || row.ignoreCheck.checked === true } );
-
-			if( Nino.admin.keys._view !== 'group' || Nino.admin.keys._session === null || dc.getElementById('keys-edit-form') === null )
-				return false;
-
-			return Nino.admin.keys._session.isDirty() === true || Nino.admin.keys._shapeChanged().length > 0;
-		},
-
-		/**
-		 *	Throw the input away. A row goes back to what its fields held when it was drawn; the new-key
-		 *	and scan forms are emptied. The form is about to be left or drawn again.
-		 *	While a save runs nothing is thrown away: it finishes with what it was given
-		 *
-		 *	@return		void
-		 */
-		discard : function() {
-
-			const keys = Nino.admin.keys;
-
-			if( keys._saving === true )
-				return;
-
-			if( keys._view === 'new' ) {
-				// Drawn again as it was opened
-				keys._renderNewKeyForm();
-			} else if( keys._view === 'scan' ) {
-				keys._scanRows.forEach( function( row ) {
-					if( row.valueInput !== null )
-						row.valueInput.value = '';
-					row.ignoreCheck.checked = false;
-				} );
-			} else if( keys._session !== null ) {
-				keys._session.discard();
-				Object.keys( keys._settings ).forEach( function( key ) {
-					const set = keys._settings[key];
-					set.format.value = set.base.format;
-					set.limit.value = set.base.limit;
-					set.global.checked = set.base.global;
-					set.hidden.checked = set.base.hidden;
-				} );
-			}
-
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
-		},
-
-		/**
-		 *	Save what the open form holds, whichever form it is (see isDirty())
-		 *
-		 *	@param		{Function}	done				Called once with true or false
-		 *
-		 *	@return		void
-		 */
-		_saveOpen : function( done ) {
-
-			if( Nino.admin.keys._view === 'new' )
-				return Nino.admin.keys._saveNewKey( done );
-
-			if( Nino.admin.keys._view === 'scan' )
-				return Nino.admin.keys._saveScanResults( Nino.admin.keys._scanRows, done );
-
-			Nino.admin.keys._save( done );
-		},
-
-		/**
-		 *	The action bar of the form on screen, which is where the shell puts its mark of unsaved input
-		 *
-		 *	@return		{Element|null}
-		 */
-		_bar : function() {
-
-			const form = dc.getElementById('keys-edit-form') ?? dc.getElementById('keys-new-form') ?? dc.getElementById('keys-scan-form');
-
-			return form === null || form === undefined ? null : form.querySelector('.nino-admin-actionbar');
-		},
-
-		/**
-		 *	Render a row's form in the language the workbench edits content in: the way back and the name of the row
-		 *	in the context bar, a section for each part and in it, for every key, its text and its shape
-		 *	(see _keyRows()). One bar, one Save
-		 *
-		 *	@param		{Object}		carried				key -> { value, shape } typed into a key a save did not take, drawn as it was typed
-		 *	@param		{Object}		refused				key -> { value, format, limit } the sentence at a field of a key that a save did not take
-		 *
-		 *	@return		void
-		 */
-		_renderGroupForm : function( carried, refused ) {
-
-			const keys 		= Nino.admin.keys;
-			const group 	= keys._currentGroup;
-			const model 	= keys._model;
-			const row 		= model.rows[group];
-			const locale 	= keys._locale();
-
-			keys._destroyHtmlEditors();
-			keys._shownLocale = locale;
-			keys._session = Nino.admin.textKeys.session();
-			keys._settings = {};
-
-			const wrap = dc.getElementById('keys-form');
-			wrap.innerHTML = '';
-
-			wrap.appendChild( keys._contextBar( wrap, Nino.admin.textKeys.rowLabel( model, row, locale ) ) );
-
-			const form = dc.createElement('form');
-			form.id = 'keys-edit-form';
-			form.noValidate = true;
-
-			Nino.admin.textKeys.sectionsView( model, row, function( field ) { return keys._keyRows( field, carried ) } ).forEach( function( fieldset ) { form.appendChild( fieldset ) } );
-
-			const msg = dc.createElement('p');
-			msg.id = 'keys-form-msg';
-
-			const bar = Nino.adminUi.actionBar( {
-				status : { line : msg },
-				primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ),
+				if( field !== undefined )
+					field.handle.fail( say.texts[code] );
 			} );
 
-			keys._status = bar.line;
-			bar.line.bind( form, keys.isDirty );
-			form.appendChild( bar.el );
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); keys._save() } );
-
-			wrap.appendChild( form );
-
-			// What a save did not take says so at its field
-			keys._showRefused( refused );
-
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
-		},
-
-		/**
-		 *	Say at its field what a save did not take: the sentence under the text, the format, the limit, or the row
-		 *
-		 *	@param		{Object}		refused				key -> { value, format, limit, shape } sentences
-		 *
-		 *	@return		void
-		 */
-		_showRefused : function( refused ) {
-
-			const keys = Nino.admin.keys;
-
-			Object.keys( refused ).forEach( function( key ) {
-				const say = refused[key];
-				const set = keys._settings[key];
-
-				if( say.value !== undefined && keys._session.get( key ) !== undefined )
-					keys._session.get( key ).fail( say.value );
-
-				if( set === undefined )
-					return;
-
-				[ [ 'format', set.formatField, set.format ], [ 'limit', set.limitField, set.limit ] ].forEach( function( part ) {
-					if( say[part[0]] !== undefined )
-						Nino.adminUi.fieldError( part[1], part[2], 'keys-error-'+ part[2].id, say[part[0]] );
-				} );
-
-				if( say.shape !== undefined )
-					Nino.adminUi.fieldError( set.row.querySelector('.admin-key-controls'), null, 'keys-error-'+ set.row.dataset.settings, say.shape );
+			[ [ 'format', set.formatField, set.format ], [ 'limit', set.limitField, set.limit ] ].forEach( function( part ) {
+				if( say[part[0]] !== undefined )
+					Nino.adminUi.fieldError( part[1], part[2], 'keys-error-'+ part[2].id, say[part[0]] );
 			} );
 
+			if( say.shape !== undefined )
+				Nino.adminUi.fieldError( set.hiddenField, set.hidden, 'keys-error-'+ set.hidden.id, say.shape );
 		},
 
 		/**
@@ -1187,119 +1492,7 @@
 			if( limit === '' || ( /^\d+$/.test( limit ) === true && Number( limit ) >= 1 ) )
 				return '';
 
-			return Nino.adminUi.format( Nino.content.getText('/_admin/keys/error/invalid'), Nino.content.getText('/_admin/keys/label/limit'), Nino.content.getText('/_admin/keys/expect/limit') );
-		},
-
-		/**
-		 *	Save everything of the open row that was changed, with the one Save: the shape of every key whose shape
-		 *	was changed - one request each - and then the text of every key whose text was changed, in the language the
-		 *	row was drawn in, in one request. What a request turns down is said at its field and stays changed; what
-		 *	it took is what the row shows afterwards, read from the server, so that nothing counts as saved that is not.
-		 *	A format that holds less than the one it replaces converts what is stored, and says which keys in one question first.
-		 *	Only what changed is sent, so a row saved without a change leaves its files as they are
-		 *
-		 *	Every way this ends reports to done( ok ), if there is one (see Nino.admin.dirty.guard())
-		 *
-		 *	@param		{Function}	[done]				Called once with true when everything that changed was written, false otherwise
-		 *
-		 *	@return		void
-		 */
-		_save : function( done ) {
-
-			const keys = Nino.admin.keys;
-
-			const report = function( ok ) {
-				if( typeof Nino.admin.dirty === 'object' )
-					Nino.admin.dirty.refresh();
-				if( typeof done === 'function' )
-					done( ok );
-			};
-
-			if( keys._saving === true || keys._session === null || keys._status === null ) {
-				report( false );
-				return;
-			}
-
-			const session = keys._session;
-			const line 		= keys._status;
-			const entries = keys._groups[keys._currentGroup] ?? [];
-			const form 		= dc.getElementById('keys-edit-form');
-
-			Nino.adminUi.clearFieldErrors( form );
-
-			const shapeKeys = keys._shapeChanged();
-			const textKeys 	= session.changed();
-
-			// Nothing differs from what is stored: nothing is written, and what is on screen is what is stored
-			if( shapeKeys.length === 0 && textKeys.length === 0 ) {
-				line.saved();
-				report( true );
-				return;
-			}
-
-			// What is wrong is said at the field before anything is sent
-			let first = null;
-
-			shapeKeys.forEach( function( key ) {
-
-				const set = keys._settings[key];
-				const sentence = keys._limitProblem( set.limit.value.trim() );
-
-				if( sentence === '' )
-					return;
-
-				Nino.adminUi.fieldError( set.limitField, set.limit, 'keys-error-'+ set.limit.id, sentence );
-				first = first ?? set.limit;
-			} );
-
-			if( first !== null ) {
-				line.fail( Nino.content.getText('/_admin/keys/error/fields') );
-				first.focus();
-				report( false );
-				return;
-			}
-
-			const entryOf = function( key ) { return entries.find( function( e ) { return e.key === key } ) };
-			const formats = keys.FORMATS;
-
-			// What is stored is converted and cannot be converted back where a format holds less than the one it replaces, and
-			// where a key becomes global, which keeps the text of the native language and drops the others: said once for
-			// all of them, with what happens to each key
-			const native = Nino.adminUi.locales.native;
-			const converting = shapeKeys.filter( function( key ) {
-				const format = keys._shapeNow( key ).format;
-				return format !== 'auto' && formats.indexOf( format ) < formats.indexOf( entryOf( key ).format );
-			} );
-			const losing = shapeKeys.filter( function( key ) {
-				const entry = entryOf( key );
-				return keys._shapeNow( key ).global === true && entry.global === false && keys._droppedBy( entry ).length > 0;
-			} );
-
-			const proceed = function() { keys._send( shapeKeys, textKeys, report ) };
-
-			if( converting.length === 0 && losing.length === 0 ) {
-				proceed();
-				return;
-			}
-
-			Nino.adminUi.confirm( 'destructive', {
-				title			: Nino.content.getText('/_admin/keys/confirm/convert-title'),
-				message		: Nino.content.getText('/_admin/keys/confirm/convert'),
-				details		: converting.map( function( key ) {
-					const format = keys._shapeNow( key ).format;
-					return Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/format-line'), key, Nino.content.getText('/_admin/keys/format/'+ entryOf( key ).format ), Nino.content.getText('/_admin/keys/format/'+ format ), Nino.content.getText('/_admin/keys/convert/'+ format ) );
-				} ).concat( losing.map( function( key ) {
-					return Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/global-line'), key, keys._droppedBy( entryOf( key ) ).map( function( code ) { return Nino.adminUi.localeName( code ) } ).join(', '), Nino.adminUi.localeName( native ) );
-				} ) ),
-				yes				: Nino.content.getText('/_admin/keys/confirm/convert-title'),
-				no				: Nino.content.getText('/_admin/common/label/cancel'),
-				onChoose	: function( ok ) {
-					if( ok === true )
-						proceed();
-					else
-						report( false );
-				},
-			} );
+			return Nino.adminUi.format( word('/_admin/keys/error/invalid'), word('/_admin/keys/label/limit'), word('/_admin/keys/expect/limit') );
 		},
 
 		/**
@@ -1321,344 +1514,566 @@
 		},
 
 		/**
-		 *	The requests of a save of a row: the shape of each key whose shape changed, one after the other - a refusal
-		 *	does not stop the others -, then the text of every key whose text changed and whose shape was taken, in
-		 *	one request. Then the keys are read again and the row is drawn from them, with what a request turned down as
-		 *	it was typed and its sentence at the field
+		 *	The text a conflict is about, by its place, its key and its language, as the question names it
 		 *
-		 *	@param		{Array}			shapeKeys			The keys whose shape changed
-		 *	@param		{Array}			textKeys			The keys whose text changed
-		 *	@param		{Function}	report				Called once with true when everything was written, false otherwise
+		 *	@param		{string}	key
+		 *	@param		{string}	code
+		 *
+		 *	@return		{string}
+		 */
+		_named : function( key, code ) {
+
+			const keys = Nino.admin.keys;
+			const place = Nino.admin.textKeys.nameOf( keys._model, key );
+			const language = code === '*' ? '' : ', '+ Nino.adminUi.localeName( code, keys._locales );
+
+			return ( place === '' ? '' : place+ ' ' )+ '('+ key+ language+ ')';
+		},
+
+		/**
+		 *	Save what the record holds: the shape of the key - by keys/save, with all five fields - where it was changed, and each language whose text was changed, by
+		 *	keys/savebatch, one request for each with one item; and nothing else, so that a record saved without a change leaves the files as they are. A text
+		 *	made shorter in the save that lowers the limit is written BEFORE the shape, or the server would refuse a limit under the text the key holds; every other
+		 *	text follows it. A text of a key whose shape changes goes without the text it was read as - the shape says where the text is written - and the text of a
+		 *	key whose shape the server turned down is not sent. A format that holds less than the one it replaces and a key that becomes global are asked about once,
+		 *	with the heaviest weight, for what they drop. A limit that is no whole number is said at its field before anything is sent. Then the keys are read again
+		 *	and the record shows what the server holds: what a request turned down is drawn as it was typed, with the sentence at its field. A language that was
+		 *	written by another since the record was drawn is the question of a conflict - Overwrite writes that language again, without the text it was read as
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Function}	done					done( ok, { row, error, conflict } )
 		 *
 		 *	@return		void
 		 */
-		_send : function( shapeKeys, textKeys, report ) {
+		_save : function( row, ctx, done ) {
 
-			const keys 		= Nino.admin.keys;
-			const session = keys._session;
-			const line 		= keys._status;
-			const locale 	= keys._shownLocale;
-			const entries = keys._groups[keys._currentGroup] ?? [];
-			const typed 	= {};
+			const keys = Nino.admin.keys;
 
-			// What was typed, as the row is drawn again from it where a request turns it down
-			session.keys().forEach( function( key ) { typed[key] = { value : session.get( key ).read(), shape : keys._shapeNow( key ) } } );
+			if( ctx.creating === true )
+				return keys._saveNew( row, ctx, done );
 
-			const refused = {};
-			const refuse = function( key, field, sentence ) {
-				refused[key] = refused[key] ?? {};
-				refused[key][field] = sentence;
-			};
+			const view = ctx.view;
+			const key = row.key;
+			const entry = keys._entryOf( key ) ?? row.entry;
+			const now = function() { return keys._find( key ) ?? row };
+
+			Nino.adminUi.clearFieldErrors( ctx.form );
+
+			const shape = keys._shapeNow( view );
+			const reshaped = keys._shapeChanged( view );
+			const changed = view.fields.filter( function( field ) { return field.handle.read() !== field.base } );
+
+			// Nothing differs from what is stored: nothing is written, and what is on screen is what is stored
+			if( reshaped === false && changed.length === 0 )
+				return done( true, { row : now() } );
+
+			// What is wrong is said at the field before anything is sent
+			if( reshaped === true ) {
+
+				const sentence = keys._limitProblem( shape.limit );
+
+				if( sentence !== '' ) {
+					Nino.adminUi.fieldError( view.set.limitField, view.set.limit, 'keys-error-'+ view.set.limit.id, sentence );
+					view.set.limit.focus();
+					return done( false, { error : word('/_admin/keys/error/fields'), row : now() } );
+				}
+			}
+
+			// What is stored is converted and cannot be converted back where a format holds less than the one it replaces, and where a key becomes global, which keeps
+			// the text of the native language and drops the others: said once, with what happens to the key
+			const formats = keys.FORMATS;
+			const native = Nino.adminUi.locales.native;
+			const converting = reshaped === true && shape.format !== 'auto' && formats.indexOf( shape.format ) < formats.indexOf( entry.format );
+			const losing = reshaped === true && shape.global === true && entry.global === false && keys._droppedBy( entry ).length > 0;
+
+			const proceed = function() { keys._send( row, ctx, entry, shape, reshaped, changed, done ) };
+
+			if( converting === false && losing === false )
+				return proceed();
+
+			const details = [];
+
+			if( converting === true )
+				details.push( Nino.adminUi.format( word('/_admin/keys/confirm/format-line'), key, word( '/_admin/keys/format/'+ entry.format ), word( '/_admin/keys/format/'+ shape.format ), word( '/_admin/keys/convert/'+ shape.format ) ) );
+
+			if( losing === true )
+				details.push( Nino.adminUi.format( word('/_admin/keys/confirm/global-line'), key, keys._droppedBy( entry ).map( function( code ) { return Nino.adminUi.localeName( code ) } ).join(', '), Nino.adminUi.localeName( native ) ) );
+
+			Nino.adminUi.confirm( 'destructive', {
+				title			: word('/_admin/keys/confirm/convert-title'),
+				message		: Nino.content.getText('/_admin/keys/confirm/convert'),
+				details		: details,
+				yes				: word('/_admin/keys/confirm/convert-title'),
+				no				: word('/_admin/common/label/cancel'),
+				nested		: true,
+				opener		: ctx.bar.primary,
+				onChoose	: function( ok ) {
+
+					if( ok === true )
+						return proceed();
+
+					// Nothing was sent: the record is as it was typed
+					done( false, { error : '', row : now() } );
+					ctx.status.idle();
+				},
+			} );
+		},
+
+		/**
+		 *	The requests of a save, one after the other, and then the keys read again and the record drawn from them
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Object}		entry					The key as the model holds it
+		 *	@param		{Object}		shape					What the controls of the shape hold
+		 *	@param		{boolean}		reshaped			Whether the shape is changed
+		 *	@param		{Array}			changed				The fields whose text is changed
+		 *	@param		{Function}	done
+		 *
+		 *	@return		void
+		 */
+		_send : function( row, ctx, entry, shape, reshaped, changed, done ) {
+
+			const keys = Nino.admin.keys;
+			const T = Nino.admin.textKeys;
+			const view = ctx.view;
+			const key = row.key;
+			const locale = view.locale;
+			const native = Nino.adminUi.locales.native;
+			const typed = { texts : {}, shape : shape };
+			const refused = { texts : {}, shape : false };
+			const say = { texts : {} };
 			const written = {};
 			const conflicts = [];
-			const queue = shapeKeys.slice();
 
-			// A text that is made shorter in the save that lowers the limit is written first, or the server would refuse a
-			// limit under the text the key holds; every other text follows the shape, which says where it is written
-			const early = textKeys.filter( function( key ) {
-				const entry = entries.find( function( e ) { return e.key === key } );
-				const now = typed[key].shape;
-				return shapeKeys.indexOf( key ) !== -1 && now.limit !== '' && Number( now.limit ) < entry.maxlength && now.global === entry.global;
+			view.fields.forEach( function( field ) { typed.texts[field.code] = field.handle.read() } );
+
+			// A key that becomes global keeps the text of the native language and drops the others (which the question named): only that text is written
+			const wanted = changed.filter( function( field ) { return reshaped === false || shape.global === false || entry.global === true || field.code === native } );
+
+			// The language a text is written in follows the shape the key has after the save
+			const items = wanted.map( function( field ) {
+
+				const target = shape.global === true ? '*' : ( field.code === '*' ? locale : field.code );
+				const item = { key : key, locale : target, value : typed.texts[field.code] };
+
+				// The text it was read as, so that a text another tab wrote since is not written over unseen - not for a key whose shape is changed in this very save,
+				// which moves the text where it was read from
+				if( reshaped === false )
+					item.was = keys._stamps[target+ ' '+ key] ?? T.valueOf( entry, field.code === '*' ? locale : field.code );
+
+				// The language that was turned down as changed is written over what is there: forced, without the text it was read as
+				if( ctx.overwrite === true && view.conflict.indexOf( field.code ) !== -1 ) {
+					delete item.was;
+					item.force = true;
+				}
+
+				return { code : field.code, item : item };
 			} );
 
-			keys._saving = true;
-			keys._pending( true );
-			line.saving();
+			// A text that is made shorter in the save that lowers the limit is written first, or the server would refuse a limit under the text the key holds
+			const early = reshaped === true && shape.limit !== '' && Number( shape.limit ) < entry.maxlength && shape.global === entry.global;
+
+			view.lock( true );
 
 			const finish = function() {
 
 				keys._load( function( status, response ) {
 
-					keys._saving = false;
+					view.lock( false );
+
+					const failed = Object.keys( refused.texts ).length + ( refused.shape === true ? 1 : 0 );
+
+					// What was typed and not written is drawn as it was typed - the text of a language, the shape where that was what was refused
+					const carry = { texts : {}, say : { texts : refused.texts } };
+
+					items.forEach( function( one ) {
+						if( written[one.code] !== true )
+							carry.texts[one.code] = typed.texts[one.code];
+					} );
+
+					[ 'format', 'limit', 'shape' ].forEach( function( part ) {
+						if( say[part] !== undefined ) {
+							carry.say[part] = say[part];
+							carry.shape = typed.shape;
+						}
+					} );
 
 					if( status !== 200 || response === null ) {
-						keys._stay( status, response, typed, refused, written );
-						report( false );
+						keys._stay( ctx, view, typed, written, say, refused, done, now );
 						return;
 					}
 
-					// What a request turned down is drawn as it was typed: the text, and the shape where that was what was refused
-					const carried = {};
+					keys._after( ctx, view, key, carry, function( made ) {
 
-					Object.keys( refused ).forEach( function( key ) {
-						const shape = refused[key].shape !== undefined || refused[key].format !== undefined || refused[key].limit !== undefined;
-						carried[key] = shape === true ? { value : typed[key].value, shape : typed[key].shape } : { value : typed[key].value };
+						if( conflicts.length > 0 ) {
+
+							view.conflict = conflicts.map( function( one ) { return one.code } );
+
+							return done( false, { conflict : true, error : Nino.adminUi.format( word('/_admin/text/error/changed'), conflicts.map( function( one ) { return keys._named( key, one.code ) } ).join(', ') ), row : made } );
+						}
+
+						view.conflict = [];
+
+						if( failed > 0 )
+							return done( false, { error : word('/_admin/keys/error/one'), row : made } );
+
+						done( true, { row : made } );
 					} );
+				} );
+			};
 
-					keys._renderCategoryList();
+			const now = function() { return keys._find( key ) ?? row };
 
-					const failed = Object.keys( refused ).length;
+			const writeText = function( list, next ) {
 
-					if( keys._groups[keys._currentGroup] === undefined ) {
-						keys._view = null;
-						keys._showList( null );
+				if( list.length === 0 )
+					return next();
+
+				const one = list[0];
+
+				keys._apiCall( 'savebatch', { items : [ one.item ] }, function( status, response ) {
+
+					if( status !== 200 || response === null ) {
+						refused.texts[one.code] = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+						return writeText( list.slice( 1 ), next );
 					}
+
+					const result = ( response.results ?? {} )[key];
+
+					if( result !== undefined && result.error === 'changed' ) {
+
+						conflicts.push( one );
+
+						if( one.item.was !== undefined )
+							keys._stamps[one.item.locale+ ' '+ key] = one.item.was;
+					}
+					else if( result === undefined || result.ok !== true )
+						refused.texts[one.code] = word('/_admin/text/error/key');
 					else {
-						keys._renderGroupForm( carried, refused );
-						keys._showForm( false );
-						keys._focusAfterSave( failed > 0 ? refused : null );
+						written[one.code] = true;
+						delete keys._stamps[one.item.locale+ ' '+ key];
+						keys._wrote( [ 'texts' ] );
 					}
 
-					if( failed > 0 ) {
-						if( keys._status !== null )
-							keys._status.fail( Nino.adminUi.format( Nino.content.getText( failed === 1 ? '/_admin/keys/error/one' : '/_admin/keys/error/some' ), failed ) );
-
-						// Another tab or person wrote a key since it was read: the texts stay as they were typed, the question is the kernel's
-						if( conflicts.length > 0 )
-							keys._askConflict( conflicts );
-
-						report( false );
-						return;
-					}
-
-					if( keys._status !== null )
-						keys._status.saved();
-
-					report( true );
+					writeText( list.slice( 1 ), next );
 				} );
 			};
 
-			const writeTexts = function( wanted, next ) {
+			const writeShape = function( next ) {
 
-				const items = wanted.filter( function( key ) { return refused[key] === undefined } ).map( function( key ) {
+				if( reshaped === false )
+					return next();
 
-					const global = keys._settings[key] === undefined ? false : keys._shapeNow( key ).global;
-					const item = { key : key, locale : global === true ? '*' : locale, value : typed[key].value };
-
-					// The text it was read as, so that a text another tab wrote since is not written over unseen - not for a key whose shape
-					// is changed in this very save, which moves the text where it was read from
-					if( shapeKeys.indexOf( key ) === -1 )
-						item.was = keys._stamps[item.locale+ ' '+ key] ?? Nino.admin.textKeys.valueOf( entries.find( function( e ) { return e.key === key } ), locale );
-
-					return item;
-				} );
-
-				if( items.length === 0 ) {
-					next();
-					return;
-				}
-
-				keys._apiCall( 'savebatch', { items : items }, function( status, response ) {
-
-					if( status !== 200 || response === null ) {
-						items.forEach( function( item ) {
-							refuse( item.key, 'value', Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
-						} );
-						next();
-						return;
-					}
-
-					Nino.admin.touch( 'texts' );
-
-					const results = response.results ?? {};
-
-					items.forEach( function( item ) {
-
-						if( results[item.key] !== undefined && results[item.key].error === 'changed' ) {
-							conflicts.push( item );
-							if( item.was !== undefined )
-								keys._stamps[item.locale+ ' '+ item.key] = item.was;
-							refuse( item.key, 'value', Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), item.key ) );
-						}
-						else if( results[item.key] === undefined || results[item.key].ok !== true )
-							refuse( item.key, 'value', Nino.content.getText('/_admin/text/error/key') );
-						else {
-							written[item.key] = true;
-							delete keys._stamps[item.locale+ ' '+ item.key];
-						}
-					} );
-
-					next();
-				} );
-			};
-
-			const writeShape = function() {
-
-				if( queue.length === 0 ) {
-					writeTexts( textKeys.filter( function( key ) { return early.indexOf( key ) === -1 } ), finish );
-					return;
-				}
-
-				const key = queue.shift();
-				const now = typed[key].shape;
-
-				keys._apiCall( 'save', { key : key, global : now.global, blacklisted : now.hidden, format : now.format, maxlength : now.limit === '' ? null : Number( now.limit ) }, function( status, response ) {
+				keys._apiCall( 'save', { key : key, global : shape.global, blacklisted : shape.hidden, format : shape.format, maxlength : shape.limit === '' ? null : Number( shape.limit ) }, function( status, response ) {
 
 					if( status !== 200 || response === null ) {
 
 						const sentence = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 						const named = response !== null && typeof response === 'object' && typeof response.field === 'string' ? response.field : '';
 
-						refuse( key, named === 'format' || named === 'maxlength' ? ( named === 'format' ? 'format' : 'limit' ) : 'shape', sentence );
+						refused.shape = true;
+						say[named === 'format' ? 'format' : ( named === 'maxlength' ? 'limit' : 'shape' )] = sentence;
 					}
 					else {
-						Nino.admin.touch( 'texts' );
-						written[key+ '/shape'] = true;
+						written.shape = true;
+						keys._wrote( [ 'texts' ] );
 					}
 
-					writeShape();
+					next();
 				} );
 			};
 
-			writeTexts( early, writeShape );
+			if( early === true )
+				writeText( items, function() { writeShape( finish ) } );
+			else
+				writeShape( function() {
+					// The text of a key whose shape was turned down is not sent
+					writeText( refused.shape === true ? [] : items, finish );
+				} );
 		},
 
 		/**
-		 *	The question about keys that another tab or person wrote since this row was read (see Nino.admin.textKeys.conflict()):
-		 *	Overwrite writes the typed texts over what is stored, Reload shows what is stored, Cancel leaves them as typed
+		 *	The keys were read again after a save: the table is given the row as it is stored and the record is drawn from it, with what a request turned down as it
+		 *	was typed. The focus that stood in a field that was drawn anew goes to the main button
 		 *
-		 *	@param		{Array}		conflicts				The items the server turned down as changed
+		 *	@param		{Object}		ctx
+		 *	@param		{Object}		view
+		 *	@param		{string}		key
+		 *	@param		{Object}		carry					See view.draw()
+		 *	@param		{Function}	then					then( row ) - the row as it is stored now
 		 *
 		 *	@return		void
 		 */
-		_askConflict : function( conflicts ) {
+		_after : function( ctx, view, key, carry, then ) {
+
+			const keys = Nino.admin.keys;
+			const held = dc.activeElement ?? null;
+
+			keys._stale = false;
+
+			if( keys._directory !== null && keys._group !== null && keys._model.rows[keys._group] !== undefined )
+				keys._directory.update( keys._rows( keys._group ), key );
+
+			view.draw( carry );
+
+			if( held !== null && held !== undefined && view.wrap.contains( held ) === false && held.isConnected === false && ctx.bar !== null && ctx.bar.primary !== undefined )
+				ctx.bar.primary.focus();
+
+			then( keys._find( key ) );
+		},
+
+		/**
+		 *	The save was written and the keys could not be read again: the record stays as it is, says that it was saved and not read again, what was written counts
+		 *	as saved and what was turned down stays unsaved at its field, and a button reads the keys anew
+		 *
+		 *	@param		{Object}		ctx
+		 *	@param		{Object}		view
+		 *	@param		{Object}		typed					{ texts, shape } as it was typed
+		 *	@param		{Object}		written				code => true for a text that was written, shape for the shape
+		 *	@param		{Object}		say						The sentences at the shape
+		 *	@param		{Object}		refused				The sentences at the texts
+		 *	@param		{Function}	done
+		 *	@param		{Function}	now						The row as the table has it
+		 *
+		 *	@return		void
+		 */
+		_stay : function( ctx, view, typed, written, say, refused, done, now ) {
 
 			const keys = Nino.admin.keys;
 
-			Nino.admin.textKeys.conflict( conflicts, {
-				model			: keys._model,
-				opener		: dc.getElementById('keys-edit-form').querySelector('.nino-admin-btn-primary'),
-				onOverwrite : function( forced ) {
+			Object.keys( typed.texts ).forEach( function( code ) {
 
-					keys._apiCall( 'savebatch', { items : forced }, function( status, response ) {
+				const field = view.fields.find( function( one ) { return one.code === code } );
 
-						const results = status === 200 && response !== null ? ( response.results ?? {} ) : {};
+				if( written[code] === true && field !== undefined )
+					field.base = typed.texts[code];
+			} );
 
-						if( forced.some( function( item ) { return results[item.key] === undefined || results[item.key].ok !== true } ) === true ) {
-							keys._status.error( status, response, '/_admin/common/error/save' );
-							return;
-						}
+			if( written.shape === true )
+				view.set.base = typed.shape;
 
-						Nino.admin.touch( 'texts' );
-						keys._stamps = {};
-						keys._reload( true, undefined, conflicts[0].key );
-					} );
-				},
-				onReload	: function() {
+			keys._say( view, { texts : refused.texts, format : say.format, limit : say.limit, shape : say.shape } );
+			keys._stale = true;
+
+			done( false, { error : word('/_admin/keys/error/reload'), row : now() } );
+		},
+
+		/**
+		 *	The button Reload of a record whose keys could not be read again: ask about the input that would be lost, read the keys and draw the record from them
+		 *
+		 *	@param		{string}		key
+		 *	@param		{Element}		opener
+		 *
+		 *	@return		void
+		 */
+		_refetch : function( key, opener ) {
+
+			const keys = Nino.admin.keys;
+
+			keys._guarded( key, opener, function() {
+
+				keys._load( function( status, response ) {
+
+					if( status !== 200 || response === null ) {
+
+						if( keys._ctx !== null && keys._ctx.status !== null )
+							keys._ctx.status.error( status, response, '/_admin/common/error/load' );
+
+						return;
+					}
+
+					keys._stale = false;
 					keys._stamps = {};
-					keys._reload( false, undefined, conflicts[0].key );
-				},
-				// The text stays as it was typed, at its field, and the next save asks again
-				onCancel	: function() { keys._session.get( conflicts[0].key ).focus() },
+
+					if( keys._directory !== null && keys._model.rows[keys._group] !== undefined )
+						keys._directory.setRows( keys._rows( keys._group ), { keep : true } );
+
+					if( keys._ctx !== null && keys._ctx.status !== null )
+						keys._ctx.status.idle();
+
+					keys._redraw();
+				} );
 			} );
 		},
 
 		/**
-		 *	Where the focus goes when the row was drawn again after a save: to the first field a request turned down, else
-		 *	to the main button
-		 *
-		 *	@param		{Object|null}	refused			See _renderGroupForm(), null where nothing was refused
+		 *	Draw the open record again from what the keys hold, as the next entry of the rows is drawn - or, for a key the rows the directory shows do not hold, in
+		 *	place - and take it for saved
 		 *
 		 *	@return		void
 		 */
-		_focusAfterSave : function( refused ) {
+		_redraw : function() {
 
 			const keys = Nino.admin.keys;
-			const first = refused === null ? undefined : keys._session.keys().find( function( key ) { return refused[key] !== undefined } );
+			const view = keys._view;
 
-			if( first === undefined ) {
-				const main = dc.getElementById('keys-edit-form').querySelector('.nino-admin-btn-primary');
-				if( main !== null )
-					main.focus();
+			if( view === null || keys._ctx === null )
+				return;
+
+			if( keys._record.key() !== null && keys._directory !== null && keys._directory.rows().some( function( row ) { return row.key === keys._record.key() } ) === true ) {
+				keys._ctx.go( 0 );
 				return;
 			}
 
-			const say = refused[first];
-
-			if( say.value !== undefined )
-				keys._session.get( first ).focus();
-			else
-				( say.limit !== undefined || say.shape !== undefined ? keys._settings[first].limit : keys._settings[first].format ).focus();
-		},
-
-		/**
-		 *	The save was written and the keys could not be read again: the form stays as it is, the line says that it
-		 *	was saved and not read again, what was written counts as saved and what was turned down stays unsaved at its
-		 *	field, and a button reads the keys anew
-		 *
-		 *	@param		{number}		status			What the read answered
-		 *	@param		{*}					response
-		 *	@param		{Object}		typed				key -> { value, shape } as it was typed
-		 *	@param		{Object}		refused			key -> the sentences at its fields
-		 *	@param		{Object}		written			key -> true for a text that was written, key/shape for a shape
-		 *
-		 *	@return		void
-		 */
-		_stay : function( status, response, typed, refused, written ) {
-
-			const keys = Nino.admin.keys;
-			const form = dc.getElementById('keys-edit-form');
-
-			keys._pending( false );
-
-			Object.keys( typed ).forEach( function( key ) {
-
-				if( written[key] === true )
-					keys._session.capture( key, typed[key].value );
-
-				if( written[key+ '/shape'] === true )
-					keys._settings[key].base = typed[key].shape;
-			} );
-
-			keys._showRefused( refused );
-
-			const bar = form.querySelector('.nino-admin-actionbar');
-			if( dc.getElementById('keys-reload') === null )
-				bar.insertBefore( Nino.adminUi.button( Nino.content.getText('/_admin/keys/label/reload'), function() {
-					keys._guard( function() { keys._reload( false ) } );
-				}, { kind : 'secondary', id : 'keys-reload' } ), bar.querySelector('.nino-admin-btn-primary') );
-			keys._status.fail( Nino.content.getText('/_admin/keys/error/reload') );
-			keys._focusAfterSave( Object.keys( refused ).length > 0 ? refused : null );
+			view.draw();
 
 			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
+				Nino.admin.dirty.snapshot( 'keys' );
 		},
 
 		/**
-		 *	Keep controls stable while the requests of a save run: a field changed in the middle of them would be a
-		 *	change that nothing says whether it was saved
+		 *	Ask the shell about the input the record holds before something that would lose it - the rename, a reload -, and run proceed() where the answer lets it go
+		 *	on. A Discard of the shell's question takes the record away; the record of the key is opened again where it did, at the address it has
 		 *
-		 *	@param		{boolean}	pending
+		 *	@param		{string}		key
+		 *	@param		{Element}		opener
+		 *	@param		{Function}	proceed
 		 *
 		 *	@return		void
 		 */
-		_pending : function( pending ) {
+		_guarded : function( key, opener, proceed ) {
 
-			const form = dc.getElementById('keys-edit-form');
+			const keys = Nino.admin.keys;
 
-			if( form === null )
-				return;
+			if( typeof Nino.admin.dirty !== 'object' )
+				return proceed();
 
-			form.setAttribute( 'aria-busy', pending === true ? 'true' : 'false' );
-			form.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
-			form.querySelectorAll('[contenteditable]').forEach( function( el ) { el.contentEditable = pending === true ? 'false' : 'true' } );
+			Nino.admin.dirty.guard( [ 'keys' ], function() {
+
+				if( keys._record.isOpen() === false )
+					keys._record.open( key, { opener : opener } );
+
+				proceed();
+			} );
 		},
 
 		/**
-		 *	Open the form that creates a key - or, given a key, renames it. Both
-		 *	ask for the four segments of the key, each in a field of its own,
-		 *	/<namespace>/<category>/<part>/<name>; a rename is that form filled in
-		 *	with the key's segments
+		 *	Read the keys again for the answer Reload of a conflict: what is stored is what the record and the table show, and what this tab typed is dropped
 		 *
-		 *	@param		{string|null}	[fromKey]			The key to rename
-		 *	@param		{Element}			[opener]			The button that was pressed: Back returns the focus to it
-		 *	@param		{boolean}			[opened]			The person opened it: the focus goes into the form
+		 *	@param		{string}		key
+		 *	@param		{Function}	done					done( row ) with the row of the key as it is stored now, null where it could not be read or is gone
 		 *
 		 *	@return		void
 		 */
-		_openNewKeyForm : function( fromKey, opener, opened ) {
+		_reload : function( key, done ) {
 
-			Nino.admin.keys._destroyHtmlEditors();
-			Nino.admin.keys._renameFrom = typeof fromKey === 'string' ? fromKey : null;
-			Nino.admin.keys._opener = opener ?? null;
-			Nino.admin.keys._view = 'new';
-			Nino.admin.keys._renderNewKeyForm();
-			Nino.admin.keys._showForm( opened === true );
+			const keys = Nino.admin.keys;
+
+			keys._load( function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+
+					if( keys._ctx !== null && keys._ctx.status !== null )
+						keys._ctx.status.error( status, response, '/_admin/common/error/load' );
+
+					return done( null );
+				}
+
+				keys._stamps = {};
+
+				if( keys._view !== null )
+					keys._view.conflict = [];
+
+
+				if( keys._group === null || keys._model.rows[keys._group] === undefined )
+					return done( null );
+
+				if( keys._directory !== null )
+					keys._directory.setRows( keys._rows( keys._group ), { keep : true } );
+
+				done( keys._find( key ) );
+			} );
 		},
 
 		/**
-		 *	The four segments a key is filled into the form as: its own if it
-		 *	follows the grammar, otherwise /project and nothing - a key somebody
+		 *	Delete a key entirely, after the question of its weight, and draw the table without it - or the list, where it was the last of the row. A refusal stands in
+		 *	the line of the record's bar
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Element}		opener
+		 *	@param		{Function}	done					done( true ) where it went, done( false, { error } ) where it failed, done( null ) where the answer was no
+		 *
+		 *	@return		void
+		 */
+		_remove : function( row, opener, done ) {
+
+			const keys = Nino.admin.keys;
+			const key = row.key;
+
+			Nino.adminUi.confirm( 'destructive', {
+				title			: word('/_admin/keys/confirm/delete-title'),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/delete'), key ),
+				yes				: word('/_admin/keys/confirm/delete-title'),
+				no				: word('/_admin/common/label/cancel'),
+				nested		: true,
+				opener		: opener,
+				onChoose	: function( ok ) {
+
+					if( ok === false )
+						return done( null );
+
+					keys._apiCall( 'delete', { key : key }, function( status, response ) {
+
+						if( status !== 200 || response === null )
+							return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) } );
+
+						keys._wrote( [ 'texts' ] );
+
+						keys._load( function( loadStatus, loadResponse ) {
+
+							// The key is gone: where the keys cannot be read again the model is made without it
+							if( loadStatus !== 200 || loadResponse === null ) {
+								keys._data.keys = keys._data.keys.filter( function( entry ) { return entry.key !== key } );
+								keys._buildModel();
+							}
+
+
+							if( keys._group !== null && keys._model.rows[keys._group] === undefined ) {
+
+								// The last key of the row: the list is what is behind the record
+								keys._level( null );
+								return done( true );
+							}
+
+							if( keys._directory !== null )
+								keys._directory.setRows( keys._rows( keys._group ), { keep : true } );
+
+							done( true );
+						} );
+					} );
+				},
+			} );
+		},
+
+		// ------------------------------------------------------------------ A key that is made
+
+		/**
+		 *	Open the form of a new key in the record, at #text/keys/@new
+		 *
+		 *	@param		{Element}		opener				The button that was pressed: the focus goes back to it
+		 *	@param		{Object|null}	seed				{ namespace, category } the form starts from
+		 *
+		 *	@return		void
+		 */
+		_newKey : function( opener, seed ) {
+
+			const keys = Nino.admin.keys;
+
+			keys._seed = seed;
+			keys._wantNew = true;
+
+			try {
+				keys._record.create( { opener : opener } );
+			}
+			finally {
+				keys._wantNew = false;
+			}
+		},
+
+		/**
+		 *	The four parts a key is filled into the form as: its own if it follows the grammar, otherwise /project and nothing - a key somebody
 		 *	invented has to be named again
 		 *
 		 *	@param		{string}	key
@@ -1675,19 +2090,7 @@
 		},
 
 		/**
-		 *	What the four fields of the form hold now
-		 *
-		 *	@return		{Object}									{ namespace, category, part, name }
-		 */
-		_readSegments : function() {
-
-			const value = function( id ) { const el = dc.getElementById( id ); return el === null ? '' : String( el.value ) };
-
-			return { namespace : value('keys-form-namespace'), category : value('keys-form-category'), part : value('keys-form-part'), name : value('keys-form-name') };
-		},
-
-		/**
-		 *	The key the segments make
+		 *	The key the four parts make
 		 *
 		 *	@param		{Object}	segments				{ namespace, category, part, name }
 		 *
@@ -1698,82 +2101,68 @@
 		},
 
 		/**
-		 *	Render the form that creates a key or renames one: a field for each segment, and under them the key
-		 *	they make and the name it will be read by. The namespace is a choice that offers /project to begin
-		 *	with - the others, which belong to a template, a feature or a module, after "Unlock", or at once for a key
-		 *	that is in one; the category is a choice from what there is where it is a template, a feature or a module,
-		 *	and a field with suggestions for /project. What is wrong is said at the field when the form is sent,
-		 *	and a segment that is no word of the vocabulary is said as it is typed, which it may be all the same
+		 *	Draw the fields of the four parts of a key into a container, for the form of a new key and for the rename: a field for each part, and under them the key
+		 *	they make and the name it will be read by. The namespace is a choice that offers /project to begin with - the others, which belong to a template, a feature
+		 *	or a module, after "More namespaces", or at once for a key that is in one; the category is a choice from what there is where it is a template, a feature or
+		 *	a module, and a field with suggestions for /project. What is wrong is said at the field when the form is sent (check()), and a part that is no word of the
+		 *	vocabulary is said as it is typed, which it may be all the same
 		 *
-		 *	@return		void
+		 *	@param		{Element}		host					Where the fields are put
+		 *	@param		{Object}		initial				{ namespace, category, part, name }
+		 *
+		 *	@return		{Object}									{ read(), key(), check(), fields : { category, part, name }, controls : { namespace, category, part, name }, focus() }
 		 */
-		_renderNewKeyForm : function() {
+		_segmentForm : function( host, initial ) {
 
-			const keys 		= Nino.admin.keys;
-			const from 		= keys._renameFrom;
-			const initial = from === null ? { namespace : 'project', category : '', part : '', name : '' } : keys._segmentsOf( from );
-			const text 		= function( key ) { return Nino.content.getText( key ) };
+			const keys = Nino.admin.keys;
+			let unlocked = initial.namespace !== 'project';
 
-			keys._unlocked = initial.namespace !== 'project';
-			keys._formInitial = JSON.stringify( initial );
-
-			const wrap = dc.getElementById('keys-form');
-			wrap.innerHTML = '';
-			wrap.appendChild( keys._contextBar( wrap, text( from === null ? '/_admin/keys/label/new' : '/_admin/keys/label/rename-title' ) ) );
-
-			const form = dc.createElement('form');
-			form.id = 'keys-new-form';
-			form.noValidate = true;
-
-			const fieldset = dc.createElement('fieldset');
-			const legend = dc.createElement('legend');
-			legend.textContent = text( from === null ? '/_admin/keys/label/new' : '/_admin/keys/label/rename-title' );
-			fieldset.appendChild( legend );
-			form.appendChild( fieldset );
-
-			// The namespace: one choice at first, all of them after the unlock
 			const namespaceField = Nino.adminUi.selectField( {
 				id : 'keys-form-namespace',
-				label : text('/_admin/keys/label/namespace'),
+				label : word('/_admin/keys/label/namespace'),
 				options : [ { value : initial.namespace, label : '/'+ initial.namespace } ],
 				value : initial.namespace,
 			} );
 			const namespace = namespaceField.querySelector('select');
 
+			// The namespace: one choice at first, all of them after the unlock
 			const fillNamespaces = function( chosen ) {
+
 				namespace.innerHTML = '';
-				keys.NAMESPACES.filter( function( name ) { return name === 'project' || keys._unlocked === true } ).forEach( function( name ) {
+
+				keys.NAMESPACES.filter( function( name ) { return name === 'project' || unlocked === true } ).forEach( function( name ) {
 					const option = dc.createElement('option');
 					option.value = name;
 					option.textContent = '/'+ name;
 					option.selected = name === chosen;
 					namespace.appendChild( option );
 				} );
+
 				namespace.value = chosen;
 			};
 
 			fillNamespaces( initial.namespace );
-			fieldset.appendChild( namespaceField );
+			host.appendChild( namespaceField );
 
 			const unlockField = Nino.adminUi.switchField( {
-				checked : keys._unlocked,
-				label : text('/_admin/keys/label/unlock'),
-				help : text('/_admin/keys/hint/unlock'),
-				on : text('/_admin/common/label/on'),
-				off : text('/_admin/common/label/off'),
+				checked : unlocked,
+				label : word('/_admin/keys/label/unlock'),
+				help : word('/_admin/keys/hint/unlock'),
+				on : word('/_admin/common/label/on'),
+				off : word('/_admin/common/label/off'),
 			} );
 			const unlock = unlockField.querySelector('input');
+
 			unlock.addEventListener( 'change', function() {
-				keys._unlocked = unlock.checked;
-				fillNamespaces( keys._unlocked === true ? namespace.value : 'project' );
+				unlocked = unlock.checked;
+				fillNamespaces( unlocked === true ? namespace.value : 'project' );
 				fillCategory( '' );
 				refresh();
 			} );
-			fieldset.appendChild( unlockField );
+			host.appendChild( unlockField );
 
-			// The category: a choice where there is a list to choose from, a field
-			// with suggestions where the project may name its own
-			const segmentHelp = text('/_admin/keys/hint/segment');
+			// The category: a choice where there is a list to choose from, a field with suggestions where the project may name its own
+			const segmentHelp = word('/_admin/keys/hint/segment');
 			let categoryField = null;
 			let category = null;
 
@@ -1788,7 +2177,7 @@
 				let field;
 
 				if( namespace.value === 'project' ) {
-					field = Nino.adminUi.textField( { id : 'keys-form-category', label : text('/_admin/keys/label/category'), help : segmentHelp, value : chosen, required : true, autocomplete : 'off', placeholder : 'company' } );
+					field = Nino.adminUi.textField( { id : 'keys-form-category', label : word('/_admin/keys/label/category'), help : segmentHelp, value : chosen, required : true, autocomplete : 'off', placeholder : 'company' } );
 					const input = field.querySelector('input');
 					input.setAttribute( 'list', 'keys-form-categories' );
 					input.spellcheck = false;
@@ -1799,16 +2188,15 @@
 						option.value = name;
 						list.appendChild( option );
 					} );
-					form.appendChild( list );
+					host.appendChild( list );
 				} else {
-					// A category the key has that is not on offer any more (a feature
-					// that was taken out) stays choosable, so a rename can keep it
+					// A category the key has that is not on offer any more (a feature that was taken out) stays choosable, so a rename can keep it
 					if( chosen !== '' && offered.indexOf( chosen ) === -1 )
 						offered.unshift( chosen );
 
 					field = Nino.adminUi.selectField( {
 						id : 'keys-form-category',
-						label : text('/_admin/keys/label/category'),
+						label : word('/_admin/keys/label/category'),
 						help : segmentHelp,
 						options : offered.map( function( name ) { return { value : name, label : name } } ),
 						value : chosen === '' && offered.length > 0 ? offered[0] : chosen,
@@ -1821,9 +2209,9 @@
 				category.addEventListener( 'change', refresh );
 
 				if( categoryField === null )
-					fieldset.appendChild( field );
+					host.appendChild( field );
 				else
-					fieldset.replaceChild( field, categoryField );
+					categoryField.replaceWith( field );
 
 				categoryField = field;
 			};
@@ -1831,10 +2219,10 @@
 			fillCategory( initial.category );
 
 			const segment = function( id, labelKey, value, placeholder ) {
-				const field = Nino.adminUi.textField( { id : id, label : text( labelKey ), help : segmentHelp, value : value, required : true, autocomplete : 'off', placeholder : placeholder } );
+				const field = Nino.adminUi.textField( { id : id, label : word( labelKey ), help : segmentHelp, value : value, required : true, autocomplete : 'off', placeholder : placeholder } );
 				field.querySelector('input').spellcheck = false;
 				field.querySelector('input').addEventListener( 'input', refresh );
-				fieldset.appendChild( field );
+				host.appendChild( field );
 				return field;
 			};
 
@@ -1843,7 +2231,6 @@
 
 			// The key the four make and the name it is read by, said as they are typed
 			const composedField = Nino.adminUi.el( 'div', 'nino-admin-field' );
-			const composedName = Nino.adminUi.el( 'span', '', text('/_admin/keys/label/key') );
 			const composedBody = Nino.adminUi.el( 'div', 'admin-key-composed' );
 			const composedKey = Nino.adminUi.el( 'code', '' );
 			const shown = Nino.adminUi.el( 'small', 'admin-key-note' );
@@ -1853,51 +2240,25 @@
 			composedBody.setAttribute( 'aria-live', 'polite' );
 			composedBody.appendChild( composedKey );
 			composedBody.appendChild( shown );
-			composedField.appendChild( composedName );
+			composedField.appendChild( Nino.adminUi.el( 'span', '', word('/_admin/keys/label/key') ) );
 			composedField.appendChild( composedBody );
-			fieldset.appendChild( composedField );
+			host.appendChild( composedField );
 
-			if( from === null ) {
+			const input = function( field ) { return field.querySelector('input') };
 
-				const globalField = Nino.adminUi.switchField( {
-					label : text('/_admin/common/label/global'),
-					help : text('/_admin/keys/help/global'),
-					on : text('/_admin/common/label/on'),
-					off : text('/_admin/common/label/off'),
-				} );
-				globalField.querySelector('input').id = 'keys-form-new-global';
-				fieldset.appendChild( globalField );
+			const read = function() {
+				return { namespace : String( namespace.value ), category : String( category.value ), part : String( input( partField ).value ), name : String( input( nameField ).value ) };
+			};
 
-				fieldset.appendChild( Nino.adminUi.textareaField( {
-					id : 'keys-form-new-value',
-					label : text('/_admin/keys/label/initial'),
-					help : text('/_admin/keys/help/initial'),
-					rows : 2,
-					fills : { editable : true, load : keys._loadFills },
-				} ) );
-			}
-
-			const msg = dc.createElement('p');
-			msg.id = 'keys-form-msg';
-			const bar = Nino.adminUi.actionBar( {
-				status : { line : msg, fresh : true },
-				primary : Nino.adminUi.button( text( from === null ? '/_admin/keys/label/create' : '/_admin/keys/label/rename-title' ), null, { type : 'submit' } ),
-			} );
-
-			keys._status = bar.line;
-			bar.line.bind( form, keys.isDirty );
-			form.appendChild( bar.el );
-
-			// What the fields say now: the key and its name, and which segment is no word of the vocabulary - which
-			// it may be all the same
+			// What the fields say now: the key and its name, and which segment is no word of the vocabulary - which it may be all the same
 			function refresh() {
 
-				const segments = keys._readSegments();
+				const segments = read();
 
 				composedKey.textContent = keys._composeKey( segments );
 
 				const valid = keys.SEGMENT.test( segments.part ) === true && keys.SEGMENT.test( segments.name ) === true;
-				shown.textContent = valid === true ? text('/_admin/keys/label/shown-as')+ ' '+ Nino.adminUi.slugLabel( segments.part )+ ' › '+ Nino.adminUi.slugLabel( segments.name ) : '';
+				shown.textContent = valid === true ? word('/_admin/keys/label/shown-as')+ ' '+ Nino.adminUi.slugLabel( segments.part )+ ' › '+ Nino.adminUi.slugLabel( segments.name ) : '';
 
 				[ [ categoryField, segments.category ], [ partField, segments.part ], [ nameField, segments.name ] ].forEach( function( pair ) {
 
@@ -1908,214 +2269,583 @@
 
 					// A slug of a key that is no word still saves: it is said what it will read like
 					if( pair[1] !== '' && keys.SEGMENT.test( pair[1] ) === true && Nino.adminUi.isWord( pair[1] ) === false )
-						pair[0].appendChild( Nino.adminUi.el( 'small', 'admin-key-note', Nino.adminUi.format( text('/_admin/keys/hint/not-a-word'), pair[1], Nino.adminUi.slugLabel( pair[1] ) ) ) );
+						pair[0].appendChild( Nino.adminUi.el( 'small', 'admin-key-note', Nino.adminUi.format( word('/_admin/keys/hint/not-a-word'), pair[1], Nino.adminUi.slugLabel( pair[1] ) ) ) );
 				} );
 			}
 
 			namespace.addEventListener( 'change', function() { fillCategory( '' ); refresh() } );
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); keys._saveNewKey() } );
-
-			wrap.appendChild( form );
 
 			refresh();
 
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
+			return {
+				read : read,
+				key : function() { return keys._composeKey( read() ) },
+				controls : { namespace : namespace, category : function() { return category }, part : input( partField ), name : input( nameField ) },
+				fields : { category : function() { return categoryField }, part : partField, name : nameField },
+				/**
+				 *	Say what is wrong with the parts before anything is sent - the sentence under each field - and answer the first control that is wrong, null where they are fine
+				 */
+				check : function() {
+
+					const segments = read();
+					let first = null;
+
+					Nino.adminUi.clearFieldErrors( host );
+
+					[ [ 'keys-form-category', segments.category, '/_admin/keys/label/category' ], [ 'keys-form-part', segments.part, '/_admin/keys/label/part' ], [ 'keys-form-name', segments.name, '/_admin/keys/label/name' ] ].forEach( function( rule ) {
+
+						const control = dc.getElementById( rule[0] );
+						const name = word( rule[2] );
+						let sentence = '';
+
+						if( rule[1] === '' )
+							sentence = Nino.adminUi.format( word('/_admin/common/error/missing'), name );
+						else if( keys.SEGMENT.test( rule[1] ) === false )
+							sentence = Nino.adminUi.format( word('/_admin/keys/error/invalid'), name, word('/_admin/keys/expect/segment') );
+
+						if( sentence === '' )
+							return;
+
+						Nino.adminUi.fieldError( control.closest('label'), control, 'keys-error-'+ rule[0], sentence );
+						first = first ?? control;
+					} );
+
+					return first;
+				},
+			};
 		},
 
 		/**
-		 *	Say what is wrong with the segments of the form before anything is sent - the sentence under each field,
-		 *	the line of the bar for all of them - and take the focus to the first. A key that is not changed by a
-		 *	rename is no rename
+		 *	The content of the form of a new key: the four parts of the key, one text for all languages, and the start value, written in the language the workbench
+		 *	edits content in - which the form says where it is not the native one. The record is opened at the namespace and the category of the row the button stood in
 		 *
-		 *	@param		{Object}		line					The status line of the form's bar
+		 *	@param		{Object}		row						See _blank()
+		 *	@param		{Object}		ctx
 		 *
-		 *	@return		{boolean}									Whether the form is fine
+		 *	@return		{Element}
 		 */
-		_checkSegments : function( line ) {
+		_newBody : function( row, ctx ) {
 
 			const keys = Nino.admin.keys;
-			const segments = keys._readSegments();
-			let first = null;
+			const wrap = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
 
-			Nino.adminUi.clearFieldErrors( dc.getElementById('keys-new-form') );
+			wrap.id = 'keys-record';
 
-			[ [ 'keys-form-category', segments.category, '/_admin/keys/label/category' ], [ 'keys-form-part', segments.part, '/_admin/keys/label/part' ], [ 'keys-form-name', segments.name, '/_admin/keys/label/name' ] ].forEach( function( rule ) {
+			const view = { key : null, creating : true, fields : [], wrap : wrap, form : null, global : null, value : null, badge : Nino.adminUi.el( 'p', 'admin-key-worklang' ), mark : null };
 
-				const input = dc.getElementById( rule[0] );
-				const name = Nino.content.getText( rule[2] );
-				let sentence = '';
+			view.mark = function() {
 
-				if( rule[1] === '' )
-					sentence = Nino.adminUi.format( Nino.content.getText('/_admin/common/error/missing'), name );
-				else if( keys.SEGMENT.test( rule[1] ) === false )
-					sentence = Nino.adminUi.format( Nino.content.getText('/_admin/keys/error/invalid'), name, Nino.content.getText('/_admin/keys/expect/segment') );
+				view.badge.innerHTML = '';
 
-				if( sentence === '' )
-					return;
+				const badge = Nino.adminUi.localeBadge( keys._locale() );
 
-				Nino.adminUi.fieldError( input.closest('label'), input, 'keys-error-'+ rule[0], sentence );
-				first = first ?? input;
+				if( badge !== null )
+					view.badge.appendChild( badge );
+
+				view.badge.hidden = badge === null;
+			};
+
+			view.mark();
+			wrap.appendChild( view.badge );
+
+			const section = keys._section( word('/_admin/keys/label/new') );
+			const initial = Object.assign( { namespace : 'project', category : '', part : '', name : '' }, row.seed ?? {} );
+
+			view.form = keys._segmentForm( section, initial );
+
+			const globalField = Nino.adminUi.switchField( {
+				label : word('/_admin/keys/label/global'),
+				help : word('/_admin/keys/help/global'),
+				on : word('/_admin/common/label/on'),
+				off : word('/_admin/common/label/off'),
 			} );
 
-			if( first !== null ) {
-				line.fail( Nino.content.getText('/_admin/keys/error/fields') );
-				first.focus();
-				return false;
-			}
+			view.global = globalField.querySelector('input');
+			view.global.id = 'keys-form-new-global';
+			section.appendChild( globalField );
 
-			if( keys._renameFrom !== null && keys._composeKey( segments ) === keys._renameFrom ) {
-				line.fail( Nino.content.getText('/_admin/keys/error/unchanged') );
-				dc.getElementById('keys-form-name').focus();
-				return false;
-			}
+			const value = Nino.adminUi.textareaField( {
+				id : 'keys-form-new-value',
+				label : word('/_admin/keys/label/initial'),
+				help : word('/_admin/keys/help/initial'),
+				rows : 2,
+				fills : { editable : true, load : function( done ) { keys._loadFills( keys._locale(), done ) } },
+			} );
 
-			return true;
+			view.value = value.querySelector('textarea');
+			section.appendChild( value );
+			wrap.appendChild( section );
+
+			ctx.view = view;
+			keys._view = view;
+			keys._ctx = ctx;
+
+			return wrap;
 		},
 
 		/**
-		 *	Create the key the form holds - or rename the key it was opened for
-		 *	to it. The server decides the segments again, and what it refuses stands at the field it names
+		 *	Create the key the form holds. The parts are checked first and what is wrong is said at its field; the server decides them again, and what it refuses
+		 *	stands at the field it names. The key has its own place once it is made: the keys are read again, the table of its row is drawn behind the record, and the record
+		 *	is the record of the new key, at its address
 		 *
-		 *	@param		{Function}	[done]				Called once with true when the key was created or renamed, false otherwise
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Function}	done
 		 *
 		 *	@return		void
 		 */
-		_saveNewKey : function( done ) {
+		_saveNew : function( row, ctx, done ) {
 
 			const keys = Nino.admin.keys;
+			const view = ctx.view;
+			const first = view.form.check();
 
-			const report = function( ok ) {
-				if( typeof done === 'function' )
-					done( ok );
-			};
-
-			const line = keys._status;
-
-			if( keys._checkSegments( line ) === false ) {
-				report( false );
-				return;
+			if( first !== null ) {
+				first.focus();
+				return done( false, { error : word('/_admin/keys/error/fields') } );
 			}
 
-			const key 		= keys._composeKey( keys._readSegments() );
-			const from 		= keys._renameFrom;
+			const key = view.form.key();
+			const value = view.value.value;
 
-			const answered = function( status, response ) {
+			keys._apiCall( 'create', { key : key, global : view.global.checked, value : value, values : { [ keys._locale() ] : value } }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 
-					line.error( status, response, from === null ? '/_admin/common/error/save' : '/_admin/common/error/rename' );
-
-					// A key the server refuses is refused at the last segment, which is where the name of it ends
+					// A key the server refuses is refused at the last part, which is where the name of it ends
 					const named = response !== null && typeof response === 'object' ? response.field : '';
 
 					if( named === 'key' || named === 'newKey' ) {
-						const input = dc.getElementById('keys-form-name');
+						const input = view.form.controls.name;
 						Nino.adminUi.fieldError( input.closest('label'), input, 'keys-error-keys-form-name', Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
 						input.focus();
 					}
 
-					report( false );
-					return;
+					return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) } );
 				}
 
-				Nino.admin.touch( 'texts' );
 				// A key of a template is one the rows of that template did not have
-				if( key.indexOf('/template/') === 0 )
-					Nino.admin.touch( 'templates' );
+				keys._wrote( key.indexOf('/template/') === 0 ? [ 'texts', 'templates' ] : [ 'texts' ] );
 
-				// The key has its own place now: its row is open at it, at the address it has
 				keys._load( function( loadStatus, loadResponse ) {
 
-					if( loadStatus !== 200 || loadResponse === null ) {
-						// The key exists: only the list failed, and a Save that is reported as failed would be tried again
-						keys._showError( dc.getElementById('keys-form'), loadStatus, loadResponse );
-						report( true );
-						return;
-					}
+					if( loadStatus !== 200 || loadResponse === null )
+						return done( false, { error : word('/_admin/keys/error/reload') } );
 
-					keys._renderCategoryList();
+					const group = keys._model.rowOf[key];
 
-					const row = keys._model.rowOf[key];
 
-					if( row === undefined ) {
-						keys._showList();
-					}
-					else {
-						Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( row, key ) );
-						keys._openGroup( row, key, true );
-					}
+					if( group === undefined )
+						return done( false, { error : word('/_admin/keys/error/reload') } );
 
-					Nino.adminUi.say( Nino.content.getText('/_admin/common/msg/saved') );
-					report( true );
+					// The table of the row that holds the key is behind the record, and the address is the key's
+					keys._release();
+					keys._group = group;
+					keys._drawGroup( group );
+					keys._shown = 'group';
+					Nino.adminUi.showLevel( 'keys-form', { focus : false } );
+
+					done( true, { row : keys._find( key ) } );
 				} );
-			};
-
-			if( from !== null ) {
-
-				// Templates may still call the key by its old name: renaming an identifier is asked about (a key of the system is not renamed here)
-				const asked = Nino.adminUi.confirm( 'big', {
-					title		: Nino.content.getText('/_admin/keys/confirm/rename-title'),
-					message	: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/rename'), from, key ),
-					yes			: Nino.content.getText('/_admin/keys/confirm/rename-title'),
-					no			: Nino.content.getText('/_admin/common/label/cancel'),
-					opener	: dc.getElementById('keys-form-name'),
-					onChoose : function( ok ) {
-						if( ok !== true ) {
-							report( false );
-							return;
-						}
-
-						line.saving();
-						keys._apiCall( 'rename', { key : from, newKey : key }, answered );
-					},
-				} );
-
-				if( asked === false )
-					report( false );
-
-				return;
-			}
-
-			// The text is written in the language this tab shows - said in the request, since another window of the same session may have moved the session's own
-			const value = dc.getElementById('keys-form-new-value').value;
-			line.saving();
-			keys._apiCall( 'create', { key : key, global : dc.getElementById('keys-form-new-global').checked, value : value, values : { [ keys._locale() ] : value } }, answered );
+			} );
 		},
 
+		// ------------------------------------------------------------------ A key that is renamed
+
 		/**
-		 *	Open the "missing keys found in templates" scan form - see Keys::apiScan(). The form is the view while the
-		 *	scan runs: its sentence says so, and the rows come in its place
+		 *	The Rename of a record: the dialog over it with the four parts of the key. Input in the record is asked about first; the dialog is an entry of the history
+		 *	of its own, #text/keys/@rename/<key>, which Back closes
 		 *
-		 *	@param		{Element}		[opener]			The button that was pressed: Back returns the focus to it
-		 *	@param		{boolean}		[opened]			The person opened it: the focus goes into the form
+		 *	@param		{string}		key
+		 *	@param		{Element}		opener
 		 *
 		 *	@return		void
 		 */
-		_openScanForm : function( opener, opened ) {
+		_rename : function( key, opener ) {
 
 			const keys = Nino.admin.keys;
 
-			keys._destroyHtmlEditors();
-			keys._view = 'scan';
-			keys._opener = opener ?? null;
-			keys._scanRows = [];
+			keys._guarded( key, opener, function() {
+				keys._openRename( key, opener, true );
+			} );
+		},
+
+		/**
+		 *	The address names the rename of a key: the table of its row, the record of the key and the dialog over it, as one entry of the history - the one the
+		 *	address is. The record of a key that is not there is the notice over the table
+		 *
+		 *	@param		{string}		key
+		 *
+		 *	@return		void
+		 */
+		_openRenameByAddress : function( key ) {
+
+			const keys = Nino.admin.keys;
+			const router = Nino.admin.router;
+			const group = keys._model.rowOf[key];
+
+			if( keys._group !== group || keys._directory === null )
+				keys._level( group );
+
+			// The record of the key is what the address says first - also where the form of a new key is open, which reads the parts of the address as a key
+			router.set( 'keys', [ group, key ] );
+
+			if( keys._record.creating() === true )
+				keys._forced = { row : group };
+
+			try {
+				keys._record.follow();
+			}
+			finally {
+				keys._forced = null;
+			}
+
+			if( keys._record.isOpen() === false || keys._record.key() !== key )
+				return;
+
+			keys._openRename( key, null, false );
+		},
+
+		/**
+		 *	Open the dialog that renames a key: the four parts of its name, the key they make and, once the parts are fine, the question before the rename
+		 *
+		 *	@param		{string}			key
+		 *	@param		{Element|null}	opener
+		 *	@param		{boolean}			push			The address is a new entry of the history - a person's own move - and not written over the one that named the rename
+		 *
+		 *	@return		void
+		 */
+		_openRename : function( key, opener, push ) {
+
+			const keys = Nino.admin.keys;
+			const router = Nino.admin.router;
+			const host = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+			host.id = 'keys-rename-fields';
+
+			const form = keys._segmentForm( host, keys._segmentsOf( key ) );
+			const name = form.controls.name;
+
+			keys._renaming = key;
+			keys._renamePushed = false;
+			keys._renameLeaving = false;
+
+			const before = router.position();
+
+			if( push === true ) {
+				router.go( 'keys', [ router.word('rename'), key ] );
+
+				if( router.position() !== before ) {
+					router.mark('keys-rename');
+					keys._renamePushed = true;
+				}
+			}
+			else
+				router.set( 'keys', [ router.word('rename'), key ] );
+
+			const closed = function( value ) {
+
+				const back = keys._renameLeaving === false && keys._afterRename === null;
+				const pushed = keys._renamePushed;
+				const row = keys._group;
+
+				keys._dialog = null;
+				keys._renaming = null;
+				keys._renamePushed = false;
+				keys._renameLeaving = false;
+
+				// A dialog that was closed by its own cancel gives the address back to the record: the entry it made is taken off the history, the address the reload
+				// named is written over
+				if( value === 'cancel' && back === true ) {
+
+					if( pushed === true && router.marked() === 'keys-rename' && typeof wn.history === 'object' && typeof wn.history.go === 'function' )
+						wn.history.go( -1 );
+					else
+						router.set( 'keys', row === null ? [] : [ row, key ] );
+				}
+			};
+
+			const handle = Nino.adminUi.formDialog( {
+				title : word('/_admin/keys/confirm/rename-title'),
+				body : host,
+				submit : word('/_admin/keys/confirm/rename-title'),
+				cancel : word('/_admin/common/label/cancel'),
+				nested : true,
+				opener : opener ?? undefined,
+				onClose : closed,
+				onSubmit : function( values, ctl ) {
+
+					const first = form.check();
+
+					if( first !== null ) {
+						first.focus();
+						return ctl.idle();
+					}
+
+					const target = form.key();
+
+					// A key that is not changed is no rename
+					if( target === key ) {
+						Nino.adminUi.fieldError( name.closest('label'), name, 'keys-error-keys-form-name', word('/_admin/keys/error/unchanged') );
+						name.focus();
+						return ctl.idle();
+					}
+
+					// Templates may still call the key by its old name: renaming an identifier is asked about
+					const asked = Nino.adminUi.confirm( 'big', {
+						title		: word('/_admin/keys/confirm/rename-title'),
+						message	: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/rename'), key, target ),
+						yes			: word('/_admin/keys/confirm/rename-title'),
+						no			: word('/_admin/common/label/cancel'),
+						nested	: true,
+						opener	: name,
+						onChoose : function( ok ) {
+
+							if( ok !== true )
+								return ctl.idle();
+
+							keys._apiCall( 'rename', { key : key, newKey : target }, function( status, response ) {
+
+								if( status !== 200 || response === null ) {
+
+									// A key the server refuses is refused at the last part, which is where the name of it ends
+									const named = response !== null && typeof response === 'object' ? response.field : '';
+									const sentence = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/rename' );
+
+									if( named === 'key' || named === 'newKey' ) {
+										ctl.idle();
+										Nino.adminUi.fieldError( name.closest('label'), name, 'keys-error-keys-form-name', sentence );
+										name.focus();
+										return;
+									}
+
+									return ctl.fail( null, sentence );
+								}
+
+								keys._renamed( key, target, ctl );
+							} );
+						},
+					} );
+
+					if( asked === false )
+						ctl.idle();
+				},
+			} );
+
+			if( handle === false ) {
+				keys._renaming = null;
+				return;
+			}
+
+			keys._dialog = handle;
+		},
+
+		/**
+		 *	The server renamed the key: the keys are read again, the dialog is closed and the record follows the new key. The history is back at the record of the old key
+		 *	first where the dialog made an entry of its own, so that there is one entry for the record and the cross takes it off the history as before
+		 *
+		 *	@param		{string}		key
+		 *	@param		{string}		target
+		 *	@param		{Object}		ctl						The control of the dialog
+		 *
+		 *	@return		void
+		 */
+		_renamed : function( key, target, ctl ) {
+
+			const keys = Nino.admin.keys;
+
+			keys._wrote( target.indexOf('/template/') === 0 || key.indexOf('/template/') === 0 ? [ 'texts', 'templates' ] : [ 'texts' ] );
+
+			keys._load( function( status, response ) {
+
+				// The key is renamed: where the keys cannot be read again the model is made with the new name
+				if( status !== 200 || response === null ) {
+					const entry = keys._data.keys.find( function( one ) { return one.key === key } );
+
+					if( entry !== undefined )
+						entry.key = target;
+
+					keys._buildModel();
+				}
+
+
+				const group = keys._model.rowOf[target];
+
+				keys._afterRename = { key : target, group : group === undefined ? keys._group : group, pushed : keys._renamePushed };
+				ctl.close();
+
+				const router = Nino.admin.router;
+
+				// Back at the record of the old key by the history: the hashchange that comes finishes the rename. Where the dialog made no entry - a reload at its
+				// address - it is finished at once
+				if( keys._afterRename !== null && keys._afterRename.pushed === true && router.marked() === 'keys-rename' && typeof wn.history === 'object' && typeof wn.history.go === 'function' ) {
+					wn.history.go( -1 );
+					wn.setTimeout( function() { if( keys._afterRename !== null ) keys._finishRename() }, 1500 );
+					return;
+				}
+
+				keys._finishRename();
+			} );
+		},
+
+		/**
+		 *	The rename is done and the address is the record's again: the table is drawn for the row of the new key, which may be another, and the record follows the key -
+		 *	one address, written over the one the record had
+		 *
+		 *	@return		void
+		 */
+		_finishRename : function() {
+
+			const keys = Nino.admin.keys;
+			const after = keys._afterRename;
+
+			keys._afterRename = null;
+
+			if( after === null )
+				return;
+
+			keys._release();
+			keys._group = after.group;
+			keys._drawGroup( after.group );
+			keys._shown = 'group';
+			Nino.adminUi.showLevel( 'keys-form', { focus : false } );
+
+			// The record shows the new key where it stands: no new entry of the history
+			keys._record.open( after.key, {} );
+			keys._address();
+		},
+
+		/**
+		 *	An address that leads away while the rename dialog is open - Back, a typed address: the dialog is asked to close as Escape asks it, one with nothing typed
+		 *	closes, one with input asks what to do with it. Where it stays the address is written to what the screen shows
+		 *
+		 *	@return		void
+		 */
+		_leaveRename : function() {
+
+			const keys = Nino.admin.keys;
+			const router = Nino.admin.router;
+			const key = keys._renaming;
+
+			keys._renameLeaving = true;
+
+			if( keys._dialog !== null && typeof wn.KeyboardEvent === 'function' )
+				keys._dialog.el.dispatchEvent( new wn.KeyboardEvent( 'keydown', { key : 'Escape', bubbles : true, cancelable : true } ) );
+
+			if( keys._dialog === null ) {
+				// The address is the record's own: the follow goes on with it
+				keys._follow( router.current() );
+				return;
+			}
+
+			keys._renameLeaving = false;
+			router.set( 'keys', [ router.word('rename'), key ] );
+		},
+
+		// ------------------------------------------------------------------ The scan
+
+		/**
+		 *	The one way back of the scan: "Back to <the tab>", which leaves the scan for the list and puts the focus on what opened it. A scan that holds unsaved input is
+		 *	asked about first by the shell
+		 *
+		 *	@param		{string}		title					The name of the view
+		 *
+		 *	@return		{Element}
+		 */
+		_contextBar : function( title ) {
+
+			const keys = Nino.admin.keys;
+
+			const bar = Nino.adminUi.contextBar( {
+				back : { to : word('/_admin/text/label/back-name'), href : Nino.admin.router.href( 'keys', [] ), onClick : function() {
+					Nino.admin.router.go( 'keys', [] );
+					keys._leaveScan( true );
+				} },
+				title : title,
+			} );
+
+			// What is shown and written in a language says which, where it is not the native one
+			Nino.adminUi.localeBadge( keys._locale(), bar );
+
+			return bar;
+		},
+
+		/**
+		 *	Leave the scan for the list, as it stands: the focus goes back to the button that opened the scan where the person came back by the link, else it stays
+		 *
+		 *	@param		{boolean|null}	back				The person used the way back
+		 *
+		 *	@return		void
+		 */
+		_leaveScan : function( back ) {
+
+			const keys = Nino.admin.keys;
+
+			keys._scanning = false;
+			keys._scanRows = null;
+			keys._line = null;
+			keys._group = null;
+			keys._directory = null;
+			keys._shown = 'list';
+			keys._renderBody();
+
+			if( back === true )
+				Nino.adminUi.backTo( 'keys-list', keys._opener !== null && keys._opener.isConnected === true ? keys._opener : keys._buttons.scan );
+			else
+				Nino.adminUi.showLevel( 'keys-list', { focus : false } );
+		},
+
+		/**
+		 *	Have the shell take the scan form on screen as the one that is stored (see Nino.admin.dirty)
+		 *
+		 *	@return		void
+		 */
+		_snapshot : function() {
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'keys-scan' );
+		},
+
+		/**
+		 *	Open the "missing keys found in templates" scan - see Keys::apiScan(). The scan is a view of its own in the level beside the list: its way back, its form and
+		 *	its bar. It says that it is scanning while the scan runs: the rows come in its place
+		 *
+		 *	@param		{boolean}		[opened]			The person pressed the button: the focus goes into the view
+		 *	@param		{boolean}		[person]			...and the address is a step of the history; otherwise it is written over the one that named the scan
+		 *
+		 *	@return		void
+		 */
+		_openScan : function( opened, person ) {
+
+			const keys = Nino.admin.keys;
+
+			if( person === true )
+				Nino.admin.router.go( 'keys', [ Nino.admin.router.word('scan') ] );
+
+			keys._scanRows = null;
+			keys._scanning = true;
+			keys._group = null;
+			keys._directory = null;
+			keys._release();
 
 			const wrap = dc.getElementById('keys-form');
 			wrap.innerHTML = '';
-			wrap.appendChild( keys._contextBar( wrap, Nino.content.getText('/_admin/keys/label/scan') ) );
+			wrap.appendChild( keys._contextBar( word('/_admin/keys/label/scan') ) );
 
-			const loading = Nino.adminUi.el( 'p', 'nino-admin-empty', Nino.content.getText('/_admin/common/msg/scanning') );
+			const loading = Nino.adminUi.el( 'p', 'nino-admin-empty', word('/_admin/common/msg/scanning') );
 			loading.id = 'keys-scan-msg';
 			loading.setAttribute( 'aria-busy', 'true' );
 			wrap.appendChild( loading );
 
-			keys._showForm( opened === true );
+			keys._snapshot();
+			Nino.admin.router.set( 'keys', [ Nino.admin.router.word('scan') ] );
+			keys._shown = 'group';
+			Nino.adminUi.showLevel( 'keys-form', opened === true ? {} : { focus : false } );
 
 			keys._apiCall( 'scan', {}, function( status, response ) {
 
-				// Left in the meantime: the answer is for a form that is not on screen any more
-				if( keys._view !== 'scan' )
+				// Left in the meantime: the answer is for a view that is not on screen any more
+				if( keys._scanning !== true || loading.isConnected === false )
 					return;
 
 				if( status !== 200 || response === null ) {
@@ -2123,7 +2853,7 @@
 					return;
 				}
 
-				keys._renderScanForm( response.missing, response.alsoUsed || [] );
+				keys._renderScan( response.missing, response.alsoUsed || [] );
 			} );
 		},
 
@@ -2151,14 +2881,21 @@
 		 *
 		 *	@return		void
 		 */
-		_renderScanForm : function( missing, alsoUsed ) {
+		_renderScan : function( missing, alsoUsed ) {
 
 			const keys = Nino.admin.keys;
 			const wrap = dc.getElementById('keys-form');
-			const text = function( key ) { return Nino.content.getText( key ) };
+
+			// The view that stood while the scan ran may hold the focus, on its back link: the one that replaces it takes it over
+			const held = ( dc.activeElement ?? null ) !== null && dc.activeElement.closest('#keys-form') !== null;
 
 			wrap.innerHTML = '';
-			wrap.appendChild( keys._contextBar( wrap, text('/_admin/keys/label/scan') ) );
+
+			const back = keys._contextBar( word('/_admin/keys/label/scan') );
+			wrap.appendChild( back );
+
+			if( held === true )
+				back.querySelector('a').focus();
 
 			const form = dc.createElement('form');
 			form.id = 'keys-scan-form';
@@ -2169,14 +2906,14 @@
 			// What the scan shows and does not take - where a key is read, what it is - is a line at the height of a name, as at a field
 			const shows = function( card, labelKey, words ) {
 				const line = Nino.adminUi.el( 'div', 'nino-admin-field' );
-				line.appendChild( Nino.adminUi.el( 'span', '', text( labelKey ) ) );
+				line.appendChild( Nino.adminUi.el( 'span', '', word( labelKey ) ) );
 				line.appendChild( Nino.adminUi.el( 'p', 'admin-keys-scan-line', words ) );
 				card.appendChild( line );
 			};
 
 			if( missing.length === 0 ) {
-				form.appendChild( Nino.adminUi.emptyState( text('/_admin/keys/scan/none') ) );
-				keys._status = null;
+				wrap.appendChild( Nino.adminUi.emptyState( word('/_admin/keys/scan/none') ) );
+				keys._line = null;
 			}
 
 			missing.forEach( function( item ) {
@@ -2191,7 +2928,7 @@
 				let valueInput = null;
 
 				if( kind === 'create' ) {
-					const field = Nino.adminUi.textField( { id : 'keys-scan-value-'+ rows.length, label : text('/_admin/keys/label/scan-value'), help : text('/_admin/keys/help/scan-value'), autocomplete : 'off' } );
+					const field = Nino.adminUi.textField( { id : 'keys-scan-value-'+ rows.length, label : word('/_admin/keys/label/scan-value'), help : word('/_admin/keys/help/scan-value'), autocomplete : 'off' } );
 					valueInput = field.querySelector('input');
 					card.appendChild( field );
 				}
@@ -2204,7 +2941,7 @@
 				// A key of the system is not the scan's to retire: it is the
 				// system's to write, and ignoring it would only hide the gap
 				if( kind !== 'system' ) {
-					const ignore = Nino.adminUi.checkField( { id : 'keys-scan-ignore-'+ rows.length, label : text('/_admin/keys/label/scan-ignore'), help : text('/_admin/keys/help/scan-ignore') } );
+					const ignore = Nino.adminUi.checkField( { id : 'keys-scan-ignore-'+ rows.length, label : word('/_admin/keys/label/scan-ignore'), help : word('/_admin/keys/help/scan-ignore') } );
 					card.appendChild( ignore );
 					rows.push( { key : item.key, valueInput : valueInput, ignoreCheck : ignore.querySelector('input') } );
 				}
@@ -2217,14 +2954,14 @@
 
 				const also = dc.createElement('fieldset');
 				const legend = dc.createElement('legend');
-				legend.textContent = text('/_admin/keys/scan/also-title');
+				legend.textContent = word('/_admin/keys/scan/also-title');
 				also.appendChild( legend );
-				Nino.adminUi.sectionHelp( legend, also, text('/_admin/keys/scan/also-hint') );
+				Nino.adminUi.sectionHelp( legend, also, word('/_admin/keys/scan/also-hint') );
 
 				const ul = dc.createElement('ul');
 				ul.className = 'nino-admin-list-dense';
 				alsoUsed.forEach( function( item ) {
-					ul.appendChild( Nino.adminUi.el( 'li', '', Nino.adminUi.format( text('/_admin/keys/scan/also-line'), item.key, item.files.join(', ') ) ) );
+					ul.appendChild( Nino.adminUi.el( 'li', '', Nino.adminUi.format( word('/_admin/keys/scan/also-line'), item.key, item.files.join(', ') ) ) );
 				} );
 				also.appendChild( ul );
 
@@ -2237,11 +2974,11 @@
 				msg.id = 'keys-scan-msg';
 				const bar = Nino.adminUi.actionBar( {
 					status : { line : msg, fresh : true },
-					primary : Nino.adminUi.button( text('/_admin/common/label/save'), null, { type : 'submit' } ),
+					primary : Nino.adminUi.button( word('/_admin/common/label/save'), null, { type : 'submit' } ),
 				} );
 
-				keys._status = bar.line;
-				bar.line.bind( form, keys.isDirty );
+				keys._line = bar.line;
+				bar.line.bind( form );
 				form.appendChild( bar.el );
 				form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); keys._saveScanResults( rows ) } );
 			}
@@ -2250,9 +2987,8 @@
 
 			keys._scanRows = rows;
 
-			// The form that stood while the scan ran had the focus, on its back link: what replaces it keeps it there
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
+			// What the scan came with is the baseline of its input
+			keys._snapshot();
 		},
 
 		/**
@@ -2268,13 +3004,13 @@
 		_scanNote : function( item ) {
 
 			if( item.kind === 'grammar' )
-				return Nino.content.getText('/_admin/keys/scan/grammar');
+				return word('/_admin/keys/scan/grammar');
 
 			if( item.kind === 'system' )
-				return Nino.content.getText('/_admin/keys/scan/system-'+ ( item.writer || 'none' ) );
+				return word('/_admin/keys/scan/system-'+ ( item.writer || 'none' ) );
 
 			if( item.hint === 'feature' || item.hint === 'module' )
-				return Nino.adminUi.format( Nino.content.getText('/_admin/keys/scan/hint-'+ item.hint ), item.owner );
+				return Nino.adminUi.format( word('/_admin/keys/scan/hint-'+ item.hint ), item.owner );
 
 			return '';
 		},
@@ -2302,7 +3038,7 @@
 					done( ok );
 			};
 
-			const line = keys._status;
+			const line = keys._line;
 
 			if( line !== null )
 				line.saving();
@@ -2311,7 +3047,7 @@
 				return { key : row.key, value : row.valueInput === null ? '' : row.valueInput.value, ignore : row.ignoreCheck.checked };
 			} );
 
-			// The values are written in the language this tab shows, said in the request (see the new key above)
+			// The values are written in the language this tab shows, said in the request: another window of the same session may have moved the session's own
 			keys._apiCall( 'scanapply', { rows : payload, locale : keys._locale() }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
@@ -2321,16 +3057,10 @@
 					return;
 				}
 
-				Nino.admin.touch( 'texts' );
-				// What the scan creates are the keys the templates read: a template
-				// with one is a row the Text panel did not have
-				if( response.created > 0 && payload.some( function( row ) { return row.ignore === false && row.key.indexOf('/template/') === 0 } ) === true )
-					Nino.admin.touch( 'templates' );
+				// What the scan creates are the keys the templates read: a template with one is a row the Text panel did not have
+				keys._wrote( response.created > 0 && payload.some( function( row ) { return row.ignore === false && row.key.indexOf('/template/') === 0 } ) === true ? [ 'texts', 'templates' ] : [ 'texts' ] );
 
-				// Back to the list, which reloads from the server: the keys
-				// just created belong in their categories, and a retired one
-				// belongs in the list as a hidden key that can be brought back
-				keys._view = null;
+				// Back to the list, which reads again: the keys just created belong in their rows, and a retired one belongs in the list as a hidden key that can be brought back
 				keys._load( function( loadStatus, loadResponse ) {
 
 					if( loadStatus !== 200 || loadResponse === null ) {
@@ -2339,11 +3069,10 @@
 						return;
 					}
 
-					keys._renderCategoryList();
 					Nino.admin.router.go( 'keys', [] );
-					keys._showList();
+					keys._leaveScan( null );
 
-					Nino.adminUi.say( Nino.content.getText('/_admin/keys/scan/result')
+					Nino.adminUi.say( word('/_admin/keys/scan/result')
 						.replace( '%c', String( response.created ) )
 						.replace( '%i', String( response.ignored ) )
 						.replace( '%s', String( response.skipped ) ) );
@@ -2359,15 +3088,17 @@
 	// The language moves for this tab whoever moved it (see Nino.admin.workLocale)
 	Nino.admin.workLocale.follow( 'keys', Nino.admin.keys._followLocale );
 
-	// The shell asks before anything throws the tab's input away (see
-	// Nino.admin.dirty). A shell without the registry is simply not asking
+	// The shell asks before anything throws the input of the scan away (see Nino.admin.dirty). The record has its own entry, `keys`, which answers for the scan as
+	// well while the scan is on screen (see _share()). A shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.register( 'keys', {
-			isDirty : Nino.admin.keys.isDirty,
-			save		: Nino.admin.keys._saveOpen,
-			discard : Nino.admin.keys.discard,
-			saving	: function() { return Nino.admin.keys._saving === true },
-			bar			: Nino.admin.keys._bar,
+		Nino.admin.dirty.watchForm( 'keys-scan', function() { return Nino.admin.keys._scanning === true ? dc.getElementById('keys-form') : null }, function( done ) {
+			if( Nino.admin.keys._scanRows !== null )
+				Nino.admin.keys._saveScanResults( Nino.admin.keys._scanRows, done );
+			else
+				done( true );
+		}, function() {
+			const form = dc.getElementById('keys-form');
+			return form === null || Nino.admin.keys._scanning !== true ? null : form.querySelector('.nino-admin-actionbar');
 		} );
 
 })(window, document, document.documentElement, document.body);

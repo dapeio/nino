@@ -4,7 +4,7 @@
  *										(_admin/Nino/Modules/Text/assets): how keys are named and
  *										fall into rows, sections and fields, how they are searched,
  *										and what the Text panel does on the real shell
- *										(adminPage() of the harness) and the Keys tab on a fake page.
+ *										(adminPage() of the harness), and the Keys tab on it too.
  *
  *										The groups of both tabs are the list of the workbench, with
  *										the same names and an address each; the language the
@@ -13,13 +13,19 @@
  *										directory of its texts and ONE text is edited in the record
  *										over it: the working language first, the other languages
  *										below, saved one request for each language that was
- *										changed, none where nothing was. The Keys tab shows one
- *										language in a form and writes that one and no other, saves a key's shape and its text with
- *										the one Save as well, asks once for the formats that
- *										would change what is stored, and says at the field which
- *										part a server turned down - what is not saved is not
- *										counted as saved. A key is made and renamed in a view of
- *										its own with an address, checked when it is sent.
+ *										changed, none where nothing was. The Text Keys tab is the
+ *										same on the real shell: a row of the list says how many keys
+ *										it holds and how many are hidden, opens as a table of its
+ *										keys, and ONE key is edited in the record over it - its text
+ *										in every language and its settings - which saves what was
+ *										changed and nothing else, in the order of the base: the text
+ *										made shorter before a lowered limit, the shape by keys/save,
+ *										each language by keys/savebatch, asks once for what a
+ *										narrower format or a global key drops, says at the field
+ *										which part a server turned down, and reads the keys again.
+ *										A key is renamed in a dialog over the record and made in the
+ *										same record, each with an address; the scan of the templates
+ *										is a view of its own beside them.
  *
  *	Usage: node tests/admin-text-js-smoke.js
  */
@@ -190,7 +196,7 @@ function world( locale, hash, session ) {
 	};
 
 	const context = vm.createContext( box );
-	[ '_admin/assets/Nino.admin.js', '_admin/Nino/Modules/Text/assets/textkeys.js', '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js' ]
+	[ '_admin/assets/Nino.admin.js', '_admin/Nino/Modules/Text/assets/textkeys.js', '_admin/Nino/Modules/Text/assets/admin.js' ]
 		.forEach( file => load( file, context, file ) );
 
 	const mount = ( ...ids ) => ids.map( id => { const el = dom.make('div'); el.id = id; dom.root.appendChild( el ); return el } );
@@ -457,10 +463,7 @@ function openedText( response, hash, locale ) {
 	return Object.assign( w, { list, form, title, text } );
 }
 
-// What the Keys part reads its forms of the fake page with
-const fieldOf = ( t, key ) => t.form.querySelector('[data-key="'+ key+ '"]');
-const typeInto = ( control, value ) => { control.value = value; control.fire('input') };
-
+// What the checks read the drawn page with
 const has = ( el, name ) => el.classList.contains( name );
 const byClass = ( root, name ) => findAll( root, el => has( el, name ) );
 const tag = ( root, name ) => findAll( root, el => el.tagName === name.toUpperCase() );
@@ -1346,53 +1349,78 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	} );
 }
 
-// --- the Keys tab: the list, the search, the form of a row, the form that makes and renames a key ---
+// --- the Text Keys tab on the real shell: the list, the table of a row, the record of one key, the dialog that renames, the scan ----------------------------------
 
 const keysResponse = ( extra ) => Object.assign( { keys : homeKeys.map( e => Object.assign( {}, e, { values : Object.assign( {}, e.values ), formatSet : false, maxlengthSet : false } ) ),
 	locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages, templates : homeData().templates, features : homeData().features,
 	categories : { template : [ 'common', 'frame-header', 'page-services' ], feature : [ 'consent' ], module : [ 'form', 'localepicker' ], project : [ 'company', 'website', 'mail', 'catalog' ] } }, extra ?? {} );
 
-/**
- *	A page of the workbench with the Keys tab open on a server that holds the keys and changes them the way the real one does: a shape that is
- *	saved is what the next list says, a text that is written is the text of the key. What it refuses is told to refuse
- */
-function openedKeys( response, hash, language ) {
-	const w = world( 'de_DE', hash, language ?? 'de_DE' );
-	const { title, levels : [ list, form ] } = w.pane( 'keys', 'keys-list', 'keys-form' );
-	title.textContent = 'Texte';
-	form.classList.add('admin-hidden');
-	w.Nino.adminUi.panelName = () => 'Texte';
-	w.Nino.adminUi.fillsDialog = () => true;
-	const sent = [], told = [], asked = [];
-	const handle = { answer : true, refuse : {}, down : false, hold : false, held : [], listed : 0, scan : { missing : [], alsoUsed : [] }, stored : {} };
-	w.Nino.adminUi.say = sentence => told.push( sentence );
-	w.Nino.adminUi.confirm = ( level, options ) => { asked.push( Object.assign( { level : level }, options ) ); options.onChoose( handle.answer ); return true };
-	const keys = w.Nino.admin.keys;
-	const entry = key => response.keys.find( e => e.key === key );
+const keyAddress = ( row, key ) => '#text/keys/'+ ( row === undefined ? '' : encodeURIComponent( row ) )+ ( key === undefined ? '' : '/'+ encodeURIComponent( key ) );
+const renameAddress = key => '#text/keys/@rename/'+ encodeURIComponent( key );
+const choose = ( select, value ) => { select.value = value; fire( select, 'change', { target : select } ) };
+const tick = box => { box.checked = box.checked === false; fire( box, 'change', { target : box } ) };
+const typeKey = ( control, value ) => {
+	control.value = value;
+	// What is typed is heard by everything round the control, as in a page
+	for( let up = control; up !== null && up !== undefined; up = up.parentNode )
+		fire( up, 'input', { target : control } );
+};
 
-	keys._apiCall = ( endpoint, payload, callback ) => {
-		sent.push( { endpoint : endpoint, payload : payload } );
-		if( handle.hold === true && endpoint === 'save' ) {
-			handle.held.push( () => { handle.hold = false; keys._apiCall( endpoint, payload, callback ); sent.pop() } );
-			return;
-		}
-		const refused = [].concat( handle.refuse[endpoint] ?? [] ).find( r => r.key === undefined || r.key === payload.key );
+/**
+ *	A page of the real shell with the Text Keys tab open on a server that holds the keys and changes them the way the real one does: a shape that is saved is what
+ *	the next list says, a text that is written is the text of the key. What it refuses is told to refuse
+ */
+function keysPage( response, options ) {
+
+	options = options ?? {};
+
+	const h = adminPage();
+	const words = workbenchWords( options.words ?? 'de_DE' );
+	const list = element('div'), form = element('div');
+	const sent = [], told = [], touches = [], editors = [];
+	const handle = { refuse : {}, down : false, hold : false, held : [], listed : 0, scan : { missing : [], alsoUsed : [] }, stored : {} };
+
+	list.id = 'keys-list';
+	form.id = 'keys-form';
+	form.classList.add('admin-hidden');
+	h.page.appendChild( list );
+	h.page.appendChild( form );
+	h.show('keys');
+	h.router.start();
+	h.Nino.content.getText = key => words[key] ?? '';
+	h.ui.locales.names = { de_DE : 'Deutsch', en_US : 'English' };
+	h.ui.locales.native = 'de_DE';
+	h.admin.workLocale.current = options.work ?? 'de_DE';
+
+	const entry = key => response.keys.find( e => e.key === key );
+	const writes = [ 'save', 'savebatch', 'create', 'rename', 'delete', 'scanapply' ];
+
+	// The server: what it holds changes as the real one's does
+	const serve = ( action, payload ) => {
+
+		const name = action.replace( 'keys/', '' );
+		const refused = [].concat( handle.refuse[name] ?? [] ).find( r => r.key === undefined || r.key === payload.key );
+
 		if( refused !== undefined )
-			return callback( refused.status, refused.body );
-		if( endpoint === 'list' ) {
+			return [ refused.status, refused.body ];
+
+		if( name === 'list' ) {
 			handle.listed++;
-			return handle.down === true && handle.listed > 1 ? callback( 500, null ) : callback( 200, response );
+			return handle.down === true && handle.listed > 1 ? [ 500, null ] : [ 200, JSON.parse( JSON.stringify( response ) ) ];
 		}
-		if( endpoint === 'fills' )
-			return callback( 200, { fills : [] } );
-		if( endpoint === 'scan' )
-			return callback( 200, handle.scan );
-		if( endpoint === 'save' ) {
+
+		if( name === 'fills' )
+			return [ 200, { fills : [] } ];
+
+		if( name === 'scan' )
+			return [ 200, handle.scan ];
+
+		if( name === 'save' ) {
 			const e = entry( payload.key );
 			// A limit under the longest text the key holds is turned down, as the real server does
 			const longest = Math.max( ...Object.values( e.values ).map( v => String( v ?? '' ).length ) );
 			if( payload.maxlength !== null && payload.maxlength < longest )
-				return callback( 400, { error : 'limit below the current text', code : 'keys_limit_short', params : [ longest ], field : 'maxlength' } );
+				return [ 400, { error : 'limit below the current text', code : 'keys_limit_short', params : [ longest ], field : 'maxlength' } ];
 			if( e.global !== payload.global )
 				e.values = payload.global === true ? { '*' : Object.values( e.values ).find( v => v !== '' && v !== null ) ?? '' } : Object.fromEntries( [ 'de_DE', 'en_US' ].map( code => [ code, Object.values( e.values )[0] ] ) );
 			e.global = payload.global;
@@ -1402,624 +1430,1465 @@ function openedKeys( response, hash, language ) {
 			e.html = e.format !== 'plain';
 			e.maxlengthSet = payload.maxlength !== null;
 			e.maxlength = payload.maxlength ?? 150;
-			return callback( 200, {} );
+			return [ 200, {} ];
 		}
-		if( endpoint === 'savebatch' ) {
+
+		if( name === 'savebatch' ) {
 			const results = {};
 			payload.items.forEach( item => {
 				// As the server does: a text that was read as something other than what is stored now is not written, unless it is forced
 				const changed = item.was !== undefined && item.force !== true && handle.stored[item.locale+ ' '+ item.key] !== undefined && handle.stored[item.locale+ ' '+ item.key] !== item.was;
-				const refused = changed === true ? { ok : false, error : 'changed' } : handle.refuse['item:'+ item.key];
-				if( refused === undefined ) {
-					entry( item.key ).values[item.locale] = item.value;
-					handle.stored[item.locale+ ' '+ item.key] = item.value;
+				const turned = changed === true ? { ok : false, error : 'changed' } : ( handle.refuse['item:'+ item.key+ ' '+ item.locale] ?? handle.refuse['item:'+ item.key] );
+				const value = handle.sanitize === undefined ? item.value : handle.sanitize( item.value );
+				if( turned === undefined ) {
+					entry( item.key ).values[item.locale] = value;
+					handle.stored[item.locale+ ' '+ item.key] = value;
 				}
-				results[item.key] = refused ?? { ok : true, value : item.value };
+				results[item.key] = turned ?? { ok : true, value : value };
 			} );
-			return callback( 200, { results : results } );
+			return [ 200, { results : results } ];
 		}
-		if( endpoint === 'delete' ) {
+
+		if( name === 'delete' ) {
 			response.keys = response.keys.filter( e => e.key !== payload.key );
-			return callback( 200, {} );
+			return [ 200, {} ];
 		}
-		if( endpoint === 'create' ) {
-			response.keys.push( textEntry( payload.key, payload.global === true ? { '*' : payload.value } : { de_DE : payload.value, en_US : '' } ) );
-			return callback( 200, { ok : true, key : payload.key } );
+
+		if( name === 'create' ) {
+			response.keys.push( textEntry( payload.key, payload.global === true ? { '*' : payload.value } : { de_DE : payload.value, en_US : '' }, { formatSet : false, maxlengthSet : false } ) );
+			return [ 200, { ok : true, key : payload.key } ];
 		}
-		if( endpoint === 'rename' ) {
+
+		if( name === 'rename' ) {
 			entry( payload.key ).key = payload.newKey;
-			return callback( 200, { ok : true, key : payload.newKey } );
+			return [ 200, { ok : true, key : payload.newKey } ];
 		}
-		callback( 200, { created : 1, ignored : 1, skipped : 1 } );
+
+		return [ 200, { created : 1, ignored : 1, skipped : 1 } ];
 	};
-	keys.init();
-	return Object.assign( w, { list, form, title, sent, keys, told, asked, handle, response, entry } );
+
+	h.Nino.http = { sendRequest : function( uri, method, callback, data ) {
+		const payload = JSON.parse( data.data );
+		sent.push( { endpoint : data.action.replace( 'keys/', '' ), payload : payload } );
+		const answer = () => { const [ status, body ] = serve( data.action, payload ); callback( { status : status, responseJSON : body } ) };
+		if( handle.hold === true && data.action === 'keys/save' )
+			handle.held.push( () => { handle.hold = false; answer() } );
+		else
+			answer();
+	} };
+
+	const say = h.ui.say;
+	h.ui.say = function( words, opts ) { told.push( words ); return say.call( this, words, opts ) };
+	const touch = h.admin.touch;
+	h.admin.touch = function( topic, uri ) { touches.push( topic ); return touch.call( this, topic, uri ) };
+	h.box.KeyboardEvent = function( type, init ) { Object.assign( this, { type : type }, init ) };
+
+	// Every address the tab writes or links to is read back by the router as the same screen and the same parts
+	[ 'set', 'go', 'href' ].forEach( name => {
+		const real = h.router[name];
+		h.router[name] = function( screen, parts ) { codec.check( screen, parts ); return real.call( this, screen, parts ) };
+	} );
+
+	// The rich-text editor, which keeps what it is given and says what a field marked it with
+	h.admin.htmlEditor = { create : ( mount, value, maxlength, rows, format ) => {
+		mount.dataset.editor = 'yes';
+		const box = element('div');
+		box.setAttribute( 'contenteditable', 'true' );
+		mount.appendChild( box );
+		let kept = String( value ?? '' );
+		const marks = {};
+		const editor = { maxlength : maxlength, format : format, given : String( value ?? '' ), marks : marks, destroyed : false, mount : mount, box : box,
+			getValue : () => kept, setValue : v => { kept = v }, focus(){}, mark : state => Object.assign( marks, state ), destroy : () => { editor.destroyed = true } };
+		editors.push( editor );
+		return editor;
+	} };
+
+	if( options.hash !== undefined )
+		h.box.location.hash = options.hash;
+	else
+		h.router.set( 'keys', [] );
+
+	load( '_admin/Nino/Modules/Text/assets/textkeys.js', h.context );
+	load( '_admin/Nino/Modules/Text/assets/keys.js', h.context );
+
+	const panel = h.admin.keys;
+	const dialog = () => h.dialogs.filter( d => d.open ).pop() ?? null;
+	const record = () => h.dialogs.filter( d => d.open && has( d, 'nino-admin-record' ) ).pop() ?? null;
+	const rows = () => findAll( form, el => el.tagName === 'TR' && el.dataset.row !== undefined );
+	const w = { h, panel, list, form, sent, told, touches, editors, handle, response, entry, dialog, record, rows,
+		open : () => { panel.showCurrent(); return w },
+		listRows : () => findAll( list, el => el.tagName === 'LI' && el.dataset.row !== undefined ),
+		listRow : id => w.listRows().find( li => li.dataset.row === id ),
+		linkOf : id => byClass( w.listRow( id ), 'nino-admin-row-open' )[0],
+		lineOf : id => tag( w.listRow( id ), 'small' )[0].textContent,
+		ids : () => rows().map( el => el.dataset.row ),
+		row : key => rows().find( el => el.dataset.row === key ),
+		cells : key => w.row( key ).children.filter( el => el.tagName === 'TD' ),
+		heads : () => findAll( form, el => el.tagName === 'TH' && el.dataset.key !== undefined ),
+		selects : () => tag( form, 'select' ).filter( el => has( el, 'nino-admin-filterbar-select' ) && has( el, 'nino-admin-table-sortby' ) === false ),
+		search : () => tag( form, 'input' ).find( el => el.type === 'search' ),
+		listSearch : () => tag( list, 'input' ).find( el => el.type === 'search' ),
+		pencil : key => byClass( w.row( key ), 'nino-admin-row-actions' )[0]?.children[0],
+		writes : () => sent.filter( c => writes.indexOf( c.endpoint ) !== -1 ),
+		titleOf : d => byClass( d, 'nino-admin-dialog-title' )[0]?.textContent ?? null,
+		subtitleOf : d => byClass( d, 'nino-admin-dialog-subtitle' )[0]?.textContent ?? '',
+		fieldOf : ( d, code ) => findAll( d, el => el.dataset.locale === code )[0],
+		fields : d => findAll( d, el => el.dataset.locale !== undefined ),
+		controlOf : ( d, code ) => findAll( w.fieldOf( d, code ), el => el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' )[0],
+		counterOf : ( d, code ) => byClass( w.fieldOf( d, code ), 'nino-admin-char-counter' )[0],
+		byId : ( d, stem ) => findAll( d, el => typeof el.id === 'string' && el.id.indexOf( stem ) === 0 )[0],
+		format : d => w.byId( d, 'keys-format-' ),
+		limit : d => w.byId( d, 'keys-limit-' ),
+		switches : d => findAll( d, el => el.tagName === 'INPUT' && el.type === 'checkbox' && has( el.parentNode, 'nino-admin-switch' ) ),
+		global : d => w.switches( d ).find( b => allText( b.parentNode ).indexOf( W('/_admin/keys/label/global') ) !== -1 ),
+		hidden : d => w.switches( d ).find( b => allText( b.parentNode ).indexOf( W('/_admin/keys/label/hide') ) !== -1 ),
+		errorsOf : d => byClass( d, 'nino-admin-field-error' ),
+		button : ( d, text ) => tag( d, 'button' ).find( b => b.textContent === text ),
+		lineText : d => byClass( d, 'nino-admin-status' )[0]?.textContent ?? '',
+		type : ( d, code, value ) => { typeKey( w.controlOf( d, code ), value ); h.dirty.refresh() },
+		save : d => fire( tag( d, 'form' )[0], 'submit' ),
+		openRow : key => { const p = w.pencil( key ); fire( p, 'click', { currentTarget : p } ); return record() },
+		cross : d => tag( d, 'button' ).find( b => has( b, 'nino-admin-dialog-close' ) ),
+		close : d => { const asked = h.went.length; fire( w.cross( d ), 'click' ); if( h.went.length > asked && dialog() === null ) w.back() },
+		back : () => { h.back(); h.router.arrive(); panel.showCurrent(); h.hashchange() },
+		forward : () => { h.forward(); h.router.arrive(); panel.showCurrent(); h.hashchange() },
+		step : address => { h.box.location.hash = address; h.router.arrive(); panel.showCurrent(); h.hashchange() },
+		// An address typed or followed: the browser makes an entry of it
+		typed : address => { h.box.history.pushState( null, '', address ); h.router.arrive(); panel.showCurrent(); h.hashchange() },
+		go : code => { h.admin.workLocale.current = code; h.admin.workLocale._followers.forEach( follower => follower.handler( code ) ) },
+		answerAsk : text => { const top = dialog(); const asked = h.went.length; fire( w.button( top, text ), 'click' ); if( h.went.length > asked && dialog() === null ) w.back(); return top },
+		hash : () => h.hash(),
+		scanButton : () => byClass( list, 'nino-admin-list-actions' )[0].querySelectorAll('.nino-admin-btn-secondary')[0],
+		newButton : () => byClass( list, 'nino-admin-list-actions' )[0].querySelectorAll('.nino-admin-btn-primary')[0],
+	};
+
+	return w;
 }
 
-const keyWrites = k => k.sent.filter( c => c.endpoint !== 'list' && c.endpoint !== 'fills' );
-const settingsOf = ( k, key ) => k.form.querySelector('[data-settings="'+ key+ '"]');
-const part = ( row, selector ) => row.querySelector( selector );
-const rowButtons = row => row.querySelectorAll('.nino-admin-row-actions button');
-const keyControl = ( k, key ) => k.form.querySelector('[data-key="'+ key+ '"]').querySelector('input, textarea');
-const submitKeys = k => k.form.querySelector('form').fire('submit');
-const choose = ( select, value ) => { select.value = value; select.fire('change') };
-const tick = box => { box.checked = box.checked === false; box.fire('change') };
+// The page, shown and its keys read: the list is up, nothing is open
+const keysShown = ( response, options ) => keysPage( response ?? keysResponse(), options ).open();
+// ... and a row of it open
+const keysRow = ( id, response, options ) => { const w = keysShown( response, options ); fire( w.linkOf( id ), 'click', { target : w.linkOf( id ) } ); return w };
+// ... and a key of it open in the record
+const keysRecord = ( id, key, response, options ) => { const w = keysRow( id, response, options ); w.openRow( key ); return w };
+const KEYS = [ '/_nino/webpage/services/uri', '/_nino/webpage/services/name', '/_nino/webpage/services/title', '/_nino/webpage/services/description', '/template/page-services/intro/title', '/template/page-services/intro/text',
+	'/template/page-services/item-1/title', '/template/page-services/item-1/text', '/template/page-services/item-2/title', '/template/page-services/legal/note' ];
+const K1 = '/template/page-services/intro/title', K2 = '/template/page-services/intro/text', K3 = '/template/page-services/item-1/title', K4 = '/template/page-services/item-2/title', K5 = '/template/page-services/item-1/text';
+
+
+// --- the first level: the list, its counts, the search -------------------------------------------------------------------------------------------------------
 
 {
-	const k = openedKeys( keysResponse() );
+	const k = keysShown();
 	const text = openedText( textResponse() );
+	const rowOpens = list => opens( list );
 
+	check( 'the first read asks for the keys, once, and for nothing else', k.sent.length === 1 && k.sent[0].endpoint === 'list' && JSON.stringify( k.sent[0].payload ) === '{}' );
 	check( 'the Keys tab has the groups of the Text panel as the list of the workbench - with the hidden keys and the words of the workbench, which it exists to show - each a link with an address of its own', k.list.querySelectorAll('ul.nino-admin-list').length > 0
-		&& opens( k.list ).some( a => keyOf( a ) === '_admin' ) && opens( k.list ).some( a => keyOf( a ) === 'project/mail' ) && opens( k.list ).every( a => a.tagName === 'a' && a.href === '#text/keys/'+ encodeURIComponent( keyOf( a ) ) )
+		&& rowOpens( k.list ).some( a => keyOf( a ) === '_admin' ) && rowOpens( k.list ).some( a => keyOf( a ) === 'project/mail' ) && rowOpens( k.list ).every( a => a.tagName === 'A' && a.href === keyAddress( keyOf( a ) ) )
 		&& k.list.querySelectorAll('li').every( li => li.classList.contains('nino-admin-list-row') ) );
-	const nameOf = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group ).querySelector('strong').textContent;
+	const nameOfRow = ( t, group ) => rowOpens( t.list ).find( r => keyOf( r ) === group ).querySelector('strong').textContent;
 	check( '...and a group has the one name in both tabs: the pages by their routes, the others by the words of the vocabulary - "Leistungen", not "Page services"',
-		[ 'template/page-services', 'project/company', 'feature/consent', 'template/frame-header' ].every( g => nameOf( k, g ) === nameOf( text, g ) ) && nameOf( k, 'template/page-services' ) === 'Leistungen' && nameOf( k, 'template/frame-header' ) === W('/_admin/common/word/frame-header') );
-	check( '...and the same height: the same row of the block, two lines', [ 'template/page-services', 'project/company' ].every( g => opens( k.list ).find( r => keyOf( r ) === g ).parentNode.parentNode.className === opens( text.list ).find( r => keyOf( r ) === g ).parentNode.parentNode.className ) );
-	check( 'the bar of the list holds the scan and the new key, with the main button for the new key and nothing else', ( () => { const bar = k.list.querySelector('.nino-admin-list-actions'); return bar !== null && bar.querySelectorAll('button').length === 2
-		&& bar.querySelectorAll('.nino-admin-btn-primary').length === 1 && bar.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/new') && bar.querySelector('.nino-admin-btn-secondary').textContent === W('/_admin/keys/label/scan') } )() );
-	check( 'there is no switch of a language in the tab', k.list.querySelectorAll('select').length === 0 );
-
-	// the search with the hidden keys, and the chip for them alone
-	const box = k.list.querySelector('#keys-search');
-	check( 'the search is the Text panel\'s, with a chip of the workbench for the hidden keys', box.getAttribute('aria-label') === W('/_admin/text/label/search') && k.list.querySelector('#keys-list-hidden').classList.contains('nino-admin-chip') && k.list.querySelector('#keys-list-hidden').textContent === W('/_admin/keys/label/hidden-only') );
-	box.value = 'netzwerk';
-	box.fire('input');
-	check( 'it finds a hidden key as well, as a row of the list', k.list.querySelectorAll('li').length === 1 && k.list.querySelector('.admin-text-hit-key').textContent === '/_admin/elements/field/social/title' && opens( k.list )[0].href === '#text/keys/_admin/%2F_admin%2Felements%2Ffield%2Fsocial%2Ftitle' );
-	box.value = '';
-	box.fire('input');
-	k.list.querySelector('#keys-list-hidden').click();
-	check( 'only the hidden ones: the chip is on, and the hits are the keys hidden from the Text panel', k.list.querySelector('#keys-list-hidden').getAttribute('aria-pressed') === 'true'
-		&& k.list.querySelectorAll('.admin-text-hit-key').map( c => c.textContent ).sort().join() === '/_admin/elements/field/social/title,/_nino/webpage/services/uri,/project/mail/color/backdrop' );
-	k.list.querySelector('#keys-list-hidden').click();
-	box.value = 'consulting';
-	box.fire('input');
-	check( 'a hit in another language has that language\'s code as a small button, and it asks the workbench for it', ( () => { const code = k.list.querySelector('.nino-admin-row-actions button'); const asked = [];
-		k.Nino.admin.workLocale.choose = c => asked.push( c ); code.click(); k.Nino.admin.workLocale.choose = c => k.Nino.admin.workLocale.set( c ); return code.textContent === 'en_US' && asked.join() === 'en_US' } )() );
-	box.value = 'beratung';
-	box.fire('input');
-	k.calls.length = 0;
-	opens( k.list )[0].click();
-	check( 'a hit opens the row at the key: the address names it, the field is marked', k.keys._currentGroup === 'template/page-services' && k.calls.includes('go keys/template/page-services//template/page-services/item-1/title') && k.calls.includes('set keys/template/page-services//template/page-services/item-1/title')
-		&& k.form.querySelector('[data-key="/template/page-services/item-1/title"]').classList.contains('is-found') && k.keys._view === 'group' );
+		[ 'template/page-services', 'project/company', 'feature/consent', 'template/frame-header' ].every( g => nameOfRow( k, g ) === nameOfRow( text, g ) ) && nameOfRow( k, 'template/page-services' ) === 'Leistungen' && nameOfRow( k, 'template/frame-header' ) === W('/_admin/common/word/frame-header') );
+	check( '...and the same height: the same row of the block, two lines', [ 'template/page-services', 'project/company' ].every( g => rowOpens( k.list ).find( r => keyOf( r ) === g ).parentNode.parentNode.className === rowOpens( text.list ).find( r => keyOf( r ) === g ).parentNode.parentNode.className ) );
+	check( 'the bar of the list holds the scan and the new key, with the main button for the new key and nothing else', ( () => { const bar = byClass( k.list, 'nino-admin-list-actions' )[0]; return bar !== undefined && tag( bar, 'button' ).length === 2
+		&& byClass( bar, 'nino-admin-btn-primary' ).length === 1 && byClass( bar, 'nino-admin-btn-primary' )[0].textContent === W('/_admin/keys/label/new') && byClass( bar, 'nino-admin-btn-secondary' )[0].textContent === W('/_admin/keys/label/scan') } )() );
+	check( 'there is no switch of a language in the tab', tag( k.list, 'select' ).length === 0 );
+	check( 'the page is at the address of the list, and the table of a row is not shown', k.hash() === '#text/keys' && has( k.form, 'admin-hidden' ) === true && has( k.list, 'admin-hidden' ) === false );
 }
 
 {
-	// the form of a row: a text and what it is, for every key, and one Save
-	const k = openedKeys( keysResponse() );
-	opens( k.list ).find( a => keyOf( a ) === 'template/page-services' ).click();
-	const KEY = '/template/page-services/intro/title';
+	// the second line of a row is counts: how many keys, and how many of them are hidden
+	const k = keysShown();
+	const hidden = id => k.panel._model.rows[id].entries.filter( e => e.blacklisted === true ).length;
 
-	check( 'the form has the way back in the context bar, the name of the row, and no select of a language', k.form.querySelectorAll('.nino-admin-back-link').length === 1 && k.form.querySelector('.nino-admin-back-link').textContent === F('/_admin/common/label/back-to',W('/_admin/text/label/back-name'))
-		&& k.form.querySelector('.nino-admin-contextbar-title').textContent === 'Leistungen' && k.form.querySelectorAll('select').filter( s => s.dataset.settings === undefined && s.closest('.admin-key-settings') === null ).length === 0 );
-	check( 'a key is a field named like the Text panel\'s, with the key and the count under it, and under it the row of what the key is', ( () => { const f = k.form.querySelector('[data-key="'+ KEY+ '"]'); return f.querySelector('.admin-text-meta code').textContent === KEY
-		&& f.querySelector('input').value === 'Leistungen' && settingsOf( k, KEY ) !== null && f.parentNode === settingsOf( k, KEY ).parentNode && f.parentNode.children.indexOf( settingsOf( k, KEY ) ) === f.parentNode.children.indexOf( f ) + 1 } )() );
-	const row = settingsOf( k, KEY );
-	check( 'the row of a key is a format, a limit, whether it is global and whether it is hidden - fields of the workbench, each with its own name - and the buttons of the key at its end', ( () => {
-		const select = part( row, 'select' ), limit = part( row, 'input[type="number"]' ), boxes = row.querySelectorAll('input').filter( i => i.type === 'checkbox' );
-		return select.children.map( o => o.value ).join() === 'auto,plain,inline,lines,blocks' && select.value === 'auto' && limit.value === '' && limit.min === '1' && boxes.length === 2 && boxes.every( b => b.checked === false )
-			&& row.querySelectorAll('.nino-admin-switch').length === 2 && row.children[0].tagName === 'span' && row.querySelector('.nino-admin-help') !== null } )() );
-	check( '...Rename and Delete are the small buttons at the end of the row of the key, the one that takes something away last and red', ( () => { const buttons = rowButtons( row );
-		return buttons.map( b => b.textContent ).join() === [ 'rename', 'delete' ].map( w => W('/_admin/common/label/'+ w) ).join() && buttons.every( b => b.classList.contains('nino-admin-btn--small') ) && buttons[1].classList.contains('nino-admin-btn-danger') && buttons.every( b => b.getAttribute('aria-label').indexOf( KEY ) !== -1 ) } )() );
-	check( '...a key of the system has no button to rename it - its name is what the code that reads it asks for - and one somebody made up has', ( () => {
-		k.keys._openGroup( '_nino/webpage' ); const a = rowButtons( k.form.querySelector('.admin-key-settings') ).map( b => b.textContent ).join();
-		k.keys._openGroup( 'website' ); const b = rowButtons( k.form.querySelector('.admin-key-settings') ).map( b => b.textContent ).join();
-		k.keys._openGroup( 'template/page-services' ); return a === W('/_admin/common/label/delete') && b === [ 'rename', 'delete' ].map( w => W('/_admin/common/label/'+ w) ).join() } )() );
-	check( 'the view has one bar with one main button that submits, and no button of Apply, in the rows or anywhere', k.form.querySelectorAll('.nino-admin-actionbar').length === 1 && k.form.querySelectorAll('.nino-admin-btn-primary').length === 1
-		&& k.form.querySelector('.nino-admin-btn-primary').type === 'submit' && k.form.querySelectorAll('button').filter( b => b.type === 'submit' ).length === 1 );
-	check( 'a key the form holds that is the same in every language has the badge, and the row says that it is global', ( () => { k.keys._openGroup( 'project/company' ); const f = k.form.querySelector('[data-key="/project/company/general/name"]');
-		const g = settingsOf( k, '/project/company/general/name' ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[0]; k.keys._openGroup( 'template/page-services' ); return f.querySelector('.nino-admin-badge') !== null && g.checked === true } )() );
-	check( 'the fill icon is at a field of several lines and a text with markup, and not at a line', k.form.querySelectorAll('.admin-text-field').every( f => ( f.querySelector('input') !== null ) === ( f.querySelector('.nino-admin-fills-button') === null ) ) );
+	check( 'the second line of a row is how many keys it holds and - where there are any - how many are hidden from the Text panel, and no running text', k.lineOf('template/page-services') === F('/_admin/keys/count/keys',10)+ ' · '+ F('/_admin/keys/count/hidden',1)
+		&& hidden('template/page-services') === 1 && k.lineOf('template/page-services').indexOf( 'Beratung' ) === -1 );
+	check( '...a row with no key hidden says only how many', k.lineOf('project/company') === F('/_admin/keys/count/keys',4) && hidden('project/company') === 0 && k.lineOf('template/common') === F('/_admin/keys/count/keys',2) );
+	check( '...one key is the singular, in the words of the tab', k.lineOf('template/frame-header') === F('/_admin/keys/count/key',1));
+	check( '...a row of the system that holds only hidden keys says so', k.lineOf('_admin') === F('/_admin/keys/count/key',1)+ ' · '+ F('/_admin/keys/count/hidden',1) );
+}
 
-	// nothing changed: nothing is sent
-	submitKeys( k );
-	check( 'a save with nothing changed sends nothing and says it is saved', keyWrites( k ).length === 0 && k.told.join() === W('/_admin/common/msg/saved') );
+{
+	// the counts follow what is saved: a key that is hidden is one more on the line of its row
+	const k = keysRecord( 'template/page-services', K1 );
+	tick( k.hidden( k.record() ) );
+	k.save( k.record() );
+	k.close( k.record() );
+	fire( byClass( k.form, 'nino-admin-back-link' )[0], 'click' );
+	check( 'the counts follow a save that hides a key: the list says it when it is shown again, and the row that held the key is the one that was open', k.dialog() === null && k.lineOf('template/page-services') === F('/_admin/keys/count/keys',10)+ ' · '+ F('/_admin/keys/count/hidden',2) );
+}
 
-	// a text
-	typeInto( keyControl( k, KEY ), 'Unsere Leistungen' );
-	check( 'a changed text is unsaved input', k.registry.keys.isDirty() === true );
-	submitKeys( k );
-	check( 'a save of a text sends the text and nothing of its shape, then reads the keys again and draws the row from what the server holds', keyWrites( k ).map( c => c.endpoint ).join() === 'savebatch'
-		&& keyWrites( k )[0].payload.items.length === 1 && keyWrites( k )[0].payload.items[0].key === KEY && keyWrites( k )[0].payload.items[0].locale === 'de_DE' && k.sent.at(-1).endpoint === 'list' );
-	check( '...says it as a toast, the line empty, the view and the address as they were - and the form holds no unsaved input', k.told.at(-1) === W('/_admin/common/msg/saved') && k.form.querySelector('#keys-form-msg').textContent === '' && k.keys._currentGroup === 'template/page-services' && k.registry.keys.isDirty() === false
-		&& keyControl( k, KEY ).value === 'Unsere Leistungen' );
-	check( '...and tells the shell that texts were written, once for each request that wrote', k.touched.join() === 'texts' );
+{
+	// the search with the hidden keys, and the chip for them alone
+	const k = keysShown();
+	const box = k.listSearch();
+	const chip = () => byClass( k.list, 'nino-admin-chip' )[0];
+	const hits = () => byClass( k.list, 'admin-text-hit-key' ).map( c => c.textContent );
+
+	check( 'the search is the Text panel\'s, with a chip of the workbench for the hidden keys', box.attributes['aria-label'] === W('/_admin/text/label/search') && chip().id === 'keys-list-hidden' && chip().textContent === W('/_admin/keys/label/hidden-only') && chip().attributes['aria-pressed'] === 'false' );
+	box.value = 'netzwerk';
+	fire( box, 'input', { target : box } );
+	check( 'it finds a hidden key as well, as a row of the list', k.listRows().length === 1 && hits().join() === '/_admin/elements/field/social/title' && opens( k.list )[0].href === keyAddress( '_admin', '/_admin/elements/field/social/title' ) );
+	box.value = '';
+	fire( box, 'input', { target : box } );
+	fire( chip(), 'click', { target : chip() } );
+	check( 'only the hidden ones: the chip is on, and the hits are the keys hidden from the Text panel', chip().attributes['aria-pressed'] === 'true' && hits().sort().join() === '/_admin/elements/field/social/title,/_nino/webpage/services/uri,/project/mail/color/backdrop' );
+	fire( chip(), 'click', { target : chip() } );
+	box.value = 'consulting';
+	fire( box, 'input', { target : box } );
+	check( 'a hit in another language has that language\'s code as a small button, and it asks the workbench for it', ( () => {
+		const code = byClass( k.list, 'nino-admin-row-actions' )[0].children[0]; const asked = [];
+		const choose = k.h.admin.workLocale.choose; k.h.admin.workLocale.choose = c => asked.push( c ); fire( code, 'click' ); k.h.admin.workLocale.choose = choose;
+		return code.textContent === 'en_US' && asked.join() === 'en_US' } )() );
+	box.value = 'beratung';
+	fire( box, 'input', { target : box } );
+	const before = k.h.entries.length;
+	fire( opens( k.list )[0], 'click', { target : opens( k.list )[0] } );
+	check( 'a hit opens the record of its key over the table of its row, at the address of the key, one entry more in the history', k.record() !== null && k.hash() === keyAddress( 'template/page-services', K3 ) && has( k.form, 'admin-hidden' ) === false && k.ids().length === KEYS.length && k.h.entries.length === before + 1
+		&& k.titleOf( k.record() ).indexOf( 'Titel' ) !== -1 && k.subtitleOf( k.record() ) === K3 );
+}
+
+{
+	// the singular of a count is another word than the plural in English, where the words are not the same
+	const k = keysShown( keysResponse(), { words : 'en_US' } );
+	const E = workbenchWords('en_US');
+
+	check( 'a row with one key says "1 key", the others "n keys", in English', k.lineOf('template/frame-header') === E['/_admin/keys/count/key'].replace( '%d', '1' ) && k.lineOf('template/frame-header') === '1 key' && k.lineOf('project/company') === '4 keys' );
+}
+
+// --- the keys of a row: the standard directory -------------------------------------------------------------------------------------------------------------
+
+{
+	const k = keysRow('template/page-services');
+
+	check( 'a row opens as its own view at its address, under the way back and the name of the row - one link, to the tab by its name', k.hash() === keyAddress('template/page-services') && has( k.form, 'admin-hidden' ) === false && has( k.list, 'admin-hidden' ) === true
+		&& byClass( k.form, 'nino-admin-back-link' ).length === 1 && byClass( k.form, 'nino-admin-back-link' )[0].textContent === F('/_admin/common/label/back-to',W('/_admin/text/label/back-name')) && byClass( k.form, 'nino-admin-contextbar-title' )[0].textContent === 'Leistungen' );
+	check( '...and under it the standard directory - no box to choose rows by - and under the table the bar of the list: the scan beside the main button that makes a key', byClass( k.form, 'nino-admin-directory' ).length === 1 && tag( k.form, 'input' ).filter( el => el.type === 'checkbox' ).length === 0
+		&& byClass( k.form, 'nino-admin-list-actions' ).length === 1 && byClass( k.form, 'nino-admin-btn-primary' ).map( b => b.textContent ).join() === W('/_admin/keys/label/new') && byClass( byClass( k.form, 'nino-admin-list-actions' )[0], 'nino-admin-btn-secondary' )[0].textContent === W('/_admin/keys/label/scan') );
+	check( 'the rows are the keys of the row in the order of its sections - the details of the page first - and of the templates', k.ids().join() === KEYS.join() );
+	check( '...the columns are the name, the section, the text, the format, the limit and the state', k.heads().map( el => el.dataset.key ).join() === 'name,place,text,format,limit,states' );
+	check( '...none of them sorts: the order is the content', k.heads().every( el => el.attributes['aria-sort'] === undefined || el.attributes['aria-sort'] === 'none' ) && tag( k.form, 'th' ).every( th => tag( th, 'button' ).length === 0 ) );
+	check( '...the heads say what they hold, the one of the text in the language on screen', k.heads().map( el => el.textContent ).join() === [ W('/_admin/text/col/name'), W('/_admin/text/col/section'), F('/_admin/text/col/text','Deutsch'), W('/_admin/keys/label/format'), W('/_admin/keys/label/limit'), W('/_admin/keys/col/state') ].join() );
+
+	const one = k.cells( K1 );
+	check( 'a row says the name of the key strong, its key under it in the face of an identifier, as text', byClass( one[0], 'admin-text-name-label' )[0].tagName === 'STRONG' && byClass( one[0], 'admin-text-name-label' )[0].textContent === 'Titel' && byClass( one[0], 'admin-text-name-key' )[0].textContent === K1 );
+	check( '...the section by its name - for the details of a page with the path - and the text of the working language, clamped, as plain text', one[1].textContent === 'Einleitung' && k.cells('/_nino/webpage/services/name')[1].textContent === W('/_admin/text/label/page-details')+ ' (/services)'
+		&& byClass( one[2], 'nino-admin-table-clamp' )[0].textContent === 'Leistungen' && byClass( k.cells( K5 )[2], 'nino-admin-table-clamp' )[0].textContent === 'Wir beraten Sie gern' );
+	check( '...the format and the limit "Automatic: ..." where they are not set, with what is at work', one[3].textContent === F('/_admin/keys/col/auto',W('/_admin/keys/format/plain')) && one[4].textContent === F('/_admin/keys/col/auto',150) && k.cells( K5 )[3].textContent === F('/_admin/keys/col/auto',W('/_admin/keys/format/blocks')) );
+	check( '...and no badge where the key is neither global nor hidden', byClass( one[5], 'nino-admin-badge' ).length === 0 );
+
+	const states = key => byClass( k.cells( key )[5], 'nino-admin-badge' ).map( b => b.textContent+ ':'+ ( b.dataset.state ?? '' ) );
+	check( 'a key that is one text for all languages and hidden says both, a word each - the colour is not the only thing that says it', states('/_nino/webpage/services/uri').join() === W('/_admin/text/label/all-languages')+ ':,'+ W('/_admin/keys/label/blacklist')+ ':warn' );
+	check( 'the pencil of a key is named for it, one for each key - every key of the tab opens', k.pencil( K1 ).attributes['aria-label'] === F('/_admin/keys/row/open','Einleitung › Titel') && KEYS.every( key => k.pencil( key ) !== undefined ) );
+}
+
+{
+	// a format and a limit that are set are said as they are
+	const response = keysResponse();
+	const e1 = response.keys.find( e => e.key === K1 ), e2 = response.keys.find( e => e.key === K3 );
+	Object.assign( e1, { formatSet : true, format : 'lines', maxlengthSet : true, maxlength : 90 } );
+	Object.assign( e2, { formatSet : true, format : 'blocks', html : true, maxlengthSet : false } );
+	const k = keysRow( 'template/page-services', response );
+
+	check( 'a format and a limit that were set are said as they are, a format that was not as "Automatic: ..." with the format that is at work', k.cells( K1 )[3].textContent === W('/_admin/keys/format/lines') && k.cells( K1 )[4].textContent === '90'
+		&& k.cells( K3 )[3].textContent === W('/_admin/keys/format/blocks') && k.cells( K3 )[4].textContent === F('/_admin/keys/col/auto',150) );
+}
+
+{
+	// the category, the select "Show", the search
+	const response = keysResponse();
+	response.keys.find( e => e.key === K2 ).blacklisted = true;
+	Object.assign( response.keys.find( e => e.key === '/template/page-services/legal/note' ), { global : true, values : { '*' : 'Ohne Gewähr' } } );
+	const k = keysRow( 'template/page-services', response );
+	const [ category, show ] = k.selects();
+
+	check( 'the section is the category, left of the search: all sections, then the sections in their order, the details of a page with its path', category !== undefined && show !== undefined && k.selects().length === 2
+		&& tag( category, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/text/filter/sections'), W('/_admin/text/label/page-details')+ ' (/services)', 'Einleitung', 'Eintrag 1', 'Eintrag 2', 'Legal' ].join() );
+	check( '...and one select "Show" after it: all keys, the hidden ones, the ones that are one text for all languages', show.attributes['aria-label'] === W('/_admin/text/filter/show')
+		&& tag( show, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/keys/filter/all'), W('/_admin/keys/filter/hidden'), W('/_admin/keys/filter/global') ].join() );
+
+	choose( category, 'item-1' );
+	check( 'a section narrows the rows to its keys, in their order', k.ids().join() === [ K3, K5 ].join() );
+	choose( category, '' );
+	choose( show, 'hidden' );
+	check( 'Show "hidden" keeps the keys hidden from the Text panel', k.ids().join() === [ '/_nino/webpage/services/uri', K2 ].join() );
+	choose( show, 'global' );
+	check( '...Show "one text for all languages" the ones that are the same in every language', k.ids().join() === [ '/_nino/webpage/services/uri', '/template/page-services/legal/note' ].join() );
+	choose( show, '' );
+	check( '...and "all keys" is every one again', k.ids().join() === KEYS.join() );
+
+	// the search: the name, the key, the section, the text of every language
+	const found = query => { const box = k.search(); box.value = query; fire( box, 'input', { target : box } ); return k.ids().join() };
+	check( 'the search finds a key by its text in the language on screen', found( 'Beratung' ) === K3 );
+	check( '...by its text in another language', found( 'consulting' ) === K3 );
+	check( '...by its name, its key and its section', found( 'eintrag 2' ) === K4 && found( 'legal/note' ) === '/template/page-services/legal/note' && found( 'Einleitung' ) === [ K1, K2 ].join() );
+	check( '...and says it finds nothing in the words of the tab', found( 'zzz' ) === '' && byClass( k.form, 'nino-admin-empty' )[0].textContent === W('/_admin/text/msg/nothing') );
+	found( '' );
+
+	// the state is kept per row, while the tab lives
+	choose( k.selects()[1], 'hidden' );
+	fire( byClass( k.form, 'nino-admin-back-link' )[0], 'click' );
+	check( 'Back is the list, the focus on the row that was open, the address the list\'s', has( k.list, 'admin-hidden' ) === false && k.hash() === '#text/keys' && k.h.doc.activeElement === k.linkOf('template/page-services') );
+	fire( k.linkOf('template/page-services'), 'click', { target : k.linkOf('template/page-services') } );
+	check( 'the row opened again is as the person left it: the select "Show" holds what it held', k.ids().join() === [ '/_nino/webpage/services/uri', K2 ].join() && k.selects()[1].value === 'hidden' );
+	fire( byClass( k.form, 'nino-admin-back-link' )[0], 'click' );
+	fire( k.linkOf('template/frame-header'), 'click', { target : k.linkOf('template/frame-header') } );
+	check( '...and another row has its own state: none, and no category where it has one section', k.ids().length === 1 && k.selects().length === 1 && k.selects()[0].value === '' );
+}
+
+{
+	// text from the server is text: in the list, the table, the head of the record, its subtitle and the fields; a rich text goes to the editor as it is
+	const BAD = '<img src=x onerror=alert(1)> "quoted" [[/key]]';
+	const SAID = 'x <img src=x onerror=alert(1)> "quoted" [[/key]]';
+	const KEY = '/template/page-services/intro/bad', ENTITY = '/template/page-services/intro/entity', ODD = '/template/page-services/<b>sec/<img src=x onerror=alert(2)>';
+	const response = keysResponse();
+	response.keys.push( textEntry( KEY, { de_DE : BAD, en_US : BAD } ) );
+	response.keys.push( textEntry( ENTITY, { de_DE : 'x &lt;img src=x onerror=alert(1)&gt; "quoted" [[/key]]', en_US : '' } ) );
+	response.keys.push( textEntry( ODD, { de_DE : 'x', en_US : 'y' } ) );
+	response.keys.push( textEntry( '/template/page-services/intro/rich', { de_DE : '<p>'+ BAD+ '</p>', en_US : '' }, { html : true, format : 'blocks' } ) );
+	const k = keysRow( 'template/page-services', response );
+	const noMarkup = root => tag( root, 'img' ).length === 0 && tag( root, 'b' ).length === 0;
+
+	check( 'a text, a name and a key holding markup are text in the table - nothing in the page is made of them', noMarkup( k.form ) && byClass( k.cells( ENTITY )[2], 'nino-admin-table-clamp' )[0].textContent === SAID && byClass( k.cells( KEY )[0], 'admin-text-name-key' )[0].textContent === KEY
+		&& byClass( k.cells( KEY )[2], 'nino-admin-table-clamp' )[0].textContent === k.panel._find( KEY ).text && noMarkup( k.list ) );
+	const d = k.openRow( KEY );
+	check( '...in the head of the record, its subtitle and its fields', noMarkup( d ) && k.subtitleOf( d ) === KEY && k.controlOf( d, 'de_DE' ).value === BAD && k.controlOf( d, 'en_US' ).value === BAD && k.hash() === keyAddress( 'template/page-services', KEY ) );
+	k.close( d );
+	const r = k.openRow( '/template/page-services/intro/rich' );
+	check( '...a text with markup is given to the editor as it is, and nothing else makes elements of it', k.editors.some( e => e.given === '<p>'+ BAD+ '</p>' ) && noMarkup( r ) );
+	k.close( r );
+	fire( byClass( k.form, 'nino-admin-back-link' )[0], 'click' );
+	const row = k.panel._model.rowOf[ODD];
+	fire( k.linkOf( row ), 'click', { target : k.linkOf( row ) } );
+	check( '...a section and a key that are no words of the grammar are text as well, in the row they fall into and in its record', noMarkup( k.form ) && k.ids().indexOf( ODD ) !== -1 && noMarkup( k.openRow( ODD ) ) && k.subtitleOf( k.record() ) === ODD );
+	k.close( k.record() );
+	fire( byClass( k.form, 'nino-admin-back-link' )[0], 'click' );
+	const box = k.listSearch();
+	box.value = 'onerror';
+	fire( box, 'input', { target : box } );
+	check( '...and in the hits of the search of the list: the words found are marks of text', noMarkup( k.list ) && byClass( k.list, 'admin-text-hit-key' ).length > 0 );
+}
+
+// --- the record of one key ---------------------------------------------------------------------------------------------------------------------------------
+
+const PAGE = 'template/page-services';
+
+{
+	const k = keysRow( PAGE );
+	const before = k.h.entries.length, index = k.h.index();
+	const d = k.openRow( K1 );
+
+	check( 'a pencil opens the record of that key, over the table: the place and the name in its head, the key under it, at its address as one step of the history', d !== null && k.titleOf( d ) === 'Einleitung › Titel' && k.subtitleOf( d ) === K1
+		&& k.hash() === keyAddress( PAGE, K1 ) && k.h.entries.length === before + 1 && has( k.form, 'admin-hidden' ) === false && k.ids().length === KEYS.length );
+	check( '...the dialog is the large one of a record, with the step to the keys of the table around it, its place and the cross', has( d, 'nino-admin-record' ) && has( d, 'nino-admin-dialog--large' ) && byClass( d, 'nino-admin-record-count' )[0].textContent === F('/_admin/common/record/position',5,10)
+		&& tag( d, 'button' ).some( b => b.attributes['aria-label'] === W('/_admin/keys/record/prev') ) && tag( d, 'button' ).some( b => b.attributes['aria-label'] === W('/_admin/keys/record/next') ) && k.cross( d ) !== undefined );
+
+	// the two groups
+	const sets = tag( d, 'fieldset' );
+	check( 'the body is two groups, each a fieldset with its legend: the text in every language, and the settings', sets.length === 2 && sets.map( s => s.children[0].textContent ).join() === [ W('/_admin/keys/label/text'), W('/_admin/keys/label/settings') ].join()
+		&& d.querySelector('#keys-record') !== null && has( d.querySelector('#keys-record'), 'nino-admin-dialog-fields' ) && sets.every( s => s.parentNode.id === 'keys-record' ) );
+	check( '...the text has a field for each language, the working one first and marked, and each says the count against the limit of the key', k.fields( d ).map( f => f.dataset.locale ).join() === 'de_DE,en_US'
+		&& nameOf( k.fieldOf( d, 'de_DE' ) ) === 'Deutsch ('+ W('/_admin/text/label/working')+ ')' && nameOf( k.fieldOf( d, 'en_US' ) ) === 'English' && k.controlOf( d, 'de_DE' ).value === 'Leistungen' && k.controlOf( d, 'en_US' ).value === 'Services'
+		&& k.counterOf( d, 'de_DE' ).textContent === '10 / 150' && k.counterOf( d, 'en_US' ).textContent === '8 / 150' );
+	check( '...no field shows its key under it - the key is in the head - and none has the badge of a text for all languages', byClass( d, 'admin-text-meta' ).every( m => tag( m, 'code' ).length === 0 ) && byClass( d.querySelector('#keys-record'), 'nino-admin-badge' ).length === 0 );
+
+	const group = sets[1];
+	check( 'the settings are a format, a limit, one text for all languages and whether the key is hidden from the Text panel - each a field of the workbench with its own name and its own help behind the (?)', ( () => {
+		const select = k.format( d ), limit = k.limit( d ), boxes = k.switches( d );
+		return select.children.map( o => o.value ).join() === 'auto,plain,inline,lines,blocks' && select.value === 'auto' && limit.value === '' && limit.min === '1' && limit.type === 'number' && limit.placeholder === W('/_admin/keys/placeholder/limit')
+			&& boxes.length === 2 && boxes.every( b => b.checked === false ) && allText( group ).indexOf( W('/_admin/keys/label/global') ) !== -1 && allText( group ).indexOf( W('/_admin/keys/label/hide') ) !== -1
+			&& byClass( group, 'nino-admin-help' ).length === 4 && byClass( group, 'nino-admin-help-text' ).map( h => h.textContent ).sort().join() === [ 'format', 'limit', 'global', 'hidden' ].map( n => W('/_admin/keys/help/'+ n) ).sort().join() } )() );
+	check( '...the limit says its unit in its name', allText( k.limit( d ).parentNode ).indexOf( W('/_admin/common/unit/characters') ) !== -1 );
+
+	// the bar
+	const bar = byClass( d, 'nino-admin-actionbar' )[0];
+	const buttons = tag( bar, 'button' ).filter( b => b.hidden !== true );
+	check( 'the bar has "Delete text key" at the left in red, and at the right "Save and continue", "Rename" and the one main button "Save" - and no Cancel, no Close', buttons.map( b => b.textContent ).join() === [ W('/_admin/keys/confirm/delete-title'), W('/_admin/common/label/save-next'), W('/_admin/common/label/rename'), W('/_admin/common/label/save') ].join()
+		&& has( buttons[0], 'nino-admin-btn-danger' ) && byClass( bar, 'nino-admin-btn-primary' ).length === 1 && byClass( bar, 'nino-admin-btn-primary' )[0].textContent === W('/_admin/common/label/save') && byClass( bar, 'nino-admin-btn-danger' ).length === 1 );
+	check( '...a button that reads the keys again is not there while nothing went wrong', tag( bar, 'button' ).filter( b => b.textContent === W('/_admin/keys/label/reload') ).every( b => b.hidden === true ) );
+
+	// closing: the cross takes the entry off the history, the table is as it was, the focus is on the row
+	k.close( d );
+	check( 'the cross closes the record: the address is the row\'s, the table is as it was and the focus is on the row of the key', k.record() === null && k.hash() === keyAddress( PAGE ) && k.h.index() === index && k.h.doc.activeElement === k.row( K1 ) );
+}
+
+{
+	// a key that is one text for all languages and hidden: the one field, the two switches on, no button to rename a key of the system
+	const k = keysRow( PAGE );
+	const d = k.openRow( '/_nino/webpage/services/uri' );
+
+	check( 'a key that is one text for all languages has the one field, which says so by its name and is not marked as a language, and the switches say what the key is', k.fields( d ).map( f => f.dataset.locale ).join() === '*' && nameOf( k.fieldOf( d, '*' ) ) === W('/_admin/text/label/all-languages') && k.controlOf( d, '*' ).value === '/services'
+		&& k.global( d ).checked === true && k.hidden( d ).checked === true );
+	check( '...a key of the system has no button to rename it - its name is what the code that reads it asks for - and one somebody made up has', tag( byClass( d, 'nino-admin-actionbar' )[0], 'button' ).filter( b => b.textContent === W('/_admin/common/label/rename') ).every( b => b.hidden === true )
+		&& ( () => { k.close( d ); const e = k.openRow( K1 ); return tag( byClass( e, 'nino-admin-actionbar' )[0], 'button' ).filter( b => b.textContent === W('/_admin/common/label/rename') ).every( b => b.hidden !== true ) } )() );
+}
+
+{
+	// a text with markup is the rich-text editor, in every language; a language the website does not serve yet is marked
+	const response = keysResponse();
+	response.locales = [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : false } ];
+	const k = keysRow( PAGE, response );
+	const d = k.openRow( K5 );
+
+	check( 'a text with markup is an editor in each language, given the text as it is stored, with the limit of the key', k.editors.length === 2 && k.editors.every( e => e.mount.dataset.editor === 'yes' ) && k.editors[0].given === '<p>Wir beraten Sie gern</p>' && k.editors[0].maxlength === 150 && k.editors[0].format === 'blocks' );
+	check( '...a language the website does not serve yet is marked as the select of the working language marks it', nameOf( k.fieldOf( d, 'en_US' ) ) === 'English ('+ W('/_admin/common/word/inactive')+ ')' );
+}
+
+{
+	// a reload at the address of a key opens the record over the table of its row - no step of the history of its own; Back closes it
+	const k = keysPage( keysResponse(), { hash : keyAddress( PAGE, K1 ) } ).open();
+
+	check( 'a reload at the address of a key opens the record of it over the table of its row, as one entry of the history', k.record() !== null && k.subtitleOf( k.record() ) === K1 && k.ids().length === KEYS.length && k.hash() === keyAddress( PAGE, K1 ) && k.h.entries.length === 1 && has( k.list, 'admin-hidden' ) );
+	k.close( k.record() );
+	check( '...and closed by the cross it leaves the table at the row\'s address, written over the one that was there', k.record() === null && k.hash() === keyAddress( PAGE ) && k.ids().length === KEYS.length );
+
+	const b = keysRecord( PAGE, K1 );
+	b.back();
+	check( 'Back closes the record: the table of the row, at its address', b.record() === null && b.hash() === keyAddress( PAGE ) && b.ids().length === KEYS.length && has( b.form, 'admin-hidden' ) === false );
+	b.forward();
+	check( '...and Forward opens it again', b.record() !== null && b.subtitleOf( b.record() ) === K1 && b.hash() === keyAddress( PAGE, K1 ) );
+}
+
+{
+	// a key the row does not hold, and a row nobody has
+	const k = keysPage( keysResponse(), { hash : keyAddress( PAGE, '/template/nope/a/b' ) } ).open();
+
+	check( 'an address that names a key the row does not hold is the table of the row with the notice that it is not there - the address is the row\'s', k.record() === null && byClass( k.form, 'nino-admin-notice' ).some( n => n.textContent === W('/_admin/keys/record/missing') ) && k.hash() === keyAddress( PAGE ) );
+	const l = keysPage( keysResponse(), { hash : keyAddress( 'nothing', K1 ) } ).open();
+	check( '...and a row nobody has is the list, at its address', l.record() === null && has( l.list, 'admin-hidden' ) === false && l.hash() === '#text/keys' );
+	const n = keysShown();
+	n.step( keyAddress( PAGE, K1 ) );
+	check( 'an address typed while the list is up opens the table of the row and the record of the key', n.record() !== null && n.ids().length === KEYS.length && n.hash() === keyAddress( PAGE, K1 ) );
+	n.step( keyAddress( PAGE, K3 ) );
+	check( '...and another key of the row is shown in the same record, with no entry of the history of its own', n.record() !== null && n.subtitleOf( n.record() ) === K3 && n.hash() === keyAddress( PAGE, K3 ) );
+	n.step( '#text/keys' );
+	check( '...the list closes it and shows the list', n.record() === null && has( n.list, 'admin-hidden' ) === false && n.hash() === '#text/keys' );
+}
+
+{
+	// the key %40new is a row called @new, never the form of a new key: the word is told from the key by the router
+	const response = keysResponse();
+	response.keys.push( textEntry( '/@new/a/b', { de_DE : 'x', en_US : 'y' } ) );
+	const k = keysPage( response, { hash : '#text/keys/%40new' } ).open();
+
+	check( 'a row called @new (%40new) is a row, and the word @new is the form of a new key: the address says which', k.record() === null && k.dialog() === null && has( k.form, 'admin-hidden' ) === false && k.ids().join() === '/@new/a/b' && k.hash() === '#text/keys/%40new' );
+	const w = keysPage( keysResponse(), { hash : '#text/keys/@new' } ).open();
+	check( '...the word opens the form of a new key, and not a record of a key called @new', w.record() !== null && w.titleOf( w.record() ) === W('/_admin/keys/label/new') );
+}
+
+// --- saving: what is sent, in which order, and what the record shows after it ----------------------------------------------------------------------------------
+
+const detailsOf = d => tag( byClass( d, 'nino-admin-dialog-details' )[0], 'li' ).map( li => li.textContent );
+const CONTINUE = () => W('/_admin/common/label/save-next');
+const dirtyNow = k => k.h.dirty.isDirty( [ 'keys' ] );
+const lastList = k => k.sent.filter( c => c.endpoint === 'list' ).length;
+// The sentence said at a control: the paragraph its aria-describedby names first (it stands after the label, not in it)
+const saidAt = ( d, control ) => findAll( d, el => has( el, 'nino-admin-field-error' ) && el.id === ( control.attributes['aria-describedby'] ?? '' ).split(' ')[0] )[0];
+
+{
+	// nothing changed: nothing is sent, and what is on screen is what is stored
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+	const listed = lastList( k );
+
+	k.save( d );
+	check( 'a save with nothing changed sends nothing - not a request for a text, not one for the shape, not even a read of the keys - and says that it is saved', k.writes().length === 0 && lastList( k ) === listed && k.told.at(-1) === W('/_admin/common/msg/saved') && dirtyNow( k ) === false );
+	check( '...and it says it with the badge and a line that stays empty, no toast of a failure', k.lineText( d ) === '' && k.touches.length === 0 );
+	k.save( k.record() );
+	check( '...as often as it is asked', k.writes().length === 0 );
+}
+
+{
+	// a text: one request, for the language that was changed - and the keys are read again
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+	const read = k.entry( K1 ).values.de_DE;
+
+	k.type( d, 'de_DE', 'Unsere Leistungen' );
+	check( 'a changed text is unsaved input for the shell', dirtyNow( k ) === true );
+	k.save( d );
+	const writes = k.writes();
+	check( 'a save of a text sends the text and nothing of its shape: one request for one language, with one item, with the text it was read as', writes.map( c => c.endpoint ).join() === 'savebatch' && writes[0].payload.items.length === 1
+		&& JSON.stringify( writes[0].payload.items[0] ) === JSON.stringify( { key : K1, locale : 'de_DE', value : 'Unsere Leistungen', was : read } ) );
+	check( '...then it reads the keys again and draws the record from what the server holds', k.sent.at(-1).endpoint === 'list' && k.controlOf( k.record(), 'de_DE' ).value === 'Unsere Leistungen' && k.controlOf( k.record(), 'en_US' ).value === 'Services' );
+	check( '...says it as a toast, the line empty, the address as it was - and the record holds no unsaved input', k.told.at(-1) === W('/_admin/common/msg/saved') && k.lineText( k.record() ) === '' && k.hash() === keyAddress( PAGE, K1 ) && dirtyNow( k ) === false );
+	check( '...and tells the shell that texts were written, once for each request that wrote', k.touches.join() === 'texts' );
+	check( '...the table behind the record has the text it holds now', byClass( k.cells( K1 )[2], 'nino-admin-table-clamp' )[0].textContent === 'Unsere Leistungen' );
+}
+
+{
+	// two languages: one request each, in the order of the fields - the working language first
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+
+	k.type( d, 'en_US', 'Our services' );
+	k.type( d, 'de_DE', 'Unsere Leistungen' );
+	k.save( d );
+	check( 'a save of two languages is one request for each, one after the other in the order of the fields - the answer is keyed by the key, so two languages in one request would be one answer', k.writes().map( c => c.endpoint+ ':'+ c.payload.items.map( i => i.locale ).join() ).join() === 'savebatch:de_DE,savebatch:en_US'
+		&& k.touches.join() === 'texts,texts' && dirtyNow( k ) === false );
+}
+
+{
+	// what the server kept is what the field shows
+	const k = keysRecord( PAGE, K1 );
+	k.handle.sanitize = text => text.trim().toUpperCase();
+	k.type( k.record(), 'de_DE', '  neu  ' );
+	k.save( k.record() );
+	check( 'a text the server changed on its way in - cleaned, converted - is the text the field shows after the save, which counts as saved', k.controlOf( k.record(), 'de_DE' ).value === 'NEU' && dirtyNow( k ) === false );
 }
 
 {
 	// a key that another tab wrote since is not written over unseen, and the question is the kernel's
-	const k = openedKeys( keysResponse() );
-	opens( k.list ).find( a => keyOf( a ) === 'template/page-services' ).click();
-	const KEY = '/template/page-services/intro/title';
-	const read = k.entry( KEY ).values.de_DE;
-	const questions = [];
-	k.Nino.adminUi.conflict = options => { questions.push( options ); return true };
-	k.handle.stored['de_DE '+ KEY] = 'Fremder Text';
-	typeInto( keyControl( k, KEY ), 'Mein Text' );
-	submitKeys( k );
-	check( 'the text goes with the text it was read as, and a key that was written by another meanwhile asks the question of a refused save', keyWrites( k )[0].payload.items[0].was === read && keyWrites( k )[0].payload.items[0].force === undefined
-		&& questions.length === 1 && questions[0].message.indexOf( KEY ) !== -1 );
-	check( '...the text stays as it was typed, at its field, and unsaved', keyControl( k, KEY ).value === 'Mein Text' && k.registry.keys.isDirty() === true && k.told.length === 0 );
-	// Cancel leaves the typed text at its field, with the focus on it; the keys were read again and show the text of the other tab, which this tab was never
-	// shown as the text it holds: a second save is held to the text this tab read, and asks again
-	questions[0].onCancel();
-	check( 'Cancel puts the focus on the field of the text that was turned down', k.dom.doc.activeElement === keyControl( k, KEY ) );
-	k.entry( KEY ).values.de_DE = 'Fremder Text';
-	submitKeys( k );
-	const second = keyWrites( k ).filter( c => c.endpoint === 'savebatch' ).at(-1).payload.items[0];
-	check( 'a second save after Cancel is sent with the text of the first read, and asks the question again: the text of the other tab is not written over because the keys were read again', second.was === read && questions.length === 2 && k.handle.stored['de_DE '+ KEY] === 'Fremder Text' );
-	check( '...and the question names the text by its place and by its key', questions[1].message.indexOf( KEY ) !== -1 && questions[1].message.indexOf(' › ') !== -1 );
-	questions[1].onOverwrite();
-	const forced = keyWrites( k ).filter( c => c.endpoint === 'savebatch' ).at(-1).payload.items;
-	check( 'Overwrite writes it once more for that key alone, forced and without the text it was read as - and the row is read again, saved', forced.length === 1 && forced[0].force === true && forced[0].was === undefined && k.handle.stored['de_DE '+ KEY] === 'Mein Text'
-		&& k.registry.keys.isDirty() === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+	const read = k.entry( K1 ).values.de_DE;
+
+	k.handle.stored['de_DE '+ K1] = 'Fremder Text';
+	k.entry( K1 ).values.de_DE = 'Fremder Text';
+	k.type( d, 'de_DE', 'Mein Text' );
+	k.save( d );
+	const ask = k.dialog();
+	check( 'the text goes with the text it was read as, and a key that was written by another meanwhile asks the question of a refused save, naming the text by its place and its key', k.writes()[0].payload.items[0].was === read && k.writes()[0].payload.items[0].force === undefined
+		&& ask !== null && k.titleOf( ask ) === W('/_admin/common/conflict/title') && allText( ask ).indexOf( K1 ) !== -1 && allText( ask ).indexOf( ' › ' ) !== -1 );
+	check( '...the text stays as it was typed, at its field, and unsaved, and nothing was said as saved', k.controlOf( k.record(), 'de_DE' ).value === 'Mein Text' && dirtyNow( k ) === true && k.told.length === 0 );
+
+	// Cancel leaves the text at its field: the next save is held to the text this tab read, and asks again
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( 'Cancel closes the question and puts the focus on the main button, the record is as it was typed', k.dialog() === k.record() && k.controlOf( k.record(), 'de_DE' ).value === 'Mein Text' && k.h.doc.activeElement === byClass( byClass( k.record(), 'nino-admin-actionbar' )[0], 'nino-admin-btn-primary' )[0] );
+	k.save( k.record() );
+	const second = k.writes().filter( c => c.endpoint === 'savebatch' ).at(-1).payload.items[0];
+	check( 'a second save after Cancel is sent with the text of the first read, and asks the question again: the text of the other tab is not written over because the keys were read again', second.was === read && k.dialog() !== k.record() && k.handle.stored['de_DE '+ K1] === 'Fremder Text' );
+	k.answerAsk( W('/_admin/common/conflict/overwrite') );
+	const forced = k.writes().filter( c => c.endpoint === 'savebatch' ).at(-1).payload.items;
+	check( 'Overwrite writes it once more for that language alone, forced and without the text it was read as - and the record is read again, saved', forced.length === 1 && forced[0].force === true && forced[0].was === undefined && k.handle.stored['de_DE '+ K1] === 'Mein Text'
+		&& dirtyNow( k ) === false && k.told.at(-1) === W('/_admin/common/msg/saved') && k.controlOf( k.record(), 'de_DE' ).value === 'Mein Text' );
+}
+
+{
+	// Reload shows what the other tab wrote, and drops what this one typed
+	const k = keysRecord( PAGE, K1 );
+
+	k.handle.stored['en_US '+ K1] = 'Fremd';
+	k.type( k.record(), 'en_US', 'Mein' );
+	k.save( k.record() );
+	const listed = lastList( k );
+	k.entry( K1 ).values.en_US = 'Fremd';
+	k.answerAsk( W('/_admin/common/conflict/reload') );
+	check( 'Reload reads the keys again and shows what is stored, the text of the other tab, and what was typed here is gone - nothing is unsaved, nothing was written', lastList( k ) === listed + 1 && k.controlOf( k.record(), 'en_US' ).value === 'Fremd' && dirtyNow( k ) === false && k.writes().filter( c => c.payload.items !== undefined && c.payload.items[0].force === true ).length === 0 );
 }
 
 {
 	// a key whose shape changes in the save has no stamp of its text: the text moves with the shape
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title';
-	choose( part( settingsOf( k, T ), 'select' ), 'lines' );
-	typeInto( keyControl( k, T ), 'Geändert' );
-	submitKeys( k );
-	check( 'a text written in the save that changes the shape of its key is written without a stamp', keyWrites( k ).filter( c => c.endpoint === 'savebatch' ).every( c => c.payload.items.every( i => i.was === undefined ) ) );
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+
+	choose( k.format( d ), 'lines' );
+	k.type( d, 'de_DE', 'Geändert' );
+	k.save( d );
+	check( 'a text written in the save that changes the shape of its key is written without the text it was read as', k.writes().filter( c => c.endpoint === 'savebatch' ).length === 1 && k.writes().filter( c => c.endpoint === 'savebatch' ).every( c => c.payload.items.every( i => i.was === undefined ) ) );
 }
 
 {
 	// the shape of a key is saved with its text, by the one Save
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title', X = '/template/page-services/intro/text';
-	const row = key => settingsOf( k, key );
+	const k = keysRecord( PAGE, K2 );
+	const d = k.record();
 
-	choose( part( row( T ), 'select' ), 'lines' );
-	check( 'a format that is chosen is unsaved input for the shell', k.registry.keys.isDirty() === true );
-	choose( part( row( T ), 'select' ), 'auto' );
-	check( '...and chosen back it is not', k.registry.keys.isDirty() === false );
-	choose( part( row( T ), 'select' ), 'lines' );
-	typeInto( part( row( T ), 'input[type="number"]' ), '90' );
-	tick( row( X ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[1] );
-	typeInto( keyControl( k, X ), 'Das bieten wir an: mehr' );
-	submitKeys( k );
-	const writes = keyWrites( k );
-	check( 'a save writes the shape of each key that changed, one request each, and then the texts that changed in one - and the formats a text was widened to ask nothing', writes.map( c => c.endpoint ).join() === 'save,save,savebatch' && k.asked.length === 0 );
-	check( '...a shape with the format, the limit as a number and both ticks', JSON.stringify( writes[0].payload ) === JSON.stringify( { key : T, global : false, blacklisted : false, format : 'lines', maxlength : 90 } )
-		&& JSON.stringify( writes[1].payload ) === JSON.stringify( { key : X, global : false, blacklisted : true, format : 'auto', maxlength : null } ) );
-	check( '...and the text in the language the form shows', writes[2].payload.items.length === 1 && writes[2].payload.items[0].key === X && writes[2].payload.items[0].locale === 'de_DE' );
-	check( 'the row is drawn again from what the server holds: the format, the limit and the ticks are the stored ones, and nothing is unsaved', part( row( T ), 'select' ).value === 'lines' && part( row( T ), 'input[type="number"]' ).value === '90'
-		&& row( X ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[1].checked === true && k.registry.keys.isDirty() === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
-
-	// while the requests run the form is held, and drawn again from the server when they are done
-	choose( part( row( T ), 'select' ), 'inline' );
-	typeInto( keyControl( k, X ), 'Während es läuft' );
-	k.handle.hold = true;
-	submitKeys( k );
-	let second = null;
-	k.registry.keys.save( ok => { second = ok } );
-	check( 'while the requests of a save run the form is busy: its controls are held, the shell sees a save that runs, and a second save is told no and sends nothing', k.form.querySelector('form').getAttribute('aria-busy') === 'true'
-		&& k.form.querySelectorAll('input, textarea, select, button').every( c => c.disabled === true ) && k.registry.keys.saving() === true && second === false && keyWrites( k ).filter( c => c.endpoint === 'save' ).length === 3 );
-	k.handle.held.shift()();
-	check( '...and when they are done the form is free again, drawn from what the server holds', k.registry.keys.saving() === false && k.form.querySelector('form').getAttribute('aria-busy') !== 'true' && k.form.querySelectorAll('button').some( c => c.disabled === true ) === false
-		&& part( row( T ), 'select' ).value === 'inline' && k.registry.keys.isDirty() === false );
-
-	// a key made global: its text is written to the one text
-	tick( row( X ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[0] );
-	typeInto( keyControl( k, X ), 'Global jetzt' );
-	submitKeys( k );
-	const batch = keyWrites( k ).at(-1);
-	check( 'a key that is made global has its text written to the one text of every language, and not to the language on screen', batch.endpoint === 'savebatch' && batch.payload.items[0].locale === '*' && k.keys._groups['template/page-services'].find( e => e.key === X ).global === true );
+	choose( k.format( d ), 'lines' );
+	check( 'a format that is chosen is unsaved input for the shell', dirtyNow( k ) === true );
+	choose( k.format( d ), 'auto' );
+	check( '...and chosen back it is not', dirtyNow( k ) === false );
+	choose( k.format( d ), 'lines' );
+	typeKey( k.limit( d ), '200' );
+	tick( k.hidden( d ) );
+	k.type( d, 'de_DE', 'Das bieten wir an: mehr' );
+	k.save( d );
+	const writes = k.writes();
+	check( 'a save writes the shape of the key first - one request with all five fields - and then the text of each language that changed, one request each; the format a text was widened to asks nothing', writes.map( c => c.endpoint ).join() === 'save,savebatch' && k.dialog() === k.record() );
+	check( '...the shape with the format, the limit as a number and both ticks', JSON.stringify( writes[0].payload ) === JSON.stringify( { key : K2, global : false, blacklisted : true, format : 'lines', maxlength : 200 } ) );
+	check( '...and the text in the language of the field, without the text it was read as', writes[1].payload.items.length === 1 && writes[1].payload.items[0].key === K2 && writes[1].payload.items[0].locale === 'de_DE' && writes[1].payload.items[0].was === undefined );
+	const e = k.record();
+	check( 'the record is drawn again from what the server holds: the format, the limit and the ticks are the stored ones, and nothing is unsaved', k.format( e ).value === 'lines' && k.limit( e ).value === '200' && k.hidden( e ).checked === true && k.global( e ).checked === false
+		&& dirtyNow( k ) === false && k.told.at(-1) === W('/_admin/common/msg/saved') && k.touches.join() === 'texts,texts' );
+	check( '...the table behind it says the format, the limit and the badge of the key as they are stored', k.cells( K2 )[3].textContent === W('/_admin/keys/format/lines') && k.cells( K2 )[4].textContent === '200' && byClass( k.cells( K2 )[5], 'nino-admin-badge' ).map( b => b.textContent ).join() === W('/_admin/keys/label/blacklist') );
 }
 
 {
-	// a format that holds less asks once, for all the keys it changes
+	// only the shape changed: one request for the shape, none for a text; only a text: none for the shape
+	const k = keysRecord( PAGE, K1 );
+
+	tick( k.hidden( k.record() ) );
+	k.save( k.record() );
+	check( 'a shape alone is one keys/save with all five fields - the three that did not change as they are stored - and no request for a text', k.writes().length === 1 && JSON.stringify( k.writes()[0].payload ) === JSON.stringify( { key : K1, global : false, blacklisted : true, format : 'auto', maxlength : null } ) );
+	const j = keysRecord( PAGE, K1 );
+	choose( j.format( j.record() ), 'blocks' );
+	typeKey( j.limit( j.record() ), '120' );
+	j.save( j.record() );
+	check( '...a format and a limit that were chosen are written as chosen', JSON.stringify( j.writes()[0].payload ) === JSON.stringify( { key : K1, global : false, blacklisted : false, format : 'blocks', maxlength : 120 } ) && j.writes().length === 1 );
+}
+
+{
+	// while the requests run the record is held, and drawn again from the server when they are done
+	const k = keysRecord( PAGE, K2 );
+	const d = k.record();
+
+	typeKey( k.limit( d ), '200' );
+	k.type( d, 'de_DE', 'Während es läuft' );
+	k.handle.hold = true;
+	k.save( d );
+	const sentBefore = k.writes().length;
+	k.save( d );
+	check( 'while the requests of a save run the controls are held, and a second save sends nothing', k.writes().length === sentBefore && sentBefore === 1 && [ k.controlOf( d, 'de_DE' ), k.controlOf( d, 'en_US' ), k.format( d ), k.limit( d ) ].every( c => c.disabled === true ) && k.switches( d ).every( c => c.disabled === true ) );
+	k.handle.held.shift()();
+	const e = k.record();
+	check( '...and when they are done the record is free again, drawn from what the server holds', [ k.controlOf( e, 'de_DE' ), k.format( e ), k.limit( e ) ].every( c => c.disabled === false ) && k.limit( e ).value === '200' && k.controlOf( e, 'de_DE' ).value === 'Während es läuft' && dirtyNow( k ) === false );
+}
+
+{
+	// a key made global: its text is written to the one text
+	const k = keysRecord( PAGE, K2 );
+	const d = k.record();
+
+	tick( k.global( d ) );
+	k.type( d, 'de_DE', 'Global jetzt' );
+	k.save( d );
+	const batch = k.writes().at(-1);
+	check( 'a key that is made global has its text written to the one text of every language, and not to a language - after the shape, which says where the text goes', k.writes().map( c => c.endpoint ).join() === 'save,savebatch' && batch.payload.items[0].locale === '*' && batch.payload.items[0].was === undefined && k.writes()[0].payload.global === true );
+	const e = k.record();
+	check( '...the record shows the one field of a key that is the same in every language, and it holds the text', k.fields( e ).map( f => f.dataset.locale ).join() === '*' && k.controlOf( e, '*' ).value === 'Global jetzt' && k.global( e ).checked === true && dirtyNow( k ) === false );
+	tick( k.global( e ) );
+	k.type( e, '*', 'Wieder je Sprache' );
+	k.save( e );
+	check( 'a key that is made one text per language again has the text of its one field written to the language of the workbench', k.writes().at(-1).endpoint === 'savebatch' && k.writes().at(-1).payload.items[0].locale === 'de_DE' && k.writes().at(-2).payload.global === false );
+}
+
+{
+	// a format that holds less asks once, with what is stored being converted
+	const k = keysRecord( PAGE, K5 );
+	const d = k.record();
+
+	choose( k.format( d ), 'plain' );
+	k.save( d );
+	const ask = k.dialog();
+	check( 'a format that holds less than the one before is asked about once, with the heaviest weight - what is stored is converted - and the key and what happens to it as the details of the question', ask !== null && ask !== d && has( ask, 'nino-admin-dialog' ) && k.titleOf( ask ) === W('/_admin/keys/confirm/convert-title') && allText( ask ).indexOf( W('/_admin/keys/confirm/convert') ) !== -1
+		&& detailsOf( ask ).length === 1 && detailsOf( ask )[0] === F('/_admin/keys/confirm/format-line',K5,W('/_admin/keys/format/blocks'),W('/_admin/keys/format/plain'),W('/_admin/keys/convert/plain')) );
+	check( '...its main answer is worded like its title', k.button( ask, W('/_admin/keys/confirm/convert-title') ) !== undefined && has( k.button( ask, W('/_admin/keys/confirm/convert-title') ), 'nino-admin-btn-danger' ) );
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( 'answered no it sends nothing, and the record is as it was typed, with an empty line', k.writes().length === 0 && dirtyNow( k ) === true && k.format( k.record() ).value === 'plain' && k.lineText( k.record() ) === '' && k.dialog() === k.record() );
+	k.save( k.record() );
+	k.answerAsk( W('/_admin/keys/confirm/convert-title') );
+	check( 'answered yes it writes the shape, and asks nothing more', k.writes().map( c => c.endpoint ).join() === 'save' && k.writes()[0].payload.format === 'plain' && k.dialog() === k.record() && dirtyNow( k ) === false );
+	const j = keysRecord( PAGE, K1 );
+	choose( j.format( j.record() ), 'blocks' );
+	j.save( j.record() );
+	check( 'a format that holds more asks nothing', j.dialog() === j.record() && j.writes().length === 1 );
+	const i = keysRecord( PAGE, K1 );
+	choose( i.format( i.record() ), 'inline' );
+	i.save( i.record() );
+	check( '...nor does one that holds more than the format "automatic", which is plain, and the format "automatic" itself is not asked about either', i.writes().length === 1 && i.dialog() === i.record() );
+	choose( i.format( i.record() ), 'auto' );
+	i.save( i.record() );
+	check( '...going back to "automatic" asks nothing, whatever the format that was set', i.writes().length === 2 && i.dialog() === i.record() && i.writes()[1].payload.format === 'auto' );
+}
+
+{
+	// a key that becomes global drops the texts of the other languages: asked once with the format, naming the key and the languages
 	const response = keysResponse();
-	[ '/template/page-services/item-1/text', '/template/page-services/intro/title' ].forEach( key => { const e = response.keys.find( x => x.key === key ); e.format = 'blocks'; e.formatSet = true; e.html = true } );
-	const k = openedKeys( response );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const A = '/template/page-services/item-1/text', B = '/template/page-services/intro/title', C = '/template/page-services/item-2/title';
-	choose( part( settingsOf( k, A ), 'select' ), 'plain' );
-	choose( part( settingsOf( k, B ), 'select' ), 'inline' );
-	choose( part( settingsOf( k, C ), 'select' ), 'blocks' );
-	k.handle.answer = false;
-	submitKeys( k );
-	check( 'two formats that hold less are asked about once, with the heaviest weight - what is stored is converted - and the keys they change as the details of the question', k.asked.length === 1 && k.asked[0].level === 'destructive'
-		&& k.asked[0].details.length === 2 && k.asked[0].details.some( d => d.indexOf( A ) === 0 ) && k.asked[0].details.some( d => d.indexOf( B ) === 0 ) );
-	check( '...a format that holds as much as the one before is not among them, and a question that is answered no sends nothing', k.asked[0].details.every( d => d.indexOf( C ) === -1 ) && keyWrites( k ).length === 0 && k.registry.keys.isDirty() === true );
-	k.handle.answer = true;
-	submitKeys( k );
-	check( 'answered yes it writes the shape of all three, in one go, and asks nothing more', k.asked.length === 2 && keyWrites( k ).filter( c => c.endpoint === 'save' ).length === 3 );
-	choose( part( settingsOf( k, B ), 'select' ), 'blocks' );
-	submitKeys( k );
-	check( 'a format that holds more asks nothing', k.asked.length === 2 && keyWrites( k ).filter( c => c.endpoint === 'save' ).length === 4 );
+	response.keys.find( e => e.key === K1 ).values = { de_DE : 'Gleich', en_US : 'Gleich' };
+	const k = keysRecord( PAGE, K3, response );
+
+	tick( k.global( k.record() ) );
+	k.save( k.record() );
+	let ask = k.dialog();
+	check( 'a key that becomes global asks, with the heaviest weight, naming the key and the languages that lose their text and the one whose text stays', ask !== k.record() && detailsOf( ask ).length === 1 && detailsOf( ask )[0] === F('/_admin/keys/confirm/global-line',K3,'English','Deutsch') );
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( '...answered no it changes nothing: nothing is sent and the record is as it was typed', k.writes().length === 0 && dirtyNow( k ) === true && k.global( k.record() ).checked === true );
+	choose( k.format( k.record() ), 'plain' );
+	const m = keysRecord( PAGE, K5, keysResponse() );
+	tick( m.global( m.record() ) );
+	choose( m.format( m.record() ), 'plain' );
+	m.save( m.record() );
+	ask = m.dialog();
+	check( 'a narrower format and a global key are one question with both among its details', detailsOf( ask ).length === 2 && detailsOf( ask ).some( l => l.indexOf( K5 ) === 0 && l.indexOf( W('/_admin/keys/format/plain') ) !== -1 ) && detailsOf( ask ).some( l => l.indexOf( K5 ) === 0 && l.indexOf( 'English' ) !== -1 ) );
+	m.answerAsk( W('/_admin/keys/confirm/convert-title') );
+	check( '...answered yes the shape is written once, with both', m.writes().filter( c => c.endpoint === 'save' ).length === 1 && m.writes()[0].payload.global === true && m.writes()[0].payload.format === 'plain' );
+	// the key of which the other languages say the same - or nothing - loses nothing: no question
+	const c = keysRecord( PAGE, K1, response );
+	tick( c.global( c.record() ) );
+	c.save( c.record() );
+	check( 'a key whose other languages say the same as the native one, or nothing, loses nothing when it becomes global: no question', c.dialog() === c.record() && c.writes().length === 1 && c.writes()[0].payload.global === true );
+}
+
+{
+	// a key that becomes global keeps the text of the native language: a text typed in another language is dropped with the others, as the question said
+	const k = keysRecord( PAGE, K1 );
+
+	tick( k.global( k.record() ) );
+	k.type( k.record(), 'en_US', 'Typed in English' );
+	k.save( k.record() );
+	k.answerAsk( W('/_admin/keys/confirm/convert-title') );
+	check( 'a key that becomes global has only its native text written: a text typed in another language is not sent to the one text, which the question about what is dropped has named', k.writes().map( c => c.endpoint ).join() === 'save' && k.writes()[0].payload.global === true );
+	const j = keysRecord( PAGE, K1 );
+	tick( j.global( j.record() ) );
+	j.type( j.record(), 'de_DE', 'Typed in German' );
+	j.type( j.record(), 'en_US', 'Typed in English' );
+	j.save( j.record() );
+	j.answerAsk( W('/_admin/keys/confirm/convert-title') );
+	check( '...and the native one is written to the one text', j.writes().map( c => c.endpoint ).join() === 'save,savebatch' && j.writes()[1].payload.items.length === 1 && j.writes()[1].payload.items[0].locale === '*' && j.writes()[1].payload.items[0].value === 'Typed in German' );
 }
 
 {
 	// a server that turns a part down: said at its field, nothing counts as saved that is not
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title', X = '/template/page-services/intro/text', Y = '/template/page-services/item-2/title';
-	const row = key => settingsOf( k, key );
-	const limitOf = key => part( row( key ), 'input[type="number"]' );
-	typeInto( limitOf( T ), '5' );
-	typeInto( keyControl( k, T ), 'Ein neuer Titel' );
-	typeInto( keyControl( k, X ), 'Ein neuer Text' );
-	typeInto( keyControl( k, Y ), 'Ein neuer Titel B' );
-	choose( part( row( Y ), 'select' ), 'lines' );
-	k.handle.refuse.save = [
-		{ key : T, status : 400, body : { error : 'limit', code : 'keys_limit_short', params : [ 14 ], field : 'maxlength' } },
-		{ key : Y, status : 400, body : { error : 'unknown format', code : 'keys_format', params : [], field : 'format' } },
-	];
-	submitKeys( k );
-	const writes = keyWrites( k );
-	check( 'a shape the server turns down is said under its field - the limit under the limit, the format under the format - in the words of the server', row( T ).querySelectorAll('.nino-admin-field-error').length === 1 && limitOf( T ).getAttribute('aria-invalid') === 'true'
-		&& row( Y ).querySelectorAll('.nino-admin-field-error').length === 1 && part( row( Y ), 'select' ).getAttribute('aria-invalid') === 'true' && row( T ).querySelector('.nino-admin-field-error').textContent === F('/_admin/error/keys_limit_short',14) );
-	check( 'a text made shorter in the save that lowers its limit is written before the shape, so that the server does not refuse a limit under the text; the text of a key whose shape was turned down for another reason is not sent', writes.map( c => c.endpoint ).join() === 'savebatch,save,save,savebatch'
-		&& writes[0].payload.items.map( i => i.key ).join() === T && writes[3].payload.items.map( i => i.key ).join() === X );
-	check( '...what the server took is saved and what it did not is still unsaved input, drawn as it was typed', k.registry.keys.isDirty() === true && limitOf( T ).value === '5' && part( row( Y ), 'select' ).value === 'lines' && keyControl( k, Y ).value === 'Ein neuer Titel B'
-		&& k.keys._session.changed().join() === Y && k.keys._shapeChanged().sort().join() === [ T, Y ].sort().join() );
-	check( '...the line of the bar says how many keys were not saved - no toast of success - and the focus is on the first field that is wrong', k.form.querySelector('#keys-form-msg').textContent === F('/_admin/keys/error/some',2) && k.told.length === 0 && k.dom.doc.activeElement === limitOf( T ) );
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+
+	typeKey( k.limit( d ), '5' );
+	k.type( d, 'de_DE', 'Ein neuer Titel' );
+	choose( k.format( d ), 'lines' );
+	k.handle.refuse.save = [ { key : K1, status : 400, body : { error : 'limit', code : 'keys_limit_short', params : [ 14 ], field : 'maxlength' } } ];
+	k.save( d );
+	const e = k.record();
+	check( 'a shape the server turns down is said under its field - the limit under the limit - in the words of the server, and the field is marked', saidAt( e, k.limit( e ) ) !== undefined && k.limit( e ).attributes['aria-invalid'] === 'true' && saidAt( e, k.limit( e ) ).textContent === F('/_admin/error/keys_limit_short',14)
+		&& byClass( e, 'nino-admin-field-error' ).length === 1 );
+	check( 'a text made shorter in the save that lowers its limit is written before the shape, so that the server does not refuse a limit under the text', k.writes().map( c => c.endpoint ).join() === 'savebatch,save' && k.writes()[0].payload.items[0].value === 'Ein neuer Titel' );
+	check( '...what the server took is saved and what it did not is still unsaved input, drawn as it was typed: the limit and the format', dirtyNow( k ) === true && k.limit( e ).value === '5' && k.format( e ).value === 'lines' && k.controlOf( e, 'de_DE' ).value === 'Ein neuer Titel' && k.entry( K1 ).values.de_DE === 'Ein neuer Titel' );
+	check( '...the line of the bar says that a key was not saved - no toast of success - and the focus is on the first field that is wrong', k.lineText( e ) === W('/_admin/keys/error/one') && k.told.length === 0 && k.h.doc.activeElement === k.limit( e ) );
 	k.handle.refuse = {};
-	typeInto( limitOf( T ), '40' );
+	typeKey( k.limit( e ), '40' );
 	k.sent.length = 0;
-	submitKeys( k );
-	check( 'the next save sends what is still unsaved, the shapes of both keys and the text of the one', keyWrites( k ).map( c => c.endpoint ).join() === 'save,save,savebatch' && keyWrites( k ).at(-1).payload.items.map( i => i.key ).join() === Y
-		&& k.registry.keys.isDirty() === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
-	check( '...and after a save that went well the focus is on the main button', k.dom.doc.activeElement === k.form.querySelector('.nino-admin-btn-primary') );
-
-	// a text the server turns down
-	typeInto( keyControl( k, X ), 'Noch ein Text' );
-	k.handle.refuse['item:'+ X] = { ok : false, error : 'could not be written' };
-	submitKeys( k );
-	check( 'a text the server turns down is said under its field, stays unsaved input and takes the focus', fieldOf( k, X ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 && k.registry.keys.isDirty() === true && keyControl( k, X ).value === 'Noch ein Text' && k.dom.doc.activeElement === keyControl( k, X ) );
-	delete k.handle.refuse['item:'+ X];
-
-	// a limit that is no number is said before anything is sent
-	k.sent.length = 0;
-	typeInto( limitOf( T ), '0' );
-	submitKeys( k );
-	check( 'a limit that is not a whole number from 1 is said at its field before anything is sent, with the focus on it', keyWrites( k ).length === 0 && row( T ).querySelectorAll('.nino-admin-field-error').length === 1 && k.dom.doc.activeElement === limitOf( T )
-		&& k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/fields') );
-	typeInto( limitOf( T ), '40' );
+	k.save( e );
+	check( 'the next save sends what is still unsaved: the shape - and not the text, which was written', k.writes().map( c => c.endpoint ).join() === 'save' && k.writes()[0].payload.maxlength === 40 && dirtyNow( k ) === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
+	check( '...and after a save that went well the focus is where it was: on the main button', k.h.doc.activeElement === byClass( byClass( k.record(), 'nino-admin-actionbar' )[0], 'nino-admin-btn-primary' )[0] || k.h.doc.activeElement === null || k.record().contains( k.h.doc.activeElement ) );
 }
 
 {
-	// one key that was not saved is said in the singular, several in the plural
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title';
-	typeInto( keyControl( k, T ), 'Neu' );
-	k.handle.refuse['item:'+ T] = { ok : false, error : 'could not be written' };
-	submitKeys( k );
-	check( 'one key that was not saved is said in the singular, which is not the sentence of several', k.form.querySelector('#keys-form-msg').textContent === F('/_admin/keys/error/one',1) && F('/_admin/keys/error/one',1) !== F('/_admin/keys/error/some',1) );
+	// a format the server turns down is said under the format
+	const k = keysRecord( PAGE, K1 );
+
+	choose( k.format( k.record() ), 'lines' );
+	k.handle.refuse.save = [ { key : K1, status : 400, body : { error : 'unknown format', code : 'keys_format', params : [], field : 'format' } } ];
+	k.save( k.record() );
+	check( 'a format the server turns down is said under the format, which is marked, and the focus goes there', saidAt( k.record(), k.format( k.record() ) ) !== undefined && k.format( k.record() ).attributes['aria-invalid'] === 'true' && saidAt( k.record(), k.format( k.record() ) ).textContent === W('/_admin/error/keys_format') && k.h.doc.activeElement === k.format( k.record() ) );
+	// the text of a key whose shape was turned down is not sent, and stays as it was typed
+	k.sent.length = 0;
+	k.handle.refuse.save = [ { key : K1, status : 400, body : { error : 'unknown format', code : 'keys_format', params : [], field : 'format' } } ];
+	k.type( k.record(), 'de_DE', 'Bleibt stehen' );
+	k.save( k.record() );
+	check( 'the text of a key whose shape the server turned down is not sent with it: one request for the shape, none for the text, and what was typed stays at its field, unsaved', k.writes().map( c => c.endpoint ).join() === 'save' && k.controlOf( k.record(), 'de_DE' ).value === 'Bleibt stehen' && k.entry( K1 ).values.de_DE !== 'Bleibt stehen' && dirtyNow( k ) === true );
+	k.handle.refuse.save = [ { key : K1, status : 500, body : null } ];
+	k.save( k.record() );
+	check( '...a refusal that names no field is said at the controls of the shape and in the line, and what was typed stays', byClass( k.record(), 'nino-admin-field-error' ).length === 1 && k.format( k.record() ).value === 'lines' && dirtyNow( k ) === true );
+}
+
+{
+	// a text the server turns down
+	const k = keysRecord( PAGE, K1 );
+
+	k.type( k.record(), 'en_US', 'Noch ein Text' );
+	k.handle.refuse['item:'+ K1] = { ok : false, error : 'could not be written' };
+	k.save( k.record() );
+	check( 'a text the server turns down is said under its field, stays unsaved input and takes the focus', saidAt( k.record(), k.controlOf( k.record(), 'en_US' ) ) !== undefined && byClass( k.record(), 'nino-admin-field-error' ).length === 1
+		&& dirtyNow( k ) === true && k.controlOf( k.record(), 'en_US' ).value === 'Noch ein Text' && k.h.doc.activeElement === k.controlOf( k.record(), 'en_US' ) && k.lineText( k.record() ) === W('/_admin/keys/error/one') );
+	delete k.handle.refuse['item:'+ K1];
+	k.save( k.record() );
+	check( '...the next save writes it, and the record is saved', k.writes().length === 2 && dirtyNow( k ) === false && k.told.at(-1) === W('/_admin/common/msg/saved') );
+}
+
+{
+	// one language is turned down, the other is written: the one that was written is saved
+	const k = keysRecord( PAGE, K1 );
+
+	k.type( k.record(), 'de_DE', 'Deutsch neu' );
+	k.type( k.record(), 'en_US', 'English new' );
+	k.handle.refuse['item:'+ K1+ ' en_US'] = { ok : false, error : 'could not be written' };
+	k.save( k.record() );
+	check( 'where one language is turned down and another is written, the one that was written counts as saved and the other is unsaved at its field', k.entry( K1 ).values.de_DE === 'Deutsch neu' && k.controlOf( k.record(), 'de_DE' ).value === 'Deutsch neu' && saidAt( k.record(), k.controlOf( k.record(), 'en_US' ) ) !== undefined
+		&& byClass( k.record(), 'nino-admin-field-error' ).length === 1 && dirtyNow( k ) === true );
+}
+
+{
+	// a limit that is no number is said before anything is sent
+	const k = keysRecord( PAGE, K1 );
+
+	typeKey( k.limit( k.record() ), '0' );
+	k.save( k.record() );
+	check( 'a limit that is not a whole number from 1 is said at its field before anything is sent, with the focus on it and the line saying to check the marked fields', k.writes().length === 0 && saidAt( k.record(), k.limit( k.record() ) ) !== undefined && k.h.doc.activeElement === k.limit( k.record() )
+		&& k.lineText( k.record() ) === W('/_admin/keys/error/fields') && saidAt( k.record(), k.limit( k.record() ) ).textContent === F('/_admin/keys/error/invalid',W('/_admin/keys/label/limit'),W('/_admin/keys/expect/limit')) );
+	typeKey( k.limit( k.record() ), '1.5' );
+	k.save( k.record() );
+	check( '...so is one with a fraction', k.writes().length === 0 && byClass( k.record(), 'nino-admin-field-error' ).length === 1 );
 }
 
 {
 	// the limit and the text in one save: each action is valid by itself, in either direction
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const X = '/template/page-services/intro/text', T = '/template/page-services/intro/title';
-	typeInto( part( settingsOf( k, X ), 'input[type="number"]' ), '40' );
-	typeInto( keyControl( k, T ), 'Kürzer' );
-	typeInto( part( settingsOf( k, T ), 'input[type="number"]' ), '10' );
-	typeInto( keyControl( k, X ), 'Ein Text' );
-	k.entry( X ).values.de_DE = 'Ein Text von mehr als vierzig Zeichen Länge, der gekürzt wird.';
-	k.keys._openGroup( 'template/page-services', null, true );
-	typeInto( part( settingsOf( k, X ), 'input[type="number"]' ), '20' );
-	typeInto( keyControl( k, X ), 'Gekürzt' );
-	k.sent.length = 0;
-	submitKeys( k );
-	check( 'a limit lowered under the text a key holds and the text made shorter in the same save: the text is written first and the limit is taken', keyWrites( k ).map( c => c.endpoint ).join() === 'savebatch,save' && k.registry.keys.isDirty() === false
-		&& k.form.querySelectorAll('.nino-admin-field-error').length === 0 );
+	const response = keysResponse();
+	response.keys.find( e => e.key === K2 ).values.de_DE = 'Ein Text von mehr als vierzig Zeichen Länge, der gekürzt wird.';
+	const k = keysRecord( PAGE, K2, response );
+	const d = k.record();
+	const X = K2;
+
+	typeKey( k.limit( d ), '20' );
+	k.type( d, 'de_DE', 'Gekürzt' );
+	k.save( d );
+	check( 'a limit lowered under the text a key holds and the text made shorter in the same save: the text is written first and the limit is taken', k.writes().map( c => c.endpoint ).join() === 'savebatch,save' && dirtyNow( k ) === false && byClass( k.record(), 'nino-admin-field-error' ).length === 0 );
 
 	// the limit raised and the text made longer: the field takes the longer text as the limit is typed, and the shape is written first
-	const control = keyControl( k, X );
-	const before = control.maxLength;
-	typeInto( part( settingsOf( k, X ), 'input[type="number"]' ), '400' );
-	check( 'a limit that is typed is the limit the field counts to and takes, before the save', control.maxLength === 400 && before === 20 && fieldOf( k, X ).querySelector('.nino-admin-char-counter').textContent.split(' / ')[1] === '400' );
-	typeInto( control, 'x'.repeat( 300 ) );
+	const e = k.record();
+	const before = k.controlOf( e, 'de_DE' ).maxLength;
+	typeKey( k.limit( e ), '400' );
+	check( 'a limit that is typed is the limit the field counts to and takes, before the save: every language\'s field', k.controlOf( e, 'de_DE' ).maxLength === 400 && k.controlOf( e, 'en_US' ).maxLength === 400 && before === 20 && k.counterOf( e, 'de_DE' ).textContent.split(' / ')[1] === '400' );
+	k.type( e, 'de_DE', 'x'.repeat( 300 ) );
 	k.sent.length = 0;
-	submitKeys( k );
-	check( '...a limit raised and the text made longer in the same save: the shape is written first, then the text', keyWrites( k ).map( c => c.endpoint ).join() === 'save,savebatch' && k.registry.keys.isDirty() === false );
+	k.save( e );
+	check( '...a limit raised and the text made longer in the same save: the shape is written first, then the text', k.writes().map( c => c.endpoint ).join() === 'save,savebatch' && dirtyNow( k ) === false );
+	void X;
 }
 
 {
-	// a key that becomes global drops the texts of the other languages: asked once with the formats, naming each key and the languages
-	const response = keysResponse();
-	const A = '/template/page-services/item-1/title', C = '/template/page-services/intro/title', D = '/template/page-services/item-1/text';
-	response.keys.find( e => e.key === C ).values = { de_DE : 'Gleich', en_US : 'Gleich' };
-	{ const e = response.keys.find( x => x.key === D ); e.format = 'blocks'; e.formatSet = true; e.html = true }
-	const k = openedKeys( response );
-	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	k.keys._openGroup( 'template/page-services', null, true );
-	const globalBox = key => settingsOf( k, key ).querySelectorAll('input').filter( i => i.type === 'checkbox' )[0];
-	k.handle.answer = false;
-	tick( globalBox( A ) );
-	tick( globalBox( C ) );
-	tick( globalBox( '/template/page-services/intro/text' ) );
-	submitKeys( k );
-	check( 'a key that becomes global asks, with the heaviest weight, naming the key and the languages that lose their text and the one whose text stays - and a key whose other texts are the same does not', k.asked.length === 1 && k.asked[0].level === 'destructive'
-		&& k.asked[0].details.length === 1 && k.asked[0].details[0] === F('/_admin/keys/confirm/global-line',A,'English','Deutsch') ); // the key whose other language has no text is not among them
-	check( '...answered no it changes nothing: nothing is sent and the form is as it was typed', keyWrites( k ).length === 0 && k.registry.keys.isDirty() === true && globalBox( A ).checked === true );
-	choose( part( settingsOf( k, D ), 'select' ), 'plain' );
-	submitKeys( k );
-	check( 'a narrower format and a global key are one question with both among its details', k.asked.length === 2 && k.asked[1].details.length === 2 && k.asked[1].details.some( d => d.indexOf( D ) === 0 ) && k.asked[1].details.some( d => d.indexOf( A ) === 0 ) );
-	k.handle.answer = true;
-	submitKeys( k );
-	check( '...answered yes both are written', keyWrites( k ).filter( c => c.endpoint === 'save' ).map( c => c.payload.key ).sort().join() === [ A, C, D, '/template/page-services/intro/text' ].sort().join() && k.asked.length === 3 );
-}
+	// the keys cannot be read again after what was written: the record stays, says it, and keeps what was turned down
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
 
-{
-	// the keys cannot be read again after what was written: the form stays, says it, and keeps what was turned down
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title', X = '/template/page-services/intro/text';
-	typeInto( keyControl( k, T ), 'Gespeichert aber nicht gelesen' );
-	typeInto( keyControl( k, X ), 'Abgelehnt' );
-	k.handle.refuse['item:'+ X] = { ok : false, error : 'could not be written' };
+	k.type( d, 'de_DE', 'Gespeichert aber nicht gelesen' );
+	k.type( d, 'en_US', 'Abgelehnt' );
+	k.handle.refuse['item:'+ K1+ ' en_US'] = { ok : false, error : 'could not be written' };
 	k.handle.down = true;
-	submitKeys( k );
-	check( 'where the keys cannot be read again the form stays: the line says it was saved and not read again, with a button that reads them, and the controls are free', k.form.querySelector('form') !== null && k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/reload')
-		&& k.form.querySelector('#keys-reload') !== null && k.form.querySelector('form').getAttribute('aria-busy') !== 'true' && k.form.querySelectorAll('input, textarea, select, button').every( c => c.disabled === false ) );
-	check( '...what was written counts as saved and what was turned down is still unsaved input at its field, so the shell asks about exactly that', k.registry.keys.isDirty() === true && k.keys._session.changed().join() === X
-		&& fieldOf( k, X ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 && keyControl( k, X ).value === 'Abgelehnt' );
+	k.save( d );
+	const bar = byClass( k.record(), 'nino-admin-actionbar' )[0];
+	const reload = () => tag( bar, 'button' ).find( b => b.textContent === W('/_admin/keys/label/reload') );
+	check( 'where the keys cannot be read again the record stays: the line says it was saved and not read again, and a button reads them - which was not there before', k.record() !== null && k.lineText( k.record() ) === W('/_admin/keys/error/reload') && reload().hidden !== true && [ k.controlOf( k.record(), 'de_DE' ), k.limit( k.record() ) ].every( c => c.disabled === false ) );
+	check( '...what was written counts as saved and what was turned down is still unsaved input at its field, so the shell asks about exactly that', k.record() === d && saidAt( k.record(), k.controlOf( k.record(), 'en_US' ) ) !== undefined && k.controlOf( k.record(), 'en_US' ).value === 'Abgelehnt' && k.controlOf( k.record(), 'de_DE' ).value === 'Gespeichert aber nicht gelesen' );
 	k.handle.down = false;
 	k.handle.refuse = {};
-	k.form.querySelector('#keys-reload').click();
-	check( 'the button reads the keys anew and draws the row from them', k.form.querySelector('#keys-reload') === null && keyControl( k, T ).value === 'Gespeichert aber nicht gelesen' && k.registry.keys.isDirty() === false );
+	fire( reload(), 'click' );
+	check( 'the button asks about what would be lost, reads the keys anew and draws the record from them: the button is gone, nothing is unsaved', k.dialog() !== k.record() );
+	k.answerAsk( W('/_admin/common/label/discard') );
+	const again = byClass( k.record(), 'nino-admin-actionbar' )[0];
+	check( '...answered Discard it reads the keys and draws the record from what the server holds, the same key at the same address', k.record() !== null && k.hash() === keyAddress( PAGE, K1 ) && tag( again, 'button' ).filter( b => b.textContent === W('/_admin/keys/label/reload') ).every( b => b.hidden === true )
+		&& k.controlOf( k.record(), 'de_DE' ).value === 'Gespeichert aber nicht gelesen' && k.controlOf( k.record(), 'en_US' ).value === 'Services' && dirtyNow( k ) === false && k.lineText( k.record() ) === '' );
 }
 
 {
-	// delete: asked, and said at the bar
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title';
-	k.handle.answer = false;
-	rowButtons( settingsOf( k, T ) )[1].click();
-	check( 'deleting asks first, with the heaviest weight, and the title and the answer say what is done', k.asked.length === 1 && k.asked[0].level === 'destructive' && k.asked[0].title === W('/_admin/keys/confirm/delete-title') && k.asked[0].yes === k.asked[0].title && keyWrites( k ).length === 0 );
-	k.handle.answer = true;
-	k.handle.refuse.delete = { status : 500, body : null };
-	rowButtons( settingsOf( k, T ) )[1].click();
-	check( 'a refusal stands in the line of the bar - no window of the browser - and the key is still there', k.form.querySelector('#keys-form-msg').textContent.indexOf( '500' ) !== -1 && settingsOf( k, T ) !== null && k.told.length === 0 );
-	delete k.handle.refuse.delete;
-	rowButtons( settingsOf( k, T ) )[1].click();
-	check( 'a delete that went through draws the row again without the key, says it and keeps the address', keyWrites( k ).at(-1).endpoint === 'delete' && settingsOf( k, T ) === null && k.told.at(-1) === W('/_admin/common/msg/deleted') && k.form.classList.contains('admin-hidden') === false && k.touched.join() === 'texts' );
+	// "Save and continue": saves and goes on to the next key of the table - also from a key that a save hides or takes out of the rows that are shown
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
 
-	// it asks about unsaved input first, as the row is drawn again
-	typeInto( keyControl( k, '/template/page-services/intro/text' ), 'x' );
-	const before = k.counts.guard;
-	rowButtons( settingsOf( k, '/template/page-services/item-2/title' ) )[1].click();
-	check( 'a delete of a key in a row that holds unsaved input asks the shell first', k.counts.guard === before + 1 );
+	k.type( d, 'de_DE', 'Neuer Titel' );
+	fire( k.button( d, CONTINUE() ), 'click' );
+	check( '"Save and continue" saves the key and shows the next one of the table at its address, in the same record', k.writes().length === 1 && k.record() === d && k.subtitleOf( k.record() ) === K2 && k.hash() === keyAddress( PAGE, K2 ) && k.entry( K1 ).values.de_DE === 'Neuer Titel' );
+	check( '...the key it came from is as saved in the table behind', byClass( k.cells( K1 )[2], 'nino-admin-table-clamp' )[0].textContent === 'Neuer Titel' );
+	tick( k.hidden( k.record() ) );
+	fire( k.button( k.record(), CONTINUE() ), 'click' );
+	check( '...also from a key that the save hides while "Show: all" is chosen: it stays among the rows, and the next one is shown', k.subtitleOf( k.record() ) === K3 && k.entry( K2 ).blacklisted === true );
+
+	// under "Show: hidden" un-hiding takes the key out of the rows: it goes on to the one that followed
+	const response = keysResponse();
+	[ K1, K2, K3 ].forEach( key => { response.keys.find( e => e.key === key ).blacklisted = true } );
+	const h = keysRow( PAGE, response );
+	choose( h.selects()[1], 'hidden' );
+	const order = h.ids();
+	const e = h.openRow( K1 );
+	tick( h.hidden( e ) );
+	fire( h.button( e, CONTINUE() ), 'click' );
+	check( '"Save and continue" under "Show: hidden", where un-hiding takes the key out of the rows, goes on to the one that followed it - the next hidden key', order.join() === [ '/_nino/webpage/services/uri', K1, K2, K3 ].join() && h.subtitleOf( h.record() ) === K2 && h.entry( K1 ).blacklisted === false );
+	check( '...and the table says the rows that are hidden now', h.ids().join() === [ '/_nino/webpage/services/uri', K2, K3 ].join() );
 }
 
 {
-	// the form that renames: an address, the four segments, checked when it is sent
-	const k = openedKeys( keysResponse() );
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/item-1/title';
-	k.calls.length = 0;
-	rowButtons( settingsOf( k, T ) )[0].click();
-	const control = id => k.form.querySelector( '#'+ id );
-	const options = id => control( id ).children.filter( c => c.tagName === 'option' ).map( o => o.value );
-	check( 'Rename opens the form of a rename at its address, with the four segments of the key in its fields', k.keys._view === 'new' && k.keys._renameFrom === T && k.calls.includes('go keys/@rename//template/page-services/item-1/title') && k.calls.includes('set keys/@rename//template/page-services/item-1/title')
-		&& control('keys-form-namespace').value === 'template' && control('keys-form-category').value === 'page-services' && control('keys-form-part').value === 'item-1' && control('keys-form-name').value === 'title' );
-	check( '...the title says it and the main button says it - one main button, not locked', k.form.querySelector('.nino-admin-contextbar-title').textContent === W('/_admin/keys/label/rename-title') && k.form.querySelectorAll('.nino-admin-btn-primary').length === 1
-		&& k.form.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/rename-title') && k.form.querySelector('.nino-admin-btn-primary').disabled === false && k.form.querySelector('form').noValidate === true );
-	check( '...a namespace other than /project is unlocked, so the choice has them all; the category is a choice of what there is', options('keys-form-namespace').join() === 'project,template,feature,module' && options('keys-form-category').join() === 'common,frame-header,page-services'
-		&& control('keys-form-preview').textContent === T && control('keys-form-new-value') === null );
-	check( 'the form is in the address of the tab, and Back shows the list', JSON.stringify( k.keys._parts() ) === '[{"word":"@rename"},"/template/page-services/item-1/title"]' );
+	// the language: the working language first, and the fields follow a change of it
+	const k = keysRecord( PAGE, K1, keysResponse(), { work : 'en_US' } );
+	const d = k.record();
 
-	submitKeys( k );
-	check( 'a key that is not changed is no rename: the line says so, nothing is sent, the focus is at the name', keyWrites( k ).length === 0 && k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/unchanged') && k.dom.doc.activeElement === control('keys-form-name') );
-	const name = control('keys-form-name');
-	typeInto( name, 'Titel!' );
-	submitKeys( k );
-	check( 'a segment that is no word of a key is said under it when the form is sent, with what is expected - and nothing is sent', keyWrites( k ).length === 0 && k.form.querySelectorAll('.nino-admin-field-error').length === 1 && name.getAttribute('aria-invalid') === 'true'
-		&& k.form.querySelector('.nino-admin-field-error').textContent === F('/_admin/keys/error/invalid',W('/_admin/keys/label/name'),W('/_admin/keys/expect/segment')) );
-	typeInto( name, 'heading-2' );
-	check( 'the key the segments make is said as it is typed, and how the panel will read it', control('keys-form-preview').textContent === '/template/page-services/item-1/heading-2' && k.form.querySelector('#keys-form-shown').textContent === W('/_admin/keys/label/shown-as')+ ' '+ k.U.slugLabel('item-1')+ ' › '+ k.U.slugLabel('heading-2') );
-	typeInto( control('keys-form-part'), 'cta' );
-	check( '...a segment that is no word of the vocabulary but is one of a key is said under it - a warning, no refusal', k.form.querySelectorAll('.admin-key-note').some( n => n.textContent.indexOf( stem('/_admin/keys/hint/not-a-word') ) === 0 ) );
-	typeInto( control('keys-form-part'), 'item-1' );
-	k.handle.refuse.rename = { status : 409, body : { error : 'key already exists', code : 'keys_exists', params : [ '/template/page-services/item-1/heading-2' ], field : 'newKey' } };
-	submitKeys( k );
-	check( 'a key the server refuses - one that is taken - is said at the name field and in the line, with the focus there', k.form.querySelectorAll('.nino-admin-field-error').length === 1 && name.getAttribute('aria-invalid') === 'true' && k.form.querySelector('#keys-form-msg').textContent === F('/_admin/error/keys_exists','/template/page-services/item-1/heading-2') && k.dom.doc.activeElement === name );
-	delete k.handle.refuse.rename;
-	const renames = () => keyWrites( k ).filter( c => c.endpoint === 'rename' ).length;
-	const before = renames();
-	k.handle.answer = false;
-	submitKeys( k );
-	check( 'a rename asks first, at the weight of an identifier that templates may still call by its old name, with both names in the question and the act in the title and the answer', k.asked.at(-1).level === 'big' && k.asked.at(-1).title === W('/_admin/keys/confirm/rename-title') && k.asked.at(-1).yes === W('/_admin/keys/confirm/rename-title')
-		&& k.asked.at(-1).message === F('/_admin/keys/confirm/rename',T,'/template/page-services/item-1/heading-2') );
-	check( '...and No sends nothing: the form stays as it is, the line does not say it is saving', renames() === before && k.keys._view === 'new' && k.form.querySelector('#keys-form-msg').textContent !== W('/_admin/common/status/saving') );
-	k.handle.answer = true;
-	submitKeys( k );
-	check( 'submitting renames the key to the one the segments make', keyWrites( k ).at(-1).endpoint === 'rename' && JSON.stringify( keyWrites( k ).at(-1).payload ) === JSON.stringify( { key : T, newKey : '/template/page-services/item-1/heading-2' } ) );
-	check( '...a write of texts, and of templates too where the key is one a template reads', k.touched.join() === 'texts,templates' );
-	check( '...and the key has its place: its row is open at it, at its address, as a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'template/page-services' && k.calls.at(-1).indexOf( 'set keys/template/page-services//template/page-services/item-1/heading-2' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved') );
+	check( 'a record opens in the working language of the workbench: its field is the first and marked, the other follows', k.fields( d ).map( f => f.dataset.locale ).join() === 'en_US,de_DE' && nameOf( k.fieldOf( d, 'en_US' ) ) === 'English ('+ W('/_admin/text/label/working')+ ')' && k.controlOf( d, 'en_US' ).value === 'Services' );
+	check( '...and the table behind it says its texts in that language, the head too', k.heads()[2].textContent === F('/_admin/text/col/text','English') && byClass( k.cells( K1 )[2], 'nino-admin-table-clamp' )[0].textContent === 'Services' );
+	k.go( 'de_DE' );
+	check( 'a change of the working language draws the record again with that language first, and the table in it', k.fields( k.record() ).map( f => f.dataset.locale ).join() === 'de_DE,en_US' && k.controlOf( k.record(), 'de_DE' ).value === 'Leistungen' && byClass( k.cells( K1 )[2], 'nino-admin-table-clamp' )[0].textContent === 'Leistungen'
+		&& k.heads()[2].textContent === F('/_admin/text/col/text','Deutsch') );
+	k.go( 'en_US' );
+	check( '...and back', k.fields( k.record() ).map( f => f.dataset.locale ).join() === 'en_US,de_DE' );
 }
 
 {
-	// the form that creates
-	const k = openedKeys( keysResponse() );
-	k.calls.length = 0;
-	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-primary').click();
-	const control = id => k.form.querySelector( '#'+ id );
-	const options = id => control( id ).children.filter( c => c.tagName === 'option' ).map( o => o.value );
-	check( 'a new key has an address of its own, the at sign keeping it from a row called new', k.keys._view === 'new' && k.keys._renameFrom === null && k.calls.includes('go keys/@new') && k.calls.includes('set keys/@new') );
-	check( '...the labels are at the left of the fields (the form is a fieldset of fields of the workbench), and every field of the segments is required', k.form.querySelector('fieldset').children.some( c => c.classList.contains('nino-admin-field') )
-		&& [ 'keys-form-category', 'keys-form-part', 'keys-form-name' ].every( id => control( id ).getAttribute('aria-required') === 'true' ) );
-	check( 'the main button says what it does, and is not locked while the form is empty', k.form.querySelector('.nino-admin-btn-primary').textContent === W('/_admin/keys/label/create') && k.form.querySelector('.nino-admin-btn-primary').disabled === false && k.form.querySelector('form').noValidate === true );
-	check( '...a new key begins with /project alone to choose from, and a switch of the workbench that unlocks the others, with its reason behind the (?)', options('keys-form-namespace').join() === 'project'
-		&& k.form.querySelector('.nino-admin-switch') !== null && k.form.querySelectorAll('.nino-admin-help-text').some( h => h.textContent === W('/_admin/keys/hint/unlock') ) );
-	check( '...its category is a field with suggestions for /project', control('keys-form-category').tagName === 'input' && control('keys-form-category').getAttribute('list') === 'keys-form-categories' && k.form.querySelector('#keys-form-categories').children.map( o => o.value ).join() === 'company,website,mail,catalog' );
-	check( '...and has a starting value, which is a field of several lines with the textfills', control('keys-form-new-value').tagName === 'textarea' && control('keys-form-new-value').closest('.nino-admin-field').querySelector('.nino-admin-fills-button') !== null && control('keys-form-new-global') !== null );
+	// a language without a value is an empty field, a whitespace is a change
+	const k = keysRecord( PAGE, K2, keysResponse(), { work : 'en_US' } );
+	const d = k.record();
 
-	const unlock = k.form.querySelector('.nino-admin-switch input');
-	unlock.checked = true;
-	unlock.fire('change');
-	check( 'the unlock offers the other namespaces, and takes the category from a choice for a template, a feature or a module', options('keys-form-namespace').join() === 'project,template,feature,module' );
-	choose( control('keys-form-namespace'), 'template' );
-	check( '...whose categories are the ones there are', control('keys-form-category').tagName === 'select' && options('keys-form-category').join() === 'common,frame-header,page-services' );
-	unlock.checked = false;
-	unlock.fire('change');
-	check( 'locking it again takes them away', options('keys-form-namespace').join() === 'project' && control('keys-form-namespace').value === 'project' );
-
-	submitKeys( k );
-	const errors = k.form.querySelectorAll('.nino-admin-field-error').map( e => e.textContent );
-	check( 'sent empty, the form says under each segment that it is missing - the first takes the focus - and sends nothing', errors.join() === [ 'category', 'part', 'name' ].map( f => F('/_admin/common/error/missing',W('/_admin/keys/label/'+ f)) ).join() && keyWrites( k ).length === 0 && k.dom.doc.activeElement === control('keys-form-category') );
-	check( '...and the line of the bar says so once', k.form.querySelector('#keys-form-msg').textContent === W('/_admin/keys/error/fields') );
-	typeInto( control('keys-form-category'), 'company' );
-	typeInto( control('keys-form-part'), 'tester' );
-	typeInto( control('keys-form-name'), 'zzz-name' );
-	typeInto( control('keys-form-new-value'), 'Hallo Welt' );
-	check( 'the form is unsaved input once something is typed', k.registry.keys.isDirty() === true );
-	submitKeys( k );
-	check( 'sent, the form makes the key from its segments, with the starting value in the language of the workbench', keyWrites( k )[0].endpoint === 'create' && JSON.stringify( keyWrites( k )[0].payload ) === JSON.stringify( { key : '/project/company/tester/zzz-name', global : false, value : 'Hallo Welt', values : { de_DE : 'Hallo Welt' } } ) );
-	check( '...the new key is open in its row, at its address, with the cursor in it, and a toast says it', k.keys._view === 'group' && k.keys._currentGroup === 'project/company' && k.calls.at(-1).indexOf( 'set keys/project/company//project/company/tester/zzz-name' ) === 0 && k.told.at(-1) === W('/_admin/common/msg/saved')
-		&& k.form.querySelector('[data-key="/project/company/tester/zzz-name"]') !== null );
+	check( 'a language that has no text for a key draws its field empty - the text of another language is not put in as if it were its own - and nothing is unsaved', k.controlOf( d, 'en_US' ).value === '' && k.controlOf( d, 'de_DE' ).value === 'Das bieten wir an' && dirtyNow( k ) === false );
+	k.type( d, 'en_US', ' ' );
+	k.save( d );
+	check( 'a whitespace is a change, and is saved as typed, in the language of the field, and in no other', k.writes().length === 1 && k.writes()[0].payload.items.length === 1 && k.writes()[0].payload.items[0].value === ' ' && k.writes()[0].payload.items[0].locale === 'en_US' );
+	const j = keysRecord( PAGE, K1, keysResponse(), { work : 'en_US' } );
+	j.save( j.record() );
+	check( 'a save without a change sends no text, and none for a key that had none', j.writes().length === 0 );
 }
 
 {
-	// the language: a row shows one and writes that one
-	const k = openedKeys( keysResponse(), undefined, 'en_US' );
-	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	k.keys._openGroup( 'template/page-services', null, true );
-	const T = '/template/page-services/intro/title';
-	check( 'a row opens in the language of the workbench, which is the pill of its bar - and the list names its rows in it', keyControl( k, T ).value === 'Services' && k.form.querySelector('.nino-admin-locale-badge') !== null && k.keys._shownLocale === 'en_US' );
-	k.box.Nino.admin.workLocale.current = 'de_DE';
-	typeInto( keyControl( k, T ), 'Services B' );
-	submitKeys( k );
-	check( 'it writes the language it shows, whatever the workbench says by now', keyWrites( k )[0].payload.items[0].locale === 'en_US' );
-	k.Nino.admin.workLocale.set( 'de_DE' );
-	check( 'a language the workbench moved draws the row again in it, and the pill goes', keyControl( k, T ).value === 'Leistungen' && k.form.querySelector('.nino-admin-locale-badge') === null && k.keys._shownLocale === 'de_DE' );
-}
-
-{
-	// the scan: a view with an address, the three answers of a finding, said as a toast
-	const k = openedKeys( keysResponse() );
-	k.handle.scan = { missing : [
-		{ key : '/project/shop/hero/title', files : [ 'page-shop.tpl' ], kind : 'create', hint : null },
-		{ key : '/project/shop/hero/text', files : [ 'page-shop.tpl', 'page-other.tpl' ], kind : 'create', hint : 'feature', owner : 'consent' },
-		{ key : '/foo/bar', files : [ 'page-shop.tpl' ], kind : 'grammar' },
-		{ key : '/_nino/webpage/shop/name', files : [ 'page-shop.tpl' ], kind : 'system', writer : 'routes' },
-	], alsoUsed : [ { key : '/template/page-shop/x/y', files : [ 'page-other.tpl' ] } ] };
-	k.calls.length = 0;
-	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-secondary').click();
-	check( 'the scan is a view with an address of its own, and says that it is scanning in place of the form while it runs', k.keys._view === 'scan' && k.calls.includes('go keys/@scan') && k.form.querySelector('form') !== null );
-	const rows = k.form.querySelectorAll('fieldset.admin-keys-scan-row');
-	check( 'a finding is a card with the key as its name, where it is read, and a starting value - where a key can be made here - and the three outcomes of it: a value, nothing, or ignored for good', rows.length === 4 && rows[0].querySelector('legend').textContent === '/project/shop/hero/title'
-		&& rows[0].querySelector('input') !== null && rows[2].querySelectorAll('input').filter( i => i.type === 'text' ).length === 0 && rows[3].querySelectorAll('input').length === 0 );
-	check( '...what the scan says besides - why a key cannot be made, who writes it - stands at the finding as a line of its own, and every note has its words', rows[1].textContent.indexOf( F('/_admin/keys/scan/hint-feature','consent') ) !== -1 && rows[2].textContent.indexOf( W('/_admin/keys/scan/grammar') ) !== -1 && rows[3].textContent.indexOf( W('/_admin/keys/scan/system-routes') ) !== -1 );
-	check( '...a key of the system has nothing to tick: it is the system\'s to write', rows[3].querySelectorAll('input').length === 0 && rows[2].querySelectorAll('input').filter( i => i.type === 'checkbox' ).length === 1 );
-	check( 'the keys another template reads as well are listed as a note, and counted nowhere', k.form.textContent.indexOf( '/template/page-shop/x/y' ) !== -1 && k.keys._scanRows.length === 3 );
-	check( 'the bar has the one main button, and no explanation stands open over the rows: the scan is explained behind the ? of the panel', k.form.querySelectorAll('.nino-admin-btn-primary').length === 1 && k.form.querySelectorAll('.nino-admin-hint').length === 0 );
-	check( 'a form nobody touched holds nothing unsaved', k.registry.keys.isDirty() === false );
-	typeInto( rows[0].querySelector('input'), 'Eine Überschrift' );
-	rows[2].querySelectorAll('input').find( i => i.type === 'checkbox' ).checked = true;
-	check( 'a value typed or a key ticked is unsaved input', k.registry.keys.isDirty() === true );
-	submitKeys( k );
-	const apply = keyWrites( k ).at(-1);
-	check( 'the whole form goes to the server in one request, with the language the tab shows: every finding, the ones left empty included - which the server passes over - and the ignored ones', apply.endpoint === 'scanapply' && apply.payload.rows.length === 3 && apply.payload.locale === 'de_DE'
-		&& apply.payload.rows[0].value === 'Eine Überschrift' && apply.payload.rows[0].ignore === false && apply.payload.rows[1].value === '' && apply.payload.rows[2].ignore === true );
-	check( 'what came of it is one sentence as a toast, and the list is back - with the keys that were made', k.told.at(-1) === W('/_admin/keys/scan/result').replace( '%c', '1' ).replace( '%i', '1' ).replace( '%s', '1' ) && k.form.classList.contains('admin-hidden') === true && k.list.classList.contains('admin-hidden') === false );
-	check( '...a write of texts, and of templates where a key of a template was made', k.touched.join() === 'texts' );
-	k.handle.scan = { missing : [], alsoUsed : [] };
-	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-secondary').click();
-	check( 'a scan that finds nothing says so in the box of the workbench, with no bar to save', k.form.querySelector('.nino-admin-empty') !== null && k.form.querySelectorAll('.nino-admin-actionbar').length === 0 && k.registry.keys.isDirty() === false );
-}
-
-{
-	// the address of a view of the tab
-	const k = openedKeys( keysResponse() );
-	const target = parts => JSON.stringify( k.keys._target( parts ) );
-	check( 'an address names a row, a key in it, the form of a new key, the scan, or the rename of a key that can be renamed', target( [ 'template/page-services' ] ) === '{"view":"group","row":"template/page-services","key":null}'
-		&& target( [ 'template/page-services', '/template/page-services/intro/title' ] ) === '{"view":"group","row":"template/page-services","key":"/template/page-services/intro/title"}' && target( [ '@new' ] ) === '{"view":"new","key":null}' && target( [ '@scan' ] ) === '{"view":"scan"}'
-		&& target( [ '@rename', '/template/page-services/intro/title' ] ) === '{"view":"new","key":"/template/page-services/intro/title"}' );
-	check( 'the address read by the router: @rename and a key is the rename of that key, %40rename and a key is no rename - a row called @rename is none', JSON.stringify( k.keys._target( codec.read( '#text/keys/@rename/%2Ftemplate%2Fpage-services%2Fintro%2Ftitle' ).parts ) ) === '{"view":"new","key":"/template/page-services/intro/title"}' );
-	check( '...and what is not there is the list: a rename of a key that is not there or of one of the system, an at sign with more behind it, a row nobody has', k.keys._target( [ '@rename', '/template/nope/a/b' ] ) === null && k.keys._target( [ '@rename', '/_nino/webpage/services/title' ] ) === null && k.keys._target( [ '@rename', 'template', 'page-services', 'intro', 'title' ] ) === null && k.keys._target( [ '@rename', '/template/page-services/intro/title', 'more' ] ) === null && k.keys._target( codec.read( '#text/keys/%40rename/%2Ftemplate%2Fpage-services%2Fintro%2Ftitle' ).parts ) === null
-		&& k.keys._target( [ '@new', 'x' ] ) === null && k.keys._target( [ '@scan', 'x' ] ) === null && k.keys._target( [ 'nothing' ] ) === null && k.keys._target( [ '@rename' ] ) === null );
-}
-
-{
-	// the fills a field offers are the tab's own, asked of the server in the language on screen
-	const k = openedKeys( keysResponse() );
+	// the fills a field offers are the tab's own, asked of the server in the language of the field
+	const k = keysShown();
 	let listed = 'none';
-	k.keys._loadFills( list => { listed = list } );
-	check( 'the textfills are asked for with the tab\'s own action, and the answer is the list', k.sent.at(-1).endpoint === 'fills' && Array.isArray( listed ) === true );
-	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 200, { fills : [ { key : '/project/company/contact/phone', notation : '[[/project/company/contact/phone]]', value : '+49' } ] } );
-	k.keys._loadFills( list => { listed = list } );
-	check( '...each row named by its key read as words, with the notation the field reads and what it says today', JSON.stringify( listed ) === JSON.stringify( [ { name : [ 'company', 'contact', 'phone' ].map( w => k.U.slugLabel( w ) ).join(' \u00B7 '), notation : '[[/project/company/contact/phone]]', value : '+49' } ] ) );
-	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 403, null );
-	k.keys._loadFills( list => { listed = list } );
+
+	k.panel._loadFills( 'en_US', list => { listed = list } );
+	check( 'the textfills are asked for with the tab\'s own action, in the language that is asked for, and the answer is the list', k.sent.at(-1).endpoint === 'fills' && k.sent.at(-1).payload.locale === 'en_US' && Array.isArray( listed ) === true );
+	const asked = k.h.Nino.http.sendRequest;
+	k.h.Nino.http.sendRequest = ( uri, method, callback ) => callback( { status : 200, responseJSON : { fills : [ { key : '/project/company/contact/phone', notation : '[[/project/company/contact/phone]]', value : '+49' } ] } } );
+	k.panel._loadFills( 'de_DE', list => { listed = list } );
+	check( '...each row named by its key read as words, with the notation the field reads and what it says today', JSON.stringify( listed ) === JSON.stringify( [ { name : [ 'company', 'contact', 'phone' ].map( w => k.h.ui.slugLabel( w ) ).join(' · '), notation : '[[/project/company/contact/phone]]', value : '+49' } ] ) );
+	k.h.Nino.http.sendRequest = ( uri, method, callback ) => callback( { status : 403, responseJSON : null } );
+	k.panel._loadFills( 'de_DE', list => { listed = list } );
 	check( '...and where they could not be had, none is said and the field is left as it is', listed === null );
+	k.h.Nino.http.sendRequest = asked;
+	const r = keysRecord( PAGE, K5 );
+	check( 'the fill icon is at a field of several lines and a text with markup, and not at a line', byClass( r.record(), 'nino-admin-fills-button' ).length > 0 && r.editors.length === 2 );
+	const line = keysRecord( PAGE, K1 );
+	check( '...a line has none', byClass( line.record(), 'nino-admin-fills-button' ).length === 0 );
+}
+
+// --- delete ----------------------------------------------------------------------------------------------------------------------------------------------
+
+const DELETE = () => W('/_admin/keys/confirm/delete-title');
+
+{
+	const k = keysRecord( PAGE, K1 );
+	const d = k.record();
+
+	fire( k.button( d, DELETE() ), 'click' );
+	const ask = k.dialog();
+	check( 'deleting asks first, with the heaviest weight, over the record: the title and the answer say what is done, the message names the key', ask !== d && k.titleOf( ask ) === DELETE() && has( k.button( ask, DELETE() ), 'nino-admin-btn-danger' ) && allText( ask ).indexOf( F('/_admin/keys/confirm/delete',K1) ) !== -1 && k.writes().length === 0 );
+	check( '...and it opens on Cancel, not on the button that destroys', k.h.doc.activeElement !== k.button( ask, DELETE() ) );
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( 'answered no it sends nothing and the record stays', k.writes().length === 0 && k.dialog() === d && k.entry( K1 ) !== undefined );
+
+	k.handle.refuse.delete = [ { status : 500, body : null } ];
+	fire( k.button( d, DELETE() ), 'click' );
+	k.answerAsk( DELETE() );
+	check( 'a refusal stands in the line of the bar - no window of the browser - and the key is still there, in the record and the table', k.lineText( d ).indexOf( '500' ) !== -1 && k.dialog() === d && k.row( K1 ) !== undefined && k.told.length === 0 );
+	delete k.handle.refuse.delete;
+	fire( k.button( d, DELETE() ), 'click' );
+	k.answerAsk( DELETE() );
+	check( 'a delete that went through closes the record, draws the table without the key, says it and tells the shell', k.writes().at(-1).endpoint === 'delete' && JSON.stringify( k.writes().at(-1).payload ) === JSON.stringify( { key : K1 } ) && k.record() === null && k.row( K1 ) === undefined && k.told.at(-1) === W('/_admin/common/msg/deleted') && k.touches.join() === 'texts' );
+	check( '...the address is the row\'s, and the focus is on the row that stands where the deleted one did', k.hash() === keyAddress( PAGE ) && k.h.doc.activeElement === k.row( K2 ) && k.ids().length === KEYS.length - 1 );
 }
 
 {
-	// the focus after a delete: the key that stands where the deleted one did, else the list; and the language is told in the other views
+	// the last key of a row: the list is what is behind the record
 	const response = keysResponse();
 	response.keys.push( textEntry( '/project/shop/solo/name', { de_DE : 'Einzig', en_US : 'Only' } ) );
-	const k = openedKeys( response );
-	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	k.keys._openGroup( 'template/page-services', null, true );
-	const order = k.keys._session.keys();
-	const T = '/template/page-services/intro/title', next = order[order.indexOf( T ) + 1];
-	rowButtons( settingsOf( k, T ) )[1].click();
-	check( 'after a delete the focus is on the field of the key that stands where the deleted one was', settingsOf( k, T ) === null && k.dom.doc.activeElement === keyControl( k, next ) );
-	const last = k.keys._session.keys().at(-1);
-	rowButtons( settingsOf( k, last ) )[1].click();
-	check( '...and where it was the last one, on the one before', k.dom.doc.activeElement === keyControl( k, k.keys._session.keys().at(-1) ) );
+	const k = keysRecord( 'project/shop', '/project/shop/solo/name', response );
 
-	k.keys._openGroup( 'project/shop', null, true );
-	rowButtons( settingsOf( k, '/project/shop/solo/name' ) )[1].click();
-	check( 'a delete that leaves the group without a key draws the list, which is the empty state of the group, and the focus is not lost to the page', k.keys._view === null && k.form.classList.contains('admin-hidden') && k.dom.doc.activeElement !== null && k.dom.doc.activeElement !== k.dom.doc.body );
-
-	// the language the workbench is in is said by a pill in the views that make or scan, and it follows
-	k.Nino.admin.workLocale.current = 'en_US';
-	k.keys._openNewKeyForm( null, null, true );
-	check( 'the form that makes a key says the language its starting value is written in, by the pill of the bar', k.form.querySelector('.nino-admin-locale-badge') !== null );
-	k.Nino.admin.workLocale.set( 'de_DE' );
-	check( '...and the native language needs none', k.form.querySelector('.nino-admin-locale-badge') === null );
-	k.Nino.admin.workLocale.set( 'en_US' );
-	check( '...the language the workbench moves to is the pill, without the form being drawn again', k.form.querySelector('.nino-admin-locale-badge') !== null );
-	k.list.querySelector('.nino-admin-list-actions .nino-admin-btn-secondary').click();
-	check( 'the scan says the language its new keys get their value in, in the same way', k.keys._view === 'scan' && k.form.querySelector('.nino-admin-locale-badge') !== null );
+	fire( k.button( k.record(), DELETE() ), 'click' );
+	k.answerAsk( DELETE() );
+	check( 'a delete that leaves the row without a key shows the list, which has no such row any more, at the address of the list', k.record() === null && has( k.list, 'admin-hidden' ) === false && has( k.form, 'admin-hidden' ) === true && k.listRow( 'project/shop' ) === undefined && k.hash() === '#text/keys' );
 }
 
 {
-	// a language without a value is an empty field, a whitespace is a change, and the fills ask in the language of the form
+	// the last key of a row, the record opened by an address: the list is behind it and its address is written
 	const response = keysResponse();
-	const k = openedKeys( response, undefined, 'en_US' );
-	k.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	k.keys._openGroup( 'template/page-services', null, true );
-	const X = '/template/page-services/intro/text', T = '/template/page-services/intro/title';
-	check( 'a language that has no text for a key draws its field empty - the text of another language is not put in as if it were its own', keyControl( k, X ).value === '' && keyControl( k, T ).value === 'Services' && k.registry.keys.isDirty() === false );
-	typeInto( keyControl( k, T ), 'Services ' );
-	submitKeys( k );
-	check( 'a whitespace is a change, and is saved as typed, in the language of the form', keyWrites( k ).length === 1 && keyWrites( k )[0].payload.items.length === 1 && keyWrites( k )[0].payload.items[0].value === 'Services ' && keyWrites( k )[0].payload.items[0].locale === 'en_US' );
-	k.sent.length = 0;
-	submitKeys( k );
-	check( 'a save without a change sends no text, and none for the key that had none', keyWrites( k ).every( c => c.endpoint !== 'savebatch' ) );
-	k.keys._loadFills( () => {} );
-	check( 'the textfills are asked for in the language of the form', k.sent.at(-1).endpoint === 'fills' && k.sent.at(-1).payload.locale === 'en_US' );
+	response.keys.push( textEntry( '/project/shop/solo/name', { de_DE : 'Einzig', en_US : 'Only' } ) );
+	const k = keysPage( response, { hash : keyAddress( 'project/shop', '/project/shop/solo/name' ) } ).open();
+
+	fire( k.button( k.record(), DELETE() ), 'click' );
+	k.answerAsk( DELETE() );
+	check( 'a delete of the last key of a row, in a record that an address opened, shows the list and writes the address of the list - there is no entry of the history to step back to', k.record() === null && has( k.list, 'admin-hidden' ) === false && k.hash() === '#text/keys' && k.listRow( 'project/shop' ) === undefined );
 }
 
 {
-	// words: every fill the two scripts ask for is there in both languages
-	const files = [ '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js', '_admin/Nino/Modules/Text/assets/textkeys.js' ];
+	// the key that is deleted takes its place in the keys that were read again
+	const k = keysRecord( PAGE, K3 );
+	const listed = lastList( k );
+
+	fire( k.button( k.record(), DELETE() ), 'click' );
+	k.answerAsk( DELETE() );
+	check( 'after a delete the keys are read again, so that the list says how many are left', lastList( k ) === listed + 1 );
+	fire( byClass( k.form, 'nino-admin-back-link' )[0], 'click' );
+	check( '...the list says one key less on the row that held it', k.lineOf( PAGE ) === F('/_admin/keys/count/keys',9)+ ' · '+ F('/_admin/keys/count/hidden',1) );
+}
+
+// --- rename: a dialog over the record, at its own address -------------------------------------------------------------------------------------------------------
+
+const RENAME = () => W('/_admin/common/label/rename');
+const RENAMED = '/template/page-services/item-1/heading-2';
+
+{
+	const k = keysRecord( PAGE, K3 );
+	const d = k.record();
+	const before = k.h.index();
+
+	fire( k.button( d, RENAME() ), 'click' );
+	const r = k.dialog();
+	const control = id => findAll( r, el => el.id === id )[0];
+	const options = id => tag( control( id ), 'option' ).map( o => o.value );
+
+	check( 'Rename opens a small dialog over the record, at the address of the rename of the key, as one entry more of the history', r !== d && has( r, 'nino-admin-dialog--form' ) && has( r, 'nino-admin-record' ) === false && k.record() === d && k.hash() === renameAddress( K3 ) && k.h.index() === before + 1
+		&& k.titleOf( r ) === W('/_admin/keys/confirm/rename-title') && k.panel._renaming === K3 );
+	check( '...with the four parts of the key in its fields - the namespace, the category, the part, the name - and the key they make', control('keys-form-namespace').value === 'template' && control('keys-form-category').value === 'page-services' && control('keys-form-part').value === 'item-1' && control('keys-form-name').value === 'title'
+		&& control('keys-form-preview').textContent === K3 && control('keys-form-new-value') === undefined && control('keys-form-new-global') === undefined );
+	check( '...a namespace other than /project is unlocked, so the choice has them all; the category is a choice of what there is', options('keys-form-namespace').join() === 'project,template,feature,module' && options('keys-form-category').join() === 'common,frame-header,page-services' );
+	check( '...its answers are Cancel and, at the far right, the rename - worded like the title', tag( r, 'button' ).filter( b => has( b, 'nino-admin-btn-primary' ) ).map( b => b.textContent ).join() === W('/_admin/keys/confirm/rename-title') && k.button( r, W('/_admin/common/label/cancel') ) !== undefined );
+
+	// the checks
+	fire( k.button( r, W('/_admin/keys/confirm/rename-title') ), 'click' );
+	check( 'a key that is not changed is no rename: the name says so, nothing is sent, the focus is at the name', k.writes().length === 0 && saidAt( r, control('keys-form-name') ).textContent === W('/_admin/keys/error/unchanged') && k.h.doc.activeElement === control('keys-form-name') && k.dialog() === r );
+	const name = control('keys-form-name');
+	typeKey( name, 'Titel!' );
+	fire( k.button( r, W('/_admin/keys/confirm/rename-title') ), 'click' );
+	check( 'a part that is no word of a key is said under it when the dialog is sent, with what is expected - and nothing is sent', k.writes().length === 0 && byClass( r, 'nino-admin-field-error' ).length === 1 && name.attributes['aria-invalid'] === 'true'
+		&& byClass( r, 'nino-admin-field-error' )[0].textContent === F('/_admin/keys/error/invalid',W('/_admin/keys/label/name'),W('/_admin/keys/expect/segment')) );
+	typeKey( name, 'heading-2' );
+	check( 'the key the parts make is said as it is typed, and how the panel will read it', control('keys-form-preview').textContent === RENAMED && control('keys-form-shown').textContent === W('/_admin/keys/label/shown-as')+ ' '+ k.h.ui.slugLabel('item-1')+ ' › '+ k.h.ui.slugLabel('heading-2') );
+	typeKey( control('keys-form-part'), 'cta' );
+	check( '...a part that is no word of the vocabulary but is one of a key is said under it - a warning, no refusal', byClass( r, 'admin-key-note' ).some( n => n.textContent.indexOf( stem('/_admin/keys/hint/not-a-word') ) === 0 ) );
+	typeKey( control('keys-form-part'), 'item-1' );
+
+	// the question, and what the server refuses
+	k.handle.refuse.rename = [ { status : 409, body : { error : 'key already exists', code : 'keys_exists', params : [ RENAMED ], field : 'newKey' } } ];
+	fire( k.button( r, W('/_admin/keys/confirm/rename-title') ), 'click' );
+	const ask = k.dialog();
+	check( 'a rename asks first, at the weight of an identifier that templates may still call by its old name, with both names in the question and the act in the title and the answer', ask !== r && k.titleOf( ask ) === W('/_admin/keys/confirm/rename-title') && allText( ask ).indexOf( F('/_admin/keys/confirm/rename',K3,RENAMED) ) !== -1 && k.button( ask, W('/_admin/keys/confirm/rename-title') ) !== undefined );
+	k.answerAsk( W('/_admin/keys/confirm/rename-title') );
+	check( 'a key the server refuses - one that is taken - is said at the name field, in the words of the server, with the focus there, and the dialog stays', k.dialog() === r && saidAt( r, name ) !== undefined && saidAt( r, name ).textContent === F('/_admin/error/keys_exists',RENAMED) && name.attributes['aria-invalid'] === 'true' && k.h.doc.activeElement === name );
+	delete k.handle.refuse.rename;
+	const renames = () => k.writes().filter( c => c.endpoint === 'rename' ).length;
+	const done = renames();
+	fire( k.button( r, W('/_admin/keys/confirm/rename-title') ), 'click' );
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( '...and No sends nothing: the dialog stays as it is, and can be sent again', renames() === done && k.dialog() === r );
+	fire( k.button( r, W('/_admin/keys/confirm/rename-title') ), 'click' );
+	const asked = k.h.went.length;
+	k.answerAsk( W('/_admin/keys/confirm/rename-title') );
+	check( 'submitting renames the key to the one the parts make - the old and the new name, nothing else', k.writes().at(-1).endpoint === 'rename' && JSON.stringify( k.writes().at(-1).payload ) === JSON.stringify( { key : K3, newKey : RENAMED } ) );
+	check( '...a write of texts, and of templates too where the key is one a template reads', k.touches.join() === 'texts,templates' );
+	check( '...the dialog is gone, and the history is back at the record, which the page asked for', k.dialog() === d && k.h.went.length > asked );
+	k.back();
+	check( 'the record follows the new key: its head, its address - written over the one the record had, one entry for it - and the table behind it names the new key', k.record() === d && k.subtitleOf( d ) === RENAMED && k.hash() === keyAddress( PAGE, RENAMED ) && k.h.index() === before && k.h.entries[before] === keyAddress( PAGE, RENAMED ) && k.row( RENAMED ) !== undefined && k.row( K3 ) === undefined );
+	check( '...the field of the key says its text, and nothing is unsaved', k.controlOf( k.record(), 'de_DE' ).value === 'Beratung' && dirtyNow( k ) === false && k.panel._renaming === null && k.panel._dialog === null );
+	const index = k.h.index();
+	k.close( k.record() );
+	check( 'the cross takes the one entry of the record off the history, as it does for a key that was not renamed - no address of the old key is left behind', k.record() === null && k.hash() === keyAddress( PAGE ) && k.h.index() === index - 1 );
+}
+
+{
+	// Cancel gives the address back to the record: no stray entry
+	const k = keysRecord( PAGE, K3 );
+	const before = k.h.index();
+
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	const r = k.dialog();
+	const asked = k.h.went.length;
+	fire( k.button( r, W('/_admin/common/label/cancel') ), 'click' );
+	check( 'Cancel closes the dialog without a request and takes the entry it made off the history', k.dialog() === k.record() && k.writes().length === 0 && k.h.went.length === asked + 1 );
+	k.back();
+	check( '...the record is as it was, at its address, with no entry left over', k.record() !== null && k.hash() === keyAddress( PAGE, K3 ) && k.h.index() === before && k.panel._renaming === null );
+
+	// Esc: nothing typed, nothing asked
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	fire( k.dialog(), 'keydown', { key : 'Escape' } );
+	k.back();
+	check( 'Esc closes it as Cancel does', k.dialog() === k.record() && k.hash() === keyAddress( PAGE, K3 ) );
+}
+
+{
+	// Back closes the dialog first, and the record stays
+	const k = keysRecord( PAGE, K3 );
+
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	k.back();
+	check( 'Back from the dialog closes the dialog first: the record stays, at its address, with its text', k.dialog() === k.record() && k.record() !== null && k.hash() === keyAddress( PAGE, K3 ) && k.panel._renaming === null && k.writes().length === 0 );
+	k.back();
+	check( '...and the next Back closes the record', k.record() === null && k.hash() === keyAddress( PAGE ) );
+	k.forward();
+	k.forward();
+	check( '...Forward opens the record and the dialog again', k.record() !== null && k.dialog() !== k.record() && k.hash() === renameAddress( K3 ) && k.panel._renaming === K3 );
+
+	// something typed in the dialog: Back asks first, and where the answer is no the address is the dialog's
+	const r = k.dialog();
+	typeKey( findAll( r, el => el.id === 'keys-form-name' )[0], 'other' );
+	k.back();
+	check( 'Back with something typed in the dialog asks what to do with it: the dialog stays, with the question on it, and the address is the dialog\'s', k.dialog() !== r && k.panel._renaming === K3 && k.hash() === renameAddress( K3 ) );
+	k.answerAsk( W('/_admin/common/dialog/discard-title') );
+	check( '...Discard closes the dialog and leaves the record', k.dialog() === k.record() && k.panel._renaming === null );
+}
+
+{
+	// a reload at the address of a rename opens the table of the row, the record of the key and the dialog over it - one entry of the history
+	const k = keysPage( keysResponse(), { hash : renameAddress( K3 ) } ).open();
+
+	check( 'a reload at the address of a rename opens the table of its row, the record of the key and the dialog over it, in one entry of the history', k.record() !== null && k.subtitleOf( k.record() ) === K3 && k.dialog() !== k.record() && k.ids().length === KEYS.length && k.hash() === renameAddress( K3 ) && k.h.entries.length === 1 );
+	fire( k.button( k.dialog(), W('/_admin/common/label/cancel') ), 'click' );
+	check( '...Cancel there gives the record its address: written over, as no entry was made', k.dialog() === k.record() && k.hash() === keyAddress( PAGE, K3 ) && k.h.entries.length === 1 );
+	const j = keysPage( keysResponse(), { hash : renameAddress( K3 ) } ).open();
+	const control = id => findAll( j.dialog(), el => el.id === id )[0];
+	typeKey( control('keys-form-name'), 'heading-2' );
+	fire( j.button( j.dialog(), W('/_admin/keys/confirm/rename-title') ), 'click' );
+	j.answerAsk( W('/_admin/keys/confirm/rename-title') );
+	check( '...and a rename there ends with the record of the new key at once, over the one entry of the history', j.dialog() === j.record() && j.subtitleOf( j.record() ) === RENAMED && j.hash() === keyAddress( PAGE, RENAMED ) && j.h.entries.length === 1 );
+}
+
+{
+	// the address of a rename of a key that is not there, of a key of the system or of anything else is not a rename
+	const t = hash => keysPage( keysResponse(), { hash : hash } ).open();
+	const key = '/template/page-services/intro/title';
+
+	check( 'the address of a rename of a key that is not there, one of the system, one with more behind it or without the key is the list', [ renameAddress( '/template/nope/a/b' ), renameAddress( '/_nino/webpage/services/title' ), renameAddress( key )+ '/more', '#text/keys/@rename' ].every( hash => { const w = t( hash ); return w.dialog() === null && has( w.list, 'admin-hidden' ) === false && w.hash() === '#text/keys' } ) );
+	check( '...so is %40rename and a key: a row called @rename is a row, never the word', ( () => { const w = t( '#text/keys/%40rename/'+ encodeURIComponent( key ) ); return w.dialog() === null && w.hash() === '#text/keys' } )() );
+}
+
+{
+	// a rename into another row: the table behind the record is the table of that row
+	const k = keysRecord( PAGE, K3 );
+	const moved = '/template/frame-header/item-1/title';
+
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	const r = k.dialog();
+	const control = id => findAll( r, el => el.id === id )[0];
+	choose( control('keys-form-category'), 'frame-header' );
+	fire( k.button( r, W('/_admin/keys/confirm/rename-title') ), 'click' );
+	k.answerAsk( W('/_admin/keys/confirm/rename-title') );
+	k.back();
+	check( 'a key renamed into another row has its record at the address of that row, and the table behind it is the table of that row', k.subtitleOf( k.record() ) === moved && k.hash() === keyAddress( 'template/frame-header', moved ) && k.ids().indexOf( moved ) !== -1 && k.ids().indexOf( K3 ) === -1 && byClass( k.form, 'nino-admin-contextbar-title' )[0].textContent === W('/_admin/common/word/frame-header') );
+}
+
+{
+	// unsaved input in the record is asked about before the rename is offered
+	const k = keysRecord( PAGE, K3 );
+
+	k.type( k.record(), 'de_DE', 'Beratung neu' );
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	check( 'Rename of a record that holds unsaved input asks first, with the question of the workbench - and the dialog is not there yet', k.dialog() !== k.record() && k.panel._dialog === null && k.writes().length === 0 && k.titleOf( k.dialog() ) === W('/_admin/common/dirty/title') );
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( '...Cancel leaves everything as it is: the record, with what was typed', k.dialog() === k.record() && k.controlOf( k.record(), 'de_DE' ).value === 'Beratung neu' && k.panel._dialog === null );
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	k.answerAsk( W('/_admin/common/label/discard') );
+	check( '...Discard gives the typed text up and offers the rename: the record stays the record of the key, and the dialog is open over it, at the address of the rename, with no entry more in the history', k.record() !== null && k.dialog() !== k.record() && k.panel._renaming === K3 && k.controlOf( k.record(), 'de_DE' ).value === 'Beratung' && k.hash() === renameAddress( K3 ) );
+	fire( k.button( k.dialog(), W('/_admin/common/label/cancel') ), 'click' );
+	k.back();
+	k.type( k.record(), 'de_DE', 'Beratung neu' );
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	k.answerAsk( W('/_admin/common/label/save') );
+	check( '...Save writes the text first, and then the dialog is offered', k.writes().length === 1 && k.writes()[0].endpoint === 'savebatch' && k.panel._renaming === K3 && k.dialog() !== k.record() );
+}
+
+// --- a key that is made: the form of a new key in the record, at #text/keys/@new ---------------------------------------------------------------------------------
+
+const CREATE = () => W('/_admin/keys/label/create');
+const NEW = '/project/company/tester/zzz-name';
+const idIn = ( d, id ) => findAll( d, el => el.id === id )[0];
+const barButtons = d => tag( byClass( d, 'nino-admin-actionbar' )[0], 'button' ).filter( b => b.hidden !== true ).map( b => b.textContent );
+
+{
+	const k = keysShown();
+	const before = k.h.index();
+
+	fire( k.newButton(), 'click' );
+	const d = k.record();
+	const options = id => tag( idIn( d, id ), 'option' ).map( o => o.value );
+
+	check( 'New text key opens the form of a new key in the record at the address #text/keys/@new, as one entry more of the history, over the list - the at sign keeps it from a row called new', d !== null && k.hash() === '#text/keys/@new' && k.h.index() === before + 1 && has( k.list, 'admin-hidden' ) === false
+		&& k.titleOf( d ) === W('/_admin/keys/label/new') && k.subtitleOf( d ) === '' && has( d, 'nino-admin-record' ) && k.panel._record.creating() === true && k.sent.length === 1 );
+	check( '...its bar has the one main button, "Create text key" - no way to delete, no "Save and continue", no rename, no reload - and the cross', barButtons( d ).join() === CREATE() && byClass( byClass( d, 'nino-admin-actionbar' )[0], 'nino-admin-btn-primary' ).length === 1 && k.cross( d ) !== undefined );
+	check( '...the four parts of the key are fields of the workbench, required, with the labels at the left, in one group with its legend', tag( d, 'fieldset' ).length === 1 && [ 'keys-form-category', 'keys-form-part', 'keys-form-name' ].every( id => idIn( d, id ).attributes['aria-required'] === 'true' ) && tag( d, 'fieldset' )[0].children.some( c => has( c, 'nino-admin-field' ) ) );
+	check( '...a new key begins with /project alone to choose from, and a switch of the workbench that unlocks the others, with its reason behind the (?)', options('keys-form-namespace').join() === 'project' && byClass( d, 'nino-admin-switch' ).length >= 2 && byClass( d, 'nino-admin-help-text' ).some( h => h.textContent === W('/_admin/keys/hint/unlock') ) );
+	check( '...its category is a field with suggestions for /project', idIn( d, 'keys-form-category' ).tagName === 'INPUT' && idIn( d, 'keys-form-category' ).attributes.list === 'keys-form-categories' && tag( idIn( d, 'keys-form-categories' ), 'option' ).map( o => o.value ).join() === 'company,website,mail,catalog' );
+	check( '...and has one text for all languages and a start value, which is a field of several lines with the textfills', idIn( d, 'keys-form-new-value' ).tagName === 'TEXTAREA' && byClass( idIn( d, 'keys-form-new-value' ).parentNode, 'nino-admin-fills-button' ).length === 1 && idIn( d, 'keys-form-new-global' ) !== undefined
+		&& allText( idIn( d, 'keys-form-new-global' ).parentNode ).indexOf( W('/_admin/keys/label/global') ) !== -1 );
+	check( '...the key and how the panel reads it are said under the fields as they are typed', idIn( d, 'keys-form-preview' ).textContent === '/project///' && k.dialog() === d );
+
+	const unlock = byClass( d, 'nino-admin-switch' )[0].children[0];
+	tick( unlock );
+	check( 'the unlock offers the other namespaces, and takes the category from a choice for a template, a feature or a module', options('keys-form-namespace').join() === 'project,template,feature,module' );
+	choose( idIn( d, 'keys-form-namespace' ), 'template' );
+	check( '...whose categories are the ones there are', idIn( d, 'keys-form-category' ).tagName === 'SELECT' && options('keys-form-category').join() === 'common,frame-header,page-services' );
+	tick( unlock );
+	check( 'locking it again takes them away', options('keys-form-namespace').join() === 'project' && idIn( d, 'keys-form-namespace' ).value === 'project' );
+
+	k.save( d );
+	check( 'sent empty, the form says under each part that it is missing - the first takes the focus - and sends nothing', byClass( d, 'nino-admin-field-error' ).map( e => e.textContent ).join() === [ 'category', 'part', 'name' ].map( f => F('/_admin/common/error/missing',W('/_admin/keys/label/'+ f)) ).join()
+		&& k.writes().length === 0 && k.h.doc.activeElement === idIn( d, 'keys-form-category' ) && k.lineText( d ) === W('/_admin/keys/error/fields') );
+	typeKey( idIn( d, 'keys-form-category' ), 'Bad Category' );
+	typeKey( idIn( d, 'keys-form-part' ), 'tester' );
+	typeKey( idIn( d, 'keys-form-name' ), 'zzz-name' );
+	k.save( d );
+	check( 'a part that is no word of a key is said under it when the form is sent, with what is expected', k.writes().length === 0 && byClass( d, 'nino-admin-field-error' ).length === 1 && byClass( d, 'nino-admin-field-error' )[0].textContent === F('/_admin/keys/error/invalid',W('/_admin/keys/label/category'),W('/_admin/keys/expect/segment')) );
+	typeKey( idIn( d, 'keys-form-category' ), 'company' );
+	typeKey( idIn( d, 'keys-form-new-value' ), 'Hallo Welt' );
+	check( 'the form is unsaved input once something is typed', dirtyNow( k ) === true && idIn( d, 'keys-form-preview' ).textContent === NEW );
+	k.save( d );
+	check( 'sent, the form makes the key from its parts, with the start value in the language of the workbench', k.writes()[0].endpoint === 'create' && JSON.stringify( k.writes()[0].payload ) === JSON.stringify( { key : NEW, global : false, value : 'Hallo Welt', values : { de_DE : 'Hallo Welt' } } ) );
+	check( '...the record is the record of the new key, in the same dialog, at the address of the key in its row - written over the form\'s, no entry more - with the table of the row behind it', k.record() === d && k.subtitleOf( d ) === NEW && k.hash() === keyAddress( 'project/company', NEW ) && k.h.index() === before + 1
+		&& k.ids().indexOf( NEW ) !== -1 && k.controlOf( k.record(), 'de_DE' ).value === 'Hallo Welt' && k.panel._record.creating() === false && barButtons( d ).length === 4 );
+	check( '...the toast says that the key was made, and tells the shell that texts were written', k.told.at(-1) === W('/_admin/keys/msg/created') && k.touches.join() === 'texts' && dirtyNow( k ) === false );
+	k.close( k.record() );
+	check( 'the cross takes the one entry of the history off: the list is back, with the key counted in its row', k.record() === null && k.hash() === '#text/keys' && has( k.list, 'admin-hidden' ) === false && k.lineOf('project/company') === F('/_admin/keys/count/keys',5) );
+}
+
+{
+	// the button under the table of a row: the form starts in the namespace and the category of the row
+	const k = keysRow( PAGE );
+	const before = k.h.index();
+
+	fire( byClass( byClass( k.form, 'nino-admin-list-actions' )[0], 'nino-admin-btn-primary' )[0], 'click' );
+	const d = k.record();
+
+	check( 'the button of the bar under the table opens the form at the same address - not under a row - and the form starts in the namespace and the category of the row', d !== null && k.hash() === '#text/keys/@new' && k.h.index() === before + 1 && idIn( d, 'keys-form-namespace' ).value === 'template' && idIn( d, 'keys-form-category' ).value === 'page-services'
+		&& idIn( d, 'keys-form-part' ).value === '' && idIn( d, 'keys-form-name' ).value === '' && dirtyNow( k ) === false && has( k.form, 'admin-hidden' ) === false );
+	typeKey( idIn( d, 'keys-form-part' ), 'hero' );
+	typeKey( idIn( d, 'keys-form-name' ), 'title' );
+	check( '...the key it makes is the key of the row, with what was typed', idIn( d, 'keys-form-preview' ).textContent === '/template/page-services/hero/title' );
+	k.close( d );
+	check( 'Cancel by the cross asks first, as input of a record is asked about - and nothing was sent', k.record() === d && k.writes().length === 0 && k.dialog() !== d );
+	k.answerAsk( W('/_admin/common/label/discard') );
+	check( '...and Discard closes the form: the table of the row, at its address, with the focus on the button that opened it', k.record() === null && k.hash() === keyAddress( PAGE ) && k.ids().length === KEYS.length );
+
+	const c = keysRow( 'project/company' );
+	fire( byClass( byClass( c.form, 'nino-admin-list-actions' )[0], 'nino-admin-btn-primary' )[0], 'click' );
+	check( '...a row of /project starts the form in /project and the category of the row', idIn( c.record(), 'keys-form-namespace' ).value === 'project' && idIn( c.record(), 'keys-form-category' ).value === 'company' );
+	const s = keysRow( '_admin' );
+	fire( byClass( byClass( s.form, 'nino-admin-list-actions' )[0], 'nino-admin-btn-primary' )[0], 'click' );
+	check( '...a row that stands for no namespace and category starts the form empty', idIn( s.record(), 'keys-form-namespace' ).value === 'project' && idIn( s.record(), 'keys-form-category' ).value === '' );
+}
+
+{
+	// what the server refuses is said at the field it names
+	const k = keysShown();
+
+	fire( k.newButton(), 'click' );
+	const d = k.record();
+	typeKey( idIn( d, 'keys-form-category' ), 'company' );
+	typeKey( idIn( d, 'keys-form-part' ), 'general' );
+	typeKey( idIn( d, 'keys-form-name' ), 'name' );
+	k.handle.refuse.create = [ { status : 409, body : { error : 'key already exists', code : 'keys_exists', params : [ '/project/company/general/name' ], field : 'key' } } ];
+	k.save( d );
+	check( 'a key the server refuses - one that already exists - is said at the last part and in the line of the bar, in the words of the server, with the focus there; the form stays as it was typed', k.record() === d && k.panel._record.creating() === true && saidAt( d, idIn( d, 'keys-form-name' ) ) !== undefined
+		&& saidAt( d, idIn( d, 'keys-form-name' ) ).textContent === F('/_admin/error/keys_exists','/project/company/general/name') && k.lineText( d ) === F('/_admin/error/keys_exists','/project/company/general/name') && k.h.doc.activeElement === idIn( d, 'keys-form-name' ) && idIn( d, 'keys-form-category' ).value === 'company' );
+	k.handle.refuse.create = [ { status : 500, body : null } ];
+	k.save( d );
+	check( '...a refusal that names no field is in the line alone', k.lineText( d ).indexOf( '500' ) !== -1 && byClass( d, 'nino-admin-field-error' ).length === 0 && k.record() === d );
+	k.handle.refuse = {};
+	typeKey( idIn( d, 'keys-form-name' ), 'new-name' );
+	k.save( d );
+	check( '...and the next send makes the key', k.writes().at(-1).endpoint === 'create' && k.subtitleOf( k.record() ) === '/project/company/general/new-name' );
+}
+
+{
+	// a key of a template, one text for all languages, the language of the workbench
+	const k = keysShown( keysResponse(), { work : 'en_US' } );
+
+	fire( k.newButton(), 'click' );
+	const d = k.record();
+
+	check( 'the form says the language the start value is written in, where it is not the native one, by the pill of the workbench', byClass( d, 'nino-admin-locale-badge' ).length === 1 );
+	tick( byClass( d, 'nino-admin-switch' )[0].children[0] );
+	choose( idIn( d, 'keys-form-namespace' ), 'template' );
+	choose( idIn( d, 'keys-form-category' ), 'page-services' );
+	typeKey( idIn( d, 'keys-form-part' ), 'hero' );
+	typeKey( idIn( d, 'keys-form-name' ), 'title' );
+	tick( idIn( d, 'keys-form-new-global' ) );
+	typeKey( idIn( d, 'keys-form-new-value' ), 'Welcome' );
+	k.save( d );
+	check( 'a key of a template is made with its one text for all languages, written in the language of the workbench in the request, and tells the shell of the templates as well', JSON.stringify( k.writes()[0].payload ) === JSON.stringify( { key : '/template/page-services/hero/title', global : true, value : 'Welcome', values : { en_US : 'Welcome' } } ) && k.touches.join() === 'texts,templates' );
+	check( '...and the record of the new key has the one field of a text for all languages, in the row of the key', k.fields( k.record() ).map( f => f.dataset.locale ).join() === '*' && k.controlOf( k.record(), '*' ).value === 'Welcome' && k.hash() === keyAddress( PAGE, '/template/page-services/hero/title' ) );
+	k.go( 'de_DE' );
+	check( 'the working language of the workbench is said by the pill of the form, and goes with it', true );
+}
+
+{
+	// the word of the address that makes a key, typed and reloaded
+	const k = keysPage( keysResponse(), { hash : '#text/keys/@new' } ).open();
+
+	check( 'a reload at #text/keys/@new opens the form of a new key over the list, as the one entry of the history', k.record() !== null && k.panel._record.creating() === true && has( k.list, 'admin-hidden' ) === false && k.hash() === '#text/keys/@new' && k.h.entries.length === 1 && k.titleOf( k.record() ) === W('/_admin/keys/label/new') );
+	k.close( k.record() );
+	check( '...and the cross there writes the address of the list over it, as no entry was made', k.record() === null && k.hash() === '#text/keys' );
+
+	const t = keysRow( PAGE );
+	t.typed( '#text/keys/@new' );
+	check( 'the address of a new key typed while the table of a row is up opens the form over the table', t.record() !== null && t.panel._record.creating() === true && t.ids().length === KEYS.length && t.hash() === '#text/keys/@new' );
+	t.back();
+	check( 'Back closes the form and shows the table of the row it was opened from', t.record() === null && t.hash() === keyAddress( PAGE ) && t.ids().length === KEYS.length );
+	t.forward();
+	check( '...and Forward opens it again', t.record() !== null && t.panel._record.creating() === true && t.hash() === '#text/keys/@new' );
+
+	const u = keysShown();
+	fire( u.newButton(), 'click' );
+	typeKey( idIn( u.record(), 'keys-form-part' ), 'typed' );
+	u.step( '#text/keys' );
+	check( 'an address that leads away from a form that holds input asks first, with the question of the workbench; no keeps the form, with what was typed, at its address', u.dialog() !== u.record() && u.record() !== null );
+	u.answerAsk( W('/_admin/common/label/cancel') );
+	check( '...Cancel puts the address back to the form\'s', u.record() !== null && u.hash() === '#text/keys/@new' && idIn( u.record(), 'keys-form-part' ).value === 'typed' );
+}
+
+{
+	// the form of a new key and a record of a key: the one that is open is the one the address names
+	const k = keysRecord( PAGE, K1 );
+
+	fire( k.button( k.record(), W('/_admin/common/label/save-next') ), 'click' );
+	k.close( k.record() );
+	const b = keysRecord( PAGE, K1 );
+	b.step( '#text/keys/@new' );
+	check( 'the form of a new key typed while a record is open takes the place of the record, in the same dialog', b.record() !== null && b.panel._record.creating() === true && b.hash() === '#text/keys/@new' && b.titleOf( b.record() ) === W('/_admin/keys/label/new') );
+	b.step( keyAddress( PAGE, K3 ) );
+	check( '...and the address of a key takes the form\'s place, which was not typed into: the record of that key', b.record() !== null && b.panel._record.creating() === false && b.subtitleOf( b.record() ) === K3 && b.hash() === keyAddress( PAGE, K3 ) );
+}
+
+// --- the scan: a view of its own, beside the records ------------------------------------------------------------------------------------------------------
+
+const SCAN = { missing : [
+	{ key : '/project/shop/hero/title', files : [ 'page-shop.tpl' ], kind : 'create', hint : null },
+	{ key : '/project/shop/hero/text', files : [ 'page-shop.tpl', 'page-other.tpl' ], kind : 'create', hint : 'feature', owner : 'consent' },
+	{ key : '/foo/bar', files : [ 'page-shop.tpl' ], kind : 'grammar' },
+	{ key : '/_nino/webpage/shop/name', files : [ 'page-shop.tpl' ], kind : 'system', writer : 'routes' },
+], alsoUsed : [ { key : '/template/page-shop/x/y', files : [ 'page-other.tpl' ] } ] };
+
+{
+	const k = keysShown();
+	k.handle.scan = SCAN;
+	const before = k.h.index();
+
+	fire( k.scanButton(), 'click' );
+	check( 'the scan is a view with an address of its own, #text/keys/@scan, as one entry more of the history: the level of the form shows it, with its way back', k.hash() === '#text/keys/@scan' && k.h.index() === before + 1 && has( k.form, 'admin-hidden' ) === false && has( k.list, 'admin-hidden' ) === true && k.panel._scanning === true
+		&& byClass( k.form, 'nino-admin-back-link' ).length === 1 && byClass( k.form, 'nino-admin-contextbar-title' )[0].textContent === W('/_admin/keys/label/scan') && k.sent.filter( c => c.endpoint === 'scan' ).length === 1 );
+	const rows = byClass( k.form, 'admin-keys-scan-row' );
+	check( 'a finding is a card with the key as its name, where it is read, and a starting value - where a key can be made here - and the three outcomes of it: a value, nothing, or ignored for good', rows.length === 4 && rows[0].children[0].textContent === '/project/shop/hero/title'
+		&& tag( rows[0], 'input' ).length === 2 && tag( rows[2], 'input' ).filter( i => i.type === 'text' ).length === 0 && tag( rows[3], 'input' ).length === 0 );
+	check( '...what the scan says besides - why a key cannot be made, who writes it - stands at the finding as a line of its own, and every note has its words', allText( rows[1] ).indexOf( F('/_admin/keys/scan/hint-feature','consent') ) !== -1 && allText( rows[2] ).indexOf( W('/_admin/keys/scan/grammar') ) !== -1 && allText( rows[3] ).indexOf( W('/_admin/keys/scan/system-routes') ) !== -1 );
+	check( '...a key of the system has nothing to tick: it is the system\'s to write', tag( rows[3], 'input' ).length === 0 && tag( rows[2], 'input' ).filter( i => i.type === 'checkbox' ).length === 1 );
+	check( 'the keys another template reads as well are listed as a note, and counted nowhere', allText( k.form ).indexOf( '/template/page-shop/x/y' ) !== -1 && k.panel._scanRows.length === 3 );
+	check( 'the bar has the one main button, and no explanation stands open over the rows: the scan is explained behind the ? of the panel', byClass( k.form, 'nino-admin-btn-primary' ).length === 1 && byClass( k.form, 'nino-admin-hint' ).length === 0 );
+	check( 'a form nobody touched holds nothing unsaved', dirtyNow( k ) === false );
+	typeKey( tag( rows[0], 'input' ).find( i => i.type === 'text' ), 'Eine Überschrift' );
+	const ignore = tag( rows[2], 'input' ).find( i => i.type === 'checkbox' );
+	ignore.checked = true;
+	fire( ignore, 'change', { target : ignore } );
+	check( 'a value typed or a key ticked is unsaved input, which the shell knows by the one name of the tab', dirtyNow( k ) === true );
+	fire( tag( k.form, 'form' )[0], 'submit' );
+	const apply = k.writes().at(-1);
+	check( 'the whole form goes to the server in one request, with the language the tab shows: every finding, the ones left empty included - which the server passes over - and the ignored ones', apply.endpoint === 'scanapply' && apply.payload.rows.length === 3 && apply.payload.locale === 'de_DE'
+		&& apply.payload.rows[0].value === 'Eine Überschrift' && apply.payload.rows[0].ignore === false && apply.payload.rows[1].value === '' && apply.payload.rows[2].ignore === true );
+	check( 'what came of it is one sentence as a toast, and the list is back - with the keys that were made', k.told.at(-1) === W('/_admin/keys/scan/result').replace( '%c', '1' ).replace( '%i', '1' ).replace( '%s', '1' ) && has( k.form, 'admin-hidden' ) === true && has( k.list, 'admin-hidden' ) === false && k.panel._scanning === false && k.hash() === '#text/keys' );
+	check( '...a write of texts, and of templates where a key of a template was made', k.touches.join() === 'texts' && dirtyNow( k ) === false );
+	k.handle.scan = { missing : [], alsoUsed : [] };
+	fire( k.scanButton(), 'click' );
+	check( 'a scan that finds nothing says so in the box of the workbench, with no bar to save', byClass( k.form, 'nino-admin-empty' ).length === 1 && byClass( k.form, 'nino-admin-actionbar' ).length === 0 && dirtyNow( k ) === false );
+}
+
+{
+	// a scan with a template key: the templates are told
+	const k = keysShown();
+	k.handle.scan = { missing : [ { key : '/template/page-shop/hero/title', files : [ 'page-shop.tpl' ], kind : 'create', hint : null } ], alsoUsed : [] };
+	fire( k.scanButton(), 'click' );
+	typeKey( tag( byClass( k.form, 'admin-keys-scan-row' )[0], 'input' ).find( i => i.type === 'text' ), 'Shop' );
+	fire( tag( k.form, 'form' )[0], 'submit' );
+	check( 'a scan that makes a key of a template tells the shell of the templates as well', k.touches.join() === 'texts,templates' );
+}
+
+{
+	// the scan beside the records: its unsaved input is asked about on leaving the tab, and Ctrl+S saves it through the registry's entry
+	const k = keysShown();
+	k.handle.scan = SCAN;
+	fire( k.scanButton(), 'click' );
+	typeKey( tag( byClass( k.form, 'admin-keys-scan-row' )[0], 'input' ).find( i => i.type === 'text' ), 'Wert' );
+	let left = 0, stayed = 0;
+
+	k.h.dirty.guard( [ 'keys' ], () => { left++ }, () => { stayed++ } );
+	check( 'a way out of the tab - the rail, the language of the interface - asks about the unsaved input of the scan first, as it asks about the input of a record', k.dialog() !== null && k.titleOf( k.dialog() ) === W('/_admin/common/dirty/title') && left === 0 );
+	k.answerAsk( W('/_admin/common/label/cancel') );
+	check( '...Cancel stays', left === 0 && stayed === 1 && k.panel._scanning === true );
+	k.h.dirty.shortcut( { ctrlKey : true, key : 's', preventDefault : () => {} } );
+	check( 'Ctrl+S saves the scan, through the entry of the tab', k.writes().at(-1).endpoint === 'scanapply' && k.panel._scanning === false && k.hash() === '#text/keys' );
+
+	// the same entry answers for a record
+	const r = keysRecord( PAGE, K1 );
+	r.type( r.record(), 'de_DE', 'Strg S' );
+	r.h.dirty.shortcut( { ctrlKey : true, key : 's', preventDefault : () => {} } );
+	check( '...and for a record that holds input: Ctrl+S saves it', r.writes().length === 1 && r.writes()[0].endpoint === 'savebatch' && dirtyNow( r ) === false );
+}
+
+{
+	// leaving the scan by the history with input in it asks first, as the shell asks for a record
+	const k = keysShown();
+	k.handle.scan = SCAN;
+	fire( k.scanButton(), 'click' );
+	typeKey( tag( byClass( k.form, 'admin-keys-scan-row' )[0], 'input' ).find( i => i.type === 'text' ), 'Wert' );
+	k.back();
+	check( 'Back from a scan that holds input asks what to do with it, with the question of the workbench: the scan stays on screen under it', k.dialog() !== null && k.titleOf( k.dialog() ) === W('/_admin/common/dirty/title') && k.panel._scanning === true );
+	fire( k.button( k.dialog(), W('/_admin/common/label/cancel') ), 'click' );
+	check( '...Cancel keeps the scan, with what was typed, and takes the step back through the history: the history is asked to go forward again', k.panel._scanning === true && tag( byClass( k.form, 'admin-keys-scan-row' )[0], 'input' ).find( i => i.type === 'text' ).value === 'Wert' && k.dialog() === null && k.h.went.at(-1) === 1 );
+	k.forward();
+	check( '...which brings the address of the scan back', k.hash() === '#text/keys/@scan' && k.panel._scanning === true && k.dialog() === null );
+	k.back();
+	fire( k.button( k.dialog(), W('/_admin/common/label/discard') ), 'click' );
+	check( '...Discard leaves the scan for the list', k.panel._scanning === false && has( k.list, 'admin-hidden' ) === false && k.writes().length === 0 );
+}
+
+{
+	// every transition between the scan, the table, the record, the form of a new key and the rename by address, and through the history
+	const k = keysShown();
+	k.handle.scan = SCAN;
+
+	k.typed( keyAddress( PAGE ) );
+	k.typed( '#text/keys/@scan' );
+	check( 'the address of the scan, typed over the table of a row, shows the scan in the place of the table', k.panel._scanning === true && byClass( k.form, 'admin-keys-scan-row' ).length === 4 && k.hash() === '#text/keys/@scan' );
+	k.back();
+	check( 'Back leaves the scan for the table of the row it came from', k.panel._scanning === false && k.ids().length === KEYS.length && k.hash() === keyAddress( PAGE ) );
+	k.forward();
+	check( '...Forward is the scan again', k.panel._scanning === true && k.hash() === '#text/keys/@scan' );
+	k.typed( keyAddress( PAGE, K1 ) );
+	check( 'the address of a key typed while the scan is up draws the table of its row and opens the record', k.panel._scanning === false && k.record() !== null && k.subtitleOf( k.record() ) === K1 && k.ids().length === KEYS.length );
+	k.typed( '#text/keys/@scan' );
+	check( 'the address of the scan typed while a record is open closes the record and shows the scan', k.record() === null && k.panel._scanning === true && k.hash() === '#text/keys/@scan' );
+	k.typed( '#text/keys/@new' );
+	check( 'the address of a new key typed while the scan is up leaves the scan and opens the form', k.panel._scanning === false && k.record() !== null && k.panel._record.creating() === true && k.hash() === '#text/keys/@new' );
+	k.typed( renameAddress( K3 ) );
+	check( 'the address of a rename typed while the form of a new key is open opens the record of that key with the dialog over it', k.record() !== null && k.panel._record.creating() === false && k.subtitleOf( k.record() ) === K3 && k.panel._renaming === K3 && k.dialog() !== k.record() && k.hash() === renameAddress( K3 ) );
+	k.typed( '#text/keys/@scan' );
+	check( 'the address of the scan typed while the rename dialog is open closes the dialog and the record and shows the scan', k.dialog() === null && k.record() === null && k.panel._renaming === null && k.panel._scanning === true && k.hash() === '#text/keys/@scan' );
+	k.typed( '#text/keys' );
+	check( 'the address of the list shows the list', k.panel._scanning === false && has( k.list, 'admin-hidden' ) === false && k.hash() === '#text/keys' );
+}
+
+{
+	// the way through the history: list, row, key, rename, and back
+	const k = keysShown();
+
+	fire( k.linkOf( PAGE ), 'click', { target : k.linkOf( PAGE ) } );
+	k.openRow( K3 );
+	fire( k.button( k.record(), RENAME() ), 'click' );
+	const states = () => [ k.hash(), k.record() !== null, k.dialog() !== null && k.dialog() !== k.record(), has( k.list, 'admin-hidden' ) === false ].join();
+
+	check( 'row, key and rename are three steps of the history, each its own address', states() === [ renameAddress( K3 ), true, true, false ].join() );
+	k.back();
+	check( 'Back: the dialog goes, the record stays', states() === [ keyAddress( PAGE, K3 ), true, false, false ].join() );
+	k.back();
+	check( 'Back: the record goes, the table of the row stays', states() === [ keyAddress( PAGE ), false, false, false ].join() && k.ids().length === KEYS.length );
+	k.back();
+	check( 'Back: the list', states() === [ '#text/keys', false, false, true ].join() );
+	k.forward();
+	k.forward();
+	k.forward();
+	check( 'Forward walks the same way again, to the dialog over the record over the table', states() === [ renameAddress( K3 ), true, true, false ].join() );
+}
+
+// --- the words --------------------------------------------------------------------------------------------------------------------------------------------
+
+{
+	// every fill the two scripts ask for is there in both languages: every quoted fill of the tab, the ones put together at runtime among them
+	const files = [ '_admin/Nino/Modules/Text/assets/keys.js', '_admin/Nino/Modules/Text/assets/textkeys.js' ];
 	const used = new Set();
-	files.forEach( file => { for( const m of fs.readFileSync( path.join( __dirname, '..', file ), 'utf8' ).matchAll( /(?:getText|text)\(\s*'(\/_admin\/[^']+)'/g ) ) used.add( m[1] ) } );
+	files.forEach( file => { for( const m of fs.readFileSync( path.join( __dirname, '..', file ), 'utf8' ).matchAll( /'(\/_admin\/[^']+)'/g ) ) used.add( m[1] ) } );
 	[ 'en_US', 'de_DE' ].forEach( locale => {
 		const words = workbenchWords( locale );
 		const missing = [ ...used ].filter( key => key.endsWith('/') === false && key.endsWith('-') === false && words[key] === undefined );
-		check( locale+ ': every fill the scripts of the Text module name is there'+ ( missing.length === 0 ? '' : ' - not '+ missing.join() ), missing.length === 0 );
+		check( locale+ ': every fill the scripts of the Text Keys tab name is there'+ ( missing.length === 0 ? '' : ' - not '+ missing.join() ), used.size > 40 && missing.length === 0 );
 		const sorts = [ 'grammar', 'system-routes', 'system-language', 'system-none', 'hint-feature', 'hint-module' ].filter( s => words['/_admin/keys/scan/'+ s] === undefined );
 		check( locale+ ': every note of the scan, which is put together at runtime, has its words', sorts.length === 0 );
 		check( locale+ ': every word of a format and of its conversion is there', [ 'auto', 'plain', 'inline', 'lines', 'blocks' ].every( f => words['/_admin/keys/format/'+ f] !== undefined ) && [ 'plain', 'inline', 'lines' ].every( f => words['/_admin/keys/convert/'+ f] !== undefined ) );
+		check( locale+ ': the counts, the heads, the filter, the words of the table and the record are all there', [ 'count/key', 'count/keys', 'count/hidden', 'col/state', 'col/auto', 'filter/all', 'filter/hidden', 'filter/global', 'row/open', 'record/prev', 'record/next', 'record/missing', 'msg/created', 'label/text', 'label/global', 'label/hide',
+			'help/format', 'help/limit', 'help/global', 'help/hidden' ].every( k => words['/_admin/keys/'+ k] !== undefined && words['/_admin/keys/'+ k] !== '' ) );
 	} );
+	check( 'the singular of a count is another word than the plural, in English', workbenchWords('en_US')['/_admin/keys/count/key'] !== workbenchWords('en_US')['/_admin/keys/count/keys'] );
 }
+
 check( 'every address the Text and Keys panels wrote or drew - a row, a key of it, a new key, a rename, the scan - is read back by the router as the same screen and the same parts', codec.written.length > 10 && codec.mismatches.length === 0
 	&& codec.written.some( written => written.screen === 'text' && written.parts.length === 2 ) && codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@rename' ) && written.parts.length === 2 )
-	&& codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@scan' ) ) );
+	&& codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@new' ) ) && codec.written.some( written => written.screen === 'keys' && ( typeof written.parts[0] === 'object' && String( written.parts[0] ) === '@scan' ) )
+	&& codec.written.some( written => written.screen === 'keys' && written.parts.length === 2 && typeof written.parts[0] === 'string' ) );
 
 done();

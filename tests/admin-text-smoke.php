@@ -1918,4 +1918,126 @@ foreach( [ 'de_DE', 'en_US', 'fr_FR' ] as $locale )
 
 echo "\n";
 
+echo "Text Keys - who may call the nine actions through the dispatcher, and a save with the values a key has leaves every file byte for byte\n";
+
+/*	What was pinned before: each of the nine actions of \Nino\Modules\Text\Keys called directly (above), their answers and refusals, the format and the limit of a key,
+	and in admin-smoke.php an account with no permission at all and one with the permission of another panel only turned away from keys/list. What no suite held is the
+	entry the browser calls - Admin::handlePost() - for each of the nine: with no session, with a token the guard refused, with a role that holds /_admin/text/manage and
+	not /_admin/keys/manage (the Text panel's door is not the tab's), and with the right of the tab; and that keys/save, posted with the five values a key already
+	has - which the record of a key does for a key whose shape was not changed, and the panel is built never to do - writes no file at all	*/
+$keyPost = static function( string $action, array $data = [] ) use ( &$appData ): array {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	return [ $status, $body ];
+};
+$keyFiles = static fn(): array => [ '/text/de_DE.php', '/text/en_US.php', '/text/fr_FR.php', '/text/global.php', '/text/meta.php', '/text/blacklist.php' ];
+$keySnapshot = static function() use ( &$appData, $keyFiles ): array { return array_map( static fn( string $file ): string => (string) @file_get_contents( \Nino\Filesystem::path( $appData, $file ) ), $keyFiles() ); };
+
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status ] = $keyPost( 'keys/create', [ 'key' => '/project/company/keysdemo/title', 'global' => false, 'value' => 'Titel', 'values' => [ 'de_DE' => 'Titel', 'en_US' => 'Title', 'fr_FR' => 'Titre' ] ] );
+check( 'a key to ask about is made, with a text in each of the three languages', $status === 200 && \Nino\Text::entry( $appData, '/project/company/keysdemo/title' ) !== null );
+
+$KK = '/project/company/keysdemo/title';
+$keyActions = [
+	'keys/list'				=> [],
+	'keys/fills'			=> [ 'locale' => 'de_DE' ],
+	'keys/create'			=> [ 'key' => '/project/company/keysdemo/made', 'global' => false, 'value' => 'Made', 'values' => [ 'de_DE' => 'Made' ] ],
+	'keys/save'				=> [ 'key' => $KK, 'global' => false, 'blacklisted' => true, 'format' => 'inline', 'maxlength' => 300 ],
+	'keys/savebatch'	=> [ 'items' => [ [ 'key' => $KK, 'locale' => 'de_DE', 'value' => 'Neu' ] ] ],
+	'keys/rename'			=> [ 'key' => $KK, 'newKey' => '/project/company/keysdemo/renamed' ],
+	'keys/delete'			=> [ 'key' => $KK ],
+	'keys/scan'				=> [],
+	'keys/scanapply'	=> [ 'rows' => [ [ 'key' => '/project/company/keysdemo/ignored', 'value' => 'x', 'ignore' => false ] ], 'locale' => 'de_DE' ],
+];
+
+// No session: 401, the code "session", nothing written
+$signedOut = $appData;
+unset( $signedOut['./nino/auth/current'] );
+$bad = [];
+foreach( $keyActions as $action => $data ) {
+	$was = $keySnapshot();
+	[ $status, $body ] = ninoCall( $signedOut, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	if( $status !== 401 || ( $body['code'] ?? '' ) !== 'session' || $keySnapshot() !== $was )
+		$bad[] = $action. ': '. $status;
+}
+check( 'with no session every one of the nine actions is 401 with the code "session", and writes nothing'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] && count( $keyActions ) === 9 );
+
+// A token the guard refused: 403, the code "csrf", the action is not called
+$bad = [];
+foreach( $keyActions as $action => $data ) {
+	$was = $keySnapshot();
+	$_POST['action'] = $action;
+	$_POST['data'] = json_encode( $data );
+	$refused = [ '/nino/http/response' => [ 'statusCode' => 403, 'body' => false ], './nino/csrf/blocked' => true ];
+	\Nino\Admin\Admin::handlePost( $appData, $refused );
+	if( $refused['/nino/http/response']['statusCode'] !== 403 || ( $refused['/nino/http/response']['body']['code'] ?? '' ) !== 'csrf' || $keySnapshot() !== $was )
+		$bad[] = $action. ': '. $refused['/nino/http/response']['statusCode'];
+}
+check( 'the dispatcher respects a request the token guard refused: 403 with the code "csrf" for the nine actions, even for full access, and the action is not called'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+
+// An account that holds the door of the Text panel and not the right of the tab
+ninoUser( $appData, 'textonly@example.com', [ \Nino\Modules\Text\Admin::MANAGE_PERM ], 'textonly password' );
+$bad = [];
+foreach( $keyActions as $action => $data ) {
+	$was = $keySnapshot();
+	[ $status, $body ] = $keyPost( $action, $data );
+	if( $status !== 403 || isset( $body['keys'] ) === true || isset( $body['fills'] ) === true || isset( $body['missing'] ) === true || isset( $body['results'] ) === true || $keySnapshot() !== $was )
+		$bad[] = $action. ': '. $status;
+}
+check( 'with /_admin/text/manage and not /_admin/keys/manage every one of the nine actions is 403 - no keys, no fills, no scan, no results - and nothing is written'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+check( '...the right of the tab is the one of \Nino\Modules\Text\Keys, and it is not the right of the Text panel', \Nino\Modules\Text\Keys::MANAGE_PERM === '/_admin/keys/manage' && \Nino\Modules\Text\Keys::MANAGE_PERM !== \Nino\Modules\Text\Admin::MANAGE_PERM );
+
+// An account that holds the right of the tab: every action answers, and does what it is for
+ninoUser( $appData, 'keysright@example.com', [ \Nino\Modules\Text\Keys::MANAGE_PERM ], 'keys right password' );
+[ $status, $body ] = $keyPost( 'keys/list' );
+check( 'with /_admin/keys/manage keys/list is 200 and answers the keys - the hidden ones too -, the languages, the categories a key can be made in and what the rows are named by',
+	$status === 200 && in_array( $KK, array_column( $body['keys'], 'key' ), true ) === true && isset( $body['locales'], $body['categories'], $body['order'], $body['templates'], $body['selectedLocale'] ) === true );
+[ $status, $body ] = $keyPost( 'keys/fills', [ 'locale' => 'en_US' ] );
+check( '...keys/fills is 200 and lists the texts a field may take, in the language that is asked', $status === 200 && is_array( $body['fills'] ?? null ) === true && array_column( $body['fills'], 'value', 'key' )[$KK] === 'Title' );
+[ $status ] = $keyPost( 'keys/create', $keyActions['keys/create'] );
+check( '...keys/create makes the key, with its text in the language it was given', $status === 200 && ( \Nino\Text::entry( $appData, '/project/company/keysdemo/made' )['values']['de_DE'] ?? '' ) === 'Made' );
+[ $status ] = $keyPost( 'keys/save', $keyActions['keys/save'] );
+$entry = \Nino\Text::entry( $appData, $KK );
+check( '...keys/save writes the shape of the key: hidden, the format, the limit', $status === 200 && $entry['blacklisted'] === true && $entry['format'] === 'inline' && $entry['formatSet'] === true && $entry['maxlength'] === 300 && $entry['maxlengthSet'] === true );
+[ $status, $body ] = $keyPost( 'keys/savebatch', $keyActions['keys/savebatch'] );
+check( '...keys/savebatch writes the text of one language and answers by key', $status === 200 && ( $body['results'][$KK]['ok'] ?? false ) === true && \Nino\Text::entry( $appData, $KK )['values']['de_DE'] === 'Neu' && \Nino\Text::entry( $appData, $KK )['values']['en_US'] === 'Title' );
+[ $status ] = $keyPost( 'keys/rename', $keyActions['keys/rename'] );
+check( '...keys/rename moves the key with its texts', $status === 200 && \Nino\Text::entry( $appData, $KK ) === null && ( \Nino\Text::entry( $appData, '/project/company/keysdemo/renamed' )['values']['de_DE'] ?? '' ) === 'Neu' );
+[ $status ] = $keyPost( 'keys/delete', [ 'key' => '/project/company/keysdemo/renamed' ] );
+check( '...keys/delete takes the key away in every language', $status === 200 && \Nino\Text::entry( $appData, '/project/company/keysdemo/renamed' ) === null );
+[ $status, $body ] = $keyPost( 'keys/scan' );
+check( '...keys/scan answers what the templates read and nobody has written yet, and writes nothing', $status === 200 && is_array( $body['missing'] ?? null ) === true );
+[ $status, $body ] = $keyPost( 'keys/scanapply', [ 'rows' => [], 'locale' => 'de_DE' ] );
+check( '...keys/scanapply answers what it did: created, ignored, left for later', $status === 200 && isset( $body['created'], $body['ignored'], $body['skipped'] ) === true && $body['created'] === 0 );
+
+// keys/save with the five values a key has
+$shapes = [
+	'a key as it was made'						=> [ '/project/company/keysdemo/plain', false, null, null, false ],
+	'a key with a format and a limit set'		=> [ '/project/company/keysdemo/set', false, 'inline', 400, false ],
+	'a key that is hidden'						=> [ '/project/company/keysdemo/hidden', false, null, null, true ],
+	'a key that is one text for all languages'	=> [ '/project/company/keysdemo/global', true, null, null, false ],
+	'a global key that is hidden, with both set'	=> [ '/project/company/keysdemo/globalset', true, 'lines', 120, true ],
+];
+$kept = [];
+foreach( $shapes as $label => [ $key, $global, $format, $limit, $hidden ] ) {
+	$text = 'Text of '. basename( $key );
+	[ $status ] = $keyPost( 'keys/create', [ 'key' => $key, 'global' => $global, 'value' => $text, 'values' => $global === true ? [] : [ 'de_DE' => $text, 'en_US' => $text. ' en', 'fr_FR' => $text. ' fr' ] ] );
+	if( $format !== null || $limit !== null || $hidden === true )
+		[ $status ] = $keyPost( 'keys/save', [ 'key' => $key, 'global' => $global, 'blacklisted' => $hidden, 'format' => $format ?? 'auto', 'maxlength' => $limit ] );
+
+	$entry = \Nino\Text::entry( $appData, $key );
+	$was = $keySnapshot();
+	[ $status ] = $keyPost( 'keys/save', [ 'key' => $key, 'global' => $entry['global'], 'blacklisted' => $entry['blacklisted'], 'format' => $entry['formatSet'] === true ? $entry['format'] : 'auto', 'maxlength' => $entry['maxlengthSet'] === true ? $entry['maxlength'] : null ] );
+	$kept[$label] = [ $status, $keySnapshot() === $was, $entry['blacklisted'] === $hidden && $entry['global'] === $global ];
+}
+check( 'keys/save posted with the five values a key already has - global, hidden, format as it is set or "auto", limit as it is set or null - leaves global.php, every language file, meta.php and blacklist.php byte for byte, for every shape a key can have'.
+	( array_filter( $kept, static fn( array $answer ): bool => $answer !== [ 200, true, true ] ) === [] ? '' : ' - '. implode( ', ', array_keys( array_filter( $kept, static fn( array $answer ): bool => $answer !== [ 200, true, true ] ) ) ) ), array_filter( $kept, static fn( array $answer ): bool => $answer !== [ 200, true, true ] ) === [] && count( $kept ) === count( $shapes ) );
+
+foreach( array_column( $shapes, 0 ) as $key )
+	$keyPost( 'keys/delete', [ 'key' => $key ] );
+
+\Nino\Auth::deleteUser( $appData, 'textonly@example.com' );
+\Nino\Auth::deleteUser( $appData, 'keysright@example.com' );
+
+echo "\n";
+
 ninoDone( $appData );

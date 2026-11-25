@@ -6,9 +6,8 @@
  *													which names - and the search over them. Functions over
  *													the data the server sent (see \Nino\Modules\Text\Admin::
  *													apiKeys()), pure but for what builds the DOM both tabs
- *													draw alike: the search bar and a hit, the sections of a
- *													row, the field of one key's value and the session that
- *													knows which of its fields were changed. The only thing
+ *													draw alike: the search bar and a hit, and the field of
+ *													one key's value. The only thing
  *													they ask the page is the words of the workbench, through
  *													Nino.content.getText() and Nino.adminUi.slugLabel().
  *
@@ -847,45 +846,6 @@
 		},
 
 		/**
-		 *	The sections of a row as the form draws them, one fieldset each: its name in the legend, the path of a page
-		 *	quietly behind it, and its fields in a grid whose labels stand at the left. What a field is, is the
-		 *	caller's: build( field, section ) answers its element
-		 *
-		 *	@param		{Object}		model
-		 *	@param		{Object}		row
-		 *	@param		{Function}	build							build( { entry, label }, section ) -> Element, or a list of them
-		 *
-		 *	@return		{Array}											The fieldsets, in the order they are shown
-		 */
-		sectionsView : function( model, row, build ) {
-
-			return Nino.admin.textKeys.sections( model, row ).map( function( section ) {
-
-				const fieldset = Nino.adminUi.el( 'fieldset', 'admin-text-section' );
-				fieldset.dataset.section = section.id;
-
-				const legend = Nino.adminUi.el( 'legend', '' );
-				legend.appendChild( Nino.adminUi.el( 'span', 'admin-text-section-name', section.label ) );
-
-				if( section.route !== '' )
-					legend.appendChild( Nino.adminUi.el( 'code', 'admin-text-section-route', section.route ) );
-
-				fieldset.appendChild( legend );
-
-				const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
-
-				// A field is one element of the grid, or several: the rows that belong to one key
-				section.fields.forEach( function( field ) {
-					[].concat( build( field, section ) ).forEach( function( el ) { grid.appendChild( el ) } );
-				} );
-
-				fieldset.appendChild( grid );
-
-				return fieldset;
-			} );
-		},
-
-		/**
 		 *	The field of one key's value, in the build of every field of the workbench: its name at the left of it, the
 		 *	key and the count of what is typed under it. A plain text of one line is a line (textField()), of several
 		 *	a field of several (textareaField()), a text with markup the rich-text editor; a text the account may not
@@ -1098,64 +1058,6 @@
 		},
 
 		/**
-		 *	What a form of values knows of its fields: the text each held when it was drawn or last stored, which of
-		 *	them differs now, and how to put one back. A rich-text field reads back as the markup it built, which is
-		 *	not always the string the server holds - so a field is changed when it differs from what it held then, and
-		 *	not from the stored value
-		 *
-		 *	@return		{Object}									{ add( field ), get( key ), keys(), changed(), isDirty(), capture( key ), discard(), destroy() }
-		 */
-		session : function() {
-
-			const fields = Object.create( null );
-			const base = Object.create( null );
-
-			const session = {
-
-				add : function( field ) {
-					fields[field.key] = field;
-					base[field.key] = field.read();
-				},
-
-				get : function( key ) {
-					return fields[key];
-				},
-
-				keys : function() {
-					return Object.keys( fields );
-				},
-
-				// The keys whose field holds another text than it did - the text of a key the account may not change is shown, and never differs
-				changed : function() {
-					return Object.keys( fields ).filter( function( key ) { return fields[key].read() !== base[key] } );
-				},
-
-				isDirty : function() {
-					return session.changed().length > 0;
-				},
-
-				// Take what the field holds now as what is stored; or, given the text, what it was stored as
-				capture : function( key, text ) {
-					base[key] = text === undefined ? fields[key].read() : String( text );
-				},
-
-				discard : function() {
-					Object.keys( fields ).forEach( function( key ) {
-						if( fields[key].read() !== base[key] )
-							fields[key].write( base[key] );
-					} );
-				},
-
-				destroy : function() {
-					Object.keys( fields ).forEach( function( key ) { fields[key].destroy() } );
-					Object.keys( fields ).forEach( function( key ) { delete fields[key]; delete base[key] } );
-				},
-			};
-
-			return session;
-		},
-
-		/**
 		 *	The item of a save for one key: where it is written and the text it was read as, so that the server can tell a
 		 *	text that another tab or person wrote since from the one this form was drawn from
 		 *
@@ -1182,32 +1084,6 @@
 			const found = Nino.admin.textKeys.fields( model ).find( function( hit ) { return hit.field.entry.key === key } );
 
 			return found === undefined ? '' : found.path.join(' › ');
-		},
-
-		/**
-		 *	The question that a save of keys asks when another tab or person wrote them since this form was drawn: the
-		 *	kernel's (Nino.adminUi.conflict()). Overwrite sends those items again, once, without the stamp of the text they
-		 *	were read as; Reload drops the work of this tab and shows what is stored; Cancel leaves the keys as they are
-		 *
-		 *	@param		{Array}			changed				The items the server turned down as changed
-		 *	@param		{Object}		options				{ model, opener, onOverwrite( items ), onReload(), onCancel() } - model the rows (build()), to name a text by its place and not by its key alone
-		 *
-		 *	@return		{boolean}									false when a question is already open and this one was not asked
-		 */
-		conflict : function( changed, options ) {
-
-			return Nino.adminUi.conflict( {
-				message			: Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), changed.map( function( item ) {
-					const name = options.model === undefined || options.model === null ? '' : Nino.admin.textKeys.nameOf( options.model, item.key );
-					return name === '' ? item.key : name+ ' ('+ item.key+ ')';
-				} ).join(', ') ),
-				opener			: options.opener,
-				onOverwrite : function() {
-					options.onOverwrite( changed.map( function( item ) { return { key : item.key, locale : item.locale, value : item.value, force : true } } ) );
-				},
-				onReload		: options.onReload,
-				onCancel		: options.onCancel,
-			} );
 		},
 
 		/**

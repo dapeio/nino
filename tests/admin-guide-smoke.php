@@ -1006,8 +1006,7 @@ check( 'the stylesheet of the Elements panel restyles no block: it names the ids
 // --- the Text panel and its Keys tab: the groups, the language, the one way of saving, the key in a view of its own ------------------
 
 /*	The two tabs draw their groups with the list of the workbench and give each an address; neither has a switch of the language of its own - the
-	language is the workbench's, which both follow and show as the pill of the bar; the one Save of a row is the bar's, with no button of Apply in a
-	row; a key is renamed and deleted by the small buttons at the end of its row, which ask as the guide asks; a key is made in a view of its own.
+	language is the workbench's, which both follow and show as the pill of the bar; a key of the Text Keys tab is edited in the record over the table of its row, which is the bar's one Save, renamed in a dialog over it and made in the same record, each asking as the guide asks.
 	Held by structure - the call of the block, never a word	*/
 $textTabs = [ '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js', '_admin/Nino/Modules/Text/assets/textkeys.js' ];
 $ownLanguage = [];
@@ -1035,9 +1034,11 @@ $textSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( 
 $keysSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Text/assets/keys.js' ) ) );
 $partsSource = (string) preg_replace( '~^\s*(//|\*|/\*).*$~m', '', $bare( $read( '_admin/Nino/Modules/Text/assets/textkeys.js' ) ) );
 
+check( 'the Text Keys tab is the standard directory of the keys of a row with the record of one key over it, and renames in a dialog of the blocks', str_contains( $keysSource, 'adminUi.directory(' ) === true && str_contains( $keysSource, 'adminUi.record(' ) === true
+	&& str_contains( $keysSource, 'adminUi.formDialog(' ) === true && preg_match( '/createElement\(\s*\'(table|tr|td)\'\s*\)/', $keysSource ) === 0 );
 check( 'the fields of both are the blocks of the workbench - a line, several lines, the switch, the select and the textfills of the field - and the text of a field that is not an editor is no field of the panel\'s own',
 	str_contains( $partsSource, 'adminUi.textField' ) === true && str_contains( $partsSource, 'adminUi.textareaField' ) === true && str_contains( $partsSource, 'adminUi.fillsButton(' ) === true && str_contains( $partsSource, 'adminUi.fieldError(' ) === true
-	&& str_contains( $keysSource, 'adminUi.switchField(' ) === true && str_contains( $keysSource, 'adminUi.selectField(' ) === true && str_contains( $keysSource, 'adminUi.rowActions(' ) === true && preg_match( '/createElement\(\s*\'(label|input|textarea|button)\'\s*\)/', $partsSource.$keysSource.$textSource ) === 0 );
+	&& str_contains( $keysSource, 'adminUi.switchField(' ) === true && str_contains( $keysSource, 'adminUi.selectField(' ) === true && preg_match( '/createElement\(\s*\'(label|input|textarea|button)\'\s*\)/', $partsSource.$keysSource.$textSource ) === 0 );
 
 // --- the Features panel: one table for every tab, the count of a tab a chip, an address for a feature, a toast and a question for a switch -----------
 
