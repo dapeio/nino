@@ -2660,10 +2660,11 @@ namespace Nino\Admin {
 		 */
 		public static function handleGet( array &$appData, array &$request ): void {
 
-			// The length a password must have, for the forms that name it: the page cannot ask a text file, which may be what is broken
+			// The length a password must have and the most bytes it may have, for the forms that name them: the page cannot ask a text file, which may be what is broken
 			\Nino\Html::addFills( $appData, [
 				'[[/_admin/recovery/open]]'					=> self::isOpen( $appData ) === true ? '1' : '0',
 				'[[/_admin/recovery/min-password]]'	=> (string) self::MIN_PW_LENGTH,
+				'[[/_admin/recovery/max-password]]'	=> (string) \Nino\Auth::PASSWORD_MAX_BYTES,
 			], '*' );
 		}
 
@@ -2985,7 +2986,7 @@ namespace Nino\Admin {
 
 		/**
 		 *	The checks reset and create share: a valid address and a password
-		 *	of the minimum length. Answers 400 itself
+		 *	that may be set (see \Nino\Auth::passwordRefusal()). Answers 400 itself
 		 *
 		 *	@param		array 		&$request			(reference) Current server request
 		 *	@param		string		$mail
@@ -3000,12 +3001,31 @@ namespace Nino\Admin {
 				return false;
 			}
 
-			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'recovery_password_short' );
+			if( ( $refusal = \Nino\Auth::passwordRefusal( $pw ) ) !== null ) {
+				self::_refusePassword( $request, $refusal );
 				return false;
 			}
 
 			return true;
+		}
+
+		/**
+		 *	Say why a password is refused - see \Nino\Auth::passwordRefusal(). The page knows the minimum, so that code
+		 *	carries no number; the maximum is the server's to tell
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$reason				'invalid', 'short' or 'long'
+		 *
+		 *	@return 	void
+		 */
+		private static function _refusePassword( array &$request, string $reason ): void {
+
+			if( $reason === 'invalid' )
+				\Nino\Http::fail( $request, 400, 'a password is text without a null byte', 'recovery_password_invalid' );
+			elseif( $reason === 'long' )
+				\Nino\Http::fail( $request, 400, 'password must be at most '. \Nino\Auth::PASSWORD_MAX_BYTES. ' bytes', 'recovery_password_long', [ \Nino\Auth::PASSWORD_MAX_BYTES ] );
+			else
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'recovery_password_short' );
 		}
 
 		/**

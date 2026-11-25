@@ -22,6 +22,7 @@ const root = element('div');
 const wrap = element('div');
 wrap.id = 'install-page-wrap';
 wrap.dataset.minPassword = '8';
+wrap.dataset.maxPassword = '72';
 root.appendChild( wrap );
 [ 'finish-content', 'finish-key-wrap', 'finish-done', 'finish-next-steps' ].forEach( function( id ) {
 	const el = element('div');
@@ -70,6 +71,7 @@ const said = [];
 Nino.install = {
 	t : function( key, ...params ) { return text.t( key, ...params ) },
 	minPassword : function() { return 8 },
+	maxPassword : function() { return 72 },
 	failure : function( status, response ) { return text.failure( status, response, 8 ) },
 	say : function( words, error ) { said.push( [ words, error === true ] ) },
 	next : function() { Nino.install.finish.submit( function( ok, message ) { outcome = [ ok, message ] } ) },
@@ -212,6 +214,17 @@ finish.submit( function() {} );
 check( 'a password that is shorter than the length the page states is said at its field, with the length', posted === null && errors().join() === en['/_admin/install/error/password-short'].replace( '%s', '8' ) && field('finish-pw').focused === true );
 field('finish-pw').value = 'a recovery password';
 field('finish-pw2').value = 'a recovery password';
+
+// What the server refuses about the password is said at the password, with the focus there, in the words of the table and with the number the server names
+[ [ 'install_password_short', [], en['/_admin/page/error/install-password-short'].replace( '%s', '8' ) ], [ 'install_password_long', [ 72 ], en['/_admin/page/error/install-password-long'].replace( '%s', '72' ) ],
+	[ 'install_password_invalid', [], en['/_admin/page/error/install-password-invalid'] ] ].forEach( function( [ code, params, sentence ] ) {
+	answer = { status : 400, response : { error : 'English of the server', code : code, params : params } };
+	field('finish-pw2').focused = true;
+	field('finish-pw').focused = false;
+	outcome = null;
+	finish.submit( function( ok, message ) { outcome = [ ok, message ] } );
+	check( 'a refusal "'+ code+ '" is said at the password field, with the focus there, and the bar is told to look at the fields', errors().join() === sentence && field('finish-pw').getAttribute('aria-invalid') === 'true' && field('finish-pw').focused === true && outcome[0] === false && outcome[1] === en['/_admin/install/error/fields'] );
+} );
 answer = { status : 500, response : { error : 'English of the server', code : 'install_recovery_write' } };
 finish.submit( function( ok, message ) { outcome = [ ok, message ] } );
 check( 'a refusal of the server is said in the line of the bar in the words of the table for its code - never the English of the server - and keeps what was typed', outcome[0] === false && outcome[1] === en['/_admin/page/error/install-recovery-write'] && field('finish-pw').value === 'a recovery password' );

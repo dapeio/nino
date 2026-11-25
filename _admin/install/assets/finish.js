@@ -98,7 +98,7 @@
 			Nino.adminUi.sectionHelp( legend, card, t('/_admin/install/finish/help') );
 
 			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
-			const pw = Nino.adminUi.textField( { key : 'finish-pw', id : 'finish-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/finish/pw'), help : t( '/_admin/install/finish/pw-help', Nino.install.minPassword() ) } );
+			const pw = Nino.adminUi.textField( { key : 'finish-pw', id : 'finish-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/finish/pw'), help : t( '/_admin/install/finish/pw-help', Nino.install.minPassword(), Nino.install.maxPassword() ) } );
 			const pw2 = Nino.adminUi.textField( { key : 'finish-pw2', id : 'finish-pw2', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/finish/pw2') } );
 
 			grid.appendChild( pw );
@@ -378,7 +378,7 @@
 
 					const code = response !== null && typeof response === 'object' && typeof response.code === 'string' ? response.code : '';
 
-					if( code === 'install_password_short' ) {
+					if( [ 'install_password_short', 'install_password_long', 'install_password_invalid' ].indexOf( code ) !== -1 ) {
 						Nino.adminUi.fieldError( ui.pw, pw, 'finish-error-0', Nino.install.failure( status, response ) );
 						pw.focus();
 						callback( false, t('/_admin/install/error/fields') );

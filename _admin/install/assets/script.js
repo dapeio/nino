@@ -98,6 +98,19 @@
 		},
 
 		/**
+		 *	The most bytes a password may have, which the server states in the page and enforces itself
+		 *
+		 *	@return		{number}
+		 */
+		maxPassword : function() {
+
+			const wrap = dc.getElementById('install-page-wrap');
+			const max = wrap === null ? 0 : parseInt( wrap.dataset.maxPassword, 10 );
+
+			return Number.isInteger( max ) === true && max > 0 ? max : 0;
+		},
+
+		/**
 		 *	What a refusal says, in the language of the page: the sentence of its code, or the general one. A
 		 *	refusal about the length of a password has the length to say
 		 *

@@ -30,6 +30,8 @@ const wrap = element('div');
 wrap.id = 'recovery-wrap';
 wrap.className = 'nino-admin-auth nino-admin-auth--form';
 wrap.dataset.minPassword = '8';
+// A number the rule does not have, so that a script that types the number in, or leaves one out of a sentence, shows
+wrap.dataset.maxPassword = '71';
 const loginForm = element('form');
 loginForm.id = 'recovery-login';
 const loginFields = element('fieldset');
@@ -311,11 +313,32 @@ fire( resetForm, 'submit' );
 answer( 'recovery/reset', 404, { error : 'unknown account', code : 'recovery_unknown_account' } );
 check( 'a refusal is said in the line of its card, in the words of the table for its code', findAll( byId('recovery-reset-card'), el => el.className.includes('nino-admin-status') ).map( el => el.textContent ).join('') === Nino.recovery.text.de['/_admin/page/error/recovery-unknown-account'] );
 
+// What the server refuses about the password is said at the password field, with the focus there, in the words of the table and with the number the server names
+const passwordRefusals = [ [ 'recovery_password_short', [], '8' ], [ 'recovery_password_long', [ 72 ], '72' ], [ 'recovery_password_invalid', [], null ] ].map( function( [ code, params, number ] ) {
+	const sentence = Nino.recovery.text.de['/_admin/page/error/'+ code.replace( /_/g, '-' )];
+	return [ code, params, number === null ? sentence : sentence.replace( '%s', number ) ];
+} );
+
+passwordRefusals.forEach( function( [ code, params, sentence ] ) {
+	resetPw.value = 'another password';
+	resetPw.focused = false;
+	fire( resetForm, 'submit' );
+	answer( 'recovery/reset', 400, { error : 'English of the server', code : code, params : params } );
+	check( 'a refusal "'+ code+ '" of the password to set is said at its field, which has the focus, and not in the line of the card', errorsIn( resetForm ).join() === sentence && resetPw.focused === true
+		&& findAll( byId('recovery-reset-card'), el => el.className.includes('nino-admin-status') ).map( el => el.textContent ).join('') === '' );
+} );
+
 // Create: only after the repeat matches and the question was answered yes
 const createForm = byId('recovery-create');
 const createMail = byId('recovery-create-mail');
 const createPw = byId('recovery-create-pw');
 const createRepeat = byId('recovery-create-repeat');
+// The help of the password fields says the two numbers the page states - read from the attributes of its root by the script - and leaves no place for a number empty
+const helpOf = scope => findAll( scope, el => el.className === 'nino-admin-help-text' ).map( el => el.textContent );
+check( 'the help of the two password fields says the least characters and the most bytes the page states', [ 'reset', 'create' ].every( area => {
+	const wanted = Nino.recovery.text.de['/_admin/recovery/'+ area+ '/pw-help'].replace( '%s', '8' ).replace( '%s', '71' );
+	return wanted.includes('%s') === false && wanted.includes('71') === true && helpOf( byId('recovery-'+ area) ).includes( wanted );
+} ) );
 fire( createForm, 'submit' );
 check( 'an empty form is said at every field that is empty, and the focus goes to the first', sent('recovery/create').length === 0 && errorsIn( createForm ).length === 3 && createMail.focused === true );
 createMail.value = 'new@example.com';
@@ -350,6 +373,16 @@ fire( createForm, 'submit' );
 fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/create/confirm-title'] ), 'click' );
 answer( 'recovery/create', 409, { error : 'account exists - use reset', code : 'recovery_exists' } );
 check( 'a refusal about the address is said at the address, which has the focus', errorsIn( createForm ).join() === Nino.recovery.text.de['/_admin/page/error/recovery-exists'] && createMail.focused === true );
+
+passwordRefusals.forEach( function( [ code, params, sentence ] ) {
+	createPw.value = 'a fresh password';
+	createRepeat.value = 'a fresh password';
+	createPw.focused = false;
+	fire( createForm, 'submit' );
+	fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/create/confirm-title'] ), 'click' );
+	answer( 'recovery/create', 400, { error : 'English of the server', code : code, params : params } );
+	check( 'a refusal "'+ code+ '" of the password of the account to create is said at the password, which has the focus', errorsIn( createForm ).join() === sentence && createPw.focused === true );
+} );
 
 // The language: the other one, drawn at once, kept over a reload, with what was typed
 createMail.value = 'typed@example.com';

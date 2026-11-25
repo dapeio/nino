@@ -155,7 +155,7 @@ This step creates the root account of the workbench: the **Developer** role, ful
 Provide:
 
 - a valid **email address**;
-- a **password** with at least 8 characters, entered twice - the rule stands behind the (?) of the field, and a password that is too short or a repeat that differs is said under its field, with the focus on it, before anything is sent.
+- a **password** with at least eight characters and at most 72 bytes (a letter outside the plain Latin alphabet takes two to four of them), entered twice - the rule stands behind the (?) of the field; a password that is too short or a repeat that differs is said under its field, with the focus on it, before anything is sent, and a password that is too long or holds a null byte is said there when the server answers.
 
 An address that differs only in upper and lower case from an entry that exists is refused as already in use, for the first account as well; an entry at exactly that address that cannot sign in (a deactivated account, one with no password) is replaced by the new account.
 
@@ -189,7 +189,7 @@ The last step creates the starter pages, sets the **recovery password**, makes t
 
 Provide:
 
-- a **password** with at least 8 characters, entered twice - the rule stands behind the (?) of the field, and what is wrong is said under the field.
+- a **password** with at least eight characters and at most 72 bytes, entered twice - the rule stands behind the (?) of the field, and what is wrong is said under the field.
 
 The one main button of the bar names itself for what it leads to: **Finish installation**, or - where exactly one application that was set up has an entry point - **Set up <name>**. Its hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps the wizard locked, so losing the password file does not hand it back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/` and the modules wholesale.
 

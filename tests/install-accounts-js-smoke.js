@@ -20,6 +20,7 @@ const root = element('div');
 const wrap = element('div');
 wrap.id = 'install-page-wrap';
 wrap.dataset.minPassword = '8';
+wrap.dataset.maxPassword = '72';
 const content = element('div');
 content.id = 'accounts-content';
 const csrfField = element('input');
@@ -50,6 +51,7 @@ const said = [];
 Nino.install = {
 	t : function( key, ...params ) { return Nino.pageText.t( key, ...params ) },
 	minPassword : function() { return 8 },
+	maxPassword : function() { return 72 },
 	failure : function( status, response ) { return Nino.pageText.failure( status, response, 8 ) },
 	say : function( words, error ) { said.push( [ words, error === true ] ) },
 };
@@ -121,6 +123,16 @@ typed( 'admin@example.com', 'a-long-enough-password', 'a-long-enough-password' )
 create();
 check( 'a refusal of the server about the address is said at the address, in the words of the table for its code - never the English of the server', errors().join() === en['/_admin/page/error/install-mail'] && byId('accounts-add-mail').getAttribute('aria-invalid') === 'true' && byId('accounts-add-mail').focused === true );
 check( '...and keeps the typed values', byId('accounts-add-pw').value === 'a-long-enough-password' && byId('accounts-add-pw2').value === 'a-long-enough-password' );
+// What the server refuses about the password is said at the password, with the focus there, in the words of the table and with the number the server names
+[ [ 'install_password_short', [], en['/_admin/page/error/install-password-short'].replace( '%s', '8' ) ], [ 'install_password_long', [ 72 ], en['/_admin/page/error/install-password-long'].replace( '%s', '72' ) ],
+	[ 'install_password_invalid', [], en['/_admin/page/error/install-password-invalid'] ] ].forEach( function( [ code, params, sentence ] ) {
+	answer = { status : 400, response : { error : 'English of the server', code : code, params : params } };
+	byId('accounts-add-mail').focused = false;
+	create();
+	check( 'a refusal "'+ code+ '" is said at the password field, with the focus there, and the line of the bar points at the fields', errors().join() === sentence && byId('accounts-add-pw').getAttribute('aria-invalid') === 'true' && byId('accounts-add-pw').focused === true
+		&& said[said.length - 1][0] === en['/_admin/install/error/fields'] );
+} );
+check( '...and the words for the two new codes are in both languages, the long one with the place for the number', [ 'long', 'invalid' ].every( name => typeof en['/_admin/page/error/install-password-'+ name] === 'string' && typeof de['/_admin/page/error/install-password-'+ name] === 'string' ) && de['/_admin/page/error/install-password-long'].includes('%s') );
 answer = { status : 500, response : { error : 'English of the server' } };
 create();
 check( 'a refusal that belongs to no field is said in the line of the bar, as an error, with the status, and is never the English of the server', said[said.length - 1][1] === true && said[said.length - 1][0] === en['/_admin/page/error/failed'].replace( '%s', '500' ) && errors().length === 0 );

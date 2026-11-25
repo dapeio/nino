@@ -68,7 +68,7 @@
 
 			const grid = Nino.adminUi.el( 'div', 'nino-admin-fieldgrid' );
 			const mail = Nino.adminUi.textField( { key : 'accounts-mail', id : 'accounts-add-mail', type : 'email', autocomplete : 'off', required : true, label : t('/_admin/install/accounts/mail') } );
-			const pw = Nino.adminUi.textField( { key : 'accounts-pw', id : 'accounts-add-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw'), help : t( '/_admin/install/accounts/pw-help', Nino.install.minPassword() ) } );
+			const pw = Nino.adminUi.textField( { key : 'accounts-pw', id : 'accounts-add-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw'), help : t( '/_admin/install/accounts/pw-help', Nino.install.minPassword(), Nino.install.maxPassword() ) } );
 			const pw2 = Nino.adminUi.textField( { key : 'accounts-pw2', id : 'accounts-add-pw2', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/install/accounts/pw2') } );
 
 			// Asked only where an account exists, and then of the account of the session: it is what changing one's own account asks for
@@ -247,7 +247,7 @@
 				if( status !== 200 || response === null ) {
 
 					const code = response !== null && typeof response === 'object' && typeof response.code === 'string' ? response.code : '';
-					const field = code === 'install_mail' || code === 'install_mail_in_use' ? [ ui.mail, mail ] : ( code === 'install_password_short' ? [ ui.pw, pw ] : ( code === 'install_wrong_password' ? [ ui.current, current ] : null ) );
+					const field = code === 'install_mail' || code === 'install_mail_in_use' ? [ ui.mail, mail ] : ( [ 'install_password_short', 'install_password_long', 'install_password_invalid' ].indexOf( code ) !== -1 ? [ ui.pw, pw ] : ( code === 'install_wrong_password' ? [ ui.current, current ] : null ) );
 
 					// A refusal about a value is said at the field of it, and the line says that something is to be fixed; any other is said in the line, as the server's code is worded
 					const sentence = field !== null ? t('/_admin/install/error/fields') : Nino.install.failure( status, response );

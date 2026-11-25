@@ -67,6 +67,33 @@
 		},
 
 		/**
+		 *	The most bytes a password may have, which the server states in the page and enforces itself
+		 *
+		 *	@return		{number}
+		 */
+		_max : function() {
+
+			const wrap = dc.getElementById('recovery-wrap');
+			const max = wrap === null ? 0 : parseInt( wrap.dataset.maxPassword, 10 );
+
+			return Number.isInteger( max ) === true && max > 0 ? max : 0;
+		},
+
+		/**
+		 *	Whether an answer refuses the password that was sent: its code is one of the three the server has for it
+		 *
+		 *	@param		{*}					response
+		 *
+		 *	@return		{boolean}
+		 */
+		_isPasswordRefusal : function( response ) {
+
+			const code = response !== null && typeof response === 'object' && typeof response.code === 'string' ? response.code : '';
+
+			return [ 'recovery_password_short', 'recovery_password_long', 'recovery_password_invalid' ].indexOf( code ) !== -1;
+		},
+
+		/**
 		 *	What a refusal says, in the language of the page: the sentence of its code, or the general one. A refusal
 		 *	that is about the length of a password has the length to say
 		 *
@@ -456,6 +483,15 @@
 			Nino.recovery._apiCall( 'reset', { mail : mail.value, pw : pw.value }, function( status, response ) {
 
 				if( status !== 200 ) {
+
+					// A refusal about the password is the field's, and the line says nothing more
+					if( Nino.recovery._isPasswordRefusal( response ) === true ) {
+						ui.resetLine.idle('');
+						Nino.adminUi.fieldError( ui.resetPw, pw, 'recovery-reset-error', Nino.recovery._failure( status, response ) );
+						pw.focus();
+						return;
+					}
+
 					ui.resetLine.fail( Nino.recovery._failure( status, response ) );
 					return;
 				}
@@ -492,7 +528,7 @@
 			form.noValidate = true;
 
 			ui.resetAccount = Nino.recovery._accountField();
-			ui.resetPw = Nino.adminUi.textField( { key : 'reset-pw', id : 'recovery-reset-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/recovery/reset/pw'), help : t( '/_admin/recovery/reset/pw-help', Nino.recovery._min() ) } );
+			ui.resetPw = Nino.adminUi.textField( { key : 'reset-pw', id : 'recovery-reset-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/recovery/reset/pw'), help : t( '/_admin/recovery/reset/pw-help', Nino.recovery._min(), Nino.recovery._max() ) } );
 			ui.resetSubmit = Nino.adminUi.button( t('/_admin/recovery/reset/action'), null, { kind : 'primary', type : 'submit', id : 'recovery-reset-submit', disabled : Nino.recovery._data.users.length === 0 } );
 
 			const foot = Nino.recovery._foot( ui.resetSubmit );
@@ -563,6 +599,13 @@
 								return;
 							}
 
+							// ...and so is one about the password
+							if( Nino.recovery._isPasswordRefusal( response ) === true ) {
+								Nino.adminUi.fieldError( ui.createPw, pw, 'recovery-create-error-pw', Nino.recovery._failure( status, response ) );
+								pw.focus();
+								return;
+							}
+
 							ui.createLine.fail( Nino.recovery._failure( status, response ) );
 							return;
 						}
@@ -589,7 +632,7 @@
 			form.noValidate = true;
 
 			ui.createMail = Nino.adminUi.textField( { key : 'create-mail', id : 'recovery-create-mail', type : 'email', autocomplete : 'off', required : true, label : t('/_admin/recovery/create/mail') } );
-			ui.createPw = Nino.adminUi.textField( { key : 'create-pw', id : 'recovery-create-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/recovery/create/pw'), help : t( '/_admin/recovery/create/pw-help', Nino.recovery._min() ) } );
+			ui.createPw = Nino.adminUi.textField( { key : 'create-pw', id : 'recovery-create-pw', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/recovery/create/pw'), help : t( '/_admin/recovery/create/pw-help', Nino.recovery._min(), Nino.recovery._max() ) } );
 			ui.createRepeat = Nino.adminUi.textField( { key : 'create-repeat', id : 'recovery-create-repeat', type : 'password', autocomplete : 'new-password', required : true, label : t('/_admin/recovery/create/repeat') } );
 			ui.createSubmit = Nino.adminUi.button( t('/_admin/recovery/create/action'), null, { kind : 'primary', type : 'submit', id : 'recovery-create-submit' } );
 

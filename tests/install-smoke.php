@@ -1038,6 +1038,47 @@ $strangers = $appData['/nino/auth/user'];
 check( 'the first account is refused 400 "install_mail_in_use" at an address that differs in case only from a stored account that cannot sign in, and nothing is stored or signed in', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail_in_use'
 	&& $appData['/nino/auth/user'] === $strangers && ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === '' );
 
+/*	The rule for a password that is set - Auth::passwordRefusal() - holds at every place the wizard sets one: the first account, the own account and the recovery password at the end.
+	A password the rule refuses is answered 400 with the code of the place and nothing is written, nothing is verified and nothing is counted: the own account is asked with a current password that is wrong, and
+	is still told what is wrong with the new one. A body that is JSON cannot carry bytes that are no text, so the null byte stands for what 'invalid' is (the bytes themselves are asked of the rule in
+	admin-users-server-smoke.php)	*/
+$pwCases = [
+	'äöüß, eight bytes and four units'	=> [ 'äöüß', 'short', [] ],
+	'73 bytes'													=> [ str_repeat( 'a', 73 ), 'long', [ 72 ] ],
+	'a null byte'												=> [ "abcdefgh\0ijkl", 'invalid', [] ],
+	'nothing'														=> [ '', 'short', [] ],
+];
+$pwAccepted = [ '72 bytes' => str_repeat( 'a', 72 ), 'four emoji, eight units' => '😀😀😀😀' ];
+$pwWorld = static fn(): array => [ $appData['/nino/auth/user'], \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ), \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] ) ];
+$pwRefused = static function( string $place, array $action, array $send, string $field ) use ( &$appData, $pwCases, $pwWorld ): string {
+
+	$wrong = [];
+
+	foreach( $pwCases as $label => [ $pw, $reason, $params ] ) {
+
+		$before = $pwWorld();
+		[ $status, $body ] = ninoCall( $appData, [ $action[0], $action[1] ], [ $field => $pw ] + $send );
+
+		if( $status !== 400 || ( $body['code'] ?? '' ) !== $place. '_password_'. $reason || ( $body['params'] ?? [] ) !== $params || $pwWorld() !== $before )
+			$wrong[] = $label. ': '. $status. ' '. ( $body['code'] ?? '-' );
+	}
+
+	return $wrong === [] ? '' : ' - '. implode( '; ', $wrong );
+};
+
+$wrong = $pwRefused( 'install', [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com' ], 'pw' );
+check( 'the first account is refused 400 for a password of four units, of 73 bytes, with a null byte or of none - "install_password_short", "..._long" with the 72 as param, "..._invalid" - and nothing is written'. $wrong, $wrong === '' );
+
+foreach( $pwAccepted as $label => $pw ) {
+
+	[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => $pw ] );
+	check( 'the first account takes '. $label, $status === 200 && password_verify( $pw, (string) ( \Nino\Auth::getUser( $appData, 'admin@example.com' )['pw'] ?? '' ) ) === true );
+	\Nino\Auth::logoutUser( $appData );
+	ninoDeleteUser( $appData, 'admin@example.com' );
+}
+
+check( '...and the project is as it was before them', $appData['/nino/auth/user'] === $strangers && \Nino\Install\Accounts::usableUsers( $appData ) === [] );
+
 [ , $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-long-enough-password' ] );
 check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com' ) !== false );
 check( 'the root account holds the Developer role the Setup step wrote, and full access through it', \Nino\Auth::getUser( $appData, 'admin@example.com' )['role'] === 'developer' && \Nino\Auth::getUser( $appData, 'admin@example.com' )['perms'] === [] && \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'admin@example.com' ) === true );
@@ -1072,6 +1113,28 @@ check( '...and it is changed back', $status === 200 && isset( $appData['/nino/au
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'a-different-password' ] );
 check( 'without a session it changes nothing at all: 401', $status === 401 && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
 
+// The own account: the rule is asked of the new password before the current one is, so a refusal verifies nothing and counts nothing, whatever the current password is
+\Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' );
+$wrong = $pwRefused( 'install', [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'currentPassword' => 'not the password' ], 'pw' );
+check( 'the own account is refused 400 for a password of four units, of 73 bytes, with a null byte or of none, with the current password wrong: nothing is written, verified or counted'. $wrong, $wrong === '' );
+
+$previous = 'a-different-password';
+
+foreach( $pwAccepted as $label => $pw ) {
+
+	[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => $pw, 'currentPassword' => $previous ] );
+	check( 'the own account takes '. $label, $status === 200 && password_verify( $pw, (string) ( \Nino\Auth::getUser( $appData, 'admin@example.com' )['pw'] ?? '' ) ) === true );
+	$previous = $pw;
+}
+
+// What exists is not measured: an account whose password is shorter than the rule - made as data, as before the rule - signs in, and confirms it as the current one of a change to a valid password
+\Nino\Auth::updateUser( $appData, 'admin@example.com', 'admin@example.com', 'äöüß' );
+\Nino\Auth::logoutUser( $appData );
+check( 'an account whose password is "äöüß" signs in', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'äöüß' ) !== false );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password', 'currentPassword' => 'äöüß' ] );
+check( '...and the wizard takes it as the current password of the own account, which gets a valid one: 200', $status === 200 && password_verify( 'a-different-password', (string) ( \Nino\Auth::getUser( $appData, 'admin@example.com' )['pw'] ?? '' ) ) === true );
+\Nino\Auth::logoutUser( $appData );
+
 /*	The rule the form names up front is the rule the server enforces. The
 	number is the one the wizard's page states, read from the page as the
 	kernel draws it - the scripts take it from there - and tried against the
@@ -1104,6 +1167,11 @@ $recoveryRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '
 $minPwShown['the recovery page'] = [ (int) ( \Nino\Html::getFills( $appData )['[[/_admin/recovery/min-password]]'] ?? 0 ) ];
 check( 'the recovery page states the length of a password as well, in its template where the script reads it', str_contains( (string) file_get_contents( __DIR__. '/../_admin/templates/page-recovery.tpl' ), 'data-min-password="[[/_admin/recovery/min-password]]"' ) === true );
 $minPwShown['the wizard'] = [ $minPw ];
+
+// The most bytes of a password is the server's number as well: a fill of each page, on the root of the page where its script reads it, and in the words of the help of the field from there
+$maxPwFills = \Nino\Html::getFills( $appData );
+check( 'both pages state the most bytes a password may have - a fill of the page, a data attribute on its root - and it is the one the server enforces', (int) ( $maxPwFills['[[/_admin/install/max-password]]'] ?? 0 ) === \Nino\Auth::PASSWORD_MAX_BYTES && (int) ( $maxPwFills['[[/_admin/recovery/max-password]]'] ?? 0 ) === \Nino\Auth::PASSWORD_MAX_BYTES
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_admin/install/templates/page-wizard.tpl' ), 'data-max-password="[[/_admin/install/max-password]]"' ) === true && str_contains( (string) file_get_contents( __DIR__. '/../_admin/templates/page-recovery.tpl' ), 'data-max-password="[[/_admin/recovery/max-password]]"' ) === true );
 check( 'one minimum password length, Recovery::MIN_PW_LENGTH, declared once and named by every form, script, label and page the two pages are drawn from', $minPwDeclared === 1
 	&& array_filter( $minPwShown, static fn( array $numbers ): bool => $numbers !== [ \Nino\Admin\Recovery::MIN_PW_LENGTH ] ) === [] );
 
@@ -1828,6 +1896,20 @@ check( 'rejects a too-short _admin password with 400', $status === 400 );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
 check( '...also one character below the rule the Finish form shows', $status === 400 );
+
+// The recovery password is set by the same rule: refused with the codes of the place, and no hash is made, no key, no marker
+$pwFile = \Nino\Admin\Recovery::path( $appData );
+$wrong = $pwRefused( 'install', [ \Nino\Install\Finish::class, 'apiComplete' ], [], 'password' );
+check( 'the recovery password is refused 400 for four units, 73 bytes, a null byte or none - "install_password_short", "..._long" with the 72 as param, "..._invalid" - and nothing is written'. $wrong, $wrong === ''
+	&& is_file( $pwFile ) === false && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/install/completed'] ) === false );
+
+foreach( $pwAccepted as $label => $pw ) {
+
+	$appReset();
+	$ending = $appProject( 'install-finish-password' );
+	[ $status ] = ninoCall( $ending, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => $pw, 'applications' => [] ] );
+	check( 'the recovery password takes '. $label. ', and the page that asks for it verifies it', $status === 200 && password_verify( $pw, (string) \Nino\Admin\Recovery::hash( $ending ) ) === true && \Nino\Admin\Recovery::verify( $ending, $pw ) === 200 );
+}
 
 // The hash is stored under the private directory, outside every tool folder
 // and outside config.php. _admin/Admin.php therefore stays byte-identical,

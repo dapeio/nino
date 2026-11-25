@@ -117,12 +117,13 @@ namespace Nino\Install {
 					return;
 				}
 
-				// The length a password must have, for the forms that name it: the page has no text file to ask. And the account of the
+				// The length a password must have and the most bytes it may have, for the forms that name them: the page has no text file to ask. And the account of the
 				// session that asks, which is its own to know: a page that finds its session changed by another tab sees that it is not
 				// the one it was drawn for, as the workbench's does (see Nino.install.session)
 				$user = \Nino\Auth::getCurrentUser( $appData );
 				\Nino\Html::addFills( $appData, [
 					'[[/_admin/install/min-password]]'	=> (string) \Nino\Admin\Recovery::MIN_PW_LENGTH,
+					'[[/_admin/install/max-password]]'	=> (string) \Nino\Auth::PASSWORD_MAX_BYTES,
 					'[[/_admin/install/account]]'				=> $user === false ? '' : str_replace( '[', '&#91;', htmlspecialchars( (string) ( $user['mail'] ?? '' ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
 				], '*' );
 				return;
@@ -1219,7 +1220,7 @@ namespace Nino\Install {
 	 *												\Nino\Auth, the way \Nino\Modules\Users\Admin creates them - repeated
 	 *												here rather than called, since the Users module can be
 	 *												deleted on its own. The password rule is
-	 *												\Nino\Admin\Recovery::MIN_PW_LENGTH, the one every password
+	 *												\Nino\Auth::passwordRefusal(), the one every password
 	 *												of the workbench follows
 	 *
 	 *	@package					Dape/Nino
@@ -1314,8 +1315,8 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'install_password_short' );
+			if( ( $refusal = \Nino\Auth::passwordRefusal( $pw ) ) !== null ) {
+				self::_refusePassword( $request, $refusal );
 				return;
 			}
 
@@ -1452,6 +1453,25 @@ namespace Nino\Install {
 			}
 
 			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ), 'csrf' => \Nino\Csrf::getToken( $appData ), 'user' => $mail ] );
+		}
+
+		/**
+		 *	Say why a password is refused - see \Nino\Auth::passwordRefusal(). The page knows the minimum, so that code
+		 *	carries no number; the maximum is the server's to tell
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$reason				'invalid', 'short' or 'long'
+		 *
+		 *	@return 	void
+		 */
+		private static function _refusePassword( array &$request, string $reason ): void {
+
+			if( $reason === 'invalid' )
+				\Nino\Http::fail( $request, 400, 'a password is text without a null byte', 'install_password_invalid' );
+			elseif( $reason === 'long' )
+				\Nino\Http::fail( $request, 400, 'password must be at most '. \Nino\Auth::PASSWORD_MAX_BYTES. ' bytes', 'install_password_long', [ \Nino\Auth::PASSWORD_MAX_BYTES ] );
+			else
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'install_password_short' );
 		}
 	}
 
@@ -2391,8 +2411,8 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'install_password_short' );
+			if( ( $refusal = \Nino\Auth::passwordRefusal( $pw ) ) !== null ) {
+				self::_refusePassword( $request, $refusal );
 				return;
 			}
 
@@ -2481,6 +2501,25 @@ namespace Nino\Install {
 				$request['/nino/http/response']['header']['Cache-Control'] = 'private, no-store';
 
 			\Nino\Http::ok( $request, [ 'login' => $login, 'targets' => \Nino\Install\Applications::targets( $appData, $applied ) ] + ( $recoveryKey !== false ? [ 'recoveryKey' => $recoveryKey ] : [] ) );
+		}
+
+		/**
+		 *	Say why a password is refused - see \Nino\Auth::passwordRefusal(). The page knows the minimum, so that code
+		 *	carries no number; the maximum is the server's to tell
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$reason				'invalid', 'short' or 'long'
+		 *
+		 *	@return 	void
+		 */
+		private static function _refusePassword( array &$request, string $reason ): void {
+
+			if( $reason === 'invalid' )
+				\Nino\Http::fail( $request, 400, 'a password is text without a null byte', 'install_password_invalid' );
+			elseif( $reason === 'long' )
+				\Nino\Http::fail( $request, 400, 'password must be at most '. \Nino\Auth::PASSWORD_MAX_BYTES. ' bytes', 'install_password_long', [ \Nino\Auth::PASSWORD_MAX_BYTES ] );
+			else
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'install_password_short' );
 		}
 	}
 }

@@ -24,6 +24,8 @@ const root = element('div');
 const wrap = element('div');
 wrap.id = 'install-page-wrap';
 wrap.dataset.minPassword = '8';
+// A number the rule does not have, so that a script that types the number in, or leaves one out of a sentence, shows
+wrap.dataset.maxPassword = '71';
 root.appendChild( wrap );
 
 const nav = {};
@@ -256,6 +258,12 @@ function drawn( scope ) {
 			leftovers.push( key+ ': '+ JSON.stringify( shownText ) );
 	} ) );
 	check( language+ ': no step shows a key, a place for a value that was not filled or the mark of a fill'+ ( leftovers.length ? ' - '+ leftovers.slice( 0, 4 ).join(', ') : '' ), leftovers.length === 0 );
+	// The help of the password fields says the two numbers the page states, read from the attributes of its root by the script of the shell
+	const helps = scope => findAll( scope, el => el.className === 'nino-admin-help-text' ).map( el => el.textContent );
+	check( language+ ': the help of the password fields says the least characters and the most bytes the page states, and leaves no place for a number empty', [ 'accounts', 'finish' ].every( key => {
+		const wanted = text._tables[language]['/_admin/install/'+ key+ '/pw-help'].replace( '%s', '8' ).replace( '%s', '71' );
+		return wanted.includes('%s') === false && wanted.includes('71') === true && helps( byId( key+ '-content' ) ).includes( wanted );
+	} ) );
 	check( language+ ': what the server wrote is shown by nothing: not the English of an extension\'s reason, which is the table\'s word in the language of the page', stepKeys.every( key => drawn( panes[key] ).every( shownText => shownText !== 'English of the server' ) ) );
 } );
 

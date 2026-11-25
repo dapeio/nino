@@ -2953,6 +2953,50 @@ check( 'a reset that could not lift the lock is 500 and has written its line', $
 
 $appData['/nino/admin/logs'] = $logSwitch;
 
+/*	The rule for a password that is set - Auth::passwordRefusal() - holds at this door as well, for a password that is set to an account and for the one of an account that is made. A refusal is 400 with the code
+	of the door, the maximum as its param, and nothing is written: the accounts, the recovery password and the counters are as they were. A body that is JSON cannot carry bytes that are no text, so a null byte
+	stands for what 'invalid' is (the bytes themselves are asked of the rule in admin-users-server-smoke.php)	*/
+$doorWorld = static fn(): array => [ $appData['/nino/auth/user'], (string) @file_get_contents( \Nino\Admin\Recovery::path( $appData ) ), \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] ) ];
+$wrong = [];
+
+foreach( [ 'äöüß, four units' => [ 'äöüß', 'short', [] ], '73 bytes' => [ str_repeat( 'a', 73 ), 'long', [ 72 ] ], 'a null byte' => [ "abcdefgh\0ijkl", 'invalid', [] ], 'nothing' => [ '', 'short', [] ] ] as $label => [ $pw, $reason, $params ] )
+	foreach( [ 'recovery/reset' => [ 'mail' => 'resetme@example.com' ], 'recovery/create' => [ 'mail' => 'pwnew@example.com', 'confirm' => true ] ] as $action => $data ) {
+
+		$before = $doorWorld();
+		[ $status, $body ] = $recoveryCall( $action, $data + [ 'pw' => $pw ] );
+
+		if( $status !== 400 || ( $body['code'] ?? '' ) !== 'recovery_password_'. $reason || ( $body['params'] ?? [] ) !== $params || $doorWorld() !== $before || \Nino\Auth::getUser( $appData, 'pwnew@example.com' ) !== false )
+			$wrong[] = $label. ', '. $action. ': '. $status. ' '. ( $body['code'] ?? '-' );
+	}
+
+check( 'a password of four units, of 73 bytes, with a null byte or of none is refused 400 by reset and by create - "recovery_password_short", "..._long" with the 72 as param, "..._invalid" - and nothing is written'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ), $wrong === [] );
+
+$wrong = [];
+
+foreach( [ '72 bytes' => str_repeat( 'a', 72 ), 'four emoji, eight units' => '😀😀😀😀' ] as $label => $pw ) {
+
+	[ $reset ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => $pw ] );
+	$resetIn = is_array( \Nino\Auth::loginUser( $appData, 'resetme@example.com', $pw ) );
+	[ $created ] = $recoveryCall( 'recovery/create', [ 'mail' => 'pwnew@example.com', 'pw' => $pw, 'confirm' => true ] );
+	$createdIn = is_array( \Nino\Auth::loginUser( $appData, 'pwnew@example.com', $pw ) );
+	ninoDeleteUser( $appData, 'pwnew@example.com' );
+
+	if( $reset !== 200 || $resetIn === false || $created !== 200 || $createdIn === false )
+		$wrong[] = $label;
+}
+
+check( '72 bytes and four emoji of two units are taken by reset and by create, and the password signs in'. ( $wrong === [] ? '' : ' - '. implode( '; ', $wrong ) ), $wrong === [] );
+[ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'a second password' ] );
+check( '...and the account is given the password the later checks know', $status === 200 && password_verify( 'a second password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// What exists is not measured: the recovery password of 100 bytes, set before the rule, opens the door
+$hundred = str_repeat( 'R', 100 );
+\Nino\Admin\Recovery::set( $appData, $hundred );
+check( 'a recovery password of 100 bytes that is stored is verified by the door, as it was', \Nino\Admin\Recovery::verify( $appData, $hundred ) === 200 );
+\Nino\Admin\Recovery::set( $appData, 'the real password' );
+$resetLockout();
+
 $accountsAfter = array_keys( $appData['/nino/auth/user'] );
 [ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'yet another password' ], false );
 check( 'with the session flag unset, reset is 401', $status === 401 && password_verify( 'a second password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
