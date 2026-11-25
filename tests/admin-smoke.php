@@ -1513,8 +1513,10 @@ check( 'and activates it again', $status === 200 && $body['status'] === 'active'
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
 // The last active account with full access. Every other account is switched
-// off, in memory and in config.php, for the length of the check - the
-// session of the manager doing it is not touched by that
+// off, in memory and in config.php, for the length of the check - the manager
+// doing it among them: a manager holds what the account it changes holds, so it
+// is an account with full access itself, and one that config.php holds as off
+// is no caller (the session of the request, kept in memory, is not what decides)
 \Nino\Auth::insertUser( $appData, 'lastadmin@example.com', 'last admin password', [ '/*' ] );
 $statuses = [];
 foreach( $appData['/nino/auth/user'] as $mail => $record )
@@ -1523,12 +1525,12 @@ foreach( $appData['/nino/auth/user'] as $mail => $record )
 		$appData['/nino/auth/user'][$mail]['status'] = \Nino\Auth::STATUS_DISABLED;
 	}
 \Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
-[ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'lastadmin@example.com', 'active' => false ] );
-check( 'the last active account with full access cannot be deactivated - other full access accounts being disabled do not count', $status === 409
+[ $status, $body ] = callUsers( $appData, 'apiStatus', [ 'username' => 'lastadmin@example.com', 'active' => false ] );
+check( 'a manager that config.php holds as off cannot deactivate the last active account with full access: 401 "session", and the account stays active', $status === 401 && ( $body['code'] ?? '' ) === 'session'
 	&& \Nino\Auth::getUser( $appData, 'lastadmin@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
 check( '...fullAccessExists() counts active accounts only', \Nino\Modules\Users\Roles::fullAccessExists( $appData ) === true && \Nino\Modules\Users\Roles::fullAccessExists( $appData, 'lastadmin@example.com' ) === false );
-[ $status ] = callUsers( $appData, 'apiDelete', [ 'username' => 'lastadmin@example.com' ] );
-check( '...nor deleted', $status === 409 );
+[ $status, $body ] = callUsers( $appData, 'apiDelete', [ 'username' => 'lastadmin@example.com' ] );
+check( '...nor deleted', $status === 401 && ( $body['code'] ?? '' ) === 'session' && \Nino\Auth::getUser( $appData, 'lastadmin@example.com' ) !== false );
 foreach( $statuses as $mail => $was )
 	$appData['/nino/auth/user'][$mail]['status'] = $was;
 \Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );

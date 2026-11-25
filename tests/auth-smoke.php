@@ -380,6 +380,21 @@ check( 'a disabled account is not resumed from that same token', \Nino\Auth::get
 check( '...and the token is dropped rather than left to age out', \Nino\Auth::getUser( $appData, 'disabled@example.com' )['sessions'] === [] );
 \Nino\Auth::deleteUser( $appData, 'disabled@example.com' );
 
+// What a request is let in by is asked of a record and a token: the account is active, lists the token, and the session is not older than its time
+$held = [ 'status' => \Nino\Auth::STATUS_ACTIVE, 'sessions' => [ 'fresh' => [ 'time' => time() - 29 * 86400 ], 'stale' => [ 'time' => time() - 31 * 86400 ], 'broken' => 'not a session', '' => [ 'time' => time() ] ] ];
+check( 'sessionHolds: an active account that lists the token, within the time of a session', \Nino\Auth::sessionHolds( $held, 'fresh' ) === true );
+check( '...not an account that is off', \Nino\Auth::sessionHolds( [ 'status' => \Nino\Auth::STATUS_DISABLED ] + $held, 'fresh' ) === false && \Nino\Auth::sessionHolds( [ 'sessions' => $held['sessions'] ], 'fresh' ) === false );
+check( '...not a token the account does not list, one that is no session, or none - not even where a session is listed under none', \Nino\Auth::sessionHolds( $held, 'other' ) === false && \Nino\Auth::sessionHolds( $held, 'broken' ) === false && \Nino\Auth::sessionHolds( $held, '' ) === false && \Nino\Auth::sessionHolds( [ 'status' => \Nino\Auth::STATUS_ACTIVE ], 'fresh' ) === false );
+check( '...not a session older than its time', \Nino\Auth::sessionHolds( $held, 'stale' ) === false );
+
+ninoUser( $appData, 'aged@example.com', [] );
+$agedToken = \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+$appData['/nino/auth/user']['aged@example.com']['sessions'][$agedToken]['time'] = time() - 31 * 86400;
+unset( $appData['./nino/auth/current'] );
+\Nino\Auth::init( $appData );
+check( 'a session older than its time is not resumed, and the token is dropped', \Nino\Auth::getCurrentUser( $appData ) === false && \Nino\Auth::getUser( $appData, 'aged@example.com' )['sessions'] === [] );
+\Nino\Auth::deleteUser( $appData, 'aged@example.com' );
+
 // An account is switched off and on from the Users panel, and says when it
 // logged in last - in its own record, since a file of its own would be one
 // more thing a project keeps beside data/ (the catalogue's Hello test holds

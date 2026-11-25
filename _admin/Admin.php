@@ -865,7 +865,7 @@ namespace Nino\Admin {
 		 *	domain class (Elements, Text, ...) other than Users/Dashboard/
 		 *	locale uses, now that access can be tailored per competency
 		 *	instead of "any logged-in user may do anything". Users keeps its
-		 *	own bespoke self-or-manage rule (see Users::_authorize()) since
+		 *	own bespoke self-or-manage rule (see Users::authorize()) since
 		 *	"edit your own account" never depends on a permission; Dashboard
 		 *	and admin/locale stay guard()-only since they're not module-
 		 *	specific actions.

@@ -482,7 +482,7 @@ namespace Nino\Modules\Users {
 
 			// The role is looked up in the roles config.php holds, and the account is
 			// written before the lock is let go: a role that is deleted meanwhile is not handed out
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;
@@ -560,7 +560,7 @@ namespace Nino\Modules\Users {
 
 			// Whether full access remains is decided against the accounts config.php
 			// holds, under its lock, and the account goes before the lock is let go
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;
@@ -612,7 +612,7 @@ namespace Nino\Modules\Users {
 			$currentPw 		= \Nino\Admin\Admin::postString( $data, 'currentPassword' );
 			$postedRole 	= array_key_exists( 'role', $data ) === true ? $data['role'] : null;
 
-			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
+			[ $allowed, $isSelf ] = self::authorize( $appData, $username, self::MANAGE_PERM );
 
 			if( $allowed === false ) {
 				\Nino\Http::fail( $request, 403, 'not allowed' );
@@ -672,12 +672,7 @@ namespace Nino\Modules\Users {
 
 			if( $isSelf === true && $stored !== false && $postedRole !== null && $postedRole !== (string) ( $stored['role'] ?? '' ) ) {
 
-				if( \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM ) === false ) {
-					\Nino\Http::fail( $request, 403, 'not allowed' );
-					return;
-				}
-
-				if( self::_refuseOwnRole( $appData, $request, $username ) === true )
+				if( self::_refuseOwnRoleChange( $appData, $request, $username ) === true )
 					return;
 			}
 
@@ -691,13 +686,12 @@ namespace Nino\Modules\Users {
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			$roleChange = $postedRole !== null && $postedRole !== (string) ( $stored['role'] ?? '' );
-			$changeName = $postedName !== null && $postedName !== (string) ( $stored['name'] ?? '' );
 			$mail 			= $username;
+			$confirmed	= $stored['pw'] ?? null;
 
 			// What the change runs into is decided against the accounts and roles
 			// config.php holds, under its lock, and the account is written before the lock is let go
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM, $username );
 
 			if( $fresh === null )
 				return;
@@ -705,6 +699,22 @@ namespace Nino\Modules\Users {
 			try {
 
 				if( self::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				// What is a change is asked of the account as config.php holds it, and the
+				// current password was confirmed against the hash this request found: a password
+				// set meanwhile is a password that was not confirmed, and not a guess to count. A hash
+				// of the same password that another request made meanwhile (a sign-in that rehashes) is none
+				$stored 		= \Nino\Auth::getUser( $fresh, $username );
+				$roleChange = $postedRole !== null && $postedRole !== (string) ( $stored['role'] ?? '' );
+				$changeName = $postedName !== null && $postedName !== (string) ( $stored['name'] ?? '' );
+
+				if( $isSelf === true && ( $stored['pw'] ?? null ) !== $confirmed && password_verify( $currentPw, (string) ( $stored['pw'] ?? '' ) ) === false ) {
+					\Nino\Http::fail( $request, 401, 'wrong current password', 'wrong_password', [], 'currentPassword' );
+					return;
+				}
+
+				if( $isSelf === true && $roleChange === true && self::_refuseOwnRoleChange( $fresh, $request, $username ) === true )
 					return;
 
 				if( $roleChange === true && self::_refuseRoleChange( $fresh, $request, $username, $postedRole ) === true )
@@ -751,7 +761,7 @@ namespace Nino\Modules\Users {
 			$data 		= \Nino\Admin\Admin::postData();
 			$username = \Nino\Admin\Admin::postString( $data, 'username' );
 
-			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
+			[ $allowed, $isSelf ] = self::authorize( $appData, $username, self::MANAGE_PERM );
 
 			if( $allowed === false ) {
 				\Nino\Http::fail( $request, 403, 'not allowed' );
@@ -774,7 +784,7 @@ namespace Nino\Modules\Users {
 				return;
 
 			// Reach and existence once more against what config.php holds, under its lock
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM, $username );
 
 			if( $fresh === null )
 				return;
@@ -832,7 +842,7 @@ namespace Nino\Modules\Users {
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;
@@ -897,7 +907,7 @@ namespace Nino\Modules\Users {
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;
@@ -919,6 +929,27 @@ namespace Nino\Modules\Users {
 			}
 
 			\Nino\Http::ok( $request, [ 'status' => $active === true ? 'active' : 'disabled' ] );
+		}
+
+		/**
+		 *	Whether the own role may not be changed by the signed-in account - and if so, the response says what:
+		 *	the right to manage accounts first, then the rule that nobody changes their own role. Asked of this
+		 *	request's copy before the lock and of the stored accounts under it, so that the two answer alike
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data, or the copy with the stored accounts and roles
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$username			The account
+		 *
+		 *	@return 	bool										True when the change is refused and the response set
+		 */
+		private static function _refuseOwnRoleChange( array &$appData, array &$request, string $username ): bool {
+
+			if( \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM ) === false ) {
+				\Nino\Http::fail( $request, 403, 'not allowed' );
+				return true;
+			}
+
+			return self::_refuseOwnRole( $appData, $request, $username );
 		}
 
 		/**
@@ -969,7 +1000,10 @@ namespace Nino\Modules\Users {
 		 *	Whether the account is the last one that holds full access - what a delete, a deactivation or
 		 *	a role change must not end - and so is refused, the response says. Asked of the
 		 *	accounts and roles config.php holds (see Roles::lockStored()); an account that is gone
-		 *	from them is a 404
+		 *	from them is a 404. A signed-in account that may act on an account with full access holds full
+		 *	access itself and is counted as long as it is active, which the lock has asked of it: this refusal
+		 *	and the one of _refuseRoleChange() for the last full access are a second safeguard, which a
+		 *	request of the panel does not reach
 		 *
 		 *	@param		array 		&$fresh				(reference) The copy of the app data with the stored accounts and roles
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1079,18 +1113,21 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Whether the current user may act on $username, and whether it's themselves
+		 *	Whether the current user may act on $username, and whether it's themselves: the account itself
+		 *	or one that holds the permission. The one question the action asks before the lock and
+		 *	Roles::lockStored() asks under it, of the record config.php holds, as well
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$username 		Target username
+		 *	@param		string		$perm					The permission that lets in an account other than the target itself
 		 *
 		 *	@return 	array										[ allowed, isSelf ]
 		 */
-		private static function _authorize( array &$appData, string $username ): array {
+		public static function authorize( array &$appData, string $username, string $perm ): array {
 
 			$current 	= \Nino\Auth::getCurrentUser( $appData );
 			$isSelf 	= $current !== false && $current['mail'] === $username;
-			$canManage = \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM );
+			$canManage = \Nino\Auth::checkPermission( $appData, $perm );
 
 			return [ $isSelf === true || $canManage === true, $isSelf ];
 		}

@@ -155,7 +155,7 @@ namespace Nino\Modules\Users {
 				return;
 
 			// Reach and existence once more against what config.php holds, under its lock
-			$fresh = Roles::lockStored( $appData, $request );
+			$fresh = Roles::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;

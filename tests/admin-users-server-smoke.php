@@ -617,43 +617,53 @@ $bootRequest = static function( string $who ) use ( &$app ): array {
 
 $rolesOnDisk = static fn(): array => $read( '/config.php' )['/nino/auth/roles'];
 
+/**
+ *	A request that booted earlier, sent as the browser of its account sends it: with the php session of that account, the token it holds on disk
+ */
+$sendBooted = static function( array &$request, string $action, array $data ) use ( $as ): array {
+
+	$as( (string) strstr( (string) ( $request['./nino/auth/current']['mail'] ?? 'visitor@' ), '@', true ) );
+
+	return ninoCall( $request, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+};
+
 $restore( $worldA );
 $first	= $bootRequest( 'dev' );
 $second	= $bootRequest( 'dev2' );
-[ $status ] = ninoCall( $first, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'editor', 'label' => 'Editor, relabelled by the first', 'perms' => [ $text, $types ] ], 'roles/save' );
+[ $status ] = $sendBooted( $first, 'roles/save', [ 'id' => 'editor', 'label' => 'Editor, relabelled by the first', 'perms' => [ $text, $types ] ] );
 check( 'the first request relabels a role and gives it a permission', $status === 200 && $rolesOnDisk()['editor']['label'] === 'Editor, relabelled by the first' );
-[ $status ] = ninoCall( $second, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'side', 'label' => 'Side, saved by the second', 'perms' => [ $types ] ], 'roles/save' );
+[ $status ] = $sendBooted( $second, 'roles/save', [ 'id' => 'side', 'label' => 'Side, saved by the second', 'perms' => [ $types ] ] );
 check( 'the second, which booted before it, saves another role', $status === 200 && $rolesOnDisk()['side']['label'] === 'Side, saved by the second' );
 check( '...and the relabel of the first stands', $rolesOnDisk()['editor'] === [ 'label' => 'Editor, relabelled by the first', 'perms' => [ $text, $types ] ] );
 
 $restore( $worldA );
 $first	= $bootRequest( 'dev' );
 $second	= $bootRequest( 'dev2' );
-ninoCall( $first, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'created-by-one', 'label' => 'Created by the first', 'perms' => [ $text ], 'create' => true ], 'roles/save' );
-[ $status ] = ninoCall( $second, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'spare' ], 'roles/delete' );
+$sendBooted( $first, 'roles/save', [ 'id' => 'created-by-one', 'label' => 'Created by the first', 'perms' => [ $text ], 'create' => true ] );
+[ $status ] = $sendBooted( $second, 'roles/delete', [ 'id' => 'spare' ] );
 check( 'a role the first request created stands after the second, stale, deleted another', $status === 200 && isset( $rolesOnDisk()['created-by-one'] ) === true && isset( $rolesOnDisk()['spare'] ) === false );
 
 $restore( $worldA );
 $first	= $bootRequest( 'dev' );
 $second	= $bootRequest( 'dev2' );
-ninoCall( $first, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'wide' ], 'roles/delete' );
-[ $status ] = ninoCall( $second, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'side', 'label' => 'Side, saved by the second', 'perms' => [ $types ] ], 'roles/save' );
+$sendBooted( $first, 'roles/delete', [ 'id' => 'wide' ] );
+[ $status ] = $sendBooted( $second, 'roles/save', [ 'id' => 'side', 'label' => 'Side, saved by the second', 'perms' => [ $types ] ] );
 check( 'a role the first request deleted stays deleted after the second, stale, saved another', $status === 200 && isset( $rolesOnDisk()['wide'] ) === false && $rolesOnDisk()['side']['label'] === 'Side, saved by the second' );
 
 // A stale request decides against the roles that stand when it decides
 $restore( $worldA );
 $first	= $bootRequest( 'dev' );
 $second	= $bootRequest( 'dev2' );
-ninoCall( $first, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'wide' ], 'roles/delete' );
-[ $status, $body ] = ninoCall( $second, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'id' => 'wide' ], 'roles/delete' );
+$sendBooted( $first, 'roles/delete', [ 'id' => 'wide' ] );
+[ $status, $body ] = $sendBooted( $second, 'roles/delete', [ 'id' => 'wide' ] );
 check( 'a second delete of a role that is gone is a 404 "roles_unknown"', $status === 404 && ( $body['code'] ?? '' ) === 'roles_unknown' );
 
 // --- What depends on the state of others is decided under the lock, against what config.php holds ---
 
 echo "\nTwo requests that booted from the same file decide against what is stored\n";
 
-$handle = static function( array &$request, string $action, array $data ) use ( $lockFree, &$held ): array {
-	[ $status, $body ] = ninoCall( $request, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+$handle = static function( array &$request, string $action, array $data ) use ( $lockFree, &$held, $sendBooted ): array {
+	[ $status, $body ] = $sendBooted( $request, $action, $data );
 
 	if( $lockFree() === false )
 		$held[] = 'stale '. $action. ' '. $status;
@@ -674,20 +684,22 @@ $fullActive = static function() use ( $read ): array {
 };
 
 $pairs = [
-	'A, two deletes of the two accounts with full access'		=> [ [ 'dev', 'users/delete', [ 'username' => 'dev2@example.com' ] ], [ 'dev2', 'users/delete', [ 'username' => 'dev@example.com' ] ], 'users_last_admin_delete' ],
-	'A2, a deactivation and a role taken away'							=> [ [ 'dev', 'users/status', [ 'username' => 'dev2@example.com', 'active' => false ] ], [ 'dev2', 'users/role', [ 'username' => 'dev@example.com', 'role' => '' ] ], 'users_last_admin_role' ],
-	'A3, two saves that take the role away'								=> [ [ 'dev', 'users/save', [ 'username' => 'dev2@example.com', 'mail' => 'dev2@example.com', 'role' => '' ] ], [ 'dev2', 'users/save', [ 'username' => 'dev@example.com', 'mail' => 'dev@example.com', 'role' => '' ] ], 'users_last_admin_role' ],
-	'A4, a delete and a deactivation'												=> [ [ 'dev2', 'users/delete', [ 'username' => 'dev@example.com' ] ], [ 'dev', 'users/status', [ 'username' => 'dev2@example.com', 'active' => false ] ], 'users_last_admin_status' ],
+	'A, two deletes of the two accounts with full access'		=> [ [ 'dev', 'users/delete', [ 'username' => 'dev2@example.com' ] ], [ 'dev2', 'users/delete', [ 'username' => 'dev@example.com' ] ], [ 401, 'session' ] ],
+	'A2, a deactivation and a role taken away'							=> [ [ 'dev', 'users/status', [ 'username' => 'dev2@example.com', 'active' => false ] ], [ 'dev2', 'users/role', [ 'username' => 'dev@example.com', 'role' => '' ] ], [ 401, 'session' ] ],
+	'A3, two saves that take the role away'								=> [ [ 'dev', 'users/save', [ 'username' => 'dev2@example.com', 'mail' => 'dev2@example.com', 'role' => '' ] ], [ 'dev2', 'users/save', [ 'username' => 'dev@example.com', 'mail' => 'dev@example.com', 'role' => '' ] ], [ 403, null ] ],
+	'A4, a delete and a deactivation'												=> [ [ 'dev2', 'users/delete', [ 'username' => 'dev@example.com' ] ], [ 'dev', 'users/status', [ 'username' => 'dev2@example.com', 'active' => false ] ], [ 401, 'session' ] ],
 ];
 
+// The second request is the caller of the account the first one took its access from: what config.php holds ends its session or its right before the change is looked at, as it does for a request that boots after the first - the refusal for the last full access (users_last_admin_*) is not reached, and an account with full access stands
 foreach( $pairs as $label => [ $first, $second, $wanted ] ) {
 
 	$restore( $worldA );
 	$requests = [ $first[0] => $bootRequest( $first[0] ), $second[0] => $bootRequest( $second[0] ) ];
 	$one			= $handle( $requests[$first[0]], $first[1], $first[2] );
+	$before		= $disk();
 	$two			= $handle( $requests[$second[0]], $second[1], $second[2] );
 
-	check( $label. ': the second answers 409 "'. $wanted. '" and an active account with full access stands', $one[0] === 200 && $two === [ 409, $wanted ] && count( $fullActive() ) === 1 );
+	check( $label. ': the second answers '. $wanted[0]. ( $wanted[1] === null ? ' "not allowed"' : ' "'. $wanted[1]. '"' ). ', writes nothing, and an active account with full access stands', $one[0] === 200 && $two === $wanted && $disk() === $before && count( $fullActive() ) === 1 );
 }
 
 $restore( $worldA );
@@ -801,6 +813,244 @@ foreach( [
 
 	check( 'an account widened meanwhile: '. $label. ' of the manager is 403 "users_account_beyond" and writes nothing', $answer === [ 403, 'users_account_beyond' ] && $disk() === $before );
 }
+
+// --- A request that booted before another one acted: the accounts and the caller are the stored ones ---------
+
+echo "\nA request that booted before another one acted decides and writes against what config.php holds - the caller included\n";
+
+$user			= static fn( string $mail ): array => (array) ( $read( '/config.php' )['/nino/auth/user'][$mail] ?? [] );
+$answerOf	= static fn( array $answer ): array => [ $answer['status'], $answer['body'] ];
+$off			= \Nino\Auth::STATUS_DISABLED;
+
+// What a request without a session is told, and what a request of an account that lacks the right is told: the answers the dispatcher and guardPerm() give
+$visitor	= static fn( string $action, array $data ): array => $answerOf( $send( 'visitor', $action, $data ) );
+$refused	= [ 403, [ 'error' => 'not allowed' ] ];
+
+// What a stale request does to an account that another request changed meanwhile: only its own change is made, on the account as config.php holds it
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/status', [ 'username' => 'ed@example.com', 'active' => false ] );
+$answer = $handle( $stale, 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed.new@example.com' ] );
+check( 'a rename by a request that booted before the account was deactivated: 200, and the account at the new address is deactivated still', $answer === [ 200, null ] && ( $user( 'ed.new@example.com' )['status'] ?? null ) === $off && $user( 'ed@example.com' ) === [] );
+
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed@example.com', 'pw' => $password ] );
+$answer = $handle( $stale, 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed.new@example.com' ] );
+$hash		= (string) ( $user( 'ed.new@example.com' )['pw'] ?? '' );
+check( 'a rename by a request that booted before a password was set: 200, and the account at the new address holds the password that was set', $answer === [ 200, null ] && password_verify( $password, $hash ) === true && password_verify( PW, $hash ) === false );
+
+foreach( [
+	'users/role'		=> [ 'users/role', [ 'username' => 'ed2@example.com', 'role' => 'spare' ], static fn( array $record ): bool => ( $record['role'] ?? '' ) === 'spare' ],
+	'users/status'	=> [ 'users/status', [ 'username' => 'ed2@example.com', 'active' => false ], static fn( array $record ): bool => ( $record['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED ],
+	'users/save'		=> [ 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'role' => 'spare' ], static fn( array $record ): bool => ( $record['role'] ?? '' ) === 'spare' ],
+] as $label => [ $action, $data, $done ] ) {
+
+	$restore( $worldA );
+	$stale = $bootRequest( 'man' );
+	$send( 'dev', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'name' => 'Set Meanwhile' ] );
+	$answer = $handle( $stale, $action, $data );
+	check( $label. ' by a request that booted before the name was set: 200, and the change is made with the name that was set', $answer === [ 200, null ] && $done( $user( 'ed2@example.com' ) ) === true && ( $user( 'ed2@example.com' )['name'] ?? '' ) === 'Set Meanwhile' );
+}
+
+// Three requests: the second gives an account full access, the third takes it from the first, the first - a request that booted before - saves the account that was given it
+$restore( $worldA );
+$stale = $bootRequest( 'dev2' );
+$send( 'dev', 'users/role', [ 'username' => 'none@example.com', 'role' => 'developer' ] );
+$send( 'none', 'users/role', [ 'username' => 'dev@example.com', 'role' => '' ] );
+$answer = $handle( $stale, 'users/save', [ 'username' => 'none@example.com', 'mail' => 'none@example.com', 'name' => 'Renamed' ] );
+check( 'three requests: the account that was given full access and took it from another still holds it after a stale save of its name, and the name is set', $answer === [ 200, null ] && ( $user( 'none@example.com' )['role'] ?? '' ) === 'developer' && ( $user( 'none@example.com' )['name'] ?? '' ) === 'Renamed' && $fullActive() === [ 'dev2@example.com', 'none@example.com' ] );
+
+// An address that was freed meanwhile is free for the request that booted before
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2.moved@example.com' ] );
+$answer = $handle( $stale, 'users/create', [ 'mail' => 'ed2@example.com', 'pw' => $password, 'role' => 'editor', 'name' => '' ] );
+check( 'an address freed by a rename meanwhile is made an account: 200', $answer === [ 200, null ] && ( $user( 'ed2@example.com' )['role'] ?? null ) === 'editor' && $user( 'ed2.moved@example.com' ) !== [] );
+
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2.moved@example.com' ] );
+$answer = $handle( $stale, 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed2@example.com' ] );
+check( 'an address freed by a rename meanwhile is the new address of another account: 200', $answer === [ 200, null ] && $user( 'ed2@example.com' ) !== [] && $user( 'ed@example.com' ) === [] && $user( 'ed2.moved@example.com' ) !== [] );
+
+// A caller whose right was taken away meanwhile: what a request that boots after the change is told, for every action that takes the lock
+$sites = [
+	'users/create'		=> [ 'users/create', [ 'mail' => 'made@example.com', 'pw' => $password, 'role' => 'editor', 'name' => '' ] ],
+	'users/delete'		=> [ 'users/delete', [ 'username' => 'ed2@example.com' ] ],
+	'users/save'			=> [ 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'name' => 'Late' ] ],
+	'users/status'		=> [ 'users/status', [ 'username' => 'ed2@example.com', 'active' => false ] ],
+	'users/role'			=> [ 'users/role', [ 'username' => 'ed2@example.com', 'role' => 'spare' ] ],
+	'users/logoutall'	=> [ 'users/logoutall', [ 'username' => 'ed2@example.com' ] ],
+	'lockout/unlock'	=> [ 'lockout/unlock', [ 'username' => 'ed2@example.com' ] ],
+	'roles/save'			=> [ 'roles/save', [ 'id' => 'spare', 'label' => 'Spare, relabelled', 'perms' => [ $text ] ] ],
+	'roles/delete'		=> [ 'roles/delete', [ 'id' => 'spare' ] ],
+];
+
+foreach( $sites as $label => [ $action, $data ] ) {
+
+	$restore( $worldA );
+	$stale = $bootRequest( 'man' );
+	$send( 'dev', 'users/role', [ 'username' => 'man@example.com', 'role' => 'editor' ] );
+	$before = $disk();
+	[ $status, $body ] = $sendBooted( $stale, $action, $data );
+	$answer = [ $status, $body ];
+	$same		= $disk() === $before;
+	$fresh	= $answerOf( $send( 'man', $action, $data ) );
+
+	check( $label. ' of a manager who was lowered to an editor meanwhile: 403 "not allowed" as a request that boots after the change is told, nothing written', $answer === $refused && $fresh === $refused && $same === true && $disk() === $before );
+}
+
+// The own account stays the account's own without the right
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/role', [ 'username' => 'man@example.com', 'role' => 'editor' ] );
+[ $status, $body ] = $sendBooted( $stale, 'users/save', [ 'username' => 'man@example.com', 'mail' => 'man@example.com', 'name' => 'Own Name', 'currentPassword' => PW ] );
+check( 'a manager who was lowered meanwhile saves its own name: 200', $status === 200 && ( $user( 'man@example.com' )['name'] ?? '' ) === 'Own Name' && ( $user( 'man@example.com' )['role'] ?? '' ) === 'editor' );
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/role', [ 'username' => 'man@example.com', 'role' => 'editor' ] );
+[ $status ] = $sendBooted( $stale, 'users/logoutall', [ 'username' => 'man@example.com' ] );
+check( '...and ends its own sessions: 200', $status === 200 && ( $user( 'man@example.com' )['sessions'] ?? [ 'x' ] ) === [] );
+
+// A caller whose session is gone meanwhile: 401 "session", the answer of a request that has none, nothing written
+$ways = [
+	'logged out everywhere'								=> [ 'users/logoutall', [ 'username' => 'man@example.com' ] ],
+	'deactivated'													=> [ 'users/status', [ 'username' => 'man@example.com', 'active' => false ] ],
+	'deleted'															=> [ 'users/delete', [ 'username' => 'man@example.com' ] ],
+	'renamed'															=> [ 'users/save', [ 'username' => 'man@example.com', 'mail' => 'man.renamed@example.com' ] ],
+	'given a password by somebody else'		=> [ 'users/save', [ 'username' => 'man@example.com', 'mail' => 'man@example.com', 'pw' => $password ] ],
+];
+
+foreach( $ways as $label => [ $action, $data ] ) {
+
+	$restore( $worldA );
+	$stale = $bootRequest( 'man' );
+	$send( 'dev', $action, $data );
+	$before = $disk();
+	$create = [ 'mail' => 'made@example.com', 'pw' => $password, 'role' => 'editor', 'name' => '' ];
+	[ $status, $body ] = $sendBooted( $stale, 'users/create', $create );
+
+	check( 'a manager '. $label. ' meanwhile creates no account: 401 "session" as a request without a session is told, nothing written', [ $status, $body ] === $visitor( 'users/create', $create ) && $status === 401 && ( $body['code'] ?? '' ) === 'session' && $disk() === $before );
+}
+
+foreach( $sites as $label => [ $action, $data ] ) {
+
+	$restore( $worldA );
+	$stale = $bootRequest( 'man' );
+	$send( 'dev', 'users/logoutall', [ 'username' => 'man@example.com' ] );
+	$before = $disk();
+	[ $status, $body ] = $sendBooted( $stale, $action, $data );
+
+	check( $label. ' of a manager who was logged out everywhere meanwhile: 401 "session", nothing written', [ $status, $body ] === $visitor( $action, $data ) && $status === 401 && $disk() === $before );
+}
+
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/logoutall', [ 'username' => 'man@example.com' ] );
+$before = $disk();
+$own		= [ 'username' => 'man@example.com', 'mail' => 'man@example.com', 'pw' => $password, 'currentPassword' => PW ];
+[ $status, $body ] = $sendBooted( $stale, 'users/save', $own );
+check( 'a manager who was logged out everywhere meanwhile sets its own new password: 401 "session", the password is the one it had', [ $status, $body ] === $visitor( 'users/save', $own ) && password_verify( PW, (string) ( $user( 'man@example.com' )['pw'] ?? '' ) ) === true && $disk() === $before );
+
+// A session that outlived its time is no session, and a request that finds it so cleans nothing up: the next request of that browser does
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+ninoBoot( $app );
+$app['/nino/auth/user']['man@example.com']['sessions'][$sessions['man']]['time'] = time() - 31 * 86400;
+\Nino\AppData::writeContentData( $app, [ '/nino/auth/user' ] );
+$before = $disk();
+[ $status, $body ] = $sendBooted( $stale, 'users/create', [ 'mail' => 'made@example.com', 'pw' => $password, 'role' => 'editor', 'name' => '' ] );
+check( 'a session older than its time, written into the record meanwhile: 401 "session", and the record is as it was - the token is still listed', $status === 401 && ( $body['code'] ?? '' ) === 'session' && $disk() === $before && isset( $user( 'man@example.com' )['sessions'][$sessions['man']] ) === true );
+
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+ninoBoot( $app );
+$app['/nino/auth/user']['man@example.com']['sessions'][$sessions['man']]['time'] = time() - 29 * 86400;
+\Nino\AppData::writeContentData( $app, [ '/nino/auth/user' ] );
+[ $status ] = $sendBooted( $stale, 'users/create', [ 'mail' => 'made@example.com', 'pw' => $password, 'role' => 'editor', 'name' => '' ] );
+check( '...and one that is a day short of its time goes through: 200', $status === 200 && $user( 'made@example.com' ) !== [] );
+
+// What a save posts is a change where it differs from the account as config.php holds it, not as the request found it
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'name' => 'Another Name', 'role' => 'spare' ] );
+$answer = $handle( $stale, 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'name' => '', 'role' => 'editor' ] );
+check( 'a save that posts the role and the name the form was opened with, where another save has set others meanwhile: 200, and the posted ones are set', $answer === [ 200, null ] && ( $user( 'ed2@example.com' )['role'] ?? '' ) === 'editor' && ( $user( 'ed2@example.com' )['name'] ?? '' ) === '' );
+
+// ...and never the own role: the account is told what a request that boots after the change is told
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/role', [ 'username' => 'man@example.com', 'role' => 'developer' ] );
+$before = $disk();
+$answer = $handle( $stale, 'users/save', [ 'username' => 'man@example.com', 'mail' => 'man@example.com', 'role' => 'manager', 'currentPassword' => PW ] );
+check( 'an own save that posts the role the form was opened with, where another request has given the account another: 400 "users_own_role", nothing written', $answer === [ 400, 'users_own_role' ] && $disk() === $before && ( $user( 'man@example.com' )['role'] ?? '' ) === 'developer' );
+
+// ...and one that lost the right meanwhile is told what a request that boots after the change is told: not allowed
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$send( 'dev', 'users/role', [ 'username' => 'man@example.com', 'role' => 'editor' ] );
+$before = $disk();
+$own		= [ 'username' => 'man@example.com', 'mail' => 'man@example.com', 'role' => 'manager', 'currentPassword' => PW ];
+[ $status, $body ] = $sendBooted( $stale, 'users/save', $own );
+$fresh	= $answerOf( $send( 'man', 'users/save', $own ) );
+check( 'an own save that posts the role the form was opened with, by a caller lowered meanwhile: 403 "not allowed" as a request that boots after the change is told, nothing written', [ $status, $body ] === $refused && $fresh === $refused && $disk() === $before );
+
+// The current password was confirmed against the password the request found: a password set meanwhile by a second request of the same session is none that was confirmed
+$restore( $worldA );
+$stale = $bootRequest( 'ed' );
+$send( 'ed', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed@example.com', 'pw' => $password, 'currentPassword' => PW ] );
+$before = $disk();
+[ $status, $body ] = $sendBooted( $stale, 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed@example.com', 'name' => 'Late', 'currentPassword' => PW ] );
+check( 'an own save with the password the request found, where the same session has set another meanwhile: 401 "wrong_password" at the field currentPassword, nothing written, no attempt counted', $status === 401 && ( $body['code'] ?? '' ) === 'wrong_password' && ( $body['field'] ?? '' ) === 'currentPassword' && $disk() === $before );
+$wrong = $send( 'ed', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed@example.com', 'name' => 'Late', 'currentPassword' => PW ] );
+check( '...the answer of a request that boots after the change and brings that password', $answerOf( $wrong ) === [ $status, $body ] );
+
+// A hash of the same password that another request made meanwhile (a sign-in that rehashes) is the password that was confirmed
+$restore( $worldA );
+$stale = $bootRequest( 'ed' );
+ninoBoot( $app );
+$app['/nino/auth/user']['ed@example.com']['pw'] = password_hash( PW, PASSWORD_BCRYPT, [ 'cost' => 4 ] );
+\Nino\AppData::writeContentData( $app, [ '/nino/auth/user' ] );
+$rehashed = $user( 'ed@example.com' )['pw'];
+[ $status ] = $sendBooted( $stale, 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed@example.com', 'name' => 'After Rehash', 'currentPassword' => PW ] );
+check( 'an own save with the password the request found, where a sign-in has stored another hash of that password meanwhile: 200, and the change is written', $status === 200 && ( $user( 'ed@example.com' )['name'] ?? '' ) === 'After Rehash' && password_verify( PW, (string) ( $user( 'ed@example.com' )['pw'] ?? '' ) ) === true && $rehashed !== '' );
+
+// What a stale request must keep of the others: a session another request opened, and the end of every session
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$as( 'visitor' );
+ninoBoot( $app );
+\Nino\Auth::loginUser( $app, 'ed2@example.com', PW );
+$opened = \Nino\Runtime::getSessionValue( $app, './nino/auth/token', '' );
+$answer = $handle( $stale, 'users/role', [ 'username' => 'ed2@example.com', 'role' => 'spare' ] );
+check( 'a role change keeps the session that the account opened by signing in meanwhile', $answer === [ 200, null ] && isset( $user( 'ed2@example.com' )['sessions'][$opened] ) === true && isset( $user( 'ed2@example.com' )['sessions'][$sessions['ed2']] ) === true );
+
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$as( 'visitor' );
+ninoBoot( $app );
+\Nino\Auth::loginUser( $app, 'ed2@example.com', PW );
+$opened = \Nino\Runtime::getSessionValue( $app, './nino/auth/token', '' );
+$answer = $handle( $stale, 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2.renamed@example.com' ] );
+check( 'a rename takes the session that the account opened meanwhile along to the new address', $answer === [ 200, null ] && isset( $user( 'ed2.renamed@example.com' )['sessions'][$opened] ) === true && isset( $user( 'ed2.renamed@example.com' )['sessions'][$sessions['ed2']] ) === true );
+
+$restore( $worldA );
+$stale = $bootRequest( 'man' );
+$as( 'visitor' );
+ninoBoot( $app );
+\Nino\Auth::loginUser( $app, 'ed2@example.com', PW );
+$answer = $handle( $stale, 'users/logoutall', [ 'username' => 'ed2@example.com' ] );
+check( 'the end of every session ends the one that the account opened meanwhile too', $answer === [ 200, null ] && ( $user( 'ed2@example.com' )['sessions'] ?? [ 'x' ] ) === [] );
+
+// The own session goes on through the own save and the own rename: the next request of the browser is the account's, at the address it has
+$restore( $worldA );
+$answer = $send( 'ed', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed@example.com', 'name' => 'Own', 'currentPassword' => PW ] );
+$next		= ninoLive( $app, 'users/list', [], \Nino\Csrf::getToken( $app ) );
+check( 'the own save: 200, and the next request of the same session is the account\'s', $answer['status'] === 200 && $next['status'] === 200 && ( \Nino\Auth::getCurrentUser( $app )['mail'] ?? '' ) === 'ed@example.com' );
+$answer = $send( 'ed', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'ed.moved@example.com', 'currentPassword' => PW ] );
+$next		= ninoLive( $app, 'users/list', [], \Nino\Csrf::getToken( $app ) );
+check( 'the own rename: 200, the session carries the new address, and the next request of the same session is the account\'s at it', $answer['status'] === 200 && \Nino\Runtime::getSessionValue( $app, './nino/auth/current', '' ) === 'ed.moved@example.com' && $next['status'] === 200 && ( \Nino\Auth::getCurrentUser( $app )['mail'] ?? '' ) === 'ed.moved@example.com' );
 
 // --- The Dashboard tile -------------------------------------------------------------------------
 
@@ -920,8 +1170,10 @@ echo "\nAn address that differs from an account's in case only\n";
 
 $restore( $worldA );
 $stored = static fn(): array => array_map( 'strval', array_keys( (array) $read( '/config.php' )['/nino/auth/user'] ) );
-$signIn = static function( string $mail, string $pw ) use ( &$app ): bool {
+$signIn = static function( string $mail, string $pw ) use ( &$app, $as ): bool {
 
+	// A browser with no session signs in: a sign-in of the account that is signed in ends its session
+	$as( 'visitor' );
 	ninoBoot( $app );
 
 	return \Nino\Auth::loginUser( $app, $mail, $pw ) !== false;

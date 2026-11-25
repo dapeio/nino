@@ -1071,6 +1071,25 @@ namespace Nino {
 		}
 
 
+		/**
+		 *	Whether an account record still holds the session of a token: the account is active, lists
+		 *	the token, and the session is not older than SESSION_TTL. The question the sign-in of a
+		 *	request is decided by (_resumeSession()), asked of any record and without writing anything - so a
+		 *	request that holds the lock of config.php can ask it of the record the file holds
+		 *
+		 *	@param		array 		$user					An account record, as getUser() answers it
+		 *	@param		string		$token				The session token of the php session
+		 *
+		 *	@return 	bool
+		 */
+		public static function sessionHolds( array $user, string $token ): bool {
+
+			return $token !== ''
+				&& ( $user['status'] ?? null ) === self::STATUS_ACTIVE
+				&& is_array( $user['sessions'][$token] ?? null ) === true
+				&& ( $user['sessions'][$token]['time'] ?? 0 ) >= time() - self::SESSION_TTL;
+		}
+
 		// Restore the logged-in user behind a session token - if that token
 		// is still listed on the user AND hasn't outlived SESSION_TTL. The
 		// ttl used to be enforced in loginUser() only, ie. on write: tokens
@@ -1092,8 +1111,7 @@ namespace Nino {
 			// has no such step, and without this the account stays fully
 			// authorised in every browser still holding a listed token - up
 			// to SESSION_TTL later
-			if( $user['status'] !== self::STATUS_ACTIVE
-				|| ( $user['sessions'][$token]['time'] ?? 0 ) < time() - self::SESSION_TTL ) {
+			if( self::sessionHolds( $user, $token ) === false ) {
 
 				unset( $appData['/nino/auth/user'][$mail]['sessions'][$token] );
 				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );

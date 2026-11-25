@@ -502,7 +502,7 @@ namespace Nino\Modules\Users {
 			// Read, checked and written under one lock (see lockStored()): what the
 			// decisions rest on is what config.php holds - the roles and the accounts - and
 			// only the role of this request is set in the copy of the roles that is written
-			$fresh = self::lockStored( $appData, $request );
+			$fresh = self::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;
@@ -555,17 +555,27 @@ namespace Nino\Modules\Users {
 
 		/**
 		 *	Take the lock of config.php and read what it holds: the roles and the accounts. The
-		 *	roles of this request become the stored ones; the answer is a copy of the app data with the stored
-		 *	roles and accounts, the one a decision about them is made against, while a write
-		 *	goes through $appData (accounts are merged, see \Nino\AppData::writeContentData()). The
-		 *	caller releases the lock with \Nino\Filesystem::unlockFile( $appData, '/config.php' )
+		 *	roles and the accounts of this request become the stored ones, the baseline the
+		 *	accounts are merged against with them, so that what is written afterwards is what
+		 *	config.php holds plus the one change of the action; the answer is a copy of the
+		 *	app data, the one a decision about them is made against, while a write goes through $appData
+		 *	(accounts are merged, see \Nino\AppData::writeContentData()). Then the signed-in account is asked
+		 *	of what config.php holds as well: its record still lists the session of this request
+		 *	and it still holds the right of the action. An account that was deleted, switched off, logged out
+		 *	everywhere or given another password meanwhile is answered with the 401 and the code 'session' of a request
+		 *	without a session, one that lost the right with the 403 of guardPerm() - the lock is let go and nothing
+		 *	is written (an ended session is not cleaned up here, the next request of its browser does that). The stored
+		 *	record is the signed-in account for what follows. The caller releases the lock with
+		 *	\Nino\Filesystem::unlockFile( $appData, '/config.php' )
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$perm					The permission the action asks for, as its guardPerm() does
+		 *	@param		string|null	$selfOr				The account the signed-in one may act on without the permission, the action's own account (see \Nino\Modules\Users\Admin::authorize())
 		 *
-		 *	@return 	array|null								The copy, null when the lock could not be taken and the response says so
+		 *	@return 	array|null								The copy, null when the lock could not be taken or the signed-in account may not go on, and the response says so
 		 */
-		public static function lockStored( array &$appData, array &$request ): ?array {
+		public static function lockStored( array &$appData, array &$request, string $perm, ?string $selfOr = null ): ?array {
 
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
@@ -574,13 +584,54 @@ namespace Nino\Modules\Users {
 
 			$roles = \Nino\AppData::stored( $appData, '/nino/auth/roles', [] );
 			$users = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
+			$users = is_array( $users ) === true ? $users : [];
 
-			$appData['/nino/auth/roles'] = is_array( $roles ) === true ? $roles : [];
+			$appData['/nino/auth/roles']			= is_array( $roles ) === true ? $roles : [];
+			$appData['/nino/auth/user']				= $users;
+			$appData['./nino/auth/baseline']	= $users;
 
-			$fresh = $appData;
-			$fresh['/nino/auth/user'] = is_array( $users ) === true ? $users : [];
+			if( self::_refuseCaller( $appData, $request, $perm, $selfOr ) === true ) {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+				return null;
+			}
 
-			return $fresh;
+			return $appData;
+		}
+
+		/**
+		 *	Whether what config.php holds does not let the signed-in account of this request go on - and if so,
+		 *	the response says what. The account becomes the stored record of the account
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data, its accounts and roles the stored ones
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$perm					The permission the action asks for
+		 *	@param		string|null	$selfOr				The account the signed-in one may act on without it
+		 *
+		 *	@return 	bool										True when the action is refused and the response set
+		 */
+		private static function _refuseCaller( array &$appData, array &$request, string $perm, ?string $selfOr ): bool {
+
+			$current	= \Nino\Auth::getCurrentUser( $appData );
+			$token		= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+			$stored		= $current === false ? false : \Nino\Auth::getUser( $appData, (string) $current['mail'] );
+
+			if( $stored === false || is_string( $token ) === false || \Nino\Auth::sessionHolds( $stored, $token ) === false ) {
+				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+				return true;
+			}
+
+			$appData['./nino/auth/current'] = $stored;
+
+			$allowed = $selfOr === null
+				? \Nino\Admin\Admin::permitted( $appData, $perm )
+				: Admin::authorize( $appData, $selfOr, $perm )[0];
+
+			if( $allowed === false ) {
+				\Nino\Http::fail( $request, 403, 'not allowed' );
+				return true;
+			}
+
+			return false;
 		}
 
 		/**
@@ -601,7 +652,7 @@ namespace Nino\Modules\Users {
 			$id = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'id' );
 
 			// Read, checked and written under one lock, as apiSave() does
-			$fresh = self::lockStored( $appData, $request );
+			$fresh = self::lockStored( $appData, $request, self::MANAGE_PERM );
 
 			if( $fresh === null )
 				return;

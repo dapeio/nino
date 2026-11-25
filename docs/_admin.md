@@ -23,6 +23,8 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 
 An account that may manage users still stays within what it holds itself: it hands out no role and sets no password, and it renames, deactivates, deletes, logs out, unlocks or gives another role to no account - and it renames, empties or deletes no role - that holds a permission its own account does not. The Developer holds everything and so changes everything; an account beyond the signed-in one stays in the table of the panel with the badge "More rights than you", has no button and opens no record - a click on its row says why over the table -, and the form of a role beyond the signed-in one shows what it holds and offers nothing to press.
 
+Two requests that change accounts at the same time do not undo each other: every action of the Users panel reads the accounts and the roles from `config.php` under its lock and writes its one change to the account as it is stored there, so what another request set on it meanwhile - a name, a password, a switch-off, a session - stays, and an address another request freed meanwhile is free. The signed-in account is asked of `config.php` as well: a manager who was lowered, switched off, deleted, renamed, given another password by someone else or logged out everywhere while its request was on the way is refused it - 403 `not allowed` where the right is gone, 401 with the code `session` where the session is - and nothing is written. An account that saves its own account while another request of its session has set its password is told the current password is wrong, and no attempt is counted.
+
 | Panel | Permission |
 |---|---|
 | Dashboard | none – every account |

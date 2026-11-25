@@ -388,12 +388,16 @@ ninoDeleteUser( $appData, 'dev3@example.com' );
 
 // A manager who sets another account's password ends every session of that account
 $signIn( 'man2@example.com' );
+ninoBoot( $appData );
 $appData['/nino/auth/user']['ed2@example.com']['sessions'] = [ 'one' => [ 'time' => time() ], 'two' => [ 'time' => time() ] ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 [ $status ] = $post( 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'pw' => 'a password of my choosing' ] );
 check( 'a manager who sets the password of another account ends that account\'s sessions', $status === 200 && ( $appData['/nino/auth/user']['ed2@example.com']['sessions'] ?? [ 'x' ] ) === []
 	&& password_verify( 'a password of my choosing', (string) $appData['/nino/auth/user']['ed2@example.com']['pw'] ) === true );
 check( '...and keeps its own session', \Nino\Auth::getCurrentUser( $appData ) !== false && \Nino\Auth::getCurrentUser( $appData )['mail'] === 'man2@example.com' );
+ninoBoot( $appData );
 $appData['/nino/auth/user']['ed2@example.com']['sessions'] = [ 'one' => [ 'time' => time() ] ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 [ $status ] = $post( 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2.renamed@example.com' ] );
 check( '...a change of the address that is no password ends none: the account is the same, and its sessions go with it', $status === 200 && isset( $appData['/nino/auth/user']['ed2@example.com'] ) === false && array_keys( $appData['/nino/auth/user']['ed2.renamed@example.com']['sessions'] ?? [] ) === [ 'one' ] );
 
