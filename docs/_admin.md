@@ -256,7 +256,7 @@ php -r 'echo "<?php http_response_code(403); exit; return \x27", password_hash( 
 
 Do this in a protected local environment only – a password on a command line may be visible in the shell history or the process list.
 
-The **Recovery password** tab of the Users panel changes the recovery password: the current one, the new one - at least eight characters - and the new one again. A wrong current password counts against the same five attempts `recovery.php` has. The tab cannot set a first password: where `private/.auth/pw.php` is missing, the one-liner above writes it. The tab needs `/_admin/recoverypw/manage`, a permission of its own that the Developer role holds through full access and the Editor role does not - whoever holds it can lock `recovery.php`, and with the recovery password restore a backup over the whole project.
+The **Recovery password** tab of the Users panel changes the recovery password: the current one, the new one - at least eight characters and at most 72 bytes - and the new one again. A wrong current password counts against the same five attempts `recovery.php` has. The tab cannot set a first password: where `private/.auth/pw.php` is missing, the one-liner above writes it. The tab needs `/_admin/recoverypw/manage`, a permission of its own that the Developer role holds through full access and the Editor role does not - whoever holds it can lock `recovery.php`, and with the recovery password restore a backup over the whole project.
 
 ## Text and Text Keys
 

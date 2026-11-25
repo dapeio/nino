@@ -28,6 +28,10 @@ declare(strict_types=1);
  *								ninoErrors()		Every error one call raises, with its level, and the Failure that ended it
  *								ninoCall()			One workbench request, as a panel sees it
  *								ninoUser()			An account, inserted and signed in
+ *								ninoBoot()			The state a request finds on disk: accounts, roles, the baseline of the merge, the signed-in account
+ *								ninoDeleteUser()	An account deleted from config.php, which Auth::deleteUser() alone does not do in a sandbox
+ *								ninoWireLive()	The token check, the route and the dispatcher of POST /_admin, as a live boot registers them
+ *								ninoLive()			One request of POST /_admin through the real token check and the dispatcher
  *								ninoVisit()			One request of the site, through Http::request()
  *								ninoCounter()		The entries of a counter of \Nino\Feature::count(), whichever file they are in
  *								ninoCounterSet()	A counter put into the state a test needs, entry by entry into the file of its client
@@ -355,6 +359,128 @@ function ninoUser( array &$appData, string $mail, array $perms = [ '/*' ], strin
 
 	\Nino\Auth::insertUser( $appData, $mail, $password, $perms );
 	\Nino\Auth::loginUser( $appData, $mail, $password );
+}
+
+/**
+ *	What a live request does before its action runs and a sandbox does not: it reads config.php afresh - the accounts and the roles - takes
+ *	the baseline Auth::init() takes (the accounts as this request found them, the first side of the three-way merge of
+ *	\Nino\AppData::writeContentData()), has no revocation or rehash marker of an earlier request and resumes the session of the signed-in
+ *	account. Without it a deletion or a rename of an account reaches the copy in memory only: the merge keeps every account the file has
+ *	where the baseline is empty. A test that asserts what config.php holds after such a change, or that two requests see what the
+ *	other one wrote, sends the request through this first (ninoLive() does)
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *
+ *	@return 	void
+ */
+function ninoBoot( array &$appData ): void {
+
+	$mail = \Nino\Runtime::getSessionValue( $appData, './nino/auth/current', '' );
+	$file = (static function( string $path ): mixed { return is_file( $path ) === true ? include $path : []; })( $appData['./nino/filesystem/configpath']. '/config.php' );
+
+	foreach( [ '/nino/auth/user', '/nino/auth/roles' ] as $key )
+		$appData[$key] = is_array( $file ) === true && is_array( $file[$key] ?? null ) === true ? $file[$key] : [];
+
+	$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
+	unset( $appData['./nino/auth/revoked'], $appData['./nino/auth/rehashed'] );
+
+	if( is_string( $mail ) === true && $mail !== '' && ( $user = \Nino\Auth::getUser( $appData, $mail ) ) !== false )
+		$appData['./nino/auth/current'] = $user;
+	else
+		unset( $appData['./nino/auth/current'] );
+}
+
+/**
+ *	Delete an account so that it is gone from config.php too: Auth::deleteUser() leaves a record in the file where the baseline of the merge
+ *	is empty, as it is in a sandbox that has not booted a request (see ninoBoot()), and a decision that reads the accounts from the file would
+ *	still find it
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		string		$mail
+ *
+ *	@return 	bool										What Auth::deleteUser() answers
+ */
+function ninoDeleteUser( array &$appData, string $mail ): bool {
+
+	$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'] ?? [];
+	$deleted = \Nino\Auth::deleteUser( $appData, $mail );
+
+	unset( $appData['./nino/auth/baseline'] );
+
+	return $deleted;
+}
+
+/**
+ *	The three registrations a live boot has for POST /_admin and a sandbox lacks: the token check (Csrf::init(), which \Nino\init() calls), the
+ *	route and the dispatcher as the callback of that route (Admin::init()). After this ninoLive() reaches the action through
+ *	Http::request() and Http::response(), as a request of the browser does
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *
+ *	@return 	void
+ */
+function ninoWireLive( array &$appData ): void {
+
+	\Nino\Csrf::init( $appData );
+	$appData['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin' ];
+	\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin', [ \Nino\Admin\Admin::class, 'handlePost' ] );
+}
+
+/**
+ *	One POST /_admin through the real token check and the dispatcher (needs ninoWireLive()), booted from disk (ninoBoot()). The token the
+ *	page sends is the one of the session, \Nino\Csrf::getToken(); here it is whatever the test gives:
+ *
+ *		ninoWireLive( $appData );
+ *		$answer = ninoLive( $appData, 'users/save', [ ... ], \Nino\Csrf::getToken( $appData ) );
+ *		$answer = ninoLive( $appData, 'users/save', [ ... ], 'wrong' );		// 403, code 'csrf', 'blocked' true
+ *		$answer = ninoLive( $appData, 'users/save', [ ... ], null );				// no token at all
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		string		$action				eg. 'users/save'
+ *	@param		array 		$data					Becomes $_POST['data'], json encoded
+ *	@param		string|null	$token			Becomes $_POST['_csrf'], null for none
+ *	@param		string|null	$header			Becomes the request header X-CSRF-Token, null for none
+ *	@param		array 		$server				More of the server array
+ *	@param		string|null	$jsonBody		The body of the request, handed over between Http::request() and Http::response() (php://input is empty in the cli), null for none
+ *
+ *	@return 	array										[ 'status' => int, 'body' => mixed, 'failure' => ?string (the message of a \Nino\Failure that ended the request, status 500 then), 'blocked' => bool (the token check refused it) ]
+ */
+function ninoLive( array &$appData, string $action, array $data, ?string $token, ?string $header = null, array $server = [], ?string $jsonBody = null ): array {
+
+	$_POST = [ 'action' => $action, 'data' => json_encode( $data ) ];
+
+	if( $token !== null )
+		$_POST['_csrf'] = $token;
+
+	$request = $server + [ 'REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/_admin', 'REMOTE_ADDR' => '127.0.0.1' ];
+
+	if( $header !== null )
+		$request['HTTP_X_CSRF_TOKEN'] = $header;
+
+	$failure = null;
+
+	ninoBoot( $appData );
+
+	try {
+		\Nino\Http::request( $appData, $request );
+
+		if( $jsonBody !== null )
+			$request['/nino/http/request']['body'] = $jsonBody;
+
+		\Nino\Http::response( $appData, $request );
+	}
+	catch( \Nino\Failure $caught ) {
+		$failure = $caught->getMessage();
+	}
+
+	unset( $_POST['_csrf'], $_POST['action'], $_POST['data'] );
+
+	return [
+		'status' 	=> $failure !== null ? 500 : $request['/nino/http/response']['statusCode'],
+		'body' 		=> $request['/nino/http/response']['body'] ?? null,
+		'failure' => $failure,
+		'blocked' => ( $request['./nino/csrf/blocked'] ?? false ) === true,
+	];
 }
 
 /**

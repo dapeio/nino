@@ -692,7 +692,7 @@ console.log('Admin Users');
 	const d = w.openRow('b@example.com');
 	w.type( w.field( d, 'pw' ), PASSWORD );
 	w.save( d );
-	w.answer( 403, { error : 'too wide', code : 'users_password_too_wide', params : [ '/*' ], field : 'pw' } );
+	w.answer( 403, { error : 'too wide', code : 'users_account_beyond', params : [ '/*' ], field : 'pw' } );
 	check( 'a password the server refused stays in its field and is marked: it is what the person corrects', w.field( d, 'pw' ).value === PASSWORD && w.field( d, 'pw' ).attributes['aria-invalid'] === 'true' );
 	w.close( d );
 	w.answerAsk( '/_admin/common/label/discard' );
@@ -733,7 +733,7 @@ console.log('Admin Users');
 {
 	const REFUSALS = [
 		[ 'users_unknown_role', 400, 'role', [] ], [ 'users_invalid_mail', 400, 'mail', [] ], [ 'users_password_short', 400, 'pw', [ 8 ] ], [ 'users_name_long', 400, 'name', [ 60 ] ], [ 'users_name_invalid', 400, 'name', [] ],
-		[ 'wrong_password', 401, 'currentPassword', [] ], [ 'users_password_too_wide', 403, 'pw', [ '/*' ] ], [ 'users_password_too_wide_scoped', 403, 'pw', [ '/x/' ] ], [ 'users_role_too_wide', 403, 'role', [ '/*' ] ], [ 'users_role_too_wide_scoped', 403, 'role', [ '/x/' ] ],
+		[ 'wrong_password', 401, 'currentPassword', [] ], [ 'users_account_beyond', 403, 'pw', [ '/*' ] ], [ 'users_account_beyond_scoped', 403, 'pw', [ '/x/' ] ], [ 'users_role_too_wide', 403, 'role', [ '/*' ] ], [ 'users_role_too_wide_scoped', 403, 'role', [ '/x/' ] ],
 		[ 'users_own_role', 400, 'role', [] ], [ 'users_mail_in_use', 400, 'mail', [] ],
 	];
 

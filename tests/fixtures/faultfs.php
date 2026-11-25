@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 /**
  *	The file protocol of php for a moment, with a record of what is done and with the failures a test names: a read of a file that is
- *	there fails, a chmod, an unlink. Everything else is what php does itself
+ *	there fails, a chmod, an unlink, the replace of a file (rename). Everything else is what php does itself
  */
 final class FaultFs {
 
@@ -95,6 +95,10 @@ final class FaultFs {
 
 	public function rename( string $from, string $to ): bool {
 		self::$log[] = [ 'rename', $from, $to ];
+
+		// 'rename' => function( string $to ): bool, true to refuse the replace of a file: the file is then as it was
+		if( self::fails( 'rename', $to ) === true )
+			return false;
 
 		return self::real( static fn(): mixed => @rename( $from, $to ) );
 	}

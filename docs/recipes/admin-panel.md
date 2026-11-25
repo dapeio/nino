@@ -296,8 +296,9 @@ asked of a list - may not be written, handed out or set as a password by an
 account that does not hold the whole panel - a blanket of it, or the door with no
 scoped entry. A role that is wide may still be edited by such an account as long
 as nothing widens. The panels are asked of every `scopes()`, including one that
-offers no area at the moment (`scopeOptions( $appData, true )`). The refusal is a `403` with the codes `roles_grant_too_wide_scoped`,
-`users_role_too_wide_scoped` and `users_password_too_wide_scoped`, which name the panel's scope.
+offers no area at the moment (`scopeOptions( $appData, true )`). The refusal is a `403` with the codes `roles_grant_too_wide_scoped` and
+`users_role_too_wide_scoped`, which name the panel's scope; the password of an account that holds such a set is
+refused as any change of an account beyond the signed-in one is, with `users_account_beyond_scoped`.
 
 Changing is bounded by the same holding. `\Nino\Modules\Users\Admin::beyond()` asks
 `Roles::notHeld()` of what an account other than the signed-in one holds, role and own permissions together,

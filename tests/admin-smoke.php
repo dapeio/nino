@@ -45,6 +45,8 @@ $appData['/nino/modules'][]							= '\\Nino\\Modules\\Form';
 // The two roles the wizard writes (see Roles::defaults()), read off this
 // registry: the Editor role holds the module's content permission too
 $appData['/nino/auth/roles']						= \Nino\Modules\Users\Roles::defaults( $appData );
+// ...and as config.php holds them, which is what a role action decides against
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
 
 // '/*' - the main test account throughout this file exercises every module,
 // same shape as config.php's real seeded admin (full access)
@@ -1448,9 +1450,9 @@ check( 'nor rename it', $status === 403 && \Nino\Auth::getUser( $appData, 'wide@
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'narrow@example.com', 'mail' => 'narrow@example.com', 'pw' => 'a password of my choosing' ] );
 check( 'a manager can set the password of an account no wider than their own', $status === 200 && password_verify( 'a password of my choosing', \Nino\Auth::getUser( $appData, 'narrow@example.com' )['pw'] ) === true );
 
-\Nino\Auth::deleteUser( $appData, 'wide@example.com' );
-\Nino\Auth::deleteUser( $appData, 'narrow@example.com' );
-\Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
+ninoDeleteUser( $appData, 'wide@example.com' );
+ninoDeleteUser( $appData, 'narrow@example.com' );
+ninoDeleteUser( $appData, 'usersonly@example.com' );
 
 // An account written by hand has a hash, a status and permissions and no
 // 'role' key (see auth-smoke.php). Changing its own password must answer
@@ -1464,7 +1466,7 @@ ninoWarnings();
 $handWarnings = ninoWarnings();
 check( 'a hand-written account without a role key changes its own password without a warning', $status === 200 && $body['mail'] === 'hand@example.com' && $body['role'] === '' && $handWarnings === [] );
 check( '...and the new password is the stored one', password_verify( 'a password of my choosing', \Nino\Auth::getUser( $appData, 'hand@example.com' )['pw'] ) === true );
-\Nino\Auth::deleteUser( $appData, 'hand@example.com' );
+ninoDeleteUser( $appData, 'hand@example.com' );
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
 $appData['/nino/auth/user']['plain3@example.com']['sessions'] = [ '127.0.0.1' => time(), '10.0.0.1' => time() ];
@@ -1511,8 +1513,8 @@ check( 'and activates it again', $status === 200 && $body['status'] === 'active'
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
 // The last active account with full access. Every other account is switched
-// off in memory for the length of the check - the session of the manager
-// doing it is not touched by that
+// off, in memory and in config.php, for the length of the check - the
+// session of the manager doing it is not touched by that
 \Nino\Auth::insertUser( $appData, 'lastadmin@example.com', 'last admin password', [ '/*' ] );
 $statuses = [];
 foreach( $appData['/nino/auth/user'] as $mail => $record )
@@ -1520,6 +1522,7 @@ foreach( $appData['/nino/auth/user'] as $mail => $record )
 		$statuses[$mail] = $record['status'] ?? null;
 		$appData['/nino/auth/user'][$mail]['status'] = \Nino\Auth::STATUS_DISABLED;
 	}
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 [ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'lastadmin@example.com', 'active' => false ] );
 check( 'the last active account with full access cannot be deactivated - other full access accounts being disabled do not count', $status === 409
 	&& \Nino\Auth::getUser( $appData, 'lastadmin@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
@@ -1528,9 +1531,10 @@ check( '...fullAccessExists() counts active accounts only', \Nino\Modules\Users\
 check( '...nor deleted', $status === 409 );
 foreach( $statuses as $mail => $was )
 	$appData['/nino/auth/user'][$mail]['status'] = $was;
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 [ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'lastadmin@example.com', 'active' => false ] );
 check( 'with another active full access in place it can be', $status === 200 );
-\Nino\Auth::deleteUser( $appData, 'lastadmin@example.com' );
+ninoDeleteUser( $appData, 'lastadmin@example.com' );
 
 check( 'log() names the direction of the switch', \Nino\Modules\Users\Admin::log( 'users/status', [ 'username' => 'x@example.com', 'active' => false ] ) === 'Deactivate User x@example.com'
 	&& \Nino\Modules\Users\Admin::log( 'users/status', [ 'username' => 'x@example.com', 'active' => true ] ) === 'Activate User x@example.com' );
@@ -1541,7 +1545,7 @@ check( 'log() names the direction of the switch', \Nino\Modules\Users\Admin::log
 check( 'a manager changes address, password and role in one save', $status === 200 && $body === [ 'mail' => 'onesave2@example.com', 'role' => 'editor' ] );
 $saved = \Nino\Auth::getUser( $appData, 'onesave2@example.com' );
 check( '...and all three are stored', $saved !== false && $saved['role'] === 'editor' && password_verify( 'a changed password', $saved['pw'] ) === true && \Nino\Auth::getUser( $appData, 'onesave@example.com' ) === false );
-check( 'log() puts the role into the line', \Nino\Modules\Users\Admin::log( 'users/save', [ 'username' => 'a@example.com', 'mail' => 'b@example.com', 'role' => 'editor' ] ) === 'Edit User b@example.com Role editor' );
+check( 'log() puts the role into the line', \Nino\Modules\Users\Admin::log( 'users/save', [ 'username' => 'a@example.com', 'mail' => 'b@example.com', 'role' => 'editor' ] ) === 'Edit User a@example.com -> b@example.com Role editor' );
 
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave2@example.com', 'mail' => 'onesave3@example.com', 'role' => 'editor' ] );
 check( 'a role posted unchanged is not a role change', $status === 200 && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === 'editor' );
@@ -1568,10 +1572,10 @@ check( '...but may not hand out a role wider than their own - and nothing of tha
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'usersonly@example.com', 'mail' => 'usersonly@example.com', 'currentPassword' => 'users only password', 'role' => 'developer' ] );
 check( 'nor their own role', $status === 400 );
 
-\Nino\Auth::deleteUser( $appData, 'devacct@example.com' );
-\Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
-\Nino\Auth::deleteUser( $appData, 'onesave3@example.com' );
-\Nino\Auth::deleteUser( $appData, 'toggle@example.com' );
+ninoDeleteUser( $appData, 'devacct@example.com' );
+ninoDeleteUser( $appData, 'usersonly@example.com' );
+ninoDeleteUser( $appData, 'onesave3@example.com' );
+ninoDeleteUser( $appData, 'toggle@example.com' );
 
 // A plain user: no manager, so no role of their own either, and no status
 ninoUser( $appData, 'selfsave@example.com', [], 'self save password' );
@@ -1582,7 +1586,7 @@ check( '...nor deactivate an account', $status === 403 );
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callUsers( $appData, 'apiStatus', [ 'username' => 'plain3@example.com', 'active' => false ] );
 check( 'and apiStatus wants a session at all', $status === 401 );
-\Nino\Auth::deleteUser( $appData, 'selfsave@example.com' );
+ninoDeleteUser( $appData, 'selfsave@example.com' );
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
 // --- Users::apiSetRole / Roles ---

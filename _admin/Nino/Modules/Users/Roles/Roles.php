@@ -445,7 +445,8 @@ namespace Nino\Modules\Users {
 		 *	(PERM_PATTERN) and is refused by name otherwise, so a typo cannot
 		 *	end up in config.php looking like a grant; '/*' stands alone, since
 		 *	it covers everything else already. Tried on a copy first, for the
-		 *	two refusals the class docblock names
+		 *	two refusals the class docblock names. Decided against the roles
+		 *	config.php holds, under its lock, and only this role is set in them
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -498,43 +499,94 @@ namespace Nino\Modules\Users {
 			if( in_array( '/*', $perms, true ) === true )
 				$perms = [ '/*' ];
 
-			$next = $appData;
-			$next['/nino/auth/roles'][$id] = [ 'label' => $label, 'perms' => $perms ];
+			// Read, checked and written under one lock (see lockStored()): what the
+			// decisions rest on is what config.php holds - the roles and the accounts - and
+			// only the role of this request is set in the copy of the roles that is written
+			$fresh = self::lockStored( $appData, $request );
 
-			if( \Nino\Auth::checkPermission( $next, self::MANAGE_PERM ) === false ) {
-				\Nino\Http::fail( $request, 409, 'this change would take the permission to manage users away from your own account', 'roles_locks_self_out' );
+			if( $fresh === null )
 				return;
+
+			try {
+
+				// The form that makes a new role says so: an id that is taken is refused
+				// against the roles config.php holds, and the role that holds it stays as it is
+				if( ( $data['create'] ?? false ) === true && array_key_exists( $id, self::all( $fresh ) ) === true ) {
+					\Nino\Http::fail( $request, 409, 'a role with this id exists', 'roles_id_taken', [], 'id' );
+					return;
+				}
+
+				// A role that holds what the account does not is not its to change -
+				// not to rename, not to empty
+				if( self::refuseChange( $fresh, $request, $id ) === true )
+					return;
+
+				// Only what the role gains is measured against the account making
+				// the change (see notHeld()): taking a permission it does not hold
+				// away from a role narrows somebody else and widens nobody
+				$missing = self::notHeld( $fresh, $perms, self::all( $fresh )[$id]['perms'] ?? [] );
+
+				if( $missing !== '' ) {
+					\Nino\Http::fail( $request, 403, 'cannot grant a permission your own account does not hold: '. $missing, self::isScope( $missing ) === true ? 'roles_grant_too_wide_scoped' : 'roles_grant_too_wide', [ $missing ] );
+					return;
+				}
+
+				$next = $fresh;
+				$next['/nino/auth/roles'][$id] = [ 'label' => $label, 'perms' => $perms ];
+
+				if( \Nino\Auth::checkPermission( $next, self::MANAGE_PERM ) === false ) {
+					\Nino\Http::fail( $request, 409, 'this change would take the permission to manage users away from your own account', 'roles_locks_self_out' );
+					return;
+				}
+
+				if( self::fullAccessExists( $fresh ) === true && self::fullAccessExists( $next ) === false ) {
+					\Nino\Http::fail( $request, 409, 'this change would leave no account with full access', 'roles_no_full_access' );
+					return;
+				}
+
+				$appData['/nino/auth/roles'] = $next['/nino/auth/roles'];
+				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
+
+				\Nino\Http::ok( $request, [ 'id' => $id, 'label' => $label, 'perms' => $perms, 'users' => self::holders( $fresh, $id ) ] );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
+		}
+
+		/**
+		 *	Take the lock of config.php and read what it holds: the roles and the accounts. The
+		 *	roles of this request become the stored ones; the answer is a copy of the app data with the stored
+		 *	roles and accounts, the one a decision about them is made against, while a write
+		 *	goes through $appData (accounts are merged, see \Nino\AppData::writeContentData()). The
+		 *	caller releases the lock with \Nino\Filesystem::unlockFile( $appData, '/config.php' )
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	array|null								The copy, null when the lock could not be taken and the response says so
+		 */
+		public static function lockStored( array &$appData, array &$request ): ?array {
+
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
+				return null;
 			}
 
-			if( self::fullAccessExists( $appData ) === true && self::fullAccessExists( $next ) === false ) {
-				\Nino\Http::fail( $request, 409, 'this change would leave no account with full access', 'roles_no_full_access' );
-				return;
-			}
+			$roles = \Nino\AppData::stored( $appData, '/nino/auth/roles', [] );
+			$users = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
 
-			// Only what the role gains is measured against the account making
-			// the change (see notHeld()): taking a permission it does not hold
-			// away from a role narrows somebody else and widens nobody
-			$missing = self::notHeld( $appData, $perms, self::all( $appData )[$id]['perms'] ?? [] );
+			$appData['/nino/auth/roles'] = is_array( $roles ) === true ? $roles : [];
 
-			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot grant a permission your own account does not hold: '. $missing, self::isScope( $missing ) === true ? 'roles_grant_too_wide_scoped' : 'roles_grant_too_wide', [ $missing ] );
-				return;
-			}
+			$fresh = $appData;
+			$fresh['/nino/auth/user'] = is_array( $users ) === true ? $users : [];
 
-			// A role that holds what the account does not is not its to change -
-			// not to rename, not to empty
-			if( self::refuseChange( $appData, $request, $id ) === true )
-				return;
-
-			$appData['/nino/auth/roles'] = $next['/nino/auth/roles'];
-			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
-
-			\Nino\Http::ok( $request, [ 'id' => $id, 'label' => $label, 'perms' => $perms, 'users' => self::holders( $appData, $id ) ] );
+			return $fresh;
 		}
 
 		/**
 		 *	Delete a role nobody holds - an account with a dangling role would
-		 *	silently lose what the role granted, so the accounts come first
+		 *	silently lose what the role granted, so the accounts come first.
+		 *	Decided against the roles config.php holds, under its lock
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -548,25 +600,36 @@ namespace Nino\Modules\Users {
 
 			$id = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'id' );
 
-			if( isset( self::all( $appData )[$id] ) === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown role' );
+			// Read, checked and written under one lock, as apiSave() does
+			$fresh = self::lockStored( $appData, $request );
+
+			if( $fresh === null )
 				return;
+
+			try {
+
+				if( isset( self::all( $fresh )[$id] ) === false ) {
+					\Nino\Http::fail( $request, 404, 'unknown role', 'roles_unknown', [ $id ] );
+					return;
+				}
+
+				if( self::refuseChange( $fresh, $request, $id ) === true )
+					return;
+
+				$holders = self::holders( $fresh, $id );
+
+				if( $holders > 0 ) {
+					\Nino\Http::fail( $request, 409, $holders. ( $holders === 1 ? ' account holds' : ' accounts hold' ). ' this role - give them another one first', 'roles_in_use', [ $holders ] );
+					return;
+				}
+
+				unset( $appData['/nino/auth/roles'][$id] );
+				\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
+
+				\Nino\Http::ok( $request );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
-
-			$holders = self::holders( $appData, $id );
-
-			if( $holders > 0 ) {
-				\Nino\Http::fail( $request, 409, $holders. ( $holders === 1 ? ' account holds' : ' accounts hold' ). ' this role - give them another one first', 'roles_in_use', [ $holders ] );
-				return;
-			}
-
-			if( self::refuseChange( $appData, $request, $id ) === true )
-				return;
-
-			unset( $appData['/nino/auth/roles'][$id] );
-			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
-
-			\Nino\Http::ok( $request );
 		}
 	}
 }

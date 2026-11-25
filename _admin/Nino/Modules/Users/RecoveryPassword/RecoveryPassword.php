@@ -72,6 +72,24 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
+		 *	Say why a new recovery password is refused - see \Nino\Auth::passwordRefusal()
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$reason				'invalid', 'short' or 'long'
+		 *
+		 *	@return 	void
+		 */
+		private static function _refuseNew( array &$request, string $reason ): void {
+
+			if( $reason === 'invalid' )
+				\Nino\Http::fail( $request, 400, 'a password is text without a null byte', 'recoverypw_password_invalid', [], 'pw' );
+			elseif( $reason === 'long' )
+				\Nino\Http::fail( $request, 400, 'password must be at most '. \Nino\Auth::PASSWORD_MAX_BYTES. ' bytes', 'recoverypw_password_long', [ \Nino\Auth::PASSWORD_MAX_BYTES ], 'pw' );
+			else
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'recoverypw_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
+		}
+
+		/**
 		 *	Change the recovery password. Nothing posted is echoed back: the
 		 *	answer is ok or the reason it is not
 		 *
@@ -99,7 +117,7 @@ namespace Nino\Modules\Users {
 			// A refusal a person can cause names itself (the code carries the words in
 			// the workbench's language), and the field it is about
 			match( $status ) {
-				400 		=> \Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'recoverypw_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' ),
+				400 		=> self::_refuseNew( $request, (string) \Nino\Auth::passwordRefusal( $new ) ),
 				401 		=> \Nino\Http::fail( $request, 401, 'wrong current password', 'recoverypw_wrong', [], 'current' ),
 				429 		=> \Nino\Http::fail( $request, 429, 'too many attempts', 'recoverypw_locked' ),
 				409 		=> \Nino\Http::fail( $request, 409, 'no recovery password is set - see the manual', 'recoverypw_unset' ),

@@ -38,6 +38,13 @@ $appData['/nino/auth/roles']				= [
 	'side'			=> [ 'label' => 'Side', 'perms' => [ $types ] ],
 ];
 
+// The roles stand in config.php, as a request finds them: what a role action decides, it decides against that
+$storeRoles = static function() use ( &$appData ): void {
+	\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
+};
+
+$storeRoles();
+
 $password = 'correct horse battery staple';
 
 foreach( [ 'dev' => 'developer', 'dev2' => 'developer', 'man' => 'manager', 'man2' => 'manager', 'ed' => 'editor', 'ed2' => 'editor' ] as $name => $role )
@@ -198,8 +205,8 @@ foreach( $actors as $actorName => $actor ) {
 			elseif( $status !== 200 || $did === false )
 				$wrong[] = "$actorName x $rank x $action: $status". ( $did === true ? '' : ', not done' );
 
-			\Nino\Auth::deleteUser( $appData, $mail );
-			\Nino\Auth::deleteUser( $appData, 'renamed.'. $mail );
+			ninoDeleteUser( $appData, $mail );
+			ninoDeleteUser( $appData, 'renamed.'. $mail );
 		}
 
 		foreach( $roleActions as $action => [ $class, $method, $ask, $done, $applies ] ) {
@@ -210,6 +217,7 @@ foreach( $actors as $actorName => $actor ) {
 			$id = 'target';
 
 			$appData['/nino/auth/roles'][$id] = [ 'label' => 'Target', 'perms' => $target['perms'] ];
+			$storeRoles();
 
 			$before = $roleOf( $id );
 			[ $status ] = $call( $class, $method, $ask( $id, $target['perms'] ) );
@@ -227,6 +235,7 @@ foreach( $actors as $actorName => $actor ) {
 				$wrong[] = "$actorName x $rank x role $action: $status". ( $did === true ? '' : ', not done' );
 
 			unset( $appData['/nino/auth/roles'][$id] );
+			$storeRoles();
 		}
 	}
 }
@@ -246,14 +255,16 @@ check( 'relabelling the Developer role answers 403 with the code of this refusal
 
 // The password of a wider account has words of its own, and keeps them
 [ $status, $body ] = $call( $users, 'apiSave', [ 'username' => 'dev2@example.com', 'mail' => 'dev2@example.com', 'pw' => 'a password of my choosing' ] );
-check( 'setting the password of a Developer answers with its own code', $status === 403 && ( $body['code'] ?? '' ) === 'users_password_too_wide' );
+check( 'setting the password of a Developer is refused as the change of an account beyond the manager is', $status === 403 && ( $body['code'] ?? '' ) === 'users_account_beyond' && ( $body['params'] ?? [] ) === [ '/*' ] );
 
 // A role that is wide for a panel lets in all of it; an account that holds
 // the panel in detail does not hold what that role is
 $elementsDoor	= '/_admin/elements/manage';
 $elementsOne	= '/_admin/elements/testtype/insert';
 $appData['/nino/auth/roles']['panel']		= [ 'label' => 'Panel', 'perms' => [ $elementsDoor ] ];
+$storeRoles();
 $appData['/nino/auth/roles']['partial']	= [ 'label' => 'Partial', 'perms' => [ $manage, $elementsDoor, $elementsOne ] ];
+$storeRoles();
 \Nino\Auth::insertUser( $appData, 'partial@example.com', $password, [], 'partial' );
 \Nino\Auth::insertUser( $appData, 'panel@example.com', $password, [], 'panel' );
 $signIn( 'partial@example.com' );
@@ -263,19 +274,21 @@ check( 'an account that holds a panel in detail does not deactivate one that is 
 	&& \Nino\Auth::getUser( $appData, 'panel@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
 [ $status ] = $call( $users, 'apiLogoutAll', [ 'username' => 'panel@example.com' ] );
 check( '...nor ends its sessions', $status === 403 );
-\Nino\Auth::deleteUser( $appData, 'panel@example.com' );
+ninoDeleteUser( $appData, 'panel@example.com' );
 [ $status, $body ] = $call( $roles, 'apiDelete', [ 'id' => 'panel' ] );
 check( '...nor deletes the role it holds, which nobody holds now', $status === 403 && ( $body['code'] ?? '' ) === 'roles_role_beyond_scoped' && isset( $appData['/nino/auth/roles']['panel'] ) === true );
 $signIn( 'dev@example.com' );
 [ $status ] = $call( $roles, 'apiDelete', [ 'id' => 'panel' ] );
 check( 'the Developer deletes it', $status === 200 && isset( $appData['/nino/auth/roles']['panel'] ) === false );
-\Nino\Auth::deleteUser( $appData, 'partial@example.com' );
+ninoDeleteUser( $appData, 'partial@example.com' );
 unset( $appData['/nino/auth/roles']['partial'] );
+$storeRoles();
 
 // A role that holds nothing beyond the manager is still not the manager's to
 // change while an account beyond the manager holds it: that account is changed
 // through its role
 $appData['/nino/auth/roles']['shared'] = [ 'label' => 'Shared', 'perms' => [ $text ] ];
+$storeRoles();
 \Nino\Auth::insertUser( $appData, 'shared@example.com', $password, [ $types ], 'shared' );
 $signIn( 'man@example.com' );
 [ $status, $body ] = $call( $roles, 'apiSave', [ 'id' => 'shared', 'label' => 'Shared', 'perms' => [] ] );
@@ -287,13 +300,16 @@ check( '...nor rename it', $status === 403 && $appData['/nino/auth/roles']['shar
 check( '...and the list says so, and that it is the holder that is beyond and not the role', array_column( $body['roles'], 'canChange', 'id' )['shared'] === false
 	&& array_column( $body['roles'], 'heldBeyond', 'id' )['shared'] === true && array_column( $body['roles'], 'heldBeyond', 'id' )['developer'] === false );
 $appData['/nino/auth/roles']['shared']['perms'] = [ $text, $types ];
+$storeRoles();
 [ $status, $body ] = $call( $roles, 'apiSave', [ 'id' => 'shared', 'label' => 'Shared', 'perms' => [ $text, $types ] ] );
 check( 'a role that holds the permission itself is refused for that, whoever holds it', $status === 403 && ( $body['code'] ?? '' ) === 'roles_role_beyond' );
 $appData['/nino/auth/roles']['shared']['perms'] = [ $text ];
-\Nino\Auth::deleteUser( $appData, 'shared@example.com' );
+$storeRoles();
+ninoDeleteUser( $appData, 'shared@example.com' );
 [ $status ] = $call( $roles, 'apiSave', [ 'id' => 'shared', 'label' => 'Renamed', 'perms' => [ $text ] ] );
 check( 'with nobody beyond the manager holding it the role is the manager\'s to change', $status === 200 && $appData['/nino/auth/roles']['shared']['label'] === 'Renamed' );
 unset( $appData['/nino/auth/roles']['shared'] );
+$storeRoles();
 
 echo "\n";
 echo "What the workbench draws its controls from\n";
@@ -355,20 +371,20 @@ $store = static function() use ( &$appData ): string {
 	return json_encode( [ $appData['/nino/auth/user'] ?? null, $appData['/nino/auth/roles'] ?? null ] );
 };
 
-// The last account with full access cannot lose its role through the one save of the account's form either
+// The last account with full access is not a manager's to change through the one save of the account's form either: it is beyond the manager, whatever the change
 $signIn( 'man2@example.com' );
 $fullAccess = array_keys( array_filter( $appData['/nino/auth/user'], static fn( array $user ): bool => in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) ) );
 $before = $accountOf( 'dev@example.com' );
 [ $status, $body ] = $post( 'users/save', [ 'username' => 'dev@example.com', 'mail' => 'dev@example.com', 'role' => 'editor' ] );
 check( 'the fixture: one account holds full access, and a manager asks that its role is taken away through users/save', $fullAccess === [ 'dev@example.com' ] );
-check( 'the last account with full access cannot lose its role through users/save: 409, "users_last_admin_role", nothing written', $status === 409 && ( $body['code'] ?? '' ) === 'users_last_admin_role' && $accountOf( 'dev@example.com' ) === $before );
+check( 'the last account with full access is refused a manager through users/save as an account beyond it: 403, "users_account_beyond", nothing written', $status === 403 && ( $body['code'] ?? '' ) === 'users_account_beyond' && $accountOf( 'dev@example.com' ) === $before );
 check( '...the refusal names no field of the form: it is said in the line', array_key_exists( 'field', $body ?? [] ) === false );
 
 \Nino\Auth::insertUser( $appData, 'dev3@example.com', $password, [], 'developer' );
 $signIn( 'dev@example.com' );
 [ $status ] = $post( 'users/save', [ 'username' => 'dev3@example.com', 'mail' => 'dev3@example.com', 'role' => 'editor' ] );
 check( 'while another account holds full access the same save goes through - the bound is the last one', $status === 200 && \Nino\Auth::getUser( $appData, 'dev3@example.com' )['role'] === 'editor' );
-\Nino\Auth::deleteUser( $appData, 'dev3@example.com' );
+ninoDeleteUser( $appData, 'dev3@example.com' );
 
 // A manager who sets another account's password ends every session of that account
 $signIn( 'man2@example.com' );
@@ -471,7 +487,7 @@ check( '...and deletes one', $status === 200 && isset( $appData['/nino/auth/user
 check( '...but not its own account', $status === 400 && isset( $appData['/nino/auth/user']['man2@example.com'] ) === true );
 [ $status ] = $post( 'users/status', [ 'username' => 'man2@example.com', 'active' => false ] );
 check( '...nor deactivates it', $status === 400 && \Nino\Auth::getUser( $appData, 'man2@example.com' )['status'] === \Nino\Auth::STATUS_ACTIVE );
-\Nino\Auth::deleteUser( $appData, 'tmp@example.com' );
+ninoDeleteUser( $appData, 'tmp@example.com' );
 
 // A change of the own password keeps the session it is made in, and ends every other
 $signIn( 'ed.renamed@example.com' );

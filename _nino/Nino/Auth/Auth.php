@@ -59,6 +59,10 @@ namespace Nino {
 		// prefix keeps ip keys from colliding with a mail address.
 		private const string IP_KEY_PREFIX = 'ip:';
 
+		// The fewest UTF-16 code units a password that is set holds - the browser's count - and the most bytes of it bcrypt reads: what follows is not part of the hash (see passwordRefusal())
+		public const int PASSWORD_MIN_UNITS = 8;
+		public const int PASSWORD_MAX_BYTES = 72;
+
 		// The bucket of the confirmation of the password in the workbench (confirmPassword()): one for each account, beside the one of the sign-in and with its limits
 		private const string CONFIRM_KEY_PREFIX = 'confirm:';
 
@@ -620,6 +624,38 @@ namespace Nino {
 		// in-progress cooldown survives a rename.
 		public static function updateUser( array &$appData, string $username, string $newUsername, string $pw = '' ): array|false {
 
+			return self::_storeUser( $appData, $username, $newUsername, $pw, null, null, true );
+		}
+
+		/**
+		 *	Change an account's mail, password, role and name in one write of
+		 *	config.php: what updateUser(), setRole() and setName() do one after the
+		 *	other, so that a write that fails leaves the account as it was and not
+		 *	half changed. The caller has checked everything (see
+		 *	\Nino\Modules\Users\Admin::apiSave()); false is for an account that does not exist,
+		 *	a mail another account holds and a role that does not exist, with nothing written.
+		 *	A record is replaced as updateUser() replaces it where the mail or the password
+		 *	changes, and changed in place where only the role or the name does
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account's mail
+		 *	@param		string		$newUsername	The mail it holds after the save, the same one for no change
+		 *	@param		string		$pw						The new password, '' for none
+		 *	@param		string|null	$role				The role, '' for none, null to leave it
+		 *	@param		string|null	$name				The name, '' for none, null to leave it
+		 *
+		 *	@return 	array|false									The account as stored, false where nothing was written
+		 */
+		public static function saveUser( array &$appData, string $username, string $newUsername, string $pw = '', ?string $role = null, ?string $name = null ): array|false {
+
+			return self::_storeUser( $appData, $username, $newUsername, $pw, $role, $name, $newUsername !== $username || $pw !== '' );
+		}
+
+		// The one write behind updateUser() and saveUser(). $replace: the record is
+		// taken out and put back under the new mail with the password and the
+		// sessions of the change; otherwise role and name are set in the record as it stands
+		private static function _storeUser( array &$appData, string $username, string $newUsername, string $pw, ?string $role, ?string $name, bool $replace ): array|false {
+
 			$user = self::getUser( $appData, $username );
 			if( $user === false )
 				return false;
@@ -627,35 +663,49 @@ namespace Nino {
 			if( $newUsername !== $username && self::getUser( $appData, $newUsername ) !== false )
 				return false;
 
-			$user['mail'] = $newUsername;
+			if( $role !== null && $role !== '' && isset( $appData['/nino/auth/roles'][$role] ) === false )
+				return false;
 
-			if( $pw !== '' ) {
+			if( $replace === true ) {
 
-				$user['pw'] = password_hash( $pw, PASSWORD_DEFAULT );
+				$user['mail'] = $newUsername;
 
-				// A password change has to end the sessions opened with the old
-				// one - otherwise the single action taken after a compromise
-				// ("change the password") leaves the attacker's session running.
-				// The session performing the change keeps its own token, so
-				// changing your own password doesn't log you out of the tab you
-				// are doing it in.
-				$currentToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
-				$isSelf				= ( $appData['./nino/auth/current']['mail'] ?? '' ) === $username;
+				if( $pw !== '' ) {
 
-				$user['sessions'] = ( $isSelf === true && is_string( $currentToken ) === true && isset( $user['sessions'][$currentToken] ) === true )
-					? [ $currentToken => $user['sessions'][$currentToken] ]
-					: [];
+					$user['pw'] = password_hash( $pw, PASSWORD_DEFAULT );
 
-				// Tell the merge in AppData::writeContentData() that this is a
-				// revocation, not just "these are the sessions I know about" -
-				// otherwise a login that happened in a parallel request after
-				// this one booted would be carried straight back in
-				$appData['./nino/auth/revoked'][$newUsername]	= true;
-				$appData['./nino/auth/revoked'][$username]			= true;
+					// A password change has to end the sessions opened with the old
+					// one - otherwise the single action taken after a compromise
+					// ("change the password") leaves the attacker's session running.
+					// The session performing the change keeps its own token, so
+					// changing your own password doesn't log you out of the tab you
+					// are doing it in.
+					$currentToken	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+					$isSelf				= ( $appData['./nino/auth/current']['mail'] ?? '' ) === $username;
+
+					$user['sessions'] = ( $isSelf === true && is_string( $currentToken ) === true && isset( $user['sessions'][$currentToken] ) === true )
+						? [ $currentToken => $user['sessions'][$currentToken] ]
+						: [];
+
+					// Tell the merge in AppData::writeContentData() that this is a
+					// revocation, not just "these are the sessions I know about" -
+					// otherwise a login that happened in a parallel request after
+					// this one booted would be carried straight back in
+					$appData['./nino/auth/revoked'][$newUsername]	= true;
+					$appData['./nino/auth/revoked'][$username]			= true;
+				}
+
+				unset( $appData['/nino/auth/user'][$username] );
+				$appData['/nino/auth/user'][$newUsername] = $user;
 			}
 
-			unset( $appData['/nino/auth/user'][$username] );
-			$appData['/nino/auth/user'][$newUsername] = $user;
+			if( $role !== null )
+				$appData['/nino/auth/user'][$newUsername]['role'] = $role;
+
+			if( $name === '' )
+				unset( $appData['/nino/auth/user'][$newUsername]['name'] );
+			elseif( $name !== null )
+				$appData['/nino/auth/user'][$newUsername]['name'] = $name;
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 			if( $newUsername !== $username )
@@ -670,8 +720,10 @@ namespace Nino {
 
 			// Run callback - eg. syncing the changed mail/password elsewhere.
 			// See insertUser() for why this can't pass self::getUser(...) straight through.
-			$updatedUser = self::getUser( $appData, $newUsername );
-			\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/update', $updatedUser );
+			if( $replace === true ) {
+				$updatedUser = self::getUser( $appData, $newUsername );
+				\Nino\Callbacks::doCallbacks( $appData, '/nino/auth/user/update', $updatedUser );
+			}
 
 			return self::getUser( $appData, $newUsername );
 		}
@@ -801,6 +853,29 @@ namespace Nino {
 			}
 
 			return $locked;
+		}
+
+		/**
+		 *	Why a password that is about to be set is refused, or null when it may be set. A rule for setting
+		 *	only: the passwords that exist are never measured by it, and the sign-in and the confirmation
+		 *	(confirmPassword()) take what they are given. Refused: one that is not valid UTF-8 or holds a
+		 *	null byte (bcrypt takes no null byte, and everything after one would not count when it is
+		 *	checked), one shorter than PASSWORD_MIN_UNITS as the browser counts - in UTF-16
+		 *	code units - and one longer than PASSWORD_MAX_BYTES, the bytes bcrypt reads
+		 *
+		 *	@param		string		$pw						The password to set
+		 *
+		 *	@return 	string|null								'invalid', 'short' or 'long'; null for a password that may be set
+		 */
+		public static function passwordRefusal( string $pw ): ?string {
+
+			if( str_contains( $pw, "\0" ) === true || mb_check_encoding( $pw, 'UTF-8' ) === false )
+				return 'invalid';
+
+			if( strlen( mb_convert_encoding( $pw, 'UTF-16LE', 'UTF-8' ) ) / 2 < self::PASSWORD_MIN_UNITS )
+				return 'short';
+
+			return strlen( $pw ) > self::PASSWORD_MAX_BYTES ? 'long' : null;
 		}
 
 		/**
@@ -1047,20 +1122,25 @@ namespace Nino {
 			} );
 		}
 
-		// Move a username's tries entry to a new key - called on
-		// updateUser()'s rename path so an in-progress cooldown survives a
-		// mail change instead of being silently dropped (reset) or left
-		// behind as an orphan under the old, now-unused mail
+		// Move a username's tries entries to a new key - the one of the sign-in
+		// and the one of the confirmation of the password - called on the
+		// rename path of the writes of an account so an in-progress cooldown
+		// survives a mail change: neither is it dropped (a reset) nor left
+		// behind as an orphan under the old mail, which a new account may take
 		private static function _renameTries( array &$appData, string $oldUsername, string $newUsername ): void {
 
 			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state ) use ( $oldUsername, $newUsername ): ?array {
 
-				if( isset( $state[$oldUsername] ) === false )
-					return null;
+				$moved = false;
 
-				$state[$newUsername] = $state[$oldUsername];
-				unset( $state[$oldUsername] );
-				return $state;
+				foreach( [ '', self::CONFIRM_KEY_PREFIX ] as $prefix )
+					if( isset( $state[$prefix. $oldUsername] ) === true ) {
+						$state[$prefix. $newUsername] = $state[$prefix. $oldUsername];
+						unset( $state[$prefix. $oldUsername] );
+						$moved = true;
+					}
+
+				return $moved === true ? $state : null;
 			} );
 		}
 

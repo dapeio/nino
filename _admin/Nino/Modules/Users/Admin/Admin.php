@@ -59,9 +59,14 @@ namespace Nino\Modules\Users {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array
+		 *	@return 	array|null								The tile; null for an account that does not manage accounts, which has none
 		 */
-		public static function summary( array &$appData ): array {
+		public static function summary( array &$appData ): ?array {
+
+			// The number is every account's, so it is the tile of whoever manages them: the panel itself lists anybody else their own row
+			if( \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM ) === false )
+				return null;
+
 			return [ 'value' => count( $appData['/nino/auth/user'] ?? [] ), 'label' => '/_admin/dashboard/label/users' ];
 		}
 
@@ -104,12 +109,31 @@ namespace Nino\Modules\Users {
 			return match( $action ) {
 				'users/create' 		=> 'Create User '. trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ),
 				'users/delete' 		=> 'Delete User '. \Nino\Admin\Admin::postString( $data, 'username' ),
-				'users/save' 			=> 'Edit User '. ( trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ) !== '' ? $data['mail'] : \Nino\Admin\Admin::postString( $data, 'username' ) ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
+				'users/save' 			=> 'Edit User '. self::_savedAccount( $data ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
 				'users/status' 		=> ( ( $data['active'] ?? false ) === true ? 'Activate User ' : 'Deactivate User ' ). \Nino\Admin\Admin::postString( $data, 'username' ),
 				'users/logoutall' => 'Logout-All '. \Nino\Admin\Admin::postString( $data, 'username' ),
 				'users/role' 			=> 'Set Role '. \Nino\Admin\Admin::postString( $data, 'username' ). ' '. \Nino\Admin\Admin::postString( $data, 'role' ),
 				default 					=> '',
 			};
+		}
+
+		/**
+		 *	The account a save names in the activity log: its address, and the address it is given
+		 *	where the two differ
+		 *
+		 *	@param		array 		$data					What was posted
+		 *
+		 *	@return 	string
+		 */
+		private static function _savedAccount( array $data ): string {
+
+			$old = \Nino\Admin\Admin::postString( $data, 'username' );
+			$new = trim( \Nino\Admin\Admin::postString( $data, 'mail' ) );
+
+			if( $new === '' )
+				return $old;
+
+			return $new === $old ? $new : $old. ' -> '. $new;
 		}
 
 		/**
@@ -156,6 +180,24 @@ namespace Nino\Modules\Users {
 			$long = $problem === 'long';
 
 			\Nino\Http::fail( $request, 400, $long ? 'a name has at most '. self::NAME_MAX. ' characters' : 'a name is one line of text', $long ? 'users_name_long' : 'users_name_invalid', $long ? [ self::NAME_MAX ] : [], 'name' );
+		}
+
+		/**
+		 *	Say why a password is refused - see \Nino\Auth::passwordRefusal()
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$reason				'invalid', 'short' or 'long'
+		 *
+		 *	@return 	void
+		 */
+		private static function _refusePassword( array &$request, string $reason ): void {
+
+			if( $reason === 'invalid' )
+				\Nino\Http::fail( $request, 400, 'a password is text without a null byte', 'users_password_invalid', [], 'pw' );
+			elseif( $reason === 'long' )
+				\Nino\Http::fail( $request, 400, 'password must be at most '. \Nino\Auth::PASSWORD_MAX_BYTES. ' bytes', 'users_password_long', [ \Nino\Auth::PASSWORD_MAX_BYTES ], 'pw' );
+			else
+				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'users_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
 		}
 
 		/**
@@ -433,35 +475,52 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			if( strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'users_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
+			if( ( $refusal = \Nino\Auth::passwordRefusal( $pw ) ) !== null ) {
+				self::_refusePassword( $request, $refusal );
 				return;
 			}
 
-			if( $role !== '' && isset( Roles::all( $appData )[$role] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
+			// The role is looked up in the roles config.php holds, and the account is
+			// written before the lock is let go: a role that is deleted meanwhile is not handed out
+			$fresh = Roles::lockStored( $appData, $request );
+
+			if( $fresh === null )
 				return;
-			}
 
-			$name = self::cleanName( $data['name'] ?? '', $problem );
+			try {
 
-			if( $name === null ) {
-				self::_refuseName( $request, (string) $problem );
-				return;
-			}
+				if( $role !== '' && isset( Roles::all( $fresh )[$role] ) === false ) {
+					\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
+					return;
+				}
 
-			// A new account with a role wider than the one creating it is
-			// the account its creator signs in as next (see Roles::notHeld())
-			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
+				$name = self::cleanName( $data['name'] ?? '', $problem );
 
-			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_role_too_wide_scoped' : 'users_role_too_wide', [ $missing ], 'role' );
-				return;
-			}
+				if( $name === null ) {
+					self::_refuseName( $request, (string) $problem );
+					return;
+				}
 
-			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [], $role, $name ) === false ) {
-				\Nino\Http::fail( $request, 409, 'mail already in use', 'users_mail_in_use', [], 'mail' );
-				return;
+				// A new account with a role wider than the one creating it is
+				// the account its creator signs in as next (see Roles::notHeld())
+				$missing = $role !== '' ? Roles::notHeld( $fresh, Roles::all( $fresh )[$role]['perms'] ) : '';
+
+				if( $missing !== '' ) {
+					\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_role_too_wide_scoped' : 'users_role_too_wide', [ $missing ], 'role' );
+					return;
+				}
+
+				if( \Nino\Auth::getUser( $fresh, $mail ) !== false ) {
+					\Nino\Http::fail( $request, 409, 'mail already in use', 'users_mail_in_use', [], 'mail' );
+					return;
+				}
+
+				if( \Nino\Auth::insertUser( $appData, $mail, $pw, [], $role, $name ) === false ) {
+					\Nino\Http::fail( $request, 409, 'mail already in use', 'users_mail_in_use', [], 'mail' );
+					return;
+				}
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			\Nino\Http::ok( $request, [ 'mail' => $mail, 'role' => $role, 'name' => $name ] );
@@ -491,24 +550,35 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			$user = \Nino\Auth::getUser( $appData, $username );
-
-			if( $user === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown user' );
-				return;
-			}
-
-			if( in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true && Roles::fullAccessExists( $appData, $username ) === false ) {
-				\Nino\Http::fail( $request, 409, 'the last account with full access cannot be deleted', 'users_last_admin_delete' );
+			if( \Nino\Auth::getUser( $appData, $username ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
 				return;
 			}
 
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			if( \Nino\Auth::deleteUser( $appData, $username ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not delete' );
+			// Whether full access remains is decided against the accounts config.php
+			// holds, under its lock, and the account goes before the lock is let go
+			$fresh = Roles::lockStored( $appData, $request );
+
+			if( $fresh === null )
 				return;
+
+			try {
+
+				if( self::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				if( self::_refuseLastFullAccess( $fresh, $request, $username, true ) === true )
+					return;
+
+				if( \Nino\Auth::deleteUser( $appData, $username ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not delete' );
+					return;
+				}
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			\Nino\Http::ok( $request );
@@ -516,12 +586,14 @@ namespace Nino\Modules\Users {
 
 		/**
 		 *	Update a user's mail, password, name and - for a manager - role, in one
-		 *	save. Everything is checked before anything is written. The role
-		 *	counts only when it differs from the stored one, and the checks of
-		 *	apiSetRole() - not your own, one that exists, not the last full
-		 *	access, not wider than yours - run for a change only. Whatever is
-		 *	changed, an account other than your own that holds a permission yours
-		 *	does not is refused (see beyond())
+		 *	save: one write of config.php, after every check. The answers come in
+		 *	the order every action on an account gives them: the right, what is
+		 *	wrong with the posted values and what concerns the signed-in account
+		 *	itself, the account existing, the account being within reach (see
+		 *	beyond()), and last what the change itself runs into. The role counts only
+		 *	when it differs from the stored one, and the checks of apiSetRole() - not
+		 *	your own, one that exists, not the last full access, not wider than
+		 *	yours - run for a change only
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -547,6 +619,12 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			// An array, a number or nothing is no name of an account
+			if( is_string( $data['username'] ?? null ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid username', 'users_invalid_name', [], 'username' );
+				return;
+			}
+
 			if( $postedRole !== null && is_string( $postedRole ) === false ) {
 				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
 				return;
@@ -557,8 +635,8 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			if( $pw !== '' && strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'users_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
+			if( $pw !== '' && ( $refusal = \Nino\Auth::passwordRefusal( $pw ) ) !== null ) {
+				self::_refusePassword( $request, $refusal );
 				return;
 			}
 
@@ -587,64 +665,69 @@ namespace Nino\Modules\Users {
 				}
 			}
 
-			// Whoever sets a password signs in with it - so a manager may set
-			// one only on an account no wider than their own, the same bound as
-			// handing out a role (see Roles::notHeld()), and with the words of its
-			// own. An account editing itself has proven its current password above
-			if( $isSelf === false && $pw !== '' ) {
-
-				$target		= \Nino\Auth::getUser( $appData, $username );
-				$missing	= ( $target !== false ) ? Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $target ) ) : '';
-
-				if( $missing !== '' ) {
-					\Nino\Http::fail( $request, 403, 'cannot set the password of an account holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_password_too_wide_scoped' : 'users_password_too_wide', [ $missing ], 'pw' );
-					return;
-				}
-			}
-
 			// The role: only a real change is a change - and one only a manager
-			// may make, never on their own account
-			$stored			= \Nino\Auth::getUser( $appData, $username );
-			$roleChange	= $postedRole !== null && $stored !== false && $postedRole !== (string) ( $stored['role'] ?? '' );
+			// may make, never on their own account. The own account is always
+			// there, and what is refused of it is answered before any other account is looked up
+			$stored = \Nino\Auth::getUser( $appData, $username );
 
-			if( $roleChange === true ) {
+			if( $isSelf === true && $stored !== false && $postedRole !== null && $postedRole !== (string) ( $stored['role'] ?? '' ) ) {
 
 				if( \Nino\Auth::checkPermission( $appData, self::MANAGE_PERM ) === false ) {
 					\Nino\Http::fail( $request, 403, 'not allowed' );
 					return;
 				}
 
-				if( self::_refuseRoleChange( $appData, $request, $username, $postedRole ) === true )
+				if( self::_refuseOwnRole( $appData, $request, $username ) === true )
 					return;
 			}
 
-			// Nor may any other change be made to an account that holds what the
-			// signed-in one does not: its address, its name, its role
+			if( $stored === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
+				return;
+			}
+
+			// Nor may any change be made to an account that holds what the
+			// signed-in one does not: its address, its password, its name, its role
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			$mail = $username;
+			$roleChange = $postedRole !== null && $postedRole !== (string) ( $stored['role'] ?? '' );
+			$changeName = $postedName !== null && $postedName !== (string) ( $stored['name'] ?? '' );
+			$mail 			= $username;
 
-			if( $newUsername !== $username || $pw !== '' ) {
+			// What the change runs into is decided against the accounts and roles
+			// config.php holds, under its lock, and the account is written before the lock is let go
+			$fresh = Roles::lockStored( $appData, $request );
 
-				$result = \Nino\Auth::updateUser( $appData, $username, $newUsername, $pw );
+			if( $fresh === null )
+				return;
 
-				if( $result === false ) {
+			try {
+
+				if( self::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				if( $roleChange === true && self::_refuseRoleChange( $fresh, $request, $username, $postedRole ) === true )
+					return;
+
+				if( $newUsername !== $username && \Nino\Auth::getUser( $fresh, $newUsername ) !== false ) {
 					\Nino\Http::fail( $request, 400, 'mail already in use', 'users_mail_in_use', [], 'mail' );
 					return;
 				}
 
-				$mail = $result['mail'];
-			}
+				if( $newUsername !== $username || $pw !== '' || $roleChange === true || $changeName === true ) {
 
-			if( $roleChange === true && \Nino\Auth::setRole( $appData, $mail, $postedRole ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save' );
-				return;
-			}
+					$result = \Nino\Auth::saveUser( $appData, $username, $newUsername, $pw, $roleChange === true ? $postedRole : null, $changeName === true ? $postedName : null );
 
-			if( $postedName !== null && $stored !== false && $postedName !== (string) ( $stored['name'] ?? '' ) && \Nino\Auth::setName( $appData, $mail, $postedName ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save' );
-				return;
+					if( $result === false ) {
+						\Nino\Http::fail( $request, 500, 'could not save' );
+						return;
+					}
+
+					$mail = $result['mail'];
+				}
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			$saved = \Nino\Auth::getUser( $appData, $mail );
@@ -668,13 +751,6 @@ namespace Nino\Modules\Users {
 			$data 		= \Nino\Admin\Admin::postData();
 			$username = \Nino\Admin\Admin::postString( $data, 'username' );
 
-			// An array or a number is no name: read as '' it would pass for the
-			// account nobody holds and be answered like any other
-			if( isset( $data['username'] ) === true && is_string( $data['username'] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid username', 'users_invalid_name', [], 'username' );
-				return;
-			}
-
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
 
 			if( $allowed === false ) {
@@ -682,10 +758,36 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			// An array or a number is no name: read as '' it would pass for the
+			// account nobody holds and be answered like any other
+			if( isset( $data['username'] ) === true && is_string( $data['username'] ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid username', 'users_invalid_name', [], 'username' );
+				return;
+			}
+
+			if( \Nino\Auth::getUser( $appData, $username ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
+				return;
+			}
+
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			$ok = \Nino\Auth::logoutAllSessions( $appData, $username );
+			// Reach and existence once more against what config.php holds, under its lock
+			$fresh = Roles::lockStored( $appData, $request );
+
+			if( $fresh === null )
+				return;
+
+			try {
+
+				if( self::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				$ok = \Nino\Auth::logoutAllSessions( $appData, $username );
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
 
 			\Nino\Http::ok( $request, [ 'ok' => $ok, 'loggedOutSelf' => $isSelf ] );
 		}
@@ -713,15 +815,42 @@ namespace Nino\Modules\Users {
 			$username = \Nino\Admin\Admin::postString( $data, 'username' );
 			$role 		= \Nino\Admin\Admin::postString( $data, 'role' );
 
-			if( self::_refuseRoleChange( $appData, $request, $username, $role ) === true )
+			// No role posted is no role to give, and not the role that is none
+			if( is_string( $data['role'] ?? null ) === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
 				return;
+			}
+
+			if( self::_refuseOwnRole( $appData, $request, $username ) === true )
+				return;
+
+			if( \Nino\Auth::getUser( $appData, $username ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
+				return;
+			}
 
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			if( \Nino\Auth::setRole( $appData, $username, $role ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save' );
+			$fresh = Roles::lockStored( $appData, $request );
+
+			if( $fresh === null )
 				return;
+
+			try {
+
+				if( self::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				if( self::_refuseRoleChange( $fresh, $request, $username, $role ) === true )
+					return;
+
+				if( \Nino\Auth::setRole( $appData, $username, $role ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not save' );
+					return;
+				}
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			\Nino\Http::ok( $request, [ 'role' => $role ] );
@@ -760,45 +889,50 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			$user = \Nino\Auth::getUser( $appData, $username );
-
-			if( $user === false ) {
+			if( \Nino\Auth::getUser( $appData, $username ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
-				return;
-			}
-
-			if( $active === false && in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true && Roles::fullAccessExists( $appData, $username ) === false ) {
-				\Nino\Http::fail( $request, 409, 'the last active account with full access cannot be deactivated', 'users_last_admin_status' );
 				return;
 			}
 
 			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			if( \Nino\Auth::setStatus( $appData, $username, $active ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not save' );
+			$fresh = Roles::lockStored( $appData, $request );
+
+			if( $fresh === null )
 				return;
+
+			try {
+
+				if( self::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				if( $active === false && self::_refuseLastFullAccess( $fresh, $request, $username, false ) === true )
+					return;
+
+				if( \Nino\Auth::setStatus( $appData, $username, $active ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not save' );
+					return;
+				}
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			\Nino\Http::ok( $request, [ 'status' => $active === true ? 'active' : 'disabled' ] );
 		}
 
 		/**
-		 *	Whether something stands in the way of giving $username the role
-		 *	$role - and if so, the response says what. Shared by apiSetRole()
-		 *	and apiSave(); the caller has checked MANAGE_PERM. Refused: your own
-		 *	account, an account or a role that does not exist, the last full
-		 *	access taken away, and a role wider than the signed-in account
-		 *	itself (see Roles::notHeld())
+		 *	Whether the change is one of the signed-in account's own role, which
+		 *	nobody makes for themselves - and if so, the response says what. Shared
+		 *	by apiSetRole() and apiSave(); the caller has checked MANAGE_PERM
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *	@param		string		$username			The account
-		 *	@param		string		$role					A role id, or '' for none
 		 *
 		 *	@return 	bool										True when the change is refused and the response set
 		 */
-		private static function _refuseRoleChange( array &$appData, array &$request, string $username, string $role ): bool {
+		private static function _refuseOwnRole( array &$appData, array &$request, string $username ): bool {
 
 			$current = \Nino\Auth::getCurrentUser( $appData );
 
@@ -807,14 +941,90 @@ namespace Nino\Modules\Users {
 				return true;
 			}
 
-			$user = \Nino\Auth::getUser( $appData, $username );
+			return false;
+		}
 
-			if( $user === false ) {
-				\Nino\Http::fail( $request, 404, 'unknown user' );
+		/**
+		 *	Whether the account is gone from what config.php holds or has become one the signed-in account may not
+		 *	change (see beyond()) - and if so, the response says what. Asked under the lock, of the accounts and roles
+		 *	as stored (see Roles::lockStored()), after the same questions were asked of this request's copy
+		 *
+		 *	@param		array 		&$fresh				(reference) The copy of the app data with the stored accounts and roles
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$username			The account
+		 *
+		 *	@return 	bool										True when the change is refused and the response set
+		 */
+		public static function refuseTarget( array &$fresh, array &$request, string $username ): bool {
+
+			if( \Nino\Auth::getUser( $fresh, $username ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
 				return true;
 			}
 
-			if( $role !== '' && isset( Roles::all( $appData )[$role] ) === false ) {
+			return Roles::refuseBeyond( $fresh, $request, self::beyond( $fresh, $username ), 'account' );
+		}
+
+		/**
+		 *	Whether the account is the last one that holds full access - what a delete, a deactivation or
+		 *	a role change must not end - and so is refused, the response says. Asked of the
+		 *	accounts and roles config.php holds (see Roles::lockStored()); an account that is gone
+		 *	from them is a 404
+		 *
+		 *	@param		array 		&$fresh				(reference) The copy of the app data with the stored accounts and roles
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$username			The account
+		 *	@param		bool			$deleting			Whether the change is a delete, else a deactivation
+		 *
+		 *	@return 	bool										True when the change is refused and the response set
+		 */
+		private static function _refuseLastFullAccess( array &$fresh, array &$request, string $username, bool $deleting ): bool {
+
+			$user = \Nino\Auth::getUser( $fresh, $username );
+
+			if( $user === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
+				return true;
+			}
+
+			if( in_array( '/*', \Nino\Auth::permissions( $fresh, $user ), true ) === true && Roles::fullAccessExists( $fresh, $username ) === false ) {
+				if( $deleting === true )
+					\Nino\Http::fail( $request, 409, 'the last account with full access cannot be deleted', 'users_last_admin_delete' );
+				else
+					\Nino\Http::fail( $request, 409, 'the last active account with full access cannot be deactivated', 'users_last_admin_status' );
+
+				return true;
+			}
+
+			return false;
+		}
+
+		/**
+		 *	Whether something stands in the way of giving $username the role
+		 *	$role - and if so, the response says what. Shared by apiSetRole()
+		 *	and apiSave(); the caller has checked MANAGE_PERM and that the account is within
+		 *	reach (see beyond()), and asks it of the accounts and roles config.php holds (see
+		 *	Roles::lockStored()). Refused: an account that is gone, a role that does not exist, the
+		 *	last full access taken away, and a role wider than the signed-in account
+		 *	itself (see Roles::notHeld())
+		 *
+		 *	@param		array 		&$fresh				(reference) The copy of the app data with the stored accounts and roles
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$username			The account
+		 *	@param		string		$role					A role id, or '' for none
+		 *
+		 *	@return 	bool										True when the change is refused and the response set
+		 */
+		private static function _refuseRoleChange( array &$fresh, array &$request, string $username, string $role ): bool {
+
+			$user = \Nino\Auth::getUser( $fresh, $username );
+
+			if( $user === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown user', 'users_unknown' );
+				return true;
+			}
+
+			if( $role !== '' && isset( Roles::all( $fresh )[$role] ) === false ) {
 				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
 				return true;
 			}
@@ -822,21 +1032,21 @@ namespace Nino\Modules\Users {
 			$next 				= $user;
 			$next['role'] = $role;
 
-			if( in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true
-				&& in_array( '/*', \Nino\Auth::permissions( $appData, $next ), true ) === false
-				&& Roles::fullAccessExists( $appData, $username ) === false ) {
+			if( in_array( '/*', \Nino\Auth::permissions( $fresh, $user ), true ) === true
+				&& in_array( '/*', \Nino\Auth::permissions( $fresh, $next ), true ) === false
+				&& Roles::fullAccessExists( $fresh, $username ) === false ) {
 				\Nino\Http::fail( $request, 409, 'the last account with full access cannot lose it', 'users_last_admin_role' );
 				return true;
 			}
 
 			// The same bound as on creating an account (see Roles::notHeld())
-			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
+			$missing = $role !== '' ? Roles::notHeld( $fresh, Roles::all( $fresh )[$role]['perms'] ) : '';
 
 			// A role is not the account's only source (see \Nino\Auth::permissions()):
 			// taking one away, or swapping it, can leave the permissions the
 			// account holds itself wide for a panel the role described
 			if( $missing === '' )
-				$missing = Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $next ), \Nino\Auth::permissions( $appData, $user ) );
+				$missing = Roles::notHeld( $fresh, \Nino\Auth::permissions( $fresh, $next ), \Nino\Auth::permissions( $fresh, $user ) );
 
 			if( $missing !== '' ) {
 				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_role_too_wide_scoped' : 'users_role_too_wide', [ $missing ], 'role' );

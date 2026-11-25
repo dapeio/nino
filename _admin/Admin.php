@@ -2624,7 +2624,7 @@ namespace Nino\Admin {
 
 		// The shortest password the workbench accepts, for every account and for
 		// this secret - the wizard and the Users panel read it from here
-		public const int MIN_PW_LENGTH = 8;
+		public const int MIN_PW_LENGTH = \Nino\Auth::PASSWORD_MIN_UNITS;
 
 		/**
 		 *	Register recovery.php's own route pair - the file is its own
@@ -3100,7 +3100,7 @@ namespace Nino\Admin {
 		 */
 		public static function change( array &$appData, string $current, string $new ): int {
 
-			if( strlen( $new ) < self::MIN_PW_LENGTH )
+			if( \Nino\Auth::passwordRefusal( $new ) !== null )
 				return 400;
 
 			if( self::hash( $appData ) === null )

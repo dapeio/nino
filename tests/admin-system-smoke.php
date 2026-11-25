@@ -167,6 +167,8 @@ file_put_contents( $sandbox. '/private/elements/testtype.php', '<?php return [
 // A set-up project with one developer account, logged in - the shell serves
 // the workbench, every panel action runs against this session
 $appData['/nino/auth/roles'] = \Nino\Modules\Users\Roles::defaults( $appData );
+// ...and as config.php holds them, which is what a role action decides against
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
 ninoUser( $appData, 'dev@example.com' );
 
 echo "Sandbox: $sandbox\n\n";
@@ -366,12 +368,12 @@ ninoUser( $appData, 'typesonly@example.com', [ '/_admin/types/manage' ] );
 $typesOnly = \Nino\Admin\Admin::visiblePanels( $appData );
 check( 'an account holding only a tab\'s permission gets the pane without the panel\'s own screen', isset( $typesOnly['elements'] ) === true && $typesOnly['elements']['own'] === false && array_keys( $typesOnly['elements']['tabs'] ) === [ 'types' ] );
 check( '...rendered as the tab pane alone under the panel\'s own head - one tab is no strip, but the name stays', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="admin-panel-actions"></div><button type="button" class="admin-panel-manual" data-manual="elements" aria-haspopup="dialog" aria-label="[[/_admin/common/label/manual]]" title="[[/_admin/common/label/manual]]">?</button></div><div id="admin-tab-types" data-tab="types" data-address-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
-\Nino\Auth::deleteUser( $appData, 'typesonly@example.com' );
+ninoDeleteUser( $appData, 'typesonly@example.com' );
 
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'types/list' );
 check( 'and 200 for full access', $status === 200 );
-\Nino\Auth::deleteUser( $appData, 'editor@example.com' );
+ninoDeleteUser( $appData, 'editor@example.com' );
 
 echo "\n";
 
@@ -1247,7 +1249,7 @@ check( 'apiNow is 401 logged out', $status === 401 && $timedFiles() === $timedBe
 ninoUser( $appData, 'usersmanageonly@example.com', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
 [ $status ] = $nowCall( $appData );
 check( '...403 without the backups permission', $status === 403 && $timedFiles() === $timedBefore );
-\Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
+ninoDeleteUser( $appData, 'usersmanageonly@example.com' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 /*	What an archive holds besides the texts and the elements: the pages and
@@ -2659,12 +2661,12 @@ check( 'apiUnlock answers 500 when the lock could not be lifted', $status === 50
 ninoUser( $appData, 'usersmanageonly@example.com', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiUnlock', [ 'username' => 'lockedtwo@example.com' ] );
 check( 'apiUnlock is 403 for an account that holds users/manage but not the login protection permission', $status === 403 && isset( \Nino\Auth::lockedAccounts( $appData )['lockedtwo@example.com'] ) === true );
-\Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
+ninoDeleteUser( $appData, 'usersmanageonly@example.com' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 $lockTries( [ 'ip:203.0.113.9' => null ] );
-\Nino\Auth::deleteUser( $appData, 'lockedone@example.com' );
-\Nino\Auth::deleteUser( $appData, 'lockedtwo@example.com' );
+ninoDeleteUser( $appData, 'lockedone@example.com' );
+ninoDeleteUser( $appData, 'lockedtwo@example.com' );
 
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 3 ] ] );
@@ -2791,7 +2793,7 @@ check( 'RecoveryPassword::apiSave is 401 logged out', $status === 401 && \Nino\A
 ninoUser( $appData, 'usersmanageonly@example.com', [ \Nino\Modules\Users\Admin::MANAGE_PERM ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\RecoveryPassword::class, 'apiSave', [ 'current' => 'the real password', 'pw' => 'a brand new secret' ] );
 check( '...403 for an account that manages users but does not hold the recovery password permission', $status === 403 && \Nino\Admin\Recovery::hash( $appData ) === $secretBefore );
-\Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
+ninoDeleteUser( $appData, 'usersmanageonly@example.com' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 check( 'the tab\'s permission is its own, under /_admin/<uri>/manage', \Nino\Modules\Users\RecoveryPassword::MANAGE_PERM === '/_admin/recoverypw/manage' && \Nino\Modules\Users\RecoveryPassword::perm() === '/_admin/recoverypw/manage' );
@@ -2976,8 +2978,8 @@ unset( $_POST['action'] );
 check( '...with no "Array to string conversion" raised on the way', array_filter( ninoWarnings(), static fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) ) === [] );
 
 \Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
-\Nino\Auth::deleteUser( $appData, 'resetme@example.com' );
-\Nino\Auth::deleteUser( $appData, 'fresh@example.com' );
+ninoDeleteUser( $appData, 'resetme@example.com' );
+ninoDeleteUser( $appData, 'fresh@example.com' );
 $lockTries( [ 'resetme@example.com' => null ] );
 
 echo "\n";
@@ -3042,7 +3044,7 @@ ninoUser( $appData, 'noswitch@example.com', [ '/_admin/text/manage' ] );
 check( 'apiStatus is 403 for an account without the permission', $status === 403 );
 [ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => true, 'retry' => 120 ] );
 check( '...apiSet too', $status === 403 );
-\Nino\Auth::deleteUser( $appData, 'noswitch@example.com' );
+ninoDeleteUser( $appData, 'noswitch@example.com' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 echo "\n";
@@ -3066,7 +3068,7 @@ check( 'a non-manager does not have the manage permission', \Nino\Auth::checkPer
 check( '...nor any structure or system panel', \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'newcontenteditor@example.com' ) === false && \Nino\Auth::checkPermission( $appData, '/_admin/types/manage', 'newcontenteditor@example.com' ) === false );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiCreate', [ 'mail' => 'norole@example.com', 'pw' => 'a-long-enough-password', 'role' => 'wizard' ] );
 check( 'apiCreate rejects an unknown role', $status === 400 );
-\Nino\Auth::deleteUser( $appData, 'newcontenteditor@example.com' );
+ninoDeleteUser( $appData, 'newcontenteditor@example.com' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiCreate', [ 'mail' => 'not-an-email', 'pw' => 'a-long-enough-password' ] );
 check( 'apiCreate rejects an invalid mail', $status === 400 );
@@ -3208,7 +3210,7 @@ check( 'full access stands alone - it covers everything else already', $status =
 // the Developer role alone for this, the way the wizard's root account does -
 // and has to be the last full access there is, so the Backup section's
 // account above goes first
-\Nino\Auth::deleteUser( $appData, 'admin@example.com' );
+ninoDeleteUser( $appData, 'admin@example.com' );
 $appData['/nino/auth/user']['dev@example.com']['perms'] = [];
 \Nino\Auth::setRole( $appData, 'dev@example.com', 'developer' );
 check( 'the signed-in account now holds full access through its role only', \Nino\Auth::checkPermission( $appData, '/_admin/users/manage' ) === true );
@@ -3218,11 +3220,11 @@ check( 'a change that would take the manage permission from your own account is 
 callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/text/manage' ] ] );
 ninoUser( $appData, 'mgr@example.com', [ '/_admin/users/manage', '/_admin/text/manage' ], 'a-long-enough-password' );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developer', 'perms' => [ '/_admin/elements/manage', '/_admin/users/manage' ] ] );
-check( 'a change that would leave no account with full access is refused', $status === 409 && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
+check( 'a change that would leave no account with full access is refused - to a manager without full access as the change of a role beyond it', $status === 403 && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'dev@example.com', 'role' => 'editor' ] );
-check( 'nor may the last full access be handed away through a role change', $status === 409 && \Nino\Auth::getUser( $appData, 'dev@example.com' )['role'] === 'developer' );
+check( 'nor may the last full access be handed away through a role change - it is an account beyond the manager', $status === 403 && \Nino\Auth::getUser( $appData, 'dev@example.com' )['role'] === 'developer' );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiDelete', [ 'username' => 'dev@example.com' ] );
-check( 'nor deleted - the role counts, not just the account\'s own permissions', $status === 409 );
+check( 'nor deleted - the role counts, not just the account\'s own permissions: an account beyond the manager', $status === 403 && \Nino\Auth::getUser( $appData, 'dev@example.com' ) !== false );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/text/manage' ] ] );
 check( 'a manager without full access still edits a role it holds in full', $status === 200 );
 
@@ -3244,7 +3246,7 @@ check( '...while one holding only what the manager holds is created', $status ==
 check( 'nor move an account onto such a role', $status === 403 && \Nino\Auth::getUser( $appData, 'detour@example.com' )['role'] === 'reviewer' );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developers', 'perms' => [ '/*' ] ] );
 check( 'a role it may not widen it may not rename either - it holds what the manager does not', $status === 403 && $appData['/nino/auth/roles']['developer']['label'] === 'Developer' && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
-\Nino\Auth::deleteUser( $appData, 'detour@example.com' );
+ninoDeleteUser( $appData, 'detour@example.com' );
 
 // Holding fewer permissions is not always holding less: a panel permission
 // with no scoped one beside it allows the whole panel, one with a scoped
@@ -3297,16 +3299,18 @@ check( '...while a role described within its own is handed out', $status === 200
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'viadescribed@example.com', 'role' => 'wide' ] );
 check( 'nor sets such a role on an account', $status === 403 && ( $body['code'] ?? '' ) === 'users_role_too_wide_scoped' && \Nino\Auth::getUser( $appData, 'viadescribed@example.com' )['role'] === 'described' );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSave', [ 'username' => 'widehold@example.com', 'mail' => 'widehold@example.com', 'pw' => 'a password of my choosing' ] );
-check( 'nor sets the password of an account that holds it', $status === 403 && ( $body['code'] ?? '' ) === 'users_password_too_wide_scoped' && password_verify( 'widehold password', \Nino\Auth::getUser( $appData, 'widehold@example.com' )['pw'] ) === true );
+check( 'nor sets the password of an account that holds it - the account is beyond the lead', $status === 403 && ( $body['code'] ?? '' ) === 'users_account_beyond_scoped' && password_verify( 'widehold password', \Nino\Auth::getUser( $appData, 'widehold@example.com' )['pw'] ) === true );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSave', [ 'username' => 'describedhold@example.com', 'mail' => 'describedhold@example.com', 'pw' => 'a password of my choosing' ] );
 check( '...while the password of an account described within its own is set', $status === 200 );
 
 // A role is not the account's only source of permissions: taking it away
 // leaves what the account holds of its own
 $appData['/nino/auth/user']['viadescribed@example.com']['perms'] = [ $elementsDoor ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'viadescribed@example.com', 'role' => '' ] );
 check( 'a role is not taken from an account whose own permissions are then wide', $status === 403 && ( $body['code'] ?? '' ) === 'users_role_too_wide_scoped' && \Nino\Auth::getUser( $appData, 'viadescribed@example.com' )['role'] === 'described' );
 $appData['/nino/auth/user']['viadescribed@example.com']['perms'] = [];
+\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'viadescribed@example.com', 'role' => '' ] );
 check( '...and is taken from one that is then holding nothing', $status === 200 );
 
@@ -3322,7 +3326,7 @@ callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock'
 callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead', 'label' => 'Lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM ] ] );
 \Nino\Auth::loginUser( $appData, 'lead@example.com', 'lead password' );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor ] ] );
-check( 'a manager without the panel turns a described role into the whole panel - refused', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' && $storedRoles()['sock']['perms'] === [ $elementsDoor, $elementsOne ] );
+check( 'a manager without the panel turns a described role into the whole panel - refused, as a role beyond it (it holds the door and an entry the manager lacks)', $status === 403 && ( $body['code'] ?? '' ) === 'roles_role_beyond' && $storedRoles()['sock']['perms'] === [ $elementsDoor, $elementsOne ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock, relabelled', 'perms' => [ $elementsDoor, $elementsOne ] ] );
 check( '...nor is relabelling it, with a panel that is not the lead\'s', $status === 403 && $storedRoles()['sock']['label'] === 'Sock' );
 
@@ -3374,7 +3378,7 @@ check( '...but describes none in detail, which is a permission it does not hold'
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor ] ] );
 check( 'full access widens any role, as before', $status === 200 && $storedRoles()['door']['perms'] === [ $elementsDoor ] );
 foreach( [ 'viadoor@example.com', 'viadescribed@example.com', 'lead@example.com', 'plainlead@example.com', 'widehold@example.com', 'describedhold@example.com', 'textlead@example.com' ] as $mail )
-	\Nino\Auth::deleteUser( $appData, $mail );
+	ninoDeleteUser( $appData, $mail );
 foreach( [ 'door', 'sock', 'lead', 'plainlead', 'wide', 'described', 'textlead', 'textdoor' ] as $role )
 	callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => $role ] );
 
@@ -3385,8 +3389,8 @@ check( 'apiDelete refuses a role an account holds', $status === 409 && isset( $a
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'reviewer' ] );
 check( 'apiDelete removes a role nobody holds', $status === 200 && isset( $appData['/nino/auth/roles']['reviewer'] ) === false && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles']['reviewer'] ) === false );
 
-\Nino\Auth::deleteUser( $appData, 'mgr@example.com' );
-\Nino\Auth::deleteUser( $appData, 'permsdev@example.com' );
+ninoDeleteUser( $appData, 'mgr@example.com' );
+ninoDeleteUser( $appData, 'permsdev@example.com' );
 $appData['/nino/auth/user']['dev@example.com']['perms'] = [ '/*' ];
 \Nino\Auth::setRole( $appData, 'dev@example.com', '' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
@@ -3499,8 +3503,8 @@ $readable = static fn( array $answer ): bool => count( $answer['lines'] ) === co
 	&& array_values( array_unique( array_map( static fn( string $key ): string => substr( $key, 0, 10 ), array_slice( $answer['keys'], 0, -1 ) ) ) ) === [ $logToday ];
 check( '...with the right to read the log it is a 200 with the lines and the keys, and so it is with full access', $viewStatus === 200 && $readable( $viewBody ) === true && $fullStatus === 200 && $readable( $fullBody ) === true && count( $fullBody['lines'] ) === count( $viewBody['lines'] ) + 1 );
 
-\Nino\Auth::deleteUser( $appData, 'logsright@example.com' );
-\Nino\Auth::deleteUser( $appData, 'logswrong@example.com' );
+ninoDeleteUser( $appData, 'logsright@example.com' );
+ninoDeleteUser( $appData, 'logswrong@example.com' );
 
 echo "\n";
 

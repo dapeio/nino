@@ -154,9 +154,23 @@ namespace Nino\Modules\Users {
 			if( Roles::refuseBeyond( $appData, $request, Admin::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
-			if( \Nino\Auth::unlock( $appData, $username ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not lift the lock' );
+			// Reach and existence once more against what config.php holds, under its lock
+			$fresh = Roles::lockStored( $appData, $request );
+
+			if( $fresh === null )
 				return;
+
+			try {
+
+				if( Admin::refuseTarget( $fresh, $request, $username ) === true )
+					return;
+
+				if( \Nino\Auth::unlock( $appData, $username ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not lift the lock' );
+					return;
+				}
+			} finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			\Nino\Http::ok( $request, [ 'locked' => self::_locked( $appData ) ] );
