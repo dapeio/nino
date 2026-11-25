@@ -437,6 +437,26 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a page is one the site cannot do without: the page that answers the address '/' and the page of the status 404 -
+		 *	the route GET://404, or the Element-URI /404 -, which every address that has no page is answered with
+		 *
+		 *	@param		array 		$block				A page as blocks() gives it: [ 'uri' => the Element-URI, 'keys' => [ route key, ... ] ]
+		 *	@param		string		$field				The field the refusal names
+		 *
+		 *	@return 	array|null								Null for any other page, else the refusal (409, routes_remove_home or routes_remove_not_found)
+		 */
+		public static function keeper( array $block, string $field = 'template' ): ?array {
+
+			if( in_array( 'GET://', $block['keys'], true ) === true )
+				return self::_refuse( 409, 'the page "'. $block['uri']. '" answers the address "/"', 'routes_remove_home', [ $block['uri'] ], $field );
+
+			if( in_array( 'GET://404', $block['keys'], true ) === true || $block['uri'] === '/404' )
+				return self::_refuse( 409, 'the page "'. $block['uri']. '" answers the addresses that have no page', 'routes_remove_not_found', [ $block['uri'] ], $field );
+
+			return null;
+		}
+
+		/**
 		 *	The route keys of one page, in the order they stand in
 		 *
 		 *	@param		array 		$routes				The persisted route array
@@ -1022,11 +1042,10 @@ namespace Nino {
 
 			foreach( $pages as $block ) {
 
-				if( in_array( 'GET://', $block['keys'], true ) === true )
-					return self::_refuse( 409, 'the page "'. $block['uri']. '" answers the address "/"', 'routes_remove_home', [ $block['uri'] ], 'template' );
+				$kept = self::keeper( $block, 'template' );
 
-				if( in_array( 'GET://404', $block['keys'], true ) === true || $block['uri'] === '/404' )
-					return self::_refuse( 409, 'the page "'. $block['uri']. '" answers the addresses that have no page', 'routes_remove_not_found', [ $block['uri'] ], 'template' );
+				if( $kept !== null )
+					return $kept;
 			}
 
 			if( count( $pages ) > 1 )

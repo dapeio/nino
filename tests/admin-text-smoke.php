@@ -536,6 +536,92 @@ check( 'apiSaveBatch entity-encodes quotes in a plain-text value', $body['result
 ] ] );
 check( '...and saving that value again does not escape it a second time', $body['results']['/project/company/general/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
 
+// What the field of a text shows is what was typed: a plain text is stored with its quotes and brackets as entities, and the answers
+// carry the typed form beside the stored one. Whatever the field shows, saved with the stored text as the one it was read as, leaves
+// the file as it was - for every input, in every format, however often
+$typedInputs = [ '"', "'", '&', '<', '>', 'a < b', 'Tom <3 Jerry', '&quot;', '&amp;quot;', '[x]', 'ä ö ü ß € 日本語 😀', '<script>alert(1)</script>', '&#91;&#91;/template/common/a/b&#93;&#93;' ];
+$typedFile = static fn(): string => (string) file_get_contents( \Nino\Filesystem::path( $appData, '/text/de_DE.php' ) );
+$typedHeld = static function( string $key ) use ( &$appData ): ?array {
+	[ , $listed ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+	return array_column( $listed['keys'], null, 'key' )[$key] ?? null;
+};
+$typedRounds = [];
+$typedShown = [];
+
+foreach( [ 'plain', 'inline', 'lines', 'blocks' ] as $typedFormat )
+	foreach( $typedInputs as $typedAt => $typedInput ) {
+
+		$typedKey = '/project/typed/'. $typedFormat. '/in'. $typedAt;
+
+		callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $typedKey, 'global' => false, 'value' => '', 'format' => $typedFormat ] );
+		[ $typedStatus, $typedBody ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $typedKey, 'locale' => 'de_DE', 'value' => $typedInput ] ] ] );
+		$typedFirst = $typedFile();
+		$typedOk = $typedStatus === 200 && ( $typedBody['results'][$typedKey]['ok'] ?? false ) === true;
+
+		for( $typedRound = 1; $typedRound <= 3; $typedRound++ ) {
+
+			$typedEntry = $typedHeld( $typedKey );
+			$typedStored = (string) $typedEntry['values']['de_DE'];
+			$typedField = $typedEntry['typed']['de_DE'] ?? $typedStored;
+
+			if( $typedRound === 1 )
+				$typedShown[$typedFormat][$typedAt] = [ $typedStored, $typedField, isset( $typedEntry['typed'] ) ];
+
+			[ $typedStatus, $typedBody ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $typedKey, 'locale' => 'de_DE', 'value' => $typedField, 'was' => $typedStored ] ] ] );
+			$typedOk = $typedOk && $typedStatus === 200 && ( $typedBody['results'][$typedKey]['ok'] ?? false ) === true && $typedFile() === $typedFirst
+				&& ( $typedBody['results'][$typedKey]['value'] ?? null ) === $typedStored;
+		}
+
+		$typedRounds[$typedFormat][$typedAt] = $typedOk;
+	}
+
+foreach( $typedRounds as $typedFormat => $typedResults )
+	check( 'the format '. $typedFormat. ': what the field shows, saved with the stored text as the one it was read as, is no conflict and leaves the language file byte for byte as the first save wrote it - three rounds, '. count( $typedInputs ). ' inputs', in_array( false, $typedResults, true ) === false );
+
+check( 'a plain text typed as Sag "Hallo" & it\'s [x] is stored with its entities and listed in both forms: values stored, typed as it was typed',
+	( static function() use ( $typedHeld, &$appData ): bool {
+		callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/typed/shown/one', 'global' => false, 'value' => '' ] );
+		callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/project/typed/shown/one', 'locale' => 'de_DE', 'value' => 'Sag "Hallo" & it\'s [x]' ] ] ] );
+		$entry = $typedHeld( '/project/typed/shown/one' );
+		return $entry['values']['de_DE'] === 'Sag &quot;Hallo&quot; & it&#039;s &#91;x&#93;' && $entry['typed'] === [ 'de_DE' => 'Sag "Hallo" & it\'s [x]' ];
+	} )() );
+check( '...a text that holds nothing a person typed differently has no typed form in the list', $typedShown['plain'][2][2] === false && $typedShown['plain'][2][1] === '&' );
+check( '...every format but plain is shown as it is stored', array_reduce( [ 'inline', 'lines', 'blocks' ], static fn( bool $all, string $f ): bool => $all && array_reduce( $typedShown[$f], static fn( bool $one, array $row ): bool => $one && $row[2] === false && $row[0] === $row[1], true ), true ) );
+check( '...the typed form of the table: " \' [x] and a lone & are shown as typed', $typedShown['plain'][0][1] === '"' && $typedShown['plain'][1][1] === "'" && $typedShown['plain'][9][1] === '[x]' && $typedShown['plain'][10][1] === 'ä ö ü ß € 日本語 😀' );
+check( '...a text with a tag-like < is stored cut at the tag, a literal &quot; is shown as the quote it stands for (both store the same), and a literal &amp;quot; is shown as it stands', $typedShown['plain'][6][1] === 'Tom ' && $typedShown['plain'][7][1] === '"' && $typedShown['plain'][8][1] === '&amp;quot;' );
+check( '...the counterexample, two entities of a bracket around a fill, is shown as it is stored (it would be a live fill if decoded)', $typedShown['plain'][12] === [ '&#91;&#91;/template/common/a/b&#93;&#93;', '&#91;&#91;/template/common/a/b&#93;&#93;', false ] );
+
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/typed/panel/one', 'global' => false, 'value' => '' ] );
+[ , $typedBody ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/project/typed/panel/one', 'locale' => 'de_DE', 'value' => 'Er sagt "ja"' ] ] ] );
+[ , $typedListed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+$typedPanel = array_column( $typedListed['keys'], null, 'key' )['/project/typed/panel/one'] ?? [];
+check( 'the Text panel answers the same two forms: text/savebatch says the value stored and the value typed, text/keys the stored ones as values and the typed ones as typed',
+	( $typedBody['results']['/project/typed/panel/one'] ?? [] ) === [ 'ok' => true, 'value' => 'Er sagt &quot;ja&quot;', 'typed' => 'Er sagt "ja"' ] && ( $typedPanel['values']['de_DE'] ?? '' ) === 'Er sagt &quot;ja&quot;' && ( $typedPanel['typed'] ?? [] ) === [ 'de_DE' => 'Er sagt "ja"' ] );
+
+// The words of the site: a plain text printed in a page is the stored form, as it was, whatever the field shows
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/typed/site/script', 'global' => true, 'value' => '' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/typed/site/quote', 'global' => true, 'value' => '' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/project/typed/site/script', 'locale' => '*', 'value' => '<script>alert(1)</script>' ],
+	[ 'key' => '/project/typed/site/quote', 'locale' => '*', 'value' => 'Sag "Hallo" & it\'s [x]' ],
+] ] );
+$typedPage = \Nino\Html::renderHtml( $appData, '<h1>[[/project/typed/site/script]]</h1><p title="[[/project/typed/site/quote]]">[[/project/typed/site/quote]]</p>' );
+check( 'a page that prints a plain text holding a script and one holding quotes sends the stored form, and no script of the text',
+	$typedPage === '<h1>alert(1)</h1><p title="Sag &quot;Hallo&quot; & it&#039;s &#91;x&#93;">Sag &quot;Hallo&quot; & it&#039;s &#91;x&#93;</p>' && str_contains( $typedPage, '<script' ) === false );
+
+// Saving what the field shows leaves what the page sends as it was
+$typedSite = $typedFile();
+foreach( [ '/project/typed/site/script', '/project/typed/site/quote' ] as $typedKey ) {
+	$typedEntry = $typedHeld( $typedKey );
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $typedKey, 'locale' => '*', 'value' => $typedEntry['typed']['*'] ?? $typedEntry['values']['*'], 'was' => $typedEntry['values']['*'] ] ] ] );
+}
+check( '...and a save of what the field shows changes neither the file nor the page', $typedFile() === $typedSite && \Nino\Html::renderHtml( $appData, '<h1>[[/project/typed/site/script]]</h1><p title="[[/project/typed/site/quote]]">[[/project/typed/site/quote]]</p>' ) === $typedPage );
+
+// The keys of this block are taken away, with their format
+foreach( array_column( \Nino\Text::entries( $appData, true ), 'key' ) as $typedKey )
+	if( str_starts_with( $typedKey, '/project/typed/' ) === true )
+		callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $typedKey ] );
+
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
 	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
 ] ] );
@@ -580,6 +666,74 @@ foreach( [ '/_nino/webpage/legacy/name', '/_admin/legacy/word/name' ] as $system
 check( '...and the value of a system key stays', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/webpage/legacy/name]]'] ?? null ) === 'Legacy' );
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/legacy/name', 'global' => true, 'blacklisted' => false ] );
 check( 'a key that does not follow the grammar stays saveable - what is there is not touched', $status === 200 );
+
+// A key of the system keeps its name and its shape: it is not deleted, it is not made one text for each language or the other way round,
+// and it is not given another format. Hiding it, its limit and its text stay the Text panel's to decide
+$systemShape = static fn(): string => serialize( [ \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ), \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ), \Nino\Filesystem::getFileContent( $appData, '/text/meta.php', [] ), \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ) ] );
+$systemHeld = $systemShape();
+foreach( [ '/_nino/webpage/legacy/name', '/_admin/legacy/word/name' ] as $systemKey ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $systemKey ] );
+	check( "apiDelete refuses $systemKey as apiRename does: 400, keys_system, the key as the parameter, the field key - and writes nothing", $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && ( $body['params'] ?? [] ) === [ $systemKey ] && ( $body['field'] ?? '' ) === 'key' && $systemShape() === $systemHeld );
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => $systemKey, 'global' => false, 'blacklisted' => false ] );
+	check( "apiSave refuses to make $systemKey one text for each language: 400, keys_system, nothing written", $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && ( $body['params'] ?? [] ) === [ $systemKey ] && $systemShape() === $systemHeld );
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => $systemKey, 'global' => true, 'blacklisted' => false, 'format' => 'blocks' ] );
+	check( "...and to give $systemKey another format", $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && $systemShape() === $systemHeld );
+	[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => $systemKey, 'global' => true, 'blacklisted' => false, 'format' => 'plain', 'maxlength' => 80 ] );
+	check( "...sending the shape it has passes, with its limit, and the key can be hidden and shown once more", $status === 200 && ( \Nino\Text::meta( $appData )[$systemKey]['maxlength'] ?? null ) === 80
+		&& callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => $systemKey, 'global' => true, 'blacklisted' => true ] )[0] === 200 && isset( \Nino\Text::blacklist( $appData )[$systemKey] ) === true
+		&& callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => $systemKey, 'global' => true, 'blacklisted' => false, 'maxlength' => null ] )[0] === 200 && isset( \Nino\Text::blacklist( $appData )[$systemKey] ) === false );
+	\Nino\Text::setMeta( $appData, $systemKey, null, null );
+}
+// The format a key of the system is saved with is the one it has after the request: 'auto' on a key that holds blocks drops the choice and the
+// texts are detected anew, which is a change; plain is the one way out for a page's detail; a key only the blacklist holds has no shape to write
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $content ): array {
+	$content['[[/_nino/webpage/home/description]]'] = 'Hallo';
+	$content['[[/_admin/legacy/word/blocks]]'] = 'Wort';
+	return $content;
+} );
+\Nino\Text::setMeta( $appData, '/_nino/webpage/home/description', 'blocks', null );
+\Nino\Text::setMeta( $appData, '/_admin/legacy/word/blocks', 'blocks', null );
+\Nino\Text::setBlacklisted( $appData, '/_nino/webpage/later/title', true );
+$systemMeta = static fn(): string => serialize( \Nino\Text::meta( $appData ) );
+$metaHeld = $systemMeta();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/home/description', 'global' => false, 'blacklisted' => false, 'format' => 'auto' ] );
+check( 'apiSave of a key of the system with auto, which would turn blocks into the plain text its texts are detected as, is refused: 400, keys_system, nothing written', $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && $systemMeta() === $metaHeld );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/home/description', 'global' => false, 'blacklisted' => false, 'format' => 'lines' ] );
+check( '...another format than the one it has is refused', $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && $systemMeta() === $metaHeld );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_admin/legacy/word/blocks', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
+check( '...plain is allowed for the detail of a page only: a key of the workbench that holds blocks is refused it', $status === 400 && $systemMeta() === $metaHeld );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/home/description', 'global' => false, 'blacklisted' => false, 'format' => 'blocks' ] );
+check( '...the format it has passes, and it is blocks by choice', $status === 200 && $systemMeta() === $metaHeld && ( \Nino\Text::entry( $appData, '/_nino/webpage/home/description' )['format'] ?? '' ) === 'blocks' && ( \Nino\Text::entry( $appData, '/_nino/webpage/home/description' )['formatSet'] ?? false ) === true );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/home/description', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
+check( '...and plain for a detail of a page that holds blocks is the way back: 200, the key is plain', $status === 200 && ( \Nino\Text::entry( $appData, '/_nino/webpage/home/description' )['format'] ?? '' ) === 'plain' );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/home/description', 'global' => false, 'blacklisted' => false, 'format' => 'auto' ] );
+check( '...and auto on it, whose texts are detected as plain, changes nothing and passes', $status === 200 );
+$metaHeld = $systemMeta();
+foreach( [ [ [ 'global' => false, 'format' => 'blocks' ], 'a format' ], [ [ 'global' => true ], 'one text for all languages' ], [ [ 'global' => false, 'format' => 'plain' ], 'plain' ] ] as [ $later, $laterWhat ] ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/later/title', 'blacklisted' => true ] + $later );
+	check( "a key of the system that only the blacklist holds is given no shape: $laterWhat is refused, nothing written", $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && $systemMeta() === $metaHeld && ( \Nino\Text::blacklist( $appData )['/_nino/webpage/later/title'] ?? null ) !== null );
+}
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/later/title', 'global' => false, 'blacklisted' => true, 'maxlength' => 60 ] );
+check( '...hiding it and its limit are not refused', $status === 200 && ( \Nino\Text::meta( $appData )['/_nino/webpage/later/title']['maxlength'] ?? null ) === 60 );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $content ): array {
+	unset( $content['[[/_nino/webpage/home/description]]'], $content['[[/_admin/legacy/word/blocks]]'] );
+	return $content;
+} );
+foreach( [ '/_nino/webpage/home/description', '/_admin/legacy/word/blocks', '/_nino/webpage/later/title' ] as $laterKey ) {
+	\Nino\Text::setMeta( $appData, $laterKey, null, null );
+	\Nino\Text::setBlacklisted( $appData, $laterKey, false );
+}
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/_nino/webpage/ghost/name' ] );
+check( '...the refusal does not tell whether the key exists: an unknown key of the system is refused the same way', $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/_nino/webpage/neu/name', 'global' => true, 'value' => 'x' ] );
+check( 'apiCreate refuses a key of the system: 400, keys_invalid, nothing written', $status === 400 && ( $body['code'] ?? '' ) === 'keys_invalid' && $systemShape() === $systemHeld );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/_nino/webpage/legacy/name', 'locale' => '*', 'value' => 'Legacy neu' ] ] ] );
+check( 'the text of a key of the system stays editable through text/savebatch', $status === 200 && ( $body['results']['/_nino/webpage/legacy/name']['ok'] ?? false ) === true && ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/webpage/legacy/name]]'] ?? '' ) === 'Legacy neu' );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/_nino/webpage/legacy/name]]'] = 'Legacy';
+	return $global;
+} );
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/old/free/form', 'global' => true, 'blacklisted' => true ] );
 check( '...and can be hidden', $status === 200 && in_array( '/old/free/form', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
 \Nino\Text::setBlacklisted( $appData, '/old/free/form', false );
@@ -592,8 +746,12 @@ check( '...and renamed to one that follows the grammar', $status === 200 && ( \N
 } );
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/old/free/form' ] );
 check( '...and deleted', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/old/free/form]]'] ) === false );
-foreach( [ '/project/old/free/form', '/_nino/webpage/legacy/name', '/_admin/legacy/word/name' ] as $cleanKey )
-	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $cleanKey ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/old/free/form' ] );
+// A key of the system is not deleted through the panel: the test takes its own out of the file
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	unset( $global['[[/_nino/webpage/legacy/name]]'], $global['[[/_admin/legacy/word/name]]'] );
+	return $global;
+} );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/company/general/motto', 'newKey' => '/project/company/general/note' ] );
 check( 'apiRename rejects a new key that already exists', $status === 409 );
@@ -1984,6 +2142,13 @@ foreach( $keyActions as $action => $data ) {
 		$bad[] = $action. ': '. $status;
 }
 check( 'with /_admin/text/manage and not /_admin/keys/manage every one of the nine actions is 403 - no keys, no fills, no scan, no results - and nothing is written'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+$keysRefused = [];
+foreach( [ '/_nino/webpage/contact/name', '/_admin/legacy/word/name', $KK ] as $keysTarget ) {
+	$was = $keySnapshot();
+	[ $status, $body ] = $keyPost( 'keys/delete', [ 'key' => $keysTarget ] );
+	$keysRefused[] = [ $status, $body, $keySnapshot() === $was ];
+}
+check( 'without the right of the tab keys/delete of a key of the system is answered as the delete of any other key is: 403, no code, nothing of the target in it, nothing written', $keysRefused[0][0] === 403 && isset( $keysRefused[0][1]['code'] ) === false && $keysRefused[0] === $keysRefused[1] && $keysRefused[0] === $keysRefused[2] && $keysRefused[0][2] === true );
 check( '...the right of the tab is the one of \Nino\Modules\Text\Keys, and it is not the right of the Text panel', \Nino\Modules\Text\Keys::MANAGE_PERM === '/_admin/keys/manage' && \Nino\Modules\Text\Keys::MANAGE_PERM !== \Nino\Modules\Text\Admin::MANAGE_PERM );
 
 // An account that holds the right of the tab: every action answers, and does what it is for

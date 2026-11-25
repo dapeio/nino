@@ -42,7 +42,7 @@ return [
 	'[[/_admin/dashboard/label/keys]]'	=> 'Fehlende Textschlüssel',
 	'[[/_admin/error/keys_invalid]]'	=> 'Der Schlüssel „%s“ ist ungültig. Ein Schlüssel hat vier Teile, /<namensraum>/<kategorie>/<teil>/<name>, zum Beispiel /project/company/general/name. Der Namensraum ist template, project, feature oder module; jeder Teil besteht aus kleinen Wörtern, die ein Bindestrich verbindet.',
 	'[[/_admin/error/keys_exists]]'	=> 'Den Schlüssel „%s“ gibt es schon.',
-	'[[/_admin/error/keys_system]]'	=> 'Der Schlüssel „%s“ gehört dem System und wird nicht umbenannt. Sein Wert lässt sich bearbeiten.',
+	'[[/_admin/error/keys_system]]'	=> 'Der Schlüssel „%s“ gehört dem System: Er wird nicht umbenannt, gelöscht oder umgeformt. Seine Texte lassen sich bearbeiten.',
 	'[[/_admin/error/keys_format]]'	=> 'Dieses Format gibt es nicht. Zur Wahl stehen automatisch, reiner Text, formatiert, Zeilenumbrüche sowie Absätze und Listen.',
 	'[[/_admin/error/keys_limit]]'	=> 'Das Limit muss eine ganze Zahl von 1 bis %d sein.',
 	'[[/_admin/error/keys_limit_short]]'	=> 'Der Schlüssel enthält schon einen Text mit %d Zeichen. Kürze ihn zuerst oder wähle ein höheres Limit.',

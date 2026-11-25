@@ -301,6 +301,94 @@ check( 'the deleted entry\'s own text meta is left in place - additive-only, nev
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/does-not-exist' ] );
 check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
 
+// The page of the address '/' and the page of the status 404 are the ones the site is answered with: the delete keeps them
+$keeperRoutes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+$keeperSet = static function( array $routes ) use ( &$appData ): void {
+	\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ) use ( $routes ): array { $config['/nino/http/routes'] = $routes; return $config; } );
+	$appData['/nino/http/routes'] = $routes;
+};
+$keeperFile = static fn(): string => (string) file_get_contents( \Nino\Filesystem::path( $appData, '/config.php' ) );
+$keeperPage = static fn( string $uri, string $template = 'page-about', array $more = [] ): array => [ 'uri' => $uri, 'body' => '[template /templates/'. $template. ']' ] + $more;
+
+$keeperSet( [
+	'GET://' 					=> $keeperPage( '/home' ),
+	'GET://404' 			=> $keeperPage( '/missing', 'page-contact', [ 'statusCode' => 404 ] ),
+	'GET://elsewhere' => $keeperPage( '/404', 'page-contact' ),
+	'GET://ordinary' 	=> $keeperPage( '/ordinary', 'page-about' ),
+] );
+$keeperBefore = $keeperFile();
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/home' ] );
+check( 'apiDelete refuses the page at "/": 409, routes_remove_home, the Element-URI as the parameter, the field uri, and config.php is byte for byte what it was', $status === 409 && ( $body['code'] ?? '' ) === 'routes_remove_home' && ( $body['params'] ?? [] ) === [ '/home' ] && ( $body['field'] ?? '' ) === 'uri' && $keeperFile() === $keeperBefore );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/missing' ] );
+check( '...refuses the page that holds GET://404: 409, routes_remove_not_found, nothing written', $status === 409 && ( $body['code'] ?? '' ) === 'routes_remove_not_found' && ( $body['params'] ?? [] ) === [ '/missing' ] && ( $body['field'] ?? '' ) === 'uri' && $keeperFile() === $keeperBefore );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/404' ] );
+check( '...refuses a page whose Element-URI is /404 at another address, as Pages::uses() refuses it', $status === 409 && ( $body['code'] ?? '' ) === 'routes_remove_not_found' && ( $body['params'] ?? [] ) === [ '/404' ] && $keeperFile() === $keeperBefore
+	&& ( \Nino\Pages::uses( $appData, 'page-contact' )['error']['code'] ?? '' ) === 'routes_remove_not_found' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+check( '...and the list says deletable false for the page at "/", the page of GET://404 and the page /404, and true for the other', $status === 200 && array_column( $body['pages'], 'deletable', 'uri' ) === [ '/home' => false, '/missing' => false, '/404' => false, '/ordinary' => true ]
+	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text', 'deletable' ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/ordinary' ] );
+check( '...an ordinary page is deleted as ever: 200, its route gone and no other', $status === 200 && array_keys( \Nino\AppData::stored( $appData, '/nino/http/routes', [] ) ) === [ 'GET://', 'GET://404', 'GET://elsewhere' ] );
+
+// The page at '/' in one language only: a route for each language, the one of the language at '/'
+$keeperSet( [
+	'GET://' 		=> $keeperPage( '/start', 'page-about', [ 'locale' => 'de_DE' ] ),
+	'GET://en' 	=> $keeperPage( '/start', 'page-about', [ 'locale' => 'en_US' ] ),
+	'GET://fr' 	=> $keeperPage( '/start', 'page-about', [ 'locale' => 'fr_FR' ] ),
+] );
+$keeperBefore = $keeperFile();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/start' ] );
+check( '...a page with an address for each language, one of them "/", is refused as the page at "/"', $status === 409 && ( $body['code'] ?? '' ) === 'routes_remove_home' && $keeperFile() === $keeperBefore );
+[ , $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+check( '...and the list says it is not deletable', array_column( $body['pages'], 'deletable', 'uri' ) === [ '/start' => false ] );
+
+// Through the workbench's own dispatch: without the right the answer is the one every page gets, and nothing says what the page is
+$keeperSet( [ 'GET://' => $keeperPage( '/home' ), 'GET://ordinary' => $keeperPage( '/ordinary' ) ] );
+ninoUser( $appData, 'keeperright@example.com', [ '/_admin/images/manage' ] );
+$keeperBefore = $keeperFile();
+$keeperAnswers = [];
+foreach( [ '/home', '/ordinary', '/unknown' ] as $keeperUri )
+	$keeperAnswers[$keeperUri] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'uri' => $keeperUri ], 'routes/delete' );
+check( 'through handlePost, without the right the page at "/" is answered as every other page is: 403, not allowed, no code and no word of the target, nothing written',
+	$keeperAnswers['/home'][0] === 403 && ( $keeperAnswers['/home'][1]['error'] ?? '' ) === 'not allowed' && isset( $keeperAnswers['/home'][1]['code'] ) === false && $keeperAnswers['/home'][1] === $keeperAnswers['/ordinary'][1] && $keeperAnswers['/home'][1] === $keeperAnswers['/unknown'][1] && $keeperFile() === $keeperBefore );
+\Nino\Auth::logoutUser( $appData );
+\Nino\Auth::deleteUser( $appData, 'keeperright@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+$keeperSet( $keeperRoutes );
+
+// What the fields of the record show is what was typed: the texts of a page are stored with their quotes and brackets as entities
+$quotedText = [];
+foreach( \Nino\Locales::getAvailableLocales( $appData ) as $quotedLocale )
+	$quotedText[$quotedLocale] = [ 'name' => 'Über "uns" it\'s [x]', 'title' => 'Titel "T" & Co', 'description' => 'Sag "ja"' ];
+$quotedFiles = static function() use ( &$appData ): string {
+	$held = '';
+	foreach( [ '/config.php', '/text/de_DE.php', '/text/en_US.php', '/text/fr_FR.php', '/text/global.php', '/text/meta.php', '/text/blacklist.php' ] as $file )
+		$held .= $file. ':'. ( is_file( \Nino\Filesystem::path( $appData, $file ) ) === true ? (string) file_get_contents( \Nino\Filesystem::path( $appData, $file ) ) : '-' ). "\n";
+	return $held;
+};
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '', 'uri' => '/quoted', 'httpUris' => [ '' => '/quoted' ], 'template' => 'page-about', 'text' => $quotedText ] );
+$quotedHeld = $quotedFiles();
+[ , $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$quotedPage = array_column( $body['pages'], null, 'uri' )['/quoted'] ?? [];
+check( 'a page with quotes in its texts is stored with entities and listed as it was typed: the record shows the quotes',
+	$status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/quoted/name]]'] ?? '' ) === 'Über &quot;uns&quot; it&#039;s &#91;x&#93;'
+	&& ( $quotedPage['text']['de_DE'] ?? [] ) === $quotedText['de_DE'] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '/quoted', 'uri' => '/quoted', 'httpUris' => $quotedPage['httpUris'], 'template' => $quotedPage['template'], 'navs' => $quotedPage['navs'], 'statusCode' => $quotedPage['statusCode'], 'text' => $quotedPage['text'] ] );
+check( '...and the listed record saved a second time leaves every file of the texts and the routes byte for byte as it was', $status === 200 && $quotedFiles() === $quotedHeld );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '/quoted', 'uri' => '/quoted', 'httpUris' => $quotedPage['httpUris'], 'template' => $quotedPage['template'], 'navs' => $quotedPage['navs'], 'statusCode' => $quotedPage['statusCode'], 'text' => $quotedPage['text'] ] );
+check( '...a third time as well', $status === 200 && $quotedFiles() === $quotedHeld );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/quoted' ] );
+foreach( [ 'name', 'title', 'description' ] as $quotedField )
+	foreach( \Nino\Locales::getAvailableLocales( $appData ) as $quotedLocale )
+		\Nino\Filesystem::mutate( $appData, '/text/'. $quotedLocale. '.php', static function( array $content ) use ( $quotedField ): array {
+			unset( $content['[[/_nino/webpage/quoted/'. $quotedField. ']]'] );
+			return $content;
+		} );
+
 // What a route carries that the form does not edit stays. Somebody put a
 // 'maintenance' => false, a 'locale' and a 'header' on it in config.php - the
 // first keeps a page up while the site is down - and a save used to build the
@@ -742,7 +830,7 @@ ninoUser( $appData, 'routesright@example.com', [ \Nino\Modules\Routes\Admin::MAN
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'routes/list' );
 check( 'with the right the list answers the pages in the order they are stored in, with what the table shows and the record reads - and writes nothing', $status === 200 && $routesHeld() === $routesBefore && in_array( '/acc-a', array_column( $body['pages'], 'uri' ), true )
 	&& array_search( '/acc-a', array_column( $body['pages'], 'uri' ), true ) < array_search( '/acc-b', array_column( $body['pages'], 'uri' ), true )
-	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text' ] && isset( $body['runtime'], $body['templates'], $body['locales'], $body['localeNames'], $body['selectedLocale'], $body['navs'], $body['navNames'], $body['defaultTemplate'] ) );
+	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text', 'deletable' ] && isset( $body['runtime'], $body['templates'], $body['locales'], $body['localeNames'], $body['selectedLocale'], $body['navs'], $body['navNames'], $body['defaultTemplate'] ) );
 [ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeActions['routes/save'], 'routes/save' );
 check( '...a save writes the page: its texts', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/acc-a/name]]'] ?? '' ) === 'acc-a changed' );
 $accOrder = static fn(): array => array_column( ( ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'routes/list' )[1] )['pages'], 'uri' );

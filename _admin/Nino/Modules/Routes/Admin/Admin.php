@@ -254,7 +254,9 @@ namespace Nino\Modules\Routes {
 		 *	line and the link out use: the native language's where it has one
 		 *	of its own, else the one for every language, else the first. The
 		 *	template, the menus, the status code and the body are the first
-		 *	route's, which is what apiSave() has written to all of them
+		 *	route's, which is what apiSave() has written to all of them.
+		 *	'deletable' is false for the page of the address '/' and the page of
+		 *	the status 404 (see \Nino\Pages::keeper()), which apiDelete() refuses
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$routes				The persisted route array
@@ -302,6 +304,10 @@ namespace Nino\Modules\Routes {
 
 			foreach( $pages as $key => $page )
 				$pages[$key]['httpUri'] = $page['httpUris'][$native] ?? $page['httpUris'][''] ?? $page['httpUri'];
+
+			foreach( \Nino\Pages::blocks( $routes ) as $block )
+				if( isset( $pages[$block['uri']] ) === true )
+					$pages[$block['uri']]['deletable'] = \Nino\Pages::keeper( $block ) === null;
 
 			return array_values( $pages );
 		}
@@ -366,7 +372,8 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	One page's name, title and description per language
+		 *	One page's name, title and description per language, each as a person types it (\Nino\Text::typed()) - they are stored with their
+		 *	quotes and brackets as entities, and the fields of the record and the row show the text
 		 *
 		 *	@param		array 		$text					Locale => the locale's text file
 		 *	@param		array 		$locales			Available locales
@@ -380,9 +387,9 @@ namespace Nino\Modules\Routes {
 
 			foreach( $locales as $locale )
 				$pageText[$locale] = [
-					'name' 				=> (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/name]]'] 				?? '' ),
-					'title' 			=> (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/title]]'] 			?? '' ),
-					'description' => (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/description]]'] ?? '' ),
+					'name' 				=> \Nino\Text::typed( (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/name]]'] 				?? '' ), 'plain' ),
+					'title' 			=> \Nino\Text::typed( (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/title]]'] 			?? '' ), 'plain' ),
+					'description' => \Nino\Text::typed( (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/description]]'] ?? '' ), 'plain' ),
 				];
 
 			return $pageText;
@@ -588,7 +595,10 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	Remove a page: every route it has. Its /_nino/webpage&lt;uri&gt;/* text
+		 *	Remove a page: every route it has, except the page of the address '/'
+		 *	and the page of the status 404, which are refused with 409
+		 *	(routes_remove_home, routes_remove_not_found) and nothing written.
+		 *	Its /_nino/webpage&lt;uri&gt;/* text
 		 *	meta - the fills of its addresses among it - is deliberately left in
 		 *	place, same additive-only philosophy every other apply/save in this
 		 *	codebase follows, deleting a file/key a developer may have since
@@ -633,6 +643,12 @@ namespace Nino\Modules\Routes {
 					\Nino\Http::fail( $request, 404, 'unknown page' );
 					return;
 				}
+
+				// The page of the address '/' and the page of the status 404 are the
+				// ones the site is answered with: they are kept, whatever else the
+				// delete would leave in place
+				if( self::_refused( $request, \Nino\Pages::keeper( [ 'uri' => $uri, 'keys' => $keys ], 'uri' ) ?? [] ) === true )
+					return;
 
 				foreach( $keys as $routeKey )
 					unset( $routes[$routeKey] );

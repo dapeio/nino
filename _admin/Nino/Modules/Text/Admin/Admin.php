@@ -141,7 +141,10 @@ namespace Nino\Modules\Text {
 		 *	List every editable key with its current value(s), whether it's a
 		 *	global (locale-independent) or per-locale key, whether it currently
 		 *	holds markup (so the editor offers the html editor for it) and a
-		 *	maxlength derived from the longest current value. Blacklisted keys
+		 *	maxlength derived from the longest current value. 'values' holds the
+		 *	text as it is stored; 'typed' the text of a language as a person types
+		 *	it where that is not the stored one (\Nino\Text::typed()), which is
+		 *	what the field of a plain text shows. Blacklisted keys
 		 *	(technical values, not content) are hidden entirely - unlike the
 		 *	Text Keys tab, this one only ever edits existing key values and
 		 *	never sees the blacklist itself - and so are the words of the

@@ -632,7 +632,7 @@
 						sectionId : section.id,
 						title : [ place, field.label ].filter( function( part, at, parts ) { return at === 0 || part !== parts[at - 1] } ).join(' › '),
 						text : shown.length > 200 ? shown.slice( 0, 200 )+ '…' : shown,
-						chars : T.lengthOf( entry, T.valueOf( entry, locale ) ),
+						chars : T.lengthOf( entry, T.typedOf( entry, locale ) ),
 						emptyHere : T.isEmptyIn( entry, locale ),
 						writable : text._writable( entry ),
 						// One badge for each language of the site; a key that is one text for all of them has the one
@@ -940,7 +940,7 @@
 					const name = entry.global === true ? Nino.content.getText('/_admin/text/label/all-languages') : Nino.adminUi.localeName( code, text._locales );
 					const handle = Nino.admin.textKeys.valueField( {
 						entry : entry,
-						value : Nino.admin.textKeys.valueOf( entry, code ),
+						value : Nino.admin.textKeys.typedOf( entry, code ),
 						label : marks.length === 0 ? name : name+ ' ('+ marks.join(', ')+ ')',
 						id : 'text-field-'+ ( ++text._fieldSeq ),
 						writable : writable,
@@ -1120,11 +1120,18 @@
 					Nino.admin.touch( 'texts' );
 					view.conflict = null;
 					entry.values[item.locale] = result.value;
+					entry.typed = entry.typed ?? {};
+
+					if( typeof result.typed === 'string' && result.typed !== result.value )
+						entry.typed[item.locale] = result.typed;
+					else
+						delete entry.typed[item.locale];
 
 					// What the server kept is what the field shows - unless more was typed while it was on its way, which is not in what was sent and stays unsaved
 					if( field.handle.read() === sent ) {
-						if( result.value !== sent )
-							field.handle.write( result.value );
+						const shown = Nino.admin.textKeys.typedOf( entry, field.code === '*' ? text._locale() : field.code );
+						if( shown !== sent )
+							field.handle.write( shown );
 						field.base = field.handle.read();
 					}
 					else

@@ -42,7 +42,7 @@ return [
 	'[[/_admin/dashboard/label/keys]]'	=> 'Missing text keys',
 	'[[/_admin/error/keys_invalid]]'	=> 'The key “%s” is not valid. A key has four parts, /<namespace>/<category>/<part>/<name>, for example /project/company/general/name. The namespace is template, project, feature or module; every part is lowercase words joined by hyphens.',
 	'[[/_admin/error/keys_exists]]'	=> 'The key “%s” already exists.',
-	'[[/_admin/error/keys_system]]'	=> 'The key “%s” belongs to the system and is not renamed. Its value can be edited.',
+	'[[/_admin/error/keys_system]]'	=> 'The key “%s” belongs to the system: it is not renamed, deleted or reshaped. Its texts can be edited.',
 	'[[/_admin/error/keys_format]]'	=> 'This format does not exist. Choose automatic, plain text, formatted, line breaks, or paragraphs and lists.',
 	'[[/_admin/error/keys_limit]]'	=> 'The limit has to be a whole number from 1 to %d.',
 	'[[/_admin/error/keys_limit_short]]'	=> 'The key already holds a text of %d characters. Shorten it first, or choose a higher limit.',

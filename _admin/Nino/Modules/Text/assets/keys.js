@@ -289,9 +289,23 @@
 		 */
 		_renamable : function( key ) {
 
-			const model = Nino.admin.keys._model;
+			const keys = Nino.admin.keys;
+			const model = keys._model;
 
-			return model !== null && model.rowOf[key] !== undefined && key.indexOf('/_nino/') !== 0 && key.indexOf('/_admin/') !== 0;
+			return model !== null && model.rowOf[key] !== undefined && keys._isSystem( key ) === false;
+		},
+
+		/**
+		 *	Whether a key is one of the system's - /_nino/..., named after a page or a language, and /_admin/..., the words of the workbench. Its name and its
+		 *	shape are what the code that reads it expects, and only its text is edited: it is not renamed, not deleted, and its format and the one text for all
+		 *	languages are not changed
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{boolean}
+		 */
+		_isSystem : function( key ) {
+			return String( key ).indexOf('/_nino/') === 0 || String( key ).indexOf('/_admin/') === 0;
 		},
 
 		/**
@@ -1127,7 +1141,7 @@
 				body : keys._body,
 				save : keys._save,
 				reload : keys._reload,
-				danger : { label : word('/_admin/keys/confirm/delete-title'), run : keys._remove },
+				danger : { label : word('/_admin/keys/confirm/delete-title'), run : keys._remove, hidden : function( row ) { return keys._isSystem( row.key ) === true } },
 				actions : [
 					// A key of the system is what the code that reads it asks for: its value is edited, its name is not
 					{ label : word('/_admin/common/label/rename'), kind : 'secondary', hidden : function( row ) { return keys._renamable( row.key ) === false }, run : function( row, ctx ) { keys._rename( row.key, ctx.opener ) } },
@@ -1319,7 +1333,7 @@
 					const name = entry.global === true ? word('/_admin/text/label/all-languages') : Nino.adminUi.localeName( code, keys._locales );
 					const handle = Nino.admin.textKeys.valueField( {
 						entry : entry,
-						value : Nino.admin.textKeys.valueOf( entry, code === '*' ? locale : code ),
+						value : Nino.admin.textKeys.typedOf( entry, code === '*' ? locale : code ),
 						label : marks.length === 0 ? name : name+ ' ('+ marks.join(', ')+ ')',
 						id : 'keys-field-'+ ( ++keys._fieldSeq ),
 						writable : true,
@@ -1366,6 +1380,9 @@
 				} );
 
 				[ view.set.format, view.set.limit, view.set.global, view.set.hidden ].forEach( function( control ) { control.disabled = on === true } );
+
+				// The shape of a key of the system is not changed: its format and its one text for all languages stay locked
+				keys._lockShape( view );
 			};
 
 			view.draw();
@@ -1437,17 +1454,39 @@
 
 			view.set = {
 				base : base,
+				kept : entry.format,
 				format : formatField.querySelector('select'), formatField : formatField,
 				limit : limitField.querySelector('input'), limitField : limitField,
 				global : globalField.querySelector('input'), globalField : globalField,
 				hidden : hiddenField.querySelector('input'), hiddenField : hiddenField,
 			};
 
+			keys._lockShape( view );
+
 			// The limit of a key that was typed and not saved is the limit its fields count to
 			if( shape.limit !== base.limit && /^\d+$/.test( shape.limit ) === true && Number( shape.limit ) >= 1 )
 				view.fields.forEach( function( field ) { field.handle.setLimit( Number( shape.limit ) ) } );
 
 			return section;
+		},
+
+		/**
+		 *	Lock the format and the switch of one text for all languages of the record of a key of the system - the format of the detail of a page stays free where it is not plain
+		 *
+		 *	@param		{Object}	view					What the body of the record keeps
+		 *
+		 *	@return		void
+		 */
+		_lockShape : function( view ) {
+
+			if( Nino.admin.keys._isSystem( view.key ) === false )
+				return;
+
+			// The detail of a page that holds markup keeps its format select, to be given plain: it lands in attributes on the site
+			if( view.key.indexOf('/_nino/webpage/') !== 0 || view.set.kept === 'plain' )
+				view.set.format.disabled = true;
+
+			view.set.global.disabled = true;
 		},
 
 		/**

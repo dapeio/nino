@@ -122,6 +122,22 @@
 		},
 
 		/**
+		 *	The text of one key in one language as its field shows it: the text as a person types it where the key is a plain
+		 *	text stored with its quotes and brackets as entities (the answer's `typed`), else the stored one
+		 *
+		 *	@param		{Object}	entry
+		 *	@param		{string}	locale
+		 *
+		 *	@return		{string}									'' where there is none
+		 */
+		typedOf : function( entry, locale ) {
+
+			const typed = ( entry.typed ?? {} )[entry.global === true ? '*' : locale];
+
+			return typeof typed === 'string' ? typed : Nino.admin.textKeys.valueOf( entry, locale );
+		},
+
+		/**
 		 *	Whether a key still has no text in a language: one per language,
 		 *	and nothing in this one
 		 *
@@ -151,13 +167,13 @@
 				return false;
 
 			return Object.keys( entry.values ).every( function( code ) {
-				const text = String( entry.values[code] ?? '' );
+				const text = T.typedOf( entry, code );
 				return /[\r\n]/.test( text ) === false && text.length <= T.SINGLE_LINE_LENGTH;
 			} );
 		},
 
 		/**
-		 *	How long a text is as its field counts it: the characters of a plain text as they stand, and for a text
+		 *	How long a text is as its field counts it: the characters of a plain text as they stand (the text as the field shows it), and for a text
 		 *	with markup the characters a person sees - the tags gone, the entities decoded, nothing collapsed -, which
 		 *	is what the rich-text editor counts (the length of the text of its content) and cuts at the limit
 		 *

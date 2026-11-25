@@ -495,7 +495,7 @@ function textPage( response, options ) {
 	const words = workbenchWords( options.words ?? 'de_DE' );
 	const list = element('div'), form = element('div');
 	const sent = [], told = [], touches = [], held = [], editors = [];
-	const handle = { hold : false, refuse : {}, fail : null, sanitize : null, listed : 0 };
+	const handle = { hold : false, refuse : {}, fail : null, sanitize : null, typed : null, listed : 0 };
 
 	list.id = 'text-list';
 	form.id = 'text-form';
@@ -533,7 +533,7 @@ function textPage( response, options ) {
 			else {
 				const value = handle.sanitize === null ? item.value : handle.sanitize( item.value );
 				entry.values[item.locale] = value;
-				results[item.key] = { ok : true, value : value };
+				results[item.key] = handle.typed === null ? { ok : true, value : value } : { ok : true, value : value, typed : handle.typed( value ) };
 			}
 		} );
 		return [ 200, { results : results } ];
@@ -1003,6 +1003,32 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	w.sent.length = 0;
 	w.save( d );
 	check( '...and a save of that is no change', w.writes().length === 0 );
+}
+
+{
+	// P15b: a plain text is stored with its quotes as entities and the field shows what was typed
+	const server = fullResponse();
+	const held = server.keys.find( e => e.key === TITLE );
+	held.values.de_DE = 'Sag &quot;Hallo&quot; & it&#039;s';
+	held.typed = { de_DE : 'Sag "Hallo" & it\'s' };
+	const w = inRow( ROW, server );
+	w.handle.sanitize = value => value.replace( /"/g, '&quot;' ).replace( /'/g, '&#039;' );
+	w.handle.typed = value => value.replace( /&quot;/g, '"' ).replace( /&#039;/g, "'" );
+	const d = w.openRow( TITLE );
+	check( 'the field of a plain text shows what was typed, the quotes as they are, and its counter counts the characters it shows', w.controlOf( d, 'de_DE' ).value === 'Sag "Hallo" & it\'s' && w.counterOf( d, 'de_DE' ).textContent === '18 / 150' );
+	check( '...a language that has no typed form shows the stored text', w.controlOf( d, 'en_US' ).value === 'Services' );
+	check( '...and the record is not unsaved', w.h.dirty.isDirty() === false );
+	w.save( d );
+	check( 'a save of the record as it was drawn sends nothing', w.writes().length === 0 );
+	w.type( d, 'de_DE', 'Sag "Hallo" & it\'s mehr' );
+	w.save( d );
+	check( 'a changed text is sent as it stands in the field, and the text it was read as is the STORED text, never the typed one', w.writes().length === 1
+		&& JSON.stringify( w.writes()[0].payload.items ) === JSON.stringify( [ { key : TITLE, locale : 'de_DE', value : 'Sag "Hallo" & it\'s mehr', was : 'Sag &quot;Hallo&quot; & it&#039;s' } ] ) );
+	check( '...what the server kept is held in both forms: the model has the stored text and the typed one, the field is not rewritten and is not unsaved', w.panel._groups[ROW].find( e => e.key === TITLE ).values.de_DE === 'Sag &quot;Hallo&quot; & it&#039;s mehr'
+		&& w.panel._groups[ROW].find( e => e.key === TITLE ).typed.de_DE === 'Sag "Hallo" & it\'s mehr' && w.controlOf( d, 'de_DE' ).value === 'Sag "Hallo" & it\'s mehr' && w.h.dirty.isDirty() === false );
+	w.type( d, 'de_DE', 'Neu' );
+	w.save( d );
+	check( '...the next change is read as the stored text of the save before', w.writes().length === 2 && w.writes()[1].payload.items[0].was === 'Sag &quot;Hallo&quot; & it&#039;s mehr' && w.panel._groups[ROW].find( e => e.key === TITLE ).typed.de_DE === undefined );
 }
 
 {
@@ -1825,6 +1851,26 @@ const PAGE = 'template/page-services';
 }
 
 {
+	// a key of the system is not deleted and its shape is not changed: no button to delete it, the format and the one text for all languages locked; the limit and the hiding are not
+	const k = keysRow( PAGE );
+	const system = k.openRow( '/_nino/webpage/services/uri' );
+	const deleteLabel = W('/_admin/keys/confirm/delete-title');
+	const deleteOf = d => tag( byClass( d, 'nino-admin-actionbar' )[0], 'button' ).filter( b => b.textContent === deleteLabel );
+
+	check( 'the record of a key of the system has no button to delete it, and its format and its switch of one text for all languages are locked', deleteOf( system ).every( b => b.hidden === true ) && k.format( system ).disabled === true && k.global( system ).disabled === true );
+	check( '...the limit and the hiding are not locked', k.limit( system ).disabled !== true && k.hidden( system ).disabled !== true );
+	k.close( system );
+	// The detail of a page that holds blocks can be given plain; the switch of one text for all languages stays locked
+	const marked = keysResponse();
+	Object.assign( marked.keys.find( e => e.key === '/_nino/webpage/services/description' ), { format : 'blocks', formatSet : true, html : true } );
+	const repair = keysRow( PAGE, marked );
+	const detail = repair.openRow( '/_nino/webpage/services/description' );
+	check( '...the format of the detail of a page that is not plain stays free, so that it can be given plain, and its switch of one text for all languages is locked', repair.format( detail ).disabled !== true && repair.global( detail ).disabled === true );
+	const ordinary = k.openRow( K1 );
+	check( '...a key somebody made has the button, and both controls are free', deleteOf( ordinary ).length === 1 && deleteOf( ordinary ).every( b => b.hidden !== true ) && k.format( ordinary ).disabled !== true && k.global( ordinary ).disabled !== true );
+}
+
+{
 	// a text with markup is the rich-text editor, in every language; a language the website does not serve yet is marked
 	const response = keysResponse();
 	response.locales = [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : false } ];
@@ -1897,6 +1943,23 @@ const saidAt = ( d, control ) => findAll( d, el => has( el, 'nino-admin-field-er
 	check( '...and it says it with the badge and a line that stays empty, no toast of a failure', k.lineText( d ) === '' && k.touches.length === 0 );
 	k.save( k.record() );
 	check( '...as often as it is asked', k.writes().length === 0 );
+}
+
+{
+	// a plain text is stored with its quotes as entities: the record of the Keys tab shows what was typed and sends the stored text as the one it was read as
+	const server = keysResponse();
+	const held = server.keys.find( e => e.key === K1 );
+	held.values.de_DE = 'Sag &quot;Hallo&quot;';
+	held.typed = { de_DE : 'Sag "Hallo"' };
+	const k = keysRecord( PAGE, K1, server );
+	const d = k.record();
+
+	check( 'the field of a plain text in the Keys tab shows what was typed, and the record is not unsaved', k.controlOf( d, 'de_DE' ).value === 'Sag "Hallo"' && k.controlOf( d, 'en_US' ).value === 'Services' && dirtyNow( k ) === false );
+	k.save( d );
+	check( '...saved as it was drawn it sends nothing', k.writes().length === 0 );
+	k.type( d, 'de_DE', 'Sag "Hallo" mehr' );
+	k.save( d );
+	check( '...a changed text is sent as typed, with the stored text as the one it was read as', k.writes().length === 1 && JSON.stringify( k.writes()[0].payload.items[0] ) === JSON.stringify( { key : K1, locale : 'de_DE', value : 'Sag "Hallo" mehr', was : 'Sag &quot;Hallo&quot;' } ) );
 }
 
 {

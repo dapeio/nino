@@ -437,6 +437,52 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
+		 *	Whether a save would change the shape of a key of the system: whether it is one text for all languages, or the format it is saved with
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key
+		 *	@param		array|null	$entry				The key's entry, null for a key that only the blacklist holds
+		 *	@param		bool		$isGlobal			Whether the request says it is one text for all languages
+		 *	@param		bool		$formatPosted	Whether the request names a format
+		 *	@param		string|null	$format				The format it names, null for 'auto'
+		 *
+		 *	@return 	bool
+		 */
+		private static function _reshapes( array &$appData, string $key, ?array $entry, bool $isGlobal, bool $formatPosted, ?string $format ): bool {
+
+			if( $entry === null )
+				return $isGlobal === true || ( $formatPosted === true && ( $format !== null || isset( \Nino\Text::meta( $appData )[$key]['format'] ) === true ) );
+
+			if( $entry['global'] !== $isGlobal )
+				return true;
+
+			if( $formatPosted === false )
+				return false;
+
+			if( $format === 'plain' && str_starts_with( $key, '/_nino/webpage/' ) === true )
+				return false;
+
+			$detected = 0;
+			foreach( $entry['values'] as $value )
+				if( $value !== null )
+					$detected = max( $detected, (int) array_search( \Nino\Html::detectFormat( (string) $value ), \Nino\Html::FORMATS, true ) );
+
+			return ( $format ?? \Nino\Html::FORMATS[$detected] ) !== $entry['format'];
+		}
+
+		/**
+		 *	Whether a key is one of the system's: /_nino/..., named after a page's Element-URI or a language's code, and /_admin/..., the
+		 *	words of the workbench. The code that reads one asks for its name and its shape, and only its value is edited
+		 *
+		 *	@param		string		$key
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isSystem( string $key ): bool {
+			return str_starts_with( $key, '/_nino/' ) === true || str_starts_with( $key, '/_admin/' ) === true;
+		}
+
+		/**
 		 *	Whether a key exists in the blacklist and nowhere else - see
 		 *	_blacklistOnly(). Such a key is still editable here (un-ignoring
 		 *	and deleting are the two things that have to work on it), it just
@@ -464,7 +510,11 @@ namespace Nino\Modules\Text {
 		 *	sends neither. A format that is set converts every stored value to it
 		 *	(see _convertFormat()); 'auto' only forgets the choice, the values
 		 *	stay as they are. A limit below the longest text the key holds is
-		 *	refused: the editor would cut the text at it on the next keystroke
+		 *	refused: the editor would cut the text at it on the next keystroke.
+		 *	A key of the system (see _isSystem()) keeps its shape: a request that
+		 *	changes whether it is global, or leaves it another format than it has
+		 *	(plain is always allowed for a /_nino/webpage/ key), is
+		 *	refused with 400 and keys_system, and nothing is written
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -504,6 +554,15 @@ namespace Nino\Modules\Text {
 
 			if( $limit === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid limit', 'keys_limit', [ \Nino\Text::MAX_LIMIT ], 'maxlength' );
+				return;
+			}
+
+			// The shape of a key of the system - one text for every language or one for each, and the format it is saved with - is what the code that
+			// reads it expects: sending what it has passes, a change does not. The format counts as what the key has after the request (the one posted,
+			// for 'auto' the one its texts are detected as). The one way out is plain for a page's detail, whose text lands in attributes on the site.
+			// A key with no text, only a line of the blacklist, has no shape to write at all. Hiding it and its limit are the Text panel's to decide
+			if( self::_isSystem( $key ) === true && self::_reshapes( $appData, $key, $entry, $isGlobal, $formatPosted, $format ) === true ) {
+				\Nino\Http::fail( $request, 400, 'the shape of a key of the system is not changed', 'keys_system', [ $key ], 'key' );
 				return;
 			}
 
@@ -676,7 +735,7 @@ namespace Nino\Modules\Text {
 				return;
 			}
 
-			if( str_starts_with( $key, '/_nino/' ) === true || str_starts_with( $key, '/_admin/' ) === true ) {
+			if( self::_isSystem( $key ) === true ) {
 				\Nino\Http::fail( $request, 400, 'a key of the system is not renamed', 'keys_system', [ $key ], 'key' );
 				return;
 			}
@@ -750,7 +809,8 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	Delete a key entirely - its value(s) from global.php or every
-		 *	locale file, and its blacklist entry if any
+		 *	locale file, and its blacklist entry if any. A key of the system
+		 *	(see _isSystem()) is not deleted: 400, keys_system, nothing written
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -764,6 +824,11 @@ namespace Nino\Modules\Text {
 
 			$data = \Nino\Admin\Admin::postData();
 			$key 	= \Nino\Admin\Admin::postString( $data, 'key' );
+
+			if( self::_isSystem( $key ) === true ) {
+				\Nino\Http::fail( $request, 400, 'a key of the system is not deleted', 'keys_system', [ $key ], 'key' );
+				return;
+			}
 
 			$entry = \Nino\Text::entry( $appData, $key );
 

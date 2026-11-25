@@ -830,7 +830,8 @@
 				labels : { prev : word('/_admin/routes/record/prev'), next : word('/_admin/routes/record/next'), createTitle : word('/_admin/routes/label/new'), createSave : word('/_admin/routes/label/create'), created : word('/_admin/routes/msg/created') },
 				body : panel._body,
 				save : panel._save,
-				danger : { label : word('/_admin/routes/label/delete'), run : panel._remove },
+				// The page of the address '/' and the page of the status 404 are answered as not deletable: the button is not drawn for them
+				danger : { label : word('/_admin/routes/label/delete'), run : panel._remove, hidden : function( row ) { return ( row.entry || {} ).deletable === false } },
 				missing : function() { panel._directory.notice( word('/_admin/routes/record/missing') ) },
 			} );
 		},

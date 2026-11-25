@@ -1023,6 +1023,18 @@ const DELETE = '/_admin/routes/label/delete';
 	check( '...says it was deleted as a toast, closes the record by the history, and the table has lost the page', w.toasts().at(-1) === text('/_admin/common/msg/deleted') && w.dialog() === null && w.ids().join() === '/,/contact' && w.h.went.at(-1) === -1 );
 	check( '...with the focus on the row after the one that went', w.focused() === w.row('/contact') );
 
+	// A page the list answers as not deletable has no delete button; the others have one
+	const k = world();
+	const kept = listing( [ '/', '/about', '/404' ] );
+	kept.pages[0].deletable = false;
+	kept.pages[1].deletable = true;
+	kept.pages[2].deletable = false;
+	k.open( kept );
+	const keptHome = k.openRow('/');
+	check( 'the record of a page that is not deletable draws no delete button, and keeps its save button', k.button( keptHome, DELETE ).hidden === true && k.button( keptHome, SAVE ).hidden !== true );
+	check( '...the record of the 404 page draws none either', k.button( k.openRow('/404'), DELETE ).hidden === true );
+	check( '...the record of a page that is deletable draws one', k.button( k.openRow('/about'), DELETE ).hidden !== true );
+
 	// A delete the server refuses is said in the line of the record, and the record stays
 	const r = world();
 	r.open( listing( [ '/', '/contact' ] ) );

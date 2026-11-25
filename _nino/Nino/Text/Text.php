@@ -72,7 +72,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		bool		$includeBlacklisted	Whether a blacklisted key is in the list (flagged) or left out
 		 *
-		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, values } - values is locale => text, null for a language without one, or '*' => text for a global key
+		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, values, typed } - values is locale => text as it is stored, null for a language without one, or '*' => text for a global key. typed is the same map for the texts a person types differently from how they are stored (see typed()): only the locales whose typed form differs from the stored one are in it, and an entry with none has no 'typed' key
 		 */
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
@@ -137,6 +137,15 @@ namespace Nino {
 
 				$format = $meta[$key]['format'] ?? \Nino\Html::FORMATS[$detected];
 				$limit 	= $meta[$key]['maxlength'] ?? null;
+				$typed 	= [];
+
+				foreach( $values as $locale => $value ) {
+
+					$shown = $value === null ? null : self::typed( $value, $format );
+
+					if( $shown !== null && $shown !== $value )
+						$typed[$locale] = $shown;
+				}
 
 				$entries[] = [
 					'key' 				=> $key,
@@ -148,7 +157,7 @@ namespace Nino {
 					'maxlength' 	=> $limit !== null ? max( $limit, $visible ) : self::maxlength( $longest ),
 					'maxlengthSet' => $limit !== null,
 					'values' 			=> $values,
-				];
+				] + ( $typed === [] ? [] : [ 'typed' => $typed ] );
 			}
 
 			usort( $entries, fn( array $a, array $b ) => strcmp( $a['key'], $b['key'] ) );
@@ -289,6 +298,28 @@ namespace Nino {
 			return preg_match( self::KEY_GRAMMAR, $key ) === 1;
 		}
 
+		/**
+		 *	The text of a stored value as a person typed it: a plain text is stored with its quotes and brackets as entities
+		 *	(see sanitizeValue()), and those four entities - &quot;, &#039;, &#91; and &#93; - are written back as the
+		 *	characters they stand for. Only where the stored value is what sanitizeValue() makes of the decoded text: a value
+		 *	that would be stored differently (a shortcode written out as entities, a value somebody put in the file by hand
+		 *	with a tag in it) is answered as it is stored. Every other format is answered as it is stored
+		 *
+		 *	@param		string		$stored				The value as it is stored
+		 *	@param		string		$format				plain, inline, lines or blocks
+		 *
+		 *	@return		string									What the field shows: the text, or the stored value where it cannot be written back
+		 */
+		public static function typed( string $stored, string $format ): string {
+
+			if( $format !== 'plain' )
+				return $stored;
+
+			$typed = str_replace( [ '&quot;', '&#039;', '&#91;', '&#93;' ], [ '"', "'", '[', ']' ], $stored );
+
+			return self::sanitizeValue( $typed, 'plain' ) === $stored ? $typed : $stored;
+		}
+
 		// How many characters of a value a person sees: the tags are not
 		// text, and an entity is one character. What a key's limit is
 		// measured in - the editor counts the same way
@@ -361,6 +392,9 @@ namespace Nino {
 		// are. The results are one for each key: a key named twice - in two
 		// languages - says 'changed' where either of its items did, and
 		// the other item is written all the same, by its own stamp.
+		// A written key's result is { ok, value, typed }: value is the text as
+		// it is stored, typed the text as a person types it (see typed()), the
+		// two forms the editor holds afterwards.
 		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted ): array {
 
 			$results 		= [];
@@ -409,7 +443,7 @@ namespace Nino {
 				if( array_key_exists( 'was', $item ) === true && ( $item['force'] ?? false ) !== true )
 					$fileWas[$file]['[['. $key. ']]'] = (string) $item['was'];
 
-				$results[$key] = [ 'ok' => true, 'value' => $value ];
+				$results[$key] = [ 'ok' => true, 'value' => $value, 'typed' => self::typed( $value, $entry['format'] ) ];
 			}
 
 			foreach( $fileChanges as $file => $changes ) {
