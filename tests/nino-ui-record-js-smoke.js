@@ -421,6 +421,40 @@ console.log('Nino.adminUi.record - the dialog of one entry of a directory\n');
 	fire( buttonOf( s.dialog(), 'Save and continue' ), 'click' );
 	check( 'Save and continue saves and shows the next entry of the rows', s.calls.save.length === 2 && titleOf( s.dialog() ) === 'Item 4' && s.h.hash() === '#submissions/submissions/r04' );
 
+	{
+		// A save that takes the entry out of the rows the directory shows - a select narrows them, and the saved entry no longer fits it - still goes on to the entry that followed
+		const gone = setup( true );
+		const narrow = tag( gone.mount, 'select' ).find( select => select.id === 'cat' );
+		narrow.value = 'a';
+		fire( narrow, 'change' );
+		gone.record.open( 'r02', {} );
+		gone.calls.answer = function( finished, row ) {
+			const moved = Object.assign( {}, row, { group : 'b' } );
+			gone.rows().splice( gone.rows().indexOf( row ), 1, moved );
+			gone.directory.update( gone.rows(), row.key );
+			finished( true, { row : moved } );
+		};
+		typeInto( gone.dialog(), 'Leaves the rows' );
+		fire( buttonOf( gone.dialog(), 'Save and continue' ), 'click' );
+		check( 'Save and continue goes on to the entry that followed where the save took the saved entry out of the rows that are shown', gone.calls.save.length === 1 && gone.dialog() !== null && titleOf( gone.dialog() ) === 'Item 4' && gone.h.hash() === '#submissions/submissions/r04' );
+
+		const lone = setup( true );
+		const narrower = tag( lone.mount, 'select' ).find( select => select.id === 'cat' );
+		narrower.value = 'a';
+		fire( narrower, 'change' );
+		const last = lone.rows().filter( row => row.group === 'a' ).pop();
+		lone.record.open( last.key, {} );
+		lone.calls.answer = function( finished, row ) {
+			const moved = Object.assign( {}, row, { group : 'b' } );
+			lone.rows().splice( lone.rows().indexOf( row ), 1, moved );
+			lone.directory.update( lone.rows(), row.key );
+			finished( true, { row : moved } );
+		};
+		typeInto( lone.dialog(), 'The last one leaves' );
+		fire( buttonOf( lone.dialog(), 'Save and continue' ), 'click' );
+		check( '...and stays on the saved entry where none followed it', lone.calls.save.length === 1 && lone.dialog() !== null && titleOf( lone.dialog() ) === last.name && lone.h.hash() === '#submissions/submissions/'+ last.key );
+	}
+
 	const t = setup( true );
 	t.calls.answer = ( finished ) => finished( false, { error : 'Not saved.' } );
 	t.record.open( 'r03', {} );

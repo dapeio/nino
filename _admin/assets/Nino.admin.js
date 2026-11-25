@@ -8709,7 +8709,26 @@
 
 					if( options.saveNext === true ) {
 						continueButton = Nino.adminUi.button( word( 'saveNext', '/_admin/common/label/save-next' ), function() {
-							primarySave( function( ok ) { if( ok === true ) go( 1 ) } );
+
+							// The entry that follows is looked up before the save: a save can take the entry out of the rows the directory shows - the last empty text of a list that shows
+							// the empty ones - and an entry that is not among the rows has no next one to step to
+							const after = sequence()[place() + 1];
+							const onward = place() === -1 || after === undefined ? null : options.keyOf( after );
+
+							primarySave( function( ok ) {
+
+								if( ok !== true )
+									return;
+
+								if( place() !== -1 || onward === null )
+									return go( 1 );
+
+								if( sequence().some( function( row ) { return options.keyOf( row ) === onward } ) === true )
+									ask( function() {
+										if( show( onward ) === true )
+											address();
+									} );
+							} );
 						}, { kind : 'secondary' } );
 						secondary.push( continueButton );
 					}

@@ -1145,12 +1145,13 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	w.type( d, 'de_DE', 'Zeile eins\nZeile zwei\nDrei' );
 	fire( w.button( d, '/_admin/common/label/save-next' ), 'click' );
 	check( '"Save and continue" goes on to the next row of the table as it is filtered: the texts that are empty in a language', w.subtitleOf( w.dialog() ) === LONG && w.hash() === addressOf( ROW, LONG ) && w.writes().length === 1 );
-	// a text that the save made no longer empty leaves that table: there is no place to step on from, and the record stays at it, saved
+	// a text that the save made no longer empty leaves that table: the record goes on to the text that followed it there - or stays, saved, where none did
 	w.close( w.dialog() );
+	const followed = w.ids()[ w.ids().indexOf( INTRO ) + 1 ] ?? null;
 	const e = w.openRow( INTRO );
 	w.type( e, 'en_US', 'Hello' );
 	fire( w.button( e, '/_admin/common/label/save-next' ), 'click' );
-	check( 'a text that the save made fill its last empty language leaves the table that shows the empty ones: the record stays at it, saved', w.subtitleOf( w.dialog() ) === INTRO && w.ids().indexOf( INTRO ) === -1 && w.h.dirty.isDirty() === false && w.writes().length === 2 );
+	check( 'a text that the save made fill its last empty language leaves the table that shows the empty ones, and the record goes on to the text that followed it - it stays at the saved one where none did', w.subtitleOf( w.dialog() ) === ( followed ?? INTRO ) && w.ids().indexOf( INTRO ) === -1 && w.h.dirty.isDirty() === false && w.writes().length === 2 );
 }
 
 {
