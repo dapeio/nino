@@ -3,15 +3,18 @@
  *	admin-text-js-smoke.js	DOM-light checks for the Text panel and its Keys tab
  *										(_admin/Nino/Modules/Text/assets): how keys are named and
  *										fall into rows, sections and fields, how they are searched,
- *										and what the two views do on a fake page.
+ *										and what the Text panel does on the real shell
+ *										(adminPage() of the harness) and the Keys tab on a fake page.
  *
  *										The groups of both tabs are the list of the workbench, with
  *										the same names and an address each; the language the
  *										texts are shown in is the workbench's own, there is no
- *										switch of it here, and a form shows one language and
- *										writes that one and no other. The Text panel saves what
- *										was changed with one Save and sends nothing where nothing
- *										was; the Keys tab saves a key's shape and its text with
+ *										switch of it here. In the Text panel a group is the standard
+ *										directory of its texts and ONE text is edited in the record
+ *										over it: the working language first, the other languages
+ *										below, saved one request for each language that was
+ *										changed, none where nothing was. The Keys tab shows one
+ *										language in a form and writes that one and no other, saves a key's shape and its text with
  *										the one Save as well, asks once for the formats that
  *										would change what is stored, and says at the field which
  *										part a server turned down - what is not saved is not
@@ -26,7 +29,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-const { check, done, fills, load, shellRouter } = require( './harness.js' );
+const { check, done, fills, load, shellRouter, adminPage, element, findAll, fire } = require( './harness.js' );
 
 // What the panels write into the address goes through the router's own codec: every state written, every link drawn, is read back
 const codec = shellRouter();
@@ -206,9 +209,6 @@ function world( locale, hash, session ) {
 
 	return { dom, box, calls, words, touched, stamps, registry, counts, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount, pane };
 }
-
-// Whether the focus is in a level, as a person who looks at the page would say
-const focusIn = ( w, level ) => w.dom.doc.activeElement !== null && w.dom.doc.activeElement.closest( '#'+ level.id ) === level;
 
 // --- the names of a key ---------------------------------------------------------
 
@@ -431,10 +431,10 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 		&& w.T.resolve( model, [ '_nino/webpage', '/_nino/webpage/blog/name' ] ).row === '_nino/webpage' );
 	check( 'hashParts: the row\'s id, and the key as it is - each one part, whatever slashes it holds', JSON.stringify( w.T.hashParts( 'template/page-services' ) ) === '["template/page-services"]' && JSON.stringify( w.T.hashParts( 'x', '/a/b/c' ) ) === '["x","/a/b/c"]' );
 }
-// --- the Text panel: the list, the search, the form ------------------------------------
+// --- the Text panel on the real shell: the list, the texts of a row as a directory, the record of one text -------------
 
-const copies = list => list.map( e => Object.assign( {}, e, { values : Object.assign( {}, e.values ) } ) );
 // The words of the workbench in German, by their fills: what a check asks for is the fill, never the wording
+const copies = list => list.map( e => Object.assign( {}, e, { values : Object.assign( {}, e.values ) } ) );
 const D = workbenchWords('de_DE');
 const W = key => D[key];
 const F = ( key, ...params ) => { let at = 0; return W( key ).replace( /%[sdn]/g, token => at < params.length ? String( params[at++] ) : token ) };
@@ -444,506 +444,907 @@ const group = id => W('/_admin/text/group/'+ id);
 const textResponse = ( extra ) => Object.assign( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ), locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages,
 	templates : homeData().templates, features : homeData().features }, extra ?? {} );
 
-/** A page of the workbench with the Text panel open on a stubbed server: what it asked, what it said as a toast, and the answers it can be made to give */
+/** A page of the workbench with the Text panel open on a stubbed server: the keys the way the first level of the page is checked in the Keys part */
 function openedText( response, hash, locale ) {
 	const w = world( locale ?? 'de_DE', hash );
 	const { title, levels : [ list, form ] } = w.pane( 'text', 'text-list', 'text-form' );
 	title.textContent = 'Texte';
 	form.classList.add('admin-hidden');
-	// The name the head of the pane says: the fake page cannot answer the selector the block asks it with
 	w.Nino.adminUi.panelName = () => 'Texte';
-	w.Nino.adminUi.fillsDialog = options => { w.dialogs.push( options ); return true };
-	const sent = [], told = [], held = [];
-	w.dialogs = [];
-	const handle = { hold : false, refuse : {}, fail : null, stored : {} };
-	w.Nino.adminUi.say = sentence => told.push( sentence );
 	const text = w.Nino.admin.text;
-	text._apiCall = ( endpoint, payload, callback ) => {
-		sent.push( { endpoint : endpoint, payload : payload } );
-		const answer = () => {
-			if( endpoint === 'keys' )
-				return callback( 200, response );
-			if( endpoint === 'fills' )
-				return callback( 200, { fills : [ { key : '/project/company/general/name', notation : '[[/project/company/general/name]]', value : 'Acme' } ] } );
-			if( handle.fail !== null )
-				return callback( handle.fail.status, handle.fail.body );
-			const results = {};
-			payload.items.forEach( item => {
-				// As the server does: a text that was read as something other than what is stored now is not written, unless it is forced
-				const changed = item.was !== undefined && item.force !== true && handle.stored[item.locale+ ' '+ item.key] !== undefined && handle.stored[item.locale+ ' '+ item.key] !== item.was;
-				results[item.key] = changed === true ? { ok : false, error : 'changed' } : ( handle.refuse[item.key] ?? { ok : true, value : item.value } );
-				if( results[item.key].ok === true )
-					handle.stored[item.locale+ ' '+ item.key] = item.value;
-			} );
-			callback( 200, { results : results } );
-		};
-		if( handle.hold === true && endpoint === 'savebatch' )
+	text._apiCall = ( endpoint, payload, callback ) => callback( 200, endpoint === 'keys' ? response : {} );
+	text.init();
+	return Object.assign( w, { list, form, title, text } );
+}
+
+// What the Keys part reads its forms of the fake page with
+const fieldOf = ( t, key ) => t.form.querySelector('[data-key="'+ key+ '"]');
+const typeInto = ( control, value ) => { control.value = value; control.fire('input') };
+
+const has = ( el, name ) => el.classList.contains( name );
+const byClass = ( root, name ) => findAll( root, el => has( el, name ) );
+const tag = ( root, name ) => findAll( root, el => el.tagName === name.toUpperCase() );
+
+// The home page of the checks: a text that is the same in every language, one the account may not write, one that is longer than its limit, one of several lines
+const EXTRAS = () => [
+	textEntry( '/template/page-services/intro/badge', { '*' : 'Neu' } ),
+	textEntry( '/template/page-services/item-2/body', { de_DE : 'Zeile eins\nZeile zwei', en_US : '' } ),
+	textEntry( '/template/page-services/legal/locked', { de_DE : 'Gesperrt', en_US : 'Locked' }, { writable : false } ),
+	textEntry( '/template/page-services/legal/long', { de_DE : 'Dieser Satz ist länger als sein Limit erlaubt', en_US : '' }, { maxlength : 30 } ),
+];
+const fullResponse = ( extra ) => textResponse( Object.assign( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( EXTRAS() ) }, extra ?? {} ) );
+
+const ROW = 'template/page-services';
+const ORDER = [ '/_nino/webpage/services/name', '/_nino/webpage/services/title', '/_nino/webpage/services/description', '/template/page-services/intro/badge', '/template/page-services/intro/title', '/template/page-services/intro/text',
+	'/template/page-services/item-1/title', '/template/page-services/item-1/text', '/template/page-services/item-2/title', '/template/page-services/item-2/body', '/template/page-services/legal/locked', '/template/page-services/legal/long', '/template/page-services/legal/note' ];
+const TITLE = '/template/page-services/intro/title', INTRO = '/template/page-services/intro/text', LONG = '/template/page-services/legal/long', LOCKED = '/template/page-services/legal/locked', BADGE = '/template/page-services/intro/badge', BODY = '/template/page-services/item-2/body', RICH = '/template/page-services/item-1/text';
+// What a field is named: the words of the span at its head (the text is a node of its own in the stand-in)
+// All the words under an element (a stand-in's textContent is its own text only)
+const allText = el => el.textContent+ el.children.map( allText ).join('');
+const nameOf = el => { const span = tag( el, 'span' )[0]; return span.textContent+ span.children.map( c => c.textContent ).join('') };
+const addressOf = ( row, key ) => '#text/text/'+ encodeURIComponent( row )+ ( key === undefined ? '' : '/'+ encodeURIComponent( key ) );
+
+function textPage( response, options ) {
+
+	options = options ?? {};
+
+	const h = adminPage();
+	const words = workbenchWords( options.words ?? 'de_DE' );
+	const list = element('div'), form = element('div');
+	const sent = [], told = [], touches = [], held = [], editors = [];
+	const handle = { hold : false, refuse : {}, fail : null, sanitize : null, listed : 0 };
+
+	list.id = 'text-list';
+	form.id = 'text-form';
+	form.classList.add('admin-hidden');
+	h.page.appendChild( list );
+	h.page.appendChild( form );
+	h.show('text');
+	h.router.start();
+	h.Nino.content.getText = key => words[key] ?? '';
+	h.ui.locales.names = { de_DE : 'Deutsch', en_US : 'English' };
+	h.ui.locales.native = 'de_DE';
+	h.admin.workLocale.current = options.work ?? 'de_DE';
+
+	// The server: the keys it holds, written as the real one does - a text read as something else than what is stored now is not written unless it is forced
+	const stored = ( key, locale ) => { const e = response.keys.find( one => one.key === key ); return e === undefined ? undefined : String( ( e.global === true ? e.values['*'] : e.values[locale] ) ?? '' ) };
+	const serve = ( action, payload ) => {
+		if( action === 'text/keys' ) {
+			handle.listed++;
+			return [ 200, JSON.parse( JSON.stringify( response ) ) ];
+		}
+		if( action === 'text/fills' )
+			return [ 200, { fills : [ { key : '/project/company/general/name', notation : '[[/project/company/general/name]]', value : 'Acme' } ] } ];
+		if( handle.fail !== null )
+			return [ handle.fail.status, handle.fail.body ];
+		const results = {};
+		payload.items.forEach( item => {
+			const entry = response.keys.find( one => one.key === item.key );
+			const changed = item.force !== true && item.was !== undefined && stored( item.key, item.locale ) !== item.was;
+			if( entry === undefined )
+				results[item.key] = { ok : false, error : 'unknown key' };
+			else if( changed === true )
+				results[item.key] = { ok : false, error : 'changed' };
+			else if( handle.refuse[item.key + ' ' + item.locale] !== undefined )
+				results[item.key] = handle.refuse[item.key + ' ' + item.locale];
+			else {
+				const value = handle.sanitize === null ? item.value : handle.sanitize( item.value );
+				entry.values[item.locale] = value;
+				results[item.key] = { ok : true, value : value };
+			}
+		} );
+		return [ 200, { results : results } ];
+	};
+	h.Nino.http = { sendRequest : function( uri, method, callback, data ) {
+		const payload = JSON.parse( data.data );
+		sent.push( { endpoint : data.action.replace( 'text/', '' ), payload : payload } );
+		const answer = () => { const [ status, body ] = serve( data.action, payload ); callback( { status : status, responseJSON : body } ) };
+		if( handle.hold === true && data.action === 'text/savebatch' )
 			held.push( answer );
 		else
 			answer();
+	} };
+
+	const say = h.ui.say;
+	h.ui.say = function( words, opts ) { told.push( words ); return say.call( this, words, opts ) };
+	const touch = h.admin.touch;
+	h.admin.touch = function( topic, uri ) { touches.push( topic ); return touch.call( this, topic, uri ) };
+
+	// Every address the panel writes or links to is read back by the router as the same screen and the same parts
+	[ 'set', 'go', 'href' ].forEach( name => {
+		const real = h.router[name];
+		h.router[name] = function( screen, parts ) { codec.check( screen, parts ); return real.call( this, screen, parts ) };
+	} );
+
+	// The rich-text editor, which keeps what it is given and says what a field marked it with
+	h.admin.htmlEditor = { create : ( mount, value, maxlength, rows, format ) => {
+		mount.dataset.editor = 'yes';
+		const box = element('div');
+		box.setAttribute( 'contenteditable', 'true' );
+		mount.appendChild( box );
+		let kept = String( value ?? '' );
+		const marks = {};
+		const editor = { maxlength : maxlength, format : format, given : String( value ?? '' ), marks : marks, destroyed : false, mount : mount, box : box,
+			getValue : () => kept, setValue : v => { kept = v }, focus(){}, mark : state => Object.assign( marks, state ), destroy : () => { editor.destroyed = true } };
+		editors.push( editor );
+		return editor;
+	} };
+
+	if( options.hash !== undefined )
+		h.box.location.hash = options.hash;
+	else
+		h.router.set( 'text', [] );
+
+	load( '_admin/Nino/Modules/Text/assets/textkeys.js', h.context );
+	load( '_admin/Nino/Modules/Text/assets/admin.js', h.context );
+
+	const panel = h.admin.text;
+	const dialog = () => h.dialogs.filter( d => d.open ).pop() ?? null;
+	const rows = () => findAll( form, el => el.tagName === 'TR' && el.dataset.row !== undefined );
+	const w = { h, panel, list, form, sent, told, touches, held, editors, handle, response, dialog, rows,
+		open : () => { panel.showCurrent(); return w },
+		listRows : () => findAll( list, el => el.tagName === 'LI' && el.dataset.row !== undefined ),
+		listRow : id => w.listRows().find( li => li.dataset.row === id ),
+		linkOf : id => byClass( w.listRow( id ), 'nino-admin-row-open' )[0],
+		lineOf : id => tag( w.listRow( id ), 'small' )[0].textContent,
+		ids : () => rows().map( el => el.dataset.row ),
+		row : key => rows().find( el => el.dataset.row === key ),
+		cells : key => w.row( key ).children.filter( el => el.tagName === 'TD' ),
+		heads : () => findAll( form, el => el.tagName === 'TH' && el.dataset.key !== undefined ),
+		selects : () => tag( form, 'select' ).filter( el => has( el, 'nino-admin-filterbar-select' ) && has( el, 'nino-admin-table-sortby' ) === false ),
+		search : () => tag( form, 'input' ).find( el => el.type === 'search' ),
+		listSearch : () => tag( list, 'input' ).find( el => el.type === 'search' ),
+		pencil : key => byClass( w.row( key ), 'nino-admin-row-actions' )[0]?.children[0],
+		writes : () => sent.filter( c => c.endpoint === 'savebatch' ),
+		titleOf : d => byClass( d, 'nino-admin-dialog-title' )[0]?.textContent ?? null,
+		subtitleOf : d => byClass( d, 'nino-admin-dialog-subtitle' )[0]?.textContent ?? '',
+		fieldOf : ( d, code ) => findAll( d, el => el.dataset.locale === code )[0],
+		fields : d => findAll( d, el => el.dataset.locale !== undefined ),
+		controlOf : ( d, code ) => findAll( w.fieldOf( d, code ), el => el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' )[0],
+		counterOf : ( d, code ) => byClass( w.fieldOf( d, code ), 'nino-admin-char-counter' )[0],
+		errorsOf : d => byClass( d, 'nino-admin-field-error' ),
+		button : ( d, key ) => tag( d, 'button' ).find( b => b.textContent === W( key ) ),
+		lineText : d => byClass( d, 'nino-admin-status' )[0]?.textContent ?? '',
+		type : ( d, code, value ) => {
+			const control = w.controlOf( d, code );
+			control.value = value;
+			// What is typed is heard by everything round the control, as in a page
+			for( let up = control; up !== null && up !== undefined; up = up.parentNode )
+				fire( up, 'input', { target : control } );
+			h.dirty.refresh();
+		},
+		save : d => fire( tag( d, 'form' )[0], 'submit' ),
+		openRow : key => { const p = w.pencil( key ); fire( p, 'click', { currentTarget : p } ); return dialog() },
+		cross : d => tag( d, 'button' ).find( b => has( b, 'nino-admin-dialog-close' ) ),
+		close : d => { const asked = h.went.length; fire( w.cross( d ), 'click' ); if( h.went.length > asked && dialog() === null ) w.back() },
+		back : () => { h.back(); h.router.arrive(); panel.showCurrent(); h.hashchange() },
+		step : address => { h.box.location.hash = address; h.router.arrive(); panel.showCurrent(); h.hashchange() },
+		go : code => { h.admin.workLocale.current = code; h.admin.workLocale._followers.forEach( follower => follower.handler( code ) ) },
+		asking : () => { const top = dialog(); return top !== null && has( top, 'nino-admin-record' ) === false ? top : null },
+		answerAsk : key => { const top = dialog(); const asked = h.went.length; fire( tag( top, 'button' ).find( b => b.textContent === W( key ) ), 'click' ); if( h.went.length > asked && dialog() === null ) w.back(); return top },
+		external : ( key, locale, value ) => { const e = response.keys.find( one => one.key === key ); e.values[e.global === true ? '*' : locale] = value },
+		hash : () => h.hash(),
 	};
-	text.init();
-	return Object.assign( w, { list, form, title, sent, text, told, handle, held, dialogs : w.dialogs } );
+
+	return w;
 }
 
-/** The names of the fields of a section, as the labels at the left say them */
-const namesOf = section => section.querySelectorAll('.nino-admin-field').map( f => f.children[0].firstChild.textContent );
-const writes = t => t.sent.filter( c => c.endpoint === 'savebatch' );
-const fieldOf = ( t, key ) => t.form.querySelector('[data-key="'+ key+ '"]');
-const controlOf = ( t, key ) => fieldOf( t, key ).querySelector('input, textarea');
-const typeInto = ( control, value ) => { control.value = value; control.fire('input') };
-const submitText = t => t.form.querySelector('form').fire('submit');
-const openRow = ( t, group ) => opens( t.list ).find( r => keyOf( r ) === group ).click();
+// The page, shown and its keys read: the list is up, nothing is open
+const shown = ( response, options ) => textPage( response ?? fullResponse(), options ).open();
+// ... and a row of it open
+const inRow = ( id, response, options ) => { const w = shown( response, options ); fire( w.linkOf( id ), 'click', { target : w.linkOf( id ) } ); return w };
 
 {
-	const t = openedText( textResponse() );
-	const rows = opens( t.list );
+	const w = shown();
 
-	check( 'the list is two blocks: the pages, and the rest in groups - each with its heading', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === [ 'pages', 'general' ].map( group ).join()
-		&& t.list.querySelectorAll('h3').map( h => h.textContent ).join() === [ 'project', 'blocks', 'modules', 'features', 'system', 'other' ].map( group ).join() );
-	check( '...a row for each page, named after the route, and one for each group of the others - the rows of the workbench\'s list', rows.length === Object.keys( t.text._model.rows ).length && keyOf( rows[0] ) === 'template/page-services'
-		&& rows.map( r => r.querySelector('strong').textContent ).slice( 0, 2 ).join() === 'Leistungen,Rechtliches' && t.list.querySelectorAll('li').every( li => li.classList.contains('nino-admin-list-row') ) );
-	check( '...with what it holds as its line: how many keys and the beginning of their texts', rows[0].querySelector('small').textContent.startsWith( '(9) ' ) );
-	check( 'every row is a link to an address of its own, which writes it when it is pressed', rows.every( r => r.tagName === 'a' && r.href === '#text/text/'+ encodeURIComponent( keyOf( r ) ) ) );
-	check( 'the bar of the list has the search and the filter and no switch of a language: the language is the workbench\'s', t.list.querySelector('#text-search').getAttribute('aria-label') === W('/_admin/text/label/search')
-		&& t.list.querySelectorAll('select').length === 0 && t.list.querySelector('.nino-admin-filterbar') !== null && t.list.querySelector('#text-list-empty').classList.contains('nino-admin-chip') );
-	check( '...and the filter names the language the way the workbench does, and is off', t.list.querySelector('#text-list-empty').textContent === F('/_admin/text/label/empty-in','de_DE') && t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'false' );
-	check( 'the words of the workbench are not among the rows', opens( t.list ).every( r => keyOf( r ) !== '_admin' ) );
+	check( 'the first read asks for the keys, once, and for nothing else', w.sent.length === 1 && w.sent[0].endpoint === 'keys' && JSON.stringify( w.sent[0].payload ) === '{}' );
+	check( 'the list is two blocks: the pages, and the rest in groups - each with its heading', tag( w.list, 'h2' ).map( h => h.textContent ).join() === [ 'pages', 'general' ].map( group ).join()
+		&& tag( w.list, 'h3' ).map( h => h.textContent ).join() === [ 'project', 'blocks', 'modules', 'features', 'system', 'other' ].map( group ).join() );
+	check( '...a row for each page, named after the route, and one for each group of the others - the rows of the workbench\'s list', w.listRows().length === Object.keys( w.panel._model.rows ).length && w.listRows()[0].dataset.row === ROW
+		&& w.listRows().slice( 0, 2 ).map( li => tag( li, 'strong' )[0].textContent ).join() === 'Leistungen,Rechtliches' );
+	check( 'every row is a link to an address of its own, which writes it when it is pressed', w.listRows().every( li => byClass( li, 'nino-admin-row-open' )[0].href === addressOf( li.dataset.row ) ) );
+	check( 'the bar of the list has the search and the filter and no switch of a language: the language is the workbench\'s', w.listSearch().attributes['aria-label'] === W('/_admin/text/label/search') && tag( w.list, 'select' ).length === 0
+		&& findAll( w.list, el => el.id === 'text-list-empty' ).length === 1 );
+	check( '...and the filter names the language the way the workbench does, and is off', findAll( w.list, el => el.id === 'text-list-empty' )[0].textContent === F('/_admin/text/label/empty-in','Deutsch') && findAll( w.list, el => el.id === 'text-list-empty' )[0].attributes['aria-pressed'] === 'false' );
+	check( 'the words of the workbench are not among the rows', w.listRows().every( li => li.dataset.row !== '_admin' ) );
+	check( 'the page is at the address of the list, and the table of a row is not shown', w.hash() === '#text' && has( w.form, 'admin-hidden' ) === true && has( w.list, 'admin-hidden' ) === false );
 
-	t.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	t.Nino.admin.workLocale.set( 'en_US' );
-	check( 'the language the rail moves is the one the list is named in, and the filter says it', t.list.querySelector('#text-list-empty').textContent === F('/_admin/text/label/empty-in','English')
-		&& opens( t.list ).slice( 0, 2 ).map( r => r.querySelector('strong').textContent ).join() === 'Services,Legal' );
-	t.Nino.admin.workLocale.set( 'de_DE' );
+	// P1: the second line of a row is counts in place of running text
+	check( 'the second line of a row is how many texts it holds, how many have none in the working language and how many are too long - and no running text', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/long',1) && w.lineOf( ROW ).indexOf( 'Beratung' ) === -1 );
+	check( '...a row that has nothing empty and nothing too long says only how many', w.lineOf('project/company') === F('/_admin/text/count/texts',4) && w.lineOf('template/common') === F('/_admin/text/count/texts',2) );
+	check( '...one text is the singular, in the words of the panel', w.lineOf('template/frame-header') === F('/_admin/text/count/text',1) && W('/_admin/text/count/text') !== W('/_admin/text/count/texts') );
+	check( '...a text that is the same in every language is never empty in one', w.panel._model.rows['project/company'].entries.some( e => e.global === true ) && w.lineOf('project/company').indexOf(' leer in ') === -1 );
 
-	// the search
-	const box = t.list.querySelector('#text-search');
-	box.value = 'beraten';
-	box.fire('input');
-	check( 'a search replaces the rows by hits, the rows of the list again: the path, the piece of text with the word marked, the key behind it', opens( t.list ).length === 1 && t.list.querySelectorAll('li').length === 1
-		&& t.list.querySelector('strong').textContent === 'Leistungen › Eintrag 1 › Text' && t.list.querySelector('mark')?.textContent === 'beraten' && t.list.querySelector('.admin-text-hit-key').textContent === '/template/page-services/item-1/text'
-		&& t.list.querySelector('small').textContent.startsWith( 'Wir ' ) );
-	check( '...each a link to the row of the key, at its own address', opens( t.list )[0].href === '#text/text/template%2Fpage-services/%2Ftemplate%2Fpage-services%2Fitem-1%2Ftext' );
-	check( '...and says how many there are, where a screen reader hears it', t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/result',1) && t.list.querySelector('#text-list-status').getAttribute('aria-live') === 'polite' );
-	check( 'a hit in the language on screen has no code of a language', t.list.querySelectorAll('.nino-admin-row-actions').length === 0 );
-	box.value = 'xyzzy';
-	box.fire('input');
-	check( 'nothing found says so, with the empty state of the workbench', t.list.querySelectorAll('li').length === 0 && t.list.querySelector('.nino-admin-empty').textContent === W('/_admin/text/msg/nothing') && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/results',0) );
-	box.value = '';
-	box.fire('input');
-	check( 'an empty box is the rows again', opens( t.list ).length === rows.length && t.list.querySelector('#text-list-status').textContent === '' );
+	// the counts follow the working language
+	w.go( 'en_US' );
+	check( 'the counts follow the working language: the texts that are empty in it, named in it, and the ones that are too long there', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/empty',3,'English')
+		&& tag( w.listRow( ROW ), 'strong' )[0].textContent === 'Services' && findAll( w.list, el => el.id === 'text-list-empty' )[0].textContent === F('/_admin/text/label/empty-in','English') );
+	w.go( 'de_DE' );
+	check( '...and back', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/long',1) );
+}
 
-	// a hit in another language: its code asks for the language, and nothing else
-	box.value = 'consulting';
-	box.fire('input');
-	const lang = t.list.querySelector('.nino-admin-row-actions button');
-	check( 'a hit in another language shows that language\'s code as a small button of the workbench, named for what it does', lang.textContent === 'en_US' && lang.classList.contains('nino-admin-btn--small') && lang.getAttribute('aria-label') === F('/_admin/text/label/switch-language','English') );
+{
+	// "too long" is counted the way the field counts: the characters of a plain text, the visible characters of a text with markup
+	const w = shown( fullResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [
+		textEntry( '/template/page-hello/hero/rich', { de_DE : '<p><strong>abcdefghij</strong></p>', en_US : '' }, { html : true, format : 'blocks', maxlength : 20 } ),
+		textEntry( '/template/page-hello/hero/rich-long', { de_DE : '<p>abcdefghijklm</p><p>nopqrstuvw</p>', en_US : '' }, { html : true, format : 'blocks', maxlength : 20 } ),
+		textEntry( '/template/page-hello/hero/plain', { de_DE : 'abcdefghijklmnopqrstu', en_US : '' }, { maxlength : 20 } ),
+		textEntry( '/template/page-hello/hero/exact', { de_DE : 'abcdefghijklmnopqrst', en_US : '' }, { maxlength : 20 } ),
+		textEntry( '/template/page-hello/hero/entity', { de_DE : '<p>a&amp;b&nbsp;c</p>', en_US : '' }, { html : true, format : 'blocks', maxlength : 4 } ),
+	] ) } ) );
+	const U = w.h.admin.textKeys;
+	check( 'a text with markup is counted by what a person sees: the tags are no characters, the entities are one each, nothing is collapsed', U.lengthOf( { html : true }, '<p><strong>abcdefghij</strong></p>' ) === 10 && U.lengthOf( { html : true }, '<p>a&amp;b&nbsp;c</p>' ) === 5
+		&& U.lengthOf( { html : true }, '<p>abc</p><p>def</p>' ) === 6 && U.lengthOf( { html : false }, '<p>abc</p>' ) === 10 );
+	// P2
+	check( 'a text with markup is too long by its visible characters and a plain one by its length - on the limit it is not', w.lineOf('template/page-hello') === F('/_admin/text/count/texts',5)+ ' · '+ F('/_admin/text/count/long',3) );
+	check( '...counted for the language on screen: the other has none of them', ( () => { w.go( 'en_US' ); const line = w.lineOf('template/page-hello'); w.go( 'de_DE' ); return line === F('/_admin/text/count/texts',5)+ ' · '+ F('/_admin/text/count/empty',5,'English') } )() );
+}
+
+{
+	// the search: hits, the language of a hit, the filter - the list is the list
+	const w = shown();
+	const box = w.listSearch();
+	const type = value => { box.value = value; fire( box, 'input', { target : box } ) };
+
+	type('beraten');
+	check( 'a search replaces the rows by hits: the path, the piece of text with the word marked, the key behind it', w.listRows().length === 1 && tag( w.list, 'strong' )[0].textContent === 'Leistungen › Eintrag 1 › Text' && tag( w.list, 'mark' )[0].textContent === 'beraten'
+		&& byClass( w.list, 'admin-text-hit-key' )[0].textContent === RICH && tag( w.list, 'small' )[0].textContent.startsWith( 'Wir ' ) );
+	check( '...each a link to the text, at its own address - the row and the key, each one part', byClass( w.list, 'nino-admin-row-open' )[0].href === addressOf( ROW, RICH ) && addressOf( ROW, RICH ) === '#text/text/template%2Fpage-services/%2Ftemplate%2Fpage-services%2Fitem-1%2Ftext' );
+	check( '...and says how many there are, where a screen reader hears it', byClass( w.list, 'admin-text-count' )[0].textContent === F('/_admin/text/msg/result',1) && byClass( w.list, 'admin-text-count' )[0].attributes['aria-live'] === 'polite' );
+	check( 'a hit in the language on screen has no code of a language', byClass( w.list, 'nino-admin-row-actions' ).length === 0 );
+	type('xyzzy');
+	check( 'nothing found says so, with the empty state of the workbench', w.listRows().length === 0 && byClass( w.list, 'nino-admin-empty' )[0].textContent === W('/_admin/text/msg/nothing') );
+	type('');
+	check( 'an empty box is the rows again', w.listRows().length === Object.keys( w.panel._model.rows ).length && byClass( w.list, 'admin-text-count' )[0].textContent === '' );
+
+	type('consulting');
+	const code = tag( byClass( w.list, 'nino-admin-row-actions' )[0], 'button' )[0];
+	check( 'a hit in another language shows that language\'s code as a small button of the workbench, named for what it does', code.textContent === 'en_US' && has( code, 'nino-admin-btn--small' ) && code.attributes['aria-label'] === F('/_admin/text/label/switch-language','English') );
 	const chosen = [];
-	t.Nino.admin.workLocale.choose = code => chosen.push( code );
-	t.list.querySelector('.nino-admin-row-actions button').click();
-	check( '...which asks the workbench for it - as every change of the language is, so that a view with unsaved input is asked about first - and opens nothing', chosen.join() === 'en_US' && t.text._currentGroup === null );
-	t.Nino.admin.workLocale.choose = undefined;
-	box.value = '';
-	box.fire('input');
+	const choose = w.h.admin.workLocale.choose;
+	w.h.admin.workLocale.choose = c => chosen.push( c );
+	fire( code, 'click' );
+	check( '...which asks the workbench for it - as every change of the language is, so that a view with unsaved input is asked about first - and opens nothing', chosen.join() === 'en_US' && w.dialog() === null && has( w.form, 'admin-hidden' ) === true );
+	w.h.admin.workLocale.choose = choose;
+	type('');
 
-	t.Nino.admin.workLocale.set( 'en_US' );
-	t.list.querySelector('#text-list-empty').click();
-	check( 'the filter for the keys with no text in the language shows them as hits, and says it is on', t.list.querySelector('#text-list-empty').getAttribute('aria-pressed') === 'true'
-		&& t.list.querySelectorAll('.admin-text-hit-key').map( h => h.textContent ).join() === '/template/page-services/intro/text' );
-	t.list.querySelector('#text-list-empty').click();
-	t.Nino.admin.workLocale.set( 'de_DE' );
+	w.go( 'en_US' );
+	fire( findAll( w.list, el => el.id === 'text-list-empty' )[0], 'click' );
+	check( 'the filter for the texts with no text in the language shows them as hits, and says it is on', findAll( w.list, el => el.id === 'text-list-empty' )[0].attributes['aria-pressed'] === 'true'
+		&& byClass( w.list, 'admin-text-hit-key' ).map( k => k.textContent ).sort().join() === [ INTRO, LONG, BODY ].sort().join() );
+	fire( findAll( w.list, el => el.id === 'text-list-empty' )[0], 'click' );
+	w.go( 'de_DE' );
 
-	// a hit opens its row, at the field
-	box.value = 'beraten';
-	box.fire('input');
-	t.calls.length = 0;
-	opens( t.list )[0].click();
-	const field = fieldOf( t, '/template/page-services/item-1/text' );
-	check( 'a hit opens its row at the field - the address names the key, the field is marked and scrolled to', t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false && t.list.classList.contains('admin-hidden') === true
-		&& t.calls.includes( 'go text/template/page-services//template/page-services/item-1/text' ) && t.calls.includes( 'set text/template/page-services//template/page-services/item-1/text' ) && field.classList.contains('is-found') && field.scrolled === true );
-}
-
-{
-	// the form of a row
-	const t = openedText( textResponse() );
-	openRow( t, 'template/page-services' );
-
-	const back = t.form.querySelectorAll('.nino-admin-back-link');
-	check( 'the way back is one link in the context bar, to the panel by its name, and the bar says what the view is', back.length === 1 && back[0].textContent === F('/_admin/common/label/back-to',W('/_admin/text/label/back-name')) && back[0].closest('.nino-admin-contextbar') !== null
-		&& t.form.querySelector('.nino-admin-contextbar-title').textContent === 'Leistungen' && t.form.querySelectorAll('.main-title').length === 0 );
-	check( 'the form has no switch of a language and no select at all', t.form.querySelectorAll('select').length === 0 );
-	const sections = t.form.querySelectorAll('fieldset.admin-text-section');
-	check( 'the form is a section for each part, the details of the page first, then in the order of the template', sections.map( f => f.dataset.section ).join() === 'webpage:/services,intro,item-1,item-2,legal' );
-	check( '...a legend with the name of the section and, for a page, its route small', sections[0].querySelector('legend .admin-text-section-name').textContent === W('/_admin/text/label/page-details') && sections[0].querySelector('legend code')?.textContent === '/services'
-		&& sections[1].querySelector('legend .admin-text-section-name').textContent === W('/_admin/common/word/intro') && sections[1].querySelector('legend code') === null );
-	check( 'the fields stand in a grid whose labels are at the left: a fieldgrid in the fieldset, a field of the workbench for each key', sections.every( s => s.querySelector('.nino-admin-fieldgrid') !== null && s.querySelector('.nino-admin-fieldgrid').children.every( f => f.classList.contains('nino-admin-field') ) ) );
-	check( '...named in German - the key is not the name', namesOf( sections[0] ).join() === [ 'name', 'title', 'description' ].map( f => W('/_admin/text/label/page-'+ f) ).join() );
-
-	// what a field is
-	const form = t.form.querySelector('form');
-	check( 'the form checks nothing itself, and is the one form of the view', form.noValidate === true && t.form.querySelectorAll('form').length === 1 );
-	check( 'a plain text of a line is a line, with its key and its count under it', ( () => { const f = fieldOf( t, '/template/page-services/intro/title' ); return f.querySelector('input') !== null && f.querySelector('textarea') === null
-		&& f.querySelector('.admin-text-meta code').textContent === '/template/page-services/intro/title' && f.querySelector('.nino-admin-char-counter').textContent === '10 / 150' } )() );
-	check( 'a text with markup is the rich-text editor of the workbench, named by a span its group points at', ( () => { const f = fieldOf( t, '/template/page-services/item-1/text' ); return f.querySelector('[data-editor]') !== null
-		&& f.getAttribute('role') === 'group' && f.getAttribute('aria-labelledby') === f.querySelector('span').id } )() );
-	check( 'no field is a label that holds the editor, and none carries the key as its name', t.form.querySelectorAll('.admin-text-field').every( f => f.querySelector('span').textContent.indexOf('/') === -1 ) );
-	check( 'the textfills are asked for at a field the account may change that is a text with markup', fieldOf( t, '/template/page-services/item-1/text' ).querySelector('.nino-admin-fills-button') !== null );
-	check( '...and at no field of one line', t.form.querySelectorAll('.admin-text-field').filter( f => f.querySelector('input') !== null ).every( f => f.querySelector('.nino-admin-fills-button') === null ) );
-
-	// the bar: one, with one main button
-	const bars = t.form.querySelectorAll('.nino-admin-actionbar');
-	check( 'the view has one bar, with one main button that submits - no button of Save in the content', bars.length === 1 && bars[0].querySelectorAll('.nino-admin-btn-primary').length === 1 && bars[0].querySelector('.nino-admin-btn-primary').type === 'submit'
-		&& t.form.querySelectorAll('button').filter( b => b.type === 'submit' ).length === 1 && bars[0].querySelectorAll('.nino-admin-btn-danger').length === 0 );
-	check( '...with the state of the form and the line that says what a save did', bars[0].querySelector('.nino-admin-actionbar-state') !== null && t.form.querySelector('#text-form-msg') !== null );
-	check( 'the panel is in the registry of unsaved input under its name, with the bar that carries its mark', typeof t.registry.text.isDirty === 'function' && typeof t.registry.text.save === 'function' && typeof t.registry.text.discard === 'function' && t.registry.text.bar() === bars[0] );
-	check( 'a form nobody touched holds nothing unsaved', t.registry.text.isDirty() === false );
-
-	// a save that changes nothing sends nothing
-	submitText( t );
-	check( 'a save with nothing changed sends nothing and says it is saved', writes( t ).length === 0 && t.told.join() === W('/_admin/common/msg/saved') );
-
-	// a save sends what was changed, in the language the form shows
-	typeInto( controlOf( t, '/template/page-services/intro/title' ), 'Leistungen neu' );
-	check( 'a field that differs from what it held is unsaved input for the shell', t.registry.text.isDirty() === true );
-	typeInto( controlOf( t, '/template/page-services/intro/title' ), 'Leistungen' );
-	check( '...and typing it back takes that away', t.registry.text.isDirty() === false );
-	typeInto( controlOf( t, '/template/page-services/intro/title' ), 'Leistungen neu' );
-	typeInto( controlOf( t, '/_nino/webpage/services/title' ), 'Neuer Seitentitel' );
-	t.told.length = 0;
-	submitText( t );
-	const batch = writes( t )[0];
-	check( 'a save sends the keys that were changed - the text of the template and the details of the page together - and no other', writes( t ).length === 1 && batch.payload.items.map( i => i.key ).sort().join() === '/_nino/webpage/services/title,/template/page-services/intro/title'
-		&& batch.payload.items.every( i => i.locale === 'de_DE' ) );
-	check( '...says it with a toast, the line left empty and the form as it was - no jump to the list', t.told.join() === W('/_admin/common/msg/saved') && t.form.querySelector('#text-form-msg').textContent === '' && t.form.classList.contains('admin-hidden') === false && t.registry.text.isDirty() === false );
-	check( '...and tells the shell that texts were written, once, and no template, which the panel does not write', t.touched.join() === 'texts' );
-	check( '...what the server answered is what the model holds', t.text._groups['template/page-services'].find( e => e.key === '/template/page-services/intro/title' ).values.de_DE === 'Leistungen neu' );
-}
-
-{
-	// another tab wrote the key since: the save is turned down, the question is the kernel's, and each answer does what it says
-	const t = openedText( textResponse() );
-	const KEY = '/template/page-services/intro/title';
-	const read = t.text._groups['template/page-services'].find( e => e.key === KEY ).values.de_DE;
-	const questions = [];
-	t.Nino.adminUi.conflict = options => { questions.push( options ); return true };
-	openRow( t, 'template/page-services' );
-	t.handle.stored['de_DE '+ KEY] = 'Fremder Text';
-	typeInto( controlOf( t, KEY ), 'Mein Text' );
-	submitText( t );
-	check( 'a save sends the text each key was read as, beside what is written', writes( t )[0].payload.items.every( i => i.was !== undefined ) && writes( t )[0].payload.items.find( i => i.key === KEY ).was === read && writes( t )[0].payload.items.every( i => i.force === undefined ) );
-	check( '...and a key that was written by another meanwhile asks the question of a refused save, with the key in it, and says nothing was saved: the text stays typed and unsaved', questions.length === 1 && questions[0].message.indexOf( KEY ) !== -1
-		&& t.told.length === 0 && t.registry.text.isDirty() === true && controlOf( t, KEY ).value === 'Mein Text' && t.form.querySelector('#text-form-msg').textContent !== '' );
-	questions[0].onOverwrite();
-	const forced = writes( t ).at(-1).payload.items;
-	check( 'Overwrite writes it again, once, for that key alone and without the text it was read as - and then it is saved', forced.length === 1 && forced[0].key === KEY && forced[0].force === true && forced[0].was === undefined && forced[0].value === 'Mein Text'
-		&& t.handle.stored['de_DE '+ KEY] === 'Mein Text' && t.registry.text.isDirty() === false && t.told.at(-1) === W('/_admin/common/msg/saved') );
-	t.handle.stored['de_DE '+ KEY] = 'Wieder fremd';
-	typeInto( controlOf( t, KEY ), 'Noch einer' );
-	submitText( t );
-	questions.at(-1).onReload();
-	check( 'Reload puts the focus on the field of the text that was turned down, drawn again', t.dom.doc.activeElement === controlOf( t, KEY ) );
-	check( 'the question names the text by its place and by its key', questions.at(-1).message.indexOf( KEY ) !== -1 && questions.at(-1).message.indexOf(' › ') !== -1 );
-	check( 'Reload drops what was typed and shows what is stored', t.sent.filter( c => c.endpoint === 'keys' ).length === 2 && controlOf( t, KEY ).value !== 'Noch einer' && t.registry.text.isDirty() === false );
-}
-
-{
-	// a key that is the same in every language says so, and is written to the one text
-	const t = openedText( textResponse() );
-	openRow( t, 'project/company' );
-	const name = fieldOf( t, '/project/company/general/name' );
-	check( 'a field that is the same in every language carries a badge beside its name, and the field is described by it', name.querySelector('.nino-admin-badge').textContent === W('/_admin/text/label/all-languages')
-		&& name.querySelector('input').getAttribute('aria-describedby') === name.querySelector('.nino-admin-badge').id && fieldOf( t, '/project/company/general/description' ).querySelector('.nino-admin-badge') === null );
-	check( 'the row is called by its name in the vocabulary, and the fields that are the same in every language come first in their section', t.form.querySelector('.nino-admin-contextbar-title').textContent === W('/_admin/common/word/company')
-		&& namesOf( t.form.querySelectorAll('fieldset.admin-text-section')[0] ).join() === [ 'name', 'description' ].map( w => W('/_admin/common/word/'+ w) ).join() );
-	typeInto( controlOf( t, '/project/company/general/name' ), 'Acme AG' );
-	typeInto( controlOf( t, '/project/company/general/description' ), 'Wir bauen mehr' );
-	submitText( t );
-	const items = writes( t )[0].payload.items;
-	check( 'a save writes it to the one text, and a text of a language to the language the form shows', items.find( i => i.key === '/project/company/general/name' ).locale === '*' && items.find( i => i.key === '/project/company/general/description' ).locale === 'de_DE' );
-}
-
-{
-	// textareas: a text with a line break, or a long one, is a field of several lines
-	const longText = 'Ein langer Satz, der über die Länge einer Zeile hinausgeht und deshalb in einem Feld von mehreren Zeilen steht.';
-	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).concat( [ textEntry( '/project/shop/about/two', { de_DE : 'Zeile eins\nZeile zwei', en_US : '' } ), textEntry( '/project/shop/about/long', { de_DE : longText, en_US : '' } ), textEntry( '/project/shop/about/high', { de_DE : 'Kurz', en_US : '' }, { maxlength : 600 } ) ] ) } );
-	const t = openedText( response );
-	openRow( t, 'project/shop' );
-	const kind = key => fieldOf( t, key ).querySelector('textarea') !== null ? 'textarea' : 'input';
-	check( 'a text with a line break, a text longer than a line and one with a high limit are fields of several lines - a short one is a line', [ '/project/shop/about/two', '/project/shop/about/long', '/project/shop/about/high' ].every( k => kind( k ) === 'textarea' ) );
-	check( '...which is where the textfills are asked for, at the name, for the account that may change it', [ '/project/shop/about/two', '/project/shop/about/long' ].every( k => fieldOf( t, k ).querySelector('.nino-admin-fills-button') !== null ) );
-	fieldOf( t, '/project/shop/about/two' ).querySelector('.nino-admin-fills-button').click();
-	check( '...and the list they offer is the server\'s, asked when the button is pressed', t.sent.some( c => c.endpoint === 'fills' ) );
-	check( 'a plain text of a line keeps its line breaks where it has them: a value with one is never put into a field that would cut it', kind( '/project/shop/about/two' ) === 'textarea' && controlOf( t, '/project/shop/about/two' ).value === 'Zeile eins\nZeile zwei' );
-}
-
-{
-	// the language: a form shows one and writes that one
-	const t = openedText( textResponse() );
-	t.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	openRow( t, 'template/page-services' );
-	const title = '/template/page-services/intro/title';
-	check( 'a form in the native language has no badge of a language', t.form.querySelector('.nino-admin-locale-badge') === null && controlOf( t, title ).value === 'Leistungen' );
-
-	// the language moved under the form without the form being told: what it writes is what it shows
-	t.box.Nino.admin.workLocale.current = 'en_US';
-	typeInto( controlOf( t, title ), 'Leistungen B' );
-	submitText( t );
-	check( 'a form writes the language it shows, whatever the workbench says by now', writes( t )[0].payload.items.length === 1 && writes( t )[0].payload.items[0].locale === 'de_DE' && writes( t )[0].payload.items[0].value === 'Leistungen B' );
-	t.box.Nino.admin.workLocale.current = 'de_DE';
-
-	// the language moved, as the shell does it after it has asked
-	typeInto( controlOf( t, title ), 'In German' );
-	t.Nino.admin.workLocale.set( 'en_US' );
-	check( 'the form follows a language the workbench moved: it is drawn again in it, the pill in its bar says so, and what was typed is not there', controlOf( t, title ).value === 'Services' && t.form.querySelector('.nino-admin-locale-badge') !== null
-		&& t.text._shownLocale === 'en_US' && t.registry.text.isDirty() === false );
-	typeInto( controlOf( t, title ), 'Services two' );
-	t.sent.length = 0;
-	submitText( t );
-	check( '...and writes that language, and no other', writes( t ).length === 1 && writes( t )[0].payload.items.length === 1 && writes( t )[0].payload.items[0].locale === 'en_US' && writes( t )[0].payload.items[0].value === 'Services two' );
-	t.Nino.admin.workLocale.set( 'de_DE' );
-	check( '...the native language needs no pill', t.form.querySelector('.nino-admin-locale-badge') === null && controlOf( t, title ).value === 'Leistungen B' );
-}
-
-{
-	// a server that turns a key down: said at its field, the key stays changed, the others are saved
-	const t = openedText( textResponse() );
-	openRow( t, 'template/page-services' );
-	const title = '/template/page-services/intro/title', text = '/template/page-services/intro/text';
-	typeInto( controlOf( t, title ), 'Eins' );
-	typeInto( controlOf( t, text ), 'Zwei' );
-	t.handle.refuse[text] = { ok : false, error : 'could not be written' };
-	submitText( t );
-	check( 'a key the server turns down says so at its field, in a sentence under it, and the field is marked', fieldOf( t, text ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 && controlOf( t, text ).getAttribute('aria-invalid') === 'true'
-		&& fieldOf( t, title ).parentNode.querySelectorAll('.nino-admin-field-error').length === 1 );
-	check( '...and the form says how many were not saved, in the line of the bar - no toast of success', t.form.querySelector('#text-form-msg').textContent === W('/_admin/text/error/one') && t.told.length === 0 );
-	check( '...the key stays unsaved input, the one that was saved is not', t.registry.text.isDirty() === true && t.text._session.changed().join() === text );
-	typeInto( controlOf( t, text ), 'Zwei!' );
-	check( '...and typing into the field takes its sentence away', fieldOf( t, text ).parentNode.querySelectorAll('.nino-admin-field-error').length === 0 && controlOf( t, text ).getAttribute('aria-invalid') === null );
-	t.handle.refuse = {};
-	t.sent.length = 0;
-	submitText( t );
-	check( 'the next save sends the key that is still changed, and nothing else', writes( t )[0].payload.items.map( i => i.key ).join() === text && t.registry.text.isDirty() === false );
-
-	// a request that fails
-	typeInto( controlOf( t, title ), 'Drei' );
-	t.handle.fail = { status : 500, body : null };
-	submitText( t );
-	check( 'a request that fails leaves the form as it is, unsaved, and says so in the line', t.registry.text.isDirty() === true && t.form.querySelector('#text-form-msg').textContent.indexOf( '500' ) !== -1 );
-	t.handle.fail = null;
-
-	// what is typed while the request runs is not in what was sent
-	t.handle.hold = true;
-	typeInto( controlOf( t, title ), 'Vier' );
-	submitText( t );
-	typeInto( controlOf( t, title ), 'Vier und mehr' );
-	let ended = null;
-	t.registry.text.save( ok => { ended = ok } );
-	check( 'a second save while one runs is told no, and sends nothing', ended === false && writes( t ).length === 3 );
-	check( 'the shell sees a save that runs', t.registry.text.saving() === true );
-	t.held.shift()();
-	check( 'what was typed while the request was on its way stays unsaved input', t.registry.text.isDirty() === true && controlOf( t, title ).value === 'Vier und mehr' && t.registry.text.saving() === false );
-	t.handle.hold = false;
-
-	// discard
-	t.registry.text.discard();
-	check( 'discarding puts the fields back to what they held', controlOf( t, title ).value === 'Vier' && t.registry.text.isDirty() === false );
-}
-
-{
-	// keys this account may not write are read, in place
-	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => e.key.indexOf( '/project/company/' ) === 0 ? Object.assign( {}, e, { writable : e.key.endsWith( 'email' ) } ) : e ) } );
-	const t = openedText( response );
-	openRow( t, 'project/company' );
-	const view = fieldOf( t, '/project/company/general/name' ).querySelector('.admin-text-readonly');
-	check( 'a key the account may not write is shown as text - named like the others - and has no field and no textfills', view !== null && view.textContent === 'Acme' && t.text._session.get( '/project/company/general/name' ).readonly === true
-		&& view.getAttribute('aria-labelledby') === view.parentNode.querySelector('span').id && fieldOf( t, '/project/company/general/name' ).querySelector('input, textarea, .nino-admin-fills-button') === null );
-	check( '...the keys it may write are fields, and a save sends only those', controlOf( t, '/project/company/contact/email' ) !== null && t.form.querySelectorAll('button').filter( b => b.type === 'submit' ).length === 1 );
-	typeInto( controlOf( t, '/project/company/contact/email' ), 'x@acme.test' );
-	submitText( t );
-	check( '...and a save sends only the keys it may write that were changed', writes( t )[0].payload.items.map( i => i.key ).join() === '/project/company/contact/email' );
-
-	// a row with nothing writable has no Save
-	const none = openedText( textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => Object.assign( {}, e, { writable : false } ) ) } ) );
-	openRow( none, 'project/company' );
-	check( 'a row this account may not write anywhere is a row to read: no bar, no Save', none.form.querySelectorAll('.nino-admin-actionbar').length === 0 && none.registry.text.isDirty() === false );
-}
-
-{
-	// A template written since the keys were read is a row the list did not have - the Builder makes the keys of its sections, and so does a key of a template that the
-	// Keys tab adds: the panel reads the keys again where it is shown, and not before
-	const response = textResponse();
-	const t = openedText( response );
-	const asked = () => t.sent.filter( c => c.endpoint === 'keys' ).length;
-	const fresh = '/template/frame-footer/navigation/label';
-	const rowOf = key => t.text._model.rowOf[key];
-	const listed = group => opens( t.list ).some( r => keyOf( r ) === group );
-
-	check( 'the panel asks for the keys once when it opens, and keeps the stamp of the templates it asked at', asked() === 1 && t.text._stamp === 0 && rowOf( fresh ) === undefined && listed( 'template/frame-footer' ) === false );
-	t.text.showCurrent();
-	check( 'shown again with nothing written since, it asks for nothing', asked() === 1 );
-	t.Nino.admin.touch( 'texts' );
-	t.text.showCurrent();
-	check( '...nor does a write of texts make it ask: the texts it writes itself it has in hand', asked() === 1 );
-
-	response.keys = response.keys.concat( [ textEntry( fresh, { de_DE : 'Fußnavigation', en_US : 'Footer navigation' } ) ] );
-	t.Nino.admin.touch( 'templates' );
-	t.text.showCurrent();
-	check( 'a template written since: shown again, it asks again - and the rows have what the template made', asked() === 2 && t.text._stamp === 1 && rowOf( fresh ) === 'template/frame-footer' && listed( 'template/frame-footer' ) );
-	t.text.showCurrent();
-	check( '...once: what it holds now is the stamp it asked at', asked() === 2 );
-
-	// a row is open: the list is not drawn over it
-	opens( t.list ).find( r => keyOf( r ) === 'template/page-services' ).click();
-	t.Nino.admin.touch( 'templates' );
-	t.text.showCurrent();
-	check( 'a row that is open is not drawn over: shown again, the panel asks for nothing and the form stays', asked() === 2 && t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false );
-	t.text._showList();
-	t.text.showCurrent();
-	check( '...the showing that finds the list is the one that asks, and the stamp is the one of that time', asked() === 3 && t.text._stamp === 2 );
-
-	// a template written while the answer is on its way is not in it
-	let held = null;
-	t.text._apiCall = ( endpoint, payload, callback ) => { t.sent.push( { endpoint : endpoint, payload : payload } ); held = () => callback( 200, response ) };
-	t.Nino.admin.touch( 'templates' );
-	t.text.showCurrent();
-	t.Nino.admin.touch( 'templates' );
-	held();
-	check( 'a template written while the answer is on its way is not in it: the panel keeps the stamp from before the request', asked() === 4 && t.text._stamp === 3 && t.stamps.templates === 4 );
-	t.text.showCurrent();
-	check( '...so the next showing asks again', asked() === 5 );
-}
-
-{
-	// a row and a part named like a member of Object.prototype open as any other
-	const free = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).concat( [ textEntry( '/project/shop/constructor/name', { de_DE : 'Konstrukteur', en_US : 'Constructor' } ), textEntry( '/constructor/x', { de_DE : 'Frei' } ) ] ) } );
-	const t = openedText( free );
-	const box = t.list.querySelector('#text-search');
-	box.value = 'konstrukteur';
-	box.fire('input');
-	check( 'the search over keys with a part named constructor answers, in the Text panel', t.list.querySelectorAll('li').length === 1 );
-	box.value = '';
-	box.fire('input');
-	opens( t.list ).find( r => keyOf( r ) === 'project/shop' ).click();
-	check( '...and the form of its row opens, with the section named by the part', t.form.querySelectorAll('fieldset.admin-text-section').map( f => f.dataset.section ).join() === 'constructor' && controlOf( t, '/project/shop/constructor/name' ).value === 'Konstrukteur' );
-}
-
-{
-	// deep links: a key, the details of a page
-	const t = openedText( textResponse(), { panel : 'text', parts : [ 'template/page-services', '/template/page-services/item-2/title' ] } );
-	check( 'a hash that names a key opens the row that holds it, at that key, when the panel loads', t.text._currentGroup === 'template/page-services' && t.text._focusKey === '/template/page-services/item-2/title'
-		&& t.form.querySelector('[data-key="/template/page-services/item-2/title"]').classList.contains('is-found') && t.list.classList.contains('admin-hidden') );
-	const details = openedText( textResponse(), { panel : 'text', parts : [ 'template/page-services', '/_nino/webpage/services/title' ] } );
-	check( '...also the details of a page, which are in the form of the page', details.text._currentGroup === 'template/page-services' && details.text._focusKey === '/_nino/webpage/services/title' );
-	// the hash moves to another key of the row that is open: that field is shown, and the address keeps it
-	const moving = { panel : 'text', parts : [ 'template/page-services', '/template/page-services/item-2/title' ] };
-	const open = openedText( textResponse(), moving );
-	moving.parts = [ 'template/page-services', '/template/page-services/intro/text' ];
-	open.calls.length = 0;
-	open.text.showCurrent();
-	check( 'a hash that names another key of the row that is open focuses that key and the address keeps it', open.text._focusKey === '/template/page-services/intro/text'
-		&& open.form.querySelector('[data-key="/template/page-services/intro/text"]').classList.contains('is-found') && open.calls.at(-1) === 'set text/template/page-services//template/page-services/intro/text' );
-	const other = openedText( textResponse(), { panel : 'images', parts : [ 'x' ] } );
-	check( 'the hash of another panel leaves the list', other.text._currentGroup === null && other.list.classList.contains('admin-hidden') === false );
-	const unknown = openedText( textResponse(), { panel : 'text', parts : [ 'template/page-nope' ] } );
-	check( 'a row there is not is the list', unknown.text._currentGroup === null && unknown.list.classList.contains('admin-hidden') === false );
-}
-
-{
-	// the focus of a drill-down: into the form that a row or a hit opens, back to the row, and left where it stands when a level is only shown again
-	const t = openedText( textResponse() );
-	const row = group => opens( t.list ).find( r => keyOf( r ) === group );
-	const pressed = row('template/page-services');
-
-	pressed.click();
-	check( 'a row that is opened takes the focus into its form', t.form.classList.contains('admin-hidden') === false && focusIn( t, t.form ) );
-	t.form.querySelector('.nino-admin-back-link').click();
-	check( 'Back shows the list and gives the focus to the row that was open - the one the list has now, drawn again, not the one that was pressed', t.list.classList.contains('admin-hidden') === false
-		&& t.dom.doc.activeElement !== pressed && t.dom.doc.activeElement === row('template/page-services') );
-
-	// a hit opens the row at its key: the focus goes in with it
-	const box = t.list.querySelector('#text-search');
-	box.value = 'beraten';
-	box.fire('input');
-	opens( t.list )[0].click();
-	check( 'a hit takes the focus into the form as well', focusIn( t, t.form ) );
-
-	// the level shown again, by the address or by a step through the history: the focus is the person's
-	t.text._showList();
-	check( 'the list shown again with the focus in the form that goes gives it to the name of the panel - it would fall to the body', focusIn( t, t.list ) === false && t.dom.doc.activeElement === t.title );
-	box.focus();
-	t.text._showList();
-	check( '...and leaves it where it stands, in the search box, when it stood in the level that stays', t.dom.doc.activeElement === box );
-	t.text._openGroup( 'template/page-services' );
-	check( 'a form shown by the address takes the focus only from the level that goes: it was in the search box, and is on the name of the panel now', t.form.classList.contains('admin-hidden') === false && t.dom.doc.activeElement === t.title );
+	// P3: a hit opens the record of its text
+	type('beraten');
+	fire( byClass( w.list, 'nino-admin-row-open' )[0], 'click', { target : byClass( w.list, 'nino-admin-row-open' )[0] } );
+	const d = w.dialog();
+	check( 'a hit opens the record of its text, over the table of its row, at the address of the text', d !== null && w.titleOf( d ) === 'Eintrag 1 › Text' && w.subtitleOf( d ) === RICH && w.hash() === addressOf( ROW, RICH ) && has( w.form, 'admin-hidden' ) === false && has( w.list, 'admin-hidden' ) === true );
 }
 
 {
 	// more hits than a page: fifty, then "Weitere anzeigen", fifty at a time
 	const many = Array.from( { length : 120 }, ( v, i ) => textEntry( '/project/many/item/n'+ String( i ).padStart( 3, '0' ), { de_DE : 'Treffer '+ i, en_US : '' } ) );
-	const t = openedText( textResponse( { keys : many, pages : [], order : {} } ) );
-	const box = t.list.querySelector('#text-search');
-	box.value = 'treffer';
-	box.fire('input');
-	const more = () => t.list.querySelectorAll('button').find( b => b.textContent === W('/_admin/text/label/more') );
-	check( 'a search with many hits draws fifty and offers more', t.list.querySelectorAll('li').length === 50 && more() !== undefined && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/results',120) );
-	more().click();
-	check( '...fifty more', t.list.querySelectorAll('li').length === 100 && more() !== undefined );
-	more().click();
-	check( '...until there are no more, and no button', t.list.querySelectorAll('li').length === 120 && more() === undefined );
-	box.value = 'treffer 119';
-	box.fire('input');
-	check( 'typing again begins at the first fifty', t.list.querySelectorAll('li').length === 1 && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/result',1) );
-	t.Nino.admin.workLocale.set( 'en_US' );
-	t.list.querySelector('#text-list-empty').click();
-	box.value = '';
-	box.fire('input');
-	check( 'the filter alone is a list of hits as well: 50 of the 120 keys that are empty in English', t.list.querySelectorAll('li').length === 50 && t.list.querySelector('#text-list-status').textContent === F('/_admin/text/msg/results',120) );
+	const w = shown( textResponse( { keys : many, pages : [], order : {} } ) );
+	const box = w.listSearch();
+	const type = value => { box.value = value; fire( box, 'input', { target : box } ) };
+	const more = () => tag( w.list, 'button' ).find( b => b.textContent === W('/_admin/text/label/more') );
+	type('treffer');
+	check( 'a search with many hits draws fifty and offers more', w.listRows().length === 50 && more() !== undefined && byClass( w.list, 'admin-text-count' )[0].textContent === F('/_admin/text/msg/results',120) );
+	fire( more(), 'click' );
+	check( '...fifty more', w.listRows().length === 100 && more() !== undefined );
+	fire( more(), 'click' );
+	check( '...until there are no more, and no button', w.listRows().length === 120 && more() === undefined );
+	type('treffer 119');
+	check( 'typing again begins at the first fifty', w.listRows().length === 1 && byClass( w.list, 'admin-text-count' )[0].textContent === F('/_admin/text/msg/result',1) );
+	w.go( 'en_US' );
+	fire( findAll( w.list, el => el.id === 'text-list-empty' )[0], 'click' );
+	type('');
+	check( 'the filter alone is a list of hits as well: 50 of the 120 texts that are empty in English', w.listRows().length === 50 && byClass( w.list, 'admin-text-count' )[0].textContent === F('/_admin/text/msg/results',120) );
 }
 
 {
 	// without the Routes module there are no pages, and the list has no block of them
-	const t = openedText( textResponse( { pages : null } ) );
-	check( 'without pages the list has the one block, and the details of a page are among the system\'s rows', t.list.querySelectorAll('h2').map( h => h.textContent ).join() === group('general')
-		&& opens( t.list ).some( r => keyOf( r ) === '_nino/webpage' ) );
+	const w = shown( textResponse( { pages : null } ) );
+	check( 'without pages the list has the one block, and the details of a page are among the system\'s rows', tag( w.list, 'h2' ).map( h => h.textContent ).join() === group('general') && w.listRows().some( li => li.dataset.row === '_nino/webpage' ) );
+}
+
+// --- the texts of a row: the standard directory -------------------------------------------------------------------------
+
+{
+	const w = inRow( ROW );
+
+	check( 'a row opens as its own view at its address, under the way back and the name of the row - one link, to the panel by its name', w.hash() === addressOf( ROW ) && has( w.form, 'admin-hidden' ) === false && has( w.list, 'admin-hidden' ) === true
+		&& byClass( w.form, 'nino-admin-back-link' ).length === 1 && byClass( w.form, 'nino-admin-back-link' )[0].textContent === F('/_admin/common/label/back-to',W('/_admin/text/label/back-name')) && byClass( w.form, 'nino-admin-contextbar-title' )[0].textContent === 'Leistungen' );
+	check( '...and under it the standard directory: no list bar, no box to choose rows by, one directory', byClass( w.form, 'nino-admin-directory' ).length === 1 && byClass( w.form, 'nino-admin-list-actions' ).length === 0
+		&& tag( w.form, 'input' ).filter( el => el.type === 'checkbox' ).length === 0 );
+	// P4: the order is the templates'
+	check( 'the rows are the texts of the row in the order of its sections - the details of the page first - and of the templates, a text that is the same in every language first in its section', w.ids().join() === ORDER.join() );
+	check( '...the columns are the name, the section, the text, the characters and the languages', w.heads().map( el => el.dataset.key ).join() === 'name,place,text,chars,states' );
+	check( '...none of them sorts: the order is the content', w.heads().every( el => el.attributes['aria-sort'] === undefined || el.attributes['aria-sort'] === 'none' ) && tag( w.form, 'th' ).every( th => tag( th, 'button' ).length === 0 ) );
+	check( '...the heads say what they hold, the one of the text in the language on screen', w.heads().map( el => el.textContent ).join() === [ W('/_admin/text/col/name'), W('/_admin/text/col/section'), F('/_admin/text/col/text','Deutsch'), W('/_admin/text/col/chars'), W('/_admin/text/col/languages') ].join() );
+
+	// the cells
+	const title = w.cells( TITLE );
+	check( 'a row says the name of the text strong, its key under it in the face of an identifier, as text', byClass( title[0], 'admin-text-name-label' )[0].tagName === 'STRONG' && byClass( title[0], 'admin-text-name-label' )[0].textContent === 'Titel' && byClass( title[0], 'admin-text-name-key' )[0].textContent === TITLE );
+	check( '...the section by its name - for the details of a page with the path - and the text of the working language, clamped, as plain text', title[1].textContent === 'Einleitung' && w.cells('/_nino/webpage/services/name')[1].textContent === W('/_admin/text/label/page-details')+ ' (/services)'
+		&& byClass( title[2], 'nino-admin-table-clamp' )[0].textContent === 'Leistungen' && byClass( w.cells( RICH )[2], 'nino-admin-table-clamp' )[0].textContent === 'Wir beraten Sie gern' );
+	check( '...the characters against the limit, counted as the field counts them: the text with markup by what is seen', byClass( title[3], 'nino-admin-table-limit' )[0].textContent === '10 / 150' && byClass( w.cells( RICH )[3], 'nino-admin-table-limit' )[0].textContent === '20 / 150' );
+	// P5
+	check( '...a text over its limit says the word, as a badge that warns - the number is the characters it holds', ( () => { const cell = byClass( w.cells( LONG )[3], 'nino-admin-table-limit' )[0]; const badge = byClass( cell, 'nino-admin-badge' )[0];
+		return cell.textContent.startsWith( '45 / 30' ) && cell.dataset.over === 'true' && badge.textContent === W('/_admin/text/col/long') && badge.dataset.state === 'warn' } )() && byClass( title[3], 'nino-admin-badge' ).length === 0 );
+	// P6
+	const states = key => byClass( w.cells( key )[4], 'nino-admin-badge' ).map( b => b.textContent+ ':'+ b.dataset.state );
+	check( 'a badge for each language of the texts - a tick where it has a text, a dash where not, the sign and not the colour alone', states( TITLE ).join() === 'DE ✓:ok,EN ✓:ok' && states( INTRO ).join() === 'DE ✓:ok,EN –:warn' && states( LONG ).join() === 'DE ✓:ok,EN –:warn' );
+	check( '...each named by its language in the tooltip, and a text that is the same in every language has the one badge that says so', byClass( w.cells( INTRO )[4], 'nino-admin-badge' ).map( b => b.title ).join() === 'Deutsch: '+ W('/_admin/text/col/lang-ok')+ ',English: '+ W('/_admin/text/col/lang-missing')
+		&& states( BADGE ).join() === W('/_admin/text/label/all-languages')+ ' ✓:ok' );
+	check( 'a markup-only text is empty in the language, as the panel says it: the badge', ( () => { const e = w.panel._model.rows[ROW].entries.find( x => x.key === INTRO ); const before = e.values.en_US; e.values.en_US = '<p>&nbsp;</p>'; const dash = w.panel._rows( ROW ).find( r => r.key === INTRO ).states.map( s => s.ok ).join(); e.values.en_US = before; return dash === 'true,false' } )() );
+
+	// the pencil
+	check( 'the pencil of a text is named for it, one for each text the account may write', w.pencil( TITLE ).attributes['aria-label'] === F('/_admin/text/row/open','Einleitung › Titel') && w.pencil( LOCKED ) === undefined && ORDER.filter( k => w.pencil( k ) !== undefined ).length === 12 );
+	// P7
+	fire( w.row( LOCKED ), 'click', { target : w.row( LOCKED ) } );
+	check( 'a text the account may not change opens no record: a click on its row says so over the table, and nothing is sent', w.dialog() === null && byClass( w.form, 'nino-admin-notice' ).some( n => n.textContent === W('/_admin/text/error/denied') ) && w.writes().length === 0 );
+	fire( w.row( TITLE ), 'click', { target : w.row( TITLE ) } );
+	check( '...and a text it may change opens, which takes the notice away', w.dialog() !== null && byClass( w.form, 'nino-admin-notice' ).length === 0 );
 }
 
 {
-	// what the form calls a change: a whitespace is one, a text that is only the fallback of a language is none, a hit is text
-	const t = openedText( textResponse() );
-	t.Nino.adminUi.locales = { native : 'de_DE', names : { de_DE : 'Deutsch', en_US : 'English' } };
-	openRow( t, 'template/page-services' );
-	const title = '/template/page-services/intro/title', intro = '/template/page-services/intro/text';
-	typeInto( controlOf( t, title ), 'Leistungen ' );
-	check( 'a text that differs from the stored one by a whitespace only is a change: the form is unsaved and the save sends it', t.registry.text.isDirty() === true );
-	submitText( t );
-	check( '...as typed, with the whitespace', writes( t ).length === 1 && writes( t )[0].payload.items.length === 1 && writes( t )[0].payload.items[0].value === 'Leistungen ' );
-	t.Nino.admin.workLocale.set( 'en_US' );
-	check( 'a language that has no text of its own is drawn with an empty field: the text of another language that stands in for it is never put into the field', controlOf( t, intro ).value === '' && t.registry.text.isDirty() === false );
-	t.sent.length = 0;
-	submitText( t );
-	check( '...and saved as it is, it sends nothing for that key', writes( t ).every( c => c.payload.items.every( i => i.key !== intro ) ) );
-	// the fills are asked for in the language of the form
-	fieldOf( t, '/template/page-services/item-1/text' ).querySelector('.nino-admin-fills-button').click();
-	check( 'the textfills are asked for in the language the form is drawn in', t.sent.filter( c => c.endpoint === 'fills' ).at(-1).payload.locale === 'en_US' );
+	// the category, the select "Show", the search
+	const w = inRow( ROW );
+	const [ category, show ] = w.selects();
+
+	check( 'the section is the category, left of the search: all sections, then the sections in their order, the details of a page with its path', category !== undefined && show !== undefined && w.selects().length === 2
+		&& tag( category, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/text/filter/sections'), W('/_admin/text/label/page-details')+ ' (/services)', 'Einleitung', 'Eintrag 1', 'Eintrag 2', 'Legal' ].join() );
+	check( '...and one select "Show" after it: all texts, empty in the working language, empty in a language, too long', show.attributes['aria-label'] === W('/_admin/text/filter/show') || findAll( w.form, el => el.textContent === W('/_admin/text/filter/show') ).length > 0
+		&& tag( show, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/text/filter/all'), F('/_admin/text/label/empty-in','Deutsch'), W('/_admin/text/filter/empty-any'), W('/_admin/text/filter/long') ].join() );
+	const choose = ( select, value ) => { select.value = value; fire( select, 'change', { target : select } ) };
+
+	choose( category, 'item-1' );
+	check( 'a section narrows the rows to its texts, in their order', w.ids().join() === [ '/template/page-services/item-1/title', RICH ].join() );
+	choose( category, '' );
+	choose( show, 'long' );
+	check( 'Show "too long" keeps the texts over their limit - counted as the field counts them', w.ids().join() === LONG );
+	choose( show, 'any' );
+	check( '...Show "empty in a language": the texts that have none in one language of the site - a text of every language never', w.ids().join() === [ INTRO, BODY, LONG ].join() );
+	choose( show, 'empty' );
+	check( '...Show "empty in <the working language>": none, in German', w.ids().length === 0 && byClass( w.form, 'nino-admin-empty' ).length === 1 );
+	w.go( 'en_US' );
+	check( '...the language of the table follows the working language: the head, the text, the words of the select - and what was chosen is kept', w.heads()[2].textContent === F('/_admin/text/col/text','English') && w.ids().join() === [ INTRO, BODY, LONG ].join()
+		&& tag( w.selects()[1], 'option' ).map( o => o.textContent )[1] === F('/_admin/text/label/empty-in','English') && w.selects()[1].value === 'empty' && w.cells( INTRO )[2].textContent === '' );
+	choose( w.selects()[1], '' );
+	check( '...and its text is the one of that language', byClass( w.cells( TITLE )[2], 'nino-admin-table-clamp' )[0].textContent === 'Services' );
+	w.go( 'de_DE' );
+
+	// the search: the name, the key, the section, the text of every language
+	const found = query => { const box = w.search(); box.value = query; fire( box, 'input', { target : box } ); return w.ids().join() };
+	check( 'the search finds a text by its text in the language on screen', found( 'Beratung' ) === '/template/page-services/item-1/title' );
+	check( '...by its text in another language', found( 'consulting' ) === '/template/page-services/item-1/title' && found( 'Locked' ) === LOCKED );
+	check( '...by its name, its key and its section', found( 'eintrag 2' ) === [ '/template/page-services/item-2/title', BODY ].join() && found( 'legal/long' ) === LONG && found( 'Anmerkung' ) === '/template/page-services/legal/note' );
+	check( '...and says it finds nothing in the words of the panel', found( 'zzz' ) === '' && byClass( w.form, 'nino-admin-empty' )[0].textContent === W('/_admin/text/msg/nothing') );
+	found( '' );
+
+	// the state is kept per row, while the panel lives
+	choose( w.selects()[1], 'long' );
+	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
+	check( 'Back is the list, the focus on the row that was open, the address the list\'s', has( w.list, 'admin-hidden' ) === false && w.hash() === '#text' && w.h.doc.activeElement === w.linkOf( ROW ) );
+	fire( w.linkOf( ROW ), 'click', { target : w.linkOf( ROW ) } );
+	check( 'the row opened again is as the person left it: the select "Show" holds what it held', w.ids().join() === LONG && w.selects()[1].value === 'long' );
+	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
+	fire( w.linkOf('template/frame-header'), 'click', { target : w.linkOf('template/frame-header') } );
+	check( '...and another row has its own state: none, and no category where it has one section', w.ids().length === 1 && w.selects().length === 1 && w.selects()[0].value === '' );
 }
 
 {
-	// a hit arrives as text, whatever the text holds
-	const bad = 'Treffer &lt;img src=x&gt; und &lt;b&gt;fett&lt;/b&gt;';
-	const t = openedText( textResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [ textEntry( '/project/shop/xss/name', { de_DE : bad, en_US : bad } ) ] ) } ) );
-	const box = t.list.querySelector('#text-search');
-	box.value = 'treffer';
-	box.fire('input');
-	check( 'a hit that holds markup shows it as words: the text is in the row and no element is made from it', t.list.querySelectorAll('li').length === 1 && t.list.textContent.indexOf( '<b>fett</b>' ) !== -1 && t.list.querySelectorAll('img, b').length === 0 );
+	// text from the server is text: in the table, the head of the record, its subtitle and the plain fields; a rich text goes to the editor as it is
+	const BAD = 'x &lt;img src=x onerror=alert(1)&gt; "quoted" [[/key]]';
+	const SHOWN = 'x <img src=x onerror=alert(1)> "quoted" [[/key]]';
+	const KEYBAD = '/project/<img src=x onerror=alert(2)>/"q"/n[[/key]]';
+	const RICHBAD = '<p>Hallo <b>Welt</b> <img src=x onerror=alert(3)></p>';
+	const response = textResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [
+		textEntry( KEYBAD, { de_DE : BAD, en_US : BAD } ),
+		textEntry( '/project/shop/xss/rich', { de_DE : RICHBAD, en_US : '' }, { html : true, format : 'blocks' } ),
+	] ) } );
+	const w = inRow( 'project', response );
+	const cell = byClass( w.cells( KEYBAD )[2], 'nino-admin-table-clamp' )[0];
+	// P22
+	check( 'a text, a key and the names made of it that hold markup are text in the table - no element is made of any of them', cell.textContent === SHOWN && byClass( w.cells( KEYBAD )[0], 'admin-text-name-key' )[0].textContent === KEYBAD
+		&& w.cells( KEYBAD )[1].textContent.indexOf( '<img src=x onerror=alert(2)>' ) !== -1 && findAll( w.form, el => el.tagName === 'IMG' || el.tagName === 'B' ).length === 0 );
+	const d = w.openRow( KEYBAD );
+	check( 'the head of the record has the place, the name and the key as text, and the fields hold the text as a value', w.titleOf( d ).indexOf( '<img src=x onerror=alert(2)>' ) !== -1 && w.subtitleOf( d ) === KEYBAD && w.controlOf( d, 'de_DE' ).value === BAD && w.controlOf( d, 'en_US' ).value === BAD
+		&& findAll( d, el => el.tagName === 'IMG' || el.tagName === 'B' ).length === 0 );
+	w.close( d );
+	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
+	fire( w.linkOf('project/shop'), 'click', { target : w.linkOf('project/shop') } );
+	const rich = w.openRow( '/project/shop/xss/rich' );
+	check( 'a rich text is given to the editor as it is, which is the only thing that makes elements of it - nothing else of the record does', w.editors.length === 2 && w.editors[0].given === RICHBAD && findAll( rich, el => el.tagName === 'IMG' || el.tagName === 'B' ).length === 0 );
+	w.close( rich );
+	check( 'a table that shows a rich text shows its words, as text', byClass( w.cells('/project/shop/xss/rich')[2], 'nino-admin-table-clamp' )[0].textContent === 'Hallo Welt' );
+}
+
+// --- the record of one text ---------------------------------------------------------------------------------------------------
+
+{
+	const w = inRow( ROW );
+	const position = w.h.index();
+	const d = w.openRow( TITLE );
+
+	// P8
+	check( 'a pencil opens the record of that text, over the table: the place and the name in its head, the key under it, at its address as one step of the history', d !== null && has( d, 'nino-admin-record' ) && w.titleOf( d ) === 'Einleitung › Titel' && w.subtitleOf( d ) === TITLE
+		&& w.hash() === addressOf( ROW, TITLE ) && w.h.index() === position + 1 && w.h.router.marked() === 'text' );
+	check( '...the key is ONE part: the row and the key, each encoded alone', w.hash() === '#text/text/template%2Fpage-services/%2Ftemplate%2Fpage-services%2Fintro%2Ftitle' );
+	check( '...the table stands under it as it was', w.ids().join() === ORDER.join() && byClass( w.form, 'nino-admin-directory' ).length === 1 );
+	check( '...with the step to the previous and the next text, named in the words of the panel, and the place in the rows the table shows', tag( d, 'button' ).some( b => b.attributes['aria-label'] === W('/_admin/text/record/prev') ) && tag( d, 'button' ).some( b => b.attributes['aria-label'] === W('/_admin/text/record/next') )
+		&& byClass( d, 'nino-admin-record-count' )[0].textContent === F('/_admin/common/record/position',5,12) );
+
+	// the fields: the working language first and marked, then the others
+	check( 'a field for each language of the text - the working language first, marked as it, then the other - each named by the name of its language', w.fields( d ).map( f => f.dataset.locale ).join() === 'de_DE,en_US'
+		&& byClass( w.fieldOf( d, 'de_DE' ), 'nino-admin-field' ).length === 0 && nameOf( w.fieldOf( d, 'de_DE' ) ) === 'Deutsch ('+ W('/_admin/text/label/working')+ ')' && nameOf( w.fieldOf( d, 'en_US' ) ) === 'English' );
+	check( '...all of them fields to type in, with what each language holds, and a counter against the limit under each', w.controlOf( d, 'de_DE' ).value === 'Leistungen' && w.controlOf( d, 'en_US' ).value === 'Services' && w.counterOf( d, 'de_DE' ).textContent === '10 / 150' && w.counterOf( d, 'en_US' ).textContent === '8 / 150'
+		&& w.controlOf( d, 'de_DE' ).maxLength === 150 && w.controlOf( d, 'en_US' ).maxLength === 150 && w.controlOf( d, 'de_DE' ).readOnly !== true );
+	check( '...a line, for a text of a line - and no key under the field: the head says it', w.controlOf( d, 'de_DE' ).tagName === 'INPUT' && findAll( d, el => el.tagName === 'CODE' ).length === 0 );
+	check( '...and no textfill at a line', byClass( d, 'nino-admin-fills-button' ).length === 0 );
+	// P9
+	check( 'the typing counter follows what is typed, in the field of that language', ( () => { w.type( d, 'en_US', 'Services!' ); const ok = w.counterOf( d, 'en_US' ).textContent === '9 / 150' && w.counterOf( d, 'de_DE' ).textContent === '10 / 150'; w.type( d, 'en_US', 'Services' ); return ok } )() );
+	check( 'nothing is sent by opening it', w.sent.filter( c => c.endpoint !== 'keys' ).length === 0 );
+	w.close( d );
+	check( 'Back - the cross - closes the record: the address is the row\'s, the table is as it was and the focus is on the row', w.dialog() === null && w.hash() === addressOf( ROW ) && w.ids().join() === ORDER.join() && w.h.index() === position );
+
+	// a text of several lines, the textfill, an empty language, the rich text
+	const body = w.openRow( BODY );
+	check( 'a text of several lines is a field of several lines, in every language, with the textfills at its name - asked for in the language of THAT field', w.controlOf( body, 'de_DE' ).tagName === 'TEXTAREA' && w.controlOf( body, 'en_US' ).tagName === 'TEXTAREA'
+		&& byClass( w.fieldOf( body, 'de_DE' ), 'nino-admin-fills-button' ).length === 1 && byClass( w.fieldOf( body, 'en_US' ), 'nino-admin-fills-button' ).length === 1 );
+	// P10
+	check( '...an empty language is an empty field: the text of another language is not put in as its own, and the line breaks stay', w.controlOf( body, 'en_US' ).value === '' && w.controlOf( body, 'de_DE' ).value === 'Zeile eins\nZeile zwei' );
+	fire( byClass( w.fieldOf( body, 'en_US' ), 'nino-admin-fills-button' )[0], 'click' );
+	fire( byClass( w.fieldOf( body, 'de_DE' ), 'nino-admin-fills-button' )[0], 'click' );
+	const asked = w.sent.filter( c => c.endpoint === 'fills' ).map( c => c.payload.locale ).join();
+	check( '...the list of the textfills is the server\'s, asked when the button is pressed, for the language of the field it stands at', asked === 'en_US,de_DE' );
+	w.close( w.dialog() );
+
+	const rich = w.openRow( RICH );
+	check( 'a text with markup is the rich-text editor in every language - with the limit and the format of the key - and the textfills at its name', w.editors.length === 2 && w.editors.every( e => e.maxlength === 150 && e.format === 'blocks' ) && w.editors[0].given === '<p>Wir beraten Sie gern</p>' && w.editors[1].given === 'We are happy to advise you'
+		&& byClass( w.fieldOf( rich, 'de_DE' ), 'nino-admin-fills-button' ).length === 1 && byClass( w.fieldOf( rich, 'en_US' ), 'nino-admin-fills-button' ).length === 1 && w.fieldOf( rich, 'de_DE' ).attributes['role'] === 'group' );
+	w.close( rich );
+	check( 'the editors of a record that is closed are taken down when the table is shown again', w.editors.length === 2 && w.editors.every( e => e.destroyed === true ) );
+
+	// a text that is the same in every language
+	const one = w.openRow( BADGE );
+	check( 'a text that is the same in every language is ONE field, named for that - and no field of a language', w.fields( one ).length === 1 && w.fields( one )[0].dataset.locale === '*' && nameOf( w.fields( one )[0] ) === W('/_admin/text/label/all-languages') && w.controlOf( one, '*' ).value === 'Neu' );
+	w.close( one );
 }
 
 {
-	// a key that cannot be written is read as text, markup included
-	const readonly = textEntry( '/project/company/note/html', { de_DE : '<p>Hallo <b>Welt</b></p>', en_US : '' }, { html : true, format : 'blocks', writable : false } );
-	const t = openedText( textResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [ readonly ] ) } ) );
-	openRow( t, 'project/company' );
-	const view = fieldOf( t, '/project/company/note/html' ).querySelector('.admin-text-readonly');
-	check( 'a text with markup that the account may not write is read as text: the words, and no element made from the markup', view !== null && view.textContent.indexOf( 'Hallo' ) !== -1 && view.textContent.indexOf( '<' ) === -1 && view.querySelectorAll('b, p').length === 0 );
+	// the address: a reload opens the record over its table; one that names no text, or one that may not be written, says so and is the row's
+	const w = textPage( fullResponse(), { hash : addressOf( ROW, TITLE ) } ).open();
+	const d = w.dialog();
+	// P11
+	check( 'a reload at the address of a text opens the record of it over the table of its row - no step of the history of its own', d !== null && w.titleOf( d ) === 'Einleitung › Titel' && w.ids().join() === ORDER.join() && w.hash() === addressOf( ROW, TITLE ) && w.h.router.marked() !== 'text' );
+	w.close( d );
+	check( '...closing it writes the address of the row over it', w.dialog() === null && w.hash() === addressOf( ROW ) );
+
+	const missing = textPage( fullResponse(), { hash : addressOf( ROW, '/template/page-services/intro/nope' ) } ).open();
+	check( 'a key the row does not hold says so over the table, in the words of the panel, and the address is the row\'s', missing.dialog() === null && byClass( missing.form, 'nino-admin-notice' ).some( n => n.textContent === W('/_admin/text/record/missing') ) && missing.hash() === addressOf( ROW ) && missing.ids().length === 13 );
+	const locked = textPage( fullResponse(), { hash : addressOf( ROW, LOCKED ) } ).open();
+	check( 'a text the account may not change is no record at its address either: the notice, and the address is the row\'s - nothing is asked of the server', locked.dialog() === null && byClass( locked.form, 'nino-admin-notice' ).some( n => n.textContent === W('/_admin/text/error/denied') ) && locked.hash() === addressOf( ROW ) && locked.sent.length === 1 );
+	const row = textPage( fullResponse(), { hash : addressOf( ROW ) } ).open();
+	check( 'the address of the row alone is its table', row.dialog() === null && row.ids().join() === ORDER.join() && has( row.list, 'admin-hidden' ) === true );
+	const none = textPage( fullResponse(), { hash : '#text/text/template%2Fpage-nope' } ).open();
+	check( 'a row there is not is the list, and the address is the list\'s', has( none.list, 'admin-hidden' ) === false && none.hash() === '#text' && none.dialog() === null );
+	const other = textPage( fullResponse(), { hash : '#images/images/x' } ).open();
+	check( 'the address of another panel leaves the list where it is', has( other.list, 'admin-hidden' ) === false && other.dialog() === null );
+}
+
+{
+	// Back and Forward through the history: the record opens and closes with the address
+	const w = inRow( ROW );
+	w.openRow( TITLE );
+	w.back();
+	check( 'Back closes the record: the table of the row, at its address', w.dialog() === null && w.hash() === addressOf( ROW ) && w.ids().join() === ORDER.join() );
+	w.back();
+	check( '...Back again is the list', has( w.list, 'admin-hidden' ) === false && w.hash() === '#text' );
+	w.h.forward();
+	w.h.router.arrive();
+	w.panel.showCurrent();
+	w.h.hashchange();
+	check( '...and Forward is the table again', has( w.form, 'admin-hidden' ) === false && w.hash() === addressOf( ROW ) );
+}
+
+// --- saving -------------------------------------------------------------------------------------------------------------------
+
+{
+	const w = inRow( ROW );
+	const d = w.openRow( TITLE );
+
+	// P12: nothing changed - nothing sent
+	w.save( d );
+	check( 'a save with nothing changed sends nothing, and says it is saved', w.writes().length === 0 && w.told.length > 0 && w.told.every( t => t === W('/_admin/common/msg/saved') ) && w.touches.length === 0 );
+	check( '...and the record is not unsaved', w.h.dirty.isDirty() === false );
+
+	// P13: one language changed - one request with one item
+	w.type( d, 'de_DE', 'Leistungen neu' );
+	check( 'a field that differs from what it held is unsaved input for the shell, typing it back takes that away', w.h.dirty.isDirty() === true && ( w.type( d, 'de_DE', 'Leistungen' ), w.h.dirty.isDirty() === false ) );
+	w.type( d, 'de_DE', 'Leistungen neu' );
+	w.told.length = 0;
+	w.save( d );
+	check( 'one language changed is ONE request with ONE item: the key, the language, the text as typed and the text it was read as', w.writes().length === 1 && JSON.stringify( w.writes()[0].payload ) === JSON.stringify( { items : [ { key : TITLE, locale : 'de_DE', value : 'Leistungen neu', was : 'Leistungen' } ] } ) );
+	check( '...a toast says it, the record stays and is not unsaved, and the shell is told that texts were written - once', w.told.length > 0 && w.told.every( t => t === W('/_admin/common/msg/saved') ) && w.dialog() === d && w.h.dirty.isDirty() === false && w.touches.join() === 'texts' );
+	check( '...what the server answered is what the table and the model hold', byClass( w.cells( TITLE )[2], 'nino-admin-table-clamp' )[0].textContent === 'Leistungen neu' && byClass( w.cells( TITLE )[3], 'nino-admin-table-limit' )[0].textContent === '14 / 150'
+		&& w.panel._groups[ROW].find( e => e.key === TITLE ).values.de_DE === 'Leistungen neu' && has( w.row( TITLE ), 'is-fresh' ) );
+	w.save( d );
+	check( 'saved again as it is, it sends nothing more', w.writes().length === 1 );
+
+	// P14: two languages changed - two requests, in the order of the fields
+	w.type( d, 'en_US', 'Services new' );
+	w.type( d, 'de_DE', 'Leistungen zwei' );
+	w.touches.length = 0;
+	w.save( d );
+	check( 'two languages changed are TWO requests, one after the other in the order of the fields, each with one item', w.writes().length === 3 && w.writes().slice( 1 ).map( c => c.payload.items.length+ c.payload.items[0].locale ).join() === '1de_DE,1en_US'
+		&& w.writes()[1].payload.items[0].was === 'Leistungen neu' && w.writes()[2].payload.items[0].was === 'Services' );
+	check( '...each a write: the shell is told for each, and both are saved', w.touches.join() === 'texts,texts' && w.h.dirty.isDirty() === false && w.panel._groups[ROW].find( e => e.key === TITLE ).values.en_US === 'Services new' );
+
+	// only the language that was changed
+	w.type( d, 'en_US', 'Services third' );
+	w.save( d );
+	check( 'the other language is not sent where only one was changed', w.writes().length === 4 && w.writes()[3].payload.items[0].locale === 'en_US' );
+	w.close( d );
+}
+
+{
+	// P15: the sanitized value comes back into the field and the row
+	const w = inRow( ROW );
+	w.handle.sanitize = value => value.replace( /"/g, '&quot;' );
+	const d = w.openRow( TITLE );
+	w.type( d, 'de_DE', 'Sag "Hallo"' );
+	w.save( d );
+	check( 'what the server kept is what the field shows and what the row holds - the field is rewritten where it differs, and is not unsaved', w.controlOf( d, 'de_DE' ).value === 'Sag &quot;Hallo&quot;' && w.panel._groups[ROW].find( e => e.key === TITLE ).values.de_DE === 'Sag &quot;Hallo&quot;'
+		&& w.h.dirty.isDirty() === false && w.counterOf( d, 'de_DE' ).textContent === '21 / 150' );
+	w.sent.length = 0;
+	w.save( d );
+	check( '...and a save of that is no change', w.writes().length === 0 );
+}
+
+{
+	// P16: a text that is the same in every language is written to the one text
+	const w = inRow( ROW );
+	const d = w.openRow( BADGE );
+	w.type( d, '*', 'Neu!' );
+	w.save( d );
+	check( 'a text that is the same in every language is written to the one text: the locale is *, the text it was read as is the one text', w.writes().length === 1 && JSON.stringify( w.writes()[0].payload.items ) === JSON.stringify( [ { key : BADGE, locale : '*', value : 'Neu!', was : 'Neu' } ] ) );
+}
+
+{
+	// P17: the second language is refused: the first is saved, the sentence stands at the second, what was typed there stays
+	const w = inRow( ROW );
+	const d = w.openRow( TITLE );
+	w.handle.refuse[TITLE+ ' en_US'] = { ok : false, error : 'could not be written' };
+	w.type( d, 'de_DE', 'Eins' );
+	w.type( d, 'en_US', 'One' );
+	w.save( d );
+	check( 'the first language is saved - the model, the table - and the record says it failed', w.writes().length === 2 && w.panel._groups[ROW].find( e => e.key === TITLE ).values.de_DE === 'Eins' && byClass( w.cells( TITLE )[2], 'nino-admin-table-clamp' )[0].textContent === 'Eins' && w.told.length === 0 );
+	check( '...the sentence stands at the field of the second, which is marked, and what was typed there stays', w.errorsOf( d ).length === 1 && w.errorsOf( d )[0].parentNode === w.fieldOf( d, 'en_US' ).parentNode && w.fieldOf( d, 'en_US' ).parentNode.children.indexOf( w.errorsOf( d )[0] ) === w.fieldOf( d, 'en_US' ).parentNode.children.indexOf( w.fieldOf( d, 'en_US' ) ) + 1 && w.controlOf( d, 'en_US' ).attributes['aria-invalid'] === 'true'
+		&& w.errorsOf( d )[0].textContent === W('/_admin/text/error/key') && w.controlOf( d, 'en_US' ).value === 'One' );
+	check( '...the shell is told once that texts were written - for the language that was, not for the one that was refused', w.touches.join() === 'texts' );
+	check( '...the line of the bar says how many were not saved, and the record is unsaved', w.lineText( d ) === W('/_admin/text/error/one') && w.h.dirty.isDirty() === true );
+	w.type( d, 'en_US', 'One!' );
+	check( '...typing into the field takes its sentence away', w.errorsOf( d ).length === 0 );
+	w.handle.refuse = {};
+	w.sent.length = 0;
+	w.save( d );
+	check( 'the next save sends the language that is still changed, and only that', w.writes().length === 1 && w.writes()[0].payload.items[0].locale === 'en_US' && w.h.dirty.isDirty() === false );
+	w.close( d );
+
+	// denied is said as the words for it
+	const e = w.openRow( INTRO );
+	w.handle.refuse[INTRO+ ' de_DE'] = { ok : false, error : 'not allowed' };
+	w.type( e, 'de_DE', 'Neu' );
+	w.save( e );
+	check( 'a language the server says the account may not write is said in the words of the panel', w.errorsOf( e )[0].textContent === W('/_admin/text/error/denied') );
+	w.handle.refuse = {};
+	w.close( w.dialog() );
+	check( 'a record that is closed with a language that is not saved asks about it first - the text is not given up silently', w.asking() !== null && w.writes().length === 2 );
+	w.answerAsk('/_admin/common/label/discard');
+	check( '...and a Discard closes it', w.dialog() === null && w.hash() === addressOf( ROW ) );
+}
+
+{
+	// a request that fails leaves the record as it is; what is typed while the request runs is not in what was sent
+	const w = inRow( ROW );
+	const d = w.openRow( TITLE );
+	w.type( d, 'de_DE', 'Drei' );
+	w.handle.fail = { status : 500, body : null };
+	w.save( d );
+	check( 'a request that fails leaves the record as it is, unsaved, and says so in the line', w.h.dirty.isDirty() === true && w.lineText( d ).indexOf( '500' ) !== -1 && w.touches.length === 0 );
+	w.handle.fail = null;
+	// P23: the fields take no input while a save runs - what the record takes as saved when it ends is what the form holds then
+	w.handle.hold = true;
+	w.type( d, 'de_DE', 'Vier' );
+	w.type( d, 'en_US', 'Four' );
+	w.controlOf( d, 'de_DE' ).focus();
+	const before = w.writes().length;
+	w.save( d );
+	check( 'while the requests of a save run the fields take no input - the one that was sent and the one that waits', w.controlOf( d, 'de_DE' ).disabled === true && w.controlOf( d, 'en_US' ).disabled === true && w.held.length === 1 && w.writes().length === before + 1 );
+	w.held.shift()();
+	check( '...the second request goes out when the first is answered, and the fields stay closed until the save is over', w.writes().length === before + 2 && w.held.length === 1 && w.controlOf( d, 'de_DE' ).disabled === true );
+	w.held.shift()();
+	check( '...and when the save is over they are open again, saved, the focus where it was', w.controlOf( d, 'de_DE' ).disabled === false && w.controlOf( d, 'en_US' ).disabled === false && w.h.dirty.isDirty() === false && w.h.doc.activeElement === w.controlOf( d, 'de_DE' ) );
+	w.handle.hold = false;
+}
+
+{
+	// P18: another tab or person wrote a language since: the question of a conflict, Overwrite, Reload, Cancel
+	const make = () => {
+		const w = inRow( ROW );
+		const d = w.openRow( TITLE );
+		w.external( TITLE, 'de_DE', 'Fremder Text' );
+		w.type( d, 'de_DE', 'Mein Text' );
+		return Object.assign( w, { d : d } );
+	};
+
+	const a = make();
+	a.save( a.d );
+	const q = a.asking();
+	check( 'a language that another wrote meanwhile asks the question of a refused save, naming the text by its place, its key and its language - nothing is saved, the text stays typed and unsaved', q !== null && a.writes().length === 1 && a.writes()[0].payload.items[0].was === 'Leistungen' && a.writes()[0].payload.items[0].force === undefined
+		&& allText( q ).indexOf( TITLE ) !== -1 && allText( q ).indexOf( 'Deutsch' ) !== -1 && allText( q ).indexOf( ' › ' ) !== -1 && a.told.length === 0 && a.h.dirty.isDirty() === true && a.controlOf( a.d, 'de_DE' ).value === 'Mein Text' );
+	// P19
+	a.answerAsk('/_admin/common/conflict/overwrite');
+	const forced = a.writes().at( -1 ).payload.items;
+	check( 'Overwrite writes that language again - once, forced, without the text it was read as - and then it is saved', a.writes().length === 2 && forced.length === 1 && forced[0].key === TITLE && forced[0].locale === 'de_DE' && forced[0].force === true && forced[0].was === undefined && forced[0].value === 'Mein Text'
+		&& a.h.dirty.isDirty() === false && a.told.at( -1 ) === W('/_admin/common/msg/saved') && a.touches.join() === 'texts' );
+
+	// Overwrite sends only the language that was turned down: the other one goes with its own text
+	const b = make();
+	b.type( b.d, 'en_US', 'Services B' );
+	b.save( b.d );
+	b.answerAsk('/_admin/common/conflict/overwrite');
+	check( 'with two languages changed, the first turned down stops the save: nothing of the second was sent before the answer - and Overwrite forces the first and then sends the second as it always does', b.writes().length === 3 && b.writes()[0].payload.items[0].locale === 'de_DE' && b.writes()[1].payload.items[0].force === true
+		&& b.writes()[2].payload.items[0].locale === 'en_US' && b.writes()[2].payload.items[0].force === undefined && b.writes()[2].payload.items[0].was === 'Services' );
+
+	// P20: Reload
+	const c = make();
+	c.save( c.d );
+	c.answerAsk('/_admin/common/conflict/reload');
+	check( 'Reload reads the keys again - one more read - and shows what is stored, the row of the server: the typed text is dropped, the table has it', c.sent.filter( e => e.endpoint === 'keys' ).length === 2 && c.controlOf( c.dialog(), 'de_DE' ).value === 'Fremder Text'
+		&& c.h.dirty.isDirty() === false && byClass( c.cells( TITLE )[2], 'nino-admin-table-clamp' )[0].textContent === 'Fremder Text' );
+
+	// Cancel
+	const e = make();
+	e.save( e.d );
+	e.answerAsk('/_admin/common/label/cancel');
+	check( 'Cancel keeps the record as it is: what was typed stays, unsaved, nothing more was sent', e.dialog() === e.d && e.controlOf( e.d, 'de_DE' ).value === 'Mein Text' && e.h.dirty.isDirty() === true && e.writes().length === 1 );
+}
+
+{
+	// P21: "Save and continue": the next text of the table, a text the account may not write is skipped
+	const w = inRow( ROW );
+	const d = w.openRow( BADGE );
+	w.type( d, '*', 'Neu!' );
+	fire( w.button( d, '/_admin/common/label/save-next' ), 'click' );
+	check( '"Save and continue" saves and goes on to the next text of the table - at its address, with its head', w.writes().length === 1 && w.titleOf( w.dialog() ) === 'Einleitung › Titel' && w.hash() === addressOf( ROW, TITLE ) );
+	w.close( w.dialog() );
+	const prev = w.openRow( BODY );
+	check( 'the steps skip a text the account may not write: after the text before the locked one comes the one after it', byClass( prev, 'nino-admin-record-count' )[0].textContent === F('/_admin/common/record/position',10,12) );
+	w.type( prev, 'de_DE', 'Zeile eins\nZeile zwei\nund drei' );
+	fire( w.button( prev, '/_admin/common/label/save-next' ), 'click' );
+	check( '..."Save and continue" too: it is the long text, at its address', w.subtitleOf( w.dialog() ) === LONG && w.hash() === addressOf( ROW, LONG ) && w.writes().length === 2 );
+	w.close( w.dialog() );
+	// nothing changed: it goes on and sends nothing
+	const last = w.openRow( LONG );
+	fire( w.button( last, '/_admin/common/label/save-next' ), 'click' );
+	check( '...and with nothing changed it goes on and sends nothing', w.subtitleOf( w.dialog() ) === '/template/page-services/legal/note' && w.writes().length === 2 );
+}
+
+{
+	// "Save and continue" walks the rows the table shows now
+	const w = inRow( ROW );
+	const select = w.selects()[1];
+	select.value = 'any';
+	fire( select, 'change', { target : select } );
+	const d = w.openRow( BODY );
+	check( 'the record has the place of the text in the rows the table shows now', byClass( d, 'nino-admin-record-count' )[0].textContent === F('/_admin/common/record/position',2,3) );
+	w.type( d, 'de_DE', 'Zeile eins\nZeile zwei\nDrei' );
+	fire( w.button( d, '/_admin/common/label/save-next' ), 'click' );
+	check( '"Save and continue" goes on to the next row of the table as it is filtered: the texts that are empty in a language', w.subtitleOf( w.dialog() ) === LONG && w.hash() === addressOf( ROW, LONG ) && w.writes().length === 1 );
+	// a text that the save made no longer empty leaves that table: there is no place to step on from, and the record stays at it, saved
+	w.close( w.dialog() );
+	const e = w.openRow( INTRO );
+	w.type( e, 'en_US', 'Hello' );
+	fire( w.button( e, '/_admin/common/label/save-next' ), 'click' );
+	check( 'a text that the save made fill its last empty language leaves the table that shows the empty ones: the record stays at it, saved', w.subtitleOf( w.dialog() ) === INTRO && w.ids().indexOf( INTRO ) === -1 && w.h.dirty.isDirty() === false && w.writes().length === 2 );
+}
+
+{
+	// P24: the counts of the list follow a save when the list is shown again
+	const w = inRow( ROW, undefined, { work : 'en_US' } );
+	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
+	const before = w.lineOf( ROW );
+	fire( w.linkOf( ROW ), 'click', { target : w.linkOf( ROW ) } );
+	const d = w.openRow( INTRO );
+	w.type( d, 'en_US', 'Introduction' );
+	w.save( d );
+	w.close( d );
+	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
+	check( 'the counts of the list follow a save: the text that was empty in the working language is not counted as empty any more', before === F('/_admin/text/count/texts',13)+ ' \u00B7 '+ F('/_admin/text/count/empty',3,'English') && w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' \u00B7 '+ F('/_admin/text/count/empty',2,'English') );
+}
+
+{
+	// what the record calls a change: a whitespace is one, a language that is empty is not sent unless it was typed into
+	const w = inRow( ROW );
+	const d = w.openRow( INTRO );
+	w.type( d, 'de_DE', 'Das bieten wir an ' );
+	check( 'a text that differs from the stored one by a whitespace only is a change: the record is unsaved', w.h.dirty.isDirty() === true );
+	w.save( d );
+	check( '...and the save sends it as typed, with the whitespace - and only that language: the empty one is not sent', w.writes().length === 1 && w.writes()[0].payload.items.length === 1 && w.writes()[0].payload.items[0].value === 'Das bieten wir an ' && w.writes()[0].payload.items[0].locale === 'de_DE' );
+	check( 'a language that has no text of its own is an empty field, whatever the other says', w.controlOf( d, 'en_US' ).value === '' );
+	w.type( d, 'en_US', 'x' );
+	w.type( d, 'en_US', '' );
+	w.save( d );
+	check( '...typed into and emptied again it is what it was: nothing more is sent', w.writes().length === 1 );
+}
+
+{
+	// a language the website does not serve yet is a field like the others, marked as the select of the working language marks it
+	const response = fullResponse( { locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : false } ] } );
+	const w = inRow( ROW, response );
+	const d = w.openRow( TITLE );
+	check( 'a switched-off language is a field, editable, marked as inactive as the select of the working language marks it', nameOf( w.fieldOf( d, 'en_US' ) ) === 'English ('+ W('/_admin/common/word/inactive')+ ')' && w.controlOf( d, 'en_US' ).readOnly !== true );
+	const v = inRow( ROW, response, { work : 'en_US' } );
+	const e = v.openRow( TITLE );
+	check( '...and as the working language it says both', nameOf( v.fieldOf( e, 'en_US' ) ) === 'English ('+ W('/_admin/text/label/working')+ ', '+ W('/_admin/common/word/inactive')+ ')' );
+}
+
+{
+	// a text with markup: the editor holds it, a save writes what the editor reads, and what the server kept is written back into it
+	const w = inRow( ROW );
+	w.handle.sanitize = value => value.replace( /<script>.*<\/script>/, '' );
+	const d = w.openRow( RICH );
+	check( 'the editors are as the form was drawn, and nothing is unsaved', w.editors.length === 2 && w.h.dirty.isDirty() === false );
+	w.save( d );
+	check( 'a save of a record nothing was typed into sends nothing - the editor reads back what it was given', w.writes().length === 0 );
+	w.editors[0].setValue( '<p>Wir beraten <strong>gern</strong></p><script>x</script>' );
+	w.save( d );
+	check( 'a rich text that was changed is sent as the editor reads it, for its language, with the text it was read as', w.writes().length === 1 && JSON.stringify( w.writes()[0].payload.items ) === JSON.stringify( [ { key : RICH, locale : 'de_DE', value : '<p>Wir beraten <strong>gern</strong></p><script>x</script>', was : '<p>Wir beraten Sie gern</p>' } ] ) );
+	check( '...and what the server kept is written back into the editor, and is what the model holds', w.editors[0].getValue() === '<p>Wir beraten <strong>gern</strong></p>' && w.panel._groups[ROW].find( e => e.key === RICH ).values.de_DE === '<p>Wir beraten <strong>gern</strong></p>' && w.h.dirty.isDirty() === false );
+	check( '...the table shows the words of it', byClass( w.cells( RICH )[2], 'nino-admin-table-clamp' )[0].textContent === 'Wir beraten gern' );
+	// the editable box of a rich text takes no input while a save runs
+	w.handle.hold = true;
+	w.editors[1].setValue( 'We advise' );
+	w.save( d );
+	check( 'while a save runs the editable box of a rich text is not editable - and is again when it is over', w.editors[0].box.attributes['contenteditable'] === 'false' && w.editors[1].box.attributes['contenteditable'] === 'false' && ( w.held.shift()(), w.editors[0].box.attributes['contenteditable'] === 'true' && w.editors[1].box.attributes['contenteditable'] === 'true' ) );
+	w.handle.hold = false;
+}
+
+// --- the language moves under an open record --------------------------------------------------------------------------------
+
+{
+	const w = inRow( ROW );
+	const d = w.openRow( TITLE );
+
+	check( 'the working language is first, marked as the working language', w.fields( d ).map( f => f.dataset.locale ).join() === 'de_DE,en_US' );
+	// the shell asks about unsaved input before the language moves: there is none here
+	w.go( 'en_US' );
+	check( 'the record is drawn again with the new language first, marked, and what it held is what is stored', w.dialog() === d && w.fields( d ).map( f => f.dataset.locale ).join() === 'en_US,de_DE' && nameOf( w.fieldOf( d, 'en_US' ) ) === 'English ('+ W('/_admin/text/label/working')+ ')'
+		&& nameOf( w.fieldOf( d, 'de_DE' ) ) === 'Deutsch' && w.controlOf( d, 'en_US' ).value === 'Services' && w.controlOf( d, 'de_DE' ).value === 'Leistungen' && w.h.dirty.isDirty() === false );
+	check( '...and so is the table: its text column says the language, the title of the record is the same text', byClass( w.cells( TITLE )[2], 'nino-admin-table-clamp' )[0].textContent === 'Services' && w.dialog() === d && w.hash() === addressOf( ROW, TITLE ) );
+	w.type( d, 'de_DE', 'Leistungen zwo' );
+	w.sent.length = 0;
+	w.save( d );
+	check( 'a save writes the languages that were changed, whichever is first: the language is the field\'s, not the workbench\'s', w.writes().length === 1 && w.writes()[0].payload.items[0].locale === 'de_DE' && w.writes()[0].payload.items[0].value === 'Leistungen zwo' );
+	w.go( 'de_DE' );
+	check( '...and back: German first again', w.fields( d ).map( f => f.dataset.locale ).join() === 'de_DE,en_US' && w.controlOf( d, 'de_DE' ).value === 'Leistungen zwo' );
+}
+
+{
+	// unsaved input that the shell was told to give up closes the record, as every record is closed by a Discard: the address is the row's then
+	const w = inRow( ROW );
+	const d = w.openRow( TITLE );
+	w.type( d, 'de_DE', 'Unsaved' );
+	w.h.dirty._entries.text.discard();
+	w.go( 'en_US' );
+	check( 'a discarded record is gone and the address says the row: the table is in the new language and nothing was sent', w.dialog() === null && w.hash() === addressOf( ROW ) && w.heads()[2].textContent === F('/_admin/text/col/text','English') && w.writes().length === 0 );
+}
+
+{
+	// a record that a filter hides is drawn again in place: its fields are put in the order of the language
+	const w = inRow( ROW );
+	const select = w.selects()[1];
+	select.value = 'any';
+	fire( select, 'change', { target : select } );
+	const d = w.openRow( INTRO );
+	w.go( 'en_US' );
+	check( 'a text the table hides is drawn again where it stands - the table follows, the working language is first', w.dialog() === d && w.fields( d ).map( f => f.dataset.locale ).join() === 'en_US,de_DE' );
+}
+
+// --- what the panel reads again ----------------------------------------------------------------------------------------------
+
+{
+	// A template written since the keys were read is a row the list did not have: the panel reads the keys again where it is shown with no record open, and not before
+	const response = textResponse();
+	const w = textPage( response ).open();
+	const asked = () => w.sent.filter( c => c.endpoint === 'keys' ).length;
+	const fresh = '/template/frame-footer/navigation/label';
+
+	check( 'the panel asks for the keys once when it opens, and keeps the stamp of the templates it asked at', asked() === 1 && w.panel._stamp === 0 && w.panel._model.rowOf[fresh] === undefined && w.listRow('template/frame-footer') === undefined );
+	w.panel.showCurrent();
+	check( 'shown again with nothing written since, it asks for nothing', asked() === 1 );
+	w.h.admin.touch( 'texts' );
+	w.panel.showCurrent();
+	check( '...nor does a write of texts make it ask: the texts it writes itself it has in hand', asked() === 1 );
+
+	response.keys = response.keys.concat( [ textEntry( fresh, { de_DE : 'Fußnavigation', en_US : 'Footer navigation' } ) ] );
+	w.h.admin.touch( 'templates' );
+	w.panel.showCurrent();
+	check( 'a template written since: shown again, it asks again - and the rows have what the template made', asked() === 2 && w.panel._stamp === 1 && w.panel._model.rowOf[fresh] === 'template/frame-footer' && w.listRow('template/frame-footer') !== undefined );
+	w.panel.showCurrent();
+	check( '...once: what it holds now is the stamp it asked at', asked() === 2 );
+
+	// a record is open: the table is not drawn under it
+	fire( w.linkOf( ROW ), 'click', { target : w.linkOf( ROW ) } );
+	const d = w.openRow( TITLE );
+	w.h.admin.touch( 'templates' );
+	w.panel.showCurrent();
+	check( 'a record that is open is not drawn under: shown again, the panel asks for nothing and the record stays', asked() === 2 && w.dialog() === d && w.panel._group === ROW );
+	w.close( d );
+	w.panel.showCurrent();
+	check( '...the showing that finds none open is the one that asks, and the stamp is the one of that time - the table of the row is drawn from what it holds', asked() === 3 && w.panel._stamp === 2 && has( w.form, 'admin-hidden' ) === false && w.ids().length === 9 );
+
+	// a template written while the answer is on its way is not in it
+	const v = textPage( response );
+	v.panel.showCurrent();
+	v.h.admin.touch( 'templates' );
+	check( 'the stamp is the one from before the request went out: the answer that arrives later keeps it', v.panel._stamp === 0 && v.panel._ready === true );
+	v.panel.showCurrent();
+	check( '...so the next showing asks again', v.sent.filter( c => c.endpoint === 'keys' ).length === 2 );
+}
+
+{
+	// A "Reload" of a conflict is a read the base does not make otherwise; the page reads once when it opens
+	const w = textPage( fullResponse() ).open();
+	check( 'a page that is opened reads the keys once', w.sent.length === 1 );
+}
+
+{
+	// a row and a part named like a member of Object.prototype open as any other
+	const free = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).concat( [ textEntry( '/project/shop/constructor/name', { de_DE : 'Konstrukteur', en_US : 'Constructor' } ), textEntry( '/constructor/x', { de_DE : 'Frei' } ) ] ) } );
+	const w = shown( free );
+	const box = w.listSearch();
+	box.value = 'konstrukteur';
+	fire( box, 'input', { target : box } );
+	check( 'the search over keys with a part named constructor answers, in the Text panel', w.listRows().length === 1 );
+	box.value = '';
+	fire( box, 'input', { target : box } );
+	fire( w.linkOf('project/shop'), 'click', { target : w.linkOf('project/shop') } );
+	check( '...and the table of its row opens, and the record of its text', w.ids().join() === '/project/shop/constructor/name' && w.openRow('/project/shop/constructor/name') !== null && w.controlOf( w.dialog(), 'de_DE' ).value === 'Konstrukteur' );
+}
+
+// --- what a person of a restricted role sees ---------------------------------------------------------------------------------
+
+{
+	const response = textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => e.key.indexOf( '/project/company/' ) === 0 ? Object.assign( {}, e, { writable : e.key.endsWith( 'email' ) } ) : e ) } );
+	const w = inRow( 'project/company', response );
+	check( 'a text the account may not write has no pencil; the ones it may write have', w.pencil('/project/company/general/name') === undefined && w.pencil('/project/company/contact/email') !== undefined );
+	const d = w.openRow('/project/company/contact/email');
+	w.type( d, '*', 'x@acme.test' );
+	w.save( d );
+	check( 'a save sends only the text it may write that was changed', w.writes().length === 1 && w.writes()[0].payload.items[0].key === '/project/company/contact/email' );
+	const none = inRow( 'project/company', textResponse( { keys : homeKeys.filter( e => e.blacklisted === false ).map( e => Object.assign( {}, e, { writable : false } ) ) } ) );
+	check( 'a row this account may not write anywhere is a table to read: no pencil, no record by a click', none.rows().every( row => none.pencil( row.dataset.row ) === undefined ) && ( fire( none.rows()[0], 'click', { target : none.rows()[0] } ), none.dialog() === null ) );
+}
+
+// --- the words ---------------------------------------------------------------------------------------------------------------
+
+{
+	// every fill the Text script asks for exists in both languages
+	const used = new Set();
+	for( const file of [ '_admin/Nino/Modules/Text/assets/admin.js' ] )
+		for( const m of fs.readFileSync( path.join( __dirname, '..', file ), 'utf8' ).matchAll( /(?:getText|text|word)\(\s*'(\/_admin\/[^']+)'/g ) ) used.add( m[1] );
+	[ 'en_US', 'de_DE' ].forEach( locale => {
+		const words = workbenchWords( locale );
+		const missing = [ ...used ].filter( key => key.endsWith('/') === false && words[key] === undefined );
+		check( locale+ ': every fill the Text script asks for is there'+ ( missing.length === 0 ? '' : ' - not '+ missing.join() ), used.size > 20 && missing.length === 0 );
+		check( locale+ ': the counts, the heads and the words of the table and the record are all there, and the singular is another word than the plural', [ 'count/text', 'count/texts', 'count/empty', 'count/long', 'col/name', 'col/section', 'col/text', 'col/chars', 'col/long', 'col/languages', 'col/lang-ok', 'col/lang-missing', 'filter/show', 'filter/all', 'filter/empty-any', 'filter/long', 'filter/sections', 'row/open', 'record/prev', 'record/next', 'record/missing', 'label/working' ].every( k => words['/_admin/text/'+ k] !== undefined && words['/_admin/text/'+ k] !== '' )
+			&& words['/_admin/text/count/text'] !== words['/_admin/text/count/texts'] );
+	} );
 }
 
 // --- the Keys tab: the list, the search, the form of a row, the form that makes and renames a key ---

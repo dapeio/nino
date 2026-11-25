@@ -5,15 +5,24 @@
  *	admin.js									Admin "Text" panel: find a text - by what it says, what it
  *													is called or its key - or browse the rows the keys fall
  *													into (pages first, then the project, the common words,
- *													building blocks, modules, features), then edit every key
- *													of a row at once: a section for each part, the fields that
- *													are the same in every language marked. The language the
- *													texts are shown and written in is the workbench's own
- *													(Nino.admin.workLocale): a row on screen shows it, writes
- *													it and nothing else. How keys become rows, sections and
- *													names is textkeys.js. The set of keys is developer-owned
- *													(see /text/blacklist.php) - this only ever edits existing
- *													key values, no create/delete.
+ *													building blocks, modules, features). A row of the list
+ *													says how many texts it holds, how many have none in the
+ *													working language and how many are too long. A row opens as
+ *													the standard directory of its texts
+ *													(Nino.adminUi.directory()): the name and the key, the
+ *													section, the text of the working language, the characters
+ *													against the limit and a badge for each language - in the
+ *													order the templates read them, which is the content, so
+ *													nothing sorts. ONE text is edited in the record over it
+ *													(Nino.adminUi.record(), #text/text/<row>/<key>): the
+ *													working language first, the other languages below it, all
+ *													of them editable, and a save writes the languages that
+ *													were changed, one request each. The language the texts
+ *													are shown in is the workbench's own (Nino.admin.workLocale).
+ *													How keys become rows, sections and names is textkeys.js.
+ *													The set of keys is developer-owned (see
+ *													/text/blacklist.php) - this only ever edits existing key
+ *													values, no create/delete.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -28,30 +37,32 @@
 
 		// The languages that have a text file, the first of which is the language of the panel where the workbench has none
 		_locales				: [],
+		// The ones of them the website does not serve yet
+		_inactive				: [],
 		// What the server sent (see \Nino\Modules\Text\Admin::apiKeys()) and the
 		// rows textkeys.js made of it: _groups is row id -> its keys, _model
 		// the rows, blocks and where each key sits
 		_data						: null,
 		_model					: null,
 		_groups					: {},
-		// The row that is open - its id is the part of a key it stands for,
-		// eg. 'template/page-home' - and the key that was asked for, if one
-		// was: a hit of the search, a link
-		_currentGroup		: null,
-		_focusKey				: null,
+		// The row whose texts are on screen - its id is the part of a key it stands
+		// for, eg. 'template/page-home' - null where the list is
+		_group					: null,
 		// What the search box holds, whether the list is cut down to the keys
 		// with no text in the language, and how many hits are drawn
 		_search					: { query : '', emptyOnly : false, shown : 0 },
-		// The language the form on screen was drawn in: what it shows and the only one it writes
-		_shownLocale		: null,
-		// What the form on screen knows of its fields (see Nino.admin.textKeys.session()), and the line of its bar
-		_session				: null,
-		_status					: null,
-		// The button that opened the form: Back returns the focus to it
-		_opener					: null,
+		// The directory of the texts of the open row, what the person chose in
+		// it for each row (kept while the panel lives), and the record over it
+		_directory			: null,
+		_states					: {},
+		_record					: null,
+		// What the body of the record on screen was given: the fields of the languages, kept in ctx.view, and the context of the record
+		_view						: null,
+		_ctx						: null,
 		_fieldSeq				: 0,
+		// A move of the person's own: the level it leads to takes the focus
+		_moved					: false,
 		_loading				: false,
-		_saving					: false,
 		_ready					: false,
 		// The stamp of the templates (see Nino.admin.touch()) the keys were asked
 		// for: the rows of the templates are made from what the answer held
@@ -59,7 +70,7 @@
 
 		/**
 		 *	Load every editable key, sort them into rows and render the list - or,
-		 *	where the hash names a row or a key, open it
+		 *	where the address names a row or a text, open it
 		 *
 		 *	@return		void
 		 */
@@ -79,24 +90,34 @@
 				if( status !== 200 || response === null )
 					return Nino.admin.text._showError( dc.getElementById('text-list'), status, response );
 
-				// Capture the hash before any _show*() call below can overwrite it -
-				// _showList() would otherwise wipe the deep-link part it's trying to restore
-				const hash = Nino.admin.router.current();
-
-				Nino.admin.text._locales = response.locales.map( function( entry ) { return entry.locale } );
-				Nino.admin.text._data = response;
-				Nino.admin.text._buildModel();
+				Nino.admin.text._take( response );
 				Nino.admin.text._renderList();
 				Nino.admin.text._ready 	= true;
 				Nino.admin.text._stamp 	= stamp;
 
-				const target = hash.panel === 'text' && hash.parts.length > 0 ? Nino.admin.text._resolve( hash.parts ) : null;
+				if( Nino.admin.text._record === null )
+					Nino.admin.text._record = Nino.admin.text._makeRecord();
 
-				if( target !== null )
-					Nino.admin.text._openGroup( target.row, target.key );
-				else
-					Nino.admin.text._showList();
+				// Drawn from what this answer holds, whatever stood there before
+				Nino.admin.text._group = null;
+				Nino.admin.text._directory = null;
+				Nino.admin.text.showCurrent();
 			} );
+		},
+
+		/**
+		 *	Take an answer of text/keys in: the languages, the keys and the rows they fall into
+		 *
+		 *	@param		{Object}	response
+		 *
+		 *	@return		void
+		 */
+		_take : function( response ) {
+
+			Nino.admin.text._locales = response.locales.map( function( entry ) { return entry.locale } );
+			Nino.admin.text._inactive = response.locales.filter( function( entry ) { return entry.active === false } ).map( function( entry ) { return entry.locale } );
+			Nino.admin.text._data = response;
+			Nino.admin.text._buildModel();
 		},
 
 		/**
@@ -129,109 +150,135 @@
 		},
 
 		/**
-		 *	What a hash behind #text names: a row, or a key and its row
+		 *	The row an address names: its first part, where that is a row and no word of the router. Nothing for the list
 		 *
-		 *	@param		{Array}		parts					The hash behind the panel's name
+		 *	@param		{Object}	at						router.current()
 		 *
-		 *	@return		{Object|null}						{ row, key }, see Nino.admin.textKeys.resolve()
+		 *	@return		{string|null}
 		 */
-		_resolve : function( parts ) {
-			return Nino.admin.text._model === null ? null : Nino.admin.textKeys.resolve( Nino.admin.text._model, parts );
+		_addressGroup : function( at ) {
+
+			if( Nino.admin.text._model === null || at.parts.length === 0 || Nino.admin.router.wordOf( at.parts, 0 ) !== '' )
+				return null;
+
+			const id = String( at.parts[0] );
+
+			return Nino.admin.text._model.rows[id] === undefined ? null : id;
 		},
 
 		/**
-		 *	Re-apply whatever drill-down level this panel is currently on -
-		 *	called when the user switches TO this tab, so the hash (only ever
-		 *	written by router.set() while this panel is the visible one) gets
-		 *	synced to reality instead of staying stale from before the switch.
-		 *
-		 *	Where the hash names this panel, the hash wins: a step through the
-		 *	browser's history changes the address and nothing else, so the level
-		 *	it names is shown - and leaving a form that holds unsaved input asks
-		 *	first, as its back link does. A hash that names another panel (a
-		 *	click on the rail) leaves the level in memory as it is.
-		 *
-		 *	The keys are read again where a template was written since they were
-		 *	read (the Builder creates them, and so does a key of a template that
-		 *	the Keys tab adds), so that the rows have it. Not while a row is
-		 *	open: the list would be drawn over it, and the showing that finds
-		 *	none open reads them
+		 *	The panel is shown, or the address moved. The record reads the address itself: one that names a text of the open row opens it, one that names the row
+		 *	alone or none closes it. The row it names is drawn first, and the list where it names none. Where a template was written since the keys were read
+		 *	(the Builder creates them, and so does a key of a template that the Keys tab adds) they are read again, so that the rows have it - not while a record
+		 *	is open: the table would be drawn under it. An address of another panel (a click on the rail) leaves the level in memory as it is, and writes its address
 		 *
 		 *	@return		void
 		 */
 		showCurrent : function() {
 
-			if( Nino.admin.text._ready === false ) {
-				Nino.admin.text.init();
+			const text = Nino.admin.text;
+
+			if( text._ready === false ) {
+				text.init();
 				return;
 			}
 
-			if( dc.getElementById('text-form').classList.contains('admin-hidden') === true && Nino.admin.stamp( 'templates' ) !== Nino.admin.text._stamp ) {
-				Nino.admin.text._ready = false;
-				Nino.admin.text.init();
+			const open = text._record !== null && text._record.isOpen() === true;
+
+			if( open === false && Nino.admin.stamp( 'templates' ) !== text._stamp ) {
+				text._ready = false;
+				text.init();
 				return;
 			}
 
-			const hash = Nino.admin.router.current();
-			if( hash.panel === 'text' && Nino.admin.text._follow( hash.parts ) === true )
-				return;
+			const at = Nino.admin.router.current();
 
-			Nino.admin.text._showLevel();
+			if( at.panel !== 'text' ) {
+				text._address();
+				return;
+			}
+
+			const want = text._addressGroup( at );
+
+			if( want !== text._group || ( want !== null && text._directory === null ) )
+				text._level( want );
+			else if( want === null )
+				text._address();
+			else if( open === false )
+				text._release();
+
+			if( want !== null )
+				text._record.follow();
 		},
 
 		/**
-		 *	Show the level this panel is on, and write it into the address
+		 *	Write the address of what is on screen and show its level: the list, the texts of a row, or a text of it
 		 *
 		 *	@return		void
 		 */
-		_showLevel : function() {
+		_address : function() {
 
-			if( dc.getElementById('text-form').classList.contains('admin-hidden') === false )
-				return Nino.admin.text._showForm();
+			const text = Nino.admin.text;
+			let parts = [];
 
-			Nino.admin.text._showList();
+			if( text._group !== null ) {
+				parts = [ text._group ];
+
+				if( text._record !== null && text._record.isOpen() === true && text._record.key() !== null )
+					parts.push( text._record.key() );
+			}
+
+			Nino.admin.router.set( 'text', parts );
+			Nino.adminUi.showLevel( text._group === null ? 'text-list' : 'text-form', { focus : false } );
 		},
 
 		/**
-		 *	Move to the level the hash names, if it is not the one on screen.
-		 *	A hash that names a row - or a key, which is in one - opens it; one
-		 *	that names nothing there is is the list. Leaving a form with unsaved
-		 *	input asks first (see Nino.admin.router.leave()). A key of the row
-		 *	that is open is shown in place
+		 *	Show the level the address names: the list - which is drawn again, for what was edited since it was shown has changed its counts, and the focus
+		 *	goes back to the row that was open where the person came back - or the texts of a row, drawn from the state the person left them in
 		 *
-		 *	@param		{Array}		parts					The hash behind the panel's name
+		 *	@param		{string|null}	group
 		 *
-		 *	@return		{boolean}									Whether a move was made or is being asked about
+		 *	@return		void
 		 */
-		_follow : function( parts ) {
+		_level : function( group ) {
 
-			const open = dc.getElementById('text-form').classList.contains('admin-hidden') === false;
-			const target = parts.length > 0 ? Nino.admin.text._resolve( parts ) : null;
+			const text = Nino.admin.text;
+			const was = text._group;
+			const moved = text._moved;
 
-			if( target === null ? open === false : ( open === true && Nino.admin.text._currentGroup === target.row ) ) {
+			text._moved = false;
+			text._release();
+			text._group = group;
 
-				// Another key of the row on screen is no move, but the field the
-				// address names is the one shown and the one it keeps
-				if( target !== null && target.key !== Nino.admin.text._focusKey ) {
-					Nino.admin.text._focusKey = target.key;
+			if( group === null ) {
+				Nino.admin.router.set( 'text', [] );
 
-					if( target.key !== null )
-						Nino.admin.text._focusField( target.key );
-				}
+				if( text._model !== null )
+					text._renderCategoryList();
 
-				return false;
+				if( moved === true && was !== null )
+					Nino.adminUi.backTo( 'text-list', text._rowOf( was ) );
+				else
+					Nino.adminUi.showLevel( 'text-list', { focus : false } );
+
+				return;
 			}
 
-			Nino.admin.router.leave( [ 'text' ], open, function() {
-				if( target === null ) {
-					Nino.admin.text._destroyHtmlEditors();
-					Nino.admin.text._showList();
-					return;
-				}
-				Nino.admin.text._openGroup( target.row, target.key );
-			}, Nino.admin.text._showLevel );
+			text._drawGroup( group );
+			Nino.adminUi.showLevel( 'text-form', moved === true ? {} : { focus : false } );
+		},
 
-			return true;
+		/**
+		 *	A move of the person's own inside the panel: the address is a new entry of the history, and the screen follows it
+		 *
+		 *	@param		{Array}		parts					The address behind the panel's name
+		 *
+		 *	@return		void
+		 */
+		_go : function( parts ) {
+			Nino.admin.text._moved = true;
+			Nino.admin.router.go( 'text', parts );
+			Nino.admin.text.showCurrent();
 		},
 
 		/**
@@ -259,43 +306,6 @@
 		 */
 		_showError : function( container, status, response ) {
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
-		},
-
-		/**
-		 *	Drill-down navigation: list -> row form. The main
-		 *	System/Text/Elements bar stays visible throughout. The focus stays
-		 *	where it is, unless it stood in the level that is hidden now (see
-		 *	Nino.adminUi.showLevel()): the level is shown again as it stands, by the
-		 *	address. Back goes to the row, and what a person opens takes the
-		 *	focus in
-		 *
-		 *	@param		{string|null}	[group]		Back: the row that was open, to give the focus to; null where there is none to name
-		 *
-		 *	@return		void
-		 */
-		_showList : function( group ) {
-			Nino.admin.router.set( 'text', [] );
-
-			// What was edited in the form, or the language it was in, is not
-			// what the list showed when it was last drawn - and drawn before the
-			// focus goes back, so that the row it goes to is there
-			if( Nino.admin.text._model !== null )
-				Nino.admin.text._renderCategoryList();
-
-			if( group === undefined )
-				Nino.adminUi.showLevel( 'text-list', { focus : false } );
-			else
-				Nino.adminUi.backTo( 'text-list', group === null ? null : Nino.admin.text._rowOf( group ) );
-		},
-
-		/**
-		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
-		 *
-		 *	@return		void
-		 */
-		_showForm : function( opened ) {
-			Nino.admin.router.set( 'text', Nino.admin.textKeys.hashParts( Nino.admin.text._currentGroup, Nino.admin.text._focusKey ) );
-			Nino.adminUi.showLevel( 'text-form', opened === true ? {} : { focus : false } );
 		},
 
 		/**
@@ -358,9 +368,10 @@
 
 		/**
 		 *	The workbench's content language moved (Nino.admin.workLocale), and the
-		 *	shell has asked about the unsaved input of this panel first: the form on
-		 *	screen is drawn again in the other language - what it held is saved or
-		 *	given up by now - and the list names its rows in it
+		 *	shell has asked about the unsaved input of this panel first: the rows are
+		 *	named in the other language, the table of the open row says its texts in it,
+		 *	and a record that is open is drawn again with that language first - what it
+		 *	held is saved or given up by now
 		 *
 		 *	@param		{string}	locale
 		 *
@@ -368,24 +379,42 @@
 		 */
 		_followLocale : function( locale ) {
 
-			if( Nino.admin.text._data === null || Nino.admin.text._model === null )
+			const text = Nino.admin.text;
+
+			if( text._data === null || text._model === null )
 				return;
 
-			const form = dc.getElementById('text-form');
+			text._buildModel();
+			text._search.shown = 0;
 
-			if( form.classList.contains('admin-hidden') === false && dc.getElementById('text-edit-form') !== null ) {
+			if( dc.getElementById('text-list-body') !== null )
+				text._renderCategoryList();
 
-				if( locale === Nino.admin.text._shownLocale )
-					return;
+			if( text._group === null || text._model.rows[text._group] === undefined )
+				return;
 
-				Nino.admin.text._buildModel();
-				Nino.admin.text._renderGroupForm();
+			text._drawGroup( text._group );
+
+			// A record that was given up with its input is closed, and the address that named its text says the row
+			if( text._record === null || text._record.isOpen() === false || text._ctx === null ) {
+
+				if( text._record !== null && text._record.isOpen() === false && Nino.admin.router.current().panel === 'text' )
+					text._address();
+
 				return;
 			}
 
-			Nino.admin.text._search.shown = 0;
-			Nino.admin.text._buildModel();
-			Nino.admin.text._renderCategoryList();
+			// An entry that stands among the rows the record steps through is drawn again from its row. One that a filter hides has no place to be stepped to: its
+			// fields are put in the order of the language where they stand
+			if( text._record.key() !== null && text._directory.rows().some( function( row ) { return row.key === text._record.key() && row.writable === true } ) === true )
+				return text._ctx.go( 0 );
+
+			if( text._view !== null ) {
+				text._view.draw();
+
+				if( typeof Nino.admin.dirty === 'object' )
+					Nino.admin.dirty.snapshot( 'text' );
+			}
 		},
 
 		/**
@@ -449,8 +478,30 @@
 		},
 
 		/**
-		 *	One group of rows, each a row of the workbench's list that opens the row's
-		 *	form, and has its address
+		 *	What a row of the list says under its name, in the language on screen: how many texts it holds, and - where there are any - how many of them are empty
+		 *	in it and how many are longer than their limit
+		 *
+		 *	@param		{Object}	row
+		 *	@param		{string}	locale
+		 *
+		 *	@return		{string}
+		 */
+		_counts : function( row, locale ) {
+
+			const counts = Nino.admin.textKeys.rowCounts( row, locale );
+			const words = [ Nino.adminUi.format( Nino.content.getText( counts.texts === 1 ? '/_admin/text/count/text' : '/_admin/text/count/texts' ), counts.texts ) ];
+
+			if( counts.empty > 0 )
+				words.push( Nino.adminUi.format( Nino.content.getText('/_admin/text/count/empty'), counts.empty, Nino.adminUi.localeName( locale ) ) );
+
+			if( counts.long > 0 )
+				words.push( Nino.adminUi.format( Nino.content.getText('/_admin/text/count/long'), counts.long ) );
+
+			return words.join(' · ');
+		},
+
+		/**
+		 *	One group of rows, each a row of the workbench's list that opens the texts of the row, and has its address
 		 *
 		 *	@param		{Array}		ids						Row ids
 		 *	@param		{string}	[title]				The name of the group, where it has one
@@ -469,13 +520,10 @@
 				return {
 					key : id,
 					title : Nino.admin.textKeys.rowLabel( model, row, locale ),
-					detail : Nino.admin.textKeys.rowSummary( row, locale ),
+					detail : Nino.admin.text._counts( row, locale ),
 					sub : Nino.admin.textKeys.rowDepth( row ) > 0,
 					href : Nino.admin.router.href( 'text', Nino.admin.textKeys.hashParts( id ) ),
-					onOpen : function() {
-						Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( id ) );
-						Nino.admin.text._openGroup( id, null, true );
-					},
+					onOpen : function() { Nino.admin.text._go( Nino.admin.textKeys.hashParts( id ) ) },
 				};
 			} ), { title : title, level : 3 } );
 		},
@@ -485,9 +533,9 @@
 		 *	reads it by, the piece of its text with the words marked, its key
 		 *	small, and where the words are in another language than the one on
 		 *	screen, that language's code - 50 at a time (see
-		 *	Nino.admin.textKeys.hitList()). A hit opens the row at its field; only
+		 *	Nino.admin.textKeys.hitList()). A hit opens the record of its text; only
 		 *	the code switches the language. Nothing is edited here: saving and the
-		 *	log belong to a row
+		 *	log belong to a record
 		 *
 		 *	@param		{Element}	body
 		 *
@@ -513,10 +561,7 @@
 
 			body.appendChild( Nino.admin.textKeys.hitList( hits.slice( 0, search.shown ), locale, {
 				href : function( hit ) { return Nino.admin.router.href( 'text', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) ) },
-				onOpen : function( hit ) {
-					Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) );
-					Nino.admin.text._openGroup( hit.item.row.id, hit.item.field.entry.key, true );
-				},
+				onOpen : function( hit ) { Nino.admin.text._go( Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) ) },
 				// Asked for as every change of the language is, so that a view with unsaved input is asked about first
 				onLanguage : function( code ) { Nino.admin.workLocale.choose( code ) },
 			} ) );
@@ -528,55 +573,6 @@
 				}, { kind : 'secondary' } );
 				body.appendChild( more );
 			}
-		},
-
-		/**
-		 *	Open a row's bulk-edit form, at one of its keys where one was asked
-		 *	for: that field is scrolled to and marked
-		 *
-		 *	@param		{string}		group					The row's id
-		 *	@param		{string|null}	[key]
-		 *	@param		{boolean}			[opened]			The person opened it - a row, or a hit: the focus goes into the form, to the field of the key where there is one. Otherwise it is shown as it stands, by the address
-		 *
-		 *	@return		void
-		 */
-		_openGroup : function( group, key, opened ) {
-
-			Nino.admin.text._destroyHtmlEditors();
-
-			Nino.admin.text._currentGroup = group;
-			Nino.admin.text._focusKey 		= key ?? null;
-
-			Nino.admin.text._renderGroupForm();
-			Nino.admin.text._showForm( opened === true );
-
-			if( Nino.admin.text._focusKey !== null )
-				Nino.admin.text._focusField( Nino.admin.text._focusKey );
-		},
-
-		/**
-		 *	Scroll to the field of a key, mark it and put the cursor in it
-		 *
-		 *	@param		{string}	key
-		 *
-		 *	@return		void
-		 */
-		_focusField : function( key ) {
-
-			const field = Array.from( dc.getElementById('text-form').querySelectorAll('[data-key]') ).find( function( el ) { return el.dataset.key === key } );
-
-			if( field === undefined )
-				return;
-
-			field.classList.add('is-found');
-
-			if( typeof field.scrollIntoView === 'function' )
-				field.scrollIntoView( { block : 'center' } );
-
-			const control = field.querySelector('textarea, input, [contenteditable="true"]');
-
-			if( control !== null && typeof control.focus === 'function' )
-				control.focus( { preventScroll : true } );
 		},
 
 		/**
@@ -592,320 +588,572 @@
 		},
 
 		/**
-		 *	The textfills a text may take, for the "[ ]" at the name of a field: asked for when the dialog opens,
-		 *	in the language on screen
+		 *	The short name of a language in the table: its code's language, DE or EN - with the region where two languages of the site share it
 		 *
-		 *	@param		{Function}	done					Called with the list the server sent, with null where it could not be had
+		 *	@param		{string}	code
 		 *
-		 *	@return		void
+		 *	@return		{string}
 		 */
-		_loadFills : function( done ) {
-			Nino.admin.textKeys.fills( function( callback ) { Nino.admin.text._apiCall( 'fills', { locale : Nino.admin.text._shownLocale ?? Nino.admin.text._locale() }, callback ) }, done );
+		_short : function( code ) {
+
+			const language = String( code ).split('_')[0];
+			const shared = Nino.admin.text._locales.filter( function( other ) { return String( other ).split('_')[0] === language } ).length > 1;
+
+			return ( shared === true ? String( code ).replace( '_', '-' ) : language ).toUpperCase();
 		},
 
 		/**
-		 *	Take every rich-text editor of the form on screen down, and the fields with it
+		 *	The rows of the directory of a row of the list: a text each, in the order of the sections and of the templates. What the table shows of a text, and the
+		 *	text itself for the record to read
 		 *
-		 *	@return		void
-		 */
-		_destroyHtmlEditors : function() {
-
-			if( Nino.admin.text._session !== null )
-				Nino.admin.text._session.destroy();
-
-			Nino.admin.text._session = null;
-		},
-
-		/**
-		 *	Whether the open group holds input nobody has saved - what the shell
-		 *	asks before it lets anything throw that away (see Nino.admin.dirty):
-		 *	a writable field that differs from what it held when it was drawn or
-		 *	last saved, which includes one whose save is on its way or was refused
+		 *	@param		{string}	group					The row's id
 		 *
-		 *	@return		{boolean}
+		 *	@return		{Array}
 		 */
-		isDirty : function() {
-
-			const form = dc.getElementById('text-form');
-
-			if( form === null || Nino.admin.text._session === null || form.classList.contains('admin-hidden') === true || dc.getElementById('text-edit-form') === null )
-				return false;
-
-			return Nino.admin.text._session.isDirty();
-		},
-
-		/**
-		 *	Throw the input away: every field is put back to what it held. The
-		 *	form is about to be left or drawn again. While a save runs nothing is
-		 *	thrown away: it finishes with what it was given
-		 *
-		 *	@return		void
-		 */
-		discard : function() {
-
-			if( Nino.admin.text._saving === true || Nino.admin.text._session === null )
-				return;
-
-			Nino.admin.text._session.discard();
-
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
-		},
-
-		/**
-		 *	The action bar of the form on screen, which is where the shell puts its mark of unsaved input
-		 *
-		 *	@return		{Element|null}
-		 */
-		_bar : function() {
-
-			const form = dc.getElementById('text-edit-form');
-
-			return form === null ? null : form.querySelector('.nino-admin-actionbar');
-		},
-
-		/**
-		 *	Render a row's bulk-edit form in the language the workbench edits content in: the way back and the name
-		 *	of the row in the context bar, a section for each part - a page begins with the details of its routes -
-		 *	and in it every key, the ones that are the same in every language first. One bar, one Save
-		 *
-		 *	@return		void
-		 */
-		_renderGroupForm : function() {
+		_rows : function( group ) {
 
 			const text 		= Nino.admin.text;
-			const group 	= text._currentGroup;
-			const entries = text._groups[group] ?? [];
+			const T 			= Nino.admin.textKeys;
+			const locale 	= text._locale();
+			const all 		= Nino.content.getText('/_admin/text/label/all-languages');
+			const rows 		= [];
+
+			T.sections( text._model, text._model.rows[group] ).forEach( function( section ) {
+
+				const place = section.route === '' ? section.label : section.label+ ' ('+ section.route+ ')';
+
+				section.fields.forEach( function( field ) {
+
+					const entry = field.entry;
+					const shown = T.plain( T.valueOf( entry, locale ) );
+
+					rows.push( {
+						key : entry.key,
+						entry : entry,
+						name : field.label,
+						place : place,
+						sectionId : section.id,
+						title : [ place, field.label ].filter( function( part, at, parts ) { return at === 0 || part !== parts[at - 1] } ).join(' › '),
+						text : shown.length > 200 ? shown.slice( 0, 200 )+ '…' : shown,
+						chars : T.lengthOf( entry, T.valueOf( entry, locale ) ),
+						long : T.isTooLong( entry, locale ),
+						emptyHere : T.isEmptyIn( entry, locale ),
+						writable : text._writable( entry ),
+						// One badge for each language of the site; a key that is one text for all of them has the one
+						states : entry.global === true ? [ { locale : '*', label : all, name : all, ok : true } ] : text._locales.map( function( code ) {
+							return { locale : code, label : text._short( code ), name : Nino.adminUi.localeName( code, text._locales ), ok : T.isEmptyIn( entry, code ) === false };
+						} ),
+						// What a person looks for: every language's text, whole
+						found : Object.keys( entry.values ).map( function( code ) { return T.plain( entry.values[code] ) } ).join(' '),
+					} );
+				} );
+			} );
+
+			return rows;
+		},
+
+		/**
+		 *	The row of one text, as the directory and the record have it: null for a text that is not in the open row or that this account may not write - which
+		 *	opens no record
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{Object|null}
+		 */
+		_find : function( key ) {
+
+			const text = Nino.admin.text;
+
+			if( text._group === null || text._model === null || text._model.rows[text._group] === undefined )
+				return null;
+
+			const row = text._rows( text._group ).find( function( one ) { return one.key === key } );
+
+			return row === undefined || row.writable === false ? null : row;
+		},
+
+		/**
+		 *	The text of the open row that a key names, in the model - whatever this account may do with it
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{Object|undefined}
+		 */
+		_entryOf : function( key ) {
+
+			const text = Nino.admin.text;
+
+			return text._group === null ? undefined : ( text._groups[text._group] ?? [] ).find( function( entry ) { return entry.key === key } );
+		},
+
+		/**
+		 *	The texts of a row: the way back and the name of the row in the context bar, and under it the directory - the section as its category, the search, the
+		 *	select "Show", and the table in the order the templates read the texts. What the person chose in it is kept for the row while the panel lives
+		 *
+		 *	@param		{string}	group					The row's id
+		 *
+		 *	@return		void
+		 */
+		_drawGroup : function( group ) {
+
+			const text 		= Nino.admin.text;
+			const T 			= Nino.admin.textKeys;
 			const model 	= text._model;
 			const row 		= model.rows[group];
 			const locale 	= text._locale();
-
-			text._destroyHtmlEditors();
-			text._shownLocale = locale;
-			text._session = Nino.admin.textKeys.session();
+			const word 		= function( key ) { return Nino.content.getText( key ) };
 
 			const wrap = dc.getElementById('text-form');
 			wrap.innerHTML = '';
 
 			const back = Nino.adminUi.contextBar( {
-				back : { to : Nino.content.getText('/_admin/text/label/back-name'), href : Nino.admin.router.href( 'text', [] ), onClick : function() {
-					Nino.admin.router.go( 'text', [] );
-					Nino.admin.text._destroyHtmlEditors();
-					Nino.admin.text._showList( Nino.admin.text._currentGroup );
-				} },
-				title : Nino.admin.textKeys.rowLabel( model, row, locale ),
+				back : { to : word('/_admin/text/label/back-name'), href : Nino.admin.router.href( 'text', [] ), onClick : function() { text._moved = true; Nino.admin.router.go( 'text', [] ); text.showCurrent() } },
+				title : T.rowLabel( model, row, locale ),
 			} );
 			wrap.appendChild( back );
 			Nino.adminUi.localeBadge( locale, back );
 
-			const form = dc.createElement('form');
-			form.id = 'text-edit-form';
-			form.noValidate = true;
+			const mount = Nino.adminUi.el( 'div' );
+			wrap.appendChild( mount );
 
-			// Every key of the row, writable or not - a read-only one is
-			// rendered as a read-only field (see Nino.admin.textKeys.valueField()), because
-			// seeing the text around the one being edited is the point of
-			// editing a whole row at once
-			Nino.admin.textKeys.sectionsView( model, row, function( field ) {
+			const rows = text._rows( group );
+			const sections = T.sections( model, row );
 
-				const entry = field.entry;
-				const writable = text._writable( entry );
-				const handle = Nino.admin.textKeys.valueField( {
-					entry : entry,
-					value : Nino.admin.textKeys.valueOf( entry, locale ),
-					label : field.label,
-					id : 'text-field-'+ ( ++text._fieldSeq ),
-					writable : writable,
-					fills : writable === true ? text._loadFills : null,
-				} );
+			const filters = [ {
+				id : 'text-show',
+				label : word('/_admin/text/filter/show'),
+				value : '',
+				options : [
+					{ value : '', label : word('/_admin/text/filter/all') },
+					{ value : 'empty', label : Nino.adminUi.format( word('/_admin/text/label/empty-in'), Nino.adminUi.localeName( locale ) ) },
+					{ value : 'any', label : word('/_admin/text/filter/empty-any') },
+					{ value : 'long', label : word('/_admin/text/filter/long') },
+				],
+				match : function( one, value ) {
 
-				text._session.add( handle );
+					if( value === 'empty' )
+						return one.emptyHere === true;
 
-				return handle.el;
-			} ).forEach( function( fieldset ) { form.appendChild( fieldset ) } );
+					if( value === 'any' )
+						return one.states.some( function( state ) { return state.ok === false } );
 
-			text._status = null;
+					return value !== 'long' || one.long === true;
+				},
+			} ];
 
-			// A row this account may not write anywhere is a row to read.
-			// Offering Save on it would post an empty batch and report success
-			// for a screen where nothing could have changed
-			if( entries.some( function( e ) { return text._writable( e ) === true } ) === true ) {
+			text._directory = Nino.adminUi.directory( {
+				mount : mount,
+				rowKey : 'key',
+				state : text._states[group],
+				onState : function( now ) { text._states[group] = now },
+				columns : [
+					{ key : 'name', label : word('/_admin/text/col/name'), type : 'string', primary : true, sortable : false, render : text._nameCell },
+					{ key : 'place', label : word('/_admin/text/col/section'), type : 'string', sortable : false, narrow : false },
+					{ key : 'text', label : Nino.adminUi.format( word('/_admin/text/col/text'), Nino.adminUi.localeName( locale ) ), type : 'string', cell : 'clamp', fill : true, sortable : false },
+					{ key : 'chars', label : word('/_admin/text/col/chars'), type : 'integer', cell : 'limit', sortable : false, limit : function( one ) { return one.entry.maxlength }, over : word('/_admin/text/col/long') },
+					{ key : 'states', label : word('/_admin/text/col/languages'), cell : 'locales', sortable : false, words : { ok : word('/_admin/text/col/lang-ok'), missing : word('/_admin/text/col/lang-missing') } },
+				],
+				labels : { search : word('/_admin/text/label/search'), empty : word('/_admin/text/empty'), noMatch : word('/_admin/text/msg/nothing') },
+				// The sections of the row, in the order the templates read them; a row that has one section has nothing to narrow to
+				category : sections.length < 2 ? undefined : {
+					id : 'text-section',
+					label : word('/_admin/text/col/section'),
+					value : '',
+					options : [ { value : '', label : word('/_admin/text/filter/sections') } ].concat( sections.map( function( section ) {
+						return { value : section.id, label : section.route === '' ? section.label : section.label+ ' ('+ section.route+ ')' };
+					} ) ),
+					match : function( one, value ) { return value === '' || one.sectionId === value },
+				},
+				filters : filters,
+				// What a person looks for: the name, the key, the section and the text in every language
+				searchText : function( one ) { return [ one.name, one.key, one.place, one.found ].join(' ') },
+				actions : text._actions,
+				// A row is opened by its first button as well: the row is not a stop of the Tab key where it holds buttons. A text this account may not change has no
+				// button, and its row says why where it is pressed
+				onOpen : function( one ) {
 
-				const msg = dc.createElement('p');
-				msg.id = 'text-form-msg';
+					if( one.writable === false )
+						return text._directory.notice( word('/_admin/text/error/denied') );
 
-				const bar = Nino.adminUi.actionBar( {
-					status : { line : msg },
-					primary : Nino.adminUi.button( Nino.content.getText('/_admin/common/label/save'), null, { type : 'submit' } ),
-				} );
-
-				text._status = bar.line;
-				bar.line.bind( form, text.isDirty );
-				form.appendChild( bar.el );
-			}
-
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); text._save() } );
-
-			wrap.appendChild( form );
-
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.refresh();
+					text._directory.notice('');
+					text._record.open( one.key, {} );
+				},
+				rows : rows,
+			} );
 		},
 
 		/**
-		 *	Save the keys of the open row whose field was changed - and nothing else, so that a row saved without a
-		 *	change leaves its files as they are - in the language the form was drawn in, in one request. A key the
-		 *	server turns down is said at its field and stays changed; what was written is what the field holds
-		 *	and what it is marked as saved by. The view stays as it is.
+		 *	The text in the table: its name strong, its key under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip
 		 *
-		 *	Every way this ends reports to done( ok ), if there is one: the
-		 *	shell's question about unsaved input saves through it and goes on
-		 *	only when it hears true (see Nino.admin.dirty.guard())
+		 *	@param		{string}	value
+		 *	@param		{Object}	row
 		 *
-		 *	@param		{Function}	[done]				Called once with true when everything was written, false otherwise
-		 *
-		 *	@return		void
+		 *	@return		{Element}
 		 */
-		_save : function( done ) {
+		_nameCell : function( value, row ) {
+
+			const cell = Nino.adminUi.el( 'span', 'admin-text-name' );
+			const name = Nino.adminUi.el( 'strong', 'admin-text-name-label', row.name );
+			const key = Nino.adminUi.el( 'span', 'admin-text-name-key', row.key );
+
+			name.title = row.name;
+			key.title = row.key;
+			cell.appendChild( name );
+			cell.appendChild( key );
+
+			return cell;
+		},
+
+		/**
+		 *	The button at the end of a row: edit, which opens the text - for a text that can be changed; there is none for one that cannot
+		 *
+		 *	@param		{Object}	row
+		 *
+		 *	@return		{Array}
+		 */
+		_actions : function( row ) {
+
+			if( row.writable === false )
+				return [];
+
+			return [ Nino.adminUi.iconButton( 'pencil', Nino.adminUi.format( Nino.content.getText('/_admin/text/row/open'), row.title ), function( event ) {
+				Nino.admin.text._directory.notice('');
+				Nino.admin.text._record.open( row.key, { opener : event.currentTarget } );
+			}, { small : true } ) ];
+		},
+
+		/**
+		 *	The directory as the record sees it: what is on screen now, whatever drew it last. The record walks the texts that open - the steps skip the ones
+		 *	this account may not change, and the place counts only those
+		 *
+		 *	@return		{Object}
+		 */
+		_texts : function() {
 
 			const text = Nino.admin.text;
 
-			const report = function( ok ) {
-				if( typeof Nino.admin.dirty === 'object' )
-					Nino.admin.dirty.refresh();
-				if( typeof done === 'function' )
-					done( ok );
+			return {
+				rows : function() { return text._directory === null ? [] : text._directory.rows().filter( function( row ) { return row.writable === true } ) },
+				reveal : function( key ) { return text._directory === null ? false : text._directory.reveal( key ) },
+				focusRow : function( key ) { return text._directory === null ? false : text._directory.focusRow( key ) },
+				focusSearch : function() { return text._directory === null ? false : text._directory.focusSearch() },
 			};
-
-			if( text._saving === true || text._session === null || text._status === null ) {
-				report( false );
-				return;
-			}
-
-			const session = text._session;
-			const line 		= text._status;
-			const locale 	= text._shownLocale;
-			const entries = text._groups[text._currentGroup] ?? [];
-
-			Nino.adminUi.clearFieldErrors( dc.getElementById('text-edit-form') );
-
-			const keys = session.changed();
-
-			// Nothing differs from what is stored: nothing is written, and what is on screen is what is stored
-			if( keys.length === 0 ) {
-				line.saved();
-				report( true );
-				return;
-			}
-
-			const sent = {};
-			const items = keys.map( function( key ) {
-
-				const entry = entries.find( function( e ) { return e.key === key } );
-				sent[key] = session.get( key ).read();
-
-				// The language the form shows is the language it writes, whatever the workbench says by now
-				return Nino.admin.textKeys.saveItem( entry, locale, sent[key] );
-			} );
-
-			// What is written is the items that are given: all of them, and the ones that a conflict was answered with Overwrite for
-			const write = function( items ) {
-
-				text._saving = true;
-				line.saving();
-
-				text._apiCall( 'savebatch', { items : items }, function( status, response ) {
-
-					text._saving = false;
-
-					if( status !== 200 || response === null ) {
-						line.error( status, response, '/_admin/common/error/save' );
-						report( false );
-						return;
-					}
-
-					// Written, whichever of the items a later check turns down
-					Nino.admin.touch( 'texts' );
-
-					const results = response.results ?? {};
-					const changed = [];
-					let first = null;
-					let failed = 0;
-
-					items.forEach( function( item ) {
-
-						const result = results[item.key];
-						const field = session.get( item.key );
-
-						// Another tab or person wrote the key since: the question below is the answer, the text stays as it was typed
-						if( result !== undefined && result.error === 'changed' ) {
-							changed.push( item );
-							first = first ?? field;
-							return;
-						}
-
-						if( result === undefined || result.ok !== true ) {
-							failed++;
-							field.fail( Nino.content.getText( result !== undefined && result.error === 'not allowed' ? '/_admin/text/error/denied' : '/_admin/text/error/key' ) );
-							first = first ?? field;
-							return;
-						}
-
-						const entry = entries.find( function( e ) { return e.key === item.key } );
-						entry.values[item.locale] = result.value;
-
-						// What the server kept is what the field shows - unless more was typed while it was on its way, which is not
-						// in what was sent and stays unsaved
-						if( field.read() === sent[item.key] ) {
-							if( result.value !== sent[item.key] )
-								field.write( result.value );
-							session.capture( item.key );
-						}
-						else
-							session.capture( item.key, sent[item.key] );
-					} );
-
-					if( changed.length > 0 ) {
-
-						line.fail( Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), changed.map( function( item ) { return item.key } ).join(', ') ) );
-
-						if( Nino.admin.textKeys.conflict( changed, {
-							model			: text._model,
-							opener		: dc.getElementById('text-edit-form').querySelector('.nino-admin-btn-primary'),
-							onOverwrite : function( forced ) { write( forced ) },
-							onReload	: function() { text._reread( report, changed[0].key ) },
-							onCancel	: function() { first.focus(); report( false ) },
-						} ) === false )
-							report( false );
-
-						return;
-					}
-
-					if( failed > 0 ) {
-						line.fail( Nino.adminUi.format( Nino.content.getText( failed === 1 ? '/_admin/text/error/one' : '/_admin/text/error/some' ), failed ) );
-						first.focus();
-						report( false );
-						return;
-					}
-
-					line.saved();
-					report( true );
-				} );
-			};
-
-			write( items );
 		},
 
 		/**
-		 *	Read the keys again and draw the open row from them: what this tab typed is dropped and the row shows what is
-		 *	stored. Ends with done( true ) when it did, done( false ) when the keys could not be read, which the line says
+		 *	The record of a text: a dialog over the table with the place of the text in its head and its key under it, a field for each language - the working
+		 *	language first - and "Save", "Save and continue". There is nothing to delete or to make here: a key is made, renamed and deleted on the Text Keys tab
 		 *
-		 *	@param		{Function}	[done]
-		 *	@param		{string}		[key]				The text whose field takes the focus
+		 *	@return		{Object}
+		 */
+		_makeRecord : function() {
+
+			const text = Nino.admin.text;
+
+			return Nino.adminUi.record( {
+				screen : 'text',
+				// The texts are under a part of the screen: the row - #text/text/<row>/<key>
+				prefix : function() { return text._group === null ? [] : [ text._group ] },
+				directory : text._texts(),
+				keyOf : function( row ) { return row.key },
+				find : text._find,
+				title : function( row ) { return row.title },
+				subtitle : function( row ) { return row.key },
+				saveNext : true,
+				labels : { prev : Nino.content.getText('/_admin/text/record/prev'), next : Nino.content.getText('/_admin/text/record/next') },
+				body : text._body,
+				save : text._save,
+				reload : text._reload,
+				// An address that names a text the row does not hold, or one this account may not change: said over the table
+				missing : function( key ) {
+					text._directory.notice( Nino.content.getText( text._entryOf( key ) === undefined ? '/_admin/text/record/missing' : '/_admin/text/error/denied' ) );
+				},
+			} );
+		},
+
+		/**
+		 *	Take the editors of the record that was on screen down, and the fields with them
 		 *
 		 *	@return		void
 		 */
-		_reread : function( done, key ) {
+		_release : function() {
+
+			const text = Nino.admin.text;
+
+			if( text._view !== null )
+				text._view.fields.forEach( function( field ) { field.handle.destroy() } );
+
+			text._view = null;
+			text._ctx = null;
+		},
+
+		/**
+		 *	The textfills a text may take, for the "[ ]" at the name of a field: asked for when the dialog opens, in the language of THAT field
+		 *
+		 *	@param		{string}		locale
+		 *	@param		{Function}	done					Called with the list the server sent, with null where it could not be had
+		 *
+		 *	@return		void
+		 */
+		_loadFills : function( locale, done ) {
+			Nino.admin.textKeys.fills( function( callback ) { Nino.admin.text._apiCall( 'fills', { locale : locale }, callback ) }, done );
+		},
+
+		/**
+		 *	The content of the record: one field for each language of the text - the working language first and marked, then the others in their order, a language
+		 *	the website does not serve yet marked as the select of the working language marks it - or the one field of a key that is the same in every language.
+		 *	Each is drawn by the rule of the key (a line, several lines, the rich-text editor) with its counter, and what it read back after it was drawn is what a
+		 *	save compares it with. What the fields are is kept in ctx.view, which the save finds there
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *
+		 *	@return		{Element}
+		 */
+		_body : function( row, ctx ) {
+
+			const text = Nino.admin.text;
+
+			// The fields of the entry that was on screen go with it
+			text._release();
+
+			const wrap = Nino.adminUi.el( 'div', 'nino-admin-dialog-fields' );
+
+			// The root of what the panel's stylesheet arranges in the record: the dialog stands outside the pane of the panel
+			wrap.id = 'text-record';
+			const view = { key : row.key, fields : [], wrap : wrap, conflict : null, draw : null };
+
+			// Drawn again where the language moved under an open record that no step can redraw
+			view.draw = function() {
+
+				view.fields.forEach( function( field ) { field.handle.destroy() } );
+				view.fields = [];
+				wrap.innerHTML = '';
+
+				const entry = text._entryOf( view.key ) ?? row.entry;
+				const locale = text._locale();
+				const writable = text._writable( entry );
+				const codes = entry.global === true ? [ '*' ] : [ locale ].concat( text._locales.filter( function( code ) { return code !== locale } ) );
+
+				codes.forEach( function( code ) {
+
+					const marks = [];
+
+					if( entry.global === false && code === locale )
+						marks.push( Nino.content.getText('/_admin/text/label/working') );
+
+					if( entry.global === false && text._inactive.indexOf( code ) !== -1 )
+						marks.push( Nino.adminUi.text('/_admin/common/word/inactive') );
+
+					const name = entry.global === true ? Nino.content.getText('/_admin/text/label/all-languages') : Nino.adminUi.localeName( code, text._locales );
+					const handle = Nino.admin.textKeys.valueField( {
+						entry : entry,
+						value : Nino.admin.textKeys.valueOf( entry, code ),
+						label : marks.length === 0 ? name : name+ ' ('+ marks.join(', ')+ ')',
+						id : 'text-field-'+ ( ++text._fieldSeq ),
+						writable : writable,
+						fills : writable === true ? function( done ) { text._loadFills( code === '*' ? locale : code, done ) } : null,
+						keyLine : false,
+						badge : false,
+						locale : code,
+					} );
+
+					// What the field read back after it was drawn: a rich text reads back as the markup the editor built, not always the string that is stored
+					view.fields.push( { code : code, handle : handle, base : handle.read() } );
+					wrap.appendChild( handle.el );
+				} );
+			};
+
+			view.draw();
+			ctx.view = view;
+			text._view = view;
+			text._ctx = ctx;
+
+			// The record puts the focus in the first line or box of the form; the editor of a rich text is neither, so it is given the focus once the record is drawn
+			if( view.fields.length > 0 && view.fields[0].handle.readonly !== true && /^(INPUT|TEXTAREA)$/.test( view.fields[0].handle.control.tagName ) === false )
+				wn.setTimeout( function() {
+					if( text._view === view && view.fields.length > 0 && wrap.contains( dc.activeElement ) === false )
+						view.fields[0].handle.focus();
+				}, 0 );
+
+			return wrap;
+		},
+
+		/**
+		 *	Take the input from the fields of the record while a save runs, and give it back: a line and several lines are disabled, the editable box of a rich text
+		 *	is not editable
+		 *
+		 *	@param		{Object}		view					What the body of the record keeps
+		 *	@param		{boolean}		on
+		 *
+		 *	@return		void
+		 */
+		_lock : function( view, on ) {
+
+			view.fields.forEach( function( field ) {
+
+				if( field.handle.readonly === true )
+					return;
+
+				const box = field.handle.control.querySelector !== undefined ? field.handle.control.querySelector('[contenteditable]') : null;
+
+				if( box !== null && box !== undefined )
+					box.setAttribute( 'contenteditable', on === true ? 'false' : 'true' );
+				else
+					field.handle.control.disabled = on === true;
+			} );
+		},
+
+		/**
+		 *	The text a conflict is about, by its place, its key and its language, as the question names it
+		 *
+		 *	@param		{string}	key
+		 *	@param		{string}	code
+		 *
+		 *	@return		{string}
+		 */
+		_named : function( key, code ) {
+
+			const text = Nino.admin.text;
+			const place = Nino.admin.textKeys.nameOf( text._model, key );
+			const language = code === '*' ? '' : ', '+ Nino.adminUi.localeName( code, text._locales );
+
+			return ( place === '' ? '' : place+ ' ' )+ '('+ key+ language+ ')';
+		},
+
+		/**
+		 *	Save the text the record shows: the languages whose field was changed - and nothing else, so that a record saved without a change leaves the files as they
+		 *	are -, each in a request of its own with one item, one after the other in the order of the fields: the answer is keyed by the key, so two languages of
+		 *	one key in one request would be one answer. What the server kept is what the field shows and what it is marked as saved by. A language the server turns
+		 *	down is said at its field and stays changed, and the languages before it stay saved; a language that was written by another since the record was drawn is
+		 *	the question of a conflict - Overwrite writes that language again, without the text it was read as. A request that fails ends the save
+		 *
+		 *	@param		{Object}		row
+		 *	@param		{Object}		ctx
+		 *	@param		{Function}	done					done( ok, { row, error, conflict } )
+		 *
+		 *	@return		void
+		 */
+		_save : function( row, ctx, done ) {
+
+			const text = Nino.admin.text;
+			const view = ctx.view;
+			const key = row.key;
+			const group = text._group;
+
+			Nino.adminUi.clearFieldErrors( ctx.form );
+
+			// What is saved, as the table and the record have it now
+			const now = function() { return text._find( key ) ?? row };
+
+			// Nothing differs from what is stored: nothing is written, and what is on screen is what is stored
+			const changed = view.fields.filter( function( field ) { return field.handle.readonly !== true && field.handle.read() !== field.base } );
+
+			if( changed.length === 0 )
+				return done( true, { row : now() } );
+
+			let failed = 0;
+			let first = null;
+
+			// The fields take no input while the requests run: the record takes what its form holds when the save ends as saved, and a text typed meanwhile would be
+			// taken with it
+			const held = dc.activeElement ?? null;
+
+			text._lock( view, true );
+
+			const end = function( ok, result ) {
+
+				text._lock( view, false );
+
+				if( held !== null && held !== undefined && typeof held.focus === 'function' && ctx.form.contains( held ) === true )
+					held.focus();
+
+				done( ok, result );
+			};
+
+			const finish = function( error ) {
+
+				const made = now();
+
+				text._directory.update( text._rows( group ), key );
+
+				if( error !== undefined )
+					return end( false, { error : error, row : made } );
+
+				if( failed > 0 ) {
+					end( false, { error : Nino.adminUi.format( Nino.content.getText( failed === 1 ? '/_admin/text/error/one' : '/_admin/text/error/some' ), failed ), row : made } );
+					first.handle.focus();
+					return;
+				}
+
+				end( true, { row : made } );
+			};
+
+			const write = function( at ) {
+
+				if( at >= changed.length )
+					return finish();
+
+				const field = changed[at];
+				const entry = text._entryOf( key );
+				const sent = field.handle.read();
+
+				// The language that was turned down as changed is written over what is there: forced, without the text it was read as
+				const item = ctx.overwrite === true && view.conflict === field.code
+					? { key : key, locale : field.code, value : sent, force : true }
+					: Nino.admin.textKeys.saveItem( entry, field.code === '*' ? text._locale() : field.code, sent );
+
+				text._apiCall( 'savebatch', { items : [ item ] }, function( status, response ) {
+
+					if( status !== 200 || response === null )
+						return finish( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+
+					const result = ( response.results ?? {} )[key];
+
+					// Another tab or person wrote the text since: the question is the record's, the text stays as it was typed
+					if( result !== undefined && result.error === 'changed' ) {
+						view.conflict = field.code;
+						text._directory.update( text._rows( group ), key );
+						return end( false, { conflict : true, error : Nino.adminUi.format( Nino.content.getText('/_admin/text/error/changed'), text._named( key, field.code ) ), row : now() } );
+					}
+
+					if( result === undefined || result.ok !== true ) {
+						failed++;
+						field.handle.fail( Nino.content.getText( result !== undefined && result.error === 'not allowed' ? '/_admin/text/error/denied' : '/_admin/text/error/key' ) );
+						first = first ?? field;
+						return write( at + 1 );
+					}
+
+					// Written
+					Nino.admin.touch( 'texts' );
+					view.conflict = null;
+					entry.values[item.locale] = result.value;
+
+					// What the server kept is what the field shows - unless more was typed while it was on its way, which is not in what was sent and stays unsaved
+					if( field.handle.read() === sent ) {
+						if( result.value !== sent )
+							field.handle.write( result.value );
+						field.base = field.handle.read();
+					}
+					else
+						field.base = sent;
+
+					write( at + 1 );
+				} );
+			};
+
+			write( 0 );
+		},
+
+		/**
+		 *	Read the keys again for the answer Reload of a conflict: what is stored is what the record and the table show, and what this tab typed is dropped
+		 *
+		 *	@param		{string}		key
+		 *	@param		{Function}	done					done( row ) with the row of the text as it is stored now, null where it could not be read or is gone
+		 *
+		 *	@return		void
+		 */
+		_reload : function( key, done ) {
 
 			const text = Nino.admin.text;
 
@@ -913,42 +1161,25 @@
 
 				if( status !== 200 || response === null ) {
 
-					if( text._status !== null )
-						text._status.error( status, response, '/_admin/common/error/load' );
+					if( text._ctx !== null && text._ctx.status !== null )
+						text._ctx.status.fail( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/load' ) );
 
-					if( typeof done === 'function' )
-						done( false );
-
-					return;
+					return done( null );
 				}
 
-				text._data = response;
-				text._buildModel();
+				text._take( response );
 				text._renderCategoryList();
-				text._openGroup( text._currentGroup, null );
 
-				// The focus is on the text that was shown again, where the dialog that asked was
-				if( key !== undefined && text._session !== null && text._session.get( key ) !== undefined )
-					text._session.get( key ).focus();
+				if( text._group === null || text._model.rows[text._group] === undefined )
+					return done( null );
 
-				if( typeof done === 'function' )
-					done( true );
+				text._directory.setRows( text._rows( text._group ), { keep : true } );
+				done( text._find( key ) );
 			} );
 		},
 	};
 
 	// The language moves for this panel whoever moved it (see Nino.admin.workLocale)
 	Nino.admin.workLocale.follow( 'text', Nino.admin.text._followLocale );
-
-	// The shell asks before anything throws the open group's input away (see
-	// Nino.admin.dirty). A shell without the registry is simply not asking
-	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.register( 'text', {
-			isDirty : Nino.admin.text.isDirty,
-			save		: function( done ) { Nino.admin.text._save( done ) },
-			discard : Nino.admin.text.discard,
-			saving	: function() { return Nino.admin.text._saving === true },
-			bar			: Nino.admin.text._bar,
-		} );
 
 })(window, document, document.documentElement, document.body);

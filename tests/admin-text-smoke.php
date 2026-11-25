@@ -1827,6 +1827,95 @@ check( 'a row sent back as it is stored leaves the files of the texts, the forma
 
 echo "\n";
 
+echo "Text - who may call the three actions of the panel through the dispatcher, and a write of one language leaves the others\n";
+
+/*	What was pinned before: the answers of apiKeys, apiSaveBatch and apiFills called directly (above), a save sent back as it is stored leaving the files byte for byte,
+	and in admin-smoke.php an account with no permission at all, and one with the permission of another panel only, turned away from text/keys and text/fills
+	(403). What no suite held is the entry the browser calls - Admin::handlePost() - for each of the three actions the Text panel reads and writes through: with no
+	session, with a token the guard refused, with a role that does not hold /_admin/text/manage and with one that does; and that a savebatch of ONE item for ONE
+	language changes that language's file and no other (the panel saves one request for each language it changed, and relies on it)	*/
+$post = static function( string $action, array $data = [] ) use ( &$appData ): array {
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	return [ $status, $body ];
+};
+$stored = static fn( string $file ): string => (string) @file_get_contents( \Nino\Filesystem::path( $appData, $file ) );
+$files = static fn(): array => [ '/text/de_DE.php', '/text/en_US.php', '/text/fr_FR.php', '/text/global.php', '/text/meta.php', '/text/blacklist.php' ];
+$snapshot = static function() use ( $stored, $files ): array { return array_map( $stored, $files() ); };
+
+$KEY = '/project/company/onelang/title';
+$asks = [
+	'text/keys'				=> [],
+	'text/fills'			=> [ 'locale' => 'de_DE' ],
+	'text/savebatch'	=> [ 'items' => [ [ 'key' => $KEY, 'locale' => 'de_DE', 'value' => 'Titel' ] ] ],
+];
+
+foreach( [ 'de_DE' => 'Titel', 'en_US' => 'Title', 'fr_FR' => 'Titre' ] as $locale => $value )
+	\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', fn( array $texts ): array => $texts + [ '[['. $KEY. ']]' => $value ] );
+
+// No session: 401, the code "session", nothing written
+$signedOut = $appData;
+unset( $signedOut['./nino/auth/current'] );
+$bad = [];
+foreach( $asks as $action => $data ) {
+	$was = $snapshot();
+	[ $status, $body ] = ninoCall( $signedOut, [ \Nino\Admin\Admin::class, 'handlePost' ], $data, $action );
+	if( $status !== 401 || ( $body['code'] ?? '' ) !== 'session' || $snapshot() !== $was )
+		$bad[] = $action. ': '. $status;
+}
+check( 'with no session every one of the three actions is 401 with the code "session", and writes nothing'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+
+// A token the guard refused: 403, the code "csrf", the action is not called
+$bad = [];
+foreach( $asks as $action => $data ) {
+	$was = $snapshot();
+	$_POST['action'] = $action;
+	$_POST['data'] = json_encode( $data );
+	$refused = [ '/nino/http/response' => [ 'statusCode' => 403, 'body' => false ], './nino/csrf/blocked' => true ];
+	\Nino\Admin\Admin::handlePost( $appData, $refused );
+	if( $refused['/nino/http/response']['statusCode'] !== 403 || ( $refused['/nino/http/response']['body']['code'] ?? '' ) !== 'csrf' || $snapshot() !== $was )
+		$bad[] = $action. ': '. $refused['/nino/http/response']['statusCode'];
+}
+check( 'the dispatcher respects a request the token guard refused (it arrives marked blocked): 403 with the code "csrf" for the three actions, even for full access, and the action is not called'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+
+// An account whose role does not hold the door of the panel
+ninoUser( $appData, 'plain@example.com', [ \Nino\Modules\Elements\Admin::MANAGE_PERM ], 'plain password' );
+$bad = [];
+foreach( $asks as $action => $data ) {
+	$was = $snapshot();
+	[ $status, $body ] = $post( $action, $data );
+	if( $status !== 403 || isset( $body['keys'] ) === true || isset( $body['fills'] ) === true || isset( $body['results'] ) === true || $snapshot() !== $was )
+		$bad[] = $action. ': '. $status;
+}
+check( 'without /_admin/text/manage every one of the three actions is 403 - no keys, no fills, no results - and nothing is written'. ( $bad === [] ? '' : ' - '. implode( ', ', $bad ) ), $bad === [] );
+
+// An account whose role holds it
+ninoUser( $appData, 'texter@example.com', [ \Nino\Modules\Text\Admin::MANAGE_PERM ], 'texter password' );
+[ $status, $keys ] = $post( 'text/keys' );
+check( 'with /_admin/text/manage text/keys is 200 and answers the keys, the languages and what the rows are named by', $status === 200 && is_array( $keys['keys'] ?? null ) === true && in_array( $KEY, array_column( $keys['keys'], 'key' ), true ) === true && isset( $keys['locales'], $keys['order'], $keys['templates'] ) === true );
+[ $status, $fills ] = $post( 'text/fills', [ 'locale' => 'en_US' ] );
+check( '...text/fills is 200 and lists the texts a field may take, in the language that is asked', $status === 200 && is_array( $fills['fills'] ?? null ) === true && array_column( $fills['fills'], 'value', 'key' )[$KEY] === 'Title' );
+
+// A savebatch of one item for one language writes that language's file and no other
+$before = $snapshot();
+[ $status, $body ] = $post( 'text/savebatch', [ 'items' => [ [ 'key' => $KEY, 'locale' => 'de_DE', 'value' => 'Neuer Titel', 'was' => 'Titel' ] ] ] );
+$after = $snapshot();
+check( '...text/savebatch is 200 and answers by key: the item written, with the value it kept', $status === 200 && ( $body['results'][$KEY]['ok'] ?? false ) === true && ( $body['results'][$KEY]['value'] ?? '' ) === 'Neuer Titel' );
+check( 'a savebatch of ONE item for ONE language writes that language: its file holds the new text', \Nino\Text::entry( $appData, $KEY )['values']['de_DE'] === 'Neuer Titel' && $after[0] !== $before[0] );
+check( '...and leaves the files of the other languages, the common texts, the formats and the hidden keys byte for byte as they were', array_slice( $after, 1 ) === array_slice( $before, 1 ) );
+
+$before = $snapshot();
+[ $status ] = $post( 'text/savebatch', [ 'items' => [ [ 'key' => $KEY, 'locale' => 'en_US', 'value' => 'New title', 'was' => 'Title' ] ] ] );
+$after = $snapshot();
+check( 'the next language, in a request of its own, is written the same way: its file changes, the one written before and the rest stay', $status === 200 && $after[1] !== $before[1] && $after[0] === $before[0] && array_slice( $after, 2 ) === array_slice( $before, 2 )
+	&& \Nino\Text::entry( $appData, $KEY )['values']['en_US'] === 'New title' && \Nino\Text::entry( $appData, $KEY )['values']['de_DE'] === 'Neuer Titel' );
+
+// Two items of one key in one request are one answer: the reason the panel sends one request for each language
+[ $status, $body ] = $post( 'text/savebatch', [ 'items' => [ [ 'key' => $KEY, 'locale' => 'de_DE', 'value' => 'A' ], [ 'key' => $KEY, 'locale' => 'fr_FR', 'value' => 'B' ] ] ] );
+check( 'the answer is keyed by the key: two items of one key in one request are ONE result, which is why a language is a request of its own', $status === 200 && count( $body['results'] ?? [] ) === 1 );
+
+foreach( [ 'de_DE', 'en_US', 'fr_FR' ] as $locale )
+	\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', fn( array $texts ): array => array_diff_key( $texts, [ '[['. $KEY. ']]' => 1 ] ) );
+
 echo "\n";
 
 ninoDone( $appData );

@@ -158,6 +158,71 @@
 		},
 
 		/**
+		 *	How long a text is as its field counts it: the characters of a plain text as they stand, and for a text
+		 *	with markup the characters a person sees - the tags gone, the entities decoded, nothing collapsed -, which
+		 *	is what the rich-text editor counts (the length of the text of its content) and cuts at the limit
+		 *
+		 *	@param		{Object}	entry
+		 *	@param		{*}				value
+		 *
+		 *	@return		{number}
+		 */
+		lengthOf : function( entry, value ) {
+
+			value = String( value ?? '' );
+
+			if( entry.html !== true )
+				return value.length;
+
+			const entities = { amp : '&', lt : '<', gt : '>', quot : '"', apos : "'", nbsp : '\u00A0' };
+
+			return value
+				.replace( /<[^>]*>/g, '' )
+				.replace( /&(#x?[0-9a-f]+|[a-z]+);/gi, function( all, name ) {
+					if( name.charAt(0) === '#' ) {
+						const code = name.charAt(1).toLowerCase() === 'x' ? parseInt( name.slice( 2 ), 16 ) : parseInt( name.slice( 1 ), 10 );
+						return code > 0 && code < 0x110000 ? String.fromCodePoint( code ) : all;
+					}
+					return entities[name.toLowerCase()] ?? all;
+				} ).length;
+		},
+
+		/**
+		 *	Whether the text of a key in a language is longer than its limit, counted as its field counts it
+		 *
+		 *	@param		{Object}	entry
+		 *	@param		{string}	locale
+		 *
+		 *	@return		{boolean}
+		 */
+		isTooLong : function( entry, locale ) {
+
+			const T = Nino.admin.textKeys;
+
+			return T.lengthOf( entry, T.valueOf( entry, locale ) ) > entry.maxlength;
+		},
+
+		/**
+		 *	What a row holds, counted in a language: how many texts, how many of them have none in it (isEmptyIn(), a key
+		 *	that is one text for every language is never empty in one) and how many are longer than their limit
+		 *
+		 *	@param		{Object}	row
+		 *	@param		{string}	locale
+		 *
+		 *	@return		{Object}									{ texts, empty, long }
+		 */
+		rowCounts : function( row, locale ) {
+
+			const T = Nino.admin.textKeys;
+
+			return {
+				texts : row.entries.length,
+				empty : row.entries.filter( function( entry ) { return T.isEmptyIn( entry, locale ) } ).length,
+				long : row.entries.filter( function( entry ) { return T.isTooLong( entry, locale ) } ).length,
+			};
+		},
+
+		/**
 		 *	Sort the keys into rows, blocks and groups.
 		 *
 		 *	A row is, in this order of asking:
@@ -866,11 +931,13 @@
 			const id 				= String( options.id );
 
 			const meta = Nino.adminUi.el( 'div', 'admin-text-meta' );
-			meta.appendChild( Nino.adminUi.el( 'code', '', entry.key ) );
+
+			if( options.keyLine !== false )
+				meta.appendChild( Nino.adminUi.el( 'code', '', entry.key ) );
 
 			// A field that is the same in every language says so beside its name; the badge describes the field, and
 			// its id is one of a note, which an error leaves in the description
-			const badge = entry.global === true ? Nino.adminUi.el( 'span', 'nino-admin-badge', Nino.content.getText('/_admin/text/label/all-languages') ) : null;
+			const badge = entry.global === true && options.badge !== false ? Nino.adminUi.el( 'span', 'nino-admin-badge', Nino.content.getText('/_admin/text/label/all-languages') ) : null;
 
 			if( badge !== null )
 				badge.id = 'nino-admin-note-'+ id+ '-badge';
@@ -918,12 +985,16 @@
 
 				el.dataset.key = entry.key;
 
+				if( options.locale !== undefined )
+					el.dataset.locale = String( options.locale );
+
 				if( badge !== null )
 					name.appendChild( badge );
 
 				el.appendChild( name );
 				el.appendChild( view );
-				el.appendChild( meta );
+				if( meta.firstChild !== null )
+					el.appendChild( meta );
 
 				handle.el = el;
 				handle.control = view;
@@ -943,6 +1014,9 @@
 
 				name.id = id+ '-name';
 				el.dataset.key = entry.key;
+
+				if( options.locale !== undefined )
+					el.dataset.locale = String( options.locale );
 				el.setAttribute( 'role', 'group' );
 				el.setAttribute( 'aria-labelledby', name.id );
 
@@ -958,7 +1032,8 @@
 
 				el.appendChild( name );
 				el.appendChild( mount );
-				el.appendChild( meta );
+				if( meta.firstChild !== null )
+					el.appendChild( meta );
 
 				handle.el = el;
 				handle.control = mount;
@@ -988,6 +1063,9 @@
 
 			field.className = 'nino-admin-field admin-text-field';
 			field.dataset.key = entry.key;
+
+			if( options.locale !== undefined )
+				field.dataset.locale = String( options.locale );
 			control.spellcheck = single === false;
 
 			if( badge !== null ) {

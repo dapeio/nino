@@ -763,7 +763,6 @@ $barred = [
 	'_admin/Nino/Modules/Images/assets/favicon.js',
 	'_admin/Nino/Modules/Elements/assets/admin.js',
 	'_admin/Nino/Modules/Elements/assets/types.js',
-	'_admin/Nino/Modules/Text/assets/admin.js',
 	'_admin/Nino/Modules/Text/assets/keys.js',
 ];
 
@@ -1025,7 +1024,7 @@ foreach( $textTabs as $script ) {
 	if( preg_match( '/\b(window|wn)\.(confirm|alert|prompt)\(|(?<![\w.])(alert|prompt|confirm)\(/', $source ) === 1 )
 		$nativeAsk[] = $script;
 
-	if( $script !== $textTabs[2] && ( str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || str_contains( $source, 'router.leave(' ) === false || preg_match( '/workLocale\.follow\(\s*\'(text|keys)\'/', $source ) !== 1 || str_contains( $source, 'adminUi.localeBadge(' ) === false ) )
+	if( $script !== $textTabs[2] && ( str_contains( $source, 'router.href(' ) === false || str_contains( $source, 'router.go(' ) === false || ( $script === $textTabs[1] && str_contains( $source, 'router.leave(' ) === false ) || preg_match( '/workLocale\.follow\(\s*\'(text|keys)\'/', $source ) !== 1 || str_contains( $source, 'adminUi.localeBadge(' ) === false ) )
 		$unaddressed[] = $script;
 }
 

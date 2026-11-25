@@ -53,10 +53,37 @@
 	overflow-wrap: anywhere;
 }
 
+/* ------------------------------------------- The texts of a row: the table */
+
+/* The name of a text in the table: the name strong, its key under it in the face of an identifier, each in one line that an ellipsis ends and whole in its tooltip */
+#text-form .admin-text-name {
+	display: inline-grid;
+	gap: var(--nino-admin-space-1);
+	min-width: 16rem;
+	max-width: 24rem;
+	text-align: left;
+}
+
+#text-form .admin-text-name > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#text-form .admin-text-name-label {
+	font-weight: var(--nino-admin-weight-strong);
+}
+
+#text-form .admin-text-name-key {
+	color: var(--editor-text-secondary);
+	font-family: var(--nino-admin-mono);
+	font-size: var(--nino-admin-text-xs);
+	font-weight: var(--nino-admin-weight-normal);
+}
+
 /* ------------------------------------------- Reading a row: its sections */
 
 /* What the legend says besides the name of the section: the path of a page. Not in capitals like the name */
-#text-form .admin-text-section-route,
 #keys-form .admin-text-section-route {
 	margin-left: var(--nino-admin-space-4);
 	font: var(--nino-admin-text-xs)/1.4 var(--nino-admin-mono);
@@ -65,7 +92,6 @@
 }
 
 /* The key the field is, small, and the count of what was typed - the description of the field, not part of its name */
-#text-form .admin-text-meta,
 #keys-form .admin-text-meta {
 	display: flex;
 	align-items: baseline;
@@ -75,7 +101,6 @@
 	margin-top: var(--nino-admin-space-2);
 }
 
-#text-form .admin-text-meta code,
 #keys-form .admin-text-meta code {
 	min-width: 0;
 	color: var(--editor-text-secondary);
@@ -84,40 +109,32 @@
 }
 
 /* A field that is the same in every language says so with a pill beside its name */
-#text-form .admin-text-field > span > .nino-admin-badge,
 #keys-form .admin-text-field > span > .nino-admin-badge {
 	margin-left: var(--nino-admin-space-3);
 }
 
-/* A text this account may read: the box of the text next to it, flat and with nothing to type into */
-#text-form .admin-text-readonly {
-	padding: var(--nino-admin-space-3) var(--nino-admin-space-4);
-	border: 1px solid var(--editor-separator);
-	border-radius: var(--editor-radius-sm);
-	background: var(--nino-admin-surface-muted);
-	color: var(--editor-text-secondary);
-	line-height: 1.5;
-	white-space: pre-wrap;
-}
-
-#text-form .admin-text-readonly > :first-child {
-	margin-top: 0;
-}
-
-#text-form .admin-text-readonly > :last-child {
-	margin-bottom: 0;
-}
-
-#text-form .admin-text-readonly:empty::before {
-	content: "—";
-}
-
-/* The field a hit or a link led to, marked until the row is left. A mark that stays and does not move, so there is nothing
+/* The field a link led to, marked until the row is left. A mark that stays and does not move, so there is nothing
    to switch off for those who ask for less motion */
-#text-form .admin-text-field.is-found,
 #keys-form .admin-text-field.is-found {
 	background: var(--editor-blue-soft);
 	box-shadow: calc( var(--nino-admin-space-1) * -1 ) 0 0 var(--editor-blue);
+}
+
+/* ------------------------------------------- The record of a text: a field for each language */
+
+/* What stands under a field of the record: the count of what was typed, at the right under the control, where the label is at the left of it */
+#text-record .admin-text-meta {
+	display: flex;
+	justify-content: flex-end;
+	min-width: 0;
+	margin-top: var(--nino-admin-space-2);
+}
+
+@media (min-width: 40rem) {
+	#text-record > .admin-text-field > .admin-text-meta {
+		grid-column: 2;
+		margin-top: calc( var(--nino-admin-space-3) * -1 );
+	}
 }
 
 /* ------------------------------------------ A key: its shape, its rows */

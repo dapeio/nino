@@ -167,41 +167,6 @@ function panel( file, nodes, name, levels, before = [] ) {
 	return { module, calls, asked, at, box };
 }
 
-console.log( 'Text' );
-{
-	const nodes = { 'text-form' : { classList : classes( true ) }, 'text-list' : { classList : classes( false ) } };
-	const { module, calls, asked, at, box } = panel( '_admin/Nino/Modules/Text/assets/admin.js', nodes, 'text', [ '_showList', '_showForm', '_openGroup', '_destroyHtmlEditors', '_focusField' ], [ '_admin/Nino/Modules/Text/assets/textkeys.js' ] );
-	// Two rows of the model - a page's template and the company - and the keys in them
-	const entry = key => ( { key : key, global : false, values : { de_DE : 'x' } } );
-	module._model = box.Nino.admin.textKeys.build( { entries : [ entry('/template/page-home/welcome/title'), entry('/template/page-footer/links/title'), entry('/project/company/general/name'), entry('/website/contact/uri') ], locale : 'de_DE' } );
-	const on = ( form, group ) => { nodes['text-form'].classList = classes( form === false ); nodes['text-list'].classList = classes( form === true ); module._currentGroup = group ?? null };
-
-	on( false );
-	at( 'text', 'template/page-home' );
-	check( 'a hash that names a row opens it from the list', calls.join() === 'openGroup template/page-home null' && asked[0].leaving === false );
-	at( 'text', 'template/page-home', '/template/page-home/welcome/title' );
-	check( '...a hash that names a key of it, the row at that key', calls.join() === 'openGroup template/page-home /template/page-home/welcome/title' );
-	at( 'text', 'website' );
-	check( '...a row of keys somebody made up is a row like any other', calls.join() === 'openGroup website null' );
-	on( true, 'template/page-home' );
-	at( 'text' );
-	check( 'the bare panel is the list, the form torn down like its back link does, asked first - a form is left', calls.join() === 'destroyHtmlEditors,showList' && asked[0].leaving === true && JSON.stringify( asked[0].names ) === '["text"]' );
-	at( 'text', 'project/company' );
-	check( 'another row replaces this one', calls.join() === 'openGroup project/company null' && asked[0].leaving === true );
-	at( 'text', 'template/page-home' );
-	check( 'the row on screen is only written back', calls.join() === 'showForm' && asked.length === 0 );
-	at( 'text', 'template/page-home', '/template/page-home/welcome/title' );
-	check( '...whichever key of it the address names, which is the one shown and the one the address keeps', calls.join() === 'focusField /template/page-home/welcome/title,showForm' && asked.length === 0 && module._focusKey === '/template/page-home/welcome/title' );
-	at( 'text', 'nope' );
-	check( 'a row there is not is the list', calls.join() === 'destroyHtmlEditors,showList' );
-	on( false );
-	at( 'text' );
-	check( 'the list on screen is only written back', calls.join() === 'showList' );
-	on( true, 'template/page-home' );
-	at( 'images' );
-	check( 'another panel\'s hash (a click on the rail) keeps the level in memory', calls.join() === 'showForm' && asked.length === 0 );
-}
-
 console.log( 'Text Keys' );
 {
 	const nodes = { 'keys-form' : { classList : classes( true ) }, 'keys-list' : { classList : classes( false ) } };
