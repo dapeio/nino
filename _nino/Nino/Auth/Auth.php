@@ -879,6 +879,46 @@ namespace Nino {
 		}
 
 		/**
+		 *	The stored address that differs from an address only in upper and lower case, or null when there is none. A rule
+		 *	for making and renaming an account only: the sign-in stays an exact lookup, so accounts whose addresses differ in
+		 *	case only that exist stay usable and are not touched by it. The address itself is no twin of itself, nor is
+		 *	the one named by $except (the account that is being renamed). Nothing is written
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The address that is about to be made or given
+		 *	@param		string		$except				An address that is not asked about: the account's own, when it is renamed
+		 *
+		 *	@return 	string|null								The stored spelling of the twin; null where no account has one
+		 */
+		public static function twin( array &$appData, string $username, string $except = '' ): ?string {
+
+			$stored = $appData['/nino/auth/user'] ?? [];
+
+			if( is_array( $stored ) === false )
+				return null;
+
+			$lower = mb_strtolower( $username, 'UTF-8' );
+
+			foreach( $stored as $key => $user ) {
+
+				// An address that looks like a number is an integer key of the array
+				$key = (string) $key;
+
+				if( $key === $username || $key === $except )
+					continue;
+
+				// Bytes that are no text would all fold to the same character and make a twin of an address that is none
+				if( mb_check_encoding( $key, 'UTF-8' ) === false )
+					continue;
+
+				if( mb_strtolower( $key, 'UTF-8' ) === $lower )
+					return $key;
+			}
+
+			return null;
+		}
+
+		/**
 		 *	Whether the password a signed-in account gives to change its own account is its own. The guesses are counted so that a session that is
 		 *	somebody else's cannot guess the password here without limit: in a bucket of their own for the account ('confirm:<account>', in the file of the
 		 *	counters of the sign-in, with the same maxtries and cooldown) and not in the bucket of the sign-in. A wrong password is a failed attempt of the

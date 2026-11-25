@@ -157,6 +157,8 @@ Provide:
 - a valid **email address**;
 - a **password** with at least 8 characters, entered twice - the rule stands behind the (?) of the field, and a password that is too short or a repeat that differs is said under its field, with the focus on it, before anything is sent.
 
+An address that differs only in upper and lower case from an entry that exists is refused as already in use, for the first account as well; an entry at exactly that address that cannot sign in (a deactivated account, one with no password) is replaced by the new account.
+
 Both can be changed later under **Users**. The accounts live in `config.php` under `/nino/auth/user`.
 
 The account is signed in to your browser as it is made. Whether that sign-in outlives the wizard is decided by the last step: with exactly one account, finishing opens the workbench as that account; with several (an account added by hand to `config.php`), finishing ends the session and `/_admin` asks which one you are.

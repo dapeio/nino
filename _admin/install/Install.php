@@ -1356,6 +1356,12 @@ namespace Nino\Install {
 					return;
 				}
 
+				// An entry that differs from the address in case only stays as it is, and the address is not made beside it
+				if( \Nino\Auth::twin( $appData, $mail ) !== null ) {
+					\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
+					return;
+				}
+
 				// An entry at this address that cannot sign in (disabled, no password) is the one the account replaces. Its
 				// removal is a write of its own, and a write lets the lock of the file go when it is done (see
 				// \Nino\Filesystem::mutate()): the lock is taken once more and the question asked once more, from the file,
@@ -1374,6 +1380,11 @@ namespace Nino\Install {
 
 					if( self::usableUsers( $appData ) !== [] ) {
 						\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+						return;
+					}
+
+					if( \Nino\Auth::twin( $appData, $mail ) !== null ) {
+						\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
 						return;
 					}
 				}
@@ -1425,7 +1436,7 @@ namespace Nino\Install {
 
 			$own = (string) $current['mail'];
 
-			if( $mail !== $own && \Nino\Auth::getUser( $appData, $mail ) !== false ) {
+			if( $mail !== $own && ( \Nino\Auth::getUser( $appData, $mail ) !== false || \Nino\Auth::twin( $appData, $mail, $own ) !== null ) ) {
 				\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
 				return;
 			}

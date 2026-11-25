@@ -1033,6 +1033,11 @@ check( 'rejects an invalid email with 400', $status === 400 );
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'short' ] );
 check( 'rejects a too-short password with 400', $status === 400 );
 
+$strangers = $appData['/nino/auth/user'];
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'Disabled@Example.com', 'pw' => 'a-long-enough-password' ] );
+check( 'the first account is refused 400 "install_mail_in_use" at an address that differs in case only from a stored account that cannot sign in, and nothing is stored or signed in', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail_in_use'
+	&& $appData['/nino/auth/user'] === $strangers && ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === '' );
+
 [ , $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-long-enough-password' ] );
 check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com' ) !== false );
 check( 'the root account holds the Developer role the Setup step wrote, and full access through it', \Nino\Auth::getUser( $appData, 'admin@example.com' )['role'] === 'developer' && \Nino\Auth::getUser( $appData, 'admin@example.com' )['perms'] === [] && \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'admin@example.com' ) === true );
@@ -1055,6 +1060,14 @@ check( '...and it can sign in with it', \Nino\Auth::loginUser( $appData, 'admin@
 check( 'a wrong current password is refused 401 with a code of its own and changes nothing', $status === 401 && ( $body['code'] ?? '' ) === 'install_wrong_password' && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'changeme@domain.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'a-different-password' ] );
 check( 'the address of another account is refused 400 with a code of its own: this step never replaces an account that is not the session\'s', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail_in_use' && count( $appData['/nino/auth/user'] ) === 3 );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'CHANGEME@domain.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'a-different-password' ] );
+check( 'the address of another account in other case is refused as well: 400 "install_mail_in_use", and the account is as it was', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail_in_use' && count( $appData['/nino/auth/user'] ) === 3 && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'Admin@example.com', 'pw' => 'a-different-password', 'currentPassword' => 'a-different-password' ] );
+check( 'the own account may change the case of its own address: 200', $status === 200 && isset( $appData['/nino/auth/user']['Admin@example.com'] ) === true && isset( $appData['/nino/auth/user']['admin@example.com'] ) === false );
+\Nino\Auth::logoutUser( $appData );
+check( '...and it signs in under the new spelling only', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' ) === false && \Nino\Auth::loginUser( $appData, 'Admin@example.com', 'a-different-password' ) !== false );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password', 'currentPassword' => 'a-different-password' ] );
+check( '...and it is changed back', $status === 200 && isset( $appData['/nino/auth/user']['admin@example.com'] ) === true && isset( $appData['/nino/auth/user']['Admin@example.com'] ) === false );
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-third-password-here', 'currentPassword' => 'a-different-password' ] );
 check( 'without a session it changes nothing at all: 401', $status === 401 && \Nino\Auth::confirmPassword( $appData, 'admin@example.com', 'a-different-password' ) === true );
@@ -1247,6 +1260,31 @@ $appReset = static function() use ( &$appRequests ): void {
 $appCall = static function( array &$app, string $action, array $data = [] ): array {
 	return ninoCall( $app, [ \Nino\Install\Install::class, 'handlePost' ], $data, $action );
 };
+
+/*	The first account asks for a twin of its address once more when the lock is taken again after the entry at its exact address was removed: what another request wrote in between is in the file then.
+	That request is played by the callback deleteUser() runs after its write, which adds an entry that cannot sign in at a spelling that differs in case only	*/
+$twinProject = $appProject( 'install-first-twin', false );
+\Nino\Auth::insertUser( $twinProject, 'a@x.example', 'a long enough password', [ '/*' ], 'developer' );
+\Nino\Auth::setStatus( $twinProject, 'a@x.example', false );
+$twinDir = ninoSandboxDir( $twinProject ). '/private';
+\Nino\Callbacks::registerCallback( $twinProject, '/nino/auth/user/delete', static function() use ( $twinDir ): void {
+
+	$other = [ './nino/uid' => $twinDir ];
+	\Nino\AppData::prepare( $other );
+	$other['./nino/filesystem/path']				= dirname( $twinDir );
+	$other['./nino/filesystem/configpath']	= $twinDir;
+	$other['./nino/filesystem/contentpath']	= $twinDir;
+	$other['./nino/filesystem/publicpath']	= dirname( $twinDir ). '/public';
+	$file = include $twinDir. '/config.php';
+	$other['/nino/auth/user'] = (array) ( $file['/nino/auth/user'] ?? [] );
+	$other['./nino/auth/baseline'] = $other['/nino/auth/user'];
+	$other['/nino/auth/user']['A@x.example'] = [ 'pw' => '', 'status' => 0, 'sessions' => [], 'perms' => [], 'mail' => 'A@x.example' ];
+	\Nino\AppData::writeContentData( $other, [ '/nino/auth/user' ] );
+} );
+[ $status, $body ] = ninoCall( $twinProject, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'a@x.example', 'pw' => 'a long enough password' ] );
+$twinStored = array_map( 'strval', array_keys( (array) ( ( include $twinDir. '/config.php' )['/nino/auth/user'] ?? [] ) ) );
+check( 'the first account is refused 400 "install_mail_in_use" when an entry that differs from its address in case only is written while its own entry is removed, and no account is made', $status === 400 && ( $body['code'] ?? '' ) === 'install_mail_in_use'
+	&& $twinStored === [ 'A@x.example' ] && \Nino\Install\Accounts::usableUsers( $twinProject ) === [] && \Nino\Auth::getCurrentUser( $twinProject ) === false );
 
 $appReset();
 $project = $appProject( 'install-applications' );

@@ -510,7 +510,7 @@ namespace Nino\Modules\Users {
 					return;
 				}
 
-				if( \Nino\Auth::getUser( $fresh, $mail ) !== false ) {
+				if( \Nino\Auth::getUser( $fresh, $mail ) !== false || \Nino\Auth::twin( $fresh, $mail ) !== null ) {
 					\Nino\Http::fail( $request, 409, 'mail already in use', 'users_mail_in_use', [], 'mail' );
 					return;
 				}
@@ -710,7 +710,7 @@ namespace Nino\Modules\Users {
 				if( $roleChange === true && self::_refuseRoleChange( $fresh, $request, $username, $postedRole ) === true )
 					return;
 
-				if( $newUsername !== $username && \Nino\Auth::getUser( $fresh, $newUsername ) !== false ) {
+				if( $newUsername !== $username && ( \Nino\Auth::getUser( $fresh, $newUsername ) !== false || \Nino\Auth::twin( $fresh, $newUsername, $username ) !== null ) ) {
 					\Nino\Http::fail( $request, 400, 'mail already in use', 'users_mail_in_use', [], 'mail' );
 					return;
 				}

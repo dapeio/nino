@@ -761,6 +761,26 @@ foreach( [
 	check( $label. ' of one address: the second answers '. $status. ' "users_mail_in_use" and writes nothing', $answer === [ $status, 'users_mail_in_use' ] && $disk() === $before && isset( $read( '/config.php' )['/nino/auth/user']['ed2@example.com'] ) === true );
 }
 
+// The same where the two spellings differ in case only: the question is asked of the accounts config.php holds under its lock, not of the ones the request found when it booted
+foreach( [
+	'two creates'							=> [ [ 'dev', 'users/create', [ 'mail' => 'Race@x.example', 'pw' => $password, 'role' => 'editor', 'name' => '' ] ], [ 'dev2', 'users/create', [ 'mail' => 'race@x.example', 'pw' => $password, 'role' => 'spare', 'name' => '' ] ], 409 ],
+	'two renames'							=> [ [ 'dev', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'Race@x.example' ] ], [ 'dev2', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'race@x.example' ] ], 400 ],
+	'a create and a rename'		=> [ [ 'dev', 'users/create', [ 'mail' => 'Race@x.example', 'pw' => $password, 'role' => 'editor', 'name' => '' ] ], [ 'dev2', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'RACE@x.example' ] ], 400 ],
+	'a rename and a create'		=> [ [ 'dev', 'users/save', [ 'username' => 'ed@example.com', 'mail' => 'Race@x.example' ] ], [ 'dev2', 'users/create', [ 'mail' => 'race@x.example', 'pw' => $password, 'role' => 'spare', 'name' => '' ] ], 409 ],
+] as $label => [ $first, $second, $status ] ) {
+
+	$restore( $worldA );
+	$one		= $bootRequest( $first[0] );
+	$two		= $bootRequest( $second[0] );
+	$handle( $one, $first[1], $first[2] );
+	$as( $second[0] );
+	$before = $disk();
+	$answer = $handle( $two, $second[1], $second[2] );
+	$names	= array_map( 'strval', array_keys( (array) $read( '/config.php' )['/nino/auth/user'] ) );
+
+	check( $label. ' of addresses that differ in case only: the second answers '. $status. ' "users_mail_in_use" and writes nothing', $answer === [ $status, 'users_mail_in_use' ] && $disk() === $before && count( preg_grep( '/^race@x\.example$/i', $names ) ) === 1 && isset( $read( '/config.php' )['/nino/auth/user']['ed2@example.com'] ) === true );
+}
+
 // An account that was widened meanwhile is beyond the manager when the change is made
 foreach( [
 	'users/save'			=> [ 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'ed2@example.com', 'name' => 'Late' ] ],
@@ -893,6 +913,84 @@ ninoBoot( $app );
 \Nino\Auth::insertUser( $app, 'short@example.com', 'äöüß' );
 check( 'an account with a password of 89 bytes still signs in and confirms it', \Nino\Auth::loginUser( $app, 'long@example.com', str_repeat( 'L', 89 ) ) !== false && \Nino\Auth::confirmPassword( $app, 'long@example.com', str_repeat( 'L', 89 ) ) === true );
 check( 'an account with the password "äöüß" still signs in and confirms it', \Nino\Auth::loginUser( $app, 'short@example.com', 'äöüß' ) !== false && \Nino\Auth::confirmPassword( $app, 'short@example.com', 'äöüß' ) === true );
+
+// --- Addresses that differ in case only --------------------------------------------------------
+
+echo "\nAn address that differs from an account's in case only\n";
+
+$restore( $worldA );
+$stored = static fn(): array => array_map( 'strval', array_keys( (array) $read( '/config.php' )['/nino/auth/user'] ) );
+$signIn = static function( string $mail, string $pw ) use ( &$app ): bool {
+
+	ninoBoot( $app );
+
+	return \Nino\Auth::loginUser( $app, $mail, $pw ) !== false;
+};
+
+$answer = $send( 'man', 'users/create', [ 'mail' => 'Case@x.example', 'pw' => $password, 'role' => 'editor', 'name' => '' ] );
+check( 'an account is made at an address with capitals in it', $answer['status'] === 200 && in_array( 'Case@x.example', $stored(), true ) === true );
+
+$before = $disk();
+$count	= count( $stored() );
+$answer = $send( 'man', 'users/create', [ 'mail' => 'case@x.example', 'pw' => $password, 'role' => 'editor', 'name' => '' ] );
+check( 'a create at the same address in lower case is 409 "users_mail_in_use" at the field mail, config.php is as it was and no account is more', [ $answer['status'], $code( $answer ), $answer['body']['field'] ?? '' ] === [ 409, 'users_mail_in_use', 'mail' ] && $disk() === $before && count( $stored() ) === $count );
+
+$before = $disk();
+$answer = $send( 'man', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'CASE@X.EXAMPLE' ] );
+check( 'a rename to an address that differs from an account\'s in case only is 400 "users_mail_in_use" at the field mail, and writes nothing', [ $answer['status'], $code( $answer ), $answer['body']['field'] ?? '' ] === [ 400, 'users_mail_in_use', 'mail' ] && $disk() === $before );
+
+$answer = $send( 'man', 'users/save', [ 'username' => 'Case@x.example', 'mail' => 'case@x.example' ] );
+check( 'an account may change the case of its own address: 200', $answer['status'] === 200 && in_array( 'case@x.example', $stored(), true ) === true && in_array( 'Case@x.example', $stored(), true ) === false );
+check( '...and it signs in under the new spelling only', $signIn( 'case@x.example', $password ) === true && $signIn( 'Case@x.example', $password ) === false );
+
+$answer = $send( 'man', 'users/create', [ 'mail' => 'plain@x.example', 'pw' => $password, 'role' => 'editor', 'name' => '' ] );
+$answer = $send( 'man', 'users/save', [ 'username' => 'plain@x.example', 'mail' => 'Plain@x.example' ] );
+check( 'a rename that only changes the case of the own address is 200', $answer['status'] === 200 && in_array( 'Plain@x.example', $stored(), true ) === true && in_array( 'plain@x.example', $stored(), true ) === false );
+
+// Accounts that differ in case only and exist already, written as stored data from before: the sign-in is exact, and both stay usable and changeable
+$restore( $worldA );
+ninoBoot( $app );
+\Nino\Auth::insertUser( $app, 'Twin@x.example', 'the password of the capital', [], 'editor' );
+\Nino\Auth::insertUser( $app, 'twin@x.example', 'the password of the small', [], 'editor' );
+check( 'both accounts are in config.php', in_array( 'Twin@x.example', $stored(), true ) === true && in_array( 'twin@x.example', $stored(), true ) === true );
+check( 'both sign in, each with its own password only', $signIn( 'Twin@x.example', 'the password of the capital' ) === true && $signIn( 'twin@x.example', 'the password of the small' ) === true
+	&& $signIn( 'Twin@x.example', 'the password of the small' ) === false && $signIn( 'twin@x.example', 'the password of the capital' ) === false );
+
+$answer = $send( 'man', 'users/save', [ 'username' => 'Twin@x.example', 'mail' => 'Twin@x.example', 'name' => 'Capital' ] );
+$other	= $send( 'man', 'users/save', [ 'username' => 'twin@x.example', 'mail' => 'twin@x.example' ] );
+check( 'a save of either without a rename is 200', $answer['status'] === 200 && $other['status'] === 200 && ( $read( '/config.php' )['/nino/auth/user']['Twin@x.example']['name'] ?? '' ) === 'Capital' );
+
+$before = $disk();
+$answer = $send( 'man', 'users/save', [ 'username' => 'ed2@example.com', 'mail' => 'TWIN@x.example' ] );
+check( 'a rename of a third account to a third spelling of the twins is refused', [ $answer['status'], $code( $answer ) ] === [ 400, 'users_mail_in_use' ] && $disk() === $before );
+$answer = $send( 'man', 'users/save', [ 'username' => 'Twin@x.example', 'mail' => 'TWIN@x.example' ] );
+check( '...and so is the rename of one of them to a spelling the other one is a twin of', [ $answer['status'], $code( $answer ) ] === [ 400, 'users_mail_in_use' ] && $disk() === $before );
+
+$answer = $send( 'man', 'users/save', [ 'username' => 'Twin@x.example', 'mail' => 'free@x.example' ] );
+check( 'one of them is renamed to a free address: 200, and the other one is as it was', $answer['status'] === 200 && in_array( 'free@x.example', $stored(), true ) === true && in_array( 'twin@x.example', $stored(), true ) === true
+	&& $signIn( 'free@x.example', 'the password of the capital' ) === true && $signIn( 'twin@x.example', 'the password of the small' ) === true );
+
+$restore( $worldA );
+ninoBoot( $app );
+\Nino\Auth::insertUser( $app, 'Twin@x.example', 'the password of the capital', [], 'editor' );
+\Nino\Auth::insertUser( $app, 'twin@x.example', 'the password of the small', [], 'editor' );
+$answer = $send( 'man', 'users/status', [ 'username' => 'Twin@x.example', 'active' => false ] );
+$other	= $send( 'man', 'users/delete', [ 'username' => 'twin@x.example' ] );
+check( 'the status and the deletion of either of two twins are what they are for any account', $answer['status'] === 200 && $other['status'] === 200 && in_array( 'Twin@x.example', $stored(), true ) === true && in_array( 'twin@x.example', $stored(), true ) === false );
+
+// The question itself: a non-ASCII pair cannot be sent (FILTER_VALIDATE_EMAIL takes no such address), an address that PHP makes an integer key can be stored
+check( 'an address with a non-ASCII letter is not one the panel takes, so the question is asked of the kernel', filter_var( 'Ä@x.example', FILTER_VALIDATE_EMAIL ) === false );
+$probe = [ '/nino/auth/user' => [ 123 => [ 'pw' => '' ], 'Case@x.example' => [ 'pw' => '' ], 'Ä@x.example' => [ 'pw' => '' ], 'ä@x.example' => [ 'pw' => '' ] ] ];
+$copy		= $probe;
+$none		= [];
+check( 'the question: the stored spelling for a spelling that differs in case, null for the address itself and for the one named as the exception', \Nino\Auth::twin( $probe, 'case@x.example' ) === 'Case@x.example' && \Nino\Auth::twin( $probe, 'CASE@X.EXAMPLE' ) === 'Case@x.example'
+	&& \Nino\Auth::twin( $probe, 'Case@x.example' ) === null && \Nino\Auth::twin( $probe, 'case@x.example', 'Case@x.example' ) === null && \Nino\Auth::twin( $probe, 'other@x.example' ) === null );
+$umlaut = [ '/nino/auth/user' => [ 'Ä@x.example' => [ 'pw' => '' ] ] ];
+check( '...with letters outside ASCII', \Nino\Auth::twin( $umlaut, 'ä@x.example' ) === 'Ä@x.example' && \Nino\Auth::twin( $umlaut, 'Ä@x.example' ) === null && \Nino\Auth::twin( $umlaut, 'Ö@x.example' ) === null
+	&& \Nino\Auth::twin( $probe, 'Ä@X.EXAMPLE', 'Ä@x.example' ) === 'ä@x.example' );
+$bytes = [ '/nino/auth/user' => [ "\xff@x.example" => [ 'pw' => '' ], "\xfe@x.example" => [ 'pw' => '' ] ] ];
+check( '...a stored key that is no text is skipped, so that bytes that fold to one character make no twin of an address that is none', \Nino\Auth::twin( $bytes, '?@x.example' ) === null && \Nino\Auth::twin( $bytes, "\xff@X.EXAMPLE" ) === null );
+check( '...with a key that is an integer, and with no accounts at all, and it writes nothing', \Nino\Auth::twin( $probe, '123' ) === null && \Nino\Auth::twin( $probe, 'CASE@x.example', '123' ) === 'Case@x.example' && \Nino\Auth::twin( $none, 'a@x.example' ) === null && $probe === $copy );
 
 // --- The token check ----------------------------------------------------------------------------
 
