@@ -1210,7 +1210,7 @@ $runNote = static function( array $note ) use ( $runFile ): void {
 @unlink( $runFile );
 check( 'no record, no run that ended without an end of its own', \Nino\Modules\Backups::stopped( $appData ) === null );
 $runNote( [ 'kind' => 'manual', 'started' => 1700000000, 'files' => 541, 'bytes' => 44000000, 'cause' => 'time', 'limit' => 30 ] );
-check( 'a record that nobody holds is a run that ended without an end of its own, with what it had to pack and what ended it', \Nino\Modules\Backups::stopped( $appData ) === [ 'kind' => 'manual', 'started' => 1700000000, 'files' => 541, 'bytes' => 44000000, 'cause' => 'time', 'limit' => 30 ] );
+check( 'a record that nobody holds is a run that ended without an end of its own, with what it had to pack and what ended it', \Nino\Modules\Backups::stopped( $appData ) === [ 'kind' => 'manual', 'started' => 1700000000, 'files' => 541, 'bytes' => 44000000, 'cause' => 'time', 'limit' => 30, 'feature' => '' ] );
 [ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
 check( '...and apiList carries it', ( $listBody['stopped']['cause'] ?? null ) === 'time' && ( $listBody['stopped']['kind'] ?? null ) === 'manual' );
 $holder = fopen( $runFile, 'r+b' );
@@ -1219,7 +1219,7 @@ check( 'a record that a run holds is a run that is going on, and says nothing', 
 flock( $holder, LOCK_UN );
 fclose( $holder );
 $runNote( [ 'kind' => 'daily', 'started' => 1700000000 ] );
-check( 'a run that left no word of the cause or the work says only that it did not end', \Nino\Modules\Backups::stopped( $appData ) === [ 'kind' => 'daily', 'started' => 1700000000, 'files' => 0, 'bytes' => 0, 'cause' => '', 'limit' => 0 ] );
+check( 'a run that left no word of the cause or the work says only that it did not end', \Nino\Modules\Backups::stopped( $appData ) === [ 'kind' => 'daily', 'started' => 1700000000, 'files' => 0, 'bytes' => 0, 'cause' => '', 'limit' => 0, 'feature' => '' ] );
 $runNote( [ 'kind' => 'nobody', 'started' => 1700000000 ] );
 check( 'a record of no kind a run has, or without a time, is none', \Nino\Modules\Backups::stopped( $appData ) === null );
 $runNote( [ 'kind' => 'daily', 'started' => '1700000000' ] );
@@ -1320,7 +1320,7 @@ check( 'an archive carries the templates of the project, each as templates/<name
 check( '...and every file below assets/, nested ones at their relative path', ( $entries['assets/probe.css'] ?? null ) === '.probe { color: #123456; }' && ( $entries['assets/nested/deep.css'] ?? null ) === '.deep { color: #654321; }' );
 check( '...but not a directory that is called x.tpl, a file that is no .tpl or a link'. ( $linked === true ? '' : ' (no link could be made here)' ),
 	isset( $entries['templates/folder.tpl'] ) === false && isset( $entries['templates/notes.txt'] ) === false && isset( $entries['templates/link.tpl'] ) === false );
-check( 'the archive names the state it comes from: nino.php holds the version that runs and the features that are on, by their key', $stamped === [ 'nino' => \Nino\VERSION, 'features' => [ 'stamped' => '2.3.4' ] ] );
+check( 'the archive names the state it comes from: nino.php holds the version that runs and the features that are on, by their key', $stamped === [ 'nino' => \Nino\VERSION, 'features' => [ 'stamped' => '2.3.4' ], 'copies' => [], 'raw' => [], 'links' => [] ] );
 check( '...and no file of the manifest is called that, since the note is no file of the project', in_array( 'nino.php', \Nino\Backup::manifest( $appData ), true ) === false && is_string( $pagesId ) === true );
 
 // Changed after the archive, and one more written after it: the archive's own

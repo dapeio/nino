@@ -303,7 +303,8 @@ methods on a feature's classes:
 | `upgrade( array &$appData, string $fromVersion ): bool` | by `\Nino\Features::activate()` ([Updates](#updates-and-the-upgrade-hook)) | `false` refuses the update, anything else goes on |
 | `component<Name>()` | by the register of components when the component is drawn | draws it ([Components in folders](#components-in-folders)) |
 | a callback of `'/nino/admin/dashboard/head'` | by the Dashboard, once for each answer of its summary, with the areas so far, `name => data` | the areas it answers, which the script of a panel draws above the notices ([The head of the Dashboard](_admin.md#the-head-of-the-dashboard)) |
-| a callback of `'/nino/admin/restore'` | by the Backups panel and the recovery page, with `{ dataDir, staging }` | none ([Data and restore](#data-and-restore)) |
+| a callback of `'/nino/admin/backup'` | before every backup packs its files - the daily one, Back up now and the safety snapshot of a restore - with `{ dataDir, staging }` | packs the copy of its data that the feature wrote into `staging` where the live file stands ([Data, backup and restore](#data-backup-and-restore)) |
+| a callback of `'/nino/admin/restore'` | by the Backups panel and the recovery page, with `{ dataDir, staging }` | none ([Data, backup and restore](#data-backup-and-restore)) |
 | on a panel class: `log( $action, $data )`, `summary( &$appData )`, `scopes( &$appData )` | after an action that completed; by the Dashboard; by the roles tab | the line of the activity log (`''` for none); a tile `{ value, label }`; the scoped permissions |
 
 What a feature may read where it draws the head of the Dashboard: `\Nino\Runtime::getSessionValue( $appData, './nino/auth/previous' )`, the login before the one that opened the session (`0` for the first login of an account, `null` where the session holds none), `\Nino\Modules\Logs\Admin::countSince( $appData, $since, $actor, $visit )`, the number of lines the activity log holds since a visit (the minute of `$since` and the sign-in of `$actor` at `$visit` are not counted), and `\Nino\Modules\Backups::lastDate()`, `missed()` and `stopped()` (their notes read without a class of the workbench, so that a feature can report from a page request). The kernel itself reads none of them; they are there for a feature, behind `class_exists()` where its module may be off. A feature that tells the notices of the Dashboard somewhere else - in a mail to the owner of the site - works none out by itself: `\Nino\Modules\Dashboard\Admin::notices( $appData, true )` answers them as the Dashboard draws them, for every notice whatever the signed-in account may open (`false`, the default, is the account's own view), each as `key`, `text`, `values` and `link`, where `key` names the finding for as long as it is the same one and a count that moves is no part of it, and `sentence( $appData, $notice, $locale )` says one in a language of the site. The callback of `'/nino/admin/dashboard/head'` is asked on its own for every account that opens the Dashboard: one that throws or answers no list is named in a warning and its answer dropped, an entry whose name is no slug or whose data is no array is named and left out, and a name that is taken stays with the first. The script is as safe: a `render()` that throws, or answers anything but an element or `null`, is named in the console and its area left out, and the rest of the Dashboard is drawn. A date an area shows is written by `\Nino\Format::date()`, `dateLong()` or `datetime()`: the callback runs in the interface language of the session, and they write in it.
@@ -869,20 +870,48 @@ nothing; what they write to `config.php` they read from it first.
   next activation. Bump `version` with every release a project should tell apart:
   the hook runs on any difference, a lower manifest version too.
 
-### Data and restore
+### Data, backup and restore
 
-What a feature writes under `data/` belongs to the project: the daily backup carries
-the files `data` in the manifest names. A feature whose restore has to merge rather
-than overwrite - a removal that must survive an older backup, a counter that must
-not go backwards - registers a callback of `'/nino/admin/restore'` in `init()`
-(`\Nino\Callbacks::registerCallback()`). The Backups panel and the recovery page
+What a feature writes under `data/` belongs to the project: the daily backup carries the files `data` in the manifest names, as they lie when it packs them. Whatever size the files below `data/` have is carried: an archive is
+written and opened in chunks, so its memory does not depend on them, only the time of a run and the room on the disk do. The templates a feature keeps in a folder of the project's `templates/`
+(`templates/<folder>/<name>.tpl`) are carried by the backup like the ones directly in it, and a restore makes the folder where it is missing.
+
+**A file that is written to while it is copied** is no state it ever had, and a database in write-ahead mode is not a database at all without the `-wal` that holds what was committed last. A feature that keeps one registers a
+callback of `'/nino/admin/backup'` in `init()` (`\Nino\Callbacks::registerCallback()`). Before a run packs anything - the daily backup, **Back up now** and the safety snapshot a restore takes first, so on the recovery page as well - the
+kernel calls it for every feature that is switched on, under the lock of the run, with `{ dataDir, staging }`: the live `data/` directory and an empty folder of the run, closed to other accounts. The feature writes there a copy of its
+file that is whole, under the name the file has below `data/`, and the run packs the copy where the live file stands:
+
+```php
+public static function callbackBackup( array &$appData, array &$args ): void {
+
+	$file = $args['dataDir']. '/crm.sqlite';
+
+	// The first days of a feature have no database yet: what does not exist is not handed over, and not made here either
+	if( is_file( $file ) === false )
+		return;
+
+	$live = new \PDO( 'sqlite:'. $file );
+	$live->exec( 'VACUUM INTO '. $live->quote( $args['staging']. '/crm.sqlite' ) );
+}
+```
+
+- **Only its own names, and only files that exist.** A copy replaces a file the manifest of the feature names under `data` (the file, or a file below a folder it names) and whose live file the backup would carry; nothing is added. What else lies in the staging when the callback is done - a name the manifest does not give, a file of another feature, a case twin of an own name, a name the backup never carries (`auth-tries.php`, anything hidden), a link, a folder with no file of its own, a pipe or other entry that is no file, a file with a second name (a hard link), something put above the staging or into the folder of another feature, a file that two features hand over - ends the run, with the feature named.
+- **Whose callback it is** is read from its class: a callback of a class below the namespace of a feature that is switched on is that feature's. One that no such feature owns - a function, a class of `app/` - has no manifest that could name a file for it and is not asked; the log says so at every run. The recovery page asks the callbacks of the features that `config.php` lists: where that file cannot be read no feature is on, and the safety snapshot packs the files as they lie.
+- **A callback that throws ends the run, and nothing falls back to the live file.** The answer is a `500` with the code `backups_hook` and the key of the feature, the daily backup notes it as the reason it did not run (and the request of the workbench that made it is answered as it would be anyway), the log holds what the feature said, no archive is written and the folder of the copies is gone. A write that the disk refuses in the callback ends the run as a full disk does (`backups_write`, the record says `disk`). A request that ends in the callback - `exit`, the time or the memory limit of the request, which is the limit of the callback - leaves the record of the run with the key of the feature (`feature`) and the cause (`hook`, or the limit that php names), the folder of the copies is removed, the lock goes with the process, and a backup that was asked for by hand and has nothing sent yet is answered `500` with the code `backups_hook`. A callback is part of the request that makes the backup: a slow one makes slower the one request of the workbench that makes the daily backup. A callback does not ask for a backup of its own.
+- **A restore is never kept from happening by a callback.** The safety snapshot before a restore is the net under the state as it is: where the callback of a feature throws, hands over what is not its own or finds the disk full, the snapshot holds that feature's files as they lie, with the files an open database keeps beside them - also where the main file is gone; one that is a link is left out and named in the stamp - says so - in the stamp of the snapshot, in the log and in the answer of the restore, which is no failure - and the restore goes on. That is what a database that is broken needs: the callback of the manual throws on it, and the good backup is restored all the same. The backup that is asked for and the daily one end as above.
+- **Room.** A run counts the live size of every file a feature with a callback owns, and what an open database keeps beside it, as the room the copies take, before it asks; and counts again with the sizes of what the features wrote, before it packs.
+- **The files beside a database.** Of a file that was handed over, its `<name>-wal`, `<name>-shm` and `<name>-journal` are not in the archive: they belong to the live file, and next to the copy they would be applied to it - unless a manifest names such a file itself, which is then its own file. The archive lists in its stamp the names that were handed over, and a restore puts such a file back as the one file: it removes those three from the live `data/`. The list is the archive's word, so it is believed as far as the project can check it: only for a name the archive carries, that a feature which is switched on and has a callback of `'/nino/admin/backup'` owns by its manifest, whose companion no manifest names and the archive does not carry itself, and only if the list has no more names than the archive has files below `data/`. An archive of another project - one that is restored with a recovery key that was typed - takes nothing away: the answer says beside how many files the companions were left standing (`backups_companions_left`, also on the recovery page), and the operator removes those three files beside each database by hand before the database is used, or the old log of writes is applied to the restored file. No file is removed for one that is packed as it lies, for one that only ends so, or for an archive without the list.
+- **Without the callback** a file is packed as it lies, as it always was. That is whole for a file that is written whole - `\Nino\Filesystem::putFileContent()` and `mutate()` replace it by a rename - and not for a database that is written in place: the archive holds what was on the disk at that moment, with the files beside it only where the manifest names the folder, and a restore does not take the companions of the live file away.
+
+**What the check of the folder is and what it is not.** The callback is code of the feature and runs with the rights of the kernel, like the feature itself. The check finds a callback that is wrong - one that writes where it was not asked to, leaves a link or a file of another kind, or hands over a name that is not its own - and names the feature. It is no defence against a feature that means to deceive the run: such a feature can read and write every file of the project itself, put back a time it changed, replace its copy or the copy of another between the check and the packing. What it is not asked to do it cannot be stopped from doing. What the archive holds of a `.php` name is judged by a restore as any other: one that was opened with a typed key is refused when it holds code.
+
+**Modules under `app/`** have no manifest that the kernel reads - `\Nino\Features::all()` reads `features/` - so no `data` that a backup carries and no callback of `'/nino/admin/backup'` that is asked: a callback that no feature owns is not called, and the log says so at every run. What the backup carries of a module of a project is what it carries of any project: the files it names itself (`newsletter.php`, `forms.*.php`, `logs.*.php`) and what lies in the directories of the workbench. A project that keeps a database in a module under `app/` makes it a feature (a directory below `features/` with a `feature.php`) to have it backed up whole.
+
+A feature whose restore has to merge rather than overwrite - a removal that must survive an older backup, a counter that must
+not go backwards - registers a callback of `'/nino/admin/restore'` in `init()`. The Backups panel and the recovery page
 call it, while the feature is active, with `{ dataDir, staging }`, the live `data/`
 directory and the extracted backup; it rewrites its own files in the staged copy
-before that is copied over the live one. Whatever size the files below `data/` have is carried: an archive is
-written and opened in chunks, so its memory does not depend on them, only the time
-of a run and the room on the disk do. The templates a feature keeps in a folder of the project's `templates/`
-(`templates/<folder>/<name>.tpl`) are carried by the backup like the ones directly in it,
-and a restore makes the folder where it is missing.
+before that is copied over the live one.
 [`Newsletter::callbackRestore()`](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/Newsletter.php)
 of the catalogue is the reference.
 

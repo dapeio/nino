@@ -757,7 +757,10 @@ namespace Nino\Modules\Backups {
 			}
 
 			if( $notice !== null && $actor !== false )
-				\Nino\Admin\Admin::record( $appData, $actor['mail'], 'Backup '. $date. ' comes from Nino '. $notice['params'][0]. ', this is '. $notice['params'][1]. ' ('. $notice['code']. ')' );
+				\Nino\Admin\Admin::record( $appData, $actor['mail'], match( $notice['code'] ) {
+					'backups_snapshot_raw' 			=> 'The safety snapshot of '. $notice['params'][0]. ' is the state as it was, with all its files ('. $notice['code']. ')',
+					'backups_companions_left' 	=> 'The files an open database keeps beside itself stand beside '. $notice['params'][0]. ' files of the project, as they were ('. $notice['code']. ')',
+					default 										=> 'Backup '. $date. ' comes from Nino '. $notice['params'][0]. ', this is '. $notice['params'][1]. ' ('. $notice['code']. ')' } );
 
 			// The session ends with the restore (see above): the values of the
 			// session go, the csrf token is a new one as at any change of the
@@ -1009,15 +1012,26 @@ namespace Nino\Modules\Backups {
 					return [ 507, 'the disk of the project has no room for the files of the archive', 'backups_disk', $short ];
 
 				$snapshot = '';
+				$hook 		= '';
+				$short 		= [];
+				$raw			= [];
 
 				try {
-					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key );
+					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key, $hook, $short, $raw );
 				}
 				catch( \RuntimeException $e ) {
+
+					// The disk that the copies the features handed over filled, with the sizes; and the feature that could not hand its data over, by its key
+					if( $e->getCode() === \Nino\Backup::DISK_SHORT && $short !== [] )
+						return [ 507, 'the disk has no room for the safety snapshot', 'backups_disk', $short ];
+
+					if( $e->getCode() === \Nino\Backup::HOOK_FAILED && $hook !== '' )
+						return [ 500, 'the safety snapshot could not be made: '. $e->getMessage(), 'backups_hook', [ $hook ] ];
+
 					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ] + ( $e->getCode() === \Nino\Backup::WRITE_FAILED ? [ 2 => 'backups_write' ] : [] );
 				}
 
-				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true, $snapshot );
+				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true, $snapshot, $raw, $entered !== null );
 			}
 			finally {
 				@unlink( $tmpGz );
@@ -1071,7 +1085,7 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
-		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false, string $snapshot = '' ): true|array {
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false, string $snapshot = '', array $raw = [], bool $foreign = false ): true|array {
 
 			if( $written === false && @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
 				return [ 500, 'the backup could not be written for unpacking' ];
@@ -1088,6 +1102,7 @@ namespace Nino\Modules\Backups {
 			// and this one would land beside index.php. An archive made before
 			// there was a note has none, and there is nothing to say then
 			$stagedStamp = $staging. '/nino.php';
+			$copies			 = [];
 
 			if( is_file( $stagedStamp ) === true ) {
 
@@ -1096,7 +1111,14 @@ namespace Nino\Modules\Backups {
 
 				if( is_array( $stamp ) === true && is_string( $stamp['nino'] ?? null ) === true && $stamp['nino'] !== \Nino\VERSION )
 					$notice = [ 'code' => 'backups_restored_other_version', 'params' => [ $stamp['nino'], \Nino\VERSION ] ];
+
+				// The files a feature handed over whole, as the archive lists them: of those, and of no other file, the companions go (see \Nino\Backup::dropCompanions())
+				$copies = is_array( $stamp ) === true ? ( $stamp['copies'] ?? [] ) : [];
 			}
+
+			// The safety snapshot holds the state of a feature whose hook could not do its work as it was, with all its files: said, and no failure
+			if( $raw !== [] )
+				$notice = $notice ?? [ 'code' => 'backups_snapshot_raw', 'params' => [ implode( ', ', $raw ) ] ];
 
 			$configPath = \Nino\Filesystem::getConfigPath( $appData );
 
@@ -1164,6 +1186,18 @@ namespace Nino\Modules\Backups {
 			// Every copy is asked how it went and every file is looked at after it: a disk that fills up leaves files that are cut off, and
 			// a restore that says it was done over such a site is the worst answer there is
 			$unfinished = false;
+
+			// What an archive carries of a database that a feature hands over whole (see \Nino\Backup::stage()) is that one file: the files an open
+			// database keeps beside itself in the project would be applied to the copy that is put there, so they go - and where one cannot be
+			// removed, the answer is the one for a restore that is done in part
+			$left = 0;
+
+			if( \Nino\Backup::dropCompanions( $appData, $staging, $copies, $foreign, $left ) === false )
+				$unfinished = true;
+
+			// An archive of another project is not believed about what to take away: the operator is told beside how many files the companions stand
+			if( $left > 0 )
+				$notice = $notice ?? [ 'code' => 'backups_companions_left', 'params' => [ (string) $left ] ];
 
 			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
 
@@ -1236,10 +1270,13 @@ namespace Nino\Modules\Backups {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$key					Raw (not base64) 32-byte AES key
+		 *	@param		string		&$hook				(reference) The key of the feature that was asked for a copy of its data last, '' once none is being asked (see \Nino\Backup::stage())
+		 *	@param		array 		&$short				(reference) Set where the copies the features handed over left the disk without the room for the packing: [ megabytes needed, megabytes free ]
+		 *	@param		array 		&$raw					(reference) The keys of the features whose files the snapshot holds as they lie, because their hook could not hand over a copy
 		 *
 		 *	@return 	string									The id of the snapshot, as the list names it
 		 */
-		private static function _safetySnapshot( array &$appData, string $dir, string $key ): string {
+		private static function _safetySnapshot( array &$appData, string $dir, string $key, string &$hook = '', array &$short = [], array &$raw = [] ): string {
 
 			/*	The shape Backups::_create() has, which this had drifted from:
 				the file tempnam() makes was never removed - one per restore,
@@ -1258,12 +1295,54 @@ namespace Nino\Modules\Backups {
 			$tmpTar = $tmpBase. '.tar';
 
 			// What a request that php ends takes with it: the plain tar of the project is no file to leave in the temporary directory
-			[ $guardFiles ] = self::_guard();
+			[ $guardFiles, $guardDirs ] = self::_guard();
 			$guardFiles->exchangeArray( [ $tmpTar, $tmpTar. '.gz', $tmpBase ] );
+			$guardDirs->exchangeArray( [ $tmpBase. '.staging' ] );
 
 			try {
+				// The features that keep a database hand over a copy of it that is whole, as they do for a backup, and what is packed is that copy;
+				// the disk is asked again with what they wrote
+				// A net under the state as it IS: a hook that fails is no reason to keep a restore from happening, which is what a database that
+				// is broken needs. That feature's files are packed as they lie, with what an open database keeps beside them, and the stamp says so
+				$notes		= [];
+				$whole		= \Nino\Backup::manifest( $appData );
+				$manifest = \Nino\Backup::stage( $appData, $whole, $tmpBase. '.staging', static function( string $feature ) use ( &$hook ): void {
+					$hook = $feature;
+				}, true, $notes );
+
+				$bytes = 0;
+
+				foreach( array_keys( $manifest ) as $absolute )
+					$bytes += (int) @filesize( $absolute );
+
+				$room = \Nino\Backup::spaceShort( $appData, $bytes, count( $manifest ), $dir );
+
+				// The copies filled the disk: the files as they lie are what there is room for, or there is none
+				if( $room !== null && $notes['copies'] !== [] ) {
+
+					\Nino\Filesystem::removeDir( $tmpBase. '.staging' );
+
+					$notes['raw']		= array_fill_keys( $notes['asked'], 'the disk had no room for the copies' );
+					$notes['copies']	= [];
+					$notes['links']		= [];
+					$manifest 				= \Nino\Backup::raw( $appData, $whole, $notes['asked'], $notes['links'] );
+					$bytes 						= 0;
+
+					foreach( array_keys( $manifest ) as $absolute )
+						$bytes += (int) @filesize( $absolute );
+
+					$room = \Nino\Backup::spaceShort( $appData, $bytes, count( $manifest ), $dir );
+				}
+
+				if( $room !== null ) {
+					$short = $room;
+					throw new \RuntimeException( 'the disk has no room', \Nino\Backup::DISK_SHORT );
+				}
+
 				// One pass over the files, as a backup is made (see \Nino\Backup::pack())
-				\Nino\Backup::pack( $appData, \Nino\Backup::manifest( $appData ), $tmpTar );
+				$raw = array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) );
+
+				\Nino\Backup::pack( $appData, $manifest, $tmpTar, $notes );
 
 				$snapshot	= $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php';
 
@@ -1276,8 +1355,10 @@ namespace Nino\Modules\Backups {
 				@unlink( $tmpTar );
 				@unlink( $tmpTar. '.gz' );
 				@unlink( $tmpBase );
+				\Nino\Filesystem::removeDir( $tmpBase. '.staging' );
 				fclose( $lease );
 				$guardFiles->exchangeArray( [] );
+				$guardDirs->exchangeArray( [] );
 			}
 
 			self::_pruneSnapshots( $dir );

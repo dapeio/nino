@@ -886,7 +886,7 @@ namespace Nino {
 
 
 		/**
-		 *	Delete a file, or a directory with everything in it. Quiet about what
+		 *	Delete a file, or a directory with everything in it - a pipe or a socket among it. Quiet about what
 		 *	is not there. A link - to a file or to a directory, working or broken,
 		 *	at any depth and as $target itself, with or without a slash or a dot at the
 		 *	end of the path - is removed as the link it is, with
@@ -924,8 +924,14 @@ namespace Nino {
 				return;
 			}
 
-			if( ! is_dir( $target ) )
+			if( ! is_dir( $target ) ) {
+
+				// A pipe or a socket is neither: it is an entry all the same, and a folder that holds one is not empty until it is gone
+				if( @lstat( $target ) !== false )
+					@unlink( $target );
+
 				return;
+			}
 
 			// @ throughout: two concurrent cleanups (or a request racing this
 			// same recursion) can both reach a since-removed entry - is_dir()

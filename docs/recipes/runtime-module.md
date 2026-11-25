@@ -370,3 +370,8 @@ tools and the installer:
   staged backup and the live data directory, and the module merges what is
   its own - `Newsletter::callbackRestore()` in the catalogue's Newsletter
   feature is the reference. Restore itself knows no module.
+- `'/nino/admin/backup'` is asked of a **feature** - a module with a `feature.php` that names its `data` - and of no other module: a module under
+  `app/` has no manifest that the kernel reads, so a backup carries none of its data (but the few files the kernel names itself) and a callback it
+  registers there is not called; the log says so at every run. A module that keeps a database that is written in place becomes a feature, and then
+  hands the backup a copy of it that is whole before the files are packed - see
+  [Data, backup and restore](../features.md#data-backup-and-restore).

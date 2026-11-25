@@ -387,6 +387,18 @@ check( '...a run that the disk ended says so, with the size and the number of fi
 mount.innerHTML = '';
 requests.length = 0;
 panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : null, stopped : Object.assign( stopped( 'time', 'manual' ), { feature : 'vault' } ) } );
+check( '...a run that ended while a feature was asked for a copy of its data names the feature, in the one notice', said( noticeOf() ) && noticeOf()[0].textContent.includes( 'vault' ) && manualTime.includes( 'vault' ) === false );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : null, stopped : Object.assign( stopped( 'hook', 'manual' ), { feature : 'vault' } ) } );
+check( '...a run that a hook ended names the feature in one notice of its own', noticeOf().length === 1 && noticeOf()[0].textContent.includes( 'vault' ) && noticeOf()[0].textContent !== manualTime );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
 answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : { reason : 'no room', code : 'write' }, stopped : stopped( 'disk', 'daily' ) } );
 check( 'a missed daily backup that a write failed and the run that the disk ended are one notice, not two', noticeOf().length === 1 );
 

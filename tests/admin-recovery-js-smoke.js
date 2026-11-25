@@ -206,6 +206,11 @@ answer( 'recovery/restore', 200, { restoredDate : '2026-10-02', notice : { code 
 check( '...and with the notice of a backup from another version: where it comes from and what runs here', findAll( doc.body, el => el.textContent.includes( Nino.recovery.text.de['/_admin/recovery/restore/notice'].replace( '%s', '1.8.0' ).replace( '%s', '1.9.0' ) ) ).length >= 1 );
 fire( restoreButton, 'click', { currentTarget : restoreButton } );
 fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
+answer( 'recovery/restore', 200, { restoredDate : '2026-10-02', notice : { code : 'backups_snapshot_raw', params : [ 'vault' ] } } );
+check( '...and with the notice that the safety copy of a feature is the state as it was, and with the notice of files that stand beside a database: said, in the sentence of the table of the page',
+	findAll( doc.body, el => el.textContent.includes( Nino.recovery.text.de['/_admin/page/error/backups-snapshot-raw'].replace( '%s', 'vault' ) ) ).length >= 1 );
+fire( restoreButton, 'click', { currentTarget : restoreButton } );
+fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
 answer( 'recovery/restore', 500, { error : 'decryption failed on the server' } );
 check( 'a refused restore without a code of its own says the general sentence with the status - in the line of its card, never the English of the server',
 	findAll( byId('recovery-restore'), el => el.className.includes('nino-admin-status') ).map( el => el.textContent ).join('') === Nino.recovery.text.de['/_admin/page/error/failed'].replace( '%s', '500' ) );

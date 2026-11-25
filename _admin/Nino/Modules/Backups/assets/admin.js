@@ -144,7 +144,7 @@
 		 *	Say a run that ended without an end of its own: when it began, what
 		 *	ended it where the server said, and how much it had to pack
 		 *
-		 *	@param		{Object}		stopped				{ started: unix time, files, bytes, cause: 'time'|'memory'|'error'|'disk'|'', limit: seconds or bytes }
+		 *	@param		{Object}		stopped				{ started: unix time, files, bytes, cause: 'time'|'memory'|'error'|'disk'|'hook'|'', limit: seconds or bytes, feature: the key of the feature that was asked for its data, '' where none was }
 		 *
 		 *	@return		{string}
 		 */
@@ -152,17 +152,24 @@
 
 			const when = Nino.adminUi.dateText( new Date( stopped.started * 1000 ) );
 			const size = Nino.adminUi.megabytes( stopped.bytes );
+			let text;
 
 			if( stopped.cause === 'time' )
-				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-time'), when, stopped.limit, size, stopped.files );
+				text = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-time'), when, stopped.limit, size, stopped.files );
+			else if( stopped.cause === 'memory' )
+				text = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-memory'), when, Nino.adminUi.megabytes( stopped.limit ), size, stopped.files );
+			else if( stopped.cause === 'hook' )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-hook'), when, stopped.feature );
+			else if( stopped.cause === 'disk' )
+				text = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-disk'), when, size, stopped.files );
+			else
+				text = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-open'), when, size, stopped.files );
 
-			if( stopped.cause === 'memory' )
-				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-memory'), when, Nino.adminUi.megabytes( stopped.limit ), size, stopped.files );
+			// The feature the run was asking for a copy of its data when it ended
+			if( typeof stopped.feature === 'string' && stopped.feature !== '' )
+				text += ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-feature'), stopped.feature );
 
-			if( stopped.cause === 'disk' )
-				return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-disk'), when, size, stopped.files );
-
-			return Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/stopped-open'), when, size, stopped.files );
+			return text;
 		},
 
 		/**

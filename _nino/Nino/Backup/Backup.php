@@ -45,6 +45,16 @@ namespace Nino {
 		// carried beside it by the run (see \Nino\Modules\Backups::now())
 		public const int DISK_SHORT = 2;
 
+		// The code of the RuntimeException that says a feature could not hand over the copy of its data a run asked for (see stage()): it threw,
+		// or what it put into its staging is no file of its own. The run that threw it has named the feature (see \Nino\Modules\Backups::stopped())
+		public const int HOOK_FAILED = 3;
+
+		// The hook a feature answers before its files are packed (see stage()), the counterpart of '/nino/admin/restore'
+		public const string HOOK = '/nino/admin/backup';
+
+		// The files an open database keeps beside itself while it is used: they belong to the live file and to nothing that is copied
+		private const array COMPANIONS = [ '-wal', '-shm', '-journal' ];
+
 		// What a run keeps free beyond what it counts: the tar's end, the stamp, the bookkeeping of the file system
 		private const int SPACE_RESERVE = 4194304;
 
@@ -80,11 +90,12 @@ namespace Nino {
 		 *	@param		int				$bytes				The bytes of the files
 		 *	@param		int				$files				How many there are
 		 *	@param		bool			$together			Whether the archive is written to the disk of the temporary directory
+		 *	@param		int				$staged				The bytes of the copies the features hand over before the packing (see copyBytes()), which lie in the temporary directory as well
 		 *
 		 *	@return 	int
 		 */
-		public static function spaceNeed( int $bytes, int $files, bool $together ): int {
-			return ( $together === true ? (int) ceil( $bytes * 7 / 3 ) : 2 * $bytes ) + 512 * $files + self::SPACE_RESERVE;
+		public static function spaceNeed( int $bytes, int $files, bool $together, int $staged = 0 ): int {
+			return ( $together === true ? (int) ceil( $bytes * 7 / 3 ) : 2 * $bytes ) + 512 * $files + self::SPACE_RESERVE + $staged;
 		}
 
 		/**
@@ -94,14 +105,15 @@ namespace Nino {
 		 *	@param		int				$bytes				The bytes of the files
 		 *	@param		int				$files				How many there are
 		 *	@param		string|null	$archiveDir		The directory the archive is written to, where there is one
+		 *	@param		int				$staged				The bytes of the copies that are still to be handed over (see spaceNeed()); 0 once they lie there
 		 *
 		 *	@return 	array|null							null where it fits or the system does not say, else [ megabytes needed, megabytes free ]
 		 */
-		public static function spaceShort( array &$appData, int $bytes, int $files, ?string $archiveDir ): ?array {
+		public static function spaceShort( array &$appData, int $bytes, int $files, ?string $archiveDir, int $staged = 0 ): ?array {
 
 			$temp 		= sys_get_temp_dir();
 			$together = $archiveDir !== null && ( $a = @stat( $temp ) ) !== false && ( $b = @stat( $archiveDir ) ) !== false && $a['dev'] === $b['dev'];
-			$need 		= self::spaceNeed( $bytes, $files, $together );
+			$need 		= self::spaceNeed( $bytes, $files, $together, $staged );
 			$free 		= self::freeSpace( $appData, $temp );
 
 			if( $free !== null && $free < $need )
@@ -357,7 +369,7 @@ namespace Nino {
 
 			// What an installed feature says it owns under /data/. The manifest
 			// key is documented as what a backup carries (see docs/features.md,
-			// "Data and restore"), and until this read it it was not:
+			// "Data, backup and restore"), and until this read it it was not:
 			// the two entries above are hardcoded literals for the one feature
 			// that predates the catalogue, and anything else - a directory a
 			// feature owns, a file a feature nobody here knows about writes -
@@ -423,6 +435,637 @@ namespace Nino {
 			}
 
 			return $files;
+		}
+
+		/**
+		 *	The callbacks of '/nino/admin/backup' by the feature that registered them: a callback belongs to the feature whose class - or a class
+		 *	below its namespace - owns it, as a shortcode does (see \Nino\Features::shortcodes()). Only a feature that is switched on has registered
+		 *	one. A callback that no feature owns - a function, a class of the kernel or of app/ - has no manifest that could name a file for it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ feature key => its callbacks, the number of callbacks that no feature owns ]
+		 */
+		private static function _hooks( array &$appData ): array {
+
+			$features = \Nino\Features::all( $appData );
+			$hooks		= [];
+			$strays 	= 0;
+
+			foreach( \Nino\Callbacks::registered( $appData, self::HOOK ) as $callback ) {
+
+				$owner = \Nino\Callbacks::owner( $callback );
+				$found = null;
+
+				foreach( $features as $key => $feature ) {
+
+					$module = ltrim( (string) $feature['module'], '\\' );
+
+					if( $feature['active'] === true && $owner !== null && ( $owner === $module || str_starts_with( $owner, $module. '\\' ) === true ) ) {
+						$found = (string) $key;
+						break;
+					}
+				}
+
+				if( $found === null )
+					$strays++;
+				else
+					$hooks[$found][] = $callback;
+			}
+
+			return [ $hooks, $strays ];
+		}
+
+		/**
+		 *	The names of a manifest that a feature owns by what its manifest says it does: below one of the files or directories of its 'data',
+		 *	and none that a backup leaves out of every archive (see _transient())
+		 *
+		 *	@param		array 		$feature			One feature as \Nino\Features::all() answers it
+		 *	@param		array 		$names				Archive names, eg. 'data/crm.sqlite'
+		 *
+		 *	@return 	array										The names of $names it owns
+		 */
+		private static function _owned( array $feature, array $names ): array {
+
+			$owned = [];
+
+			foreach( (array) ( $feature['data'] ?? [] ) as $entry ) {
+
+				$entry = '/'. trim( (string) $entry, '/' );
+
+				if( $entry === '/data' )
+					continue;
+
+				$prefix = ltrim( $entry, '/' );
+
+				foreach( $names as $name )
+					if( str_starts_with( $name, 'data/' ) === true && ( $name === $prefix || str_starts_with( $name, $prefix. '/' ) === true ) && self::_transient( substr( $name, 5 ) ) === false )
+						$owned[$name] = $name;
+			}
+
+			return array_values( $owned );
+		}
+
+		// The name of the file whose companion a name is - an open database keeps it beside itself (see COMPANIONS) - or null for a name that is none
+		private static function _companion( string $name ): ?string {
+
+			foreach( self::COMPANIONS as $suffix )
+				if( str_ends_with( $name, $suffix ) === true )
+					return substr( $name, 0, -strlen( $suffix ) );
+
+			return null;
+		}
+
+		/**
+		 *	The bytes the copies of the features will take beside the files they are made of, counted before the hooks are asked: for each file a
+		 *	feature with a hook owns, its size and the size of the files an open database keeps beside it - what a copy of it can hold at the most,
+		 *	since a copy has what the file holds and what its log of writes (-wal) has still to add
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
+		 *
+		 *	@return 	int
+		 */
+		public static function copyBytes( array &$appData, array $manifest ): int {
+
+			[ $hooks ] = self::_hooks( $appData );
+
+			if( $hooks === [] )
+				return 0;
+
+			$features = \Nino\Features::all( $appData );
+			$byName 	= array_flip( $manifest );
+			$counted	= [];
+			$bytes		= 0;
+
+			foreach( array_keys( $hooks ) as $key )
+				foreach( self::_owned( $features[$key], array_values( $manifest ) ) as $name ) {
+
+					// A companion of a file that is in the manifest is counted with it
+					if( isset( $counted[$name] ) === true || isset( $byName[ (string) self::_companion( $name ) ] ) === true )
+						continue;
+
+					$counted[$name] = true;
+					$bytes += (int) @filesize( $byName[$name] );
+
+					foreach( self::COMPANIONS as $suffix )
+						$bytes += (int) @filesize( $byName[$name]. $suffix );
+				}
+
+			return $bytes;
+		}
+
+		/**
+		 *	What a feature put into its staging, judged: every entry is a file of a plain kind - no link, no folder that is not on the way to one, no
+		 *	device, pipe or socket, no file with a second name - and its name, relative to the staging, is one the manifest of the feature gives
+		 *	and the live file of which is in the manifest. Read with lstat() and never opened, so a pipe cannot block it
+		 *
+		 *	@param		string		$key					The feature's key, for the sentence
+		 *	@param		string		$dir					The staging of the feature
+		 *	@param		array 		$allowed			The names the feature may hand over, relative to data/, as keys
+		 *	@param		string		$below				The folder of the staging that is read, relative to it; '' for the staging itself
+		 *	@param		array 		$declared			The entries of the manifest of the feature below data/ (without the slash at their ends): a name below one that is not allowed has no live file yet
+		 *
+		 *	@return 	array										Name relative to data/ -> absolute path of the copy
+		 *
+		 *	@throws		\RuntimeException					HOOK_FAILED, for the first entry that is none of these
+		 */
+		private static function _staged( string $key, string $dir, array $allowed, string $below = '', array $declared = [] ): array {
+
+			$files = [];
+			$here	 = $below === '' ? $dir : $dir. '/'. $below;
+
+			// What php remembers of a path it was asked about is what the feature has changed since
+			clearstatcache();
+
+			foreach( @scandir( $here ) ?: [] as $entry ) {
+
+				if( $entry === '.' || $entry === '..' )
+					continue;
+
+				$relative = $below === '' ? $entry : $below. '/'. $entry;
+				$stat 		= @lstat( $dir. '/'. $relative );
+				$kind 		= $stat === false ? 0 : $stat['mode'] & 0170000;
+				$refuse		= static fn( string $what ): \RuntimeException => new \RuntimeException( 'the feature "'. $key. '" put '. $what. ' into its copy of the data, which is not taken: '. substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $relative ), 0, 80 ), self::HOOK_FAILED );
+
+				if( $kind === 0040000 ) {
+
+					$inside = self::_staged( $key, $dir, $allowed, $relative, $declared );
+
+					if( $inside === [] )
+						throw $refuse( 'a folder with no file of its own' );
+
+					$files += $inside;
+					continue;
+				}
+
+				if( $kind === 0120000 )
+					throw $refuse( 'a link' );
+
+				if( $kind !== 0100000 )
+					throw $refuse( 'an entry that is no file' );
+
+				if( $stat['nlink'] !== 1 )
+					throw $refuse( 'a file with a second name' );
+
+				if( isset( $allowed[$relative] ) === false ) {
+
+					// A name of its own that the project has no file of yet - a database that the first run of the feature has not made - is told as that
+					foreach( $declared as $entry )
+						if( $relative === $entry || str_starts_with( $relative, $entry. '/' ) === true )
+							throw $refuse( 'a file that the project does not have yet, which is not asked for (a file is handed over where it exists)' );
+
+					throw $refuse( 'a name the manifest of the feature does not give it' );
+				}
+
+				$files[$relative] = $dir. '/'. $relative;
+			}
+
+			return $files;
+		}
+
+		/**
+		 *	That what lies in the staging is what was judged and nothing else, asked after each feature, so that the one that changed it is the one named:
+		 *	a folder or a name more in the run's own folder, a name more or less in the folder of a feature that was asked before, and a file of one that is
+		 *	another size, or was written, since. This is what the check is and what it is not: it finds a feature that is wrong - one that writes where it
+		 *	was not asked to, or that leaves a link or a file of another kind - and it names it. It is no defence against a feature that means to deceive
+		 *	the run: a hook is code of the feature and runs with the rights of the kernel, so it can read and write every file of the project itself, put
+		 *	back a time it changed, and swap a file between the check and the packing. What it is not asked to do it cannot be stopped from doing
+		 *
+		 *	@param		string		$staging			The run's staging
+		 *	@param		string|null	$key					The feature that was asked last: its folder is there and is not judged yet; null where there is none
+		 *	@param		array 		$handed				What the features before it handed over: key => name relative to data/ => absolute path of the copy
+		 *	@param		array 		$sealed				Of each copy, [ size, mtime, inode ] as it was when the feature was done
+		 *
+		 *	@return 	void
+		 *
+		 *	@throws		\RuntimeException					HOOK_FAILED, naming $key
+		 */
+		private static function _unchanged( string $staging, ?string $key, array $handed, array $sealed ): void {
+
+			$found = array_values( array_diff( @scandir( $staging ) ?: [], [ '.', '..' ] ) );
+			$known = array_map( 'strval', array_merge( array_keys( $handed ), $key === null ? [] : [ $key ] ) );
+			$who	 = $key === null ? 'a feature' : 'the feature "'. $key. '"';
+
+			sort( $found );
+			sort( $known );
+
+			if( $found !== $known )
+				throw new \RuntimeException( $who. ' changed the folder for the copies of the data of the run, which is not its own', self::HOOK_FAILED );
+
+			foreach( $handed as $before => $files ) {
+
+				if( self::_staged( (string) $before, $staging. '/'. $before, array_flip( array_keys( $files ) ) ) !== $files )
+					throw new \RuntimeException( $who. ' changed the copies of the data of the feature "'. $before. '"', self::HOOK_FAILED );
+
+				foreach( $files as $copy ) {
+
+					$stat = @lstat( $copy );
+
+					if( $stat === false || [ $stat['size'], $stat['mtime'], $stat['ino'] ] !== $sealed[$copy] )
+						throw new \RuntimeException( $who. ' changed the copies of the data of the feature "'. $before. '"', self::HOOK_FAILED );
+				}
+			}
+		}
+
+		// What php says of a write that failed because the disk is full: a hook that meets it ends the run as a disk that is full does, and not as a hook that is wrong
+		private const string DISK_FULL = '/No space left on device|errno=28|out of free disk space|Disk quota exceeded|database or disk is full/i';
+
+		/**
+		 *	The names that the manifests of the features name themselves below data/, whole: a file a feature declares and not one that is found in a
+		 *	folder it declares. A file of that kind is its own, whatever it is called
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Archive names as keys
+		 */
+		private static function _named( array &$appData ): array {
+
+			$named = [];
+
+			foreach( \Nino\Features::all( $appData ) as $feature )
+				foreach( (array) ( $feature['data'] ?? [] ) as $entry )
+					$named[ ltrim( '/'. trim( (string) $entry, '/' ), '/' ) ] = true;
+
+			return $named;
+		}
+
+		/**
+		 *	The files of a manifest with the files an open database keeps beside its file added, for the names the features in $keys declare: the state
+		 *	of those features as it is, whole - what a safety snapshot packs for a feature that could not hand over a copy. A name that a feature
+		 *	declares counts whether or not its main file is there: the files beside a database that is gone are part of the state as well. A main file
+		 *	that is a link is left out, and named in $links: what lies behind a link is no file of the project
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
+		 *	@param		array 		$keys					Keys of features
+		 *	@param		array 		&$links				(reference) The archive names of the main files that were left out as links
+		 *
+		 *	@return 	array										The manifest to pack
+		 */
+		public static function raw( array &$appData, array $manifest, array $keys, array &$links = [] ): array {
+
+			$features = \Nino\Features::all( $appData );
+			$byName 	= array_flip( $manifest );
+
+			foreach( $keys as $key ) {
+
+				$names = self::_owned( $features[$key] ?? [], array_values( $manifest ) );
+
+				foreach( (array) ( $features[$key]['data'] ?? [] ) as $entry ) {
+
+					$entry = ltrim( '/'. trim( (string) $entry, '/' ), '/' );
+
+					if( $entry !== 'data' && str_starts_with( $entry, 'data/' ) === true && self::_transient( substr( $entry, 5 ) ) === false )
+						$names[] = $entry;
+				}
+
+				foreach( array_unique( $names ) as $name ) {
+
+					$live = \Nino\Filesystem::path( $appData, '/'. $name );
+
+					if( is_dir( $live ) === true && is_link( $live ) === false )
+						continue;
+
+					if( is_link( $live ) === true ) {
+
+						unset( $manifest[$live] );
+						$links[] = $name;
+					}
+
+					foreach( self::COMPANIONS as $suffix )
+						if( isset( $byName[$name. $suffix] ) === false && is_file( $live. $suffix ) === true && is_link( $live. $suffix ) === false ) {
+							$manifest[$live. $suffix] = $name. $suffix;
+							$byName[$name. $suffix] = $live. $suffix;
+						}
+				}
+			}
+
+			return $manifest;
+		}
+
+		/**
+		 *	Ask the features that keep a file the backup cannot copy as it lies - a database that is written to - for a copy that is whole, before
+		 *	anything is packed. Each feature that is switched on and has a callback of '/nino/admin/backup' is called with { dataDir, staging }:
+		 *	the live data directory and a folder of its own, empty, below $staging, made 0700 by this run. It writes the copy of each of its files there
+		 *	under the name the file has below data/ (staging/crm.sqlite, made by VACUUM INTO), and the manifest that comes back names that copy where the
+		 *	live file stood. The copy replaces a file the manifest already has and only that: what a feature puts there that its own manifest does not
+		 *	give - another name, a name of another feature, a case twin, a link, a folder, a pipe, a file with a second name - ends the run, naming the
+		 *	feature, and so does a hook that throws. Nothing is then packed and nothing falls back to the live file. A file a feature owns that is not
+		 *	handed over is packed as it lies, as it is for a feature that has no hook. Of a database that was handed over, the files an open one keeps
+		 *	beside itself (-wal, -shm, -journal) are left out - unless a feature names such a file itself - and the names that were handed over are
+		 *	written to $notes, which the archive carries in its stamp: a restore takes the companions of those and of no other file out of the project.
+		 *
+		 *	With $tolerant - the safety snapshot before a restore, which is the net under the state as it IS - a feature whose hook fails does not end the
+		 *	run: its copy is dropped, its files are packed as they lie with the files an open database keeps beside them, and $notes says so ('raw').
+		 *	A restore is never kept from the project by a hook that cannot do its work, which is what a restore is there for.
+		 *
+		 *	What the check of the staging is and is not: see _unchanged()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
+		 *	@param		string		$staging			Where the run's staging is made, not existing yet: below the temporary directory, in the name of the run's own file
+		 *	@param		callable|null	$announce		Called with the key of the feature before it is asked, and with '' after the last: what the run records of where it is
+		 *	@param		bool			$tolerant			Whether a hook that fails is not the end of the run
+		 *	@param		array 		&$notes				(reference) Set: 'asked' => keys of the features asked, 'copies' => archive names that were handed over, 'raw' => key => why, for the features whose files are packed as they lie
+		 *
+		 *	@return 	array										The manifest to pack: the one that was given where no feature has a hook
+		 *
+		 *	@throws		\RuntimeException					HOOK_FAILED, or WRITE_FAILED where the staging cannot be made or the disk is full
+		 */
+		public static function stage( array &$appData, array $manifest, string $staging, ?callable $announce = null, bool $tolerant = false, array &$notes = [] ): array {
+
+			$notes = [ 'asked' => [], 'copies' => [], 'raw' => [], 'links' => [] ];
+
+			[ $hooks, $strays ] = self::_hooks( $appData );
+
+			if( $strays > 0 )
+				trigger_error( 'Backup: '. $strays. ' callback(s) of \''. self::HOOK. '\' belong to no feature that is switched on, and are not asked', E_USER_WARNING );
+
+			if( $hooks === [] )
+				return $manifest;
+
+			// The lock of a run is held by the process, so a hook that asks for a backup of its own would be let in by it, and be asked itself
+			if( ( $appData['./nino/backup/staging'] ?? false ) === true )
+				throw new \RuntimeException( 'a feature asked for a backup while the features were handing over their data', self::HOOK_FAILED );
+
+			if( @mkdir( $staging, 0700 ) === false )
+				throw new \RuntimeException( 'the backup could not be written: the folder for the copies of the data could not be made', self::WRITE_FAILED );
+
+			$features = \Nino\Features::all( $appData );
+			$names		= array_values( $manifest );
+			$dataDir	= \Nino\Filesystem::path( $appData, '/data' );
+			$handed 	= [];
+			$claimed	= [];
+			$sealed 	= [];
+
+			$appData['./nino/backup/staging'] = true;
+
+			try {
+
+				foreach( $hooks as $key => $callbacks ) {
+
+					$dir = $staging. '/'. $key;
+
+					if( @mkdir( $dir, 0700 ) === false )
+						throw new \RuntimeException( 'the backup could not be written: the folder for the copies of the data could not be made', self::WRITE_FAILED );
+
+					$notes['asked'][] = (string) $key;
+
+					if( $announce !== null )
+						$announce( (string) $key );
+
+					try {
+
+						self::_ask( $appData, (string) $key, $callbacks, $dataDir, $dir );
+
+						// What the ones before it handed over is as they left it, and what this one hands over is its own
+						self::_unchanged( $staging, (string) $key, $handed, $sealed );
+
+						$allowed	= array_flip( array_map( static fn( string $name ): string => substr( $name, 5 ), self::_owned( $features[$key], $names ) ) );
+						$declared	= array_map( static fn( string $entry ): string => substr( trim( (string) $entry, '/' ), 5 ), array_filter( (array) ( $features[$key]['data'] ?? [] ), static fn( mixed $entry ): bool => str_starts_with( trim( (string) $entry, '/' ), 'data/' ) ) );
+						$own			= self::_staged( (string) $key, $dir, $allowed, '', $declared );
+
+						foreach( $own as $relative => $copy ) {
+
+							if( isset( $claimed[$relative] ) === true )
+								throw new \RuntimeException( 'the feature "'. $key. '" handed over a file that the feature "'. $claimed[$relative]. '" handed over as well: '. substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', (string) $relative ), 0, 80 ), self::HOOK_FAILED );
+
+							$base = self::_companion( (string) $relative );
+
+							if( $base !== null && ( isset( $own[$base] ) === true || isset( $claimed[$base] ) === true ) )
+								throw new \RuntimeException( 'the feature "'. $key. '" handed over a file that is the companion of another handed over: '. substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', (string) $relative ), 0, 80 ), self::HOOK_FAILED );
+
+							foreach( self::COMPANIONS as $suffix )
+								if( isset( $claimed[$relative. $suffix] ) === true )
+									throw new \RuntimeException( 'the feature "'. $key. '" handed over a file of which another handed over is the companion: '. substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', (string) $relative ), 0, 80 ), self::HOOK_FAILED );
+						}
+
+						$handed[$key] = $own;
+
+						foreach( $own as $relative => $copy ) {
+
+							$claimed[$relative] = (string) $key;
+							$stat = lstat( $copy );
+							$sealed[$copy] = [ $stat['size'] ?? 0, $stat['mtime'] ?? 0, $stat['ino'] ?? 0 ];
+						}
+					}
+					catch( \RuntimeException $failed ) {
+
+						if( $tolerant === false || in_array( $failed->getCode(), [ self::HOOK_FAILED, self::WRITE_FAILED ], true ) === false )
+							throw $failed;
+
+						// The state as it is: this feature's files are packed as they lie, with what an open database keeps beside them, and the snapshot says so
+						$notes['raw'][(string) $key] = $failed->getMessage();
+						trigger_error( 'Backup: the safety snapshot holds the files of the feature "'. $key. '" as they lie: '. $failed->getMessage(), E_USER_WARNING );
+
+						\Nino\Filesystem::removeDir( $dir );
+
+						// What it did to the copies of the ones before it cannot be told apart from what they made: those are packed as they lie as well
+						try {
+							self::_unchanged( $staging, null, $handed, $sealed );
+						}
+						catch( \RuntimeException $changed ) {
+
+							foreach( array_keys( $handed ) as $before ) {
+								$notes['raw'][(string) $before] = $changed->getMessage();
+								\Nino\Filesystem::removeDir( $staging. '/'. $before );
+							}
+
+							foreach( array_diff( @scandir( $staging ) ?: [], [ '.', '..' ] ) as $left )
+								\Nino\Filesystem::removeDir( $staging. '/'. $left );
+
+							$handed 	= [];
+							$claimed	= [];
+							$sealed 	= [];
+						}
+					}
+				}
+			}
+			finally {
+				unset( $appData['./nino/backup/staging'] );
+			}
+
+			if( $announce !== null )
+				$announce( '' );
+
+			$named		= self::_named( $appData );
+			$replaced = [];
+			$left 		= [];
+
+			foreach( $claimed as $relative => $key ) {
+
+				$replaced['data/'. $relative] = $staging. '/'. $key. '/'. $relative;
+
+				// Beside a copy the files of the open database are left out: of its live file, which the copy replaces - unless a feature names one itself
+				foreach( self::COMPANIONS as $suffix )
+					if( isset( $named['data/'. $relative. $suffix] ) === false )
+						$left['data/'. $relative. $suffix] = true;
+
+				$notes['copies'][] = 'data/'. $relative;
+			}
+
+			$result = [];
+
+			foreach( $manifest as $absolute => $name ) {
+
+				if( isset( $left[$name] ) === true )
+					continue;
+
+				if( isset( $replaced[$name] ) === true )
+					$result[$replaced[$name]] = $name;
+				else
+					$result[$absolute] = $name;
+			}
+
+			$notes['links'] = [];
+
+			if( $notes['raw'] === [] )
+				return $result;
+
+			$result = self::raw( $appData, $result, array_keys( $notes['raw'] ), $notes['links'] );
+
+			if( $notes['links'] !== [] )
+				trigger_error( 'Backup: the safety snapshot leaves out '. count( $notes['links'] ). ' file(s) of a feature that are links, which are no files of the project', E_USER_WARNING );
+
+			return $result;
+		}
+
+		/**
+		 *	Call the callbacks of one feature with its folder. A hook that throws - an error as well - or leaves a notice of a write that the disk
+		 *	refused ends here as a run that could not hand over the data, or as a run whose disk is full
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature
+		 *	@param		array 		$callbacks		Its callbacks of the hook
+		 *	@param		string		$dataDir			The live data directory
+		 *	@param		string		$dir					Its folder of the run
+		 *
+		 *	@return 	void
+		 *
+		 *	@throws		\RuntimeException					HOOK_FAILED, or WRITE_FAILED for a disk that is full
+		 */
+		private static function _ask( array &$appData, string $key, array $callbacks, string $dataDir, string $dir ): void {
+
+			// A write that the disk refused is a notice for php, which the handler of the kernel answers by ending the request: here it is the run's to
+			// answer. Everything else goes to the handler that was there
+			$previous = null;
+			$previous = set_error_handler( static function( int $level, string $message, string $file = '', int $line = 0 ) use ( &$previous ): bool {
+
+				if( ( error_reporting() & $level ) !== 0 && preg_match( self::DISK_FULL, $message ) === 1 )
+					throw new \ErrorException( $message, 0, $level, $file, $line );
+
+				return is_callable( $previous ) === true ? (bool) $previous( $level, $message, $file, $line ) : false;
+			} );
+
+			try {
+
+				foreach( $callbacks as $callback ) {
+
+					$args = [ 'dataDir' => $dataDir, 'staging' => $dir ];
+
+					call_user_func_array( $callback, [ &$appData, &$args ] );
+				}
+
+				restore_error_handler();
+			}
+			catch( \Throwable $thrown ) {
+
+				restore_error_handler();
+
+				if( $thrown instanceof \Nino\Failure )
+					throw $thrown;
+
+				// What the feature said is for the log, which is private: the message of the run names the feature and no path
+				trigger_error( 'Backup: the feature "'. $key. '" threw '. get_class( $thrown ). ' while it handed over its data: '. str_replace( [ "\r", "\n" ], ' ', $thrown->getMessage() ), E_USER_WARNING );
+
+				if( preg_match( self::DISK_FULL, $thrown->getMessage() ) === 1 )
+					throw new \RuntimeException( 'the backup could not be written: there was no room left, or a file could not be written', self::WRITE_FAILED, $thrown );
+
+				throw new \RuntimeException( 'the feature "'. $key. '" could not hand over a copy of its data, so no backup was made', self::HOOK_FAILED, $thrown );
+			}
+		}
+
+		/**
+		 *	Take the files an open database keeps beside itself out of the project, for the files of an archive that were handed over by a hook: the
+		 *	archive lists their names in its stamp, and a file that is restored is a whole database, so a -wal, -shm or -journal of the live one beside it
+		 *	would be applied to it. The list is the archive's word and a stamp can be made by anybody who can make an archive, so it is believed as far
+		 *	as the project can check it: a name is taken if the archive carries it, a feature that is switched on and has a callback of
+		 *	'/nino/admin/backup' owns it by its manifest, no manifest names the companion and the archive does not carry it - and the list has no more
+		 *	names than the archive has files below data/. For an archive of another project ($foreign: it was opened with a key that was typed) nothing
+		 *	is taken away at all; $left says beside how many files such companions were left standing, which the answer tells the operator
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *	@param		mixed			$copies				The 'copies' of the stamp of the archive: archive names, as they were handed over
+		 *	@param		bool			$foreign			Whether the archive is not this project's own
+		 *	@param		int				&$left				(reference) Set: how many of the listed files have companions in the project that were not taken away
+		 *
+		 *	@return 	bool										false where a file that had to go could not be removed
+		 */
+		public static function dropCompanions( array &$appData, string $staging, mixed $copies, bool $foreign = false, int &$left = 0 ): bool {
+
+			$left = 0;
+			$root = rtrim( $staging, DIRECTORY_SEPARATOR );
+
+			if( is_array( $copies ) === false || $copies === [] || is_dir( $root. '/data' ) === false )
+				return true;
+
+			clearstatcache();
+
+			$count = 0;
+
+			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root. '/data', \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $carried )
+				$count++;
+
+			// More names than the archive has files: no stamp that was made by this code
+			if( count( $copies ) > $count )
+				return true;
+
+			[ $hooks ] = self::_hooks( $appData );
+			$features = \Nino\Features::all( $appData );
+			$named		= self::_named( $appData );
+			$data 		= \Nino\Filesystem::path( $appData, '/data' );
+			$whole		= true;
+
+			foreach( $copies as $name ) {
+
+				// The stamp is the archive's: a name of it is judged as a name of an archive is, whatever the archive says
+				if( is_string( $name ) === false || preg_match( '#^data/[^\0]+$#D', $name ) !== 1 || in_array( '..', explode( '/', $name ), true ) === true || in_array( '', explode( '/', $name ), true ) === true )
+					continue;
+
+				if( is_file( $root. '/'. $name ) === false || is_link( $root. '/'. $name ) === true || self::_companion( $name ) !== null )
+					continue;
+
+				$mine = false;
+
+				foreach( array_keys( $hooks ) as $key )
+					if( self::_owned( $features[$key], [ $name ] ) !== [] )
+						$mine = true;
+
+				$standing = false;
+
+				foreach( self::COMPANIONS as $suffix ) {
+
+					$live = $data. '/'. substr( $name, 5 ). $suffix;
+
+					if( isset( $named[$name. $suffix] ) === true || file_exists( $root. '/'. $name. $suffix ) === true || ( is_file( $live ) === false && is_link( $live ) === false ) )
+						continue;
+
+					if( $foreign === true || $mine === false ) {
+						$standing = true;
+						continue;
+					}
+
+					if( @unlink( $live ) === false )
+						$whole = false;
+				}
+
+				if( $standing === true && $foreign === true )
+					$left++;
+			}
+
+			return $whole;
 		}
 
 		/**
@@ -1361,7 +2004,7 @@ namespace Nino {
 		 *
 		 *	@return 	string									The php source of the file: an array with 'nino' (the version) and 'features' (key => version)
 		 */
-		public static function stamp( array &$appData ): string {
+		public static function stamp( array &$appData, array $notes = [] ): string {
 
 			$features = [];
 
@@ -1369,7 +2012,8 @@ namespace Nino {
 				if( $feature['active'] === true )
 					$features[(string) $key] = (string) $feature['version'];
 
-			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features ], true ). ';';
+			// 'copies': the files a feature handed over (see stage()), the files whose companions a restore takes away; 'raw': the features whose files are in the archive as they lay
+			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features, 'copies' => array_values( (array) ( $notes['copies'] ?? [] ) ), 'raw' => array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) ), 'links' => array_values( (array) ( $notes['links'] ?? [] ) ) ], true ). ';';
 		}
 
 		/**
@@ -1420,19 +2064,20 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
 		 *	@param		string		$tar					Where the tar is made; the archive is $tar.'.gz'
+		 *	@param		array 		$notes				What stage() noted, which the stamp carries
 		 *
 		 *	@return 	void
 		 *
 		 *	@throws		\RuntimeException				If a file of the manifest cannot be read
 		 */
-		public static function pack( array &$appData, array $manifest, string $tar ): void {
+		public static function pack( array &$appData, array $manifest, string $tar, array $notes = [] ): void {
 
 			$entries = [];
 			foreach( $manifest as $absolute => $name )
 				$entries[$name] = $absolute;
 
 			// The stamp is made before the step, which turns every notice into an exception: what it reads is no part of the writing
-			$stamp = self::stamp( $appData );
+			$stamp = self::stamp( $appData, $notes );
 
 			// Everything PharData says of a file that cannot be written - a disk that is full - is one sentence, and no path. It says it as a
 			// notice first, and the handler of the kernel ends the request at a notice: so the step runs with a handler of its own

@@ -105,6 +105,6 @@ Klicke im Bereich **Features** bei „Treffen“ auf **Auf 0.5.0 aktualisieren**
 ## Nachschlagen
 
 - [Settings](../features.md#settings): alle Typen und Regeln
-- [Data and restore](../features.md#data-and-restore): Backup und Wiederherstellung eigener Dateien
+- [Data, backup and restore](../features.md#data-backup-and-restore): Backup und Wiederherstellung eigener Dateien, auch einer Datenbank
 - [The install unit](../features.md#the-install-unit): der Abschnitt der Datenschutzerklärung und die Bereiche von `order`
 - [Legal](../development.md#legal): Platzhalter und Elemente der rechtlichen Texte

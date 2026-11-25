@@ -1499,7 +1499,7 @@ The workbench's own screens are the same thing in a different root: `_admin` hol
 
 Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `_nino/Nino/Modules/Form/Admin/Admin.php` is one with fills and a Dashboard tile, and the smallest complete panel in the checkout is the fixture `tests/fixtures/features/Sample/Admin/Admin.php` - in the catalogue, `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied, and `features/Builder/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) walks through a complete panel including its frontend.
 
-A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the [Features panel](_admin.md#features); the manifest, the settings and the updates are in [Developing a feature](features.md).
+A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). A feature that keeps a database there, one that is written in place, registers `'/nino/admin/backup'` as well: before the backup packs its files the Backups module calls it with the live data directory and an empty folder, and the feature writes a copy of its file there (`VACUUM INTO` for SQLite) that is packed where the live file stands ([Data, backup and restore](features.md#data-backup-and-restore)). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the [Features panel](_admin.md#features); the manifest, the settings and the updates are in [Developing a feature](features.md).
 
 ### Secure Custom Write Operations
 
@@ -1731,7 +1731,7 @@ its name.
 
 So the boundary is: **events across the tool's edge, contract inside it.**
 `/_admin` registers its own routes as callbacks like anything else, and
-`/nino/admin/action` and `/nino/admin/restore` are the two points where a
+`/nino/admin/action`, `/nino/admin/backup` and `/nino/admin/restore` are the points where a
 module reacts to what the workbench does without owning a panel there.
 `/nino/admin/dashboard/head` is the third: the one where a module adds an area to
 the head of the Dashboard, answered with data the script of a panel of the same

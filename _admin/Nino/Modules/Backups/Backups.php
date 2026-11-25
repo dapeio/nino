@@ -319,7 +319,7 @@ namespace Nino\Modules {
 
 				$dir 		= self::dir( $appData );
 				$id 		= date( 'Y-m-d-His' ). self::MANUAL_SUFFIX;
-				$run 		= self::_begin( $dir, 'manual' );
+				$run 		= self::_begin( $dir, 'manual', ( $appData['./nino/backups/answer'] ?? PHP_SAPI !== 'cli' ) === true );
 				$cause 	= null;
 
 				try {
@@ -342,6 +342,10 @@ namespace Nino\Modules {
 
 				if( $e->getCode() === \Nino\Backup::DISK_SHORT && $run instanceof \stdClass )
 					return [ 507, $e->getMessage(), 'backups_disk', $run->short ];
+
+				// A feature that could not hand over the copy of its data: named by the run, in the sentence of the panel as well
+				if( $e->getCode() === \Nino\Backup::HOOK_FAILED && $run instanceof \stdClass && $run->hook !== '' )
+					return [ 500, $e->getMessage(), 'backups_hook', [ $run->hook ] ];
 
 				return self::_code( $e ) === 'write' ? [ 500, $e->getMessage(), 'backups_write' ] : [ 500, $e->getMessage() ];
 			}
@@ -368,6 +372,15 @@ namespace Nino\Modules {
 
 			$note = self::_readAttempt( $dir );
 
+			// A request that ended in a hook left no word of its own: the record of the run knows which feature it was asking
+			if( $note !== null && $note['reason'] === '' ) {
+
+				$run = self::stopped( $appData );
+
+				if( $run !== null && $run['kind'] === 'daily' && $run['feature'] !== '' )
+					$note['reason'] = 'the request ended while the feature "'. $run['feature']. '" handed over its data';
+			}
+
 			return $note === null || $note['date'] !== date( 'Y-m-d' ) ? null : [ 'reason' => $note['reason'] ] + ( isset( $note['code'] ) === true ? [ 'code' => $note['code'] ] : [] );
 		}
 
@@ -377,13 +390,14 @@ namespace Nino\Modules {
 		 *	before it was over, which no catch sees, and which nobody else
 		 *	reports. It says when it began, how many files and how many bytes it
 		 *	had to pack and, where php said so, what ended it: the time limit or
-		 *	the memory limit, with the limit. A run that is going on is none of
+		 *	the memory limit, with the limit - and the feature it was asking for
+		 *	a copy of its data, where that was what it was doing. A run that is going on is none of
 		 *	this (it holds the lock of its record), and one that ended by itself
 		 *	has removed its record. Shared by the Backups panel, which says so
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array|null							[ 'kind' => 'daily'|'manual', 'started' => unix time, 'files' => int, 'bytes' => int, 'cause' => 'time'|'memory'|'error'|'disk'|'' (what ended it, '' where nothing says), 'limit' => seconds or bytes of that limit, 0 where there is none ], or null
+		 *	@return 	array|null							[ 'kind' => 'daily'|'manual', 'started' => unix time, 'files' => int, 'bytes' => int, 'cause' => 'time'|'memory'|'error'|'disk'|'hook'|'' (what ended it, '' where nothing says), 'limit' => seconds or bytes of that limit, 0 where there is none, 'feature' => the key of the feature that was asked for its data when it ended, '' where none was ], or null
 		 */
 		public static function stopped( array &$appData ): ?array {
 
@@ -410,8 +424,9 @@ namespace Nino\Modules {
 				'started'	=> $note['started'],
 				'files' 	=> is_int( $note['files'] ?? null ) === true ? $note['files'] : 0,
 				'bytes' 	=> is_int( $note['bytes'] ?? null ) === true ? $note['bytes'] : 0,
-				'cause' 	=> in_array( $note['cause'] ?? null, [ 'time', 'memory', 'error', 'disk' ], true ) === true ? $note['cause'] : '',
+				'cause' 	=> in_array( $note['cause'] ?? null, [ 'time', 'memory', 'error', 'disk', 'hook' ], true ) === true ? $note['cause'] : '',
 				'limit' 	=> is_int( $note['limit'] ?? null ) === true ? $note['limit'] : 0,
+				'feature'	=> is_string( $note['feature'] ?? null ) === true && preg_match( '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D', $note['feature'] ) === 1 ? $note['feature'] : '',
 			];
 		}
 
@@ -665,7 +680,7 @@ namespace Nino\Modules {
 		 *
 		 *	@return 	\stdClass								The state of the run: what _create(), _end() and the shutdown function share
 		 */
-		private static function _begin( string $dir, string $kind ): \stdClass {
+		private static function _begin( string $dir, string $kind, bool $answer = false ): \stdClass {
 
 			$run 				= new \stdClass();
 			$run->done 	= false;
@@ -675,6 +690,7 @@ namespace Nino\Modules {
 			$run->lease = null;
 			$run->partial = '';
 			$run->short = [];
+			$run->hook 	= '';
 			$run->handle = @fopen( $run->path, 'c+b' );
 
 			if( $run->handle !== false && flock( $run->handle, LOCK_EX | LOCK_NB ) === false ) {
@@ -684,7 +700,7 @@ namespace Nino\Modules {
 
 			self::_record( $run, [] );
 
-			register_shutdown_function( static function() use ( $run ): void {
+			register_shutdown_function( static function() use ( $run, $answer ): void {
 
 				if( $run->done === true )
 					return;
@@ -706,8 +722,24 @@ namespace Nino\Modules {
 						$cause = [ 'cause' => 'disk' ];
 				}
 
+				// A request that ended in a hook: the record says which feature it was asking, and what ended it was the hook
+				if( $run->hook !== '' && ( $cause === [] || $cause['cause'] === 'error' ) )
+					$cause = [ 'cause' => 'hook' ];
+
 				self::_record( $run, $cause );
 				self::_dropTemp( $run );
+
+				// Where nothing is sent yet, whoever asked for the backup by hand is told in the words of the panel and not by an empty answer: this is
+				// the end of a request that has no response left to set
+				if( $run->hook !== '' && $answer === true && headers_sent() === false ) {
+
+					while( ob_get_level() > 0 )
+						@ob_end_clean();
+
+					http_response_code( 500 );
+					header( 'Content-Type: application/json; charset=utf-8' );
+					echo json_encode( [ 'error' => 'the backup ended while a feature handed over its data', 'code' => 'backups_hook', 'params' => [ $run->hook ] ] );
+				}
 
 				if( is_resource( $run->handle ) === true )
 					fclose( $run->handle );
@@ -783,6 +815,9 @@ namespace Nino\Modules {
 			if( $run->temp === '' )
 				return;
 
+			// The copies the features handed over, in the folder the run made for them beside its file
+			\Nino\Filesystem::removeDir( $run->temp. '.staging' );
+
 			@unlink( $run->temp. '.tar' );
 			@unlink( $run->temp. '.tar.gz' );
 			@unlink( $run->temp );
@@ -801,14 +836,15 @@ namespace Nino\Modules {
 		 *	bytes. A file the manifest names that cannot be read ends the run here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array|null	$given				The manifest after the features handed over their copies (see \Nino\Backup::stage()), which is measured as it is; null for the files as they lie
 		 *
-		 *	@return 	array										[ 'manifest' => path -> name, 'files' => int, 'bytes' => int ]
+		 *	@return 	array										[ 'manifest' => path -> name, 'files' => int, 'bytes' => int, 'copies' => the bytes the copies of the features are still to take, 0 for a manifest that was given ]
 		 *
 		 *	@throws		\RuntimeException					If a file of the manifest cannot be read
 		 */
-		private static function _plan( array &$appData ): array {
+		private static function _plan( array &$appData, ?array $given = null ): array {
 
-			$manifest = \Nino\Backup::manifest( $appData );
+			$manifest = $given ?? \Nino\Backup::manifest( $appData );
 			$bytes 		= 0;
 
 			foreach( $manifest as $absolute => $archiveName ) {
@@ -821,7 +857,7 @@ namespace Nino\Modules {
 				$bytes += $size;
 			}
 
-			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes ];
+			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes, 'copies' => $given === null ? \Nino\Backup::copyBytes( $appData, $manifest ) : 0 ];
 		}
 
 		/**
@@ -877,7 +913,8 @@ namespace Nino\Modules {
 			// temporary directory, and where the archive is written to the same disk, more. A disk that has less is refused with the
 			// sizes before anything is made; a disk that fills up all the same - another request writes to it - ends the run with the
 			// notice of a write that failed, and the record of the run says 'disk'
-			$short = \Nino\Backup::spaceShort( $appData, $plan['bytes'], $plan['files'], $dir );
+			// The copies the features with a hook hand over lie beside the files for as long as the run does, which the first count adds
+			$short = \Nino\Backup::spaceShort( $appData, $plan['bytes'], $plan['files'], $dir, $plan['copies'] );
 
 			if( $short !== null ) {
 				$run->short = $short;
@@ -890,9 +927,33 @@ namespace Nino\Modules {
 
 			[ $run->temp, $run->lease ] = $temp;
 
+			// Before anything is packed, under the lock of the run: a feature that keeps a database hands over a copy of it that is whole, and
+			// the run packs the copy where the live file stood. What the features wrote is counted again by what it is, and the disk is asked again
+			// with those sizes - a run that ends in a hook or in a disk the copies filled leaves no archive, and the folder of the copies goes with
+			// the run's other files (see _dropTemp()). The record of the run names the feature it is asking, for a request that is ended meanwhile
+			$notes	= [];
+			$staged = \Nino\Backup::stage( $appData, $plan['manifest'], $run->temp. '.staging', static function( string $feature ) use ( $run ): void {
+				$run->hook = $feature;
+				self::_record( $run, [ 'feature' => $feature ] );
+			}, false, $notes );
+
+			if( $staged !== $plan['manifest'] ) {
+
+				$plan = self::_plan( $appData, $staged );
+
+				self::_record( $run, [ 'files' => $plan['files'], 'bytes' => $plan['bytes'] ] );
+
+				$short = \Nino\Backup::spaceShort( $appData, $plan['bytes'], $plan['files'], $dir );
+
+				if( $short !== null ) {
+					$run->short = $short;
+					throw new \RuntimeException( sprintf( 'the backup needs about %d MB of free space for its temporary files and %d MB are free', $short[0], $short[1] ), \Nino\Backup::DISK_SHORT );
+				}
+			}
+
 			$tmpTar = $run->temp. '.tar';
 
-			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar );
+			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar, $notes );
 
 			// Sealed chunk by chunk while it is written, to a file beside the archive that a rename makes one
 			self::_writeRawAtomic( $path, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ), $run );
@@ -1145,7 +1206,7 @@ namespace Nino\Modules {
 			$temp 		= sys_get_temp_dir();
 			$dir 			= self::dir( $appData );
 			$together = ( $a = @stat( $temp ) ) !== false && ( $b = @stat( is_dir( $dir ) === true ? $dir : dirname( $dir ) ) ) !== false && $a['dev'] === $b['dev'];
-			$need 		= 2 * (int) ceil( $bytes * 3 / 4 ) + \Nino\Backup::spaceNeed( $have, count( $manifest ), $together );
+			$need 		= 2 * (int) ceil( $bytes * 3 / 4 ) + \Nino\Backup::spaceNeed( $have, count( $manifest ), $together, \Nino\Backup::copyBytes( $appData, $manifest ) );
 			$free 		= \Nino\Backup::freeSpace( $appData, $temp );
 
 			if( $free !== null && $free < $need )
