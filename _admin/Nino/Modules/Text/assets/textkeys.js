@@ -188,28 +188,13 @@
 		},
 
 		/**
-		 *	Whether the text of a key in a language is longer than its limit, counted as its field counts it
-		 *
-		 *	@param		{Object}	entry
-		 *	@param		{string}	locale
-		 *
-		 *	@return		{boolean}
-		 */
-		isTooLong : function( entry, locale ) {
-
-			const T = Nino.admin.textKeys;
-
-			return T.lengthOf( entry, T.valueOf( entry, locale ) ) > entry.maxlength;
-		},
-
-		/**
 		 *	What a row holds, counted in a language: how many texts, how many of them have none in it (isEmptyIn(), a key
-		 *	that is one text for every language is never empty in one) and how many are longer than their limit
+		 *	that is one text for every language is never empty in one)
 		 *
 		 *	@param		{Object}	row
 		 *	@param		{string}	locale
 		 *
-		 *	@return		{Object}									{ texts, empty, long }
+		 *	@return		{Object}									{ texts, empty }
 		 */
 		rowCounts : function( row, locale ) {
 
@@ -218,7 +203,6 @@
 			return {
 				texts : row.entries.length,
 				empty : row.entries.filter( function( entry ) { return T.isEmptyIn( entry, locale ) } ).length,
-				long : row.entries.filter( function( entry ) { return T.isTooLong( entry, locale ) } ).length,
 			};
 		},
 

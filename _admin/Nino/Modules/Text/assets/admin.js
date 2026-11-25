@@ -6,8 +6,8 @@
  *													is called or its key - or browse the rows the keys fall
  *													into (pages first, then the project, the common words,
  *													building blocks, modules, features). A row of the list
- *													says how many texts it holds, how many have none in the
- *													working language and how many are too long. A row opens as
+ *													says how many texts it holds and how many have none in the
+ *													working language. A row opens as
  *													the standard directory of its texts
  *													(Nino.adminUi.directory()): the name and the key, the
  *													section, the text of the working language, the characters
@@ -479,7 +479,7 @@
 
 		/**
 		 *	What a row of the list says under its name, in the language on screen: how many texts it holds, and - where there are any - how many of them are empty
-		 *	in it and how many are longer than their limit
+		 *	in it
 		 *
 		 *	@param		{Object}	row
 		 *	@param		{string}	locale
@@ -493,9 +493,6 @@
 
 			if( counts.empty > 0 )
 				words.push( Nino.adminUi.format( Nino.content.getText('/_admin/text/count/empty'), counts.empty, Nino.adminUi.localeName( locale ) ) );
-
-			if( counts.long > 0 )
-				words.push( Nino.adminUi.format( Nino.content.getText('/_admin/text/count/long'), counts.long ) );
 
 			return words.join(' · ');
 		},
@@ -636,7 +633,6 @@
 						title : [ place, field.label ].filter( function( part, at, parts ) { return at === 0 || part !== parts[at - 1] } ).join(' › '),
 						text : shown.length > 200 ? shown.slice( 0, 200 )+ '…' : shown,
 						chars : T.lengthOf( entry, T.valueOf( entry, locale ) ),
-						long : T.isTooLong( entry, locale ),
 						emptyHere : T.isEmptyIn( entry, locale ),
 						writable : text._writable( entry ),
 						// One badge for each language of the site; a key that is one text for all of them has the one
@@ -727,17 +723,13 @@
 					{ value : '', label : word('/_admin/text/filter/all') },
 					{ value : 'empty', label : Nino.adminUi.format( word('/_admin/text/label/empty-in'), Nino.adminUi.localeName( locale ) ) },
 					{ value : 'any', label : word('/_admin/text/filter/empty-any') },
-					{ value : 'long', label : word('/_admin/text/filter/long') },
 				],
 				match : function( one, value ) {
 
 					if( value === 'empty' )
 						return one.emptyHere === true;
 
-					if( value === 'any' )
-						return one.states.some( function( state ) { return state.ok === false } );
-
-					return value !== 'long' || one.long === true;
+					return value !== 'any' || one.states.some( function( state ) { return state.ok === false } );
 				},
 			} ];
 

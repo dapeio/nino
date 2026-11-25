@@ -650,21 +650,22 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	check( 'the page is at the address of the list, and the table of a row is not shown', w.hash() === '#text' && has( w.form, 'admin-hidden' ) === true && has( w.list, 'admin-hidden' ) === false );
 
 	// P1: the second line of a row is counts in place of running text
-	check( 'the second line of a row is how many texts it holds, how many have none in the working language and how many are too long - and no running text', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/long',1) && w.lineOf( ROW ).indexOf( 'Beratung' ) === -1 );
-	check( '...a row that has nothing empty and nothing too long says only how many', w.lineOf('project/company') === F('/_admin/text/count/texts',4) && w.lineOf('template/common') === F('/_admin/text/count/texts',2) );
+	check( 'the second line of a row is how many texts it holds - and no running text, and nothing about a text over its limit although the row has one', w.lineOf( ROW ) === F('/_admin/text/count/texts',13) && w.lineOf( ROW ).indexOf( 'Beratung' ) === -1
+		&& w.panel._model.rows[ROW].entries.some( e => w.h.admin.textKeys.lengthOf( e, w.h.admin.textKeys.valueOf( e, 'de_DE' ) ) > e.maxlength ) );
+	check( '...a row that has nothing empty says only how many', w.lineOf('project/company') === F('/_admin/text/count/texts',4) && w.lineOf('template/common') === F('/_admin/text/count/texts',2) );
 	check( '...one text is the singular, in the words of the panel', w.lineOf('template/frame-header') === F('/_admin/text/count/text',1) && W('/_admin/text/count/text') !== W('/_admin/text/count/texts') );
 	check( '...a text that is the same in every language is never empty in one', w.panel._model.rows['project/company'].entries.some( e => e.global === true ) && w.lineOf('project/company').indexOf(' leer in ') === -1 );
 
 	// the counts follow the working language
 	w.go( 'en_US' );
-	check( 'the counts follow the working language: the texts that are empty in it, named in it, and the ones that are too long there', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/empty',3,'English')
+	check( 'the counts follow the working language: the texts that are empty in it, named in it', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/empty',3,'English')
 		&& tag( w.listRow( ROW ), 'strong' )[0].textContent === 'Services' && findAll( w.list, el => el.id === 'text-list-empty' )[0].textContent === F('/_admin/text/label/empty-in','English') );
 	w.go( 'de_DE' );
-	check( '...and back', w.lineOf( ROW ) === F('/_admin/text/count/texts',13)+ ' · '+ F('/_admin/text/count/long',1) );
+	check( '...and back', w.lineOf( ROW ) === F('/_admin/text/count/texts',13) );
 }
 
 {
-	// "too long" is counted the way the field counts: the characters of a plain text, the visible characters of a text with markup
+	// the characters are counted the way the field counts: the characters of a plain text, the visible characters of a text with markup
 	const w = shown( fullResponse( { keys : copies( homeKeys.filter( e => e.blacklisted === false ) ).concat( [
 		textEntry( '/template/page-hello/hero/rich', { de_DE : '<p><strong>abcdefghij</strong></p>', en_US : '' }, { html : true, format : 'blocks', maxlength : 20 } ),
 		textEntry( '/template/page-hello/hero/rich-long', { de_DE : '<p>abcdefghijklm</p><p>nopqrstuvw</p>', en_US : '' }, { html : true, format : 'blocks', maxlength : 20 } ),
@@ -675,9 +676,8 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	const U = w.h.admin.textKeys;
 	check( 'a text with markup is counted by what a person sees: the tags are no characters, the entities are one each, nothing is collapsed', U.lengthOf( { html : true }, '<p><strong>abcdefghij</strong></p>' ) === 10 && U.lengthOf( { html : true }, '<p>a&amp;b&nbsp;c</p>' ) === 5
 		&& U.lengthOf( { html : true }, '<p>abc</p><p>def</p>' ) === 6 && U.lengthOf( { html : false }, '<p>abc</p>' ) === 10 );
-	// P2
-	check( 'a text with markup is too long by its visible characters and a plain one by its length - on the limit it is not', w.lineOf('template/page-hello') === F('/_admin/text/count/texts',5)+ ' · '+ F('/_admin/text/count/long',3) );
-	check( '...counted for the language on screen: the other has none of them', ( () => { w.go( 'en_US' ); const line = w.lineOf('template/page-hello'); w.go( 'de_DE' ); return line === F('/_admin/text/count/texts',5)+ ' · '+ F('/_admin/text/count/empty',5,'English') } )() );
+	check( 'the line of a row with texts over their limit says only how many texts it holds', w.lineOf('template/page-hello') === F('/_admin/text/count/texts',5) );
+	check( '...and, for the language on screen, how many of them are empty: the other has none of them', ( () => { w.go( 'en_US' ); const line = w.lineOf('template/page-hello'); w.go( 'de_DE' ); return line === F('/_admin/text/count/texts',5)+ ' · '+ F('/_admin/text/count/empty',5,'English') } )() );
 }
 
 {
@@ -796,15 +796,13 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 
 	check( 'the section is the category, left of the search: all sections, then the sections in their order, the details of a page with its path', category !== undefined && show !== undefined && w.selects().length === 2
 		&& tag( category, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/text/filter/sections'), W('/_admin/text/label/page-details')+ ' (/services)', 'Einleitung', 'Eintrag 1', 'Eintrag 2', 'Legal' ].join() );
-	check( '...and one select "Show" after it: all texts, empty in the working language, empty in a language, too long', show.attributes['aria-label'] === W('/_admin/text/filter/show') || findAll( w.form, el => el.textContent === W('/_admin/text/filter/show') ).length > 0
-		&& tag( show, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/text/filter/all'), F('/_admin/text/label/empty-in','Deutsch'), W('/_admin/text/filter/empty-any'), W('/_admin/text/filter/long') ].join() );
+	check( '...and one select "Show" after it: all texts, empty in the working language, empty in a language - three options, none for the texts that are too long', ( show.attributes['aria-label'] === W('/_admin/text/filter/show') || findAll( w.form, el => el.textContent === W('/_admin/text/filter/show') ).length > 0 )
+		&& tag( show, 'option' ).map( o => o.textContent ).join() === [ W('/_admin/text/filter/all'), F('/_admin/text/label/empty-in','Deutsch'), W('/_admin/text/filter/empty-any') ].join() );
 	const choose = ( select, value ) => { select.value = value; fire( select, 'change', { target : select } ) };
 
 	choose( category, 'item-1' );
 	check( 'a section narrows the rows to its texts, in their order', w.ids().join() === [ '/template/page-services/item-1/title', RICH ].join() );
 	choose( category, '' );
-	choose( show, 'long' );
-	check( 'Show "too long" keeps the texts over their limit - counted as the field counts them', w.ids().join() === LONG );
 	choose( show, 'any' );
 	check( '...Show "empty in a language": the texts that have none in one language of the site - a text of every language never', w.ids().join() === [ INTRO, BODY, LONG ].join() );
 	choose( show, 'empty' );
@@ -825,11 +823,11 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	found( '' );
 
 	// the state is kept per row, while the panel lives
-	choose( w.selects()[1], 'long' );
+	choose( w.selects()[1], 'any' );
 	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
 	check( 'Back is the list, the focus on the row that was open, the address the list\'s', has( w.list, 'admin-hidden' ) === false && w.hash() === '#text' && w.h.doc.activeElement === w.linkOf( ROW ) );
 	fire( w.linkOf( ROW ), 'click', { target : w.linkOf( ROW ) } );
-	check( 'the row opened again is as the person left it: the select "Show" holds what it held', w.ids().join() === LONG && w.selects()[1].value === 'long' );
+	check( 'the row opened again is as the person left it: the select "Show" holds what it held', w.ids().join() === [ INTRO, BODY, LONG ].join() && w.selects()[1].value === 'any' );
 	fire( byClass( w.form, 'nino-admin-back-link' )[0], 'click' );
 	fire( w.linkOf('template/frame-header'), 'click', { target : w.linkOf('template/frame-header') } );
 	check( '...and another row has its own state: none, and no category where it has one section', w.ids().length === 1 && w.selects().length === 1 && w.selects()[0].value === '' );
@@ -1343,7 +1341,7 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 		const words = workbenchWords( locale );
 		const missing = [ ...used ].filter( key => key.endsWith('/') === false && words[key] === undefined );
 		check( locale+ ': every fill the Text script asks for is there'+ ( missing.length === 0 ? '' : ' - not '+ missing.join() ), used.size > 20 && missing.length === 0 );
-		check( locale+ ': the counts, the heads and the words of the table and the record are all there, and the singular is another word than the plural', [ 'count/text', 'count/texts', 'count/empty', 'count/long', 'col/name', 'col/section', 'col/text', 'col/chars', 'col/long', 'col/languages', 'col/lang-ok', 'col/lang-missing', 'filter/show', 'filter/all', 'filter/empty-any', 'filter/long', 'filter/sections', 'row/open', 'record/prev', 'record/next', 'record/missing', 'label/working' ].every( k => words['/_admin/text/'+ k] !== undefined && words['/_admin/text/'+ k] !== '' )
+		check( locale+ ': the counts, the heads and the words of the table and the record are all there, and the singular is another word than the plural', [ 'count/text', 'count/texts', 'count/empty', 'col/name', 'col/section', 'col/text', 'col/chars', 'col/long', 'col/languages', 'col/lang-ok', 'col/lang-missing', 'filter/show', 'filter/all', 'filter/empty-any', 'filter/sections', 'row/open', 'record/prev', 'record/next', 'record/missing', 'label/working' ].every( k => words['/_admin/text/'+ k] !== undefined && words['/_admin/text/'+ k] !== '' )
 			&& words['/_admin/text/count/text'] !== words['/_admin/text/count/texts'] );
 	} );
 }
