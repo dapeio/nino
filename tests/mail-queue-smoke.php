@@ -76,7 +76,7 @@ $holders = static function( string $needle ) use ( $sandbox ): array {
 };
 $clock = static function( int $seconds ) use ( &$appData ): void { $appData['./nino/mail/now'] = NOW + $seconds; };
 $reset = static function() use ( &$appData, &$taken, &$answer, &$throws, &$onSend, $path ): void {
-	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-unwritable.php', '/data/mail-queue-unreadable.php', '/data/mail-queue-keys.php', '/data/mail-queue-stuck.php', \Nino\MailQueue::DAMAGED_KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED_STATES, '/data/mail-queue-body.php', '/data/mail-queue-states.php' ] as $name ) {
+	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_FAILED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-unwritable.php', '/data/mail-queue-unreadable.php', '/data/mail-queue-keys.php', '/data/mail-queue-stuck.php', \Nino\MailQueue::DAMAGED_KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED_STATES, '/data/mail-queue-body.php', '/data/mail-queue-states.php', '/data/mail-queue-lapsed.php', '/data/mail-queue-untried.php' ] as $name ) {
 		is_dir( $path( $name ) ) === true ? @rmdir( $path( $name ) ) : @unlink( $path( $name ) );
 	}
 
@@ -1088,6 +1088,240 @@ echo 'files loaded: '. $none[2]. ' without an outbox, '. $sleeping[2]. ' with ma
 check( 'a request of a site whose outbox is empty loads neither the mail class nor the classes of the outbox', $none[0] === false && $none[1] === false );
 check( '...and so is a request of a site whose mails all wait for a time to come: it loads none of them either', $sleeping[0] === false && $sleeping[1] === false && $sleeping[2] === $none[2] );
 check( '...and a request that finds a mail due loads them to deliver, after its response', $some[0] === true && $some[1] === true && $some[2] > $none[2] );
+
+echo "\n";
+echo "A mail that expires\n";
+
+// claim() as a deliverer calls it, with the variables it fills
+final class MailQueueProbe {
+
+	public static function claim( array &$appData, string $token, int $now ): ?array {
+
+		$gave = 0;
+		$unwritable = false;
+
+		return \Nino\MailQueue::claim( $appData, $token, $now, $gave, $unwritable );
+	}
+}
+
+// The mails of this part tell their own words, so that a file that holds one of them can be found
+$coded = static fn( int $i, array $over = [] ): array => $over + [ 'to' => 'lapse'. $i. '-7731@example.net', 'subject' => 'Code lapse'. $i, 'body' => '<p>Your code is 5550'. $i. '</p>', 'replyTo' => '' ];
+$traces = static fn( int $i ): array => array_merge( $holders( 'lapse'. $i. '-7731' ), $holders( 'Code lapse'. $i ), $holders( '5550'. $i ) );
+
+$reset();
+$refused = [];
+
+foreach( [ 0, 59, \Nino\MailQueue::MAX_AGE + 1, -60, '900', 900.0, 900.5, true, null, [ 900 ] ] as $value )
+	$refused[] = [ \Nino\Mail::queue( $appData, [ 'expires' => $value ] + $mail( 1 ) ), \Nino\Mail::queueRefused( $appData ) ];
+
+$low = \Nino\Mail::queue( $appData, [ 'expires' => \Nino\MailQueue::MIN_EXPIRES ] + $mail( 2 ) );
+$high = \Nino\Mail::queue( $appData, [ 'expires' => \Nino\MailQueue::MAX_AGE ] + $mail( 3 ) );
+check( 'the expiry is a whole number of seconds, a minute at least and MAX_AGE at most: anything else - none of the numbers, a float, a string, null - is no mail, refused as invalid with nothing queued; the two limits are taken and stored as the second they name', array_unique( array_map( 'json_encode', $refused ) ) === [ json_encode( [ '', 'invalid' ] ) ] && count( $waiting() ) === 2 && ( $waiting()[$low]['expires'] ?? 0 ) === NOW + 60 && ( $waiting()[$high]['expires'] ?? 0 ) === NOW + \Nino\MailQueue::MAX_AGE );
+
+$reset();
+\Nino\Mail::queue( $appData, $mail( 1 ) );
+check( 'a mail with no expiry is stored as it always was: the file has no field for it and the mail never lapses', str_contains( (string) file_get_contents( $path( \Nino\MailQueue::WAITING ) ), 'expires' ) === false && \Nino\Mail::queue( $appData, $mail( 1 ) ) !== '' );
+
+$reset();
+$first = \Nino\Mail::queue( $appData, [ 'expires' => 300 ] + $mail( 1 ), \Nino\Mail::CLIENT, 'lapse/same' );
+check( 'the expiry is no part of what a mail is: the same mail with another expiry, or none, under its key is that mail - its id is answered and the expiry it had stays', \Nino\Mail::queue( $appData, [ 'expires' => 900 ] + $mail( 1 ), \Nino\Mail::CLIENT, 'lapse/same' ) === $first && \Nino\Mail::queue( $appData, $mail( 1 ), \Nino\Mail::CLIENT, 'lapse/same' ) === $first && count( $waiting() ) === 1 && ( $waiting()[$first]['expires'] ?? 0 ) === NOW + 300 );
+
+// Two mails with the expiry of the same second and one without, tried once and refused by the transport so that they wait for their next attempt
+$reset();
+$answer = false;
+$one = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 900 ] ), \Nino\Mail::CLIENT, 'lapse/one' );
+$clock( 1 );
+$two = \Nino\Mail::queue( $appData, $coded( 2, [ 'expires' => 899 ] ), \Nino\Mail::CLIENT, 'lapse/two' );
+$clock( 2 );
+$plain = \Nino\Mail::queue( $appData, $coded( 3 ), \Nino\Mail::CLIENT, 'lapse/plain' );
+\Nino\Mail::deliverQueued( $appData, 10 );
+$tries = count( $taken );
+$answer = true;
+$clock( 899 );
+$early = \Nino\Mail::state( $appData, 'lapse/two' );
+$result = \Nino\Mail::deliverQueued( $appData, 1 );
+$clock( 900 );
+$stateAt = \Nino\Mail::state( $appData, 'lapse/two' );
+$texted = $traces( 2 ) !== [];
+$result = \Nino\Mail::deliverQueued( $appData, 10 );
+$subjects = array_column( array_slice( $taken, $tries ), 'subject' );
+check( 'a mail is tried until the second of its expiry and never from it: one second before, it goes out; at the second the transport is asked for the mail with no expiry and not for the one that lapsed', $tries === 3 && $subjects === [ 'Code lapse1', 'Code lapse3' ] && $result['delivered'] === 1 && $result['retry'] === 0 );
+check( '...state() says waiting until the second and failed from it - before any run took the mail out of the file, which still holds its text - and after the run the mail is in no file: not in the outbox, not in the keys, not in the states, not in any record', $early === \Nino\Mail::STATE_WAITING && $stateAt === \Nino\Mail::STATE_FAILED && $texted === true && $traces( 2 ) === [] && $waiting() === [] && \Nino\Mail::state( $appData, 'lapse/two' ) === \Nino\Mail::STATE_FAILED && \Nino\Mail::state( $appData, 'lapse/plain' ) === \Nino\Mail::STATE_SENT );
+$said = array_values( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) );
+$record = \Nino\MailQueue::decode( (string) @file_get_contents( $path( \Nino\MailQueue::FAILED ) ) )['failed'] ?? [];
+check( '...and what a transport had refused before it lapsed is the sign of a transport that is down: it is one mail given up on, with a record of its own word that holds no text, no address and no key, the log says it, and the dashboard shows the failure', $result['failed'] === 1 && \Nino\Mail::queued( $appData )['failed'] === 1 && count( $record ) === 1 && $record[0]['error'] === \Nino\MailQueue::LAPSED && count( $said ) === 1 && \Nino\Mail::failure( $appData ) !== null && $traces( 2 ) === [] );
+
+// A failure that stands is neither cleared nor made worse by a mail that lapses
+$reset();
+$answer = false;
+\Nino\Mail::send( $appData, 'probe@example.com', 'probe', 'probe', '' );
+$answer = true;
+$standing = \Nino\Mail::failure( $appData );
+\Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ) );
+$clock( 60 );
+\Nino\Mail::deliverQueued( $appData );
+check( 'a mail that lapses leaves the failure of the dashboard as it is: it is not delivered and clears none, and it is no failure and adds none', $standing !== null && \Nino\Mail::failure( $appData ) === $standing && $traces( 1 ) === [] );
+
+// A mail that lapses while it waits for a later attempt wakes the outbox, though the attempt is far away
+$reset();
+$answer = false;
+\Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 120 ] ) );
+\Nino\Mail::deliverQueued( $appData );
+$clock( 60 );
+\Nino\Mail::deliverQueued( $appData );
+$tries = count( $taken );
+$clock( 119 );
+$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '<p>ok</p>' ] ];
+$quiet = \Nino\Http::prepareAfter( $appData, $request );
+$clock( 120 );
+$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '<p>ok</p>' ] ];
+$woken = \Nino\Http::prepareAfter( $appData, $request );
+foreach( $woken as $work )
+	$work();
+check( 'the second of an expiry is a second at which something is due, whatever the next attempt says: the request a second before has no work, the request at it has, and its work takes the mail out of the file with no transport asked', $tries === 2 && $quiet === [] && count( $woken ) === 1 && count( $taken ) === $tries && $waiting() === [] && is_file( $path( \Nino\MailQueue::DUE ) ) === false && $traces( 1 ) === [] );
+
+// The window: a mail that was taken a second before its expiry and whose transport is about to be asked
+$reset();
+$mine = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 900 ] ), \Nino\Mail::CLIENT, 'lapse/window' );
+$taking = \Nino\MailQueue::claim( $appData, 'aaaa', NOW + 899, $gave, $unwritable );
+$clock( 900 );
+$deliver = new \ReflectionMethod( \Nino\Mail::class, '_deliverQueued' );
+$outcome = $deliver->invokeArgs( null, [ &$appData, $taking ?? [] ] );
+$settled = \Nino\MailQueue::settle( $appData, 'aaaa', $mine, $outcome[0], $outcome[1], NOW + 900 );
+check( 'a mail that was taken before its expiry and is about to go to the transport after it is let go with no transport asked: it leaves the outbox with its text, is failed by its key, and no record or failure is made of it', $taking !== null && $outcome === [ 'lapsed', '' ] && $taken === [] && $settled === [ 'written' => true, 'gaveUp' => false ] && $waiting() === [] && $traces( 1 ) === [] && \Nino\Mail::state( $appData, 'lapse/window' ) === \Nino\Mail::STATE_FAILED && is_file( $path( \Nino\MailQueue::FAILED ) ) === false );
+$reset();
+\Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 900 ] ) );
+$taking = \Nino\MailQueue::claim( $appData, 'aaaa', NOW + 899, $gave, $unwritable );
+$clock( 899 );
+check( '...and a second earlier the same mail goes to the transport', $taking !== null && $deliver->invokeArgs( null, [ &$appData, $taking ] ) === [ 'sent', '' ] && count( $taken ) === 1 );
+
+// ...and the same for a mail that a transport had refused before: it is a mail given up on, as it is where a run finds it
+$reset();
+$answer = false;
+$mine = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 900 ] ), \Nino\Mail::CLIENT, 'lapse/refused' );
+\Nino\Mail::deliverQueued( $appData );
+$clock( 899 );
+$taking = \Nino\MailQueue::claim( $appData, 'aaaa', NOW + 899, $gave, $unwritable );
+$clock( 900 );
+$outcome = $deliver->invokeArgs( null, [ &$appData, $taking ?? [] ] );
+$settled = \Nino\MailQueue::settle( $appData, 'aaaa', $mine, $outcome[0], $outcome[1], NOW + 900 );
+check( 'a mail that a transport had refused and whose expiry passes before it is asked again is let go as a mail given up on: a record of the word, and the failure of the dashboard stands to be raised by the run that counts it', $outcome === [ 'lapsed', '' ] && $settled === [ 'written' => true, 'gaveUp' => true ] && \Nino\Mail::queued( $appData )['failed'] === 1 && $waiting() === [] && \Nino\Mail::state( $appData, 'lapse/refused' ) === \Nino\Mail::STATE_FAILED );
+
+// A mail that a deliverer took and did not finish is no question for the cron job
+$reset();
+\Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ), \Nino\Mail::CLIENT, 'lapse/orphan' );
+\MailQueueProbe::claim( $appData, 'aaaa', NOW );
+$clock( 61 + \Nino\MailQueue::LEASE );
+\Nino\Mail::deliverQueued( $appData );
+$said = array_values( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) );
+check( 'a mail that a deliverer took and that lapses with its lease is said apart from one that no run took: one line, which asks nothing of the cron job', count( $said ) === 1 && str_contains( $said[0], 'did not finish' ) === true && str_contains( $said[0], 'cron' ) === false && $waiting() === [] && $taken === [] );
+
+// A flood of mails that lapse pushes out no record of a mail given up on
+$reset();
+$blank = static fn( int $i, array $over ): array => $over + [ 'id' => sprintf( '%016x', $i ), 'key' => '', 'content' => str_repeat( 'a', 64 ), 'kind' => 'system', 'to' => $address( 9 ), 'subject' => 's', 'body' => 'b', 'replyTo' => '', 'queued' => NOW, 'tries' => 0, 'next' => NOW, 'error' => '', 'claim' => '', 'until' => 0 ];
+@mkdir( dirname( $list ), 0755, true );
+file_put_contents( $list, \Nino\MailQueue::encode( [ 'format' => 1, 'waiting' => [ $blank( 1, [ 'tries' => \Nino\MailQueue::attempts(), 'error' => 'refused' ] ) ] ] ) );
+\Nino\Mail::deliverQueued( $appData );
+$flood = [];
+
+for( $i = 2; $i < 602; $i++ )
+	$flood[] = $blank( $i, [ 'tries' => 1, 'error' => 'refused', 'expires' => NOW + 1 ] );
+
+file_put_contents( $list, \Nino\MailQueue::encode( [ 'format' => 1, 'waiting' => $flood ] ) );
+@unlink( $path( \Nino\MailQueue::DUE ) );
+$clock( 2 );
+$answer = true;
+$result = \Nino\Mail::deliverQueued( $appData, 100 );
+$words = array_count_values( array_column( \Nino\MailQueue::decode( (string) file_get_contents( $path( \Nino\MailQueue::FAILED ) ) )['failed'] ?? [], 'error' ) );
+\Nino\Mail::queue( $appData, $mail( 1 ) );
+\Nino\Mail::deliverQueued( $appData );
+check( 'a flood of mails that lapse pushes out no record of a mail given up on: 600 of them leave the last MAX_LAPSED records of their word beside the record of the mail of the system, which holds the failure of the dashboard through a delivery that went out', ( new \ReflectionClass( \Nino\MailQueue::class ) )->getConstant( 'MAX_LAPSED' ) === 50 && $result['failed'] === 600 && $words == [ \Nino\MailQueue::ABANDONED => 1, \Nino\MailQueue::LAPSED => \Nino\MailQueue::MAX_LAPSED ] && \Nino\MailQueue::given( $appData ) === 1 && \Nino\Mail::failure( $appData ) !== null );
+
+// A code that lapsed and lies in the file is not the answer to the request for a new one
+$reset();
+$answer = false;
+$old = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ), \Nino\Mail::CLIENT, 'lapse/key' );
+\Nino\Mail::deliverQueued( $appData );
+$answer = true;
+$clock( 60 );
+$new = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 900 ] ), \Nino\Mail::CLIENT, 'lapse/key' );
+$result = \Nino\Mail::deliverQueued( $appData );
+check( 'a mail that lapsed and is still in the file is not the mail that waits under its key: the same mail queued again is a new one - no conflict, not the old id - and the run lets the old go and delivers the new', $new !== '' && $new !== $old && $result['delivered'] === 1 && $result['failed'] === 1 && count( $taken ) === 2 && $waiting() === [] && \Nino\Mail::state( $appData, 'lapse/key' ) === \Nino\Mail::STATE_SENT );
+
+// A site whose outbox holds nothing but codes, and a transport that never takes one: each code is tried until it lapses, none is ever given up on
+$reset();
+$answer = false;
+$ids = [];
+
+for( $minute = 0; $minute <= 120 * 60; $minute += 60 ) {
+
+	if( $minute % 300 === 0 )
+		$ids[] = \Nino\Mail::queue( $appData, $coded( 1 + count( $ids ), [ 'expires' => 900 ] ), \Nino\Mail::CLIENT, 'lapse/code'. count( $ids ) );
+
+	$clock( $minute );
+	\Nino\Mail::deliverQueued( $appData );
+}
+
+$said = array_values( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) );
+check( 'a transport that never takes a mail stays visible where every mail expires: the failure of the dashboard is raised, queued() counts the mails that lapsed after a refusal, and the log says it once for the two hours, not for each', \Nino\Mail::failure( $appData ) !== null && \Nino\Mail::queued( $appData )['failed'] > 0 && count( $said ) === 1 && str_contains( $said[0], '@' ) === false );
+$answer = true;
+$clock( 121 * 60 );
+\Nino\Mail::queue( $appData, $mail( 1 ) );
+\Nino\Mail::deliverQueued( $appData );
+check( '...and it goes with the first delivery that went out, though the records of the mails that lapsed are still kept: they are no reason to hold the failure back, as the records of the other mails given up on are', \Nino\Mail::failure( $appData ) === null && \Nino\Mail::queued( $appData )['failed'] > 0 );
+
+// Mails that lapse with no transport asked: no run came
+$reset();
+\Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ) );
+\Nino\Mail::queue( $appData, $coded( 2, [ 'expires' => 60 ] ) );
+$clock( 3600 );
+\Nino\Mail::deliverQueued( $appData );
+$said = array_values( array_filter( ninoWarnings(), static fn( string $warning ): bool => str_starts_with( $warning, 'Mail queue' ) ) );
+check( 'mails that lapse before any transport was asked for them are no failure of the transport: no failure of the dashboard, no record, and the log says once that mails lapse unasked, which a cron job that does not run looks like', \Nino\Mail::failure( $appData ) === null && \Nino\Mail::queued( $appData )['failed'] === 0 && count( $said ) === 1 && str_contains( $said[0], 'cron' ) === true && $taken === [] && $waiting() === [] );
+
+// The transport of a mail runs over the second of its expiry
+$reset();
+$held = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ), \Nino\Mail::CLIENT, 'lapse/held' );
+$clock( 59 );
+$taking = \MailQueueProbe::claim( $appData, 'aaaa', NOW + 59 );
+$clock( 61 );
+$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '<p>ok</p>' ] ];
+$busy = \Nino\Http::prepareAfter( $appData, $request );
+$states = [ \Nino\Mail::state( $appData, 'lapse/held' ) ];
+// A mail that is due makes the run look at the whole outbox
+\Nino\Mail::queue( $appData, $mail( 5 ) );
+$result = \Nino\Mail::deliverQueued( $appData );
+$states[] = \Nino\Mail::state( $appData, 'lapse/held' );
+$same = \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ), \Nino\Mail::CLIENT, 'lapse/held' );
+$inFile = count( $waiting() );
+$settled = \Nino\MailQueue::settle( $appData, 'aaaa', $held, 'sent', '', NOW + 61 );
+check( 'a mail whose transport runs over the second of its expiry stays in the file until the transport answers: another run, which delivers a mail that is due, does not take it and does not send it, state() says waiting - not failed and then sent - and queue() answers its id', $taking !== null && $busy === [] && $result === [ 'delivered' => 1, 'void' => 0, 'retry' => 0, 'held' => 0, 'failed' => 0, 'unwritable' => false ] && $states === [ \Nino\Mail::STATE_WAITING, \Nino\Mail::STATE_WAITING ] && $same === $held && $inFile === 1 && count( $taken ) === 1 && $taken[0]['subject'] === 'Subject 5' );
+check( '...and its answer finds it: the mail is sent, its key is the key of a mail that went out, and no record or failure is made', $settled === [ 'written' => true, 'gaveUp' => false ] && \Nino\Mail::state( $appData, 'lapse/held' ) === \Nino\Mail::STATE_SENT && $waiting() === [] && \Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ), \Nino\Mail::CLIENT, 'lapse/held' ) === $held && $waiting() === [] && is_file( $path( \Nino\MailQueue::FAILED ) ) === false );
+
+$reset();
+\Nino\Mail::queue( $appData, $coded( 1, [ 'expires' => 60 ] ), \Nino\Mail::CLIENT, 'lapse/dead' );
+$clock( 59 );
+\MailQueueProbe::claim( $appData, 'aaaa', NOW + 59 );
+$clock( 61 );
+\Nino\Mail::deliverQueued( $appData );
+$during = count( $waiting() );
+$clock( 59 + \Nino\MailQueue::LEASE );
+$result = \Nino\Mail::deliverQueued( $appData );
+check( 'a transport that never answers holds the mail for its lease and no longer: the run after the lease takes it out of the file with its text and never asks the transport for it, and its key is failed', $during === 1 && $waiting() === [] && $taken === [] && $result['delivered'] === 0 && \Nino\Mail::state( $appData, 'lapse/dead' ) === \Nino\Mail::STATE_FAILED && $traces( 1 ) === [] );
+
+// A file a person edited
+$reset();
+@mkdir( dirname( $list ), 0755, true );
+$good = [ 'id' => '1234567890123456', 'key' => '', 'content' => str_repeat( 'a', 64 ), 'kind' => 'client', 'to' => $address( 9 ), 'subject' => 'Edited', 'body' => 'Hi', 'replyTo' => '', 'queued' => NOW, 'tries' => 0, 'next' => NOW, 'error' => '', 'claim' => '', 'until' => 0 ];
+file_put_contents( $list, \Nino\MailQueue::encode( [ 'format' => 1, 'waiting' => [
+	$good,
+	[ 'id' => '2123456789abcdef', 'expires' => 'soon' ] + $good,
+	[ 'id' => '3123456789abcdef', 'expires' => -5 ] + $good,
+	[ 'id' => '4123456789abcdef', 'expires' => NOW - 5 ] + $good,
+	[ 'id' => '5123456789abcdef', 'expires' => null ] + $good,
+] ] ) );
+$result = \Nino\Mail::deliverQueued( $appData, 100 );
+check( 'an expiry in a file a person edited is read with no trust: one that is no number of seconds makes the entry no mail, which is given up on, and one that has passed lets the mail go with no record; a mail with no field is a mail with none', $result['delivered'] === 1 && $result['failed'] === 3 && count( $taken ) === 1 && \Nino\Mail::queued( $appData )['failed'] === 3 && $waiting() === [] );
 
 echo "\n";
 echo "The command of the outbox\n";

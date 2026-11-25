@@ -26,7 +26,8 @@ namespace Nino {
 	 *	the file, which every writer takes (lockFile(), read, putFileContent(), the sequence mutate() is made of).
 	 *
 	 *	WAITING, '/data/mail-queue.php': { format, waiting: [ mail, ... ] }. A mail is { id, key, content, kind, to,
-	 *	subject, body, replyTo, queued, tries, next, error, claim, until }. The file is removed when the last mail leaves
+	 *	subject, body, replyTo, queued, tries, next, error, claim, until, expires }, 'expires' - the second after which the
+	 *	mail is never delivered - only where the caller gave one (see \Nino\Mail::queue()). The file is removed when the last mail leaves
 	 *	it, so that the check of every request - whether the file is there - is a question of one stat. A mail to nobody
 	 *	(\Nino\Mail::VOID) is a mail of the kind CLIENT here, whose 'to' is hyphens alone as long as the address was: the
 	 *	outbox knows no kind of its own for it, and the deliverer lets it go without a transport (see \Nino\Mail::queue()).
@@ -54,6 +55,21 @@ namespace Nino {
 	 *
 	 *	FAILED, '/data/mail-failed.php': { format, failed: [ record, ... ] }. What a mail came to that was given up on -
 	 *	no address, no subject, no body, no key, only { id, kind, queued, failed, tries, error } - for KEEP_FAILED seconds.
+	 *
+	 *	A mail that carries an expiry has an end of its own: from the second it names, the next run takes it out of WAITING together
+	 *	with its text (the file of the text of a mail of the owner, too) and notes its key as 'failed', and a deliverer that took it
+	 *	a moment before is stopped just before the transport is asked. Two cases are told apart by what the transport said before.
+	 *	A mail that a transport refused or threw on at least once ('error' is set) and then lapsed is a sign of a transport that is
+	 *	down - a site whose outbox holds nothing but codes would otherwise never hear of it, since none of them is ever given up
+	 *	on: it is kept in FAILED as a record of the word LAPSED (no text, no address, no key, as every record; the last MAX_LAPSED of them, in a
+	 *	list of their own that pushes out no record of a mail given up on), counts in
+	 *	counts() and for the failure of the dashboard as a mail given up on, and clears with the next delivery that went out - the
+	 *	records of this word are none of what holds that back (see given()). A mail that lapsed before any transport was asked -
+	 *	no run came in time - is no fault of the transport and leaves nothing but its state; the log says, once an hour, that mails
+	 *	lapse unasked, which is what a cron job that does not run looks like. A mail whose lease is running - its transport was
+	 *	asked before the second - stays in WAITING until the lease is over, so that the settle() of the transport finds it and notes
+	 *	'sent', and no state of it says 'failed' and then 'sent'; a lease that ends with no settle() is followed by the removal, and
+	 *	the mail is never asked again. The clock is the site's: one that is set back after the second makes the mail due again.
 	 *
 	 *	A mail is delivered at least once. A deliverer takes one mail at a time: the attempt is counted, the next one set and
 	 *	the lease of the mail written - and read back - before the transport is asked (claim()), so that a process that dies in
@@ -158,11 +174,19 @@ namespace Nino {
 		// How long a mail may wait before it is given up on, in seconds - two days
 		public const int MAX_AGE = 172800;
 
+		// The shortest an expiry that a caller names may be, in seconds from the moment of queue(): a minute, the first wait of a mail
+		// that was not delivered at once; the longest is MAX_AGE, the age at which every mail is given up on whatever it says
+		public const int MIN_EXPIRES = 60;
+
 		// How long a mail that was given up on is kept as a record, and the notice of a file that could not be read, in seconds - fourteen days
 		public const int KEEP_FAILED = 1209600;
 
 		// How many records of mails given up on the file keeps; the oldest go first
 		public const int MAX_FAILED = 500;
+
+		// How many records of the word LAPSED it keeps besides, the oldest first: a record of a mail that lapsed after a refusal says that
+		// mails lapse and the last few of them, and a flood of them in a bad hour must push out no record of a mail given up on
+		public const int MAX_LAPSED = 50;
 
 		// The seconds a mail waits after the first, second ... attempt that did not deliver it: 1 min, 5 min, 30 min, 2 h, 12 h.
 		// One more attempt than there are waits is the last
@@ -184,6 +208,7 @@ namespace Nino {
 		public const string INVALID = 'invalid';
 		public const string FAILURE = 'exception';
 		public const string EXPIRED = 'expired';
+		public const string LAPSED = 'lapsed';
 		public const string ABANDONED = 'abandoned';
 		public const string UNREADABLE = 'unreadable';
 
@@ -262,7 +287,7 @@ namespace Nino {
 		public static function peek( array &$appData, string $kind, string $key ): array {
 
 			$state = self::_read( $appData );
-			$known = self::_withKey( $state['waiting'], $key ) ?? self::_remembered( $appData, $key );
+			$known = self::_withKey( $state['waiting'], $key, self::now( $appData ) ) ?? self::_remembered( $appData, $key );
 
 			return [ 'id' => $known['id'] ?? '', 'content' => $known['content'] ?? '', 'full' => self::_full( $state['waiting'], $kind ) ];
 		}
@@ -275,10 +300,11 @@ namespace Nino {
 		 *	@param		string		$kind					One of \Nino\Mail::CLIENT, SYSTEM, TEST, OWNER
 		 *	@param		string		$key					The hash of the key against a second queueing of the same mail, '' for none
 		 *	@param		string		$content			The hash of what the mail is, which a second mail with the same key has to equal
+		 *	@param		int				$expires			Seconds from now after which the mail is delivered by nobody, 0 for no expiry; no part of $content: the same mail with another expiry is the same mail
 		 *
 		 *	@return 	array										{ id, refused } - the id of the mail that waits, or '' and why it was not taken: 'full', 'conflict' (the key is a mail that is another) or 'unwritable'
 		 */
-		public static function add( array &$appData, array $mail, string $kind, string $key, string $content ): array {
+		public static function add( array &$appData, array $mail, string $kind, string $key, string $content, int $expires = 0 ): array {
 
 			$now		= self::now( $appData );
 			$id			= bin2hex( random_bytes( 8 ) );
@@ -286,14 +312,15 @@ namespace Nino {
 
 			// The callback answers null for a mail that is known and for a full outbox: those are answers of their own in $result,
 			// and what stays 'unwritable' is a file that could not be locked or written
-			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $mail, $kind, $key, $content, $now, $id, &$result ): ?array {
+			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $mail, $kind, $key, $content, $expires, $now, $id, &$result ): ?array {
 
 				$state = self::_state( $stored );
 
-				// The same mail twice is one: the one that waits is the answer. Another mail under the key is refused, never
-				// answered with the id of a mail it is not
+				// The same mail twice is one: the one that waits is the answer, unless its expiry has passed, which makes it no mail that
+				// waits - a code that lapsed and is still in the file is not the answer to the request for a new one. Another mail under
+				// the key is refused, never answered with the id of a mail it is not
 				$unreadable	= false;
-				$known			= self::_withKey( $state['waiting'], $key ) ?? self::_remembered( $appData, $key, $unreadable );
+				$known			= self::_withKey( $state['waiting'], $key, $now ) ?? self::_remembered( $appData, $key, $unreadable );
 
 				// Where the keys cannot be read it is not known whether this mail went out a moment ago: it is not queued
 				if( $known === null && $unreadable === true )
@@ -343,6 +370,7 @@ namespace Nino {
 					'error'		=> '',
 					'claim'		=> '',
 					'until'		=> 0,
+					'expires'	=> $expires > 0 ? $now + $expires : 0,
 				];
 
 				$result = [ 'id' => $id, 'refused' => '' ];
@@ -364,7 +392,10 @@ namespace Nino {
 
 		/**
 		 *	Take the mail that is due for the deliverer of $token, and give up on the ones that cannot be delivered any
-		 *	more: older than MAX_AGE, out of attempts, or no mail at all. Taking the mail is counting the attempt, setting
+		 *	more: older than MAX_AGE, out of attempts, or no mail at all. A mail whose expiry has passed is let go the same
+		 *	way, with its text, unless its lease runs - it stays until the lease is over: a mail that a transport refused is a mail
+		 *	given up on, with the word LAPSED, and one that no transport was asked for is no mail that was given up on: its key is
+		 *	noted as failed and nothing else is written of it. Taking the mail is counting the attempt, setting
 		 *	the wait after it and writing its lease - and nothing is answered that is not on the disk, read back from
 		 *	there: where the outbox cannot be written the call says so and no mail is handed out, since a mail that is sent
 		 *	without a record of it is sent again by every request that follows.
@@ -372,15 +403,17 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$token				The deliverer
 		 *	@param		int				$now
-		 *	@param		int				&$gaveUp			(reference) How many mails this call gave up on, for the report of the caller
+		 *	@param		int				&$gaveUp			(reference) How many mails this call gave up on, for the report of the caller; a mail whose expiry passed is none of them
 		 *	@param		bool			&$unwritable	(reference) Whether the outbox could not be written
+		 *	@param		array 		&$lapses			(reference) { rejected, untried, orphaned }: how many mails whose expiry passed this call let go - rejected, a transport had refused them, which is in $gaveUp as a mail given up on; untried, no deliverer had taken them; orphaned, one had and did not finish
 		 *
-		 *	@return 	array|null								The mail taken { id, kind, to, subject, body, replyTo }, null for none
+		 *	@return 	array|null								The mail taken { id, kind, to, subject, body, replyTo, expires }, null for none
 		 */
-		public static function claim( array &$appData, string $token, int $now, int &$gaveUp, bool &$unwritable ): ?array {
+		public static function claim( array &$appData, string $token, int $now, int &$gaveUp, bool &$unwritable, array &$lapses = [] ): ?array {
 
 			$gaveUp			= 0;
 			$unwritable	= false;
+			$lapses			= [ 'rejected' => 0, 'untried' => 0, 'orphaned' => 0 ];
 			$state			= self::_read( $appData );
 
 			// A file that is there and cannot be read is no empty outbox: nothing is taken from it, and it is not written over
@@ -406,18 +439,35 @@ namespace Nino {
 			$given	= 0;
 			$dropped = [];
 
-			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $token, $now, &$taken, &$given, &$dropped ): ?array {
+			$written = self::_mutate( $appData, self::WAITING, static function( array $stored ) use ( &$appData, $token, $now, &$taken, &$given, &$dropped, &$lapses ): ?array {
 
 				$state	= self::_state( $stored );
 				$mine		= null;
 				$records = [];
 				$pending = [];
+				$lapsed	= [];
 
 				for( $i = 0; $i < $state['bad']; $i++ )
 					$records[] = self::_record( bin2hex( random_bytes( 8 ) ), \Nino\Mail::CLIENT, $now, $now, 0, self::INVALID );
 
 				// The id of a mail is its field, not the key it is stored under: php makes an array key of digits alone an int
 				foreach( $state['waiting'] as $entry ) {
+
+					// A mail whose expiry has passed leaves, once no transport holds it: one that a transport had refused is a sign of a transport that
+					// is down and is recorded as a mail given up on, one that no transport was asked for leaves no record - its end is the one its
+					// caller asked for. A mail that is held by a transport stays for the settle() of it, and is gone with its lease
+					if( self::lapsed( $entry, $now ) === true && self::_leased( $entry, $now ) === false ) {
+
+						if( $entry['error'] !== '' ) {
+
+							$records[] = self::_record( $entry['id'], $entry['kind'], $entry['queued'], $now, $entry['tries'], self::LAPSED );
+							$pending[ $entry['id'] ] = true;
+						}
+						else
+							$lapsed[ $entry['id'] ] = $entry['tries'] === 0 ? 'untried' : 'orphaned';
+
+						continue;
+					}
 
 					if( $now - $entry['queued'] >= self::MAX_AGE )
 						$why = self::EXPIRED;
@@ -433,7 +483,7 @@ namespace Nino {
 				// The mails of the owner are taken after the mails of the others and while the credit of their pace lasts, so that a wave neither
 				// keeps a mail of a visitor waiting nor goes out in one run
 				$credit	= self::_credit( $state['pace'], $now );
-				$due		= array_filter( array_diff_key( $state['waiting'], $pending ), static fn( array $entry ): bool => $entry['next'] <= $now && $entry['tries'] < self::attempts() && self::_leased( $entry, $now ) === false && ( $entry['kind'] !== \Nino\Mail::OWNER || $credit >= self::OWNER_GAP ) );
+				$due		= array_filter( array_diff_key( $state['waiting'], $pending, $lapsed ), static fn( array $entry ): bool => $entry['next'] <= $now && $entry['tries'] < self::attempts() && self::_leased( $entry, $now ) === false && ( $entry['kind'] !== \Nino\Mail::OWNER || $credit >= self::OWNER_GAP ) );
 				uasort( $due, static fn( array $a, array $b ): int => [ $a['kind'] === \Nino\Mail::OWNER, $a['queued'], $a['id'] ] <=> [ $b['kind'] === \Nino\Mail::OWNER, $b['queued'], $b['id'] ] );
 
 				foreach( $due as $entry ) {
@@ -443,7 +493,7 @@ namespace Nino {
 					$state['waiting'][ $entry['id'] ]['next']		= $now + self::BACKOFF[ min( $tries, count( self::BACKOFF ) ) - 1 ];
 					$state['waiting'][ $entry['id'] ]['claim']	= $token;
 					$state['waiting'][ $entry['id'] ]['until']	= $now + self::LEASE;
-					$mine = [ 'id' => $entry['id'], 'kind' => $entry['kind'], 'to' => $entry['to'], 'subject' => $entry['subject'], 'body' => $entry['body'], 'replyTo' => $entry['replyTo'] ];
+					$mine = [ 'id' => $entry['id'], 'kind' => $entry['kind'], 'to' => $entry['to'], 'subject' => $entry['subject'], 'body' => $entry['body'], 'replyTo' => $entry['replyTo'], 'expires' => $entry['expires'] ];
 
 					if( $entry['kind'] === \Nino\Mail::OWNER )
 						$state['pace'] = [ 'at' => $now, 'credit' => $credit - self::OWNER_GAP ];
@@ -467,13 +517,14 @@ namespace Nino {
 					$pending = [];
 				}
 
-				$gone = array_intersect_key( $state['waiting'], $pending );
+				$lapses = [ 'rejected' => count( array_filter( $records, static fn( array $record ): bool => $record['error'] === self::LAPSED ) ), 'untried' => count( array_keys( $lapsed, 'untried', true ) ), 'orphaned' => count( array_keys( $lapsed, 'orphaned', true ) ) ];
+				$gone = array_intersect_key( $state['waiting'], $pending + $lapsed );
 
 				// What became of them is kept by their keys, once the record of them is written
 				self::_note( $appData, array_map( static fn( array $entry ): array => [ $entry['key'], $entry['content'], $entry['kind'] === \Nino\Mail::OWNER ], $gone ), \Nino\Mail::STATE_FAILED, $now );
 
 				$dropped = array_column( array_filter( $gone, static fn( array $entry ): bool => $entry['kind'] === \Nino\Mail::OWNER ), 'id' );
-				$state['waiting'] = array_diff_key( $state['waiting'], $pending );
+				$state['waiting'] = array_diff_key( $state['waiting'], $pending + $lapsed );
 				$taken	= $mine;
 				$given	= count( $records );
 
@@ -527,7 +578,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$token				The deliverer
 		 *	@param		string		$id
-		 *	@param		string		$outcome			'sent' - the mail leaves the outbox; 'again' - it stays for the time set when it was taken and says why in $error, unless it had its last attempt, which gives up on it; 'invalid' - it is no mail that can be sent, which gives up on it at once; 'held' - the mail was not tried, the attempt is not counted and it waits CAP_WAIT
+		 *	@param		string		$outcome			'sent' - the mail leaves the outbox; 'again' - it stays for the time set when it was taken and says why in $error, unless it had its last attempt, which gives up on it; 'invalid' - it is no mail that can be sent, which gives up on it at once; 'held' - the mail was not tried, the attempt is not counted and it waits CAP_WAIT; 'lapsed' - its expiry passed after it was taken and before the transport was asked: it leaves the outbox with its text and its key is noted as failed, with the record of a mail given up on (LAPSED) where a transport had refused it before
 		 *	@param		string		$error				One of the words of 'error', for 'again'
 		 *	@param		int				$now
 		 *
@@ -577,6 +628,22 @@ namespace Nino {
 					$state['waiting'][$id]['next']	= $now + self::CAP_WAIT;
 					$state['waiting'][$id]['claim']	= '';
 					$state['waiting'][$id]['until']	= 0;
+				}
+				else if( $outcome === 'lapsed' ) {
+
+					// As claim() lets a lapsed mail go: one that a transport had refused is recorded, one that none was asked for is not
+					if( $entry['error'] !== '' ) {
+
+						if( self::_fail( $appData, [ self::_record( $id, $entry['kind'], $entry['queued'], $now, $entry['tries'], self::LAPSED ) ], $now ) === false )
+							return null;
+
+						$gaveUp = true;
+					}
+
+					self::_note( $appData, [ [ $entry['key'], $entry['content'], $entry['kind'] === \Nino\Mail::OWNER ] ], \Nino\Mail::STATE_FAILED, $now );
+
+					unset( $state['waiting'][$id] );
+					$text = $entry['kind'] === \Nino\Mail::OWNER;
 				}
 				else if( $outcome === 'invalid' || $entry['tries'] >= self::attempts() ) {
 
@@ -645,6 +712,49 @@ namespace Nino {
 		}
 
 		/**
+		 *	How many mails given up on the file of them holds that stand for a failure of the delivery: all but the records of LAPSED, which
+		 *	stand for the failure while the transport is down and are no reason to keep the failure of the dashboard once a mail went out
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int												1 where the file is there and cannot be read: nothing is known then
+		 */
+		public static function given( array &$appData ): int {
+
+			$stored = self::_load( $appData, self::FAILED );
+
+			return $stored === false ? 1 : count( array_filter( self::_failed( $stored, self::now( $appData ) ), static fn( array $record ): bool => $record['error'] !== self::LAPSED ) );
+		}
+
+		/**
+		 *	Whether the expiry of a mail has passed: from the second it names the mail is delivered by nobody. A mail with no expiry
+		 *	never lapses by it
+		 *
+		 *	@param		array 		$entry				A mail of the outbox, as _state() answers it or claim() hands it out: { expires, ... }
+		 *	@param		int				$now
+		 *
+		 *	@return 	bool
+		 */
+		public static function lapsed( array $entry, int $now ): bool {
+
+			return $entry['expires'] > 0 && $now >= $entry['expires'];
+		}
+
+		/**
+		 *	Whether a mail is over for good: its expiry has passed and no transport holds it. One that a transport holds is not over - its
+		 *	outcome is open, and settle() decides it
+		 *
+		 *	@param		array 		$entry
+		 *	@param		int				$now
+		 *
+		 *	@return 	bool
+		 */
+		private static function _over( array $entry, int $now ): bool {
+
+			return self::lapsed( $entry, $now ) === true && self::_leased( $entry, $now ) === false;
+		}
+
+		/**
 		 *	Whether there is nothing for a deliverer to do: no mail that is due and free, none to give up on, nothing that is
 		 *	not a mail
 		 *
@@ -659,8 +769,8 @@ namespace Nino {
 		}
 
 		/**
-		 *	The second at which the outbox has something to do: the first mail that is free and due, or too old, or - for a
-		 *	mail that belongs to a deliverer - when the lease is over. 'now' where the file holds what is no mail
+		 *	The second at which the outbox has something to do: the first mail that is free and due, or too old, or whose expiry
+		 *	is over, or - for a mail that belongs to a deliverer - when the lease is over. 'now' where the file holds what is no mail
 		 *
 		 *	@param		array 		$state
 		 *	@param		int				$now
@@ -684,7 +794,7 @@ namespace Nino {
 				if( $entry['kind'] === \Nino\Mail::OWNER && $entry['tries'] < self::attempts() )
 					$wake = max( $wake, $now + $wait );
 
-				$due = min( $due, $wake, $entry['queued'] + self::MAX_AGE );
+				$due = min( $due, $wake, $entry['queued'] + self::MAX_AGE, $entry['expires'] > 0 ? max( $entry['expires'], self::_holdEnd( $entry, $now ) ) : PHP_INT_MAX );
 			}
 
 			return $due;
@@ -734,20 +844,21 @@ namespace Nino {
 		}
 
 		/**
-		 *	The waiting mail that carries a key
+		 *	The waiting mail that carries a key: one whose expiry has passed and that no transport holds does not wait, though it is in the file until the next run
 		 *
 		 *	@param		array 		$waiting
 		 *	@param		string		$key					'' is no key
+		 *	@param		int				$now
 		 *
 		 *	@return 	array|null
 		 */
-		private static function _withKey( array $waiting, string $key ): ?array {
+		private static function _withKey( array $waiting, string $key, int $now ): ?array {
 
 			if( $key === '' )
 				return null;
 
 			foreach( $waiting as $entry )
-				if( $entry['key'] === $key )
+				if( $entry['key'] === $key && self::_over( $entry, $now ) === false )
 					return $entry;
 
 			return null;
@@ -806,7 +917,13 @@ namespace Nino {
 
 				uasort( $failed, static fn( array $a, array $b ): int => $b['failed'] <=> $a['failed'] );
 
-				return [ 'format' => 1, 'failed' => array_values( array_slice( $failed, 0, self::MAX_FAILED, true ) ) ];
+				// Two lists of their own: the records of the mails that lapsed are cut by themselves and push out no other
+				$lapsed	= array_filter( $failed, static fn( array $record ): bool => $record['error'] === self::LAPSED );
+				$kept		= array_slice( $lapsed, 0, self::MAX_LAPSED, true ) + array_slice( array_diff_key( $failed, $lapsed ), 0, self::MAX_FAILED, true );
+
+				uasort( $kept, static fn( array $a, array $b ): int => $b['failed'] <=> $a['failed'] );
+
+				return [ 'format' => 1, 'failed' => array_values( $kept ) ];
 			} );
 		}
 
@@ -1247,12 +1364,17 @@ namespace Nino {
 			// holds ids that no key has
 			$key		= is_string( $secret['secret'] ?? null ) === true && preg_match( '/^[0-9a-f]{64}$/D', $secret['secret'] ) === 1 ? $secret['secret'] : '';
 			$kept		= $key === '' ? [] : self::_stateRecords( $stored, self::now( $appData ) );
-			$waiting = array_flip( array_column( $state['waiting'], 'key' ) );
+			$now		= self::now( $appData );
+			$waiting = array_flip( array_column( array_filter( $state['waiting'], static fn( array $entry ): bool => self::_over( $entry, $now ) === false ), 'key' ) );
+			$lapsed	= array_flip( array_column( array_filter( $state['waiting'], static fn( array $entry ): bool => self::_over( $entry, $now ) === true ), 'key' ) );
 
 			foreach( $hashes as $hash ) {
 
 				if( isset( $waiting[$hash] ) === true )
 					$answer[$hash] = \Nino\Mail::STATE_WAITING;
+				// A mail whose expiry has passed and that no transport holds is delivered by nobody, and is failed from that second, whether the next run took it out of the file or not
+				else if( isset( $lapsed[$hash] ) === true )
+					$answer[$hash] = \Nino\Mail::STATE_FAILED;
 				else
 					$answer[$hash] = $key !== '' ? ( $kept[ self::_stateId( $key, $hash ) ][1] ?? \Nino\Mail::STATE_UNKNOWN ) : \Nino\Mail::STATE_UNKNOWN;
 			}
@@ -1467,6 +1589,10 @@ namespace Nino {
 				if( is_int( $entry[$number] ?? null ) === false || $entry[$number] < 0 )
 					return null;
 
+			// The expiry is there where the caller gave one: a mail with none has no field, and a field that is no number of seconds is no mail
+			if( array_key_exists( 'expires', $entry ) === true && ( is_int( $entry['expires'] ) === false || $entry['expires'] < 0 ) )
+				return null;
+
 			if( preg_match( '/^[0-9a-f]{16}$/', $entry['id'] ) !== 1
 				|| ( $entry['key'] !== '' && preg_match( '/^[0-9a-f]{64}$/', $entry['key'] ) !== 1 )
 				|| preg_match( '/^[0-9a-f]{64}$/', $entry['content'] ) !== 1
@@ -1491,6 +1617,7 @@ namespace Nino {
 				'error'		=> $entry['error'],
 				'claim'		=> $entry['claim'],
 				'until'		=> $entry['until'],
+				'expires'	=> $entry['expires'] ?? 0,
 			];
 		}
 
@@ -1503,7 +1630,14 @@ namespace Nino {
 		 */
 		private static function _file( array $state ): array {
 
-			$file = [ 'format' => 1, 'waiting' => array_values( $state['waiting'] ) ];
+			// A mail with no expiry has no field for it: the bytes of such a mail are the bytes of a mail of an outbox that knows none
+			$file = [ 'format' => 1, 'waiting' => array_values( array_map( static function( array $entry ): array {
+
+				if( $entry['expires'] === 0 )
+					unset( $entry['expires'] );
+
+				return $entry;
+			}, $state['waiting'] ) ) ];
 
 			if( $state['pace'] !== null )
 				$file['pace'] = $state['pace'];

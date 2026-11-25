@@ -277,13 +277,28 @@ namespace Nino {
 		 *	minutes, 500 mails 25 - with the waits and the end of the other kinds as they are. What became of one mail of a wave is asked
 		 *	of state() by its key.
 		 *
+		 *	A mail that is worth nothing after a time - a code that is good for fifteen minutes - carries 'expires' => seconds. From the
+		 *	second the expiry names, which is no part of what the mail is (the same mail with another expiry is the same mail under its key), the mail is
+		 *	delivered by nobody: not by a request, not by the command, not by a deliverer that took it a moment before and has not yet asked the
+		 *	transport. The next run of the outbox - a request that finds the note of what is due, or the command - takes it out of the file with its
+		 *	text, the file of its text for a mail of the owner included, and notes its key as STATE_FAILED. One that a transport had refused or thrown
+		 *	on before is a sign of a transport that is down - the only one a site whose mails all expire would ever get, since none of them is
+		 *	given up on - and counts as a mail given up on: a record without text, address and key, queued(), the failure of the dashboard and a
+		 *	line in the log at most once an hour, and the failure goes with the next delivery that went out. One that no transport was asked for
+		 *	- no request and no cron job came in time - leaves nothing but its state, and the log says once an hour that mails lapse unasked.
+		 *	Where nothing runs it lies in the file until something does, and its text with it. A mail whose transport was asked before the second
+		 *	stays in the file until its lease is over, so that the answer of the transport is noted - state() says 'waiting' until it is
+		 *	'sent' or 'failed', and a second queue() under its key is the same mail; it cannot be called back, and it is at most as long as the
+		 *	lease (MailQueue::LEASE). A clock that is set back after the second makes the mail due again. A mail to nobody (VOID) takes the field as
+		 *	a mail does and the way of it, to the same operations and the same bytes for the same value.
+		 *
 		 *	The caps of the hour hold as they do for send() and sendSystem(), at the place where the mail is not
 		 *	delivered without them: a mail of the kind CLIENT counts one try of the client's cap when it is queued, the
 		 *	only moment the client is known; a mail of the kind SYSTEM or TEST counts one unit of the site's cap of that
 		 *	kind when it is about to go out, and one that is over the cap waits for the next hour and is no failure.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$mail					{ to, subject, body, replyTo }
+		 *	@param		array 		$mail					{ to, subject, body, replyTo, expires? } - 'expires', where it is given, is a whole number of seconds from now, at least MailQueue::MIN_EXPIRES (60) and at most MailQueue::MAX_AGE (172800), after which the mail is delivered by nobody and its text is nowhere; any other value is 'invalid'
 		 *	@param		string		$kind					CLIENT, SYSTEM, TEST, VOID or OWNER
 		 *	@param		string		$key					Names the mail, '<name of the feature>/<anything>' - the name is a slug and no other feature's: a second call with the key of a mail that waits and the same mail is that mail, and its id is answered, one with another mail is refused as 'conflict'; '' for none. A key is remembered for ten minutes after its mail went out, so that a request that comes twice is the mail that went out
 		 *
@@ -309,6 +324,18 @@ namespace Nino {
 			// session and the method
 			if( $kind === self::OWNER && ( $_SERVER['REQUEST_METHOD'] ?? '' ) !== 'POST' )
 				return self::_refused( $appData, 'method' );
+
+			// The expiry is the one field of the mail that is no text of it: whole seconds from now, at least MailQueue::MIN_EXPIRES and at most
+			// MailQueue::MAX_AGE. A field that is there and is none of that is no mail ('invalid'), whatever it is - a float, a string, null
+			$expires = 0;
+
+			if( array_key_exists( 'expires', $mail ) === true ) {
+
+				$expires = $mail['expires'];
+
+				if( is_int( $expires ) === false || $expires < \Nino\MailQueue::MIN_EXPIRES || $expires > \Nino\MailQueue::MAX_AGE )
+					return self::_refused( $appData, 'invalid' );
+			}
 
 			$checked = self::_checked( $mail );
 
@@ -356,7 +383,7 @@ namespace Nino {
 					return self::_refused( $appData, 'size' );
 			}
 
-			$added = \Nino\MailQueue::add( $appData, $checked['mail'], $kind, $hash, $content );
+			$added = \Nino\MailQueue::add( $appData, $checked['mail'], $kind, $hash, $content, $expires );
 
 			return $added['id'] !== '' ? $added['id'] : self::_refused( $appData, $added['refused'] );
 		}
@@ -462,14 +489,21 @@ namespace Nino {
 
 			$token	= bin2hex( random_bytes( 8 ) );
 			$left		= max( 1, $limit ?? \Nino\MailQueue::BATCH );
+			$lapsed	= 0;
+			$untried = 0;
+			$orphaned = 0;
 
 			while( $left > 0 ) {
 
 				$gaveUp			= 0;
 				$unwritable	= false;
-				$entry			= \Nino\MailQueue::claim( $appData, $token, \Nino\MailQueue::now( $appData ), $gaveUp, $unwritable );
+				$lapses			= [];
+				$entry			= \Nino\MailQueue::claim( $appData, $token, \Nino\MailQueue::now( $appData ), $gaveUp, $unwritable, $lapses );
 
 				$result['failed'] += $gaveUp;
+				$lapsed		+= $lapses['rejected'] ?? 0;
+				$untried	+= $lapses['untried'] ?? 0;
+				$orphaned	+= $lapses['orphaned'] ?? 0;
 
 				if( $unwritable === true ) {
 					$result['unwritable'] = true;
@@ -489,13 +523,19 @@ namespace Nino {
 					break;
 				}
 
-				if( $settled['gaveUp'] === true )
+				if( $settled['gaveUp'] === true ) {
+
 					$result['failed']++;
+
+					// A mail that lapsed after a transport refused it is given up on by its expiry
+					$lapsed += $outcome === 'lapsed' ? 1 : 0;
+				}
 				else if( $outcome === 'sent' )
 					$result[ self::_isVoid( $entry ) === true ? 'void' : 'delivered' ]++;
 				else if( $outcome === 'held' )
 					$result['held']++;
-				else
+				// A mail that lapsed is counted by none of the words: it was neither delivered nor given up on, and no attempt is waiting
+				else if( $outcome !== 'lapsed' )
 					$result['retry']++;
 
 				$left--;
@@ -511,12 +551,24 @@ namespace Nino {
 			}
 			else if( $result['failed'] > 0 ) {
 
-				trigger_error( 'Mail queue: '. $result['failed']. ' mail(s) could not be delivered and were given up on - see \\Nino\\Mail::queued().', E_USER_WARNING );
+				// Mails that lapsed after a transport refused them are the one sign a site of codes has of a transport that is down, and one such mail
+				// follows another every few minutes: said once an hour, as the other troubles of the outbox are. Any other mail given up on is said at once
+				if( $result['failed'] > $lapsed || \Nino\Feature::count( $appData, 'mail-queue-lapsed', 'site', 1, self::WINDOW ) === true )
+					trigger_error( 'Mail queue: '. $result['failed']. ' mail(s) could not be delivered and were given up on - see \\Nino\\Mail::queued().', E_USER_WARNING );
+
 				self::_recordOutcome( $appData, false );
 			}
 			// The look at the record is made for a mail to nobody as for a mail, so that the outbox is read the same; only a mail that went out clears the failure
-			else if( $result['delivered'] + $result['void'] > 0 && \Nino\MailQueue::counts( $appData )['failed'] === 0 && $result['delivered'] > 0 )
+			else if( $result['delivered'] + $result['void'] > 0 && \Nino\MailQueue::given( $appData ) === 0 && $result['delivered'] > 0 )
 				self::_recordOutcome( $appData, true );
+
+			// Mails that lapsed with no transport asked for them: no run came in time, which is a cron job that does not run, or a site nobody visits
+			if( $untried > 0 && \Nino\Feature::count( $appData, 'mail-queue-untried', 'site', 1, self::WINDOW ) === true )
+				trigger_error( 'Mail queue: '. $untried. ' mail(s) lapsed before any run took them - does the cron job of the outbox run?', E_USER_WARNING );
+
+			// A deliverer took the mail and did not finish - a process that died, a transport that never answered - which is no question for the cron job
+			if( $orphaned > 0 && \Nino\Feature::count( $appData, 'mail-queue-orphaned', 'site', 1, self::WINDOW ) === true )
+				trigger_error( 'Mail queue: '. $orphaned. ' mail(s) lapsed after a deliverer took them and did not finish - a process that died, or a transport that did not answer.', E_USER_WARNING );
 
 			return $result;
 		}
@@ -525,11 +577,15 @@ namespace Nino {
 		 *	One mail of the outbox, past the checks: whether it went, and why not
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$entry				{ id, kind, to, subject, body, replyTo }
+		 *	@param		array 		$entry				{ id, kind, to, subject, body, replyTo, expires }
 		 *
 		 *	@return 	array										[ outcome, error ] - see MailQueue::settle()
 		 */
 		private static function _deliverQueued( array &$appData, array $entry ): array {
+
+			// The last moment before a transport is asked: a mail whose expiry passed since it was taken is let go, a mail to nobody as well
+			if( \Nino\MailQueue::lapsed( $entry, \Nino\MailQueue::now( $appData ) ) === true )
+				return [ 'lapsed', '' ];
 
 			// The text of a mail of the owner is in a file of its own, which was not there or could not be read: a mail that has no text cannot be
 			// sent, and a text that cannot be read now is tried again after the wait

@@ -59,7 +59,7 @@ $holders = static function( string $needle ) use ( $sandbox ): array {
 	return $found;
 };
 $reset = static function() use ( &$appData, &$taken, &$answer, $path ): void {
-	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php' ] as $name )
+	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-lapsed.php', '/data/mail-queue-untried.php' ] as $name )
 		@unlink( $path( $name ) );
 
 	clearstatcache();
@@ -94,13 +94,14 @@ echo "What a mail and a mail to nobody have the same\n";
 // One whole way of one mail, recorded: what queue() does to the disk, what the request does before its response (prepareAfter()), and what the work after
 // the response does. The names of the temporary files are made at random and are one name in the record; everything else - the order, the file, the mode, the bytes - is kept
 $normal = static fn( array $log ): array => array_map( static fn( array $line ): string => preg_replace( '/[0-9a-f]{12}\.tmp/', 'X.tmp', str_replace( $sandbox, '<sandbox>', implode( ' ', array_map( 'strval', $line ) ) ) ), $log );
-$trace = static function( string $kind ) use ( &$appData, &$taken, $reset, $mail, $normal ): array {
+$trace = static function( string $kind, array $over = [], int $later = 0 ) use ( &$appData, &$taken, $reset, $mail, $normal ): array {
 
 	$reset();
 	FaultFs::on();
-	$id			= \Nino\Mail::queue( $appData, $mail( 1 ), $kind, 'login/same' );
+	$id			= \Nino\Mail::queue( $appData, $over + $mail( 1 ), $kind, 'login/same' );
 	$queue	= FaultFs::$log;
 	FaultFs::$log = [];
+	$appData['./nino/mail/now'] = NOW + $later;
 	$request	= [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => '<p>page</p>' ] ];
 	$after		= \Nino\Http::prepareAfter( $appData, $request );
 	$before		= FaultFs::$log;
@@ -126,6 +127,43 @@ check( 'the request before its response asks the disk what it asks for a mail, a
 check( 'the work after the response does what it does for a mail: the same operations on the disk, the outbox is empty, the note and the file gone, the key kept', $real['work'] !== [] && $real['work'] === $void['work'] && $void['counts'] === $real['counts'] && $void['counts']['waiting'] === 0 && $void['counts']['failed'] === 0 && is_file( $path( \Nino\MailQueue::WAITING ) ) === false && str_contains( (string) file_get_contents( $path( \Nino\MailQueue::KEYS ) ), $void['id'] ) === true );
 check( '...and the mail went out where it is a mail and went nowhere where it is a mail to nobody: the one difference of the whole way', $real['taken'] === 1 && $void['taken'] === 0 );
 
+// The expiry of a mail (the field 'expires') is the same for both kinds: the same operations and the same bytes for the same value, whether the mail
+// is still good when the work after the response runs or has lapsed by then
+$trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ] );
+$trace( \Nino\Mail::VOID, [ 'expires' => 900 ] );
+$realLive = $trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ] );
+$voidLive = $trace( \Nino\Mail::VOID, [ 'expires' => 900 ] );
+$realLapsed = $trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ], 900 );
+$voidLapsed = $trace( \Nino\Mail::VOID, [ 'expires' => 900 ], 900 );
+$stored = [];
+
+foreach( [ \Nino\Mail::CLIENT, \Nino\Mail::VOID ] as $kind ) {
+	$reset();
+	\Nino\Mail::queue( $appData, [ 'expires' => 900 ] + $mail( 1 ), $kind, 'login/same' );
+	$stored[$kind] = array_values( $waiting() )[0]['expires'] ?? null;
+}
+
+check( 'a mail with an expiry takes the same way as without, for both: the same files read, locked and written with the same bytes by queue() and by the request before the response, the same value is stored, and the work after the response does the same - for a mail that is still good, and for one that has lapsed by then', $realLive['queue'] !== [] && $realLive['queue'] === $voidLive['queue'] && $realLive['before'] === $voidLive['before'] && $realLive['work'] === $voidLive['work'] && $realLapsed['queue'] === $voidLapsed['queue'] && $realLapsed['work'] !== [] && $realLapsed['work'] === $voidLapsed['work'] && $stored === [ 'client' => NOW + 900, 'void' => NOW + 900 ] );
+check( '...and a mail that has lapsed goes nowhere, whichever it is: the transport is not asked, the outbox is empty, and the key says failed for both', $realLapsed['taken'] === 0 && $voidLapsed['taken'] === 0 && $realLapsed['counts'] === $voidLapsed['counts'] && $realLapsed['counts']['waiting'] === 0 && $realLapsed['counts']['failed'] === 0 && $realLive['taken'] === 1 && $voidLive['taken'] === 0 );
+
+// The window of the expiry is the same for both: taken a second before it and about to be let go a second after it, a mail to nobody is let go as a lapsed mail
+// is, and a mail is not sent
+$deliver = new \ReflectionMethod( \Nino\Mail::class, '_deliverQueued' );
+$windows = [];
+$gave = 0;
+$unwritable = false;
+
+foreach( [ \Nino\Mail::CLIENT, \Nino\Mail::VOID ] as $kind ) {
+	$reset();
+	\Nino\Mail::queue( $appData, [ 'expires' => 900 ] + $mail( 1 ), $kind, 'login/window' );
+	$claimed = \Nino\MailQueue::claim( $appData, 'aaaa', NOW + 899, $gave, $unwritable );
+	$appData['./nino/mail/now'] = NOW + 900;
+	$windows[$kind] = [ $claimed !== null, $deliver->invokeArgs( null, [ &$appData, $claimed ?? [] ] ), count( $taken ) ];
+}
+
+check( 'a mail taken a second before its expiry and about to go to the transport a second after it is let go for both kinds alike: neither is sent, and the one that is a mail to nobody does not say it was let go', $windows === [ 'client' => [ true, [ 'lapsed', '' ], 0 ], 'void' => [ true, [ 'lapsed', '' ], 0 ] ] );
+$reset();
+
 // The same through a request of the site: a route whose response callback queues, answered by the kernel
 $signin = [ 'kind' => \Nino\Mail::CLIENT ];
 $appData['/nino/http/routes']['GET://signin'] = [ 'uri' => '/signin', 'body' => '<p>we sent a code, if we could</p>' ];
@@ -149,6 +187,31 @@ check( 'a request of the site that queues answers the same status, the same head
 $noMail = $visit( '' );
 check( '...whereas the same request that queues nothing answers another response - no length, no closed connection, no work - which is what a feature gives away by calling queue() for a mail and not for none', $noMail['after'] === 0 && isset( $noMail['header']['Content-Length'] ) === false && $noMail['header'] !== $realVisit['header'] );
 $reset();
+
+// What the file of the states holds grows with every mail that has a key and went out, for both kinds and by as much: a second mail after the first, with no reset
+// between them, writes the same operations and a file that is larger by the same bytes
+$growth = [];
+
+foreach( [ \Nino\Mail::CLIENT, \Nino\Mail::VOID ] as $kind ) {
+
+	$reset();
+	$sizes = [];
+	$logs = [];
+
+	for( $i = 1; $i <= 2; $i++ ) {
+		FaultFs::on();
+		\Nino\Mail::queue( $appData, $mail( 1 ), $kind, 'login/grow'. $i );
+		\Nino\Mail::deliverQueued( $appData );
+		$logs[] = $normal( FaultFs::$log );
+		FaultFs::off();
+		clearstatcache();
+		$sizes[] = (int) filesize( $path( \Nino\MailQueue::STATES ) );
+	}
+
+	$growth[$kind] = [ $sizes[1] - $sizes[0], $logs[1] ];
+}
+
+check( 'the file of the states grows with every delivered mail that has a key, and for both kinds alike: a second mail after the first, with no reset between them, adds the same bytes to it and does the same operations', $growth['client'][0] > 0 && $growth['client'] === $growth['void'] );
 
 // Time is told and never bound: the machines the suite runs on differ
 $times = [ 'client' => [], 'void' => [] ];

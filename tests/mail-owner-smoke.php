@@ -69,7 +69,7 @@ $bodies = static function() use ( $path ): array {
 	return glob( $path( \Nino\MailQueue::BODIES ). '/*.php' ) ?: [];
 };
 $reset = static function() use ( &$appData, &$taken, &$answer, $path, $bodies ): void {
-	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_STATES, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-body.php', '/data/mail-queue-states.php' ] as $name )
+	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_STATES, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-body.php', '/data/mail-queue-states.php', '/data/mail-queue-lapsed.php', '/data/mail-queue-untried.php' ] as $name )
 		@unlink( $path( $name ) );
 
 	foreach( $bodies() as $file )
@@ -232,6 +232,45 @@ $old = \Nino\Mail::queue( $appData, $mail( 1 ), \Nino\Mail::OWNER, 'wave/old' );
 check( 'a mail of the owner that waited too long is given up on as any mail, and its text and its key go with it: the state says failed', $result['failed'] === 1 && $sent === [] && $bodies() === [] && \Nino\Mail::state( $appData, 'wave/old' ) === \Nino\Mail::STATE_FAILED );
 $anew = \Nino\Mail::queue( $appData, $mail( 1 ), \Nino\Mail::OWNER, 'wave/old' );
 check( '...and a mail that was given up on is free to be queued again, which is a second try of its owner: it waits, and its text with it', $anew !== '' && \Nino\Mail::state( $appData, 'wave/old' ) === \Nino\Mail::STATE_WAITING && count( $bodies() ) === 1 );
+
+$reset();
+$secretText = '<p>Round code 7741-lapse</p>';
+$lapsing = \Nino\Mail::queue( $appData, [ 'expires' => 900 ] + $mail( 1, $secretText ), \Nino\Mail::OWNER, 'wave/lapse' );
+$lasting = \Nino\Mail::queue( $appData, $mail( 2 ), \Nino\Mail::OWNER, 'wave/last' );
+$textBefore = is_file( $bodyFile( $lapsing ) ) === true && $holders( '7741-lapse' ) !== [];
+[ $result, $sent ] = $run( 900 );
+check( 'a mail of the owner whose expiry has passed is not sent, and its text file goes with it: the one without an expiry is delivered, no file of the project holds the text of the other, and it is no failure', $textBefore === true && $result['delivered'] === 1 && $result['failed'] === 0 && count( $sent ) === 1 && $sent[0]['subject'] === 'Subject 2' && is_file( $bodyFile( $lapsing ) ) === false && $bodies() === [] && $holders( '7741-lapse' ) === [] && \Nino\Mail::queued( $appData )['failed'] === 0 && \Nino\Mail::state( $appData, 'wave/lapse' ) === \Nino\Mail::STATE_FAILED && \Nino\Mail::state( $appData, 'wave/last' ) === \Nino\Mail::STATE_SENT );
+$again = \Nino\Mail::queue( $appData, $mail( 1, $secretText ), \Nino\Mail::OWNER, 'wave/lapse' );
+check( '...and a mail that lapsed is free to be queued again, as one that was given up on is', $again !== '' && $again !== $lapsing && \Nino\Mail::state( $appData, 'wave/lapse' ) === \Nino\Mail::STATE_WAITING );
+
+// The window the kernel names: the mail is taken a second before its expiry, and the second passes while its text is read from the file - before the transport is asked
+$reset();
+$late = \Nino\Mail::queue( $appData, [ 'expires' => 900 ] + $mail( 1, $secretText ), \Nino\Mail::OWNER, 'wave/late' );
+$appData['./nino/mail/now'] = NOW + 899;
+FaultFs::on( [ 'read' => static function( string $name ) use ( &$appData, $late ): bool {
+	if( basename( $name ) === $late. '.php' )
+		$appData['./nino/mail/now'] = NOW + 900;
+
+	return false;
+} ] );
+$result = \Nino\Mail::deliverQueued( $appData, 100 );
+FaultFs::off();
+check( 'a mail of the owner whose expiry passes after it was taken and before the transport is asked is let go with no transport: nothing is delivered, retried or given up on, its text file is gone and the state says failed', $result === [ 'delivered' => 0, 'void' => 0, 'retry' => 0, 'held' => 0, 'failed' => 0, 'unwritable' => false ] && $taken === [] && $bodies() === [] && $holders( '7741-lapse' ) === [] && $waiting() === [] && \Nino\Mail::state( $appData, 'wave/late' ) === \Nino\Mail::STATE_FAILED );
+
+// The transport of a mail of the owner runs over the second of its expiry, and the owner clicks again
+$reset();
+$held = \Nino\Mail::queue( $appData, [ 'expires' => 60 ] + $mail( 1, $secretText ), \Nino\Mail::OWNER, 'wave/held' );
+$gave = 0;
+$unwritable = false;
+$appData['./nino/mail/now'] = NOW + 59;
+$taking = \Nino\MailQueue::claim( $appData, 'aaaa', NOW + 59, $gave, $unwritable );
+\Nino\Mail::queue( $appData, $mail( 5 ) );
+[ $result, $sent ] = $run( 61 );
+$second = \Nino\Mail::queue( $appData, [ 'expires' => 60 ] + $mail( 1, $secretText ), \Nino\Mail::OWNER, 'wave/held' );
+$stateDuring = \Nino\Mail::state( $appData, 'wave/held' );
+\Nino\MailQueue::settle( $appData, 'aaaa', $held, 'sent', '', NOW + 61 );
+$third = \Nino\Mail::queue( $appData, [ 'expires' => 60 ] + $mail( 1, $secretText ), \Nino\Mail::OWNER, 'wave/held' );
+check( 'a mail of the owner whose transport runs over the second of its expiry is delivered once: a second click in the meantime is the same mail, state() says waiting and then sent, and the click after the answer queues nothing', $taking !== null && count( $sent ) === 1 && $sent[0]['subject'] === 'Subject 5' && $second === $held && $stateDuring === \Nino\Mail::STATE_WAITING && \Nino\Mail::state( $appData, 'wave/held' ) === \Nino\Mail::STATE_SENT && $third !== '' && $waiting() === [] && $bodies() === [] );
 
 echo "\n";
 echo "The pace and the order\n";
