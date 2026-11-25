@@ -157,7 +157,7 @@ namespace Nino {
 		// first character
 		private const string ASSET_PATTERN = '/^[A-Za-z0-9_][A-Za-z0-9_.\/-]*\.(?:css|js)$/D';
 
-		// The counter of the warning for a feature that is switched on and not installed (/data/feature-notices.php)
+		// The counter of the warning for a feature that is switched on and not installed (the folder /data/.counters/feature-notices/)
 		private const string MISSING_COUNTER = 'feature-notices';
 
 		private const int MAX_STRING_LENGTH = 1000;

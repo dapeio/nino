@@ -1630,7 +1630,7 @@ $noticesOf = static function( array $body, string $text ): array {
 	return array_values( array_filter( $body['notices'] ?? [], static fn( array $notice ): bool => $notice['text'] === $text ) );
 };
 @unlink( \Nino\Filesystem::path( $appData, '/data/mail-status.php' ) );
-\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+ninoCounterSet( $appData, 'ratelimit', [] );
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
 check( 'notices is an array, and carries no mail notice while nothing failed', is_array( $body['notices'] ?? null ) === true && $noticesOf( $body, '/_admin/dashboard/notice/mail' ) === [] );
 
@@ -1651,7 +1651,7 @@ check( 'an account with no panel permission sees the mail notice as well', $stat
 
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
-\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+ninoCounterSet( $appData, 'ratelimit', [] );
 \Nino\Mail::send( $appData, 'owner@example.com', 'a', 'b', '' );
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
 check( 'the next send that delivered everything takes the notice away', $noticesOf( $body, '/_admin/dashboard/notice/mail' ) === [] );

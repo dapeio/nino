@@ -29,6 +29,9 @@ declare(strict_types=1);
  *								ninoCall()			One workbench request, as a panel sees it
  *								ninoUser()			An account, inserted and signed in
  *								ninoVisit()			One request of the site, through Http::request()
+ *								ninoCounter()		The entries of a counter of \Nino\Feature::count(), whichever file they are in
+ *								ninoCounterSet()	A counter put into the state a test needs, entry by entry into the file of its client
+ *								ninoCountersReset()	Every counter that was tried, as if none had been
  *								ninoCatalogue()	The json of a catalogue of format 2, from entries of features written flat
  *								ninoDone()			The summary and its seconds, the sandbox removed
  *
@@ -167,6 +170,71 @@ function ninoCalls( string $source, string $function ): array {
 function ninoSandboxDir( array &$appData ): string {
 
 	return (string) ( $appData['./nino/test/sandbox'] ?? '' );
+}
+
+/**
+ *	The entries of a counter of \Nino\Feature::count() - [ sha256 of the key => [ 'tries' => n, 'reset' => time ] ] -
+ *	read from the disk, whichever of the files of the counter they are in
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		string		$name					The counter
+ *
+ *	@return 	array
+ */
+function ninoCounter( array &$appData, string $name ): array {
+
+	$entries = [];
+
+	foreach( glob( \Nino\Filesystem::path( $appData, '/data/.counters/'. $name ). '/*.php' ) ?: [] as $file )
+		$entries += (array) include $file;
+
+	return $entries;
+}
+
+/**
+ *	A counter of \Nino\Feature::count() as a test needs it: what it held is gone, and the entries given are in, each in the
+ *	file that its hash belongs to
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		string		$name					The counter
+ *	@param		array 		$entries			[ sha256 of the key => [ 'tries' => n, 'reset' => time ] ]; [] for a counter that was never tried
+ *
+ *	@return 	void
+ */
+function ninoCounterSet( array &$appData, string $name, array $entries ): void {
+
+	foreach( glob( \Nino\Filesystem::path( $appData, '/data/.counters/'. $name ). '/*.php' ) ?: [] as $file )
+		unlink( $file );
+
+	unset( $appData['./nino/filesystem/cache'] );
+
+	if( $entries === [] )
+		return;
+
+	$seed		= ( new ReflectionMethod( '\Nino\Feature', '_seed' ) )->invokeArgs( null, [ &$appData, true ] );
+	$shard	= new ReflectionMethod( '\Nino\Feature', '_shardPath' );
+	$files	= [];
+
+	foreach( $entries as $hash => $entry )
+		$files[ (string) $shard->invoke( null, $name, (string) $hash, (string) $seed ) ][$hash] = $entry;
+
+	foreach( $files as $path => $content )
+		\Nino\Filesystem::putFileContent( $appData, $path, $content );
+}
+
+/**
+ *	Every counter of \Nino\Feature::count() as if none had been tried: the files of all of them are gone, the key of the installation stays
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *
+ *	@return 	void
+ */
+function ninoCountersReset( array &$appData ): void {
+
+	foreach( glob( \Nino\Filesystem::path( $appData, '/data/.counters/*/*.php' ) ) ?: [] as $file )
+		unlink( $file );
+
+	unset( $appData['./nino/filesystem/cache'] );
 }
 
 /**

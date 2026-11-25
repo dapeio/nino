@@ -92,14 +92,14 @@ Klicke im Bereich **Features** bei „Treffen“ auf **Auf 0.5.0 aktualisieren**
 
 ## Prüfen
 
-- Öffne im Bereich **Features** das Feature „Treffen“. Der Reiter **Einstellungen** zeigt das Feld „Anmeldeversuche je Besucher (pro Stunde)“ mit dem Wert 10. Trage 3 ein und speichere. Der Wert steht jetzt in `private/config.php` unter `/nino/features`. Lösche dann `private/data/meetups-signup-tries.php`, damit der Zähler aus Tutorial 7 leer ist. Sende viermal eine Anmeldung ohne Namen, mit den `curl`-Zeilen aus Tutorial 7. Der vierte Versuch bekommt den Status `429`. Stelle den Wert danach wieder auf 10 und lösche die Datei noch einmal.
+- Öffne im Bereich **Features** das Feature „Treffen“. Der Reiter **Einstellungen** zeigt das Feld „Anmeldeversuche je Besucher (pro Stunde)“ mit dem Wert 10. Trage 3 ein und speichere. Der Wert steht jetzt in `private/config.php` unter `/nino/features`. Lösche dann die Dateien im Ordner `private/data/.counters/meetups-signup-tries/`, damit der Zähler aus Tutorial 7 leer ist. Sende viermal eine Anmeldung ohne Namen, mit den `curl`-Zeilen aus Tutorial 7. Der vierte Versuch bekommt den Status `429`. Stelle den Wert danach wieder auf 10 und lösche die Dateien im Ordner noch einmal.
 - Öffne die Datenschutzerklärung der Seite, `/datenschutz` oder `/privacy`. Dort steht der Abschnitt „Anmeldung zu einem Treffen“ mit der E-Mail-Adresse des Projekts.
 
 ## Häufige Fehler
 
 - **Eine Einstellung ohne gültige Vorgabe.** `default` muss selbst zu `type`, `min` und `max` passen. Sonst lehnt Nino das Manifest ab.
 - **Den Abschnitt nachträglich ändern wollen.** Auch Elemente fügt Nino nur hinzu. Einen Abschnitt, den die Redaktion geändert oder gelöscht hat, bringt kein Update zurück.
-- **Die Datei des Zählers unter `data` nennen.** Der Zähler der Drossel gehört nicht ins Backup. Nenne nur die Dateien mit Inhalt.
+- **Den Zähler unter `data` nennen.** Der Zähler der Drossel ist ein Ordner unter `data/.counters/` und gehört nicht ins Backup. Nenne nur die Dateien mit Inhalt.
 - **Ein Geheimnis als `string` speichern.** Für Passwörter und Schlüssel gibt es den Typ `secret`.
 
 ## Nachschlagen

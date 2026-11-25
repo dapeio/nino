@@ -80,6 +80,7 @@ $reset = static function() use ( &$appData, &$taken, &$answer, &$throws, &$onSen
 		is_dir( $path( $name ) ) === true ? @rmdir( $path( $name ) ) : @unlink( $path( $name ) );
 	}
 
+	ninoCountersReset( $appData );
 	clearstatcache();
 	$onSend = null;
 	$appData['./nino/mail/now'] = NOW;
@@ -345,7 +346,7 @@ for( $i = 0; $i < \Nino\Mail::SYSTEM_CAP + 3; $i++ )
 $result = \Nino\Mail::deliverQueued( $appData, 100 );
 check( 'the cap of the hour of the system holds: no more mails of its kind go out than the cap says, the others wait for the next hour and are no failure, and no attempt is counted for them', $result['delivered'] === \Nino\Mail::SYSTEM_CAP && $result['held'] === 3 && $result['failed'] === 0
 	&& count( $waiting() ) === 3 && array_unique( array_column( $waiting(), 'tries' ) ) === [ 0 ] );
-@unlink( $path( '/data/sysmail-system.php' ) );
+ninoCounterSet( $appData, 'sysmail-system', [] );
 $clock( \Nino\MailQueue::CAP_WAIT );
 check( '...and go out when the hour is over', \Nino\Mail::deliverQueued( $appData, 100 )['delivered'] === 3 && $waiting() === [] );
 

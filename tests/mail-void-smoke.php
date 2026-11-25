@@ -62,6 +62,7 @@ $reset = static function() use ( &$appData, &$taken, &$answer, $path ): void {
 	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-lapsed.php', '/data/mail-queue-untried.php' ] as $name )
 		@unlink( $path( $name ) );
 
+	ninoCountersReset( $appData );
 	clearstatcache();
 	$appData['./nino/mail/now'] = NOW;
 	$appData['/nino/mail/cap'] = 0;
@@ -133,6 +134,9 @@ $trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ] );
 $trace( \Nino\Mail::VOID, [ 'expires' => 900 ] );
 $realLive = $trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ] );
 $voidLive = $trace( \Nino\Mail::VOID, [ 'expires' => 900 ] );
+// The first lapsed runs make the folders of the counters that say a mail lapsed: the record is of the runs after them
+$trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ], 900 );
+$trace( \Nino\Mail::VOID, [ 'expires' => 900 ], 900 );
 $realLapsed = $trace( \Nino\Mail::CLIENT, [ 'expires' => 900 ], 900 );
 $voidLapsed = $trace( \Nino\Mail::VOID, [ 'expires' => 900 ], 900 );
 $stored = [];

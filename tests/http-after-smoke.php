@@ -64,7 +64,8 @@ $run = static function( string $case, bool $ask, array $ini = [], bool $keep = f
 
 	// The warning of a dropped work is said once an hour: each request of the tests is the first, but where a test asks for the hour
 	if( $keep === false )
-		@unlink( $sandbox. '/private/data/after-response-dropped.php' );
+		foreach( glob( $sandbox. '/private/data/.counters/after-response-dropped/*.php' ) ?: [] as $dropped )
+			@unlink( $dropped );
 	$command = array_merge( [ PHP_BINARY ], $ini, [ $child, dirname( __DIR__ ), $sandbox, $case, $ask === true ? '1' : '0' ] );
 	$process = proc_open( $command, [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
 	$out = stream_get_contents( $pipes[1] ). stream_get_contents( $pipes[2] );

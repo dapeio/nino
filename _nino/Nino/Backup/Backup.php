@@ -16,9 +16,9 @@ namespace Nino {
 
 		/*	What a backup never carries, whatever else asks for it.
 
-			auth-tries.php and ratelimit.php are named in the docblock below as
-			transient throttling counters rather than data, and they were left
-			out by simply not listing them - which held for as long as the list
+			auth-tries.php is named in the docblock below as
+			a transient throttling counter rather than data, and it was left
+			out by simply not listing it - which held for as long as the list
 			was literals. It stopped holding when a feature's manifest became a
 			source of paths: one that names a directory gets its whole tree
 			walked, and a manifest naming '/data/' itself - which the validator
@@ -33,8 +33,10 @@ namespace Nino {
 			ago; restored .locks plants lock files for requests that ended weeks ago.
 
 			So the promise is kept where it is made rather than by what the list
-			happens not to mention. A leading dot with it: '/data/.locks' is the
-			only one today, and everything hidden under /data/ is this
+			happens not to mention. A leading dot with it: '/data/.locks' and
+			'/data/.counters' (the folders of \Nino\Feature::count(), which keeps its
+			counters there since a counter in a file of its own grew with its clients)
+			are the ones today, and everything hidden under /data/ is this
 			framework's own bookkeeping rather than a project's content	*/
 		// The code of the RuntimeException that says a write failed - no room left in
 		// the temporary directory or where the archives are kept, or a file that
@@ -242,8 +244,8 @@ namespace Nino {
 		// as it was archived. Deliberately not developer code (_nino/,
 		// _admin/ itself, ...) - that's already versioned in git and would
 		// just bloat every backup. Also deliberately not
-		// auth-tries.php, ratelimit.php or mail-status.php - transient
-		// throttling counters and the last failed mail - nor the outbox of
+		// auth-tries.php or mail-status.php - the
+		// failed-login counters and the last failed mail - nor the outbox of
 		// \Nino\Mail (mail-queue.php and mail-failed.php), not data a restore
 		// should bring back. The workbench's
 		// activity log is not in an archive either: it is written to

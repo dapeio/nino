@@ -43,6 +43,25 @@ namespace Nino {
 		// trailing newline passes
 		private const string NAME_PATTERN = '/^[a-z][a-z0-9-]*$/D';
 
+		// Where the counters are kept (see count()): a folder of the project's data that starts with a dot, which a backup reads as the framework's own bookkeeping
+		private const string COUNTERS = '/data/.counters';
+
+		// The key of the installation that chooses the file of a client (see _shardPath()), beside the folders of the counters
+		private const string SEED_PATH = self::COUNTERS. '/seed.php';
+
+		// The files of a counter: the first SHARD_LENGTH hex characters of the HMAC of a client's key, so 256 files (16 to the power of SHARD_LENGTH). Measured: a try of one file costs 1.9 ms
+		// at 1,000 live entries, 15 ms at 10,000 and 224 ms at 100,000; at 256 files, 100,000 entries are 390 in a file and a try costs 1.2 ms (the target
+		// was 5). More files would make the folders larger and the try no cheaper: what is left of the 1.2 ms is the lock and the write
+		private const int SHARD_LENGTH = 2;
+
+		// The most entries that are still open that a file holds, and with it what a counter keeps at most: 256 * SHARD_ROOM = 131,072 clients at
+		// once, which holds the 100,000 that the counter was measured with (the files of 100,000 random keys hold 390 on average, 450 at most) and
+		// bounds the disk at about 17 MB for a counter. What count() does at the number is explained there
+		private const int SHARD_ROOM = 512;
+
+		// The counter of what count() says about the counters themselves, once an hour for each thing (see _say()): its own entries are never said
+		private const string NOTICE_COUNTER = 'counter-notices';
+
 		/*	What slug() makes of the letters ascii does not have. Lower case only,
 			since the text is lower-cased first. The script twin, Nino.slug(),
 			has to carry the same table, and the two must stay equal: a slug a
@@ -243,11 +262,18 @@ namespace Nino {
 		/**
 		 *	Register one try of a client and say whether it is still within budget:
 		 *	a counter in a window, the rule \Nino\Mail has always sent by. The
-		 *	counter is the file /data/<name>.php, shaped
-		 *	[ hash => [ 'tries' => n, 'reset' => unix time ] ], and the first try
-		 *	of a client opens its window of $window seconds; a window that has
-		 *	run out starts a new one, and every entry of that kind is dropped when
-		 *	the file is written next, so it cannot grow without bound.
+		 *	counter is a folder, /data/.counters/<name>/, of 256 files of
+		 *	the shape [ hash => [ 'tries' => n, 'reset' => unix time ] ]: the file
+		 *	of a client is the one its key falls into (see _shardPath()), and a try
+		 *	reads and writes that file only, under the lock of that file, so that
+		 *	its cost does not grow with the number of clients the counter has seen
+		 *	(100,000 live entries cost a try 1.2 ms where one file with all of
+		 *	them cost 224 ms), and two clients in two files do not wait for each
+		 *	other. The first try of a client opens its window of $window seconds; a
+		 *	window that has run out starts a new one, and every entry of that kind
+		 *	is dropped when its file is written next. The files of a counter that
+		 *	nobody tries any more are left as they are, each of them as small as
+		 *	SHARD_ROOM entries.
 		 *
 		 *	The try is counted whatever the answer: a client past the limit keeps
 		 *	counting, and is let in again when its window is over - not when it
@@ -256,13 +282,62 @@ namespace Nino {
 		 *	no reliable count, no budget: an unreliable cap is worse than a closed
 		 *	one.
 		 *
+		 *	A file holds SHARD_ROOM live entries at most, and what happens at that
+		 *	number is the one decision of this method that is about an attacker.
+		 *	Anybody who can make requests from many addresses - or, where a key is
+		 *	what a visitor types, from one - can make entries: a try of a key that
+		 *	has none opens one. Three answers are possible for a client that has no
+		 *	entry and finds its file full of entries that are still open:
+		 *	- Forget the oldest entry, and count the client. The attacker then
+		 *		makes room for himself: SHARD_ROOM keys that fall into the file of his
+		 *		own entry push it out, and his count starts from nothing - the limit
+		 *		is no limit for whoever sends a few hundred requests more, which is
+		 *		what the counter is there to stop. Refused.
+		 *	- Let the client in without a count. The attacker fills the file, and
+		 *		everything that falls into it is unlimited. Refused, for the same
+		 *		reason and worse: it needs no cleverness.
+		 *	- Refuse the client, and count nothing: false, as for a client past
+		 *		its limit. A file that is full of open entries is a file that a
+		 *		stream of keys has filled, and what comes through it from a key that
+		 *		has no entry is not told from that stream. Entries that exist go on
+		 *		counting - a client that is in is not locked out by the ones that
+		 *		came after it - and every entry that runs out makes room again, so
+		 *		that the refusal ends with the windows that caused it. This is what
+		 *		count() does. The price is that a client that is not in a full file
+		 *		is turned away for at most one window although it did nothing - the
+		 *		longest the counter keeps any client out - and that a visitor who
+		 *		finds the file of a guard in front of a form full cannot use the form
+		 *		for as long. It is what stops the attacker as well, and it is
+		 *		bounded by what he keeps up.
+		 *	How far an attacker gets with it: he has to keep SHARD_ROOM open
+		 *	entries in one file - a file of 256 - to turn away the clients of that
+		 *	file, and the file of a client is chosen by a key of the installation
+		 *	(see _shardPath()), so he cannot aim at the file of a client. Measured
+		 *	with keys of different /64 networks and a window of an hour: 98,304 open
+		 *	keys fill no file, 131,072 fill 132 of 256, and from about 150,000 all
+		 *	are full (about 42 requests a second, each with a new key; the files
+		 *	fill unevenly). A key that is turned away is lost to him. Where the key
+		 *	is what a visitor types he needs less, unless the caller counts the
+		 *	visitor first and the typed key after: do that. No entry is lost to him
+		 *	on the way: a counter is never made smaller by what others do. The
+		 *	refusal ends a window after his last new key, and it ends at once where
+		 *	an operator deletes the files of the counter, data/.counters/<name>/,
+		 *	which costs the clients of that counter the tries they hold and nothing
+		 *	else; the log says so, once an hour for each counter (the counter
+		 *	'counter-notices'), with the name of the folder.
+		 *
+		 *	The disk is bounded as well: 256 files of SHARD_ROOM entries,
+		 *	about 17 MB for a counter, however many keys come. A counter is a name
+		 *	that the code chooses - never a visitor, see the check of the name -
+		 *	so the number of counters is that of the places in the code that ask.
+		 *
 		 *	The key is hashed, always. It is an address, a mail, a name - what a
-		 *	person is - and the file lies where a backup, a log or a stranger with
-		 *	a read bug can reach it; sha256 of it is the file's key, and the key
-		 *	itself is never written. A backup carries a file below data/ only where
-		 *	\Nino\Backup::manifest() names it - by a manifest's 'data' entry or by
-		 *	the kernel's own list - so a counter under a name of its own stays out
-		 *	of it.
+		 *	person is - and the files lie where a backup, a log or a stranger with
+		 *	a read bug can reach them; sha256 of it is the entry's key, and the key
+		 *	itself is never written. The folder starts with a dot, which is how a
+		 *	backup knows it is the framework's own bookkeeping and carries it
+		 *	nowhere (see \Nino\Backup::manifest()), and a restore leaves it as it
+		 *	is.
 		 *
 		 *	An address is counted as \Nino\Http::clientBucket() says - an IPv6
 		 *	address as its /64 - so that a client who writes any address of its
@@ -272,18 +347,22 @@ namespace Nino {
 		 *	must be: two requests at once cannot read the same count. A file that
 		 *	holds anything but an array is a file that holds no tries.
 		 *
-		 *	The name is the file, and /data/ is shared: the kernel keeps its own
-		 *	files there (auth-tries, mail-status, catalogue) and so do the features
-		 *	(what a manifest lists under 'data'). A counter of such a name would
-		 *	find the other's entries and drop them on its next write, as it drops
-		 *	whatever is no entry of a counter - the name is the counter's alone.
+		 *	The name is the folder's, and nothing else is kept there; a file
+		 *	/data/<name>.php of the same name is another thing and is not touched -
+		 *	but for one that is a counter of an earlier form of this class (an array
+		 *	of entries under 64 hex characters, none or many): that is removed when
+		 *	the folder is made, which is when the counter is tried first, and its
+		 *	tries run out within a window anyway; nothing reads it. A file of the
+		 *	name that is anything else is named in a warning once an hour: a counter
+		 *	and a file of one name do not disturb each other, but an operator who
+		 *	finds both should not have to guess.
 		 *
-		 *	A $limit of 0 or less is no limit: true, and the file is not touched.
+		 *	A $limit of 0 or less is no limit: true, and nothing is touched.
 		 *
 		 *	spent() asks without counting, forget() lets a client go.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$name					The counter, a slug: the file /data/<name>.php
+		 *	@param		string		$name					The counter, a slug: the folder /data/.counters/<name>/
 		 *	@param		string		$key					Whose try it is, eg. \Nino\Http::getClientIp( $appData )
 		 *	@param		int				$limit				The tries a window allows
 		 *	@param		int				$window				How long a window lasts, in seconds
@@ -292,21 +371,35 @@ namespace Nino {
 		 */
 		public static function count( array &$appData, string $name, string $key, int $limit, int $window ): bool {
 
-			$path = self::_counterPath( 'count', $name );
-
-			if( $path === null )
+			if( self::_counterPath( 'count', $name ) === null )
 				return false;
 
 			if( $limit <= 0 )
 				return true;
 
 			$hash		= hash( 'sha256', \Nino\Http::clientBucket( $key ) );
+			$seed		= self::_seed( $appData, true );
+
+			if( $seed === null ) {
+				self::_say( $appData, $name, 'seed', 'Feature::count(): the key of the counters cannot be read or made, so no counter counts and every client is turned away - '. self::_owners( $appData ) );
+				return false;
+			}
+
+			$path		= self::_shardPath( $name, $hash, $seed );
 			$now		= time();
 			$tries	= 0;
+			$full		= false;
 
-			$written = \Nino\Filesystem::mutate( $appData, $path, static function( mixed $state ) use ( $hash, $now, $window, &$tries ): array {
+			self::_earlier( $appData, $name );
+
+			$written = \Nino\Filesystem::mutate( $appData, $path, static function( mixed $state ) use ( $hash, $now, $window, &$tries, &$full ): ?array {
 
 				$state = self::_live( is_array( $state ) === true ? $state : [], $now );
+
+				if( isset( $state[$hash] ) === false && count( $state ) >= self::SHARD_ROOM ) {
+					$full = true;
+					return null;
+				}
 
 				$entry					= $state[$hash] ?? [ 'tries' => 0, 'reset' => $now + $window ];
 				$entry['tries']	= (int) ( $entry['tries'] ?? 0 ) + 1;
@@ -315,6 +408,11 @@ namespace Nino {
 
 				return $state;
 			}, [] );
+
+			if( $full === true )
+				self::_say( $appData, $name, 'full', 'Feature::count(): a file of the counter "'. $name. '" holds '. self::SHARD_ROOM. ' open entries, and the clients that have none are turned away until one runs out - a stream of keys, or a site with more visitors than this counter is made for. The counter is the folder data/.counters/'. $name. '/: what is in it runs out within a window by itself, and deleting its files lets everybody in at once, at the price of the tries they hold' );
+			elseif( $written === false )
+				self::_say( $appData, $name, 'unusable', 'Feature::count(): the counter "'. $name. '" cannot be written, so no client of it is counted and every one is turned away - '. self::_owners( $appData ) );
 
 			return $written === true && $tries <= $limit;
 		}
@@ -327,27 +425,35 @@ namespace Nino {
 		 *	does any work.
 		 *
 		 *	A client with no entry, or one whose window is over, has spent
-		 *	nothing; a $limit of 0 or less is no limit, so nothing is ever spent.
+		 *	nothing - unless its file is full of open entries, where count()
+		 *	would turn it away, and a guard that asks first has to be told the
+		 *	same; a $limit of 0 or less is no limit, so nothing is ever spent.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$name					The counter, a slug
 		 *	@param		string		$key					Whose tries
 		 *	@param		int				$limit				The tries a window allows
 		 *
-		 *	@return 	bool											True while the window is open and holds $limit tries or more
+		 *	@return 	bool											True while the window is open and holds $limit tries or more, or where a try would be turned away for want of room
 		 */
 		public static function spent( array &$appData, string $name, string $key, int $limit ): bool {
 
-			$path = self::_counterPath( 'spent', $name );
-
-			if( $path === null || $limit <= 0 )
+			if( self::_counterPath( 'spent', $name ) === null || $limit <= 0 )
 				return false;
 
-			$state = \Nino\Filesystem::getFileContent( $appData, $path, [] );
-			$entry = is_array( $state ) === true ? ( $state[ hash( 'sha256', \Nino\Http::clientBucket( $key ) ) ] ?? null ) : null;
+			$hash	= hash( 'sha256', \Nino\Http::clientBucket( $key ) );
+			$seed	= self::_seed( $appData, false );
 
-			if( is_array( $entry ) === false || (int) ( $entry['reset'] ?? 0 ) <= time() )
+			// No key of the installation: nothing was ever counted
+			if( $seed === null )
 				return false;
+
+			$state	= \Nino\Filesystem::getFileContent( $appData, self::_shardPath( $name, $hash, $seed ), [] );
+			$now		= time();
+			$entry	= is_array( $state ) === true ? ( $state[$hash] ?? null ) : null;
+
+			if( is_array( $entry ) === false || (int) ( $entry['reset'] ?? 0 ) <= $now )
+				return is_array( $state ) === true && count( self::_live( $state, $now ) ) >= self::SHARD_ROOM;
 
 			return (int) ( $entry['tries'] ?? 0 ) >= $limit;
 		}
@@ -356,7 +462,8 @@ namespace Nino {
 		 *	Let a client go: its entry leaves the counter, so that the next try
 		 *	opens a window of its own - what a correct password does to the tries
 		 *	a wrong one counted. Nothing is written for a client that has no
-		 *	entry; where something is, the entries whose window is over go with it.
+		 *	entry; where something is, the entries of its file whose window is over
+		 *	go with it.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$name					The counter, a slug
@@ -366,15 +473,18 @@ namespace Nino {
 		 */
 		public static function forget( array &$appData, string $name, string $key ): void {
 
-			$path = self::_counterPath( 'forget', $name );
-
-			if( $path === null )
+			if( self::_counterPath( 'forget', $name ) === null )
 				return;
 
-			$hash	= hash( 'sha256', \Nino\Http::clientBucket( $key ) );
-			$now	= time();
+			$hash		= hash( 'sha256', \Nino\Http::clientBucket( $key ) );
+			$seed		= self::_seed( $appData, false );
 
-			\Nino\Filesystem::mutate( $appData, $path, static function( mixed $state ) use ( $hash, $now ): ?array {
+			if( $seed === null )
+				return;
+
+			$now		= time();
+
+			\Nino\Filesystem::mutate( $appData, self::_shardPath( $name, $hash, $seed ), static function( mixed $state ) use ( $hash, $now ): ?array {
 
 				if( is_array( $state ) === false || array_key_exists( $hash, $state ) === false )
 					return null;
@@ -386,8 +496,95 @@ namespace Nino {
 		}
 
 		/**
-		 *	The file of a counter - /data/<name>.php - or null, with a warning,
-		 *	for a name that is no slug
+		 *	Say something about the counters in the log, once an hour for each thing and counter. The counter that keeps
+		 *	the hour is a counter of this class, so it says nothing about itself
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The counter it is about
+		 *	@param		string		$what					What it is, a word
+		 *	@param		string		$message
+		 *
+		 *	@return 	void
+		 */
+		private static function _say( array &$appData, string $name, string $what, string $message ): void {
+
+			// Asked first: where the folder of the counters cannot be written, the hour cannot be kept, and the warning that says so is said by every request
+			// - one line in the log for a site that is broken, which is what an operator has to see
+			if( $name === self::NOTICE_COUNTER || self::spent( $appData, self::NOTICE_COUNTER, $what. '|'. $name, 1 ) === true )
+				return;
+
+			self::count( $appData, self::NOTICE_COUNTER, $what. '|'. $name, 1, 3600 );
+			trigger_error( $message, E_USER_WARNING );
+		}
+
+		/**
+		 *	Who owns the folder of the counters and the key of the installation, and who runs this request: what an
+		 *	operator needs to see that the web server may not write where it has to
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		private static function _owners( array &$appData ): string {
+
+			$describe = static function( string $path ): string {
+
+				$owner	= @fileowner( $path );
+				$mode		= @fileperms( $path );
+
+				return basename( $path ). ' owner '. ( $owner === false ? '?' : (string) $owner ). ', mode '. ( $mode === false ? '?' : decoct( $mode & 0777 ) );
+			};
+
+			return $describe( \Nino\Filesystem::path( $appData, self::COUNTERS ) ). '; '. $describe( \Nino\Filesystem::path( $appData, self::SEED_PATH ) ). '; this request runs as user '. ( function_exists( 'posix_geteuid' ) === true ? (string) posix_geteuid() : '?' ). ' - the folder data/.counters and the files in it have to belong to the user of the web server';
+		}
+
+		/**
+		 *	A file /data/<name>.php of the name of a counter, where the counter is not yet a folder: it is removed if it
+		 *	is a counter of an earlier form - an array of entries [ 64 hex characters => [ tries, reset ] ], an empty one included -
+		 *	and left as it is if it is anything else, with a warning once an hour that names it. The counter works either way:
+		 *	it is in its folder
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The counter, a checked slug
+		 *
+		 *	@return 	void
+		 */
+		private static function _earlier( array &$appData, string $name ): void {
+
+			$file = \Nino\Filesystem::path( $appData, '/data/'. $name. '.php' );
+
+			// Looked at once, at the first use: where the folder of the counter is there, a file of the name is none of the counter's business,
+			// and it is not read - a file that comes back with a restore would cost every count its whole size
+			if( is_dir( \Nino\Filesystem::path( $appData, self::COUNTERS. '/'. $name ) ) === true || is_file( $file ) === false )
+				return;
+
+
+			try {
+				$state = \Nino\Filesystem::getFileContent( $appData, '/data/'. $name. '.php', [] );
+			}
+			catch( \Throwable ) {
+				$state = null;
+			}
+
+			$counter = is_array( $state ) === true;
+
+			foreach( $counter === true ? $state : [] as $key => $entry )
+				if( preg_match( '/^[0-9a-f]{64}$/D', (string) $key ) !== 1 || is_array( $entry ) === false || array_keys( $entry ) !== [ 'tries', 'reset' ] || is_int( $entry['tries'] ) === false || is_int( $entry['reset'] ) === false )
+					$counter = false;
+
+			if( $counter === true ) {
+
+				@unlink( $file );
+
+				return;
+			}
+
+			self::_say( $appData, $name, 'earlier', 'Feature::count(): the file data/'. $name. '.php has the name of the counter "'. $name. '" and is no counter, so it is left as it is - the counter is the folder data/.counters/'. $name. '/ and the two do not disturb each other, but a counter and a file of one name are one name too many' );
+		}
+
+		/**
+		 *	The folder of a counter - /data/.counters/<name> - or null, with a
+		 *	warning, for a name that is no slug
 		 *
 		 *	@param		string		$method				The method that was called, for the message
 		 *	@param		string		$name
@@ -401,7 +598,79 @@ namespace Nino {
 				return null;
 			}
 
-			return '/data/'. $name. '.php';
+			return self::COUNTERS. '/'. $name;
+		}
+
+		/**
+		 *	The file of a counter that a client falls into: SHARD_LENGTH hex
+		 *	characters of an HMAC of the entry's key under the key of the
+		 *	installation. The key is what keeps an attacker from choosing the file
+		 *	of a client he wants to crowd out (see count()): the sha256 of an
+		 *	address is public, and a file chosen by its first characters could be
+		 *	filled from outside with the keys that a few hundred requests can
+		 *	make; chosen by a key that is not written anywhere he can read, he can
+		 *	only fill them all.
+		 *
+		 *	@param		string		$name					The counter, a checked slug
+		 *	@param		string		$hash					The sha256 of the client's key
+		 *	@param		string		$seed					The key of the installation, see _seed()
+		 *
+		 *	@return 	string										A virtual path
+		 */
+		private static function _shardPath( string $name, string $hash, string $seed ): string {
+
+			return self::COUNTERS. '/'. $name. '/'. substr( hash_hmac( 'sha256', $hash, $seed ), 0, self::SHARD_LENGTH ). '.php';
+		}
+
+		/**
+		 *	The key of the installation that the files of the counters are chosen
+		 *	by: 32 random bytes in hex, in /data/.counters/seed.php with the mode
+		 *	0600 - it is what keeps a visitor from aiming at a file, see
+		 *	_shardPath(). It is made by the first count() of the installation under
+		 *	the lock of its file, so that two requests that meet it first make one.
+		 *	A file that holds anything else - or does not parse - is made again:
+		 *	the counters it chose files for lose their tries, which a window is
+		 *	short for. A key that cannot be made is no counter: count() is false,
+		 *	as where the file of a counter cannot be locked.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$make					Whether to make it where it is not there: count() does, the others only read
+		 *
+		 *	@return 	string|null								null where there is none and none is made, or it cannot be
+		 */
+		private static function _seed( array &$appData, bool $make ): ?string {
+
+			$read = static function() use ( &$appData ): ?string {
+
+				try {
+					$state = \Nino\Filesystem::getFileContent( $appData, self::SEED_PATH, [] );
+				}
+				catch( \Throwable ) {
+					return null;
+				}
+
+				return is_array( $state ) === true && is_string( $state['seed'] ?? null ) === true && preg_match( '/^[0-9a-f]{64}$/D', $state['seed'] ) === 1 ? $state['seed'] : null;
+			};
+
+			$seed = $read();
+
+			if( $seed !== null || $make === false )
+				return $seed;
+
+			if( \Nino\Filesystem::lockFile( $appData, self::SEED_PATH ) === false )
+				return null;
+
+			// What another request made while this one waited for the lock: read again, from the disk
+			$seed = $read();
+
+			if( $seed !== null ) {
+				\Nino\Filesystem::unlockFile( $appData, self::SEED_PATH );
+				return $seed;
+			}
+
+			$seed = bin2hex( random_bytes( 32 ) );
+
+			return \Nino\Filesystem::putFileContent( $appData, self::SEED_PATH, [ 'seed' => $seed ], true, 0600 ) === true ? $seed : null;
 		}
 
 		/**

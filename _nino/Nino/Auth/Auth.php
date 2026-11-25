@@ -30,9 +30,11 @@ namespace Nino {
 		// Failed-attempt counters live here, not in config.php - a login
 		// storm from an unauthenticated attacker would otherwise force a
 		// config.php rewrite (routes, module wiring, every user's hash) on
-		// every single failure. The same kind of file below /data/ that
-		// \Nino\Feature::count() keeps for the counters of a feature and of
-		// Mail's send cap, with a number per key where those keep tries and a reset.
+		// every single failure. A file of its own below /data/, with a number per
+		// key; \Nino\Feature::count() keeps the counters of the features and of
+		// Mail's send cap in folders of files, tries and a reset per key. This one
+		// is a single file: it is bounded by TRIES_MAX_ENTRIES (at 5000 entries
+		// a failed attempt costs about 10 ms), and lockedAccounts() reads it whole
 		//
 		// An entry is a lock - a negative number, the time it ends, negated - or
 		// a counter: [ 'tries' => n, 'reset' => time ], which is over at 'reset',

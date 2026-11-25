@@ -81,7 +81,7 @@ symlink( \Nino\Filesystem::path( $appData, '/templates/frame-header-landing.tpl'
 $inside = ( new ReflectionClassConstant( \Nino\Modules\Template::class, 'INSIDE' ) )->getValue();
 $said = ( new ReflectionClassConstant( \Nino\Modules\Template::class, 'SAID' ) )->getValue();
 $cache = ( new ReflectionClassConstant( \Nino\Html::class, 'CACHE' ) )->getValue();
-$counter = \Nino\Filesystem::path( $appData, '/data/template-frame-notices.php' );
+$counter = static function() use ( &$appData ): string { return implode( '|', array_map( 'file_get_contents', glob( \Nino\Filesystem::path( $appData, '/data/.counters/template-frame-notices' ). '/*.php' ) ?: [] ) ); };
 
 /**
  *	A request of its own: what was kept in memory and what was said in it is gone - the counter of the log, which lasts, is told by itself
@@ -91,7 +91,7 @@ $fresh = static function( bool $window = true ) use ( &$appData, $inside, $said,
 	clearstatcache();
 
 	if( $window === true )
-		file_put_contents( $counter, '<?php return array ( );' );
+		ninoCounterSet( $appData, 'template-frame-notices', [] );
 };
 
 /**
@@ -382,9 +382,9 @@ check( 'a thing is said once in a request and once in an hour, however many requ
 	$first === 1 && $second === 0 && count( $logged ) === 1 );
 
 $page( $head( 'ghost' ) );
-$before = (string) file_get_contents( $counter );
+$before = $counter();
 $page( $head( 'ghost' ). $head( 'ghost' ), false );
-check( 'a thing that was said in the hour is met without a write: the counter file is the one it was', count( $logged ) === 0 && (string) file_get_contents( $counter ) === $before && $before !== '' );
+check( 'a thing that was said in the hour is met without a write: the files of the counter are as they were', count( $logged ) === 0 && $counter() === $before && $before !== '' );
 
 $page( $head( 'ghost' ). $foot( 'ghost' ). '[frame /templates/frame-header-other]' );
 check( 'what is another thing is said of its own', count( $logged ) === 3 );

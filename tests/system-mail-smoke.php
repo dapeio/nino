@@ -41,34 +41,34 @@ for( $i = 0; $i < \Nino\Mail::SYSTEM_CAP + 3; $i++ )
 		$ran++;
 check( 'the system has a cap of its own for the whole site: calls an hour, and then it is refused as rate limited with nothing sent', $ran === 10 && \Nino\Mail::SYSTEM_CAP === 12 && \Nino\Mail::rateLimited( $appData ) === true );
 
-\Nino\Filesystem::putFileContent( $appData, '/data/sysmail-system.php', [] );
-$units = static function() use ( &$appData ): int { return (int) ( array_values( (array) \Nino\Filesystem::getFileContent( $appData, '/data/sysmail-system.php', [] ) )[0]['tries'] ?? 0 ); };
+ninoCounterSet( $appData, 'sysmail-system', [] );
+$units = static function() use ( &$appData ): int { return (int) ( array_values( ninoCounter( $appData, 'sysmail-system' ) )[0]['tries'] ?? 0 ); };
 \Nino\Mail::sendSystem( $appData, [ $mails[0], $mails[1], $mails[0] ] );
 check( 'all the mails of one call - one mail to several addresses - are one unit of the cap', $units() === 1 );
 \Nino\Mail::sendSystem( $appData, $mails, \Nino\Mail::TEST );
-check( '...a test mail has a counter of its own and does not use the unit of the others', $units() === 1 && is_file( \Nino\Filesystem::path( $appData, '/data/sysmail-test.php' ) ) === true );
+check( '...a test mail has a counter of its own and does not use the unit of the others', $units() === 1 && ninoCounter( $appData, 'sysmail-test' ) !== [] );
 $taken = [];
-check( 'any other kind than the two is refused: nothing is sent, and no counter is made for it', \Nino\Mail::sendSystem( $appData, $mails, 'form-hour' ) === false && \Nino\Mail::sendSystem( $appData, $mails, 'Not A Kind' ) === false && $taken === [] && is_file( \Nino\Filesystem::path( $appData, '/data/sysmail-form-hour.php' ) ) === false );
+check( 'any other kind than the two is refused: nothing is sent, and no counter is made for it', \Nino\Mail::sendSystem( $appData, $mails, 'form-hour' ) === false && \Nino\Mail::sendSystem( $appData, $mails, 'Not A Kind' ) === false && $taken === [] && ninoCounter( $appData, 'sysmail-form-hour' ) === [] );
 \Nino\Feature::count( $appData, 'form-hour', 'site', 300, 3600 );
 $hourBefore = \Nino\Form::capped( $appData );
 for( $i = 0; $i < \Nino\Mail::SYSTEM_CAP + \Nino\Mail::TEST_CAP + 2; $i++ )
 	\Nino\Mail::sendSystem( $appData, $mails, $i % 2 === 0 ? \Nino\Mail::SYSTEM : \Nino\Mail::TEST );
 check( 'no counter outside the prefix is touched: the form cap of the hour is as it was, and its counter is the one the form made', \Nino\Form::capped( $appData ) === $hourBefore && \Nino\Mail::TEST_CAP === 6 );
 \Nino\Feature::forget( $appData, 'form-hour', 'site' );
-\Nino\Filesystem::putFileContent( $appData, '/data/sysmail-system.php', [] );
-\Nino\Filesystem::putFileContent( $appData, '/data/sysmail-test.php', [] );
+ninoCounterSet( $appData, 'sysmail-system', [] );
+ninoCounterSet( $appData, 'sysmail-test', [] );
 $taken = [];
 $testRan = 0;
 for( $i = 0; $i < 20; $i++ )
 	if( \Nino\Mail::sendSystem( $appData, $mails, \Nino\Mail::TEST ) === true )
 		$testRan++;
 check( 'the cap of the test mails holds over many calls: six an hour, not one more', $testRan === 6 && count( $taken ) === 12 );
-\Nino\Filesystem::putFileContent( $appData, '/data/sysmail-system.php', [] );
+ninoCounterSet( $appData, 'sysmail-system', [] );
 $taken = [];
 $sent = false;
 check( 'the first mail that is not delivered ends the call: the ones after it are not tried, and the results are those of the ones that were', \Nino\Mail::sendSystem( $appData, $mails ) === false && $taken === [ 'a@example.org' ] && $appData['./nino/mail/results'] === [ false ] );
 $sent = true;
-\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+ninoCounterSet( $appData, 'ratelimit', [] );
 $sent = false;
 check( 'a transport that refuses is a failure, recorded for the dashboard like any other', \Nino\Mail::sendSystem( $appData, $mails ) === false && \Nino\Mail::failure( $appData ) !== null && $appData['./nino/mail/results'] === [ false ] );
 $sent = true;

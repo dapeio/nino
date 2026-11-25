@@ -130,7 +130,7 @@ Die Reihenfolge in `callbackSignup()` ist wichtig:
 
 1. **CSRF.** Der Kernel hat das Token schon geprüft, aber der Callback läuft auch nach einer Ablehnung. `\Nino\Form::blocked()` sagt, ob er abgelehnt hat. Dann kehrt der Callback sofort um. Ohne diese Zeile speichert die Route einen gefälschten Post. Hat keiner der Callbacks einer Route `\Nino\Form::blocked()` gefragt und beantworten sie einen abgelehnten Post mit Erfolg oder Umleitung, verwirft der Kernel die Antwort, antwortet mit der `403` und schreibt eine Warnung ins Log. Ersetzt wird nur die Antwort: Was ein Callback direkt getan hat (Header oder Cookie sofort gesendet, Sitzung, Dateien, Ausgabe), bleibt. Gespeichert hat die Route dann schon: Die Warnung macht den Fehler sichtbar, sie verhindert ihn nicht.
 2. **Eingabe lesen.** `\Nino\Form::posted()` liefert nur Texte, gekürzt und ohne Leerraum am Rand.
-3. **Drosseln.** `\Nino\Feature::count()` zählt die Versuche je Besucher in einem Zeitfenster, hier 3600 Sekunden. Den Besucher erkennt es an seiner IP-Adresse. Über der Grenze antwortet es `false`. Der Zähler liegt in `private/data/meetups-signup-tries.php`. Die IP-Adresse steht dort nicht lesbar, sondern als Hash: eine Prüfsumme, aus der sich die Adresse nicht zurückrechnen lässt.
+3. **Drosseln.** `\Nino\Feature::count()` zählt die Versuche je Besucher in einem Zeitfenster, hier 3600 Sekunden. Den Besucher erkennt es an seiner IP-Adresse. Über der Grenze antwortet es `false`. Der Zähler liegt im Ordner `private/data/.counters/meetups-signup-tries/`. Die IP-Adresse steht dort nicht lesbar, sondern als Hash: eine Prüfsumme, aus der sich die Adresse nicht zurückrechnen lässt.
 4. **Prüfen.** Der Name hat eine Länge, das Treffen gibt es, und es liegt nicht in der Vergangenheit.
 5. **Speichern.** `\Nino\Filesystem::mutate()` sperrt die Datei, liest sie, ruft Deine Funktion auf und schreibt das Ergebnis. Die Datei wächst nie über `MAX_SIGNUPS`.
 6. **Antworten.** `\Nino\Http::redirect()` leitet weiter. Bei einem Fehler setzt der Callback nur den Status: `400` für eine falsche Eingabe, `429` für zu viele Versuche, `500` für einen Fehler beim Schreiben. Die Falle, die Drossel und die Prüfung sind Sache der Route: Das Skript schickt das Feld `website` leer oder gefüllt mit und prüft nichts davon. Eine Falle oder eine Drossel antwortet mit einem anderen Status als `200` und `400`, und das Skript zeigt dann den allgemeinen Satz `error`, damit ein Bot nicht erfährt, welche Prüfung ihn abgewiesen hat.
@@ -156,7 +156,7 @@ curl -s -b $J -o /dev/null -w "%{http_code}\n" -d "meetup=christmas" -d "name=Ad
   Die erste Antwort ist `400`, die zweite `403`. Bei `403` wird nichts gespeichert.
 - Wiederhole die Zeile mit `name=`, bis `429` kommt. Das ist nach acht Wiederholungen der Fall: Die Anmeldung im Browser und die erste Zeile zählen mit, die Anfrage ohne Token zählt nicht. Der elfte Versuch in einer Stunde ist der erste mit `429`. Im Browser steht dann „Das hat nicht geklappt. Bitte versuche es später noch einmal.“ Das ist der allgemeine Satz für jeden Status außer `200` und `400`.
 
-Lösche `private/data/meetups-signup-tries.php`, um den Zähler zurückzusetzen.
+Lösche die Dateien im Ordner `private/data/.counters/meetups-signup-tries/`, um den Zähler zurückzusetzen.
 
 ## Häufige Fehler
 

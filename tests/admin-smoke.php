@@ -1997,7 +1997,7 @@ $appData[ \Nino\Form::HOUR_CAP ] = 1;
 [ , $cappedBody ] = callAdminPost( $appData, 'submissions/list' );
 check( '...or the hour', $cappedBody['capped'] === 'hour' );
 unset( $appData[ \Nino\Form::HOUR_CAP ] );
-@unlink( \Nino\Filesystem::path( $appData, '/data/form-hour.php' ) );
+ninoCounterSet( $appData, 'form-hour', [] );
 
 // Deleting one - the request a person makes about their own inquiry, and
 // the one write this panel does

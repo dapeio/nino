@@ -229,7 +229,7 @@ namespace Nino {
 		// The value a renderer is handed, with its marked form, for fill() to write: [ name, value, marked ], while the renderer runs
 		private const string MARK = './nino/components/mark';
 
-		// The counter of the things said once in a window (/data/component-notices.php), and the window of a name that is no component: an hour
+		// The counter of the things said once in a window (the folder /data/.counters/component-notices/), and the window of a name that is no component: an hour
 		private const string NOTICE_COUNTER = 'component-notices';
 		private const int UNKNOWN_WINDOW = 3600;
 

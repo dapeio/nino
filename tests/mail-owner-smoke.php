@@ -72,6 +72,8 @@ $reset = static function() use ( &$appData, &$taken, &$answer, $path, $bodies ):
 	foreach( [ \Nino\MailQueue::WAITING, \Nino\MailQueue::DUE, \Nino\MailQueue::FAILED, \Nino\MailQueue::KEYS, \Nino\MailQueue::STATES, \Nino\MailQueue::DAMAGED, \Nino\MailQueue::DAMAGED_STATES, '/data/mail-status.php', '/data/ratelimit.php', '/data/sysmail-system.php', '/data/sysmail-test.php', '/data/mail-queue-body.php', '/data/mail-queue-states.php', '/data/mail-queue-lapsed.php', '/data/mail-queue-untried.php' ] as $name )
 		@unlink( $path( $name ) );
 
+	ninoCountersReset( $appData );
+
 	foreach( $bodies() as $file )
 		@unlink( $file );
 

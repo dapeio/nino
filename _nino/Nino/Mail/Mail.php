@@ -15,7 +15,7 @@ namespace Nino {
 	// send cap - the calls of send() and sendAll() one client address may
 	// make in an hour, the key '/nino/mail/cap' of config.php (default 5,
 	// 0 for no cap; the Config panel edits it), counted by
-	// \Nino\Feature::count() in /data/ratelimit.php. Over budget, send()
+	// \Nino\Feature::count() under the name 'ratelimit'. Over budget, send()
 	// and sendAll() return false and rateLimited() answers true, which is
 	// what tells a caller "we refused to send this" apart from a mail() that failed:
 	// \Nino\Form::handle() asks it and answers 429 without recording the

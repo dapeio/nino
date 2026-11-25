@@ -937,21 +937,36 @@ check( 'a callback of the response that widens the policy changes the policy the
 // count(), spent() and forget(): a counter per client, in a window
 $toolClient = '203.0.113.7';
 $toolHash = hash( 'sha256', $toolClient );
-$toolFile = '/data/tries.php';
+
+// A counter is a folder of files, one for each part of the clients (see \Nino\Feature::count()): what a test reads is all of them, and where it writes it
+// writes the file of the client it means
+$toolEntries = static function( array &$appData, string $name ): array {
+	$all = [];
+	foreach( glob( \Nino\Filesystem::path( $appData, '/data/.counters/'. $name ). '/*.php' ) ?: [] as $shard )
+		$all += (array) include $shard;
+	return $all;
+};
+$toolShard = static function( array &$appData, string $name, string $key ): string {
+	$seed = (string) \Nino\Filesystem::getFileContent( $appData, '/data/.counters/seed.php', [] )['seed'];
+	return (string) ( new ReflectionMethod( '\Nino\Feature', '_shardPath' ) )->invoke( null, $name, hash( 'sha256', \Nino\Http::clientBucket( $key ) ), $seed );
+};
+$toolFile = null;
 
 $toolAlong = [];
 foreach( [ 'spent', 'count', 'spent', 'count', 'spent', 'count' ] as $toolStep )
 	$toolAlong[] = $toolStep === 'count' ? \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) : \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 );
 check( 'at a limit of 2 count() answers true, true, false - and spent(), which counts nothing, false, false, true in between', $toolAlong === [ false, true, false, true, true, false ] );
 
-$toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
+$toolState = $toolEntries( $toolset, 'tries' );
+$toolFile = $toolShard( $toolset, 'tries', $toolClient );
 check( 'every try is counted, the refused one too - and the counter holds nothing but the client, under the sha256 of its key', array_keys( $toolState ) === [ $toolHash ] && $toolState[$toolHash]['tries'] === 3 );
 check( '...a key of 64 hex characters, and the key itself is in no byte of the file', preg_match( '/^[0-9a-f]{64}$/D', (string) array_key_first( $toolState ) ) === 1 && str_contains( (string) file_get_contents( \Nino\Filesystem::path( $toolset, $toolFile ) ), $toolClient ) === false );
 check( '...whose window the first try opened, for the seconds asked', $toolState[$toolHash]['reset'] - time() > 3590 && $toolState[$toolHash]['reset'] - time() <= 3600 );
 $toolSoon = time() + 100;
-\Nino\Filesystem::putFileContent( $toolset, '/data/fixed.php', [ hash( 'sha256', 'c' ) => [ 'tries' => 1, 'reset' => $toolSoon ] ] );
 \Nino\Feature::count( $toolset, 'fixed', 'c', 5, 3600 );
-check( '...and a later try inside an open window counts without moving its end', \Nino\Filesystem::getFileContent( $toolset, '/data/fixed.php', [] )[ hash( 'sha256', 'c' ) ] === [ 'tries' => 2, 'reset' => $toolSoon ] );
+\Nino\Filesystem::putFileContent( $toolset, $toolShard( $toolset, 'fixed', 'c' ), [ hash( 'sha256', 'c' ) => [ 'tries' => 1, 'reset' => $toolSoon ] ] );
+\Nino\Feature::count( $toolset, 'fixed', 'c', 5, 3600 );
+check( '...and a later try inside an open window counts without moving its end', $toolEntries( $toolset, 'fixed' )[ hash( 'sha256', 'c' ) ] === [ 'tries' => 2, 'reset' => $toolSoon ] );
 check( 'another client has a budget of its own', \Nino\Feature::count( $toolset, 'tries', '203.0.113.8', 2, 3600 ) === true && \Nino\Feature::spent( $toolset, 'tries', '203.0.113.8', 2 ) === false && \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 ) === true );
 check( 'spent() of a limit of 0 or less is false, whatever has been tried', \Nino\Feature::spent( $toolset, 'tries', $toolClient, 0 ) === false && \Nino\Feature::spent( $toolset, 'tries', $toolClient, -1 ) === false );
 
@@ -961,7 +976,7 @@ foreach( [ 'first', 'second', 'third' ] as $toolStep )
 	$toolFolded[] = \Nino\Feature::count( $toolset, 'folded', '2001:db8:1:1::'. dechex( count( $toolFolded ) + 1 ), 2, 3600 );
 check( 'the addresses of one /64 share a budget: count() answers true, true, false', $toolFolded === [ true, true, false ] );
 check( '...spent() reads it for any other address of the /64', \Nino\Feature::spent( $toolset, 'folded', '2001:db8:1:1:aaaa::1', 2 ) === true && \Nino\Feature::spent( $toolset, 'folded', '2001:db8:1:2::1', 2 ) === false );
-check( '...the counter holds one entry for them, under the hash of the /64 key', array_keys( \Nino\Filesystem::getFileContent( $toolset, '/data/folded.php', [] ) ) === [ hash( 'sha256', \Nino\Http::clientBucket( '2001:db8:1:1::1' ) ) ] );
+check( '...the counter holds one entry for them, under the hash of the /64 key', array_keys( $toolEntries( $toolset, 'folded' ) ) === [ hash( 'sha256', \Nino\Http::clientBucket( '2001:db8:1:1::1' ) ) ] );
 $toolOtherNet = \Nino\Feature::count( $toolset, 'folded', '2001:db8:1:2::1', 2, 3600 );
 $toolOtherV4 = \Nino\Feature::count( $toolset, 'folded', '198.51.100.7', 2, 3600 );
 check( 'another /64 and an IPv4 address have a budget of their own', $toolOtherNet === true && $toolOtherV4 === true );
@@ -970,16 +985,16 @@ $toolSpentAfter = \Nino\Feature::spent( $toolset, 'folded', '2001:db8:1:1::1', 2
 $toolCountAfter = \Nino\Feature::count( $toolset, 'folded', '2001:db8:1:1::5', 2, 3600 );
 check( 'forget() lets the whole /64 go', $toolSpentAfter === false && $toolCountAfter === true );
 
-$toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
+$toolState = $toolEntries( $toolset, 'tries' );
 $toolState[$toolHash]['reset'] = time() - 1;
-\Nino\Filesystem::putFileContent( $toolset, $toolFile, $toolState );
+\Nino\Filesystem::putFileContent( $toolset, $toolFile, array_intersect_key( $toolState, [ $toolHash => true ] ) );
 check( 'a client whose window is over has spent nothing, and its next try opens a new window with a count of one', \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 ) === false && \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) === true
-	&& \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] )[$toolHash]['tries'] === 1 );
+	&& $toolEntries( $toolset, 'tries' )[$toolHash]['tries'] === 1 );
 
 \Nino\Feature::forget( $toolset, 'tries', $toolClient );
-$toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
-check( 'forget() lets a client go: its entry leaves the file, the others stay, and its next try opens a window of its own', isset( $toolState[$toolHash] ) === false && isset( $toolState[ hash( 'sha256', '203.0.113.8' ) ] ) === true
-	&& \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) === true && \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] )[$toolHash]['tries'] === 1 );
+$toolState = $toolEntries( $toolset, 'tries' );
+check( 'forget() lets a client go: its entry leaves the counter, the others stay, and its next try opens a window of its own', isset( $toolState[$toolHash] ) === false && isset( $toolState[ hash( 'sha256', '203.0.113.8' ) ] ) === true
+	&& \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) === true && $toolEntries( $toolset, 'tries' )[$toolHash]['tries'] === 1 );
 
 $toolPath = \Nino\Filesystem::path( $toolset, $toolFile );
 touch( $toolPath, time() - 500 );
@@ -989,34 +1004,48 @@ $toolMtime = filemtime( $toolPath );
 clearstatcache();
 check( 'forget() of a client that has no entry writes nothing', filemtime( $toolPath ) === $toolMtime );
 \Nino\Feature::forget( $toolset, 'never-written', $toolClient );
-check( '...and makes no file of a counter that was never written', is_file( \Nino\Filesystem::path( $toolset, '/data/never-written.php' ) ) === false );
+check( '...and makes no file of a counter that was never written', is_dir( \Nino\Filesystem::path( $toolset, '/data/.counters/never-written' ) ) === false );
 
-\Nino\Filesystem::putFileContent( $toolset, '/data/prune.php', [
-	hash( 'sha256', 'stale' )	=> [ 'tries' => 9, 'reset' => time() - 10 ],
-	'junk'										=> 'not an entry',
-	hash( 'sha256', 'open' )	=> [ 'tries' => 1, 'reset' => time() + 600 ],
+// Keys that fall into the same file of a counter as another key: what the tests of the files that hold more than one client need
+$toolSame = static function( array &$appData, string $name, string $key, int $number ) use ( $toolShard ): array {
+	$found = [];
+	for( $i = 0; count( $found ) < $number; $i++ )
+		if( $toolShard( $appData, $name, 'same-'. $i ) === $toolShard( $appData, $name, $key ) )
+			$found[] = 'same-'. $i;
+	return $found;
+};
+
+\Nino\Feature::count( $toolset, 'prune', 'fresh', 5, 60 );
+[ $toolStale, $toolOpen, $toolGone ] = $toolSame( $toolset, 'prune', 'fresh', 3 );
+\Nino\Filesystem::putFileContent( $toolset, $toolShard( $toolset, 'prune', 'fresh' ), [
+	hash( 'sha256', $toolStale )	=> [ 'tries' => 9, 'reset' => time() - 10 ],
+	'junk'												=> 'not an entry',
+	hash( 'sha256', $toolOpen )		=> [ 'tries' => 1, 'reset' => time() + 600 ],
+	hash( 'sha256', 'fresh' )			=> [ 'tries' => 1, 'reset' => time() + 60 ],
 ] );
 \Nino\Feature::count( $toolset, 'prune', 'fresh', 5, 60 );
-check( 'the next write drops every entry whose window is over and whatever is no entry, and keeps those still open', array_keys( \Nino\Filesystem::getFileContent( $toolset, '/data/prune.php', [] ) ) === [ hash( 'sha256', 'open' ), hash( 'sha256', 'fresh' ) ] );
-\Nino\Filesystem::putFileContent( $toolset, '/data/prune.php', [
-	hash( 'sha256', 'stale' )	=> [ 'tries' => 9, 'reset' => time() - 10 ],
-	hash( 'sha256', 'open' )	=> [ 'tries' => 1, 'reset' => time() + 600 ],
-	hash( 'sha256', 'gone' )	=> [ 'tries' => 1, 'reset' => time() + 600 ],
+check( 'the next write of a file drops every entry whose window is over and whatever is no entry, and keeps those still open', array_keys( $toolEntries( $toolset, 'prune' ) ) === [ hash( 'sha256', $toolOpen ), hash( 'sha256', 'fresh' ) ] );
+\Nino\Filesystem::putFileContent( $toolset, $toolShard( $toolset, 'prune', 'fresh' ), [
+	hash( 'sha256', $toolStale )	=> [ 'tries' => 9, 'reset' => time() - 10 ],
+	hash( 'sha256', $toolOpen )		=> [ 'tries' => 1, 'reset' => time() + 600 ],
+	hash( 'sha256', $toolGone )		=> [ 'tries' => 1, 'reset' => time() + 600 ],
 ] );
-\Nino\Feature::forget( $toolset, 'prune', 'gone' );
-check( '...and so does forget(), where it writes', array_keys( \Nino\Filesystem::getFileContent( $toolset, '/data/prune.php', [] ) ) === [ hash( 'sha256', 'open' ) ] );
+\Nino\Feature::forget( $toolset, 'prune', $toolGone );
+check( '...and so does forget(), where it writes', array_keys( $toolEntries( $toolset, 'prune' ) ) === [ hash( 'sha256', $toolOpen ) ] );
 
-\Nino\Filesystem::putFileContent( $toolset, '/data/corrupt.php', 'not an array' );
+\Nino\Feature::count( $toolset, 'corrupt', $toolClient, 1, 60 );
+\Nino\Filesystem::putFileContent( $toolset, $toolShard( $toolset, 'corrupt', $toolClient ), 'not an array' );
 check( 'a counter file that holds anything but an array counts from zero instead of taking the request down', \Nino\Feature::spent( $toolset, 'corrupt', $toolClient, 1 ) === false
 	&& \Nino\Feature::count( $toolset, 'corrupt', $toolClient, 1, 60 ) === true && \Nino\Feature::count( $toolset, 'corrupt', $toolClient, 1, 60 ) === false );
 check( 'a limit of 0 or less is no limit: always true, and nothing is written', \Nino\Feature::count( $toolset, 'unlimited', $toolClient, 0, 60 ) === true && \Nino\Feature::count( $toolset, 'unlimited', $toolClient, -3, 60 ) === true
-	&& \Nino\Feature::spent( $toolset, 'unlimited', $toolClient, 0 ) === false && is_file( \Nino\Filesystem::path( $toolset, '/data/unlimited.php' ) ) === false );
+	&& \Nino\Feature::spent( $toolset, 'unlimited', $toolClient, 0 ) === false && is_dir( \Nino\Filesystem::path( $toolset, '/data/.counters/unlimited' ) ) === false );
 
 // A directory where the sidecar lock goes: lockFile() cannot open it, which is what a counter on a disk that cannot be written looks like
-$toolLock = \Nino\Filesystem::path( $toolset, '/data/.locks' ). '/'. sha1( '/data/locked.php' ). '.lock';
+\Nino\Feature::count( $toolset, 'unlocked-once', $toolClient, 5, 60 );
+$toolLock = \Nino\Filesystem::path( $toolset, '/data/.locks' ). '/'. sha1( (string) ( new ReflectionMethod( '\Nino\Filesystem', '_canonicalPath' ) )->invokeArgs( null, [ &$toolset, $toolShard( $toolset, 'locked', $toolClient ) ] ) ). '.lock';
 \Nino\Filesystem::forceDir( $toolset, '/data/.locks' );
 @mkdir( $toolLock );
-check( 'a counter whose lock cannot be taken has no budget to give: false, and nothing is written', \Nino\Feature::count( $toolset, 'locked', $toolClient, 5, 60 ) === false && is_file( \Nino\Filesystem::path( $toolset, '/data/locked.php' ) ) === false );
+check( 'a counter whose lock cannot be taken has no budget to give: false, and nothing is written', \Nino\Feature::count( $toolset, 'locked', $toolClient, 5, 60 ) === false && is_file( \Nino\Filesystem::path( $toolset, $toolShard( $toolset, 'locked', $toolClient ) ) ) === false );
 @rmdir( $toolLock );
 unset( $toolset['./nino/filesystem/locks'], $toolset['./nino/filesystem/cache'] );
 check( '...and counts again once it can', \Nino\Feature::count( $toolset, 'locked', $toolClient, 5, 60 ) === true );
@@ -1091,8 +1120,8 @@ $treeOff = \Nino\Features::deactivate( $treeApp, 'sample' );
 check( '...and switching it off', $treeOff === true && is_file( $treeFile() ) === false );
 unset( $treeReport, $treeApp );
 /*	And what a backup never carries, whatever asks for it. Backup's own
-	docblock calls auth-tries.php and ratelimit.php transient throttling
-	counters rather than data, and they were left out by not being listed -
+	docblock calls auth-tries.php a transient throttling
+	counter rather than data, and they were left out by not being listed -
 	which held while the list was literals and stopped holding the moment a
 	manifest became a source of paths. A restore is what makes it matter:
 	restored auth-tries.php re-locks an account somebody already waited out,
@@ -1102,7 +1131,7 @@ unset( $treeReport, $treeApp );
 	validator above now refuses - so this is the second answer to the same
 	question, and the one that does not depend on a manifest being well-formed	*/
 \Nino\Filesystem::putFileContent( $appData, '/data/auth-tries.php', [ 'x' => 1 ] );
-\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ 'x' => 1 ] );
+\Nino\Feature::count( $appData, 'ratelimit', '203.0.113.9', 5, 3600 );
 \Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', [ 'x' => 1 ] );
 \Nino\Filesystem::putFileContent( $appData, '/data/mail-status.php', [ 'since' => '2026-01-02 03:04', 'last' => '2026-01-02 03:04', 'count' => 1 ] );
 \Nino\Filesystem::forceDir( $appData, '/data/.locks' );
@@ -1120,7 +1149,7 @@ $greedyAppData['./nino/features/all'] = [ 'greedy' => [
 $greedy = array_map( static fn( string $name ): string => (string) preg_replace( '#/+#', '/', $name ), \Nino\Backup::manifest( $greedyAppData ) );
 
 check( 'a backup carries no throttling counter, whatever a manifest claims', in_array( 'data/auth-tries.php', $greedy, true ) === false
-	&& in_array( 'data/ratelimit.php', $greedy, true ) === false );
+	&& preg_grep( '#\.counters#', $greedy ) === [] && ninoCounter( $appData, 'ratelimit' ) !== [] );
 check( '...nor the catalogue cache, which is fetched again when it is wanted', in_array( 'data/catalogue.php', $greedy, true ) === false );
 check( '...nor the record of the last failed mail, which a restore would bring back long after it was fixed', in_array( 'data/mail-status.php', $greedy, true ) === false );
 check( '...nor anything hidden, so a restore plants no lock files', array_values( array_filter( $greedy, static fn( string $name ): bool => str_contains( $name, '/.' ) === true ) ) === [] );
