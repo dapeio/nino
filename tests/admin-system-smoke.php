@@ -9,17 +9,17 @@ declare(strict_types=1);
  *											that is no string -, Backups and Restore, Config and the Lockout tab,
  *											Language, the Recovery password, Maintenance, Users and Roles. The
  *											Restore checks count the temporary files a restore leaves in the
- *											system's temp directory, so run this suite alone: any other that makes
- *											a backup writes there as well. Runs against an isolated sandbox
- *											directory, never touches the real project data.
+ *											system's temp directory by the mark of this suite's own project, so
+ *											a backup of another project beside it does not move a count. Runs
+ *											against an isolated sandbox directory, never touches the real
+ *											project data.
  *
  *	Usage: php tests/admin-system-smoke.php
  */
 
-// The checks of the backup count the files of the system's temp directory before and after - "nothing is left behind" - and that directory is shared: with
-// another run of this suite in another copy, or any other process that makes a ninobackup* or ninorestore* file there, the count moves and a check is red with nothing
-// broken. So the suite runs in a temp directory of its own: it starts itself once more with sys_temp_dir set to a directory that only it makes files in, and
-// takes that directory away when it is done. What the run prints and its exit status are those of the run that does the work
+// The checks of the backup count the files of the system's temp directory before and after - "nothing is left behind" - by the mark of this suite's project
+// ($ownTemp below). The suite runs in a temp directory of its own as well: it starts itself once more with sys_temp_dir set to a directory that only it makes
+// files in, and takes that directory away when it is done. What the run prints and its exit status are those of the run that does the work
 if( getenv( 'NINO_SMOKE_OWN_TEMP' ) === false && ( $argv[1] ?? '' ) === '' ) {
 
 	$own = sys_get_temp_dir(). '/nino-system-smoke-'. bin2hex( random_bytes( 6 ) );
@@ -142,6 +142,16 @@ stream_wrapper_register( 'ninofull', NinoFullStream::class );
 
 $appData = ninoSandbox( 'admin-system' );
 $sandbox = ninoSandboxDir( $appData );
+
+// What the runs of THIS project leave in the system's temp directory, which is the mark of the project in the name (Backup::_tempId()): the directory is shared with
+// whatever else runs on the machine, and a backup or a restore of another project beside this suite is none of its files
+$tempMark = ( new ReflectionMethod( \Nino\Backup::class, '_tempId' ) )->invokeArgs( null, [ &$appData ] );
+$ownTemp = static function( array $kinds = [ 'backup', 'restore', 'snapshot' ], string $end = '*' ) use ( $tempMark ): array {
+	$found = [];
+	foreach( $kinds as $kind )
+		$found = array_merge( $found, glob( sys_get_temp_dir(). '/nino'. $kind. '-'. $tempMark. '-'. $end ) ?: [] );
+	return $found;
+};
 mkdir( $sandbox. '/private/elements', 0777, true );
 
 // A hand-authored-shaped type file (top-level 'title' key, real locale content) -
@@ -663,10 +673,10 @@ $goodKey = $appData['/nino/backup/key'];
 $config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => 'not a key' ] + $config );
 $timedBefore = $timedFiles();
-$tempBefore = count( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [] );
+$tempBefore = count( $ownTemp( [ 'backup' ] ) );
 [ $status, $body ] = $nowCall( $appData );
 check( 'a failing run is a 500 with its reason, writes no archive and leaves no temporary file', $status === 500 && is_string( $body['error'] ?? null ) === true && $timedFiles() === $timedBefore
-	&& count( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [] ) === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] );
+	&& count( $ownTemp( [ 'backup' ] ) ) === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] );
 \Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => $goodKey ] + $config );
 $appData['/nino/backup/key'] = $goodKey;
 [ $status ] = $nowCall( $appData );
@@ -754,7 +764,7 @@ $withDisk = static function( mixed $free ) use ( &$appData ): array|string {
 	unset( $appData['./nino/backups/disk'] );
 	return $result;
 };
-$tempLeft = static fn(): int => count( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [] );
+$tempLeft = static fn(): int => count( $ownTemp( [ 'backup' ] ) );
 $dropNew = static function( array $before ) use ( $timedFiles, $nowDir ): void {
 	foreach( array_diff( $timedFiles(), $before ) as $name )
 		unlink( $nowDir. '/'. $name );
@@ -832,14 +842,14 @@ $dropNew( $timedBefore );
 if( DIRECTORY_SEPARATOR === '/' ) {
 	$parkedId = \Nino\Modules\Backups::now( $appData );
 	$parkedMode = null;
-	$probe = new class( $parkedMode ) implements ArrayAccess {
+	$probe = new class( $parkedMode, $ownTemp ) implements ArrayAccess {
 		public bool $armed = false;
-		public function __construct( public ?int &$mode ) {}
+		public function __construct( public ?int &$mode, private Closure $ownTemp ) {}
 		public function offsetExists( mixed $key ): bool { return true; }
 		public function offsetSet( mixed $key, mixed $value ): void {}
 		public function offsetUnset( mixed $key ): void {}
 		public function offsetGet( mixed $key ): mixed {
-			$parked = glob( sys_get_temp_dir(). '/ninorestore*.tar.gz' ) ?: [];
+			$parked = ( $this->ownTemp )( [ 'restore' ], '*.tar.gz' );
 			if( $this->armed === true && $parked !== [] ) {
 				usort( $parked, static fn( string $a, string $b ): int => filemtime( $b ) <=> filemtime( $a ) );
 				$this->mode = fileperms( $parked[0] ) & 0777;
@@ -1167,12 +1177,12 @@ mkdir( $blocked );
 file_put_contents( $blocked. '/in-the-way', 'x' );
 $daysBefore = $dailyFiles();
 $handsBefore = $timedFiles();
-$tempBefore = count( glob( sys_get_temp_dir(). '/ninobackup-*' ) ?: [] );
+$tempBefore = count( $ownTemp( [ 'backup' ] ) );
 ninoWarnings();
 \Nino\Modules\Backups::maybeRun( $appData );
 $writeWarned = ninoWarnings();
 check( 'an archive that cannot be put in its place leaves every archive that exists, and no temporary file', $dailyFiles() === $daysBefore && $timedFiles() === $handsBefore && is_file( $blocked ) === false
-	&& count( glob( sys_get_temp_dir(). '/ninobackup-*' ) ?: [] ) === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] && count( $writeWarned ) > 0 );
+	&& count( $ownTemp( [ 'backup' ] ) ) === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] && count( $writeWarned ) > 0 );
 check( '...and the panel is told it was a write that failed: the record of the run says the disk ended it, and the run is not said to have ended without a word', ( ( \Nino\Modules\Backups::missed( $appData ) ?? [] )['code'] ?? null ) === 'write' && ( \Nino\Modules\Backups::stopped( $appData )['cause'] ?? null ) === 'disk' );
 [ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
 check( '...in apiList too', ( $listBody['missed']['code'] ?? null ) === 'write' && is_string( $listBody['missed']['reason'] ?? null ) === true );
@@ -1809,14 +1819,14 @@ foreach( $hostile as $what => $tar ) {
 	$filesBefore		= $projectFiles();
 	$snapshotsNow		= glob( $nowDir. '/pre-restore-*.php' ) ?: [];
 	$listBefore			= file_get_contents( $pagesDir. '/crm-portal/list.tpl' );
-	$tempBefore			= count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] );
+	$tempBefore			= count( $ownTemp( [ 'restore' ] ) );
 
 	\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 	[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $id ] );
 
 	check( 'an archive with '. $what. ' is refused with 422, as a whole: nothing is written, no snapshot is made, no temporary file is left',
 		$status === 422 && is_string( $body['error'] ?? null ) === true && $projectFiles() === $filesBefore && file_get_contents( $pagesDir. '/crm-portal/list.tpl' ) === $listBefore
-		&& ( glob( $nowDir. '/pre-restore-*.php' ) ?: [] ) === $snapshotsNow && count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] ) === $tempBefore );
+		&& ( glob( $nowDir. '/pre-restore-*.php' ) ?: [] ) === $snapshotsNow && count( $ownTemp( [ 'restore' ] ) ) === $tempBefore );
 	unlink( $nowDir. '/'. $id. '.php' );
 }
 
@@ -1939,7 +1949,7 @@ check( 'the simulated corruption actually wiped the user record', \Nino\Filesyst
 // file it names, and both the restore and its safety snapshot went on to work
 // on that name plus a suffix - the file tempnam() made was never removed, two
 // per restore, for the life of the server
-$tempFiles	= static fn(): int => count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] ) + count( glob( sys_get_temp_dir(). '/ninosnapshot*' ) ?: [] );
+$tempFiles	= static fn(): int => count( $ownTemp( [ 'restore' ] ) ) + count( $ownTemp( [ 'snapshot' ] ) );
 $restoreLeft = [ $leave( 'ninorestore-'. $mark. '-Dead08' ), $leave( 'ninorestore-'. $mark. '-Dead08.tar.gz' ), $leave( 'ninosnapshot-'. $mark. '-Dead09' ) ];
 $tempBefore	= $tempFiles() - count( $restoreLeft );
 
