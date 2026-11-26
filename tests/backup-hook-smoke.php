@@ -19,6 +19,7 @@ declare(strict_types=1);
 define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/backup-hook' );
 
 require __DIR__. '/harness.php';
+require_once __DIR__. '/fixtures/faultfs.php';
 
 // Whatever ends the run - a fatal error as well - the folders of the projects it made are taken away
 register_shutdown_function( static function(): void {
@@ -354,22 +355,22 @@ $copies		= \Nino\Backup::copyBytes( $appData, $manifest );
 $together	= ( $a = @stat( sys_get_temp_dir() ) ) !== false && ( $b = @stat( \Nino\Modules\Backups::dir( $appData ) ) ) !== false && $a['dev'] === $b['dev'];
 $need			= \Nino\Backup::spaceNeed( $bytes, count( $manifest ), $together );
 
-$appData['./nino/backups/disk'] = $need + $copies - 1;
+\Nino\Backup::$diskFree = $need + $copies - 1;
 $run			= $attempt( [ 'files' => [ 'vault.db' => 'copy of vault' ] ] );
 $short		= $run['result'];
 check( 'the room is asked for before a feature is: the files and the copies they will make - a disk with room for the files and none for the copies is refused with the sizes, nothing is asked and nothing is made',
 	is_array( $short ) === true && $short[0] === 507 && ( $short[2] ?? '' ) === 'backups_disk' && count( $short[3] ?? [] ) === 2 && $run['asked'] === 0 && $run['new'] === [] && $run['temp'] === [] );
-$appData['./nino/backups/disk'] = $need + $copies;
+\Nino\Backup::$diskFree = $need + $copies;
 $run			= $attempt( [ 'files' => [ 'vault.db' => 'copy of vault' ] ] );
 check( '...and one with room for both is backed up', is_string( $run['result'] ) === true );
 
 // A copy of a size the disk has no room for after it is made: the sizes the run has are the true ones
-$appData['./nino/backups/disk'] = $need + $copies;
+\Nino\Backup::$diskFree = $need + $copies;
 $run			= $attempt( [ 'files' => [ 'vault.db' => str_repeat( 'x', 3 * 1048576 ) ] ] );
 $tried['a copy of 3 MB that the disk has no room for'] = is_array( $run['result'] ) === true ? $run['result'][1] : 'NOT REFUSED';
 check( 'what the features wrote is counted again by what it is: a copy that the disk has no room for after it was made ends the run with the sizes, no archive and nothing left',
 	is_array( $run['result'] ) === true && $run['result'][0] === 507 && ( $run['result'][2] ?? '' ) === 'backups_disk' && count( $run['result'][3] ?? [] ) === 2 && $run['asked'] === 1 && $run['new'] === [] && $run['temp'] === [] && $run['tmp'] === [] );
-unset( $appData['./nino/backups/disk'] );
+\Nino\Backup::$diskFree = null;
 
 // --- The lock -----------------------------------------------------------------------------------------------
 
@@ -754,6 +755,778 @@ while( ( $line = fgets( STDIN ) ) !== false )
 	file_put_contents( $crm, $damaged );
 	$result = \Nino\Modules\Backups\Admin::restore( $lite, (string) $good, $notice, (string) base64_decode( (string) $lite['/nino/backup/key'], true ) );
 	check( '...and so is the restore of the recovery page', $result === true && $count( $crm ) === [ 3, 'ok' ] );
+}
+
+// --- A restore callback that throws, and the length of a copy -------------------------------------------------
+
+echo "\nA restore callback that throws\n";
+
+$cb				= hookProject( 'backup-hook-callback' );
+$cbData		= \Nino\Filesystem::path( $cb, '/data' );
+ninoUser( $cb, 'dev@example.com' );
+$cb['./vault/files'] = [ 'vault.db' => 'copy of vault' ];
+$cbArchive	= (string) \Nino\Modules\Backups::now( $cb );
+
+/** The state a restore starts from: files that differ from the archive's, and a key in config.php that the archive does not have */
+$cbLive = static function() use ( &$cb, $cbData ): void {
+
+	file_put_contents( $cbData. '/vault.db', 'live vault' );
+	file_put_contents( $cbData. '/other.db', 'live other' );
+	file_put_contents( $cbData. '/vault-dir/a.db', 'live a' );
+	$config = \Nino\Filesystem::getFileContent( $cb, '/config.php', [] );
+	$config['/project/probe/epoch'] = 'live';
+	\Nino\Filesystem::putFileContent( $cb, '/config.php', $config );
+	unset( $cb['./other/restored'], $cb['./vault/restored'] );
+	hookSnapshotsGone( $cb );
+};
+
+/** One restore by the real action of the Backups panel ('panel') or by the one of the recovery page ('recovery'): [ status, body ] */
+$cbRestore = static function( string $door ) use ( &$cb, $cbArchive ): array {
+
+	if( $door === 'panel' ) {
+		\Nino\Auth::loginUser( $cb, 'dev@example.com', 'correct horse battery staple' );
+
+		return ninoCall( $cb, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $cbArchive ] );
+	}
+
+	\Nino\Runtime::setSessionValue( $cb, \Nino\Admin\Recovery::SESSION_KEY, true );
+	$answer = ninoCall( $cb, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $cbArchive ], 'recovery/restore' );
+	\Nino\Runtime::unsetSessionValue( $cb, \Nino\Admin\Recovery::SESSION_KEY );
+
+	return $answer;
+};
+
+foreach( [ 'panel', 'recovery' ] as $door ) {
+
+	$label = $door === 'panel' ? 'the Backups panel' : 'the recovery page';
+
+	// A callback that throws before it changed anything
+	$cbLive();
+	$cb['./vault/restore'] = 'throw';
+	ninoWarnings();
+	[ $status, $body ] = $cbRestore( $door );
+	$warned = implode( "\n", ninoWarnings() );
+	$snapshots = array_values( array_filter( hookIds( $cb ), static fn( string $name ): bool => str_starts_with( $name, 'pre-restore-' ) ) );
+	$config = \Nino\Filesystem::getFileContent( $cb, '/config.php', [] );
+
+	check( $label. ': a restore callback that throws does not end the restore: the answer is a 500 with the code of a restore that is done in part, the key of the feature in the sentence and in a field of its own, and the archive that holds the state before',
+		$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_callback' && ( $body['params'] ?? [] ) === [ 'vault', $snapshots[0] ?? '-' ] && ( $body['features'] ?? [] ) === [ 'vault' ] && count( $snapshots ) === 1 );
+	check( '...it names no path of what the feature said, and the log holds it with the feature',
+		str_contains( json_encode( $body ), '/secret' ) === false && str_contains( $warned, 'the feature "vault" threw RuntimeException while it restored its data: vault could not restore /secret/place/vault.db' ) === true );
+	check( '...config.php is the archive\'s, and the files of the feature are put back as if it had no callback: what was staged is copied',
+		isset( $config['/project/probe/epoch'] ) === false && file_get_contents( $cbData. '/vault.db' ) === 'copy of vault' );
+	check( '...and the callback of the feature that comes after it ran, with the staged files of the archive, as did every other file of the restore',
+		count( $cb['./other/restored'] ?? [] ) === 1 && ( $cb['./other/restored'][0]['staged'] ?? false ) === true && file_get_contents( $cbData. '/other.db' ) === 'copy of other' && hookTemp( $cb ) === [] );
+
+	// ...before and after it changed something: what it rewrote in the staging is what is copied, what it put into the live file stays
+	$cbLive();
+	$cb['./vault/restore'] = 'throw-after';
+	[ $status, $body ] = $cbRestore( $door );
+	check( $label. ': a callback that rewrote its staged file and threw: the answer is the same, and the file in the staging as it is then is what is copied',
+		$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_callback' && file_get_contents( $cbData. '/vault.db' ) === 'rewritten by the feature' && file_get_contents( $cbData. '/other.db' ) === 'copy of other' );
+
+	$cbLive();
+	$cb['./vault/restore'] = 'took-over';
+	[ $status, $body ] = $cbRestore( $door );
+	check( $label. ': a callback that restored its file itself, took it out of the staging and threw: the file it restored is left as it made it, and the answer names the feature',
+		$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_callback' && ( $body['params'][0] ?? '' ) === 'vault' && file_get_contents( $cbData. '/vault.db' ) === 'restored by the feature itself' && file_get_contents( $cbData. '/other.db' ) === 'copy of other' );
+
+	// An error is caught as an exception is
+	$cbLive();
+	$cb['./vault/restore'] = 'error';
+	[ $status, $body ] = $cbRestore( $door );
+	check( $label. ': a TypeError of the callback is caught as an exception is', $status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_callback' && file_get_contents( $cbData. '/vault.db' ) === 'copy of vault' );
+
+	// A callback that does its work is no failure, and the file it took out of the staging is not copied
+	$cbLive();
+	$cb['./vault/restore'] = 'take';
+	[ $status, $body ] = $cbRestore( $door );
+	check( $label. ': a callback that restored its file and took it out of the staging is a restore that is done: 200, and the file is as the feature made it',
+		$status === 200 && ( $door === 'panel' ? ( $body['ok'] ?? false ) === true : ( $body['restoredDate'] ?? '' ) !== '' ) && file_get_contents( $cbData. '/vault.db' ) === 'restored by the feature itself' && file_get_contents( $cbData. '/other.db' ) === 'copy of other' );
+}
+
+// What a callback changes in its arguments is what the next one is handed, as doCallbacks() does
+$cbLive();
+$cb['./vault/restore'] = 'args';
+$cbRestore( 'panel' );
+check( 'a callback that sets a key of its arguments is seen by the callback that comes after it: the arguments are handed on by reference', ( $cb['./other/restored'][0]['marker'] ?? null ) === 'set by vault' );
+
+// A restore that went through and left something out ends as one that succeeded does: the session ends, the token is a new one, the notices are in the
+// answer, and the tries of the key that was typed are let go. One that stopped halfway ends where it is
+$cbKey = (string) $cb['/nino/backup/key'];
+
+foreach( [ 'panel', 'recovery' ] as $door ) {
+
+	$label = $door === 'panel' ? 'the Backups panel' : 'the recovery page';
+
+	$cbLive();
+	$cb['./vault/restore']	= 'throw';
+	$cb['./vault/mode']			= 'throw';
+	$token = \Nino\Csrf::getToken( $cb );
+	[ $status, $body ] = $door === 'panel' ? $cbRestore( 'panel' ) : ( static function() use ( &$cb, $cbArchive, $cbKey ): array {
+		\Nino\Runtime::setSessionValue( $cb, \Nino\Admin\Recovery::SESSION_KEY, true );
+		$answer = ninoCall( $cb, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $cbArchive, 'key' => $cbKey ], 'recovery/restore' );
+		\Nino\Runtime::unsetSessionValue( $cb, \Nino\Admin\Recovery::SESSION_KEY );
+		return $answer;
+	} )();
+
+	check( $label. ': a restore that went through and failed in its callback ends as one that succeeded does: the notice of the snapshot that is the state as it was is in the answer of the 500',
+		$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_callback' && ( $body['notice']['code'] ?? '' ) === 'backups_snapshot_raw' && ( $body['notice']['params'] ?? [] ) === [ 'vault' ] );
+
+	if( $door === 'panel' )
+		check( '...the session of the account has ended and the csrf token is a new one', \Nino\Auth::getCurrentUser( $cb ) === false && \Nino\Runtime::getSessionValue( $cb, './nino/auth/current' ) === null && \Nino\Csrf::getToken( $cb ) !== $token );
+	else
+		check( '...the tries of the key that was typed are let go', \Nino\Feature::spent( $cb, 'recovery-key', 'recovery', 1 ) === false );
+
+	// ...and one that stopped halfway keeps the session and the tries
+	$cbLive();
+	$cb['./vault/restore']	= 'faults';
+	$cb['./vault/faults']		= [ 'cut' => static fn( string $path ): bool => $path === $cbData. '/vault.db' ];
+
+	try {
+		[ $status, $body ] = $door === 'panel' ? $cbRestore( 'panel' ) : ( static function() use ( &$cb, $cbArchive, $cbKey ): array {
+			\Nino\Runtime::setSessionValue( $cb, \Nino\Admin\Recovery::SESSION_KEY, true );
+			$answer = ninoCall( $cb, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $cbArchive, 'key' => $cbKey ], 'recovery/restore' );
+			\Nino\Runtime::unsetSessionValue( $cb, \Nino\Admin\Recovery::SESSION_KEY );
+			return $answer;
+		} )();
+	}
+	finally {
+		FaultFs::off();
+	}
+
+	check( $label. ': a restore that stopped halfway (a file that is cut) ends where it is: no notice, the session of the account stays, the tries of the key are kept',
+		$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_partial' && isset( $body['notice'] ) === false
+		&& ( $door === 'panel' ? \Nino\Auth::getCurrentUser( $cb ) !== false : \Nino\Feature::spent( $cb, 'recovery-key', 'recovery', 1 ) === true ) );
+	\Nino\Feature::forget( $cb, 'recovery-key', 'recovery' );
+}
+
+unset( $cb['./vault/mode'], $cb['./vault/faults'] );
+
+// The log line of the failed restore says which feature and which archive holds the state before
+$cbLive();
+$cb['./vault/restore'] = 'throw';
+\Nino\Auth::loginUser( $cb, 'dev@example.com', 'correct horse battery staple' );
+$cbResult = \Nino\Modules\Backups\Admin::restore( $cb, $cbArchive );
+\Nino\Modules\Backups\Admin::recordRestore( $cb, 'dev@example.com', $cbArchive, $cbResult );
+$cbLogged = implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $cb, 3 ) );
+check( 'the line of the activity log says that the restore failed in part, the archive that holds the state before and the feature whose callback failed',
+	is_array( $cbResult ) === true && str_contains( $cbLogged, 'in part, the state before is the archive pre-restore-' ) === true && str_contains( $cbLogged, ', the restore callback of vault failed' ) === true );
+
+// A request that ends the way \Nino\Runtime::fail() ends it is the request's to end: it is not caught
+$cbLive();
+$cb['./vault/restore'] = 'fail';
+$ended = null;
+try {
+	\Nino\Modules\Backups\Admin::restore( $cb, $cbArchive );
+}
+catch( \Nino\Failure $failure ) {
+	$ended = $failure->getMessage();
+}
+$cbConfig = \Nino\Filesystem::getFileContent( $cb, '/config.php', [] );
+check( 'what ends the request as \Nino\Runtime::fail() does is not caught by the restore, and the lock and the temporary files are gone: config.php is the archive\'s by then and the files of data/ are as they were, which the manual says',
+	$ended === 'vault cannot go on' && hookTemp( $cb ) === [] && \Nino\Filesystem::lockFile( $cb, \Nino\Modules\Backups::LOCK_PATH, false ) === true && isset( $cbConfig['/project/probe/epoch'] ) === false && file_get_contents( $cbData. '/vault.db' ) === 'live vault' );
+\Nino\Filesystem::unlockFile( $cb, \Nino\Modules\Backups::LOCK_PATH );
+
+// --- A file that grew after it was put back, and a copy that fell short ----------------------------------------------
+
+echo "\nThe length of what was put back\n";
+
+foreach( [ 'panel', 'recovery' ] as $door ) {
+
+	$label = $door === 'panel' ? 'the Backups panel' : 'the recovery page';
+	$grew	 = 0;
+	$busy	 = false;
+
+	// A process that appends to the file at the moment the copy closes it: no other can come closer
+	$cbLive();
+	$cb['./vault/restore'] = 'faults';
+	$cb['./vault/faults']	 = [ 'closed' => static function( string $path, string $mode ) use ( $cbData, &$grew, &$busy ): void {
+
+		if( $busy === false && $path === $cbData. '/vault.db' && str_starts_with( $mode, 'w' ) === true ) {
+			$busy = true;
+			file_put_contents( $path, ' - written to after the copy', FILE_APPEND );
+			$grew++;
+			$busy = false;
+		}
+	} ];
+
+	try {
+		[ $status, $body ] = $cbRestore( $door );
+	}
+	finally {
+		FaultFs::off();
+	}
+
+	check( $label. ': a database that a process wrote to right after it was put back is not a restore that is done in part: 200, and the file is the archive\'s with what was written after it',
+		$grew === 1 && $status === 200 && file_get_contents( $cbData. '/vault.db' ) === 'copy of vault - written to after the copy' );
+
+	// A copy that answers that it wrote everything and wrote half
+	$cbLive();
+	$cb['./vault/faults'] = [ 'cut' => static fn( string $path ): bool => $path === $cbData. '/vault.db' ];
+
+	try {
+		[ $status, $body ] = $cbRestore( $door );
+	}
+	finally {
+		FaultFs::off();
+	}
+
+	$snapshots = array_values( array_filter( hookIds( $cb ), static fn( string $name ): bool => str_starts_with( $name, 'pre-restore-' ) ) );
+
+	check( $label. ': a file that is shorter than its source after the copy is a restore that is done in part, with the archive that holds the state before',
+		$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_partial' && ( $body['params'] ?? [] ) === [ $snapshots[0] ?? '-' ] && strlen( (string) file_get_contents( $cbData. '/vault.db' ) ) === 6 );
+}
+
+unset( $cb['./vault/restore'], $cb['./vault/faults'] );
+
+// --- A database that is in use ---------------------------------------------------------------------------------------
+
+echo "\nA database that is in use\n";
+
+$lockList = '/proc/locks';
+
+if( extension_loaded( 'pdo_sqlite' ) === false )
+	echo "  --  - pdo_sqlite is not there: the databases that processes hold open are not made, the restore of a database in use is not tried\n";
+else if( is_readable( $lockList ) === false )
+	echo "  --  - /proc/locks cannot be read here: the restore sees no locks, and the rule that it puts the files back as it does any other is what the test below holds\n";
+
+if( extension_loaded( 'pdo_sqlite' ) === true ) {
+
+	$use			= hookProject( 'backup-hook-inuse', [ 'Other', 'Vault' ] );
+	$useDir		= ninoSandboxDir( $use );
+	$useData	= \Nino\Filesystem::path( $use, '/data' );
+	$useDb		= $useData. '/crm.sqlite';
+	$use['./vault/example'] = [ \Nino\Modules\DocHook::class, 'callbackBackup' ];
+	ninoUser( $use, 'dev@example.com' );
+
+	// The process that holds a database in the way a request does: 'txn' an open transaction that has written (rollback journal), 'wal' an open
+	// connection of a database in write-ahead mode, 'dead' a writer that was killed in the middle of a transaction. It says 'ready', waits for a
+	// line, ends what it holds and says how that went
+	$holder = $useDir. '/holder.php';
+	file_put_contents( $holder, '<?php
+[ , $file, $mode ] = $argv;
+$say = static function( string $line ): void { echo $line, "\n"; fflush( STDOUT ); };
+$db = new PDO( $file === "" ? "sqlite::memory:" : "sqlite:". $file, null, null, [ PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ] );
+$db->exec( "PRAGMA busy_timeout = 4000" );
+$db->exec( "PRAGMA journal_mode = ". ( $mode === "wal" ? "WAL" : "DELETE" ) );
+$rows = static function( int $count ) use ( $db ): void { $put = $db->prepare( "INSERT INTO t ( v ) VALUES ( ? )" ); for( $i = 0; $i < $count; $i++ ) $put->execute( [ str_repeat( "w", 400 ) ] ); };
+if( $mode === "wal" ) {
+	$db->exec( "PRAGMA wal_autocheckpoint = 0" );
+	$rows( 20 );
+	$db->query( "SELECT COUNT(*) FROM t" )->fetchColumn();
+	$say( "ready" );
+	fgets( STDIN );
+	$rows( 20 );
+	$say( "written" );
+	exit;
+}
+if( $mode === "dead" )
+	$db->exec( "PRAGMA cache_size = 5" );
+$db->exec( "BEGIN IMMEDIATE" );
+$rows( $mode === "dead" ? 2000 : 20 );
+if( $mode === "slow" || $mode === "long" ) {
+	$say( "ready" );
+	usleep( $mode === "long" ? 6500000 : 600000 );
+	$db->exec( "COMMIT" );
+	$say( "committed" );
+	exit;
+}
+$say( "ready" );
+fgets( STDIN );
+if( $mode === "dead" ) {
+	posix_kill( getmypid(), SIGKILL );
+	sleep( 5 );
+}
+try { $db->exec( "COMMIT" ); $say( "committed" ); } catch( Throwable $e ) { $say( "COMMIT failed: ". $e->getMessage() ); }
+' );
+
+	/** A database of the project: epoch and rows, in the journal mode named */
+	$useMake = static function( string $mode, string $epoch ) use ( $useDb ): void {
+
+		foreach( [ '', '-wal', '-shm', '-journal' ] as $suffix )
+			@unlink( $useDb. $suffix );
+
+		$pdo = new \PDO( 'sqlite:'. $useDb, null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
+		$pdo->exec( 'PRAGMA journal_mode = '. ( $mode === 'wal' ? 'WAL' : 'DELETE' ) );
+		$pdo->exec( 'CREATE TABLE meta ( k TEXT PRIMARY KEY, v TEXT )' );
+		$pdo->exec( 'CREATE TABLE t ( id INTEGER PRIMARY KEY, v TEXT )' );
+		$pdo->exec( "INSERT INTO meta VALUES ( 'epoch', '". $epoch. "' )" );
+		$pdo->beginTransaction();
+
+		for( $row = 1; $row <= 200; $row++ )
+			$pdo->exec( "INSERT INTO t ( v ) VALUES ( '". str_repeat( 'a', 400 ). "' )" );
+
+		$pdo->commit();
+		$pdo = null;
+	};
+
+	/** What a database holds: [ integrity, epoch, rows ] - opened by a connection of its own, which closes before it answers */
+	$useRead = static function() use ( $useDb ): array {
+
+		try {
+			$pdo = new \PDO( 'sqlite:'. $useDb, null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
+			$pdo->exec( 'PRAGMA busy_timeout = 4000' );
+			$read = [ (string) $pdo->query( 'PRAGMA integrity_check' )->fetchColumn(), (string) $pdo->query( "SELECT v FROM meta WHERE k = 'epoch'" )->fetchColumn(), (int) $pdo->query( 'SELECT COUNT(*) FROM t' )->fetchColumn() ];
+			$pdo = null;
+
+			return $read;
+		}
+		catch( \Throwable $e ) {
+			return [ 'unreadable: '. $e->getMessage(), '', 0 ];
+		}
+	};
+
+	/** Start the process that holds the database: [ process, pipes ], waiting for its 'ready' */
+	$useHold = static function( string $mode ) use ( $holder, $useDb ): array {
+
+		$process = proc_open( [ PHP_BINARY, $holder, $useDb, $mode ], [ 0 => [ 'pipe', 'r' ], 1 => [ 'pipe', 'w' ] ], $pipes );
+		$ready	 = is_resource( $process ) === true ? trim( (string) fgets( $pipes[1] ) ) : '';
+
+		return [ $process, $pipes, $ready ];
+	};
+
+	/** End what the process holds, and what it says of that */
+	$useEnd = static function( array $held ): string {
+
+		[ $process, $pipes ] = $held;
+		@fwrite( $pipes[0], "go\n" );
+		$said = trim( (string) fgets( $pipes[1] ) );
+		fclose( $pipes[0] );
+		fclose( $pipes[1] );
+		proc_close( $process );
+
+		return $said;
+	};
+
+	/** The restore of the archive of the project, by the real action: [ status, body ] */
+	$useRestore = static function( string $door, string $date ) use ( &$use ): array {
+
+		if( $door === 'panel' ) {
+			\Nino\Auth::loginUser( $use, 'dev@example.com', 'correct horse battery staple' );
+
+			return ninoCall( $use, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $date ] );
+		}
+
+		\Nino\Runtime::setSessionValue( $use, \Nino\Admin\Recovery::SESSION_KEY, true );
+		$answer = ninoCall( $use, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $date ], 'recovery/restore' );
+		\Nino\Runtime::unsetSessionValue( $use, \Nino\Admin\Recovery::SESSION_KEY );
+
+		return $answer;
+	};
+
+	// The archive: the state 'A' of the database, a copy that is whole, and the file of the other feature
+	$useMake( 'delete', 'A' );
+	$use['./vault/mode'] = 'example';
+	$useArchive = (string) \Nino\Modules\Backups::now( $use );
+	$useStamp		= hookStamp( $use, hookArchive( $use, $useArchive ) );
+	check( 'the archive of the database lists it as handed over, the premise of what follows', ( $useStamp['copies'] ?? [] ) === [ 'data/other.db', 'data/crm.sqlite' ] && $useRead() === [ 'ok', 'A', 200 ] );
+
+	// What the locks of a list say, whatever process holds them: the list is read for the device and the inode of the live file
+	$useStat = stat( $useDb );
+	$useMajor = ( ( $useStat['dev'] >> 8 ) & 0xfff ) | ( ( $useStat['dev'] >> 32 ) & ~0xfff );
+	$useMinor = ( $useStat['dev'] & 0xff ) | ( ( $useStat['dev'] >> 12 ) & ~0xff );
+	$useLine	= static fn( int $number, string $kind, int $ino, string $arrow = '' ): string => sprintf( '%d: %s%s ADVISORY  WRITE 4242 %02x:%02x:%d 1073741824 1073741824', $number, $arrow, $kind, $useMajor, $useMinor, $ino );
+	$useStage = $useDir. '/stage-locks';
+	mkdir( $useStage. '/data', 0755, true );
+	file_put_contents( $useStage. '/data/crm.sqlite', 'x' );
+	file_put_contents( $useStage. '/data/other.db', 'x' );
+	$useList = $useDir. '/locks-list';
+	$useSees = static function( string $text ) use ( &$use, $useStage, $useList ): array {
+
+		file_put_contents( $useList, $text );
+		\Nino\Backup::$locksFile = $useList;
+		$names = \Nino\Backup::inUse( $use, $useStage, [ 'data/other.db', 'data/crm.sqlite' ] );
+		\Nino\Backup::$locksFile = null;
+
+		return $names;
+	};
+	check( 'a list of locks that holds a POSIX lock on the device and inode of the file names it, and nothing else does: not a lock of another kind (flock), not another inode, not a line that is none',
+		$useSees( $useLine( 1, 'POSIX', $useStat['ino'] ). "\n". $useLine( 2, 'FLOCK', $useStat['ino'] + 1 ). "\nnonsense\n\n" ) === [ 'data/crm.sqlite' ]
+		&& $useSees( $useLine( 1, 'FLOCK', $useStat['ino'] ). "\n". $useLine( 2, 'POSIX', $useStat['ino'] + 7 ). "\n" ) === [] && $useSees( '' ) === [] );
+	check( '...a process that waits for a lock on the file shows in the list as well, and a list that is not there says nothing, which is none: the files are put back',
+		$useSees( $useLine( 3, 'POSIX', $useStat['ino'], '-> ' ). "\n" ) === [ 'data/crm.sqlite' ] && $useSees( $useLine( 1, 'POSIX', $useStat['ino'] ). "\n" ) !== []
+		&& ( static function() use ( &$use, $useStage ): array { \Nino\Backup::$locksFile = '/nowhere/locks'; $names = \Nino\Backup::inUse( $use, $useStage, [ 'data/crm.sqlite' ] ); \Nino\Backup::$locksFile = null; return $names; } )() === [] );
+	check( '...an archive of another project is not believed about what it hands over: nothing is named for it, and no name of a file that is none of the feature\'s',
+		( static function() use ( &$use, $useStage, $useList, $useLine, $useStat ): array { file_put_contents( $useList, $useLine( 1, 'POSIX', $useStat['ino'] ). "\n" ); \Nino\Backup::$locksFile = $useList; $names = \Nino\Backup::inUse( $use, $useStage, [ 'data/crm.sqlite' ], true ); \Nino\Backup::$locksFile = null; return $names; } )() === []
+		&& $useSees( $useLine( 1, 'POSIX', $useStat['ino'] ). "\n" ) === [ 'data/crm.sqlite' ] );
+
+	// What config.php can hold - every key of it is merged into the app data, an archive's among them - does not point the check of the locks elsewhere nor name the room of the disk
+	file_put_contents( $useList, $useLine( 1, 'POSIX', $useStat['ino'] ). "\n" );
+	$use['./nino/backup/locks']	 = $useList;
+	$use['./nino/backups/disk']	 = 0;
+	check( 'a key of the app data that names a list of locks, or a number of free bytes, is not read: the real list is asked, and the real disk',
+		\Nino\Backup::inUse( $use, $useStage, [ 'data/crm.sqlite' ] ) === [] && ( \Nino\Backup::freeSpace( $use, $useDir ) ?? 1 ) > 0 );
+	unset( $use['./nino/backup/locks'], $use['./nino/backups/disk'] );
+
+	// A file that no feature with a callback of '/nino/admin/backup' owns is not asked about, whatever the list of the archive says and whatever lies on it
+	$plainStat = stat( $useData. '/plain.db' );
+	file_put_contents( $useStage. '/data/plain.db', 'x' );
+	file_put_contents( $useList, $useLine( 1, 'POSIX', $useStat['ino'] ). "\n". $useLine( 2, 'POSIX', $plainStat['ino'] ). "\n" );
+	\Nino\Backup::$locksFile = $useList;
+	$ownedOnly = \Nino\Backup::inUse( $use, $useStage, [ 'data/crm.sqlite', 'data/plain.db' ] );
+	\Nino\Backup::$locksFile = null;
+	check( 'a file of a feature without a callback of \'/nino/admin/backup\' is not asked about the locks, though the archive lists it and a lock lies on it: it is put back as any file is', $ownedOnly === [ 'data/crm.sqlite' ] );
+
+	if( is_readable( $lockList ) === true ) {
+
+		// An open transaction that has written, in rollback mode; and a connection of a database in write-ahead mode
+		foreach( [ 'txn' => 'delete', 'wal' => 'wal' ] as $mode => $journal ) {
+
+			$useMake( $journal, 'A' );
+			$use['./vault/mode'] = 'example';
+			$useArchive = (string) \Nino\Modules\Backups::now( $use );
+
+			$pdo = new \PDO( 'sqlite:'. $useDb );
+			$pdo->exec( "UPDATE meta SET v = 'B' WHERE k = 'epoch'" );
+			$pdo = null;
+			file_put_contents( $useData. '/other.db', 'live other' );
+			$held		= $useHold( $mode );
+			$before	= sha1_file( $useDb );
+			$beside	= array_values( array_filter( [ '-wal', '-shm', '-journal' ], static fn( string $suffix ): bool => is_file( $useDb. $suffix ) ) );
+
+			check( 'a process holds the database ('. ( $mode === 'txn' ? 'an open transaction that has written, rollback journal' : 'a connection that is open, write-ahead log' ). '): the premise, with the files beside it as that mode has them',
+				$held[2] === 'ready' && $beside === ( $mode === 'txn' ? [ '-journal' ] : [ '-wal', '-shm' ] ) );
+
+			foreach( [ 'panel', 'recovery' ] as $door ) {
+
+				$label = $door === 'panel' ? 'the Backups panel' : 'the recovery page';
+				hookSnapshotsGone( $use );
+				ninoWarnings();
+				[ $status, $body ] = $useRestore( $door, $useArchive );
+				$warned		 = implode( "\n", ninoWarnings() );
+				$snapshots = array_values( array_filter( hookIds( $use ), static fn( string $name ): bool => str_starts_with( $name, 'pre-restore-' ) ) );
+
+				check( $label. ', '. $mode. ': the file is not put back and the answer says so: a 500 with the code of files that are in use, their number in the sentence, their names in a field of their own and the archive that holds the state before',
+					$status === 500 && ( $body['code'] ?? '' ) === 'backups_restore_inuse' && ( $body['params'] ?? [] ) === [ 1, $snapshots[0] ?? '-' ] && ( $body['files'] ?? [] ) === [ 'data/crm.sqlite' ] && str_contains( $warned, 'data/crm.sqlite is in use by another process and was left as it is' ) === true );
+				check( '...the file is the bytes it was and the files beside it are where they were',
+					sha1_file( $useDb ) === $before && array_values( array_filter( [ '-wal', '-shm', '-journal' ], static fn( string $suffix ): bool => is_file( $useDb. $suffix ) ) ) === $beside );
+				check( '...and everything else of the archive is restored: the file of the other feature, and config.php',
+					file_get_contents( $useData. '/other.db' ) === 'copy of other' && hookTemp( $use ) === [] );
+				check( '...the line of the activity log names the file that was left as it is, and the archive that holds the state before',
+					str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $use, 3 ) ), 'in part, the state before is the archive '. ( $snapshots[0] ?? '-' ). ', data/crm.sqlite in use and left as it is' ) === true );
+				check( '...and the restore ended as one that went through does: the session of the account that ran it has ended (the Backups panel)',
+					$door === 'recovery' || ( \Nino\Auth::getCurrentUser( $use ) === false && \Nino\Runtime::getSessionValue( $use, './nino/auth/current' ) === null ) );
+				file_put_contents( $useData. '/other.db', 'live other' );
+			}
+
+			$said = $useEnd( $held );
+			check( '...the process that held the database ends its transaction without a failure, and the database is whole and has what the process wrote: nothing was written under its feet',
+				$said === ( $mode === 'txn' ? 'committed' : 'written' ) && $useRead() === [ 'ok', 'B', $mode === 'txn' ? 220 : 240 ] );
+
+			// Nothing holds it any more: the same restore puts it back
+			hookSnapshotsGone( $use );
+			[ $status, $body ] = $useRestore( 'panel', $useArchive );
+			check( 'the restore, repeated when the process is gone, puts the file back and removes the files beside it: the database is whole and is the archive\'s',
+				$status === 200 && ( $body['ok'] ?? false ) === true && $useRead() === [ 'ok', 'A', 200 ] && is_file( $useDb. '-journal' ) === false && is_file( $useDb. '-wal' ) === false );
+		}
+
+		// A writer that was killed in the middle of a transaction: a hot journal and no lock
+		$useMake( 'delete', 'A' );
+		$use['./vault/mode'] = 'example';
+		$useArchive = (string) \Nino\Modules\Backups::now( $use );
+		$pdo = new \PDO( 'sqlite:'. $useDb );
+		$pdo->exec( "UPDATE meta SET v = 'B' WHERE k = 'epoch'" );
+		$pdo = null;
+		$held = $useHold( 'dead' );
+		$useEnd( $held );
+		clearstatcache();
+		check( 'a writer that was killed in the middle of a transaction leaves a hot journal and no lock on the file: the premise', $held[2] === 'ready' && is_file( $useDb. '-journal' ) === true && filesize( $useDb. '-journal' ) > 0 );
+
+		foreach( [ 'panel', 'recovery' ] as $door ) {
+
+			if( $door === 'recovery' ) {
+				$useMake( 'delete', 'A' );
+				$pdo = new \PDO( 'sqlite:'. $useDb );
+				$pdo->exec( "UPDATE meta SET v = 'B' WHERE k = 'epoch'" );
+				$pdo = null;
+				$held = $useHold( 'dead' );
+				$useEnd( $held );
+			}
+
+			hookSnapshotsGone( $use );
+			[ $status, $body ] = $useRestore( $door, $useArchive );
+			check( ( $door === 'panel' ? 'the Backups panel' : 'the recovery page' ). ': a file that no process holds is put back, and the hot journal of the writer that died is removed: 200, and the database is whole and is the archive\'s',
+				$status === 200 && $useRead() === [ 'ok', 'A', 200 ] && is_file( $useDb. '-journal' ) === false );
+		}
+
+		// Where the list of the locks cannot be read nothing is known: the file is put back as every other file is
+		$useMake( 'delete', 'A' );
+		$use['./vault/mode'] = 'example';
+		$useArchive = (string) \Nino\Modules\Backups::now( $use );
+		$archived		= hookArchive( $use, $useArchive )['data/crm.sqlite'] ?? '';
+		$pdo = new \PDO( 'sqlite:'. $useDb );
+		$pdo->exec( "UPDATE meta SET v = 'B' WHERE k = 'epoch'" );
+		$pdo = null;
+		$held = $useHold( 'txn' );
+		\Nino\Backup::$locksFile = $useDir. '/no-such-list';
+		hookSnapshotsGone( $use );
+		[ $status, $body ] = $useRestore( 'panel', $useArchive );
+		\Nino\Backup::$locksFile = null;
+		$putBack = file_get_contents( $useDb );
+		$useEnd( $held );
+		check( 'where the list of the locks cannot be read the restore says nothing of them and puts the file back, as it does any other file: 200, the bytes are the archive\'s',
+			$held[2] === 'ready' && $status === 200 && ( $body['ok'] ?? false ) === true && $putBack === $archived );
+	}
+
+	// --- What happens together: a callback that fails, files that are in use, a file that is cut, a file that is taken out and one that is held late ---
+
+	if( is_readable( $lockList ) === true ) {
+
+		echo "\nOutcomes that meet\n";
+
+		/** A process that holds the database $file in the way $mode says: [ process, pipes, what it said first ] */
+		$holdAt = static function( string $file, string $mode ) use ( $holder ): array {
+
+			$process = proc_open( [ PHP_BINARY, $holder, $file, $mode ], [ 0 => [ 'pipe', 'r' ], 1 => [ 'pipe', 'w' ] ], $pipes );
+
+			return [ $process, $pipes, is_resource( $process ) === true ? trim( (string) fgets( $pipes[1] ) ) : '' ];
+		};
+
+		/**
+		 *	One restore of the database of the manual's feature with what $o says: 'restore' the mode of the restore callback of the feature, 'hold' the
+		 *	process that holds the database while it runs, 'faults' a function that makes the faults of FaultFs and may start a process into $box['held'],
+		 *	'stale' a journal that lies beside the database. The snapshot of the restore is the state as it was (the feature's backup callback throws), so
+		 *	its notice is in every answer
+		 */
+		$meet = static function( string $door, array $o ) use ( &$use, $useMake, $useDb, $useData, $useRestore, $useEnd, $holdAt ): array {
+
+			$useMake( 'delete', 'A' );
+			$use['./vault/mode']	= 'example';
+			$use['./vault/example'] = [ \Nino\Modules\DocHook::class, 'callbackBackup' ];
+			hookSnapshotsGone( $use );
+			$date = (string) \Nino\Modules\Backups::now( $use );
+			$pdo	= new \PDO( 'sqlite:'. $useDb );
+			$pdo->exec( "UPDATE meta SET v = 'B' WHERE k = 'epoch'" );
+			$pdo	= null;
+			file_put_contents( $useData. '/other.db', 'live other' );
+
+			if( isset( $o['stale'] ) === true )
+				file_put_contents( $useDb. '-journal', str_repeat( "\0", 512 ) );
+
+			$use['./vault/mode']		= 'throw';
+			$use['./vault/restore']	= $o['restore'] ?? '';
+			$box										= [ 'held' => [] ];
+
+			if( isset( $o['faults'] ) === true ) {
+				$use['./vault/restore']	= 'faults';
+				$use['./vault/faults']	= $o['faults']( $box );
+			}
+
+			if( isset( $o['hold'] ) === true )
+				$box['held'][] = $holdAt( $useDb, $o['hold'] );
+
+			$before = sha1_file( $useDb );
+			$token	= \Nino\Csrf::getToken( $use );
+			ninoWarnings();
+
+			try {
+				[ $status, $body ] = $useRestore( $door, $date );
+			}
+			finally {
+				FaultFs::off();
+			}
+
+			$warned	= implode( "\n", ninoWarnings() );
+			$logged	= implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $use, 3 ) );
+			$after	= sha1_file( $useDb );
+			$ended	= \Nino\Auth::getCurrentUser( $use ) === false && \Nino\Csrf::getToken( $use ) !== $token;
+			$said		= [];
+
+			foreach( $box['held'] as $held )
+				$said[] = $useEnd( $held );
+
+			unset( $use['./vault/restore'], $use['./vault/faults'], $use['./vault/mode'] );
+
+			$snapshots = array_values( array_filter( hookIds( $use ), static fn( string $name ): bool => str_starts_with( $name, 'pre-restore-' ) ) );
+
+			return [ 'status' => $status, 'body' => $body, 'warned' => $warned, 'logged' => $logged, 'same' => $before === $after, 'ended' => $ended, 'said' => $said, 'snapshot' => $snapshots[0] ?? '-', 'other' => (string) file_get_contents( $useData. '/other.db' ) ];
+		};
+
+		foreach( [ 'panel', 'recovery' ] as $door ) {
+
+			$label = $door === 'panel' ? 'the Backups panel' : 'the recovery page';
+
+			// A callback that throws and a file in use: the answer says both, and the file is named
+			$r = $meet( $door, [ 'restore' => 'throw', 'hold' => 'txn' ] );
+			check( $label. ': a callback that throws and a database in use: the answer is a 500 with the code that says both, the feature and the number of the files in its sentence, and the names in both of its fields',
+				$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_both' && ( $r['body']['params'] ?? [] ) === [ 'vault', 1, $r['snapshot'] ] && ( $r['body']['features'] ?? [] ) === [ 'vault' ] && ( $r['body']['files'] ?? [] ) === [ 'data/crm.sqlite' ] );
+			check( '...the file is as it was, the rest of the archive is restored, and the line of the activity log says both',
+				$r['same'] === true && $r['other'] === 'copy of other' && str_contains( $r['logged'], ', the restore callback of vault failed' ) === true && str_contains( $r['logged'], ', data/crm.sqlite in use and left as it is' ) === true );
+			check( '...and the restore ended as one that went through does: the notice is in the answer'. ( $door === 'panel' ? ', the session has ended and the token is a new one' : '' ),
+				( $r['body']['notice']['code'] ?? '' ) === 'backups_snapshot_raw' && ( $door === 'recovery' || $r['ended'] === true ) );
+
+			// A callback that takes a file out of the staging and then fails: the file is named as one that was not put back
+			$r = $meet( $door, [ 'restore' => 'took-crm' ] );
+			check( $label. ': a callback that took the database out of the staging and then threw: the answer is the one of a callback that failed, and the file is named in a field of its own as not put back by the restore',
+				$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_callback' && ( $r['body']['features'] ?? [] ) === [ 'vault' ] && ( $r['body']['taken'] ?? [] ) === [ 'data/crm.sqlite' ] && $r['same'] === true && $r['other'] === 'copy of other'
+				&& str_contains( $r['logged'], ', data/crm.sqlite not put back by the restore: the callback of the feature took it out and failed' ) === true );
+
+			// A file that is cut and a file in use: the restore that stopped halfway still names the file it left
+			$r = $meet( $door, [ 'hold' => 'txn', 'faults' => static fn( array &$box ): array => [ 'cut' => static fn( string $path ): bool => str_ends_with( $path, '/data/other.db' ) ] ] );
+			check( $label. ': a file that is cut and a database in use: the answer is the one of a restore that stopped halfway, and names the file that was left as it is',
+				$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_partial' && ( $r['body']['params'] ?? [] ) === [ $r['snapshot'] ] && ( $r['body']['files'] ?? [] ) === [ 'data/crm.sqlite' ] && $r['same'] === true
+				&& str_contains( $r['logged'], 'in part, the state before is the archive '. $r['snapshot']. ', data/crm.sqlite in use and left as it is' ) === true && isset( $r['body']['notice'] ) === false && ( $door === 'recovery' || $r['ended'] === false ) );
+
+			// A process that takes its lock after the first look: the second look, right before data/ is copied, finds it
+			$r = $meet( $door, [ 'stale' => true, 'faults' => static function( array &$box ) use ( $useDb, $holdAt ): array {
+				return [ 'unlink' => static function( string $path ) use ( &$box, $useDb, $holdAt ): bool {
+					if( $path === $useDb. '-journal' && $box['held'] === [] )
+						$box['held'][] = $holdAt( $useDb, 'txn' );
+					return false;
+				} ];
+			} ] );
+			check( $label. ': a process that takes its lock after the first look and before data/ is copied: the second look finds it, the file is left as it is and named',
+				$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_inuse' && ( $r['body']['files'] ?? [] ) === [ 'data/crm.sqlite' ] && $r['same'] === true && $r['other'] === 'copy of other' && ( $r['said'][0] ?? '' ) !== '' );
+
+			// A process that takes its lock while the file is copied: it cannot be undone, and the answer says that the file may be damaged
+			$r = $meet( $door, [ 'faults' => static function( array &$box ) use ( $useDb, $holdAt ): array {
+				return [ 'closed' => static function( string $path, string $mode ) use ( &$box, $useDb, $holdAt ): void {
+					if( $path === $useDb && str_starts_with( $mode, 'w' ) === true && $box['held'] === [] )
+						$box['held'][] = $holdAt( $useDb, 'txn' );
+				} ];
+			} ] );
+			check( $label. ': a process that takes its lock while the file is copied: the answer has the code of a file that was written while it was in use, the name in a field of its own, and the line of the log says so',
+				$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_written' && ( $r['body']['params'] ?? [] ) === [ 1, $r['snapshot'] ] && ( $r['body']['written'] ?? [] ) === [ 'data/crm.sqlite' ]
+				&& str_contains( $r['logged'], ', data/crm.sqlite written while in use and possibly damaged' ) === true && str_contains( $r['warned'], 'data/crm.sqlite was in use by another process while it was put back and may be damaged' ) === true );
+			check( '...and it ends as a restore that went through does: the notice is in the answer'. ( $door === 'panel' ? ', the session has ended and the token is a new one' : '' ),
+				( $r['body']['notice']['code'] ?? '' ) === 'backups_snapshot_raw' && ( $door === 'recovery' || $r['ended'] === true ) );
+
+			// ...and where a copy fell short as well, the restore stopped halfway: that is the answer, with the file that was written, and it ends where it is
+			$r = $meet( $door, [ 'faults' => static function( array &$box ) use ( $useDb, $holdAt ): array {
+				return [ 'cut' => static fn( string $path ): bool => str_ends_with( $path, '/data/other.db' ), 'closed' => static function( string $path, string $mode ) use ( &$box, $useDb, $holdAt ): void {
+					if( $path === $useDb && str_starts_with( $mode, 'w' ) === true && $box['held'] === [] )
+						$box['held'][] = $holdAt( $useDb, 'txn' );
+				} ];
+			} ] );
+			check( $label. ': a file that was written while it was in use and a copy that fell short: the answer is the one of a restore that stopped halfway, with the file that was written and the entry that is not whole in fields of their own, and the restore ends where it is',
+				$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_partial' && ( $r['body']['params'] ?? [] ) === [ $r['snapshot'] ] && ( $r['body']['written'] ?? [] ) === [ 'data/crm.sqlite' ] && ( $r['body']['cut'] ?? [] ) === [ 'data' ]
+				&& isset( $r['body']['notice'] ) === false && ( $door === 'recovery' || $r['ended'] === false ) );
+			check( '...the line of the activity log and the log of errors name both: the copy that is not whole and the file that was written while it was in use',
+				str_contains( $r['logged'], 'in part, the state before is the archive '. $r['snapshot'] ) === true && str_contains( $r['logged'], ', data/crm.sqlite written while in use and possibly damaged' ) === true && str_contains( $r['logged'], ', the copy of data was not whole' ) === true
+				&& str_contains( $r['warned'], 'the copy of data is not whole' ) === true && str_contains( $r['warned'], 'data/crm.sqlite was in use by another process while it was put back' ) === true );
+		}
+
+		// A file that is held takes nothing from the files beside another file that was handed over: the guard on the number of files is the archive's
+		$duo = hookProject( 'backup-hook-duo', [ 'Other', 'Vault' ] );
+		$duoData = \Nino\Filesystem::path( $duo, '/data' );
+
+		foreach( array_diff( scandir( $duoData ) ?: [], [ '.', '..' ] ) as $left )
+			\Nino\Filesystem::removeDir( $duoData. '/'. $left );
+
+		ninoUser( $duo, 'dev@example.com' );
+		$pdo = new \PDO( 'sqlite:'. $duoData. '/crm.sqlite', null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
+		$pdo->exec( 'CREATE TABLE t ( id INTEGER PRIMARY KEY, v TEXT )' );
+		$pdo = null;
+		file_put_contents( $duoData. '/other.db', 'live other' );
+		$duo['./vault/example']	= [ \Nino\Modules\DocHook::class, 'callbackBackup' ];
+		$duo['./vault/mode']		= 'example';
+		$duoId = (string) \Nino\Modules\Backups::now( $duo );
+		$duo['./vault/mode']		= 'throw';
+		file_put_contents( $duoData. '/other.db-shm', 'live shm' );
+		file_put_contents( $duoData. '/other.db-journal', 'live journal' );
+		$held = $holdAt( $duoData. '/crm.sqlite', 'txn' );
+		\Nino\Auth::loginUser( $duo, 'dev@example.com', 'correct horse battery staple' );
+		[ $status, $body ] = ninoCall( $duo, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $duoId ] );
+		$useEnd( $held );
+		check( 'where the archive hands over two files and one is held, the files beside the other are taken away as they are for a file that is put back: what the restore leaves out is no change in what it counts',
+			( $body['code'] ?? '' ) === 'backups_restore_inuse' && is_file( $duoData. '/other.db-shm' ) === false && is_file( $duoData. '/other.db-journal' ) === false && file_get_contents( $duoData. '/other.db' ) === 'copy of other' );
+	}
+
+	// --- A feature that restores its database itself, with the example of the manual -------------------------------------
+	echo "\nThe restore callback of the manual\n";
+
+	if( extension_loaded( 'sqlite3' ) === false )
+		echo "  --  - ext/sqlite3 is not there: the online backup of the manual's callback cannot be run; the callback leaves the staged file in the staging, which is the rule of the files in use above\n";
+	else {
+
+		$manual = (string) file_get_contents( dirname( __DIR__ ). '/docs/features.md' );
+		preg_match( '/### Data, backup and restore(.*?)\n## /s', $manual, $section );
+		preg_match_all( '/```php\n(.*?)```/s', (string) ( $section[1] ?? '' ), $blocks );
+		$restoreExample = '';
+
+		foreach( $blocks[1] as $block )
+			if( str_contains( $block, 'function callbackRestore' ) === true )
+				$restoreExample = $block;
+
+		check( 'the manual has the example of the restore callback', $restoreExample !== '' && str_contains( $restoreExample, 'backup(' ) === true && str_contains( $restoreExample, 'unlink( $staged )' ) === true );
+		eval( 'namespace Nino\Modules; class DocRestore { '. $restoreExample. ' }' );
+
+		// The database of the feature of the manual is crm.sqlite; the backup callback of the manual makes the copy
+		$crm = $useData. '/crm.sqlite';
+
+		foreach( [ 'delete', 'wal' ] as $journal ) {
+
+			foreach( [ '', '-wal', '-shm', '-journal' ] as $suffix )
+				@unlink( $crm. $suffix );
+
+			$pdo = new \PDO( 'sqlite:'. $crm, null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
+			$pdo->exec( 'PRAGMA journal_mode = '. ( $journal === 'wal' ? 'WAL' : 'DELETE' ) );
+			$pdo->exec( 'CREATE TABLE t ( id INTEGER PRIMARY KEY, v TEXT )' );
+			$pdo->exec( "INSERT INTO t ( v ) VALUES ( 'one' ), ( 'two' ), ( 'three' )" );
+			$pdo = null;
+
+			$use['./vault/example']	= [ \Nino\Modules\DocHook::class, 'callbackBackup' ];
+			$use['./vault/mode']		= 'example';
+			$docArchive = (string) \Nino\Modules\Backups::now( $use );
+
+			$pdo = new \PDO( 'sqlite:'. $crm, null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
+			$pdo->exec( "INSERT INTO t ( v ) VALUES ( 'four' )" );
+			$pdo = null;
+
+			// Another process holds the database in a transaction that it ends by itself after a while
+			$crmHolder = $useDir. '/holder-crm.php';
+			file_put_contents( $crmHolder, '<?php
+$db = new PDO( "sqlite:". $argv[1], null, null, [ PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ] );
+$db->exec( "PRAGMA busy_timeout = 4000" );
+$db->exec( "BEGIN IMMEDIATE" );
+$db->exec( "INSERT INTO t ( v ) VALUES ( \'five\' )" );
+echo "ready\n"; fflush( STDOUT );
+usleep( 500000 );
+try { $db->exec( "COMMIT" ); echo "committed\n"; } catch( Throwable $e ) { echo "COMMIT failed: ", $e->getMessage(), "\n"; }
+' );
+			$process	= proc_open( [ PHP_BINARY, $crmHolder, $crm ], [ 1 => [ 'pipe', 'w' ] ], $crmPipes );
+			$ready		= trim( (string) fgets( $crmPipes[1] ) );
+
+			$use['./vault/restore']					= 'example';
+			$use['./vault/example-restore']	= [ \Nino\Modules\DocRestore::class, 'callbackRestore' ];
+			unset( $use['./vault/mode'] );
+			$use['./vault/files'] = [];
+			hookSnapshotsGone( $use );
+			ninoWarnings();
+			$result = \Nino\Modules\Backups\Admin::restore( $use, $docArchive );
+			$said		= trim( (string) fgets( $crmPipes[1] ) );
+			fclose( $crmPipes[1] );
+			proc_close( $process );
+			$open = new \PDO( 'sqlite:'. $crm, null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
+			$state = [ (string) $open->query( 'PRAGMA integrity_check' )->fetchColumn(), (int) $open->query( 'SELECT COUNT(*) FROM t' )->fetchColumn(), (string) $open->query( 'PRAGMA journal_mode' )->fetchColumn() ];
+			$open = null;
+			unset( $use['./vault/restore'], $use['./vault/example-restore'] );
+
+			check( 'the callback of the manual, '. $journal. ' mode, a process that holds the database in a transaction for a while: the restore is done, the callback took its file out of the staging, the database is whole and is the archive\'s (3 rows), the journal mode is what it was',
+				$ready === 'ready' && $result === true && $said === 'committed' && $state === [ 'ok', 3, $journal ] && is_file( $crm. '-journal' ) === false && ( $use['./vault/staged-after'] ?? true ) === false );
+		}
+		// The callback of the manual where a process holds the database longer than its busy timeout (5 s): it throws, the restore goes on, and the file that
+		// is held and still staged is left as it is - the answer says both, which it must not say as one of them alone
+		if( isset( $meet ) === true ) {
+
+			$use['./vault/example-restore'] = [ \Nino\Modules\DocRestore::class, 'callbackRestore' ];
+
+			foreach( [ 'panel', 'recovery' ] as $door ) {
+
+				$r = $meet( $door, [ 'restore' => 'example', 'hold' => 'long' ] );
+				check( ( $door === 'panel' ? 'the Backups panel' : 'the recovery page' ). ': the callback of the manual and a process that holds the database for longer than the callback waits: the answer says that the feature failed and that the file was left as it is, the file is as it was, the process ended its transaction',
+					$r['status'] === 500 && ( $r['body']['code'] ?? '' ) === 'backups_restore_both' && ( $r['body']['features'] ?? [] ) === [ 'vault' ] && ( $r['body']['files'] ?? [] ) === [ 'data/crm.sqlite' ] && $r['same'] === true && $r['said'] === [ 'committed' ]
+					&& str_contains( $r['warned'], 'the feature "vault" threw' ) === true && str_contains( $r['logged'], ', data/crm.sqlite in use and left as it is' ) === true && $r['other'] === 'copy of other' );
+			}
+
+			unset( $use['./vault/example-restore'] );
+		}
+
+	}
+
+	// One process holds a database that a feature without a callback of '/nino/admin/restore' keeps: the files of the feature do not change what the kernel does
+	@unlink( $useData. '/crm.sqlite' );
 }
 
 echo "\nWhat was tried\n\n";

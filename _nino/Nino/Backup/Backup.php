@@ -54,6 +54,18 @@ namespace Nino {
 		// The hook a feature answers before its files are packed (see stage()), the counterpart of '/nino/admin/restore'
 		public const string HOOK = '/nino/admin/backup';
 
+		// The hook a feature answers while a restore puts the files back, before they are copied over the live ones (see restoreCallbacks())
+		public const string RESTORE_HOOK = '/nino/admin/restore';
+
+		// Where the system lists the locks that processes hold on files (Linux), read by inUse()
+		private const string LOCKS = '/proc/locks';
+
+		// The free bytes a test says the disk has, in place of what the system answers (see freeSpace()): a static of the class, which no file of a project - config.php and so an archive - can set
+		public static ?int $diskFree = null;
+
+		// Where a test points inUse() instead: a static of the class, which no file of a project - config.php and so an archive - can set
+		public static ?string $locksFile = null;
+
 		// The files an open database keeps beside itself while it is used: they belong to the live file and to nothing that is copied
 		private const array COMPANIONS = [ '-wal', '-shm', '-journal' ];
 
@@ -61,7 +73,7 @@ namespace Nino {
 		private const int SPACE_RESERVE = 4194304;
 
 		/**
-		 *	The free bytes of the disk a path lies on: what the system says, or what './nino/backups/disk' names as an int (the
+		 *	The free bytes of the disk a path lies on: what the system says, or what \Nino\Backup::$diskFree names as an int (the
 		 *	test of the check cannot fill a disk)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -71,10 +83,8 @@ namespace Nino {
 		 */
 		public static function freeSpace( array &$appData, string $path ): ?int {
 
-			$injected = $appData['./nino/backups/disk'] ?? null;
-
-			if( is_int( $injected ) === true )
-				return $injected;
+			if( self::$diskFree !== null )
+				return self::$diskFree;
 
 			$free = @disk_free_space( $path );
 
@@ -456,18 +466,7 @@ namespace Nino {
 
 			foreach( \Nino\Callbacks::registered( $appData, self::HOOK ) as $callback ) {
 
-				$owner = \Nino\Callbacks::owner( $callback );
-				$found = null;
-
-				foreach( $features as $key => $feature ) {
-
-					$module = ltrim( (string) $feature['module'], '\\' );
-
-					if( $feature['active'] === true && $owner !== null && ( $owner === $module || str_starts_with( $owner, $module. '\\' ) === true ) ) {
-						$found = (string) $key;
-						break;
-					}
-				}
+				$found = self::_featureOf( $features, $callback );
 
 				if( $found === null )
 					$strays++;
@@ -476,6 +475,29 @@ namespace Nino {
 			}
 
 			return [ $hooks, $strays ];
+		}
+
+		/**
+		 *	The key of the feature that is switched on and owns a callback: the feature whose class - or a class below its namespace - owns it
+		 *
+		 *	@param		array 		$features			\Nino\Features::all()
+		 *	@param		mixed			$callback			A callable as the callbacks of a hook are registered
+		 *
+		 *	@return 	string|null							The key, null for a callback that no feature owns
+		 */
+		private static function _featureOf( array $features, mixed $callback ): ?string {
+
+			$owner = \Nino\Callbacks::owner( $callback );
+
+			foreach( $features as $key => $feature ) {
+
+				$module = ltrim( (string) $feature['module'], '\\' );
+
+				if( $feature['active'] === true && $owner !== null && ( $owner === $module || str_starts_with( $owner, $module. '\\' ) === true ) )
+					return (string) $key;
+			}
+
+			return null;
 		}
 
 		/**
@@ -989,29 +1011,90 @@ namespace Nino {
 		}
 
 		/**
-		 *	Take the files an open database keeps beside itself out of the project, for the files of an archive that were handed over by a hook: the
-		 *	archive lists their names in its stamp, and a file that is restored is a whole database, so a -wal, -shm or -journal of the live one beside it
-		 *	would be applied to it. The list is the archive's word and a stamp can be made by anybody who can make an archive, so it is believed as far
-		 *	as the project can check it: a name is taken if the archive carries it, a feature that is switched on and has a callback of
-		 *	'/nino/admin/backup' owns it by its manifest, no manifest names the companion and the archive does not carry it - and the list has no more
-		 *	names than the archive has files below data/. For an archive of another project ($foreign: it was opened with a key that was typed) nothing
-		 *	is taken away at all; $left says beside how many files such companions were left standing, which the answer tells the operator
+		 *	Call the callbacks of '/nino/admin/restore' the way \Nino\Callbacks::doCallbacks() does - in their order, a value a callback returns
+		 *	replacing the arguments of the next - with one difference: a callback that throws, an error as well, does not end the restore. A restore
+		 *	is never kept from happening by a callback, and config.php is replaced by the time they run, so a restore that ended here would leave the
+		 *	project half in the archive's state. The callbacks that follow run, what the failing one said goes to the log, and the key of what it
+		 *	belongs to is answered: the feature that owns the callback, else the class that does. What ends the request as \Nino\Runtime::fail()
+		 *	does (\Nino\Failure) is thrown on at once, as everywhere (AGENTS.md, failure behavior), and so does an exit()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$args				(reference) What a callback is handed: [ 'dataDir' => ..., 'staging' => ... ]
+		 *	@param		array 		$watch				Archive names, eg. 'data/crm.sqlite', of the staged files that a failing callback is asked about: which of them it took out of the staging
+		 *	@param		array 		&$took				(reference) Set: the names of $watch that a callback that then threw took out of the staging
+		 *
+		 *	@return 	array										The keys of the features whose callbacks threw, once each, in the order they failed
+		 */
+		public static function restoreCallbacks( array &$appData, array &$args, array $watch = [], array &$took = [] ): array {
+
+			$features = \Nino\Features::all( $appData );
+			$failed 	= [];
+			$took			= [];
+
+			foreach( \Nino\Callbacks::registered( $appData, self::RESTORE_HOOK ) as $callback ) {
+
+				$staged = array_filter( $watch, static fn( string $name ): bool => is_file( $args['staging']. '/'. $name ) === true );
+
+				try {
+					$args = call_user_func_array( $callback, [ &$appData, &$args ] ) ?? $args;
+				}
+				catch( \Nino\Failure $thrown ) {
+					throw $thrown;
+				}
+				catch( \Throwable $thrown ) {
+
+					$key = self::_featureOf( $features, $callback ) ?? \Nino\Callbacks::owner( $callback ) ?? 'unknown';
+
+					// What the callback said is for the log, which is private: the answer of the restore names the feature and no path
+					trigger_error( 'Backup: the feature "'. $key. '" threw '. get_class( $thrown ). ' while it restored its data: '. str_replace( [ "\r", "\n" ], ' ', $thrown->getMessage() ), E_USER_WARNING );
+
+					$failed[$key] = $key;
+
+					// A file it took out of the staging and then failed on: the live file is what the callback left of it, and the restore puts nothing back
+					clearstatcache();
+
+					foreach( $staged as $name )
+						if( is_file( $args['staging']. '/'. $name ) === false )
+							$took[$name] = $name;
+				}
+			}
+
+			$took = array_values( $took );
+
+			return array_values( $failed );
+		}
+
+		/**
+		 *	The files of a stamp's 'copies' that a restore may rely on, as they are in the staging: [ archive name => whether a feature with a hook owns
+		 *	it ] (see _handedOver()). Asked before the callbacks of the restore run, it is the list as the archive made it; what a callback takes out of
+		 *	the staging after that stays on it, and inUse() and dropCompanions() leave it alone
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
-		 *	@param		mixed			$copies				The 'copies' of the stamp of the archive: archive names, as they were handed over
-		 *	@param		bool			$foreign			Whether the archive is not this project's own
-		 *	@param		int				&$left				(reference) Set: how many of the listed files have companions in the project that were not taken away
+		 *	@param		mixed			$copies				The 'copies' of the stamp of the archive
 		 *
-		 *	@return 	bool										false where a file that had to go could not be removed
+		 *	@return 	array
 		 */
-		public static function dropCompanions( array &$appData, string $staging, mixed $copies, bool $foreign = false, int &$left = 0 ): bool {
+		public static function handedOver( array &$appData, string $staging, mixed $copies ): array {
+			return self::_handedOver( $appData, rtrim( $staging, DIRECTORY_SEPARATOR ), $copies );
+		}
 
-			$left = 0;
-			$root = rtrim( $staging, DIRECTORY_SEPARATOR );
+		/**
+		 *	The files of a stamp's 'copies' that a restore may rely on: those of a feature that is switched on, has a callback of '/nino/admin/backup'
+		 *	and owns the file by its manifest. The list is the archive's word and a stamp can be made by anybody who can make an archive, so it is
+		 *	believed as far as the project can check it: a name is taken if the archive still carries it as a file (a feature that restored its data
+		 *	itself has taken it out of the staging), it is no link and no companion, and the list has no more names than the archive has files below data/
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$root					Absolute path of the directory the archive was unpacked into, without a trailing slash
+		 *	@param		mixed			$copies				The 'copies' of the stamp of the archive: archive names, as they were handed over
+		 *
+		 *	@return 	array										[ archive name => whether a feature with a hook owns it ] for the names that are taken
+		 */
+		private static function _handedOver( array &$appData, string $root, mixed $copies ): array {
 
 			if( is_array( $copies ) === false || $copies === [] || is_dir( $root. '/data' ) === false )
-				return true;
+				return [];
 
 			clearstatcache();
 
@@ -1022,13 +1105,11 @@ namespace Nino {
 
 			// More names than the archive has files: no stamp that was made by this code
 			if( count( $copies ) > $count )
-				return true;
+				return [];
 
 			[ $hooks ] = self::_hooks( $appData );
 			$features = \Nino\Features::all( $appData );
-			$named		= self::_named( $appData );
-			$data 		= \Nino\Filesystem::path( $appData, '/data' );
-			$whole		= true;
+			$taken		= [];
 
 			foreach( $copies as $name ) {
 
@@ -1044,6 +1125,119 @@ namespace Nino {
 				foreach( array_keys( $hooks ) as $key )
 					if( self::_owned( $features[$key], [ $name ] ) !== [] )
 						$mine = true;
+
+				$taken[$name] = $mine;
+			}
+
+			return $taken;
+		}
+
+		/**
+		 *	The files a restore must not put back because another process uses them: of the files that a backup hook handed over whole and that
+		 *	are still in the staging after the callbacks of the restore - the feature has not taken them over itself - those whose live file has a
+		 *	POSIX lock on it, as a database has while a process reads it or writes to it (SQLite holds one for as long as a connection is in a
+		 *	transaction, and in WAL mode for as long as it is open). Put back in place, the copy would write the archive's pages into the file under
+		 *	the feet of that process, which goes on writing pages it computed from the old content: the database is corrupt then
+		 *
+		 *	How it is told without touching the file: stat() for the device and the inode, and the list of the locks the system keeps
+		 *	('/proc/locks'). Opening the file to ask it would end the locks of this very process, since closing any descriptor of a file drops the
+		 *	locks the process holds on it. Where the list cannot be read (a system that is not Linux, a restricted one) nothing is known and
+		 *	nothing is left out: the files are put back as they are when nothing can be said about them. A lock that a filesystem keeps elsewhere
+		 *	(NFS, some union and network filesystems) is not on that list either
+		 *
+		 *	The answer and the copy are not atomic: a process can take its lock a moment after the list was read, and one that held it can be gone
+		 *	by the time the files are copied. What this takes away is the window of the whole restore - a process that uses the file at the
+		 *	time of the check is seen, and one that comes later is the window that is left
+		 *
+		 *	An archive of another project ($foreign) is not believed about what it hands over: nothing is left out for it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *	@param		mixed			$copies				The 'copies' of the stamp of the archive: archive names, as they were handed over
+		 *	@param		bool			$foreign			Whether the archive is not this project's own
+		 *	@param		array|null	$listed				handedOver() of the staging as the archive made it, where callbacks have run since: the names of it that are still staged are asked about
+		 *
+		 *	@return 	array										The archive names, eg. 'data/crm.sqlite', of the files that are in use
+		 */
+		public static function inUse( array &$appData, string $staging, mixed $copies, bool $foreign = false, ?array $listed = null ): array {
+
+			if( $foreign === true )
+				return [];
+
+			$root		= rtrim( $staging, DIRECTORY_SEPARATOR );
+			$taken	= array_keys( array_filter( $listed ?? self::_handedOver( $appData, $root, $copies ) ) );
+			$taken	= array_values( array_filter( $taken, static fn( string $name ): bool => is_file( $root. '/'. $name ) === true ) );
+
+			if( $taken === [] )
+				return [];
+
+			$list = @file_get_contents( self::$locksFile ?? self::LOCKS );
+
+			if( $list === false )
+				return [];
+
+			$data 	= \Nino\Filesystem::path( $appData, '/data' );
+			$locked = [];
+
+			foreach( $list === '' ? [] : explode( "\n", $list ) as $line )
+				if( preg_match( '/^\d+:\s+(?:->\s+)?POSIX\s.*?\s([0-9a-f]+):([0-9a-f]+):(\d+)\s/', $line, $match ) === 1 )
+					$locked[ hexdec( $match[1] ). ':'. hexdec( $match[2] ). ':'. $match[3] ] = true;
+
+			if( $locked === [] )
+				return [];
+
+			$busy = [];
+
+			foreach( $taken as $name ) {
+
+				clearstatcache( true, $data. '/'. substr( $name, 5 ) );
+				$stat = @stat( $data. '/'. substr( $name, 5 ) );
+
+				if( $stat === false )
+					continue;
+
+				// The device as the system lists it: st_dev is major and minor, spread over the bits as the kernel writes them
+				$major = ( ( $stat['dev'] >> 8 ) & 0xfff ) | ( ( $stat['dev'] >> 32 ) & ~0xfff );
+				$minor = ( $stat['dev'] & 0xff ) | ( ( $stat['dev'] >> 12 ) & ~0xff );
+
+				if( isset( $locked[ $major. ':'. $minor. ':'. $stat['ino'] ] ) === true )
+					$busy[] = $name;
+			}
+
+			return $busy;
+		}
+
+		/**
+		 *	Take the files an open database keeps beside itself out of the project, for the files of an archive that were handed over by a hook: the
+		 *	archive lists their names in its stamp, and a file that is restored is a whole database, so a -wal, -shm or -journal of the live one beside it
+		 *	would be applied to it. The list is the archive's word and a stamp can be made by anybody who can make an archive, so it is believed as far
+		 *	as the project can check it (see _handedOver()), and a name is taken only where no manifest names the companion and the archive does not
+		 *	carry it. A file that a feature took over in its callback, or that inUse() named and the restore took out of the staging, is not in
+		 *	the staging, so nothing is taken away for it: the files beside it stay for the process that uses them. For an archive of another project ($foreign: it was opened
+		 *	with a key that was typed) nothing is taken away at all; $left says beside how many files such companions were left standing, which the answer tells the operator
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *	@param		mixed			$copies				The 'copies' of the stamp of the archive: archive names, as they were handed over
+		 *	@param		bool			$foreign			Whether the archive is not this project's own
+		 *	@param		int				&$left				(reference) Set: how many of the listed files have companions in the project that were not taken away
+		 *	@param		array|null	$listed				handedOver() of the staging as the archive made it, where callbacks have run since: the guard on the number of files is the archive's, and what a callback took out of the staging does not lower it
+		 *
+		 *	@return 	bool										false where a file that had to go could not be removed
+		 */
+		public static function dropCompanions( array &$appData, string $staging, mixed $copies, bool $foreign = false, int &$left = 0, ?array $listed = null ): bool {
+
+			$left = 0;
+			$root = rtrim( $staging, DIRECTORY_SEPARATOR );
+
+			$named	= self::_named( $appData );
+			$data 	= \Nino\Filesystem::path( $appData, '/data' );
+			$whole	= true;
+
+			foreach( $listed ?? self::_handedOver( $appData, $root, $copies ) as $name => $mine ) {
+
+				if( is_file( $root. '/'. $name ) === false )
+					continue;
 
 				$standing = false;
 

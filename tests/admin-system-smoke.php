@@ -81,6 +81,13 @@ if( ( $argv[1] ?? '' ) === 'daily-backup' || ( $argv[1] ?? '' ) === 'daily-backu
 	$appData['./nino/filesystem/publicpath']	= $argv[2]. '/public';
 
 	if( $argv[1] === 'daily-backup' ) {
+
+		// The code of the run is read before the limit is taken, so that the megabyte is the run's to pack with and not what loading its classes costs:
+		// a project with many features reads more of them, and the run has to come as far as counting what it packs
+		foreach( [ \Nino\Backup::class, \Nino\Backup\Seal::class, \Nino\Modules\Backups::class, \Nino\Features::class, \Nino\Callbacks::class, \Nino\Filesystem::class, \Nino\Packages::class ] as $read )
+			class_exists( $read );
+		\Nino\Features::all( $appData );
+
 		$squeeze = memory_get_usage( true ) + 1048576;
 		ini_set( 'memory_limit', (string) $squeeze );
 		echo 'limit='. $squeeze. "\n";
@@ -752,16 +759,16 @@ unlink( $attemptFile );
 
 // What a run holds of memory does not follow the size of what it carries: the sources are packed in pieces and the archive is
 // sealed in chunks while it is written. What can stop a run for its size is the disk, which the tar needs room on before anything
-// is packed, and which is asked of the system - or of './nino/backups/disk', which the test of the check sets as an int
+// is packed, and which is asked of the system - or of \Nino\Backup::$diskFree, which the test of the check sets as an int
 $imageDir = $sandbox. '/public/images';
 $formsDir = $sandbox. '/private/data';
 @mkdir( $imageDir, 0777, true );
 @mkdir( $formsDir, 0777, true );
 $mb = 1048576;
 $withDisk = static function( mixed $free ) use ( &$appData ): array|string {
-	$appData['./nino/backups/disk'] = $free;
+	\Nino\Backup::$diskFree = is_int( $free ) === true ? $free : null;
 	$result = \Nino\Modules\Backups::now( $appData );
-	unset( $appData['./nino/backups/disk'] );
+	\Nino\Backup::$diskFree = null;
 	return $result;
 };
 $tempLeft = static fn(): int => count( $ownTemp( [ 'backup' ] ) );
@@ -779,9 +786,9 @@ $tempBefore = $tempLeft();
 $refused = $withDisk( 8 * $mb );
 check( 'a disk with less room than the run needs is refused at once, as the 507 now() answers, with the sizes, the code the panel words them by and the numbers it puts in the sentence', is_array( $refused ) === true && $refused[0] === 507
 	&& preg_match( '/needs about \d+ MB of free space for its temporary files and \d+ MB are free/', (string) $refused[1] ) === 1 && ( $refused[2] ?? '' ) === 'backups_disk' && count( $refused[3] ?? [] ) === 2 && $refused[3][1] === 8 );
-$appData['./nino/backups/disk'] = 8 * $mb;
+\Nino\Backup::$diskFree = 8 * $mb;
 [ $diskStatus, $diskBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiNow' ] );
-unset( $appData['./nino/backups/disk'] );
+\Nino\Backup::$diskFree = null;
 check( '...and the panel is answered with that code and the two numbers its sentence has', $diskStatus === 507 && ( $diskBody['code'] ?? '' ) === 'backups_disk' && count( $diskBody['params'] ?? [] ) === 2 && $diskBody['params'][1] === 8 );
 check( '...naming no path, writing no archive and leaving no temporary file or record of a run', str_contains( (string) $refused[1], $sandbox ) === false && str_contains( (string) $refused[1], sys_get_temp_dir() ) === false
 	&& $timedFiles() === $timedBefore && $tempLeft() === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] && is_file( $nowDir. '/run.php' ) === false );
@@ -1247,9 +1254,9 @@ $timedBefore = $timedFiles();
 $endedId = \Nino\Modules\Backups::now( $appData );
 check( 'a run that ends by itself leaves no record, and a record of an earlier one goes with it', is_string( $endedId ) === true && is_file( $runFile ) === false && \Nino\Modules\Backups::stopped( $appData ) === null );
 $dropNew( $timedBefore );
-$appData['./nino/backups/disk'] = 1;
+\Nino\Backup::$diskFree = 1;
 $refusedNow = \Nino\Modules\Backups::now( $appData );
-unset( $appData['./nino/backups/disk'] );
+\Nino\Backup::$diskFree = null;
 check( 'a run that is refused ends by itself too: nothing is left of it', is_array( $refusedNow ) === true && is_file( $runFile ) === false && \Nino\Modules\Backups::stopped( $appData ) === null );
 
 \Nino\Auth::logoutUser( $appData );

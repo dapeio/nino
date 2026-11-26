@@ -9,6 +9,13 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/admin/backup', [ self::class, 'callbackBackup' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/admin/restore', [ self::class, 'callbackRestore' ], 8 );
+		}
+
+		// The callback of a restore that only notes that it was called, and with what: a feature that is asked after another one (priority 8, Vault is 5) that throws
+		public static function callbackRestore( array &$appData, array &$args ): void {
+
+			$appData['./other/restored'][] = [ 'dataDir' => $args['dataDir'], 'staged' => is_file( $args['staging']. '/data/other.db' ), 'marker' => $args['marker'] ?? null ];
 		}
 
 		public static function callbackBackup( array &$appData, array &$args ): void {

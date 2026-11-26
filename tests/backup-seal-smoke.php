@@ -105,7 +105,7 @@ if( in_array( $argv[1] ?? '', [ 'hold', 'now', 'now-blind', 'restore-blind', 'di
 	// The check of the room is passed - a disk that another request fills is what that stands for - and the handler of the kernel is
 	// the one that ends a request at a notice, as it does in a request of the workbench
 	if( $mode === 'now-blind' || $mode === 'restore-blind' ) {
-		$appData['./nino/backups/disk'] = 1 << 40;
+		\Nino\Backup::$diskFree = 1 << 40;
 		set_error_handler( [ \Nino\Runtime::class, 'handleError' ] );
 	}
 
@@ -842,7 +842,7 @@ echo "\nThe disk\n";
 $room 			= [ 'upload' => 0, 'restore' => 0 ];
 $treeNow 		= sealTree( $sandboxOfDoors );
 $listNow 		= glob( $backupsOfDoors. '/*' ) ?: [];
-$doorsProject['./nino/backups/disk'] = 1048576;
+\Nino\Backup::$diskFree = 1048576;
 [ $status, $body ] = $put( $doorsProject, 'backup-example.com-2025-03-06-050607-manual.php', $real );
 $room['upload'] = $status === 507 && ( $body['code'] ?? '' ) === 'backups_disk' && count( $body['params'] ?? [] ) === 2 && $body['params'][1] === 1 ? 1 : 0;
 file_put_contents( $backupsOfDoors. '/2025-03-06-050607-manual.php', $real );
@@ -851,15 +851,15 @@ $room['restore'] = $status === 507 && ( $body['code'] ?? '' ) === 'backups_disk'
 unlink( $backupsOfDoors. '/2025-03-06-050607-manual.php' );
 $noticeNone = null;
 $typed 			= \Nino\Modules\Backups\Admin::restoreFile( $doorsProject, $sandboxOfDoors. '/upload-ok.bin', $rawKeyOfDoors, $noticeNone );
-unset( $doorsProject['./nino/backups/disk'] );
+\Nino\Backup::$diskFree = null;
 check( 'an upload, a restore and a restore of a file at recovery.php are refused with a 507 and the numbers where the disk has no room for them, and nothing is made', $room === [ 'upload' => 1, 'restore' => 1 ] && ( is_array( $typed ) === false || $typed[0] === 507 ) && sealTree( $sandboxOfDoors ) === $treeNow && ( glob( $backupsOfDoors. '/*' ) ?: [] ) === $listNow );
-$doorsProject['./nino/backups/disk'] = 0;
+\Nino\Backup::$diskFree = 0;
 $small = \Nino\Modules\Backups::restoreShort( $doorsProject, 0 );
 $large = \Nino\Modules\Backups::restoreShort( $doorsProject, 400 * 1048576 );
 check( 'a restore asks for twice the plain archive, which is three quarters of the file, and the room of the snapshot on top: 400 MB of archive ask for 600 MB more than none', is_array( $small ) === true && is_array( $large ) === true && abs( $large[0] - $small[0] - 600 ) <= 1 && $small[0] >= 4 );
-$doorsProject['./nino/backups/disk'] = 1 << 40;
+\Nino\Backup::$diskFree = 1 << 40;
 check( '...and a disk that has the room is not asked', \Nino\Modules\Backups::restoreShort( $doorsProject, 400 * 1048576 ) === null );
-unset( $doorsProject['./nino/backups/disk'] );
+\Nino\Backup::$diskFree = null;
 
 // A disk that fills up, for real: a tmpfs of a size, where this process may mount one (root does; the check says so where it does not)
 $mount = $dir. '/mnt';
@@ -984,10 +984,11 @@ check( 'a notice in the step of packing is an exception, the handler of the kern
 // The room on the disk the archives are kept on, where it is none of the temporary directory's: said before anything is made
 $need = 100 * 1048576;
 $probe = [];
-$probe['./nino/backups/disk'] = (int) ceil( $need * 4 / 3 ) + 4 * 1048576 - 1;
+\Nino\Backup::$diskFree = (int) ceil( $need * 4 / 3 ) + 4 * 1048576 - 1;
 $tooLittle = \Nino\Backup::archiveShort( $probe, $need, $dir );
-$probe['./nino/backups/disk'] = (int) ceil( $need * 4 / 3 ) + 4 * 1048576;
+\Nino\Backup::$diskFree = (int) ceil( $need * 4 / 3 ) + 4 * 1048576;
 $enough = \Nino\Backup::archiveShort( $probe, $need, $dir );
+\Nino\Backup::$diskFree = null;
 check( 'the disk of the archives is asked for a third more than the bytes and the reserve: one byte less is refused, that much is enough', is_array( $tooLittle ) === true && $enough === null );
 
 // What was copied is what there was to copy: a file that is shorter than its source is not, a directory of such files is not either
@@ -1011,10 +1012,11 @@ $growDir = ninoSandboxDir( $grow );
 file_put_contents( $growDir. '/private/assets/a.bin', str_repeat( 'a', 2 * 1048576 ) );
 @mkdir( $dir. '/stg/assets', 0755, true );
 file_put_contents( $dir. '/stg/assets/a.bin', str_repeat( 'b', 3 * 1048576 ) );
-$grow['./nino/backups/disk'] = 1048576 + 4194304;
+\Nino\Backup::$diskFree = 1048576 + 4194304;
 $fits = \Nino\Backup::restoreRoom( $grow, $dir. '/stg' );
-$grow['./nino/backups/disk'] = 1048576 + 4194304 - 1;
+\Nino\Backup::$diskFree = 1048576 + 4194304 - 1;
 $short = \Nino\Backup::restoreRoom( $grow, $dir. '/stg' );
+\Nino\Backup::$diskFree = null;
 check( 'the room a restore asks of the disk of the files is what they grow by - 3 MB for the file that replaces one of 2 MB is 1 MB - and the reserve: one byte less is refused', $fits === null && is_array( $short ) === true );
 \Nino\Filesystem::removeDir( $growDir );
 

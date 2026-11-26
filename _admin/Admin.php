@@ -2860,13 +2860,20 @@ namespace Nino\Admin {
 
 			\Nino\Modules\Backups\Admin::recordRestore( $appData, self::LOG_ACTOR, $name, $result );
 
-			if( $result !== true ) {
-				\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '', $result[3] ?? [] );
+			// A restore that stopped halfway or was refused ends here; one that went through and left something out ends as one that succeeded does
+			if( $result !== true && \Nino\Modules\Backups\Admin::wentThrough( $result ) === false ) {
+				\Nino\Modules\Backups\Admin::fail( $request, $result );
 				return;
 			}
 
 			if( $typed !== null )
 				\Nino\Feature::forget( $appData, self::KEY_COUNTER, 'recovery' );
+
+			if( $result !== true ) {
+				\Nino\Modules\Backups\Admin::fail( $request, $result );
+				$request['/nino/http/response']['body'] += ( $notice !== null ? [ 'notice' => $notice ] : [] );
+				return;
+			}
 
 			// A backup of another version of Nino comes with the notice the
 			// panel's answer has (see \Nino\Modules\Backups\Admin::apiRestore())

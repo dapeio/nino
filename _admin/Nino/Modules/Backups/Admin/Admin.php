@@ -713,6 +713,9 @@ namespace Nino\Modules\Backups {
 		 *	this restore has just ended. The activity log is none of what an
 		 *	archive holds, so the line is there after the files were put back.
 		 *
+		 *	A restore that went through and left something out (see wentThrough()) ends as one that succeeded does and answers its 500 with the
+		 *	notices; one that stopped halfway or was refused answers and ends where it is.
+		 *
 		 *	The session of the account that ran it ends here. The accounts and
 		 *	their sessions are part of config.php, so an archive older than the
 		 *	login would have ended it on the next request anyway and a younger
@@ -751,8 +754,10 @@ namespace Nino\Modules\Backups {
 			if( $actor !== false )
 				self::recordRestore( $appData, $actor['mail'], $date, $result );
 
-			if( $result !== true ) {
-				\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '', $result[3] ?? [] );
+			// A restore that was refused, or stopped halfway, ends here: nothing of what follows is done for it. One that went through and left
+			// something out (see wentThrough()) ends as a restore that succeeded does, and answers its failure with the notices
+			if( $result !== true && self::wentThrough( $result ) === false ) {
+				self::fail( $request, $result );
 				return;
 			}
 
@@ -771,8 +776,32 @@ namespace Nino\Modules\Backups {
 			unset( $appData['./nino/auth/current'] );
 
 			$note = \Nino\Backup::missingNote( $appData );
+			$more = ( $notice !== null ? [ 'notice' => $notice ] : [] ) + ( $note !== null ? [ 'note' => $note ] : [] );
 
-			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) + ( $note !== null ? [ 'note' => $note ] : [] ) );
+			if( $result !== true ) {
+				self::fail( $request, $result );
+				$request['/nino/http/response']['body'] += $more;
+				return;
+			}
+
+			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] + $more );
+		}
+
+		/**
+		 *	The answer of a restore that did not succeed: the failure as \Nino\Http::fail() has it, and the fields of its own that a restore that is
+		 *	done in part names what it left (the fifth element of what restore() answers) - shared with recovery.php
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$result				What restore() answered: [ http status, message, code, params, fields ]
+		 *
+		 *	@return 	void
+		 */
+		public static function fail( array &$request, array $result ): void {
+
+			\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '', $result[3] ?? [] );
+
+			if( is_array( $result[4] ?? null ) === true )
+				$request['/nino/http/response']['body'] += $result[4];
 		}
 
 		/**
@@ -788,7 +817,21 @@ namespace Nino\Modules\Backups {
 		 *	@return 	void
 		 */
 		public static function recordRestore( array &$appData, string $actor, string $date, true|array $result ): void {
-			\Nino\Admin\Admin::record( $appData, $actor, 'Restore Backup '. $date. ( $result === true ? '' : ' failed ('. $result[0]. ')'. ( ( $result[2] ?? '' ) === 'backups_restore_partial' ? ' in part, the state before is the archive '. (string) ( $result[3][0] ?? '' ) : '' ) ) );
+			// What a restore that is done in part says besides: the archive of the list that holds the state before (the last of its params), and
+			// every part of what it names - the features whose callback failed, the files left as they are, the files a failed callback took out
+			// of the staging, the files written while they were in use
+			$what = '';
+
+			if( $result !== true && in_array( $result[2] ?? '', [ 'backups_restore_partial', 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written' ], true ) === true ) {
+
+				$what = ' in part, the state before is the archive '. (string) end( $result[3] );
+
+				foreach( [ 'features' => ', the restore callback of %s failed', 'files' => ', %s in use and left as it is', 'taken' => ', %s not put back by the restore: the callback of the feature took it out and failed', 'written' => ', %s written while in use and possibly damaged', 'cut' => ', the copy of %s was not whole' ] as $field => $words )
+					if( is_array( $result[4][$field] ?? null ) === true && $result[4][$field] !== [] )
+						$what .= sprintf( $words, implode( ', ', $result[4][$field] ) );
+			}
+
+			\Nino\Admin\Admin::record( $appData, $actor, 'Restore Backup '. $date. ( $result === true ? '' : ' failed ('. $result[0]. ')'. $what ) );
 		}
 
 		/**
@@ -806,7 +849,7 @@ namespace Nino\Modules\Backups {
 		 *	@param		array|null	&$notice			(reference) Set where the archive comes from another version of Nino than the one that runs: [ 'code' => 'backups_restored_other_version', 'params' => [ from, to ] ]; left as it was otherwise
 		 *	@param		string|null	$key					Raw (not base64) 32-byte key that somebody typed: the archive is opened with it and not with this project's own, and is then judged for what it holds (see _restoreArchive()). Only recovery.php passes one - behind its own secret, and on purpose not the panel
 		 *
-		 *	@return 	true|array								True, or [ http status, message ] - and, where a person can cause it, the code of the failure as a third element
+		 *	@return 	true|array								True, or [ http status, message ] - and, where a person can cause it, the code of the failure as a third element, its params as a fourth and, for a restore that is done in part, the fields of the answer that name what it left as a fifth
 		 */
 		public static function restore( array &$appData, string $date, ?array &$notice = null, ?string $key = null ): true|array {
 
@@ -1164,9 +1207,14 @@ namespace Nino\Modules\Backups {
 			// Newsletter module merges its removal record this way (see its
 			// callbackRestore()). Restore itself knows no module: whatever
 			// registered on '/nino/admin/restore' gets the live data
-			// directory (read only) and the extracted backup
+			// directory (read only) and the extracted backup. A callback that
+			// throws does not end the restore - config.php is replaced when they run -:
+			// what is left in the staging of its files is copied as if it had
+			// none, and the answer names it (see \Nino\Backup::restoreCallbacks())
 			$restoreArgs = [ 'dataDir' => \Nino\Filesystem::path( $appData, '/data' ), 'staging' => $staging ];
-			\Nino\Callbacks::doCallbacks( $appData, '/nino/admin/restore', $restoreArgs );
+			$listed			 = \Nino\Backup::handedOver( $appData, $staging, $copies );
+			$took				 = [];
+			$thrown 		 = \Nino\Backup::restoreCallbacks( $appData, $restoreArgs, array_keys( array_filter( $listed ) ), $took );
 
 			// The archive's own layout is flat - text/, elements/, templates/,
 			// assets/, images/, data/, blocks/, themes/, fonts/ - and they do not share
@@ -1186,14 +1234,37 @@ namespace Nino\Modules\Backups {
 			// Every copy is asked how it went and every file is looked at after it: a disk that fills up leaves files that are cut off, and
 			// a restore that says it was done over such a site is the worst answer there is
 			$unfinished = false;
+			$cut				= [];
 
 			// What an archive carries of a database that a feature hands over whole (see \Nino\Backup::stage()) is that one file: the files an open
 			// database keeps beside itself in the project would be applied to the copy that is put there, so they go - and where one cannot be
 			// removed, the answer is the one for a restore that is done in part
 			$left = 0;
 
-			if( \Nino\Backup::dropCompanions( $appData, $staging, $copies, $foreign, $left ) === false )
+			// A database that was handed over whole and that a feature has not taken over in its callback is not written over while a process holds
+			// a lock on the live file: the copy goes into the file the process works on, which then goes on writing pages of the old state into
+			// the new content. Its staged file is taken out, so that the copy below does not touch it and the files beside it are not taken away (what
+			// is not staged is not handed over), and they stay for the process that uses them. The look and the copy are not one step: it is made
+			// here, and a second time right before the files of data/ are copied - a file that is held by then is left as well, though the files beside it
+			// were taken away by the step between - and once more right after, for a file that was held while it was written: it cannot be
+			// undone, and the answer says that it may be damaged. A process that takes its lock between two of the looks is not seen
+			$inUse		= [];
+			$written	= [];
+			$leave		= static function( array $names ) use ( $staging, &$inUse ): void {
+
+				foreach( $names as $name ) {
+					@unlink( $staging. '/'. $name );
+					trigger_error( 'Restore: '. $name. ' is in use by another process and was left as it is, with the files beside it', E_USER_WARNING );
+					$inUse[] = $name;
+				}
+			};
+
+			$leave( \Nino\Backup::inUse( $appData, $staging, $copies, $foreign, $listed ) );
+
+			if( \Nino\Backup::dropCompanions( $appData, $staging, $copies, $foreign, $left, $listed ) === false ) {
 				$unfinished = true;
+				$cut[]			= 'the files beside a database';
+			}
 
 			// An archive of another project is not believed about what to take away: the operator is told beside how many files the companions stand
 			if( $left > 0 )
@@ -1202,10 +1273,24 @@ namespace Nino\Modules\Backups {
 			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
 
 				$target = \Nino\Backup::target( $appData, basename( $entry ) );
+
+				if( basename( $entry ) === 'data' )
+					$leave( \Nino\Backup::inUse( $appData, $staging, $copies, $foreign, $listed ) );
+
 				$copied = is_dir( $entry ) === true ? \Nino\Filesystem::copyDir( $entry, $target ) : @copy( $entry, $target );
 
-				if( $copied === false || self::_whole( $entry, $target ) === false )
+				if( $copied === false || self::_whole( $entry, $target ) === false ) {
 					$unfinished = true;
+					$cut[]			= basename( $entry );
+				}
+
+				if( basename( $entry ) === 'data' ) {
+
+					$written = \Nino\Backup::inUse( $appData, $staging, $copies, $foreign, $listed );
+
+					foreach( $written as $name )
+						trigger_error( 'Restore: '. $name. ' was in use by another process while it was put back and may be damaged', E_USER_WARNING );
+				}
 			}
 
 			// extractTo()/copyDir() write straight to disk, bypassing Filesystem's own
@@ -1223,15 +1308,56 @@ namespace Nino\Modules\Backups {
 			if( function_exists( 'opcache_reset' ) === true )
 				opcache_reset();
 
-			// Partly done: the answer says so, and which archive of the list holds the state before - no path
+			// Partly done: the answer says so, and which archive of the list holds the state before - no path. What the restore did not do or did
+			// to a file that is in use is in fields of the answer of their own, whichever code the answer has, and the sentence of each code says
+			// only what happened with it. The sentence of the answer carries one word or number for each of its places, which is what the
+			// recovery page takes of an answer (see Nino.pageText.failure()): the first key, the numbers of files. Of what happened together, the
+			// worst is the code, and a copy that fell short is the worst: that restore stopped halfway and ends where it is, whatever else it
+			// says. Then a file that was written while it was in use, a callback and files that are left as they are, a callback, files that
+			// are left as they are. The log has a line for every one of them
+			foreach( $cut as $name )
+				trigger_error( 'Restore: the copy of '. $name. ' is not whole: a file could not be written, the disk may be full', E_USER_WARNING );
+
+			foreach( $took as $name )
+				trigger_error( 'Restore: '. $name. ' was taken out of the staging by a callback that then failed, and was not put back', E_USER_WARNING );
+
+			$fields = array_filter( [ 'features' => $thrown, 'files' => $inUse, 'taken' => $took, 'written' => $written, 'cut' => $cut ] );
+
 			if( $unfinished === true )
-				return [ 500, 'the restore is done in part: a file could not be written, the disk may be full', 'backups_restore_partial', [ $snapshot ] ];
+				return [ 500, 'the restore is done in part: a file could not be written, the disk may be full', 'backups_restore_partial', [ $snapshot ], $fields ];
+
+			if( $written !== [] )
+				return [ 500, 'the restore is done in part: files that were in use were written and may be damaged', 'backups_restore_written', [ count( $written ), $snapshot ], $fields ];
+
+			if( $thrown !== [] && $inUse !== [] )
+				return [ 500, 'the restore is done in part: a feature could not restore its data and files that are in use were left as they are', 'backups_restore_both', [ $thrown[0], count( $inUse ), $snapshot ], $fields ];
+
+			if( $thrown !== [] )
+				return [ 500, 'the restore is done in part: a feature could not restore its data', 'backups_restore_callback', [ $thrown[0], $snapshot ], $fields ];
+
+			if( $inUse !== [] )
+				return [ 500, 'the restore is done in part: files that are in use were left as they are', 'backups_restore_inuse', [ count( $inUse ), $snapshot ], $fields ];
 
 			return true;
 		}
 
 		/**
-		 *	Whether what was copied is what there was to copy: every file of the source is at the target with the size it has
+		 *	Whether a restore that did not succeed went through all the same: the files of the archive are put back, and what is left out is named in
+		 *	the answer. Such a restore ends as one that succeeded does - the session of the account that ran it, the notices - and a restore that
+		 *	stopped halfway (backups_restore_partial) does not
+		 *
+		 *	@param		true|array	$result				What restore() answered
+		 *
+		 *	@return 	bool
+		 */
+		public static function wentThrough( true|array $result ): bool {
+			return $result !== true && in_array( $result[2] ?? '', [ 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written' ], true ) === true;
+		}
+
+		/**
+		 *	Whether what was copied is what there was to copy: every file of the source is at the target and is not shorter than it. A copy answers
+		 *	true only where it wrote every byte, so a file that is cut is shorter than its source; one that is longer was written to by another process
+		 *	after the copy - a database that is in use grows, and the restore of it is not done in part for that
 		 *
 		 *	@param		string		$source				A staged file or directory
 		 *	@param		string		$target				Where it was copied to
@@ -1243,13 +1369,13 @@ namespace Nino\Modules\Backups {
 			clearstatcache();
 
 			if( is_file( $source ) === true )
-				return is_file( $target ) === true && filesize( $target ) === filesize( $source );
+				return is_file( $target ) === true && filesize( $target ) >= filesize( $source );
 
 			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $file ) {
 
 				$there = $target. substr( $file->getPathname(), strlen( $source ) );
 
-				if( is_file( $there ) === false || filesize( $there ) !== $file->getSize() )
+				if( is_file( $there ) === false || filesize( $there ) < $file->getSize() )
 					return false;
 			}
 

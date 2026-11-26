@@ -217,6 +217,19 @@ answer( 'recovery/restore', 500, { error : 'decryption failed on the server' } )
 check( 'a refused restore without a code of its own says the general sentence with the status - in the line of its card, never the English of the server',
 	findAll( byId('recovery-restore'), el => el.className.includes('nino-admin-status') ).map( el => el.textContent ).join('') === Nino.recovery.text.de['/_admin/page/error/failed'].replace( '%s', '500' ) );
 
+// A restore that is done in part - a file of a database in use that was left as it is, a callback of a feature that threw - is said in the sentence of the table of the page, with what it names
+const statusLine = () => findAll( byId('recovery-restore'), el => el.className.includes('nino-admin-status') ).map( el => el.textContent ).join('');
+[ [ 'backups_restore_inuse', 'backups-restore-inuse', [ 2, 'pre-restore-2026-10-02-101500' ] ], [ 'backups_restore_callback', 'backups-restore-callback', [ 'crm', 'pre-restore-2026-10-02-101500' ] ],
+	[ 'backups_restore_both', 'backups-restore-both', [ 'crm', 2, 'pre-restore-2026-10-02-101500' ] ], [ 'backups_restore_written', 'backups-restore-written', [ 1, 'pre-restore-2026-10-02-101500' ] ] ].forEach( ( [ code, name, params ] ) => {
+	fire( restoreButton, 'click', { currentTarget : restoreButton } );
+	fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
+	answer( 'recovery/restore', 500, { error : 'the restore is done in part', code : code, params : params } );
+	const fill = text => params.reduce( ( said, param ) => said.replace( '%s', param ), String( text ?? '' ) );
+	check( 'a restore that is done in part ('+ code+ ') is said in the sentence of the table of the page, in both languages, with what it names',
+		statusLine() === fill( Nino.recovery.text.de['/_admin/page/error/'+ name] ) && statusLine().includes( '%s' ) === false
+		&& fill( Nino.recovery.text.en['/_admin/page/error/'+ name] ).includes( '%s' ) === false && String( Nino.recovery.text.en['/_admin/page/error/'+ name] ?? '' ).includes( '%s' ) === true );
+} );
+
 // The key of an archive of another project: typed once, sent with the restore of the row, said at its own field
 const key = 'A'.repeat( 43 )+ '=';
 // What is looked for is the secret itself, as it is typed and as an address would carry it

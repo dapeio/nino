@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 /**
  *	Nino
- *	faultfs.php		Test helper of the suites of the outbox of \Nino\Mail (mail-queue-smoke.php, mail-void-smoke.php): the file
- *								protocol of php with a record of every operation and with the failures a test names
+ *	faultfs.php		Test helper of the suites of the outbox of \Nino\Mail (mail-queue-smoke.php, mail-void-smoke.php) and of the
+ *								restore (backup-hook-smoke.php): the file protocol of php with a record of every operation and with the
+ *								failures a test names
  */
 
 /**
@@ -18,11 +19,15 @@ final class FaultFs {
 	// What was done, in order: [ operation, path, detail ]
 	public static array $log = [];
 
-	// operation => function( string $path ): bool, true to fail it
+	// operation => function( string $path ): bool, true to fail it. Besides the operations of php:
+	//   'cut'    => function( string $path ): bool, true: a write of the file puts half of what it is given and answers that it put all of it
+	//   'closed' => function( string $path, string $mode ): void, called when a file that was opened is closed - the moment a process can write to it
 	public static array $fail = [];
 
 	private $handle = null;
+	private $dir = null;
 	private string $path = '';
+	private string $mode = '';
 
 	public static function on( array $fail = [] ): void {
 		self::$log = [];
@@ -58,18 +63,34 @@ final class FaultFs {
 			return false;
 
 		$this->path = $path;
+		$this->mode = $mode;
 		$this->handle = self::real( static fn(): mixed => @fopen( $path, $mode ) );
 
 		return $this->handle !== false;
 	}
 
 	public function stream_read( int $count ): string|false { return fread( $this->handle, $count ); }
-	public function stream_write( string $data ): int { self::$log[] = [ 'write', $this->path, (string) strlen( $data ) ]; return (int) fwrite( $this->handle, $data ); }
+	public function stream_write( string $data ): int {
+		self::$log[] = [ 'write', $this->path, (string) strlen( $data ) ];
+
+		if( self::fails( 'cut', $this->path ) === true ) {
+			fwrite( $this->handle, substr( $data, 0, intdiv( strlen( $data ), 2 ) ) );
+
+			return strlen( $data );
+		}
+
+		return (int) fwrite( $this->handle, $data );
+	}
 	public function stream_eof(): bool { return feof( $this->handle ); }
 	public function stream_tell(): int { return (int) ftell( $this->handle ); }
 	public function stream_seek( int $offset, int $whence ): bool { return fseek( $this->handle, $offset, $whence ) === 0; }
 	public function stream_flush(): bool { return fflush( $this->handle ); }
-	public function stream_close(): void { fclose( $this->handle ); }
+	public function stream_close(): void {
+		fclose( $this->handle );
+
+		if( isset( self::$fail['closed'] ) === true )
+			( self::$fail['closed'] )( $this->path, $this->mode );
+	}
 	public function stream_stat(): array|false { return fstat( $this->handle ); }
 	public function stream_lock( int $operation ): bool { return flock( $this->handle, $operation ); }
 	public function stream_truncate( int $size ): bool { return ftruncate( $this->handle, $size ); }
@@ -86,6 +107,16 @@ final class FaultFs {
 
 		return $stat;
 	}
+
+	public function dir_opendir( string $path, int $options ): bool {
+		$this->dir = self::real( static fn(): mixed => @opendir( $path ) );
+
+		return $this->dir !== false;
+	}
+
+	public function dir_readdir(): string|false { return readdir( $this->dir ); }
+	public function dir_rewinddir(): bool { rewinddir( $this->dir ); return true; }
+	public function dir_closedir(): bool { closedir( $this->dir ); return true; }
 
 	public function unlink( string $path ): bool {
 		self::$log[] = [ 'unlink', $path, '' ];

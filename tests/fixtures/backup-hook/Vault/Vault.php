@@ -11,6 +11,67 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/admin/backup', [ self::class, 'callbackBackup' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/admin/restore', [ self::class, 'callbackRestore' ] );
+		}
+
+		// What the feature does when a restore asks it, set by the test in $appData['./vault/restore']; nothing where the test sets none.
+		// 'throw' throws before it changed anything; 'took-crm' takes crm.sqlite out of the staging and throws; 'args' sets a key of its arguments; 'throw-after' rewrites its staged file and throws; 'took-over' puts the staged file into the
+		// live one itself, takes it out of the staging and throws; 'take' does that and ends; 'error' makes a TypeError; 'fail' ends the request
+		// as \Nino\Runtime::fail() does; 'faults' turns FaultFs on for the copy that follows with the faults the test names; 'example' is the
+		// callback of the manual, handed over in $appData['./vault/example-restore']
+		public static function callbackRestore( array &$appData, array &$args ): void {
+
+			$mode		= $appData['./vault/restore'] ?? '';
+			$staged = $args['staging']. '/data/vault.db';
+			$live		= $args['dataDir']. '/vault.db';
+
+			$appData['./vault/restored'][] = [ 'mode' => $mode, 'staged' => is_file( $staged ), 'args' => array_keys( $args ) ];
+
+			switch( $mode ) {
+
+				case 'throw':
+					throw new \RuntimeException( 'vault could not restore /secret/place/vault.db' );
+
+				case 'throw-after':
+					file_put_contents( $staged, 'rewritten by the feature' );
+					throw new \RuntimeException( 'vault broke after it rewrote its staged file' );
+
+				case 'took-over':
+				case 'take':
+					file_put_contents( $live, 'restored by the feature itself' );
+					unlink( $staged );
+
+					if( $mode === 'took-over' )
+						throw new \RuntimeException( 'vault broke after it took its file over' );
+					break;
+
+				// Takes the database of the manual's feature out of the staging and fails: the live file is what the callback left of it
+				case 'took-crm':
+					unlink( $args['staging']. '/data/crm.sqlite' );
+					throw new \RuntimeException( 'vault broke after it took crm.sqlite out of the staging' );
+
+				// What a callback changes in its arguments is what the next one is handed, as doCallbacks() does
+				case 'args':
+					$args['marker'] = 'set by vault';
+					break;
+
+				case 'error':
+					(static function( int $number ): void {})( 'not a number' );
+					break;
+
+				case 'fail':
+					\Nino\Runtime::fail( 'vault cannot go on' );
+
+				case 'faults':
+					\FaultFs::on( $appData['./vault/faults'] );
+					break;
+
+				// What the callback of the manual leaves in the staging: its database of the feature of the manual, crm.sqlite
+				case 'example':
+					call_user_func_array( $appData['./vault/example-restore'], [ &$appData, &$args ] );
+					$appData['./vault/staged-after'] = is_file( $args['staging']. '/data/crm.sqlite' );
+					break;
+			}
 		}
 
 		public static function callbackBackup( array &$appData, array &$args ): void {
