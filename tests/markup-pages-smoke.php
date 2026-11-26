@@ -8,33 +8,38 @@ declare(strict_types=1);
  *											the elements with components in them, the content of
  *											a mail and the maintenance page - each compared byte for byte with the
  *											file under tests/fixtures/markup/starter/. The setup wizard is run for real
- *											(Setup::apiApply) in a sandbox whose path and file times are fixed, so
- *											that the four sizes a page draws from chance - the token of the form, the
- *											nonce of the script block, the version of a bundle and the stamp of the
- *											favicons - are set at their source and nothing is replaced in an output.
+ *											(Setup::apiApply) in a sandbox whose file times are fixed, so
+ *											that the three sizes a page draws from chance - the token of the form, the
+ *											nonce of the script block and the stamp of the favicons - are set at their
+ *											source and nothing is replaced in an output. The fourth, the version of a
+ *											bundle, is made of the path of the bundle's files, which is a directory of the
+ *											run's own: a page and its fixture are compared with the versions told apart
+ *											by name (pagesVersionless()), the same bundle under the same name in both.
  *											The year of the footer is fixed through a callback of the response, as the rest.
  *											What a template or a value can do to the page is checked by
  *											tests/markup-safety-smoke.php.
  *
  *	Usage: php tests/markup-pages-smoke.php
- *				 php tests/markup-pages-smoke.php --record=DIR	writes the outputs as fixtures into DIR
+ *				 php tests/markup-pages-smoke.php --record=DIR	writes the outputs as fixtures into DIR, with the versions of the bundles told apart by name
  */
 
-// The features directory stands in ONE place as well, as its path goes into the version of a bundle too
-defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-markup-pages-features' );
-
-// The site of the pages stands in ONE directory, because its path goes into the version of a bundle, and every run removes it and makes it again: a second run of this suite
-// at the same time - in another copy, or one a person starts - takes the site from under the first, and a page is drawn from files that are not its own. The runs take
-// turns: the lock is held until the process ends, and is let go of when it does
-$pagesLock = fopen( sys_get_temp_dir(). '/nino-markup-pages-site.lock', 'c' );
-
-if( $pagesLock === false || flock( $pagesLock, LOCK_EX ) === false ) {
-	fwrite( STDERR, "markup-pages-smoke: the lock of the site of the pages could not be taken\n" );
-	exit( 1 );
-}
+// Everything this run builds - the features directory and the site the pages are drawn from - stands in one directory of its own below the temporary directory, named by chance:
+// two runs of this suite, in two copies or by two users, share no file, so none waits for another and none takes a site from under another. The directory is taken away when the
+// process ends, however it ends. Its path goes into the version of a bundle, which is why the version is compared by name (pagesVersionless())
+$GLOBALS['pagesRun'] = sys_get_temp_dir(). '/nino-markup-pages-'. bin2hex( random_bytes( 6 ) );
+defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', $GLOBALS['pagesRun']. '/features' );
 
 require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
+
+if( mkdir( $GLOBALS['pagesRun'], 0755, true ) === false ) {
+	fwrite( STDERR, "markup-pages-smoke: the directory of the run could not be made\n" );
+	exit( 1 );
+}
+
+register_shutdown_function( static function(): void {
+	\Nino\Filesystem::removeDir( $GLOBALS['pagesRun'] );
+} );
 
 // The one feature of the run is the test feature of the kernel, in a features directory made again for the run: the cases use its components as their material
 \Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
@@ -46,12 +51,32 @@ foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( NINO_F
 	touch( $file->getPathname(), 1767225600 );
 
 /**
- *	The directory the site of the pages is built in: the path goes into the version of a bundle, so it is one
+ *	The directory the site of the pages is built in: one in the directory of the run, so that the run's end takes it away
  *
  *	@return 	string
  */
 function pagesSiteDir(): string {
-	return sys_get_temp_dir(). '/nino-markup-pages-site';
+	return $GLOBALS['pagesRun']. '/site';
+}
+
+/**
+ *	A page with the versions of its bundles told apart by name: the version a bundle is linked with is a hash over the path, the size and the time of its files, and the path is
+ *	the run's own. The first version a page names becomes 000000000001, the second 000000000002, and so on, so that a page that links two bundles by one version, or one bundle by two,
+ *	differs from a page that does not. The hash of nothing (a bundle none of whose files is there) is the same in every run and stays as it is. A text without such a version is
+ *	returned as it is
+ *
+ *	@param		string		$page
+ *
+ *	@return 	string
+ */
+function pagesVersionless( string $page ): string {
+
+	$names = [];
+
+	return (string) preg_replace_callback( '#(/\.cache/[A-Za-z0-9._-]+\?v=)(?!da39a3ee5e6b)([0-9a-f]{12})#', static function( array $found ) use ( &$names ): string {
+		$names[$found[2]] ??= sprintf( '%012x', count( $names ) + 1 );
+		return $found[1]. $names[$found[2]];
+	}, $page );
 }
 
 /**
@@ -162,7 +187,7 @@ function pagesSite( bool $tools ): string {
 	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $sandbox, \FilesystemIterator::SKIP_DOTS ) ) as $file )
 		touch( $file->getPathname(), 1767225600 );
 
-	// The path goes into the version of a bundle
+	// The site stands where the run's end takes it away
 	if( is_dir( pagesSiteDir() ) === true )
 		\Nino\Filesystem::removeDir( pagesSiteDir() );
 
@@ -503,7 +528,7 @@ if( is_string( $record ) === true ) {
 	is_dir( $record ) === true || mkdir( $record, 0755, true );
 
 	foreach( $outputs as $file => $output )
-		file_put_contents( $record. '/'. $file, $output );
+		file_put_contents( $record. '/'. $file, pagesVersionless( $output ) );
 
 	echo 'recorded '. count( $outputs ). " files\n";
 	exit( 0 );
@@ -519,12 +544,14 @@ check( 'the fixtures are the files of the outputs, no more and no fewer', array_
 foreach( $names as $name ) {
 
 	$expected = (string) @file_get_contents( $dir. '/'. $name );
-	$same = $expected === $outputs[$name];
+	$same = pagesVersionless( $expected ) === pagesVersionless( $outputs[$name] );
 
 	check( $name. ' ('. strlen( $outputs[$name] ). ' bytes) is as the fixture has it', $same );
 
 	if( $same === false ) {
-		$actual = sys_get_temp_dir(). '/nino-markup-pages-actual-'. $name;
+		// The one thing a run leaves in the temporary directory: the outputs that differ, in a directory of the run's own
+		is_dir( $GLOBALS['pagesRun']. '-actual' ) === true || mkdir( $GLOBALS['pagesRun']. '-actual', 0755 );
+		$actual = $GLOBALS['pagesRun']. '-actual/'. $name;
 		file_put_contents( $actual, $outputs[$name] );
 		echo "      differs, the output is in $actual\n";
 	}

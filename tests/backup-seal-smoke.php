@@ -499,7 +499,10 @@ check( 'and no damage of the doors is the file itself', count( array_filter( $do
 
 $treeBefore 	= sealTree( $sandbox );
 $listBefore 	= glob( $backups. '/*' ) ?: [];
-$tempFiles 		= static fn(): array => array_merge( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [], glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [], glob( sys_get_temp_dir(). '/ninosnapshot*' ) ?: [] );
+// What the runs of THIS project leave in the temporary directory, which is the mark of the project in the name: the directory is shared with whatever else runs on the machine,
+// and a backup of another project at the same time is none of this suite's
+$tempMark 		= ( new ReflectionMethod( \Nino\Backup::class, '_tempId' ) )->invokeArgs( null, [ &$appData ] );
+$tempFiles 		= static fn(): array => array_merge( glob( sys_get_temp_dir(). '/ninobackup-'. $tempMark. '-*' ) ?: [], glob( sys_get_temp_dir(). '/ninorestore-'. $tempMark. '-*' ) ?: [], glob( sys_get_temp_dir(). '/ninosnapshot-'. $tempMark. '-*' ) ?: [] );
 $tempBefore 	= $tempFiles();
 $paths 				= static fn( string $text ): bool => str_contains( $text, $sandbox ) === true || str_contains( $text, sys_get_temp_dir() ) === true || str_contains( $text, $dir ) === true;
 $unharmed 		= true;
