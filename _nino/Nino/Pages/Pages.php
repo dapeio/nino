@@ -51,6 +51,11 @@ namespace Nino {
 		 *	by a fill is kept as it is. A page that is renamed or given other addresses stays at the slot of its first route,
 		 *	which is what breaks a tie between two equal priorities in a menu.
 		 *
+		 *	A save writes the files that hold what it changes and no other: a file whose content, as it would be written, is what it holds
+		 *	already is left alone - not opened for writing, its bytes, its mtime and its inode stay -, so that a page that is saved as it
+		 *	stands changes no file at all and one text of one language changes the file of that language. The comparison is made under the
+		 *	lock, on the stored form, and the answer is that of a page that is written.
+		 *
 		 *	The template is a file of templates/ that is there: put() does not make one. Where $page['source'] is given it is
 		 *	made, from the source, as the one file of that name - the name is a page's (TEMPLATE, at most MAX_NAME long, and none
 		 *	the kernel draws by itself, see reserved()), the file is not there yet, and the source is no larger than
@@ -849,6 +854,28 @@ namespace Nino {
 
 			$fragments['/text/global.php'] = [ '[[/_nino/webpage'. $uri. '/uri]]' => $global ];
 
+			// A page that exists and has one address for every language is read from global.php by every language whose file holds no
+			// address of its own: the reader lays the file of the language over global.php, and takes what another language's file holds
+			// for a key that is missing or empty in its own (\Nino\Html::_textFills()). Such a file is not given the key - a page the setup
+			// wizard made has the address in global.php alone - unless another file of a language would hand its own value to the reader
+			if( $previousKeys !== [] && count( array_unique( $addresses ) ) === 1 && reset( $addresses ) === $global ) {
+
+				$key 		= '[[/_nino/webpage'. $uri. '/uri]]';
+				$files 	= [];
+
+				foreach( array_unique( array_merge( $locales, \Nino\Locales::getTextLocales( $appData ) ) ) as $locale )
+					$files[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+
+				foreach( $locales as $locale ) {
+
+					// A text counts for the reader where it is not blank: there is one, and it is no string of blanks - a number is a text (\Nino\Html::_blank())
+					$others = array_filter( array_diff_key( $files, [ $locale => true ] ), static fn( array $content ): bool => ( $content[$key] ?? null ) !== null && ( is_string( $content[$key] ) === false || trim( $content[$key] ) !== '' ) && $content[$key] !== $global );
+
+					if( array_key_exists( $key, $files[$locale] ) === false && $others === [] )
+						unset( $fragments['/text/'. $locale. '.php'][$key] );
+				}
+			}
+
 			foreach( $extra['texts'] ?? [] as $path => $keys )
 				$fragments[$path] = array_merge( $fragments[$path] ?? [], $keys );
 
@@ -859,6 +886,12 @@ namespace Nino {
 
 			$before = $routes;
 			$routes = self::_putRoute( $routes, $previousKeys, $put );
+
+			// A route that is what it was - the keys in another order, an explicit status 200, a status or a priority as a string - stays as it
+			// stands in config.php: the save writes no route of a page it changes nothing of
+			foreach( array_keys( $put ) as $routeKey )
+				if( is_array( $before[$routeKey] ?? null ) === true && self::_canonical( $before[$routeKey] ) === self::_canonical( $routes[$routeKey] ) )
+					$routes[$routeKey] = $before[$routeKey];
 
 			// A save that takes the home page or the 404 page away from the site is asked for, where the caller asks
 			if( array_key_exists( 'confirm', $page ) === true && $page['confirm'] !== true ) {
@@ -879,13 +912,62 @@ namespace Nino {
 		}
 
 		/**
+		 *	A route as put() means it, to be compared with another: the keys sorted at every depth, the status as the number put() makes of it with
+		 *	200, the one a route has without it, left out, and the priorities in the menus as numbers. Compared strictly: a text that only reads
+		 *	like the number another one is - '10' and '1e1' - is another
+		 *
+		 *	@param		array 		$route
+		 *
+		 *	@return 	array
+		 */
+		private static function _canonical( array $route ): array {
+
+			if( array_key_exists( 'statusCode', $route ) === true ) {
+
+				if( (int) $route['statusCode'] === 200 )
+					unset( $route['statusCode'] );
+				else
+					$route['statusCode'] = (int) $route['statusCode'];
+			}
+
+			if( is_array( $route['navs'] ?? null ) === true ) {
+
+				if( $route['navs'] === [] )
+					unset( $route['navs'] );
+				else
+					$route['navs'] = array_map( 'intval', $route['navs'] );
+			}
+
+			return self::_sorted( $route );
+		}
+
+		/**
+		 *	An array with its keys sorted, at every depth
+		 *
+		 *	@param		array 		$list
+		 *
+		 *	@return 	array
+		 */
+		private static function _sorted( array $list ): array {
+
+			ksort( $list, SORT_STRING );
+
+			foreach( $list as $key => $value )
+				if( is_array( $value ) === true )
+					$list[$key] = self::_sorted( $value );
+
+			return $list;
+		}
+
+		/**
 		 *	The writes of a page, in an order that lets each be taken back: the template, the text of each language, the address
 		 *	in global.php, the blacklist - and the routes last. The lock of config.php is held from the first check of put() to
 		 *	the write of the routes, which is why the routes are never written and taken back: a failure before them leaves
 		 *	config.php as it is, and a failure of that write itself is an answer like any other. Each file of the text is read
 		 *	under its own lock, in the same step that merges the keys of the page into it, and what the page changed there is
 		 *	what a failure takes out again - its keys back to what they were, no key of anybody else touched - and the template
-		 *	file is removed; the answer names the step that failed
+		 *	file is removed; the answer names the step that failed. A file that the page would write as it is - the keys of its fragment
+		 *	hold what they are given, the routes and the slots are what config.php has - is not written, and is nothing to give back
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$routes				The route array as it is to be
@@ -928,16 +1010,29 @@ namespace Nino {
 
 				$real = \Nino\Filesystem::path( $appData, $path );
 				$seen = [];
+				$same = false;
 
-				if( \Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment, $real, &$seen ): array {
+				// A file that holds every key of the fragment as it is to be written is not written: its bytes, its mtime and its inode stay
+				$written = \Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment, $real, &$seen, &$same ): ?array {
+
 					$seen = [ 'existed' => is_file( $real ), 'prior' => array_intersect_key( $content, $fragment ) ];
-					return array_merge( $content, $fragment );
-				} ) === false ) {
+					$merged = array_merge( $content, $fragment );
+
+					if( $merged === $content ) {
+						$same = true;
+						return null;
+					}
+
+					return $merged;
+				} );
+
+				if( $written === false && $same === false ) {
 					$fail = 'could not write '. $path;
 					break;
 				}
 
-				$changed[$path] = $seen;
+				if( $written === true )
+					$changed[$path] = $seen;
 			}
 
 			if( $fail === null ) {
@@ -977,15 +1072,26 @@ namespace Nino {
 
 			if( $fail === null ) {
 
-				if( \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $routes, $slots ): array {
+				$same = false;
 
-					$content['/nino/http/routes'] = $routes;
+				// config.php is written where the routes or the slots differ from what it holds
+				$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $routes, $slots, &$same ): ?array {
+
+					$new = $content;
+					$new['/nino/http/routes'] = $routes;
 
 					if( $slots !== [] )
-						$content['/nino/html/images'] = array_merge( is_array( $content['/nino/html/images'] ?? null ) === true ? $content['/nino/html/images'] : [], $slots );
+						$new['/nino/html/images'] = array_merge( is_array( $content['/nino/html/images'] ?? null ) === true ? $content['/nino/html/images'] : [], $slots );
 
-					return $content;
-				} ) === false )
+					if( $new === $content ) {
+						$same = true;
+						return null;
+					}
+
+					return $new;
+				} );
+
+				if( $written === false && $same === false )
 					$fail = 'could not write config.php';
 				else {
 					$appData['/nino/http/routes'] = $routes;

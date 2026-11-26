@@ -568,6 +568,113 @@ foreach( [ 'name', 'title', 'description' ] as $quotedField )
 			return $content;
 		} );
 
+// A save writes the files that hold what it changes and no other: a page that is saved as it stands is not written at all - not a byte, not a mtime,
+// not an inode - and one text of one language is the file of that language. Every file of the project is put to an old mtime first and read once more after
+// the save; the lock files beside the data are the locks' own and no content
+$writeTree = static function() use ( $sandbox ): array {
+	$files = [];
+	clearstatcache();
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $sandbox, FilesystemIterator::SKIP_DOTS ) ) as $file ) {
+		if( $file->isFile() === false || str_contains( (string) $file, '/.locks/' ) === true )
+			continue;
+		$files[ substr( (string) $file, strlen( $sandbox. '/private/' ) ) ] = [ md5_file( (string) $file ), fileinode( (string) $file ), filemtime( (string) $file ) ];
+	}
+	ksort( $files );
+	return $files;
+};
+$writeAged = static function() use ( $sandbox ): void {
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $sandbox, FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( $file->isFile() === true )
+			touch( (string) $file, 1000000000 );
+};
+// [ files whose bytes differ, files that were written with the bytes they had, files that came or went ]
+$writeDiff = static function( array $before, array $after ): array {
+	$bytes = $same = $made = [];
+	foreach( $after + $before as $path => $unused ) {
+		if( isset( $before[$path] ) === false || isset( $after[$path] ) === false )
+			$made[] = $path;
+		else if( $before[$path][0] !== $after[$path][0] )
+			$bytes[] = $path;
+		else if( $before[$path][1] !== $after[$path][1] || $before[$path][2] !== $after[$path][2] )
+			$same[] = $path;
+	}
+	return [ $bytes, $same, $made ];
+};
+$writeBase = [ 'originalUri' => '', 'uri' => '/write-probe', 'httpUris' => [ '' => '/write-probe' ], 'template' => 'page-about', 'statusCode' => 200, 'navs' => [], 'text' => array_map( static fn( array $one ): array => $one + [ 'description' => '' ], $pageText('Probe') ) ];
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $writeBase );
+check( 'a page for the writes check is created', $status === 200 );
+$writeBase['originalUri'] = '/write-probe';
+$writeText = static fn( string $locale, string $field, string $value ): array => [ 'text' => array_replace_recursive( $writeBase['text'], [ $locale => [ $field => $value ] ] ) ];
+
+foreach( [
+	'a save of the page as it stands' 						=> [ [], [] ],
+	'the address of one language' 								=> [ [ 'httpUris' => [ 'de_DE' => '/write-probe-de', '' => '/write-probe' ] ], [ 'config.php', 'text/de_DE.php' ] ],
+	'the status code' 														=> [ [ 'statusCode' => 203 ], [ 'config.php' ] ],
+	'the template' 																=> [ [ 'template' => 'page-contact' ], [ 'config.php' ] ],
+	'the Element-URI' 														=> [ [ 'uri' => '/write-probe-two' ], [ 'config.php', 'text/blacklist.php', 'text/de_DE.php', 'text/en_US.php', 'text/fr_FR.php', 'text/global.php' ] ],
+	'the name of one language' 										=> [ $writeText( 'de_DE', 'name', 'Neuer Name' ), [ 'text/de_DE.php' ] ],
+	'the title of one language' 									=> [ $writeText( 'en_US', 'title', 'New title' ), [ 'text/en_US.php' ] ],
+	'the description of one language' 						=> [ $writeText( 'fr_FR', 'description', 'Une description' ), [ 'text/fr_FR.php' ] ],
+	'the one address of every language' 					=> [ [ 'httpUris' => [ '' => '/write-probe-all' ] ], [ 'config.php', 'text/de_DE.php', 'text/en_US.php', 'text/fr_FR.php', 'text/global.php' ] ],
+] as $label => [ $change, $expected ] ) {
+
+	$writeAged();
+	$writeFrom = $writeTree();
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $change + $writeBase );
+	[ $writeBytes, $writeSame, $writeMade ] = $writeDiff( $writeFrom, $writeTree() );
+	sort( $expected );
+	check( $label. ': 200, and the files that hold it are the ones that differ - '. ( $expected === [] ? 'none' : implode( ', ', $expected ) ). ' - and no other file is written, not even with the bytes it had',
+		$status === 200 && $writeBytes === $expected && $writeSame === [] && $writeMade === [] );
+
+	// Back to the page as it was, for the next one
+	callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => $change['uri'] ?? $writeBase['uri'] ] + $writeBase );
+}
+
+// The answer of a save that writes nothing is the answer of one that writes: 200 and the pages as the list gives them
+$writeAged();
+$writeFrom = $writeTree();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $writeBase );
+[ , $writeList ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+check( 'a save that writes nothing answers as every save does: 200 and the pages of the list, the page as it was posted', $status === 200 && array_keys( $body ) === [ 'pages' ] && $body['pages'] === $writeList['pages']
+	&& $writeDiff( $writeFrom, $writeTree() ) === [ [], [], [] ] && ( array_column( $body['pages'], null, 'uri' )['/write-probe']['text']['en_US'] ?? [] ) === $writeBase['text']['en_US'] );
+
+// "The same" is decided strictly: a text that only reads like the number another one is - "10" and "1e1", "0" and "0.0" - is another text, and is written
+foreach( [ [ 'name', 'de_DE', '10', '1e1' ], [ 'title', 'en_US', '0', '0.0' ], [ 'description', 'fr_FR', '100', '1e2' ] ] as [ $numField, $numLocale, $numFrom, $numTo ] ) {
+	callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $writeText( $numLocale, $numField, $numFrom ) + $writeBase );
+	$writeAged();
+	$writeFrom = $writeTree();
+	[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $writeText( $numLocale, $numField, $numTo ) + $writeBase );
+	check( 'the '. $numField. ' of '. $numLocale. ' "'. $numFrom. '" -> "'. $numTo. '" is a change: written, in the file of that language alone', $status === 200 && $writeDiff( $writeFrom, $writeTree() ) === [ [ 'text/'. $numLocale. '.php' ], [], [] ]
+		&& ( \Nino\Filesystem::getFileContent( $appData, '/text/'. $numLocale. '.php', [] )['[[/_nino/webpage/write-probe/'. $numField. ']]'] ?? null ) === $numTo );
+}
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $writeBase );
+
+// What was not written is not given back: a write that fails after the first of two files is taken back, and the files the save did not write are not touched
+require_once __DIR__. '/fixtures/faultfs.php';
+$writeAged();
+$writeFrom = $writeTree();
+FaultFs::on( [ 'rename' => static fn( string $to ): bool => str_ends_with( $to, '/private/config.php' ) ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'statusCode' => 203 ] + $writeText( 'de_DE', 'name', 'Not kept' ) + $writeBase );
+FaultFs::off();
+unset( $appData['./nino/filesystem/cache'] );
+check( 'a save that fails at config.php after it wrote the file of one language is 500, gives that file back byte for byte and does not touch a file it did not write - not the other languages, not global.php, not config.php',
+	$status === 500 && $writeDiff( $writeFrom, $writeTree() ) === [ [], [ 'text/de_DE.php' ], [] ] );
+
+// The activity log is the shell's and says what was asked, not what was written: a save that changes nothing is an edit of the route in it, as it is for one that changes something
+$writeLogs = static function() use ( &$appData ): string { return implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 500 ) ); };
+$writeLogged = substr_count( $writeLogs(), 'Edit Route /write-probe' );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $writeBase, 'routes/save' );
+check( 'a save that writes nothing is logged as an edit of the route, as one that writes is', $status === 200 && substr_count( $writeLogs(), 'Edit Route /write-probe' ) === $writeLogged + 1 );
+
+// A new page is written whole: the same save with no page behind it is a page
+$writeAged();
+$writeFrom = $writeTree();
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '', 'uri' => '/write-probe-new', 'httpUris' => [ '' => '/write-probe-new' ] ] + $writeBase );
+check( 'a new page writes the routes, the texts of every language, the address fill and the blacklist', $status === 200 && $writeDiff( $writeFrom, $writeTree() ) === [ [ 'config.php', 'text/blacklist.php', 'text/de_DE.php', 'text/en_US.php', 'text/fr_FR.php', 'text/global.php' ], [], [] ] );
+
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/write-probe-new' ] );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/write-probe' ] );
+
 // What a route carries that the form does not edit stays. Somebody put a
 // 'maintenance' => false, a 'locale' and a 'header' on it in config.php - the
 // first keeps a page up while the site is down - and a save used to build the
@@ -1681,6 +1788,220 @@ echo "\n";
 [ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
 check( 'Navigations actions require an authed _admin session too', $status === 401 );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+echo "\n";
+
+// A project the setup wizard made: its starter pages have their address in global.php alone and no key of it in a language file, and a route in the shape
+// the wizard writes. A save of such a page that changes nothing writes nothing, one status writes config.php, one name writes one language's file - and the site reads what it read
+require_once dirname( __DIR__ ). '/_admin/install/Install.php';
+echo "A project made by the setup wizard\n";
+$wizard = ninoSandbox( 'admin-pages-wizard' );
+$wizardDir = ninoSandboxDir( $wizard );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $wizardPath )
+	mkdir( $wizardDir. $wizardPath, 0777, true );
+$wizard['/nino/html/navs'] = \Nino\AppData::DEFAULTS['/nino/html/navs'];
+\Nino\Filesystem::putFileContent( $wizard, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ], '/nino/modules' => [], '/nino/html/assets' => [], '/nino/http/routes' => [], '/nino/error/log' => false ] );
+[ $status ] = ninoCall( $wizard, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'native' => 'de_DE', 'modules' => [] ] );
+check( 'the wizard\'s own setup and starter pages are applied', $status === 200 && \Nino\Install\StarterPages::apply( $wizard, false ) === true );
+ninoUser( $wizard, 'wizard@example.com' );
+// The sign-in is written with the first request after it: that request is made here, so that what follows compares the saves alone
+ninoCall( $wizard, [ \Nino\Modules\Routes\Admin::class, 'apiList' ] );
+$wizardTree = static function() use ( $wizardDir ): array {
+	$files = [];
+	clearstatcache();
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $wizardDir, FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( $file->isFile() === true && str_contains( (string) $file, '/.locks/' ) === false && str_contains( (string) $file, '/.logs/' ) === false )
+			$files[ substr( (string) $file, strlen( $wizardDir. '/private/' ) ) ] = [ md5_file( (string) $file ), fileinode( (string) $file ), filemtime( (string) $file ) ];
+	ksort( $files );
+	return $files;
+};
+$wizardAged = static function() use ( $wizardDir ): void {
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $wizardDir, FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( $file->isFile() === true )
+			touch( (string) $file, 1000000000 );
+};
+$wizardPage = static function( string $uri ) use ( &$wizard ): array {
+	unset( $wizard['./nino/filesystem/cache'] );
+	[ , $listed ] = ninoCall( $wizard, [ \Nino\Modules\Routes\Admin::class, 'apiList' ] );
+	$page = array_column( $listed['pages'], null, 'uri' )[$uri];
+	return [ 'uri' => $uri, 'originalUri' => $uri, 'httpUris' => $page['httpUris'], 'template' => $page['template'], 'text' => $page['text'], 'navs' => $page['navs'], 'statusCode' => $page['statusCode'], 'stamp' => $page['stamp'] ];
+};
+$wizardSave = static function( array $form ) use ( &$wizard ): array {
+	unset( $wizard['./nino/filesystem/cache'] );
+	return ninoCall( $wizard, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], $form );
+};
+$wizardFills = static function() use ( &$wizard ): array {
+	unset( $wizard['./nino/filesystem/cache'], $wizard['./nino/html/filecache'], $wizard['./nino/locales/text'] );
+	$read = [];
+	foreach( [ 'de_DE', 'en_US' ] as $wizardLocale ) {
+		$wizard['./nino/locales/current'] = $wizardLocale;
+		unset( $wizard['./nino/html/filecache'] );
+		foreach( [ '/home', '/contact', '/404' ] as $wizardUri )
+			$read[$wizardLocale. $wizardUri] = \Nino\Html::renderTextfill( $wizard, '/_nino/webpage'. $wizardUri. '/uri' );
+	}
+	$wizard['./nino/locales/current'] = 'de_DE';
+	return $read;
+};
+$wizardRead = $wizardFills();
+check( 'the starter pages have their address as the reader gives it: "/" for the home page, "/contact", "/404", in both languages', $wizardRead === [ 'de_DE/home' => '/', 'de_DE/contact' => '/contact', 'de_DE/404' => '/404', 'en_US/home' => '/', 'en_US/contact' => '/contact', 'en_US/404' => '/404' ]
+	&& isset( \Nino\Filesystem::getFileContent( $wizard, '/text/de_DE.php', [] )['[[/_nino/webpage/contact/uri]]'] ) === false && ( \Nino\Filesystem::getFileContent( $wizard, '/text/global.php', [] )['[[/_nino/webpage/contact/uri]]'] ?? '' ) === '/contact' );
+foreach( [ '/home', '/contact', '/404' ] as $wizardUri ) {
+	$wizardAged();
+	$held = $wizardTree();
+	[ $status ] = $wizardSave( $wizardPage( $wizardUri ) );
+	check( 'a save of the starter page '. $wizardUri. ' that changes nothing is 200 and writes no file - not a byte, not a mtime, not an inode', $status === 200 && $writeDiff( $held, $wizardTree() ) === [ [], [], [] ] );
+}
+$wizardAged();
+$held = $wizardTree();
+[ $status ] = $wizardSave( [ 'statusCode' => 203 ] + $wizardPage( '/contact' ) );
+check( 'a status of the starter page is config.php alone', $status === 200 && $writeDiff( $held, $wizardTree() ) === [ [ 'config.php' ], [], [] ] );
+$wizardAged();
+$held = $wizardTree();
+$wizardForm = $wizardPage( '/contact' );
+$wizardForm['text']['en_US']['name'] = 'Get in touch';
+[ $status ] = $wizardSave( $wizardForm );
+check( 'a name in one language of the starter page is the file of that language alone', $status === 200 && $writeDiff( $held, $wizardTree() ) === [ [ 'text/en_US.php' ], [], [] ] );
+check( '...and the site reads the same addresses as before: no language file has a key that global.php did not give', $wizardFills() === $wizardRead && isset( \Nino\Filesystem::getFileContent( $wizard, '/text/en_US.php', [] )['[[/_nino/webpage/contact/uri]]'] ) === false );
+$wizardForm = $wizardPage( '/contact' );
+$wizardForm['httpUris'] = [ '' => '/kontakt' ];
+$wizardSave( $wizardForm );
+$wizardChanged = $wizardFills();
+check( 'a new address for every language is the one global.php says, and the reader gives it in both languages', $wizardChanged['de_DE/contact'] === '/kontakt' && $wizardChanged['en_US/contact'] === '/kontakt' );
+$wizardForm = $wizardPage( '/contact' );
+$wizardForm['httpUris'] = [ 'de_DE' => '/kontakt', 'en_US' => '/contact-us' ];
+$wizardSave( $wizardForm );
+$wizardChanged = $wizardFills();
+check( 'an address for each language is in the file of each, and the reader gives each its own', $wizardChanged['de_DE/contact'] === '/kontakt' && $wizardChanged['en_US/contact'] === '/contact-us' );
+// A language that has no address of its own where another language's file has one gets that one from the reader, not global.php's: such a file is given its key
+$wizardForm = $wizardPage( '/contact' );
+$wizardForm['httpUris'] = [ 'de_DE' => '/kontakt', '' => '/contact' ];
+\Nino\Filesystem::mutate( $wizard, '/text/en_US.php', static function( array $content ): array { unset( $content['[[/_nino/webpage/contact/uri]]'] ); return $content; } );
+\Nino\Filesystem::mutate( $wizard, '/text/global.php', static function( array $content ): array { unset( $content['[[/_nino/webpage/contact/uri]]'] ); return $content; } );
+$wizardSave( $wizardForm );
+$wizardChanged = $wizardFills();
+check( 'one language with an address of its own and the other with the shared one: the file of the shared one is given its key, since the reader would take the other language\'s', $wizardChanged['en_US/contact'] === '/contact' && $wizardChanged['de_DE/contact'] === '/kontakt'
+	&& ( \Nino\Filesystem::getFileContent( $wizard, '/text/en_US.php', [] )['[[/_nino/webpage/contact/uri]]'] ?? '' ) === '/contact' );
+
+// A route somebody wrote by hand in another but valid shape: a save that changes nothing leaves config.php as it is; one that changes something may write it in the shape of the writer
+$handRoute = static function( string $key, array $route ) use ( &$wizard ): void {
+	\Nino\Filesystem::mutate( $wizard, '/config.php', static function( array $config ) use ( $key, $route ): array {
+		$config['/nino/http/routes'][$key] = $route;
+		return $config;
+	} );
+	unset( $wizard['./nino/filesystem/cache'] );
+};
+foreach( [
+	'keys in another order' 														=> [ 'GET://404', [ 'body' => '[template /templates/page-404]', 'statusCode' => 404, 'uri' => '/404' ] ],
+	'a status that is 200 written out' 									=> [ 'GET://', [ 'uri' => '/home', 'body' => '[template /templates/page-home]', 'statusCode' => 200 ] ],
+	'a status as a string' 															=> [ 'GET://404', [ 'uri' => '/404', 'body' => '[template /templates/page-404]', 'statusCode' => '404' ] ],
+	'status and header before the body' 								=> [ 'GET://404', [ 'uri' => '/404', 'statusCode' => 404, 'header' => [ 'X-A' => 'b' ], 'body' => '[template /templates/page-404]' ] ],
+] as $handLabel => [ $handKey, $handShape ] ) {
+	$handRoute( $handKey, $handShape );
+	$wizardAged();
+	$held = $wizardTree();
+	$handBytes = file_get_contents( $wizardDir. '/private/config.php' );
+	[ $status ] = $wizardSave( $wizardPage( $handShape['uri'] ) );
+	check( 'a route with '. $handLabel. ': a save that changes nothing writes no file, and config.php is as it was', $status === 200 && $writeDiff( $held, $wizardTree() ) === [ [], [], [] ] && file_get_contents( $wizardDir. '/private/config.php' ) === $handBytes );
+	// back to the shape of the writer, for the next
+	$handRoute( $handKey, $handKey === 'GET://404' ? [ 'uri' => '/404', 'body' => '[template /templates/page-404]', 'statusCode' => 404 ] : [ 'uri' => '/home', 'body' => '[template /templates/page-home]' ] );
+}
+$handRoute( 'GET://404', [ 'body' => '[template /templates/page-404]', 'statusCode' => '404', 'uri' => '/404' ] );
+$handForm404 = $wizardPage( '/404' );
+$wizardAged();
+$held = $wizardTree();
+[ $status ] = $wizardSave( [ 'text' => array_replace_recursive( $handForm404['text'], [ 'de_DE' => [ 'name' => 'Nicht da' ] ] ) ] + $handForm404 );
+check( 'a hand-written route and one text changed: the file of that language alone is written, the route stays as it stands', $status === 200 && $writeDiff( $held, $wizardTree() ) === [ [ 'text/de_DE.php' ], [], [] ] );
+[ $status ] = $wizardSave( [ 'template' => 'page-contact' ] + $wizardPage( '/404' ) );
+check( 'one thing of the route changed - the template - writes config.php, and the route is then the writer\'s: its status an integer', $status === 200 && ( \Nino\Filesystem::getFileContent( $wizard, '/config.php', [] )['/nino/http/routes']['GET://404']['statusCode'] ?? null ) === 404 );
+
+// More of the same, each on a project of its own: what the reader gives every language where a language file holds the address key alone, where a file of a language the site does
+// does not serve has a value of its own, where somebody put a number there, and a priority in a menu written as a string
+$wzMake = static function() use ( $writeDiff ): array {
+	$app = ninoSandbox( 'admin-pages-wizard-more' );
+	$dir = ninoSandboxDir( $app );
+	foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $wzPath )
+		mkdir( $dir. $wzPath, 0777, true );
+	$app['/nino/html/navs'] = \Nino\AppData::DEFAULTS['/nino/html/navs'];
+	\Nino\Filesystem::putFileContent( $app, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ], '/nino/modules' => [], '/nino/html/assets' => [], '/nino/http/routes' => [], '/nino/error/log' => false ] );
+	ninoCall( $app, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'native' => 'de_DE', 'modules' => [] ] );
+	\Nino\Install\StarterPages::apply( $app, false );
+	ninoUser( $app, 'wizard2@example.com' );
+	ninoCall( $app, [ \Nino\Modules\Routes\Admin::class, 'apiList' ] );
+	return [ $app, $dir ];
+};
+$wzPage = static function( array &$app, string $uri ): array {
+	unset( $app['./nino/filesystem/cache'] );
+	[ , $listed ] = ninoCall( $app, [ \Nino\Modules\Routes\Admin::class, 'apiList' ] );
+	$page = array_column( $listed['pages'], null, 'uri' )[$uri];
+	return [ 'uri' => $uri, 'originalUri' => $uri, 'httpUris' => $page['httpUris'], 'template' => $page['template'], 'text' => $page['text'], 'navs' => $page['navs'], 'statusCode' => $page['statusCode'], 'stamp' => $page['stamp'] ];
+};
+$wzSave = static function( array &$app, array $form ): array {
+	unset( $app['./nino/filesystem/cache'] );
+	return ninoCall( $app, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], $form );
+};
+// What each language of the site reads for the address of the page: the fills as the reader makes them
+$wzReads = static function( array &$app, string $uri = '/contact' ): array {
+	$read = [];
+	foreach( \Nino\Locales::getAvailableLocales( $app ) as $wzLocale ) {
+		unset( $app['./nino/filesystem/cache'], $app['./nino/html/filecache'], $app['./nino/locales/text'] );
+		$read[$wzLocale] = \Nino\Html::getFills( $app, $wzLocale )['[[/_nino/webpage'. $uri. '/uri]]'] ?? null;
+	}
+	return $read;
+};
+$wzFile = static fn( array &$app, string $locale ): array => ( static function() use ( &$app, $locale ): array { unset( $app['./nino/filesystem/cache'] ); return \Nino\Filesystem::getFileContent( $app, '/text/'. $locale. '.php', [] ); } )();
+$wzKey = '[[/_nino/webpage/contact/uri]]';
+
+// A language file that holds the address key alone: the address changed for every language is read by every language, and the file that held the key holds the new one
+[ $wz, $wzDir ] = $wzMake();
+\Nino\Filesystem::mutate( $wz, '/text/en_US.php', static function( array $content ) use ( $wzKey ): array { $content[$wzKey] = '/contact'; return $content; } );
+$wzForm = $wzPage( $wz, '/contact' );
+$wzForm['httpUris'] = [ '' => '/x' ];
+[ $status ] = $wzSave( $wz, $wzForm );
+check( 'a language file that holds the address alone is given the new address when the address of every language changes: both languages read "/x" and the file that held the key holds it',
+	$status === 200 && $wzReads( $wz ) === [ 'de_DE' => '/x', 'en_US' => '/x' ] && ( $wzFile( $wz, 'en_US' )[$wzKey] ?? null ) === '/x' );
+
+// A file of a language the site does not serve that has a value of its own for the address: the reader hands it to a language that has none, so the keys are written, and the site reads the address the page has
+[ $wz, $wzDir ] = $wzMake();
+file_put_contents( $wzDir. '/private/text/fr_FR.php', "<?php return [ '[[/_nino/webpage/contact/uri]]' => '/fr-old' ];" );
+unset( $wz['./nino/filesystem/cache'] );
+check( 'a text file of a language that is not served has a value of its own for the address: a language with none of its own reads it (the state the wizard and a hand edit make)', $wzReads( $wz ) === [ 'de_DE' => '/fr-old', 'en_US' => '/fr-old' ] );
+[ $status ] = $wzSave( $wz, $wzPage( $wz, '/contact' ) );
+check( 'a save of that page writes the key into the files of the languages, and the site reads the address of the page - "/contact" - in both', $status === 200 && $wzReads( $wz ) === [ 'de_DE' => '/contact', 'en_US' => '/contact' ]
+	&& ( $wzFile( $wz, 'de_DE' )[$wzKey] ?? null ) === '/contact' && ( $wzFile( $wz, 'en_US' )[$wzKey] ?? null ) === '/contact' );
+// ...and the same where the other file is of a language that is served: it holds its own value, so a language with none is not left to read it
+[ $wz, $wzDir ] = $wzMake();
+\Nino\Filesystem::mutate( $wz, '/text/en_US.php', static function( array $content ) use ( $wzKey ): array { $content[$wzKey] = '/en-own'; return $content; } );
+$wzForm = $wzPage( $wz, '/contact' );
+[ $status ] = $wzSave( $wz, $wzForm );
+check( 'another served language holds a value of its own: a save of the page that has one address for every language writes the address into the file that had none, so that the site reads it in both', $status === 200 && $wzReads( $wz ) === [ 'de_DE' => '/contact', 'en_US' => '/contact' ] && ( $wzFile( $wz, 'de_DE' )[$wzKey] ?? null ) === '/contact' );
+
+// A number somebody put into another file is a text for the reader as well
+[ $wz, $wzDir ] = $wzMake();
+\Nino\Filesystem::mutate( $wz, '/text/en_US.php', static function( array $content ) use ( $wzKey ): array { $content[$wzKey] = 5; return $content; } );
+$wzForm = $wzPage( $wz, '/contact' );
+$wzForm['httpUris'] = [ '' => '/kontakt' ];
+[ $status ] = $wzSave( $wz, $wzForm );
+check( 'a number in the file of another language is a text the reader takes: the file that has none is given the address, and the site reads it in both', $status === 200 && $wzReads( $wz ) === [ 'de_DE' => '/kontakt', 'en_US' => '/kontakt' ] && ( $wzFile( $wz, 'de_DE' )[$wzKey] ?? null ) === '/kontakt' );
+[ $wz, $wzDir ] = $wzMake();
+\Nino\Filesystem::mutate( $wz, '/text/en_US.php', static function( array $content ) use ( $wzKey ): array { $content[$wzKey] = "  \t"; return $content; } );
+$wzForm = $wzPage( $wz, '/contact' );
+$wzForm['httpUris'] = [ '' => '/kontakt' ];
+[ $status ] = $wzSave( $wz, $wzForm );
+check( 'blanks in the file of another language are no text for the reader: the file that has none stays without the key where the address is the one of global.php', $status === 200 && $wzReads( $wz ) === [ 'de_DE' => '/kontakt', 'en_US' => '/kontakt' ] && array_key_exists( $wzKey, $wzFile( $wz, 'de_DE' ) ) === false );
+
+// A priority in a menu that was written as a string is the priority the writer makes: a save that changes nothing leaves the route, and unticking the menu is a change
+[ $wz, $wzDir ] = $wzMake();
+$wz['/nino/modules'] = [ '\\Nino\\Modules\\Navigation' ];
+$wzMenu = \Nino\Pages::navKeys( $wz )[0];
+\Nino\Filesystem::mutate( $wz, '/config.php', static function( array $config ) use ( $wzMenu ): array { $config['/nino/http/routes']['GET://contact']['navs'] = [ $wzMenu => '5' ]; return $config; } );
+unset( $wz['./nino/filesystem/cache'] );
+$wzBytes = (string) file_get_contents( $wzDir. '/private/config.php' );
+$wzForm = $wzPage( $wz, '/contact' );
+[ $status ] = $wzSave( $wz, $wzForm );
+check( 'a menu with its priority written as a string: a save that changes nothing leaves config.php as it is, bytes and all', $status === 200 && $wzForm['navs'] === [ $wzMenu ] && (string) file_get_contents( $wzDir. '/private/config.php' ) === $wzBytes );
+[ $status ] = $wzSave( $wz, [ 'navs' => [] ] + $wzPage( $wz, '/contact' ) );
+check( '...and unticking the menu is written', $status === 200 && (string) file_get_contents( $wzDir. '/private/config.php' ) !== $wzBytes && isset( \Nino\Filesystem::getFileContent( $wz, '/config.php', [] )['/nino/http/routes']['GET://contact']['navs'] ) === false );
 
 echo "\n";
 

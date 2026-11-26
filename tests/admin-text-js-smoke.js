@@ -970,6 +970,7 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	w.save( d );
 	check( 'one language changed is ONE request with ONE item: the key, the language, the text as typed and the text it was read as', w.writes().length === 1 && JSON.stringify( w.writes()[0].payload ) === JSON.stringify( { items : [ { key : TITLE, locale : 'de_DE', value : 'Leistungen neu', was : 'Leistungen' } ] } ) );
 	check( '...a toast says it, the record stays and is not unsaved, and the shell is told that texts were written - once', w.told.length > 0 && w.told.every( t => t === W('/_admin/common/msg/saved') ) && w.dialog() === d && w.h.dirty.isDirty() === false && w.touches.join() === 'texts' );
+	check( '...what it wrote itself it holds as read: the stamp it asked at moved with the shell\'s, so shown once more it asks for nothing', w.panel._stamp === w.panel._stampNow() && w.h.admin.stamp( 'texts' ) === 1 );
 	check( '...what the server answered is what the table and the model hold', byClass( w.cells( TITLE )[2], 'nino-admin-table-clamp' )[0].textContent === 'Leistungen neu' && byClass( w.cells( TITLE )[3], 'nino-admin-table-limit' )[0].textContent === '14 / 150'
 		&& w.panel._groups[ROW].find( e => e.key === TITLE ).values.de_DE === 'Leistungen neu' && has( w.row( TITLE ), 'is-fresh' ) );
 	w.save( d );
@@ -1286,41 +1287,45 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 // --- what the panel reads again ----------------------------------------------------------------------------------------------
 
 {
-	// A template written since the keys were read is a row the list did not have: the panel reads the keys again where it is shown with no record open, and not before
+	// A template or a text written since the keys were read - by another panel, the Routes panel writes the name and the title of a page - is a row or a value the list did not
+	// have: the panel reads the keys anew where it is shown with no record open, and not before
 	const response = textResponse();
 	const w = textPage( response ).open();
 	const asked = () => w.sent.filter( c => c.endpoint === 'keys' ).length;
 	const fresh = '/template/frame-footer/navigation/label';
 
-	check( 'the panel asks for the keys once when it opens, and keeps the stamp of the templates it asked at', asked() === 1 && w.panel._stamp === 0 && w.panel._model.rowOf[fresh] === undefined && w.listRow('template/frame-footer') === undefined );
+	check( 'the panel asks for the keys once when it opens, and keeps the stamps of the templates and of the texts it asked at', asked() === 1 && w.panel._stamp === '0:0' && w.panel._model.rowOf[fresh] === undefined && w.listRow('template/frame-footer') === undefined );
 	w.panel.showCurrent();
 	check( 'shown again with nothing written since, it asks for nothing', asked() === 1 );
 	w.h.admin.touch( 'texts' );
 	w.panel.showCurrent();
-	check( '...nor does a write of texts make it ask: the texts it writes itself it has in hand', asked() === 1 );
+	check( 'a text written since by another panel: shown once more, it asks, and keeps the stamp it asked at', asked() === 2 && w.panel._stamp === '0:1' );
+	w.panel._wrote();
+	w.panel.showCurrent();
+	check( '...nor does a write of texts make it ask that the panel made itself: what it writes it has in hand', asked() === 2 && w.panel._stamp === '0:2' && w.h.admin.stamp( 'texts' ) === 2 );
 
 	response.keys = response.keys.concat( [ textEntry( fresh, { de_DE : 'Fußnavigation', en_US : 'Footer navigation' } ) ] );
 	w.h.admin.touch( 'templates' );
 	w.panel.showCurrent();
-	check( 'a template written since: shown again, it asks again - and the rows have what the template made', asked() === 2 && w.panel._stamp === 1 && w.panel._model.rowOf[fresh] === 'template/frame-footer' && w.listRow('template/frame-footer') !== undefined );
+	check( 'a template written since: shown once more, it asks - and the rows have what the template made', asked() === 3 && w.panel._stamp === '1:2' && w.panel._model.rowOf[fresh] === 'template/frame-footer' && w.listRow('template/frame-footer') !== undefined );
 	w.panel.showCurrent();
-	check( '...once: what it holds now is the stamp it asked at', asked() === 2 );
+	check( '...once: what it holds is the stamp it asked at', asked() === 3 );
 
 	// a record is open: the table is not drawn under it
 	fire( w.linkOf( ROW ), 'click', { target : w.linkOf( ROW ) } );
 	const d = w.openRow( TITLE );
 	w.h.admin.touch( 'templates' );
 	w.panel.showCurrent();
-	check( 'a record that is open is not drawn under: shown again, the panel asks for nothing and the record stays', asked() === 2 && w.dialog() === d && w.panel._group === ROW );
+	check( 'a record that is open is not drawn under: shown once more, the panel asks for nothing and the record stays', asked() === 3 && w.dialog() === d && w.panel._group === ROW );
 	w.close( d );
 	w.panel.showCurrent();
-	check( '...the showing that finds none open is the one that asks, and the stamp is the one of that time - the table of the row is drawn from what it holds', asked() === 3 && w.panel._stamp === 2 && has( w.form, 'admin-hidden' ) === false && w.ids().length === 9 );
+	check( '...the showing that finds none open is the one that asks, and the stamp is the one of that time - the table of the row is drawn from what it holds', asked() === 4 && w.panel._stamp === '2:2' && has( w.form, 'admin-hidden' ) === false && w.ids().length === 9 );
 
 	// a template written while the answer is on its way is not in it
 	const v = textPage( response );
 	v.panel.showCurrent();
 	v.h.admin.touch( 'templates' );
-	check( 'the stamp is the one from before the request went out: the answer that arrives later keeps it', v.panel._stamp === 0 && v.panel._ready === true );
+	check( 'the stamp is the one from before the request went out: the answer that arrives later keeps it', v.panel._stamp === '0:0' && v.panel._ready === true );
 	v.panel.showCurrent();
 	check( '...so the next showing asks again', v.sent.filter( c => c.endpoint === 'keys' ).length === 2 );
 }

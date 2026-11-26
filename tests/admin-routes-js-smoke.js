@@ -366,7 +366,7 @@ console.log('Admin Routes');
 	check( '...marks the row that moved as the one that was changed', has( w.row('/contact'), 'is-fresh' ) && has( w.row('/about'), 'is-fresh' ) === false );
 	check( '...keeps the focus on the button that was pressed, which stands in the row the page moved to', w.focused() === w.move( '/contact', 'up' ) );
 	check( '...says so as a toast, because the order is saved at once', w.toasts().length === 1 && w.toasts()[0] === text('/_admin/routes/msg/moved') && text('/_admin/routes/msg/moved') !== '' );
-	check( '...and tells the other panels that routes were written, of no page in particular', JSON.stringify( w.touches ) === '[["routes",null]]'.replace( 'null', 'undefined' ).replace( 'undefined', 'null' ) || ( w.touches.length === 1 && w.touches[0][0] === 'routes' && w.touches[0][1] === undefined ) );
+	check( '...and tells the other panels that routes were written, of no page in particular, and that texts were - the order of the pages is the order of the Text panel\'s pages', w.touches.length === 2 && w.touches[0][0] === 'routes' && w.touches[0][1] === undefined && w.touches[1][0] === 'texts' && w.touches[1][1] === undefined );
 
 	// At the edge the button that was pressed is locked: the focus goes to its other half
 	fire( w.move( '/contact', 'up' ), 'click' );
@@ -560,7 +560,7 @@ const DELETE = '/_admin/routes/label/delete';
 	const saved = listing( [ '/', '/about', '/contact' ] ).pages;
 	saved[1].text.en_US = { name : 'About us', title : 'Über uns EN title', description : '' };
 	w.answer( 200, { pages : saved } );
-	check( 'a save that went through says the page was written - with its address - as the other panels hear it, and says it as a toast and in the badge', w.touches.length === 1 && w.touches[0][0] === 'routes' && w.touches[0][1] === '/about'
+	check( 'a save that went through says the page was written - with its address - as the other panels hear it, and says it as a toast and in the badge - the texts were written as well, the name and the title are theirs', w.touches.length === 2 && w.touches[0][0] === 'routes' && w.touches[0][1] === '/about' && w.touches[1][0] === 'texts'
 		&& w.toasts().at(-1) === text('/_admin/common/msg/saved') && w.stateOf( d ).dataset.state === 'ok' );
 	check( '...the record stays where it is, at its address, with a line that says nothing, and the row is the one that is drawn anew', w.dialog() === d && w.h.hash() === '#routes/routes/%2Fabout' && w.lineOf( d ).textContent === '' && has( w.row('/about'), 'is-fresh' ) );
 	check( '...and what the record holds is what is saved: the shell would not ask', w.h.dirty.isDirty( [ 'routes' ] ) === false );
@@ -677,7 +677,7 @@ const DELETE = '/_admin/routes/label/delete';
 		&& w.h.hash() === '#routes/routes/%2Fnew' && w.h.index() === position );
 	check( '...the page is in the table, at the end, and its row is the one that is drawn anew', w.ids().join() === '/,/about,/contact,/new' && has( w.row('/new'), 'is-fresh' ) );
 	check( '...it has the buttons of a route that exists: Delete route, Save, Save and continue - and no Create', w.button( d, DELETE ).hidden !== true && w.button( d, SAVE ) !== undefined && w.button( d, CREATE ) === undefined );
-	check( '...the other panels are told, with the address of the page, and a toast says the route was created', w.touches.length === 1 && w.touches[0][1] === '/new' && w.toasts().at(-1) === text('/_admin/routes/msg/created') && text('/_admin/routes/msg/created') !== '' );
+	check( '...the other panels are told, with the address of the page, and a toast says the route was created', w.touches.length === 2 && w.touches[0][1] === '/new' && w.touches[1][0] === 'texts' && w.toasts().at(-1) === text('/_admin/routes/msg/created') && text('/_admin/routes/msg/created') !== '' );
 	check( '...the shell would not ask: what the record holds is what is saved', w.h.dirty.isDirty( [ 'routes' ] ) === false );
 	fire( w.cross( d ), 'click' );
 	check( '...and the cross takes the one entry off the history and puts the focus on the new row', w.dialog() === null && w.h.went.at(-1) === -1 && w.focused() === w.row('/new') );
@@ -770,7 +770,7 @@ const DELETE = '/_admin/routes/label/delete';
 	w.answer( 200, { pages : renamed } );
 	check( 'the record has the new Element URI as its key: the head says it, the address is written over the old one, with no new step of the history', w.subtitleOf( d ) === '/kontakt-neu' && w.h.hash() === '#routes/routes/%2Fkontakt-neu' && w.h.index() === position);
 	check( '...the row of the new key is in the table, the one of the old key is not', w.ids().join() === '/,/about,/kontakt-neu' && has( w.row('/kontakt-neu'), 'is-fresh' ) );
-	check( '...the other panels are told the page that was written', w.touches.at(-1)[0] === 'routes' );
+	check( '...the other panels are told the page that was written, and its texts', w.touches.at(-2)[0] === 'routes' && w.touches.at(-1)[0] === 'texts' );
 
 	const sent = w.requests.length;
 	w.type( w.rowControl( d, 'name', 'en_US' ), 'Contact us' );
@@ -1019,7 +1019,7 @@ const DELETE = '/_admin/routes/label/delete';
 	w.touches.length = 0;
 	w.toasts().length = 0;
 	w.answer( 200, { pages : listing( [ '/', '/contact' ] ).pages } );
-	check( '...a delete that went through tells the other panels that routes were written, with no address: the page is gone', w.touches.length === 1 && w.touches[0][0] === 'routes' && w.touches[0][1] === undefined );
+	check( '...a delete that went through tells the other panels that routes were written, with no address: the page is gone, and that texts were - its page of the Text panel is gone', w.touches.length === 2 && w.touches[0][0] === 'routes' && w.touches[0][1] === undefined && w.touches[1][0] === 'texts' );
 	check( '...says it was deleted as a toast, closes the record by the history, and the table has lost the page', w.toasts().at(-1) === text('/_admin/common/msg/deleted') && w.dialog() === null && w.ids().join() === '/,/contact' && w.h.went.at(-1) === -1 );
 	check( '...with the focus on the row after the one that went', w.focused() === w.row('/contact') );
 
@@ -1109,7 +1109,7 @@ const DELETE = '/_admin/routes/label/delete';
 		written.find( one => one.uri === uri ).httpUris = { '' : '/elsewhere' };
 		written.find( one => one.uri === uri ).httpUri = '/elsewhere';
 		w.answer( 200, { pages : written } );
-		check( '...and the answer is that of a save: written, said as a toast, the record stays and holds nothing unsaved', w.toasts().at(-1) === text('/_admin/common/msg/saved') && w.touches.length === 1 && w.dialog() === d && w.h.dirty.isDirty( [ 'routes' ] ) === false && w.lineOf( d ).dataset.state !== 'error' );
+		check( '...and the answer is that of a save: written, said as a toast, the record stays and holds nothing unsaved', w.toasts().at(-1) === text('/_admin/common/msg/saved') && w.touches.length === 2 && w.dialog() === d && w.h.dirty.isDirty( [ 'routes' ] ) === false && w.lineOf( d ).dataset.state !== 'error' );
 	}
 
 	// The question that Save and continue opened gives the focus back to that button, the one of Save to Save
@@ -1260,6 +1260,66 @@ const DELETE = '/_admin/routes/label/delete';
 		w.answer( 400, { error : 'unknown navigation', code : 'routes_unknown_nav', params : [ 'legal' ], field : 'navs' } );
 			return ok && findAll( e, el => el.tagName === 'FIELDSET' && has( el, 'nino-admin-checklist-field' ) )[0].attributes['aria-invalid'] === 'true' && errorsOf( e ).length === 1 && text('/_admin/error/routes_unknown_nav') !== '';
 	} )() );
+}
+
+// --- a text written since the list was read ---------------------------------------------------------------------------------------
+
+{
+	const w = world();
+	w.open( listing( [ '/', '/about', '/contact' ] ) );
+	const idle = w.requests.length;
+
+	w.panel.showCurrent();
+	check( 'shown with no text written since, the panel asks for nothing', w.requests.length === idle );
+
+	// The Text panel wrote the name of a page: the list has the name it had
+	w.h.admin.touch('texts');
+	const d = w.openRow('/contact');
+	w.panel.showCurrent();
+	check( 'a text written while a record is open is not read at that showing: the record is not drawn over', w.requests.length === idle && w.dialog() === d );
+	w.close( d );
+	w.panel.showCurrent();
+	check( 'the showing that finds no record open reads the list anew, and the names are the ones that were written', w.requests.length === idle + 1 && w.requests[idle].action === 'routes/list' );
+	const renamed = listing( [ '/', '/about', '/contact' ] );
+	renamed.pages[2].text.de_DE.name = 'Kontakt neu';
+	w.answer( 200, renamed );
+	check( '...the row has the new name, and with nothing written after that the next showing asks for nothing', byClass( w.row('/contact'), 'routes-name-label' )[0].textContent === 'Kontakt neu' && ( w.panel.showCurrent(), w.requests.length === idle + 1 ) );
+
+	// What this panel wrote it has in hand: the texts it touched are no reason to read the list anew
+	const e = w.openRow('/about');
+	w.type( w.rowControl( e, 'name', 'en_US' ), 'About us' );
+	fire( w.button( e, SAVE ), 'click' );
+	const saved = listing( [ '/', '/about', '/contact' ] );
+	saved.pages[1].text.en_US.name = 'About us';
+	w.answer( 200, { pages : saved.pages } );
+	const written = w.requests.length;
+	w.close( w.dialog() );
+	w.panel.showCurrent();
+	check( 'a save of this panel touches the texts and does not make the panel read the list anew: the stamp it holds moved with the shell\'s', w.touches.some( one => one[0] === 'texts' ) && w.requests.length === written && w.panel._textStamp === w.h.admin.stamp('texts') );
+
+	// A text written by the Text panel before a write of this one is not in what this panel holds: the write of its own does not take it as read
+	{
+		const v = world();
+		v.open( listing( [ '/', '/about', '/contact' ] ) );
+		const f = v.openRow('/about');
+		v.h.admin.touch('texts');
+		v.type( v.rowControl( f, 'name', 'en_US' ), 'About us' );
+		fire( v.button( f, SAVE ), 'click' );
+		v.answer( 200, { pages : listing( [ '/', '/about', '/contact' ] ).pages } );
+		v.close( v.dialog() );
+		const quiet = v.requests.length;
+		v.panel.showCurrent();
+		check( 'a text the Text panel wrote before a save of this panel is still not in the list: the next showing reads it', v.requests.length === quiet + 1 && v.requests.at(-1).action === 'routes/list' );
+	}
+
+	// A text written by another panel while the answer is on its way is not in it
+	w.h.admin.touch('texts');
+	w.panel.showCurrent();
+	const out = w.requests.length;
+	w.h.admin.touch('texts');
+	w.answer( 200, listing( [ '/', '/about', '/contact' ] ) );
+	w.panel.showCurrent();
+	check( 'the stamp of the texts is the one from before the request went out: a text written meanwhile is asked for at the next showing', w.requests.length === out + 1 && w.requests.at(-1).action === 'routes/list' );
 }
 
 // --- the navigations a page stands in --------------------------------------------------------------------------------------------
@@ -1430,7 +1490,7 @@ const NEWS = '/newsletter';
 	const saved = FEATURES.map( entry => JSON.parse( JSON.stringify( entry ) ) );
 	saved[1].text = { de_DE : { name : 'Newsletter', title : 'Abonnieren', description : 'Alle drei Monate.' }, en_US : { name : 'Newsletter', title : 'Abonnieren', description : '' } };
 	w.answer( 200, { runtime : saved } );
-	check( 'the texts of a feature route are written like a page: the other panels are told, with the address the feature routes it at', w.touches.length === 1 && w.touches[0][0] === 'routes' && w.touches[0][1] === '/.newsletter' );
+	check( 'the texts of a feature route are written like a page: the other panels are told, with the address the feature routes it at, and that texts were written', w.touches.length === 2 && w.touches[0][0] === 'routes' && w.touches[0][1] === '/.newsletter' && w.touches[1][0] === 'texts' );
 	check( '...a toast says so, and the person stays in the record, at its address, with a line that says nothing', w.toasts().at(-1) === text('/_admin/common/msg/saved') && w.dialog() === d && w.h.hash() === '#routes/routes/@feature/%2Fnewsletter' && w.lineOf( d ).textContent === '' );
 	check( '...the list under the directory names the page by what was written now, and the record, drawn from it, is not changed', byClass( w.features()[1], 'nino-admin-list-copy' )[0].children[0].textContent === 'Newsletter' && w.h.dirty.isDirty( [ 'routes' ] ) === false );
 
@@ -1448,7 +1508,7 @@ const NEWS = '/newsletter';
 	w.touches.length = 0;
 	fire( w.button( d, SAVE ), 'click' );
 	w.answer( 200, { runtime : saved } );
-	check( 'a feature page routed by a pattern is saved and names no page: /blog/* is no address', w.touches.length === 1 && w.touches[0][0] === 'routes' && !w.touches[0][1] );
+	check( 'a feature page routed by a pattern is saved and names no page: /blog/* is no address', w.touches.length === 2 && w.touches[0][0] === 'routes' && !w.touches[0][1] && w.touches[1][0] === 'texts' );
 
 	w.close( d );
 	check( 'the cross closes it and puts the focus on the row of the page in the list', w.dialog() === null && w.focused() === w.featureLink('/blog/post') );

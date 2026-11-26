@@ -170,6 +170,29 @@ unset( $appData['/nino/http/routes']['GET://hand'] );
 $saved = \Nino\Pages::put( $appData, [ 'originalUri' => '/site-news', 'uri' => '/site-news', 'httpUris' => [ '' => '/news' ], 'template' => 'page-there', 'text' => $text( 'News' ), 'navs' => [ 'footer' ] ] );
 $config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 check( 'a page saved a second time replaces its routes at the slot of its first, and a template that is there is not made', $saved['created'] === false && array_keys( $config ) === [ 'GET://robots.txt', 'GET://news' ] && array_keys( $config['GET://news']['navs'] ) === [ 'footer' ] );
+// A page that is put as it stands is not written: every file of the project keeps its bytes, its mtime and its inode, and the answer is that of a page that is written. One
+// text of one language is the file of that language alone
+$files = static function() use ( $sandbox ): array {
+	$held = [];
+	clearstatcache();
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $sandbox. '/private', \FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( str_contains( $file->getPathname(), '/private/data/' ) === false && $file->isFile() === true )
+			$held[$file->getPathname()] = [ md5_file( $file->getPathname() ), fileinode( $file->getPathname() ), filemtime( $file->getPathname() ) ];
+	ksort( $held );
+	return $held;
+};
+$asStored = [ 'originalUri' => '/site-news', 'uri' => '/site-news', 'httpUris' => [ '' => '/news' ], 'template' => 'page-there', 'text' => $text( 'News' ), 'navs' => [ 'footer' ] ];
+foreach( array_keys( $files() ) as $aged )
+	touch( $aged, 1000000000 );
+$fromHere = $files();
+$putTwice = \Nino\Pages::put( $appData, $asStored );
+check( 'a page that is saved as it stands writes no file: not a byte, not a mtime, not an inode - and the answer is the one of a page that is written', $putTwice === $saved && $files() === $fromHere );
+$changed = \Nino\Pages::put( $appData, [ 'text' => [ 'fr_FR' => [ 'name' => 'Nouvelles', 'title' => 'News fr' ] ] + $text( 'News' ) ] + $asStored );
+$after = $files();
+$differ = array_keys( array_filter( $after, static fn( array $one, string $path ): bool => $one !== ( $fromHere[$path] ?? null ), ARRAY_FILTER_USE_BOTH ) );
+check( 'the name of one language is the file of that language alone', isset( $changed['error'] ) === false && array_map( 'basename', $differ ) === [ 'fr_FR.php' ] );
+\Nino\Pages::put( $appData, $asStored );
+
 $reset();
 
 echo "\nA page that is refused leaves nothing\n";
@@ -1069,9 +1092,9 @@ unset( $appData['/nino/http/routes']['GET://copy'], $appData['/nino/html/images'
 $asked = \Nino\Pages::uses( $appData, 'page-copy' );
 $removed = \Nino\Pages::remove( $appData, 'page-copy' );
 $clean = $tree() === $staged;
-$again = \Nino\Pages::duplicate( $appData, 'page-news', $copy );
+$asStored = \Nino\Pages::duplicate( $appData, 'page-news', $copy );
 check( 'the leftovers of a copy that was cut off - template, words, details of the page, a picture file without a slot - are taken by remove() as one and the project is as it was before the copy; uses() says it is a leftover, and the name is free for a new page',
-	( $asked['remnant'] ?? false ) === true && ( $removed['remnant'] ?? false ) === true && $removed['files'] === [ 'template/page-copy/hero/image.10x10.webp' ] && $clean === true && isset( $again['error'] ) === false );
+	( $asked['remnant'] ?? false ) === true && ( $removed['remnant'] ?? false ) === true && $removed['files'] === [ 'template/page-copy/hero/image.10x10.webp' ] && $clean === true && isset( $asStored['error'] ) === false );
 \Nino\Pages::remove( $appData, 'page-copy' );
 mkdir( $sandbox. '/public/images/template/page-ghost/deep', 0777, true );
 file_put_contents( $sandbox. '/public/images/template/page-ghost/deep/x.webp', 'x' );

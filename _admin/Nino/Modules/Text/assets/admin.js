@@ -64,9 +64,11 @@
 		_moved					: false,
 		_loading				: false,
 		_ready					: false,
-		// The stamp of the templates (see Nino.admin.touch()) the keys were asked
-		// for: the rows of the templates are made from what the answer held
-		_stamp					: 0,
+		// The stamps of the templates and of the texts (see Nino.admin.touch()) the
+		// keys were asked for: the rows of the templates are made from what the
+		// answer held, and so are the texts - a page's name and title are written
+		// by the Routes panel as well
+		_stamp					: '',
 
 		/**
 		 *	Load every editable key, sort them into rows and render the list - or,
@@ -83,7 +85,7 @@
 
 			// A template written while the answer is on its way is not in it: the
 			// stamp is the one from before the request went out
-			const stamp = Nino.admin.stamp( 'templates' );
+			const stamp = Nino.admin.text._stampNow();
 
 			Nino.admin.text._apiCall( 'keys', {}, function( status, response ) {
 				Nino.admin.text._loading = false;
@@ -103,6 +105,31 @@
 				Nino.admin.text._directory = null;
 				Nino.admin.text.showCurrent();
 			} );
+		},
+
+		/**
+		 *	What the templates and the texts are: two counters of the shell, as one value
+		 *
+		 *	@return		{string}
+		 */
+		_stampNow : function() {
+			return Nino.admin.stamp( 'templates' )+ ':'+ Nino.admin.stamp( 'texts' );
+		},
+
+		/**
+		 *	Tell the shell that a text was written, and take it as read by this panel: what the panel wrote itself is on screen
+		 *
+		 *	@return		void
+		 */
+		_wrote : function() {
+
+			const text = Nino.admin.text;
+			const same = text._stampNow() === text._stamp;
+
+			Nino.admin.touch( 'texts' );
+
+			if( same === true )
+				text._stamp = text._stampNow();
 		},
 
 		/**
@@ -168,9 +195,9 @@
 
 		/**
 		 *	The panel is shown, or the address moved. The record reads the address itself: one that names a text of the open row opens it, one that names the row
-		 *	alone or none closes it. The row it names is drawn first, and the list where it names none. Where a template was written since the keys were read
-		 *	(the Builder creates them, and so does a key of a template that the Keys tab adds) they are read again, so that the rows have it - not while a record
-		 *	is open: the table would be drawn under it. An address of another panel (a click on the rail) leaves the level in memory as it is, and writes its address
+		 *	alone or none closes it. The row it names is drawn first, and the list where it names none. Where a template or a text was written since the keys were read
+		 *	(the Builder creates templates, and so does a key of a template that the Keys tab adds; the Routes panel writes the name, title and description of a page) they are read
+		 *	anew, so that the rows have it and the next save compares with what is stored - not while a record is open: the table would be drawn under it. An address of another panel (a click on the rail) leaves the level in memory as it is, and writes its address
 		 *
 		 *	@return		void
 		 */
@@ -185,7 +212,7 @@
 
 			const open = text._record !== null && text._record.isOpen() === true;
 
-			if( open === false && Nino.admin.stamp( 'templates' ) !== text._stamp ) {
+			if( open === false && text._stampNow() !== text._stamp ) {
 				text._ready = false;
 				text.init();
 				return;
@@ -1117,7 +1144,7 @@
 					}
 
 					// Written
-					Nino.admin.touch( 'texts' );
+					text._wrote();
 					view.conflict = null;
 					entry.values[item.locale] = result.value;
 					entry.typed = entry.typed ?? {};

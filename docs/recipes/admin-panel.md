@@ -1253,7 +1253,8 @@ write has succeeded, and `Nino.admin.stamp( topic )` reads it. The kinds are
 none of them is ignored by `touch()` and reads `0`. The kernel's panels touch
 what they write - Text and Keys the texts, and the templates where a key of a
 template is created, Elements and Element Types the elements, Images and Slots
-the slots, Routes the routes, Navigations the navigations - and a feature's panel
+the slots, Routes the routes and the texts of a page - its name, title,
+description and address - Navigations the navigations - and a feature's panel
 that writes one of these kinds does the same: the Builder creates templates, and
 touches `templates`.
 
@@ -1261,8 +1262,10 @@ A panel that shows data it does not write remembers the stamp of it as it was
 when the request went out, and compares at its next `showCurrent()`: where the
 stamp moved, it asks again, and not while it holds input nobody has saved, which
 is asked again at the next showing. Routes does so for `templates`, so that its
-form offers a page template the Builder has just created; Text and Images read
-`templates` the same way. A panel on `Nino.adminUi.panel()` says it in its spec,
+form offers a page template the Builder has just created, and for `texts`, so
+that its list has the name and title the Text panel wrote; Text and Images read
+`templates` the same way, Text and Keys `texts` as well, and what a panel wrote
+itself it takes as read. A panel on `Nino.adminUi.panel()` says it in its spec,
 `show: 'keep'` with `stamps: [ 'templates' ]`. The counters live as long as the
 page does: a page that is loaded anew asks the server for everything.
 

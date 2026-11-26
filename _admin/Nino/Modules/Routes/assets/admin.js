@@ -93,6 +93,8 @@
 		_stamp 					: 0,
 		// ...and the stamp of the navigations (the Navigations panel touches it): the ticks of the record are the ones the list held
 		_navStamp 			: 0,
+		// ...and the stamp of the texts (the Text panel and its Keys tab touch it): the names, titles and descriptions of the list are the ones it held
+		_textStamp 			: 0,
 
 		/**
 		 *	Load the persisted page list and draw the directory; an address that names a record opens it once the rows are in
@@ -109,8 +111,8 @@
 
 		/**
 		 *	The panel is shown. An address of this panel is followed - the record of a page opens, steps or closes, the form of a new route and the record of a page of
-		 *	a feature open and close -, and where none is open the list is read again if a template or a navigation was written since it was read: the record offers what
-		 *	the answer held. Not while a record is open
+		 *	a feature open and close -, and where none is open the list is read anew if a template, a navigation or a text was written since it was read: the record
+		 *	offers what the answer held, and the names and titles are the ones the Text panel left. Not while a record is open
 		 *
 		 *	@return		void
 		 */
@@ -127,7 +129,7 @@
 			if( panel._record.isOpen() === true || panel._featureRecord.isOpen() === true )
 				return;
 
-			if( Nino.admin.stamp( 'templates' ) !== panel._stamp || Nino.admin.stamp( 'navigations' ) !== panel._navStamp )
+			if( Nino.admin.stamp( 'templates' ) !== panel._stamp || Nino.admin.stamp( 'navigations' ) !== panel._navStamp || Nino.admin.stamp( 'texts' ) !== panel._textStamp )
 				panel._load( true );
 		},
 
@@ -153,6 +155,7 @@
 			// A template written while the answer is on its way is not in it: the stamp is the one from before the request went out
 			const stamp = Nino.admin.stamp( 'templates' );
 			const navStamp = Nino.admin.stamp( 'navigations' );
+			const textStamp = Nino.admin.stamp( 'texts' );
 
 			if( quiet === false || panel._directory === null ) {
 				panel._frame();
@@ -171,6 +174,7 @@
 				panel._take( response );
 				panel._stamp = stamp;
 				panel._navStamp = navStamp;
+				panel._textStamp = textStamp;
 				panel._ready = true;
 				panel._draw();
 
@@ -354,6 +358,27 @@
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
 			Nino.adminUi.api.call( 'routes/'+ endpoint, payload, callback );
+		},
+
+		/**
+		 *	Tell the shell that a page was written, after the server has said so: the pages are touched - the window beside the workbench goes to the address - and so are the
+		 *	texts, since the name, title and description of a page, its address and its place among the pages are what the Text panel and its Keys tab show of it. What this
+		 *	panel wrote is on its own screen: the stamp of the texts it holds moves with the shell's, where it was the shell's before
+		 *
+		 *	@param		{string}		[path]				The address of the page the write was about, see Nino.admin.touch()
+		 *
+		 *	@return		void
+		 */
+		_wrote : function( path ) {
+
+			const panel = Nino.admin.routes;
+			const same = Nino.admin.stamp( 'texts' ) === panel._textStamp;
+
+			Nino.admin.touch( 'routes', path );
+			Nino.admin.touch( 'texts' );
+
+			if( same === true )
+				panel._textStamp = Nino.admin.stamp( 'texts' );
 		},
 
 		/**
@@ -685,7 +710,7 @@
 					return;
 				}
 
-				Nino.admin.touch( 'routes' );
+				panel._wrote();
 
 				panel._pages = response.pages;
 				panel._rowsOf();
@@ -1884,7 +1909,7 @@
 			const made = routes._find( uri );
 
 			// The page that was saved is the one a window beside this one goes to
-			Nino.admin.touch( 'routes', routes._publicPath( addressed.httpUris ) );
+			routes._wrote( routes._publicPath( addressed.httpUris ) );
 
 			if( made === null ) {
 				routes._directory.setRows( routes._rows, { keep : true } );
@@ -1928,7 +1953,7 @@
 
 				const made = routes._findFeature( current.key ) ?? current;
 
-				Nino.admin.touch( 'routes', routes._publicPath( { '' : made.entry.httpUri } ) );
+				routes._wrote( routes._publicPath( { '' : made.entry.httpUri } ) );
 				routes._drawFeatures();
 				done( true, { row : made } );
 			} );
@@ -2041,7 +2066,7 @@
 						if( status !== 200 || response === null )
 							return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) } );
 
-						Nino.admin.touch( 'routes' );
+						routes._wrote();
 
 						routes._pages = response.pages;
 						routes._rowsOf();
