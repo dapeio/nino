@@ -173,6 +173,54 @@
 		},
 
 		/**
+		 *	How many characters the field of one language of a key counts to and takes: the number the server names for that
+		 *	language (the answer's `limits`), the limit of the key where it names none
+		 *
+		 *	@param		{Object}	entry
+		 *	@param		{string}	[code]								The language, '*' for the one text of a global key
+		 *
+		 *	@return		{number}
+		 */
+		limitOf : function( entry, code ) {
+
+			const limit = ( entry.limits ?? {} )[code];
+
+			return typeof limit === 'number' ? limit : entry.maxlength;
+		},
+
+		/**
+		 *	The limit a text of one language is counted against where it is shown - in its field and in the column of the table: the limit of the key
+		 *	where that is below what the language may hold (a text that was longer than the limit before it was lowered), else the language's own
+		 *
+		 *	@param		{Object}	entry
+		 *	@param		{string}	[code]								The language, '*' for the one text of a global key
+		 *
+		 *	@return		{number}
+		 */
+		shownLimit : function( entry, code ) {
+
+			const limit = Nino.admin.textKeys.limitOf( entry, code );
+
+			return typeof entry.keyLimit === 'number' && entry.keyLimit < limit ? entry.keyLimit : limit;
+		},
+
+		/**
+		 *	What to say at the field of a text the server turned down: the sentence of the code it names - the limit and the
+		 *	length of a text that is too long - else that the text was not saved, or that the account may not change it
+		 *
+		 *	@param		{Object|undefined}	result			The key's result in the answer of savebatch
+		 *
+		 *	@return		{string}
+		 */
+		refusalText : function( result ) {
+
+			if( result !== undefined && result !== null && typeof result.code === 'string' )
+				return Nino.adminUi.api.errorText( 200, result, '/_admin/text/error/key' );
+
+			return Nino.content.getText( result !== undefined && result !== null && result.error === 'not allowed' ? '/_admin/text/error/denied' : '/_admin/text/error/key' );
+		},
+
+		/**
 		 *	How long a text is as its field counts it: the characters of a plain text as they stand (the text as the field shows it), and for a text
 		 *	with markup the characters a person sees - the tags gone, the entities decoded, nothing collapsed -, which
 		 *	is what the rich-text editor counts (the length of the text of its content) and cuts at the limit
@@ -186,8 +234,9 @@
 
 			value = String( value ?? '' );
 
+			// A line break is one character in a field, however the text was written
 			if( entry.html !== true )
-				return value.length;
+				return value.replace( /\r\n?/g, '\n' ).length;
 
 			const entities = { amp : '&', lt : '<', gt : '>', quot : '"', apos : "'", nbsp : '\u00A0' };
 
@@ -889,6 +938,8 @@
 			const value 		= String( options.value ?? '' );
 			const writable 	= options.writable !== false;
 			const id 				= String( options.id );
+			let limit 			= T.limitOf( entry, options.locale );
+			let keyLimit 		= typeof entry.keyLimit === 'number' ? entry.keyLimit : limit;
 
 			const meta = Nino.adminUi.el( 'div', 'admin-text-meta' );
 
@@ -980,7 +1031,7 @@
 				el.setAttribute( 'role', 'group' );
 				el.setAttribute( 'aria-labelledby', name.id );
 
-				const editor = Nino.admin.htmlEditor.create( mount, value, entry.maxlength, 0, entry.format );
+				const editor = Nino.admin.htmlEditor.create( mount, value, limit, 0, entry.format );
 
 				if( badge !== null ) {
 					name.appendChild( badge );
@@ -1015,7 +1066,7 @@
 				id : id,
 				label : label,
 				value : value,
-				maxLength : entry.maxlength,
+				maxLength : limit,
 				// The textfills are for a text of several lines; a line has none
 				fills : single === false && typeof options.fills === 'function' ? { editable : true, load : options.fills } : undefined,
 			} );
@@ -1033,10 +1084,20 @@
 				control.setAttribute( 'aria-describedby', badge.id );
 			}
 
+			// A text that is longer than the limit of its key - it was there before the limit was lowered - is counted against the limit of the
+			// key, which is what it is over, and says that it can be made shorter and not longer: the field takes what it holds and no more
 			const counter = Nino.adminUi.el( 'span', 'nino-admin-char-counter' );
+			const over = Nino.adminUi.el( 'p', 'nino-admin-hint admin-text-over' );
 			const count = function() {
-				counter.textContent = control.value.length+ ' / '+ entry.maxlength;
-				counter.classList.toggle( 'is-limit', control.value.length >= entry.maxlength );
+
+				const length = control.value.length;
+				const shown = keyLimit < limit ? keyLimit : limit;
+				const beyond = length > keyLimit && keyLimit < limit;
+
+				counter.textContent = length+ ' / '+ shown;
+				counter.classList.toggle( 'is-limit', length >= shown );
+				over.hidden = beyond === false;
+				over.textContent = beyond === true ? Nino.adminUi.format( Nino.content.getText('/_admin/text/hint/over-limit'), keyLimit ) : '';
 			};
 
 			control.addEventListener( 'input', count );
@@ -1044,11 +1105,13 @@
 
 			meta.appendChild( counter );
 			field.appendChild( meta );
+			field.appendChild( over );
 
-			// The limit the field counts to and takes, as the form of the key says it before it is saved: a text can be
-			// made longer in the save that raises the limit
-			handle.setLimit = function( limit ) {
-				entry = Object.assign( {}, entry, { maxlength : limit } );
+			// The limit the field counts to and takes: the one the form of the key says before it is saved - a text can be
+			// made longer in the save that raises the limit - and the one the server names for the language after a save
+			handle.setLimit = function( to, own ) {
+				limit = to;
+				keyLimit = own ?? to;
 				control.maxLength = limit;
 				count();
 			};

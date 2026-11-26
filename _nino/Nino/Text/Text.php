@@ -24,6 +24,9 @@ namespace Nino {
 		private const int MAXLENGTH_BUFFER = 150;
 		private const int HARD_MAXLENGTH 	= 20000;
 
+		// How many times as long as its stored form a text may be sent to the editors' save: see saveBatch()
+		private const int SANITIZED_REACH 	= 12;
+
 		// Where a key's format and limit are kept, when someone has decided
 		// them: ['/the/key' => ['format' => 'blocks', 'maxlength' => 400]].
 		// Neither is required - a key without an entry takes its format from
@@ -72,7 +75,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		bool		$includeBlacklisted	Whether a blacklisted key is in the list (flagged) or left out
 		 *
-		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, values, typed } - values is locale => text as it is stored, null for a language without one, or '*' => text for a global key. typed is the same map for the texts a person types differently from how they are stored (see typed()): only the locales whose typed form differs from the stored one are in it, and an entry with none has no 'typed' key
+		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, keyLimit, limits, values, typed } - values is locale => text as it is stored, null for a language without one, or '*' => text for a global key. keyLimit is the limit of the key itself, the one set or the one derived from its longest text, where maxlength is lifted to the longest text any language holds. limits is the same map for the number of characters a text of that language may have (see saveBatch()): the limit of the key, or the length the language's text has where that is more. typed is the same map for the texts a person types differently from how they are stored (see typed()): only the locales whose typed form differs from the stored one are in it, and an entry with none has no 'typed' key
 		 */
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
@@ -138,6 +141,7 @@ namespace Nino {
 				$format = $meta[$key]['format'] ?? \Nino\Html::FORMATS[$detected];
 				$limit 	= $meta[$key]['maxlength'] ?? null;
 				$typed 	= [];
+				$limits = [];
 
 				foreach( $values as $locale => $value ) {
 
@@ -145,6 +149,10 @@ namespace Nino {
 
 					if( $shown !== null && $shown !== $value )
 						$typed[$locale] = $shown;
+
+					// What the language may hold: the limit, and the text it already has where that is longer - a text that was
+					// there before the limit was lowered stays as it is and is not made longer
+					$limits[$locale] = max( $limit ?? self::maxlength( $longest ), $shown === null ? 0 : self::length( $shown, $format ) );
 				}
 
 				$entries[] = [
@@ -156,6 +164,8 @@ namespace Nino {
 					'formatSet' 	=> isset( $meta[$key]['format'] ),
 					'maxlength' 	=> $limit !== null ? max( $limit, $visible ) : self::maxlength( $longest ),
 					'maxlengthSet' => $limit !== null,
+					'keyLimit' 		=> $limit ?? self::maxlength( $longest ),
+					'limits' 			=> $limits,
 					'values' 			=> $values,
 				] + ( $typed === [] ? [] : [ 'typed' => $typed ] );
 			}
@@ -327,6 +337,30 @@ namespace Nino {
 			return mb_strlen( html_entity_decode( strip_tags( $value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ), 'UTF-8' );
 		}
 
+		/**
+		 *	How long a text is as the field of the workbench counts it, in the unit of the browser: UTF-16 code units, so
+		 *	that an emoji is two and a family of emoji is eight. A plain text is counted as the field holds it - the text
+		 *	as it is typed (see typed()), a line break one character whatever it was sent as - and a text with markup by what
+		 *	a person sees: the tags are no text, an entity is the character it stands for, nothing is collapsed. That is
+		 *	what the plain field's counter and the rich-text editor count, and what a text may not exceed in the Text panel
+		 *	and the Text Keys tab (see saveBatch()). visibleLength() counts the same text in characters of Unicode and
+		 *	decodes the entities of a plain text too
+		 *
+		 *	@param		string		$text					The text as its field holds it: as typed for a plain text, as stored for any other
+		 *	@param		bool|string	$format				plain, inline, lines or blocks; true is 'inline', false 'plain'
+		 *
+		 *	@return		int
+		 */
+		public static function length( string $text, bool|string $format ): int {
+
+			if( $format === true || ( is_string( $format ) === true && $format !== 'plain' ) )
+				$text = html_entity_decode( strip_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			else
+				$text = str_replace( [ "\r\n", "\r" ], "\n", $text );
+
+			return intdiv( strlen( (string) mb_convert_encoding( $text, 'UTF-16LE', 'UTF-8' ) ), 2 );
+		}
+
 		// Read the developer-maintained list of keys hidden from the workbench's
 		// Text panel (technical values, not content - uris, colors,
 		// typography, ...)
@@ -395,12 +429,40 @@ namespace Nino {
 		// A written key's result is { ok, value, typed }: value is the text as
 		// it is stored, typed the text as a person types it (see typed()), the
 		// two forms the editor holds afterwards.
-		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted ): array {
+		//
+		// $enforceLimit is what the editors of the workbench ask for: a text
+		// longer than its language's limit (see length(), entries()' limits) is
+		// not written, and its key's result is { ok: false, error: 'too long',
+		// code: 'text_too_long', params: [ limit, count ], locale }, the language
+		// of the item. A text that was longer than the limit before - stored then,
+		// or the limit was lowered - is written as long as it does not get longer.
+		// Nothing is cut: the text is sanitised whole, and where its stored form does
+		// not fit the 20000 bytes of the file - its markup counts - it is refused as
+		// a whole, { ok: false, error: 'too large', code: 'text_too_large', params:
+		// [ bytes, limit of the file ], locale }, unless it is not larger than the text
+		// the file holds for that key and language: a text that was stored above the
+		// limit of the file is written as long as it does not grow. A text sent at more
+		// than 12 times what the file takes is refused without being read (bytes is
+		// the size that was sent). An item whose stamp is not what the file holds is
+		// the conflict of that, 'changed', answered before any length is asked and
+		// never written; 'force' has no stamp and has every check made. A key named in
+		// two languages says it where either of its items was refused, and the other
+		// item is written all the same; a written key's result carries limit - what
+		// its language may hold after the write - and keyLimit - the limit of the key
+		// itself - worked out from what was written and what the entries read (see
+		// entries()' limits). Without it the limit is the editor's hint alone, and
+		// sanitizeValue()'s cut is what it has always been, as it is for a feature that
+		// writes through here
+		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted, bool $enforceLimit = false ): array {
 
 			$results 		= [];
 			$fileChanges = [];
 			$fileKeys 	= [];
 			$fileWas 		= [];
+			$refused 		= [];
+			$conflicts 	= [];
+			$wrote 			= [];
+			$after 			= [];
 
 			// entry() rebuilds the full entries() list (global.php + every
 			// locale file) on every call - fine for a single lookup, not for
@@ -433,7 +495,55 @@ namespace Nino {
 					continue;
 				}
 
-				$value = self::sanitizeValue( $value, $entry['format'] );
+				$where 	= $entry['global'] === true ? '*' : $locale;
+				$stored = is_scalar( $entry['values'][$where] ?? null ) === true ? (string) $entry['values'][$where] : '';
+
+				if( $enforceLimit === true ) {
+
+					// A text that was written by another since its editor read it is the conflict of that, whatever its length - the person is not
+					// to shorten a text and meet the conflict afterwards -, and it is answered here and not queued: the file is checked under
+					// the lock only for what is written. A forced item has no stamp to be held to, and every check below is made for it
+					if( array_key_exists( 'was', $item ) === true && ( $item['force'] ?? false ) !== true && $stored !== (string) $item['was'] ) {
+						$conflicts[$key] = true;
+						$results[$key] = [ 'ok' => false, 'error' => 'changed' ];
+						continue;
+					}
+
+					$refusal = null;
+					$typed = '';
+
+					// What sanitising cannot shrink to the file is refused before it is read: every named entity of HTML5 is at most 12 times
+					// as long as the character it stands for (&DiacriticalDoubleAcute; is 24 bytes and 2), and what the editor sends is no more
+					// than 3 times as long (&nbsp;, 6 bytes and 2). A numeric reference padded with zeros and markup the sanitiser drops have no
+					// such bound, so none is provable for every text; the one of 12 refuses nothing an editor or a person typing entities makes
+					if( strlen( $value ) > self::SANITIZED_REACH * max( self::HARD_MAXLENGTH, strlen( $stored ) ) )
+						$refusal = [ 'ok' => false, 'error' => 'too large', 'code' => 'text_too_large', 'params' => [ strlen( $value ), self::HARD_MAXLENGTH ], 'locale' => $locale ];
+
+					if( $refusal === null ) {
+
+						// Sanitised whole: what the limit of the file would cut is refused, not stored as half of the text
+						$value = self::_sanitize( $value, $entry['format'], null );
+						$typed = self::typed( $value, $entry['format'] );
+						$limit = (int) ( $entry['limits'][$where] ?? $entry['maxlength'] );
+						$count = self::length( $typed, $entry['format'] );
+
+						if( $count > $limit )
+							$refusal = [ 'ok' => false, 'error' => 'too long', 'code' => 'text_too_long', 'params' => [ $limit, $count ], 'locale' => $locale ];
+						// A text that is larger than the file takes was stored so, and is written as long as it does not grow
+						elseif( strlen( $value ) > self::HARD_MAXLENGTH && strlen( $value ) > strlen( $stored ) )
+							$refusal = [ 'ok' => false, 'error' => 'too large', 'code' => 'text_too_large', 'params' => [ strlen( $value ), self::HARD_MAXLENGTH ], 'locale' => $locale ];
+					}
+
+					if( $refusal !== null ) {
+						$refused[$key] = $refusal;
+						$results[$key] = $refusal;
+						continue;
+					}
+				}
+				else {
+					$value = self::sanitizeValue( $value, $entry['format'] );
+					$typed = self::typed( $value, $entry['format'] );
+				}
 
 				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
 
@@ -443,7 +553,10 @@ namespace Nino {
 				if( array_key_exists( 'was', $item ) === true && ( $item['force'] ?? false ) !== true )
 					$fileWas[$file]['[['. $key. ']]'] = (string) $item['was'];
 
-				$results[$key] = [ 'ok' => true, 'value' => $value, 'typed' => self::typed( $value, $entry['format'] ) ];
+				$results[$key] = [ 'ok' => true, 'value' => $value, 'typed' => $typed ];
+				$wrote[$key] = $where;
+				$after[$key] ??= $entry['values'];
+				$after[$key][$where] = $value;
 			}
 
 			foreach( $fileChanges as $file => $changes ) {
@@ -475,6 +588,41 @@ namespace Nino {
 					// every key was left as it was has no write to fail
 					if( $written === false && count( $changed ) < count( $changes ) )
 						$results[$key] = [ 'ok' => false, 'error' => 'could not be written' ];
+				}
+			}
+
+			// A key one of whose languages was refused says so, whatever another language of it answered
+			foreach( $refused as $key => $refusal )
+				if( ( $results[$key]['ok'] ?? false ) === true )
+					$results[$key] = $refusal;
+
+			// ...and a key one of whose languages is the conflict of another says that, before any refusal
+			foreach( $conflicts as $key => $unused )
+				if( ( $results[$key]['ok'] ?? false ) === true || isset( $refused[$key] ) === true )
+					$results[$key] = [ 'ok' => false, 'error' => 'changed' ];
+
+			// What the language may hold after the write and what the key's own limit is, from what was written and what the entries
+			// read before it: the longest text of the key decides the limit that is derived, a set one is the file's
+			if( $enforceLimit === true && $wrote !== [] ) {
+
+				$meta = self::meta( $appData );
+
+				foreach( $wrote as $key => $where ) {
+
+					if( ( $results[$key]['ok'] ?? false ) === false )
+						continue;
+
+					$entry 	= $entriesByKey[$key];
+					$longest = 0;
+
+					foreach( $after[$key] as $text )
+						if( is_string( $text ) === true )
+							$longest = max( $longest, strlen( $text ) );
+
+					$own = $entry['maxlengthSet'] === true ? (int) $meta[$key]['maxlength'] : self::maxlength( $longest );
+
+					$results[$key]['keyLimit'] = $own;
+					$results[$key]['limit'] = max( $own, self::length( self::typed( (string) $after[$key][$where], $entry['format'] ), $entry['format'] ) );
 				}
 			}
 
@@ -713,6 +861,12 @@ namespace Nino {
 		 *	@return 	string							The value as it may be stored: cut at the hard byte limit, its markup reduced to what the format keeps, every bracket but those of a fill written as an entity
 		 */
 		public static function sanitizeValue( string $value, bool|string $format ): string {
+			return self::_sanitize( $value, $format, self::HARD_MAXLENGTH );
+		}
+
+		// What sanitizeValue() does, with the byte limit it cuts at as a parameter: null cuts nothing, for the editors of the
+		// workbench, which refuse a text that does not fit the limit of the file, where storing half of it would lose the rest
+		private static function _sanitize( string $value, bool|string $format, ?int $cut ): string {
 
 			if( is_bool( $format ) === true )
 				$format = $format === true ? 'inline' : 'plain';
@@ -729,7 +883,8 @@ namespace Nino {
 				replacement character in for good. mb_strcut() backs off to the
 				last character boundary instead: the same byte limit, at most
 				one character less of it, and always utf-8.	*/
-			$value = mb_strcut( $value, 0, self::HARD_MAXLENGTH, 'UTF-8' );
+			if( $cut !== null )
+				$value = mb_strcut( $value, 0, $cut, 'UTF-8' );
 
 			if( in_array( $format, [ 'inline', 'lines', 'blocks' ], true ) === true )
 				return self::_neutralizeShortcodes( \Nino\Html::sanitizeHtml( $value, $format ) );

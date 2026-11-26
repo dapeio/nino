@@ -84,6 +84,9 @@ return [
 	'[[/_admin/keys/hint/not-a-word]]'	=> 'Kein Wort des Vokabulars: „%s“ wird als „%s“ angezeigt',
 
 	'[[/_admin/error/text_invalid]]'	=> 'Der Eintrag ist nicht gültig: der gelesene Stand muss ein Text sein.',
+	'[[/_admin/error/text_too_long]]'	=> 'Dieser Text darf höchstens %s Zeichen haben, er hat %s. Kürze ihn.',
+	'[[/_admin/error/text_too_large]]'	=> 'Dieser Text ist zu groß zum Speichern: er hat %s Bytes, die Datei nimmt höchstens %s auf.',
+	'[[/_admin/text/hint/over-limit]]'	=> 'Dieser Text ist länger als die Grenze des Schlüssels (%s Zeichen). Er kann gekürzt, aber nicht verlängert werden.',
 	'[[/_admin/text/error/changed]]'	=> 'Seit dem Öffnen in einem anderen Tab oder von einer anderen Person geändert: %s.',
 	'[[/_admin/text/error/key]]'	=> 'Nicht gespeichert.',
 	'[[/_admin/text/error/denied]]'	=> 'Dieser Text darf mit Deinem Konto nicht geändert werden.',

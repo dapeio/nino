@@ -660,6 +660,7 @@
 						title : [ place, field.label ].filter( function( part, at, parts ) { return at === 0 || part !== parts[at - 1] } ).join(' › '),
 						text : shown.length > 200 ? shown.slice( 0, 200 )+ '…' : shown,
 						chars : T.lengthOf( entry, T.typedOf( entry, locale ) ),
+						limit : T.shownLimit( entry, entry.global === true ? '*' : locale ),
 						emptyHere : T.isEmptyIn( entry, locale ),
 						writable : text._writable( entry ),
 						// One badge for each language of the site; a key that is one text for all of them has the one
@@ -769,7 +770,7 @@
 					{ key : 'name', label : word('/_admin/text/col/name'), type : 'string', primary : true, sortable : false, render : text._nameCell },
 					{ key : 'place', label : word('/_admin/text/col/section'), type : 'string', sortable : false, narrow : false },
 					{ key : 'text', label : Nino.adminUi.format( word('/_admin/text/col/text'), Nino.adminUi.localeName( locale ) ), type : 'string', cell : 'clamp', fill : true, sortable : false },
-					{ key : 'chars', label : word('/_admin/text/col/chars'), type : 'integer', cell : 'limit', sortable : false, limit : function( one ) { return one.entry.maxlength }, over : word('/_admin/text/col/long') },
+					{ key : 'chars', label : word('/_admin/text/col/chars'), type : 'integer', cell : 'limit', sortable : false, limit : function( one ) { return one.limit }, over : word('/_admin/text/col/long') },
 					{ key : 'states', label : word('/_admin/text/col/languages'), cell : 'locales', sortable : false, words : { ok : word('/_admin/text/col/lang-ok'), missing : word('/_admin/text/col/lang-missing') } },
 				],
 				labels : { search : word('/_admin/text/label/search'), empty : word('/_admin/text/empty'), noMatch : word('/_admin/text/msg/nothing') },
@@ -1138,7 +1139,7 @@
 
 					if( result === undefined || result.ok !== true ) {
 						failed++;
-						field.handle.fail( Nino.content.getText( result !== undefined && result.error === 'not allowed' ? '/_admin/text/error/denied' : '/_admin/text/error/key' ) );
+						field.handle.fail( Nino.admin.textKeys.refusalText( result ) );
 						first = first ?? field;
 						return write( at + 1 );
 					}
@@ -1153,6 +1154,13 @@
 						entry.typed[item.locale] = result.typed;
 					else
 						delete entry.typed[item.locale];
+
+					// What the language may hold after the write, as the server names it
+					if( typeof result.limit === 'number' ) {
+						entry.limits = Object.assign( {}, entry.limits, { [item.locale] : result.limit } );
+						entry.keyLimit = result.keyLimit ?? entry.keyLimit;
+						field.handle.setLimit( result.limit, entry.keyLimit );
+					}
 
 					// What the server kept is what the field shows - unless more was typed while it was on its way, which is not in what was sent and stays unsaved
 					if( field.handle.read() === sent ) {

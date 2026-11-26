@@ -495,7 +495,7 @@ function textPage( response, options ) {
 	const words = workbenchWords( options.words ?? 'de_DE' );
 	const list = element('div'), form = element('div');
 	const sent = [], told = [], touches = [], held = [], editors = [];
-	const handle = { hold : false, refuse : {}, fail : null, sanitize : null, typed : null, listed : 0 };
+	const handle = { hold : false, refuse : {}, fail : null, sanitize : null, typed : null, limits : {}, keyLimits : {}, listed : 0 };
 
 	list.id = 'text-list';
 	form.id = 'text-form';
@@ -534,6 +534,10 @@ function textPage( response, options ) {
 				const value = handle.sanitize === null ? item.value : handle.sanitize( item.value );
 				entry.values[item.locale] = value;
 				results[item.key] = handle.typed === null ? { ok : true, value : value } : { ok : true, value : value, typed : handle.typed( value ) };
+				if( handle.limits[item.key + ' ' + item.locale] !== undefined )
+					results[item.key].limit = handle.limits[item.key + ' ' + item.locale];
+				if( handle.keyLimits[item.key + ' ' + item.locale] !== undefined )
+					results[item.key].keyLimit = handle.keyLimits[item.key + ' ' + item.locale];
 			}
 		} );
 		return [ 200, { results : results } ];
@@ -1073,6 +1077,90 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	check( 'a record that is closed with a language that is not saved asks about it first - the text is not given up silently', w.asking() !== null && w.writes().length === 2 );
 	w.answerAsk('/_admin/common/label/discard');
 	check( '...and a Discard closes it', w.dialog() === null && w.hash() === addressOf( ROW ) );
+}
+
+{
+	// The count: the table of values the server's Text::length() is held to is held to by the script too, and the limit a field counts to is the server's for its language
+	const U = textPage( fullResponse() ).h.admin.textKeys;
+	const table = JSON.parse( fs.readFileSync( path.join( __dirname, 'fixtures', 'text-rules.json' ), 'utf8' ) ).lengths;
+	const wrong = table.filter( row => U.lengthOf( { html : row.format !== 'plain' }, row.text ) !== row.count );
+	check( 'the script counts every text of the table the server counts - plain, inline, lines and blocks, an emoji as two, a line break as one'+ ( wrong.length === 0 ? '' : ' - not '+ wrong.map( row => JSON.stringify( row.text ) ).join() ), table.length > 25 && wrong.length === 0 );
+
+	const response = fullResponse();
+	const entry = response.keys.find( e => e.key === TITLE );
+	entry.maxlength = 30;
+	entry.limits = { de_DE : 30, en_US : 12 };
+	const w = inRow( ROW, response );
+	const d = w.openRow( TITLE );
+	check( 'the field of a language counts to the limit the server names for that language and takes as many characters: the counter and the maxlength of its control',
+		w.counterOf( d, 'de_DE' ).textContent === '10 / 30' && w.counterOf( d, 'en_US' ).textContent === '8 / 12' && w.controlOf( d, 'de_DE' ).maxLength === 30 && w.controlOf( d, 'en_US' ).maxLength === 12 );
+
+	// A text the server turns down as too long: the sentence of its code stands at the field of that language, the other language is written, the focus goes to the field
+	w.handle.refuse[TITLE+ ' en_US'] = { ok : false, error : 'too long', code : 'text_too_long', params : [ 12, 14 ], locale : 'en_US' };
+	w.handle.limits[TITLE+ ' de_DE'] = 28;
+	w.type( d, 'de_DE', 'Eins' );
+	w.type( d, 'en_US', 'Fourteen chars' );
+	w.save( d );
+	check( 'a text that is too long is said at the field of its language, with the limit and the length the server names, in the words of the workbench - and nothing is made of it in the other language, which is saved',
+		w.errorsOf( d ).length === 1 && w.errorsOf( d )[0].textContent === F( '/_admin/error/text_too_long', 12, 14 ) && W('/_admin/error/text_too_long').indexOf('%s') !== -1 && w.errorsOf( d )[0].parentNode === w.fieldOf( d, 'en_US' ).parentNode
+		&& w.panel._groups[ROW].find( e => e.key === TITLE ).values.de_DE === 'Eins' && w.controlOf( d, 'en_US' ).value === 'Fourteen chars' && w.lineText( d ) === W('/_admin/text/error/one') && w.h.dirty.isDirty() === true );
+	check( '...the focus goes to the field that was turned down, the text typed there stays', w.h.doc.activeElement === w.controlOf( d, 'en_US' ) );
+	check( '...and the language that was written counts to the limit the server names after the write', w.controlOf( d, 'de_DE' ).maxLength === 28 && w.counterOf( d, 'de_DE' ).textContent === '4 / 28' && w.panel._groups[ROW].find( e => e.key === TITLE ).limits.de_DE === 28 );
+	w.type( d, 'en_US', 'Short' );
+	check( '...typing into the field takes its sentence away', w.errorsOf( d ).length === 0 );
+}
+
+{
+	// A text that is longer than the limit of its key: counted against the limit of the key, which is what it is over, with the hint that it can be shortened and not lengthened;
+	// the field still takes what the language holds, and no more
+	const response = fullResponse();
+	const entry = response.keys.find( e => e.key === TITLE );
+	entry.values.de_DE = 'x'.repeat( 29 );
+	entry.maxlength = 29;
+	entry.keyLimit = 10;
+	entry.limits = { de_DE : 29, en_US : 10 };
+	const w = inRow( ROW, response );
+	const d = w.openRow( TITLE );
+	const hintOf = code => byClass( w.fieldOf( d, code ), 'admin-text-over' )[0];
+	check( 'a text over the limit of its key is counted against that limit: "29 / 10", and the hint says the text can be shortened and not lengthened, with the limit of the key; the control takes what the language holds',
+		w.counterOf( d, 'de_DE' ).textContent === '29 / 10' && has( w.counterOf( d, 'de_DE' ), 'is-limit' ) === true && hintOf( 'de_DE' ).hidden === false && hintOf( 'de_DE' ).textContent === F( '/_admin/text/hint/over-limit', 10 )
+		&& w.controlOf( d, 'de_DE' ).maxLength === 29 );
+	check( '...a text within the limit of its key has no hint, and counts to its own', hintOf( 'en_US' ).hidden === true && hintOf( 'en_US' ).textContent === '' && w.counterOf( d, 'en_US' ).textContent === '8 / 10' );
+	w.type( d, 'de_DE', 'x'.repeat( 9 ) );
+	check( '...and shortened to the limit of the key the hint is gone and the count is against the limit of the key, which is below what the language holds', hintOf( 'de_DE' ).hidden === true && w.counterOf( d, 'de_DE' ).textContent === '9 / 10' && w.controlOf( d, 'de_DE' ).maxLength === 29 );
+	w.type( d, 'de_DE', 'x'.repeat( 15 ) );
+	check( '...lengthened once more it is over the limit of the key, with the hint', hintOf( 'de_DE' ).hidden === false && w.counterOf( d, 'de_DE' ).textContent === '15 / 10' && has( w.counterOf( d, 'de_DE' ), 'is-limit' ) === true );
+	w.type( d, 'de_DE', 'x'.repeat( 9 ) );
+	check( '...the column of the table says what the record says: the characters of the text against the limit of the key', byClass( w.cells( TITLE )[3], 'nino-admin-table-limit' )[0].textContent === '29 / 10' );
+	w.type( d, 'de_DE', 'x'.repeat( 28 ) );
+	w.handle.limits[TITLE+ ' de_DE'] = 28;
+	w.handle.keyLimits[TITLE+ ' de_DE'] = 8;
+	w.save( d );
+	check( 'after a save the server names the limit of the language and of the key, and the text is counted against the limit of the key the answer names, with the hint there', w.counterOf( d, 'de_DE' ).textContent === '28 / 8' && hintOf( 'de_DE' ).hidden === false && w.controlOf( d, 'de_DE' ).maxLength === 28
+		&& w.panel._groups[ROW].find( e => e.key === TITLE ).keyLimit === 8 );
+	check( 'the words of the hint are in both languages, with a place for the limit', [ 'de_DE', 'en_US' ].every( locale => workbenchWords( locale )['/_admin/text/hint/over-limit'].split('%s').length === 2 ) );
+}
+
+{
+	// The rich-text editor counts to the limit of its language, not to the key's largest
+	const response = fullResponse();
+	const entry = response.keys.find( e => e.key === RICH );
+	entry.maxlength = 25;
+	entry.limits = { de_DE : 25, en_US : 12 };
+	const w = inRow( ROW, response );
+	w.openRow( RICH );
+	check( 'the editor of each language is built with the limit of that language', w.editors.length === 2 && w.editors[0].maxlength === 25 && w.editors[1].maxlength === 12 );
+}
+
+{
+	// A global key is read by its star: the field counts to the limit of the one text
+	const response = fullResponse();
+	const entry = response.keys.find( e => e.key === BADGE );
+	entry.maxlength = 20;
+	entry.limits = { '*' : 7 };
+	const w = inRow( ROW, response );
+	const d = w.openRow( BADGE );
+	check( 'a text that is the same in every language counts to the limit named for its star', w.controlOf( d, '*' ).maxLength === 7 && w.counterOf( d, '*' ).textContent.split(' / ')[1] === '7' );
 }
 
 {
@@ -2263,6 +2351,17 @@ const saidAt = ( d, control ) => findAll( d, el => has( el, 'nino-admin-field-er
 }
 
 {
+	// a text that is too long: the sentence of its code, with the limit and the length, at its field
+	const k = keysRecord( PAGE, K1 );
+
+	k.type( k.record(), 'en_US', 'Ein viel zu langer Text' );
+	k.handle.refuse['item:'+ K1] = { ok : false, error : 'too long', code : 'text_too_long', params : [ 150, 151 ], locale : 'en_US' };
+	k.save( k.record() );
+	check( 'a text that is too long is said under its field in the words of its code, with the limit and the length the server names, and takes the focus', saidAt( k.record(), k.controlOf( k.record(), 'en_US' ) ) !== undefined
+		&& saidAt( k.record(), k.controlOf( k.record(), 'en_US' ) ).textContent === F( '/_admin/error/text_too_long', 150, 151 ) && dirtyNow( k ) === true && k.h.doc.activeElement === k.controlOf( k.record(), 'en_US' ) );
+}
+
+{
 	// one language is turned down, the other is written: the one that was written is saved
 	const k = keysRecord( PAGE, K1 );
 
@@ -2310,6 +2409,87 @@ const saidAt = ( d, control ) => findAll( d, el => has( el, 'nino-admin-field-er
 	k.save( e );
 	check( '...a limit raised and the text made longer in the same save: the shape is written first, then the text', k.writes().map( c => c.endpoint ).join() === 'save,savebatch' && dirtyNow( k ) === false );
 	void X;
+}
+
+{
+	// The order of the two requests of a save that changes the limit and a text: the counter showed the limit that was typed, and what the server asks of a text is
+	// the limit in force when it asks - so the texts go first where the limit is lowered or emptied and they fit what is in force, and the shape first otherwise
+	const start = ( set, longest, others, alone ) => {
+		const response = keysResponse( { limitCap : 2000 } );
+		const entry = response.keys.find( e => e.key === K1 );
+		const own = set === null ? 150 : set;
+		entry.values.de_DE = 'd'.repeat( 50 );
+		entry.values.en_US = alone === true ? '' : 'e'.repeat( 20 );
+		entry.maxlengthSet = set !== null;
+		entry.keyLimit = own;
+		entry.maxlength = Math.max( own, longest ?? 50 );
+		entry.limits = Object.assign( { de_DE : Math.max( own, 50 ), en_US : Math.max( own, 20 ) }, others ?? {} );
+		return keysRecord( PAGE, K1, response );
+	};
+	const order = ( set, limit, language, length, longest, global ) => {
+		const k = start( set, longest, null, global === true );
+		const d = k.record();
+		typeKey( k.limit( d ), limit );
+		if( global === true )
+			tick( k.global( d ) );
+		if( length !== null )
+			k.type( d, language, 'x'.repeat( length ) );
+		k.sent.length = 0;
+		k.save( d );
+		return k.sent.filter( c => c.endpoint === 'save' || c.endpoint === 'savebatch' ).map( c => c.endpoint ).join();
+	};
+
+	check( 'a limit raised: the shape is written first, whatever the text - longer, shorter or left alone, which sends no text',
+		order( 100, '200', 'de_DE', 150 ) === 'save,savebatch' && order( 100, '200', 'de_DE', 30 ) === 'save,savebatch' && order( 100, '200', 'de_DE', null ) === 'save' );
+	check( 'a limit lowered: the text is written first when it fits what is in force - longer than it was or shorter - and a limit alone is the shape alone',
+		order( 100, '60', 'de_DE', 55 ) === 'savebatch,save' && order( 100, '60', 'de_DE', 30 ) === 'savebatch,save' && order( 100, '60', 'de_DE', null ) === 'save' );
+	check( 'a limit emptied: the text is written first when it fits what is in force, as the counter allowed it - 90 characters at a limit of 100 - and the limit is derived from the texts afterwards',
+		order( 100, '', 'de_DE', 90 ) === 'savebatch,save' && order( 100, '', 'de_DE', 30 ) === 'savebatch,save' && order( 100, '', 'de_DE', null ) === 'save' );
+	check( 'a limit set for the first time under what the key had: the text is written first; over it, the shape first',
+		order( null, '80', 'de_DE', 70 ) === 'savebatch,save' && order( null, '80', 'de_DE', 30 ) === 'savebatch,save' && order( null, '300', 'de_DE', 250 ) === 'save,savebatch' && order( null, '300', 'de_DE', 30 ) === 'save,savebatch' );
+	check( 'a limit emptied and a text of a language that has a lower limit than the key\'s longest text lets it have: longer than what is in force, the shape is written first, so that the limit that is derived from the longest text is what is asked',
+		order( 10, '', 'en_US', 25, 30 ) === 'save,savebatch' && order( 10, '', 'en_US', 8, 30 ) === 'savebatch,save' );
+
+	check( 'a text as long as the limit in force goes first, one character longer goes after the shape: it is "fits" that is "not more than"',
+		order( 100, '60', 'de_DE', 100 ) === 'savebatch,save' && order( 100, '60', 'de_DE', 101 ) === 'save,savebatch' );
+	check( 'the texts go first only where the key stays one text for each language or one for all: with the switch turned, the shape is written first, however the limit is changed',
+		order( 100, '60', 'de_DE', 30, 50, true ) === 'save,savebatch' && order( 100, '', 'de_DE', 30, 50, true ) === 'save,savebatch' );
+
+	// An emptied limit is derived from the texts and the server never derives it above its cap, which its answer names: the field counts up to that
+	const capped = start( 100, 2500 );
+	const g = capped.record();
+	typeKey( capped.limit( g ), '' );
+	check( 'a limit that is emptied is counted to the cap of the server: the key holds a text of 2500 characters, the field takes 2000 and counts to it',
+		capped.controlOf( g, 'de_DE' ).maxLength === 2000 && capped.counterOf( g, 'de_DE' ).textContent.split(' / ')[1] === '2000' );
+	typeKey( capped.limit( g ), '120' );
+	check( '...and one that is typed is counted to what is typed', capped.controlOf( g, 'de_DE' ).maxLength === 120 );
+
+	// Half-way: the request that is refused leaves what the next Save completes
+	const half = start( 100, 50 );
+	const e = half.record();
+	typeKey( half.limit( e ), '60' );
+	half.type( e, 'de_DE', 'y'.repeat( 40 ) );
+	half.handle.refuse.save = [ { key : K1, status : 400, body : { error : 'limit below the current text', code : 'keys_limit_short', params : [ 99 ], field : 'maxlength' } } ];
+	half.sent.length = 0;
+	half.save( e );
+	check( 'the text was written first and the shape was refused: the text stays written', half.sent.filter( c => c.endpoint === 'save' || c.endpoint === 'savebatch' ).map( c => c.endpoint ).join() === 'savebatch,save' && half.entry( K1 ).values.de_DE === 'y'.repeat( 40 ) );
+	half.handle.refuse = {};
+	half.sent.length = 0;
+	half.save( e );
+	check( '...and the next Save writes the shape and nothing else', half.sent.filter( c => c.endpoint === 'save' || c.endpoint === 'savebatch' ).map( c => c.endpoint ).join() === 'save' && dirtyNow( half ) === false );
+
+	const second = start( 100, 50 );
+	const f = second.record();
+	typeKey( second.limit( f ), '200' );
+	second.type( f, 'de_DE', 'z'.repeat( 150 ) );
+	second.handle.refuse['item:'+ K1] = { ok : false, error : 'too long', code : 'text_too_long', params : [ 200, 150 ], locale : 'de_DE' };
+	second.sent.length = 0;
+	second.save( f );
+	check( 'the shape was written first and the text was refused: the limit is taken and the text stays typed', second.sent.filter( c => c.endpoint === 'save' || c.endpoint === 'savebatch' ).map( c => c.endpoint ).join() === 'save,savebatch' && second.entry( K1 ).values.de_DE === 'd'.repeat( 50 ) && dirtyNow( second ) === true );
+	second.handle.refuse = {};
+	second.sent.length = 0;
+	second.save( f );
+	check( '...and the next Save writes the text and nothing else', second.sent.filter( c => c.endpoint === 'save' || c.endpoint === 'savebatch' ).map( c => c.endpoint ).join() === 'savebatch' && dirtyNow( second ) === false );
 }
 
 {

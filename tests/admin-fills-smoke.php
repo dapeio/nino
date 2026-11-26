@@ -144,7 +144,7 @@ $sentences = [
 	'Features'	=> [ 'features_settings' => 0, 'features_required_by' => 2 ],
 	'Elements'	=> [ 'types_invalid_key' => 1, 'elements_save_failed' => 0, 'elements_wrong_type' => 1, 'elements_missing_key' => 1, 'elements_value_refused' => 1 ],
 	'Users'			=> [ 'users_invalid_name' => 0, 'users_incomplete' => 0, 'users_own_role' => 0 ],
-	'Text'			=> [ 'text_invalid' => 0 ],
+	'Text'			=> [ 'text_invalid' => 0, 'text_too_long' => 2, 'text_too_large' => 2 ],
 ];
 $lacking = [];
 foreach( $sentences as $module => $codes )

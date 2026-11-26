@@ -84,6 +84,9 @@ return [
 	'[[/_admin/keys/hint/not-a-word]]'	=> 'Not a word of the vocabulary: “%s” is shown as “%s”',
 
 	'[[/_admin/error/text_invalid]]'	=> 'The entry is not valid: the text it was read as has to be a text.',
+	'[[/_admin/error/text_too_long]]'	=> 'This text may have at most %s characters, and it has %s. Shorten it.',
+	'[[/_admin/error/text_too_large]]'	=> 'This text is too large to be stored: it is %s bytes, and the file takes at most %s.',
+	'[[/_admin/text/hint/over-limit]]'	=> 'This text is longer than the limit of the key (%s characters). It can be shortened, not lengthened.',
 	'[[/_admin/text/error/changed]]'	=> 'Changed by another tab or another person since you opened it: %s.',
 	'[[/_admin/text/error/key]]'	=> 'Not saved.',
 	'[[/_admin/text/error/denied]]'	=> 'Your account may not change this text.',

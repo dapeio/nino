@@ -1,0 +1,184 @@
+{
+	"lengths": [
+		{
+			"format": "plain",
+			"text": "Hello world",
+			"count": 11,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "Über Äpfel öl ß",
+			"count": 15,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "😀",
+			"count": 2,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "👨‍👩‍👧",
+			"count": 8,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "a & b",
+			"count": 5,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "a < b",
+			"count": 5,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "say \"hi\"",
+			"count": 8,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "a &quot;b&quot;",
+			"count": 15,
+			"kept": false
+		},
+		{
+			"format": "plain",
+			"text": "a &amp; b",
+			"count": 9,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "caf&eacute; &hellip;",
+			"count": 20,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "l1\r\nl2",
+			"count": 5,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "l1\nl2",
+			"count": 5,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "abc   ",
+			"count": 6,
+			"kept": true
+		},
+		{
+			"format": "plain",
+			"text": "<b>x</b>",
+			"count": 8,
+			"kept": false
+		},
+		{
+			"format": "plain",
+			"text": "a [x] b",
+			"count": 7,
+			"kept": true
+		},
+		{
+			"format": "inline",
+			"text": "😀",
+			"count": 2,
+			"kept": true
+		},
+		{
+			"format": "inline",
+			"text": "a &amp; b",
+			"count": 5,
+			"kept": true
+		},
+		{
+			"format": "inline",
+			"text": "a &lt; b",
+			"count": 5,
+			"kept": true
+		},
+		{
+			"format": "inline",
+			"text": "a&nbsp;b",
+			"count": 3,
+			"kept": false
+		},
+		{
+			"format": "inline",
+			"text": "<strong>x</strong> y",
+			"count": 3,
+			"kept": true
+		},
+		{
+			"format": "inline",
+			"text": "say \"hi\"",
+			"count": 8,
+			"kept": true
+		},
+		{
+			"format": "inline",
+			"text": "abc   ",
+			"count": 6,
+			"kept": true
+		},
+		{
+			"format": "lines",
+			"text": "l1<br>l2",
+			"count": 4,
+			"kept": true
+		},
+		{
+			"format": "lines",
+			"text": "<strong>one</strong><br>two",
+			"count": 6,
+			"kept": true
+		},
+		{
+			"format": "lines",
+			"text": "👨‍👩‍👧",
+			"count": 8,
+			"kept": true
+		},
+		{
+			"format": "blocks",
+			"text": "<p>one</p><p>two</p>",
+			"count": 6,
+			"kept": true
+		},
+		{
+			"format": "blocks",
+			"text": "<ul><li>a</li><li>b</li></ul>",
+			"count": 2,
+			"kept": true
+		},
+		{
+			"format": "blocks",
+			"text": "<p>line<br>break</p>",
+			"count": 9,
+			"kept": true
+		},
+		{
+			"format": "blocks",
+			"text": "<p>😀</p>",
+			"count": 2,
+			"kept": true
+		},
+		{
+			"format": "blocks",
+			"text": "<p>a &amp; b</p>",
+			"count": 5,
+			"kept": true
+		}
+	]
+}

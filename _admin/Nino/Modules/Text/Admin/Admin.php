@@ -141,7 +141,9 @@ namespace Nino\Modules\Text {
 		 *	List every editable key with its current value(s), whether it's a
 		 *	global (locale-independent) or per-locale key, whether it currently
 		 *	holds markup (so the editor offers the html editor for it) and a
-		 *	maxlength derived from the longest current value. 'values' holds the
+		 *	maxlength derived from the longest current value, and 'limits', the number
+		 *	of characters each language of it may hold (the field of a language counts
+		 *	to that one). 'values' holds the
 		 *	text as it is stored; 'typed' the text of a language as a person types
 		 *	it where that is not the stored one (\Nino\Text::typed()), which is
 		 *	what the field of a plain text shows. Blacklisted keys
@@ -190,6 +192,7 @@ namespace Nino\Modules\Text {
 				'keys' 					=> $keys,
 				'locales' 			=> \Nino\Admin\Admin::textLocales( $appData ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
+				'limitCap' 			=> \Nino\Text::maxlength( \Nino\Text::MAX_LIMIT ),
 			] + self::naming( $appData, array_column( $keys, 'key' ) ) );
 		}
 
@@ -458,7 +461,9 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	Save several keys' values in one request (a whole category's
-		 *	worth of fields, all posted together) - see \Nino\Text::saveBatch()
+		 *	worth of fields, all posted together) - see \Nino\Text::saveBatch().
+		 *	A text longer than the limit of its language is refused in its key's
+		 *	result, with the code text_too_long
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -492,7 +497,7 @@ namespace Nino\Modules\Text {
 				$allowed[] = $item;
 			}
 
-			\Nino\Http::ok( $request, [ 'results' => $results + \Nino\Text::saveBatch( $appData, $allowed, false ) ] );
+			\Nino\Http::ok( $request, [ 'results' => $results + \Nino\Text::saveBatch( $appData, $allowed, false, true ) ] );
 		}
 
 		/**

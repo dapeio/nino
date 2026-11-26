@@ -295,6 +295,11 @@ function saveText( array &$appData, array $data ): array {
 	return $results[$data['key'] ?? ''] ?? [ 'ok' => false ];
 }
 
+// The same item as a feature writes it: \Nino\Text::saveBatch() without the limit of the editor, which the panel asks for
+function saveTextUnlimited( array &$appData, array $data ): array {
+	return \Nino\Text::saveBatch( $appData, [ $data ], false )[$data['key'] ?? ''] ?? [ 'ok' => false ];
+}
+
 $result = saveText( $appData, [ 'key' => '/project/website/html/lang', 'locale' => 'de_DE', 'value' => 'fr' ] );
 check( 'saving a blacklisted key is rejected', $result['ok'] === false && $result['error'] === 'unknown key' );
 
@@ -401,7 +406,7 @@ check( 'a global key is written to global.php, not a locale file', ( $storedGlob
 $hardLimit 	= (int) ( new ReflectionClassConstant( '\Nino\Text', 'HARD_MAXLENGTH' ) )->getValue();
 $acrossTheCut	= str_repeat( 'a', $hardLimit - 1 ). 'ä'. str_repeat( 'b', 50 );
 
-$result = saveText( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => $acrossTheCut ] );
+$result = saveTextUnlimited( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => $acrossTheCut ] );
 
 check( 'an over-long value is still cut down to the hard byte limit', strlen( (string) ( $result['value'] ?? '' ) ) <= $hardLimit );
 check( '...at a character boundary, so the value stays utf-8', mb_check_encoding( (string) ( $result['value'] ?? '' ), 'UTF-8' ) === true
@@ -413,7 +418,7 @@ check( '...and so does the text file it was written into', mb_check_encoding( (s
 
 // The same boundary with a four-byte character, which has three ways to be
 // split rather than one
-$emojiCut = saveText( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => str_repeat( 'a', $hardLimit - 2 ). "\u{1F600}" ] );
+$emojiCut = saveTextUnlimited( $appData, [ 'key' => '/home/long', 'locale' => 'de_DE', 'value' => str_repeat( 'a', $hardLimit - 2 ). "\u{1F600}" ] );
 check( 'a four-byte character across the limit is dropped whole, not halved', mb_check_encoding( (string) ( $emojiCut['value'] ?? '' ), 'UTF-8' ) === true );
 
 // ...and nothing that fits is touched, multibyte or not

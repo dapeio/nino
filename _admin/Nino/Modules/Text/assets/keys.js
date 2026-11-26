@@ -1441,11 +1441,13 @@
 			limitField.querySelector('input').min = '1';
 			limitField.querySelector('input').step = '1';
 
-			// The field counts to the limit that is typed, and takes as much: a text may be made longer in the save that raises it
+			// The field counts to the limit that is typed, and takes as much: a text may be made longer in the save that raises it. Where the limit is emptied
+			// the server derives it from the texts, and never above the cap its answer names: the key's largest text is counted up to that
 			limitField.querySelector('input').addEventListener( 'input', function( ev ) {
 
 				const typed = ev.target.value.trim();
-				const limit = /^\d+$/.test( typed ) === true && Number( typed ) >= 1 ? Number( typed ) : entry.maxlength;
+				const cap = typeof keys._data.limitCap === 'number' ? keys._data.limitCap : entry.maxlength;
+				const limit = /^\d+$/.test( typed ) === true && Number( typed ) >= 1 ? Number( typed ) : ( typed === '' ? Math.min( entry.maxlength, cap ) : entry.maxlength );
 
 				view.fields.forEach( function( field ) { field.handle.setLimit( limit ) } );
 			} );
@@ -1711,8 +1713,13 @@
 				return { code : field.code, item : item };
 			} );
 
-			// A text that is made shorter in the save that lowers the limit is written first, or the server would refuse a limit under the text the key holds
-			const early = reshaped === true && shape.limit !== '' && Number( shape.limit ) < entry.maxlength && shape.global === entry.global;
+			// The texts go before the shape where the limit is lowered or emptied and every text fits the limit its language has in force: that is the limit the
+			// server asks of it, and what the counter showed - the limit that was typed, or the key's largest where it was emptied - is not what is asked once the
+			// shape is written (a limit that is emptied is derived from the texts that are stored). Otherwise the shape goes first, so that a text made longer is
+			// asked against the limit that was raised. A text longer than its language's limit goes after the shape either way
+			const lowered = shape.limit === '' ? view.set.base.limit !== '' : Number( shape.limit ) < entry.maxlength;
+			const fitting = wanted.every( function( field ) { return T.lengthOf( entry, typed.texts[field.code] ) <= T.limitOf( entry, field.code ) } );
+			const early = reshaped === true && lowered === true && shape.global === entry.global && fitting === true;
 
 			view.lock( true );
 
@@ -1789,7 +1796,7 @@
 							keys._stamps[one.item.locale+ ' '+ key] = one.item.was;
 					}
 					else if( result === undefined || result.ok !== true )
-						refused.texts[one.code] = word('/_admin/text/error/key');
+						refused.texts[one.code] = T.refusalText( result );
 					else {
 						written[one.code] = true;
 						delete keys._stamps[one.item.locale+ ' '+ key];

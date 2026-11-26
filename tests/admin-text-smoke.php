@@ -595,8 +595,8 @@ callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/pro
 [ , $typedBody ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/project/typed/panel/one', 'locale' => 'de_DE', 'value' => 'Er sagt "ja"' ] ] ] );
 [ , $typedListed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
 $typedPanel = array_column( $typedListed['keys'], null, 'key' )['/project/typed/panel/one'] ?? [];
-check( 'the Text panel answers the same two forms: text/savebatch says the value stored and the value typed, text/keys the stored ones as values and the typed ones as typed',
-	( $typedBody['results']['/project/typed/panel/one'] ?? [] ) === [ 'ok' => true, 'value' => 'Er sagt &quot;ja&quot;', 'typed' => 'Er sagt "ja"' ] && ( $typedPanel['values']['de_DE'] ?? '' ) === 'Er sagt &quot;ja&quot;' && ( $typedPanel['typed'] ?? [] ) === [ 'de_DE' => 'Er sagt "ja"' ] );
+check( 'the Text panel answers the same two forms: text/savebatch says the value stored, the value typed and what the language may hold, text/keys the stored ones as values and the typed ones as typed',
+	( $typedBody['results']['/project/typed/panel/one'] ?? [] ) === [ 'ok' => true, 'value' => 'Er sagt &quot;ja&quot;', 'typed' => 'Er sagt "ja"', 'keyLimit' => 172, 'limit' => 172 ] && ( $typedPanel['limits']['de_DE'] ?? 0 ) === 172 && ( $typedPanel['values']['de_DE'] ?? '' ) === 'Er sagt &quot;ja&quot;' && ( $typedPanel['typed'] ?? [] ) === [ 'de_DE' => 'Er sagt "ja"' ] );
 
 // The words of the site: a plain text printed in a page is the stored form, as it was, whatever the field shows
 callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/typed/site/script', 'global' => true, 'value' => '' ] );
@@ -2200,8 +2200,299 @@ check( 'keys/save posted with the five values a key already has - global, hidden
 foreach( array_column( $shapes, 0 ) as $key )
 	$keyPost( 'keys/delete', [ 'key' => $key ] );
 
+echo "A text longer than its limit - counted as the field counts it, refused, and never cut\n";
+
+\Nino\Auth::logoutUser( $appData );
+ninoUser( $appData, 'limits@example.com' );
+
+$rules = json_decode( (string) file_get_contents( __DIR__. '/fixtures/text-rules.json' ), true );
+$lengths = is_array( $rules['lengths'] ?? null ) === true ? $rules['lengths'] : [];
+$wrongLength = array_filter( $lengths, static fn( array $row ): bool => \Nino\Text::length( $row['text'], $row['format'] ) !== $row['count'] );
+check( 'Text::length() counts every text of the table the script counts, in the unit of the browser: an emoji is two, a family of emoji eight, a line break one, the tags of a text with markup none'. ( $wrongLength === [] ? '' : ' - not '. implode( ', ', array_map( static fn( array $row ): string => json_encode( $row['text'] ), $wrongLength ) ) ),
+	count( $lengths ) > 25 && $wrongLength === [] && \Nino\Text::length( 'x', true ) === 1 && \Nino\Text::visibleLength( "\u{1F600}" ) === 1 );
+
+$limitKeys = [ 'plain' => '/project/company/limits/plain', 'inline' => '/project/company/limits/inline', 'lines' => '/project/company/limits/lines', 'blocks' => '/project/company/limits/blocks' ];
+foreach( $limitKeys as $format => $limitKey ) {
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $limitKey, 'global' => false, 'value' => 'x' ] );
+	\Nino\Text::setMeta( $appData, $limitKey, $format, 150 );
+	\Nino\Text::saveBatch( $appData, array_map( static fn( string $locale ): array => [ 'key' => $limitKey, 'locale' => $locale, 'value' => 'x' ], [ 'de_DE', 'en_US', 'fr_FR' ] ), false );
+}
+
+// Each text of the table, at one under, at and one over its count as the limit: the first two are written, the third is refused with the limit and the length, and the files are as they were
+$wrongSave = [];
+$limitFiles = static fn(): string => md5( (string) file_get_contents( \Nino\Filesystem::path( $appData, '/text/de_DE.php' ) ) ). md5( (string) file_get_contents( \Nino\Filesystem::path( $appData, '/text/en_US.php' ) ) );
+foreach( array_filter( $lengths, static fn( array $row ): bool => $row['kept'] === true ) as $row ) {
+
+	$limitKey = $limitKeys[$row['format']];
+
+	foreach( [ 1, 0, -1 ] as $room ) {
+
+		\Nino\Text::setMeta( $appData, $limitKey, $row['format'], max( 1, $row['count'] + $room ) );
+		$before = $limitFiles();
+		[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $limitKey, 'locale' => 'de_DE', 'value' => $row['text'] ] ] ] );
+		$result = $body['results'][$limitKey] ?? [];
+
+		$right = $room >= 0
+			? ( $result['ok'] ?? false ) === true && ( $result['limit'] ?? 0 ) === max( 1, $row['count'] + $room )
+			: ( $result['ok'] ?? true ) === false && ( $result['code'] ?? '' ) === 'text_too_long' && ( $result['params'] ?? [] ) === [ $row['count'] - 1, $row['count'] ] && ( $result['locale'] ?? '' ) === 'de_DE' && $limitFiles() === $before;
+
+		if( $right === false )
+			$wrongSave[] = $row['format']. ' '. json_encode( $row['text'] ). ' '. $room;
+
+		callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $limitKey, 'locale' => 'de_DE', 'value' => 'x' ] ] ] );
+	}
+}
+check( 'every text of the table is written at its limit and one under it, and refused one over it with text_too_long, the limit and the length it has and the language - in the four formats, the files as they were'. ( $wrongSave === [] ? '' : ' - not '. implode( ', ', array_slice( $wrongSave, 0, 6 ) ) ), $wrongSave === [] );
+
+// What is counted is what the field shows after the save: a text with markup in a plain field is its words, the quotes are the characters they are
+\Nino\Text::setMeta( $appData, $limitKeys['plain'], 'plain', 8 );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $limitKeys['plain'], 'locale' => 'de_DE', 'value' => '<b>123456</b> "' ] ] ] );
+[ , $over ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $limitKeys['plain'], 'locale' => 'de_DE', 'value' => '<b>1234567</b> "' ] ] ] );
+check( 'a plain text is counted as it is stored and typed: what strip_tags takes away and a quote written as an entity are counted as the field will show them after the save', ( $body['results'][$limitKeys['plain']]['ok'] ?? false ) === true
+	&& ( $over['results'][$limitKeys['plain']]['params'] ?? [] ) === [ 8, 9 ] );
+
+// A text that is longer than its limit already: written as long as it does not get longer, in the language that holds it only
+$overKey = $limitKeys['plain'];
+\Nino\Text::setMeta( $appData, $overKey, 'plain', 10 );
+\Nino\Text::saveBatch( $appData, [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => str_repeat( 'x', 30 ) ] ], false );
+$entry = \Nino\Text::entry( $appData, $overKey );
+check( 'the entry names, for each language, what it may hold: the limit, and the text it already has where that is longer - and the limit of the key is what it was', $entry['limits'] === [ 'de_DE' => 30, 'en_US' => 10, 'fr_FR' => 10 ] && $entry['keyLimit'] === 10 && $entry['maxlength'] === 30 && $entry['maxlengthSet'] === true );
+$ask = static function( string $locale, string $value, string $class = \Nino\Modules\Text\Admin::class ) use ( &$appData, $overKey ): array {
+	[ , $body ] = callDev( $appData, $class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $overKey, 'locale' => $locale, 'value' => $value ] ] ] );
+	return $body['results'][$overKey] ?? [];
+};
+check( 'a text that is over its limit is written as it is, and one character shorter', $ask( 'de_DE', str_repeat( 'y', 30 ) )['ok'] === true && ( $answer = $ask( 'de_DE', str_repeat( 'z', 29 ) ) )['ok'] === true && $answer['limit'] === 29 );
+$answer = $ask( 'de_DE', str_repeat( 'z', 30 ) );
+check( '...and not longer than it was: once shortened, the limit of the language is the shorter one', $answer['ok'] === false && $answer['code'] === 'text_too_long' && $answer['params'] === [ 29, 30 ] && \Nino\Text::entry( $appData, $overKey )['limits']['de_DE'] === 29 );
+$answer = $ask( 'en_US', str_repeat( 'q', 11 ) );
+check( 'another language of the key has the limit of the key, whatever the first holds', $answer['ok'] === false && $answer['params'] === [ 10, 11 ] && $ask( 'en_US', str_repeat( 'q', 10 ) )['ok'] === true );
+$answer = $ask( 'de_DE', str_repeat( 'z', 29 ), \Nino\Modules\Text\Keys::class );
+check( 'the Text Keys tab asks the same: written as it is, and refused one longer', $answer['ok'] === true && $ask( 'de_DE', str_repeat( 'z', 31 ), \Nino\Modules\Text\Keys::class )['code'] === 'text_too_long' );
+
+// A batch: the item that is refused writes nothing and the others are written as the batch writes them; one key in two languages says it where either was refused
+\Nino\Text::setMeta( $appData, $overKey, 'plain', 10 );
+$otherKey = $limitKeys['inline'];
+\Nino\Text::setMeta( $appData, $otherKey, 'inline', 20 );
+$globalKey = '/project/company/limits/global';
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $globalKey, 'global' => true, 'value' => 'g' ] );
+\Nino\Text::setMeta( $appData, $globalKey, 'plain', 5 );
+$beforeFiles = [ $limitFiles(), md5( (string) file_get_contents( \Nino\Filesystem::path( $appData, '/text/global.php' ) ) ) ];
+callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $otherKey, 'locale' => 'de_DE', 'value' => 'This one is much too long for it' ], [ 'key' => $globalKey, 'locale' => '*', 'value' => 'abcdef' ] ] ] );
+check( 'a batch of refused items leaves every text file byte for byte as it was', [ $limitFiles(), md5( (string) file_get_contents( \Nino\Filesystem::path( $appData, '/text/global.php' ) ) ) ] === $beforeFiles );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => $overKey, 'locale' => 'en_US', 'value' => 'ok' ],
+	[ 'key' => $otherKey, 'locale' => 'de_DE', 'value' => 'This one is much too long for it' ],
+	[ 'key' => $globalKey, 'locale' => '*', 'value' => 'abcdef' ],
+] ] );
+$enNow = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$deNow = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'a batch with two refused items writes the one that is within its limit and nothing of the others', $status === 200 && ( $body['results'][$overKey]['ok'] ?? false ) === true && $enNow['[['. $overKey. ']]'] === 'ok'
+	&& ( $body['results'][$otherKey]['code'] ?? '' ) === 'text_too_long' && ( $body['results'][$otherKey]['params'] ?? [] ) === [ 20, 32 ] && $deNow['[['. $otherKey. ']]'] === 'x'
+	&& ( $body['results'][$globalKey]['code'] ?? '' ) === 'text_too_long' && ( $body['results'][$globalKey]['params'] ?? [] ) === [ 5, 6 ] && ( $body['results'][$globalKey]['locale'] ?? '' ) === '*'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[['. $globalKey. ']]'] === 'g' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'fine' ],
+	[ 'key' => $overKey, 'locale' => 'fr_FR', 'value' => 'this is longer than ten' ],
+] ] );
+check( 'one key in two languages, one of them too long: the key says so, with the language, and the other language is written', ( $body['results'][$overKey]['code'] ?? '' ) === 'text_too_long' && ( $body['results'][$overKey]['locale'] ?? '' ) === 'fr_FR'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $overKey. ']]'] === 'fine' );
+
+// The ones that do not ask for it - a feature that writes through the public API, the import of a translation - write what they always wrote
+\Nino\Text::setMeta( $appData, $overKey, 'plain', 10 );
+$bare = \Nino\Text::saveBatch( $appData, [ [ 'key' => $overKey, 'locale' => 'en_US', 'value' => str_repeat( 'w', 300 ) ] ], false );
+$put = \Nino\Text::put( $appData, [ $overKey => [ 'fr_FR' => str_repeat( 'v', 300 ) ] ] );
+$enNow = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[['. $overKey. ']]'];
+$frNow = \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] )['[['. $overKey. ']]'];
+check( 'Text::saveBatch() without the limit asked for and Text::put() write a text over the limit of its key, as a feature that calls them always has', ( $bare[$overKey]['ok'] ?? false ) === true && strlen( $enNow ) === 300 && is_array( $put ) === true && strlen( $frNow ) === 300 );
+[ , $exported ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiExport' );
+$exported['text'][$overKey] = str_repeat( 'u', 60 );
+[ $status, $imported ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'de_DE', 'translation' => $exported ] );
+check( 'the import of a translation writes a text over the limit of its key too', $status === 200 && strlen( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $overKey. ']]'] ) === 60 );
+
+// What is not cut: a text the hard byte limit would cut is refused as too long by the panel
+\Nino\Text::setMeta( $appData, $overKey, 'plain', 10 );
+\Nino\Text::saveBatch( $appData, [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'short' ], [ 'key' => $overKey, 'locale' => 'en_US', 'value' => 'short' ], [ 'key' => $overKey, 'locale' => 'fr_FR', 'value' => 'short' ] ], false );
+$answer = $ask( 'de_DE', str_repeat( 'a', 25000 ) );
+check( 'a text of 25000 characters is refused as it is, with its length: nothing is cut to the hard limit of the file', $answer['ok'] === false && $answer['code'] === 'text_too_long' && $answer['params'] === [ 10, 25000 ]
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $overKey. ']]'] === 'short' );
+
+// One key in two languages, the refused one first: the answer is the refusal, with its language, and the language that fits is written all the same
+\Nino\Text::setMeta( $appData, $overKey, 'plain', 10 );
+\Nino\Text::saveBatch( $appData, [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'alt' ], [ 'key' => $overKey, 'locale' => 'fr_FR', 'value' => 'alt' ] ], false );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => $overKey, 'locale' => 'fr_FR', 'value' => 'this is longer than ten' ],
+	[ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'neu' ],
+] ] );
+check( 'one key in two languages, the one that is too long named first: the key answers with the refusal and its language, and the language named second is written', ( $body['results'][$overKey]['code'] ?? '' ) === 'text_too_long'
+	&& ( $body['results'][$overKey]['locale'] ?? '' ) === 'fr_FR' && \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $overKey. ']]'] === 'neu' && \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] )['[['. $overKey. ']]'] === 'alt' );
+
+// A text that was written by another since its editor read it is the conflict of that, whatever its length
+$deBeforeStale = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'much too long for the key', 'was' => 'not what is stored' ] ] ] );
+check( 'a text that is too long and read as something else than what is stored is answered as changed, with no limit in the answer, and the length is asked after the conflict is settled', ( $body['results'][$overKey]['error'] ?? '' ) === 'changed' && array_key_exists( 'limit', $body['results'][$overKey] ) === false && array_key_exists( 'keyLimit', $body['results'][$overKey] ) === false && \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ) === $deBeforeStale );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'much too long for the key', 'was' => 'neu' ] ] ] );
+check( '...and read as what is stored it is refused as too long', ( $body['results'][$overKey]['code'] ?? '' ) === 'text_too_long' );
+
+// A global key is read by its star: its limit, an emoji counted as two, and what a written one answers
+$starKey = '/project/company/limits/star';
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $starKey, 'global' => true, 'value' => 'g' ] );
+\Nino\Text::setMeta( $appData, $starKey, 'plain', 4 );
+$star = \Nino\Text::entry( $appData, $starKey );
+[ , $ok ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $starKey, 'locale' => '*', 'value' => "\u{1F600}\u{1F600}" ] ] ] );
+[ , $no ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $starKey, 'locale' => '*', 'value' => "\u{1F600}\u{1F600}\u{1F600}" ] ] ] );
+check( 'a global key is read by its star: two emoji fit its limit of 4, three are refused with their 6, and a written one answers its limit and the limit of the key', array_keys( $star['limits'] ) === [ '*' ] && ( $star['limits']['*'] ?? 0 ) === 4
+	&& ( $ok['results'][$starKey]['ok'] ?? false ) === true && ( $ok['results'][$starKey]['limit'] ?? 0 ) === 4 && ( $ok['results'][$starKey]['keyLimit'] ?? 0 ) === 4
+	&& ( $no['results'][$starKey]['params'] ?? [] ) === [ 4, 6 ] && ( $no['results'][$starKey]['locale'] ?? '' ) === '*' && array_key_exists( 'limit', $no['results'][$starKey] ) === false && array_key_exists( 'keyLimit', $no['results'][$starKey] ) === false );
+
+// ...whichever language the item names for it: a global key has the one limit, which counts an emoji as two where maxlength counts it as one
+\Nino\Text::setMeta( $appData, $starKey, 'plain', 2 );
+\Nino\Text::saveBatch( $appData, [ [ 'key' => $starKey, 'locale' => '*', 'value' => "\u{1F600}\u{1F600}\u{1F600}" ] ], false );
+$starAfter = \Nino\Text::entry( $appData, $starKey );
+[ , $named ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $starKey, 'locale' => 'de_DE', 'value' => "\u{1F600}\u{1F600}\u{1F600}" ] ] ] );
+check( 'the limit of a global key is the one of its star, named whichever language the item carries: three emoji over a limit of 2 are written as long as they do not grow, where maxlength counts them as three characters and not six',
+	$starAfter['limits'] === [ '*' => 6 ] && $starAfter['maxlength'] === 3 && ( $named['results'][$starKey]['ok'] ?? false ) === true && ( $named['results'][$starKey]['limit'] ?? 0 ) === 6 && ( $named['results'][$starKey]['keyLimit'] ?? 0 ) === 2 );
+\Nino\Text::setMeta( $appData, $starKey, 'plain', 4 );
+
+// The limit a written text answers is the one entries() gives afterwards - a set limit, a derived one that rises, one that falls with the longest text, a global key - without a second read
+$answered = [];
+$autoKey = '/project/company/limits/auto';
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $autoKey, 'global' => false, 'value' => 'x' ] );
+\Nino\Text::saveBatch( $appData, array_map( static fn( string $locale ): array => [ 'key' => $autoKey, 'locale' => $locale, 'value' => 'x' ], [ 'de_DE', 'en_US', 'fr_FR' ] ), false );
+foreach( [ [ $autoKey, 'de_DE', str_repeat( 'a', 140 ), 'derived limit rises' ], [ $autoKey, 'de_DE', str_repeat( 'b', 280 ), 'derived limit rises a second time' ], [ $autoKey, 'de_DE', str_repeat( 'c', 40 ), 'derived limit falls with the longest text' ], [ $autoKey, 'en_US', 'short', 'derived limit is the other language\'s longest text' ], [ $autoKey, 'de_DE', str_repeat( 'ä', 100 ), 'derived limit counts bytes' ], [ $limitKeys['plain'], 'en_US', 'short', 'set limit' ], [ $starKey, '*', "\u{1F600}", 'global key' ] ] as [ $answerKey, $answerLocale, $answerText, $answerLabel ] ) {
+	[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $answerKey, 'locale' => $answerLocale, 'value' => $answerText ] ] ] );
+	$result = $body['results'][$answerKey] ?? [];
+	$afterwards = \Nino\Text::entry( $appData, $answerKey );
+	if( ( $result['ok'] ?? false ) !== true || ( $result['limit'] ?? -1 ) !== $afterwards['limits'][$answerLocale] || ( $result['keyLimit'] ?? -1 ) !== $afterwards['keyLimit'] )
+		$answered[] = $answerLabel. ' '. json_encode( [ $result['limit'] ?? null, $result['keyLimit'] ?? null, $afterwards['limits'][$answerLocale], $afterwards['keyLimit'] ] );
+}
+check( 'what a written text answers as the limit of its language and of its key is what entries() says of the files afterwards, for a set limit, a derived one that rises and one that falls, and a global key'. ( $answered === [] ? '' : ' - not '. implode( ', ', $answered ) ), $answered === [] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $autoKey ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $starKey ] );
+
+// A text with markup that does not fit the file: refused whole and never half stored; one that fits once sanitised is written whole
+$sanitiseWhole = new ReflectionMethod( \Nino\Text::class, '_sanitize' );
+$hardBytes = (int) ( new ReflectionClassConstant( '\Nino\Text', 'HARD_MAXLENGTH' ) )->getValue();
+$blocksKey = $limitKeys['blocks'];
+\Nino\Text::setMeta( $appData, $blocksKey, 'blocks', 5000 );
+$links = static fn( int $count ): string => implode( '', array_map( static fn( int $at ): string => '<p><a href="https://example.com/a/very/long/path/of/a/page/that/goes/on/and/on/'. $at. '">word</a></p>', range( 1, $count ) ) );
+$fits = 1;
+while( strlen( $sanitiseWhole->invoke( null, $links( $fits + 1 ), 'blocks', null ) ) <= $hardBytes )
+	$fits++;
+$bigFile = static fn(): string => (string) file_get_contents( \Nino\Filesystem::path( $appData, '/text/de_DE.php' ) );
+$beforeBig = $bigFile();
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $links( $fits ) ] ] ] );
+$storedBig = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $blocksKey. ']]'];
+check( 'a text with markup whose stored form is just within the 20000 bytes of the file is written whole, byte for byte: every link is kept', ( $body['results'][$blocksKey]['ok'] ?? false ) === true && $storedBig === $sanitiseWhole->invoke( null, $links( $fits ), 'blocks', null )
+	&& substr_count( $storedBig, '<a ' ) === $fits && strlen( $storedBig ) <= $hardBytes && strlen( $storedBig ) > $hardBytes - 200 );
+$beforeBig = $bigFile();
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $links( $fits + 1 ) ] ] ] );
+$refusal = $body['results'][$blocksKey] ?? [];
+check( 'one link more and the text does not fit: it is refused with text_too_large, its size and the limit of the file and its language, and nothing of it is written - the file is as it was and no link is lost', ( $refusal['code'] ?? '' ) === 'text_too_large'
+	&& ( $refusal['params'][1] ?? 0 ) === $hardBytes && ( $refusal['params'][0] ?? 0 ) > $hardBytes && ( $refusal['locale'] ?? '' ) === 'de_DE' && $bigFile() === $beforeBig );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $links( $fits + 1 ) ] ] ] );
+check( '...in the Text Keys tab as well', ( $body['results'][$blocksKey]['code'] ?? '' ) === 'text_too_large' && $bigFile() === $beforeBig );
+
+// What the editor sends: a non-breaking space is &nbsp;, six bytes where it is stored as two - more than the file holds goes out, a text that fits comes back
+$nbspTail = static fn( string $space ): string => '<p>'. str_repeat( $space, 2000 ). '!</p>';
+$nbspFits = 1;
+while( strlen( $sanitiseWhole->invoke( null, $links( $nbspFits + 1 ). $nbspTail( '&nbsp;' ), 'blocks', null ) ) <= $hardBytes )
+	$nbspFits++;
+$posted = $links( $nbspFits ). $nbspTail( '&nbsp;' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $posted ] ] ] );
+$storedNbsp = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $blocksKey. ']]'];
+check( 'a text of links and 2000 non-breaking spaces whose editor sends more than 20000 bytes and whose stored form fits is written whole: every link, the spaces and the closing paragraph are there',
+	strlen( $posted ) > $hardBytes && ( $body['results'][$blocksKey]['ok'] ?? false ) === true && $storedNbsp === $sanitiseWhole->invoke( null, $posted, 'blocks', null ) && strlen( $storedNbsp ) <= $hardBytes
+	&& substr_count( $storedNbsp, '<a ' ) === $nbspFits && str_ends_with( $storedNbsp, '!</p>' ) && \Nino\Text::sanitizeValue( $posted, 'blocks' ) !== $storedNbsp );
+
+// The file takes 20000 bytes and not one more, byte for byte: a text of exactly that stored size is written whole, one byte more is refused
+$padded = static fn( int $pad ): string => $links( 150 ). '<p><a href="https://example.com/'. str_repeat( 'p', $pad ). '">word</a></p>';
+$base = strlen( $sanitiseWhole->invoke( null, $padded( 0 ), 'blocks', null ) );
+$exact = $padded( $hardBytes - $base );
+$one = $padded( $hardBytes - $base + 1 );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $exact ] ] ] );
+$storedExact = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $blocksKey. ']]'];
+$beforeOne = $bigFile();
+[ , $over ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $one ] ] ] );
+check( 'a text whose stored form is exactly the 20000 bytes of the file is written whole, and one byte more is refused with its size, the file as it was', strlen( $storedExact ) === $hardBytes && ( $body['results'][$blocksKey]['ok'] ?? false ) === true
+	&& ( $over['results'][$blocksKey]['code'] ?? '' ) === 'text_too_large' && ( $over['results'][$blocksKey]['params'] ?? [] ) === [ $hardBytes + 1, $hardBytes ] && $bigFile() === $beforeOne && array_key_exists( 'limit', $over['results'][$blocksKey] ) === false && array_key_exists( 'keyLimit', $over['results'][$blocksKey] ) === false );
+
+// A text that is stored above the 20000 bytes - written by hand, or by a writer that did not hold it to the file - is written as long as it does not grow: the same size, one byte less, one byte more
+$hand = static fn( string $word ): string => $links( $fits + 2 ). '<p><a href="https://example.com/end">'. $word. '</a></p>';
+$handStored = $sanitiseWhole->invoke( null, $hand( 'word' ), 'blocks', null );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', static fn( array $content ): array => [ '[['. $blocksKey. ']]' => $handStored ] + $content );
+$ratchet = [];
+foreach( [ 'word' => true, 'wor' => true, 'wordd' => false ] as $word => $allowed ) {
+	[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $hand( $word ) ] ] ] );
+	$result = $body['results'][$blocksKey] ?? [];
+	$held = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[['. $blocksKey. ']]'];
+	$ratchet[] = $allowed === true ? ( ( $result['ok'] ?? false ) === true && $held === $sanitiseWhole->invoke( null, $hand( $word ), 'blocks', null ) ) : ( ( $result['code'] ?? '' ) === 'text_too_large' && $held === $handStored );
+	\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', static fn( array $content ): array => [ '[['. $blocksKey. ']]' => $handStored ] + $content );
+}
+check( 'a text stored above the 20000 bytes of the file is written at the same size and one byte smaller, and refused one byte larger - nothing is cut', strlen( $handStored ) > $hardBytes && $ratchet === [ true, true, true ] );
+
+// ...a global key's stored text is read by its star, whichever language the item names
+$bigGlobal = '/project/company/limits/bigstar';
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $bigGlobal, 'global' => true, 'value' => 'g' ] );
+\Nino\Text::setMeta( $appData, $bigGlobal, 'blocks', 5000 );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', static fn( array $content ): array => [ '[['. $bigGlobal. ']]' => $handStored ] + $content );
+$starRatchet = [];
+foreach( [ 'word' => true, 'wordd' => false ] as $word => $allowed ) {
+	[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $bigGlobal, 'locale' => 'de_DE', 'value' => $hand( $word ) ] ] ] );
+	$starRatchet[] = ( ( $body['results'][$bigGlobal]['ok'] ?? false ) === $allowed );
+}
+check( 'a global key that is stored above the 20000 bytes is held to its own stored text, read by the star: the same size is written, one byte more is refused', $starRatchet === [ true, true ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $bigGlobal ] );
+
+// What cannot fit whatever the sanitiser drops is refused without being read: the bound is 12 times what the file takes, both sides of it
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', static fn( array $content ): array => [ '[['. $blocksKey. ']]' => 'short' ] + $content );
+$dropped = static fn( int $size ): string => '<p>ok</p>'. str_repeat( '<x>', intdiv( $size - 9, 3 ) ). str_repeat( ' ', ( $size - 9 ) % 3 );
+$reach = 12 * $hardBytes;
+[ , $atBound ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $dropped( $reach ) ] ] ] );
+$beforeBound = $bigFile();
+[ , $pastBound ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $dropped( $reach + 1 ) ] ] ] );
+check( 'a text sent at 12 times the 20000 bytes whose markup the sanitiser drops is written as what is left of it, and one byte more is refused as too large with the size that was sent, the file as it was',
+	( $atBound['results'][$blocksKey]['ok'] ?? false ) === true && ( $atBound['results'][$blocksKey]['value'] ?? '' ) === '<p>ok</p>' && ( $pastBound['results'][$blocksKey]['code'] ?? '' ) === 'text_too_large'
+	&& ( $pastBound['results'][$blocksKey]['params'] ?? [] ) === [ $reach + 1, $hardBytes ] && $bigFile() === $beforeBound );
+$tooBig = str_repeat( '<p>text with a <strong>word</strong> and more of it</p>', 110000 );
+$clock = microtime( true );
+$peak = memory_get_peak_usage();
+[ , $huge ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $blocksKey, 'locale' => 'de_DE', 'value' => $tooBig ] ] ] );
+$spent = microtime( true ) - $clock;
+check( 'a post of 5 megabytes is answered as too large with the size that was sent, at once and without being sanitised: no second, no tens of megabytes', strlen( $tooBig ) > 5000000 && ( $huge['results'][$blocksKey]['params'] ?? [] ) === [ strlen( $tooBig ), $hardBytes ] && $spent < 0.5 && memory_get_peak_usage() - $peak < 30000000 && $bigFile() === $beforeBound );
+unset( $tooBig );
+
+// The conflict is answered where it is found, never queued; a forced item has no stamp, and every check is made for it
+$deStale = $bigFile();
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'much too long for the key', 'was' => 'not what is stored', 'force' => true ] ] ] );
+check( 'a forced text that is too long is refused as too long, whatever stamp it carries: the conflict does not stand in for the checks', ( $body['results'][$overKey]['code'] ?? '' ) === 'text_too_long' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $overKey, 'locale' => 'de_DE', 'value' => 'fine', 'was' => 'not what is stored' ], [ 'key' => $overKey, 'locale' => 'fr_FR', 'value' => 'too long for the limit of ten' ] ] ] );
+check( 'one key in two languages, one of them the conflict and the other too long: the key answers changed, and nothing of it is written', ( $body['results'][$overKey]['error'] ?? '' ) === 'changed' && $bigFile() === $deStale );
+
+// The order of the Text Keys tab's two requests: what the counter allowed - a limit that is emptied, a text that is longer - is written before the shape, or the limit that is derived refuses it
+$orderKey = '/project/company/limits/order';
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $orderKey, 'global' => false, 'value' => 'x' ] );
+$shapeOf = static fn( ?int $limit ): array => [ 'key' => $orderKey, 'global' => false, 'blacklisted' => false, 'format' => 'plain', 'maxlength' => $limit ];
+$resetOrder = static function() use ( &$appData, $orderKey, $shapeOf ): void {
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', $shapeOf( 1000 ) );
+	\Nino\Text::saveBatch( $appData, [ [ 'key' => $orderKey, 'locale' => 'de_DE', 'value' => str_repeat( 'o', 200 ) ] ], false );
+};
+$resetOrder();
+[ , $first ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $orderKey, 'locale' => 'de_DE', 'value' => str_repeat( 'n', 900 ) ] ] ] );
+[ $shapeStatus ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', $shapeOf( null ) );
+check( 'the text of 900 characters that a limit of 1000 allows is written first, and the limit is then emptied: both are taken', ( $first['results'][$orderKey]['ok'] ?? false ) === true && $shapeStatus === 200 && \Nino\Text::entry( $appData, $orderKey )['maxlengthSet'] === false );
+$resetOrder();
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', $shapeOf( null ) );
+[ , $second ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $orderKey, 'locale' => 'de_DE', 'value' => str_repeat( 'n', 900 ) ] ] ] );
+check( '...the other way round the limit that is derived from the 200 characters stored refuses it, which is why the text goes first', ( $second['results'][$orderKey]['code'] ?? '' ) === 'text_too_long' && ( $second['results'][$orderKey]['params'] ?? [] ) === [ 350, 900 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $orderKey ] );
+
+foreach( $limitKeys as $limitKey )
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $limitKey ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $globalKey ] );
+
 \Nino\Auth::deleteUser( $appData, 'textonly@example.com' );
 \Nino\Auth::deleteUser( $appData, 'keysright@example.com' );
+\Nino\Auth::deleteUser( $appData, 'limits@example.com' );
 
 echo "\n";
 

@@ -159,6 +159,7 @@ namespace Nino\Modules\Text {
 				'locales' => \Nino\Admin\Admin::textLocales( $appData ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'categories' => self::_categories( $appData, $keys ),
+				'limitCap' => \Nino\Text::maxlength( \Nino\Text::MAX_LIMIT ),
 			] + Admin::naming( $appData, array_column( $keys, 'key' ) ) );
 		}
 
@@ -429,6 +430,8 @@ namespace Nino\Modules\Text {
 					// moment before
 					'maxlength' 	=> $meta[$key]['maxlength'] ?? \Nino\Text::maxlength(),
 					'maxlengthSet' => isset( $meta[$key]['maxlength'] ),
+					'keyLimit' 		=> $meta[$key]['maxlength'] ?? \Nino\Text::maxlength(),
+					'limits' 			=> array_fill_keys( array_keys( $values ), $meta[$key]['maxlength'] ?? \Nino\Text::maxlength() ),
 					'values' 			=> $values,
 				];
 			}
@@ -686,7 +689,9 @@ namespace Nino\Modules\Text {
 		/**
 		 *	Save several keys' values in one request - see \Nino\Text::saveBatch().
 		 *	Unlike the Text panel, a blacklisted key is still a valid save target here -
-		 *	blacklist only hides a key from the Text panel, not from this one.
+		 *	blacklist only hides a key from the Text panel, not from this one. A text
+		 *	longer than the limit of its language is refused in its key's result,
+		 *	with the code text_too_long, as in the Text panel.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -701,7 +706,7 @@ namespace Nino\Modules\Text {
 			$data 	= \Nino\Admin\Admin::postData();
 			$items 	= is_array( $data['items'] ?? null ) ? $data['items'] : [];
 
-			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, true ) ] );
+			\Nino\Http::ok( $request, [ 'results' => \Nino\Text::saveBatch( $appData, $items, true, true ) ] );
 		}
 
 		/**
