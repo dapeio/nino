@@ -906,8 +906,16 @@ public static function callbackBackup( array &$appData, array &$args ): void {
 
 	$live = new \PDO( 'sqlite:'. $file );
 	$live->exec( 'VACUUM INTO '. $live->quote( $args['staging']. '/crm.sqlite' ) );
+
+	// The copy is checked, not the source: what throws here ends the run, and no archive holds a database that is broken
+	$copy = new \PDO( 'sqlite:'. $args['staging']. '/crm.sqlite' );
+	if( $copy->query( 'PRAGMA integrity_check' )->fetchColumn() !== 'ok' )
+		throw new \RuntimeException( 'the copy of crm.sqlite is damaged' );
 }
 ```
+
+- **A copy that is checked.** `VACUUM INTO` carries an index that is damaged into the copy as it is, and `PRAGMA quick_check` of the source does not look at the indexes, so it does not find it. A feature that wants a copy it can rely on runs `PRAGMA integrity_check` on the copy, as the example does, and throws where the answer is not `ok`; the check reads the whole file (a database of about 120 MB took under half a second where it was measured). The copy is opened by a connection of its own and by nothing else - see the next point.
+- **A database is opened by its connection and by nothing else.** A feature that keeps a SQLite file never opens that file with `file_get_contents()`, `fopen()`, `copy()`, `finfo` or anything else that takes a descriptor of its own, as long as the same process holds a connection to it: when such a descriptor is closed, the operating system lets go of every lock the process holds on the file, the ones of the connection included, and another process can write into a transaction that believes itself alone. What is needed of the file - its size, a copy, its first bytes - is asked through the connection (`VACUUM INTO`, `PRAGMA page_count`) or of the directory (`filesize()`, `stat()`, which open nothing). A second connection (`PDO`) to the same file does no harm.
 
 - **Only its own names, and only files that exist.** A copy replaces a file the manifest of the feature names under `data` (the file, or a file below a folder it names) and whose live file the backup would carry; nothing is added. What else lies in the staging when the callback is done - a name the manifest does not give, a file of another feature, a case twin of an own name, a name the backup never carries (`auth-tries.php`, anything hidden), a link, a folder with no file of its own, a pipe or other entry that is no file, a file with a second name (a hard link), something put above the staging or into the folder of another feature, a file that two features hand over - ends the run, with the feature named.
 - **Whose callback it is** is read from its class: a callback of a class below the namespace of a feature that is switched on is that feature's. One that no such feature owns - a function, a class of `app/` - has no manifest that could name a file for it and is not asked; the log says so at every run. The recovery page asks the callbacks of the features that `config.php` lists: where that file cannot be read no feature is on, and the safety snapshot packs the files as they lie.
