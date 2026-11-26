@@ -635,7 +635,7 @@ $stage();
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-routed.tpl', '<p>routed</p>' );
 foreach( [ [ '/site-home', [ '' => '/' ], 'page-home' ], [ '/404', [ '' => '/404' ], 'page-gone' ], [ '/site-twice', [ '' => '/twice' ], 'page-twice' ], [ '/site-twice-b', [ '' => '/twice-b' ], 'page-twice' ],
 	[ '/site-includes', [ '' => '/includes' ], 'page-includes' ], [ '/site-included', [ '' => '/included' ], 'page-included' ] ] as [ $pageUri, $pageHttp, $pageTemplate ] )
-	\Nino\Pages::put( $appData, [ 'uri' => $pageUri, 'httpUris' => $pageHttp, 'template' => $pageTemplate, 'text' => $text( $pageUri ), 'navs' => [] ] );
+	\Nino\Pages::put( $appData, [ 'uri' => $pageUri, 'httpUris' => $pageHttp, 'template' => $pageTemplate, 'text' => $text( $pageUri ), 'navs' => [], 'statusCode' => $pageHttp === [ '' => '/404' ] ? 404 : 200 ] );
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-legal-imprint.tpl', '<p>imprint</p>' );
 $appData['/nino/http/routes']['GET://legal/imprint'] = [ 'uri' => '/legal/imprint', 'locale' => 'de_DE', 'body' => '[template /templates/page-legal-imprint]' ];
 $appData['/nino/http/routes']['GET://by-module'] = [ 'uri' => '/by-module', 'body' => '[template /templates/page-routed]' ];

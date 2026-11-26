@@ -436,7 +436,11 @@ namespace Nino\Modules\Routes {
 		 *	addresses against the other routes, the template against the page
 		 *	templates there are, a name and a title for every active language, the
 		 *	fills of the page's addresses - and writes it all or none of it; a
-		 *	refusal of it is the failure this answers with
+		 *	refusal of it is the failure this answers with. A save that leaves the
+		 *	site without its home page or without its 404 page is refused with 409
+		 *	(routes_leaves_home, routes_leaves_not_found, routes_leaves_both) until the same data is
+		 *	posted a second time with 'confirm' => true - the panel asks first -, and the
+		 *	page that is written with the 404 route has the status 404 (400, routes_not_found_status)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -471,6 +475,7 @@ namespace Nino\Modules\Routes {
 				'text' 				=> is_array( $data['text'] ?? null ) === true ? $data['text'] : [],
 				'navs' 				=> self::entryNavs( $data, \Nino\Pages::navKeys( $appData ) ),
 				'statusCode' 	=> (int) ( $data['statusCode'] ?? 200 ),
+				'confirm' 		=> ( $data['confirm'] ?? false ) === true,
 			] );
 
 			if( self::_refused( $request, $result ) === true )

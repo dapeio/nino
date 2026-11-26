@@ -309,6 +309,7 @@ console.log('Nino.adminUi.confirm');
 		'/_admin/elements/confirm/delete' : 'destructive',
 		'/_admin/backups/confirm/restore' : 'destructive',
 		'/_admin/routes/confirm/delete-left' : 'destructive',
+		'/_admin/routes/confirm/leaves' : 'destructive',
 		'/_admin/translations/confirm/overwrite' : 'destructive',
 		'/_admin/roles/scope/warning-leave' : 'big',
 		'/_admin/roles/scope/warning' : 'big',

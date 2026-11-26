@@ -71,6 +71,10 @@ namespace Nino {
 		 *		navs 				the menus the page is in, eg. [ 'main' ]; a menu that is not registered is left out
 		 *		statusCode 	the status the route answers; 200 where it is none
 		 *		source 			the html+ of a new template, or none
+		 *		confirm 		whether the save may leave the site without its home page or without its 404 page (see leaves()):
+		 *								absent, the question is not asked and the page is written as it is posted; false, such a save is
+		 *								refused (409, routes_leaves_home, routes_leaves_not_found or, for both, routes_leaves_both) and nothing is written; true, it is
+		 *								written. Only the Routes panel asks - a caller that makes a new page has nothing to leave
 		 *
 		 *	The answer is that of a page that is written: [ 'uri' => the Element-URI, 'routes' => the route keys in the order
 		 *	they stand in, 'template' => the name of the template or '' where the body of the page is a hand-written one,
@@ -80,6 +84,12 @@ namespace Nino {
 		 *	=> the field of the form that is to blame, '' for none ] ] - the arguments of \Nino\Http::fail() - and nothing is
 		 *	written. A failed write of config.php is such an answer as well, with the status 500 and no code. Whether the caller
 		 *	may ask is for the caller to say; this knows no account.
+		 *
+		 *	The page that is written with the route GET://404 has the status 404, whatever the caller posts: a save that gives it
+		 *	another one is refused (400, routes_not_found_status, field statusCode), and no confirm lifts that - every address
+		 *	without a page would be answered with that status and the 404 page as a page that is there. It makes no difference
+		 *	whether the page held the route before or takes it with this save. A save that takes the route GET://404 away from
+		 *	the page in the same call holds it to nothing afterwards.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$page					The page, see above
@@ -457,6 +467,29 @@ namespace Nino {
 		}
 
 		/**
+		 *	Which of the two pages the site cannot do without a route array leaves behind: the home page (the route GET://) and
+		 *	the page of the status 404 (the route GET://404, which every address without a page is answered with). A role is
+		 *	left where $before has its route and $after has none - the page that held it moved its address, and no other route
+		 *	holds it after the save. The route is the role, as the kernel reads it (see keeper() for the page that holds it): a page that
+		 *	keeps its Element-URI /404 and moves its address is left of it all the same
+		 *
+		 *	@param		array 		$before				The route array as it stands
+		 *	@param		array 		$after				The route array as it is to be
+		 *
+		 *	@return 	array										The roles that are lost, 'home' and 'not_found' in that order; none for a save that leaves both
+		 */
+		public static function leaves( array $before, array $after ): array {
+
+			$left = [];
+
+			foreach( [ 'home' => 'GET://', 'not_found' => 'GET://404' ] as $role => $routeKey )
+				if( isset( $before[$routeKey] ) === true && isset( $after[$routeKey] ) === false )
+					$left[] = $role;
+
+			return $left;
+		}
+
+		/**
 		 *	The route keys of one page, in the order they stand in
 		 *
 		 *	@param		array 		$routes				The persisted route array
@@ -819,7 +852,28 @@ namespace Nino {
 			foreach( $extra['texts'] ?? [] as $path => $keys )
 				$fragments[$path] = array_merge( $fragments[$path] ?? [], $keys );
 
+			// The page that is written with the route GET://404 has the status 404, whether it held that route before or takes it with
+			// this save. It is the route as it is written that decides: a save that moves the address away holds no role of that page
+			if( isset( $put['GET://404'] ) === true && $statusCode !== 404 )
+				return self::_refuse( 400, 'the page "'. $uri. '" answers the addresses that have no page: its status is 404', 'routes_not_found_status', [ $uri ], 'statusCode' );
+
+			$before = $routes;
 			$routes = self::_putRoute( $routes, $previousKeys, $put );
+
+			// A save that takes the home page or the 404 page away from the site is asked for, where the caller asks
+			if( array_key_exists( 'confirm', $page ) === true && $page['confirm'] !== true ) {
+
+				$left = self::leaves( $before, $routes );
+
+				if( $left === [ 'home', 'not_found' ] )
+					return self::_refuse( 409, 'the site would have neither a page at the address "/" nor a page for the addresses that have no page', 'routes_leaves_both', [ $uri ] );
+
+				if( in_array( 'home', $left, true ) === true )
+					return self::_refuse( 409, 'the site would have no page at the address "/"', 'routes_leaves_home', [ $uri ] );
+
+				if( in_array( 'not_found', $left, true ) === true )
+					return self::_refuse( 409, 'the site would have no page for the addresses that have no page', 'routes_leaves_not_found', [ $uri ] );
+			}
 
 			return self::_write( $appData, $routes, $fragments, $uri, $template, $source, array_keys( $put ), $extra['slots'] ?? [], $extra['files'] ?? [] );
 		}

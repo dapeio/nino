@@ -1785,12 +1785,78 @@
 			if( creating === false && routes._same( payload, current.entry ) === true )
 				return done( true, { row : current } );
 
-			routes._apiCall( 'save', payload, function( status, response ) {
+			// The server refuses a save that leaves the site without its start page or without its 404 page until the same data comes a second time with confirm :
+			// true - asked here, once, and a no sends nothing
+			// The button that was pressed - Save, or Save and continue - is the one the focus returns to when the question is answered no
+			const held = document.activeElement;
+			const pressed = held !== null && held !== undefined && ctx.bar !== undefined && ctx.bar !== null && ctx.bar.el.contains( held ) === true && held.tagName === 'BUTTON' ? held : ( ctx.bar ?? {} ).primary ?? null;
 
-				if( status !== 200 || response === null )
-					return done( false, { error : routes._refused( ctx, status, response, addressed.folded ) } );
+			const send = function( confirmed ) {
 
-				routes._saved( payload, addressed, response, done );
+				routes._apiCall( 'save', confirmed === true ? Object.assign( {}, payload, { confirm : true } ) : payload, function( status, response ) {
+
+					if( confirmed !== true && routes._leaves( status, response ) === true )
+						return routes._ask( ctx, status, response, { name : current.name, address : routes._publicPath( addressed.httpUris ) || String( Object.values( addressed.httpUris )[0] ?? '' ) }, pressed, function( ok ) {
+
+							if( ok === true ) {
+								ctx.status.saving();
+								return send( true );
+							}
+
+							// Nothing was sent and nothing is wrong: the form stays as it is, with the state of unsaved input
+							done( false, { error : '' } );
+							ctx.status.dirty();
+						} );
+
+					if( status !== 200 || response === null )
+						return done( false, { error : routes._refused( ctx, status, response, addressed.folded ) } );
+
+					routes._saved( payload, addressed, response, done );
+				} );
+			};
+
+			send( false );
+		},
+
+		/**
+		 *	Whether the server refused a save because it would leave the site without its start page or without its 404 page - a refusal that is lifted by a confirmation
+		 *
+		 *	@param		{number}		status
+		 *	@param		{*}					response			The answer of the server
+		 *
+		 *	@return		{boolean}
+		 */
+		_leaves : function( status, response ) {
+
+			return status === 409 && response !== null && typeof response === 'object' && ( response.code === 'routes_leaves_home' || response.code === 'routes_leaves_not_found' || response.code === 'routes_leaves_both' );
+		},
+
+		/**
+		 *	Ask whether a save that leaves the site without its start page or its 404 page is to be made: the question names the page and the address it is saved at, and the sentence of the
+		 *	code says what follows. The question stands on the record, and the line of the bar says what is true while it stands: the page is not saved yet
+		 *
+		 *	@param		{Object}		ctx
+		 *	@param		{number}		status
+		 *	@param		{Object}		response			The refusal, see _leaves()
+		 *	@param		{Object}		page					{ name, address } - the page as the panel shows it and the address it is saved at
+		 *	@param		{Element|null}	opener			The button the focus goes back to
+		 *	@param		{Function}	answered			answered( true ) for yes, answered( false ) for no
+		 *
+		 *	@return		void
+		 */
+		_ask : function( ctx, status, response, page, opener, answered ) {
+
+			// The save is not in flight while the question stands
+			ctx.status.dirty();
+
+			Nino.adminUi.confirm( 'destructive', {
+				title			: word('/_admin/routes/confirm/leaves-title'),
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/leaves'), page.name, page.address )+ ' '+ Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ),
+				yes				: word('/_admin/routes/confirm/leaves-title'),
+				no				: word('/_admin/common/label/cancel'),
+				nested		: true,
+				opener		: opener,
+				onChoose	: function( ok ) { answered( ok === true ) },
 			} );
 		},
 

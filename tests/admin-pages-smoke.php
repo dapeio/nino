@@ -360,6 +360,185 @@ check( 'through handlePost, without the right the page at "/" is answered as eve
 
 $keeperSet( $keeperRoutes );
 
+// A save that leaves the site without its home page or without its 404 page is asked for: refused with 409 and written when the same data comes
+// a second time with confirm => true; the page of GET://404 keeps its status 404, which no confirmation lifts
+$leavesText = static function() use ( &$appData ): array {
+	$text = [];
+	foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+		$text[$locale] = [ 'name' => 'Seite', 'title' => 'Seite - '. $locale ];
+	return $text;
+};
+$leavesStart = static fn(): array => [
+	'GET://' 				=> $keeperPage( '/home', 'page-about' ),
+	'GET://404' 		=> $keeperPage( '/404', 'page-contact', [ 'statusCode' => 404 ] ),
+	'GET://other' 	=> $keeperPage( '/other', 'page-about' ),
+];
+$leavesSave = static function( array $page ) use ( &$appData, $leavesText ): array {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $page + [ 'template' => 'page-about', 'text' => $leavesText(), 'statusCode' => 200 ] );
+	return [ $status, $body, array_keys( \Nino\AppData::stored( $appData, '/nino/http/routes', [] ) ) ];
+};
+// Every file of the project, by its bytes: a refused save leaves the whole tree as it was, not config.php alone
+$leavesTree = static function() use ( $sandbox ): string {
+	$files = [];
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $sandbox, FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( $file->isFile() === true )
+			$files[ substr( (string) $file, strlen( $sandbox ) ) ] = md5_file( (string) $file );
+	ksort( $files );
+	return json_encode( $files, JSON_THROW_ON_ERROR );
+};
+// The sign-in that went before is written to the log with the first request after it: that request is made here, so that what follows compares the saves alone
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$leavesIs = static fn( array $answer, int $status, string $code ): bool => $answer[0] === $status && ( $answer[1]['code'] ?? '' ) === $code;
+
+$home 	= [ 'originalUri' => '/home', 'uri' => '/home', 'httpUris' => [ '' => '/' ] ];
+$lost 	= [ 'originalUri' => '/404', 'uri' => '/404', 'httpUris' => [ '' => '/404' ], 'template' => 'page-contact', 'statusCode' => 404 ];
+
+foreach( [
+	'S1 the home page moves its address' 											=> [ [ 'httpUris' => [ '' => '/start' ] ] + $home, 'routes_leaves_home', [ 'GET://start', 'GET://404', 'GET://other' ] ],
+	'S2 the 404 page moves its address, its Element-URI stays' => [ [ 'httpUris' => [ '' => '/missing' ] ] + $lost, 'routes_leaves_not_found', [ 'GET://', 'GET://missing', 'GET://other' ] ],
+	'S5 the 404 page moves its Element-URI and its address' 	=> [ [ 'uri' => '/notfound', 'httpUris' => [ '' => '/gone' ] ] + $lost, 'routes_leaves_not_found', [ 'GET://', 'GET://gone', 'GET://other' ] ],
+] as $label => $case ) {
+
+	[ $page, $code, $routeKeys ] = $case;
+
+	$keeperSet( $leavesStart() );
+	$leavesBefore = $leavesTree();
+	$answer = $leavesSave( $page );
+	check( $label. ': without confirm it is refused, 409 with the code '. $code. ', and every file of the project is byte for byte what it was', $leavesIs( $answer, 409, $code ) && $leavesTree() === $leavesBefore );
+
+	foreach( [ 'a string' => 'true', 'a number' => 1, 'the word yes' => 'yes', 'false' => false ] as $kind => $notConfirm ) {
+		$answer = $leavesSave( [ 'confirm' => $notConfirm ] + $page );
+		check( '...a confirm that is '. $kind. ' is no confirmation', $leavesIs( $answer, 409, $code ) && $leavesTree() === $leavesBefore );
+	}
+
+	$answer = $leavesSave( [ 'confirm' => true ] + $page );
+	check( '...with confirm => true it is written: 200 and the routes of the table', $answer[0] === 200 && $answer[2] === $routeKeys && $leavesTree() !== $leavesBefore );
+}
+
+// Every language of the home page leaves '/': the address of one language that stays at '/' is no loss
+$perLanguage = static fn(): array => [
+	'GET://' 		=> $keeperPage( '/start', 'page-about', [ 'locale' => 'de_DE' ] ),
+	'GET://en' 	=> $keeperPage( '/start', 'page-about', [ 'locale' => 'en_US' ] ),
+	'GET://fr' 	=> $keeperPage( '/start', 'page-about', [ 'locale' => 'fr_FR' ] ),
+	'GET://404' => $keeperPage( '/404', 'page-contact', [ 'statusCode' => 404 ] ),
+];
+$perPage = [ 'originalUri' => '/start', 'uri' => '/start' ];
+$keeperSet( $perLanguage() );
+$leavesBefore = $leavesTree();
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/de', 'en_US' => '/en', 'fr_FR' => '/fr' ] ] + $perPage );
+check( 'S12 the home page with an address for each language: all of them leave "/" - refused 409 routes_leaves_home, nothing written', $leavesIs( $answer, 409, 'routes_leaves_home' ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/de', 'en_US' => '/en', 'fr_FR' => '/fr' ], 'confirm' => true ] + $perPage );
+check( '...with confirm => true: 200, and no route is left at "/"', $answer[0] === 200 && in_array( 'GET://', $answer[2], true ) === false && in_array( 'GET://de', $answer[2], true ) === true );
+$keeperSet( $perLanguage() );
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/', 'en_US' => '/english', 'fr_FR' => '/francais' ] ] + $perPage );
+check( '...one language that keeps "/" while the others move is no loss: 200 without confirm', $answer[0] === 200 && in_array( 'GET://', $answer[2], true ) === true );
+$keeperSet( $perLanguage() );
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/start', 'en_US' => '/', 'fr_FR' => '/francais' ] ] + $perPage );
+check( '...and the language that takes "/" over from another keeps the site its home page: 200 without confirm', $answer[0] === 200 && in_array( 'GET://', $answer[2], true ) === true );
+
+// What keeps the role, or moves with the key, is no loss
+foreach( [
+	'S4 the 404 page changes its Element-URI and keeps its address' 	=> [ [ 'uri' => '/notfound' ] + $lost ],
+	'S6 the home page changes its Element-URI and keeps "/"' 				=> [ [ 'uri' => '/start-page' ] + $home ],
+	'S7 the home page takes another status' 													=> [ [ 'statusCode' => 500 ] + $home ],
+	'S8 the home page draws another template' 												=> [ [ 'template' => 'page-contact' ] + $home ],
+	'a page that is neither of them moves its address' 							=> [ [ 'originalUri' => '/other', 'uri' => '/other', 'httpUris' => [ '' => '/elsewhere' ] ] ],
+] as $label => [ $page ] ) {
+
+	$keeperSet( $leavesStart() );
+	$answer = $leavesSave( $page );
+	check( $label. ': 200 without a confirmation', $answer[0] === 200 );
+}
+
+// S3 - the page of GET://404 keeps its status, with or without a confirmation, and nothing is written
+$keeperSet( $leavesStart() );
+$leavesBefore = $leavesTree();
+foreach( [ 'without confirm' => [], 'with confirm' => [ 'confirm' => true ] ] as $kind => $more ) {
+	foreach( [ 200, 500, 410 ] as $other ) {
+		$answer = $leavesSave( $more + [ 'statusCode' => $other ] + $lost );
+		check( 'S3 the 404 page saved with the status '. $other. ' '. $kind. ': 400, routes_not_found_status, the field statusCode, the Element-URI as the parameter, nothing written',
+			$leavesIs( $answer, 400, 'routes_not_found_status' ) && ( $answer[1]['field'] ?? '' ) === 'statusCode' && ( $answer[1]['params'] ?? [] ) === [ '/404' ] && $leavesTree() === $leavesBefore );
+	}
+}
+$answer = $leavesSave( [ 'statusCode' => 404 ] + $lost );
+check( '...the 404 page saved with the status 404 is written', $answer[0] === 200 && ( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://404']['statusCode'] ?? 0 ) === 404 );
+
+// The page that moves the 404 role away in the same request is held to no status afterwards
+$keeperSet( $leavesStart() );
+$leavesBefore = $leavesTree();
+$answer = $leavesSave( [ 'statusCode' => 200, 'httpUris' => [ '' => '/gone' ] ] + $lost );
+check( 'a 404 page that moves its address and takes another status is not refused for the status, it is asked about the role: 409 routes_leaves_not_found', $leavesIs( $answer, 409, 'routes_leaves_not_found' ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'statusCode' => 200, 'httpUris' => [ '' => '/gone' ], 'confirm' => true ] + $lost );
+check( '...confirmed it is written, with the status the save posted', $answer[0] === 200 && ( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://gone'] ?? [] ) !== [] && isset( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://gone']['statusCode'] ) === false );
+
+// What the save makes counts: a page that is written with the route GET://404 has the status 404 whether it held that route before or not
+$statusRefused = static fn( array $answer ): bool => $leavesIs( $answer, 400, 'routes_not_found_status' ) && ( $answer[1]['field'] ?? '' ) === 'statusCode';
+$keeperSet( [ 'GET://' => $keeperPage( '/home', 'page-about' ), 'GET://other' => $keeperPage( '/other', 'page-about' ) ] );
+$leavesBefore = $leavesTree();
+$answer = $leavesSave( [ 'originalUri' => '/other', 'uri' => '/other', 'httpUris' => [ '' => '/404' ] ] );
+check( 'a page that is saved to the address /404 with the status 200, where the site has no 404 route: 400, routes_not_found_status, the field statusCode, nothing written', $statusRefused( $answer ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'originalUri' => '/other', 'uri' => '/other', 'httpUris' => [ '' => '/404' ], 'confirm' => true ] );
+check( '...with a confirmation as well', $statusRefused( $answer ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'originalUri' => '/other', 'uri' => '/other', 'httpUris' => [ '' => '/404' ], 'statusCode' => 404 ] );
+check( '...with the status 404 it is written, and the route answers 404', $answer[0] === 200 && ( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://404']['statusCode'] ?? 0 ) === 404 );
+
+$keeperSet( [ 'GET://' => $keeperPage( '/home', 'page-about' ), 'GET://other' => $keeperPage( '/other', 'page-about' ) ] );
+$leavesBefore = $leavesTree();
+$answer = $leavesSave( [ 'originalUri' => '', 'uri' => '/fresh', 'httpUris' => [ '' => '/404' ] ] );
+check( 'a new page at the address /404 with the status 200: 400, routes_not_found_status, the field statusCode, nothing written', $statusRefused( $answer ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'originalUri' => '', 'uri' => '/fresh', 'httpUris' => [ '' => '/404' ], 'statusCode' => 404 ] );
+check( '...with the status 404 it is made', $answer[0] === 200 && in_array( 'GET://404', $answer[2], true ) === true );
+
+$keeperSet( $leavesStart() );
+$answer = $leavesSave( [ 'statusCode' => 200, 'httpUris' => [ '' => '/gone' ], 'confirm' => true ] + $lost );
+$leavesBefore = $leavesTree();
+$back = [ 'originalUri' => '/404', 'uri' => '/404', 'httpUris' => [ '' => '/404' ], 'template' => 'page-contact' ];
+$answer = $leavesSave( [ 'statusCode' => 200 ] + $back );
+check( 'the 404 page that was moved away with the status 200 and is moved back with the status 200: 400, routes_not_found_status, nothing written', $statusRefused( $answer ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'statusCode' => 404 ] + $back );
+check( '...moved back with the status 404 it is written, and is the 404 page of the site once more', $answer[0] === 200 && ( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://404']['statusCode'] ?? 0 ) === 404 );
+
+// One save that loses both roles has a code of its own
+$both = static fn(): array => [
+	'GET://' 		=> $keeperPage( '/start', 'page-about', [ 'locale' => 'de_DE' ] ),
+	'GET://404' => $keeperPage( '/start', 'page-about', [ 'locale' => 'en_US', 'statusCode' => 404 ] ),
+	'GET://fr' 	=> $keeperPage( '/start', 'page-about', [ 'locale' => 'fr_FR', 'statusCode' => 404 ] ),
+];
+$keeperSet( $both() );
+$leavesBefore = $leavesTree();
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/de', 'en_US' => '/en', 'fr_FR' => '/fr' ], 'statusCode' => 404 ] + $perPage );
+check( 'a save that loses the home page and the 404 page together is refused with routes_leaves_both, and not with the one of the home page', $leavesIs( $answer, 409, 'routes_leaves_both' ) && $leavesTree() === $leavesBefore );
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/de', 'en_US' => '/en', 'fr_FR' => '/fr' ], 'statusCode' => 404, 'confirm' => true ] + $perPage );
+check( '...confirmed it is written, and neither GET:// nor GET://404 is left', $answer[0] === 200 && array_intersect( [ 'GET://', 'GET://404' ], $answer[2] ) === [] );
+$keeperSet( $both() );
+$answer = $leavesSave( [ 'httpUris' => [ 'de_DE' => '/de', 'en_US' => '/404', 'fr_FR' => '/fr' ], 'statusCode' => 404 ] + $perPage );
+check( '...and one that loses the home page only keeps the code of the home page', $leavesIs( $answer, 409, 'routes_leaves_home' ) );
+
+// A confirm on a save that needs none changes nothing
+$keeperSet( $leavesStart() );
+$answer = $leavesSave( [ 'originalUri' => '/other', 'uri' => '/other', 'httpUris' => [ '' => '/elsewhere' ] ] );
+$leavesPlain = $keeperFile();
+$keeperSet( $leavesStart() );
+$answer = $leavesSave( [ 'originalUri' => '/other', 'uri' => '/other', 'httpUris' => [ '' => '/elsewhere' ], 'confirm' => true ] );
+check( 'a save that needs no confirmation and carries one writes exactly what it writes without', $answer[0] === 200 && $keeperFile() === $leavesPlain );
+
+// The other callers of \Nino\Pages::put() do not know the question: without the key a save is made as it is posted
+$keeperSet( $leavesStart() );
+$leavesBefore = $leavesTree();
+foreach( [ 'the word yes' => 'yes', 'the number 1' => 1, 'true as a string' => 'true', 'false' => false ] as $kind => $notConfirm ) {
+	$asked = \Nino\Pages::put( $appData, [ 'uri' => '/home', 'originalUri' => '/home', 'template' => 'page-about', 'httpUris' => [ '' => '/start' ], 'text' => $leavesText(), 'confirm' => $notConfirm ] );
+	check( 'Pages::put() with confirm '. $kind. ' is no confirmation: 409, routes_leaves_home, nothing written', ( $asked['error']['status'] ?? 0 ) === 409 && ( $asked['error']['code'] ?? '' ) === 'routes_leaves_home' && $leavesTree() === $leavesBefore );
+}
+$keeperSet( $leavesStart() );
+$asked = \Nino\Pages::put( $appData, [ 'uri' => '/home', 'originalUri' => '/home', 'template' => 'page-about', 'httpUris' => [ '' => '/start' ], 'text' => $leavesText() ] );
+check( 'Pages::put() with no confirm key asks nothing: the home page that moves is written', isset( $asked['error'] ) === false && in_array( 'GET://', array_keys( \Nino\AppData::stored( $appData, '/nino/http/routes', [] ) ), true ) === false );
+$keeperSet( $leavesStart() );
+check( 'Pages::leaves() names what a route array loses: the home page, the 404 page, both, or none',
+	\Nino\Pages::leaves( [ 'GET://' => [], 'GET://404' => [] ], [ 'GET://404' => [] ] ) === [ 'home' ] && \Nino\Pages::leaves( [ 'GET://' => [], 'GET://404' => [] ], [ 'GET://' => [] ] ) === [ 'not_found' ]
+	&& \Nino\Pages::leaves( [ 'GET://' => [], 'GET://404' => [] ], [] ) === [ 'home', 'not_found' ] && \Nino\Pages::leaves( [ 'GET://' => [] ], [ 'GET://' => [], 'GET://x' => [] ] ) === [] );
+
+$keeperSet( $keeperRoutes );
+
 // What the fields of the record show is what was typed: the texts of a page are stored with their quotes and brackets as entities
 $quotedText = [];
 foreach( \Nino\Locales::getAvailableLocales( $appData ) as $quotedLocale )

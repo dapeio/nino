@@ -1045,6 +1045,125 @@ const DELETE = '/_admin/routes/label/delete';
 	check( 'a refused delete is said in the line of the bar, as an alert, and the record stays open with its page', r.lineOf( e ).dataset.state === 'error' && r.lineOf( e ).textContent === '(409) locked' && r.dialog() === e && r.ids().join() === '/,/contact' );
 }
 
+// --- a save that leaves the site without its start page or its 404 page is asked about -----------------------------------------------
+
+{
+	const SAVE_TITLE = text('/_admin/routes/confirm/leaves-title');
+
+	// The page the record shows is moved to another address; the server refuses it until it is confirmed
+	const move = ( uris, uri, address, press = SAVE ) => {
+		const w = world();
+		const list = listing( uris );
+		for( const one of list.pages.filter( each => each.uri === '/missing' ) )
+			Object.assign( one, { template : 'page-contact', statusCode : 404 } );
+		w.open( list );
+		const questions = [];
+		const confirm = w.h.ui.confirm;
+		w.h.ui.confirm = function( level, options ) { questions.push( Object.assign( { level : level }, options ) ); return confirm.call( this, level, options ) };
+		const d = w.openRow( uri );
+		w.type( w.addressControls( d )[0], address );
+		if( press !== null ) {
+			w.button( d, press ).focus();
+			fire( w.button( d, press ), 'click' );
+		}
+		return { w, d, questions, sent : w.requests.at(-1) };
+	};
+
+	for( const [ uri, code ] of [ [ '/', 'routes_leaves_home' ], [ '/missing', 'routes_leaves_not_found' ], [ '/', 'routes_leaves_both' ] ] ) {
+
+		const { w, d, questions, sent } = move( [ '/', '/missing' ], uri, '/elsewhere' );
+		const before = w.requests.length;
+
+		w.answer( 409, { error : 'leaves', code : code, params : [ uri ], field : '' } );
+		const asked = questions.at(-1);
+
+		check( code+ ': the refusal opens a question of the destructive level, on the record, with the question of the page and its address and, after it, the sentence of the code, and the answer worded like its title - and no error is drawn',
+			questions.length === 1 && asked.level === 'destructive' && asked.nested === true && asked.message === w.h.ui.format( text('/_admin/routes/confirm/leaves'), w.titleOf( d ), '/elsewhere' )+ ' '+ text('/_admin/error/'+ code) && text('/_admin/error/'+ code) !== '' && asked.title === SAVE_TITLE && asked.yes === SAVE_TITLE && asked.no === text('/_admin/common/label/cancel')
+			&& w.asking() !== null && w.lineOf( d ).dataset.state !== 'error' && errorsOf( d ).length === 0 );
+		check( '...the German sentence is another one that says what follows', moduleDe['/_admin/error/'+ code] !== undefined && moduleDe['/_admin/error/'+ code] !== text('/_admin/error/'+ code) && w.requests.length === before );
+
+		check( '...while the question stands the line of the bar does not say that the page is being saved: it says what is true, unsaved input', w.lineOf( d ).dataset.state === 'dirty' && w.lineOf( d ).textContent !== text('/_admin/common/msg/saving') );
+
+		// No: nothing is sent, the form stays with its values, nothing is marked as an error
+		const line = w.lineOf( d );
+		const seen = [];
+		let shown = line.textContent;
+		Object.defineProperty( line, 'textContent', { get : () => shown, set : value => { shown = value; seen.push( value ) }, configurable : true } );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/common/label/cancel') ), 'click' );
+		check( '...no sends nothing, the record stays open with what was typed, and nothing is marked as an error - the line says what it says of unsaved input', w.requests.length === before && w.dialog() === d && w.addressControls( d )[0].value === '/elsewhere'
+			&& w.lineOf( d ).dataset.state === 'dirty' && errorsOf( d ).length === 0 && w.toasts().length === 0 && w.touches.length === 0 && w.h.dirty.isDirty( [ 'routes' ] ) === true );
+
+		check( '...on that path the line never held an error sentence - only nothing or the words of unsaved input - and ends as a status, not as an alert, with no field marked', seen.every( value => value === '' || value === shown ) && shown === text('/_admin/common/msg/dirty')
+			&& line.attributes.role === 'status' && findAll( d, el => el.attributes !== undefined && el.attributes['aria-invalid'] === 'true' ).length === 0 );
+
+		// The same save a second time asks a second time, and yes sends the same data plus confirm : true
+		fire( w.button( d, SAVE ), 'click' );
+		check( '...saved a second time, the record sends the same data without a confirmation, and is asked a second time', w.requests.length === before + 1 && JSON.stringify( w.requests.at(-1).payload ) === JSON.stringify( sent.payload ) && 'confirm' in w.requests.at(-1).payload === false );
+		w.answer( 409, { error : 'leaves', code : code, params : [ uri ], field : '' } );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === SAVE_TITLE ), 'click' );
+		check( '...yes puts the line to saving, as the save is in flight', w.lineOf( d ).dataset.state === 'saving' );
+		check( '...yes sends the same save with confirm : true and nothing else changed', w.requests.length === before + 2 && w.requests.at(-1).action === 'routes/save' && w.requests.at(-1).payload.confirm === true
+			&& JSON.stringify( Object.assign( {}, w.requests.at(-1).payload, { confirm : undefined } ) ) === JSON.stringify( Object.assign( {}, sent.payload, { confirm : undefined } ) ) );
+
+		const written = listing( [ '/', '/missing' ] ).pages;
+		written.find( one => one.uri === uri ).httpUris = { '' : '/elsewhere' };
+		written.find( one => one.uri === uri ).httpUri = '/elsewhere';
+		w.answer( 200, { pages : written } );
+		check( '...and the answer is that of a save: written, said as a toast, the record stays and holds nothing unsaved', w.toasts().at(-1) === text('/_admin/common/msg/saved') && w.touches.length === 1 && w.dialog() === d && w.h.dirty.isDirty( [ 'routes' ] ) === false && w.lineOf( d ).dataset.state !== 'error' );
+	}
+
+	// The question that Save and continue opened gives the focus back to that button, the one of Save to Save
+	for( const [ label, name ] of [ [ SAVE, 'Save' ], [ SAVE_NEXT, 'Save and continue' ] ] ) {
+		const { w, d } = move( [ '/', '/missing' ], '/', '/elsewhere', label );
+		w.answer( 409, { error : 'leaves', code : 'routes_leaves_home', params : [ '/' ], field : '' } );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/common/label/cancel') ), 'click' );
+		check( 'a question answered no hands the focus back to the button that was pressed: '+ name, w.focused() === w.button( d, label ) );
+	}
+
+	// The words, in both languages
+	const de = fills('_admin/Nino/Modules/Routes/text/de_DE.php');
+	check( 'the question and the sentences of the three codes are worded as agreed, in English', text('/_admin/routes/confirm/leaves') === 'Save the page “%s” at “%s”?'
+		&& text('/_admin/error/routes_leaves_home') === 'The site has no start page afterwards: the address “/” answers “not found”.'
+		&& text('/_admin/error/routes_leaves_not_found') === 'No page answers an address that does not exist afterwards.'
+		&& text('/_admin/error/routes_leaves_both') === 'The site has neither a start page nor a page for addresses that do not exist afterwards: the address “/” and every other unknown address answer with an empty “not found”.' );
+	check( '...and in German', de['/_admin/routes/confirm/leaves'] === 'Die Seite „%s“ unter „%s“ speichern?'
+		&& de['/_admin/error/routes_leaves_home'] === 'Die Website hat danach keine Startseite: Die Adresse „/“ antwortet mit „nicht gefunden“.'
+		&& de['/_admin/error/routes_leaves_not_found'] === 'Danach beantwortet keine Seite eine Adresse, die es nicht gibt.'
+		&& de['/_admin/error/routes_leaves_both'] === 'Danach hat die Website weder eine Startseite noch eine Seite für Adressen, die es nicht gibt: Die Adresse „/“ und jede andere unbekannte Adresse werden mit einem leeren „nicht gefunden“ beantwortet.'
+		&& de['/_admin/routes/confirm/leaves-title'] === 'Seite speichern' && text('/_admin/routes/confirm/leaves-title') === 'Save page' );
+
+	// A confirmed save the server refuses for another reason is an error like any other
+	{
+		const { w, d } = move( [ '/', '/missing' ], '/', '/elsewhere' );
+		w.answer( 409, { error : 'leaves', code : 'routes_leaves_home', params : [ '/' ], field : '' } );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === SAVE_TITLE ), 'click' );
+		w.answer( 409, { error : 'taken', code : 'routes_http_uri_taken', params : [ '/elsewhere' ], field : 'httpUri' } );
+		check( 'a confirmed save that the server refuses for another reason is said at its field, and is not asked about a second time', w.asking() === null && errorsOf( d ).length === 1 && w.requests.filter( one => one.action === 'routes/save' ).length === 2 );
+	}
+
+	// A refusal of the same status that is none of the two codes is no question
+	{
+		const { w, d, questions } = move( [ '/', '/missing' ], '/', '/elsewhere' );
+		w.answer( 409, { error : 'locked' } );
+		check( 'a 409 that is none of the two codes is an error and asks nothing', questions.length === 0 && w.lineOf( d ).dataset.state === 'error' && w.lineOf( d ).textContent === '(409) locked' );
+	}
+
+	// The 404 page that is given another status: the 400 lands at the status field
+	{
+		const w = world();
+		const list = listing( [ '/', '/missing' ] );
+		Object.assign( list.pages[1], { template : 'page-contact', statusCode : 404 } );
+		w.open( list );
+		const d = w.openRow('/missing');
+		w.type( w.field( d, 'statusCode' ), '200' );
+		fire( w.button( d, SAVE ), 'click' );
+		w.answer( 400, { error : 'status', code : 'routes_not_found_status', params : [ '/missing' ], field : 'statusCode' } );
+		check( 'the refusal of a status other than 404 for the 404 page is said at the status field, with its sentence and the focus, and asks no question',
+			w.asking() === null && w.field( d, 'statusCode' ).attributes['aria-invalid'] === 'true' && w.focused() === w.field( d, 'statusCode' ) && errorsOf( d ).length === 1
+			&& errorsOf( d )[0].textContent === text('/_admin/error/routes_not_found_status').replace( '%s', '/missing' ) && w.lineOf( d ).dataset.state === 'error' && w.lineOf( d ).textContent === errorsOf( d )[0].textContent );
+	}
+}
+
 // --- the address a window beside the workbench goes to, the language, a body that picks its template -------------------------------
 
 {
