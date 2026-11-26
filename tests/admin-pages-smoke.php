@@ -328,7 +328,7 @@ check( '...refuses a page whose Element-URI is /404 at another address, as Pages
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
 check( '...and the list says deletable false for the page at "/", the page of GET://404 and the page /404, and true for the other', $status === 200 && array_column( $body['pages'], 'deletable', 'uri' ) === [ '/home' => false, '/missing' => false, '/404' => false, '/ordinary' => true ]
-	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text', 'deletable' ] );
+	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text', 'stamp', 'deletable' ] );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/ordinary' ] );
 check( '...an ordinary page is deleted as ever: 200, its route gone and no other', $status === 200 && array_keys( \Nino\AppData::stored( $appData, '/nino/http/routes', [] ) ) === [ 'GET://', 'GET://404', 'GET://elsewhere' ] );
@@ -674,6 +674,269 @@ check( 'a new page writes the routes, the texts of every language, the address f
 
 callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/write-probe-new' ] );
 callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/write-probe' ] );
+
+// A form of a page that exists carries the stamp of the page as the list gave it: a page that was changed or removed by somebody else since is a conflict - 409, and not a save
+// that writes over it or makes the page anew - and nothing is written. Whatever a save can change is part of the stamp, and what it keeps is not; a request with no stamp is
+// written as it is posted, as every other caller of \Nino\Pages::put() is
+$staleBase = [ 'originalUri' => '/stamp-probe', 'uri' => '/stamp-probe', 'httpUris' => [ '' => '/stamp-probe' ], 'template' => 'page-about', 'statusCode' => 200, 'navs' => [], 'text' => $writeBase['text'] ];
+$staleDo = static function( string $method, array $data = [], string $class = \Nino\Modules\Routes\Admin::class ) use ( &$appData ): array { return callDev( $appData, $class, $method, $data ); };
+$staleSave = static fn( array $page ): array => $staleDo( 'apiSave', $page );
+$staleStamp = static function( string $uri = '/stamp-probe' ) use ( $staleDo ): ?string {
+	[ , $listed ] = $staleDo( 'apiList' );
+	return array_column( $listed['pages'], 'stamp', 'uri' )[$uri] ?? null;
+};
+$staleFresh = static function() use ( $staleBase, $staleSave, $staleDo ): void {
+	$staleDo( 'apiDelete', [ 'uri' => '/stamp-probe' ] );
+	$staleDo( 'apiDelete', [ 'uri' => '/stamp-probe-a' ] );
+	$staleSave( [ 'originalUri' => '' ] + $staleBase );
+};
+$staleFresh();
+$stamp0 = $staleStamp();
+check( 'the list gives every page the stamp of its state: one opaque string, the same for the same state, and another for every other page', is_string( $stamp0 ) === true && $stamp0 !== '' && $stamp0 === $staleStamp()
+	&& count( array_unique( array_filter( array_column( callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' )[1]['pages'], 'stamp' ) ) ) ) === count( callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' )[1]['pages'] ) );
+
+// B saves the form it read at $stamp0 after A did something to the page
+$staleHost = static function( string $label, callable $a, string $code = 'routes_conflict' ) use ( $staleBase, $staleSave, $staleStamp, $staleFresh, $writeTree, $writeAged, $writeDiff ): void {
+	$staleFresh();
+	$from = $staleStamp();
+	$a();
+	$b = [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Von B' ] ] ), 'stamp' => $from ] + $staleBase;
+	$writeAged();
+	$held = $writeTree();
+	[ $status, $body ] = $staleSave( $b );
+	check( $label. ': the save of the form that was read before is 409 with the code '. $code. ', the page named, and every file of the project is as it was', $status === 409 && ( $body['code'] ?? '' ) === $code
+		&& ( $body['params'] ?? [] ) === [ '/stamp-probe' ] && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+};
+
+$staleHost( 'A moved the address of the page', static fn() => $staleSave( [ 'httpUris' => [ '' => '/stamp-probe-a' ] ] + $staleBase ) );
+$staleHost( 'A gave the page the address of one language', static fn() => $staleSave( [ 'httpUris' => [ 'de_DE' => '/stamp-probe-de', '' => '/stamp-probe' ] ] + $staleBase ) );
+$staleHost( 'A changed the status', static fn() => $staleSave( [ 'statusCode' => 203 ] + $staleBase ) );
+$staleHost( 'A changed the template', static fn() => $staleSave( [ 'template' => 'page-contact' ] + $staleBase ) );
+$staleHost( 'A changed the name of one language', static fn() => $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'en_US' => [ 'name' => 'Von A' ] ] ) ] + $staleBase ) );
+$staleHost( 'A changed the title of one language', static fn() => $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'fr_FR' => [ 'title' => 'Von A' ] ] ) ] + $staleBase ) );
+$staleHost( 'A changed the description of one language', static fn() => $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'description' => 'Von A' ] ] ) ] + $staleBase ) );
+$staleHost( 'A gave the page another Element-URI - the page B read is gone, whatever it is called', static fn() => $staleSave( [ 'uri' => '/stamp-probe-a' ] + $staleBase ), 'routes_conflict_gone' );
+$staleHost( 'A removed the page', static fn() => $staleDo( 'apiDelete', [ 'uri' => '/stamp-probe' ] ), 'routes_conflict_gone' );
+$staleHost( 'the Text panel changed the title of the page, a text of the page like any other', static fn() => $staleDo( 'apiSaveBatch', [ 'items' => [ [ 'key' => '/_nino/webpage/stamp-probe/title', 'locale' => 'en_US', 'value' => 'From the Text panel' ] ] ], \Nino\Modules\Text\Admin::class ) );
+foreach( [ 'name', 'title', 'description', 'uri' ] as $staleField )
+	$staleHost( 'a text file was written by hand - the '. $staleField. ' of one language', static function() use ( &$appData, $staleField ): void {
+		\Nino\Filesystem::mutate( $appData, '/text/fr_FR.php', static function( array $content ) use ( $staleField ): array { $content['[[/_nino/webpage/stamp-probe/'. $staleField. ']]'] = 'by hand'; return $content; } );
+	} );
+$staleHost( 'global.php holds another address of the page', static function() use ( &$appData ): void {
+	\Nino\Filesystem::mutate( $appData, '/text/global.php', static function( array $content ): array { $content['[[/_nino/webpage/stamp-probe/uri]]'] = '/by-hand'; return $content; } );
+} );
+$staleHost( 'a language was added to the site', static function() use ( &$appData ): void {
+	callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'en_US', 'fr_FR', 'it_IT' ], '/nino/locales/native' => 'de_DE' ] ] );
+} );
+callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'en_US', 'fr_FR' ], '/nino/locales/native' => 'de_DE' ] ] );
+
+// Another writer's change that lands while a save is on its way: the Texts panel writes a text file under that file's lock alone. A file of the text that is planted with a
+// hook gives the content it has and, once, writes another text of the project - at the moment the save reads it
+$staleEffect = static function( string $file, string $from, string $to ) use ( $sandbox ): bool {
+	$path = $sandbox. '/private'. $file;
+	file_put_contents( $path, str_replace( $from, $to, (string) file_get_contents( $path ) ) );
+	return true;
+};
+$stalePlant = static function( string $file, callable $effect ) use ( &$appData, $sandbox ): callable {
+	$content = \Nino\Filesystem::getFileContent( $appData, $file, [] );
+	$fired = false;
+	$GLOBALS['ninoHook']['stale'] = static function() use ( $content, $effect, &$fired ): array {
+		if( $fired === false && $effect() !== false )
+			$fired = true;
+
+		return $content;
+	};
+	file_put_contents( $sandbox. '/private'. $file, '<?php return ( $GLOBALS[\'ninoHook\'][\'stale\'] ?? static fn(): array => [] )();' );
+	unset( $appData['./nino/filesystem/cache'] );
+	return static function() use ( &$appData, $file, $content ): void {
+		unset( $GLOBALS['ninoHook'], $appData['./nino/filesystem/cache'] );
+		\Nino\Filesystem::putFileContent( $appData, $file, $content );
+	};
+};
+$staleFile = static fn( string $file ): string => (string) file_get_contents( $sandbox. '/private'. $file );
+
+// A text changed after the save has read the files and before it writes them is a conflict, and the save writes none of its files - the one it would have written first included
+$staleFresh();
+$from = $staleStamp();
+$unplant = $stalePlant( '/text/global.php', static fn(): bool => $staleEffect( '/text/en_US.php', 'Probe - en_US', 'Elsewhere' ) );
+$configBefore = $staleFile( '/config.php' );
+[ $status, $body ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Neuer Name' ] ] ), 'statusCode' => 203, 'stamp' => $from ] + $staleBase );
+$unplant();
+check( 'a text of the page that was written between the check and the write is 409 routes_conflict, and nothing of the save is written: not the file of the first language, not the routes, and what the other writer wrote stays',
+	$status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' && str_contains( $staleFile( '/text/en_US.php' ), 'Elsewhere' ) && str_contains( $staleFile( '/text/de_DE.php' ), 'Neuer Name' ) === false && $staleFile( '/config.php' ) === $configBefore );
+// No lock is held after a save that was refused: asked from a second handle that does not wait, while the app data of the request is alive
+$staleHeld = static function() use ( $appData ): array {
+	$held = [];
+	foreach( [ '/config.php', '/text/de_DE.php', '/text/en_US.php', '/text/fr_FR.php', '/text/global.php' ] as $lockPath ) {
+		$other = $appData;
+		unset( $other['./nino/filesystem/locks'] );
+		if( \Nino\Filesystem::lockFile( $other, $lockPath, false ) === false )
+			$held[] = $lockPath;
+		else
+			\Nino\Filesystem::unlockFile( $other, $lockPath );
+	}
+	return $held;
+};
+check( '...and a save that was refused for a text that changed meanwhile holds no lock afterwards: not config.php, not a file of the text', $staleHeld() === [] );
+[ $status ] = $staleSave( [ 'stamp' => $staleStamp() ] + $staleBase );
+check( '...and the locks are let go: the next save with the state the page has is written', $status === 200 && $staleHeld() === [] );
+
+// A text file whose lock cannot be taken: a directory where its side-car lock goes. The save is 500, writes nothing, and holds no lock - the file it had locked before the one that failed included
+$staleFresh();
+$staleFrom = $staleStamp();
+$staleLock = $sandbox. '/private/data/.locks/'. sha1( '/text/en_US.php' ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $staleLock );
+mkdir( $staleLock );
+$writeAged();
+$held = $writeTree();
+[ $status, $body ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Neuer Name' ] ] ), 'statusCode' => 203, 'stamp' => $staleFrom ] + $staleBase );
+$heldAfter = $staleHeld();
+rmdir( $staleLock );
+check( 'a save whose text file cannot be locked is 500, writes no file - not the file of the language it had locked, not the routes - and no lock is held after it', $status === 500 && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] && $heldAfter === [ '/text/en_US.php' ] );
+unset( $appData['./nino/filesystem/locks'] );
+[ $status ] = $staleSave( [ 'stamp' => $staleStamp() ] + $staleBase );
+check( '...and with the lock to be had the same save is written', $status === 200 );
+
+// The state a save answers with is the state it wrote: a change that lands after its write and before the list is read is no part of the stamp the form takes, so the form's next save is a conflict
+$staleFresh();
+$from = $staleStamp();
+$unplant = $stalePlant( '/text/en_US.php', static fn(): bool => str_contains( $staleFile( '/text/de_DE.php' ), 'Neuer Name' ) === true && $staleEffect( '/text/de_DE.php', 'Probe - de_DE', 'Elsewhere' ) );
+[ $status, $body ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Neuer Name' ] ] ), 'stamp' => $from ] + $staleBase );
+$unplant();
+$answered = array_column( $body['pages'] ?? [], 'stamp', 'uri' )['/stamp-probe'] ?? '';
+check( 'a save answers with the state of the page as it wrote it: another write that landed after it is not in that stamp', $status === 200 && str_contains( $staleFile( '/text/de_DE.php' ), 'Elsewhere' ) && $answered !== '' && $answered !== $staleStamp() );
+[ $status, $body ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Neuer Name zwei' ] ] ), 'stamp' => $answered ] + $staleBase );
+check( '...so the next save of that form is a conflict, and does not write over what landed', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' && str_contains( $staleFile( '/text/de_DE.php' ), 'Elsewhere' ) );
+$staleFresh();
+
+// What a save keeps and no form edits, and the place of the page among the others, are no change of the page: a form that was read before them is saved
+$staleFresh();
+$from = $staleStamp();
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array { $config['/nino/http/routes']['GET://stamp-probe'] += [ 'maintenance' => false, 'header' => [ 'X-Kept' => '1' ] ]; return $config; } );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/stamp-probe', 'direction' => 'up' ] );
+check( 'a field the form does not edit and the place of the page in the order are no part of its state: the stamp is what it was', $staleStamp() === $from );
+[ $status ] = $staleSave( [ 'stamp' => $from ] + $staleBase );
+check( '...and the form that was read before is saved', $status === 200 );
+
+// A save with the fresh state is a save, twice from one form with the stamp the first one answered with, and the stamp does not move for a save that writes nothing
+$staleFresh();
+$from = $staleStamp();
+[ $status, $body ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Erst' ] ] ), 'stamp' => $from ] + $staleBase );
+$answered = array_column( $body['pages'] ?? [], 'stamp', 'uri' )['/stamp-probe'] ?? '';
+check( 'a save with the state the page has is written, and answers the pages with the stamp of the page as it is stored', $status === 200 && $answered !== $from && $answered === $staleStamp() );
+[ $status, $body ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Erst' ] ] ), 'stamp' => $answered ] + $staleBase );
+check( '...the second save of the same form, with that stamp, is written as well, and one that writes nothing leaves the stamp as it is', $status === 200 && ( array_column( $body['pages'], 'stamp', 'uri' )['/stamp-probe'] ?? '' ) === $answered && $staleStamp() === $answered );
+[ $status ] = $staleSave( [ 'text' => array_replace_recursive( $staleBase['text'], [ 'de_DE' => [ 'name' => 'Zweit' ] ] ), 'stamp' => $from ] + $staleBase );
+check( '...and the first stamp is stale after the first save', $status === 409 );
+
+// A save with the state the page has may give it another Element-URI: the texts are asked for as they stood under the name of then, and written under the new one
+$staleFresh();
+[ $status, $body ] = $staleSave( [ 'uri' => '/stamp-probe-a', 'stamp' => $staleStamp() ] + $staleBase );
+$answered = array_column( $body['pages'] ?? [], 'stamp', 'uri' )['/stamp-probe-a'] ?? '';
+check( 'a save that carries the state of the page and gives it another Element-URI is written, and answers with the stamp of the page under its new name', $status === 200 && $answered !== '' && $answered === $staleStamp( '/stamp-probe-a' ) && $staleStamp() === null );
+$staleFresh();
+
+// No stamp: as it was for every caller - the page that was changed is written over, the page that is gone is made anew
+$staleFresh();
+$staleSave( [ 'httpUris' => [ '' => '/stamp-probe-a' ] ] + $staleBase );
+[ $status ] = $staleSave( $staleBase );
+check( 'a save with no stamp of a page that was changed writes what it posts', $status === 200 && $staleStamp() !== null && isset( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://stamp-probe'] ) === true && isset( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://stamp-probe-a'] ) === false );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe' ] );
+[ $status ] = $staleSave( $staleBase );
+check( '...and one of a page that is gone makes it anew', $status === 200 && $staleStamp() !== null );
+$staleFresh();
+$staleFrom = $staleStamp();
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe' ] );
+$writeAged();
+$held = $writeTree();
+[ $status, $body ] = $staleSave( [ 'stamp' => $staleFrom ] + $staleBase );
+check( 'a save with the stamp of a page that is gone does not make it: 409 routes_conflict_gone, and no file is touched', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict_gone' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] && $staleStamp() === null );
+
+// A stamp that is no stamp: of another page, a string that was never one - the page was not as that - and what is no string at all or no page's
+$staleFresh();
+$other = $staleStamp( '/stamp-probe' );
+foreach( [ 'the stamp of another page' => $staleStamp( array_key_first( array_diff_key( array_column( callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' )[1]['pages'], 'stamp', 'uri' ), [ '/stamp-probe' => true ] ) ) ), 'a string that is none' => 'garbage', 'an empty string' => '' ] as $kind => $given ) {
+	$writeAged();
+	$held = $writeTree();
+	[ $status, $body ] = $staleSave( [ 'stamp' => $given ] + $staleBase );
+	check( $kind. ' is a conflict: 409 routes_conflict, nothing written', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+}
+foreach( [ 'a number' => 5, 'null' => null, 'a list' => [ $other ], 'a true' => true ] as $kind => $given ) {
+	$writeAged();
+	$held = $writeTree();
+	[ $status, $body ] = $staleSave( [ 'stamp' => $given ] + $staleBase );
+	check( $kind. ' is no stamp: 400 routes_invalid_stamp at the field stamp, nothing written', $status === 400 && ( $body['code'] ?? '' ) === 'routes_invalid_stamp' && ( $body['field'] ?? '' ) === 'stamp' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+}
+[ $status, $body ] = $staleSave( [ 'originalUri' => '', 'uri' => '/stamp-probe-new', 'httpUris' => [ '' => '/stamp-probe-new' ], 'stamp' => $other ] + $staleBase );
+check( 'a stamp with a page that is new has no page to be the state of: 400 routes_invalid_stamp, and the page is not made', $status === 400 && ( $body['code'] ?? '' ) === 'routes_invalid_stamp' && isset( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://stamp-probe-new'] ) === false );
+
+// The order of the refusals: what is wrong with the form itself first - then the conflict - then the status of the 404 page, then the question of the start page
+$staleSet = static function( array $routes ) use ( &$appData ): void {
+	\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ) use ( $routes ): array { $config['/nino/http/routes'] = $routes; return $config; } );
+	$appData['/nino/http/routes'] = $routes;
+};
+$staleRoutes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+$staleFresh();
+$staleEntry = static fn( string $uri ): array => [ 'uri' => $uri, 'body' => '[template /templates/page-about]' ];
+$staleSet( \Nino\AppData::stored( $appData, '/nino/http/routes', [] ) + [ 'GET://' => $staleEntry( '/stamp-home' ), 'GET://404' => $staleEntry( '/stamp-lost' ) + [ 'statusCode' => 404 ] ] );
+$homeBase = [ 'originalUri' => '/stamp-home', 'uri' => '/stamp-home', 'httpUris' => [ '' => '/' ], 'template' => 'page-about', 'statusCode' => 200, 'navs' => [], 'text' => $writeBase['text'] ];
+$lostBase = [ 'originalUri' => '/stamp-lost', 'uri' => '/stamp-lost', 'httpUris' => [ '' => '/404' ], 'template' => 'page-about', 'statusCode' => 404, 'navs' => [], 'text' => $writeBase['text'] ];
+$homeFrom = $staleStamp( '/stamp-home' );
+$lostFrom = $staleStamp( '/stamp-lost' );
+$staleSave( [ 'text' => array_replace_recursive( $writeBase['text'], [ 'de_DE' => [ 'name' => 'Von A' ] ] ) ] + $homeBase );
+$staleSave( [ 'text' => array_replace_recursive( $writeBase['text'], [ 'de_DE' => [ 'name' => 'Von A' ] ] ) ] + $lostBase );
+$writeAged();
+$held = $writeTree();
+[ , $body ] = $staleSave( [ 'httpUris' => [ '' => '/start' ], 'stamp' => $homeFrom ] + $homeBase );
+check( 'a stale form that would take the start page away is a conflict first: routes_conflict, and not the question of the start page', ( $body['code'] ?? '' ) === 'routes_conflict' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+[ , $body ] = $staleSave( [ 'statusCode' => 200, 'stamp' => $lostFrom ] + $lostBase );
+check( '...and a stale form that gives the 404 page another status is a conflict first: routes_conflict, and not routes_not_found_status', ( $body['code'] ?? '' ) === 'routes_conflict' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+[ , $body ] = $staleSave( [ 'statusCode' => 200, 'stamp' => $staleStamp( '/stamp-lost' ) ] + $lostBase );
+check( '...with the state the page has, the status of the 404 page is the rule that answers', ( $body['code'] ?? '' ) === 'routes_not_found_status' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+[ , $body ] = $staleSave( [ 'httpUris' => [ '' => '/start' ], 'stamp' => $staleStamp( '/stamp-home' ) ] + $homeBase );
+check( '...and the question of the start page is the one a fresh form is asked', ( $body['code'] ?? '' ) === 'routes_leaves_home' && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+// The confirmed save is the same save with the same stamp, and is checked as the first one was
+$confirmFrom = $staleStamp( '/stamp-home' );
+$staleSave( [ 'text' => array_replace_recursive( $writeBase['text'], [ 'en_US' => [ 'title' => 'Von C' ] ] ) ] + $homeBase );
+[ $status, $body ] = $staleSave( [ 'httpUris' => [ '' => '/start' ], 'stamp' => $confirmFrom, 'confirm' => true ] + $homeBase );
+check( 'a confirmed save carries the stamp and is still checked: the page was changed between the question and the answer, so it is 409 routes_conflict and not written', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' && isset( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://'] ) === true );
+[ $status ] = $staleSave( [ 'httpUris' => [ '' => '/start' ], 'stamp' => $staleStamp( '/stamp-home' ), 'confirm' => true ] + $homeBase );
+check( '...and with the state the page has it is written', $status === 200 && isset( \Nino\AppData::stored( $appData, '/nino/http/routes', [] )['GET://'] ) === false );
+$staleSet( $staleRoutes );
+$staleFresh();
+
+// The delete carries the stamp as well: the page that was changed or removed since is not the one that was asked to be taken away; no stamp, and it is as it was
+$staleFrom = $staleStamp();
+$staleSave( [ 'httpUris' => [ '' => '/stamp-probe-a' ] ] + $staleBase );
+$writeAged();
+$held = $writeTree();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe', 'stamp' => $staleFrom ] );
+check( 'a delete of the page as it was read before it was changed is 409 routes_conflict, and nothing is removed', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' && ( $body['params'] ?? [] ) === [ '/stamp-probe' ] && $writeDiff( $held, $writeTree() ) === [ [], [], [] ] );
+$staleFresh();
+$staleFrom = $staleStamp();
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe', 'stamp' => $staleFrom ] );
+check( 'a delete of a page that somebody else removed is 409 routes_conflict_gone with a stamp, and 404 "unknown page" with none, as it was', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict_gone'
+	&& callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe' ] )[0] === 404 );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe', 'stamp' => 5 ] );
+check( 'a delete with a stamp that is no string is 400', $status === 400 );
+$staleFresh();
+$staleFrom = $staleStamp();
+$staleSave( [ 'httpUris' => [ '' => '/stamp-probe-a' ] ] + $staleBase );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe' ] );
+check( 'a delete with no stamp takes the page that was changed, as it did', $status === 200 && $staleStamp() === null );
+$staleFresh();
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-probe', 'stamp' => $staleStamp() ] );
+check( 'a delete with the state the page has takes it', $status === 200 && $staleStamp() === null );
+$staleSet( \Nino\AppData::stored( $appData, '/nino/http/routes', [] ) + [ 'GET://' => $staleEntry( '/stamp-home' ) ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-home', 'stamp' => $staleStamp( '/stamp-home' ) ] );
+check( 'the page at "/" is refused as it is with a state that is current: 409 routes_remove_home', $status === 409 && ( $body['code'] ?? '' ) === 'routes_remove_home' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/stamp-home', 'stamp' => 'garbage' ] );
+check( '...and with a state that is not, the conflict is what is said first', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' );
+$staleSet( $staleRoutes );
+
+$staleDo( 'apiDelete', [ 'uri' => '/stamp-probe' ] );
 
 // What a route carries that the form does not edit stays. Somebody put a
 // 'maintenance' => false, a 'locale' and a 'header' on it in config.php - the
@@ -1116,7 +1379,7 @@ ninoUser( $appData, 'routesright@example.com', [ \Nino\Modules\Routes\Admin::MAN
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'routes/list' );
 check( 'with the right the list answers the pages in the order they are stored in, with what the table shows and the record reads - and writes nothing', $status === 200 && $routesHeld() === $routesBefore && in_array( '/acc-a', array_column( $body['pages'], 'uri' ), true )
 	&& array_search( '/acc-a', array_column( $body['pages'], 'uri' ), true ) < array_search( '/acc-b', array_column( $body['pages'], 'uri' ), true )
-	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text', 'deletable' ] && isset( $body['runtime'], $body['templates'], $body['locales'], $body['localeNames'], $body['selectedLocale'], $body['navs'], $body['navNames'], $body['defaultTemplate'] ) );
+	&& array_keys( $body['pages'][0] ) === [ 'uri', 'httpUri', 'httpUris', 'template', 'navs', 'statusCode', 'body', 'text', 'stamp', 'deletable' ] && isset( $body['runtime'], $body['templates'], $body['locales'], $body['localeNames'], $body['selectedLocale'], $body['navs'], $body['navNames'], $body['defaultTemplate'] ) );
 [ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], $routeActions['routes/save'], 'routes/save' );
 check( '...a save writes the page: its texts', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/acc-a/name]]'] ?? '' ) === 'acc-a changed' );
 $accOrder = static fn(): array => array_column( ( ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'routes/list' )[1] )['pages'], 'uri' );
@@ -1654,6 +1917,25 @@ $beforeRoutes = $configArray()['/nino/http/routes'];
 ] );
 check( 'a page saved with a tick for a navigation that is gone is refused with a code at the field "navs", and nothing is written', $status === 400 && ( $body['code'] ?? '' ) === 'routes_unknown_nav' && ( $body['field'] ?? '' ) === 'navs' && ( $body['params'] ?? [] ) === [ 'ghost' ]
 	&& $configArray()['/nino/http/routes'] === $beforeRoutes );
+// A form of a page that was read before a menu it is in was renamed is a conflict, and not the refusal of a tick for a menu that is gone
+file_put_contents( $sandbox. '/private/templates/page-nav.tpl', '<h1>Nav</h1>' );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '', 'uri' => '/nav-probe', 'httpUris' => [ '' => '/nav-probe' ], 'template' => 'page-nav', 'navs' => [ 'primary' ], 'text' => $pageText('Nav') ] );
+[ , $navListed ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$navStamp = array_column( $navListed['pages'], 'stamp', 'uri' )['/nav-probe'] ?? '';
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'primary', 'key' => 'prime' ] );
+$navForm = [ 'originalUri' => '/nav-probe', 'uri' => '/nav-probe', 'httpUris' => [ '' => '/nav-probe' ], 'template' => 'page-nav', 'navs' => [ 'primary' ], 'text' => $pageText('Nav') ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $navForm + [ 'stamp' => $navStamp ] );
+check( 'a stale form that ticks a menu that was renamed is 409 routes_conflict, where a form with no stamp is refused for the tick', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict'
+	&& ( callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $navForm )[1]['code'] ?? '' ) === 'routes_unknown_nav' );
+// ...also where the same form gives the page another Element-URI: the page the stamp is of is the one it was read as, whatever it is called after the save
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'uri' => '/nav-probe-two' ] + $navForm + [ 'stamp' => $navStamp ] );
+check( 'a stale form that ticks a menu that was renamed and renames the page too is 409 routes_conflict, for the page it was read as', $status === 409 && ( $body['code'] ?? '' ) === 'routes_conflict' && ( $body['params'] ?? [] ) === [ '/nav-probe' ] );
+[ , $navListed ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'uri' => '/nav-probe-two' ] + $navForm + [ 'stamp' => array_column( $navListed['pages'], 'stamp', 'uri' )['/nav-probe'] ?? '' ] );
+check( '...and one that is not stale is refused for the tick, as before', $status === 400 && ( $body['code'] ?? '' ) === 'routes_unknown_nav' );
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'prime', 'key' => 'primary' ] );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/nav-probe' ] );
+unlink( $sandbox. '/private/templates/page-nav.tpl' );
 array_pop( $appData['/nino/modules'] );
 
 unset( $appData['/nino/html/navnames'] );
@@ -1874,10 +2156,10 @@ $wizardSave( $wizardForm );
 $wizardChanged = $wizardFills();
 check( 'an address for each language is in the file of each, and the reader gives each its own', $wizardChanged['de_DE/contact'] === '/kontakt' && $wizardChanged['en_US/contact'] === '/contact-us' );
 // A language that has no address of its own where another language's file has one gets that one from the reader, not global.php's: such a file is given its key
-$wizardForm = $wizardPage( '/contact' );
-$wizardForm['httpUris'] = [ 'de_DE' => '/kontakt', '' => '/contact' ];
 \Nino\Filesystem::mutate( $wizard, '/text/en_US.php', static function( array $content ): array { unset( $content['[[/_nino/webpage/contact/uri]]'] ); return $content; } );
 \Nino\Filesystem::mutate( $wizard, '/text/global.php', static function( array $content ): array { unset( $content['[[/_nino/webpage/contact/uri]]'] ); return $content; } );
+$wizardForm = $wizardPage( '/contact' );
+$wizardForm['httpUris'] = [ 'de_DE' => '/kontakt', '' => '/contact' ];
 $wizardSave( $wizardForm );
 $wizardChanged = $wizardFills();
 check( 'one language with an address of its own and the other with the shared one: the file of the shared one is given its key, since the reader would take the other language\'s', $wizardChanged['en_US/contact'] === '/contact' && $wizardChanged['de_DE/contact'] === '/kontakt'

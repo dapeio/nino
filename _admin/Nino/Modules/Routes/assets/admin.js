@@ -36,7 +36,10 @@
  *													rows hold one address share it (see _addressMap()). The
  *													navigations a page stands in are the ticks of one list, each named
  *													by its name and, quietly, its key. A save that changed nothing
- *													sends nothing.
+ *													sends nothing. The list gives every page the stamp of its state,
+ *													a save and a delete send back the stamp of the page the form was
+ *													drawn from, and a page that was changed or removed since is the
+ *													conflict of the workbench: Reload, Cancel or Overwrite.
  *
  *													The pages a feature or a module routes at runtime - which no
  *													config.php has - are a list under the directory, one row per
@@ -855,6 +858,7 @@
 				labels : { prev : word('/_admin/routes/record/prev'), next : word('/_admin/routes/record/next'), createTitle : word('/_admin/routes/label/new'), createSave : word('/_admin/routes/label/create'), created : word('/_admin/routes/msg/created') },
 				body : panel._body,
 				save : panel._save,
+				reload : panel._reload,
 				// The page of the address '/' and the page of the status 404 are answered as not deletable: the button is not drawn for them
 				danger : { label : word('/_admin/routes/label/delete'), run : panel._remove, hidden : function( row ) { return ( row.entry || {} ).deletable === false } },
 				missing : function() { panel._directory.notice( word('/_admin/routes/record/missing') ) },
@@ -1056,7 +1060,9 @@
 		_view : function( entry ) {
 
 			const panel = Nino.admin.routes;
-			const view = { entry : entry, work : panel._language(), descriptions : {} };
+			// The stamp is the state of the page the form was drawn from, which a save sends back: a page that is another since is a conflict. A save that went
+			// through gives the form the stamp of what it wrote
+			const view = { entry : entry, work : panel._language(), descriptions : {}, stamp : typeof entry.stamp === 'string' ? entry.stamp : null };
 
 			panel._locales.forEach( function( locale ) {
 				view.descriptions[locale] = String( ( ( entry.text || {} )[locale] || {} ).description || '' );
@@ -1810,6 +1816,11 @@
 			if( creating === false && routes._same( payload, current.entry ) === true )
 				return done( true, { row : current } );
 
+			// The page as the form was drawn from it: the server saves only where the page is that. Overwrite is the save that answers a conflict, and it is sent
+			// without the stamp - the person has said that what is there is to be written over
+			if( creating === false && ctx.overwrite !== true && view.stamp !== null )
+				payload.stamp = view.stamp;
+
 			// The server refuses a save that leaves the site without its start page or without its 404 page until the same data comes a second time with confirm :
 			// true - asked here, once, and a no sends nothing
 			// The button that was pressed - Save, or Save and continue - is the one the focus returns to when the question is answered no
@@ -1833,10 +1844,14 @@
 							ctx.status.dirty();
 						} );
 
+					// Another tab or another person changed or removed the page since the form was drawn: the question of the guide, asked by the record
+					if( routes._conflicted( status, response ) === true )
+						return done( false, { conflict : true, error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) } );
+
 					if( status !== 200 || response === null )
 						return done( false, { error : routes._refused( ctx, status, response, addressed.folded ) } );
 
-					routes._saved( payload, addressed, response, done );
+					routes._saved( payload, addressed, response, done, view );
 				} );
 			};
 
@@ -1854,6 +1869,83 @@
 		_leaves : function( status, response ) {
 
 			return status === 409 && response !== null && typeof response === 'object' && ( response.code === 'routes_leaves_home' || response.code === 'routes_leaves_not_found' || response.code === 'routes_leaves_both' );
+		},
+
+		/**
+		 *	Whether the server refused a save or a delete because the page was changed or removed since the form was drawn from it - a refusal the person answers
+		 *	with Reload, Cancel or Overwrite
+		 *
+		 *	@param		{number}		status
+		 *	@param		{*}					response			The answer of the server
+		 *
+		 *	@return		{boolean}
+		 */
+		_conflicted : function( status, response ) {
+
+			return status === 409 && response !== null && typeof response === 'object' && ( response.code === 'routes_conflict' || response.code === 'routes_conflict_gone' );
+		},
+
+		/**
+		 *	Read the list anew while a record is open and take it in: the rows of the directory, and what the record offers - the templates, the languages, the
+		 *	navigations. The record is not drawn over; its form is what the caller makes of it
+		 *
+		 *	@param		{Function}	done					Called with true once the list is taken in, with false where it could not be read, which is said over the directory
+		 *
+		 *	@return		void
+		 */
+		_refresh : function( done ) {
+
+			const panel = Nino.admin.routes;
+			const stamp = Nino.admin.stamp( 'templates' );
+			const navStamp = Nino.admin.stamp( 'navigations' );
+			const textStamp = Nino.admin.stamp( 'texts' );
+
+			panel._apiCall( 'list', {}, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+					panel._directory.notice( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/load' ) );
+					return done( false );
+				}
+
+				panel._take( response );
+				panel._stamp = stamp;
+				panel._navStamp = navStamp;
+				panel._textStamp = textStamp;
+				panel._draw();
+				done( true );
+			} );
+		},
+
+		/**
+		 *	The answer Reload of the question of a conflict: the list is read and the record shows the page as it is stored, what was typed in this tab is dropped. A page that is
+		 *	gone is no page to show: the record is let go, with what was typed in it - the question has said that Reload drops it -, and the directory says that the page is not there
+		 *
+		 *	@param		{string}		key
+		 *	@param		{Function}	done					done( row ) with the row of the page as it is stored, null where it could not be read or is gone
+		 *
+		 *	@return		void
+		 */
+		_reload : function( key, done ) {
+
+			const panel = Nino.admin.routes;
+
+			panel._refresh( function( ok ) {
+
+				if( ok === false )
+					return done( null );
+
+				const row = panel._find( key );
+
+				if( row !== null )
+					return done( row );
+
+				done( null );
+
+				// What the record holds is dropped: it is not unsaved input any more, and closing it asks nothing
+				Nino.admin.dirty.snapshot( 'routes' );
+				panel._record.close();
+				panel._directory.notice( word('/_admin/routes/record/missing') );
+			} );
 		},
 
 		/**
@@ -1893,10 +1985,11 @@
 		 *	@param		{Object}		addressed			What _addressMap() made of the fields
 		 *	@param		{Object}		response			{ pages }
 		 *	@param		{Function}	done
+		 *	@param		{Object}		[view]				What the body of the record keeps: it has the stamp of the page as it is written, which the next save of the form sends
 		 *
 		 *	@return		void
 		 */
-		_saved : function( payload, addressed, response, done ) {
+		_saved : function( payload, addressed, response, done, view ) {
 
 			const routes = Nino.admin.routes;
 			const before = routes._pages.map( function( page ) { return page.uri } );
@@ -1915,6 +2008,9 @@
 				routes._directory.setRows( routes._rows, { keep : true } );
 				return done( false, { error : Nino.adminUi.api.errorText( 200, null, '/_admin/common/error/save' ) } );
 			}
+
+			if( view !== undefined )
+				view.stamp = typeof made.entry.stamp === 'string' ? made.entry.stamp : null;
 
 			routes._directory.update( routes._rows, uri );
 			done( true, { row : made } );
@@ -2047,6 +2143,8 @@
 
 			const routes = Nino.admin.routes;
 			const current = routes._find( row.key ) ?? row;
+			// The page as the question names it: the delete is of that page, and of no other state of it
+			const stamp = typeof current.entry.stamp === 'string' ? current.entry.stamp : null;
 
 			Nino.adminUi.confirm( 'destructive', {
 				title			: word('/_admin/routes/confirm/delete-title'),
@@ -2061,19 +2159,71 @@
 					if( ok === false )
 						return done( null );
 
-					routes._apiCall( 'delete', { uri : current.uri }, function( status, response ) {
+					const send = function( stamped ) {
 
-						if( status !== 200 || response === null )
-							return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) } );
+						routes._apiCall( 'delete', stamped === true && stamp !== null ? { uri : current.uri, stamp : stamp } : { uri : current.uri }, function( status, response ) {
 
-						routes._wrote();
+							if( routes._conflicted( status, response ) === true )
+								return routes._removeConflict( status, response, opener, send, done );
 
-						routes._pages = response.pages;
-						routes._rowsOf();
-						routes._directory.setRows( routes._rows, { keep : true } );
-						done( true );
+							if( status !== 200 || response === null )
+								return done( false, { error : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) } );
+
+							routes._wrote();
+
+							routes._pages = response.pages;
+							routes._rowsOf();
+							routes._directory.setRows( routes._rows, { keep : true } );
+							done( true );
+						} );
+					};
+
+					send( true );
+				},
+			} );
+		},
+
+		/**
+		 *	The server refused a delete because the page was changed or removed since the list was read. A page that is gone is what the delete was for: the list is read and the
+		 *	row is out of it. A page that was changed is the question of the guide - Delete anyway sends the delete without the state, Reload drops what this tab shows and
+		 *	reads the list, Cancel leaves it all as it is
+		 *
+		 *	@param		{number}		status
+		 *	@param		{Object}		response			The refusal, see _conflicted()
+		 *	@param		{Element}		opener				The button the focus goes back to
+		 *	@param		{Function}	send					send( false ) sends the delete without the state of the page
+		 *	@param		{Function}	done					The record's: done( true ), done( null ), done( false, { error } )
+		 *
+		 *	@return		void
+		 */
+		_removeConflict : function( status, response, opener, send, done ) {
+
+			const routes = Nino.admin.routes;
+			const sentence = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
+
+			if( response.code === 'routes_conflict_gone' )
+				return routes._refresh( function( ok ) { ok === true ? done( true ) : done( false, { error : sentence } ) } );
+
+			Nino.adminUi.conflict( {
+				message : sentence,
+				nested : true,
+				opener : opener,
+				text : { overwrite : word('/_admin/routes/confirm/delete-title') },
+				onOverwrite : function() { send( false ) },
+				onReload : function() {
+
+					routes._refresh( function( ok ) {
+
+						if( ok === false )
+							return done( false, { error : sentence } );
+
+						// What the record holds is dropped, as the question said: the list is the one the server holds
+						done( null );
+						Nino.admin.dirty.snapshot( 'routes' );
+						routes._record.close();
 					} );
 				},
+				onCancel : function() { done( null ) },
 			} );
 		},
 	};

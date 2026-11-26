@@ -80,6 +80,12 @@ namespace Nino {
 		 *								absent, the question is not asked and the page is written as it is posted; false, such a save is
 		 *								refused (409, routes_leaves_home, routes_leaves_not_found or, for both, routes_leaves_both) and nothing is written; true, it is
 		 *								written. Only the Routes panel asks - a caller that makes a new page has nothing to leave
+		 *		stamp 			the state of the page as the form read it (see stamp()), for a page that exists: absent, the page is
+		 *								written as it is posted - a page that is gone since is made anew -, which is what every caller but the
+		 *								Routes panel does; a string, it is compared with the state of the page under the lock, and a page that
+		 *								was changed since is refused (409, routes_conflict), a page that was removed since is refused (409,
+		 *								routes_conflict_gone), and nothing is written; anything but a string, or a stamp for a new page, is
+		 *								refused (400, routes_invalid_stamp)
 		 *
 		 *	The answer is that of a page that is written: [ 'uri' => the Element-URI, 'routes' => the route keys in the order
 		 *	they stand in, 'template' => the name of the template or '' where the body of the page is a hand-written one,
@@ -98,10 +104,14 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$page					The page, see above
+		 *	@param		string|null	&$stamp			(reference) Set to the state of the page as this call wrote it (see stamp()), computed under the locks it wrote under: what a caller that answers a form takes as the state the form has, and not what a read after the call finds, which another writer may have changed meanwhile. Null where the call is refused
 		 *
 		 *	@return 	array										The page that was written, or its error
 		 */
-		public static function put( array &$appData, array $page ): array {
+		public static function put( array &$appData, array $page, ?string &$stamp = null ): array {
+
+			$stamp = null;
+
 
 			// Read, checked and written under one lock: the whole route array is read, decided against and written back, so
 			// two saves of two pages at the same moment would each write their own copy and the second would drop the first
@@ -111,7 +121,7 @@ namespace Nino {
 				return self::_refuse( 500, 'could not lock config.php for writing' );
 
 			try {
-				return self::_put( $appData, $page );
+				return self::_put( $appData, $page, [], $stamp );
 			} finally {
 				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
@@ -242,7 +252,7 @@ namespace Nino {
 		 *	Make a new page whose template is a copy of the one of another: put() with the source of the copy, and in the same
 		 *	step, under the same lock and with the same giving back, the words and the pictures that go with it. $page is the page
 		 *	as put() takes it - the Element-URI, the addresses, the name and the title of each language, the menus - with the name
-		 *	of the new template in 'template'; a 'source' and an 'originalUri' in it are not read. The refusals are put()'s, and the
+		 *	of the new template in 'template'; a 'source', an 'originalUri' and a 'stamp' in it are not read. The refusals are put()'s, and the
 		 *	new template's name is held to the same rules as the name of one put() makes.
 		 *
 		 *	What is copied. The source of the template, with every key of the namespace of the original - the text
@@ -495,6 +505,100 @@ namespace Nino {
 		}
 
 		/**
+		 *	The state of a page as the Routes panel can change it, as one opaque string: what a save of a page writes and what a form of it
+		 *	shows - the route keys of the page in the order they stand in, each with its Element-URI, language, body, status code and the
+		 *	menus it is in, and the name, title, description and address of the page in the text file of every language and in global.php,
+		 *	each as the file holds it (the stored form, not the one a person types). What a save keeps and no form edits - a 'maintenance',
+		 *	a 'header', the priority in a menu - and the place of the page among the others are no part of it. A page that is saved as it
+		 *	stands has the state it had. The string is a hash, to be compared and to be posted back with a save or a delete (see stale()),
+		 *	and says nothing else
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		array 		$files				The text files as they are held: language => the content of its file, '*' => the content of global.php
+		 *	@param		string		$uri					The page's Element-URI
+		 *
+		 *	@return 	string|null								Null for a uri no page has
+		 */
+		public static function stamp( array $routes, array $files, string $uri ): ?string {
+
+			$keys = self::keys( $routes, $uri );
+
+			if( $keys === [] )
+				return null;
+
+			$state = [ 'routes' => [], 'text' => [] ];
+
+			ksort( $files, SORT_STRING );
+
+			foreach( $keys as $routeKey ) {
+
+				$route = is_array( $routes[$routeKey] ?? null ) === true ? $routes[$routeKey] : [];
+				$navs = is_array( $route['navs'] ?? null ) === true ? array_map( 'strval', array_keys( $route['navs'] ) ) : [];
+
+				sort( $navs );
+
+				$state['routes'][] = [ $routeKey, self::uriOf( $routeKey, $route ), (string) ( $route['locale'] ?? '' ), (string) ( $route['body'] ?? '' ), (int) ( $route['statusCode'] ?? 200 ), $navs ];
+			}
+
+			foreach( $files as $name => $content )
+				$state['text'][(string) $name] = array_values( self::_pageKeys( $content, $uri ) );
+
+			return hash( 'sha256', serialize( $state ) );
+		}
+
+		/**
+		 *	Whether a form of a page that exists was read at the state the page has - the question of a save and of a delete that carry the
+		 *	stamp of the page as it was read (see stamp()). Asked under the lock of config.php, of the routes that were read under it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$routes				The persisted route array, as the lock holds it
+		 *	@param		mixed			$stamp				What the request carries
+		 *	@param		string		$uri					The Element-URI of the page that was read, '' for a new page
+		 *
+		 *	@return 	array|null								Null where the page is what the form read; else the refusal - 400 routes_invalid_stamp for a stamp that is no string and for one of a new page, 409 routes_conflict_gone for a page that is gone, 409 routes_conflict for one that was changed
+		 */
+		public static function stale( array &$appData, array $routes, mixed $stamp, string $uri ): ?array {
+
+			$files = [];
+
+			return self::_check( $appData, $routes, $stamp, $uri, $files );
+		}
+
+		/**
+		 *	stale(), and the text files it read: language => the content of its file, '*' => the content of global.php
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		mixed			$stamp				What the request carries
+		 *	@param		string		$uri					The Element-URI of the page that was read
+		 *	@param		array 		&$files				(reference) The files the state was computed from
+		 *
+		 *	@return 	array|null								See stale()
+		 */
+		private static function _check( array &$appData, array $routes, mixed $stamp, string $uri, array &$files ): ?array {
+
+			if( is_string( $stamp ) === false || $uri === '' )
+				return self::_refuse( 400, 'invalid stamp', 'routes_invalid_stamp', [], 'stamp' );
+
+			$files = [];
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+				$files[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+
+			$files['*'] = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+
+			$current = self::stamp( $routes, $files, $uri );
+
+			if( $current === null )
+				return self::_refuse( 409, 'the page "'. $uri. '" was removed since the form was read', 'routes_conflict_gone', [ $uri ] );
+
+			if( hash_equals( $current, $stamp ) === false )
+				return self::_refuse( 409, 'the page "'. $uri. '" was changed since the form was read', 'routes_conflict', [ $uri ] );
+
+			return null;
+		}
+
+		/**
 		 *	The route keys of one page, in the order they stand in
 		 *
 		 *	@param		array 		$routes				The persisted route array
@@ -681,7 +785,7 @@ namespace Nino {
 		 *
 		 *	@return 	array
 		 */
-		private static function _put( array &$appData, array $page, array $extra = [] ): array {
+		private static function _put( array &$appData, array $page, array $extra = [], ?string &$stamp = null ): array {
 
 			$rawUri 			= is_string( $page['uri'] ?? null ) === true ? $page['uri'] : '';
 			$originalUri 	= is_string( $page['originalUri'] ?? null ) === true ? $page['originalUri'] : '';
@@ -714,8 +818,28 @@ namespace Nino {
 			$routes 	= $config['/nino/http/routes'] ?? [];
 			$navKeys 	= self::navKeys( $appData );
 
+			// A form that carries the state it was read at is saved only if the page is in it: a page that was changed or taken
+			// away since is a conflict, and a conflict is told before anything is held against what the stored routes and texts
+			// have to say - the addresses and the Element-URI the page's own successor holds are not the form's fault
+			$guard = null;
+
+			if( array_key_exists( 'stamp', $page ) === true ) {
+
+				$seen = [];
+				$stale = self::_check( $appData, $routes, $page['stamp'], $originalUri, $seen );
+
+				if( $stale !== null )
+					return $stale;
+
+				// What the state was computed from, file by file: _write() asks every one of them a second time under its own lock, before it writes the first
+				$guard = [ 'uri' => $originalUri, 'files' => [] ];
+
+				foreach( $seen as $name => $content )
+					$guard['files'][ $name === '*' ? '/text/global.php' : '/text/'. $name. '.php' ] = self::_pageKeys( $content, $originalUri );
+			}
+
 			// The page as it stands: its routes in the order they stand in, the first of them leading. A page that is gone
-			// since the form was opened is a new one
+			// since the form was opened is a new one - where the form carries no stamp
 			$previousKeys = $originalUri !== '' ? self::keys( $routes, $originalUri ) : [];
 			$first 				= $previousKeys !== [] && is_array( $routes[$previousKeys[0]] ?? null ) === true ? $routes[$previousKeys[0]] : [];
 
@@ -908,7 +1032,28 @@ namespace Nino {
 					return self::_refuse( 409, 'the site would have no page for the addresses that have no page', 'routes_leaves_not_found', [ $uri ] );
 			}
 
-			return self::_write( $appData, $routes, $fragments, $uri, $template, $source, array_keys( $put ), $extra['slots'] ?? [], $extra['files'] ?? [] );
+			return self::_write( $appData, $routes, $fragments, $uri, $template, $source, array_keys( $put ), $extra['slots'] ?? [], $extra['files'] ?? [], $guard, $stamp );
+		}
+
+		/**
+		 *	The keys of one page in the content of a text file, as the file holds them: bracket key => the text, null where the file has none or no string
+		 *
+		 *	@param		mixed			$content			The content of a text file
+		 *	@param		string		$uri					The page's Element-URI
+		 *
+		 *	@return 	array
+		 */
+		private static function _pageKeys( mixed $content, string $uri ): array {
+
+			$keys = [];
+
+			foreach( [ 'name', 'title', 'description', 'uri' ] as $field ) {
+
+				$value = is_array( $content ) === true ? ( $content['[[/_nino/webpage'. $uri. '/'. $field. ']]'] ?? null ) : null;
+				$keys['[[/_nino/webpage'. $uri. '/'. $field. ']]'] = is_string( $value ) === true ? $value : null;
+			}
+
+			return $keys;
 		}
 
 		/**
@@ -981,7 +1126,68 @@ namespace Nino {
 		 *
 		 *	@return 	array										See put()
 		 */
-		private static function _write( array &$appData, array $routes, array $fragments, string $uri, string $template, ?string $source, array $keys, array $slots = [], array $files = [] ): array {
+		private static function _write( array &$appData, array $routes, array $fragments, string $uri, string $template, ?string $source, array $keys, array $slots = [], array $files = [], ?array $guard = null, ?string &$stamp = null ): array {
+
+			$held = [];
+			$after = [];
+
+			try {
+
+				// A save that carries the state of the page it was read at asks, before it writes the first file, whether a text file still has what that
+				// state was made of: the Texts panel writes a file under that file's lock alone, so the lock of config.php does not keep it out. Every file
+				// of the page is locked in the same order and read; one that differs is the conflict, with nothing written. A file stays locked until its
+				// own write is done
+				if( $guard !== null ) {
+
+					$paths = array_keys( $guard['files'] );
+
+					sort( $paths );
+
+					foreach( $paths as $path ) {
+
+						if( \Nino\Filesystem::lockFile( $appData, $path ) === false )
+							return self::_refuse( 500, 'could not lock '. $path );
+
+						$held[] = $path;
+
+						// The keys of the page as the form read it: under its Element-URI of then, which a save may change
+						if( self::_pageKeys( \Nino\Filesystem::getFileContent( $appData, $path, [] ), $guard['uri'] ) !== $guard['files'][$path] )
+							return self::_refuse( 409, 'the page "'. $guard['uri']. '" was changed since the form was read', 'routes_conflict', [ $guard['uri'] ] );
+					}
+				}
+
+				$answer = self::_writeLocked( $appData, $routes, $fragments, $uri, $template, $source, $keys, $slots, $files, $after );
+
+				// The state this call wrote, from the content each file had when it was written and the routes that were written
+				if( isset( $answer['error'] ) === false )
+					$stamp = self::stamp( $routes, $after, $uri );
+
+				return $answer;
+
+			} finally {
+
+				foreach( $held as $path )
+					\Nino\Filesystem::unlockFile( $appData, $path );
+			}
+		}
+
+		/**
+		 *	_write() with the locks held: the writes themselves
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$routes				See _write()
+		 *	@param		array 		$fragments		See _write()
+		 *	@param		string		$uri					See _write()
+		 *	@param		string		$template			See _write()
+		 *	@param		string|null	$source			See _write()
+		 *	@param		array 		$keys					See _write()
+		 *	@param		array 		$slots				See _write()
+		 *	@param		array 		$files				See _write()
+		 *	@param		array 		&$after				(reference) Language => the content of its file, '*' => that of global.php, as each was when this call was done with it
+		 *
+		 *	@return 	array										See put()
+		 */
+		private static function _writeLocked( array &$appData, array $routes, array $fragments, string $uri, string $template, ?string $source, array $keys, array $slots, array $files, array &$after ): array {
 
 			$file 		= '/templates/'. $template. '.tpl';
 			$listed 	= '/_nino/webpage'. $uri. '/uri';
@@ -1013,10 +1219,11 @@ namespace Nino {
 				$same = false;
 
 				// A file that holds every key of the fragment as it is to be written is not written: its bytes, its mtime and its inode stay
-				$written = \Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment, $real, &$seen, &$same ): ?array {
+				$written = \Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment, $real, $path, &$seen, &$same, &$after ): ?array {
 
 					$seen = [ 'existed' => is_file( $real ), 'prior' => array_intersect_key( $content, $fragment ) ];
 					$merged = array_merge( $content, $fragment );
+					$after[ $path === '/text/global.php' ? '*' : basename( $path, '.php' ) ] = $merged;
 
 					if( $merged === $content ) {
 						$same = true;
@@ -2040,7 +2247,7 @@ namespace Nino {
 			if( is_string( $name ) === true && trim( $name ) !== '' )
 				$source = (string) preg_replace_callback( '~\A<!--[\t ]*nino:template-name[\t ]+[^\r\n<>]+?[\t ]*-->~', static fn(): string => '<!-- nino:template-name '. trim( (string) preg_replace( '/[\r\n<>]+/', ' ', $name ) ). ' -->', $source, 1 );
 
-			$answer = self::_put( $appData, [ 'originalUri' => '', 'source' => $source ] + $page, [ 'texts' => $texts, 'slots' => $slots, 'files' => $files ] );
+			$answer = self::_put( $appData, [ 'originalUri' => '', 'source' => $source ] + array_diff_key( $page, [ 'stamp' => true ] ), [ 'texts' => $texts, 'slots' => $slots, 'files' => $files ] );
 
 			if( isset( $answer['error'] ) === false )
 				$answer['copied'] = [ 'texts' => count( $keys ), 'slots' => count( $slots ), 'files' => count( $files ) ];

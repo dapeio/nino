@@ -256,7 +256,11 @@ namespace Nino\Modules\Routes {
 		 *	template, the menus, the status code and the body are the first
 		 *	route's, which is what apiSave() has written to all of them.
 		 *	'deletable' is false for the page of the address '/' and the page of
-		 *	the status 404 (see \Nino\Pages::keeper()), which apiDelete() refuses
+		 *	the status 404 (see \Nino\Pages::keeper()), which apiDelete() refuses.
+		 *	'stamp' is the state of the page as it is stored, as one opaque string
+		 *	(see \Nino\Pages::stamp()): a form of the page posts it back with its
+		 *	save and its delete, and a page that was changed or removed since is
+		 *	a conflict
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$routes				The persisted route array
@@ -271,6 +275,7 @@ namespace Nino\Modules\Routes {
 			foreach( $locales as $locale )
 				$text[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
 
+			$files 	= $text + [ '*' => \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ];
 			$native = \Nino\Locales::getNativeLocale( $appData );
 			$pages 	= [];
 
@@ -296,6 +301,7 @@ namespace Nino\Modules\Routes {
 						'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
 						'body' 				=> $body,
 						'text' 				=> self::_pageText( $text, $locales, $uri ),
+						'stamp' 			=> \Nino\Pages::stamp( $routes, $files, $uri ),
 					];
 				}
 
@@ -440,7 +446,12 @@ namespace Nino\Modules\Routes {
 		 *	site without its home page or without its 404 page is refused with 409
 		 *	(routes_leaves_home, routes_leaves_not_found, routes_leaves_both) until the same data is
 		 *	posted a second time with 'confirm' => true - the panel asks first -, and the
-		 *	page that is written with the 404 route has the status 404 (400, routes_not_found_status)
+		 *	page that is written with the 404 route has the status 404 (400, routes_not_found_status).
+		 *	A save of a page that exists carries the 'stamp' the list gave it: a page that
+		 *	was changed since is refused with 409 (routes_conflict), one that was removed
+		 *	since with 409 (routes_conflict_gone) and is not made anew, and nothing is
+		 *	written - the panel asks what to do and, on Overwrite, posts the save without
+		 *	the stamp. A request with no stamp is written as it is posted
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -462,12 +473,23 @@ namespace Nino\Modules\Routes {
 			foreach( $ticked as $navKey ) {
 
 				if( is_string( $navKey ) === false || in_array( $navKey, \Nino\Pages::navKeys( $appData ), true ) === false ) {
+
+					// A form that carries the state it was read at, of a page that was changed since - a menu that was renamed or removed changes the pages in it -
+					// is a conflict, which is the answer to a form that ticks what is gone
+					if( array_key_exists( 'stamp', $data ) === true ) {
+
+						$conflict = \Nino\Pages::stale( $appData, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [], $data['stamp'], \Nino\Admin\Admin::postString( $data, 'originalUri' ) );
+
+						if( $conflict !== null && self::_refused( $request, $conflict ) === true )
+							return;
+					}
+
 					\Nino\Http::fail( $request, 400, 'unknown navigation', 'routes_unknown_nav', [ is_string( $navKey ) === true ? $navKey : '' ], 'navs' );
 					return;
 				}
 			}
 
-			$result = \Nino\Pages::put( $appData, [
+			$page = [
 				'uri' 				=> \Nino\Admin\Admin::postString( $data, 'uri' ),
 				'originalUri' => \Nino\Admin\Admin::postString( $data, 'originalUri' ),
 				'httpUris' 		=> is_array( $data['httpUris'] ?? null ) === true ? $data['httpUris'] : [],
@@ -476,12 +498,27 @@ namespace Nino\Modules\Routes {
 				'navs' 				=> self::entryNavs( $data, \Nino\Pages::navKeys( $appData ) ),
 				'statusCode' 	=> (int) ( $data['statusCode'] ?? 200 ),
 				'confirm' 		=> ( $data['confirm'] ?? false ) === true,
-			] );
+			];
+
+			// As posted, whatever it is: a stamp that is no string is refused by \Nino\Pages::put(), not turned into one here
+			if( array_key_exists( 'stamp', $data ) === true )
+				$page['stamp'] = $data['stamp'];
+
+			$stamp 	= null;
+			$result = \Nino\Pages::put( $appData, $page, $stamp );
 
 			if( self::_refused( $request, $result ) === true )
 				return;
 
-			\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [], \Nino\Locales::getAvailableLocales( $appData ), \Nino\Pages::navKeys( $appData ) ) ] );
+			$pages = self::pages( $appData, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [], \Nino\Locales::getAvailableLocales( $appData ), \Nino\Pages::navKeys( $appData ) );
+
+			// The page the form was saved from has the state this save wrote - computed under its locks -, not the one a read after the save finds: a change somebody else made in
+			// between is then a conflict for the form's next save, and not taken for the state the form has
+			foreach( $pages as $at => $entry )
+				if( $entry['uri'] === $result['uri'] && $stamp !== null )
+					$pages[$at]['stamp'] = $stamp;
+
+			\Nino\Http::ok( $request, [ 'pages' => $pages ] );
 		}
 
 		/**
@@ -603,6 +640,11 @@ namespace Nino\Modules\Routes {
 		 *	Remove a page: every route it has, except the page of the address '/'
 		 *	and the page of the status 404, which are refused with 409
 		 *	(routes_remove_home, routes_remove_not_found) and nothing written.
+		 *	A request that carries the 'stamp' the list gave the page - the panel
+		 *	does - is refused with 409 where the page was changed since
+		 *	(routes_conflict) or removed since (routes_conflict_gone), before the
+		 *	two refusals above, and nothing is written; one with no stamp removes
+		 *	the page as it is and answers 404 for a page that is not there.
 		 *	Its /_nino/webpage&lt;uri&gt;/* text
 		 *	meta - the fills of its addresses among it - is deliberately left in
 		 *	place, same additive-only philosophy every other apply/save in this
@@ -636,10 +678,16 @@ namespace Nino\Modules\Routes {
 
 			try {
 
-				$uri 		= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'uri' );
+				$data 	= \Nino\Admin\Admin::postData();
+				$uri 		= \Nino\Admin\Admin::postString( $data, 'uri' );
 				$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
 				$routes = is_array( $routes ) === true ? $routes : [];
 				$keys 	= \Nino\Pages::keys( $routes, $uri );
+
+				// The state the page was read at, where the request has it: a page that was changed or removed since is not the page
+				// that was asked about
+				if( array_key_exists( 'stamp', $data ) === true && self::_refused( $request, \Nino\Pages::stale( $appData, $routes, $data['stamp'], $uri ) ?? [] ) === true )
+					return;
 
 				// Only ever the routes of a page: this module lists nothing else, so
 				// anything else is a module's or a developer's and not this button's

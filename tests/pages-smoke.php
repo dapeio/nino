@@ -193,6 +193,81 @@ $differ = array_keys( array_filter( $after, static fn( array $one, string $path 
 check( 'the name of one language is the file of that language alone', isset( $changed['error'] ) === false && array_map( 'basename', $differ ) === [ 'fr_FR.php' ] );
 \Nino\Pages::put( $appData, $asStored );
 
+// The state of a page, as one string: what a save can change is part of it, and what it keeps and the place of the page are not. A form that carries the state it was read at is
+// saved only where the page has it
+$files = static function() use ( &$appData ): array {
+	$held = [];
+	foreach( [ 'de_DE', 'en_US', 'fr_FR' ] as $locale )
+		$held[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+	$held['*'] = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+	return $held;
+};
+$stateOf = static fn( string $uri ): ?string => \Nino\Pages::stamp( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'], $files(), $uri );
+$read = $stateOf( '/site-news' );
+check( 'the state of a page is a string that is the same for the same state, and none for a page that is not there', is_string( $read ) === true && $read === $stateOf( '/site-news' ) && $stateOf( '/site-nothing' ) === null );
+\Nino\Pages::put( $appData, $asStored );
+check( '...a save that writes nothing leaves it as it is', $stateOf( '/site-news' ) === $read );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array {
+	$config['/nino/http/routes']['GET://news'] += [ 'maintenance' => false, 'header' => [ 'X-Kept' => '1' ] ];
+	$config['/nino/http/routes']['GET://news']['navs']['footer'] = 9;
+	$config['/nino/http/routes'] = [ 'GET://before' => [ 'uri' => '/before', 'body' => '[template /templates/page-there]' ] ] + $config['/nino/http/routes'];
+	return $config;
+} );
+check( 'what a save keeps and no form edits - a maintenance, a header, the priority in a menu - and the place of the page among the others are no part of it', $stateOf( '/site-news' ) === $read );
+// The key of a route and its language are part of the state, and the menus are by their keys, in whatever order they stand in
+$setRoute = static function( callable $change ) use ( &$appData ): void {
+	\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ) use ( $change ): array {
+		$config['/nino/http/routes'] = $change( $config['/nino/http/routes'] );
+		return $config;
+	} );
+};
+$setRoute( static function( array $routes ): array { $routes['GET://news']['navs'] = [ 'footer' => 1, 'main' => 2 ]; return $routes; } );
+$menus = $stateOf( '/site-news' );
+$setRoute( static function( array $routes ): array { $routes['GET://news']['navs'] = [ 'main' => 2, 'footer' => 1 ]; return $routes; } );
+check( 'the menus a page is in are no other state for standing in another order', $stateOf( '/site-news' ) === $menus );
+$setRoute( static function( array $routes ): array { $routes['GET://news']['navs'] = [ 'main' => 2 ]; return $routes; } );
+check( '...and a menu more or less is', $stateOf( '/site-news' ) !== $menus );
+$setRoute( static function( array $routes ): array { $routes['GET://news']['navs'] = [ 'footer' => 1, 'main' => 2 ]; return $routes; } );
+$setRoute( static function( array $routes ): array { $out = []; foreach( $routes as $key => $route ) $out[ $key === 'GET://news' ? 'GET://news-moved' : $key ] = $route; return $out; } );
+check( 'the key of the route of a page - the address it is reached at - is part of its state, though nothing else of it changes', $stateOf( '/site-news' ) !== null && $stateOf( '/site-news' ) !== $menus );
+$setRoute( static function( array $routes ): array { $out = []; foreach( $routes as $key => $route ) $out[ $key === 'GET://news-moved' ? 'GET://news' : $key ] = $route; return $out; } );
+check( '...and the state is the one it was where the key is put back', $stateOf( '/site-news' ) === $menus );
+$setRoute( static function( array $routes ): array { $routes['GET://news']['locale'] = 'de_DE'; return $routes; } );
+check( 'the language of a route is part of the state of the page', $stateOf( '/site-news' ) !== $menus );
+$setRoute( static function( array $routes ): array { unset( $routes['GET://news']['locale'] ); $routes['GET://news']['navs'] = [ 'footer' => 9 ]; return $routes; } );
+$read = $stateOf( '/site-news' );
+
+foreach( [
+	'the menus it is in' 														=> static fn( array $page ): array => [ 'navs' => [ 'main', 'footer' ] ] + $page,
+	'the address of one language' 									=> static fn( array $page ): array => [ 'httpUris' => [ 'de_DE' => '/neues', '' => '/news' ] ] + $page,
+	'its template' 																	=> static fn( array $page ): array => [ 'template' => 'page-news' ] + $page,
+	'its status' 																		=> static fn( array $page ): array => [ 'statusCode' => 201 ] + $page,
+	'the description of one language' 							=> static fn( array $page ): array => [ 'text' => array_replace_recursive( $page['text'], [ 'fr_FR' => [ 'description' => 'Une description' ] ] ) ] + $page,
+	'the name of one language' 											=> static fn( array $page ): array => [ 'text' => array_replace_recursive( $page['text'], [ 'en_US' => [ 'name' => 'Other' ] ] ) ] + $page,
+] as $what => $change ) {
+	$before = $stateOf( '/site-news' );
+	\Nino\Pages::put( $appData, $change( $asStored ) );
+	check( 'the state of a page is another one when '. $what. ' is changed', $stateOf( '/site-news' ) !== $before && $stateOf( '/site-news' ) !== null );
+	\Nino\Pages::put( $appData, $asStored );
+}
+$read = $stateOf( '/site-news' );
+$written = \Nino\Pages::put( $appData, [ 'text' => [ 'fr_FR' => [ 'name' => 'Nouvelles', 'title' => 'News fr' ] ] + $text( 'News' ), 'stamp' => $read ] + $asStored );
+check( 'a save that carries the state the page has is written', isset( $written['error'] ) === false && $stateOf( '/site-news' ) !== $read );
+$held = $files();
+$refused = \Nino\Pages::put( $appData, [ 'stamp' => $read ] + $asStored );
+check( 'a save that carries the state the page had is refused with 409 routes_conflict, and nothing is written', ( $refused['error']['status'] ?? 0 ) === 409 && ( $refused['error']['code'] ?? '' ) === 'routes_conflict' && ( $refused['error']['params'] ?? [] ) === [ '/site-news' ] && $files() === $held );
+\Nino\Pages::put( $appData, $asStored );
+$gone = \Nino\Pages::put( $appData, [ 'stamp' => $read, 'originalUri' => '/site-nothing', 'uri' => '/site-nothing', 'httpUris' => [ '' => '/nothing' ] ] + $asStored );
+check( 'one that carries the state of a page that is not there is refused with 409 routes_conflict_gone, and the page is not made', ( $gone['error']['code'] ?? '' ) === 'routes_conflict_gone' && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://nothing'] ) === false );
+foreach( [ 'a number' => 5, 'null' => null, 'a list' => [ 'x' ] ] as $kind => $given ) {
+	$invalid = \Nino\Pages::put( $appData, [ 'stamp' => $given ] + $asStored );
+	check( 'a stamp that is '. $kind. ' is refused with 400 routes_invalid_stamp, at the field stamp', ( $invalid['error']['status'] ?? 0 ) === 400 && ( $invalid['error']['code'] ?? '' ) === 'routes_invalid_stamp' && ( $invalid['error']['field'] ?? '' ) === 'stamp' );
+}
+$invalid = \Nino\Pages::put( $appData, [ 'originalUri' => '', 'uri' => '/site-fresh', 'httpUris' => [ '' => '/fresh' ], 'stamp' => $read ] + $asStored );
+check( 'a stamp for a page that is new is refused with 400 routes_invalid_stamp, and the page is not made', ( $invalid['error']['code'] ?? '' ) === 'routes_invalid_stamp' && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://fresh'] ) === false );
+$noStamp = \Nino\Pages::put( $appData, [ 'text' => $text( 'No stamp' ) ] + $asStored );
+check( 'a save with no stamp is written as it is posted, whatever the page has become', isset( $noStamp['error'] ) === false );
+
 $reset();
 
 echo "\nA page that is refused leaves nothing\n";
@@ -809,6 +884,12 @@ $plant( '/text/blacklist.php', 'blacklist' );
 $answer = \Nino\Pages::duplicate( $appData, 'page-news', $copy );
 unset( $GLOBALS['ninoHook'] );
 check( 'a copy holds the lock of config.php from the first check to the write of its routes: every other writer that asked in between was turned away', isset( $answer['error'] ) === false && count( $turnedAway ) > 0 && in_array( false, $turnedAway->getArrayCopy(), true ) === false );
+$wipe();
+
+// A copy is a new page: a stamp in its page is the state of a page that exists, and is not read
+$stage();
+$answer = \Nino\Pages::duplicate( $appData, 'page-news', $copy + [ 'stamp' => 'garbage' ] );
+check( 'a copy is made of a page that carries a stamp as it is made of one that has none', isset( $answer['error'] ) === false && ( $answer['uri'] ?? '' ) === ( $copy['uri'] ?? 'x' ) );
 $wipe();
 
 

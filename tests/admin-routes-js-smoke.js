@@ -56,7 +56,7 @@ const errorsOf = root => byClass( root, 'nino-admin-field-error' );
 const NAMES = { '/' : 'Start', '/about' : 'Über uns', '/contact' : 'Kontakt' };
 
 function page( uri, extra ) {
-	return Object.assign( { httpUri : uri, httpUris : { '' : uri }, uri : uri, template : uri === '/' ? 'page-home' : 'page'+ uri.replace('/','-'), body : '[template /templates/'+ ( uri === '/' ? 'page-home' : 'page'+ uri.replace('/','-') )+ ']', navs : [], statusCode : 200,
+	return Object.assign( { stamp : 'stamp'+ uri, httpUri : uri, httpUris : { '' : uri }, uri : uri, template : uri === '/' ? 'page-home' : 'page'+ uri.replace('/','-'), body : '[template /templates/'+ ( uri === '/' ? 'page-home' : 'page'+ uri.replace('/','-') )+ ']', navs : [], statusCode : 200,
 		text : { de_DE : { name : NAMES[uri] || uri+ ' DE', title : ( NAMES[uri] || uri )+ ' - Titel', description : '' }, en_US : { name : ( NAMES[uri] || uri )+ ' EN', title : ( NAMES[uri] || uri )+ ' EN title', description : '' } } }, extra || {} );
 }
 
@@ -553,7 +553,7 @@ const DELETE = '/_admin/routes/label/delete';
 	fire( w.button( d, SAVE ), 'click' );
 	check( 'a changed name is sent in ONE request, routes/save, with the Element URI the page had and the texts of every language', w.requests.length === asked + 1 && w.requests.at(-1).action === 'routes/save'
 		&& w.requests.at(-1).payload.originalUri === '/about' && w.requests.at(-1).payload.uri === '/about' && w.requests.at(-1).payload.text.en_US.name === 'About us' && w.requests.at(-1).payload.text.de_DE.name === 'Über uns' );
-	check( '...the shape of the payload is the same as ever: no more keys, the status code as the field holds it', Object.keys( w.requests.at(-1).payload ).sort().join() === 'httpUris,navs,originalUri,statusCode,template,text,uri' && w.requests.at(-1).payload.statusCode === '200'
+	check( '...the payload is the fields of the form, the page it was read from and the state of that page the list gave: no more keys, the status code as the field holds it', Object.keys( w.requests.at(-1).payload ).sort().join() === 'httpUris,navs,originalUri,stamp,statusCode,template,text,uri' && w.requests.at(-1).payload.stamp === 'stamp/about' && w.requests.at(-1).payload.statusCode === '200'
 		&& JSON.stringify( w.requests.at(-1).payload.httpUris ) === '{"":"/about"}' && w.requests.at(-1).payload.template === 'page-about' && Array.isArray( w.requests.at(-1).payload.navs ) );
 	check( '...and the line of the bar says it is saving', w.lineOf( d ).dataset.state === 'saving' );
 
@@ -1015,7 +1015,7 @@ const DELETE = '/_admin/routes/label/delete';
 	// Yes: the request names the page by its Element URI; the answer closes the record and the focus goes to the next row
 	fire( w.button( d, DELETE ), 'click' );
 	fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/routes/confirm/delete-title') ), 'click' );
-	check( 'a confirmed question deletes the route, by its Element URI', w.requests.at(-1).action === 'routes/delete' && JSON.stringify( w.requests.at(-1).payload ) === '{"uri":"/site-about"}' );
+	check( 'a confirmed question deletes the route, by its Element URI', w.requests.at(-1).action === 'routes/delete' && JSON.stringify( w.requests.at(-1).payload ) === '{"uri":"/site-about","stamp":"stamp/about"}' );
 	w.touches.length = 0;
 	w.toasts().length = 0;
 	w.answer( 200, { pages : listing( [ '/', '/contact' ] ).pages } );
@@ -1162,6 +1162,209 @@ const DELETE = '/_admin/routes/label/delete';
 			w.asking() === null && w.field( d, 'statusCode' ).attributes['aria-invalid'] === 'true' && w.focused() === w.field( d, 'statusCode' ) && errorsOf( d ).length === 1
 			&& errorsOf( d )[0].textContent === text('/_admin/error/routes_not_found_status').replace( '%s', '/missing' ) && w.lineOf( d ).dataset.state === 'error' && w.lineOf( d ).textContent === errorsOf( d )[0].textContent );
 	}
+}
+
+// --- a page that was changed or removed since the form was drawn is a conflict ------------------------------------------------------
+
+{
+	const CONFLICT = '/_admin/common/conflict/';
+	const RELOAD = CONFLICT+ 'reload', OVERWRITE = CONFLICT+ 'overwrite', CANCEL = '/_admin/common/label/cancel';
+
+	// The record of /about with its name typed, saved - and the server's answer is a conflict
+	const stale = ( code, press = SAVE ) => {
+		const w = world();
+		w.open( listing( [ '/', '/about', '/contact' ] ) );
+		w.questions = [];
+		const conflict = w.h.ui.conflict;
+		w.h.ui.conflict = function( options ) { w.questions.push( options ); return conflict.call( this, options ) };
+		const d = w.openRow('/about');
+		w.type( w.rowControl( d, 'name', 'en_US' ), 'About us' );
+		w.button( d, press ).focus();
+		fire( w.button( d, press ), 'click' );
+		const sent = w.requests.at(-1);
+		w.answer( 409, { error : 'changed', code : code, params : [ '/about' ] } );
+		return { w, d, sent, asked : w.asking() };
+	};
+	const changed = uri => { const l = listing( [ '/', '/about', '/contact' ] ); const one = l.pages.find( p => p.uri === uri ); one.stamp = 'fresh'+ uri; one.text.en_US.name = 'Fresh name'; one.text.de_DE.name = 'Frischer Name'; return l };
+
+	// The save carries the state the form was drawn from
+	{
+		const { w, d, sent, asked } = stale( 'routes_conflict' );
+		check( 'a save of a page that exists sends the stamp of the page the form was drawn from, and a new page none', sent.action === 'routes/save' && sent.payload.stamp === 'stamp/about' && ( () => {
+			const v = world();
+			v.open( listing( [ '/', '/about' ], { defaultTemplate : 'page-blank' } ) );
+			fire( v.newButton(), 'click' );
+			const e = v.dialog();
+			v.type( v.field( e, 'uri' ), '/fresh' );
+			v.type( v.addressControls( e )[0], '/fresh' );
+			v.fillTexts( e );
+			fire( v.button( e, CREATE ), 'click' );
+			return v.requests.at(-1).action === 'routes/save' && 'stamp' in v.requests.at(-1).payload === false;
+		} )() );
+
+		// The refusal is the question of the guide, on the record: the sentence of the code with the page, Reload, Cancel, Overwrite - and no error at a field or in the line
+		check( 'a conflict is the question of the workbench for it, asked on the record: the sentence of the code names the page, and the answers are Reload, Cancel and Overwrite',
+			asked !== null && w.titleOf( asked ) === text( CONFLICT+ 'title' ) && w.questions.length === 1 && w.questions[0].message === w.h.ui.format( text('/_admin/error/routes_conflict'), '/about' ) && w.questions[0].nested === true && text('/_admin/error/routes_conflict') !== ''
+			&& tag( asked, 'button' ).map( b => b.textContent ).join() === [ text( RELOAD ), text( CANCEL ), text( OVERWRITE ) ].join() );
+		check( '...the form keeps what was typed, is unsaved input, and shows no error: the line says what is true of unsaved input', w.dialog() === asked && w.lineOf( d ).dataset.state !== 'error' && errorsOf( d ).length === 0 && w.rowControl( d, 'name', 'en_US' ).value === 'About us' && w.h.dirty.isDirty( [ 'routes' ] ) === true && w.touches.length === 0 );
+
+		// Cancel: nothing is sent, the form is as it was, and the same save asks the same question
+		const before = w.requests.length;
+		fire( w.button( asked, CANCEL ), 'click' );
+		check( 'Cancel sends nothing and leaves the record with its input', w.requests.length === before && w.asking() === null && w.dialog() === d && w.rowControl( d, 'name', 'en_US' ).value === 'About us' && w.h.dirty.isDirty( [ 'routes' ] ) === true );
+		fire( w.button( d, SAVE ), 'click' );
+		check( '...and a second save sends the same stamp and is refused the same way', w.requests.length === before + 1 && w.requests.at(-1).payload.stamp === 'stamp/about' );
+		w.answer( 409, { error : 'changed', code : 'routes_conflict', params : [ '/about' ] } );
+		check( '...with the question asked a second time', w.asking() !== null );
+
+		// Overwrite: the same save, without the stamp - the person said that what is there is written over - and what the server answers is the page as it is stored then
+		const wrote = w.requests.length;
+		fire( w.button( w.asking(), OVERWRITE ), 'click' );
+		check( 'Overwrite sends the same save once more, with no stamp and nothing else changed', w.requests.length === wrote + 1 && w.requests.at(-1).action === 'routes/save' && 'stamp' in w.requests.at(-1).payload === false
+			&& JSON.stringify( Object.assign( {}, w.requests.at(-1).payload, { stamp : undefined } ) ) === JSON.stringify( Object.assign( {}, sent.payload, { stamp : undefined } ) ) );
+		const written = listing( [ '/', '/about', '/contact' ] );
+		written.pages[1].stamp = 'written/about';
+		written.pages[1].text.en_US.name = 'About us';
+		w.answer( 200, { pages : written.pages } );
+		check( '...and the answer is that of a save: said as a toast, the other panels are told, the record stays and holds nothing unsaved', w.toasts().at(-1) === text('/_admin/common/msg/saved') && w.touches.map( t => t[0] ).join() === 'routes,texts' && w.dialog() === d && w.h.dirty.isDirty( [ 'routes' ] ) === false );
+
+		// The form holds the state it wrote: the next save sends that stamp, and a save of what was written sends nothing
+		const next = w.requests.length;
+		fire( w.button( d, SAVE ), 'click' );
+		check( 'a save of what was written sends nothing', w.requests.length === next );
+		w.type( w.rowControl( d, 'title', 'en_US' ), 'About title' );
+		fire( w.button( d, SAVE ), 'click' );
+		check( 'the next save of the same form carries the stamp of what the last one wrote, and not the one the form was drawn from', w.requests.length === next + 1 && w.requests.at(-1).payload.stamp === 'written/about' );
+		const second = listing( [ '/', '/about', '/contact' ] );
+		second.pages[1].stamp = 'second/about';
+		w.answer( 200, { pages : second.pages } );
+		w.type( w.rowControl( d, 'title', 'en_US' ), 'About third' );
+		fire( w.button( d, SAVE ), 'click' );
+		check( '...and so does the one after it: a form never conflicts with its own saves', w.requests.at(-1).payload.stamp === 'second/about' );
+	}
+
+	// Reload: the list is read, the record shows the page as it is stored, what was typed here is dropped, and the form holds the new stamp
+	{
+		const { w, d, asked } = stale( 'routes_conflict' );
+		const before = w.requests.length;
+		fire( w.button( asked, RELOAD ), 'click' );
+		check( 'Reload asks the server for the list and sends no save', w.requests.length === before + 1 && w.requests.at(-1).action === 'routes/list' && w.asking() === null );
+		w.answer( 200, changed( '/about' ) );
+		check( '...the record shows the page as it is stored: its name in the head and in the field, what was typed gone, nothing unsaved', w.dialog() === d && w.titleOf( d ) === 'Frischer Name' && w.rowControl( d, 'name', 'en_US' ).value === 'Fresh name'
+			&& w.rowControl( d, 'name', 'de_DE' ).value === 'Frischer Name' && w.h.dirty.isDirty( [ 'routes' ] ) === false && w.touches.length === 0 );
+		check( '...and so does the table', byClass( w.row('/about'), 'routes-name-label' )[0].textContent === 'Frischer Name' );
+		w.type( w.rowControl( d, 'title', 'en_US' ), 'Typed after the reload' );
+		fire( w.button( d, SAVE ), 'click' );
+		check( '...the next save of that form carries the stamp of the page it shows', w.requests.at(-1).action === 'routes/save' && w.requests.at(-1).payload.stamp === 'fresh/about' );
+	}
+
+	// Reload read the list: the panel takes the stamps it read it at, so the next showing does not read it once more for what Reload brought in
+	{
+		const { w, d, asked } = stale( 'routes_conflict' );
+		w.h.admin.touch('texts');
+		w.h.admin.touch('templates');
+		fire( w.button( asked, RELOAD ), 'click' );
+		w.answer( 200, changed( '/about' ) );
+		w.close( d );
+		const read = w.requests.length;
+		w.panel.showCurrent();
+		check( 'after Reload the next showing asks for nothing: the stamps of the texts and the templates are the ones the list was read at', w.requests.length === read && w.panel._textStamp === w.h.admin.stamp('texts') && w.panel._stamp === w.h.admin.stamp('templates') );
+	}
+
+	// Save and continue is a save: the same question, and the same answers
+	{
+		const { w, asked } = stale( 'routes_conflict', SAVE_NEXT );
+		check( 'Save and continue is refused the same way: the question, with the page named', asked !== null && w.questions.at(-1).message === w.h.ui.format( text('/_admin/error/routes_conflict'), '/about' ) );
+	}
+
+	// The page was removed: Overwrite makes it anew, Reload lets the record go and says that the page is not there
+	{
+		const { w, asked } = stale( 'routes_conflict_gone' );
+		check( 'a page that was removed is the same question with its own sentence', asked !== null && w.questions.at(-1).message === w.h.ui.format( text('/_admin/error/routes_conflict_gone'), '/about' ) && text('/_admin/error/routes_conflict_gone') !== text('/_admin/error/routes_conflict') );
+		fire( w.button( asked, RELOAD ), 'click' );
+		w.answer( 200, listing( [ '/', '/contact' ] ) );
+		check( 'Reload of a page that is gone lets the record go, with no question about what was typed, and the table says that the page is not there', w.dialog() === null && w.asking() === null && w.ids().join() === '/,/contact'
+			&& findAll( w.mount, el => el.textContent === text('/_admin/routes/record/missing') ).length > 0 && w.h.dirty.isDirty( [ 'routes' ] ) === false );
+	}
+	{
+		const { w, asked } = stale( 'routes_conflict_gone' );
+		fire( w.button( asked, OVERWRITE ), 'click' );
+		check( 'Overwrite of a page that is gone sends the save with no stamp: the page is made anew', w.requests.at(-1).action === 'routes/save' && 'stamp' in w.requests.at(-1).payload === false && w.requests.at(-1).payload.originalUri === '/about' );
+	}
+
+	// A conflict that follows the question of the start page: the confirmed save carries the stamp too, and the question of the guide is the one that is asked
+	{
+		const w = world();
+		const list = listing( [ '/', '/missing' ] );
+		w.open( list );
+		w.questions = [];
+		const conflict = w.h.ui.conflict;
+		w.h.ui.conflict = function( options ) { w.questions.push( options ); return conflict.call( this, options ) };
+		const d = w.openRow('/');
+		w.type( w.addressControls( d )[0], '/elsewhere' );
+		fire( w.button( d, SAVE ), 'click' );
+		w.answer( 409, { error : 'leaves', code : 'routes_leaves_home', params : [ '/' ], field : '' } );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/routes/confirm/leaves-title') ), 'click' );
+		check( 'the confirmed save carries the stamp of the form as well', w.requests.at(-1).payload.confirm === true && w.requests.at(-1).payload.stamp === 'stamp/' );
+		w.answer( 409, { error : 'changed', code : 'routes_conflict', params : [ '/' ] } );
+		check( '...and is still checked: where the page was changed meanwhile the question is the conflict of the guide', w.asking() !== null && w.questions.at(-1).message === w.h.ui.format( text('/_admin/error/routes_conflict'), '/' ) && errorsOf( d ).length === 0 );
+		fire( w.button( w.asking(), OVERWRITE ), 'click' );
+		check( '...Overwrite sends the save with no stamp, and the server asks the question of the start page for it as for any save', 'stamp' in w.requests.at(-1).payload === false && 'confirm' in w.requests.at(-1).payload === false );
+	}
+
+	// The delete is of the page as the question named it
+	{
+		const w = world();
+		w.open( listing( [ '/', '/about', '/contact' ] ) );
+		w.questions = [];
+		const conflict = w.h.ui.conflict;
+		w.h.ui.conflict = function( options ) { w.questions.push( options ); return conflict.call( this, options ) };
+		const d = w.openRow('/contact');
+		const remove = () => { fire( w.button( d, DELETE ), 'click' ); fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/routes/confirm/delete-title') ), 'click' ) };
+		remove();
+		check( 'a delete sends the stamp of the page the list gave', w.requests.at(-1).action === 'routes/delete' && JSON.stringify( w.requests.at(-1).payload ) === '{"uri":"/contact","stamp":"stamp/contact"}' );
+		w.answer( 409, { error : 'changed', code : 'routes_conflict', params : [ '/contact' ] } );
+		const asked = w.asking();
+		check( 'a page that was changed meanwhile is the question of the guide, with Delete route as the answer that goes on, and the record stays', asked !== null && w.questions.at(-1).message === w.h.ui.format( text('/_admin/error/routes_conflict'), '/contact' ) && w.dialog() === asked
+			&& tag( asked, 'button' ).map( b => b.textContent ).join() === [ text( RELOAD ), text( CANCEL ), text('/_admin/routes/confirm/delete-title') ].join() && w.toasts().length === 0 );
+		fire( w.button( asked, CANCEL ), 'click' );
+		check( 'Cancel sends nothing, and the record stays as it is', w.requests.at(-1).action === 'routes/delete' && w.asking() === null && w.dialog() === d && w.touches.length === 0 );
+		remove();
+		w.answer( 409, { error : 'changed', code : 'routes_conflict', params : [ '/contact' ] } );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/routes/confirm/delete-title') ), 'click' );
+		check( 'Delete route sends the delete with no stamp', JSON.stringify( w.requests.at(-1).payload ) === '{"uri":"/contact"}' );
+		w.answer( 200, { pages : listing( [ '/', '/about' ] ).pages } );
+		check( '...and the answer is that of a delete: the page is out of the table, the record is closed, the other panels are told', w.ids().join() === '/,/about' && w.dialog() === null && w.touches.map( t => t[0] ).join() === 'routes,texts' );
+	}
+	{
+		const w = world();
+		w.open( listing( [ '/', '/about', '/contact' ] ) );
+		const d = w.openRow('/contact');
+		fire( w.button( d, DELETE ), 'click' );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/routes/confirm/delete-title') ), 'click' );
+		w.answer( 409, { error : 'changed', code : 'routes_conflict', params : [ '/contact' ] } );
+		fire( w.button( w.asking(), RELOAD ), 'click' );
+		check( 'Reload after a delete was refused reads the list', w.requests.at(-1).action === 'routes/list' );
+		w.answer( 200, changed( '/contact' ) );
+		check( '...and lets the record go: the table has the page as it is stored, nothing is deleted', w.dialog() === null && w.ids().join() === '/,/about,/contact' && byClass( w.row('/contact'), 'routes-name-label' )[0].textContent === 'Frischer Name' && w.requests.filter( r => r.action === 'routes/delete' ).length === 1 );
+	}
+	{
+		const w = world();
+		w.open( listing( [ '/', '/about', '/contact' ] ) );
+		const d = w.openRow('/contact');
+		fire( w.button( d, DELETE ), 'click' );
+		fire( tag( w.asking(), 'button' ).find( b => b.textContent === text('/_admin/routes/confirm/delete-title') ), 'click' );
+		w.answer( 409, { error : 'gone', code : 'routes_conflict_gone', params : [ '/contact' ] } );
+		check( 'a page that somebody else removed is what the delete was for: the list is read', w.asking() === null && w.requests.at(-1).action === 'routes/list' );
+		w.answer( 200, listing( [ '/', '/about' ] ) );
+		check( '...and the page is out of the table, the record is closed, and nobody is told that anything was written', w.ids().join() === '/,/about' && w.dialog() === null && w.touches.length === 0 );
+	}
+
+	// The words, in both languages
+	check( 'the sentences of the three codes are worded as agreed, in English', text('/_admin/error/routes_conflict') === 'The page “%s” was changed by another tab or another person since you opened it.'
+		&& text('/_admin/error/routes_conflict_gone') === 'The page “%s” was removed by another tab or another person since you opened it.' && text('/_admin/error/routes_invalid_stamp') === 'The state of the page that was read is not valid.' );
+	check( '...and in German', moduleDe['/_admin/error/routes_conflict'] === 'Die Seite „%s“ wurde seit dem Öffnen in einem anderen Tab oder von einer anderen Person geändert.'
+		&& moduleDe['/_admin/error/routes_conflict_gone'] === 'Die Seite „%s“ wurde seit dem Öffnen in einem anderen Tab oder von einer anderen Person entfernt.' && moduleDe['/_admin/error/routes_invalid_stamp'] === 'Der gelesene Stand der Seite ist ungültig.' );
 }
 
 // --- the address a window beside the workbench goes to, the language, a body that picks its template -------------------------------
