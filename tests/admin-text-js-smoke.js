@@ -251,7 +251,10 @@ function world( locale, hash, session ) {
 
 // --- the rows, the sections and their order ------------------------------------------
 
-const textEntry = ( key, values, extra ) => Object.assign( { key : key, global : '*' in values, values : values, html : false, format : 'plain', maxlength : 150, blacklisted : false, writable : true }, extra ?? {} );
+// What the server says of a key: the languages that have no text for it. The rule is the server's alone (\Nino\Text::isEmpty(), held to the table of fixtures/text-rules.json below);
+// this stands in for it for the texts these suites write - none, white space, markup with nothing in it
+const emptyOf = ( values ) => '*' in values ? [] : [ 'de_DE', 'en_US' ].filter( code => /^(?:\s|&nbsp;|<[^>]*>)*$/.test( String( values[code] ?? '' ) ) );
+const textEntry = ( key, values, extra ) => Object.assign( { key : key, global : '*' in values, values : values, html : false, format : 'plain', maxlength : 150, blacklisted : false, writable : true, empty : emptyOf( values ) }, extra ?? {} );
 const homeKeys = [
 	textEntry( '/template/page-services/item-1/title', { de_DE : 'Beratung', en_US : 'Consulting' } ),
 	textEntry( '/template/page-services/item-1/text', { de_DE : '<p>Wir beraten Sie gern</p>', en_US : 'We are happy to advise you' }, { html : true, format : 'blocks' } ),
@@ -533,7 +536,9 @@ function textPage( response, options ) {
 			else {
 				const value = handle.sanitize === null ? item.value : handle.sanitize( item.value );
 				entry.values[item.locale] = value;
+				entry.empty = emptyOf( entry.values );
 				results[item.key] = handle.typed === null ? { ok : true, value : value } : { ok : true, value : value, typed : handle.typed( value ) };
+				results[item.key].empty = entry.global === false && entry.empty.indexOf( item.locale ) !== -1;
 				if( handle.limits[item.key + ' ' + item.locale] !== undefined )
 					results[item.key].limit = handle.limits[item.key + ' ' + item.locale];
 				if( handle.keyLimits[item.key + ' ' + item.locale] !== undefined )
@@ -629,7 +634,7 @@ function textPage( response, options ) {
 		go : code => { h.admin.workLocale.current = code; h.admin.workLocale._followers.forEach( follower => follower.handler( code ) ) },
 		asking : () => { const top = dialog(); return top !== null && has( top, 'nino-admin-record' ) === false ? top : null },
 		answerAsk : key => { const top = dialog(); const asked = h.went.length; fire( tag( top, 'button' ).find( b => b.textContent === W( key ) ), 'click' ); if( h.went.length > asked && dialog() === null ) w.back(); return top },
-		external : ( key, locale, value ) => { const e = response.keys.find( one => one.key === key ); e.values[e.global === true ? '*' : locale] = value },
+		external : ( key, locale, value ) => { const e = response.keys.find( one => one.key === key ); e.values[e.global === true ? '*' : locale] = value; e.empty = emptyOf( e.values ) },
 		hash : () => h.hash(),
 	};
 
@@ -1161,6 +1166,54 @@ const inRow = ( id, response, options ) => { const w = shown( response, options 
 	const w = inRow( ROW, response );
 	const d = w.openRow( BADGE );
 	check( 'a text that is the same in every language counts to the limit named for its star', w.controlOf( d, '*' ).maxLength === 7 && w.counterOf( d, '*' ).textContent.split(' / ')[1] === '7' );
+}
+
+{
+	// One rule for an empty text: the server's, which the script only reads - and the script's own words for a text read the same table the server is held to
+	const U = textPage( fullResponse() ).h.admin.textKeys;
+	const emptyTable = JSON.parse( fs.readFileSync( path.join( __dirname, 'fixtures', 'text-rules.json' ), 'utf8' ) ).empty;
+	const apart = emptyTable.filter( row => ( U.plain( row.text ) === '' ) !== row.empty );
+	check( 'the text the script makes of a stored text - for the search, the summary of a row and the name of a page - is empty exactly where the server says the text is empty, for every text of the table'+ ( apart.length === 0 ? '' : ' - not '+ apart.map( row => JSON.stringify( row.text ) ).join() ), emptyTable.length > 30 && apart.length === 0 );
+
+	const keys = emptyTable.map( ( row, at ) => textEntry( '/project/probe/table/t'+ String( at ).padStart( 2, '0' ), { de_DE : 'Text', en_US : row.text }, { empty : row.empty === true ? [ 'en_US' ] : [] } ) );
+	const model = U.build( { entries : keys, pages : [], templates : {}, features : {}, order : {}, locale : 'de_DE' } );
+	const expected = emptyTable.filter( row => row.empty === true ).length;
+	check( 'a text is empty in a language where the answer of the server lists the language, and nowhere else: not in the other language, not for a key that is one text for all, not for an answer that lists none',
+		keys.every( ( entry, at ) => U.isEmptyIn( entry, 'en_US' ) === emptyTable[at].empty && U.isEmptyIn( entry, 'de_DE' ) === false )
+		&& U.isEmptyIn( { global : true, values : { '*' : '' }, empty : [ 'de_DE' ] }, 'de_DE' ) === false && U.isEmptyIn( { global : false, values : { de_DE : '' } }, 'de_DE' ) === false );
+	check( '...the head of a group counts them, and the filter "empty in the language" keeps them: the same texts, as the Dashboard counts them', U.rowCounts( model.rows['project/probe'], 'en_US' ).empty === expected && U.rowCounts( model.rows['project/probe'], 'en_US' ).texts === emptyTable.length
+		&& U.search( model, { query : '', emptyIn : 'en_US' } ).length === expected && U.search( model, { query : '', emptyIn : 'en_US' } ).every( hit => emptyTable[keys.indexOf( hit.item.field.entry )].empty === true ) && U.search( model, { query : '', emptyIn : 'de_DE' } ).length === 0 );
+}
+
+{
+	// A text the server says is empty after a save is empty in the table and the head of its group, whatever words the save carried
+	const response = fullResponse();
+	const w = inRow( ROW, response );
+	const d = w.openRow( TITLE );
+	w.type( d, 'en_US', '<p> </p>' );
+	w.save( d );
+	check( 'a text that the server answers as empty after the save is empty in the model, and the row of the table says so', w.panel._groups[ROW].find( e => e.key === TITLE ).empty.indexOf( 'en_US' ) !== -1 && w.panel._groups[ROW].find( e => e.key === TITLE ).empty.indexOf( 'de_DE' ) === -1 );
+	w.type( d, 'en_US', 'Services' );
+	w.save( d );
+	check( '...and one that it answers as not empty is not', w.panel._groups[ROW].find( e => e.key === TITLE ).empty.indexOf( 'en_US' ) === -1 );
+}
+
+{
+	// A save changes the language it wrote in the list of the empty ones, and no other: a language that was empty stays empty
+	const response = fullResponse();
+	const entry = response.keys.find( e => e.key === TITLE );
+	entry.values.de_DE = '';
+	entry.empty = emptyOf( entry.values );
+	const w = inRow( ROW, response );
+	const d = w.openRow( TITLE );
+	const emptyNow = () => w.panel._groups[ROW].find( e => e.key === TITLE ).empty.slice().sort().join();
+	check( 'the key starts empty in German', emptyNow() === 'de_DE' );
+	w.type( d, 'en_US', '<p> </p>' );
+	w.save( d );
+	check( 'a text saved as empty in English adds English to the list and keeps German in it', emptyNow() === 'de_DE,en_US' );
+	w.type( d, 'en_US', 'Services' );
+	w.save( d );
+	check( '...a text saved with words takes English out of it and keeps German in it', emptyNow() === 'de_DE' );
 }
 
 {

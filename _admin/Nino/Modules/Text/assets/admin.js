@@ -1155,6 +1155,10 @@
 					else
 						delete entry.typed[item.locale];
 
+					// Whether the language has a text after the write, as the server says it
+					if( typeof result.empty === 'boolean' && entry.global === false )
+						entry.empty = ( entry.empty ?? [] ).filter( function( code ) { return code !== item.locale } ).concat( result.empty === true ? [ item.locale ] : [] );
+
 					// What the language may hold after the write, as the server names it
 					if( typeof result.limit === 'number' ) {
 						entry.limits = Object.assign( {}, entry.limits, { [item.locale] : result.limit } );

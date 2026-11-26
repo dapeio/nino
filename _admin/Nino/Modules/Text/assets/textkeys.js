@@ -138,8 +138,9 @@
 		},
 
 		/**
-		 *	Whether a key still has no text in a language: one per language,
-		 *	and nothing in this one
+		 *	Whether a key still has no text in a language: one per language, and the server says the language has none
+		 *	(the answer's `empty`, the languages for which \Nino\Text::isEmpty() holds) - the rule is the server's alone,
+		 *	the Dashboard counts by it too
 		 *
 		 *	@param		{Object}	entry
 		 *	@param		{string}	locale
@@ -147,7 +148,7 @@
 		 *	@return		{boolean}
 		 */
 		isEmptyIn : function( entry, locale ) {
-			return entry.global === false && Nino.admin.textKeys.plain( entry.values[locale] ) === '';
+			return entry.global === false && ( entry.empty ?? [] ).indexOf( locale ) !== -1;
 		},
 
 		/**

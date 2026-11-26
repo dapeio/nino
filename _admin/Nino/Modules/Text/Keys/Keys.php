@@ -432,6 +432,7 @@ namespace Nino\Modules\Text {
 					'maxlengthSet' => isset( $meta[$key]['maxlength'] ),
 					'keyLimit' 		=> $meta[$key]['maxlength'] ?? \Nino\Text::maxlength(),
 					'limits' 			=> array_fill_keys( array_keys( $values ), $meta[$key]['maxlength'] ?? \Nino\Text::maxlength() ),
+					'empty' 			=> array_keys( $values ),
 					'values' 			=> $values,
 				];
 			}

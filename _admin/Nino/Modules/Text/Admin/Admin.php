@@ -554,8 +554,9 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	How many keys each language of the site still has no text for: those
-		 *	with an empty text - none, an empty one or one of whitespace - in the
-		 *	language while a language that has a text file holds a text of the
+		 *	with an empty text - none, an empty one, white space or markup with
+		 *	nothing in it, as \Nino\Text::isEmpty() reads it - in the language
+		 *	while a language that has a text file holds a text of the
 		 *	key, the work the panel's own list shows as empty fields. The native
 		 *	language is counted like the others: where it has no text for a key
 		 *	another language has - a language made the native one that was
@@ -572,16 +573,16 @@ namespace Nino\Modules\Text {
 		 */
 		public static function untranslatedCounts( array &$appData ): array {
 
-			$blank	= static fn( mixed $value ): bool => $value === null || ( is_string( $value ) === true && trim( $value ) === '' );
+			$empty	= static fn( mixed $value ): bool => \Nino\Text::isEmpty( is_string( $value ) === true ? $value : null );
 			$counts = [];
 
 			foreach( \Nino\Text::entries( $appData, false ) as $entry ) {
 
-				if( $entry['global'] === true || count( array_filter( $entry['values'], static fn( mixed $value ): bool => $blank( $value ) === false ) ) === 0 )
+				if( $entry['global'] === true || count( array_filter( $entry['values'], static fn( mixed $value ): bool => $empty( $value ) === false ) ) === 0 )
 					continue;
 
 				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-					if( $blank( $entry['values'][$locale] ?? null ) === true )
+					if( $empty( $entry['values'][$locale] ?? null ) === true )
 						$counts[$locale] = ( $counts[$locale] ?? 0 ) + 1;
 			}
 

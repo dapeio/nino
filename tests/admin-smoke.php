@@ -198,6 +198,13 @@ $gapBase = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
 \Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => $texts + [ '[[/gap/space]]' => 'Only English too' ] );
 $gapSpace = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
 check( 'a text of whitespace is an empty one: the native language lacks one, a language with no file lacks it too', $gapSpace['de_DE'] === $gapBase['de_DE'] + 1 && $gapSpace['fr_FR'] === $gapBase['fr_FR'] + 1 && ( $gapSpace['en_US'] ?? 0 ) === ( $gapBase['en_US'] ?? 0 ) );
+// Markup with nothing in it says nothing: the Dashboard reads it as the panel does
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/gap/markup]]' => 'Mit Absatz' ] );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => $texts + [ '[[/gap/markup]]' => '<p>&nbsp;</p><br>' ] );
+$gapMarkup = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
+check( 'a text of markup with nothing in it - an empty paragraph, a non-breaking space, a break - is an empty one: counted as a gap in English, which a text of whitespace alone was and a markup one was not', $gapMarkup['en_US'] === ( $gapSpace['en_US'] ?? 0 ) + 1 && $gapMarkup['de_DE'] === $gapSpace['de_DE'] );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/gap/markup]]' => 1 ] ) );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/gap/markup]]' => 1 ] ) );
 \Nino\Filesystem::putFileContent( $gapAppData, '/text/it_IT.php', [ '[[/gap/switched-off]]' => 'Solo' ] );
 $gapOff = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
 check( 'a text only a language that is switched off has is a gap in every language of the site, and that language is not counted itself', $gapOff['de_DE'] === $gapSpace['de_DE'] + 1 && $gapOff['en_US'] === ( $gapSpace['en_US'] ?? 0 ) + 1 && $gapOff['fr_FR'] === $gapSpace['fr_FR'] + 1

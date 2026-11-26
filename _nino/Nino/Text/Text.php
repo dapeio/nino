@@ -75,7 +75,7 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		bool		$includeBlacklisted	Whether a blacklisted key is in the list (flagged) or left out
 		 *
-		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, keyLimit, limits, values, typed } - values is locale => text as it is stored, null for a language without one, or '*' => text for a global key. keyLimit is the limit of the key itself, the one set or the one derived from its longest text, where maxlength is lifted to the longest text any language holds. limits is the same map for the number of characters a text of that language may have (see saveBatch()): the limit of the key, or the length the language's text has where that is more. typed is the same map for the texts a person types differently from how they are stored (see typed()): only the locales whose typed form differs from the stored one are in it, and an entry with none has no 'typed' key
+		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, keyLimit, limits, empty, values, typed } - values is locale => text as it is stored, null for a language without one, or '*' => text for a global key. keyLimit is the limit of the key itself, the one set or the one derived from its longest text, where maxlength is lifted to the longest text any language holds. limits is the same map for the number of characters a text of that language may have (see saveBatch()): the limit of the key, or the length the language's text has where that is more. empty is the list of the languages that have no text for the key (see isEmpty()), [] for a key that is the same in every language. typed is the same map for the texts a person types differently from how they are stored (see typed()): only the locales whose typed form differs from the stored one are in it, and an entry with none has no 'typed' key
 		 */
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
@@ -142,6 +142,7 @@ namespace Nino {
 				$limit 	= $meta[$key]['maxlength'] ?? null;
 				$typed 	= [];
 				$limits = [];
+				$empty 	= [];
 
 				foreach( $values as $locale => $value ) {
 
@@ -155,6 +156,13 @@ namespace Nino {
 					$limits[$locale] = max( $limit ?? self::maxlength( $longest ), $shown === null ? 0 : self::length( $shown, $format ) );
 				}
 
+				// The languages that have no text for a key that is one text for each (see isEmpty()): every language of the
+				// site that has a text file, the ones whose file does not hold the key among them
+				if( $isGlobal === false )
+					foreach( $locales as $locale )
+						if( self::isEmpty( isset( $values[$locale] ) === true ? (string) $values[$locale] : null ) === true )
+							$empty[] = $locale;
+
 				$entries[] = [
 					'key' 				=> $key,
 					'global' 			=> $isGlobal,
@@ -166,6 +174,7 @@ namespace Nino {
 					'maxlengthSet' => $limit !== null,
 					'keyLimit' 		=> $limit ?? self::maxlength( $longest ),
 					'limits' 			=> $limits,
+					'empty' 			=> $empty,
 					'values' 			=> $values,
 				] + ( $typed === [] ? [] : [ 'typed' => $typed ] );
 			}
@@ -361,6 +370,59 @@ namespace Nino {
 			return intdiv( strlen( (string) mb_convert_encoding( $text, 'UTF-16LE', 'UTF-8' ) ), 2 );
 		}
 
+		/**
+		 *	Whether a text says nothing: there is none, or nothing is left of it when the markup is taken away. A break, a
+		 *	paragraph and a list item leave a space and every other tag nothing; an entity of the characters of markup, a
+		 *	number written as a reference and the non-breaking space are the characters they stand for, read once - so a
+		 *	reference that spells another reference stays text -; and white space is no text, the non-breaking space and
+		 *	the spaces of other scripts among it. An image with no alt text and a comment are tags: a text of nothing
+		 *	else is empty. A shortcode, a fill, a zero and a zero-width space are text. The one rule of the workbench for
+		 *	"this language has no text for it" - the Text panel's lists, its counts and its filter, and the number the
+		 *	Dashboard says is still to translate - while the site's own fallback to another language (see
+		 *	\Nino\Html::getFills()) asks whether a text is blank, which only white space is
+		 *
+		 *	@param		string|null	$text					A text as it is stored, null where a language has none
+		 *
+		 *	@return		bool
+		 */
+		public static function isEmpty( ?string $text ): bool {
+
+			if( $text === null )
+				return true;
+
+			$text = (string) preg_replace( [ '#</?(?:br|p|li|ul|ol)\b[^>]*>#i', '#<[^>]*>#' ], [ ' ', '' ], $text );
+
+			$text = (string) preg_replace_callback( '/&(#x?[0-9a-f]+|[a-z]+);/i', static function( array $match ): string {
+
+				$name = $match[1];
+
+				if( $name[0] === '#' ) {
+
+					$hex 	= strtolower( $name[1] ) === 'x';
+					$code = $hex === true ? hexdec( substr( $name, 2 ) ) : ( preg_match( '/^[0-9]+/', substr( $name, 1 ), $digits ) === 1 ? (int) $digits[0] : 0 );
+
+					// A lone surrogate is no character of a string in PHP; in the browser it is text
+					if( $code > 0 && $code < 0x110000 )
+						return mb_chr( (int) $code, 'UTF-8' ) ?: 'x';
+
+					return $match[0];
+				}
+
+				return match( strtolower( $name ) ) {
+					'amp' 	=> '&',
+					'lt' 		=> '<',
+					'gt' 		=> '>',
+					'quot' 	=> '"',
+					'apos' 	=> "'",
+					'nbsp' 	=> ' ',
+					default => $match[0],
+				};
+			}, $text );
+
+			// The white space of a browser's trim(), spelled out: a class of the pattern engine would count more of it
+			return preg_match( '/[^\x{0009}-\x{000D}\x{0020}\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]/u', $text ) === 0;
+		}
+
 		// Read the developer-maintained list of keys hidden from the workbench's
 		// Text panel (technical values, not content - uris, colors,
 		// typography, ...)
@@ -426,9 +488,10 @@ namespace Nino {
 		// are. The results are one for each key: a key named twice - in two
 		// languages - says 'changed' where either of its items did, and
 		// the other item is written all the same, by its own stamp.
-		// A written key's result is { ok, value, typed }: value is the text as
+		// A written key's result is { ok, value, typed, empty }: value is the text as
 		// it is stored, typed the text as a person types it (see typed()), the
-		// two forms the editor holds afterwards.
+		// two forms the editor holds afterwards, and empty whether that language
+		// has no text for the key after the write (see isEmpty()).
 		//
 		// $enforceLimit is what the editors of the workbench ask for: a text
 		// longer than its language's limit (see length(), entries()' limits) is
@@ -553,7 +616,7 @@ namespace Nino {
 				if( array_key_exists( 'was', $item ) === true && ( $item['force'] ?? false ) !== true )
 					$fileWas[$file]['[['. $key. ']]'] = (string) $item['was'];
 
-				$results[$key] = [ 'ok' => true, 'value' => $value, 'typed' => $typed ];
+				$results[$key] = [ 'ok' => true, 'value' => $value, 'typed' => $typed, 'empty' => $entry['global'] === false && self::isEmpty( $value ) ];
 				$wrote[$key] = $where;
 				$after[$key] ??= $entry['values'];
 				$after[$key][$where] = $value;

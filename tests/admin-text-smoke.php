@@ -595,8 +595,8 @@ callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/pro
 [ , $typedBody ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/project/typed/panel/one', 'locale' => 'de_DE', 'value' => 'Er sagt "ja"' ] ] ] );
 [ , $typedListed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
 $typedPanel = array_column( $typedListed['keys'], null, 'key' )['/project/typed/panel/one'] ?? [];
-check( 'the Text panel answers the same two forms: text/savebatch says the value stored, the value typed and what the language may hold, text/keys the stored ones as values and the typed ones as typed',
-	( $typedBody['results']['/project/typed/panel/one'] ?? [] ) === [ 'ok' => true, 'value' => 'Er sagt &quot;ja&quot;', 'typed' => 'Er sagt "ja"', 'keyLimit' => 172, 'limit' => 172 ] && ( $typedPanel['limits']['de_DE'] ?? 0 ) === 172 && ( $typedPanel['values']['de_DE'] ?? '' ) === 'Er sagt &quot;ja&quot;' && ( $typedPanel['typed'] ?? [] ) === [ 'de_DE' => 'Er sagt "ja"' ] );
+check( 'the Text panel answers the same two forms: text/savebatch says the value stored, the value typed, whether the language has none and what it may hold, text/keys the stored ones as values and the typed ones as typed',
+	( $typedBody['results']['/project/typed/panel/one'] ?? [] ) === [ 'ok' => true, 'value' => 'Er sagt &quot;ja&quot;', 'typed' => 'Er sagt "ja"', 'empty' => false, 'keyLimit' => 172, 'limit' => 172 ] && ( $typedPanel['limits']['de_DE'] ?? 0 ) === 172 && ( $typedPanel['values']['de_DE'] ?? '' ) === 'Er sagt &quot;ja&quot;' && ( $typedPanel['typed'] ?? [] ) === [ 'de_DE' => 'Er sagt "ja"' ] );
 
 // The words of the site: a plain text printed in a page is the stored form, as it was, whatever the field shows
 callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/typed/site/script', 'global' => true, 'value' => '' ] );
@@ -2489,6 +2489,87 @@ callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $orde
 foreach( $limitKeys as $limitKey )
 	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $limitKey ] );
 callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $globalKey ] );
+
+echo "One rule for an empty text - the panel's lists, counts and filter and the number of the Dashboard read it from one place\n";
+
+$emptyRows = is_array( $rules['empty'] ?? null ) === true ? $rules['empty'] : [];
+$wrongEmpty = array_filter( $emptyRows, static fn( array $row ): bool => \Nino\Text::isEmpty( $row['text'] ) !== $row['empty'] );
+check( 'Text::isEmpty() holds for every text of the table the script reads with its own text(): none, white space of every script, a break, an empty paragraph, a tag with nothing in it, an entity of white space - and not for a shortcode, a fill, a zero, a zero-width space, a reference that spells another one'
+	. ( $wrongEmpty === [] ? '' : ' - not '. implode( ', ', array_map( static fn( array $row ): string => json_encode( $row['text'] ), $wrongEmpty ) ) ), count( $emptyRows ) > 30 && $wrongEmpty === [] && \Nino\Text::isEmpty( null ) === true );
+
+$emptyKey = '/project/company/empty/probe';
+$emptyBracket = '[['. $emptyKey. ']]';
+$dashboardEnglish = static function() use ( &$appData ): int {
+	[ , $summary ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+	foreach( $summary['notices'] ?? [] as $notice )
+		if( ( $notice['text'] ?? '' ) === '/_admin/dashboard/notice/untranslated' && ( $notice['values'][1] ?? '' ) === 'en_US' )
+			return (int) $notice['values'][0];
+	return 0;
+};
+$writeTexts = static function( array $texts ) use ( &$appData, $emptyBracket ): void {
+	foreach( [ 'de_DE', 'en_US', 'fr_FR' ] as $locale )
+		\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', static function( array $content ) use ( $locale, $texts, $emptyBracket ): array {
+			if( array_key_exists( $locale, $texts ) === true )
+				$content[$emptyBracket] = $texts[$locale];
+			else
+				unset( $content[$emptyBracket] );
+			return $content;
+		} );
+};
+$writeTexts( [] );
+$dashboardBase = $dashboardEnglish();
+$countsBase = (int) ( \Nino\Modules\Text\Admin::untranslatedCounts( $appData )['en_US'] ?? 0 );
+
+// Every text of the table in English, German holding a text: the entry says English is empty where the rule says so, the Dashboard counts it, and the two agree
+$disagree = [];
+foreach( $emptyRows as $row ) {
+	$writeTexts( [ 'de_DE' => 'Text', 'en_US' => $row['text'], 'fr_FR' => 'Texte' ] );
+	[ , $listed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+	$entryOf = array_column( $listed['keys'] ?? [], null, 'key' )[$emptyKey] ?? [];
+	$inList = in_array( 'en_US', $entryOf['empty'] ?? [], true );
+	$fromDashboard = $dashboardEnglish() - $dashboardBase;
+	$fromCounts = (int) ( \Nino\Modules\Text\Admin::untranslatedCounts( $appData )['en_US'] ?? 0 ) - $countsBase;
+	$expected = $row['empty'] === true ? 1 : 0;
+	if( $inList !== $row['empty'] || $fromDashboard !== $expected || $fromCounts !== $expected || in_array( 'de_DE', $entryOf['empty'] ?? [], true ) === true || in_array( 'fr_FR', $entryOf['empty'] ?? [], true ) === true )
+		$disagree[] = json_encode( $row['text'] ). ' list '. json_encode( $inList ). ' dashboard '. $fromDashboard;
+}
+check( 'for every text of the table the entry of the panel says the language is empty exactly where the rule does, and the Dashboard counts exactly that text as one still to translate'. ( $disagree === [] ? '' : ' - disagree: '. implode( '; ', array_slice( $disagree, 0, 5 ) ) ), $disagree === [] && count( $emptyRows ) > 30 );
+
+// A language that has a file with no line for the key, a key only another language has, a key empty in every language, a key that is one text for all
+$writeTexts( [ 'de_DE' => 'Text' ] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+$entryOf = array_column( $listed['keys'] ?? [], null, 'key' )[$emptyKey] ?? [];
+check( 'a language whose file has no line for the key is empty in the list and counted by the Dashboard: the key is the work of that language', in_array( 'en_US', $entryOf['empty'] ?? [], true ) === true && $dashboardEnglish() === $dashboardBase + 1 );
+$writeTexts( [ 'de_DE' => '<p></p>', 'en_US' => ' ', 'fr_FR' => '&nbsp;' ] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+$entryOf = array_column( $listed['keys'] ?? [], null, 'key' )[$emptyKey] ?? [];
+check( 'the one place where the panel and the Dashboard differ: a key that is empty in every language is empty in each of them in the list, and the Dashboard does not count it, since there is nothing in it to translate', array_diff( [ 'de_DE', 'en_US', 'fr_FR' ], $entryOf['empty'] ?? [] ) === [] && $dashboardEnglish() === $dashboardBase );
+$writeTexts( [] );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', fn( array $content ): array => $content + [ $emptyBracket => '' ] );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $content ): array => $content + [ $emptyBracket => 'Text' ] );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+$entryOf = array_column( $listed['keys'] ?? [], null, 'key' )[$emptyKey] ?? [];
+check( 'a key that is one text for every language is never empty in one, whatever the language files hold', ( $entryOf['global'] ?? false ) === true && ( $entryOf['empty'] ?? null ) === [] && $dashboardEnglish() === $dashboardBase );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', fn( array $content ): array => array_diff_key( $content, [ $emptyBracket => 1 ] ) );
+$writeTexts( [] );
+
+// A save says whether the language has a text afterwards, for the panel's counts
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $emptyKey, 'global' => false, 'value' => 'x' ] );
+\Nino\Text::setMeta( $appData, $emptyKey, 'blocks', null );
+$saves = [];
+foreach( [ '<p></p>' => true, '<p>Words</p>' => false, '<p>&nbsp;</p>' => true ] as $sent => $isEmpty ) {
+	[ , $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => $emptyKey, 'locale' => 'en_US', 'value' => $sent ] ] ] );
+	$saves[] = ( $body['results'][$emptyKey]['ok'] ?? false ) === true && ( $body['results'][$emptyKey]['empty'] ?? null ) === $isEmpty;
+}
+check( 'a written text says whether its language has none after the save: an empty paragraph, words, a paragraph of a non-breaking space', $saves === [ true, true, true ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $emptyKey ] );
+
+// A key that is hidden and has no text anywhere is empty in every language of the Text Keys tab
+\Nino\Text::setBlacklisted( $appData, '/project/company/empty/hidden', true );
+[ , $listed ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+$hiddenOnly = array_column( $listed['keys'] ?? [], null, 'key' )['/project/company/empty/hidden'] ?? [];
+check( 'a hidden key without a text anywhere is listed as empty in every language, as the entries of the others are shaped', $hiddenOnly !== [] && $hiddenOnly['empty'] === array_column( $listed['locales'] ?? [], 'locale' ) && array_keys( $hiddenOnly['limits'] ) === $hiddenOnly['empty'] );
+\Nino\Text::setBlacklisted( $appData, '/project/company/empty/hidden', false );
 
 \Nino\Auth::deleteUser( $appData, 'textonly@example.com' );
 \Nino\Auth::deleteUser( $appData, 'keysright@example.com' );

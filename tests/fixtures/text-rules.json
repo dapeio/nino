@@ -180,5 +180,151 @@
 			"count": 5,
 			"kept": true
 		}
+	],
+	"empty": [
+		{
+			"text": "",
+			"empty": true
+		},
+		{
+			"text": "   ",
+			"empty": true
+		},
+		{
+			"text": "\n",
+			"empty": true
+		},
+		{
+			"text": "\t \r\n",
+			"empty": true
+		},
+		{
+			"text": "&nbsp;",
+			"empty": true
+		},
+		{
+			"text": " ",
+			"empty": true
+		},
+		{
+			"text": "<p></p>",
+			"empty": true
+		},
+		{
+			"text": "<br>",
+			"empty": true
+		},
+		{
+			"text": "<br/>",
+			"empty": true
+		},
+		{
+			"text": "<p> </p>",
+			"empty": true
+		},
+		{
+			"text": "<p>&nbsp;</p>",
+			"empty": true
+		},
+		{
+			"text": "<ul><li></li></ul>",
+			"empty": true
+		},
+		{
+			"text": "<strong></strong>",
+			"empty": true
+		},
+		{
+			"text": "<img src=\"/x.png\" alt=\"\">",
+			"empty": true
+		},
+		{
+			"text": "<!-- x -->",
+			"empty": true
+		},
+		{
+			"text": "&#160;",
+			"empty": true
+		},
+		{
+			"text": "&#x20;",
+			"empty": true
+		},
+		{
+			"text": "&#12ab;",
+			"empty": true
+		},
+		{
+			"text": "　 ",
+			"empty": true
+		},
+		{
+			"text": "﻿",
+			"empty": true
+		},
+		{
+			"text": "&#91;button /x&#93;",
+			"empty": false
+		},
+		{
+			"text": "[button /x]",
+			"empty": false
+		},
+		{
+			"text": "[[/project/company/general/name]]",
+			"empty": false
+		},
+		{
+			"text": "0",
+			"empty": false
+		},
+		{
+			"text": "Hello",
+			"empty": false
+		},
+		{
+			"text": "<p>Hello</p>",
+			"empty": false
+		},
+		{
+			"text": "​",
+			"empty": false
+		},
+		{
+			"text": "",
+			"empty": false
+		},
+		{
+			"text": "&amp;nbsp;",
+			"empty": false
+		},
+		{
+			"text": "&lt;p&gt;",
+			"empty": false
+		},
+		{
+			"text": "&nbsp",
+			"empty": false
+		},
+		{
+			"text": "&#0;",
+			"empty": false
+		},
+		{
+			"text": "&#xD800;",
+			"empty": false
+		},
+		{
+			"text": "&eacute;",
+			"empty": false
+		},
+		{
+			"text": "&amp;",
+			"empty": false
+		},
+		{
+			"text": "<pre>",
+			"empty": true
+		}
 	]
 }
