@@ -48,6 +48,34 @@ if( ( $argv[1] ?? '' ) === 'first-account' ) {
 	exit( 0 );
 }
 
+// Another process of the same project, for the pin of the own account: php install-smoke.php own-account <sandbox> <own mail> <session token> <mail> <password> <current password>.
+// It boots from the file as a request does, waits for the file <sandbox>/go, then asks the account step for the own account and says what it was answered
+if( ( $argv[1] ?? '' ) === 'own-account' ) {
+
+	$child = [ './nino/uid' => $argv[2] ];
+	\Nino\AppData::prepare( $child );
+	$child['./nino/filesystem/path']				= $argv[2];
+	$child['./nino/filesystem/configpath']	= $argv[2]. '/private';
+	$child['./nino/filesystem/contentpath']	= $argv[2]. '/private';
+	$child['./nino/filesystem/publicpath']	= $argv[2]. '/public';
+	$child['./nino/locales/current']				= 'de_DE';
+	$child['/nino/locales/native']					= 'de_DE';
+	$child['/nino/dir']											= '';
+	$file = include $argv[2]. '/private/config.php';
+	$child['/nino/auth/roles']							= (array) ( $file['/nino/auth/roles'] ?? [] );
+	$child['/nino/auth/user']								= (array) ( $file['/nino/auth/user'] ?? [] );
+	$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+	$_SESSION[$argv[2]] = [ './nino/auth/current' => $argv[3], './nino/auth/token' => $argv[4] ];
+	\Nino\Auth::init( $child );
+
+	while( is_file( $argv[2]. '/go' ) === false )
+		usleep( 200 );
+
+	[ $status, $answer ] = ninoCall( $child, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => $argv[5], 'pw' => $argv[6], 'currentPassword' => $argv[7] ] );
+	echo json_encode( [ $status, $answer['code'] ?? '' ] );
+	exit( 0 );
+}
+
 $appData = ninoSandbox( 'install' );
 $sandbox = ninoSandboxDir( $appData );
 
@@ -2690,6 +2718,214 @@ check( 'the step answered with another address and the password of the account o
 	$wsMoved[0] === 200 && array_keys( $wsOwn['/nino/auth/user'] ) === [ 'moved@example.com' ] && $wsMoved[1]['users'] === [ 'moved@example.com' ] && $wsMoved[1]['user'] === 'moved@example.com'
 	&& wizardSession( $wsOwn, $wsClients, 'owner' )['user'] === 'moved@example.com' && password_verify( 'the new password of it', $wsOwn['/nino/auth/user']['moved@example.com']['pw'] ) === true );
 check( '...and the address of the account the session holds is in the page it draws, for the page to know whose it is - and in nobody else\'s', wizardAccountOfPage( $wsOwn, $wsClients, 'owner' ) === 'moved@example.com' && wizardAccountOfPage( $wsOwn, $wsClients, 'passer-by' ) === '' );
+$appReset();
+
+// --- the own account is decided against what config.php holds, under its lock
+
+/*	A request of the account itself that booted before another one acted has the accounts of the file as they were then. The other request is played on a copy
+	booted from the file, and the wizard's request acts afterwards: what the other did to any account stays, the address it took is taken, an account of it that
+	is gone is not made anew, and the account that was confirmed is the account the file holds - with the password it holds	*/
+$appReset();
+$ownProject = $appProject( 'install-own-stale', false );
+$ownDir = ninoSandboxDir( $ownProject );
+ninoCall( $ownProject, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'owner@example.com', 'pw' => $wsPassword ] );
+$ownSession = $_SESSION;
+\Nino\Auth::insertUser( $ownProject, 'keep@example.com', $wsPassword, [], 'developer' );
+$ownProject['/nino/auth/roles']['editor'] = [ 'label' => 'Editor', 'perms' => [ '/_admin/text/manage' ] ];
+$ownProject['/nino/auth/roles']['everything'] = [ 'label' => 'Everything', 'perms' => [ '/*' ] ];
+\Nino\AppData::writeContentData( $ownProject, [ '/nino/auth/roles' ] );
+$ownFiles = [ '/config.php' => $ownDir. '/private/config.php', '/data/auth-tries.php' => $ownDir. '/private/data/auth-tries.php' ];
+$ownWorld = [];
+foreach( $ownFiles as $ownKey => $ownPath )
+	$ownWorld[$ownKey] = is_file( $ownPath ) === true ? (string) file_get_contents( $ownPath ) : null;
+$ownTick = 0;
+
+// The files as they were, with a modification time no read has seen
+$ownRestore = static function() use ( $ownFiles, &$ownWorld, &$ownTick ): void {
+
+	foreach( $ownFiles as $ownKey => $ownPath ) {
+
+		if( $ownWorld[$ownKey] === null ) {
+
+			if( is_file( $ownPath ) === true )
+				unlink( $ownPath );
+
+			continue;
+		}
+
+		file_put_contents( $ownPath, $ownWorld[$ownKey] );
+		touch( $ownPath, time() + ++$ownTick );
+	}
+};
+
+// A request as it boots from the file: the accounts as it holds them, which are its baseline as well; $who is the account of the session
+$ownBoot = static function( string $who = '' ) use ( &$ownProject, $ownDir ): array {
+
+	$request	= $ownProject;
+	$file			= include $ownDir. '/private/config.php';
+
+	$request['/nino/auth/user']				= (array) ( $file['/nino/auth/user'] ?? [] );
+	$request['./nino/auth/baseline']	= $request['/nino/auth/user'];
+	unset( $request['./nino/auth/revoked'], $request['./nino/auth/rehashed'], $request['./nino/auth/current'] );
+
+	if( $who !== '' )
+		$request['./nino/auth/current'] = \Nino\Auth::getUser( $request, $who );
+
+	return $request;
+};
+
+$ownStored	= static fn(): array => (array) ( ( include $ownDir. '/private/config.php' )['/nino/auth/user'] ?? [] );
+$ownAsk			= static function( array &$request, array $data ) use ( &$ownSession ): array {
+
+	$_SESSION = $ownSession;
+	[ $status, $body ] = ninoCall( $request, [ \Nino\Install\Accounts::class, 'apiCreate' ], $data );
+
+	return [ $status, $body['code'] ?? null ];
+};
+$ownLockFree = static function() use ( &$ownProject, $ownDir ): bool {
+
+	$method = new ReflectionMethod( \Nino\Filesystem::class, '_canonicalPath' );
+	$path		= $ownDir. '/private/data/.locks/'. sha1( (string) $method->invokeArgs( null, [ &$ownProject, '/config.php' ] ) ). '.lock';
+
+	if( is_file( $path ) === false )
+		return true;
+
+	$handle	= fopen( $path, 'c' );
+	$free		= flock( $handle, LOCK_EX | LOCK_NB );
+
+	if( $free === true )
+		flock( $handle, LOCK_UN );
+
+	fclose( $handle );
+
+	return $free;
+};
+$ownTried = static fn(): array => is_file( $ownDir. '/private/data/auth-tries.php' ) === true ? array_keys( (array) ( include $ownDir. '/private/data/auth-tries.php' ) ) : [];
+$ownNew		= 'the new password of it';
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+\Nino\Auth::insertUser( $other, 'taken@example.com', 'the password of the other', [], 'editor' );
+$takenBefore = $ownStored()['taken@example.com'];
+$answer	= $ownAsk( $booted, [ 'mail' => 'taken@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( 'the own account asks for an address that another request gave to an account meanwhile: 400 "install_mail_in_use", the other account is as it was and the own account is still its own, with its password',
+	$answer === [ 400, 'install_mail_in_use' ] && $ownStored()['taken@example.com'] === $takenBefore && password_verify( $wsPassword, (string) ( $ownStored()['owner@example.com']['pw'] ?? '' ) ) === true && $ownLockFree() === true );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+\Nino\Auth::insertUser( $other, 'taken@example.com', 'the password of the other', [], 'editor' );
+$answer	= $ownAsk( $booted, [ 'mail' => 'Taken@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( '...for an address that differs from that one in case only: 400 as well, and no second spelling is made', $answer === [ 400, 'install_mail_in_use' ] && array_keys( $ownStored() ) == [ 'owner@example.com', 'keep@example.com', 'taken@example.com' ] && $ownLockFree() === true );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+\Nino\Auth::setRole( $other, 'owner@example.com', 'everything' );
+\Nino\Auth::setName( $other, 'owner@example.com', 'Set Meanwhile' );
+$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+$moved	= $ownStored()['moved@example.com'] ?? [];
+check( 'the own account is renamed and given a password by a request that booted before a role and a name were given to it: 200, and the account at the new address holds both, with the new password',
+	$answer === [ 200, null ] && ( $moved['role'] ?? '' ) === 'everything' && ( $moved['name'] ?? '' ) === 'Set Meanwhile' && password_verify( $ownNew, (string) ( $moved['pw'] ?? '' ) ) === true && isset( $ownStored()['owner@example.com'] ) === false );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+\Nino\Auth::insertUser( $other, 'later@example.com', 'the password of the other', [], 'editor' );
+\Nino\Auth::setName( $other, 'keep@example.com', 'Kept' );
+$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( '...the accounts of others that were made or changed meanwhile stay', $answer === [ 200, null ] && isset( $ownStored()['later@example.com'] ) === true && ( $ownStored()['keep@example.com']['name'] ?? '' ) === 'Kept' );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+\Nino\Auth::setRole( $other, 'owner@example.com', 'editor' );
+$before	= $ownStored();
+$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( 'the own account of a request that booted before it was lowered to a role that holds less than everything: 403 "install_not_allowed", as a request of that account is told; nothing is written and the lock is let go', $answer === [ 403, 'install_not_allowed' ] && $ownStored() === $before && $ownLockFree() === true );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+\Nino\Auth::setRole( $other, 'owner@example.com', 'editor' );
+$other	= $ownBoot();
+\Nino\Auth::insertUser( $other, 'taken@example.com', 'the password of the other', [], 'editor' );
+$before	= $ownStored();
+$answer	= $ownAsk( $booted, [ 'mail' => 'taken@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( '...and the right is asked before the address: a caller lowered meanwhile that asks for an address that is taken is told 403 "install_not_allowed" as well, as a fresh request of it is', $answer === [ 403, 'install_not_allowed' ] && $ownStored() === $before && $ownLockFree() === true );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot();
+$other['/nino/auth/roles']['developer']['perms'] = [ '/_admin/text/manage' ];
+\Nino\AppData::writeContentData( $other, [ '/nino/auth/roles' ] );
+$before	= $ownStored();
+$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( '...and so is one whose role was narrowed in config.php meanwhile: the roles are the ones the file holds', $answer === [ 403, 'install_not_allowed' ] && $ownStored() === $before && $ownLockFree() === true );
+
+foreach( [
+	'deleted'								=> [ static fn( array &$other ) => \Nino\Auth::deleteUser( $other, 'owner@example.com' ), 'the account is gone from the file' ],
+	'deactivated'						=> [ static fn( array &$other ) => \Nino\Auth::setStatus( $other, 'owner@example.com', false ), 'the account is switched off' ],
+	'logged out everywhere'	=> [ static fn( array &$other ) => \Nino\Auth::logoutAllSessions( $other, 'owner@example.com' ), 'the session is gone from the account' ],
+	'given another password'=> [ static fn( array &$other ) => \Nino\Auth::updateUser( $other, 'owner@example.com', 'owner@example.com', 'the password of the other' ), 'the sessions were ended by the password' ],
+] as $label => [ $meanwhile, $why ] ) {
+
+	$ownRestore();
+	$booted	= $ownBoot( 'owner@example.com' );
+	$other	= $ownBoot();
+	$meanwhile( $other );
+	$before	= $ownStored();
+	$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+	check( 'the own account of a request that booted before it was '. $label. ': 401 "session", as a request without one is answered ('. $why. '); nothing is written and the lock is let go', $answer === [ 401, 'session' ] && $ownStored() === $before && $ownLockFree() === true );
+}
+
+// The current password was confirmed against the hash the request found
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot( 'owner@example.com' );
+$_SESSION = $ownSession;
+\Nino\Auth::updateUser( $other, 'owner@example.com', 'owner@example.com', 'the password of another tab' );
+$before	= $ownStored();
+$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( 'the own account of a request that booted before the password was set by the account itself, in another tab, confirmed with the password it had: 401 "install_wrong_password", nothing is written and no attempt is counted',
+	$answer === [ 401, 'install_wrong_password' ] && $ownStored() === $before && array_filter( $ownTried(), static fn( string $key ): bool => str_starts_with( $key, 'confirm:' ) ) === [] && $ownLockFree() === true );
+
+$ownRestore();
+$booted	= $ownBoot( 'owner@example.com' );
+$other	= $ownBoot( 'owner@example.com' );
+$_SESSION = $ownSession;
+\Nino\Auth::updateUser( $other, 'owner@example.com', 'owner@example.com', $wsPassword );
+$answer	= $ownAsk( $booted, [ 'mail' => 'moved@example.com', 'pw' => $ownNew, 'currentPassword' => $wsPassword ] );
+check( '...and where what was set is another hash of the same password, it is the password that was confirmed: 200', $answer === [ 200, null ] && password_verify( $ownNew, (string) ( $ownStored()['moved@example.com']['pw'] ?? '' ) ) === true );
+$ownRestore();
+
+// Two requests of two accounts that each ask for one address, in processes of their own: the one that takes the lock first has it
+$appReset();
+$raceOwn = $appProject( 'install-own-race', false );
+$raceDir = ninoSandboxDir( $raceOwn );
+ninoCall( $raceOwn, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'one@example.com', 'pw' => $wsPassword ] );
+$raceTokens = [ 'one' => (string) ( $_SESSION[$raceDir]['./nino/auth/token'] ?? '' ) ];
+\Nino\Auth::insertUser( $raceOwn, 'two@example.com', $wsPassword, [], 'developer' );
+\Nino\Auth::loginUser( $raceOwn, 'two@example.com', $wsPassword );
+$raceTokens['two'] = (string) ( $_SESSION[$raceDir]['./nino/auth/token'] ?? '' );
+$racers = $racePipes = [];
+foreach( [ 'one', 'two' ] as $raceWho )
+	$racers[$raceWho] = proc_open( [ PHP_BINARY, __FILE__, 'own-account', $raceDir, $raceWho. '@example.com', $raceTokens[$raceWho], 'taken@example.com', 'the password of '. $raceWho. ' as it asks', $wsPassword ], [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $racePipes[$raceWho] );
+file_put_contents( $raceDir. '/go', '1' );
+$raceAnswers = [];
+foreach( $racers as $raceWho => $raceProcess ) {
+	$raceAnswers[$raceWho] = json_decode( (string) stream_get_contents( $racePipes[$raceWho][1] ), true );
+	stream_get_contents( $racePipes[$raceWho][2] );
+	proc_close( $raceProcess );
+}
+$raceStored	= (array) \Nino\AppData::stored( $raceOwn, '/nino/auth/user', [] );
+$raceWon		= array_keys( array_filter( $raceAnswers, static fn( mixed $answer ): bool => is_array( $answer ) === true && $answer[0] === 200 ) );
+$raceLost		= array_keys( array_filter( $raceAnswers, static fn( mixed $answer ): bool => is_array( $answer ) === true && $answer[0] === 400 && $answer[1] === 'install_mail_in_use' ) );
+check( 'two accounts that each ask, from requests that booted before either, for the same address: one is renamed and the other is told 400 "install_mail_in_use" and keeps its address and its password',
+	count( $raceWon ) === 1 && count( $raceLost ) === 1 && array_keys( $raceStored ) !== [] && isset( $raceStored['taken@example.com'] ) === true && isset( $raceStored[$raceWon[0]. '@example.com'] ) === false
+	&& isset( $raceStored[$raceLost[0]. '@example.com'] ) === true && count( $raceStored ) === 2 && password_verify( 'the password of '. $raceWon[0]. ' as it asks', (string) ( $raceStored['taken@example.com']['pw'] ?? '' ) ) === true
+	&& password_verify( $wsPassword, (string) ( $raceStored[$raceLost[0]. '@example.com']['pw'] ?? '' ) ) === true );
 $appReset();
 
 // --- the whole wizard, with real requests: without an application, and with one

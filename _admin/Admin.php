@@ -2893,7 +2893,9 @@ namespace Nino\Admin {
 		 *	is a takeover by whoever holds the secret - and lifts the lock
 		 *	and the deactivation the account may be in: a recovered password
 		 *	for a locked or deactivated developer that still does not get
-		 *	anyone in would be no recovery
+		 *	anyone in would be no recovery. The account is the one config.php
+		 *	holds at each step (see _asStored()): one that was deleted meanwhile is
+		 *	404, and what another request changed on it stays
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2909,33 +2911,106 @@ namespace Nino\Admin {
 			if( self::_validateMailPw( $request, $mail, $pw ) === false )
 				return;
 
-			$user = \Nino\Auth::getUser( $appData, $mail );
+			// Each write lets the lock of config.php go (see \Nino\Filesystem::mutate()), so every step - the new password, the
+			// end of the sessions, the lift of the lock with the activation - asks for the account of the accounts the file holds,
+			// under the lock, and writes before the lock is let go: what another request did to the account meanwhile stays.
+			// The steps after the first go on only where the account at the address still holds the password the first one
+			// set: an account that was deleted and made anew, another one renamed into the address, or a password that
+			// somebody else set meanwhile is not the account that was reset, and nothing more is done to it
+			$updated = null;
 
-			if( $user === false ) {
+			if( self::_asStored( $appData, $mail, null, static fn( array &$appData ): array|false => \Nino\Auth::updateUser( $appData, $mail, $mail, $pw ), $updated ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown account', 'recovery_unknown_account' );
 				return;
 			}
 
-			if( \Nino\Auth::updateUser( $appData, $mail, $mail, $pw ) === false ) {
+			if( $updated === false ) {
 				\Nino\Http::fail( $request, 500, 'could not update the account', 'recovery_update' );
 				return;
 			}
 
-			\Nino\Auth::logoutAllSessions( $appData, $mail );
-
-			// Written before the unlock: the password is set from here on, and
-			// so is the line, whatever the unlock answers
+			// Written once the password is set, whatever the later steps find: the password is set from here on, and so is the line
 			Admin::record( $appData, self::LOG_ACTOR, 'Reset Password '. $mail );
 
-			if( \Nino\Auth::unlock( $appData, $mail ) === false ) {
+			$hash = (string) ( $updated['pw'] ?? '' );
+
+			if( self::_asStored( $appData, $mail, $hash, static fn( array &$appData ): bool => \Nino\Auth::logoutAllSessions( $appData, $mail ) ) === false ) {
+				self::_refuseChanged( $request );
+				return;
+			}
+
+			// Lifting the lock of the account and activating it are one step, so that the activation is made on the accounts the
+			// file holds when the lock is lifted
+			$lifted = static function( array &$appData ) use ( $mail ): bool {
+
+				if( \Nino\Auth::unlock( $appData, $mail ) === false )
+					return false;
+
+				if( \Nino\Auth::getUser( $appData, $mail )['status'] !== \Nino\Auth::STATUS_ACTIVE )
+					\Nino\Auth::setStatus( $appData, $mail, true );
+
+				return true;
+			};
+			$unlocked = null;
+
+			if( self::_asStored( $appData, $mail, $hash, $lifted, $unlocked ) === false ) {
+				self::_refuseChanged( $request );
+				return;
+			}
+
+			if( $unlocked === false ) {
 				\Nino\Http::fail( $request, 500, 'the password was set and every session ended, but the lock of the account could not be lifted', 'recovery_unlock' );
 				return;
 			}
 
-			if( $user['status'] !== \Nino\Auth::STATUS_ACTIVE )
-				\Nino\Auth::setStatus( $appData, $mail, true );
-
 			\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => false ] );
+		}
+
+		/**
+		 *	The answer of a reset that stopped after it set the password: the account at the address is not the one it set it on
+		 *	any more - deleted, made anew, or given a password by somebody else - and nothing more is done to it
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _refuseChanged( array &$request ): void {
+			\Nino\Http::fail( $request, 409, 'the account was changed while its password was being set - repeat the reset', 'recovery_changed' );
+		}
+
+		/**
+		 *	Run a step on an account under the lock of config.php, with the accounts the file holds as the accounts of this request
+		 *	(see \Nino\Auth::lockAccounts()). An account the file does not hold - or, where a hash is named, one that does not
+		 *	hold that password hash - is not touched and the step does not run. The lock is let go when the step is done,
+		 *	whether it wrote (a write does that itself) or not
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$mail					The account
+		 *	@param		string|null	$hash				The password hash the account has to hold, null for any
+		 *	@param		callable	$step					function( array &$appData ): mixed - what it answers is put into $result
+		 *	@param		mixed			&$result			(reference) What the step answered
+		 *
+		 *	@return 	bool										False when the file holds no such account
+		 */
+		private static function _asStored( array &$appData, string $mail, ?string $hash, callable $step, mixed &$result = null ): bool {
+
+			if( \Nino\Auth::lockAccounts( $appData ) === false )
+				\Nino\Runtime::fail( 'Recovery: could not lock config.php for writing.' );
+
+			try {
+
+				$stored = \Nino\Auth::getUser( $appData, $mail );
+
+				if( $stored === false || ( $hash !== null && ( $stored['pw'] ?? '' ) !== $hash ) )
+					return false;
+
+				$result = $step( $appData );
+
+				return true;
+			}
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+			}
 		}
 
 		/**
@@ -2943,7 +3018,7 @@ namespace Nino\Admin {
 		 *	developer account was deleted and there is nothing left to log
 		 *	in with. Only on an explicit confirmation - the page asks before
 		 *	it sends one - and never for an address that has an account
-		 *	already, which _reset() is for
+		 *	already, which _reset() is for: asked of the accounts config.php holds, under its lock
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2964,19 +3039,32 @@ namespace Nino\Admin {
 			if( self::_validateMailPw( $request, $mail, $pw ) === false )
 				return;
 
-			if( \Nino\Auth::getUser( $appData, $mail ) !== false ) {
-				\Nino\Http::fail( $request, 409, 'account exists - use reset', 'recovery_exists' );
-				return;
+			// Whether the address has an account is asked of the accounts config.php holds, under its lock,
+			// and the account is written before the lock is let go: of two requests for one address one makes it
+			if( \Nino\Auth::lockAccounts( $appData ) === false )
+				\Nino\Runtime::fail( 'Recovery::_create(): could not lock config.php for writing.' );
+
+			try {
+
+				if( \Nino\Auth::getUser( $appData, $mail ) !== false ) {
+					\Nino\Http::fail( $request, 409, 'account exists - use reset', 'recovery_exists' );
+					return;
+				}
+
+				// Full access of its own, whatever the roles say - this is the
+				// emergency path - and the Developer role beside it where config.php
+				// holds one, so the account reads as what it is
+				$roles = \Nino\AppData::stored( $appData, '/nino/auth/roles', [] );
+				$appData['/nino/auth/roles'] = is_array( $roles ) === true ? $roles : [];
+				$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
+
+				if( \Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ], $role ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not create the account', 'recovery_create' );
+					return;
+				}
 			}
-
-			// Full access of its own, whatever the roles say - this is the
-			// emergency path - and the Developer role beside it where there
-			// is one, so the account reads as what it is
-			$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
-
-			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [ '/*' ], $role ) === false ) {
-				\Nino\Http::fail( $request, 500, 'could not create the account', 'recovery_create' );
-				return;
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			Admin::record( $appData, self::LOG_ACTOR, 'Create User '. $mail. ' with full access' );

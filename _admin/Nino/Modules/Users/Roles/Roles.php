@@ -556,7 +556,7 @@ namespace Nino\Modules\Users {
 		/**
 		 *	Take the lock of config.php and read what it holds: the roles and the accounts. The
 		 *	roles and the accounts of this request become the stored ones, the baseline the
-		 *	accounts are merged against with them, so that what is written afterwards is what
+		 *	accounts are merged against with them (the accounts by \Nino\Auth::lockAccounts()), so that what is written afterwards is what
 		 *	config.php holds plus the one change of the action; the answer is a copy of the
 		 *	app data, the one a decision about them is made against, while a write goes through $appData
 		 *	(accounts are merged, see \Nino\AppData::writeContentData()). Then the signed-in account is asked
@@ -577,18 +577,14 @@ namespace Nino\Modules\Users {
 		 */
 		public static function lockStored( array &$appData, array &$request, string $perm, ?string $selfOr = null ): ?array {
 
-			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {
+			if( \Nino\Auth::lockAccounts( $appData ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not lock config.php for writing' );
 				return null;
 			}
 
 			$roles = \Nino\AppData::stored( $appData, '/nino/auth/roles', [] );
-			$users = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
-			$users = is_array( $users ) === true ? $users : [];
 
-			$appData['/nino/auth/roles']			= is_array( $roles ) === true ? $roles : [];
-			$appData['/nino/auth/user']				= $users;
-			$appData['./nino/auth/baseline']	= $users;
+			$appData['/nino/auth/roles'] = is_array( $roles ) === true ? $roles : [];
 
 			if( self::_refuseCaller( $appData, $request, $perm, $selfOr ) === true ) {
 				\Nino\Filesystem::unlockFile( $appData, '/config.php' );

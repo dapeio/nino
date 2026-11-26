@@ -35,6 +35,8 @@ Without a session the answer is the workbench's: 401 with the code `session`, or
 
 The first account is made under a lock of `config.php`: whether an account exists is asked again from the file once the lock is held, so that of requests that arrive together one makes the account and is signed in, and the others are told there is one (401) and get no session. The step signs its account in without asking for the password it has just set, so that an address that is cooling down from earlier attempts cannot leave the account made and its maker outside. Once it exists, a visitor can neither add an account nor replace one.
 
+The own account is changed under that lock as well: an address that another request gave to an account meanwhile, in the same or in other case, is refused 400 (`install_mail_in_use`) and nothing is written; an account that was deleted, switched off or logged out everywhere while the request was on the way is answered 401 with the code `session`, as a request without a session is; and what another request set on any account meanwhile - a role, a name - stays. A current password that was confirmed against a hash another request of the session has replaced meanwhile is refused as a wrong one, and no attempt is counted.
+
 ## Navigation and Saving
 
 Each step loads the already saved state and displays it again. As long as the assistant is not completed, you can return to an earlier step, change settings, and reapply them.

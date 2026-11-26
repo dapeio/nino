@@ -1072,6 +1072,32 @@ namespace Nino {
 
 
 		/**
+		 *	Take the lock of config.php and make the accounts it holds the accounts of this request and the baseline they are
+		 *	merged against with (see \Nino\AppData::writeContentData()): what the request writes after it is what config.php holds plus
+		 *	the one change it makes, and what it decides is decided against what config.php holds. The first read under the lock
+		 *	is a read of the disk, so what another request wrote while this one waited is there. A write lets the lock go when it is
+		 *	done (see \Nino\Filesystem::mutate()): a request that decides and writes more than once takes it, and so reads the
+		 *	accounts, anew before each of them. The caller releases the lock with \Nino\Filesystem::unlockFile( $appData, '/config.php' )
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool										False when the lock could not be taken, nothing is changed then
+		 */
+		public static function lockAccounts( array &$appData ): bool {
+
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+				return false;
+
+			$users = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
+			$users = is_array( $users ) === true ? $users : [];
+
+			$appData['/nino/auth/user'] 			= $users;
+			$appData['./nino/auth/baseline']	= $users;
+
+			return true;
+		}
+
+		/**
 		 *	Whether an account record still holds the session of a token: the account is active, lists
 		 *	the token, and the session is not older than SESSION_TTL. The question the sign-in of a
 		 *	request is decided by (_resumeSession()), asked of any record and without writing anything - so a

@@ -1342,15 +1342,10 @@ namespace Nino\Install {
 		 */
 		private static function _first( array &$appData, array &$request, string $mail, string $pw ): void {
 
-			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+			if( \Nino\Auth::lockAccounts( $appData ) === false )
 				\Nino\Runtime::fail( 'Accounts::apiCreate(): could not lock config.php for the first account.' );
 
 			try {
-
-				$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
-				$stored = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
-				$appData['/nino/auth/user'] = is_array( $stored ) === true ? $stored : [];
-				$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
 
 				if( self::usableUsers( $appData ) !== [] ) {
 					\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
@@ -1371,13 +1366,8 @@ namespace Nino\Install {
 
 					\Nino\Auth::deleteUser( $appData, $mail );
 
-					if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
+					if( \Nino\Auth::lockAccounts( $appData ) === false )
 						\Nino\Runtime::fail( 'Accounts::apiCreate(): could not lock config.php for the first account.' );
-
-					$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
-					$stored = \Nino\AppData::stored( $appData, '/nino/auth/user', [] );
-					$appData['/nino/auth/user'] = is_array( $stored ) === true ? $stored : [];
-					$appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
 
 					if( self::usableUsers( $appData ) !== [] ) {
 						\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
@@ -1416,7 +1406,8 @@ namespace Nino\Install {
 		 *	The own account of the session, its address and its password - by the rules of the Users panel for an account that changes
 		 *	itself: the current password is confirmed (a wrong one counts against the account, as there), and an address that is
 		 *	another account's is refused. The session stays the one it is: the sessions of the account that were opened with the old
-		 *	password end, this one does not
+		 *	password end, this one does not. The address is asked once more under the lock of config.php, of the accounts it holds, and so is the
+		 *	session: an account that was deleted or switched off meanwhile is answered 401 'session', as a request without one is
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1447,9 +1438,57 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( \Nino\Auth::updateUser( $appData, $own, $mail, $pw ) === false ) {
-				\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
-				return;
+			$confirmed = $current['pw'] ?? null;
+
+			// What the account may become is decided against the accounts config.php holds, under its lock, and the account is
+			// written before the lock is let go: what another request did to any account meanwhile stays
+			if( \Nino\Auth::lockAccounts( $appData ) === false )
+				\Nino\Runtime::fail( 'Accounts::apiCreate(): could not lock config.php for the own account.' );
+
+			try {
+
+				$stored = \Nino\Auth::getUser( $appData, $own );
+				$token	= \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+
+				// An account that was deleted, switched off, logged out everywhere or given another password meanwhile
+				// is a request without a session - what the next request of this browser is
+				if( $stored === false || is_string( $token ) === false || \Nino\Auth::sessionHolds( $stored, $token ) === false ) {
+					\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+					return;
+				}
+
+				// The right the wizard asks of every request is asked of the record and the roles config.php holds: an account that
+				// was lowered meanwhile is refused as a fresh request of it is
+				$appData['./nino/auth/current']	= $stored;
+				$roles													= \Nino\AppData::stored( $appData, '/nino/auth/roles', [] );
+				$appData['/nino/auth/roles']		= is_array( $roles ) === true ? $roles : [];
+
+				foreach( self::rootPerms( $appData ) as $perm )
+					if( \Nino\Auth::checkPermission( $appData, $perm ) === false ) {
+						\Nino\Http::fail( $request, 403, 'not allowed', 'install_not_allowed' );
+						return;
+					}
+
+				if( $mail !== $own && ( \Nino\Auth::getUser( $appData, $mail ) !== false || \Nino\Auth::twin( $appData, $mail, $own ) !== null ) ) {
+					\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
+					return;
+				}
+
+				// The current password was confirmed against the hash this request found: a password set meanwhile is a password
+				// that was not confirmed, and not a guess to count. A hash of the same password that another request made
+				// meanwhile (a sign-in that rehashes) is none
+				if( ( $stored['pw'] ?? null ) !== $confirmed && password_verify( $currentPw, (string) ( $stored['pw'] ?? '' ) ) === false ) {
+					\Nino\Http::fail( $request, 401, 'wrong current password', 'install_wrong_password' );
+					return;
+				}
+
+				if( \Nino\Auth::updateUser( $appData, $own, $mail, $pw ) === false ) {
+					\Nino\Http::fail( $request, 400, 'mail already in use', 'install_mail_in_use' );
+					return;
+				}
+			}
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
 
 			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ), 'csrf' => \Nino\Csrf::getToken( $appData ), 'user' => $mail ] );

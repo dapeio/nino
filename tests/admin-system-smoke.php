@@ -2939,6 +2939,338 @@ check( '...and a create one', count( $logLines( 'recovery.php', 'Create User fre
 check( '...nothing about an address the door refused, and no password in the log', $logLines( 'typo@example.com' ) === []
 	&& array_filter( [ 'a new password', 'a second password', 'a fresh password', 'the old password' ], static fn( string $secret ): bool => $logLines( $secret ) !== [] ) === [] );
 
+/*	Recovery decides and writes against the accounts config.php holds, under its lock. A request that booted before another one acted has the accounts of the
+	file as they were then: the other request is played on a copy booted from the file, and the stale one acts afterwards. What the other did to an account stays,
+	and the action's own change stands on it; an account that is gone is not made anew by a reset, and an address that got an account is not made over by a create	*/
+echo "\nRecovery: a request that booted before another one acted decides and writes against what config.php holds\n";
+
+$staleFile = ninoSandboxDir( $appData ). '/private/config.php';
+
+// A request as it boots from the file: the accounts as the file holds them, which are its baseline as well, no marker of an earlier request
+$staleBoot = static function() use ( &$appData, $staleFile ): array {
+
+	$request = $appData;
+	$file = include $staleFile;
+
+	$request['/nino/auth/user']				= (array) ( $file['/nino/auth/user'] ?? [] );
+	$request['./nino/auth/baseline']	= $request['/nino/auth/user'];
+	unset( $request['./nino/auth/revoked'], $request['./nino/auth/rehashed'], $request['./nino/auth/current'] );
+
+	return $request;
+};
+
+// An account made by a request of its own: the copy this suite holds is not what the file holds any more once another request has acted
+$staleMake		= static function( string $mail, bool $active = true ) use ( $staleBoot ): void {
+
+	$request = $staleBoot();
+	\Nino\Auth::insertUser( $request, $mail, 'the old password', [], 'editor' );
+
+	if( $active === false )
+		\Nino\Auth::setStatus( $request, $mail, false );
+};
+$staleDelete	= static function( string $mail ) use ( $staleBoot ): void {
+
+	$request = $staleBoot();
+	\Nino\Auth::deleteUser( $request, $mail );
+};
+$staleStored	= static fn( string $mail ): array => (array) ( ( include $staleFile )['/nino/auth/user'][$mail] ?? [] );
+$staleLockFree = static function() use ( &$appData ): bool {
+
+	$method = new ReflectionMethod( \Nino\Filesystem::class, '_canonicalPath' );
+	$path		= ninoSandboxDir( $appData ). '/private/data/.locks/'. sha1( (string) $method->invokeArgs( null, [ &$appData, '/config.php' ] ) ). '.lock';
+
+	if( is_file( $path ) === false )
+		return true;
+
+	$handle	= fopen( $path, 'c' );
+	$free		= flock( $handle, LOCK_EX | LOCK_NB );
+
+	if( $free === true )
+		flock( $handle, LOCK_UN );
+
+	fclose( $handle );
+
+	return $free;
+};
+
+$staleFree		= null;
+$staleAsk			= static function( array &$request, string $action, array $data ) use ( $staleLockFree, &$staleFree ): array {
+
+	\Nino\Runtime::setSessionValue( $request, \Nino\Admin\Recovery::SESSION_KEY, true );
+	[ $status, $body ] = ninoCall( $request, [ \Nino\Admin\Recovery::class, 'handlePost' ], $data, $action );
+
+	// Asked while the request that answered is alive: a lock that it still holds is held, and let go here so that nothing after it waits for it
+	$staleFree = $staleLockFree();
+	\Nino\Filesystem::unlockFile( $request, '/config.php' );
+
+	return [ $status, $body['code'] ?? null ];
+};
+$staleReset = static function( string $mail, callable $meanwhile ) use ( $staleMake, $staleBoot, $staleAsk ): array {
+
+	$staleMake( $mail );
+	$booted	= $staleBoot();
+	$other	= $staleBoot();
+	$meanwhile( $other, $mail );
+
+	return $staleAsk( $booted, 'recovery/reset', [ 'mail' => $mail, 'pw' => 'the recovered password' ] );
+};
+$staleOk = static fn( array $record, array $keep ): bool => password_verify( 'the recovered password', (string) ( $record['pw'] ?? '' ) ) === true && ( $record['sessions'] ?? null ) === [] && ( $record['status'] ?? null ) === \Nino\Auth::STATUS_ACTIVE
+	&& array_intersect_key( $record, $keep ) == $keep;
+
+$answer = $staleReset( 'stale1@example.com', static fn( array &$other, string $mail ) => \Nino\Auth::setRole( $other, $mail, 'developer' ) );
+check( 'a reset by a request that booted before a role was given: 200, and the account holds the role that was given, the recovered password, no session and is active', $answer === [ 200, null ] && $staleOk( $staleStored( 'stale1@example.com' ), [ 'role' => 'developer' ] ) );
+
+$answer = $staleReset( 'stale2@example.com', static fn( array &$other, string $mail ) => \Nino\Auth::setName( $other, $mail, 'Set Meanwhile' ) );
+check( '...before a name was set: the name stays', $answer === [ 200, null ] && $staleOk( $staleStored( 'stale2@example.com' ), [ 'name' => 'Set Meanwhile', 'role' => 'editor' ] ) );
+
+$answer = $staleReset( 'stale3@example.com', static function( array &$other, string $mail ): void {
+	\Nino\Auth::setRole( $other, $mail, 'developer' );
+	\Nino\Auth::setStatus( $other, $mail, false );
+} );
+check( '...before the account was given a role and deactivated: the account is active, as a reset makes it, with the role that was given', $answer === [ 200, null ] && $staleOk( $staleStored( 'stale3@example.com' ), [ 'role' => 'developer' ] ) );
+
+$answer = $staleReset( 'stale4@example.com', static fn( array &$other, string $mail ) => \Nino\Auth::updateUser( $other, $mail, $mail, 'a password set meanwhile' ) );
+check( '...before another password was set: the recovered one is the account\'s', $answer === [ 200, null ] && $staleOk( $staleStored( 'stale4@example.com' ), [ 'role' => 'editor' ] ) );
+
+$answer = $staleReset( 'stale5@example.com', static function( array &$other, string $mail ): void {
+	\Nino\Auth::loginUser( $other, $mail, 'the old password' );
+} );
+check( '...before the account signed in: the session ends with the reset, and the role is the one it was', $answer === [ 200, null ] && $staleOk( $staleStored( 'stale5@example.com' ), [ 'role' => 'editor' ] ) );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+$logged = count( $logLines( 'recovery.php', 'Reset Password stale6@example.com' ) );
+$answer = $staleReset( 'stale6@example.com', static fn( array &$other, string $mail ) => \Nino\Auth::deleteUser( $other, $mail ) );
+check( 'a reset by a request that booted before the account was deleted: 404 "recovery_unknown_account", the account is not made anew, nothing is logged, and the lock is let go',
+	$answer === [ 404, 'recovery_unknown_account' ] && $staleStored( 'stale6@example.com' ) === [] && count( $logLines( 'recovery.php', 'Reset Password stale6@example.com' ) ) === $logged && $staleFree === true );
+
+$answer = $staleReset( 'stale7@example.com', static fn( array &$other, string $mail ) => \Nino\Auth::updateUser( $other, $mail, 'stale7.moved@example.com' ) );
+check( '...before it was renamed: 404 as well, nothing is made at the old address, and the account at the new one is as it was', $answer === [ 404, 'recovery_unknown_account' ] && $staleStored( 'stale7@example.com' ) === []
+	&& password_verify( 'the old password', (string) ( $staleStored( 'stale7.moved@example.com' )['pw'] ?? '' ) ) === true && $staleFree === true );
+
+/*	A write lets the lock go, so a reset that goes on after its first write asks the file anew, and goes on only where the account at the address still holds the
+	password the first write set. The other request is the callback that runs after the first write: it deletes the account, makes another one at the address,
+	renames one into it or sets a password	*/
+$staleTries	= static fn(): array => (array) ( is_file( ninoSandboxDir( $appData ). '/private/data/auth-tries.php' ) === true ? include ninoSandboxDir( $appData ). '/private/data/auth-tries.php' : [] );
+$staleStops	= static function( string $mail, callable $meanwhile ) use ( $staleMake, $staleBoot, $staleAsk ): array {
+
+	$staleMake( $mail );
+	$booted	= $staleBoot();
+	$done		= false;
+	\Nino\Callbacks::registerCallback( $booted, '/nino/auth/user/update', static function() use ( &$done, $staleBoot, $meanwhile, $mail ): void {
+
+		if( $done === true )
+			return;
+
+		$done		= true;
+		$other	= $staleBoot();
+		$meanwhile( $other, $mail );
+	} );
+
+	return $staleAsk( $booted, 'recovery/reset', [ 'mail' => $mail, 'pw' => 'the recovered password' ] );
+};
+$staleChanged	= [ 409, 'recovery_changed' ];
+$staleLines		= static fn( string $mail ): int => count( $logLines( 'recovery.php', 'Reset Password '. $mail ) );
+
+$mail		= 'stale8@example.com';
+$logged	= $staleLines( $mail );
+$answer	= $staleStops( $mail, static fn( array &$other, string $mail ) => \Nino\Auth::deleteUser( $other, $mail ) );
+check( 'a reset whose account is deleted after its first write answers 409 "recovery_changed", the account stays deleted, the line of the password is logged, and the lock is let go',
+	$answer === $staleChanged && $staleStored( $mail ) === [] && $staleLines( $mail ) === $logged + 1 && $staleFree === true );
+
+$mail		= 'stale11@example.com';
+$logged	= $staleLines( $mail );
+$answer	= $staleStops( $mail, static function( array &$other, string $mail ) use ( $lockTries ): void {
+	\Nino\Auth::deleteUser( $other, $mail );
+	\Nino\Auth::insertUser( $other, $mail, 'the password of the new one', [], 'editor' );
+	\Nino\Auth::loginUser( $other, $mail, 'the password of the new one' );
+	$lockTries( [ $mail => 0 - time() - 3600 ] );
+} );
+$record	= $staleStored( $mail );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+check( '...deleted and made anew at the address: 409, and the new account keeps its password, its session and its lock', $answer === $staleChanged && password_verify( 'the password of the new one', (string) ( $record['pw'] ?? '' ) ) === true && count( (array) ( $record['sessions'] ?? [] ) ) === 1
+	&& ( $record['status'] ?? null ) === \Nino\Auth::STATUS_ACTIVE && ( $staleTries()[$mail] ?? 0 ) < 0 && $staleLines( $mail ) === $logged + 1 );
+$lockTries( [ $mail => null ] );
+
+$mail		= 'stale12@example.com';
+$answer	= $staleStops( $mail, static function( array &$other, string $mail ) use ( $lockTries ): void {
+	\Nino\Auth::deleteUser( $other, $mail );
+	\Nino\Auth::insertUser( $other, $mail, 'the password of the new one', [], 'editor' );
+	\Nino\Auth::setStatus( $other, $mail, false );
+	$lockTries( [ $mail => 0 - time() - 3600 ] );
+} );
+$record	= $staleStored( $mail );
+check( '...the new account that an administrator deactivated stays deactivated, and its lock is not lifted', $answer === $staleChanged && ( $record['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED && password_verify( 'the password of the new one', (string) ( $record['pw'] ?? '' ) ) === true
+	&& ( $staleTries()[$mail] ?? 0 ) < 0 );
+$lockTries( [ $mail => null ] );
+
+$mail		= 'stale13@example.com';
+$logged	= $staleLines( $mail );
+$answer	= $staleStops( $mail, static function( array &$other, string $mail ) use ( $staleBoot ): void {
+	\Nino\Auth::deleteUser( $other, $mail );
+	\Nino\Auth::insertUser( $other, 'stale13.other@example.com', 'the password of the other', [], 'editor' );
+	\Nino\Auth::loginUser( $other, 'stale13.other@example.com', 'the password of the other' );
+	$later = $staleBoot();
+	\Nino\Auth::updateUser( $later, 'stale13.other@example.com', $mail );
+} );
+$record	= $staleStored( $mail );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+check( '...another account renamed into the address: 409, and it keeps its password and its session', $answer === $staleChanged && $staleStored( 'stale13.other@example.com' ) === [] && password_verify( 'the password of the other', (string) ( $record['pw'] ?? '' ) ) === true
+	&& count( (array) ( $record['sessions'] ?? [] ) ) === 1 && $staleLines( $mail ) === $logged + 1 );
+
+$mail		= 'stale14@example.com';
+$logged	= $staleLines( $mail );
+$answer	= $staleStops( $mail, static fn( array &$other, string $mail ) => \Nino\Auth::updateUser( $other, $mail, $mail, 'a password set by someone else' ) );
+$record	= $staleStored( $mail );
+check( '...a password that someone else set: 409, and the account holds that password and was not activated or unlocked further', $answer === $staleChanged && password_verify( 'a password set by someone else', (string) ( $record['pw'] ?? '' ) ) === true && $staleLines( $mail ) === $logged + 1 );
+
+$mail		= 'stale15@example.com';
+$logged	= $staleLines( $mail );
+$answer	= $staleStops( $mail, static fn( array &$other, string $mail ) => \Nino\Auth::updateUser( $other, $mail, 'stale15.moved@example.com' ) );
+check( '...the account renamed: 409, nothing is made at the address, and the account at the new one holds the password that was set', $answer === $staleChanged && $staleStored( $mail ) === []
+	&& password_verify( 'the recovered password', (string) ( $staleStored( 'stale15.moved@example.com' )['pw'] ?? '' ) ) === true && $staleLines( $mail ) === $logged + 1 );
+
+/*	The third step takes the lock and the accounts the file holds, and goes on where the account at the address still holds the password the first step set. The other
+	request acts at the one point in between that nothing of the product offers: FaultFs counts the replaces of config.php, and after the second - the write of the
+	second step - the next look at the directory of the locks, which is the lock of the third step before it is taken, is where the other request acts	*/
+require_once __DIR__. '/fixtures/faultfs.php';
+$staleAtThird = static function( string $mail, callable $meanwhile ) use ( $staleMake, $staleBoot, $staleAsk ): array {
+
+	$staleMake( $mail, false );
+	$booted	= $staleBoot();
+	$writes	= 0;
+	$armed	= false;
+	$acted	= false;
+	FaultFs::on( [
+		'rename'	=> static function( string $to ) use ( &$writes, &$armed ): bool {
+
+			if( str_ends_with( $to, '/private/config.php' ) === true && ++$writes === 2 )
+				$armed = true;
+
+			return false;
+		},
+		'uid'			=> static function( string $path ) use ( &$armed, &$acted, $staleBoot, $meanwhile, $mail ): ?int {
+
+			if( $armed === true && str_ends_with( rtrim( $path, '/' ), '/.locks' ) === true ) {
+				$armed	= false;
+				$acted	= true;
+				$meanwhile( $staleBoot, $mail );
+			}
+
+			return null;
+		},
+	] );
+	$answer = $staleAsk( $booted, 'recovery/reset', [ 'mail' => $mail, 'pw' => 'the recovered password' ] );
+	FaultFs::off();
+
+	return [ $acted, $answer ];
+};
+
+$mail		= 'stale16@example.com';
+$logged	= $staleLines( $mail );
+[ $acted, $answer ] = $staleAtThird( $mail, static function( callable $boot, string $mail ): void {
+	$request = $boot();
+	\Nino\Auth::deleteUser( $request, $mail );
+	$request = $boot();
+	\Nino\Auth::insertUser( $request, $mail, 'the password of the new one', [], 'editor' );
+	\Nino\Auth::setStatus( $request, $mail, false );
+} );
+$record	= $staleStored( $mail );
+check( 'a reset whose account is deleted and made anew, and deactivated, while its third step takes the lock: 409 "recovery_changed", the new account stays deactivated and keeps its password, and the lock is let go',
+	$acted === true && $answer === $staleChanged && ( $record['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED && password_verify( 'the password of the new one', (string) ( $record['pw'] ?? '' ) ) === true && $staleFree === true && $staleLines( $mail ) === $logged + 1 );
+
+$mail		= 'stale17@example.com';
+[ $acted, $answer ] = $staleAtThird( $mail, static function( callable $boot, string $mail ): void {
+	$request = $boot();
+	\Nino\Auth::setRole( $request, $mail, 'developer' );
+	$request = $boot();
+	\Nino\Auth::setName( $request, $mail, 'Set At The Third Step' );
+} );
+$record	= $staleStored( $mail );
+check( '...a role and a name given to the account at that point: 200, the account holds both, the recovered password, and is activated', $acted === true && $answer === [ 200, null ] && $staleOk( $record, [ 'role' => 'developer', 'name' => 'Set At The Third Step' ] ) && $staleFree === true );
+
+// A role given between the first write and the last, with the account deactivated: the last one is the activation, and it is made on the account as the file holds it
+$staleMake( 'stale9@example.com', false );
+$booted	= $staleBoot();
+$given	= false;
+\Nino\Callbacks::registerCallback( $booted, '/nino/auth/user/update', static function() use ( &$given, $staleBoot ): void {
+
+	if( $given === true )
+		return;
+
+	$given	= true;
+	$other	= $staleBoot();
+	\Nino\Auth::setRole( $other, 'stale9@example.com', 'developer' );
+} );
+$answer = $staleAsk( $booted, 'recovery/reset', [ 'mail' => 'stale9@example.com', 'pw' => 'the recovered password' ] );
+check( 'a reset whose account is given a role after its first write: 200, and the account holds the role, the recovered password, no session and is active', $given === true && $answer === [ 200, null ] && $staleOk( $staleStored( 'stale9@example.com' ), [ 'role' => 'developer' ] ) );
+
+// A role given while the reset writes its line, between the end of the sessions and the lift of the lock: the account is activated as the file holds it then
+require_once __DIR__. '/fixtures/faultfs.php';
+$staleMake( 'stale10@example.com', false );
+$booted	= $staleBoot();
+$given	= false;
+FaultFs::on( [ 'rename' => static function( string $to ) use ( &$given, $staleBoot ): bool {
+
+	if( $given === true || str_contains( $to, '/.logs/' ) === false )
+		return false;
+
+	$given	= true;
+	$other	= $staleBoot();
+	\Nino\Auth::setRole( $other, 'stale10@example.com', 'developer' );
+
+	return false;
+} ] );
+$answer = $staleAsk( $booted, 'recovery/reset', [ 'mail' => 'stale10@example.com', 'pw' => 'the recovered password' ] );
+FaultFs::off();
+check( 'a reset whose account is given a role while its line is written: 200, and the account holds the role, the recovered password, no session and is active', $given === true && $answer === [ 200, null ] && $staleOk( $staleStored( 'stale10@example.com' ), [ 'role' => 'developer' ] ) );
+
+foreach( [ 'stale1', 'stale2', 'stale3', 'stale4', 'stale5', 'stale9', 'stale10', 'stale11', 'stale12', 'stale13', 'stale14', 'stale15', 'stale15.moved', 'stale16', 'stale17', 'stale7.moved' ] as $stale )
+	$staleDelete( $stale. '@example.com' );
+
+// Two creates of one address, and an address that got an account meanwhile
+$first	= $staleBoot();
+$second	= $staleBoot();
+$one		= $staleAsk( $first, 'recovery/create', [ 'mail' => 'made@example.com', 'pw' => 'the first password', 'confirm' => true ] );
+$two		= $staleAsk( $second, 'recovery/create', [ 'mail' => 'made@example.com', 'pw' => 'the second password', 'confirm' => true ] );
+check( 'two creates of one address from requests that booted before either: the first is 200, the second 409 "recovery_exists", and the account is the first\'s', $one === [ 200, null ] && $two === [ 409, 'recovery_exists' ]
+	&& password_verify( 'the first password', (string) ( $staleStored( 'made@example.com' )['pw'] ?? '' ) ) === true && $staleFree === true );
+$staleDelete( 'made@example.com' );
+
+$booted	= $staleBoot();
+$other	= $staleBoot();
+\Nino\Auth::insertUser( $other, 'made@example.com', 'the password of the panel', [], 'editor' );
+$answer	= $staleAsk( $booted, 'recovery/create', [ 'mail' => 'made@example.com', 'pw' => 'the second password', 'confirm' => true ] );
+check( 'a create for an address that got an account meanwhile is 409 "recovery_exists", and the account is the one that was made: its role, its password', $answer === [ 409, 'recovery_exists' ]
+	&& ( $staleStored( 'made@example.com' )['role'] ?? '' ) === 'editor' && password_verify( 'the password of the panel', (string) ( $staleStored( 'made@example.com' )['pw'] ?? '' ) ) === true && $staleFree === true );
+$staleDelete( 'made@example.com' );
+
+// The role of the new account is the one config.php holds when the lock is taken: a role that was deleted meanwhile is not handed out
+$other = $staleBoot();
+\Nino\AppData::writeContentData( $other, [ '/nino/auth/roles' ] );
+$booted	= $staleBoot();
+$other	= $staleBoot();
+unset( $other['/nino/auth/roles']['developer'] );
+\Nino\AppData::writeContentData( $other, [ '/nino/auth/roles' ] );
+$answer	= $staleAsk( $booted, 'recovery/create', [ 'mail' => 'rolled@example.com', 'pw' => 'the first password', 'confirm' => true ] );
+$record	= $staleStored( 'rolled@example.com' );
+$other	= $staleBoot();
+\Nino\AppData::writeContentData( $other, [ '/nino/auth/roles' ] );
+check( 'a create by a request that booted before the Developer role was deleted: 200, and the account holds full access of its own and no role that is not there', $answer === [ 200, null ] && ( $record['role'] ?? null ) === '' && ( $record['perms'] ?? [] ) === [ '/*' ] );
+$staleDelete( 'rolled@example.com' );
+
+// The address is compared as it is typed here: two spellings of one address are two accounts, as they were
+$first	= $staleBoot();
+$second	= $staleBoot();
+$one		= $staleAsk( $first, 'recovery/create', [ 'mail' => 'Twin@example.com', 'pw' => 'the first password', 'confirm' => true ] );
+$two		= $staleAsk( $second, 'recovery/create', [ 'mail' => 'twin@example.com', 'pw' => 'the second password', 'confirm' => true ] );
+check( 'the address is compared exactly by create: two spellings of one address from requests that booted together are two accounts, both 200', $one === [ 200, null ] && $two === [ 200, null ]
+	&& $staleStored( 'Twin@example.com' ) !== [] && $staleStored( 'twin@example.com' ) !== [] );
+$staleDelete( 'Twin@example.com' );
+$staleDelete( 'twin@example.com' );
+
+// The accounts this request holds are the file's: the other requests above changed the file and not this copy
+$appData['/nino/auth/user'] = $staleBoot()['/nino/auth/user'];
+
 // A reset that set the password and could not lift the lock answers 500 and has
 // left its line: the account is changed, and the log says who changed it
 $lockKey	= (string) ( new ReflectionMethod( '\Nino\Filesystem', '_canonicalPath' ) )->invokeArgs( null, [ &$appData, '/data/auth-tries.php' ] );
