@@ -968,54 +968,67 @@ namespace Nino {
 		 */
 		public static function writeAtomic( string $path, string|iterable $content ): bool {
 
+			// @ on every php call that touches the disk, as _writeFile() has it: a full disk, a quota or a permission failure makes php raise a
+			// notice (fwrite(), fflush()) or a warning (fopen(), rename()) of its own, and Runtime::handleError() ends the request on either - with
+			// the temporary file left behind, and the false this method answers unreachable
 			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
 			$handle = @fopen( $temp, 'wb' );
 
 			if( $handle === false )
 				return false;
 
-			$written	= 0;
-			$expected	= 0;
+			$renamed = false;
 
-			// Pieces that are made while they are written (an archive sealed in chunks) can fail in the middle: the file
-			// that was begun is not left behind
+			// Every way out after the temporary file was made removes it unless the rename took it: a piece that is made while it is written (an
+			// archive sealed in chunks) can throw in the middle, and so can a stream when it is flushed or closed - the exception goes on to the
+			// caller
 			try {
+
+				$written	= 0;
+				$expected	= 0;
 
 				foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
 					$expected += strlen( $piece );
-					$put = fwrite( $handle, $piece );
+					$put = @fwrite( $handle, $piece );
 					if( $put === false ) {
 						$written = false;
 						break;
 					}
 					$written += $put;
 				}
+
+				$flushed = @fflush( $handle );
+				@fclose( $handle );
+
+				// fwrite() reports a short write rather than failing, and without
+				// the fflush() a rename() can win the race against the bytes ever
+				// reaching disk - either way the result is a truncated file, and
+				// for the recovery hash one that would lock the operator out
+				if( $written === false || $written !== $expected || $flushed === false )
+					return false;
+
+				$mode = @fileperms( $path );
+				if( $mode !== false )
+					@chmod( $temp, $mode & 0777 );
+
+				if( @rename( $temp, $path ) === false )
+					return false;
+
+				$renamed = true;
 			}
-			catch( \Throwable $e ) {
-				fclose( $handle );
-				@unlink( $temp );
-				throw $e;
-			}
+			finally {
 
-			$flushed = fflush( $handle );
-			fclose( $handle );
+				// A handle that is still open: a piece threw before the file was closed
+				if( is_resource( $handle ) === true ) {
+					try {
+						@fclose( $handle );
+					}
+					catch( \Throwable ) {
+					}
+				}
 
-			// fwrite() reports a short write rather than failing, and without
-			// the fflush() a rename() can win the race against the bytes ever
-			// reaching disk - either way the result is a truncated file, and
-			// for the recovery hash one that would lock the operator out
-			if( $written === false || $written !== $expected || $flushed === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			$mode = @fileperms( $path );
-			if( $mode !== false )
-				@chmod( $temp, $mode & 0777 );
-
-			if( @rename( $temp, $path ) === false ) {
-				@unlink( $temp );
-				return false;
+				if( $renamed === false )
+					@unlink( $temp );
 			}
 
 			// The readers of these files take the bytes directly rather than
