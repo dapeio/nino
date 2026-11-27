@@ -501,6 +501,9 @@ convenience: repeat it on the server.
   value; read and write permissions are distinct when their risk differs.
   A surface outside the workbench asks `\Nino\Auth::guard()` for session,
   token and permission at once and writes the refusal with `\Nino\Auth::deny()`.
+  That guard starts no daily backup: a surface whose owner may never open the
+  workbench calls `\Nino\Modules\Backups::maybeRun()` after the guard passed,
+  behind `class_exists()` ([the daily backup](docs/features.md#a-surface-outside-the-workbench)).
 - Do not accept a username in the request and check that user's permission as
   authorization for the current caller, expose workbench actions through a new
   public route, or implement parallel ad-hoc auth cookies: session fixation

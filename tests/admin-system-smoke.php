@@ -98,6 +98,58 @@ if( ( $argv[1] ?? '' ) === 'daily-backup' || ( $argv[1] ?? '' ) === 'daily-backu
 	exit;
 }
 
+// Run as a child of itself (see "The daily backup from a request outside the workbench" below): the kernel alone, as index.php loads it for a
+// surface outside the workbench, over a project directory the parent made. Arguments: the tree of the kernel, the project, whether the
+// account signs in. Prints what the call of the daily backup did to the process: whether the shell was there before and after, and what was raised
+if( ( $argv[1] ?? '' ) === 'daily-outside' ) {
+
+	define( 'NINO_FEATURES_DIR', $argv[3]. '/features' );
+	require $argv[2]. '/_nino/Nino.php';
+
+	$raised = [];
+	set_error_handler( static function( int $level, string $message ) use ( &$raised ): bool {
+		if( ( error_reporting() & $level ) !== 0 )
+			$raised[] = $level. ': '. $message;
+		return true;
+	} );
+
+	$appData = [ './nino/uid' => $argv[3] ];
+	\Nino\AppData::prepare( $appData );
+	$appData['./nino/filesystem/path']				= $argv[3];
+	$appData['./nino/filesystem/configpath']	= $argv[3]. '/private';
+	$appData['./nino/filesystem/contentpath']	= $argv[3]. '/private';
+	$appData['./nino/filesystem/publicpath']	= $argv[3]. '/public';
+	\Nino\AppData::init( $appData );
+
+	if( ( $argv[4] ?? '0' ) === '1' )
+		\Nino\Auth::loginUser( $appData, 'outside@example.com', 'correct horse battery staple' );
+
+	// Every file of the project with its size, its time and its bytes
+	$state = static function() use ( $argv ): array {
+		$files = [];
+		clearstatcache();
+		foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $argv[3], FilesystemIterator::SKIP_DOTS ) ) as $file )
+			if( $file->isFile() === true )
+				$files[$file->getPathname()] = [ $file->getSize(), $file->getMTime(), md5( (string) file_get_contents( $file->getPathname() ) ) ];
+		ksort( $files );
+		return $files;
+	};
+
+	$before	= class_exists( '\\Nino\\Admin\\Admin', false );
+	$files	= $state();
+	\Nino\Modules\Backups::maybeRun( $appData );
+
+	// The fifth argument asks for a second call, with today's archive there already: the sign-in writes the account's own record, which is why the
+	// files are taken after it, and what the two calls write is told by the files being the same afterwards
+	if( ( $argv[5] ?? '0' ) === '1' ) {
+		\Nino\Modules\Backups::maybeRun( $appData );
+		$same = $state() === $files;
+	}
+
+	echo json_encode( [ 'before' => $before, 'after' => class_exists( '\\Nino\\Admin\\Admin', false ), 'raised' => $raised, 'same' => $same ?? null ] );
+	exit( 0 );
+}
+
 require __DIR__. '/harness.php';
 
 /*	A stream that a disk that is full or a file that cannot be written is made of, without a disk that is full: it keeps
@@ -1465,6 +1517,91 @@ check( '...and none for an archive of the version that runs', $status === 200 &&
 check( 'the recovery page writes the line of its restore too, with the door as the actor', count( $logLines( 'recovery.php', 'Restore Backup '. $otherId ) ) === 1
 	&& count( $logLines( 'recovery.php', 'Restore Backup '. $pagesId, 'failed (409)' ) ) === 1 );
 \Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+
+// --- The daily backup from a request outside the workbench ----------------------------------------------------------------------------------
+
+echo "\nThe daily backup from a request outside the workbench\n";
+
+// A process that loads _nino/Nino.php only - what a surface of a feature is when its owner never opens the workbench - calls the daily backup
+// after its own guard let the request in
+$outside			= ninoSandbox( 'daily-outside' );
+$outsideDir		= ninoSandboxDir( $outside );
+mkdir( $outsideDir. '/private', 0755, true );
+mkdir( $outsideDir. '/public', 0755, true );
+\Nino\Filesystem::putFileContent( $outside, '/config.php', [
+	'/nino/locales/native'		=> $outside['/nino/locales/native'],
+	'/nino/locales/available'	=> $outside['/nino/locales/available'],
+] );
+// Two accounts in config.php, the one that signs in is the second: the line carries the mail of the account that is signed in
+\Nino\Auth::insertUser( $outside, 'first@example.com', 'correct horse battery staple', [ '/*' ] );
+\Nino\Auth::insertUser( $outside, 'outside@example.com', 'correct horse battery staple', [ '/*' ] );
+
+$outsideRoot	= dirname( __DIR__ );
+$outsideDay		= $outsideDir. '/private/.backups/'. date( 'Y-m-d' ). '.php';
+$outsideKey		= $outsideDir. '/private/.auth/backup-key.php';
+$outsideLog		= $outsideDir. '/private/.logs/'. date( 'Y-m-d' ). '.php';
+
+/** One call of the daily backup in a process of its own: what it reports of itself */
+$callOutside = static function( string $tree, bool $signedIn, bool $twice = false ) use ( $outsideDir ): array {
+	$answer = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( __FILE__ ). ' daily-outside '. escapeshellarg( $tree ). ' '. escapeshellarg( $outsideDir ). ' '. ( $signedIn === true ? '1' : '0' ). ' '. ( $twice === true ? '1' : '0' ). ' 2>/dev/null' ), true );
+	return is_array( $answer ) === true ? $answer : [ 'raised' => [ 'the process did not answer' ] ];
+};
+
+/** The lines of the day's log, as a reader decodes them */
+$outsideLines = static function() use ( $outsideLog ): array {
+	$raw = is_file( $outsideLog ) === true ? (string) file_get_contents( $outsideLog ) : '';
+	if( str_starts_with( $raw, \Nino\Backup\Seal::STUB_PREFIX ) === false || str_ends_with( $raw, \Nino\Backup\Seal::STUB_SUFFIX ) === false )
+		return [];
+	$decoded = (string) base64_decode( substr( $raw, strlen( \Nino\Backup\Seal::STUB_PREFIX ), -strlen( \Nino\Backup\Seal::STUB_SUFFIX ) ) );
+	return $decoded === '' ? [] : explode( "\n", $decoded );
+};
+
+$reply = $callOutside( $outsideRoot, true );
+check( 'a process that loads _nino/Nino.php only, with an account signed in, makes today\'s archive and the copy of the key', is_file( $outsideDay ) === true && is_file( $outsideKey ) === true );
+check( '...raises no notice - the line of the log needs nothing of the workbench\'s shell - and the shell is not there before the call nor after it',
+	( $reply['raised'] ?? [ 'x' ] ) === [] && ( $reply['before'] ?? null ) === false && ( $reply['after'] ?? null ) === false );
+check( '...and the log holds the line "Backup created" by the account that is signed in, not by another account of config.php', count( $outsideLines() ) === 1 && str_ends_with( $outsideLines()[0], '  outside@example.com  Backup created' ) === true );
+
+$reply = $callOutside( $outsideRoot, true, true );
+check( 'the calls of a day after the first raise nothing and write nothing: no file of the project changes, none is added', ( $reply['raised'] ?? [ 'x' ] ) === [] && ( $reply['same'] ?? null ) === true );
+
+unlink( $outsideDay );
+if( is_file( $outsideDir. '/private/.backups/attempt.php' ) === true )
+	unlink( $outsideDir. '/private/.backups/attempt.php' );
+unlink( $outsideLog );
+$reply = $callOutside( $outsideRoot, false );
+check( 'a request with no account makes the archive and writes no line, and raises nothing', is_file( $outsideDay ) === true && $outsideLines() === [] && ( $reply['raised'] ?? [ 'x' ] ) === [] );
+
+unlink( $outsideDay );
+if( is_file( $outsideDir. '/private/.backups/attempt.php' ) === true )
+	unlink( $outsideDir. '/private/.backups/attempt.php' );
+$offConfig = (array) include $outsideDir. '/private/config.php';
+\Nino\Filesystem::putFileContent( $outside, '/config.php', [ '/nino/admin/backups' => false ] + $offConfig );
+$reply = $callOutside( $outsideRoot, true );
+check( 'a project that switched the daily backup off gets none from such a call, and nothing is raised', is_file( $outsideDay ) === false && $outsideLines() === [] && ( $reply['raised'] ?? [ 'x' ] ) === [] );
+\Nino\Filesystem::putFileContent( $outside, '/config.php', $offConfig );
+
+// A delivery without the Logs module: the kernel and the Backups module, nothing else of the workbench
+$noLogs = $outsideDir. '/no-logs';
+mkdir( $noLogs. '/_admin/Nino/Modules', 0755, true );
+exec( 'cp -a '. escapeshellarg( $outsideRoot. '/_nino' ). ' '. escapeshellarg( $noLogs. '/_nino' ) );
+exec( 'cp -a '. escapeshellarg( $outsideRoot. '/_admin/Nino/Modules/Backups' ). ' '. escapeshellarg( $noLogs. '/_admin/Nino/Modules/Backups' ) );
+$reply = $callOutside( $noLogs, true );
+check( 'in a tree without the Logs module the archive is made, no line is written and no notice is raised', is_file( $outsideDay ) === true && $outsideLines() === [] && is_file( $outsideLog ) === false && ( $reply['raised'] ?? [ 'x' ] ) === [] );
+
+// A restore holds the lock as long as it runs: the call returns at once, makes nothing and raises nothing
+unlink( $outsideDay );
+if( is_file( $outsideDir. '/private/.backups/attempt.php' ) === true )
+	unlink( $outsideDir. '/private/.backups/attempt.php' );
+$restoring = $outside;
+check( 'the lock a restore holds is taken here', \Nino\Filesystem::lockFile( $restoring, \Nino\Modules\Backups::LOCK_PATH, false ) === true );
+$reply = $callOutside( $outsideRoot, true );
+\Nino\Filesystem::unlockFile( $restoring, \Nino\Modules\Backups::LOCK_PATH );
+check( '...a call of another process that finds it taken returns, makes no archive, writes no line and raises nothing', is_file( $outsideDay ) === false && $outsideLines() === [] && ( $reply['raised'] ?? [ 'x' ] ) === [] && isset( $reply['after'] ) === true );
+$reply = $callOutside( $outsideRoot, true );
+check( '...and the next call, with the lock let go, makes the day\'s archive', is_file( $outsideDay ) === true && ( $reply['raised'] ?? [ 'x' ] ) === [] );
+
+\Nino\Filesystem::removeDir( $outsideDir );
 
 // --- Templates in the folders of templates/ -------------------------------
 //

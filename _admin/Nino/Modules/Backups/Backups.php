@@ -3,8 +3,10 @@ declare(strict_types=1);
 /**
  *	Nino							A compact filesystembased php framework
  *	Modules\Backups	The daily encrypted snapshot - the module's runtime half,
- *											taken on the first authenticated request of the day
- *											(see \Nino\Admin\Admin::guard()). Restoring one is the
+ *											taken by the first call of the day: the workbench's guard
+ *											makes it on every guarded request (see \Nino\Admin\Admin::guard()),
+ *											and a feature's surface outside the workbench may call
+ *											maybeRun() on purpose. Restoring one is the
  *											panel's half, beside this file in Admin/Admin.php.
  *
  *	@package					Dape/Nino
@@ -17,8 +19,10 @@ namespace Nino\Modules {
 	 *	Nino							A compact filesystembased php framework
 	 *	Modules						The workbench's own screens
 	 *	Backups						Encrypted daily snapshot of everything the admin panel can
-	 *											write to at runtime - triggered once per authenticated
-	 *											admin request per day (see \Nino\Admin\Admin::guard()), not a cron
+	 *											write to at runtime - made by the first call of the day, which
+	 *											the workbench's guard makes on every guarded request (see
+	 *											\Nino\Admin\Admin::guard()) and a feature's surface outside the
+	 *											workbench makes on purpose, not a cron
 	 *											job, so it needs no server-level scheduling at all. The
 	 *											panel's "Back up now" adds an archive of its own on top
 	 *											of that one (see now()). Lives
@@ -181,11 +185,29 @@ namespace Nino\Modules {
 		/**
 		 *	Bootstrap the backup dir/key on first call, then create today's
 		 *	backup if it doesn't exist yet and prune anything past retention.
-		 *	Called from \Nino\Admin\Admin::guard() - so once per authenticated request,
-		 *	not a cron job. Failures never interrupt the admin action that
-		 *	triggered this (backup is a safety net, not something that should
-		 *	itself become a new way to break the admin panel) - logged, not
-		 *	thrown.
+		 *
+		 *	Called by the workbench's guard (\Nino\Admin\Admin::guard()) on every
+		 *	guarded request, and on purpose by a feature whose surface lies outside
+		 *	the workbench, after \Nino\Auth::guard() let the request in: the public
+		 *	guard starts no backup of its own, and a site whose owner never opens the
+		 *	workbench would have none. The first call of a day makes the archive, so
+		 *	no cron job is needed. The call needs the kernel and this module, not the
+		 *	workbench's shell (the line of the log is written by
+		 *	\Nino\Activity::write()): a request that never loaded the shell makes the
+		 *	same archive and the same line. A feature asks class_exists() first: a
+		 *	delivery may drop this module.
+		 *
+		 *	What a call costs where today's archive is there: the two lock files
+		 *	(this class's and the one of config.php's key check), a read of
+		 *	config.php and of the key's copy, and no write. The call never waits for
+		 *	a restore, which holds the lock for as long as it runs: it returns at
+		 *	once and the next request makes the backup. Failures never interrupt the
+		 *	request that triggered this (backup is a safety net, not something that
+		 *	should itself become a new way to break a page) - raised as a notice,
+		 *	never thrown.
+		 *
+		 *	The line "Backup created" names the signed-in account; a request with no
+		 *	account makes the archive and writes no line.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -263,14 +285,15 @@ namespace Nino\Modules {
 				@unlink( $dir. '/'. self::ATTEMPT_FILE );
 				self::_prune( $dir, self::_keep( $appData, 'daily' ), self::_keep( $appData, 'manual' ), basename( $path ) );
 
-				// Through the shell rather than at the Logs module directly: the
-				// log is a module a delivery may drop, and this line sits inside
-				// the catch below - reaching for a class that is not there would
-				// turn a backup that just succeeded into "Backup failed", once
-				// per day, forever (see \Nino\Admin\Admin::record())
+				// Through the kernel's writer, which needs nothing of the workbench's
+				// shell: this call is made from a request outside the workbench as
+				// well, where \Nino\Admin\Admin is not loaded, and a class that is
+				// not there would turn a backup that just succeeded into "Backup
+				// failed" inside the catch below. The writer takes no line where the
+				// Logs module is not delivered and never throws
 				$user = \Nino\Auth::getCurrentUser( $appData );
 				if( $user !== false )
-					\Nino\Admin\Admin::record( $appData, $user['mail'], 'Backup created' );
+					\Nino\Activity::write( $appData, $user['mail'], 'Backup created' );
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Backup failed: '. $e->getMessage() );
