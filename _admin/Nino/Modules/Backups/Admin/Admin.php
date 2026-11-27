@@ -55,6 +55,9 @@ namespace Nino\Modules\Backups {
 		// How many safety snapshots a project keeps - see _pruneSnapshots()
 		private const int SNAPSHOT_KEEP = 3;
 
+		// How many of the files that could not be put back a restore that is done in part names: the rest is the entry of the archive they are in
+		private const int NAMED_FILES = 10;
+
 		/**
 		 *	This module's action map, merged into \Nino\Admin\Admin::handlePost()'s dispatch
 		 *
@@ -822,11 +825,11 @@ namespace Nino\Modules\Backups {
 			// of the staging, the files written while they were in use
 			$what = '';
 
-			if( $result !== true && in_array( $result[2] ?? '', [ 'backups_restore_partial', 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written' ], true ) === true ) {
+			if( $result !== true && in_array( $result[2] ?? '', [ 'backups_restore_partial', 'backups_restore_waiting', 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written' ], true ) === true ) {
 
 				$what = ' in part, the state before is the archive '. (string) end( $result[3] );
 
-				foreach( [ 'features' => ', the restore callback of %s failed', 'files' => ', %s in use and left as it is', 'taken' => ', %s not put back by the restore: the callback of the feature took it out and failed', 'written' => ', %s written while in use and possibly damaged', 'cut' => ', the copy of %s was not whole' ] as $field => $words )
+				foreach( [ 'features' => ', the restore callback of %s failed', 'files' => ', %s in use and left as it is', 'taken' => ', %s not put back by the restore: the callback of the feature took it out and failed', 'written' => ', %s written while in use and possibly damaged', 'cut' => ', the copy of %s was not whole', 'waiting' => ', %s being written by another request and left as it was' ] as $field => $words )
 					if( is_array( $result[4][$field] ?? null ) === true && $result[4][$field] !== [] )
 						$what .= sprintf( $words, implode( ', ', $result[4][$field] ) );
 			}
@@ -929,6 +932,7 @@ namespace Nino\Modules\Backups {
 		 */
 		private static function _restoreArchive( array &$appData, string|false $dir, string $path, ?array &$notice, ?string $entered ): true|array {
 
+			$began			= time();
 			$projectKey = self::_key( $appData );
 			$key 				= $entered ?? $projectKey;
 
@@ -984,6 +988,8 @@ namespace Nino\Modules\Backups {
 			[ $guardFiles, $guardDirs ] = self::_guard();
 			$guardFiles->exchangeArray( [ $tmpGz, $tmpBase ] );
 			$guardDirs->exchangeArray( [ $staging ] );
+
+			$locks = [];
 
 			try {
 				// The plain archive waits in the file PharData is to read, which only
@@ -1054,6 +1060,20 @@ namespace Nino\Modules\Backups {
 				if( $short !== null )
 					return [ 507, 'the disk of the project has no room for the files of the archive', 'backups_disk', $short ];
 
+				// What an earlier restore that php ended left beside the files (see _sweepBeside()) is taken away before anything is made or packed
+				self::_sweepBeside( $appData, $staging, $began );
+
+				// The files that a writer reads, changes and writes back go back under the locks their writers take (see \Nino\Backup::lockPath() and
+				// lockFiles()), all of them held before the first byte is put back and before the snapshot - as many as the limit of open files lets the
+				// restore hold (see \Nino\Backup::locksHeld()), the rest one at a time as each file is put back. A writer that waits for one of them reads
+				// the file as it is put back, and a project that is being written to is refused here, with nothing made and nothing changed. A lock is
+				// let go as its file is in place, the rest at the end (the finally below)
+				$locks	= \Nino\Backup::lockPaths( $staging );
+				$busy		= \Nino\Backup::lockFiles( $appData, array_slice( $locks, 0, \Nino\Backup::locksHeld() ) );
+
+				if( $busy !== true )
+					return [ 409, 'another request is writing a file the restore has to put back', 'backups_restore_busy', [ $busy ] ];
+
 				$snapshot = '';
 				$hook 		= '';
 				$short 		= [];
@@ -1077,6 +1097,7 @@ namespace Nino\Modules\Backups {
 				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true, $snapshot, $raw, $entered !== null );
 			}
 			finally {
+				\Nino\Backup::unlockFiles( $appData, $locks );
 				@unlink( $tmpGz );
 				if( is_dir( $staging ) === true )
 					\Nino\Filesystem::removeDir( $staging );
@@ -1125,6 +1146,9 @@ namespace Nino\Modules\Backups {
 		 *	@param		array|null	&$notice			(reference) See restore()
 		 *	@param		bool			$written			Whether $tmpGz holds the archive already
 		 *	@param		bool			$unpacked			Whether the archive is unpacked into $staging already (see _unpack())
+		 *	@param		string		$snapshot			The id of the safety snapshot
+		 *	@param		array 		$raw					The keys of the features whose files the snapshot holds as they lie
+		 *	@param		bool			$foreign			Whether the archive is not this project's own
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
@@ -1183,6 +1207,12 @@ namespace Nino\Modules\Backups {
 			// old file or the new one and nothing in between
 			if( is_file( $stagedConfig ) === true ) {
 
+				// Held since the restore began; where a snapshot that ran since let it go, it is asked for once more, for the whole time
+				$busy = \Nino\Backup::lockFiles( $appData, [ '/config.php' ] );
+
+				if( $busy !== true )
+					return [ 409, 'another request is writing a file the restore has to put back', 'backups_restore_busy', [ $busy ] ];
+
 				if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
 					return [ 500, 'could not lock config.php for the restore', 'backups_write' ];
 
@@ -1231,10 +1261,15 @@ namespace Nino\Modules\Backups {
 			// that has no blocks/, themes/ or fonts/ puts nothing there and takes
 			// nothing away: the blocks, the themes and the fonts on disk stay
 			//
+			// A file is written beside the file it replaces and renamed over it, under the lock its writers take (see _putBack()), so that a writer that
+			// read the file before does not write on top of what is put back and a reader never sees half a file. A database that was handed over whole
+			// is the exception: it is written over in place, and its size is what says that it is whole
+			//
 			// Every copy is asked how it went and every file is looked at after it: a disk that fills up leaves files that are cut off, and
 			// a restore that says it was done over such a site is the worst answer there is
 			$unfinished = false;
 			$cut				= [];
+			$held				= [];
 
 			// What an archive carries of a database that a feature hands over whole (see \Nino\Backup::stage()) is that one file: the files an open
 			// database keeps beside itself in the project would be applied to the copy that is put there, so they go - and where one cannot be
@@ -1270,26 +1305,64 @@ namespace Nino\Modules\Backups {
 			if( $left > 0 )
 				$notice = $notice ?? [ 'code' => 'backups_companions_left', 'params' => [ (string) $left ] ];
 
-			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
+			// The files that are read-modify-written by their writers first, so that their locks are let go early: the large trees come last
+			$first		= array_flip( [ 'text', 'elements', 'templates', 'data', 'assets', 'blocks', 'themes', 'fonts', 'images' ] );
+			$entries	= glob( $staging. '/*' ) ?: [];
 
-				$target = \Nino\Backup::target( $appData, basename( $entry ) );
+			usort( $entries, static fn( string $one, string $other ): int => ( $first[basename( $one )] ?? 99 ) <=> ( $first[basename( $other )] ?? 99 ) );
 
-				if( basename( $entry ) === 'data' )
+			foreach( $entries as $entry ) {
+
+				$name		= basename( $entry );
+				$target = \Nino\Backup::target( $appData, $name );
+
+				if( $name === 'data' )
 					$leave( \Nino\Backup::inUse( $appData, $staging, $copies, $foreign, $listed ) );
 
-				$copied = is_dir( $entry ) === true ? \Nino\Filesystem::copyDir( $entry, $target ) : @copy( $entry, $target );
+				$whole	 = true;
+				$inPlace = [];
 
-				if( $copied === false || self::_whole( $entry, $target ) === false ) {
+				// What a feature keeps below data/ that is no php - a database - and what a feature handed over whole: written over the live file, as it
+				// always was. A process that has such a file open keeps the file it opened, which a rename would leave to it
+				if( $name === 'data' )
+					foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $entry, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $file ) {
+
+						$one = 'data'. str_replace( DIRECTORY_SEPARATOR, '/', substr( $file->getPathname(), strlen( $entry ) ) );
+
+						if( \Nino\Backup::renamed( $one ) === true && isset( $listed[$one] ) === false )
+							continue;
+
+						$inPlace[] = $one;
+						$to 			 = $target. substr( $one, 4 );
+
+						if( \Nino\Filesystem::copyDir( $file->getPathname(), $to ) === false || self::_whole( $file->getPathname(), $to ) === false )
+							$whole = false;
+					}
+
+				[ $lost, $waiting ] = is_dir( $entry ) === true ? self::_putBack( $appData, $entry, $target, $name, $inPlace ) : [ @copy( $entry, $target ) === false || self::_whole( $entry, $target ) === false ? [ $name ] : [], [] ];
+
+				if( $whole === false || $lost !== [] ) {
 					$unfinished = true;
-					$cut[]			= basename( $entry );
+
+					// The entry is named where a copy in place fell short, the files where they could not be put back - the first few, then the entry
+					if( $whole === false || count( $lost ) > self::NAMED_FILES )
+						$cut[] = $name;
+
+					foreach( array_slice( $lost, 0, self::NAMED_FILES ) as $one )
+						if( $one !== $name )
+							$cut[] = $one;
 				}
 
-				if( basename( $entry ) === 'data' ) {
+				// A file that another request was writing for as long as the restore waits: it is as it was, and no disk is full for it
+				foreach( $waiting as $one )
+					$held[] = $one;
+
+				if( $name === 'data' ) {
 
 					$written = \Nino\Backup::inUse( $appData, $staging, $copies, $foreign, $listed );
 
-					foreach( $written as $name )
-						trigger_error( 'Restore: '. $name. ' was in use by another process while it was put back and may be damaged', E_USER_WARNING );
+					foreach( $written as $one )
+						trigger_error( 'Restore: '. $one. ' was in use by another process while it was put back and may be damaged', E_USER_WARNING );
 				}
 			}
 
@@ -1318,13 +1391,19 @@ namespace Nino\Modules\Backups {
 			foreach( $cut as $name )
 				trigger_error( 'Restore: the copy of '. $name. ' is not whole: a file could not be written, the disk may be full', E_USER_WARNING );
 
+			foreach( $held as $name )
+				trigger_error( 'Restore: '. $name. ' was being written by another request for as long as the restore waits, and is as it was', E_USER_WARNING );
+
 			foreach( $took as $name )
 				trigger_error( 'Restore: '. $name. ' was taken out of the staging by a callback that then failed, and was not put back', E_USER_WARNING );
 
-			$fields = array_filter( [ 'features' => $thrown, 'files' => $inUse, 'taken' => $took, 'written' => $written, 'cut' => $cut ] );
+			$fields = array_filter( [ 'features' => $thrown, 'files' => $inUse, 'taken' => $took, 'written' => $written, 'cut' => $cut, 'waiting' => $held ] );
 
 			if( $unfinished === true )
 				return [ 500, 'the restore is done in part: a file could not be written, the disk may be full', 'backups_restore_partial', [ $snapshot ], $fields ];
+
+			if( $held !== [] )
+				return [ 500, 'the restore is done in part: files that another request was writing were left as they are', 'backups_restore_waiting', [ count( $held ), $snapshot ], $fields ];
 
 			if( $written !== [] )
 				return [ 500, 'the restore is done in part: files that were in use were written and may be damaged', 'backups_restore_written', [ count( $written ), $snapshot ], $fields ];
@@ -1351,7 +1430,155 @@ namespace Nino\Modules\Backups {
 		 *	@return 	bool
 		 */
 		public static function wentThrough( true|array $result ): bool {
-			return $result !== true && in_array( $result[2] ?? '', [ 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written' ], true ) === true;
+			return $result !== true && in_array( $result[2] ?? '', [ 'backups_restore_callback', 'backups_restore_waiting', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written' ], true ) === true;
+		}
+
+		/**
+		 *	Put the files of one directory of the archive back, each beside the file it replaces and renamed over it (see _beside()). A file that a writer reads,
+		 *	changes and writes back (see \Nino\Backup::lockPath()) is put back under the lock its writers take: the lock is taken here where the restore does not
+		 *	hold it - one of the files beyond what it holds locks for (see \Nino\Backup::locksHeld()), or a lock that a callback let go of - with the whole time
+		 *	\Nino\Backup::$lockWait of its own, and is let go as the file is in place, with what was put back compared to the archive's file, size and hash, while
+		 *	it is held. A writer that waited for the lock reads the file as it is put back and writes on top of it. A file whose lock another request held that
+		 *	long is not put back, whatever lies there: it is as it was, and is named apart from the files that could not be written. A file that is a directory
+		 *	where it goes, or a disk that is full, leaves that file as it was, and the others are put back all the same. The assets, the pictures and the fonts have
+		 *	no lock and wait for none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				A directory of the staging, eg. '/tmp/x.staging/text'
+		 *	@param		string		$target				Where its files go
+		 *	@param		string		$entry				Its name in the archive, eg. 'text'
+		 *	@param		array 		$inPlace			The names in the archive of the files that are put back in place and not here
+		 *
+		 *	@return 	array										[ the names of the files that could not be written, the names of the files whose lock was not had ]
+		 */
+		private static function _putBack( array &$appData, string $source, string $target, string $entry, array $inPlace ): array {
+
+			$lost		= [];
+			$waiting	= [];
+
+			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $file ) {
+
+				$relative = str_replace( DIRECTORY_SEPARATOR, '/', substr( $file->getPathname(), strlen( $source ) + 1 ) );
+				$name 		= $entry. '/'. $relative;
+
+				if( in_array( $name, $inPlace, true ) === true )
+					continue;
+
+				$there	= $target. '/'. $relative;
+				$lock		= \Nino\Backup::lockPath( $name );
+
+				// A file is never put back without the lock that is its writers': where it is not had it stays as it is
+				if( $lock !== null && \Nino\Backup::lockFiles( $appData, [ $lock ] ) !== true ) {
+					$waiting[] = $name;
+					continue;
+				}
+
+				try {
+					$done = ( is_dir( dirname( $there ) ) === true || @mkdir( dirname( $there ), 0755, true ) === true || is_dir( dirname( $there ) ) === true )
+						&& self::_beside( $file->getPathname(), $there ) === true
+						&& self::_whole( $file->getPathname(), $there, true ) === true;
+				}
+				finally {
+
+					// The lock of the features is one for all the files of the blocks and the themes: it is let go with the others at the end
+					if( $lock !== null && $lock !== \Nino\Features::LOCK_PATH )
+						\Nino\Filesystem::unlockFile( $appData, $lock );
+				}
+
+				if( $done === false )
+					$lost[] = $name;
+			}
+
+			return [ $lost, $waiting ];
+		}
+
+		/**
+		 *	Take away what a restore that php ended left beside the files it puts back: <file>.<12 hex digits>.tmp, the name of the copy that _beside() makes,
+		 *	where <file> is a file of this archive that is put back beside the file and renamed over it - at any depth, not in a hidden folder, not through a
+		 *	link. Nothing else goes: not a file a person or a feature named like that, not the copy of a writer of the kernel that is at work, and none that is
+		 *	not a minute older than the restore began. Under the lock of the restore, so that no restore of the same project is writing such a file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *	@param		int				$began				The time the restore began (unix)
+		 *
+		 *	@return 	void
+		 */
+		private static function _sweepBeside( array &$appData, string $staging, int $began ): void {
+
+			$staging = rtrim( $staging, DIRECTORY_SEPARATOR );
+
+			$walk = static function( string $dir, string $relative ) use ( &$walk, $began, $staging ): void {
+
+				foreach( @scandir( $dir ) ?: [] as $object ) {
+
+					if( $object[0] === '.' )
+						continue;
+
+					$path = $dir. '/'. $object;
+
+					if( is_link( $path ) === true )
+						continue;
+
+					if( is_dir( $path ) === true ) {
+						$walk( $path, $relative. '/'. $object );
+						continue;
+					}
+
+					if( preg_match( '/^(.+)\.[0-9a-f]{12}\.tmp$/D', $object, $found ) !== 1 || (int) @filemtime( $path ) >= $began - 60 )
+						continue;
+
+					$name = substr( $relative. '/'. $found[1], 1 );
+
+					if( \Nino\Backup::renamed( $name ) === true && is_file( $staging. '/'. $name ) === true )
+						@unlink( $path );
+				}
+			};
+
+			foreach( glob( $staging. '/*' ) ?: [] as $entry )
+				if( is_dir( $entry ) === true )
+					$walk( \Nino\Backup::target( $appData, basename( $entry ) ), '/'. basename( $entry ) );
+
+			// config.php is written beside itself, in its own directory
+			if( is_file( $staging. '/config.php' ) === true )
+				foreach( glob( \Nino\Filesystem::getConfigPath( $appData ). '/config.php.*.tmp' ) ?: [] as $leftover )
+					if( preg_match( '/\.[0-9a-f]{12}\.tmp$/D', $leftover ) === 1 && (int) @filemtime( $leftover ) < $began - 60 )
+						@unlink( $leftover );
+		}
+
+		/**
+		 *	Replace a file by a copy of another that is made beside it and renamed over it, so that a reader sees the file as it was or as it is and nothing
+		 *	between, and a file that cannot be written is left as it was. The copy is made by the system, in no more memory than a buffer, whatever the size
+		 *	of the file. The mode of the file that is replaced is kept; the compiled copy of a php file goes
+		 *
+		 *	@param		string		$from					The staged file
+		 *	@param		string		$to						The file it replaces, or where it goes
+		 *
+		 *	@return 	bool											Whether it is in place
+		 */
+		private static function _beside( string $from, string $to ): bool {
+
+			$temp = $to. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+
+			if( @copy( $from, $temp ) === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			$mode = @fileperms( $to );
+
+			if( $mode !== false )
+				@chmod( $temp, $mode & 0777 );
+
+			if( @rename( $temp, $to ) === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			if( function_exists( 'opcache_invalidate' ) === true )
+				opcache_invalidate( $to, true );
+
+			return true;
 		}
 
 		/**
@@ -1359,17 +1586,31 @@ namespace Nino\Modules\Backups {
 		 *	true only where it wrote every byte, so a file that is cut is shorter than its source; one that is longer was written to by another process
 		 *	after the copy - a database that is in use grows, and the restore of it is not done in part for that
 		 *
+		 *	A file that was put back under the lock of its writers (see _putBack()) is no database that grows: $exact asks for the size of the source and for
+		 *	its hash, the bytes of the archive and nothing else
+		 *
 		 *	@param		string		$source				A staged file or directory
 		 *	@param		string		$target				Where it was copied to
+		 *	@param		bool			$exact				Whether a file must be what the source is, byte for byte
 		 *
 		 *	@return 	bool
 		 */
-		private static function _whole( string $source, string $target ): bool {
+		private static function _whole( string $source, string $target, bool $exact = false ): bool {
 
 			clearstatcache();
 
-			if( is_file( $source ) === true )
-				return is_file( $target ) === true && filesize( $target ) >= filesize( $source );
+			if( is_file( $source ) === true ) {
+
+				if( is_file( $target ) === false )
+					return false;
+
+				if( $exact === false )
+					return filesize( $target ) >= filesize( $source );
+
+				$hash = @hash_file( 'sha256', $source );
+
+				return filesize( $target ) === filesize( $source ) && $hash !== false && @hash_file( 'sha256', $target ) === $hash;
+			}
 
 			foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $file ) {
 

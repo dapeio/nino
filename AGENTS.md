@@ -276,6 +276,14 @@ To persist selected top-level configuration keys already changed in
 Do not serialize all of `$appData`. It contains runtime values and may overwrite
 concurrent changes.
 
+A restore of a backup takes the lock of every file it puts back that a writer of the
+kernel reads, changes and writes back - the virtual path that `Filesystem::mutate()` locks -
+and replaces each file by a copy made beside it and renamed over it, a database below
+`data/` excepted, which is written over in place: a save that waited for the restore is
+applied on top of the restored state, and a reader never sees half a file. A file that a
+feature writes itself, without `Filesystem::mutate()`, has no lock to take; see
+[Data, backup and restore](docs/features.md#data-backup-and-restore).
+
 ### Rendering and escaping rules
 
 HTML+ is read once into a tree (`\Nino\Markup`) and drawn from it - textfills and shortcodes in the order they stand - and then the final render callbacks run once. What the reader takes for a mark is in [HTML+ - the notation](docs/development.md#html---the-notation); in short:

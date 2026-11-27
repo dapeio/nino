@@ -66,6 +66,14 @@ namespace Nino {
 		// Where a test points inUse() instead: a static of the class, which no file of a project - config.php and so an archive - can set
 		public static ?string $locksFile = null;
 
+		// How long a restore waits in all, in seconds, for the locks of the writers of the files it puts back (see lockFiles()): a static of the class, which a test
+		// lowers and which no file of a project - config.php and so an archive - can set
+		public static float $lockWait = 10.0;
+
+		// How many locks a restore holds at once, every one being a file that is open (see locksHeld()): a static of the class, which a test lowers. null for
+		// what the limit of open files of the process says
+		public static ?int $locksHeld = null;
+
 		// The files an open database keeps beside itself while it is used: they belong to the live file and to nothing that is copied
 		private const array COMPANIONS = [ '-wal', '-shm', '-journal' ];
 
@@ -155,7 +163,8 @@ namespace Nino {
 
 		/**
 		 *	Whether the disks that the files of an unpacked archive are copied to have the room for them, before anything is copied: for each
-		 *	disk, what its files grow by - the size of the staged files less the size of those they replace - and the reserve. The staged tree
+		 *	disk, what its files grow by - the size of the staged files less the size of those they replace -, the size of the largest file that is put back beside
+		 *	the file it replaces (it exists twice for a moment) and the reserve. The staged tree
 		 *	is read, so the sizes are the sizes, not a guess
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -165,8 +174,9 @@ namespace Nino {
 		 */
 		public static function restoreRoom( array &$appData, string $staging ): ?array {
 
-			$growth = [];
-			$free 	= [];
+			$growth	 = [];
+			$largest = [];
+			$free 	 = [];
 
 			foreach( glob( rtrim( $staging, DIRECTORY_SEPARATOR ). '/*' ) ?: [] as $entry ) {
 
@@ -194,7 +204,12 @@ namespace Nino {
 				foreach( $walk as $file ) {
 
 					$relative = $file->getPathname() === $entry ? '' : substr( $file->getPathname(), strlen( $entry ) );
-					$grow 		+= (int) @filesize( $file->getPathname() ) - ( is_file( $target. $relative ) === true ? (int) @filesize( $target. $relative ) : 0 );
+					$size 		= (int) @filesize( $file->getPathname() );
+					$grow 		+= $size - ( is_file( $target. $relative ) === true ? (int) @filesize( $target. $relative ) : 0 );
+
+					// A file that is put back beside the file and renamed over it exists twice for a moment (see renamed()), one at a time
+					if( self::renamed( $name === 'config.php' ? 'config.php' : $name. str_replace( DIRECTORY_SEPARATOR, '/', $relative ) ) === true )
+						$largest[$device] = max( $largest[$device] ?? 0, $size );
 				}
 
 				$growth[$device] = ( $growth[$device] ?? 0 ) + max( 0, $grow );
@@ -203,7 +218,7 @@ namespace Nino {
 			foreach( $growth as $device => $grow ) {
 
 				$room = self::freeSpace( $appData, $free[$device] );
-				$need = $grow + self::SPACE_RESERVE;
+				$need = $grow + ( $largest[$device] ?? 0 ) + self::SPACE_RESERVE;
 
 				if( $room !== null && $room < $need )
 					return [ (int) ceil( $need / 1048576 ), (int) floor( max( 0, $room ) / 1048576 ) ];
@@ -1324,6 +1339,185 @@ namespace Nino {
 		 */
 		public static function target( array &$appData, string $entry ): string {
 			return \Nino\Filesystem::path( $appData, in_array( $entry, [ 'blocks', 'themes' ], true ) === true ? '/private/'. $entry : '/'. $entry );
+		}
+
+		/**
+		 *	The name a kernel writer locks a file of an archive under, for a restore that puts it back - for the files a writer reads, changes and writes back:
+		 *	\Nino\Filesystem::mutate() and its like lock the virtual path of the file, which is the archive's name with a slash in front (config.php, the texts, the
+		 *	elements, the templates and the data files that are php). The blocks and the themes are written as packages, a folder at a time, under the one lock of
+		 *	the features (see \Nino\Packages::place()). The assets, the pictures and the fonts are only ever written whole, and a file of the data that is no php is
+		 *	a database or the like that its feature opens itself: a lock protects none of them, and they have none here
+		 *
+		 *	@param		string		$name					The name in the archive, eg. 'text/de_DE.php'
+		 *
+		 *	@return 	string|null								null for a file that is put back without a lock
+		 */
+		public static function lockPath( string $name ): ?string {
+
+			if( $name === 'config.php' )
+				return '/config.php';
+
+			$entry = explode( '/', $name )[0];
+
+			if( in_array( $entry, [ 'blocks', 'themes' ], true ) === true )
+				return \Nino\Features::LOCK_PATH;
+
+			if( in_array( $entry, [ 'text', 'elements', 'templates' ], true ) === true )
+				return str_contains( $name, '/' ) === true ? '/'. $name : null;
+
+			return $entry === 'data' && str_contains( $name, '/' ) === true && str_ends_with( $name, '.php' ) === true ? '/'. $name : null;
+		}
+
+		/**
+		 *	Whether a file below data/ is put back beside the file and by rename, as the files of the kernel's writers are: a php file. Every other file of the data
+		 *	is a database or the like, which its feature opens itself: a process that has it open keeps the file it opened, so it is written over in place, as it
+		 *	always was
+		 *
+		 *	@param		string		$name					The name in the archive, eg. 'data/forms.2026-11.php'
+		 *
+		 *	@return 	bool
+		 */
+		public static function renamed( string $name ): bool {
+			return str_starts_with( $name, 'data/' ) === false || str_ends_with( $name, '.php' ) === true;
+		}
+
+		/**
+		 *	The time the waiting for a lock is measured by, in seconds: the monotonic clock, which no change of the time of day moves
+		 *
+		 *	@return 	float
+		 */
+		public static function clock(): float {
+			return hrtime( true ) / 1e9;
+		}
+
+		/**
+		 *	How many locks a restore holds at once: every lock is an open file, and the limit of open files of the process is what ends them. A quarter of it
+		 *	(the unpacking, the copies, the archive and what a callback opens need the rest), at most 4096 and at least 32 - the limit of 1024 that most
+		 *	servers have gives 256, which is more than the locked files of a project are
+		 *
+		 *	@return 	int
+		 */
+		public static function locksHeld(): int {
+
+			if( self::$locksHeld !== null )
+				return self::$locksHeld;
+
+			$limit = function_exists( 'posix_getrlimit' ) === true ? ( posix_getrlimit()['soft openfiles'] ?? 1024 ) : 1024;
+
+			return max( 32, min( 4096, intdiv( is_int( $limit ) === true ? $limit : 1024, 4 ) ) );
+		}
+
+		/**
+		 *	The locks a restore takes before it puts the files of an archive back (see lockPath()), in the one order it takes them in: the lock of the features,
+		 *	where the archive holds blocks or themes, then config.php, then the texts, the elements, the templates and the data, the files of each in the order of
+		 *	their names - which is the order Pages::put() takes its locks in. The order keeps the restore from waiting; it is not what keeps it from a deadlock
+		 *	(see lockFiles())
+		 *
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *
+		 *	@return 	array										The virtual paths, each once
+		 */
+		public static function lockPaths( string $staging ): array {
+
+			$root		= rtrim( $staging, DIRECTORY_SEPARATOR );
+			$groups	= [ 'features' => [], 'config' => [], 'text' => [], 'elements' => [], 'templates' => [], 'data' => [] ];
+
+			if( is_file( $root. '/config.php' ) === true )
+				$groups['config'][] = '/config.php';
+
+			foreach( array_keys( $groups ) as $entry ) {
+
+				if( in_array( $entry, [ 'features', 'config' ], true ) === true || is_dir( $root. '/'. $entry ) === false )
+					continue;
+
+				foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root. '/'. $entry, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::LEAVES_ONLY ) as $file ) {
+
+					$name = $entry. str_replace( DIRECTORY_SEPARATOR, '/', substr( $file->getPathname(), strlen( $root. '/'. $entry ) ) );
+
+					if( self::lockPath( $name ) !== null )
+						$groups[$entry][] = '/'. $name;
+				}
+
+				sort( $groups[$entry] );
+			}
+
+			foreach( [ 'blocks', 'themes' ] as $entry )
+				if( is_dir( $root. '/'. $entry ) === true )
+					$groups['features'] = [ \Nino\Features::LOCK_PATH ];
+
+			return array_values( array_unique( array_merge( ...array_values( $groups ) ) ) );
+		}
+
+		/**
+		 *	Take the locks of the writers of some files, all of them, in the order of the list: each without waiting for it, polling in slices of 5 ms (flock()
+		 *	has no time limit of its own) until every one is held or the time is up (\Nino\Backup::$lockWait in all, by the monotonic clock)
+		 *
+		 *	A process that holds a lock while it waits for another is what a lock held here must not be waited on by: where one lock has not come within a
+		 *	fifth of the time and others are held, those are let go, a moment is left to whoever waits for them, and the round starts over. So this never waits
+		 *	with a lock in its hand for longer than that, whatever order a writer takes its locks in, and nothing is held when it answers with a path
+		 *
+		 *	A lock that cannot be opened at all (see \Nino\Filesystem::lockUsable()) is none that anybody holds, and is left out
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$paths				Virtual paths, see lockPath(), each once
+		 *	@param		float|null	$until				The time (see clock()) the waiting ends at; null for \Nino\Backup::$lockWait from the call. One attempt is made whatever it is
+		 *
+		 *	@return 	true|string								true where every lock is held; else the virtual path of the one that another process held until the time was up
+		 */
+		public static function lockFiles( array &$appData, array $paths, ?float $until = null ): true|string {
+
+			$until	??= self::clock() + self::$lockWait;
+			$stall	= max( 0.01, self::$lockWait / 5 );
+
+			while( true ) {
+
+				$took = [];
+
+				foreach( $paths as $path ) {
+
+					$since = self::clock();
+
+					while( \Nino\Filesystem::lockFile( $appData, (string) $path, false ) === false ) {
+
+						// What cannot be opened is held by nobody
+						if( \Nino\Filesystem::lockUsable( $appData, (string) $path ) === false )
+							continue 2;
+
+						$at = self::clock();
+
+						if( $at >= $until ) {
+							self::unlockFiles( $appData, $took );
+							return (string) $path;
+						}
+
+						if( $took !== [] && $at - $since >= $stall ) {
+							self::unlockFiles( $appData, $took );
+							usleep( random_int( 1000, 20000 ) );
+							continue 3;
+						}
+
+						usleep( 5000 );
+					}
+
+					$took[] = $path;
+				}
+
+				return true;
+			}
+		}
+
+		/**
+		 *	Let go of the locks lockFiles() took
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$paths				Virtual paths
+		 *
+		 *	@return 	void
+		 */
+		public static function unlockFiles( array &$appData, array $paths ): void {
+
+			foreach( $paths as $path )
+				\Nino\Filesystem::unlockFile( $appData, (string) $path );
 		}
 
 		/**

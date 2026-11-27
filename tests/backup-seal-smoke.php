@@ -1012,12 +1012,12 @@ $growDir = ninoSandboxDir( $grow );
 file_put_contents( $growDir. '/private/assets/a.bin', str_repeat( 'a', 2 * 1048576 ) );
 @mkdir( $dir. '/stg/assets', 0755, true );
 file_put_contents( $dir. '/stg/assets/a.bin', str_repeat( 'b', 3 * 1048576 ) );
-\Nino\Backup::$diskFree = 1048576 + 4194304;
+\Nino\Backup::$diskFree = 1048576 + 3 * 1048576 + 4194304;
 $fits = \Nino\Backup::restoreRoom( $grow, $dir. '/stg' );
-\Nino\Backup::$diskFree = 1048576 + 4194304 - 1;
+\Nino\Backup::$diskFree = 1048576 + 3 * 1048576 + 4194304 - 1;
 $short = \Nino\Backup::restoreRoom( $grow, $dir. '/stg' );
 \Nino\Backup::$diskFree = null;
-check( 'the room a restore asks of the disk of the files is what they grow by - 3 MB for the file that replaces one of 2 MB is 1 MB - and the reserve: one byte less is refused', $fits === null && is_array( $short ) === true );
+check( 'the room a restore asks of the disk of the files is what they grow by - 3 MB for the file that replaces one of 2 MB is 1 MB -, the largest file that is put back beside the one it replaces (3 MB) and the reserve: one byte less is refused', $fits === null && is_array( $short ) === true );
 \Nino\Filesystem::removeDir( $growDir );
 
 // A site of files that are cut: the project of two files, one of which cannot be written where it goes

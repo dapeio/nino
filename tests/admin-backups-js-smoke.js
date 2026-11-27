@@ -477,6 +477,12 @@ check( '...and a refusal gives them back', listButtons().every( function( button
 check( '...saying that one is running, in the words of the module', text('/_admin/error/backups_busy') !== ''
 	&& messageText().indexOf( text('/_admin/error/backups_busy') ) !== -1 && messageState() === 'error' );
 
+// A restore that another request keeps from the lock of a file says which file, in the words of the module
+pressRestore('2024-05-02');
+answer( 409, { error : 'another request is writing a file the restore has to put back', code : 'backups_restore_busy', params : [ '/text/de_DE.php' ] } );
+check( '...a restore that waited for the lock of a file in vain gives the list back and names the file', listButtons().every( function( button ) { return button.disabled !== true } )
+	&& text('/_admin/error/backups_restore_busy') !== '' && messageText().indexOf( text('/_admin/error/backups_restore_busy').replace( '%s', '/text/de_DE.php' ) ) !== -1 && messageState() === 'error' );
+
 pressRestore('2024-05-02');
 answer( 200, { ok : true, restoredDate : '2024-05-02' } );
 check( 'a restore that went through leaves them off for the reload', listButtons().every( function( button ) { return button.disabled === true } ) );
