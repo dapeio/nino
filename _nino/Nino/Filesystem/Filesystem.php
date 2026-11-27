@@ -948,6 +948,86 @@ namespace Nino {
 			@rmdir( $target );
 		}
 
+		/**
+		 *	Write a file's content atomically: a temp file next to it, then
+		 *	rename() over the target - so a concurrent reader sees either the
+		 *	old file or the new one, never a half-written one.
+		 *
+		 *	A real path, not a virtual one, and no lock, no cache: for a file
+		 *	that putFileContent() cannot express - a php *stub* under the
+		 *	content directory, the recovery hash, the activity log's day files, a
+		 *	sealed archive written in pieces. The caller holds the lock it needs.
+		 *	It checks nothing about where the path lies: the caller has proven the
+		 *	path is its own (see removeDir())
+		 *
+		 *	@param		string		$path
+		 *	@param		string|iterable	$content		The bytes, or the pieces of them in order (see \Nino\Backup\Seal::pieces())
+		 *
+		 *	@return 	bool										False when the file could not be written, the target as it was and no temporary file left. A piece of an
+		 *																			iterable that throws is no false: the exception reaches the caller, with the target as it was and no temporary file left
+		 */
+		public static function writeAtomic( string $path, string|iterable $content ): bool {
+
+			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
+			$handle = @fopen( $temp, 'wb' );
+
+			if( $handle === false )
+				return false;
+
+			$written	= 0;
+			$expected	= 0;
+
+			// Pieces that are made while they are written (an archive sealed in chunks) can fail in the middle: the file
+			// that was begun is not left behind
+			try {
+
+				foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
+					$expected += strlen( $piece );
+					$put = fwrite( $handle, $piece );
+					if( $put === false ) {
+						$written = false;
+						break;
+					}
+					$written += $put;
+				}
+			}
+			catch( \Throwable $e ) {
+				fclose( $handle );
+				@unlink( $temp );
+				throw $e;
+			}
+
+			$flushed = fflush( $handle );
+			fclose( $handle );
+
+			// fwrite() reports a short write rather than failing, and without
+			// the fflush() a rename() can win the race against the bytes ever
+			// reaching disk - either way the result is a truncated file, and
+			// for the recovery hash one that would lock the operator out
+			if( $written === false || $written !== $expected || $flushed === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			$mode = @fileperms( $path );
+			if( $mode !== false )
+				@chmod( $temp, $mode & 0777 );
+
+			if( @rename( $temp, $path ) === false ) {
+				@unlink( $temp );
+				return false;
+			}
+
+			// The readers of these files take the bytes directly rather than
+			// including them, so opcache never sits in that path - but the
+			// file is still php a webserver may compile if it is requested,
+			// and leaving a stale compiled copy of a credential file around is
+			// not something to rely on being harmless
+			if( function_exists( 'opcache_invalidate' ) === true )
+				opcache_invalidate( $path, true );
+
+			return true;
+		}
 
 		// The ".." rejection getFileContent()/putFileContent() have always made,
 		// in the one place every reader, writer and locker passes through: it

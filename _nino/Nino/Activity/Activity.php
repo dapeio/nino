@@ -142,7 +142,7 @@ namespace Nino {
 					$lines 	 = is_file( $path ) === true ? self::_readLines( $path ) : [];
 					$lines[] = date( 'Y-m-d H:i', $time ). '  '. $actor. '  '. $message;
 
-					if( self::_writeAtomic( $path, \Nino\Backup\Seal::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). \Nino\Backup\Seal::STUB_SUFFIX ) === false )
+					if( \Nino\Filesystem::writeAtomic( $path, \Nino\Backup\Seal::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). \Nino\Backup\Seal::STUB_SUFFIX ) === false )
 						throw new \RuntimeException( 'the day\'s file could not be written: '. basename( $path ) );
 				}
 				finally {
@@ -218,59 +218,6 @@ namespace Nino {
 			$decoded = base64_decode( substr( $raw, strlen( \Nino\Backup\Seal::STUB_PREFIX ), -strlen( \Nino\Backup\Seal::STUB_SUFFIX ) ) );
 
 			return $decoded === '' ? [] : explode( "\n", $decoded );
-		}
-
-		/**
-		 *	Write a file's content atomically: a temp file next to it, then
-		 *	rename() over the target - so a concurrent reader sees either the
-		 *	old file or the new one, never a half-written one. The body of
-		 *	\Nino\Admin\Admin::writeFileAtomic() for a string, which a request
-		 *	outside the workbench cannot reach and \Nino\Filesystem's own
-		 *	writer, private and shaped around the file cache, cannot express
-		 *	for a php stub
-		 *
-		 *	@param		string		$path
-		 *	@param		string		$content
-		 *
-		 *	@return 	bool										False when the file could not be written
-		 */
-		private static function _writeAtomic( string $path, string $content ): bool {
-
-			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
-			$handle = @fopen( $temp, 'wb' );
-
-			if( $handle === false )
-				return false;
-
-			$written = fwrite( $handle, $content );
-
-			// fwrite() reports a short write rather than failing, and without
-			// the fflush() a rename() can win the race against the bytes ever
-			// reaching disk - either way the result is a truncated file
-			$flushed = fflush( $handle );
-			fclose( $handle );
-
-			if( $written === false || $written !== strlen( $content ) || $flushed === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			$mode = @fileperms( $path );
-			if( $mode !== false )
-				@chmod( $temp, $mode & 0777 );
-
-			if( @rename( $temp, $path ) === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			// The readers of these files take the bytes directly rather than
-			// including them, so opcache never sits in that path - but the
-			// file is still php a webserver may compile if it is requested
-			if( function_exists( 'opcache_invalidate' ) === true )
-				opcache_invalidate( $path, true );
-
-			return true;
 		}
 
 		/**

@@ -288,6 +288,7 @@ $clear();
 $modes = [];
 foreach( [ 0640, 0600 ] as $mode ) {
 	chmod( $logFile, $mode );
+	clearstatcache();
 	\Nino\Admin\Admin::record( $appData, 'adm@example.com', 'Next' );
 	clearstatcache( true, $logFile );
 	$modes[] = fileperms( $logFile ) & 0777;

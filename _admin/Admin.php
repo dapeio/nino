@@ -1470,15 +1470,10 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Write a file's content atomically: a temp file next to it, then
-		 *	rename() over the target - so a concurrent reader sees either the
-		 *	old file or the new one, never a half-written one.
-		 *
-		 *	The shell's own rather than \Nino\Filesystem's, which is private
-		 *	and shaped around the filesystem cache (php-array files under the
-		 *	project root); this one writes a php *stub* under the content
-		 *	directory, which that abstraction cannot express - the recovery
-		 *	hash, the activity log's day files
+		 *	Write a file's content atomically - the shell's name for
+		 *	\Nino\Filesystem::writeAtomic(), which holds the writer and its
+		 *	reasons: this one writes a php *stub* under the content directory, the
+		 *	recovery hash and the activity log's day files among them
 		 *
 		 *	@param		string		$path
 		 *	@param		string|iterable	$content		The bytes, or the pieces of them in order (see \Nino\Backup\Seal::pieces())
@@ -1487,65 +1482,7 @@ namespace Nino\Admin {
 		 */
 		public static function writeFileAtomic( string $path, string|iterable $content ): bool {
 
-			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
-			$handle = @fopen( $temp, 'wb' );
-
-			if( $handle === false )
-				return false;
-
-			$written	= 0;
-			$expected	= 0;
-
-			// Pieces that are made while they are written (an archive sealed in chunks) can fail in the middle: the file
-			// that was begun is not left behind
-			try {
-
-				foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
-					$expected += strlen( $piece );
-					$put = fwrite( $handle, $piece );
-					if( $put === false ) {
-						$written = false;
-						break;
-					}
-					$written += $put;
-				}
-			}
-			catch( \Throwable $e ) {
-				fclose( $handle );
-				@unlink( $temp );
-				throw $e;
-			}
-
-			$flushed = fflush( $handle );
-			fclose( $handle );
-
-			// fwrite() reports a short write rather than failing, and without
-			// the fflush() a rename() can win the race against the bytes ever
-			// reaching disk - either way the result is a truncated file, and
-			// for the recovery hash one that would lock the operator out
-			if( $written === false || $written !== $expected || $flushed === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			$mode = @fileperms( $path );
-			if( $mode !== false )
-				@chmod( $temp, $mode & 0777 );
-
-			if( @rename( $temp, $path ) === false ) {
-				@unlink( $temp );
-				return false;
-			}
-
-			// The readers of these files take the bytes directly rather than
-			// including them, so opcache never sits in that path - but the
-			// file is still php a webserver may compile if it is requested,
-			// and leaving a stale compiled copy of a credential file around is
-			// not something to rely on being harmless
-			if( function_exists( 'opcache_invalidate' ) === true )
-				opcache_invalidate( $path, true );
-
-			return true;
+			return \Nino\Filesystem::writeAtomic( $path, $content );
 		}
 
 	}
