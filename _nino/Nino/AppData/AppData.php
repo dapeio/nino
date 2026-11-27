@@ -14,6 +14,9 @@ namespace Nino {
 	// top-level keys back
 	class AppData {
 
+		// The counter that keeps the warning about './' keys of config.php to once an hour (see _sayRuntimeKeys())
+		private const string RUNTIME_COUNTER = 'config-runtime-keys';
+
 		private static
 			$_initialInstance = [
 				'./nino/callbacks'							=> [],
@@ -266,6 +269,19 @@ namespace Nino {
 			if( is_array( $staticAppData ) === false )
 				\Nino\Runtime::fail( 'AppData::init(): config.php exists but did not return an array.' );
 
+			/*	A key that begins with './' is of the running request alone, and
+				what the kernel set before this read - './nino/uid', the paths of
+				the filesystem - is the request's own. A file that carries one is
+				read as if it did not: taken out here, before the merge, so that
+				nothing of it reaches the app data or overwrites a runtime key.	*/
+			$runtime = [];
+
+			foreach( array_keys( $staticAppData ) as $key )
+				if( self::_isRuntimeKey( $key ) === true ) {
+					$runtime[] = (string) $key;
+					unset( $staticAppData[$key] );
+				}
+
 			/*	Defaults first, the project's own file over them: a key the file
 				does not carry is one this site never decided, not one it lost.
 				That is what lets config.php hold only what this project chose -
@@ -273,6 +289,9 @@ namespace Nino {
 				existed working unchanged, since it simply overrides each of
 				them with the same value.	*/
 			$appData = self::_merge( $appData, self::_merge( self::DEFAULTS, $staticAppData ) );
+
+			if( count( $runtime ) > 0 )
+				self::_sayRuntimeKeys( $appData, $runtime );
 
 			/*	The setup wizard of an earlier release wrote the module class of
 				the components into the list of every config.php, and a list is
@@ -285,6 +304,92 @@ namespace Nino {
 					$appData['/nino/modules'],
 					static fn( mixed $class ): bool => '\\'. ltrim( (string) $class, '\\' ) !== '\\Nino\\Modules\\Components'
 				) );
+		}
+
+		/**
+		 *	Whether a top-level key is one of the running request alone: it begins
+		 *	with './'. Only the top level of the app data and of config.php is asked -
+		 *	a key of a nested array that begins so is data like any other
+		 *
+		 *	@param		mixed			$key					A key of the app data or of config.php
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isRuntimeKey( mixed $key ): bool {
+
+			return is_string( $key ) === true && str_starts_with( $key, './' );
+		}
+
+		/**
+		 *	Say in the log that config.php holds keys of the running request, which are not read. Every request meets it, so it is
+		 *	said once an hour for the same keys, as the kernel says a feature whose directory is missing. The hour is asked first,
+		 *	without a lock and without a write (\Nino\Feature::spent()): a request of the hour that is said already touches nothing.
+		 *	Only the first one counts (\Nino\Feature::count()), and where the counters cannot be read or written - a counter
+		 *	says so in a warning of its own, which is taken here and not passed on - nothing is said at all, since a warning that
+		 *	cannot be kept to the hour would be said, and shown where errors are shown, by every request. The names are said,
+		 *	never the values: a value may be a secret, and a name is cut and cleaned, since it comes from a file somebody edited
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$keys					The keys the file holds that begin with './'
+		 *
+		 *	@return 	void
+		 */
+		private static function _sayRuntimeKeys( array &$appData, array $keys ): void {
+
+			$hour = implode( '|', $keys );
+
+			if( \Nino\Feature::spent( $appData, self::RUNTIME_COUNTER, $hour, 1 ) === true )
+				return;
+
+			$refused	= false;
+			$previous	= null;
+			$previous	= set_error_handler( static function( int $level, string $message, string $file = '', int $line = 0 ) use ( &$previous, &$refused ): bool {
+
+				if( $level === E_USER_WARNING && str_starts_with( $message, 'Feature::' ) === true ) {
+					$refused = true;
+					return true;
+				}
+
+				return is_callable( $previous ) === true ? (bool) $previous( $level, $message, $file, $line ) : false;
+			} );
+
+			try {
+				$counted = \Nino\Feature::count( $appData, self::RUNTIME_COUNTER, $hour, 1, 3600 );
+			}
+			finally {
+				restore_error_handler();
+			}
+
+			if( $counted === false || $refused === true )
+				return;
+
+			trigger_error( 'AppData::init(): config.php holds '. count( $keys ). ' key'. ( count( $keys ) === 1 ? ' that begins' : 's that begin' ). ' with "./", which exist'. ( count( $keys ) === 1 ? 's' : '' ). ' for the running request alone and '. ( count( $keys ) === 1 ? 'is' : 'are' ). ' not read: '. self::_names( $keys ). ' - persistent data is kept under a key that begins with "/"', E_USER_WARNING );
+		}
+
+		/**
+		 *	Say that keys of the running request alone were asked for and not written
+		 *
+		 *	@param		array 		$keys					The names
+		 *
+		 *	@return 	void
+		 */
+		private static function _sayRefused( array $keys ): void {
+
+			trigger_error( 'AppData::writeContentData(): not written, a key that begins with "./" is of the running request alone and persistent data is kept under a key that begins with "/": '. self::_names( array_values( array_unique( $keys ) ) ), E_USER_WARNING );
+		}
+
+		/**
+		 *	The names of keys as one line for the log: the first ten, each cleaned of anything but printable ascii and cut at a hundred
+		 *
+		 *	@param		array 		$keys					Key names
+		 *
+		 *	@return 	string
+		 */
+		private static function _names( array $keys ): string {
+
+			$names = array_map( static fn( mixed $key ): string => substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', (string) $key ), 0, 100 ), array_slice( $keys, 0, 10 ) );
+
+			return implode( ', ', $names ). ( count( $keys ) > 10 ? ' and '. ( count( $keys ) - 10 ). ' more' : '' );
 		}
 
 		// Merges $overlay into $base: associative arrays merge key-by-key
@@ -328,6 +433,12 @@ namespace Nino {
 		 *	config.php rather than written into it, so that the framework default
 		 *	stands again.
 		 *
+		 *	A named key that begins with './' is of the running request alone: it is
+		 *	not written, the others are, and a warning names it. Every key that
+		 *	begins so which the file holds is taken out of it with this write; a
+		 *	call that names such keys and no other does not touch the file, so a key of that
+		 *	kind that the file holds leaves with the next write of a key of its own.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$keys				The top-level keys of config.php to persist, spelled as it spells them: '/nino/modules', '/project/catalog'
 		 *
@@ -335,10 +446,44 @@ namespace Nino {
 		 */
 		public static function writeContentData( array &$appData, array $keys ): true {
 
+			/*	A key of the running request alone is asked for and not written:
+				the others are, and the key stays in memory for the request. Said
+				once the lock is given back. Not Runtime::fail(): nothing is lost
+				or corrupted by leaving it out, and a caller that hands over the
+				keys of a form it was sent should not end the request on one
+				wrong name. Where nothing else is asked for there is nothing to
+				write, and config.php is not touched - not even to take out a key
+				of the running request that it holds: that goes with the next
+				write of a key of its own.	*/
+			$refused	= [];
+			$wanted		= [];
+
+			foreach( $keys as $key )
+				if( self::_isRuntimeKey( $key ) === true )
+					$refused[] = (string) $key;
+				else
+					$wanted[] = $key;
+
+			if( count( $wanted ) === 0 && count( $refused ) > 0 ) {
+				self::_sayRefused( $refused );
+				return true;
+			}
+
+			$keys = $wanted;
+
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false )
 				\Nino\Runtime::fail( 'AppData::writeContentData(): could not lock config.php for writing - refusing to write unserialized.' );
 
 			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content, array &$appData ) use ( $keys ): array {
+
+				/*	A key of the running request alone is not stored, and one the
+					file already holds - written by hand, or carried by the
+					config.php of an archive - goes with this write. Taken out of
+					the copy that was just read, so every other key stands as the
+					file has it.	*/
+				foreach( array_keys( $content ) as $key )
+					if( self::_isRuntimeKey( $key ) === true )
+						unset( $content[$key] );
 
 				foreach( $keys as $key ) {
 
@@ -374,6 +519,9 @@ namespace Nino {
 
 			if( $written === false )
 				\Nino\Runtime::fail( 'AppData::writeContentData(): failed to write config.php.' );
+
+			if( count( $refused ) > 0 )
+				self::_sayRefused( $refused );
 
 			return true;
 		}

@@ -141,7 +141,8 @@ $request = \Nino\request( $appData, $_SERVER );
 `$appData` is application state, configuration, callbacks, caches, and runtime
 state; `$request` is one normalized request and its response. Both are passed by
 reference. Keys under `/...` are stable configuration/data space, keys under
-`./...` request-lifecycle-only state. A `/...` value is not persistent merely
+`./...` request-lifecycle-only state: `config.php` gives a request no `./...` key and
+`AppData::writeContentData()` writes none. A `/...` value is not persistent merely
 because it is in `$appData`: a writer must explicitly save it.
 
 ### Text keys

@@ -2960,11 +2960,19 @@ namespace Nino {
 				it here. activate() now writes every key it decides, these
 				included, in one locked read-modify-write at the end. $appData
 				still gets the value, because the rest of this request reads it	*/
-			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue )
+			foreach( ( $manifest['config'] ?? [] ) as $configKey => $configValue ) {
+
+				// A key that begins with './' is of the running request alone: a manifest is a file like config.php and gives none, nor is one written
+				if( is_string( $configKey ) === true && str_starts_with( $configKey, './' ) === true ) {
+					trigger_error( 'The unit of the feature '. basename( dirname( $unitDir ) ). ' ('. basename( $unitDir ). ') names the key "'. substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $configKey ), 0, 100 ). '" in its config, which begins with "./" and is of the running request alone: it is not set and not stored', E_USER_WARNING );
+					continue;
+				}
+
 				if( isset( $appData[$configKey] ) === false ) {
 					$appData[$configKey] = $configValue;
 					$config[$configKey] = $configValue;
 				}
+			}
 
 			$present = 0;
 			$texts = self::applyUnitTexts( $appData, $unitDir, $locales, $overwrite, $present );

@@ -25,7 +25,7 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-A key of `$appData` under `/...` belongs to the stable configuration and data space (`/nino/http/routes`), a key under `./...` to the current request alone (`./nino/locales/current`). The notation decides nothing about persistence: a `/...` value is saved only when a writer is asked to, see [Persistent Data](#persistent-data-and-concurrent-write-access).
+A key of `$appData` under `/...` belongs to the stable configuration and data space (`/nino/http/routes`), a key under `./...` to the current request alone (`./nino/locales/current`). The notation decides nothing about persistence: a `/...` value is saved only when a writer is asked to, see [Persistent Data](#persistent-data-and-concurrent-write-access). No stored file gives a request a `./...` key: one found in `config.php` is not read and is named in the log, once an hour, and a unit's `config` is not read for one either. `\Nino\AppData::writeContentData()` writes none, naming it in a warning. One somebody wrote into `config.php` by hand stays in the file, unread, until the next write of a key of its own through `writeContentData()` takes it out.
 
 ### Where does a change belong?
 
@@ -299,7 +299,7 @@ $written = \Nino\AppData::writeContentData( $appData, [
 ] );
 ```
 
-The method reads the current file state again, only takes over the specified keys, and then writes atomically. It returns `false` when `config.php` could not be locked or written; under Nino's own error handler that case already ends the request with a 500, so the return value matters where a handler continues, in the tests for example. Auth sessions are additionally merged via a three-way comparison so that parallel logins or logouts do not unnoticedly overwrite each other's state: a session that another request ended stays ended, and a login that began before the password was changed or the account switched off opens no session.
+The method reads the file as it stands at that moment, only takes over the specified keys, and then writes atomically. It answers `true`; where `config.php` cannot be locked or written it ends the request with `\Nino\Runtime::fail()`, a 500. Auth sessions are additionally merged via a three-way comparison so that parallel logins or logouts do not unnoticedly overwrite each other's state: a session that another request ended stays ended, and a login that began before the password was changed or the account switched off opens no session.
 
 ### `Filesystem`
 
