@@ -190,6 +190,22 @@ namespace Nino {
 		}
 
 		/**
+		 *	A size in bytes as the megabytes a sentence names: whole where it
+		 *	is whole (8), one decimal where it is not (0.5) - what the limits()
+		 *	say, in the form a refusal gives them as its param
+		 *
+		 *	@param		int				$bytes
+		 *
+		 *	@return 	int|float
+		 */
+		public static function megabytes( int $bytes ): int|float {
+
+			$megabytes = round( $bytes / 1048576, 1 );
+
+			return $megabytes === floor( $megabytes ) ? (int) $megabytes : $megabytes;
+		}
+
+		/**
 		 *	limits() for the two php settings given - which cannot be changed at
 		 *	run time, so a test stands in for them here. Internal - public only so that
 		 *	tests/images-smoke.php can call it

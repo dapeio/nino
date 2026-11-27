@@ -499,6 +499,8 @@ convenience: repeat it on the server.
   permission; `Admin::guard()` alone is for the one screen every account may use.
 - Runtime management endpoints check a specific `Auth::checkPermission()`
   value; read and write permissions are distinct when their risk differs.
+  A surface outside the workbench asks `\Nino\Auth::guard()` for session,
+  token and permission at once and writes the refusal with `\Nino\Auth::deny()`.
 - Do not accept a username in the request and check that user's permission as
   authorization for the current caller, expose workbench actions through a new
   public route, or implement parallel ad-hoc auth cookies: session fixation

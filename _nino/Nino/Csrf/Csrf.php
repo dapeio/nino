@@ -20,6 +20,9 @@ namespace Nino {
 		// How often blocked() answered true since watched( true ) - see there
 		private static int $_asked = 0;
 
+		// The methods that need no token: safe by definition
+		private const array SAFE_METHODS = [ 'GET', 'HEAD', 'OPTIONS' ];
+
 		// Registers the response-side check that runs for every non-safe
 		// request, whether or not the optional Modules\Csrf (the shortcode)
 		// is enabled - called unconditionally from \Nino\init(), same as
@@ -105,7 +108,7 @@ namespace Nino {
 			// can be registered for them, which left those completely
 			// unprotected. An unrecognized method ('') stays on the checked
 			// side on purpose - it has no business writing anything either.
-			if( in_array( $request['/nino/http/request']['method'], [ 'GET', 'HEAD', 'OPTIONS' ], true ) === true )
+			if( self::_safe( $request ) === true )
 				return;
 
 			// Opt-out per route, set explicitly in config.php - default stays
@@ -124,18 +127,53 @@ namespace Nino {
 			// site-wide. The raw lookup below, on the request's own uri and
 			// method, correctly comes back null for anything unmatched.
 			//
-			// 'method' needs no isset() guard the way 'uri' does: the
-			// safe-method check above already dereferenced it unconditionally,
-			// so surviving that proves it's set. 'uri' has no such prior use -
-			// a hand-built $request missing it (the smoke tests build exactly
-			// that) would otherwise hand requestRoute(), which requires a
-			// string, a null: a TypeError rather than a refusal.
+			// A request with no 'method' is an unsafe one (_safe() reads it
+			// with a default) and is looked up with the method '', which
+			// matches no route. 'uri' needs the isset() guard - a hand-built
+			// $request missing it (the smoke tests build exactly that) would
+			// otherwise hand requestRoute(), which requires a string, a null:
+			// a TypeError rather than a refusal.
 			$routeData = isset( $request['/nino/http/request']['uri'] ) === true
-				? \Nino\Http::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] )
+				? \Nino\Http::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] ?? '' )
 				: null;
 
 			if( ( $routeData['csrf'] ?? true ) === false )
 				return;
+
+			if( self::_carries( $appData, $request ) === true )
+				return;
+
+			$request['./nino/csrf/blocked']									= true;
+			$request['/nino/http/response']['statusCode']	= 403;
+			$request['/nino/http/response']['body']					= false;
+		}
+
+		/**
+		 *	Whether a request is one the token guard lets pass: its method is safe (GET, HEAD, OPTIONS), or it
+		 *	carries the token of the session - in the field '_csrf', the header X-CSRF-Token or the '_csrf' of a
+		 *	json body. The check callbackResponse() makes, without the route's opt-out: a route that switched the
+		 *	token guard off is not asked here, so code that must not rely on that (\Nino\Auth::guard()) can ask
+		 *	whether the token is there. Pure: it reads the request and the session and writes nothing, and mints
+		 *	no token. An unrecognized method counts as unsafe, as in callbackResponse()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	bool
+		 */
+		public static function satisfied( array &$appData, array $request ): bool {
+
+			return self::_safe( $request ) === true || self::_carries( $appData, $request ) === true;
+		}
+
+		// Whether the method of the request needs no token. A request with no method stays on the checked side
+		private static function _safe( array $request ): bool {
+
+			return in_array( $request['/nino/http/request']['method'] ?? '', self::SAFE_METHODS, true ) === true;
+		}
+
+		// Whether the request carries the token the session holds
+		private static function _carries( array &$appData, array $request ): bool {
 
 			$given = self::_extractToken( $request );
 
@@ -145,12 +183,7 @@ namespace Nino {
 			// refuse it in the next line would make every stray post a visitor
 			$token = \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' );
 
-			if( $given !== '' && is_string( $token ) === true && $token !== '' && hash_equals( $token, $given ) === true )
-				return;
-
-			$request['./nino/csrf/blocked']									= true;
-			$request['/nino/http/response']['statusCode']	= 403;
-			$request['/nino/http/response']['body']					= false;
+			return $given !== '' && is_string( $token ) === true && $token !== '' && hash_equals( $token, $given ) === true;
 		}
 
 		// Read the csrf token from wherever the caller put it: the classic

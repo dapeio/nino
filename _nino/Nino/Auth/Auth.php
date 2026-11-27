@@ -1072,6 +1072,226 @@ namespace Nino {
 
 
 		/**
+		 *	Scoped permissions - the finer half of the permission model.
+		 *
+		 *	A panel's own permission ('/_admin/elements/manage') is a door: it
+		 *	says the account may work in that panel at all, and the guard of the
+		 *	action (\Nino\Admin\Admin::guardPerm()) is where it is checked. A scoped permission describes what
+		 *	the account may do once inside - '/_admin/elements/services/insert',
+		 *	'/_admin/elements/services/update/title',
+		 *	'/_admin/text/update/template/page-home/hero/title'. Both kinds are ordinary
+		 *	strings checked with the same checkPermission(), so
+		 *	'/_admin/elements/services/*' covers every action on that type and
+		 *	'/_admin/text/update/template/page-home/*' every key of that template, without
+		 *	this file knowing anything about types, fields or keys.
+		 *
+		 *	Enforcement is opt-in per account, and deliberately so. An account
+		 *	that holds no scoped permission for a panel keeps exactly what the
+		 *	panel permission has always meant - all of it. The other way round,
+		 *	every role in every existing installation would have lost write
+		 *	access on the day this arrived, silently. Giving a role its first
+		 *	scoped permission for a panel is what says "describe this one in
+		 *	detail"; from then on that panel allows what the role names and
+		 *	nothing else.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$prefix				The panel's scope, with its slash (eg. '/_admin/elements/')
+		 *	@param		string		$perm					The specific permission the action needs
+		 *
+		 *	@return 	bool										Whether this account may do it
+		 */
+		public static function scoped( array &$appData, string $prefix, string $perm ): bool {
+
+			if( self::isScoped( $appData, $prefix ) === false )
+				return true;
+
+			return self::checkPermission( $appData, $perm );
+		}
+
+		/**
+		 *	Whether this account is described in detail for a panel - ie.
+		 *	holds at least one permission naming a single action inside it,
+		 *	rather than only the door or a blanket over the whole panel.
+		 *
+		 *	'/_admin/elements/manage' is the door and '/_admin/elements/*' the
+		 *	blanket: neither names an action, so neither switches the panel
+		 *	into described-in-detail mode. '/_admin/elements/services/insert'
+		 *	does, and so does '/_admin/elements/services/*' - a role limited
+		 *	to one type is still a role that was described.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$prefix				The panel's scope, with its slash
+		 *
+		 *	@return 	bool
+		 */
+		public static function isScoped( array &$appData, string $prefix ): bool {
+
+			$user = self::getCurrentUser( $appData );
+
+			if( $user === false )
+				return false;
+
+			return self::isDescribed( self::permissions( $appData, $user ), $prefix );
+		}
+
+		/**
+		 *	Whether a list of permissions describes a panel in detail - the
+		 *	test isScoped() makes of the current account, asked of any list, so
+		 *	that a role that is about to be saved is measured by the very
+		 *	definition the guards enforce (see \Nino\Modules\Users\Roles::notHeld())
+		 *
+		 *	@param		array 		$perms				Permission strings
+		 *	@param		string		$prefix				The panel's scope, with its slash
+		 *
+		 *	@return 	bool
+		 */
+		public static function isDescribed( array $perms, string $prefix ): bool {
+
+			foreach( $perms as $held ) {
+
+				if( is_string( $held ) === false || str_starts_with( $held, $prefix ) === false )
+					continue;
+
+				$rest = substr( $held, strlen( $prefix ) );
+
+				if( $rest === '*' || str_contains( $rest, '/' ) === false )
+					continue;
+
+				return true;
+			}
+
+			return false;
+		}
+
+		/**
+		 *	Whether a request of a surface outside the workbench may proceed: a page or an endpoint of a feature
+		 *	that the site's own index.php serves, where the shell of the workbench is not loaded. It asks, in
+		 *	this order and with the answers the workbench gives the same request:
+		 *
+		 *	1. Was the request refused before the guard was asked (a status other than 200)? By the token guard
+		 *	   (\Nino\Csrf::blocked(), whose flag stays set when a later callback changes the status): 413
+		 *	   'post_too_large' where the body is above post_max_size, else 403 'csrf' - a refused token wins
+		 *	   over the answer of a callback that ran after it, and deny() writes it over that answer. By
+		 *	   anything else (maintenance, another global callback): the status the response holds and the code
+		 *	   'refused' - deny() leaves such an answer as it is. 'refused' is the answer only where the token
+		 *	   was not what refused; on a route with the token guard off nothing asked the token yet.
+		 *	2. Is the token valid? For a method other than GET, HEAD and OPTIONS the request passes only if it
+		 *	   carries the token of the session (\Nino\Csrf::satisfied()) - also on a route that switched the
+		 *	   token guard off with 'csrf' => false. Answered as in 1 ('csrf', or 'post_too_large'). GET, HEAD
+		 *	   and OPTIONS are asked for no token (HEAD runs the GET callback), and the session cookie travels
+		 *	   with a cross-site GET: a guarded GET must not write or act - what changes anything is a POST.
+		 *	3. Is an account signed in (getCurrentUser())? Else 401 'session'.
+		 *	4. If $perm is not '': does the account hold it (checkPermission())? Else 403 'not_allowed'.
+		 *
+		 *	It writes no file, no session value and no log line, and changes neither $request nor $appData. The
+		 *	one thing it does besides reading is asking \Nino\Csrf::blocked() for a request the token guard
+		 *	refused, which counts as the route having asked (as \Nino\Form::blocked() does). What the guard of
+		 *	the workbench does besides - the line "Login", the base texts of a new version, the daily backup -
+		 *	it does not do. deny() writes the answer.
+		 *
+		 *	The workbench checks a right that a panel of its registry names with the rule of that panel
+		 *	(\Nino\Admin\Admin::permitted()), which may let an account in through the door of a tab with a
+		 *	scope(). The public guard asks checkPermission() alone, so it is never looser than the workbench
+		 *	and at times stricter. A fine right is asked behind its door with scoped().
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$request			Current server request
+		 *	@param		string		$perm					The permission the request needs, '' for any signed-in account
+		 *
+		 *	@return 	array|null								null where the request may proceed, else [ 'status' => int, 'error' => string, 'code' => string, 'params' => array ]
+		 */
+		public static function guard( array &$appData, array $request, string $perm = '' ): ?array {
+
+			if( ( $request['/nino/http/response']['statusCode'] ?? 200 ) !== 200 ) {
+
+				if( \Nino\Csrf::blocked( $request ) === true )
+					return self::blockedRefusal( $request );
+
+				return [ 'status' => (int) $request['/nino/http/response']['statusCode'], 'error' => 'the request was refused before the guard was asked', 'code' => 'refused', 'params' => [] ];
+			}
+
+			if( \Nino\Csrf::satisfied( $appData, $request ) === false )
+				return self::blockedRefusal( $request );
+
+			if( self::getCurrentUser( $appData ) === false )
+				return self::sessionRefusal();
+
+			if( $perm !== '' && self::checkPermission( $appData, $perm ) !== true )
+				return [ 'status' => 403, 'error' => 'not allowed', 'code' => 'not_allowed', 'params' => [] ];
+
+			return null;
+		}
+
+		/**
+		 *	Write a refusal of guard() into the response of the request with \Nino\Http::fail(): the status, the
+		 *	sentence, the code and the params. A refusal with the code 'refused' was made by somebody else before
+		 *	the guard was asked, and the answer that stands there stays as it is - where the response is not 200.
+		 *
+		 *	It fails closed: a request it was asked to refuse never looks accepted. A refusal that is not usable -
+		 *	a status that is no int or lies outside 400 to 599, an error that is no string, or 'refused' over a
+		 *	response that is 200 - is answered 500 with a fixed sentence and no code, and a warning is raised for
+		 *	the programmer. A code that is no string is read as '', params that are no array as []
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$refusal			What guard() answered
+		 *
+		 *	@return 	void
+		 */
+		public static function deny( array &$request, array $refusal ): void {
+
+			$status	= $refusal['status'] ?? null;
+			$error	= $refusal['error'] ?? null;
+			$code		= is_string( $refusal['code'] ?? null ) === true ? $refusal['code'] : '';
+			$params	= is_array( $refusal['params'] ?? null ) === true ? $refusal['params'] : [];
+
+			if( $code === 'refused' && ( $request['/nino/http/response']['statusCode'] ?? 200 ) !== 200 )
+				return;
+
+			if( is_int( $status ) === false || $status < 400 || $status > 599 || is_string( $error ) === false || $code === 'refused' ) {
+				trigger_error( 'Auth::deny(): a refusal needs a status from 400 to 599 and an error (string), and \'refused\' only stands for a response that is not 200 - the request is answered 500', E_USER_WARNING );
+				\Nino\Http::fail( $request, 500, 'the refusal of this request could not be written' );
+				return;
+			}
+
+			\Nino\Http::fail( $request, $status, $error, $code, $params );
+		}
+
+		/**
+		 *	The refusal for a request the token guard did not let pass: with a token that is not this
+		 *	session's (403, code 'csrf', the page then asks for the current one and sends the request once more),
+		 *	or with a body that never arrived at all (413, code 'post_too_large', the size php accepts in
+		 *	megabytes as the one param). php drops the whole body of a post above post_max_size, token
+		 *	included, so such a request lacks its token while the cause is its size - and no retry changes that
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	array										[ 'status' => int, 'error' => string, 'code' => string, 'params' => array ]
+		 */
+		public static function blockedRefusal( array $request ): array {
+
+			$length	= $request['/nino/http/request']['header']['Content-Length'] ?? '';
+			$post		= \Nino\Images::limits()['post'];
+
+			if( $post > 0 && is_string( $length ) === true && ctype_digit( $length ) === true && (int) $length > $post )
+				return [ 'status' => 413, 'error' => 'the request is larger than the server accepts (post_max_size)', 'code' => 'post_too_large', 'params' => [ \Nino\Images::megabytes( $post ) ] ];
+
+			return [ 'status' => 403, 'error' => 'the session token is no longer valid - reload the page', 'code' => 'csrf', 'params' => [] ];
+		}
+
+		/**
+		 *	The refusal for a request with no signed-in account: 401 with the code 'session'. A locked or
+		 *	deactivated account, a session that has ended or been revoked has no current user, so it is
+		 *	refused the way no session is. The code is what tells a session that ended from a refusal of
+		 *	somebody who is still signed in - 401 alone does not
+		 *
+		 *	@return 	array										[ 'status' => int, 'error' => string, 'code' => string, 'params' => array ]
+		 */
+		public static function sessionRefusal(): array {
+
+			return [ 'status' => 401, 'error' => 'not logged in', 'code' => 'session', 'params' => [] ];
+		}
+
+		/**
 		 *	Take the lock of config.php and make the accounts it holds the accounts of this request and the baseline they are
 		 *	merged against with (see \Nino\AppData::writeContentData()): what the request writes after it is what config.php holds plus
 		 *	the one change it makes, and what it decides is decided against what config.php holds. The first read under the lock

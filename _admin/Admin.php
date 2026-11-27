@@ -632,15 +632,7 @@ namespace Nino\Admin {
 		 */
 		public static function failBlocked( array &$request ): void {
 
-			$length	= $request['/nino/http/request']['header']['Content-Length'] ?? '';
-			$post		= \Nino\Images::limits()['post'];
-
-			if( $post > 0 && is_string( $length ) === true && ctype_digit( $length ) === true && (int) $length > $post ) {
-				\Nino\Http::fail( $request, 413, 'the request is larger than the server accepts (post_max_size)', 'post_too_large', [ self::megabytes( $post ) ] );
-				return;
-			}
-
-			\Nino\Http::fail( $request, 403, 'the session token is no longer valid - reload the page', 'csrf' );
+			\Nino\Auth::deny( $request, \Nino\Auth::blockedRefusal( $request ) );
 		}
 
 		/**
@@ -782,7 +774,7 @@ namespace Nino\Admin {
 			// somebody who is still signed in (see Nino.adminUi.api) - 401 alone
 			// does not, the Users panel answers one for a wrong password
 			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
-				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+				\Nino\Auth::deny( $request, \Nino\Auth::sessionRefusal() );
 				return false;
 			}
 
@@ -971,27 +963,8 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Scoped permissions - the finer half of the permission model.
-		 *
-		 *	A panel's own permission ('/_admin/elements/manage') is a door: it
-		 *	says the account may work in that panel at all, and guardPerm()
-		 *	above is where it is checked. A scoped permission describes what
-		 *	the account may do once inside - '/_admin/elements/services/insert',
-		 *	'/_admin/elements/services/update/title',
-		 *	'/_admin/text/update/template/page-home/hero/title'. Both kinds are ordinary
-		 *	strings checked with the same \Nino\Auth::checkPermission(), so
-		 *	'/_admin/elements/services/*' covers every action on that type and
-		 *	'/_admin/text/update/template/page-home/*' every key of that template, without
-		 *	this file knowing anything about types, fields or keys.
-		 *
-		 *	Enforcement is opt-in per account, and deliberately so. An account
-		 *	that holds no scoped permission for a panel keeps exactly what the
-		 *	panel permission has always meant - all of it. The other way round,
-		 *	every role in every existing installation would have lost write
-		 *	access on the day this arrived, silently. Giving a role its first
-		 *	scoped permission for a panel is what says "describe this one in
-		 *	detail"; from then on that panel allows what the role names and
-		 *	nothing else.
+		 *	Scoped permissions, the finer half of the permission model: \Nino\Auth::scoped(), where the
+		 *	rule and its reasons are written
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$prefix				The panel's scope, with its slash (eg. '/_admin/elements/')
@@ -1001,22 +974,11 @@ namespace Nino\Admin {
 		 */
 		public static function scoped( array &$appData, string $prefix, string $perm ): bool {
 
-			if( self::isScoped( $appData, $prefix ) === false )
-				return true;
-
-			return \Nino\Auth::checkPermission( $appData, $perm );
+			return \Nino\Auth::scoped( $appData, $prefix, $perm );
 		}
 
 		/**
-		 *	Whether this account is described in detail for a panel - ie.
-		 *	holds at least one permission naming a single action inside it,
-		 *	rather than only the door or a blanket over the whole panel.
-		 *
-		 *	'/_admin/elements/manage' is the door and '/_admin/elements/*' the
-		 *	blanket: neither names an action, so neither switches the panel
-		 *	into described-in-detail mode. '/_admin/elements/services/insert'
-		 *	does, and so does '/_admin/elements/services/*' - a role limited
-		 *	to one type is still a role that was described.
+		 *	Whether this account is described in detail for a panel: \Nino\Auth::isScoped()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$prefix				The panel's scope, with its slash
@@ -1025,19 +987,11 @@ namespace Nino\Admin {
 		 */
 		public static function isScoped( array &$appData, string $prefix ): bool {
 
-			$user = \Nino\Auth::getCurrentUser( $appData );
-
-			if( $user === false )
-				return false;
-
-			return self::isDescribed( \Nino\Auth::permissions( $appData, $user ), $prefix );
+			return \Nino\Auth::isScoped( $appData, $prefix );
 		}
 
 		/**
-		 *	Whether a list of permissions describes a panel in detail - the
-		 *	test isScoped() makes of the current account, asked of any list, so
-		 *	that a role that is about to be saved is measured by the very
-		 *	definition the guards enforce (see \Nino\Modules\Users\Roles::notHeld())
+		 *	Whether a list of permissions describes a panel in detail: \Nino\Auth::isDescribed()
 		 *
 		 *	@param		array 		$perms				Permission strings
 		 *	@param		string		$prefix				The panel's scope, with its slash
@@ -1046,20 +1000,7 @@ namespace Nino\Admin {
 		 */
 		public static function isDescribed( array $perms, string $prefix ): bool {
 
-			foreach( $perms as $held ) {
-
-				if( is_string( $held ) === false || str_starts_with( $held, $prefix ) === false )
-					continue;
-
-				$rest = substr( $held, strlen( $prefix ) );
-
-				if( $rest === '*' || str_contains( $rest, '/' ) === false )
-					continue;
-
-				return true;
-			}
-
-			return false;
+			return \Nino\Auth::isDescribed( $perms, $prefix );
 		}
 
 		/**
@@ -1494,8 +1435,7 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	A size in bytes as the megabytes a sentence names: whole where it
-		 *	is whole (8), one decimal where it is not (0.5)
+		 *	A size in bytes as the megabytes a sentence names: \Nino\Images::megabytes()
 		 *
 		 *	@param		int				$bytes
 		 *
@@ -1503,9 +1443,7 @@ namespace Nino\Admin {
 		 */
 		public static function megabytes( int $bytes ): int|float {
 
-			$megabytes = round( $bytes / 1048576, 1 );
-
-			return $megabytes === floor( $megabytes ) ? (int) $megabytes : $megabytes;
+			return \Nino\Images::megabytes( $bytes );
 		}
 
 		/**

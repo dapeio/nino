@@ -1532,7 +1532,7 @@ Additionally, the handler should:
 
 - strictly limit method and expected input format,
 - limit input lengths before expensive processing,
-- check permissions with `Auth::checkPermission()`,
+- check permissions with `Auth::checkPermission()` (a handler for a signed-in account of the workbench asks `\Nino\Auth::guard()` and has a session and a token; a webhook has neither and proves itself by its signature),
 - not return internal error messages or file paths to clients,
 - and provide a project-related rate limit for sensitive actions.
 
