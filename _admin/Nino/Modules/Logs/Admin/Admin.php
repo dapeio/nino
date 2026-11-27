@@ -17,7 +17,9 @@ namespace Nino\Modules\Logs {
 	 *											Backup - see that class' docblock for why) audit trail
 	 *											of admin actions: who logged in, and every save/delete
 	 *											that changed something. One line per event, appended to
-	 *											the current day's file. Every line comes in through
+	 *											the current day's file by \Nino\Activity, the writer a
+	 *											feature outside the workbench reaches as well. Every line
+	 *											of the workbench comes in through
 	 *											\Nino\Admin\Admin::record(): one per successfully-dispatched
 	 *											mutating action (its _logAction()), one per login (its
 	 *											_logLoginOnce()), and those a panel records itself - a backup
@@ -72,17 +74,18 @@ namespace Nino\Modules\Logs {
 			return \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' );
 		}
 
-		// Under the private directory, not in this tool's own folder: a tool
-		// folder holding runtime state cannot be replaced independently.
-		private const string LOGS_DIR = \Nino\Filesystem::CONTENT_DIR. '/.logs';
-
-		private const int RETENTION_DAYS = 14;
+		// Where the day's files are: the writer's directory, \Nino\Activity
+		private const string LOGS_DIR = \Nino\Activity::LOGS_DIR;
 
 		/**
 		 *	Append one line to today's log file, then prune anything past
-		 *	RETENTION_DAYS. Failures are logged, never thrown - an audit
+		 *	the retention. Failures are logged, never thrown - an audit
 		 *	trail is a nice-to-have, it must never break the admin action
-		 *	it's recording
+		 *	it's recording. The writer is \Nino\Activity::write(), which a
+		 *	request outside the workbench reaches as well: it cleans both fields
+		 *	(one line, the three fields kept, 300 characters for the message and
+		 *	254 for the actor) and writes no line for a field that is not valid
+		 *	UTF-8 or is empty
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$actor				The acting user's mail
@@ -92,69 +95,7 @@ namespace Nino\Modules\Logs {
 		 */
 		public static function record( array &$appData, string $actor, string $message ): void {
 
-			if( ( $appData['/nino/admin/logs'] ?? true ) === false )
-				return;
-
-			try {
-
-				$relPath = self::LOGS_DIR. '/'. date( 'Y-m-d' ). '.php';
-
-				\Nino\Filesystem::forceDir( $appData, self::LOGS_DIR );
-
-				$dir 	= self::_logDir( $appData );
-				$path = $dir. '/'. date( 'Y-m-d' ). '.php';
-
-				// Locked directly, not via Filesystem::mutate(): this file is
-				// base64+stub encoded, not the plain array format getFileContent()/
-				// putFileContent() know how to read - but two concurrent admin
-				// actions still need to not both read the same line list and each
-				// overwrite the other's append
-				if( \Nino\Filesystem::lockFile( $appData, $relPath ) === false )
-					return;
-
-				/*	Released whichever way the write goes: a throw between the
-					lock and the unlock left the handle held for the rest of the
-					request. And written beside the file and renamed over it,
-					through the shell's writer, rather than in place with
-					file_put_contents(): that left a reader a truncated file for
-					the duration of the write, and a target that could not be
-					written - a directory in its place, a permission, a full
-					disk - raised php's own warning, which the framework's
-					handler ends the request on. The action being logged died
-					in its log line; now the line is what is lost, and the
-					catch below says so	*/
-				try {
-					$lines 	 = is_file( $path ) === true ? self::_readLines( $path ) : [];
-					// One entry is one line, whatever was posted: a template name or
-					// a type uri reaches the message verbatim, and a line break in it
-					// would write a second line - dated, attributed to any account,
-					// saying anything. An audit log that can be told what to say is
-					// not one
-					$lines[] = date( 'Y-m-d H:i' ). '  '. self::_oneLine( $actor ). '  '. self::_oneLine( $message );
-
-					if( \Nino\Admin\Admin::writeFileAtomic( $path, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). \Nino\Admin\Recovery::STUB_SUFFIX ) === false )
-						throw new \RuntimeException( 'the day\'s file could not be written: '. basename( $path ) );
-				}
-				finally {
-					\Nino\Filesystem::unlockFile( $appData, $relPath );
-				}
-
-				self::_prune( $dir );
-
-			} catch( \Throwable $e ) {
-				trigger_error( 'Activity log write failed: '. $e->getMessage() );
-			}
-		}
-
-		/**
-		 *	Collapse line breaks and control characters to one space
-		 *
-		 *	@param		string		$text
-		 *
-		 *	@return 	string
-		 */
-		private static function _oneLine( string $text ): string {
-			return trim( (string) preg_replace( '/[\x00-\x1F\x7F]+/', ' ', $text ) );
+			\Nino\Activity::write( $appData, $actor, $message );
 		}
 
 		/**
@@ -308,22 +249,6 @@ namespace Nino\Modules\Logs {
 			$decoded = base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
 
 			return $decoded === '' ? [] : explode( "\n", $decoded );
-		}
-
-		/**
-		 *	Delete dated log files older than RETENTION_DAYS - same
-		 *	basename-must-match-a-plain-date guard as \Nino\Modules\Backups::_prune(), so
-		 *	nothing other than a "Y-m-d.php" file is ever considered
-		 *
-		 *	@param		string		$dir					Absolute path to the log directory
-		 *
-		 *	@return 	void
-		 */
-		private static function _prune( string $dir ): void {
-
-			$cutoff = ( new \DateTime( '-'. self::RETENTION_DAYS. ' days' ) )->setTime( 0, 0 );
-
-			\Nino\RotatingLog::prune( $dir, '', 'Y-m-d', '.php', $cutoff );
 		}
 	}
 }

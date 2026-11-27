@@ -904,6 +904,31 @@ namespace Nino {
 		}
 
 		/**
+		 *	One posted value as a string. The payload is untrusted json, so a
+		 *	field that should hold a string may hold anything: a string is
+		 *	itself, a whole or a decimal number is its text, and an array, a
+		 *	bool, null or a key that is not there is $default. Never a cast: the
+		 *	cast of an array raises "Array to string conversion", a level the
+		 *	runtime treats as fatal - a 500 for a payload one line long. Not
+		 *	trimmed, which is the caller's to do where it wants it.
+		 *
+		 *	@param		array 		$data					The decoded payload: \Nino\Admin\Admin::postData() in the workbench, the body a surface outside it decoded itself
+		 *	@param		string		$key
+		 *	@param		string		$default			Answered for anything that is neither a string nor a number
+		 *
+		 *	@return 	string
+		 */
+		public static function string( array $data, string $key, string $default = '' ): string {
+
+			$value = $data[$key] ?? null;
+
+			if( is_string( $value ) === true )
+				return $value;
+
+			return is_int( $value ) === true || is_float( $value ) === true ? (string) $value : $default;
+		}
+
+		/**
 		 *	Answer the bytes of a file as a download: an attachment the browser saves under a name, which nothing draws - the body is not read for
 		 *	calls or fills, whatever it holds (a csv or a page of html that is a document of the project is a document, not a template). Sets the
 		 *	status 200, Content-Type, Content-Disposition: attachment, X-Content-Type-Options: nosniff, Cache-Control: private, no-store and

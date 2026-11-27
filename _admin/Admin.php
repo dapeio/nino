@@ -740,7 +740,11 @@ namespace Nino\Admin {
 		 *	shell asks rather than assumes: without it the workbench keeps
 		 *	working and records nothing. class_exists() is what asks - it
 		 *	runs the autoloader, so a present module answers true without
-		 *	anything here naming a file.
+		 *	anything here naming a file. The line is cleaned by
+		 *	\Nino\Activity::write() whoever writes it: one line, the
+		 *	three fields kept, 300 characters for the message and 254 for the
+		 *	actor, nothing written for a field that is not valid UTF-8 or is
+		 *	empty.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$actor				Who did it - an account's mail address
@@ -1340,13 +1344,8 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	One posted value as a string. The payload is untrusted json, so a
-		 *	field that should hold a string may hold anything: a string is
-		 *	itself, a whole or a decimal number is its text, and an array, a
-		 *	bool, null or a key that is not there is $default. Never a cast: the
-		 *	cast of an array raises "Array to string conversion", a level the
-		 *	runtime treats as fatal - a 500 for a payload one line long. Not
-		 *	trimmed, which is the caller's to do where it wants it.
+		 *	One posted value as a string, never a cast: \Nino\Http::string(), which
+		 *	a surface outside the workbench calls on the body it decoded itself
 		 *
 		 *	@param		array 		$data					The posted payload, see postData()
 		 *	@param		string		$key
@@ -1356,12 +1355,7 @@ namespace Nino\Admin {
 		 */
 		public static function postString( array $data, string $key, string $default = '' ): string {
 
-			$value = $data[$key] ?? null;
-
-			if( is_string( $value ) === true )
-				return $value;
-
-			return is_int( $value ) === true || is_float( $value ) === true ? (string) $value : $default;
+			return \Nino\Http::string( $data, $key, $default );
 		}
 
 		/**

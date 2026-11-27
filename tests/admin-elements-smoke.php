@@ -1430,8 +1430,20 @@ check( '...the whole value stays on the one line, attributed to who wrote it', c
 	written into the body echoed as the empty string. The panel read that
 	empty 200 as a success with nothing in it, showed a blank list, and said
 	nothing - for every later opening too, until somebody edited the file by
-	hand. _oneLine() strips control characters, not malformed utf-8	*/
+	hand. The writer (\Nino\Activity) writes no line for a value that is not
+	valid utf-8	*/
+ninoWarnings();
 \Nino\Modules\Logs\Admin::record( $appData, 'editor@example.com', "Saved element \"Gru\xdfe\"" );
+check( 'a value with one malformed byte writes no line, and says so as a notice', count( array_filter( \Nino\Modules\Logs\Admin::recentLines( $appData, 500 ), static fn( $l ): bool => str_contains( is_array( $l ) ? implode( ' ', $l ) : (string) $l, 'Saved element "Gru' ) ) ) === 0
+	&& count( array_filter( ninoWarnings(), static fn( string $w ): bool => str_starts_with( $w, 'Activity log write failed: ' ) ) ) === 1 );
+
+// What a file written by an older kernel holds: the line with the malformed byte is in the day's file, in the file's own format
+$plantedPath	= \Nino\Filesystem::path( $appData, \Nino\Activity::LOGS_DIR. '/'. date( 'Y-m-d' ). '.php' );
+$plantedRaw		= is_file( $plantedPath ) === true ? (string) file_get_contents( $plantedPath ) : '';
+$plantedLines	= $plantedRaw === '' ? [] : explode( "\n", (string) base64_decode( substr( $plantedRaw, strlen( \Nino\Backup\Seal::STUB_PREFIX ), -strlen( \Nino\Backup\Seal::STUB_SUFFIX ) ) ) );
+$plantedLines[] = date( 'Y-m-d H:i' ). "  editor@example.com  Saved element \"Gru\xdfe\"";
+file_put_contents( $plantedPath, \Nino\Backup\Seal::STUB_PREFIX. base64_encode( implode( "\n", $plantedLines ) ). \Nino\Backup\Seal::STUB_SUFFIX );
+check( 'the planted line is in the file, malformed byte and all', str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 500 ) ), "Saved element \"Gru\xdfe\"" ) );
 
 $finalizeLogResponse = new ReflectionMethod( '\Nino\Http', '_finalizeResponse' );
 $finalizeLogResponse->setAccessible( true );
