@@ -334,7 +334,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	string|array						The new archive's id ("Y-m-d-His-manual"), or [ http status, message ] - and, where a write failed, the code the panel words it by as a third element
+		 *	@return 	string|array						The new archive's id ("Y-m-d-His-manual"), or [ http status, message ] - and, where a write failed, a file could not be read or the archives are named by a later time than the clock says, the code the panel words it by as a third element
 		 */
 		public static function now( array &$appData ): string|array {
 
@@ -356,7 +356,13 @@ namespace Nino\Modules {
 				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
 
 				$dir 		= self::dir( $appData );
-				$id 		= date( 'Y-m-d-His' ). self::MANUAL_SUFFIX;
+
+				// An id is taken once: where an archive of this second exists - one made by hand a moment ago - the run waits for the next second (see freeId())
+				$id 		= self::freeId( $dir, '', self::MANUAL_SUFFIX );
+
+				if( $id === null )
+					return [ 409, 'the archives carry a later time than the clock of the server', 'backups_clock' ];
+
 				$run 		= self::_begin( $dir, 'manual', ( $appData['./nino/backups/answer'] ?? PHP_SAPI !== 'cli' ) === true );
 				$cause 	= null;
 
@@ -384,6 +390,10 @@ namespace Nino\Modules {
 				// A feature that could not hand over the copy of its data: named by the run, in the sentence of the panel as well
 				if( $e->getCode() === \Nino\Backup::HOOK_FAILED && $run instanceof \stdClass && $run->hook !== '' )
 					return [ 500, $e->getMessage(), 'backups_hook', [ $run->hook ] ];
+
+				// The name of the archive was taken by one that is there, which only happens where something else than a run put it there: as a run that goes on
+				if( get_class( $e ) === \RuntimeException::class && $e->getCode() === \Nino\Backup::NAME_TAKEN )
+					return [ 409, 'a backup or a restore is running', 'backups_busy' ];
 
 				// A file of the project that could not be read, or that changed while it was packed: named in the sentence of the panel
 				if( self::_code( $e ) === 'source' )
@@ -1024,7 +1034,7 @@ namespace Nino\Modules {
 			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar, $notes );
 
 			// Sealed chunk by chunk while it is written, to a file beside the archive that a rename makes one
-			self::_writeRawAtomic( $path, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ), $run );
+			self::publish( $path, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ), $run );
 
 			@unlink( $tmpTar. '.gz' );
 		}
@@ -1044,15 +1054,69 @@ namespace Nino\Modules {
 					@unlink( $dir. '/'. $name );
 		}
 
+		/**
+		 *	Put an archive in its place: written under a name of its own and linked to its name, which fails where the name is taken - an archive is never
+		 *	replaced by another, as a rename over it would - and the name of the file is let go. A run that ends in the middle of it leaves no archive, and the file it
+		 *	leaves is the one a run's shutdown removes ($run) or the next run of the day sweeps. Under the lock of the daily run and of a restore, which is what
+		 *	makes the name free for as long as the run lasts; where the file system makes no links, the file is renamed to a name that is free
+		 *
+		 *	@param		string		$path					Absolute path of the archive
+		 *	@param		string|iterable	$content		The bytes, or the pieces of them in order (see \Nino\Backup\Seal::pieces())
+		 *	@param		\stdClass|null	$run				The run this is part of, see _begin()
+		 *
+		 *	@return 	void
+		 *
+		 *	@throws		\RuntimeException					WRITE_FAILED where the archive cannot be written or its name is a folder or a link, NAME_TAKEN where an archive of the name is there
+		 */
+		public static function publish( string $path, string|iterable $content, ?\stdClass $run = null ): void {
+
+			self::_writeRawAtomic( $path, $content, $run, false );
+		}
+
+		/**
+		 *	The id an archive made by hand or a safety snapshot is to have: the date and the time of this second, behind $prefix and before $suffix, which no archive of
+		 *	the directory has. Where one has - another a moment ago - the next second is waited for, for as long as two seconds in all: the ids of the archives are
+		 *	their seconds, and the patterns that name them have no room for more. Under the lock of the daily run and of a restore, which makes the id the run's
+		 *
+		 *	@param		string		$dir					Absolute path to the backup directory
+		 *	@param		string		$prefix				What the id begins with, eg. 'pre-restore-'
+		 *	@param		string		$suffix				What it ends with, eg. self::MANUAL_SUFFIX
+		 *
+		 *	@return 	string|null							The id, null where the next two seconds are taken as well, which only archives named by a later time than the clock says can do (backups_clock)
+		 */
+		public static function freeId( string $dir, string $prefix, string $suffix ): ?string {
+
+			$until = microtime( true ) + 2.0;
+
+			while( true ) {
+
+				$id = $prefix. date( 'Y-m-d-His' ). $suffix;
+
+				clearstatcache( true, $dir. '/'. $id. '.php' );
+
+				// What is no file - a folder, a link to nothing - is no archive that a second is to be waited for: the archive cannot be put there, and says so (see publish())
+				if( is_file( $dir. '/'. $id. '.php' ) === false )
+					return $id;
+
+				$next = floor( microtime( true ) ) + 1;
+
+				if( $next > $until )
+					return null;
+
+				usleep( (int) max( 1000, ( $next - microtime( true ) ) * 1000000 + 2000 ) );
+			}
+		}
+
 		// Raw (non-serialized) counterpart to Filesystem's atomic writer. Backup
 		// blobs and the restore-key stub are valid PHP source strings already;
 		// passing either through putFileContent() would var_export them instead.
 		// The content is a string or the pieces of one, in order, so an archive
 		// need not exist as a single string next to its parts. The file is written
-		// under a name of its own and renamed: a run that ends in the middle of it
-		// leaves no archive, and the file it leaves is the one a run's shutdown
-		// removes ($run) or the next run of the day sweeps
-		private static function _writeRawAtomic( string $path, string|iterable $content, ?\stdClass $run = null ): void {
+		// under a name of its own and renamed - or, for an archive, linked to its name
+		// where nothing of that name may be there (see publish()): a run that ends in
+		// the middle of it leaves no archive, and the file it leaves is the one a run's
+		// shutdown removes ($run) or the next run of the day sweeps
+		private static function _writeRawAtomic( string $path, string|iterable $content, ?\stdClass $run = null, bool $replace = true ): void {
 
 			$temp = $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
 			$handle = @fopen( $temp, 'wb' );
@@ -1093,8 +1157,21 @@ namespace Nino\Modules {
 				if( $mode !== false )
 					@chmod( $temp, $mode & 0777 );
 
-				if( @rename( $temp, $path ) === false )
-					throw new \RuntimeException( 'file could not be replaced: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
+				if( $replace === true ) {
+
+					if( @rename( $temp, $path ) === false )
+						throw new \RuntimeException( 'file could not be replaced: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
+				}
+				else {
+
+					// link() refuses a name that is there, atomically; the name of the file is then let go, and it is the archive's name that is left
+					if( @link( $temp, $path ) === true )
+						@unlink( $temp );
+					elseif( is_file( $path ) === true )
+						throw new \RuntimeException( 'an archive of that name is there: '. basename( $path ), \Nino\Backup::NAME_TAKEN );
+					elseif( @lstat( $path ) !== false || @rename( $temp, $path ) === false )
+						throw new \RuntimeException( 'file could not be put in its place: '. basename( $path ), \Nino\Backup::WRITE_FAILED );
+				}
 
 				if( $run !== null )
 					$run->partial = '';

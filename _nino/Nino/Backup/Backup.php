@@ -56,6 +56,10 @@ namespace Nino {
 		// file of a writer of the kernel (see leavable()). The panel words it with the name of the file (see sourceName())
 		public const int SOURCE_FAILED = 4;
 
+		// The code of the RuntimeException that says the name an archive is to have is taken by an archive that is there: one is never put in the place of another
+		// (see \Nino\Modules\Backups::publish()), and the run answers as it does for a run that is going on, for it is a matter of the next second
+		public const int NAME_TAKEN = 5;
+
 		// The hook a feature answers before its files are packed (see stage()), the counterpart of '/nino/admin/restore'
 		public const string HOOK = '/nino/admin/backup';
 

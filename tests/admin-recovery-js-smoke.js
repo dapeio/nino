@@ -238,6 +238,13 @@ check( 'a restore whose safety copy could not be made for a file that could not 
 	statusLine() === Nino.recovery.text.de['/_admin/page/error/backups-source'] && statusLine().includes( '%s' ) === false && statusLine().includes( 'notes.php' ) === false
 	&& String( Nino.recovery.text.en['/_admin/page/error/backups-source'] ?? '' ).length > 20 && String( Nino.recovery.text.en['/_admin/page/error/backups-source'] ).includes( '%s' ) === false );
 
+// Archives that carry a later time than the clock: no free second to name the safety copy by, said in words of their own
+fire( restoreButton, 'click', { currentTarget : restoreButton } );
+fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
+answer( 'recovery/restore', 409, { error : 'the archives carry a later time than the clock of the server', code : 'backups_clock' } );
+check( 'a restore that finds the archives named by a later time than the clock says so in the sentence of the table, in both languages, and not as a run that goes on',
+	statusLine() === Nino.recovery.text.de['/_admin/page/error/backups-clock'] && statusLine() !== Nino.recovery.text.de['/_admin/page/error/backups-busy'] && String( Nino.recovery.text.en['/_admin/page/error/backups-clock'] ?? '' ).length > 20 && String( Nino.recovery.text.en['/_admin/page/error/backups-clock'] ).includes( '%s' ) === false );
+
 // The key of an archive of another project: typed once, sent with the restore of the row, said at its own field
 const key = 'A'.repeat( 43 )+ '=';
 // What is looked for is the secret itself, as it is typed and as an address would carry it

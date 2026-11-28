@@ -1063,6 +1063,15 @@ namespace Nino\Modules\Backups {
 				// What an earlier restore that php ended left beside the files (see _sweepBeside()) is taken away before anything is made or packed
 				self::_sweepBeside( $appData, $staging, $began );
 
+				// The id of the safety snapshot is taken here, with its wait for the next second where a snapshot of this one is there - a restore a moment ago -,
+				// before a lock of a writer is held: the writers are not kept waiting for it. The restore's own lock is held, which no other producer of an archive
+				// takes a name under, and the link that puts the snapshot in its place refuses a name that has been taken meanwhile. The state before that restore is
+				// kept by an archive of its own
+				$name = \Nino\Modules\Backups::freeId( $dir, 'pre-restore-', '' );
+
+				if( $name === null )
+					return [ 409, 'the archives carry a later time than the clock of the server', 'backups_clock' ];
+
 				// The files that a writer reads, changes and writes back go back under the locks their writers take (see \Nino\Backup::lockPath() and
 				// lockFiles()), all of them held before the first byte is put back and before the snapshot - as many as the limit of open files lets the
 				// restore hold (see \Nino\Backup::locksHeld()), the rest one at a time as each file is put back. A writer that waits for one of them reads
@@ -1080,7 +1089,7 @@ namespace Nino\Modules\Backups {
 				$raw			= [];
 
 				try {
-					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key, $hook, $short, $raw );
+					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key, $name, $hook, $short, $raw );
 				}
 				catch( \RuntimeException $e ) {
 
@@ -1090,6 +1099,10 @@ namespace Nino\Modules\Backups {
 
 					if( $e->getCode() === \Nino\Backup::HOOK_FAILED && $hook !== '' )
 						return [ 500, 'the safety snapshot could not be made: '. $e->getMessage(), 'backups_hook', [ $hook ] ];
+
+					// A snapshot of the name was made meanwhile: the restore has not begun, and answers as it does for a run that goes on
+					if( $e->getCode() === \Nino\Backup::NAME_TAKEN )
+						return [ 409, 'a backup or a restore is running', 'backups_busy' ];
 
 					// A file of the project that could not be read, or that changed while the snapshot was packed: named in the answer and in the log, and the restore has not begun
 					if( \Nino\Backup::sourceName( $e ) !== null ) {
@@ -1645,13 +1658,14 @@ namespace Nino\Modules\Backups {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$key					Raw (not base64) 32-byte AES key
+		 *	@param		string		$name					The id of the snapshot, 'pre-restore-Y-m-d-His', taken before the locks of the writers (see \Nino\Modules\Backups::freeId())
 		 *	@param		string		&$hook				(reference) The key of the feature that was asked for a copy of its data last, '' once none is being asked (see \Nino\Backup::stage())
 		 *	@param		array 		&$short				(reference) Set where the copies the features handed over left the disk without the room for the packing: [ megabytes needed, megabytes free ]
 		 *	@param		array 		&$raw					(reference) The keys of the features whose files the snapshot holds as they lie, because their hook could not hand over a copy
 		 *
 		 *	@return 	string									The id of the snapshot, as the list names it
 		 */
-		private static function _safetySnapshot( array &$appData, string $dir, string $key, string &$hook = '', array &$short = [], array &$raw = [] ): string {
+		private static function _safetySnapshot( array &$appData, string $dir, string $key, string $name, string &$hook = '', array &$short = [], array &$raw = [] ): string {
 
 			/*	The shape Backups::_create() has, which this had drifted from:
 				the file tempnam() makes was never removed - one per restore,
@@ -1720,12 +1734,12 @@ namespace Nino\Modules\Backups {
 
 				\Nino\Backup::pack( $appData, $manifest, $tmpTar, $notes );
 
-				$snapshot	= $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php';
+				$snapshot	= $dir. '/'. $name. '.php';
 
-				// Sealed in chunks as it is written, and renamed into place like a
-				// backup itself: a snapshot the list offers is a whole one or none
-				if( \Nino\Admin\Admin::writeFileAtomic( $snapshot, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ) ) === false )
-					throw new \RuntimeException( 'the snapshot could not be written', \Nino\Backup::WRITE_FAILED );
+				// Sealed in chunks as it is written, and put into place like a backup
+				// itself, which never replaces an archive of the name: a snapshot the list
+				// offers is a whole one or none
+				\Nino\Modules\Backups::publish( $snapshot, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ) );
 			}
 			finally {
 				@unlink( $tmpTar );

@@ -102,7 +102,7 @@ $second = \Nino\Modules\Backups::now( $appData );
 $appData['/nino/admin/backups-manual'] = 3;
 
 check( 'the retention counts it with the ones made by hand: with one kept, a new one deletes the older name and the older one with the mark', is_string( $second ) === true
-	&& is_file( $dir. '/'. $legacy. '.php' ) === false && ( $second === $id ? true : is_file( $dir. '/'. $id. '.php' ) === false ) && is_file( $dir. '/'. $second. '.php' ) === true && is_file( $dir. '/'. $today. '.php' ) === true );
+	&& is_file( $dir. '/'. $legacy. '.php' ) === false && $second !== $id && is_file( $dir. '/'. $id. '.php' ) === false && is_file( $dir. '/'. $second. '.php' ) === true && is_file( $dir. '/'. $today. '.php' ) === true );
 
 // The same second, the two names: the mark decides nothing about age
 copy( $dir. '/'. $second. '.php', $dir. '/'. substr( $second, 0, 17 ). '.php' );
