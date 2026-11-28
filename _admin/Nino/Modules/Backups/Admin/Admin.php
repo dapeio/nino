@@ -1091,6 +1091,14 @@ namespace Nino\Modules\Backups {
 					if( $e->getCode() === \Nino\Backup::HOOK_FAILED && $hook !== '' )
 						return [ 500, 'the safety snapshot could not be made: '. $e->getMessage(), 'backups_hook', [ $hook ] ];
 
+					// A file of the project that could not be read, or that changed while the snapshot was packed: named in the answer and in the log, and the restore has not begun
+					if( \Nino\Backup::sourceName( $e ) !== null ) {
+
+						trigger_error( 'Restore: the safety snapshot could not be made: '. $e->getMessage(), E_USER_WARNING );
+
+						return [ 500, 'the safety snapshot could not be made: '. $e->getMessage(), 'backups_source', [ (string) \Nino\Backup::sourceName( $e ) ] ];
+					}
+
 					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ] + ( $e->getCode() === \Nino\Backup::WRITE_FAILED ? [ 2 => 'backups_write' ] : [] );
 				}
 
@@ -1655,7 +1663,7 @@ namespace Nino\Modules\Backups {
 				it touches anything	*/
 			$temp = \Nino\Backup::tempFile( $appData, 'snapshot' );
 			if( $temp === false )
-				throw new \RuntimeException( 'the temporary snapshot file could not be created' );
+				throw new \RuntimeException( 'the temporary snapshot file could not be created', \Nino\Backup::WRITE_FAILED );
 
 			[ $tmpBase, $lease ] = $temp;
 
@@ -1692,7 +1700,8 @@ namespace Nino\Modules\Backups {
 					$notes['raw']		= array_fill_keys( $notes['asked'], 'the disk had no room for the copies' );
 					$notes['copies']	= [];
 					$notes['links']		= [];
-					$manifest 				= \Nino\Backup::raw( $appData, $whole, $notes['asked'], $notes['links'] );
+					$notes['companions'] = [];
+					$manifest 				= \Nino\Backup::raw( $appData, $whole, $notes['asked'], $notes['links'], $notes['companions'] );
 					$bytes 						= 0;
 
 					foreach( array_keys( $manifest ) as $absolute )
@@ -1716,7 +1725,7 @@ namespace Nino\Modules\Backups {
 				// Sealed in chunks as it is written, and renamed into place like a
 				// backup itself: a snapshot the list offers is a whole one or none
 				if( \Nino\Admin\Admin::writeFileAtomic( $snapshot, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ) ) === false )
-					throw new \RuntimeException( 'the snapshot could not be written' );
+					throw new \RuntimeException( 'the snapshot could not be written', \Nino\Backup::WRITE_FAILED );
 			}
 			finally {
 				@unlink( $tmpTar );

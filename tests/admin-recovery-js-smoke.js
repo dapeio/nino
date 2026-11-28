@@ -230,6 +230,14 @@ const statusLine = () => findAll( byId('recovery-restore'), el => el.className.i
 		&& fill( Nino.recovery.text.en['/_admin/page/error/'+ name] ).includes( '%s' ) === false && String( Nino.recovery.text.en['/_admin/page/error/'+ name] ?? '' ).includes( '%s' ) === true );
 } );
 
+// A safety copy that could not be made for a file that could not be read: its own sentence, which names no file - a page of this table takes no path - and says where the name is
+fire( restoreButton, 'click', { currentTarget : restoreButton } );
+fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
+answer( 'recovery/restore', 500, { error : 'the safety snapshot could not be made', code : 'backups_source', params : [ 'data/ledger/notes.php' ] } );
+check( 'a restore whose safety copy could not be made for a file that could not be read says so in the sentence of the table, in both languages, and nothing of the answer but that',
+	statusLine() === Nino.recovery.text.de['/_admin/page/error/backups-source'] && statusLine().includes( '%s' ) === false && statusLine().includes( 'notes.php' ) === false
+	&& String( Nino.recovery.text.en['/_admin/page/error/backups-source'] ?? '' ).length > 20 && String( Nino.recovery.text.en['/_admin/page/error/backups-source'] ).includes( '%s' ) === false );
+
 // The key of an archive of another project: typed once, sent with the restore of the row, said at its own field
 const key = 'A'.repeat( 43 )+ '=';
 // What is looked for is the secret itself, as it is typed and as an address would carry it

@@ -88,9 +88,24 @@ if( ( $argv[1] ?? '' ) === 'daily-backup' || ( $argv[1] ?? '' ) === 'daily-backu
 			class_exists( $read );
 		\Nino\Features::all( $appData );
 
-		$squeeze = memory_get_usage( true ) + 1048576;
-		ini_set( 'memory_limit', (string) $squeeze );
-		echo 'limit='. $squeeze. "\n";
+		// The limit is taken where the packing begins - the run has made its note and counted what it packs by then - and it is what php holds at that moment: php
+		// counts in blocks of two megabytes, and how much of the last block is free is a matter of how much code was read before, which differs with the features
+		// of the project. So what is free of the blocks is taken first, down to a rest too small for a megabyte of the archive, and the first piece the packing
+		// reads is the end of the request - on a project with no feature as on one with forty
+		\Nino\Backup::$packing = static function() use ( &$filled ): void {
+
+			if( $filled !== null )
+				return;
+
+			$filled = [];
+
+			while( memory_get_usage( true ) - memory_get_usage() > 262144 && count( $filled ) < 4096 )
+				$filled[] = str_repeat( ' ', 32768 );
+
+			$squeeze = memory_get_usage( true );
+			ini_set( 'memory_limit', (string) $squeeze );
+			echo 'limit='. $squeeze. "\n";
+		};
 	}
 
 	\Nino\Modules\Backups::maybeRun( $appData );

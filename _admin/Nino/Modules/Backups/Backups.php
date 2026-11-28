@@ -262,11 +262,26 @@ namespace Nino\Modules {
 				// archive missing all the same and die the same way - the
 				// workbench would be out of reach until somebody fixed it by
 				// hand. The attempt is on disk before it starts, so the request
-				// that dies in it is the only one it costs
-				if( self::_attempted( $dir, $today ) === true )
-					return;
+				// that dies in it is the only one it costs.
+				//
+				// One more attempt after a file that could not be read or that changed
+				// while it was packed (see \Nino\Backup::SOURCE_FAILED): what ended that
+				// run was a moment of the project and not the request, and the note of the
+				// retry is on disk before it starts, as the first one's was, so a retry
+				// that dies or fails is the last of the day
+				$retry = false;
 
-				self::_noteAttempt( $dir, $today, '' );
+				if( self::_attempted( $dir, $today ) === true ) {
+
+					$note = self::_readAttempt( $dir );
+
+					if( $note === null || ( $note['code'] ?? '' ) !== 'source' || ( $note['retried'] ?? false ) === true )
+						return;
+
+					$retry = true;
+				}
+
+				self::_noteAttempt( $dir, $today, '', '', '', $retry );
 
 				$run = self::_begin( $dir, 'daily' );
 
@@ -276,7 +291,7 @@ namespace Nino\Modules {
 					self::_create( $appData, $dir, $path, $run );
 				} catch( \Throwable $e ) {
 					$cause = self::_cause( $e );
-					self::_noteAttempt( $dir, $today, self::_reason( $e ), self::_code( $e ) );
+					self::_noteAttempt( $dir, $today, self::_reason( $e ), self::_code( $e ), (string) ( \Nino\Backup::sourceName( $e ) ?? '' ), $retry );
 					throw $e;
 				} finally {
 					self::_end( $run, $cause );
@@ -370,6 +385,10 @@ namespace Nino\Modules {
 				if( $e->getCode() === \Nino\Backup::HOOK_FAILED && $run instanceof \stdClass && $run->hook !== '' )
 					return [ 500, $e->getMessage(), 'backups_hook', [ $run->hook ] ];
 
+				// A file of the project that could not be read, or that changed while it was packed: named in the sentence of the panel
+				if( self::_code( $e ) === 'source' )
+					return [ 500, $e->getMessage(), 'backups_source', [ (string) \Nino\Backup::sourceName( $e ) ] ];
+
 				return self::_code( $e ) === 'write' ? [ 500, $e->getMessage(), 'backups_write' ] : [ 500, $e->getMessage() ];
 			}
 			finally {
@@ -384,7 +403,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array|null							[ 'reason' => what the attempt reported, '' where it ended without a word ], or null
+		 *	@return 	array|null							[ 'reason' => what the attempt reported, '' where it ended without a word, 'code' => 'write' or 'source' where the panel words the reason, 'file' => the name of the file of a 'source', 'retry' => whether the next request makes one more attempt ], or null
 		 */
 		public static function missed( array &$appData ): ?array {
 
@@ -404,7 +423,9 @@ namespace Nino\Modules {
 					$note['reason'] = 'the request ended while the feature "'. $run['feature']. '" handed over its data';
 			}
 
-			return $note === null || $note['date'] !== date( 'Y-m-d' ) ? null : [ 'reason' => $note['reason'] ] + ( isset( $note['code'] ) === true ? [ 'code' => $note['code'] ] : [] );
+			return $note === null || $note['date'] !== date( 'Y-m-d' ) ? null : [ 'reason' => $note['reason'] ]
+				+ ( isset( $note['code'] ) === true ? [ 'code' => $note['code'] ] : [] )
+				+ ( ( $note['code'] ?? '' ) === 'source' ? [ 'file' => $note['file'] ?? '', 'retry' => ( $note['retried'] ?? false ) !== true ] : [] );
 		}
 
 		/**
@@ -473,7 +494,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *
-		 *	@return 	array|null							[ 'date' => "Y-m-d", 'reason' => string ], or null where there is none or it is not one
+		 *	@return 	array|null							[ 'date' => "Y-m-d", 'reason' => string ] and, where the attempt reported one, 'code' ('write' or 'source'), the 'file' of a 'source' and whether it was a 'retried' attempt; or null where there is none or it is not one
 		 */
 		private static function _readAttempt( string $dir ): ?array {
 
@@ -482,7 +503,12 @@ namespace Nino\Modules {
 			if( $note === null || is_string( $note['date'] ?? null ) === false || is_string( $note['reason'] ?? null ) === false )
 				return null;
 
-			return [ 'date' => $note['date'], 'reason' => $note['reason'] ] + ( ( $note['code'] ?? null ) === 'write' ? [ 'code' => 'write' ] : [] );
+			$code = in_array( $note['code'] ?? null, [ 'write', 'source' ], true ) === true ? $note['code'] : '';
+
+			return [ 'date' => $note['date'], 'reason' => $note['reason'] ]
+				+ ( $code !== '' ? [ 'code' => $code ] : [] )
+				+ ( $code === 'source' ? [ 'file' => is_string( $note['file'] ?? null ) === true ? $note['file'] : '' ] : [] )
+				+ ( ( $note['retried'] ?? null ) === true ? [ 'retried' => true ] : [] );
 		}
 
 		/**
@@ -514,26 +540,36 @@ namespace Nino\Modules {
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$date					"Y-m-d" of the day the attempt began
 		 *	@param		string		$reason				What the attempt reported, '' while there is none
-		 *	@param		string		$code					What kind of failure it was, where the panel words it: 'write', '' otherwise
+		 *	@param		string		$code					What kind of failure it was, where the panel words it: 'write', 'source', '' otherwise
+		 *	@param		string		$file					The name in the archive of the file that could not be read, for the code 'source'
+		 *	@param		bool			$retried			Whether this is the one more attempt that a failure of the code 'source' allows, the last of the day
 		 *
 		 *	@return 	void
 		 */
-		private static function _noteAttempt( string $dir, string $date, string $reason, string $code = '' ): void {
+		private static function _noteAttempt( string $dir, string $date, string $reason, string $code = '', string $file = '', bool $retried = false ): void {
 
-			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, self::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) ) ). self::STUB_SUFFIX );
+			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, self::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) + ( $code === 'source' ? [ 'file' => $file ] : [] ) + ( $retried === true ? [ 'retried' => true ] : [] ) ) ). self::STUB_SUFFIX );
 		}
 
 		/**
 		 *	The kind of failure the panel words in the interface language: a write
-		 *	that failed, with no room or a file that cannot be written
+		 *	that failed, with no room or a file that cannot be written, or a file of
+		 *	the project that could not be read or that changed while it was packed
 		 *
 		 *	@param		\Throwable	$e
 		 *
-		 *	@return 	string									'write', or '' for any other
+		 *	@return 	string									'write', 'source', or '' for any other
 		 */
 		private static function _code( \Throwable $e ): string {
 
-			return get_class( $e ) === \RuntimeException::class && in_array( $e->getCode(), [ \Nino\Backup::WRITE_FAILED, \Nino\Backup::DISK_SHORT ], true ) === true ? 'write' : '';
+			if( get_class( $e ) !== \RuntimeException::class )
+				return '';
+
+			return match( true ) {
+				in_array( $e->getCode(), [ \Nino\Backup::WRITE_FAILED, \Nino\Backup::DISK_SHORT ], true ) => 'write',
+				$e->getCode() === \Nino\Backup::SOURCE_FAILED => 'source',
+				default => '',
+			};
 		}
 
 		/**
@@ -856,31 +892,40 @@ namespace Nino\Modules {
 		 *	What the run has to pack, read from the files before anything is
 		 *	made: the manifest - every file of the project the archive carries,
 		 *	the data a feature owns among them - the number of files and of
-		 *	bytes. A file the manifest names that cannot be read ends the run here
+		 *	bytes. A file the manifest names that cannot be read ends the run here, as a file of the project that has gone (see \Nino\Backup::SOURCE_FAILED), unless it is one that a
+		 *	backup leaves out where it is gone (see \Nino\Backup::leavable()): those are not counted
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array|null	$given				The manifest after the features handed over their copies (see \Nino\Backup::stage()), which is measured as it is; null for the files as they lie
 		 *
 		 *	@return 	array										[ 'manifest' => path -> name, 'files' => int, 'bytes' => int, 'copies' => the bytes the copies of the features are still to take, 0 for a manifest that was given ]
 		 *
-		 *	@throws		\RuntimeException					If a file of the manifest cannot be read
+		 *	@throws		\RuntimeException					SOURCE_FAILED, if a file of the manifest cannot be read
 		 */
 		private static function _plan( array &$appData, ?array $given = null ): array {
 
 			$manifest = $given ?? \Nino\Backup::manifest( $appData );
+			$kinds		= \Nino\Backup::leavable( $appData, $manifest );
 			$bytes 		= 0;
+			$files		= 0;
 
 			foreach( $manifest as $absolute => $archiveName ) {
 
 				$size = @filesize( $absolute );
 
-				if( $size === false )
-					throw new \RuntimeException( 'backup source could not be read: '. $archiveName );
+				if( $size === false ) {
+
+					if( isset( $kinds[$archiveName] ) === true )
+						continue;
+
+					throw \Nino\Backup::sourceFailure( $archiveName );
+				}
 
 				$bytes += $size;
+				$files++;
 			}
 
-			return [ 'manifest' => $manifest, 'files' => count( $manifest ), 'bytes' => $bytes, 'copies' => $given === null ? \Nino\Backup::copyBytes( $appData, $manifest ) : 0 ];
+			return [ 'manifest' => $manifest, 'files' => $files, 'bytes' => $bytes, 'copies' => $given === null ? \Nino\Backup::copyBytes( $appData, $manifest ) : 0 ];
 		}
 
 		/**
@@ -918,7 +963,7 @@ namespace Nino\Modules {
 				throw new \RuntimeException( $refusal );
 
 			if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false )
-				throw new \RuntimeException( 'backup directory could not be created' );
+				throw new \RuntimeException( 'backup directory could not be created', \Nino\Backup::WRITE_FAILED );
 
 			// What an earlier run left that ended without a word
 			\Nino\Backup::sweepTemp( $appData );
@@ -946,7 +991,7 @@ namespace Nino\Modules {
 
 			$temp = \Nino\Backup::tempFile( $appData, 'backup' );
 			if( $temp === false )
-				throw new \RuntimeException( 'temporary backup file could not be created' );
+				throw new \RuntimeException( 'temporary backup file could not be created', \Nino\Backup::WRITE_FAILED );
 
 			[ $run->temp, $run->lease ] = $temp;
 

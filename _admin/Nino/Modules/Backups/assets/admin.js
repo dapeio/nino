@@ -184,7 +184,7 @@
 		 *
 		 *	@param		{Object[]}	archives			[ { id, kind: 'daily'|'manual'|'snapshot', size: bytes } ]
 		 *	@param		{boolean}		enabled				Whether backups are on
-		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason, code }, the reason empty where it ended without one, the code 'write' where a write failed
+		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason, code, file, retry }, the reason empty where it ended without one, the code 'write' where a write failed and 'source' where a file could not be read (the file named, retry: whether the next request tries once more)
 		 *	@param		{Object=}		stopped				Set while the last run - the daily one or one by hand - ended without an end of its own: { kind, started, files, bytes, cause, limit }, see _stoppedText()
 		 *
 		 *	@return		void
@@ -203,9 +203,11 @@
 				const noReason = isMissed === true && ( typeof missed.reason !== 'string' || missed.reason === '' );
 
 				if( isMissed === true )
-					wrap.appendChild( Nino.adminUi.notice( noReason === false
-						? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed'), missed.code === 'write' ? Nino.content.getText('/_admin/backups/msg/reason-write') : missed.reason )
-						: ( detail !== '' ? detail+ ' '+ Nino.content.getText('/_admin/backups/msg/stopped-retry') : Nino.content.getText('/_admin/backups/msg/interrupted') ) ) );
+					wrap.appendChild( Nino.adminUi.notice( missed.code === 'source' && missed.retry === true
+						? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed-source'), missed.file )
+						: ( noReason === false
+							? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed'), missed.code === 'write' ? Nino.content.getText('/_admin/backups/msg/reason-write') : ( missed.code === 'source' ? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/reason-source'), missed.file ) : missed.reason ) )
+							: ( detail !== '' ? detail+ ' '+ Nino.content.getText('/_admin/backups/msg/stopped-retry') : Nino.content.getText('/_admin/backups/msg/interrupted') ) ) ) );
 
 				// Said once: a missed backup that has no reason of its own is that run
 				if( detail !== '' && noReason === false && ( isMissed === true && missed.code === 'write' && stopped.cause === 'disk' ) === false )

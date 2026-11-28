@@ -51,6 +51,11 @@ namespace Nino {
 		// or what it put into its staging is no file of its own. The run that threw it has named the feature (see \Nino\Modules\Backups::stopped())
 		public const int HOOK_FAILED = 3;
 
+		// The code of the RuntimeException that says a file the archive is to hold could not be read, or changed while it was packed: a
+		// file of the project that is gone or unreadable at the time it is packed and that is no companion of a database and no temporary
+		// file of a writer of the kernel (see leavable()). The panel words it with the name of the file (see sourceName())
+		public const int SOURCE_FAILED = 4;
+
 		// The hook a feature answers before its files are packed (see stage()), the counterpart of '/nino/admin/restore'
 		public const string HOOK = '/nino/admin/backup';
 
@@ -66,6 +71,11 @@ namespace Nino {
 		// Where a test points inUse() instead: a static of the class, which no file of a project - config.php and so an archive - can set
 		public static ?string $locksFile = null;
 
+		// Where a test lets a file go or change in the moment a writer of the project does (see pack()): called with 'looked' and the name of a file that was found there
+		// before anything is decided of it, with 'read' after the files were looked at and before they are read, and with 'failed' after the reading failed and before
+		// the files are looked at once more, the last two with the number of the try. A static of the class, which no file of a project - config.php and so an archive - can set
+		public static ?\Closure $packing = null;
+
 		// How long a restore waits in all, in seconds, for the locks of the writers of the files it puts back (see lockFiles()): a static of the class, which a test
 		// lowers and which no file of a project - config.php and so an archive - can set
 		public static float $lockWait = 10.0;
@@ -76,6 +86,15 @@ namespace Nino {
 
 		// The files an open database keeps beside itself while it is used: they belong to the live file and to nothing that is copied
 		private const array COMPANIONS = [ '-wal', '-shm', '-journal' ];
+
+		// The name of the file a writer of the kernel makes beside the file it writes and renames over it - \Nino\Filesystem::_writeFile() and writeAtomic(),
+		// \Nino\Admin\Admin::writeFileAtomic() and the copy a restore makes beside a file (see \Nino\Modules\Backups\Admin::_beside()): the name of the file, a dot,
+		// twelve hex digits, '.tmp'. The first group is the file the copy is of
+		private const string TEMPORARY = '/^(.+)\.[0-9a-f]{12}\.tmp$/D';
+
+		// What the sentence of a source that could not be read begins with, and the sentence of one that changed while it was packed (see sourceName())
+		private const string SOURCE_GONE = 'backup source could not be read: ';
+		private const string SOURCE_CHANGED = 'backup source changed while it was packed: ';
 
 		// What a run keeps free beyond what it counts: the tar's end, the stamp, the bookkeeping of the file system
 		private const int SPACE_RESERVE = 4194304;
@@ -556,6 +575,85 @@ namespace Nino {
 		}
 
 		/**
+		 *	Which files of a manifest a backup may leave out, told by proof and never by a guess. A file is left out where it is gone and is one of two kinds:
+		 *
+		 *	- the companion of a database, <name>-wal, <name>-shm or <name>-journal, where <name> is a file of the manifest or the companion is one that
+		 *	  raw() added beside a database it packs as it lies ($companions). An open database makes them and removes them as its writers come and go:
+		 *	  a log of writes that is gone was written into the main file, which a pack reads after it (see pack())
+		 *	- a temporary file of a writer of the kernel, <name>.<12 lowercase hex digits>.tmp (see TEMPORARY): it lives for the time of one write and
+		 *	  is renamed over <name> or removed. Where it is gone, the shape is the proof; where it is there it is packed like any file
+		 *
+		 *	A name that a feature declares whole in its manifest is its own file whatever it is called and is never left out: a declared `foo-wal` or
+		 *	`x.tmp` is data, and where it is gone the backup says so (SOURCE_FAILED). So is every other file that is gone or cannot be read
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
+		 *	@param		array 		$companions		The archive names that raw() added beside a database it packs as it lies
+		 *
+		 *	@return 	array										Archive name -> 'companion' | 'temporary' for the files that may be left out where they are gone
+		 */
+		public static function leavable( array &$appData, array $manifest, array $companions = [] ): array {
+
+			$listed 	= array_flip( array_values( $manifest ) );
+			$named		= null;
+			$vanish		= [];
+
+			foreach( array_keys( $listed ) as $name ) {
+
+				$name 		= (string) $name;
+				$base 		= self::_companion( $name );
+				$temporary = preg_match( self::TEMPORARY, basename( $name ) ) === 1;
+
+				if( $base === null && $temporary === false )
+					continue;
+
+				// What a feature names whole is its own, and read at most once
+				$named ??= self::_named( $appData );
+
+				if( isset( $named[$name] ) === true )
+					continue;
+
+				if( $base !== null && ( isset( $listed[$base] ) === true || in_array( $name, $companions, true ) === true ) ) {
+					$vanish[$name] = 'companion';
+					continue;
+				}
+
+				if( $temporary === true )
+					$vanish[$name] = 'temporary';
+			}
+
+			return $vanish;
+		}
+
+		/**
+		 *	The exception for a file of the manifest that cannot be read or that changed while it was packed: SOURCE_FAILED, naming the file by its name in
+		 *	the archive - printable ascii, cut - and no path
+		 *
+		 *	@param		string		$name					The archive name
+		 *	@param		bool			$changed			Whether the file was there and was another by the time the pack failed, and not gone or unreadable
+		 *
+		 *	@return 	\RuntimeException
+		 */
+		public static function sourceFailure( string $name, bool $changed = false ): \RuntimeException {
+			return new \RuntimeException( ( $changed === true ? self::SOURCE_CHANGED : self::SOURCE_GONE ). substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $name ), 0, 80 ), self::SOURCE_FAILED );
+		}
+
+		/**
+		 *	The name of the file a SOURCE_FAILED exception names (see sourceFailure()), for the sentence of the panel and the note of the daily backup
+		 *
+		 *	@param		\Throwable	$failure
+		 *
+		 *	@return 	string|null							The archive name, null for an exception that is none of this kind
+		 */
+		public static function sourceName( \Throwable $failure ): ?string {
+
+			if( get_class( $failure ) !== \RuntimeException::class || $failure->getCode() !== self::SOURCE_FAILED )
+				return null;
+
+			return preg_match( '/^backup source (?:could not be read|changed while it was packed): (.*)$/Ds', $failure->getMessage(), $found ) === 1 ? $found[1] : null;
+		}
+
+		/**
 		 *	The bytes the copies of the features will take beside the files they are made of, counted before the hooks are asked: for each file a
 		 *	feature with a hook owns, its size and the size of the files an open database keeps beside it - what a copy of it can hold at the most,
 		 *	since a copy has what the file holds and what its log of writes (-wal) has still to add
@@ -739,10 +837,11 @@ namespace Nino {
 		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
 		 *	@param		array 		$keys					Keys of features
 		 *	@param		array 		&$links				(reference) The archive names of the main files that were left out as links
+		 *	@param		array 		&$added				(reference) The archive names of the files beside a database that were added: the companions a pack may leave out where they are gone (see leavable())
 		 *
 		 *	@return 	array										The manifest to pack
 		 */
-		public static function raw( array &$appData, array $manifest, array $keys, array &$links = [] ): array {
+		public static function raw( array &$appData, array $manifest, array $keys, array &$links = [], array &$added = [] ): array {
 
 			$features = \Nino\Features::all( $appData );
 			$byName 	= array_flip( $manifest );
@@ -776,6 +875,7 @@ namespace Nino {
 						if( isset( $byName[$name. $suffix] ) === false && is_file( $live. $suffix ) === true && is_link( $live. $suffix ) === false ) {
 							$manifest[$live. $suffix] = $name. $suffix;
 							$byName[$name. $suffix] = $live. $suffix;
+							$added[] = $name. $suffix;
 						}
 				}
 			}
@@ -806,7 +906,7 @@ namespace Nino {
 		 *	@param		string		$staging			Where the run's staging is made, not existing yet: below the temporary directory, in the name of the run's own file
 		 *	@param		callable|null	$announce		Called with the key of the feature before it is asked, and with '' after the last: what the run records of where it is
 		 *	@param		bool			$tolerant			Whether a hook that fails is not the end of the run
-		 *	@param		array 		&$notes				(reference) Set: 'asked' => keys of the features asked, 'copies' => archive names that were handed over, 'raw' => key => why, for the features whose files are packed as they lie
+		 *	@param		array 		&$notes				(reference) Set: 'asked' => keys of the features asked, 'copies' => archive names that were handed over, 'raw' => key => why, for the features whose files are packed as they lie, 'links' => the archive names left out as links, 'companions' => the archive names of the files beside a database that raw() added
 		 *
 		 *	@return 	array										The manifest to pack: the one that was given where no feature has a hook
 		 *
@@ -814,7 +914,7 @@ namespace Nino {
 		 */
 		public static function stage( array &$appData, array $manifest, string $staging, ?callable $announce = null, bool $tolerant = false, array &$notes = [] ): array {
 
-			$notes = [ 'asked' => [], 'copies' => [], 'raw' => [], 'links' => [] ];
+			$notes = [ 'asked' => [], 'copies' => [], 'raw' => [], 'links' => [], 'companions' => [] ];
 
 			[ $hooks, $strays ] = self::_hooks( $appData );
 
@@ -962,7 +1062,7 @@ namespace Nino {
 			if( $notes['raw'] === [] )
 				return $result;
 
-			$result = self::raw( $appData, $result, array_keys( $notes['raw'] ), $notes['links'] );
+			$result = self::raw( $appData, $result, array_keys( $notes['raw'] ), $notes['links'], $notes['companions'] );
 
 			if( $notes['links'] !== [] )
 				trigger_error( 'Backup: the safety snapshot leaves out '. count( $notes['links'] ). ' file(s) of a feature that are links, which are no files of the project', E_USER_WARNING );
@@ -2402,8 +2502,13 @@ namespace Nino {
 				if( $feature['active'] === true )
 					$features[(string) $key] = (string) $feature['version'];
 
-			// 'copies': the files a feature handed over (see stage()), the files whose companions a restore takes away; 'raw': the features whose files are in the archive as they lay
-			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features, 'copies' => array_values( (array) ( $notes['copies'] ?? [] ) ), 'raw' => array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) ), 'links' => array_values( (array) ( $notes['links'] ?? [] ) ) ], true ). ';';
+			// 'copies': the files a feature handed over (see stage()), the files whose companions a restore takes away; 'raw': the features whose files are in the archive as they lay;
+			// 'links': the names left out as links; 'left', only where there are any: the names of the files that were gone or that are another request's temporary files, left out
+			// (see pack()). A restore reads 'nino' and 'copies' and nothing else of it, so a note that an older kernel does not know is ignored by it, and the stamp of a project
+			// that left nothing out is the one it always was
+			$left = array_values( (array) ( $notes['left'] ?? [] ) );
+
+			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features, 'copies' => array_values( (array) ( $notes['copies'] ?? [] ) ), 'raw' => array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) ), 'links' => array_values( (array) ( $notes['links'] ?? [] ) ) ] + ( $left === [] ? [] : [ 'left' => $left ] ), true ). ';';
 		}
 
 		/**
@@ -2451,6 +2556,14 @@ namespace Nino {
 		 *	packing of \Nino\Modules\Backups::_create() and
 		 *	\Nino\Modules\Backups\Admin::_safetySnapshot()
 		 *
+		 *	Files come and go while a project is written to. What may vanish between the listing and the packing is left out and the stamp says
+		 *	so ('left', and one notice that names the files): the companion of a database and the temporary file of a writer of the kernel
+		 *	(see leavable()); a temporary file that is there is left out as well, for a backup does not carry another request's half of a write. Any
+		 *	other file that is gone, is no file any more or cannot be read ends the packing with SOURCE_FAILED and its name. A file whose
+		 *	companion is listed is read after the companion: a log of writes (-wal) that is gone by then was checkpointed into the main file, and
+		 *	the main file read after it holds what the log held. A raw copy of a database that is written to is no consistent snapshot all the same:
+		 *	pages the file changes while it is read are of two moments, which is why a feature that writes one hands over a copy of it (see stage())
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
 		 *	@param		string		$tar					Where the tar is made; the archive is $tar.'.gz'
@@ -2458,48 +2571,186 @@ namespace Nino {
 		 *
 		 *	@return 	void
 		 *
-		 *	@throws		\RuntimeException				If a file of the manifest cannot be read
+		 *	@throws		\RuntimeException				SOURCE_FAILED if a file of the manifest cannot be read or changed while it was packed, WRITE_FAILED if the archive cannot be written
 		 */
 		public static function pack( array &$appData, array $manifest, string $tar, array $notes = [] ): void {
 
-			$entries = [];
-			foreach( $manifest as $absolute => $name )
-				$entries[$name] = $absolute;
+			$kinds		= self::leavable( $appData, $manifest, (array) ( $notes['companions'] ?? [] ) );
+			$entries	= self::_ordered( $manifest );
+			$left			= [];
+			$before		= [];
 
-			// The stamp is made before the step, which turns every notice into an exception: what it reads is no part of the writing
-			$stamp = self::stamp( $appData, $notes );
+			// What is gone before the first byte is read: left out, or the end of the run for a file that is none of those. Each file is looked at once and the
+			// answer decides: a second look could find a file gone that the first found there
+			foreach( $entries as $name => $absolute ) {
+
+				if( self::_readable( $absolute ) === true ) {
+
+					if( self::$packing !== null )
+						( self::$packing )( 'looked', 0, (string) $name );
+
+					$before[$name] = self::_signature( $absolute );
+					continue;
+				}
+
+				if( isset( $kinds[$name] ) === false )
+					throw self::sourceFailure( $name );
+
+				$left[] = $name;
+				unset( $entries[$name] );
+			}
 
 			// Everything PharData says of a file that cannot be written - a disk that is full - is one sentence, and no path. It says it as a
 			// notice first, and the handler of the kernel ends the request at a notice: so the step runs with a handler of its own
 			// (see raising()), which makes it an exception that is caught here
-			try {
+			for( $try = 1; ; $try++ ) {
 
-				self::raising( static function() use ( $tar, $entries, $stamp ): void {
+				// The stamp is made before the step, which turns every notice into an exception: what it reads is no part of the writing
+				$stamp = self::stamp( $appData, [ 'left' => $left ] + $notes );
 
-					$phar = new \PharData( $tar );
+				try {
 
-					$phar->buildFromIterator( new \ArrayIterator( $entries ) );
-					$phar->addFromString( 'nino.php', $stamp );
+					if( self::$packing !== null )
+						( self::$packing )( 'read', $try );
 
-					// Written out to the tar before it is touched below, and before the handler of the step is gone
-					unset( $phar );
-				} );
-			}
-			catch( \PharException | \UnexpectedValueException | \BadMethodCallException | \ErrorException ) {
+					self::raising( static function() use ( $tar, $entries, $stamp ): void {
 
-				// The one that could not be read, by its name in the archive
-				foreach( $entries as $name => $absolute )
-					if( @is_readable( $absolute ) === false )
-						throw new \RuntimeException( 'backup source could not be read: '. $name );
+						$phar = new \PharData( $tar );
 
-				// All of them can be read: what failed is the write
-				throw new \RuntimeException( 'the backup could not be written: there was no room left, or a file could not be written', self::WRITE_FAILED );
+						$phar->buildFromIterator( new \ArrayIterator( $entries ) );
+						$phar->addFromString( 'nino.php', $stamp );
+
+						// Written out to the tar before it is touched below, and before the handler of the step is gone
+						unset( $phar );
+					} );
+
+					break;
+				}
+				catch( \PharException | \UnexpectedValueException | \BadMethodCallException | \ErrorException $failed ) {
+
+					// What was written of the tar is of the entries that were, and the next try makes the tar once more
+					@unlink( $tar );
+
+					if( self::$packing !== null )
+						( self::$packing )( 'failed', $try );
+
+					// Each file is looked at once, and the answer decides. A file that is gone is left out where it may vanish and ends the run, named, where it is
+					// a real one: the packing is made once more without the first, which reads the main file of a companion after the companion
+					$gone		= [];
+					$named	= [];
+					$opened = str_contains( $failed->getMessage(), 'could not be opened' ) === true;
+
+					foreach( $entries as $name => $absolute ) {
+
+						if( self::_readable( $absolute ) === false )
+							$gone[$name] = $absolute;
+						elseif( str_contains( $failed->getMessage(), '"'. $absolute. '"' ) === true || str_contains( $failed->getMessage(), '"'. $name. '"' ) === true )
+							$named[$name] = $absolute;
+					}
+
+					foreach( array_keys( $gone ) as $name )
+						if( isset( $kinds[$name] ) === false )
+							throw self::sourceFailure( (string) $name );
+
+					// The file that php names - it could not open it, or could not write its contents - and that is there: another file than the one that was listed, gone
+					// and back, is the end of the run for a real file, and for a companion or a temporary file that php could not open it is one more that is left out.
+					// A file that changed elsewhere while a write failed proves nothing: php did not name it
+					foreach( $named as $name => $absolute ) {
+
+						if( isset( $kinds[$name] ) === false && ( $opened === true || self::_signature( $absolute ) !== $before[$name] ) )
+							throw self::sourceFailure( (string) $name, true );
+
+						if( isset( $kinds[$name] ) === true && $opened === true )
+							$gone[$name] = $absolute;
+					}
+
+					if( $gone !== [] ) {
+
+						foreach( array_keys( $gone ) as $name ) {
+							$left[] = (string) $name;
+							unset( $entries[$name] );
+						}
+
+						continue;
+					}
+
+					// Nothing went and nothing php named is another: what failed is the write
+					throw new \RuntimeException( 'the backup could not be written: there was no room left, or a file could not be written', self::WRITE_FAILED );
+				}
 			}
 
 			self::_modes( $tar );
 			self::_gzip( $tar, $tar. '.gz' );
 
 			@unlink( $tar );
+
+			if( $left !== [] )
+				trigger_error( 'Backup: '. count( $left ). ' file(s) were gone or another request\'s temporary files and are left out of the archive: '. implode( ', ', array_map( static fn( string $name ): string => substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $name ), 0, 80 ), array_slice( $left, 0, 10 ) ) ). ( count( $left ) > 10 ? ', ...' : '' ), E_USER_NOTICE );
+		}
+
+		/**
+		 *	The names of a manifest with their files, in the order they are packed: the companion of a database - its log of writes and the files beside it -
+		 *	before the file it belongs to, where both are there, so that a log that goes while the packing is under way has been found gone before
+		 *	the main file is read. Every other name keeps its place
+		 *
+		 *	@param		array 		$manifest			Absolute path -> archive name
+		 *
+		 *	@return 	array										Archive name -> absolute path
+		 */
+		private static function _ordered( array $manifest ): array {
+
+			$byName = [];
+			foreach( $manifest as $absolute => $name )
+				$byName[$name] = $absolute;
+
+			$entries = [];
+
+			foreach( $byName as $name => $absolute ) {
+
+				$name = (string) $name;
+
+				// Put where its main file stands
+				if( ( $base = self::_companion( $name ) ) !== null && isset( $byName[$base] ) === true )
+					continue;
+
+				foreach( self::COMPANIONS as $suffix )
+					if( isset( $byName[$name. $suffix] ) === true )
+						$entries[$name. $suffix] = $byName[$name. $suffix];
+
+				$entries[$name] = $absolute;
+			}
+
+			return $entries;
+		}
+
+		/**
+		 *	Whether a file of the manifest is one that can be read: a file, not a folder, and readable by this process
+		 *
+		 *	@param		string		$absolute
+		 *
+		 *	@return 	bool
+		 */
+		private static function _readable( string $absolute ): bool {
+
+			clearstatcache( true, $absolute );
+
+			return is_file( $absolute ) === true && @is_readable( $absolute ) === true;
+		}
+
+		/**
+		 *	What tells a file that was read from the file that is there at the time of the look: its size, the time it was changed and its inode
+		 *
+		 *	@param		string		$absolute
+		 *
+		 *	@return 	array|null								null where it is gone
+		 */
+		private static function _signature( string $absolute ): ?array {
+
+			clearstatcache( true, $absolute );
+
+			$stat = @stat( $absolute );
+
+			return $stat === false ? null : [ $stat['size'], $stat['mtime'], $stat['ino'] ];
 		}
 
 		/**

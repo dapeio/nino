@@ -405,6 +405,19 @@ check( 'a missed daily backup that a write failed and the run that the disk ende
 mount.innerHTML = '';
 requests.length = 0;
 panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : { reason : 'backup source could not be read: data/<b>x</b>.php', code : 'source', file : 'data/<b>x</b>.php', retry : true } } );
+const sourceText = noticeOf().length === 1 ? noticeOf()[0].textContent : '';
+check( 'a missed daily backup that a file could not be read for names the file as text and says that the next request tries once more', noticeOf().length === 1 && noticeOf()[0].children.length === 0 && sourceText.includes( 'data/<b>x</b>.php' ) && sourceText.includes( 'once more' ) );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : { reason : 'backup source could not be read: data/x.php', code : 'source', file : 'data/x.php', retry : false } } );
+check( '...and after the second attempt it names the file and says that no more is made today', noticeOf().length === 1 && noticeOf()[0].textContent.includes( 'data/x.php' ) && noticeOf()[0].textContent.includes( 'by itself today' ) && noticeOf()[0].textContent !== sourceText );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
 answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : null, stopped : stopped( '', 'manual' ) } );
 const openText = memoryText();
 check( '...and a run that nothing says why it ended is told as one that did not end', said( noticeOf() ) && openText !== '' );
@@ -482,6 +495,12 @@ pressRestore('2024-05-02');
 answer( 409, { error : 'another request is writing a file the restore has to put back', code : 'backups_restore_busy', params : [ '/text/de_DE.php' ] } );
 check( '...a restore that waited for the lock of a file in vain gives the list back and names the file', listButtons().every( function( button ) { return button.disabled !== true } )
 	&& text('/_admin/error/backups_restore_busy') !== '' && messageText().indexOf( text('/_admin/error/backups_restore_busy').replace( '%s', '/text/de_DE.php' ) ) !== -1 && messageState() === 'error' );
+
+// A restore whose safety copy could not be made because a file of the project went meanwhile names the file, as text
+pressRestore('2024-05-02');
+answer( 500, { error : 'the safety snapshot could not be made', code : 'backups_source', params : [ 'data/<b>x</b>.php' ] } );
+check( '...a safety copy that could not be made for a file that could not be read names the file in the words of the module', listButtons().every( function( button ) { return button.disabled !== true } )
+	&& text('/_admin/error/backups_source') !== '' && messageText().indexOf( text('/_admin/error/backups_source').replace( '%s', 'data/<b>x</b>.php' ) ) !== -1 && messageState() === 'error' );
 
 pressRestore('2024-05-02');
 answer( 200, { ok : true, restoredDate : '2024-05-02' } );
