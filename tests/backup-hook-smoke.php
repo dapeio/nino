@@ -613,7 +613,7 @@ $write();
 $notice = null;
 $result = \Nino\Modules\Backups\Admin::restore( $appData, (string) $id, $notice, $rawKey );
 unset( $appData['./vault/mode'] );
-check( 'the restore of the recovery page, which has the same snapshot, is done as well, and its notice says so', $result === true && ( $notice['code'] ?? '' ) === 'backups_snapshot_raw' );
+check( 'the restore of the recovery page, which has the same snapshot, is done as well, and its notice is the strongest of the two that apply: the file beside a database that stands, which an archive of another project may not take away (the snapshot that holds the files as they were comes after it)', $result === true && ( $notice['code'] ?? '' ) === 'backups_companions_left' && ( $notice['params'] ?? [] ) === [ '1' ] );
 
 // A hook that fails still ends a backup that is asked for: the snapshot is the one net that is tolerant, the backup is the work
 $appData['./vault/mode'] = 'throw';

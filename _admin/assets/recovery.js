@@ -217,8 +217,8 @@
 			const params = response && response.notice && Array.isArray( response.notice.params ) ? response.notice.params : [];
 			const code = response && response.notice && typeof response.notice.code === 'string' ? response.notice.code : '';
 
-			// The notices of a snapshot of the state as it was and of files that stand beside a database: the table of the page has their sentences
-			if( code === 'backups_snapshot_raw' || code === 'backups_companions_left' )
+			// The notices of a snapshot that lacks files this request held open, of a snapshot of the state as it was and of files that stand beside a database: the table of the page has their sentences
+			if( code === 'backups_snapshot_held' || code === 'backups_snapshot_raw' || code === 'backups_companions_left' )
 				return ' '+ t( '/_admin/page/error/'+ code.replace( /_/g, '-' ), ...params );
 
 			return params.length === 2 ? ' '+ t( '/_admin/recovery/restore/notice', params[0], params[1] ) : '';

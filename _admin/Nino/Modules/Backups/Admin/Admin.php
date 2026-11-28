@@ -331,6 +331,9 @@ namespace Nino\Modules\Backups {
 				// Why today's automatic backup is missing, while it is (see
 				// \Nino\Modules\Backups::missed())
 				'missed' 	=> ( $appData['/nino/admin/backups'] ?? true ) !== false ? \Nino\Modules\Backups::missed( $appData ) : null,
+				// The files today's daily archive lacks, because the request that made it held them open: no failure (see
+				// \Nino\Modules\Backups::lacking())
+				'lacking' => ( $appData['/nino/admin/backups'] ?? true ) !== false ? \Nino\Modules\Backups::lacking( $appData ) : null,
 				// A run, daily or by hand, that ended without an end of its own and what ended it (see
 				// \Nino\Modules\Backups::stopped())
 				'stopped' => ( $appData['/nino/admin/backups'] ?? true ) !== false ? \Nino\Modules\Backups::stopped( $appData ) : null,
@@ -340,7 +343,11 @@ namespace Nino\Modules\Backups {
 		/**
 		 *	Back up now: one more archive, named by date and time (see
 		 *	\Nino\Modules\Backups::now()). The activity log line is written
-		 *	by the dispatcher through log(), not by that call
+		 *	by the dispatcher through log(), not by that call. An archive that
+		 *	lacks files because this request holds a lock on them - a database in
+		 *	a transaction, see \Nino\Backup::held() - is made all the same, and
+		 *	the answer says so: 'notice', a code and its params as a restore's
+		 *	has it, which the panel words in the interface language
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -352,7 +359,8 @@ namespace Nino\Modules\Backups {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$result = \Nino\Modules\Backups::now( $appData );
+			$held		= [];
+			$result = \Nino\Modules\Backups::now( $appData, $held );
 
 			if( is_array( $result ) === true ) {
 				\Nino\Http::fail( $request, $result[0], $result[1], (string) ( $result[2] ?? '' ), $result[3] ?? [] );
@@ -361,7 +369,7 @@ namespace Nino\Modules\Backups {
 
 			$note = \Nino\Backup::missingNote( $appData );
 
-			\Nino\Http::ok( $request, [ 'id' => $result ] + ( $note !== null ? [ 'note' => $note ] : [] ) );
+			\Nino\Http::ok( $request, [ 'id' => $result ] + ( $held !== [] ? [ 'notice' => [ 'code' => 'backups_held', 'params' => [ \Nino\Backup::nameList( $held ) ] ] ] : [] ) + ( $note !== null ? [ 'note' => $note ] : [] ) );
 		}
 
 		/**
@@ -766,6 +774,7 @@ namespace Nino\Modules\Backups {
 
 			if( $notice !== null && $actor !== false )
 				\Nino\Admin\Admin::record( $appData, $actor['mail'], match( $notice['code'] ) {
+					'backups_snapshot_held' 		=> 'The safety snapshot lacks the state of '. $notice['params'][0]. ', which this request held open ('. $notice['code']. ')',
 					'backups_snapshot_raw' 			=> 'The safety snapshot of '. $notice['params'][0]. ' is the state as it was, with all its files ('. $notice['code']. ')',
 					'backups_companions_left' 	=> 'The files an open database keeps beside itself stand beside '. $notice['params'][0]. ' files of the project, as they were ('. $notice['code']. ')',
 					default 										=> 'Backup '. $date. ' comes from Nino '. $notice['params'][0]. ', this is '. $notice['params'][1]. ' ('. $notice['code']. ')' } );
@@ -849,7 +858,7 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$date					"Y-m-d", "Y-m-d-His" or "pre-restore-Y-m-d-His" (see ID_PATTERN)
-		 *	@param		array|null	&$notice			(reference) Set where the archive comes from another version of Nino than the one that runs: [ 'code' => 'backups_restored_other_version', 'params' => [ from, to ] ]; left as it was otherwise
+		 *	@param		array|null	&$notice			(reference) Set where the archive comes from another version of Nino than the one that runs: [ 'code' => 'backups_restored_other_version', 'params' => [ from, to ] ]; or the notice of a safety snapshot or of files that stand beside a database, the strongest of those that apply (see _restoreFrom()); left as it was otherwise
 		 *	@param		string|null	$key					Raw (not base64) 32-byte key that somebody typed: the archive is opened with it and not with this project's own, and is then judged for what it holds (see _restoreArchive()). Only recovery.php passes one - behind its own secret, and on purpose not the panel
 		 *
 		 *	@return 	true|array								True, or [ http status, message ] - and, where a person can cause it, the code of the failure as a third element, its params as a fourth and, for a restore that is done in part, the fields of the answer that name what it left as a fifth
@@ -1087,9 +1096,10 @@ namespace Nino\Modules\Backups {
 				$hook 		= '';
 				$short 		= [];
 				$raw			= [];
+				$held			= [];
 
 				try {
-					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key, $name, $hook, $short, $raw );
+					$snapshot = self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key, $name, $hook, $short, $raw, $held );
 				}
 				catch( \RuntimeException $e ) {
 
@@ -1115,7 +1125,7 @@ namespace Nino\Modules\Backups {
 					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ] + ( $e->getCode() === \Nino\Backup::WRITE_FAILED ? [ 2 => 'backups_write' ] : [] );
 				}
 
-				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true, $snapshot, $raw, $entered !== null );
+				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true, $snapshot, $raw, $entered !== null, $held );
 			}
 			finally {
 				\Nino\Backup::unlockFiles( $appData, $locks );
@@ -1170,10 +1180,11 @@ namespace Nino\Modules\Backups {
 		 *	@param		string		$snapshot			The id of the safety snapshot
 		 *	@param		array 		$raw					The keys of the features whose files the snapshot holds as they lie
 		 *	@param		bool			$foreign			Whether the archive is not this project's own
+		 *	@param		array 		$held					The archive names of the files the safety snapshot lacks because this request holds a lock on them
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
-		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false, string $snapshot = '', array $raw = [], bool $foreign = false ): true|array {
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false, string $snapshot = '', array $raw = [], bool $foreign = false, array $held = [] ): true|array {
 
 			if( $written === false && @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
 				return [ 500, 'the backup could not be written for unpacking' ];
@@ -1191,6 +1202,7 @@ namespace Nino\Modules\Backups {
 			// there was a note has none, and there is nothing to say then
 			$stagedStamp = $staging. '/nino.php';
 			$copies			 = [];
+			$other			 = null;
 
 			if( is_file( $stagedStamp ) === true ) {
 
@@ -1198,15 +1210,22 @@ namespace Nino\Modules\Backups {
 				unlink( $stagedStamp );
 
 				if( is_array( $stamp ) === true && is_string( $stamp['nino'] ?? null ) === true && $stamp['nino'] !== \Nino\VERSION )
-					$notice = [ 'code' => 'backups_restored_other_version', 'params' => [ $stamp['nino'], \Nino\VERSION ] ];
+					$other = [ 'code' => 'backups_restored_other_version', 'params' => [ $stamp['nino'], \Nino\VERSION ] ];
 
 				// The files a feature handed over whole, as the archive lists them: of those, and of no other file, the companions go (see \Nino\Backup::dropCompanions())
 				$copies = is_array( $stamp ) === true ? ( $stamp['copies'] ?? [] ) : [];
 			}
 
-			// The safety snapshot holds the state of a feature whose hook could not do its work as it was, with all its files: said, and no failure
-			if( $raw !== [] )
-				$notice = $notice ?? [ 'code' => 'backups_snapshot_raw', 'params' => [ implode( ', ', $raw ) ] ];
+			// The answer has one notice, and the strongest of those that apply is the one it carries: the files beside a database that stand and are to be removed by hand
+			// (below, where the restore finds them), then a safety snapshot that lacks the state of files this request held open - what is missing cannot be restored from
+			// it, and the way back after an update is an archive of another version -, then the version the archive comes from, then a safety snapshot that holds a
+			// feature's files as they were. None of them is a failure
+			if( $held !== [] )
+				$notice = [ 'code' => 'backups_snapshot_held', 'params' => [ \Nino\Backup::nameList( $held ) ] ];
+			elseif( $other !== null )
+				$notice = $other;
+			elseif( $raw !== [] )
+				$notice = [ 'code' => 'backups_snapshot_raw', 'params' => [ implode( ', ', $raw ) ] ];
 
 			$configPath = \Nino\Filesystem::getConfigPath( $appData );
 
@@ -1324,7 +1343,7 @@ namespace Nino\Modules\Backups {
 
 			// An archive of another project is not believed about what to take away: the operator is told beside how many files the companions stand
 			if( $left > 0 )
-				$notice = $notice ?? [ 'code' => 'backups_companions_left', 'params' => [ (string) $left ] ];
+				$notice = [ 'code' => 'backups_companions_left', 'params' => [ (string) $left ] ];
 
 			// The files that are read-modify-written by their writers first, so that their locks are let go early: the large trees come last
 			$first		= array_flip( [ 'text', 'elements', 'templates', 'data', 'assets', 'blocks', 'themes', 'fonts', 'images' ] );
@@ -1662,10 +1681,11 @@ namespace Nino\Modules\Backups {
 		 *	@param		string		&$hook				(reference) The key of the feature that was asked for a copy of its data last, '' once none is being asked (see \Nino\Backup::stage())
 		 *	@param		array 		&$short				(reference) Set where the copies the features handed over left the disk without the room for the packing: [ megabytes needed, megabytes free ]
 		 *	@param		array 		&$raw					(reference) The keys of the features whose files the snapshot holds as they lie, because their hook could not hand over a copy
+		 *	@param		array 		&$held				(reference) The archive names of the files the snapshot lacks because this request holds a lock on them (see \Nino\Backup::pack())
 		 *
 		 *	@return 	string									The id of the snapshot, as the list names it
 		 */
-		private static function _safetySnapshot( array &$appData, string $dir, string $key, string $name, string &$hook = '', array &$short = [], array &$raw = [] ): string {
+		private static function _safetySnapshot( array &$appData, string $dir, string $key, string $name, string &$hook = '', array &$short = [], array &$raw = [], array &$held = [] ): string {
 
 			/*	The shape Backups::_create() has, which this had drifted from:
 				the file tempnam() makes was never removed - one per restore,
@@ -1732,7 +1752,7 @@ namespace Nino\Modules\Backups {
 				// One pass over the files, as a backup is made (see \Nino\Backup::pack())
 				$raw = array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) );
 
-				\Nino\Backup::pack( $appData, $manifest, $tmpTar, $notes );
+				\Nino\Backup::pack( $appData, $manifest, $tmpTar, $notes, $held );
 
 				$snapshot	= $dir. '/'. $name. '.php';
 

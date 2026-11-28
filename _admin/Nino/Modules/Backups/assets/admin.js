@@ -127,7 +127,7 @@
 		/**
 		 *	Draw what the list call answered
 		 *
-		 *	@param		{Object}		response			{ archives, uploadLimit, enabled, missed, stopped }
+		 *	@param		{Object}		response			{ archives, uploadLimit, enabled, missed, lacking, stopped }
 		 *
 		 *	@return		void
 		 */
@@ -137,7 +137,7 @@
 			Nino.admin.backups._limit = typeof response.uploadLimit === 'number' && response.uploadLimit > 0 ? response.uploadLimit : 0;
 
 			// A missing 'enabled' is an answer from before there was one
-			Nino.admin.backups._renderList( Array.isArray( response.archives ) === true ? response.archives : [], response.enabled !== false, response.missed, response.stopped );
+			Nino.admin.backups._renderList( Array.isArray( response.archives ) === true ? response.archives : [], response.enabled !== false, response.missed, response.stopped, response.lacking );
 		},
 
 		/**
@@ -184,12 +184,13 @@
 		 *
 		 *	@param		{Object[]}	archives			[ { id, kind: 'daily'|'manual'|'snapshot', size: bytes } ]
 		 *	@param		{boolean}		enabled				Whether backups are on
-		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason, code, file, retry }, the reason empty where it ended without one, the code 'write' where a write failed and 'source' where a file could not be read (the file named, retry: whether the next request tries once more)
+		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason, code, file, retry }, the reason empty where it ended without one, the code 'write' where a write failed, 'source' where a file could not be read (the file named, retry: whether the next request tries once more)
+		 *	@param		{Object=}		lacking				Set while the archive of the day is there and lacks files that the request that made it held open: { file } with their names. No failure
 		 *	@param		{Object=}		stopped				Set while the last run - the daily one or one by hand - ended without an end of its own: { kind, started, files, bytes, cause, limit }, see _stoppedText()
 		 *
 		 *	@return		void
 		 */
-		_renderList : function( archives, enabled, missed, stopped ) {
+		_renderList : function( archives, enabled, missed, stopped, lacking ) {
 
 			const panel = Nino.admin.backups;
 			const wrap = dc.getElementById('backups-list');
@@ -208,6 +209,10 @@
 						: ( noReason === false
 							? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed'), missed.code === 'write' ? Nino.content.getText('/_admin/backups/msg/reason-write') : ( missed.code === 'source' ? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/reason-source'), missed.file ) : missed.reason ) )
 							: ( detail !== '' ? detail+ ' '+ Nino.content.getText('/_admin/backups/msg/stopped-retry') : Nino.content.getText('/_admin/backups/msg/interrupted') ) ) ) );
+
+				// The archive of the day is made and lacks files: said beside the list, in words that do not call it a failure
+				if( typeof lacking === 'object' && lacking !== null )
+					wrap.appendChild( Nino.adminUi.notice( Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed-held'), lacking.file ) ) );
 
 				// Said once: a missed backup that has no reason of its own is that run
 				if( detail !== '' && noReason === false && ( isMissed === true && missed.code === 'write' && stopped.cause === 'disk' ) === false )
@@ -534,7 +539,12 @@
 					return button.focus();
 				}
 
-				const created = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/created'), panel._whenText( response.id ) || response.id );
+				let created = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/created'), panel._whenText( response.id ) || response.id );
+
+				// An archive that lacks files this request held open is made all the same, and its notice - a code and its params,
+				// worded as a failure's is - is said with it, as a restore says its own
+				if( typeof response.notice === 'object' && response.notice !== null )
+					created += ' '+ Nino.adminUi.api.errorText( status, response.notice );
 
 				// The new list replaces the old one; what was made is said once, as the toast
 				panel._apiCall( 'list', {}, function( code, body ) {

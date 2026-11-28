@@ -224,7 +224,7 @@ const recoveryCodes = Object.keys( answered ).filter( function( code ) { return 
 check( 'every code the wizard\'s server gives has a sentence in the table of the wizard, except the one the step reads as a reason and not as a refusal (install_none)', wizardCodes.length > 15
 	&& wizardCodes.filter( function( code ) { return code !== 'install_none' && sentenced( tables['the setup wizard'], code ) === false } ).join() === '' );
 check( 'every code the recovery page can come to has a sentence in the table of that page, except the ones of a notice and of a restore of the workbench\'s own panel', recoveryCodes.length > 15
-	&& recoveryCodes.filter( function( code ) { return [ 'backups_restored_other_version' ].indexOf( code ) === -1 && sentenced( tables['the recovery page'], code ) === false } ).join() === '' );
+	&& recoveryCodes.filter( function( code ) { return [ 'backups_restored_other_version', 'backups_held' ].indexOf( code ) === -1 && sentenced( tables['the recovery page'], code ) === false } ).join() === '' );
 
 // --- no sentence in a script or a template of the two pages --------------------------------
 

@@ -213,6 +213,12 @@ check( '...and with the notice that the safety copy of a feature is the state as
 	findAll( doc.body, el => el.textContent.includes( Nino.recovery.text.de['/_admin/page/error/backups-snapshot-raw'].replace( '%s', 'vault' ) ) ).length >= 1 );
 fire( restoreButton, 'click', { currentTarget : restoreButton } );
 fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
+answer( 'recovery/restore', 200, { restoredDate : '2026-10-02', notice : { code : 'backups_snapshot_held', params : [ 'data/vault.db, data/vault.db-wal' ] } } );
+check( '...and with the notice that the safety copy lacks the state of files this request held open: said, in the sentence of the table of the page, with the names, in both languages',
+	findAll( doc.body, el => el.textContent.includes( Nino.recovery.text.de['/_admin/page/error/backups-snapshot-held'].replace( '%s', 'data/vault.db, data/vault.db-wal' ) ) ).length >= 1
+	&& Nino.recovery.text.en['/_admin/page/error/backups-snapshot-held'].includes( '%s' ) === true && Nino.recovery.text.en['/_admin/page/error/backups-snapshot-held'] !== Nino.recovery.text.de['/_admin/page/error/backups-snapshot-held'] );
+fire( restoreButton, 'click', { currentTarget : restoreButton } );
+fire( dialogButton( Nino.recovery.text.de['/_admin/recovery/restore/confirm-title'] ), 'click' );
 answer( 'recovery/restore', 500, { error : 'decryption failed on the server' } );
 check( 'a refused restore without a code of its own says the general sentence with the status - in the line of its card, never the English of the server',
 	findAll( byId('recovery-restore'), el => el.className.includes('nino-admin-status') ).map( el => el.textContent ).join('') === Nino.recovery.text.de['/_admin/page/error/failed'].replace( '%s', '500' ) );

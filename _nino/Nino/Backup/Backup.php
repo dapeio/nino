@@ -69,15 +69,22 @@ namespace Nino {
 		// Where the system lists the locks that processes hold on files (Linux), read by inUse()
 		private const string LOCKS = '/proc/locks';
 
+		// Where the system says which process this is (Linux): the pid the list of the locks names is the one this link points to, which is not what getmypid() answers in a pid namespace that sees the procfs of its host
+		private const string SELF = '/proc/self';
+
 		// The free bytes a test says the disk has, in place of what the system answers (see freeSpace()): a static of the class, which no file of a project - config.php and so an archive - can set
 		public static ?int $diskFree = null;
 
 		// Where a test points inUse() instead: a static of the class, which no file of a project - config.php and so an archive - can set
 		public static ?string $locksFile = null;
 
+		// Where a test points held() to find the link of the process: a static of the class, which no file of a project - config.php and so an archive - can set
+		public static ?string $selfLink = null;
+
 		// Where a test lets a file go or change in the moment a writer of the project does (see pack()): called with 'looked' and the name of a file that was found there
-		// before anything is decided of it, with 'read' after the files were looked at and before they are read, and with 'failed' after the reading failed and before
-		// the files are looked at once more, the last two with the number of the try. A static of the class, which no file of a project - config.php and so an archive - can set
+		// before anything is decided of it, with 'read' after the files were looked at and before they are read, with 'opening' and the name of a file between the look
+		// of the open and the open itself (see _open()), with 'opened' and the name of a file after the kernel opened and checked it and before php reads it, and with 'failed' after the
+		// writing failed. 'read' and 'failed' come with the number of the try, which is 1. A static of the class, which no file of a project - config.php and so an archive - can set
 		public static ?\Closure $packing = null;
 
 		// How long a restore waits in all, in seconds, for the locks of the writers of the files it puts back (see lockFiles()): a static of the class, which a test
@@ -1315,15 +1322,20 @@ namespace Nino {
 				if( $stat === false )
 					continue;
 
-				// The device as the system lists it: st_dev is major and minor, spread over the bits as the kernel writes them
-				$major = ( ( $stat['dev'] >> 8 ) & 0xfff ) | ( ( $stat['dev'] >> 32 ) & ~0xfff );
-				$minor = ( $stat['dev'] & 0xff ) | ( ( $stat['dev'] >> 12 ) & ~0xff );
-
-				if( isset( $locked[ $major. ':'. $minor. ':'. $stat['ino'] ] ) === true )
+				if( isset( $locked[ self::_lockKey( $stat ) ] ) === true )
 					$busy[] = $name;
 			}
 
 			return $busy;
+		}
+
+		// The device and the inode of a file as the list of the locks names them (see inUse() and held()): st_dev is major and minor, spread over the bits as the kernel writes them
+		private static function _lockKey( array $stat ): string {
+
+			$major = ( ( $stat['dev'] >> 8 ) & 0xfff ) | ( ( $stat['dev'] >> 32 ) & ~0xfff );
+			$minor = ( $stat['dev'] & 0xff ) | ( ( $stat['dev'] >> 12 ) & ~0xff );
+
+			return $major. ':'. $minor. ':'. $stat['ino'];
 		}
 
 		/**
@@ -2508,11 +2520,12 @@ namespace Nino {
 
 			// 'copies': the files a feature handed over (see stage()), the files whose companions a restore takes away; 'raw': the features whose files are in the archive as they lay;
 			// 'links': the names left out as links; 'left', only where there are any: the names of the files that were gone or that are another request's temporary files, left out
-			// (see pack()). A restore reads 'nino' and 'copies' and nothing else of it, so a note that an older kernel does not know is ignored by it, and the stamp of a project
-			// that left nothing out is the one it always was
+			// (see pack()); 'held', only where there are any: the names of the files this request held a lock on, which the archive lacks (see held()). A restore reads 'nino' and
+			// 'copies' and nothing else of it, so a note that an older kernel does not know is ignored by it, and the stamp of a project that left nothing out is the one it always was
 			$left = array_values( (array) ( $notes['left'] ?? [] ) );
+			$held = array_values( (array) ( $notes['held'] ?? [] ) );
 
-			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features, 'copies' => array_values( (array) ( $notes['copies'] ?? [] ) ), 'raw' => array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) ), 'links' => array_values( (array) ( $notes['links'] ?? [] ) ) ] + ( $left === [] ? [] : [ 'left' => $left ] ), true ). ';';
+			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features, 'copies' => array_values( (array) ( $notes['copies'] ?? [] ) ), 'raw' => array_map( 'strval', array_keys( (array) ( $notes['raw'] ?? [] ) ) ), 'links' => array_values( (array) ( $notes['links'] ?? [] ) ) ] + ( $left === [] ? [] : [ 'left' => $left ] ) + ( $held === [] ? [] : [ 'held' => $held ] ), true ). ';';
 		}
 
 		/**
@@ -2560,32 +2573,53 @@ namespace Nino {
 		 *	packing of \Nino\Modules\Backups::_create() and
 		 *	\Nino\Modules\Backups\Admin::_safetySnapshot()
 		 *
+		 *	Every file is read through one descriptor that the kernel opens and checks itself (see _open()), and php is handed that
+		 *	descriptor and opens nothing by a path: what was looked at is what is read. A path that is a folder, a link or a named pipe by
+		 *	the time of the open is never read - a folder would be an empty entry, a link would pack what lies behind it, a pipe would end
+		 *	the request in a wait - and a file that a writer renamed a new file over is read whole, old or new. A file that is not
+		 *	the regular file the manifest names ends the packing with SOURCE_FAILED and its name, as does one whose size or time of change
+		 *	differs after the read from what it was at the open, since an entry of two moments is a torn one - except every name below data/,
+		 *	which is packed as it lies (a database that is written to cannot be read in a moment), and the companions and temporary files
+		 *	named below. The time of change is whole seconds: a write in place that keeps the size within the second of the open is not seen
+		 *
 		 *	Files come and go while a project is written to. What may vanish between the listing and the packing is left out and the stamp says
 		 *	so ('left', and one notice that names the files): the companion of a database and the temporary file of a writer of the kernel
-		 *	(see leavable()); a temporary file that is there is left out as well, for a backup does not carry another request's half of a write. Any
+		 *	(see leavable()); a temporary file that is there is packed like any file. Any
 		 *	other file that is gone, is no file any more or cannot be read ends the packing with SOURCE_FAILED and its name. A file whose
 		 *	companion is listed is read after the companion: a log of writes (-wal) that is gone by then was checkpointed into the main file, and
 		 *	the main file read after it holds what the log held. A raw copy of a database that is written to is no consistent snapshot all the same:
 		 *	pages the file changes while it is read are of two moments, which is why a feature that writes one hands over a copy of it (see stage())
 		 *
+		 *	A file on which this request holds a lock of its own is not opened at all, and not packed (see held()): closing any descriptor of a
+		 *	file ends every lock the process holds on it, so reading it would take the lock of a database in a transaction away from the
+		 *	connection that holds it. It is left out with the files beside it, the stamp names them ('held') and so does one warning of the log,
+		 *	and the names are handed back in $held for the caller to say so to the person who asked. The copies a feature handed over are packed
+		 *	whatever they hold. Where the system does not list the locks (see held()) nothing is known of them and every file is opened
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$manifest			Absolute path -> archive name, see manifest()
 		 *	@param		string		$tar					Where the tar is made; the archive is $tar.'.gz'
 		 *	@param		array 		$notes				What stage() noted, which the stamp carries
+		 *	@param		array 		&$held				(reference) Set: the archive names of the files that were left out because this request holds a lock on them
 		 *
 		 *	@return 	void
 		 *
 		 *	@throws		\RuntimeException				SOURCE_FAILED if a file of the manifest cannot be read or changed while it was packed, WRITE_FAILED if the archive cannot be written
 		 */
-		public static function pack( array &$appData, array $manifest, string $tar, array $notes = [] ): void {
+		public static function pack( array &$appData, array $manifest, string $tar, array $notes = [], array &$held = [] ): void {
 
 			$kinds		= self::leavable( $appData, $manifest, (array) ( $notes['companions'] ?? [] ) );
 			$entries	= self::_ordered( $manifest );
 			$left			= [];
-			$before		= [];
+
+			// What this request holds a lock on is never opened, with what lies beside it
+			$held = self::held( $entries, (array) ( $notes['copies'] ?? [] ) );
+
+			foreach( $held as $name )
+				unset( $entries[$name] );
 
 			// What is gone before the first byte is read: left out, or the end of the run for a file that is none of those. Each file is looked at once and the
-			// answer decides: a second look could find a file gone that the first found there
+			// answer decides; the open that follows is the second look, and what it finds is told apart from what this one found (see _open())
 			foreach( $entries as $name => $absolute ) {
 
 				if( self::_readable( $absolute ) === true ) {
@@ -2593,7 +2627,6 @@ namespace Nino {
 					if( self::$packing !== null )
 						( self::$packing )( 'looked', 0, (string) $name );
 
-					$before[$name] = self::_signature( $absolute );
 					continue;
 				}
 
@@ -2604,83 +2637,55 @@ namespace Nino {
 				unset( $entries[$name] );
 			}
 
+			$gone		= [];
+			$phar		= null;
+
 			// Everything PharData says of a file that cannot be written - a disk that is full - is one sentence, and no path. It says it as a
 			// notice first, and the handler of the kernel ends the request at a notice: so the step runs with a handler of its own
 			// (see raising()), which makes it an exception that is caught here
-			for( $try = 1; ; $try++ ) {
+			try {
 
-				// The stamp is made before the step, which turns every notice into an exception: what it reads is no part of the writing
-				$stamp = self::stamp( $appData, [ 'left' => $left ] + $notes );
+				if( self::$packing !== null )
+					( self::$packing )( 'read', 1 );
 
-				try {
+				self::raising( static function() use ( $tar, $entries, $kinds, &$gone, &$phar ): void {
 
-					if( self::$packing !== null )
-						( self::$packing )( 'read', $try );
+					$phar = new \PharData( $tar );
 
-					self::raising( static function() use ( $tar, $entries, $stamp ): void {
+					$phar->buildFromIterator( self::_handles( $entries, $kinds, $gone ) );
+				} );
 
-						$phar = new \PharData( $tar );
+				$left = array_merge( $left, $gone );
 
-						$phar->buildFromIterator( new \ArrayIterator( $entries ) );
-						$phar->addFromString( 'nino.php', $stamp );
+				// Made after the files, which says what the packing left out, and outside the step, which turns every notice into an exception: what it reads is no part of the writing
+				$stamp = self::stamp( $appData, [ 'left' => $left, 'held' => $held ] + $notes );
 
-						// Written out to the tar before it is touched below, and before the handler of the step is gone
-						unset( $phar );
-					} );
+				self::raising( static function() use ( &$phar, $stamp ): void {
 
-					break;
-				}
-				catch( \PharException | \UnexpectedValueException | \BadMethodCallException | \ErrorException $failed ) {
+					$phar->addFromString( 'nino.php', $stamp );
 
-					// What was written of the tar is of the entries that were, and the next try makes the tar once more
-					@unlink( $tar );
+					// Written out to the tar before it is touched below, and before the handler of the step is gone
+					$phar = null;
+				} );
+			}
+			catch( \PharException | \UnexpectedValueException | \BadMethodCallException | \ErrorException $failed ) {
 
-					if( self::$packing !== null )
-						( self::$packing )( 'failed', $try );
+				// What php says here is a write that failed: no file is opened by php, and a file that cannot be read ends the run in _handles()
+				$phar = null;
+				@unlink( $tar );
 
-					// Each file is looked at once, and the answer decides. A file that is gone is left out where it may vanish and ends the run, named, where it is
-					// a real one: the packing is made once more without the first, which reads the main file of a companion after the companion
-					$gone		= [];
-					$named	= [];
-					$opened = str_contains( $failed->getMessage(), 'could not be opened' ) === true;
+				if( self::$packing !== null )
+					( self::$packing )( 'failed', 1 );
 
-					foreach( $entries as $name => $absolute ) {
+				throw new \RuntimeException( 'the backup could not be written: there was no room left, or a file could not be written', self::WRITE_FAILED );
+			}
+			catch( \RuntimeException $source ) {
 
-						if( self::_readable( $absolute ) === false )
-							$gone[$name] = $absolute;
-						elseif( str_contains( $failed->getMessage(), '"'. $absolute. '"' ) === true || str_contains( $failed->getMessage(), '"'. $name. '"' ) === true )
-							$named[$name] = $absolute;
-					}
+				// SOURCE_FAILED out of _handles(): what was written of the tar is of the entries that were
+				$phar = null;
+				@unlink( $tar );
 
-					foreach( array_keys( $gone ) as $name )
-						if( isset( $kinds[$name] ) === false )
-							throw self::sourceFailure( (string) $name );
-
-					// The file that php names - it could not open it, or could not write its contents - and that is there: another file than the one that was listed, gone
-					// and back, is the end of the run for a real file, and for a companion or a temporary file that php could not open it is one more that is left out.
-					// A file that changed elsewhere while a write failed proves nothing: php did not name it
-					foreach( $named as $name => $absolute ) {
-
-						if( isset( $kinds[$name] ) === false && ( $opened === true || self::_signature( $absolute ) !== $before[$name] ) )
-							throw self::sourceFailure( (string) $name, true );
-
-						if( isset( $kinds[$name] ) === true && $opened === true )
-							$gone[$name] = $absolute;
-					}
-
-					if( $gone !== [] ) {
-
-						foreach( array_keys( $gone ) as $name ) {
-							$left[] = (string) $name;
-							unset( $entries[$name] );
-						}
-
-						continue;
-					}
-
-					// Nothing went and nothing php named is another: what failed is the write
-					throw new \RuntimeException( 'the backup could not be written: there was no room left, or a file could not be written', self::WRITE_FAILED );
-				}
+				throw $source;
 			}
 
 			self::_modes( $tar );
@@ -2689,7 +2694,211 @@ namespace Nino {
 			@unlink( $tar );
 
 			if( $left !== [] )
-				trigger_error( 'Backup: '. count( $left ). ' file(s) were gone or another request\'s temporary files and are left out of the archive: '. implode( ', ', array_map( static fn( string $name ): string => substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $name ), 0, 80 ), array_slice( $left, 0, 10 ) ) ). ( count( $left ) > 10 ? ', ...' : '' ), E_USER_NOTICE );
+				trigger_error( 'Backup: '. count( $left ). ' file(s) were gone or another request\'s temporary files and are left out of the archive: '. self::nameList( $left ), E_USER_NOTICE );
+
+			if( $held !== [] )
+				trigger_error( 'Backup: '. count( $held ). ' file(s) are held open by this request - a database in a transaction - and are left out of the archive, which lacks that state: '. self::nameList( $held ), E_USER_WARNING );
+		}
+
+		/**
+		 *	Names for a sentence of the log or of an answer: printable ascii, each cut, the first ten
+		 *
+		 *	@param		array 		$names				Archive names
+		 *
+		 *	@return 	string									The names, comma separated, '...' behind them where there are more
+		 */
+		public static function nameList( array $names ): string {
+			return implode( ', ', array_map( static fn( mixed $name ): string => substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', (string) $name ), 0, 80 ), array_slice( array_values( $names ), 0, 10 ) ) ). ( count( $names ) > 10 ? ', ...' : '' );
+		}
+
+		/**
+		 *	The archive names of the entries whose files this process holds a lock on, with the files beside them: a file that is opened and closed by
+		 *	this very process loses the locks the process holds on it, whichever descriptor opened it (a transaction of a database that the request
+		 *	holds is such a lock), so such a file is never opened to be packed. A database in write-ahead mode holds locks on its -shm as well, so the
+		 *	companions (-wal, -shm, -journal) of a held file are held with it and the main file of a held companion with that: a log of writes is no
+		 *	use without its main file, and is worse than none beside an older one
+		 *
+		 *	How it is told: the list of the locks the system keeps ('/proc/locks', or the file a test names in $locksFile), read once, and the
+		 *	lines of kind POSIX that carry the pid of this process as the system names it (the process the link '/proc/self' points to, getmypid() where the system says none), by device and inode. The locks the kernel takes itself are flock() and listed as FLOCK,
+		 *	and a lock of the kind OFD is not ended by another descriptor's close: neither is held. The copies a feature handed over ($copies, archive
+		 *	names) are not held whatever they hold, they are packed. Where the list cannot be read (a system that is not Linux, a restricted one) or holds no lock of this
+		 *	process, nothing is held and no file is looked at
+		 *
+		 *	@param		array 		$entries			Archive name -> absolute path, see _ordered()
+		 *	@param		array 		$copies				The archive names of the copies the features handed over
+		 *
+		 *	@return 	array										The archive names that are held, in the order of the entries
+		 */
+		public static function held( array $entries, array $copies = [] ): array {
+
+			$list = @file_get_contents( self::$locksFile ?? self::LOCKS );
+
+			if( $list === false || $list === '' )
+				return [];
+
+			$pid		= (int) basename( (string) @readlink( self::$selfLink ?? self::SELF ) ) ?: getmypid();
+			$locked = [];
+
+			foreach( explode( "\n", $list ) as $line )
+				if( preg_match( '/^\d+:\s+POSIX\s+\S+\s+\S+\s+(\d+)\s+([0-9a-f]+):([0-9a-f]+):(\d+)\s/', $line, $match ) === 1 && (int) $match[1] === $pid )
+					$locked[ hexdec( $match[2] ). ':'. hexdec( $match[3] ). ':'. $match[4] ] = true;
+
+			if( $locked === [] )
+				return [];
+
+			$held = [];
+
+			foreach( $entries as $name => $absolute ) {
+
+				clearstatcache( true, $absolute );
+				$stat = @stat( $absolute );
+
+				if( $stat !== false && isset( $locked[ self::_lockKey( $stat ) ] ) === true )
+					$held[(string) $name] = true;
+			}
+
+			foreach( array_keys( $held ) as $name ) {
+
+				$name = (string) $name;
+				$base = self::_companion( $name ) ?? $name;
+
+				foreach( [ '', ...self::COMPANIONS ] as $suffix )
+					if( isset( $entries[$base. $suffix] ) === true )
+						$held[$base. $suffix] = true;
+			}
+
+			foreach( $copies as $name )
+				unset( $held[(string) $name] );
+
+			return array_values( array_filter( array_map( 'strval', array_keys( $entries ) ), static fn( string $name ): bool => isset( $held[$name] ) === true ) );
+		}
+
+		/**
+		 *	Open a file of the manifest for reading, the one descriptor the packing reads it through. The sequence is what makes it the file that
+		 *	was meant and no other, and nothing in it waits:
+		 *
+		 *	1. lstat() must say a regular file: a folder, a link, a pipe, a device or a socket is never opened
+		 *	2. fopen() with 'n', which opens without waiting: a named pipe that was put there since step 1 has no writer, and a plain open would
+		 *	   wait for one for as long as the request lives
+		 *	3. fstat() of the descriptor must say a regular file with the device and the inode of step 1. Where it says another inode, the path is
+		 *	   looked at once more: a writer that renamed a new file over the path made the file the descriptor reads the one the path names at that moment,
+		 *	   and that is a file like any other; where the path names another file than the descriptor reads, or none, the open was of something else
+		 *	4. the stream waits as a stream does
+		 *
+		 *	The inode of the look that came before (see pack()) is not compared: a writer of the kernel renames a new file over the path, which is legitimate,
+		 *	and file systems reuse inode numbers (1,000 rewrites of one file on ext4 gave 3 different numbers)
+		 *
+		 *	A parent folder that was swapped for a link is followed, as the open of any path follows it: both the lstat and the open see the file behind it and agree, and it needs
+		 *	write access to the tree
+		 *
+		 *	@param		string		$name					The archive name, which the test hook is told
+		 *	@param		string		$absolute			Absolute path of the file
+		 *
+		 *	@return 	resource|false|null					The descriptor; null where the file is gone or cannot be read; false where it is no regular file, is a link, or is another file than the path names
+		 */
+		private static function _open( string $name, string $absolute ): mixed {
+
+			clearstatcache( true, $absolute );
+			$look = @lstat( $absolute );
+
+			if( $look === false )
+				return null;
+
+			if( ( $look['mode'] & 0170000 ) !== 0100000 )
+				return false;
+
+			if( self::$packing !== null )
+				( self::$packing )( 'opening', 0, $name );
+
+			$handle = @fopen( $absolute, 'rbn' );
+
+			if( $handle === false )
+				return null;
+
+			$open = fstat( $handle );
+
+			if( ( $open['mode'] & 0170000 ) !== 0100000 ) {
+				fclose( $handle );
+				return false;
+			}
+
+			if( $open['ino'] !== $look['ino'] || $open['dev'] !== $look['dev'] ) {
+
+				clearstatcache( true, $absolute );
+				$second = @lstat( $absolute );
+
+				if( $second === false || ( $second['mode'] & 0170000 ) !== 0100000 || $second['ino'] !== $open['ino'] || $second['dev'] !== $open['dev'] ) {
+					fclose( $handle );
+					return false;
+				}
+			}
+
+			stream_set_blocking( $handle, true );
+
+			return $handle;
+		}
+
+		/**
+		 *	The entries as php reads them: archive name => descriptor, each opened by _open() when php asks for it and closed when php has read it, so
+		 *	that one descriptor of the packing is open at a time. A file that is gone or cannot be read at the open is left out where it may vanish
+		 *	(leavable(), named in $gone) and ends the run where it is a real one; a file that is no regular file, or another one than the path names,
+		 *	ends the run as one that changed. After php has read a file the bytes it took, the size and the time of change are compared with those at the open: a file that
+		 *	was written to in place meanwhile is a torn entry, which ends the run as one that changed - except every name below data/, the kernel's own data/*.php included
+		 *	(those are written by a rename and cannot be torn), which is packed as it lies, as the manual of the features promises (a raw safety snapshot of a database
+		 *	that is written to would never be made, and a restore that has to be made would not begin), and a companion or a temporary file, which are left out where they
+		 *	are gone and are packed as they are. The time of change is whole seconds, so a write in place that keeps the size within the second of the open is not seen
+		 *
+		 *	@param		array 		$entries			Archive name -> absolute path
+		 *	@param		array 		$kinds				leavable() of the manifest
+		 *	@param		array 		&$gone				(reference) The archive names that were left out at the open
+		 *
+		 *	@return 	\Generator
+		 *
+		 *	@throws		\RuntimeException				SOURCE_FAILED, which php lets out of the step as it is
+		 */
+		private static function _handles( array $entries, array $kinds, array &$gone ): \Generator {
+
+			foreach( $entries as $name => $absolute ) {
+
+				$name		= (string) $name;
+				$handle = self::_open( $name, $absolute );
+
+				if( is_resource( $handle ) === false ) {
+
+					if( isset( $kinds[$name] ) === true ) {
+						$gone[] = $name;
+						continue;
+					}
+
+					throw self::sourceFailure( $name, $handle === false );
+				}
+
+				$opened = fstat( $handle );
+				$size		= (int) $opened['size'];
+				$time		= (int) $opened['mtime'];
+
+				try {
+
+					if( self::$packing !== null )
+						( self::$packing )( 'opened', 0, $name );
+
+					yield $name => $handle;
+
+					$read		= ftell( $handle );
+					$after	= fstat( $handle );
+				}
+				finally {
+
+					if( is_resource( $handle ) === true )
+						fclose( $handle );
+				}
+
+				// Every name below data/ is packed as it lies, whatever its size did meanwhile: what a feature keeps there is written in place, and the manual says it is packed as it
+				// lies; the kernel's own data/*.php are written by a rename and cannot be torn, so the exemption costs nothing there. The time of change, not the time of the status:
+				// the unlink of a rename writer changes the status of the old file, which is read whole
+				if( ( $read !== $size || (int) $after['size'] !== $size || (int) $after['mtime'] !== $time ) && isset( $kinds[$name] ) === false && str_starts_with( $name, 'data/' ) === false )
+					throw self::sourceFailure( $name, true );
+			}
 		}
 
 		/**
@@ -2739,22 +2948,6 @@ namespace Nino {
 			clearstatcache( true, $absolute );
 
 			return is_file( $absolute ) === true && @is_readable( $absolute ) === true;
-		}
-
-		/**
-		 *	What tells a file that was read from the file that is there at the time of the look: its size, the time it was changed and its inode
-		 *
-		 *	@param		string		$absolute
-		 *
-		 *	@return 	array|null								null where it is gone
-		 */
-		private static function _signature( string $absolute ): ?array {
-
-			clearstatcache( true, $absolute );
-
-			$stat = @stat( $absolute );
-
-			return $stat === false ? null : [ $stat['size'], $stat['mtime'], $stat['ino'] ];
 		}
 
 		/**

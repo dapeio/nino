@@ -278,6 +278,16 @@ check( '...and the focus is on the new button of the list, not left on the page'
 check( '...and shows the new archive first, and says what was made as a toast, not in the line', dateRows().join(',') === '2024-05-03-101500,2024-05-03,2024-05-02,2024-05-01'
 	&& toasts().length === 1 && toasts()[0] === text('/_admin/backups/msg/created').replace( '%s', when('2024-05-03 10:15') ) && messageText() === '' );
 
+// An archive that lacks files this request held open is made all the same: the answer carries a notice - a code and its params, worded the way a failure's is - and
+// the toast says it after "created"
+requests.length = 0;
+fire( nowButton(), 'click' );
+answer( 200, { id : '2024-05-03-101500', notice : { code : 'backups_held', params : [ 'data/ledger.sqlite, data/ledger.sqlite-wal' ] } } );
+answer( 200, { archives : [ archive('2024-05-03-101500'), archive('2024-05-03'), archive('2024-05-02'), archive('2024-05-01') ], enabled : true } );
+check( 'a backup that lacks files the request held open says so in its toast, after the sentence that it was made, with the names',
+	toasts().length === 1 && toasts()[0] === text('/_admin/backups/msg/created').replace( '%s', when('2024-05-03 10:15') ) + ' '+ text('/_admin/error/backups_held').replace( '%s', 'data/ledger.sqlite, data/ledger.sqlite-wal' )
+	&& text('/_admin/error/backups_held').includes( '%s' ) === true );
+
 requests.length = 0;
 fire( nowButton(), 'click' );
 answer( 500, { error : 'backup encryption key is invalid' } );
@@ -332,6 +342,14 @@ panel.init();
 answer( 200, { archives : [], enabled : true, missed : { reason : '' } } );
 check( 'a missed one that ended without a reason still says something', noticeOf().length === 1 && noticeOf()[0].textContent !== ''
 	&& nowButton() !== null );
+
+// The archive of the day is made and lacks files that the request that made it held open: said in words of its own, with the names, as text, and with the archive in the list
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { archives : [ archive('2024-05-03') ], enabled : true, missed : null, lacking : { file : bait } } );
+check( 'a daily archive that lacks held files is a notice above the list that says which, as text, and the archive is in the list', noticeOf().length === 1 && noticeOf()[0].textContent === text('/_admin/backups/msg/missed-held').replace( '%s', bait )
+	&& noticeOf()[0].children.length === 0 && dateRows().join(',') === '2024-05-03' && nowButton() !== null && text('/_admin/backups/msg/missed-held').includes( '%s' ) === true );
 
 mount.innerHTML = '';
 requests.length = 0;

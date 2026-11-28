@@ -287,8 +287,10 @@ namespace Nino\Modules {
 
 				$cause = null;
 
+				$held = [];
+
 				try {
-					self::_create( $appData, $dir, $path, $run );
+					self::_create( $appData, $dir, $path, $run, $held );
 				} catch( \Throwable $e ) {
 					$cause = self::_cause( $e );
 					self::_noteAttempt( $dir, $today, self::_reason( $e ), self::_code( $e ), (string) ( \Nino\Backup::sourceName( $e ) ?? '' ), $retry );
@@ -297,7 +299,13 @@ namespace Nino\Modules {
 					self::_end( $run, $cause );
 				}
 
-				@unlink( $dir. '/'. self::ATTEMPT_FILE );
+				// The archive of the day is made. Where it lacks files that the request held open (see \Nino\Backup::held()), the note of the day says so with the code 'held' and
+				// no retry: the next request makes nothing more of the day (the archive is there), and a note that is not one of a failure is what missed() hands on to the panel
+				if( $held === [] )
+					@unlink( $dir. '/'. self::ATTEMPT_FILE );
+				else
+					self::_noteAttempt( $dir, $today, 'the archive of the day lacks files that the request held open', 'held', \Nino\Backup::nameList( $held ) );
+
 				self::_prune( $dir, self::_keep( $appData, 'daily' ), self::_keep( $appData, 'manual' ), basename( $path ) );
 
 				// Through the kernel's writer, which needs nothing of the workbench's
@@ -333,10 +341,11 @@ namespace Nino\Modules {
 		 *	Admin::log()), not written here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$held				(reference) Set: the archive names of the files the archive lacks because this request holds a lock on them (see \Nino\Backup::held())
 		 *
 		 *	@return 	string|array						The new archive's id ("Y-m-d-His-manual"), or [ http status, message ] - and, where a write failed, a file could not be read or the archives are named by a later time than the clock says, the code the panel words it by as a third element
 		 */
-		public static function now( array &$appData ): string|array {
+		public static function now( array &$appData, array &$held = [] ): string|array {
 
 			if( ( $appData['/nino/admin/backups'] ?? true ) === false )
 				return [ 409, 'backups are switched off' ];
@@ -367,7 +376,7 @@ namespace Nino\Modules {
 				$cause 	= null;
 
 				try {
-					self::_create( $appData, $dir, $dir. '/'. $id. '.php', $run );
+					self::_create( $appData, $dir, $dir. '/'. $id. '.php', $run, $held );
 				} catch( \Throwable $e ) {
 					$cause = self::_cause( $e );
 					throw $e;
@@ -376,8 +385,10 @@ namespace Nino\Modules {
 				}
 
 				// An archive that was made is the way out of a day that went
-				// without one: the next request may try the daily one again
-				@unlink( $dir. '/'. self::ATTEMPT_FILE );
+				// without one: the next request may try the daily one once more. The note
+				// of a daily archive that lacks files stays: the day's archive is still the one
+				if( ( self::_readAttempt( $dir )['code'] ?? '' ) !== 'held' )
+					@unlink( $dir. '/'. self::ATTEMPT_FILE );
 				self::_prune( $dir, self::_keep( $appData, 'daily' ), self::_keep( $appData, 'manual' ), $id. '.php' );
 
 				return $id;
@@ -413,7 +424,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array|null							[ 'reason' => what the attempt reported, '' where it ended without a word, 'code' => 'write' or 'source' where the panel words the reason, 'file' => the name of the file of a 'source', 'retry' => whether the next request makes one more attempt ], or null
+		 *	@return 	array|null							[ 'reason' => what the attempt reported, '' where it ended without a word, 'code' => 'write' or 'source' where the panel words the reason, 'file' => the name of the file of a 'source', 'retry' => whether the next request makes one more attempt ], or null. It answers for a daily that failed and for nothing else: a daily archive that was made and lacks files is told by lacking()
 		 */
 		public static function missed( array &$appData ): ?array {
 
@@ -423,6 +434,10 @@ namespace Nino\Modules {
 				return null;
 
 			$note = self::_readAttempt( $dir );
+
+			// The note of a daily archive that lacks files (see lacking()) is no failure: where that archive is gone, the day's run is made on the next request
+			if( $note !== null && ( $note['code'] ?? '' ) === 'held' )
+				return null;
 
 			// A request that ended in a hook left no word of its own: the record of the run knows which feature it was asking
 			if( $note !== null && $note['reason'] === '' ) {
@@ -436,6 +451,26 @@ namespace Nino\Modules {
 			return $note === null || $note['date'] !== date( 'Y-m-d' ) ? null : [ 'reason' => $note['reason'] ]
 				+ ( isset( $note['code'] ) === true ? [ 'code' => $note['code'] ] : [] )
 				+ ( ( $note['code'] ?? '' ) === 'source' ? [ 'file' => $note['file'] ?? '', 'retry' => ( $note['retried'] ?? false ) !== true ] : [] );
+		}
+
+		/**
+		 *	What today's daily archive lacks, while it does: the archive of the day is there and was made without the files that the request that made it held a lock on (see
+		 *	\Nino\Backup::held()), and the note of the day says so. That is no failure and no reason for a second attempt - the feature would hold the files each time -, so
+		 *	missed() does not answer for it. The note of an earlier day is no note of today, and an archive that was taken away ends it. Shared by the Backups panel, which says so
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|null							[ 'file' => the archive names of the files it lacks, as the log names them ], or null
+		 */
+		public static function lacking( array &$appData ): ?array {
+
+			$dir	= self::dir( $appData );
+			$note = self::_readAttempt( $dir );
+
+			if( $note === null || ( $note['code'] ?? '' ) !== 'held' || $note['date'] !== date( 'Y-m-d' ) || is_file( $dir. '/'. date( 'Y-m-d' ). '.php' ) === false )
+				return null;
+
+			return [ 'file' => $note['file'] ?? '' ];
 		}
 
 		/**
@@ -496,7 +531,8 @@ namespace Nino\Modules {
 
 			$note = self::_readAttempt( $dir );
 
-			return $note !== null && $note['date'] === $today;
+			// The note of a daily archive that lacks files (code 'held') is no attempt that failed: where the archive is gone, the day's run is made once more
+			return $note !== null && $note['date'] === $today && ( $note['code'] ?? '' ) !== 'held';
 		}
 
 		/**
@@ -504,7 +540,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *
-		 *	@return 	array|null							[ 'date' => "Y-m-d", 'reason' => string ] and, where the attempt reported one, 'code' ('write' or 'source'), the 'file' of a 'source' and whether it was a 'retried' attempt; or null where there is none or it is not one
+		 *	@return 	array|null							[ 'date' => "Y-m-d", 'reason' => string ] and, where the attempt reported one, 'code' ('write', 'source' or 'held'), the 'file' of a 'source' or 'held' and whether it was a 'retried' attempt; or null where there is none or it is not one
 		 */
 		private static function _readAttempt( string $dir ): ?array {
 
@@ -513,11 +549,11 @@ namespace Nino\Modules {
 			if( $note === null || is_string( $note['date'] ?? null ) === false || is_string( $note['reason'] ?? null ) === false )
 				return null;
 
-			$code = in_array( $note['code'] ?? null, [ 'write', 'source' ], true ) === true ? $note['code'] : '';
+			$code = in_array( $note['code'] ?? null, [ 'write', 'source', 'held' ], true ) === true ? $note['code'] : '';
 
 			return [ 'date' => $note['date'], 'reason' => $note['reason'] ]
 				+ ( $code !== '' ? [ 'code' => $code ] : [] )
-				+ ( $code === 'source' ? [ 'file' => is_string( $note['file'] ?? null ) === true ? $note['file'] : '' ] : [] )
+				+ ( $code === 'source' || $code === 'held' ? [ 'file' => is_string( $note['file'] ?? null ) === true ? $note['file'] : '' ] : [] )
 				+ ( ( $note['retried'] ?? null ) === true ? [ 'retried' => true ] : [] );
 		}
 
@@ -550,15 +586,15 @@ namespace Nino\Modules {
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$date					"Y-m-d" of the day the attempt began
 		 *	@param		string		$reason				What the attempt reported, '' while there is none
-		 *	@param		string		$code					What kind of failure it was, where the panel words it: 'write', 'source', '' otherwise
-		 *	@param		string		$file					The name in the archive of the file that could not be read, for the code 'source'
+		 *	@param		string		$code					What kind of failure it was, where the panel words it: 'write', 'source', '' otherwise; 'held' for the note of an archive that was made and lacks files
+		 *	@param		string		$file					The name in the archive of the file that could not be read, for the code 'source'; the names of the files the archive lacks, for 'held'
 		 *	@param		bool			$retried			Whether this is the one more attempt that a failure of the code 'source' allows, the last of the day
 		 *
 		 *	@return 	void
 		 */
 		private static function _noteAttempt( string $dir, string $date, string $reason, string $code = '', string $file = '', bool $retried = false ): void {
 
-			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, self::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) + ( $code === 'source' ? [ 'file' => $file ] : [] ) + ( $retried === true ? [ 'retried' => true ] : [] ) ) ). self::STUB_SUFFIX );
+			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, self::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) + ( $code === 'source' || $code === 'held' ? [ 'file' => $file ] : [] ) + ( $retried === true ? [ 'retried' => true ] : [] ) ) ). self::STUB_SUFFIX );
 		}
 
 		/**
@@ -959,10 +995,11 @@ namespace Nino\Modules {
 		 *	@param		string		$dir					Absolute path to the backup directory
 		 *	@param		string		$path					Absolute path of the backup file to write: today's, or the timed archive's
 		 *	@param		\stdClass	$run					The run this is part of, see _begin()
+		 *	@param		array 		&$held				(reference) Set: the archive names of the files the archive lacks because this request holds a lock on them (see \Nino\Backup::pack())
 		 *
 		 *	@return 	void
 		 */
-		private static function _create( array &$appData, string $dir, string $path, \stdClass $run ): void {
+		private static function _create( array &$appData, string $dir, string $path, \stdClass $run, array &$held = [] ): void {
 
 			// A feature that is switched on and whose manifest is refused owns data this run cannot name
 			// (Backup::manifest() reads the manifests of the features it knows): the archive would lack it
@@ -1031,7 +1068,7 @@ namespace Nino\Modules {
 
 			$tmpTar = $run->temp. '.tar';
 
-			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar, $notes );
+			\Nino\Backup::pack( $appData, $plan['manifest'], $tmpTar, $notes, $held );
 
 			// Sealed chunk by chunk while it is written, to a file beside the archive that a rename makes one
 			self::publish( $path, \Nino\Backup\Seal::pieces( $tmpTar. '.gz', $key ), $run );
