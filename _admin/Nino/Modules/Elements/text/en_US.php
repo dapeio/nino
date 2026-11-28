@@ -192,4 +192,13 @@ return [
 	'[[/_admin/error/elements_wrong_type]]'	=> 'The value of “%s” is not of the kind the field takes.',
 	'[[/_admin/error/elements_missing_key]]'	=> '“%s” is required.',
 	'[[/_admin/error/elements_value_refused]]'	=> 'The value of “%s” is not one this field allows.',
+	'[[/_admin/error/elements_type_unknown]]'	=> 'This element type does not exist.',
+	'[[/_admin/error/elements_uri_invalid]]'	=> 'The element URI is not valid: it must not be empty or contain a slash, and a new one must begin with a letter (a-z) or a digit and may only consist of such letters, digits, hyphens and underscores.',
+	'[[/_admin/error/elements_locale_invalid]]'	=> 'This language is not available.',
+	'[[/_admin/error/elements_unknown]]'	=> 'This element does not exist.',
+	'[[/_admin/error/elements_exists]]'	=> 'An element with this URI exists.',
+	'[[/_admin/error/elements_reference]]'	=> 'A reference field holds what it does not allow: an element of another type, one element twice, or more entries than the field takes.',
+	'[[/_admin/error/elements_insert_not_allowed]]'	=> 'Your account may not add elements of this type.',
+	'[[/_admin/error/elements_delete_not_allowed]]'	=> 'Your account may not delete elements of this type.',
+	'[[/_admin/error/elements_vetoed]]'	=> 'The change was refused and has not been made.',
 ];

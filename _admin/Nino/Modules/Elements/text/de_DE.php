@@ -192,4 +192,13 @@ return [
 	'[[/_admin/error/elements_wrong_type]]'	=> 'Der Wert von „%s“ hat nicht die Art, die das Feld nimmt.',
 	'[[/_admin/error/elements_missing_key]]'	=> '„%s“ ist ein Pflichtfeld.',
 	'[[/_admin/error/elements_value_refused]]'	=> 'Der Wert von „%s“ ist für dieses Feld nicht erlaubt.',
+	'[[/_admin/error/elements_type_unknown]]'	=> 'Diesen Elementtyp gibt es nicht.',
+	'[[/_admin/error/elements_uri_invalid]]'	=> 'Die Element-URI ist nicht gültig: Sie darf nicht leer sein und keinen Schrägstrich enthalten; eine neue muss mit einem Buchstaben (a-z) oder einer Ziffer beginnen und darf nur aus solchen Buchstaben, Ziffern, Bindestrichen und Unterstrichen bestehen.',
+	'[[/_admin/error/elements_locale_invalid]]'	=> 'Diese Sprache ist nicht verfügbar.',
+	'[[/_admin/error/elements_unknown]]'	=> 'Dieses Element gibt es nicht.',
+	'[[/_admin/error/elements_exists]]'	=> 'Ein Element mit dieser URI gibt es schon.',
+	'[[/_admin/error/elements_reference]]'	=> 'Ein Verweisfeld enthält, was es nicht nimmt: ein Element eines anderen Typs, ein Element doppelt oder mehr Einträge, als das Feld aufnimmt.',
+	'[[/_admin/error/elements_insert_not_allowed]]'	=> 'Dein Konto darf Elemente dieses Typs nicht anlegen.',
+	'[[/_admin/error/elements_delete_not_allowed]]'	=> 'Dein Konto darf Elemente dieses Typs nicht löschen.',
+	'[[/_admin/error/elements_vetoed]]'	=> 'Die Änderung wurde abgelehnt und ist nicht gemacht worden.',
 ];

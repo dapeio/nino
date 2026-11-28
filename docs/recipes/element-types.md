@@ -129,6 +129,14 @@ Admin editor and tests together.
 treat client controls as a security boundary. When an enum or length is a
 runtime invariant, validate it in the owning server-side operation too.
 
+Code that saves or deletes an element for a person, from a surface outside the
+workbench, calls `\Nino\Elements::save()` and `remove()`: they make every check
+of the Elements panel - the uri, the language, the rights of the account per
+type and field, the html, the image rule, the values - and answer an array with
+a code at every refusal ([Elements from a feature](../features.md#elements-from-a-feature)).
+`insertElement()`, `updateElement()` and `deleteElement()` check none of that and
+are for code that needs no such checks.
+
 ## Complete type file
 
 An installable `services.php` can contain:

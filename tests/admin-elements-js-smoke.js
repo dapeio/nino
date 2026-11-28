@@ -438,6 +438,15 @@ forget();
 save();
 answer( 500, null );
 check( 'a failure that names no field is said in the line of the bar alone', sentences().length === 0 && lineState().dataset.state === 'error' && lineState().textContent.indexOf('500') !== -1 );
+forget();
+save();
+answer( 400, { error : 'Element \'/hammers/hammer\' does not exist.', code : 'elements_unknown' } );
+check( 'a refusal that carries a code of the kernel for no field is said in the line of the bar in the words of the workbench for that code, not in the English sentence', sentences().length === 0 && lineState().dataset.state === 'error'
+	&& lineState().textContent.indexOf( text('/_admin/error/elements_unknown') ) !== -1 && lineState().textContent.indexOf('/hammers/hammer') === -1 );
+forget();
+save();
+answer( 403, { error : 'not allowed to add elements of this type', code : 'elements_insert_not_allowed' } );
+check( '...as is a refusal of a right', lineState().dataset.state === 'error' && lineState().textContent.indexOf( text('/_admin/error/elements_insert_not_allowed') ) !== -1 && lineState().textContent.indexOf('(403)') === -1 );
 
 // --- a new element -------------------------------------------------------------------
 

@@ -813,7 +813,7 @@ check( 'a copy, which the panel sends as a new element, is refused the same way'
 check( 'the version in another language is refused the same way, and the veto is told the language', $status === 400 && $body['field'] === 'stop' && ( $vetoSeen[ array_key_last( $vetoSeen ) ][2] ?? '' ) === 'en_US' );
 
 [ $status, $body ] = $save( [ 'uri' => 'good', 'fields' => [ 'title' => 'Gut', 'start' => 1, 'stop' => 2 ] ] );
-check( 'a failure that is no veto is answered as itself - the refusals of the save before are not its answer', $status === 400 && array_keys( $body ) === [ 'error' ] && in_array( $body['error'], [ 'The end lies before the start.', 'The start lies after the end.' ], true ) === false );
+check( 'a failure that is no veto is answered as itself, with the code of its kind - the refusals of the save before are not its answer', $status === 400 && array_keys( $body ) === [ 'error', 'code' ] && $body['code'] === 'elements_exists' && in_array( $body['error'], [ 'The end lies before the start.', 'The start lies after the end.' ], true ) === false );
 
 $vetoMode = 'two';
 [ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
@@ -839,7 +839,7 @@ check( 'three refusals are three fields, the first of them the field and the sen
 
 $vetoMode = 'plain';
 [ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
-check( 'a veto that names no field is answered with a sentence of the kernel alone - the body is the error and nothing else', $status === 400 && array_keys( $body ) === [ 'error' ] && is_string( $body['error'] ) === true && $body['error'] !== '' );
+check( 'a veto that names no field is answered with a sentence of the kernel and the code of a veto - the body is the error and the code and nothing else', $status === 400 && array_keys( $body ) === [ 'error', 'code' ] && $body['code'] === 'elements_vetoed' && is_string( $body['error'] ) === true && $body['error'] !== '' );
 
 $vetoMode = 'none';
 [ $status, $body ] = $save( [ 'uri' => 'free', 'fields' => [ 'title' => 'Frei', 'start' => 5, 'stop' => 2 ] ] );
@@ -1581,6 +1581,321 @@ check( 'reading the element for the form does not write its file', (string) file
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'labelcopy', 'title' => 'L', 'model' => [ 'a' => [ 'type' => 'string', 'label' => [ 'de_DE' => 'Eins', 'en_US' => 'One' ] ], 'b' => [ 'type' => 'string', 'label' => '' ], 'c' => [ 'type' => 'string', 'label' => [ 'de_DE' => 5 ] ] ] ] );
 $labelled = \Nino\Filesystem::getFileContent( $appData, '/elements/labelcopy.php', [] )['model'] ?? [];
 check( 'a type created with labels keeps those that are words in a language or in many, and drops what is none', $status === 200 && ( $labelled['a']['label'] ?? null ) === [ 'de_DE' => 'Eins', 'en_US' => 'One' ] && isset( $labelled['b']['label'] ) === false && isset( $labelled['c']['label'] ) === false );
+
+echo "\n";
+
+
+// --- The public functions of \Nino\Elements, and the panel's actions on them -------
+
+echo "Elements API - POST /_admin answers what \\Nino\\Elements answers, byte for byte, every refusal with its code\n";
+
+/** One POST /_admin through the token check and the dispatcher: the status and the bytes the client gets */
+function liveBytes( array &$appData, string $action, array $data ): array {
+
+	$_POST = [ 'action' => $action, 'data' => json_encode( $data ), '_csrf' => \Nino\Csrf::getToken( $appData ) ];
+	$request = [ 'REQUEST_METHOD' => 'POST', 'REQUEST_URI' => '/_admin', 'REMOTE_ADDR' => '127.0.0.1' ];
+
+	ninoBoot( $appData );
+	\Nino\Http::request( $appData, $request );
+	\Nino\Http::response( $appData, $request );
+
+	$final = $request;
+	( new \ReflectionMethod( \Nino\Http::class, '_finalizeResponse' ) )->invokeArgs( null, [ &$final ] );
+	unset( $_POST['_csrf'], $_POST['action'], $_POST['data'] );
+
+	return [ (int) $request['/nino/http/response']['statusCode'], (string) ( $final['/nino/http/response']['body'] ?? '' ) ];
+}
+
+/** The bytes of a body as the response writes them */
+function bytesOf( array $body ): string {
+	return (string) json_encode( $body, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
+}
+
+ninoWireLive( $appData );
+
+\Nino\Elements::insertElementType( $appData, '/apitype', [
+	'title'	=> [ 'type' => 'string', 'required' => true ],
+	'body'	=> [ 'type' => 'string', 'locale' => true ],
+	'count'	=> [ 'type' => 'integer' ],
+	'kind'	=> [ 'type' => 'string', 'whitelist' => [ 'a', 'b' ] ],
+	'ref'		=> [ 'type' => 'element', 'elementType' => 'apitype' ],
+	'pic'		=> [ 'type' => 'image', 'width' => 10, 'height' => 10 ],
+	'html'	=> [ 'type' => 'string', 'html' => true ],
+] );
+\Nino\Elements::insertElement( $appData, '/apitype/first', [ 'title' => 'First', 'body' => 'Erster', 'count' => 1 ], 'de_DE' );
+
+foreach( [
+	'api-door'			=> [ '/_admin/elements/manage' ],
+	'api-described'	=> [ '/_admin/elements/manage', '/_admin/elements/apitype/update/title' ],
+	'api-blanket'		=> [ '/_admin/elements/manage', '/_admin/elements/*' ],
+] as $local => $perms )
+	\Nino\Auth::insertUser( $appData, $local. '@example.com', 'correct horse battery staple', $perms );
+
+$apiVeto = false;
+$apiRefuse = '';
+$apiWarn = '';
+$apiGuard = static function( array &$appData, mixed &$data ) use ( &$apiVeto, &$apiRefuse, &$apiWarn ): mixed {
+	if( $apiWarn === 'callback' )
+		trigger_error( 'a callback that talks', E_USER_WARNING );
+	if( $apiWarn === 'listener' ) {
+		trigger_error( 'the listener says no', E_USER_WARNING );
+		return false;
+	}
+	if( $apiWarn === 'silenced' ) {
+		@file_get_contents( '/nonexistent-directory/never.json' );
+		return false;
+	}
+	if( $apiRefuse === 'one' )
+		return \Nino\Elements::refuse( $appData, 'title', 'the title is taken', 'apitype_taken' );
+	if( $apiRefuse === 'two' ) {
+		\Nino\Elements::refuse( $appData, 'title', 'one', 'some_code' );
+		return \Nino\Elements::refuse( $appData, 'nofield', 'general sentence', '' );
+	}
+	return $apiVeto === true ? false : null;
+};
+foreach( [ '/nino/elements/apitype/update', '/nino/elements/apitype/insert', '/nino/elements/delete/apitype' ] as $callbackName )
+	\Nino\Callbacks::registerCallback( $appData, $callbackName, $apiGuard );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/committed', static function( array &$appData, mixed &$data ) use ( &$apiWarn ): void {
+	if( $apiWarn === 'committed' )
+		trigger_error( 'a hook that talks', E_USER_WARNING );
+} );
+
+ninoUser( $appData, 'api-admin@example.com', [ '/*' ] );
+
+// The status and the bytes of every refusal of get, save and delete: what the panel answered with the line of its code gained, in the order of the body
+$refusals = [
+	[ 'get, a type that is none', 'elements/get', [ 'type' => 'nope', 'uri' => 'first' ], 404, [ 'error' => 'unknown type or element', 'code' => 'elements_type_unknown' ] ],
+	[ 'get, an empty uri', 'elements/get', [ 'type' => 'apitype', 'uri' => '' ], 404, [ 'error' => 'unknown type or element', 'code' => 'elements_uri_invalid' ] ],
+	[ 'get, a uri with a slash', 'elements/get', [ 'type' => 'apitype', 'uri' => 'a/b' ], 404, [ 'error' => 'unknown type or element', 'code' => 'elements_uri_invalid' ] ],
+	[ 'get, an element nobody holds', 'elements/get', [ 'type' => 'apitype', 'uri' => 'ghost' ], 404, [ 'error' => 'element not found', 'code' => 'elements_unknown' ] ],
+	[ 'save, a type that is none', 'elements/save', [ 'type' => 'nope', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_type_unknown' ] ],
+	[ 'save, an empty uri', 'elements/save', [ 'type' => 'apitype', 'uri' => '', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_uri_invalid' ] ],
+	[ 'save, a uri with a slash', 'elements/save', [ 'type' => 'apitype', 'uri' => 'a/b', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_uri_invalid' ] ],
+	[ 'save, a new uri that is no slug', 'elements/save', [ 'type' => 'apitype', 'uri' => 'Bad uri!', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_uri_invalid' ] ],
+	[ 'save, a locale the site does not serve', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'zz_ZZ', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_locale_invalid' ] ],
+	[ 'save, a uri with a slash in a locale the site does not serve: the uri is the reason', 'elements/save', [ 'type' => 'apitype', 'uri' => 'a/b', 'locale' => 'zz_ZZ', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_uri_invalid' ] ],
+	[ 'save, a type that is none with a uri and a locale that are none either: the type is the reason', 'elements/save', [ 'type' => 'nope', 'uri' => '', 'locale' => 'zz_ZZ', 'fields' => [] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_type_unknown' ] ],
+	[ 'save, no locale', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_locale_invalid' ] ],
+	[ 'save, an image set by its name', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'pic' => 'elements/apitype/x.png' ] ], 400, [ 'error' => 'an image is set by uploading it: pic', 'code' => 'elements_image_upload', 'params' => [ 'pic' ], 'field' => 'pic' ] ],
+	[ 'save, a value of the wrong type', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'count' => 'abc' ] ], 400, [ 'error' => 'Wrong var type \'count\' in \'/apitype/first\'. \'integer\' required, \'string\' given.', 'code' => 'elements_wrong_type', 'params' => [ 'count' ], 'field' => 'count' ] ],
+	[ 'save, a required key emptied', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => '' ] ], 400, [ 'error' => 'Missing required element key \'title\' in \'/apitype/first\'.', 'code' => 'elements_missing_key', 'params' => [ 'title' ], 'field' => 'title' ] ],
+	[ 'save, a value that is not on the whitelist', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'kind' => 'z' ] ], 400, [ 'error' => 'Element value \'kind\' is not whitelisted.', 'code' => 'elements_value_refused', 'params' => [ 'kind' ], 'field' => 'kind' ] ],
+	[ 'save, a reference into another type', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'ref' => '/other/x' ] ], 400, [ 'error' => 'Element reference \'ref\' in \'/apitype/first\' must point into \'apitype\', got \'/other/x\'.', 'code' => 'elements_reference', 'params' => [ 'ref' ], 'field' => 'ref' ] ],
+	[ 'save, an element made twice', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'Element \'/apitype/first\' already exists.', 'code' => 'elements_exists' ] ],
+	[ 'save, an element that is none', 'elements/save', [ 'type' => 'apitype', 'uri' => 'ghost', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'Element \'/apitype/ghost\' does not exist.', 'code' => 'elements_unknown' ] ],
+	[ 'delete, a type that is none', 'elements/delete', [ 'type' => 'nope', 'uri' => 'first' ], 400, [ 'error' => 'invalid type or uri', 'code' => 'elements_type_unknown' ] ],
+	[ 'delete, an empty uri', 'elements/delete', [ 'type' => 'apitype', 'uri' => '' ], 400, [ 'error' => 'invalid type or uri', 'code' => 'elements_uri_invalid' ] ],
+	[ 'delete, a uri with a slash', 'elements/delete', [ 'type' => 'apitype', 'uri' => 'a/b' ], 400, [ 'error' => 'invalid type or uri', 'code' => 'elements_uri_invalid' ] ],
+];
+
+foreach( $refusals as [ $label, $action, $data, $expectedStatus, $expectedBody ] ) {
+	[ $status, $bytes ] = liveBytes( $appData, $action, $data );
+	check( 'POST '. $label. ': '. $expectedStatus. ' and the bytes of the sentence with its code', $status === $expectedStatus && $bytes === bytesOf( $expectedBody ) );
+}
+
+check( 'the bytes of a refusal that gained its code: the sentence, then the code line, in the writing of the response', liveBytes( $appData, 'elements/get', [ 'type' => 'apitype', 'uri' => 'ghost' ] ) === [ 404, "{\n    \"error\": \"element not found\",\n    \"code\": \"elements_unknown\"\n}" ] );
+
+// The same answers come out of the function, whose result the panel's body is made from
+foreach( [
+	[ 'get of an element nobody holds', 'elements/get', [ 'type' => 'apitype', 'uri' => 'ghost' ], \Nino\Elements::read( $appData, 'apitype', 'ghost' ) ],
+	[ 'save of an element made twice', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], \Nino\Elements::save( $appData, 'apitype', 'first', 'de_DE', [ 'title' => 'X' ], [ 'new' => true ] ) ],
+	[ 'delete in a type that is none', 'elements/delete', [ 'type' => 'nope', 'uri' => 'first' ], \Nino\Elements::remove( $appData, 'nope', 'first' ) ],
+] as [ $label, $action, $data, $result ] ) {
+	[ $status, $bytes ] = liveBytes( $appData, $action, $data );
+	check( 'the function and the panel answer a '. $label. ' alike: the status, and the sentence and code of the body', $result['ok'] === false && $status === $result['status'] && $bytes === bytesOf( [ 'error' => $result['error'], 'code' => $result['code'] ] ) );
+}
+
+// A veto of a callback, a refusal of one with a field and with two sentences
+$apiVeto = true;
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ] );
+check( 'POST save, an update that a callback vetoes without a word: 400 \'save failed\' with elements_vetoed', $status === 400 && $bytes === bytesOf( [ 'error' => 'save failed', 'code' => 'elements_vetoed' ] ) );
+$apiVeto = false;
+$apiRefuse = 'one';
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ] );
+check( 'POST save, a callback that refuses a field with a code: its sentence, its own code, the field and the list of fields', $status === 400 && $bytes === bytesOf( [ 'error' => 'the title is taken', 'code' => 'apitype_taken', 'field' => 'title', 'fields' => [ [ 'field' => 'title', 'error' => 'the title is taken', 'code' => 'apitype_taken' ] ] ] ) );
+$apiRefuse = 'two';
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ] );
+check( 'POST save, a callback that refuses with two sentences: the general one, no code, the field of the first and the list', $status === 400 && $bytes === bytesOf( [ 'error' => 'general sentence', 'field' => 'title', 'fields' => [ [ 'field' => 'title', 'error' => 'one', 'code' => 'some_code' ] ] ] ) );
+$apiRefuse = '';
+$apiVeto = true;
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apitype', 'uri' => 'first' ] );
+check( 'POST delete, a callback that vetoes: 409 \'delete vetoed\' with elements_vetoed', $status === 409 && $bytes === bytesOf( [ 'error' => 'delete vetoed', 'code' => 'elements_vetoed' ] ) );
+$apiVeto = false;
+
+// The return value of the delete decides, not the notices that fall while it runs: an element that is gone is gone, its pictures with it,
+// and the answer is 200 - through the function and through the panel's action alike
+$warnedPicture = 'elements/apitype/warned.10x10.png';
+foreach( [ 'callback' => 'a callback of the delete that raises a warning', 'committed' => 'a hook of /nino/elements/committed that raises a warning' ] as $mode => $what ) {
+	foreach( [ 'function', 'POST' ] as $through ) {
+		$apiWarn = '';
+		\Nino\Elements::insertElement( $appData, '/apitype/warned', [ 'title' => 'Warned', 'pic' => $warnedPicture ], 'de_DE' );
+		\Nino\Filesystem::putFileContent( $appData, '/images/'. $warnedPicture, 'bytes' );
+		$apiWarn = $mode;
+		ninoWarnings();
+		if( $through === 'function' ) {
+			$result = \Nino\Elements::remove( $appData, 'apitype', 'warned' );
+			$answered = $result === [ 'ok' => true ];
+		}
+		else {
+			[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apitype', 'uri' => 'warned' ] );
+			$answered = $status === 200 && $bytes === "{\n    \"ok\": true\n}";
+		}
+		$apiWarn = '';
+		check( ucfirst( $through ). ' delete with '. $what. ': ok, the element is gone and so is its picture', $answered === true
+			&& \Nino\Elements::getElement( $appData, '/apitype/warned', 'de_DE' ) === false && \Nino\Elements::getElement( $appData, '/apitype/warned', 'en_US' ) === false
+			&& \Nino\Filesystem::fileExists( $appData, '/images/'. $warnedPicture ) === false && ninoWarnings() === [] );
+	}
+}
+
+// The same for a save: a warning on the way is no refusal of a write that went through
+foreach( [ 'callback' => 'a callback of the update that raises a warning', 'committed' => 'a hook of /nino/elements/committed that raises a warning' ] as $mode => $what ) {
+	ninoWarnings();
+	$apiWarn = $mode;
+	[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'Warned '. $mode ] ] );
+	$apiWarn = '';
+	$saved = json_decode( $bytes, true );
+	check( 'POST save with '. $what. ': 200, and the element is written', $status === 200 && ( $saved['element']['title'] ?? null ) === 'Warned '. $mode && ( \Nino\Elements::getElement( $appData, '/apitype/first', 'de_DE' )['title'] ?? null ) === 'Warned '. $mode && ninoWarnings() === [] );
+}
+\Nino\Elements::updateElement( $appData, '/apitype/first', [ 'title' => 'First' ], 'de_DE' );
+
+// The answers of success are the ones the panel always gave
+[ $status, $bytes ] = liveBytes( $appData, 'elements/get', [ 'type' => 'apitype', 'uri' => 'first' ] );
+check( 'POST get: 200 and global, locales and raw, with no ok in the body', $status === 200 && $bytes === bytesOf( [ 'global' => [ 'title' => 'First', 'count' => 1, 'kind' => null, 'ref' => null, 'pic' => null, 'html' => null ], 'locales' => array_replace( array_fill_keys( \Nino\Locales::getAvailableLocales( $appData ), [ 'body' => null ] ), [ 'de_DE' => [ 'body' => 'Erster' ] ] ), 'raw' => [ '*' => [ 'title' => 'First', 'count' => 1 ], 'de_DE' => [ 'body' => 'Erster' ] ] ] ) );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'second', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [ 'title' => 'Second' ] ] );
+$saved = json_decode( $bytes, true );
+check( 'POST save: 200 and element and nextUri, with no ok in the body', $status === 200 && array_keys( $saved ) === [ 'element', 'nextUri' ] && $saved['nextUri'] === '' && $saved['element']['.uri'] === '/apitype/second' );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apitype', 'uri' => 'second' ] );
+check( 'POST delete: 200 and {"ok": true}', $status === 200 && $bytes === "{\n    \"ok\": true\n}" );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apitype', 'uri' => 'second' ] );
+check( 'POST delete of an element that is gone: 200 all the same', $status === 200 && $bytes === "{\n    \"ok\": true\n}" );
+
+// The scoped rights refuse in the function, and the panel says what it says
+ninoUser( $appData, 'api-described@example.com', [ '/_admin/elements/manage', '/_admin/elements/apitype/update/title' ] );
+foreach( [
+	[ 'insert', 'elements/save', [ 'type' => 'apitype', 'uri' => 'third', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [ 'title' => 'X' ] ], 403, [ 'error' => 'not allowed to add elements of this type', 'code' => 'elements_insert_not_allowed' ] ],
+	[ 'a field', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'count' => 2 ] ], 403, [ 'error' => 'not allowed to change the field(s) count', 'code' => 'elements_fields_not_allowed', 'params' => [ 'count' ], 'field' => 'count' ] ],
+	[ 'delete', 'elements/delete', [ 'type' => 'apitype', 'uri' => 'first' ], 403, [ 'error' => 'not allowed to delete elements of this type', 'code' => 'elements_delete_not_allowed' ] ],
+] as [ $label, $action, $data, $expectedStatus, $expectedBody ] ) {
+	[ $status, $bytes ] = liveBytes( $appData, $action, $data );
+	check( 'POST '. $label. ' of an account described in detail: 403 and the bytes of the sentence with its code', $status === $expectedStatus && $bytes === bytesOf( $expectedBody ) );
+}
+
+// What the panel answered before the functions, kept: an unknown field is asked like the others, the right to delete a numbered type's
+// element is asked, the language is checked before the right to insert, and only a real true is a new element
+\Nino\Elements::insertElementType( $appData, '/apinum', [ 'title' => [ 'type' => 'string' ] ], true );
+$numbered = \Nino\Elements::insertElement( $appData, '/apinum/', [ 'title' => 'Numbered' ], 'de_DE' );
+foreach( [
+	[ 'a field the model does not have', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'nosuchfield' => 'X' ] ], 403, [ 'error' => 'not allowed to change the field(s) nosuchfield', 'code' => 'elements_fields_not_allowed', 'params' => [ 'nosuchfield' ], 'field' => 'nosuchfield' ] ],
+	[ 'a field the model does not have beside one it may change', 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'Y', 'nosuchfield' => 'X' ] ], 403, [ 'error' => 'not allowed to change the field(s) nosuchfield', 'code' => 'elements_fields_not_allowed', 'params' => [ 'nosuchfield' ], 'field' => 'nosuchfield' ] ],
+	[ 'delete of an element of a numbered type', 'elements/delete', [ 'type' => 'apinum', 'uri' => basename( (string) ( $numbered['.uri'] ?? '' ) ) ], 403, [ 'error' => 'not allowed to delete elements of this type', 'code' => 'elements_delete_not_allowed' ] ],
+	[ 'a new element in a language the site does not serve: the language is the reason, not the right to insert', 'elements/save', [ 'type' => 'apitype', 'uri' => 'zz1', 'isNew' => true, 'locale' => 'zz_ZZ', 'fields' => [ 'title' => 'X' ] ], 400, [ 'error' => 'invalid type, uri or locale', 'code' => 'elements_locale_invalid' ] ],
+] as [ $label, $action, $data, $expectedStatus, $expectedBody ] ) {
+	[ $status, $bytes ] = liveBytes( $appData, $action, $data );
+	check( 'POST '. $label. ' of an account described in detail: '. $expectedStatus. ' and the bytes of the sentence with its code', $status === $expectedStatus && $bytes === bytesOf( $expectedBody ) );
+}
+check( '...the numbered element is still there', $numbered !== false && \Nino\Elements::getElement( $appData, (string) $numbered['.uri'], 'de_DE' ) !== false );
+check( '...and nothing of the refused saves was written', ( \Nino\Elements::getElement( $appData, '/apitype/first', 'de_DE' )['title'] ?? null ) === 'First' && \Nino\Elements::getElement( $appData, '/apitype/zz1', 'de_DE' ) === false );
+
+// isNew is a new element only as a boolean true: "true" and 1 are an update, as they were
+\Nino\Auth::logoutUser( $appData );
+ninoUser( $appData, 'api-admin@example.com', [ '/*' ] );
+foreach( [ 'the string "true"' => 'true', 'the number 1' => 1, 'a missing key' => null ] as $what => $isNew ) {
+	$post = [ 'type' => 'apitype', 'locale' => 'de_DE', 'fields' => [ 'title' => 'Flag' ] ] + ( $isNew === null ? [] : [ 'isNew' => $isNew ] );
+	[ $status, $bytes ] = liveBytes( $appData, 'elements/save', $post + [ 'uri' => 'isnew-flag' ] );
+	check( 'POST save with isNew as '. $what. ' of an element that is none: an update, so 400 \'does not exist\' and nothing is made', $status === 400 && $bytes === bytesOf( [ 'error' => 'Element \'/apitype/isnew-flag\' does not exist.', 'code' => 'elements_unknown' ] ) && \Nino\Elements::getElement( $appData, '/apitype/isnew-flag', 'de_DE' ) === false );
+	[ $status, $bytes ] = liveBytes( $appData, 'elements/save', $post + [ 'uri' => 'first' ] );
+	check( '...of one that is there: an update, 200', $status === 200 && ( json_decode( $bytes, true )['element']['title'] ?? null ) === 'Flag' );
+}
+\Nino\Elements::updateElement( $appData, '/apitype/first', [ 'title' => 'First' ], 'de_DE' );
+ninoUser( $appData, 'api-described@example.com', [ '/_admin/elements/manage', '/_admin/elements/apitype/update/title' ] );
+
+// Accounts that hold exactly one of the rights of a type: the one that adds may not delete, the one that deletes may not add
+\Nino\Elements::insertElementType( $appData, '/apishots', [ 'title' => [ 'type' => 'string' ], 'pic' => [ 'type' => 'image', 'width' => 10, 'height' => 10 ] ] );
+foreach( [ 'api-inserter' => '/_admin/elements/apishots/insert', 'api-deleter' => '/_admin/elements/apishots/delete' ] as $local => $perm )
+	\Nino\Auth::insertUser( $appData, $local. '@example.com', 'correct horse battery staple', [ '/_admin/elements/manage', $perm ] );
+$noFields = [ 'title' => false, 'pic' => false ];
+$rightsOfShots = static function( array &$appData ): array {
+	[ $status, $bytes ] = liveBytes( $appData, 'elements/types', [] );
+	foreach( $status === 200 ? ( json_decode( $bytes, true )['types'] ?? [] ) : [] as $type )
+		if( $type['type'] === 'apishots' )
+			return $type['rights'];
+	return [];
+};
+ninoUser( $appData, 'api-inserter@example.com', [ '/_admin/elements/manage', '/_admin/elements/apishots/insert' ] );
+check( 'an account that holds exactly the insert right of a type: rights() and the panel\'s types say it may add, may not delete and changes no field', \Nino\Elements::rights( $appData, 'apishots' ) === [ 'insert' => true, 'delete' => false, 'update' => $noFields ] && $rightsOfShots( $appData ) === [ 'insert' => true, 'delete' => false, 'update' => $noFields ] );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apishots', 'uri' => 'shot', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [] ] );
+check( '...POST save of a new element with no field: 200', $status === 200 && \Nino\Elements::getElement( $appData, '/apishots/shot', 'de_DE' ) !== false );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apishots', 'uri' => 'shot' ] );
+check( '...POST delete: 403 and the bytes of the sentence with its code, the element stays', $status === 403 && $bytes === bytesOf( [ 'error' => 'not allowed to delete elements of this type', 'code' => 'elements_delete_not_allowed' ] ) && \Nino\Elements::getElement( $appData, '/apishots/shot', 'de_DE' ) !== false );
+ninoUser( $appData, 'api-deleter@example.com', [ '/_admin/elements/manage', '/_admin/elements/apishots/delete' ] );
+check( 'an account that holds exactly the delete right of a type: rights() and the panel\'s types say it may delete, may not add and changes no field', \Nino\Elements::rights( $appData, 'apishots' ) === [ 'insert' => false, 'delete' => true, 'update' => $noFields ] && $rightsOfShots( $appData ) === [ 'insert' => false, 'delete' => true, 'update' => $noFields ] );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apishots', 'uri' => 'shot2', 'isNew' => true, 'locale' => 'de_DE', 'fields' => [] ] );
+check( '...POST save of a new element: 403 and the bytes of the sentence with its code, nothing is made', $status === 403 && $bytes === bytesOf( [ 'error' => 'not allowed to add elements of this type', 'code' => 'elements_insert_not_allowed' ] ) && \Nino\Elements::getElement( $appData, '/apishots/shot2', 'de_DE' ) === false );
+
+// An element with a picture stays with its picture where the delete is refused: POST, by an account without the right and by a listener
+\Nino\Elements::insertElement( $appData, '/apishots/pictured', [ 'title' => 'P', 'pic' => 'elements/apishots/pictured.10x10.png' ], 'de_DE' );
+\Nino\Filesystem::putFileContent( $appData, '/images/elements/apishots/pictured.10x10.png', 'bytes' );
+$shotStands = static fn(): bool => \Nino\Elements::getElement( $appData, '/apishots/pictured', 'de_DE' ) !== false && \Nino\Filesystem::fileExists( $appData, '/images/elements/apishots/pictured.10x10.png' ) === true;
+ninoUser( $appData, 'api-inserter@example.com', [ '/_admin/elements/manage', '/_admin/elements/apishots/insert' ] );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apishots', 'uri' => 'pictured' ] );
+check( 'POST delete by an account without the right: 403, and the element and its picture stay', $status === 403 && $shotStands() === true );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/delete/apishots', $apiGuard );
+ninoUser( $appData, 'api-deleter@example.com', [ '/_admin/elements/manage', '/_admin/elements/apishots/delete' ] );
+$apiWarn = 'listener';
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apishots', 'uri' => 'pictured' ] );
+$apiWarn = '';
+check( 'POST delete that a listener vetoes with a notice of its own: 409, its sentence, elements_vetoed, and the element and its picture stay', $status === 409 && $bytes === bytesOf( [ 'error' => 'the listener says no', 'code' => 'elements_vetoed' ] ) && $shotStands() === true );
+$apiVeto = true;
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apishots', 'uri' => 'pictured' ] );
+$apiVeto = false;
+check( 'POST delete that a listener vetoes without a word: 409 \'delete vetoed\', and the element and its picture stay', $status === 409 && $bytes === bytesOf( [ 'error' => 'delete vetoed', 'code' => 'elements_vetoed' ] ) && $shotStands() === true );
+\Nino\Callbacks::removeCallbacks( $appData, '/nino/elements/delete/apishots' );
+
+// The order of the checks of the delete, each request with two mistakes
+foreach( [
+	[ 'a type that is none and an empty uri: the type', [ 'type' => 'nope', 'uri' => '' ], [ 'error' => 'invalid type or uri', 'code' => 'elements_type_unknown' ], 400 ],
+	[ 'an empty uri and no right to delete: the uri', [ 'type' => 'apitype', 'uri' => '' ], [ 'error' => 'invalid type or uri', 'code' => 'elements_uri_invalid' ], 400 ],
+	[ 'a uri with a slash and no right to delete: the uri', [ 'type' => 'apitype', 'uri' => 'a/b' ], [ 'error' => 'invalid type or uri', 'code' => 'elements_uri_invalid' ], 400 ],
+] as [ $label, $data, $expectedBody, $expectedStatus ] ) {
+	[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', $data );
+	check( 'POST delete, '. $label, $status === $expectedStatus && $bytes === bytesOf( $expectedBody ) );
+}
+
+// A write that php's own warning under an @ is part of is judged by what the write answers
+ninoUser( $appData, 'api-admin@example.com', [ '/*' ] );
+$apiWarn = 'silenced';
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'title' => 'Silenced' ] ] );
+check( 'POST save, a veto callback that silences a warning with @: 400 \'save failed\' with elements_vetoed - php\'s sentence is not the answer', $status === 400 && $bytes === bytesOf( [ 'error' => 'save failed', 'code' => 'elements_vetoed' ] ) );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/delete', [ 'type' => 'apitype', 'uri' => 'first' ] );
+$apiWarn = '';
+check( 'POST delete, the same: 409 \'delete vetoed\' with elements_vetoed, and the element stays', $status === 409 && $bytes === bytesOf( [ 'error' => 'delete vetoed', 'code' => 'elements_vetoed' ] ) && \Nino\Elements::getElement( $appData, '/apitype/first', 'de_DE' ) !== false );
+
+// The rule of the image field is asked after the rights of the fields
+ninoUser( $appData, 'api-described@example.com', [ '/_admin/elements/manage', '/_admin/elements/apitype/update/title' ] );
+[ $status, $bytes ] = liveBytes( $appData, 'elements/save', [ 'type' => 'apitype', 'uri' => 'first', 'locale' => 'de_DE', 'fields' => [ 'pic' => 'elements/apitype/x.10x10.png' ] ] );
+check( 'POST save of an image field by a name, by an account that may not change the field: 403 elements_fields_not_allowed, not the image rule', $status === 403 && $bytes === bytesOf( [ 'error' => 'not allowed to change the field(s) pic', 'code' => 'elements_fields_not_allowed', 'params' => [ 'pic' ], 'field' => 'pic' ] ) );
+
+// rights() is what the types answer says for the same account
+$rightsOf = static function( array &$appData ): array {
+	[ $status, $bytes ] = liveBytes( $appData, 'elements/types', [] );
+	$types = $status === 200 ? ( json_decode( $bytes, true )['types'] ?? [] ) : [];
+	foreach( $types as $type )
+		if( $type['type'] === 'apitype' )
+			return $type['rights'];
+	return [];
+};
+
+foreach( [ 'api-admin' => 'an account with every right', 'api-door' => 'an account that holds the door alone, not described in detail', 'api-described' => 'an account described in detail', 'api-blanket' => 'an account with the blanket over the elements' ] as $local => $who ) {
+	ninoUser( $appData, $local. '@example.com', [ '/*' ] );
+	$fromPanel = $rightsOf( $appData );
+	check( 'rights() is what the panel\'s types answer says of '. $who, $fromPanel !== [] && \Nino\Elements::rights( $appData, 'apitype' ) === $fromPanel && array_keys( $fromPanel ) === [ 'insert', 'delete', 'update' ] && array_keys( $fromPanel['update'] ) === [ 'title', 'body', 'count', 'kind', 'ref', 'pic', 'html' ] );
+}
+check( '...the account described in detail has the one field, and no insert, no delete', ( static function() use ( &$appData ): bool {
+	ninoUser( $appData, 'api-described@example.com', [ '/*' ] );
+	return \Nino\Elements::rights( $appData, 'apitype' ) === [ 'insert' => false, 'delete' => false, 'update' => [ 'title' => true, 'body' => false, 'count' => false, 'kind' => false, 'ref' => false, 'pic' => false, 'html' => false ] ];
+} )() );
+\Nino\Auth::logoutUser( $appData );
+check( 'with no account signed in the panel refuses the types and the function narrows nothing', liveBytes( $appData, 'elements/types', [] )[0] === 401 && \Nino\Elements::rights( $appData, 'apitype' )['insert'] === true && \Nino\Elements::rights( $appData, 'apitype' )['delete'] === true && in_array( false, \Nino\Elements::rights( $appData, 'apitype' )['update'], true ) === false );
 
 echo "\n";
 

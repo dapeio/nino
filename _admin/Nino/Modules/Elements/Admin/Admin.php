@@ -46,7 +46,7 @@ namespace Nino\Modules\Elements {
 		 *	all is \Nino\Admin\Admin::scoped()'s call - a role holding none
 		 *	of these keeps what MANAGE_PERM has always meant.
 		 */
-		public const string SCOPE = '/_admin/elements/';
+		public const string SCOPE = \Nino\Elements::SCOPE;
 
 		public static function actions(): array {
 			return [
@@ -143,7 +143,7 @@ namespace Nino\Modules\Elements {
 					'model' 				=> self::_labelled( $appData, $typeData['model'] ?? [] ),
 					// What this account may do here - the form draws itself from
 					// it rather than offering controls the save would refuse
-					'rights' 				=> self::rights( $appData, $type, $typeData['model'] ?? [] ),
+					'rights' 				=> self::rights( $appData, $type ),
 					// The fields that have a textfill icon for this account, with the notation each takes
 					'fills' 				=> (object) self::fillFields( $appData, $type, $typeData['model'] ?? [] ),
 					'autoincrement' => $next !== null,
@@ -389,97 +389,20 @@ namespace Nino\Modules\Elements {
 			$type = \Nino\Admin\Admin::postString( $data, 'type' );
 			$uri	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
-				\Nino\Http::fail( $request, 404, 'unknown type or element' );
+			// The checks are \Nino\Elements::read()'s, which answers a result and no response
+			$result = \Nino\Elements::read( $appData, $type, $uri );
+
+			if( $result['ok'] === false ) {
+				self::_fail( $request, $result );
 				return;
 			}
 
-			$typeData = self::typeData( $appData, $type );
-			$model = $typeData['model'] ?? [];
-			[ $globalKeys, $localeKeys ] = self::splitModel( $model );
-
-			$global 	= [];
-			$locales	= [];
-			$found		= false;
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-
-				$element = \Nino\Elements::getElement( $appData, '/'. $type. '/'. $uri, $locale, [] );
-
-				if( $element === [] )
-					continue;
-
-				$found = true;
-
-				foreach( $globalKeys as $key )
-					$global[$key] = self::shownValue( $model[$key] ?? [], $element[$key] ?? null );
-
-				$locales[$locale] = [];
-				foreach( $localeKeys as $key )
-					$locales[$locale][$key] = self::shownValue( $model[$key] ?? [], $element[$key] ?? null );
-			}
-
-			if( $found === false ) {
-				\Nino\Http::fail( $request, 404, 'element not found' );
-				return;
-			}
-
-			\Nino\Http::ok( $request, [
-				'global' 	=> $global,
-				'locales' => $locales,
-				'raw' 		=> self::rawBuckets( $typeData, $uri ),
-			] );
+			unset( $result['ok'] );
+			\Nino\Http::ok( $request, $result );
 		}
 
 		/**
-		 *	The code of a refusal the kernel words in English when it saves an element: a value of the wrong type, a required key that is missing,
-		 *	a value that is not allowed. The key it is about is the parameter of the sentence and the field of the answer
-		 *
-		 *	@param		string|null		$message		What \Nino\Elements said
-		 *
-		 *	@return 	array|null									[ code, key ], null for a sentence this does not know (a veto of the project's own is its own words)
-		 */
-		private static function _coded( ?string $message ): ?array {
-
-			if( $message === null )
-				return null;
-
-			foreach( [
-				'/^Wrong var type \'(.*?)\' in \'/s'					=> 'elements_wrong_type',
-				'/^Missing required element key \'(.*?)\' in \'/s'	=> 'elements_missing_key',
-				'/^Element value \'(.*?)\' is (?:not whitelisted|blacklisted)\.$/s'	=> 'elements_value_refused',
-			] as $pattern => $code )
-				if( preg_match( $pattern, $message, $found ) === 1 )
-					return [ $code, $found[1] ];
-
-			return null;
-		}
-
-		/**
-		 *	What the form shows of a stored value. A yes or no is shown as the
-		 *	kernel delivers it - the way a query reads it (see
-		 *	\Nino\Elements::queryElements()): on where its text is '1', so the
-		 *	1 of a hand-written file is on as true is, and 0, '' or any other text
-		 *	is off. The file keeps what it holds until the field is changed
-		 *
-		 *	@param		array 		$field				The field's definition in the model
-		 *	@param		mixed			$value				The stored value
-		 *
-		 *	@return 	mixed										A boolean for a yes or no, the value as it is for any other field
-		 */
-		private static function shownValue( array $field, mixed $value ): mixed {
-
-			if( ( $field['type'] ?? '' ) !== 'boolean' || $value === null )
-				return $value;
-
-			return ( is_bool( $value ) === true ? ( $value === true ? '1' : '0' ) : ( is_scalar( $value ) === true ? (string) $value : '0' ) ) === '1';
-		}
-
-		/**
-		 *	Every storage bucket that holds this element, verbatim - the
-		 *	'*' bucket with its global fields and one bucket per locale. A
-		 *	read-only view for whoever manages a type: what the form shows
-		 *	is already the resolved value, this is what is actually on disk
+		 *	Every storage bucket that holds this element, verbatim - \Nino\Elements::rawBuckets()
 		 *
 		 *	@param		array 		$typeData			The type file's content
 		 *	@param		string		$uri					Element uri within the type
@@ -487,19 +410,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	array										[ bucket => stored entry ]
 		 */
 		public static function rawBuckets( array $typeData, string $uri ): array {
-
-			$raw = [];
-
-			foreach( $typeData as $bucket => $entries ) {
-
-				if( $bucket === 'model' || is_array( $entries ) === false )
-					continue;
-
-				if( array_key_exists( $uri, $entries ) === true )
-					$raw[(string) $bucket] = $entries[$uri];
-			}
-
-			return $raw;
+			return \Nino\Elements::rawBuckets( $typeData, $uri );
 		}
 
 		/**
@@ -744,7 +655,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	bool
 		 */
 		public static function mayInsert( array &$appData, string $type ): bool {
-			return \Nino\Admin\Admin::scoped( $appData, self::SCOPE, self::SCOPE. $type. '/insert' );
+			return \Nino\Elements::mayInsert( $appData, $type );
 		}
 
 		/**
@@ -757,7 +668,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	bool
 		 */
 		public static function mayUpdate( array &$appData, string $type, string $field ): bool {
-			return \Nino\Admin\Admin::scoped( $appData, self::SCOPE, self::SCOPE. $type. '/update/'. $field );
+			return \Nino\Elements::mayUpdate( $appData, $type, $field );
 		}
 
 		/**
@@ -769,7 +680,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	bool
 		 */
 		public static function mayDelete( array &$appData, string $type ): bool {
-			return \Nino\Admin\Admin::scoped( $appData, self::SCOPE, self::SCOPE. $type. '/delete' );
+			return \Nino\Elements::mayDelete( $appData, $type );
 		}
 
 		/**
@@ -830,21 +741,11 @@ namespace Nino\Modules\Elements {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$type					Element type
-		 *	@param		array 		$model				That type's model
 		 *
 		 *	@return 	array										[ 'insert', 'delete', 'update' => [ field => bool ] ]
 		 */
-		public static function rights( array &$appData, string $type, array $model ): array {
-
-			$update = [];
-			foreach( array_keys( $model ) as $field )
-				$update[$field] = self::mayUpdate( $appData, $type, (string) $field );
-
-			return [
-				'insert' => self::mayInsert( $appData, $type ),
-				'delete' => self::mayDelete( $appData, $type ),
-				'update' => $update,
-			];
+		public static function rights( array &$appData, string $type ): array {
+			return \Nino\Elements::rights( $appData, $type );
 		}
 
 		/**
@@ -867,114 +768,22 @@ namespace Nino\Modules\Elements {
 			$isNew 		= ( $data['isNew'] ?? false ) === true;
 			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
 
-			// A numbered type assigns the uri, so an insert into one arrives
-			// without one and the kernel allocates it under the type file's lock
-			// (see \Nino\Elements::AUTOINCREMENT_PAD). An update always names its
-			// element - by then it has a uri like any other.
-			$numbered = $isNew === true && $uri === ''
-				&& in_array( $type, self::types( $appData ), true ) === true
-				&& \Nino\Elements::readAutoincrement( self::typeData( $appData, $type ) ) !== null;
+			// Every check, in its order, is \Nino\Elements::save()'s
+			$result = \Nino\Elements::save( $appData, $type, $uri, $locale, $fields, [ 'new' => $isNew ] );
 
-			if( in_array( $type, self::types( $appData ), true ) === false || ( $uri === '' && $numbered === false ) || str_contains( $uri, '/' ) === true || ( $isNew === true && $numbered === false && self::_validNewUri( $uri ) === false ) || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
+			if( $result['ok'] === false ) {
+				self::_fail( $request, $result );
 				return;
 			}
 
-			if( $isNew === true && self::mayInsert( $appData, $type ) === false ) {
-				\Nino\Http::fail( $request, 403, 'not allowed to add elements of this type' );
-				return;
-			}
-
-			// Field by field, and refused rather than filtered: dropping the
-			// fields the account may not write would answer 200 to a form that
-			// then shows the old value back, which reads as the save having
-			// failed silently. Naming them says what happened
-			$refused = [];
-			foreach( array_keys( $fields ) as $field )
-				if( self::mayUpdate( $appData, $type, (string) $field ) === false )
-					$refused[] = (string) $field;
-
-			if( $refused !== [] ) {
-				\Nino\Http::fail( $request, 403, 'not allowed to change the field(s) '. implode( ', ', $refused ), 'elements_fields_not_allowed', [ implode( ', ', $refused ) ], (string) $refused[0] );
-				return;
-			}
-
-			// A model field with 'html' => true gets the same whitelist-tag sanitizing Text
-			// uses - never trust the client's html. Which tags that is depends on the
-			// field: 'blocks' keeps paragraphs and lists too, and a 'breaks' field is
-			// plain text whose newlines are kept as they are
-			$model = self::typeData( $appData, $type )['model'] ?? [];
-
-			// An image field gets its value from the upload alone (apiUploadImage()),
-			// which writes a name of its own making. A save may leave what the element
-			// holds as it is or empty the field - nothing else, since the name is shown
-			// on public pages and is the file that is deleted with the picture
-			foreach( $fields as $key => $value )
-				if( ( $model[$key]['type'] ?? '' ) === 'image' && $value !== '' && $value !== self::_storedImage( $appData, '/'. $type. '/'. $uri, $model[$key], (string) $key, $locale ) ) {
-					\Nino\Http::fail( $request, 400, 'an image is set by uploading it: '. $key, 'elements_image_upload', [ (string) $key ], (string) $key );
-					return;
-				}
-
-			foreach( $fields as $key => $value )
-				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
-					$fields[$key] = \Nino\Html::sanitizeHtml( $value, \Nino\Html::fieldFormat( $model[$key] ) );
-
-			// Required-field enforcement lives in the kernel itself
-			// (\Nino\Elements::insertElement()/updateElement()) - $errorMsg below
-			// already captures its "Missing required element key '...'" message
-			$errorMsg = null;
-			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
-
-			$result = ( $isNew === true )
-				? \Nino\Elements::insertElement( $appData, '/'. $type. '/'. $uri, $fields, $locale )
-				: \Nino\Elements::updateElement( $appData, '/'. $type. '/'. $uri, $fields, $locale );
-
-			restore_error_handler();
-
-			if( is_array( $result ) === false ) {
-
-				if( self::_refused( $appData, $request, $model ) === true )
-					return;
-
-				// What the kernel says of a value it refuses is English for a log: a person is told in the interface language, with the
-				// key it is about and the field it stands in
-				$coded = self::_coded( $errorMsg );
-
-				if( $coded !== null )
-					\Nino\Http::fail( $request, 400, (string) $errorMsg, $coded[0], [ $coded[1] ], $coded[1] );
-				else
-					\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
-
-				return;
-			}
-
-			// A numbered type's counter has just moved on, so the form's "saving
-			// creates /type/00007" promise would otherwise still name the number
-			// this very save consumed
-			$next = \Nino\Elements::getAutoincrement( $appData, '/'. $type );
-
-			\Nino\Http::ok( $request, [
-				'element' => $result,
-				'nextUri' => ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( $next ),
-			] );
+			unset( $result['ok'] );
+			\Nino\Http::ok( $request, $result );
 		}
 
 		/**
 		 *	Answer a write of the panel that a callback vetoed and refused fields
 		 *	for (see \Nino\Elements::refuse()), in the one form every write of the
-		 *	panel uses: 400, with
-		 *
-		 *	  fields	every refusal whose field the type has (a key of its model, or
-		 *						'.uri'), as [ 'field' => , 'error' => , 'code' => ], in the order
-		 *						the callbacks named them
-		 *	  field		the first of those, which is the one the shell marks and focuses
-		 *	  error		the sentences that name no field of the type, all of them in their
-		 *						order - they have no field to stand at, so the status line says
-		 *						them; where every sentence has its field, the first sentence
-		 *	  code		the code of the one sentence the error is, if it has a code
-		 *
-		 *	So every sentence a callback gave reaches the person: at its field, or in
-		 *	the status line.
+		 *	panel uses: \Nino\Elements::refusal()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -984,28 +793,31 @@ namespace Nino\Modules\Elements {
 		 */
 		private static function _refused( array &$appData, array &$request, array $model ): bool {
 
-			$refusals = \Nino\Elements::refusals( $appData );
+			$refusal = \Nino\Elements::refusal( $appData, $model );
 
-			if( $refusals === [] )
+			if( $refusal === null )
 				return false;
 
-			$named		= [];
-			$general	= [];
-
-			foreach( $refusals as $refusal )
-				if( $refusal['field'] === '.uri' || isset( $model[ $refusal['field'] ] ) === true )
-					$named[] = $refusal;
-				else
-					$general[] = $refusal;
-
-			$said = $general === [] ? [ $named[0] ] : $general;
-
-			\Nino\Http::fail( $request, 400, implode( ' ', array_column( $said, 'error' ) ), count( $said ) === 1 ? $said[0]['code'] : '', [], $named === [] ? '' : $named[0]['field'] );
-
-			if( $named !== [] )
-				$request['/nino/http/response']['body']['fields'] = $named;
+			self::_fail( $request, $refusal );
 
 			return true;
+		}
+
+		/**
+		 *	Answer a refusal of \Nino\Elements (see \Nino\Elements::save()) with its status, its sentence,
+		 *	its code, params and field, and the refusals of a callback that name a field of the type
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$refusal			The result of the function
+		 *
+		 *	@return 	void
+		 */
+		private static function _fail( array &$request, array $refusal ): void {
+
+			\Nino\Http::fail( $request, $refusal['status'], $refusal['error'], $refusal['code'], $refusal['params'], $refusal['field'] );
+
+			if( $refusal['fields'] !== [] )
+				$request['/nino/http/response']['body']['fields'] = $refusal['fields'];
 		}
 
 		/**
@@ -1025,45 +837,20 @@ namespace Nino\Modules\Elements {
 			$type = \Nino\Admin\Admin::postString( $data, 'type' );
 			$uri	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
-			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
-				\Nino\Http::fail( $request, 400, 'invalid type or uri' );
+			// Every check, in its order, is \Nino\Elements::remove()'s
+			$result = \Nino\Elements::remove( $appData, $type, $uri );
+
+			if( $result['ok'] === false ) {
+				self::_fail( $request, $result );
 				return;
 			}
-
-			if( self::mayDelete( $appData, $type ) === false ) {
-				\Nino\Http::fail( $request, 403, 'not allowed to delete elements of this type' );
-				return;
-			}
-
-			$elementUri = '/'. $type. '/'. $uri;
-			$imageFilenames = self::imageFilenames( $appData, $type, $elementUri );
-
-			$errorMsg = null;
-			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool { $errorMsg = $errstr; return true; } );
-
-			$deleted = \Nino\Elements::deleteElement( $appData, $elementUri, '*' );
-
-			restore_error_handler();
-
-			if( $errorMsg !== null || $deleted !== true ) {
-				\Nino\Http::fail( $request, 409, $errorMsg ?? 'delete vetoed' );
-				return;
-			}
-
-			// Only once the element itself is actually gone - an "image" field's
-			// value is just a filename reference, deleting the element wouldn't
-			// otherwise touch the file it points to at all
-			foreach( $imageFilenames as $filename )
-				if( self::removable( $appData, $type, $filename ) === true )
-					\Nino\Images::delete( $appData, $filename );
 
 			\Nino\Http::ok( $request );
 		}
 
 		/**
-		 *	Every uploaded image filename currently stored on an element - a
-		 *	locale-scoped image field can differ per locale, so all of them
-		 *	need checking, not just the global bucket
+		 *	Every uploaded image filename currently stored on an element, in every
+		 *	language - \Nino\Elements::imageFilenames()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$type					Element type
@@ -1072,56 +859,12 @@ namespace Nino\Modules\Elements {
 		 *	@return 	array										Distinct, non-empty filenames
 		 */
 		public static function imageFilenames( array &$appData, string $type, string $elementUri ): array {
-
-			$model = self::typeData( $appData, $type )['model'] ?? [];
-			$imageKeys = [];
-			foreach( $model as $key => $field )
-				if( ( $field['type'] ?? '' ) === 'image' )
-					$imageKeys[] = $key;
-
-			if( $imageKeys === [] )
-				return [];
-
-			$filenames = [];
-
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-				$element = \Nino\Elements::getElement( $appData, $elementUri, $locale, [] );
-				foreach( $imageKeys as $key )
-					if( is_string( $element[$key] ?? null ) === true && $element[$key] !== '' )
-						$filenames[$element[$key]] = true;
-			}
-
-			return array_keys( $filenames );
+			return \Nino\Elements::imageFilenames( $appData, $type, $elementUri );
 		}
 
 		/**
-		 *	What an element holds in one image field, for the scope the field is
-		 *	written in: its language for a field per language, the whole element
-		 *	otherwise - the same place apiUploadImage() reads the file it replaces
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$elementUri		Full element uri (eg. "/portfolio/item1")
-		 *	@param		array			$field				The field's model entry
-		 *	@param		string		$key					The field's key
-		 *	@param		string		$locale				The language the save is for
-		 *
-		 *	@return 	string										The filename, '' where the field holds none
-		 */
-		private static function _storedImage( array &$appData, string $elementUri, array $field, string $key, string $locale ): string {
-
-			$element = \Nino\Elements::getElement( $appData, $elementUri, ( $field['locale'] ?? false ) === true ? $locale : '*' );
-			$stored	 = is_array( $element ) === true ? ( $element[$key] ?? '' ) : '';
-
-			return is_string( $stored ) === true ? $stored : '';
-		}
-
-		/**
-		 *	Whether a file below /images may be deleted for an element of a type:
-		 *	it lies in the place this type's uploads write to (elements/<type>/,
-		 *	see apiUploadImage()), climbs out of nowhere, and no element of any
-		 *	type names it in an image field any more. A value that was written by
-		 *	hand, or by a type's model that changed, names whatever it likes; the
-		 *	file it names is not for this panel to remove unless the type made it
+		 *	Whether a file below /images may be deleted for an element of a type -
+		 *	\Nino\Elements::removable(). The image upload and the removal of an image ask it too
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$type					Element type (eg. "services")
@@ -1130,51 +873,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	bool
 		 */
 		public static function removable( array &$appData, string $type, string $filename ): bool {
-
-			$prefix = 'elements/'. $type. '/';
-
-			if( str_starts_with( $filename, $prefix ) === false || strlen( $filename ) === strlen( $prefix ) || str_contains( $filename, '..' ) === true )
-				return false;
-
-			foreach( self::types( $appData ) as $other )
-				if( in_array( $filename, self::_namedImages( $appData, $other ), true ) === true )
-					return false;
-
-			return true;
-		}
-
-		/**
-		 *	Every filename the image fields of one type hold, in every language and
-		 *	for every element, read from the type's file
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$type					Element type
-		 *
-		 *	@return 	array										Distinct, non-empty filenames
-		 */
-		private static function _namedImages( array &$appData, string $type ): array {
-
-			$typeData	= self::typeData( $appData, $type );
-			$keys			= [];
-
-			foreach( is_array( $typeData['model'] ?? null ) === true ? $typeData['model'] : [] as $key => $field )
-				if( is_array( $field ) === true && ( $field['type'] ?? '' ) === 'image' )
-					$keys[] = $key;
-
-			$named = [];
-
-			foreach( $keys === [] ? [] : $typeData as $bucket => $elements ) {
-
-				if( $bucket === 'model' || is_array( $elements ) === false )
-					continue;
-
-				foreach( $elements as $values )
-					foreach( is_array( $values ) === true ? $keys : [] as $key )
-						if( is_string( $values[$key] ?? null ) === true && $values[$key] !== '' )
-							$named[$values[$key]] = true;
-			}
-
-			return array_map( 'strval', array_keys( $named ) );
+			return \Nino\Elements::removable( $appData, $type, $filename );
 		}
 
 		/**
@@ -1185,14 +884,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	array										List of type names
 		 */
 		public static function types( array &$appData ): array {
-
-			$types = [];
-			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file )
-				$types[] = basename( $file, '.php' );
-
-			sort( $types );
-
-			return $types;
+			return \Nino\Elements::types( $appData );
 		}
 
 		/**
@@ -1204,7 +896,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	array										Type data ('key' => [ 'type', 'locale', ... ])
 		 */
 		public static function typeData( array &$appData, string $type ): array {
-			return \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
+			return \Nino\Elements::typeData( $appData, $type );
 		}
 
 		/**
@@ -1262,35 +954,6 @@ namespace Nino\Modules\Elements {
 				return (string) $element['title'];
 
 			return '/'. $uri;
-		}
-
-		/**
-		 *	Split a model into its global-only and locale-specific field keys
-		 *
-		 *	@param		array 		$model				Type model definition
-		 *
-		 *	@return 	array										[ globalKeys[], localeKeys[] ]
-		 */
-		private static function splitModel( array $model ): array {
-
-			$globalKeys = [];
-			$localeKeys = [];
-
-			foreach( $model as $key => $field )
-				if( ( $field['locale'] ?? false ) === true )
-					$localeKeys[] = $key;
-				else
-					$globalKeys[] = $key;
-
-			return [ $globalKeys, $localeKeys ];
-		}
-
-		// A new element uri becomes both an array key and (for image fields) a
-		// filename component, so it is held to the slug syntax the form's own
-		// hint promises. Only new ones: reading and deleting never re-validate,
-		// so a uri written by hand stays reachable.
-		private static function _validNewUri( string $uri ): bool {
-			return preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $uri ) === 1;
 		}
 	}
 }

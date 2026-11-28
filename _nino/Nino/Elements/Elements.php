@@ -20,6 +20,18 @@ namespace Nino {
 		// order the editor's type select shows them
 		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
 
+		/**
+		 *	The scoped permissions of the workbench's Elements panel, one per action and type:
+		 *
+		 *	  /_admin/elements/<type>/insert
+		 *	  /_admin/elements/<type>/update/<field>
+		 *	  /_admin/elements/<type>/delete
+		 *
+		 *	Read through \Nino\Auth::scoped(): an account that holds none of them keeps what the panel's
+		 *	door has always meant, all of it
+		 */
+		public const string SCOPE = '/_admin/elements/';
+
 		// config.php's list of the elements a module that lets others contribute
 		// to its types has seen deleted for good - [ '<type>' => [ '<id>', ... ] ]
 		// - which seed() never creates again. See Modules\Legal::callbackCommitted()
@@ -476,6 +488,12 @@ namespace Nino {
 
 			self::_forgetRefused( $appData );
 
+			if( self::_noLeadingSlash( $uri ) === true )
+				return false;
+
+			if( self::_unknownTypeSpelling( $appData, $uri ) === true )
+				return false;
+
 			$element = \Nino\Elements::getElement( $appData, $uri, $locale );
 
 			if( $element === false ) {
@@ -498,6 +516,12 @@ namespace Nino {
 		static public function insertElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
 			self::_forgetRefused( $appData );
+
+			if( self::_noLeadingSlash( $uri ) === true )
+				return false;
+
+			if( self::_unknownTypeSpelling( $appData, $uri ) === true )
+				return false;
 
 			if( \Nino\Elements::getElement( $appData, $uri, $locale ) !== false )
 				return ! trigger_error( 'Element \''. $uri. '\' already exists.' );
@@ -656,6 +680,12 @@ namespace Nino {
 		// Delete an element
 		static public function deleteElement( array &$appData, string $uri, string $locale = '' ): mixed {
 
+			if( self::_noLeadingSlash( $uri ) === true )
+				return false;
+
+			if( self::_unknownTypeSpelling( $appData, $uri ) === true )
+				return false;
+
 			// Verify locale
 			$locale = self::_locale( $appData, $locale );
 
@@ -784,6 +814,698 @@ namespace Nino {
 		}
 
 
+
+		/**
+		 *	The element types of the project, by their bare names (eg. "services"): the files below /elements.
+		 *	The kernel's own type (PLACEHOLDERS) is none of them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array							List of type names, sorted
+		 */
+		static public function types( array &$appData ): array {
+
+			$types = [];
+			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file )
+				$types[] = basename( $file, '.php' );
+
+			sort( $types );
+
+			return $types;
+		}
+
+		/**
+		 *	The type file of a type as it is stored: its 'model', its buckets, its title
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type (eg. "services")
+		 *
+		 *	@return 	array							Empty for a type that is not there
+		 */
+		static public function typeData( array &$appData, string $type ): array {
+			return \Nino\Filesystem::getFileContent( $appData, self::_typeFile( $type ), [] );
+		}
+
+		/**
+		 *	Whether the signed-in account may add an element of a type. These are the scoped rights of the
+		 *	workbench's panel (see SCOPE); with no account signed in nothing narrows them
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on: a feature asks rights()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *
+		 *	@return 	bool
+		 */
+		static public function mayInsert( array &$appData, string $type ): bool {
+			return \Nino\Auth::scoped( $appData, self::SCOPE, self::SCOPE. $type. '/insert' );
+		}
+
+		/**
+		 *	Whether the signed-in account may change one field of a type (see mayInsert())
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on: a feature asks rights()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *	@param		string		$field				A key of the type's model
+		 *
+		 *	@return 	bool
+		 */
+		static public function mayUpdate( array &$appData, string $type, string $field ): bool {
+			return \Nino\Auth::scoped( $appData, self::SCOPE, self::SCOPE. $type. '/update/'. $field );
+		}
+
+		/**
+		 *	Whether the signed-in account may delete an element of a type (see mayInsert())
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on: a feature asks rights()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *
+		 *	@return 	bool
+		 */
+		static public function mayDelete( array &$appData, string $type ): bool {
+			return \Nino\Auth::scoped( $appData, self::SCOPE, self::SCOPE. $type. '/delete' );
+		}
+
+		/**
+		 *	What the signed-in account may do with one type: whether it may add and delete elements, and which
+		 *	fields of the model it may change. These are the scoped rights the workbench's panel asks (see
+		 *	SCOPE) and sends with its types; the panel's door, '/_admin/elements/manage', is not asked here.
+		 *	With no account signed in no scoped right narrows anything, so every answer is true. A type that
+		 *	does not exist has nothing to allow: false, false and no field
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *
+		 *	@return 	array							[ 'insert' => bool, 'delete' => bool, 'update' => [ field => bool ] ]
+		 */
+		static public function rights( array &$appData, string $type ): array {
+
+			if( in_array( $type, self::types( $appData ), true ) === false )
+				return [ 'insert' => false, 'delete' => false, 'update' => [] ];
+
+			$update = [];
+			foreach( array_keys( self::typeData( $appData, $type )['model'] ?? [] ) as $field )
+				$update[$field] = self::mayUpdate( $appData, $type, (string) $field );
+
+			return [
+				'insert' => self::mayInsert( $appData, $type ),
+				'delete' => self::mayDelete( $appData, $type ),
+				'update' => $update,
+			];
+		}
+
+		/**
+		 *	One element as the workbench's panel reads it for its form: the global fields, the fields of each
+		 *	language of the site, and every bucket of the type file that holds it. The checks are the panel's
+		 *	and are made in this order, the first that fails answers: the type is one of types(), the uri is
+		 *	not empty and holds no '/', some language of the site has the element. The caller guards the
+		 *	request (\Nino\Auth::guard() or \Nino\Admin\Admin::guardPerm()); this asks no right, and answers
+		 *	what a result is, not a response
+		 *
+		 *	A refusal is [ 'ok' => false, 'status' => int, 'error' => string, 'code' => string, 'params' => array,
+		 *	'field' => string, 'fields' => array ]:
+		 *
+		 *	  404 'unknown type or element'		elements_type_unknown, elements_uri_invalid (in this order)
+		 *	  404 'element not found'				elements_unknown
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *	@param		string		$uri					The element's name within the type, one segment
+		 *
+		 *	@return 	array							[ 'ok' => true, 'global' => field => value, 'locales' => locale => field => value, 'raw' => bucket => stored entry ], or a refusal
+		 */
+		static public function read( array &$appData, string $type, string $uri ): array {
+
+			if( in_array( $type, self::types( $appData ), true ) === false )
+				return self::_refusal( 404, 'unknown type or element', 'elements_type_unknown' );
+
+			if( $uri === '' || str_contains( $uri, '/' ) === true )
+				return self::_refusal( 404, 'unknown type or element', 'elements_uri_invalid' );
+
+			$typeData = self::typeData( $appData, $type );
+			$model = $typeData['model'] ?? [];
+			$globalKeys = [];
+			$localeKeys = [];
+
+			foreach( $model as $key => $field )
+				if( ( $field['locale'] ?? false ) === true )
+					$localeKeys[] = $key;
+				else
+					$globalKeys[] = $key;
+
+			$global 	= [];
+			$locales	= [];
+			$found		= false;
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+
+				$element = self::getElement( $appData, '/'. $type. '/'. $uri, $locale, [] );
+
+				if( $element === [] )
+					continue;
+
+				$found = true;
+
+				foreach( $globalKeys as $key )
+					$global[$key] = self::_shown( $model[$key] ?? [], $element[$key] ?? null );
+
+				$locales[$locale] = [];
+				foreach( $localeKeys as $key )
+					$locales[$locale][$key] = self::_shown( $model[$key] ?? [], $element[$key] ?? null );
+			}
+
+			if( $found === false )
+				return self::_refusal( 404, 'element not found', 'elements_unknown' );
+
+			return [
+				'ok' 			=> true,
+				'global' 	=> $global,
+				'locales' => $locales,
+				'raw' 		=> self::rawBuckets( $typeData, $uri ),
+			];
+		}
+
+		/**
+		 *	Insert or update an element with every check the workbench's panel makes for the account that is
+		 *	signed in. The caller guards the request (\Nino\Auth::guard() or \Nino\Admin\Admin::guardPerm()):
+		 *	these functions do not ask the panel's door '/_admin/elements/manage', so an account without it gets
+		 *	everything its scoped rights allow. With no account signed in no scoped right narrows anything, and
+		 *	a caller that acts for a visitor decides for itself what it lets through. The older writers
+		 *	insertElement() and updateElement() check none of this: they stay for code that needs no such checks.
+		 *
+		 *	The checks are made in this order, the first that fails answers:
+		 *
+		 *	  1. the type is one of types()								400 'invalid type, uri or locale'	elements_type_unknown
+		 *	  2. the uri: not empty (a numbered type
+		 *	     assigns it to an insert), no '/', and for a
+		 *	     new element a slug of letters, digits,
+		 *	     hyphens and underscores								400 'invalid type, uri or locale'	elements_uri_invalid
+		 *	  3. the locale is one of the site's						400 'invalid type, uri or locale'	elements_locale_invalid
+		 *	  4. a new element: the scoped insert right		403 'not allowed to add elements of this type'	elements_insert_not_allowed
+		 *	  5. every posted field: the scoped update
+		 *	     right, all named at once; a posted key
+		 *	     the model does not have is asked too						403 'not allowed to change the field(s) ...'	elements_fields_not_allowed
+		 *	  6. an image field holds no name but its own		400 'an image is set by uploading it: ...'	elements_image_upload
+		 *	  7. the html of a field with 'html' is sanitised, which refuses nothing
+		 *	  8. the write of insertElement() or updateElement(), whose notices are caught and are the answer,
+		 *	     in this order: whether the element exists (elements_unknown for an update of one that does not,
+		 *	     elements_exists for an insert of one that does), the lock of the type file (elements_save_failed),
+		 *	     the callbacks of the model's fields, whose false is elements_vetoed with "Callback '...' returns
+		 *	     an error." before any value is judged - a required key that is emptied included -, then the
+		 *	     values, field by field in the model's order, the first that fails answering (a required key
+		 *	     that is missing or empty: elements_missing_key; a value of the wrong type: elements_wrong_type;
+		 *	     one that is not allowed: elements_value_refused; a reference rule: elements_reference, with the
+		 *	     key of the field), then what a callback of the write refused with refuse() (400, the sentences,
+		 *	     the field and 'fields' it names, the code where exactly one sentence has one) or any other
+		 *	     veto or notice (elements_vetoed, the sentence of the notice, or 'save failed'), and last the
+		 *	     write of the type file (elements_save_failed where it cannot be written)
+		 *
+		 *	The result decides, not the notices: a writer that returned the element is ok, whatever a callback
+		 *	said on the way.
+		 *
+		 *	A refusal is [ 'ok' => false, 'status' => int, 'error' => string, 'code' => string, 'params' => array,
+		 *	'field' => string, 'fields' => array ]. 'code' is the callback's own for a refusal of a callback, and
+		 *	'' where the callback gave none (refuse() without a code) or where the refusal holds several
+		 *	sentences. 'field' is the key a refusal is about, 'params' what belongs in its sentence
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *	@param		string		$uri					The element's name within the type, one segment; '' for an insert into a numbered type
+		 *	@param		string		$locale				The language the fields of a language are written in
+		 *	@param		array 		$fields				field => value; only these keys are written
+		 *	@param		array 		$options			'new' => bool: an insert (default: an update); only the boolean true is an insert, 'true' or 1 is an update
+		 *
+		 *	@return 	array							[ 'ok' => true, 'element' => the element as saved, 'nextUri' => the uri a numbered type assigns next, '' for another ], or a refusal
+		 */
+		static public function save( array &$appData, string $type, string $uri, string $locale, array $fields, array $options = [] ): array {
+
+			$isNew 	= ( $options['new'] ?? false ) === true;
+			$known 	= in_array( $type, self::types( $appData ), true );
+
+			if( $known === false )
+				return self::_refusal( 400, 'invalid type, uri or locale', 'elements_type_unknown' );
+
+			// A numbered type assigns the uri, so an insert into one arrives
+			// without one and the kernel allocates it under the type file's lock
+			// (see AUTOINCREMENT_PAD). An update always names its element - by
+			// then it has a uri like any other.
+			$numbered = $isNew === true && $uri === '' && self::readAutoincrement( self::typeData( $appData, $type ) ) !== null;
+
+			if( ( $uri === '' && $numbered === false ) || str_contains( $uri, '/' ) === true || ( $isNew === true && $numbered === false && self::_validNewUri( $uri ) === false ) )
+				return self::_refusal( 400, 'invalid type, uri or locale', 'elements_uri_invalid' );
+
+			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+				return self::_refusal( 400, 'invalid type, uri or locale', 'elements_locale_invalid' );
+
+			if( $isNew === true && self::mayInsert( $appData, $type ) === false )
+				return self::_refusal( 403, 'not allowed to add elements of this type', 'elements_insert_not_allowed' );
+
+			// Field by field, and refused rather than filtered: dropping the
+			// fields the account may not write would answer 200 to a form that
+			// then shows the old value back, which reads as the save having
+			// failed silently. Naming them says what happened
+			$refused = [];
+			foreach( array_keys( $fields ) as $field )
+				if( self::mayUpdate( $appData, $type, (string) $field ) === false )
+					$refused[] = (string) $field;
+
+			if( $refused !== [] )
+				return self::_refusal( 403, 'not allowed to change the field(s) '. implode( ', ', $refused ), 'elements_fields_not_allowed', [ implode( ', ', $refused ) ], (string) $refused[0] );
+
+			// A model field with 'html' => true gets the same whitelist-tag sanitizing Text
+			// uses - never trust the client's html. Which tags that is depends on the
+			// field: 'blocks' keeps paragraphs and lists too, and a 'breaks' field is
+			// plain text whose newlines are kept as they are
+			$model = self::typeData( $appData, $type )['model'] ?? [];
+
+			// An image field gets its value from an upload alone, which writes a name of
+			// its own making. A save may leave what the element holds as it is or empty the
+			// field - nothing else, since the name is shown on public pages and is the file
+			// that is deleted with the picture
+			foreach( $fields as $key => $value )
+				if( ( $model[$key]['type'] ?? '' ) === 'image' && $value !== '' && $value !== self::_storedImage( $appData, '/'. $type. '/'. $uri, $model[$key], (string) $key, $locale ) )
+					return self::_refusal( 400, 'an image is set by uploading it: '. $key, 'elements_image_upload', [ (string) $key ], (string) $key );
+
+			foreach( $fields as $key => $value )
+				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
+					$fields[$key] = \Nino\Html::sanitizeHtml( $value, \Nino\Html::fieldFormat( $model[$key] ) );
+
+			// The writers say why they refuse in a notice; it is caught here and becomes the answer
+			$errorMsg = null;
+			// What php raises under an '@' is masked by error_reporting() and is no notice of the writer
+			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool {
+				if( ( error_reporting() & $errno ) !== 0 )
+					$errorMsg = $errstr;
+				return true;
+			} );
+
+			try {
+				$result = ( $isNew === true )
+					? self::insertElement( $appData, '/'. $type. '/'. $uri, $fields, $locale )
+					: self::updateElement( $appData, '/'. $type. '/'. $uri, $fields, $locale );
+			}
+			finally {
+				restore_error_handler();
+			}
+
+			if( is_array( $result ) === false ) {
+
+				$refusal = self::refusal( $appData, $model );
+
+				return $refusal ?? self::_noticed( $errorMsg );
+			}
+
+			// A numbered type's counter has just moved on, so the form's "saving
+			// creates /type/00007" promise would otherwise still name the number
+			// this very save consumed
+			$next = self::getAutoincrement( $appData, '/'. $type );
+
+			return [
+				'ok' 			=> true,
+				'element' => $result,
+				'nextUri' => ( $next === null ) ? '' : self::autoincrementUri( $next ),
+			];
+		}
+
+		/**
+		 *	Delete an element in every language, with the pictures its image fields name where they are the
+		 *	type's own uploads (see removable()). The checks are the panel's, made in this order, the first
+		 *	that fails answers: the type is one of types() (400 'invalid type or uri', elements_type_unknown),
+		 *	the uri is not empty and holds no '/' (the same, elements_uri_invalid), the scoped delete right
+		 *	(403 'not allowed to delete elements of this type', elements_delete_not_allowed), then the
+		 *	delete of deleteElement(), whose return value decides: anything but true is a refusal, 409 with
+		 *	the sentence of the last notice of the delete, or 'delete vetoed' (elements_vetoed); a notice that
+		 *	says the type file could not be locked or written is elements_save_failed. When it returned true
+		 *	the element is gone, the pictures are deleted and the answer is ok, whatever notice fell on the
+		 *	way - a warning of a callback, a notice of a '/nino/elements/committed' hook. An element that does
+		 *	not exist is deleted all the same: the answer is ok, as deleteElement()'s is. The caller guards the
+		 *	request (see save()), and these functions do not ask the panel's door; a refusal has the shape
+		 *	save() documents
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *	@param		string		$uri					The element's name within the type, one segment
+		 *
+		 *	@return 	array							[ 'ok' => true ], or a refusal
+		 */
+		static public function remove( array &$appData, string $type, string $uri ): array {
+
+			if( in_array( $type, self::types( $appData ), true ) === false )
+				return self::_refusal( 400, 'invalid type or uri', 'elements_type_unknown' );
+
+			if( $uri === '' || str_contains( $uri, '/' ) === true )
+				return self::_refusal( 400, 'invalid type or uri', 'elements_uri_invalid' );
+
+			if( self::mayDelete( $appData, $type ) === false )
+				return self::_refusal( 403, 'not allowed to delete elements of this type', 'elements_delete_not_allowed' );
+
+			$elementUri = '/'. $type. '/'. $uri;
+			$imageFilenames = self::imageFilenames( $appData, $type, $elementUri );
+
+			$errorMsg = null;
+			// What php raises under an '@' is masked by error_reporting() and is no notice of the writer
+			set_error_handler( function( int $errno, string $errstr ) use ( &$errorMsg ): bool {
+				if( ( error_reporting() & $errno ) !== 0 )
+					$errorMsg = $errstr;
+				return true;
+			} );
+
+			try {
+				$deleted = self::deleteElement( $appData, $elementUri, '*' );
+			}
+			finally {
+				restore_error_handler();
+			}
+
+			// The return value of the delete decides: a notice that fell while it ran - a warning of a
+			// callback, one of a '/nino/elements/committed' hook - is no refusal of an element that is gone
+			if( $deleted !== true )
+				return self::_deleteRefusal( $errorMsg );
+
+			// Only once the element itself is actually gone - an "image" field's
+			// value is just a filename reference, deleting the element wouldn't
+			// otherwise touch the file it points to at all
+			foreach( $imageFilenames as $filename )
+				if( self::removable( $appData, $type, $filename ) === true )
+					\Nino\Images::delete( $appData, $filename );
+
+			return [ 'ok' => true ];
+		}
+
+		/**
+		 *	What the write that was just refused named, as the answer of a write: 400, with
+		 *
+		 *	  fields	every refusal whose field the type has (a key of its model, or
+		 *						'.uri'), as [ 'field' => , 'error' => , 'code' => ], in the order
+		 *						the callbacks named them
+		 *	  field		the first of those, which is the one the workbench marks and focuses
+		 *	  error		the sentences that name no field of the type, all of them in their
+		 *						order - they have no field to stand at, so the status line says
+		 *						them; where every sentence has its field, the first sentence
+		 *	  code		the code of the one sentence the error is, if it has a code
+		 *
+		 *	So every sentence a callback gave reaches the person: at its field, or in the status line. The
+		 *	refusal has the shape save() documents. The workbench's image upload asks it too
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on: a feature reads the refusal save() answers
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$model				The type's model
+		 *
+		 *	@return 	array|null								The refusal; null where the write named none (see refusals())
+		 */
+		static public function refusal( array &$appData, array $model ): ?array {
+
+			$refusals = self::refusals( $appData );
+
+			if( $refusals === [] )
+				return null;
+
+			$named		= [];
+			$general	= [];
+
+			foreach( $refusals as $refusal )
+				if( $refusal['field'] === '.uri' || isset( $model[ $refusal['field'] ] ) === true )
+					$named[] = $refusal;
+				else
+					$general[] = $refusal;
+
+			$said = $general === [] ? [ $named[0] ] : $general;
+
+			return self::_refusal( 400, implode( ' ', array_column( $said, 'error' ) ), count( $said ) === 1 ? $said[0]['code'] : '', [], $named === [] ? '' : $named[0]['field'], $named );
+		}
+
+		/**
+		 *	Every uploaded image filename currently stored on an element - a
+		 *	locale-scoped image field can differ per locale, so all of them
+		 *	need checking, not just the global bucket
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *	@param		string		$elementUri		Full element uri (eg. "/portfolio/item1")
+		 *
+		 *	@return 	array							Distinct, non-empty filenames
+		 */
+		static public function imageFilenames( array &$appData, string $type, string $elementUri ): array {
+
+			$model = self::typeData( $appData, $type )['model'] ?? [];
+			$imageKeys = [];
+			foreach( $model as $key => $field )
+				if( ( $field['type'] ?? '' ) === 'image' )
+					$imageKeys[] = $key;
+
+			if( $imageKeys === [] )
+				return [];
+
+			$filenames = [];
+
+			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+				$element = self::getElement( $appData, $elementUri, $locale, [] );
+				foreach( $imageKeys as $key )
+					if( is_string( $element[$key] ?? null ) === true && $element[$key] !== '' )
+						$filenames[$element[$key]] = true;
+			}
+
+			return array_keys( $filenames );
+		}
+
+		/**
+		 *	Whether a file below /images may be deleted for an element of a type:
+		 *	it lies in the place this type's uploads write to (elements/<type>/),
+		 *	climbs out of nowhere, and no element of any type names it in an image
+		 *	field. A value that was written by hand, or by a type's model
+		 *	that changed, names whatever it likes; the file it names is not for
+		 *	the elements to remove unless the type made it
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type (eg. "services")
+		 *	@param		string		$filename			A filename below /images/
+		 *
+		 *	@return 	bool
+		 */
+		static public function removable( array &$appData, string $type, string $filename ): bool {
+
+			$prefix = 'elements/'. $type. '/';
+
+			if( str_starts_with( $filename, $prefix ) === false || strlen( $filename ) === strlen( $prefix ) || str_contains( $filename, '..' ) === true )
+				return false;
+
+			foreach( self::types( $appData ) as $other )
+				if( in_array( $filename, self::_namedImages( $appData, $other ), true ) === true )
+					return false;
+
+			return true;
+		}
+
+		/**
+		 *	Every storage bucket that holds this element, verbatim - the
+		 *	'*' bucket with its global fields and one bucket per locale. A
+		 *	read-only view for whoever manages a type: what a form shows
+		 *	is already the resolved value, this is what is actually on disk
+		 *
+		 *	@internal	Internal to the kernel and the workbench's Elements panel, no part of the interface a feature builds on: a feature reads the buckets from read()
+		 *
+		 *	@param		array 		$typeData			The type file's content
+		 *	@param		string		$uri					Element uri within the type
+		 *
+		 *	@return 	array							[ bucket => stored entry ]
+		 */
+		static public function rawBuckets( array $typeData, string $uri ): array {
+
+			$raw = [];
+
+			foreach( $typeData as $bucket => $entries ) {
+
+				if( $bucket === 'model' || is_array( $entries ) === false )
+					continue;
+
+				if( array_key_exists( $uri, $entries ) === true )
+					$raw[(string) $bucket] = $entries[$uri];
+			}
+
+			return $raw;
+		}
+
+		/**
+		 *	A refusal of read(), save() or remove()
+		 *
+		 *	@param		int				$status				400, 403, 404 or 409
+		 *	@param		string		$error				The English sentence
+		 *	@param		string		$code
+		 *	@param		array 		$params				What belongs in the sentence, in order
+		 *	@param		string		$field				The key the refusal is about, '' for none
+		 *	@param		array 		$fields				The refusals of a callback that name a field of the type
+		 *
+		 *	@return 	array
+		 */
+		static private function _refusal( int $status, string $error, string $code, array $params = [], string $field = '', array $fields = [] ): array {
+			return [ 'ok' => false, 'status' => $status, 'error' => $error, 'code' => $code, 'params' => $params, 'field' => $field, 'fields' => $fields ];
+		}
+
+		/**
+		 *	The refusal for what a write that returned no element said in a notice. The kernel words a refusal
+		 *	of a value in English: the key it is about is the parameter of the sentence and the field of the
+		 *	answer. A write that said nothing was vetoed
+		 *
+		 *	@param		string|null		$message		The last notice of the write
+		 *
+		 *	@return 	array
+		 */
+		static private function _noticed( ?string $message ): array {
+
+			if( $message === null )
+				return self::_refusal( 400, 'save failed', 'elements_vetoed' );
+
+			if( self::_writeFailed( $message ) === true )
+				return self::_refusal( 400, $message, 'elements_save_failed' );
+
+			foreach( [
+				'/^Wrong var type \'(.*?)\' in \'/s'					=> 'elements_wrong_type',
+				'/^Missing required element key \'(.*?)\' in \'/s'	=> 'elements_missing_key',
+				'/^Element value \'(.*?)\' is (?:not whitelisted|blacklisted)\.$/s'	=> 'elements_value_refused',
+				'/^Element reference \'(.*?)\' in \'/s'				=> 'elements_reference',
+			] as $pattern => $code )
+				if( preg_match( $pattern, $message, $found ) === 1 )
+					return self::_refusal( 400, $message, $code, [ $found[1] ], $found[1] );
+
+			foreach( [
+				'/^Element \'.*\' does not exist\.$/s'		=> 'elements_unknown',
+				'/^Element \'.*\' already exists\.$/s'		=> 'elements_exists',
+			] as $pattern => $code )
+				if( preg_match( $pattern, $message ) === 1 )
+					return self::_refusal( 400, $message, $code );
+
+			return self::_refusal( 400, $message, 'elements_vetoed' );
+		}
+
+		/**
+		 *	The refusal for a delete that did not return true. A notice that says the type file could not be
+		 *	locked or the element could not be written is elements_save_failed; any other notice is a veto
+		 *	with its sentence, and a delete that said nothing was vetoed without a refusal
+		 *
+		 *	@param		string|null		$message		The last notice of the delete
+		 *
+		 *	@return 	array
+		 */
+		static private function _deleteRefusal( ?string $message ): array {
+
+			if( $message === null )
+				return self::_refusal( 409, 'delete vetoed', 'elements_vetoed' );
+
+			return self::_refusal( 409, $message, self::_writeFailed( $message ) === true ? 'elements_save_failed' : 'elements_vetoed' );
+		}
+
+		/**
+		 *	Whether a notice of a writer says that the type file could not be written: it could not be locked
+		 *	for writing, or the write itself failed
+		 *
+		 *	@param		string		$message			The notice
+		 *
+		 *	@return 	bool
+		 */
+		static private function _writeFailed( string $message ): bool {
+			return preg_match( '/^Element type \'.*\' could not be locked for writing\.$|^Element \'.*\' could not be written\.$/s', $message ) === 1;
+		}
+
+		/**
+		 *	A new element uri becomes both an array key and (for image fields) a
+		 *	filename component, so it is held to the slug syntax the form's own
+		 *	hint promises. Only new ones: reading and deleting never re-validate,
+		 *	so a uri written by hand stays reachable
+		 *
+		 *	@param		string		$uri
+		 *
+		 *	@return 	bool
+		 */
+		static private function _validNewUri( string $uri ): bool {
+			return preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $uri ) === 1;
+		}
+
+		/**
+		 *	What an element holds in one image field, for the scope the field is
+		 *	written in: its language for a field per language, the whole element
+		 *	otherwise - the same place an upload reads the file it replaces
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$elementUri		Full element uri (eg. "/portfolio/item1")
+		 *	@param		array			$field				The field's model entry
+		 *	@param		string		$key					The field's key
+		 *	@param		string		$locale				The language the save is for
+		 *
+		 *	@return 	string							The filename, '' where the field holds none
+		 */
+		static private function _storedImage( array &$appData, string $elementUri, array $field, string $key, string $locale ): string {
+
+			$element = self::getElement( $appData, $elementUri, ( $field['locale'] ?? false ) === true ? $locale : '*' );
+			$stored	 = is_array( $element ) === true ? ( $element[$key] ?? '' ) : '';
+
+			return is_string( $stored ) === true ? $stored : '';
+		}
+
+		/**
+		 *	Every filename the image fields of one type hold, in every language and
+		 *	for every element, read from the type's file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$type					The bare name of the type
+		 *
+		 *	@return 	array							Distinct, non-empty filenames
+		 */
+		static private function _namedImages( array &$appData, string $type ): array {
+
+			$typeData	= self::typeData( $appData, $type );
+			$keys			= [];
+
+			foreach( is_array( $typeData['model'] ?? null ) === true ? $typeData['model'] : [] as $key => $field )
+				if( is_array( $field ) === true && ( $field['type'] ?? '' ) === 'image' )
+					$keys[] = $key;
+
+			if( $keys === [] )
+				return [];
+
+			$named = [];
+
+			foreach( $typeData as $bucket => $elements ) {
+
+				if( $bucket === 'model' || is_array( $elements ) === false )
+					continue;
+
+				foreach( $elements as $values )
+					foreach( is_array( $values ) === true ? $keys : [] as $key )
+						if( is_string( $values[$key] ?? null ) === true && $values[$key] !== '' )
+							$named[$values[$key]] = true;
+			}
+
+			return array_map( 'strval', array_keys( $named ) );
+		}
+
+		/**
+		 *	What a form shows of a stored value. A yes or no is shown as the
+		 *	kernel delivers it - the way a query reads it (see queryElements()):
+		 *	on where its text is '1', so the 1 of a hand-written file is on as
+		 *	true is, and 0, '' or any other text is off. The file keeps what it
+		 *	holds until the field is changed
+		 *
+		 *	@param		array 		$field				The field's definition in the model
+		 *	@param		mixed			$value				The stored value
+		 *
+		 *	@return 	mixed							A boolean for a yes or no, the value as it is for any other field
+		 */
+		static private function _shown( array $field, mixed $value ): mixed {
+
+			if( ( $field['type'] ?? '' ) !== 'boolean' || $value === null )
+				return $value;
+
+			return ( is_bool( $value ) === true ? ( $value === true ? '1' : '0' ) : ( is_scalar( $value ) === true ? (string) $value : '0' ) ) === '1';
+		}
 
 		private static function getElementFile( array &$appData, string $typeUri ): array|false {
 
@@ -1107,6 +1829,56 @@ namespace Nino {
 			}
 
 			return $values;
+		}
+
+		/**
+		 *	Whether an element uri lacks the slash it begins with. The type of 'type/slug' would read as 'type', with
+		 *	no slash: the hooks asked for it are those of another name ('/nino/elements/deletetype', not
+		 *	'/nino/elements/delete/type'), so a veto is never asked, and the kernel's own type is not recognised. A
+		 *	writer refuses such a uri before it locks or writes anything
+		 *
+		 *	@param		string		$uri					The element uri as the caller gave it
+		 *
+		 *	@return 	bool							true, with a notice, for a uri that does not begin with '/'
+		 */
+		static private function _noLeadingSlash( string $uri ): bool {
+
+			if( str_starts_with( $uri, '/' ) === true )
+				return false;
+
+			trigger_error( 'Element uri \''. $uri. '\' has no leading slash (expected \'/type/slug\').' );
+
+			return true;
+		}
+
+		/**
+		 *	Whether the type of an element uri is none of the type files as the directory spells them. A disk that
+		 *	does not tell upper from lower case opens 'news.php' for '/NEWS/slug', while the veto asked and the lock
+		 *	taken are those of the spelling given: a writer refuses such a type before it locks anything. The
+		 *	kernel's own type and a uri with no type separator are left to the writer, which has its own notice
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri					The element uri, with its leading slash
+		 *
+		 *	@return 	bool							true, with a notice, for a type that has no file of exactly this name
+		 */
+		static private function _unknownTypeSpelling( array &$appData, string $uri ): bool {
+
+			$pos = strpos( substr( $uri, 1 ), '/' );
+
+			if( $pos === false )
+				return false;
+
+			$typeUri = '/'. substr( $uri, 1, $pos );
+
+			// The entries of the directory as it spells them, and no glob(): a project path that holds a '[' is a pattern to glob() and would
+			// list nothing, which would refuse every write
+			if( isset( self::PLACEHOLDERS[$typeUri] ) === true || in_array( substr( $typeUri, 1 ). '.php', @scandir( \Nino\Filesystem::path( $appData, '/elements' ) ) ?: [], true ) === true )
+				return false;
+
+			trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
+
+			return true;
 		}
 
 		// Canonical virtual filename for a type URI. Type URIs intentionally

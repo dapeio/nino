@@ -1660,8 +1660,9 @@ foreach( $source as $file ) {
 	if( str_contains( $path, '/_admin/' ) === false && str_contains( $path, '/_nino/' ) === false )
 		continue;
 	$text = (string) file_get_contents( $path );
-	// \Nino\Http::fail() names the code as its fourth argument; \Nino\Pages answers a refusal that is turned into one, its code the third
-	foreach( [ [ 'Http::fail(', 3 ], [ '_refuse(', 2 ] ] as [ $needle, $codeAt ] ) {
+	// \Nino\Http::fail() names the code as its fourth argument; \Nino\Pages answers a refusal that is turned into one, its code the third; \Nino\Elements answers
+	// a refusal as a result whose code is the third argument of its _refusal()
+	foreach( [ [ 'Http::fail(', 3 ], [ '_refuse(', 2 ], [ 'self::_refusal(', 2 ] ] as [ $needle, $codeAt ] ) {
 		$offset = 0;
 		while( ( $at = strpos( $text, $needle, $offset ) ) !== false ) {
 			// The arguments of the call, split where the commas are not inside a string or a bracket
@@ -1701,13 +1702,16 @@ foreach( $source as $file ) {
 					$codes[$code] = true;
 		}
 	}
+	// The class of the elements words what a writer says in a notice by a table of patterns, each with the code it answers: '/^Wrong var type .../' => 'elements_wrong_type'
+	if( str_ends_with( $path, '/_nino/Nino/Elements/Elements.php' ) === true && preg_match_all( "/^\\s*'\\/\\^.*\\/[a-z]*'\\s*=>\\s*'([a-z][a-z0-9_]*)',?\$/m", $text, $patterns ) > 0 )
+		foreach( $patterns[1] as $code )
+			$codes[$code] = true;
 }
 // The ones Admin builds from the type of a field, from a failed upload and from
-// the images the kernel refuses - named by variable at the call - and the one
-// a restore carries in its answer, where nothing failed and so no Http::fail()
+// the images the kernel refuses, and the one a restore carries in its answer, where nothing failed and so no Http::fail()
 // names it: the notice of a backup that comes from another version of Nino -
 // and the ones a restore that cannot start or cannot open its archive hands its callers, who pass them on
-foreach( [ 'int_range', 'elements_wrong_type', 'elements_missing_key', 'elements_value_refused', 'text_invalid', 'text_too_long', 'text_too_large', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy', 'backups_clock', 'backups_hook', 'backups_source', 'backups_snapshot_raw', 'backups_companions_left', 'backups_disk', 'backups_restore_partial', 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written', 'backups_restore_busy', 'backups_restore_waiting', 'backups_key', 'backups_key_wrong' ] as $code )
+foreach( [ 'int_range', 'text_invalid', 'text_too_long', 'text_too_large', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy', 'backups_clock', 'backups_hook', 'backups_source', 'backups_snapshot_raw', 'backups_companions_left', 'backups_disk', 'backups_restore_partial', 'backups_restore_callback', 'backups_restore_inuse', 'backups_restore_both', 'backups_restore_written', 'backups_restore_busy', 'backups_restore_waiting', 'backups_key', 'backups_key_wrong' ] as $code )
 	$codes[$code] = true;
 
 // The refusals of the recovery page are worded in the table of that page - it has no text files of the project to ask, which may be what is broken - and
